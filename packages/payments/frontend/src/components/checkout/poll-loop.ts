@@ -1,6 +1,8 @@
 import type { Result } from "../../result";
-import { waitsForDeadline, withLive, type LiveCadence } from "./poll-live";
-import { claimRearm, REARM_QUIET_MS } from "./poll-rearm";
+import { pollDelay } from "./poll-delay";
+import { waitsForDeadline, type LiveCadence } from "./poll-live";
+import { claimHint, owedAfterAnswer } from "./poll-hint";
+import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
 /**
@@ -65,16 +67,6 @@ export interface PollingOptions extends LiveCadence {
 }
 
 /**
- * The slowest a failing poll may go (FUT-1144).
- *
- * Consecutive failures double the delay — 2.5 s, 5 s, 10 s — and stop there.
- * The cap is what keeps the recovery cheap: a shopper whose signal comes back
- * during a Wi-Fi→4G handoff waits at most this long to be told they paid, and
- * the two re-arm events below usually beat it outright.
- */
-const MAX_ERROR_BACKOFF_MS = 10_000;
-
-/**
  * How long ONE status ask may take before the loop stops waiting on it.
  *
  * Comfortably longer than any healthy round trip on a bad link, so an ordinary
@@ -91,42 +83,6 @@ const DEFAULT_ASK_TIMEOUT_MS = 15_000;
  * down and a hang reads as the dropped connection it is.
  */
 const ASK_TIMED_OUT = "timeout";
-
-/**
- * How long before the next ask, given how many healthy polls have happened.
- *
- * A pure function of the options, so it lives out here rather than inside the
- * effect — the hook is at its size gate, and a scheduling RULE is easier to
- * read (and to test) stated once than threaded through a closure.
- *
- * Reads the count AFTER the poll just made, so the slow phase begins on the
- * poll FOLLOWING the threshold rather than one early: a wait described as "N
- * fast polls" has to actually make N of them.
- */
-function healthyDelay(healthy: number, options: PollingOptions): number {
-  const { intervalMs = 2500, slowAfterPolls, slowIntervalMs } = options;
-  const backingOff =
-    slowAfterPolls !== undefined && slowIntervalMs !== undefined && healthy >= slowAfterPolls;
-  return withLive(backingOff ? slowIntervalMs : intervalMs, options);
-}
-
-/**
- * The same rule with consecutive FAILURES folded in (FUT-1144).
- *
- * Errors never stop the wait, they only slow it. Doubling from the healthy
- * cadence is what makes a ten-second blip cost one extra beat instead of the
- * whole confirmation: four failures used to be terminal, and four failures is
- * what a Wi-Fi→4G handoff produces at the default 2.5 s.
- *
- * The cap is `MAX_ERROR_BACKOFF_MS` or the healthy cadence, whichever is
- * larger — a failing poll must never ask FASTER than a succeeding one, which
- * is what a bare cap would do to a consumer whose slow interval is longer.
- */
-function pollDelay(healthy: number, errors: number, options: PollingOptions): number {
-  const base = healthyDelay(healthy, options);
-  if (errors === 0) return base;
-  return Math.min(base * 2 ** (errors - 1), Math.max(base, MAX_ERROR_BACKOFF_MS));
-}
 
 /** Where a running wait writes what it has learned. */
 export interface PollSink {
@@ -166,11 +122,7 @@ function newRun() {
     askedAt: 0,
     /** Live asks abandoned by a re-arm since the last answer. See `claimRearm`. */
     supersededAsks: 0,
-    /**
-     * A realtime hint landed while an ask was in flight (FUT-3205). That ask
-     * may have been answered before the order moved, so one more is owed the
-     * moment it answers non-terminal. See {@link PollLoop.hint}.
-     */
+    /** A hint owes one more ask once the one in flight answers. See `poll-hint.ts`. */
     hinted: false,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     /**
@@ -328,26 +280,20 @@ function askNow(run: PollRun, tick: () => Promise<void>): void {
   void tick();
 }
 
+/** After a non-terminal answer: the ask a hint owes, or the usual schedule. */
+function continueAfter(run: PollRun, tick: () => Promise<void>, schedule: () => void): void {
+  const owed = owedAfterAnswer(run);
+  if (owed === "ask") askNow(run, tick);
+  else if (owed === "none") schedule();
+}
+
 /** The handle the hook holds on one running wait. */
 export interface PollLoop {
   /** Reset the clock and the counters, then ask immediately. */
   restart: () => void;
   /** Ask immediately, keeping the clock — the re-arm events' entry point. Whether it asked. */
   poke: () => boolean;
-  /**
-   * The host's channel says this buyer's orders moved (FUT-3205). NOT a
-   * re-arm: `poke`'s quiet window exists to collapse `visibilitychange` and
-   * `online` bursts, and a hint is a server fact. Deferring it by that window
-   * cost a paid buyer a full second on the pay step (P-040).
-   *
-   * - The wait ended (settled, stopped, cancelled): nothing.
-   * - No ask in flight: ask now.
-   * - An ask in flight for `REARM_QUIET_MS` or longer: supersede it the way
-   *   `poke` does, within `claimRearm`'s budget — the hung-socket case.
-   * - Otherwise, or with that budget spent: keep the ask, and owe one more the
-   *   moment it answers non-terminal. A hint is never dropped (FUT-649), and a
-   *   burst of hints during one ask costs one extra ask.
-   */
+  /** A realtime hint: ask now, or owe one ask after the current one (`poll-hint.ts`, FUT-3205). */
   hint: () => void;
   /** Tear down: nothing further is scheduled and nothing further is written. */
   stop: () => void;
@@ -387,14 +333,7 @@ export function createPollLoop(
       return;
     }
     if (run.attempt !== mine) return;
-    if (run.hinted) {
-      run.hinted = false;
-      // The wait ended while this ask was out: nothing further is owed.
-      if (run.stopped) return;
-      askNow(run, tick);
-      return;
-    }
-    scheduleNext(run, options, sink, () => void tick());
+    continueAfter(run, tick, () => scheduleNext(run, options, sink, () => void tick()));
   };
 
   return {
@@ -429,14 +368,7 @@ export function createPollLoop(
       return true;
     },
     hint: (): void => {
-      if (run.cancelled || run.settled || run.stopped) return;
-      const young = run.inFlight && Date.now() - run.askedAt < REARM_QUIET_MS;
-      if (!run.inFlight || (!young && claimRearm(run))) {
-        run.hinted = false;
-        askNow(run, tick);
-        return;
-      }
-      run.hinted = true;
+      if (claimHint(run)) askNow(run, tick);
     },
     stop: (): void => {
       run.cancelled = true;

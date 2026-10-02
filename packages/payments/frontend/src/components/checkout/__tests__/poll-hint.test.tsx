@@ -41,17 +41,21 @@ function heldClient(): {
   calls: () => number;
   release: (answer: Result<OrderStatus>) => void;
   answerInstantly: (answer: Result<OrderStatus>) => void;
+  answerAfter: (ms: number, answer: Result<OrderStatus>) => void;
 } {
   const world = {
     asked: 0,
     held: [] as Array<(answer: Result<OrderStatus>) => void>,
     instant: null as Result<OrderStatus> | null,
+    delayed: null as { ms: number; answer: Result<OrderStatus> } | null,
   };
   const client = {
     getStatus: () => {
       world.asked += 1;
       const instant = world.instant;
       if (instant) return Promise.resolve(instant);
+      const delayed = world.delayed;
+      if (delayed) return new Promise<Result<OrderStatus>>((resolve) => setTimeout(() => resolve(delayed.answer), delayed.ms));
       return new Promise<Result<OrderStatus>>((resolve) => world.held.push(resolve));
     },
   } as unknown as CheckoutClient;
@@ -61,6 +65,9 @@ function heldClient(): {
     release: (answer) => world.held.pop()?.(answer),
     answerInstantly: (answer) => {
       world.instant = answer;
+    },
+    answerAfter: (ms, answer) => {
+      world.delayed = { ms, answer };
     },
   };
 }
@@ -135,9 +142,9 @@ describe("a hint at an idle wait", () => {
     expect(calls()).toBe(2);
   });
 
-  it("asks once per hint when hints are spaced wider than a round trip", async () => {
-    const { client, calls, answerInstantly } = heldClient();
-    answerInstantly(PENDING);
+  it("asks once per hint when hints are spaced wider than a 70 ms round trip", async () => {
+    const { client, calls, answerAfter } = heldClient();
+    answerAfter(70, PENDING);
     const { subscribe, hint } = channel();
     render(<Harness client={client} signal={{ live: true, subscribe }} />);
     await elapse(0);
@@ -188,6 +195,37 @@ describe("a hint while a young ask is in flight", () => {
     await outside(hint);
     await outside(hint);
     await outside(hint);
+
+    await outside(() => release(PENDING));
+    await elapse(100);
+
+    expect(calls()).toBe(2);
+  });
+});
+
+describe("what clears the mark", () => {
+  it("an error answer still pays the owed ask, at once", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe, hint } = channel();
+    render(<Harness client={client} signal={{ live: true, subscribe }} />);
+    await elapse(50);
+    await outside(hint);
+
+    await outside(() => release({ ok: false, error: "offline" }));
+
+    expect(calls()).toBe(2);
+  });
+
+  it("a visibilitychange that supersedes the marked ask spends the mark", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe, hint } = channel();
+    render(<Harness client={client} signal={{ live: true, subscribe }} />);
+    await elapse(500);
+    await outside(hint);
+    await elapse(700);
+    // A second ask, sent after the hint: it answers for it.
+    await outside(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(calls()).toBe(2);
 
     await outside(() => release(PENDING));
     await elapse(100);
