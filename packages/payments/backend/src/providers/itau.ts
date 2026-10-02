@@ -111,9 +111,12 @@ async function getChargeLive(txid: string, credentials: ResolvedCredentials, ref
  * A cob the buyer already paid (`CONCLUIDA`) is refused by Itaú. That refusal
  * is answered with the cob as it stands, read back, so the gateway records the
  * PAID it would otherwise never hear about (it stores whatever snapshot comes
- * back). Only a refusal over a cob still open is thrown — that one really is
- * "could not void", and it is never dressed up as a void.
+ * back). Only a cob read back CLOSED answers the refusal: one still open, or
+ * one whose status we cannot read, is thrown — that really is "could not
+ * void", and it is never dressed up as a void.
  */
+const CLOSED_COB = new Set(['CONCLUIDA', 'REMOVIDA_PELO_USUARIO_RECEBEDOR', 'REMOVIDA_PELO_PSP']);
+
 async function cancelChargeLive(txid: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot> {
   const call = await itauSession(credentials);
   try {
@@ -126,7 +129,7 @@ async function cancelChargeLive(txid: string, credentials: ResolvedCredentials):
     const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
     if (status === undefined || status < 400 || status >= 500) throw error;
     const cob = await readCob(call, txid);
-    if (cob.status === 'ATIVA') throw error;
+    if (!CLOSED_COB.has(cob.status ?? '')) throw error;
     return snapshotFromCob({ txid, ...cob });
   }
 }

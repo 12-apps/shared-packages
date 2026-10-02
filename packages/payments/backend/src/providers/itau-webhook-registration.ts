@@ -11,11 +11,12 @@ interface ItauWebhook {
 
 /**
  * 4xx statuses on the registration that are NOT about the key: "try again
- * later" (408, 425, 429), and an application without the webhook scope or a
- * token Itaú would not take for this call (401, 403) — a red Pix key box would
- * blame a key that is fine.
+ * later" (408, 425, 429), an application without the webhook scope or a token
+ * Itaú would not take for this call (401, 403), and a base that does not serve
+ * the route or the body at all (404, 405, 415) — a red Pix key box would blame
+ * a key that is fine.
  */
-const NOT_ABOUT_THE_KEY = new Set([401, 403, 408, 425, 429]);
+const NOT_ABOUT_THE_KEY = new Set([401, 403, 404, 405, 408, 415, 425, 429]);
 
 /**
  * Register the store's webhook for its Pix key — BACEN's
@@ -59,7 +60,7 @@ export async function itauWebhookCheck(
     // written over a webhook we could not see.
     return unchecked(copy.webhook.unreachable);
   }
-  if (current === webhookUrl) return { key: 'pixKey', status: 'PASS', message: copy.webhook.registered };
+  if (current !== null && sameUrl(current, webhookUrl)) return { key: 'pixKey', status: 'PASS', message: copy.webhook.registered };
   if (current) return unchecked(`${copy.webhook.elsewhere} ${current}`);
   try {
     await call<unknown>('pix/webhook', path, { method: 'PUT', json: { webhookUrl } });
@@ -80,6 +81,19 @@ async function currentWebhook(call: ItauCall, path: string): Promise<string | nu
     if (error instanceof ProviderRequestError && error.options.httpStatus === 404) return null;
     throw error;
   }
+}
+
+/** Equal up to a trailing slash and the host's case, which a bank may normalise. */
+function sameUrl(a: string, b: string): boolean {
+  const canonical = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.protocol}//${parsed.host}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`;
+    } catch {
+      return url.replace(/\/+$/, '');
+    }
+  };
+  return canonical(a) === canonical(b);
 }
 
 function refusedKey(error: unknown): boolean {

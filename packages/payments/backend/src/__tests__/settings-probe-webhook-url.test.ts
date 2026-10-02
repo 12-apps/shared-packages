@@ -84,6 +84,20 @@ describe('the settings probe and the merchant webhook URL', () => {
     expect(calls.some((call) => call.url.includes('/webhook/'))).toBe(false);
   });
 
+  it('still probes, registering nothing, when the resolver throws', async () => {
+    const { settings } = world(async () => {
+      throw new Error('slug lookup failed');
+    });
+    const calls = stubItauFetch(() => undefined);
+    await settings.saveCredentials(TENANT, 'itau', { environment: 'SANDBOX', fields: FIELDS });
+
+    const verified = await settings.verify(TENANT, 'itau');
+
+    expect(verified.probe.ok).toBe(true);
+    expect(calls.some((call) => call.url.includes('/webhook/'))).toBe(false);
+    expect(verified.probe.checks).toEqual([{ key: 'pixKey', status: 'UNCHECKED', message: PT_BR_ITAU_COPY.webhook.notRegistered }]);
+  });
+
   it('adds nothing when the resolver cannot address the merchant', async () => {
     const { settings } = world(async () => null);
     const calls = stubItauFetch(() => undefined);

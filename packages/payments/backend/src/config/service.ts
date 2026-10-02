@@ -37,7 +37,7 @@ import {
   toggleInChain,
 } from './enablement';
 import { applySaveCredentials } from './save-credentials';
-import type { SettingsServiceOptions } from './settings-options';
+import { resolveWebhookUrl, type SettingsServiceOptions } from './settings-options';
 import { runVerify, type VerifiedProviderConfig } from './verify';
 
 export type { SettingsServiceOptions } from './settings-options';
@@ -313,7 +313,7 @@ export function createSettingsService(
 
     async verify(merchant, provider, environment) {
       const config = await load(merchant, provider);
-      const notificationUrl = (await options.webhookUrl?.(merchant, provider)) ?? null;
+      const notificationUrl = await resolveWebhookUrl(options, merchant, provider);
       const target = environment ?? config.environment;
       return runVerify(providers.get(provider), store, merchant, config, target, allowStubMode, toMasked, notificationUrl);
     },

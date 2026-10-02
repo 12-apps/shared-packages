@@ -11,7 +11,7 @@ import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 /**
  * A saved production certificate lapses on its own (Itaú's lives 365 days),
  * and on that day the store's PIX stops. The status bar warns inside the
- * 30-day window the bank opens for renewal, and turns into an alert once the
+ * 30-day window the bank opens for renewal, and turns red once the
  * certificate has lapsed — on PRODUCTION only, where it actually matters.
  */
 
@@ -74,13 +74,15 @@ describe('the certificate warning on the status bar', () => {
     expect(note.getAttribute('role')).toBe('status');
   });
 
-  it('turns into an alert once the certificate has lapsed', () => {
+  it('turns red once the certificate has lapsed, as a status rather than an alert', () => {
     const expiredAt = '2026-09-30T12:00:00.000Z';
     renderBar(itauConfig('PRODUCTION', expiredAt));
 
     const note = screen.getByTestId('payments-certificate-expiry');
     expect(note.textContent).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.status.certificateExpired(expiredAt));
-    expect(note.getAttribute('role')).toBe('alert');
+    // State on load, not a live event — and the probe's own error is the
+    // alert, so a second one would be read out twice.
+    expect(note.getAttribute('role')).toBe('status');
   });
 
   it('says nothing far from expiry, without a certificate, or on a sandbox store', () => {

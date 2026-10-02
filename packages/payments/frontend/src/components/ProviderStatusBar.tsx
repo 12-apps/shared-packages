@@ -225,6 +225,8 @@ function ProviderName({
  * certificate lapses, and a sandbox store testing the form has nothing to
  * renew yet. Silent outside the 30-day window (`certificateExpiryProximity`) —
  * a date a year out is not news, and it is on the provider's portal anyway.
+ * A `status`, lapsed or not: it is state on load, and the probe's own error is
+ * already the alert — a second would be read out twice.
  */
 function CertificateExpiryNote({ copy, config }: { copy: ConnectionStatusCopy; config: MaskedProviderConfig | null }) {
   const note = certificateNote(copy, config);
@@ -234,7 +236,7 @@ function CertificateExpiryNote({ copy, config }: { copy: ConnectionStatusCopy; c
     : { border: T.warnLine, background: T.warnSoft, color: T.warnInk };
   return (
     <Typography
-      role={note.past ? 'alert' : 'status'}
+      role="status"
       data-testid="payments-certificate-expiry"
       sx={{
         fontSize: '12.5px',

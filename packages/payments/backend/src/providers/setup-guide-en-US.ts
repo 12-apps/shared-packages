@@ -154,7 +154,7 @@ export const EN_US_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
     intro:
       'Itaú announces every Pix received at the URL registered for your Pix key. We register that URL with Itaú when you save and test the connection.',
     register:
-      'The result shows under the Pix key, in the form. If the registration does not go through, ask Itaú (your account manager, or developer-portal support) to register this URL as the webhook for the Pix key:',
+      'After you save and test the connection, the result shows below the Pix key field. If it says “Webhook registered”, just confirm below. If not, ask Itaú (your account manager, or developer-portal support) to register this URL as the webhook for the Pix key:',
     withoutIt:
       'Until it is registered, a paid Pix is detected by the payment screen or the periodic check — the order still confirms, just more slowly.',
     doneLabel: 'Webhook',

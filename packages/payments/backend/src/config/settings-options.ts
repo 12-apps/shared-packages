@@ -23,3 +23,21 @@ export interface SettingsServiceOptions {
    */
   webhookUrl?: MerchantWebhookUrlResolver;
 }
+
+/**
+ * The probe's webhook URL, or null. A resolver that throws (a slug lookup that
+ * failed) must not take "Testar conexão" down with it — for every provider,
+ * most of which never read the URL — so it reads as "no URL", which the
+ * adapters already report as not registered.
+ */
+export async function resolveWebhookUrl(
+  options: SettingsServiceOptions,
+  merchant: Parameters<MerchantWebhookUrlResolver>[0],
+  provider: Parameters<MerchantWebhookUrlResolver>[1],
+): Promise<string | null> {
+  try {
+    return (await options.webhookUrl?.(merchant, provider)) ?? null;
+  } catch {
+    return null;
+  }
+}

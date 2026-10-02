@@ -86,6 +86,16 @@ describe('itau verifyCredentials registers the webhook', () => {
     expect(outcome.checks).toEqual([{ key: 'pixKey', status: 'PASS', message: PT_BR_ITAU_COPY.webhook.registered }]);
   });
 
+  it('recognises its own URL through a trailing slash or a host in capitals', async () => {
+    const normalised = 'https://LOJA.example/api/webhooks/payments/loja/itau/';
+    const calls = stubItauFetch((call) => (call.method === 'GET' ? { body: { webhookUrl: normalised } } : undefined));
+
+    const outcome = await adapter().verifyCredentials(WITH_URL);
+
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+    expect(outcome.checks).toEqual([{ key: 'pixKey', status: 'PASS', message: PT_BR_ITAU_COPY.webhook.registered }]);
+  });
+
   it('reads an outage on the lookup as unreachable, and writes nothing over a webhook it could not see', async () => {
     const calls = stubItauFetch((call) => (call.method === 'GET' ? { status: 503, body: {} } : undefined));
 
@@ -101,6 +111,10 @@ describe('itau verifyCredentials registers the webhook', () => {
       { on: 'GET', status: 403 },
       { on: 'PUT', status: 401 },
       { on: 'PUT', status: 403 },
+      // A base that does not serve the route or the body says nothing about the key.
+      { on: 'PUT', status: 404 },
+      { on: 'PUT', status: 405 },
+      { on: 'PUT', status: 415 },
     ];
     for (const { on, status } of cases) {
       stubItauFetch((call) => (call.method === on ? { status, body: {} } : undefined));

@@ -41,10 +41,10 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     },
     certificateExpires: (iso) =>
       `The production certificate expires on ${new Date(iso).toLocaleDateString('en-US')}. ` +
-      'Generate a new one in the provider’s portal and paste it on the Production tab before then — with an expired certificate, Pix stops.',
+      'Before then, generate a new certificate and private key in the provider’s portal and paste both on the Production tab — with an expired certificate, Pix through this provider does not work.',
     certificateExpired: (iso) =>
-      `The production certificate expired on ${new Date(iso).toLocaleDateString('en-US')} and Pix through this provider has stopped. ` +
-      'Generate a new one in the provider’s portal and paste it on the Production tab.',
+      `The production certificate expired on ${new Date(iso).toLocaleDateString('en-US')}. ` +
+      'Until it is replaced, Pix through this provider does not work. Generate a new certificate and private key in the provider’s portal and paste both on the Production tab.',
   },
   listBadge: {
     active: 'Active',

@@ -132,7 +132,7 @@ export const EN_US_ITAU_COPY: ItauCopy = {
     elsewhere:
       'This key already notifies another address at Itaú, and we did not replace it, so another system keeps its notifications. ' +
       'If it is no longer in use, remove that webhook at Itaú and test the connection again. Current address:',
-    notRegistered: 'The webhook was not registered automatically. Register this store’s URL with Itaú, as the guide shows.',
+    notRegistered: 'The webhook was not registered automatically. Ask Itaú to register this store’s URL as the Pix key’s webhook, as the guide shows.',
   },
   fields: {
     clientId: 'Client ID',

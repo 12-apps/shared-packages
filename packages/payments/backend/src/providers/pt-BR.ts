@@ -123,7 +123,7 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
     elsewhere:
       'Esta chave já avisa outro endereço no Itaú, e não o substituímos para não cortar os avisos de outro sistema. ' +
       'Se ele não está mais em uso, remova esse webhook no Itaú e teste a conexão de novo. Endereço atual:',
-    notRegistered: 'O webhook não foi cadastrado automaticamente. Cadastre a URL desta loja no Itaú, como mostra o guia.',
+    notRegistered: 'O webhook não foi cadastrado automaticamente. Peça ao Itaú para cadastrar a URL desta loja como webhook da chave Pix, como mostra o guia.',
   },
   fields: {
     clientId: 'Client ID',

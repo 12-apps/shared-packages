@@ -70,6 +70,24 @@ describe('itau cancelCharge', () => {
     expect((failure as ProviderRequestError).options.httpStatus).toBe(400);
   });
 
+  it('throws the refusal when the cob read back carries no status it can trust', async () => {
+    stubItauFetch((call) =>
+      call.method === 'PATCH' ? { status: 400, body: {} } : { body: { ...paidCob('12.50'), status: undefined, pix: undefined } },
+    );
+
+    const failure = await adapter().cancelCharge!(TXID, SANDBOX_CREDS).catch((error: unknown) => error);
+
+    expect((failure as ProviderRequestError).options.httpStatus).toBe(400);
+  });
+
+  it('throws when the read-back after a refusal fails too, never answering a snapshot', async () => {
+    stubItauFetch(() => ({ status: 404, body: {} }));
+
+    const failure = await adapter().cancelCharge!(TXID, SANDBOX_CREDS).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ProviderRequestError);
+  });
+
   it('throws a 5xx as it came — retriable, and no read-back of a cob Itaú did not answer for', async () => {
     const calls = stubItauFetch((call) => (call.method === 'PATCH' ? { status: 503, body: {} } : { body: paidCob('12.50') }));
 
