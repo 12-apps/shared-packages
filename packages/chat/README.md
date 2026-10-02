@@ -150,10 +150,11 @@ reports it through `controls.onVisibleChange(visible)`.
 A read-only thread (`canWrite: false`) with no messages shows only the closed
 notice: no empty-thread invitation to write the first message, and no list.
 
-Own messages and the others' are told apart by their surface, not only by the
-label's colour: the reader's own bubbles are a tint of the theme's
-`palette.primary.main` (8% in light mode, 16% in dark), the others' sit on
-the paper surface. A bubble is at most 80% of the thread wide (and 60
+Own messages and the others' are told apart by their surface: the reader's
+own bubbles are a tint of the theme's `palette.primary.main` (8% in light
+mode, 16% in dark), the others' sit on the paper surface. The label is body
+text on the own tint and secondary text on paper; the primary colour itself
+reads under 4.5:1 on its own tint, so it is not used for text there. A bubble is at most 80% of the thread wide (and 60
 characters, on the web).
 
 Accessibility: the list is a polite live region (`aria-live` on the web,

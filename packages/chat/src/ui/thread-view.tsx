@@ -95,7 +95,8 @@ function Message(props: {
     <Box direction="row" justify={message.mine ? "end" : "start"} testID={`chat-message-${message.id}`}>
       <Bubble mine={message.mine}>
         <Stack direction="row" gap={1} align="baseline">
-          <Text variant="caption" weight="semibold" color={message.mine ? "primary" : "secondary"}>
+          {/* Body-text colour on the own tint: the primary colour on its own tint falls under 4.5:1. */}
+          <Text variant="caption" weight="semibold" color={message.mine ? "neutral" : "secondary"}>
             {message.label}
           </Text>
           <Text variant="caption" color="secondary">

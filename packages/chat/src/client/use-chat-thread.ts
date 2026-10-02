@@ -137,6 +137,8 @@ interface UseChatThreadOptions {
 interface Shown {
   readonly payload: ChatThreadPayload;
   readonly isCurrent: () => boolean;
+  /** The thread the payload came from: a mark goes to it, never to whichever thread is open now. */
+  readonly client: ChatClient;
 }
 
 interface Loader {
@@ -183,19 +185,19 @@ function useOwnedState(client: ChatClient): { state: OwnedState; update: Update;
  * screen. Only the latest load's unread wait; a newer load replaces them.
  */
 function useMarkRead(options: UseChatThreadOptions, onUnread: { readonly current?: (unread: number) => void }) {
-  const { client } = options;
+  const client = useLatest(options.client);
   const mode = useLatest(options.autoMarkRead ?? true);
   const visible = useRef(false);
   const pending = useRef<Shown | null>(null);
 
   const markRead = useCallback(
-    async ({ payload, isCurrent }: Shown) => {
+    async ({ payload, isCurrent, client: from }: Shown) => {
       const upTo = payload.messages.at(-1)?.createdAt;
       if (payload.unread === 0 || upTo === undefined) return;
-      const left = await client.markRead(upTo).catch(() => null);
+      const left = await from.markRead(upTo).catch(() => null);
       if (left !== null && isCurrent()) report(onUnread, left);
     },
-    [client, onUnread],
+    [onUnread],
   );
 
   const markShown = useCallback(
@@ -217,9 +219,12 @@ function useMarkRead(options: UseChatThreadOptions, onUnread: { readonly current
       const waiting = pending.current;
       if (!now || waiting === null || mode.current !== "visible") return;
       pending.current = null;
-      if (waiting.isCurrent()) void markRead(waiting);
+      // A load overtaken by a refresh of the SAME thread still showed these
+      // messages (they stay on screen until the newer load lands, and after it
+      // fails), so they are marked; a load from another thread is not.
+      if (waiting.client === client.current) void markRead(waiting);
     },
-    [mode, markRead],
+    [mode, markRead, client],
   );
 
   return { markShown, onVisibleChange };
@@ -245,7 +250,7 @@ function useLoader(options: UseChatThreadOptions, update: Update): Loader {
     if (!isCurrent()) return;
     update(client, (previous) => afterLoad(previous, payload));
     report(onUnread, payload.unread);
-    await markShown({ payload, isCurrent });
+    await markShown({ payload, isCurrent, client });
   }, [client, update, markShown, onUnread]);
 
   useEffect(() => {

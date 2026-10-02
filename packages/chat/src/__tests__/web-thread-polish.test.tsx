@@ -6,7 +6,7 @@ import { EN_US_CHAT_UI_COPY } from "../client/en-US";
 import { createWebChat } from "../react/index";
 import { ownBubbleTint } from "../ui/bubble-tint";
 import { seat } from "./fixtures";
-import { formatTime, routedFetch, seedMessage } from "./surface-harness";
+import { formatTime, replyWith, routedFetch, seedMessage } from "./surface-harness";
 
 /**
  * The web thread's surface details: whose bubble is whose, where focus goes
@@ -156,6 +156,8 @@ describe('autoMarkRead="visible" on the web', () => {
     const observer = await listObserver();
     act(() => observer.report(false));
     await waitFor(() => expect(onUnread).toHaveBeenCalledWith(1));
+    // Let anything the load set off settle before asserting that nothing was marked.
+    await act(async () => {});
     expect(harness.calls).toEqual(["GET /"]);
 
     act(() => observer.report(true));
@@ -179,6 +181,36 @@ describe('autoMarkRead="visible" on the web', () => {
 
     expect(await screen.findByText("Downstairs now")).toBeTruthy();
     await waitFor(() => expect(harness.calls).toEqual(["GET /", "GET /", "POST /read"]));
+
+    // Scrolling away and back over the same, already-marked load marks nothing again.
+    act(() => observer.report(false));
+    act(() => observer.report(true));
+    await act(async () => {});
+    expect(harness.calls).toEqual(["GET /", "GET /", "POST /read"]);
+  });
+
+  it("marks what an off-screen load showed when the list comes into view during a refresh that then fails", async () => {
+    const onUnread = vi.fn();
+    const { ChatThread, harness } = mount();
+    seedMessage(harness.db, { id: "m-theirs", body: "Downstairs now", createdAt: "2026-10-02T11:55:00.000Z" });
+    const view = render(<ChatThread endpoint="/thread" autoMarkRead="visible" refreshSignal={0} onUnreadChange={onUnread} />);
+    const observer = await listObserver();
+    act(() => observer.report(false));
+    await waitFor(() => expect(onUnread).toHaveBeenCalledWith(1));
+
+    const { answer, hold } = harness;
+    answer("GET /", replyWith(503, { error: "unavailable", message: "Down" }));
+    const release = hold("GET /");
+    await act(async () => {
+      view.rerender(<ChatThread endpoint="/thread" autoMarkRead="visible" refreshSignal={1} onUnreadChange={onUnread} />);
+    });
+    act(() => observer.report(true));
+    await act(async () => {
+      release();
+    });
+
+    await waitFor(() => expect(harness.bodies).toContainEqual({ key: "POST /read", body: { upTo: "2026-10-02T11:55:00.000Z" } }));
+    expect(screen.getByText("Downstairs now")).toBeTruthy();
   });
 
   it("marks read at once where the browser has no IntersectionObserver", async () => {
