@@ -240,6 +240,15 @@ describe('the device settings', () => {
     expect(createAttentionPreferences({ storageKey: 'attention-settings' }).read().sound).toBe('all');
   });
 
+  it("draws the bell at the host's size, a full touch target by default", () => {
+    const store = createAttentionPreferences({ storageKey: 'attention-size' });
+    const { unmount } = render(<AttentionQuickSettings store={store} messages={MESSAGES.preferences} />);
+    expect(getComputedStyle(screen.getByTestId('attention-quick-settings')).width).toBe('44px');
+    unmount();
+    render(<AttentionQuickSettings store={store} messages={MESSAGES.preferences} size={32} />);
+    expect(getComputedStyle(screen.getByTestId('attention-quick-settings')).width).toBe('32px');
+  });
+
   it('falls back to the defaults when storage holds nonsense', () => {
     window.localStorage.setItem('attention-broken', '{"sound":"loud","dock":{"side":"up"}}');
     expect(

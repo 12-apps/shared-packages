@@ -49,8 +49,6 @@ function AlertsGlyph({ on }: { readonly on: boolean }): JSX.Element {
 }
 
 const TRIGGER_SX = {
-  width: 44,
-  height: 44,
   flexShrink: 0,
   borderRadius: '50%',
   border: 1,
@@ -160,9 +158,19 @@ export interface AttentionQuickSettingsProps {
   readonly store: AttentionPreferencesStore;
   readonly messages: AttentionPreferencesMessages;
   readonly push?: AttentionPushState;
+  /**
+   * The trigger's diameter in px — 44 by default, a full touch target; a host
+   * sets its header's own icon size so the bell is its neighbours' twin.
+   */
+  readonly size?: number;
 }
 
-export function AttentionQuickSettings({ store, messages, push }: AttentionQuickSettingsProps): JSX.Element {
+export function AttentionQuickSettings({
+  store,
+  messages,
+  push,
+  size = 44,
+}: AttentionQuickSettingsProps): JSX.Element {
   const preferences = useAttentionPreferences(store);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const on = anyOn(preferences, push, useCanVibrate());
@@ -177,7 +185,7 @@ export function AttentionQuickSettings({ store, messages, push }: AttentionQuick
         data-testid="attention-quick-settings"
         data-on={on}
         onClick={(event: MouseEvent<HTMLElement>) => setAnchor(event.currentTarget)}
-        sx={TRIGGER_SX}
+        sx={{ ...TRIGGER_SX, width: size, height: size }}
       >
         <AlertsGlyph on={on} />
       </Box>
