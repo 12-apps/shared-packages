@@ -254,11 +254,9 @@ export function PixView({
   // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
   // clock, so it travels with the sentence it feeds rather than being frozen
   // to the origin host's here.
-  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, { hour: "2-digit", minute: "2-digit" });
   const manual = pix.confirmation === "MANUAL";
+  const sentences = pixSentences(copy, manual);
 
   return (
     <Box
@@ -269,7 +267,7 @@ export function PixView({
         {copy.heading}
       </Text>
       <Text variant="body" size="sm" color="secondary" as="p">
-        {pixSentences(copy, manual).instructions(order.totalLabel)}
+        {sentences.instructions(order.totalLabel)}
       </Text>
 
       <Box
@@ -284,7 +282,7 @@ export function PixView({
       <PixCodeBox pix={pix} />
 
       <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
-        {pixSentences(copy, manual).validUntil(validUntil)}
+        {sentences.validUntil(validUntil)}
       </Text>
 
       <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} manual={manual} />

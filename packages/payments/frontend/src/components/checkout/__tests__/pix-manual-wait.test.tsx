@@ -91,6 +91,8 @@ describe("a Pix the store confirms", () => {
     const pane = screen.getByTestId("pix-view").textContent ?? "";
     expect(pane).toContain(PT_BR_CHECKOUT_SCREENS_COPY.pix.manual?.instructions("R$ 42,50"));
     expect(screen.getByTestId("pix-awaiting").textContent).toBe(PT_BR_CHECKOUT_SCREENS_COPY.pix.manual?.awaiting);
+    // The owner's own words for the wait (FUT-3232), pinned literally.
+    expect(screen.getByTestId("pix-awaiting").textContent).toBe("Aguardando confirmação do pagamento pela loja…");
     expect(pane).not.toMatch(/automátic/i);
   });
 

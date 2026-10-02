@@ -21,7 +21,7 @@ const WIDTHS = [
 ] as const;
 
 for (const viewport of WIDTHS) {
-  test(`the store-confirmed Pix waits for the store at ${viewport.name}`, async ({ page }, testInfo) => {
+  test(`the store-confirmed Pix waits for the store at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await openPage(page, 'payments-checkout-pix');
     await openCase(page, 'manual');
@@ -38,11 +38,11 @@ for (const viewport of WIDTHS) {
       await pane.scrollIntoViewIfNeeded();
       await page.screenshot({ path: `${shotDir}/t2-pix-manual-${viewport.name}.png`, fullPage: true });
     }
-    testInfo.annotations.push({ type: 'width', description: String(viewport.width) });
   });
 }
 
 test('an automatic Pix still promises the automatic confirmation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await openPage(page, 'payments-checkout-pix');
   await openCase(page, 'awaiting');
   await reachPayment(page);
