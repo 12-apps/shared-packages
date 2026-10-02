@@ -102,10 +102,12 @@ the filter runs out of attempts. It is a deterrent, not a guarantee: a
 person determined to pass a number can always find an encoding no filter
 reads, and `onRefused` is how the host sees who keeps trying. Known misses,
 each the price of letting an ordinary line through: a word between the
-pieces of a number (`98765 e 4321`), both pieces behind an address unit or a
-currency symbol (`apto 98765 apto 4321`, indistinguishable from an address
-with an apartment), a chain broken by a message of something else, and a
-picture. A host that wants `arroba` to count
+pieces of a number (`98765 e 4321`), a number of nine or ten digits split
+by one address unit or one price (`98 765 ap 4321`, `9876 $5.432` — a
+space inside the first group is exactly how a street number is written),
+both pieces behind a unit or a price (`apto 98765 apto 4321`), a chain broken
+by a message of something else, and a picture. A mobile with its area code
+(eleven digits) cannot hide behind one span. A host that wants `arroba` to count
 toward a social handle adds it to `extraPatterns`.
 
 ### Retention
