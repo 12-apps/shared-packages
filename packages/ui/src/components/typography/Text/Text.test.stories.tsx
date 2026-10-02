@@ -67,7 +67,8 @@ export const StateChange: Story = {
     // Test caption variant
     const captionText = canvas.getByTestId('caption-text');
     expect(captionText).toBeInTheDocument();
-    expect(captionText).toHaveStyle({ opacity: '0.8' });
+    // A caption is a size step, not a fade: its colour is painted as given (FUT-3228).
+    expect(captionText).toHaveStyle({ opacity: '1' });
 
     // Test code variant
     const codeText = canvas.getByTestId('code-text');

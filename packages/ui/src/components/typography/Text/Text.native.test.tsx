@@ -54,7 +54,7 @@ describe('Text (native)', () => {
 
   it('caption shrinks only at the default size', () => {
     expect(textStyle(theme, base({ variant: 'caption' })).fontSize).toBe(12);
-    expect(textStyle(theme, base({ variant: 'caption' })).opacity).toBe(0.8);
+    expect(textStyle(theme, base({ variant: 'caption' })).opacity).toBeUndefined();
     expect(textStyle(theme, base({ variant: 'caption', size: 'lg' })).fontSize).toBe(18);
   });
 

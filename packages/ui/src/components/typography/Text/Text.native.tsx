@@ -4,7 +4,6 @@ import { Platform, Text as RNText, type TextStyle } from 'react-native';
 import {
   CAPTION_FONT_SIZE,
   CAPTION_LETTER_SPACING_EM,
-  CAPTION_OPACITY,
   CODE_BACKGROUND_ALPHA,
   CODE_BORDER_ALPHA,
   CODE_FONT_SIZE,
@@ -85,7 +84,6 @@ export function textStyle(theme: UiTheme, a: TextStyleArgs): TextStyle {
         ...base,
         fontSize,
         lineHeight: fontSize * step.lineHeight,
-        opacity: CAPTION_OPACITY,
         letterSpacing: CAPTION_LETTER_SPACING_EM * fontSize,
       };
     }

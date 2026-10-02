@@ -8,7 +8,6 @@ import React from 'react';
 import {
   CAPTION_FONT_SIZE,
   CAPTION_LETTER_SPACING_EM,
-  CAPTION_OPACITY,
   CODE_BACKGROUND_ALPHA,
   CODE_BORDER_ALPHA,
   CODE_FONT_SIZE,
@@ -111,7 +110,6 @@ const textVariantStyles = (theme: Theme, a: TextStyleArgs, base: CSSObject): CSS
       return {
         ...base,
         fontSize: sizeOverride(theme, a.customSize, CAPTION_FONT_SIZE),
-        opacity: CAPTION_OPACITY,
         letterSpacing: `${CAPTION_LETTER_SPACING_EM}em`,
       };
     case 'code':

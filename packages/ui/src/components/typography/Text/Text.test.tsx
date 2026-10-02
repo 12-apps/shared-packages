@@ -34,6 +34,17 @@ describe('Text (web)', () => {
     expect(screen.getByTestId('h')).toHaveStyle({ fontWeight: '600' });
   });
 
+  it('paints a caption at the colour it was given, never faded over it', () => {
+    render(
+      <Text variant="caption" color="secondary" dataTestId="cap">
+        x
+      </Text>,
+    );
+    const caption = screen.getByTestId('cap');
+    expect(caption).toHaveStyle({ fontSize: '0.75rem' });
+    expect(caption).not.toHaveStyle({ opacity: '0.8' });
+  });
+
   it('renders the element `as` asks for', () => {
     render(<Text as="p" dataTestId="p">x</Text>);
     expect(screen.getByTestId('p').tagName).toBe('P');

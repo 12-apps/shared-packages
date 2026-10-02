@@ -16,9 +16,16 @@ export const TEXT_WEIGHTS = FONT_WEIGHTS;
 export const HEADING_DEFAULT_WEIGHT = 600;
 export const HEADING_LETTER_SPACING_EM = -0.01;
 
-/** The `caption` variant: a step down at the default size, faded and looser. */
+/**
+ * The `caption` variant: a step down at the default size, and looser.
+ *
+ * It is NOT faded. It used to paint `opacity: 0.8` over whatever colour the
+ * caller chose, and that is a contrast cut nobody chose: `color="secondary"`
+ * at 0.8 is 3.69:1 on white and 3.66:1 on the storefront's Sal, under the
+ * 4.5:1 a 12px line needs, and every caption in two apps sat there (FUT-3228).
+ * What sets a caption apart is the size step and the colour the screen picks.
+ */
 export const CAPTION_FONT_SIZE = 12;
-export const CAPTION_OPACITY = 0.8;
 export const CAPTION_LETTER_SPACING_EM = 0.02;
 
 /** The `code` variant: a step down, on a faint primary wash inside a hairline. */
