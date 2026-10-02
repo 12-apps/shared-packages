@@ -25,10 +25,9 @@ import type {
  * of each returned client, in the same call, with no way to import one half
  * without the other.
  *
- * Deliberately NOT invalidated here: the assistant's current ACCESS token.
- * Those are self-contained JWTs the server does not track; a just-disconnected
- * host keeps working for at most their TTL (15 minutes by default) and can then
- * obtain nothing further.
+ * Hosts opting into `isRefreshBindingActive` also invalidate current ACCESS
+ * tokens immediately. Without that verifier hook, stateless JWTs remain valid
+ * until their TTL (15 minutes by default).
  */
 
 /** An active AI connection, narrowed for display. */
@@ -91,6 +90,9 @@ export async function disconnectAiHost(
   caller: AiConnectionCaller,
   host: AiProvider,
 ): Promise<AiDisconnectResult> {
+  if (stores.connections.disconnect) {
+    return stores.connections.disconnect(caller.userId, caller.email, host);
+  }
   const disconnectedClientIds = await stores.connections.revokeByHost(caller.userId, host);
   const revoked = await Promise.all(
     disconnectedClientIds.map((clientId) =>

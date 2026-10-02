@@ -38,6 +38,8 @@ import { isAdminEmail } from "./admin";
  */
 declare module "@auth/core/types" {
   interface Session {
+    /** Per-login nonce, stable across JWT renewal. Missing on legacy sessions. */
+    loginSessionId?: string;
     user: {
       id: string;
       provider?: string;
@@ -296,6 +298,9 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
           : isAdminEmail(user.email, getAdminEmails());
         return {
           ...token,
+          // Auth.js rotates encrypted bytes, iat and jti on ordinary session
+          // reads. A separate nonce binds consent to THIS login across renewal.
+          loginSessionId: crypto.randomUUID(),
           id: user.id ?? token.sub ?? "",
           provider: account.provider,
           isSuperadmin,
@@ -304,6 +309,10 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
       return token;
     },
     async session({ session, token }) {
+      // Never preserve client-supplied session updates, and never synthesize a
+      // nonce while reading a legacy cookie: auth() may not forward Set-Cookie.
+      session.loginSessionId = typeof token.loginSessionId === "string"
+        ? token.loginSessionId : undefined;
       if (session.user) {
         session.user.id = (token.id as string) ?? (token.sub as string) ?? "";
         session.user.provider = token.provider as string | undefined;

@@ -100,6 +100,7 @@ describe('@12-apps/mcp — the prisma assets survive publication', () => {
       expect(names).toContain('oauth_clients_client_id_key');
       expect(names).toContain('oauth_refresh_tokens_token_hash_key');
       expect(names).toContain('oauth_refresh_tokens_user_email_client_id_idx');
+      expect(names).toContain('oauth_refresh_tokens_rotated_from_idx');
       expect(names).toContain('mcp_connections_user_id_oauth_client_id_key');
     });
   });

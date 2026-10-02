@@ -39,6 +39,7 @@ export {
   AccessTokenError,
   signAccessToken,
   verifyAccessToken,
+  type AccessTokenBinding,
   type AccessTokenErrorCode,
   type AccessTokenFailureReason,
   type SignAccessTokenInput,
@@ -124,3 +125,12 @@ export {
   type AiConnectionSnapshot,
   type AiDisconnectResult,
 } from "./connections";
+
+export {
+  CONSENT_TTL_SECONDS,
+  inProcessConsentReplayStore,
+  type ConsentReplayStore,
+  type McpOauthConsentConfig,
+} from "./consent-ticket";
+export { isRefreshBindingActive } from "./access-binding";
+export { lineageHashes as collectRefreshLineageHashes } from "./refresh-lineage";

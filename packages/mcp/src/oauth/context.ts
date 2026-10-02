@@ -7,7 +7,8 @@ import {
   inProcessCodeReplayStore,
   type CodeReplayStore,
 } from "./code-replay";
-import { ACCESS_TOKEN_TTL_SECONDS } from "./access-token";
+import { ACCESS_TOKEN_TTL_SECONDS, type AccessTokenBinding } from "./access-token";
+import type { McpOauthConsentConfig } from "./consent-ticket";
 import { REFRESH_TOKEN_TTL_MS } from "./refresh";
 import { DEFAULT_ROTATION_GRACE_MS } from "./rotation-grace";
 import { loadSigningKeyFromEnv, type McpSigningKeyProvider } from "./keys";
@@ -33,11 +34,16 @@ export interface McpOauthSession {
   subject: string;
   /** The signed-in user's email — the identity the AS binds to. */
   email: string;
+  /** Opaque identity of this COOKIE login session, mandatory in consent mode.
+   * Derive from the authenticated session credential, never a client parameter.
+   * A user id/email alone is not a login-session binding. */
+  sessionBinding?: string;
 }
 
 /** Where each endpoint of the surface lives, from the origin root. */
 export interface McpOauthPaths {
   authorize: string;
+  consent: string;
   token: string;
   register: string;
   jwks: string;
@@ -48,6 +54,7 @@ export interface McpOauthPaths {
 export const DEFAULT_OAUTH_PATHS: McpOauthPaths = {
   // the origin host's paths, and the ones the RFC 8414 document has always advertised.
   authorize: "/api/oauth/authorize",
+  consent: "/api/oauth/consent",
   token: "/api/oauth/token",
   register: "/api/oauth/register",
   jwks: "/.well-known/jwks.json",
@@ -69,6 +76,10 @@ export interface McpConnectionRecording {
 }
 
 export interface McpOauthConfig {
+  /** Real interactive consent; legacy rules can optionally remain an eligibility ceiling. */
+  consent?: McpOauthConsentConfig;
+  /** Live revocation check after signature verification; missing binding fails closed. */
+  isAccessTokenActive?: (binding: AccessTokenBinding) => Promise<boolean> | boolean;
   /** Where the three owned tables live (see `./stores.ts`). */
   stores: McpOauthStores;
   /**
@@ -174,6 +185,8 @@ export interface McpOauthConfig {
 
 /** The config with every default applied — what the handlers actually read. */
 export interface McpOauthContext {
+  consent?: McpOauthConsentConfig;
+  isAccessTokenActive?: McpOauthConfig["isAccessTokenActive"];
   stores: McpOauthStores;
   resolveSession: McpOauthConfig["resolveSession"];
   enabled: () => boolean;
@@ -231,9 +244,12 @@ function resolveSurface(
 
 export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
   const enabled = config.enabled ?? true;
+  validateConsentConfig(config.consent);
   const trustedOrigins = config.trustedOrigins ?? [];
   return {
     stores: config.stores,
+    ...(config.consent ? { consent: config.consent } : {}),
+    ...(config.isAccessTokenActive ? { isAccessTokenActive: config.isAccessTokenActive } : {}),
     resolveSession: config.resolveSession,
     // Mounting is the opt-in, so the gate defaults to ON; a host that ships the
     // surface dark passes its own flag (the origin host: `MCP_BEARER_ENABLED`).
@@ -270,4 +286,14 @@ function resolveApprover(config: McpOauthConfig): McpOauthContext["approve"] {
 /** The gate's own answer: 404, so a disabled surface looks like no surface. */
 export function notFound(): Response {
   return new Response("Not Found", { status: 404 });
+}
+
+/** The UI destination is configuration, but still must never become an open redirect. */
+function validateConsentConfig(consent: McpOauthConsentConfig | undefined): void {
+  if (!consent) return;
+  const path = consent.path;
+  const base = "https://consent.invalid";
+  if (!path.startsWith("/") || path.startsWith("//") || new URL(path, base).origin !== base) {
+    throw new Error("Consent UI path must be same-origin and root-relative");
+  }
 }
