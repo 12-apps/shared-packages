@@ -33,6 +33,17 @@ export function severityFill(theme: Theme, severity: AttentionSeverity): string 
   return `color-mix(in srgb, ${theme.palette.warning.main} 78%, black)`;
 }
 
+/**
+ * The ink of a severity on WHITE — the "+N" ball is white in every theme, so
+ * its number cannot take the dark theme's light tones (~2.6:1 there). In the
+ * dark theme the fill is mixed toward black until it reads on white (≥4.5:1
+ * for 14px bold); the light theme's tones already do and are kept as approved.
+ */
+export function inkOnWhite(theme: Theme, severity: AttentionSeverity): string {
+  const fill = severity === 'calm' ? theme.palette.success.main : severityFill(theme, severity);
+  return theme.palette.mode === 'dark' ? `color-mix(in srgb, ${fill} 65%, black)` : fill;
+}
+
 /** The ink on that fill. */
 export function severityInk(theme: Theme, severity: AttentionSeverity): string {
   return severity === 'calm' ? theme.palette.success.contrastText : theme.palette.warning.contrastText;
@@ -296,8 +307,7 @@ export function AttentionOthersButton({
         borderRadius: 22,
         // White, whatever the page's paper: the ball must stand off any ground.
         bgcolor: 'common.white',
-        color: (theme: Theme) =>
-          severity === 'calm' ? theme.palette.success.main : severityFill(theme, severity),
+        color: (theme: Theme) => inkOnWhite(theme, severity),
         border: '1.5px solid currentColor',
         boxShadow: (theme: Theme) => `0 2px 6px ${alpha(theme.palette.text.primary, 0.18)}`,
         font: 'inherit',
