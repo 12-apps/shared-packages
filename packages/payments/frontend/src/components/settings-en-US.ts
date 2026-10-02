@@ -39,6 +39,12 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       state: 'Not taking sales yet',
       sub: 'Everything is ready — flip the switch to start taking payments.',
     },
+    certificateExpires: (iso) =>
+      `The production certificate expires on ${new Date(iso).toLocaleDateString('en-US')}. ` +
+      'Before then, generate a new certificate and private key in the provider’s portal and paste both on the Production tab — with an expired certificate, Pix through this provider does not work.',
+    certificateExpired: (iso) =>
+      `The production certificate expired on ${new Date(iso).toLocaleDateString('en-US')}. ` +
+      'Until it is replaced, Pix through this provider does not work. Generate a new certificate and private key in the provider’s portal and paste both on the Production tab.',
   },
   listBadge: {
     active: 'Active',

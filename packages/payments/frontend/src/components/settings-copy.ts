@@ -49,6 +49,14 @@ export interface ConnectionStatusCopy {
   pausedChip: string;
   /** Proven, not switched on yet. */
   readyNotReceiving: { state: string; sub: string };
+  /**
+   * The saved production certificate lapses inside the renewal window, or has
+   * lapsed. Given the ISO `validTo`; the pack formats the date in its own
+   * locale. Provider-neutral wording — the certificate is the store's, the
+   * portal is the provider's.
+   */
+  certificateExpires: (iso: string) => string;
+  certificateExpired: (iso: string) => string;
 }
 
 /**

@@ -114,6 +114,17 @@ export const PT_BR_ITAU_COPY: ItauCopy = {
   certificateNotYetValid: 'O certificado ainda não está válido. Aguarde o início da validade ou use o certificado vigente.',
   certificateRefused: 'O Itaú encerrou a conexão ao receber o certificado. Confira se ele é o de produção, gerado para este Client ID e não revogado — ou teste de novo em instantes.',
   refused: 'Credenciais recusadas pelo Itaú.',
+  webhook: {
+    registered: 'Webhook cadastrado no Itaú para esta chave: cada Pix recebido é avisado na hora.',
+    refused:
+      'O Itaú recusou o cadastro do webhook para esta chave. Confira se ela é uma chave Pix desta conta — o Itaú costuma aceitar o CNPJ, só números. ' +
+      'Sem o webhook, os pagamentos continuam sendo confirmados, mas com atraso.',
+    unreachable: 'Não conseguimos cadastrar o webhook no Itaú agora. Teste a conexão de novo em instantes.',
+    elsewhere:
+      'Esta chave já avisa outro endereço no Itaú, e não o substituímos para não cortar os avisos de outro sistema. ' +
+      'Se ele não está mais em uso, remova esse webhook no Itaú e teste a conexão de novo. Endereço atual:',
+    notRegistered: 'O webhook não foi cadastrado automaticamente. Peça ao Itaú para cadastrar a URL desta loja como webhook da chave Pix, como mostra o guia.',
+  },
   fields: {
     clientId: 'Client ID',
     clientSecret: 'Client Secret',

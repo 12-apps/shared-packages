@@ -24,6 +24,7 @@ import type {
   WebhookDelivery,
 } from './types';
 import type { BrowserKeyCapability } from './browser-key-capability';
+import type { CredentialExpiry } from './credential-expiry';
 import type { SettlementHints } from './settlement-hints';
 import type {
   VaultBeginInput,
@@ -298,6 +299,8 @@ export interface PaymentProviderAdapterBase {
 
   /** Mint this provider's public browser key on demand — most cannot. */
   browserKey?: BrowserKeyCapability;
+  /** When a pasted credential set lapses on its own (a certificate); most never do. */
+  credentialExpiry?: CredentialExpiry;
 
   /** Void a not-yet-paid charge. Optional: capability-gated by the gateway. */
   cancelCharge?(providerChargeId: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot>;
@@ -373,11 +376,7 @@ export interface PaymentProviderAdapterBase {
     revoke?(current: ResolvedCredentials, appCredentials: ResolvedCredentials): Promise<void>;
   };
 
-  /**
-   * The provider's step-by-step onboarding screen (stepper stages +
-   * walkthrough sections with links and copy-paste fields). Optional; the
-   * settings UI renders it when present.
-   */
+  /** The onboarding walkthrough (stages, links, copy-paste fields); rendered by the settings UI when present. */
   setupGuide?(ctx: SetupGuideContext): ProviderSetupGuide;
 
   /**

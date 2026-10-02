@@ -123,6 +123,17 @@ export const EN_US_ITAU_COPY: ItauCopy = {
   certificateNotYetValid: 'The certificate is not valid yet. Wait for its validity to begin, or use the current certificate.',
   certificateRefused: 'Itaú closed the connection on the certificate. Check that it is the production one, issued for this Client ID and not revoked — or test again shortly.',
   refused: 'Credentials refused by Itaú.',
+  webhook: {
+    registered: 'Webhook registered with Itaú for this key: each Pix received is notified as it lands.',
+    refused:
+      'Itaú refused to register the webhook for this key. Check that it is a Pix key of this account — Itaú usually accepts the CNPJ, digits only. ' +
+      'Without the webhook, payments are still confirmed, only later.',
+    unreachable: 'We could not register the webhook with Itaú just now. Test the connection again shortly.',
+    elsewhere:
+      'This key already notifies another address at Itaú, and we did not replace it, so another system keeps its notifications. ' +
+      'If it is no longer in use, remove that webhook at Itaú and test the connection again. Current address:',
+    notRegistered: 'The webhook was not registered automatically. Ask Itaú to register this store’s URL as the Pix key’s webhook, as the guide shows.',
+  },
   fields: {
     clientId: 'Client ID',
     clientSecret: 'Client Secret',

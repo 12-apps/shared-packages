@@ -31,6 +31,12 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       state: 'Ainda não está recebendo',
       sub: 'Tudo pronto — ligue a chave para começar a receber.',
     },
+    certificateExpires: (iso) =>
+      `O certificado de produção vence em ${new Date(iso).toLocaleDateString('pt-BR')}. ` +
+      'Antes disso, gere um novo certificado e uma nova chave privada no portal do provedor e cole os dois na aba Produção — com o certificado vencido, o Pix por este provedor não funciona.',
+    certificateExpired: (iso) =>
+      `O certificado de produção venceu em ${new Date(iso).toLocaleDateString('pt-BR')}. ` +
+      'Enquanto ele não for trocado, o Pix por este provedor não funciona. Gere um novo certificado e uma nova chave privada no portal do provedor e cole os dois na aba Produção.',
   },
   listBadge: {
     active: 'Ativo',

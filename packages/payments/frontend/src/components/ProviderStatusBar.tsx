@@ -4,7 +4,7 @@ import { Box, Stack, Switch, Tooltip, Typography } from '@mui/material';
 
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';
 
-import { isConnected } from './connection-state';
+import { certificateExpiryProximity, isConnected } from './connection-state';
 import { T } from './panel-tokens';
 import type { ConnectionStatusCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
@@ -218,6 +218,58 @@ function ProviderName({
   );
 }
 
+/**
+ * The saved production certificate's renewal warning, under the headline.
+ *
+ * Only for a store on PRODUCTION: that is the one whose PIX stops when the
+ * certificate lapses, and a sandbox store testing the form has nothing to
+ * renew yet. Silent outside the 30-day window (`certificateExpiryProximity`) —
+ * a date a year out is not news, and it is on the provider's portal anyway.
+ * A `status`, lapsed or not: it is state on load, and the probe's own error is
+ * already the alert — a second would be read out twice.
+ */
+function CertificateExpiryNote({ copy, config }: { copy: ConnectionStatusCopy; config: MaskedProviderConfig | null }) {
+  const note = certificateNote(copy, config);
+  if (!note) return null;
+  const tone = note.past
+    ? { border: T.badLine, background: T.badSoft, color: T.badInk }
+    : { border: T.warnLine, background: T.warnSoft, color: T.warnInk };
+  return (
+    <Typography
+      role="status"
+      data-testid="payments-certificate-expiry"
+      sx={{
+        fontSize: '12.5px',
+        fontWeight: 600,
+        lineHeight: 1.5,
+        maxWidth: '52ch',
+        mt: '8px',
+        px: '10px',
+        py: '7px',
+        borderRadius: '8px',
+        border: `1px solid ${tone.border}`,
+        background: tone.background,
+        color: tone.color,
+      }}
+    >
+      {note.text}
+    </Typography>
+  );
+}
+
+/** What the certificate note says, or null when it has nothing to say. */
+function certificateNote(
+  copy: ConnectionStatusCopy,
+  config: MaskedProviderConfig | null,
+): { text: string; past: boolean } | null {
+  const expiresAt = config?.environment === 'PRODUCTION' ? config.credentialExpiresAt : null;
+  if (!expiresAt) return null;
+  const proximity = certificateExpiryProximity(expiresAt);
+  if (proximity === 'PAST') return { text: copy.certificateExpired(expiresAt), past: true };
+  if (proximity === 'NEAR') return { text: copy.certificateExpires(expiresAt), past: false };
+  return null;
+}
+
 export function ProviderStatusBar({
   descriptor,
   config,
@@ -248,6 +300,7 @@ export function ProviderStatusBar({
         >
           {sub}
         </Typography>
+        <CertificateExpiryNote copy={copy} config={config} />
       </Box>
       {/* The switch belongs at the far edge: it is the one control here that
           changes what buyers experience, and crowding it against the status

@@ -1,3 +1,5 @@
+import { X509Certificate } from 'node:crypto';
+
 import { CredentialsError, ProviderRequestError } from '../core/errors';
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
 import { providerFetch, type ProviderHttpInit, type ProviderTransport } from './http';
@@ -102,6 +104,24 @@ function identityOf(credentials: ResolvedCredentials): ClientIdentity | null {
   const cert = credentials.fields['certificate']?.trim();
   const key = credentials.fields['privateKey']?.trim();
   return cert && key ? { cert: normalizePem(cert), key: normalizePem(key) } : null;
+}
+
+/**
+ * When the pasted production certificate stops working, as an ISO instant —
+ * what lets a screen warn the owner inside Itaú's 30-day renewal window
+ * instead of the store finding out when PIX stops. Null when no certificate
+ * is saved or it cannot be read; a garbled paste is `verifyCredentials`'s to
+ * name, not a date to show.
+ */
+export function itauCertificateExpiry(fields: Readonly<Record<string, string>>): string | null {
+  const pem = fields['certificate']?.trim();
+  if (!pem) return null;
+  try {
+    const validTo = new Date(new X509Certificate(normalizePem(pem)).validTo);
+    return Number.isNaN(validTo.getTime()) ? null : validTo.toISOString();
+  } catch {
+    return null;
+  }
 }
 
 const IDENTITY_SETUP: Record<NonNullable<ReturnType<typeof identityProblem>>, ItauSetupProblem> = {

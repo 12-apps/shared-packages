@@ -284,6 +284,27 @@ export interface ItauCopy extends ProbeUnreachableCopy {
   certificateRefused: string;
   /** Itaú answered 4xx to the token mint: the client id/secret or certificate is refused. */
   refused: string;
+  /**
+   * What became of registering the store's webhook for its Pix key
+   * (`PUT /webhook/{chave}`), reported under the Pix key after a passing
+   * probe. None of them fails the connection: a store without a webhook still
+   * takes payments, found by the checkout and the sweep, only later.
+   */
+  webhook: {
+    /** Itaú accepted the URL: each Pix received is notified as it lands. */
+    registered: string;
+    /** Itaú refused it — usually a key that is not this account's own DICT key. */
+    refused: string;
+    /** Itaú could not be reached for the registration; testing again retries it. */
+    unreachable: string;
+    /**
+     * The key already notifies ANOTHER address, which we leave alone (a PUT
+     * would cut off whatever system set it). The current URL is appended.
+     */
+    elsewhere: string;
+    /** No URL to register reached the probe — the owner registers it by hand. */
+    notRegistered: string;
+  };
   fields: {
     clientId: string;
     clientSecret: string;

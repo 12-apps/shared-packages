@@ -12,7 +12,7 @@ import type { ProviderName } from '../core/types';
  * double-charge a buyer.
  */
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
  * Retry only failures PROVEN to predate transmission, so a retry can never
