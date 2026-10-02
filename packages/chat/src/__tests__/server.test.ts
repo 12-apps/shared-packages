@@ -265,9 +265,9 @@ describe("assembly", () => {
 describe("reading order and history", () => {
   it("keeps one order for messages in the same millisecond, and the newest when it trims", async () => {
     const { config } = configWith({ historyLimit: 2 });
-    const chat = api(config);
-    for (const body of ["one", "two", "three"]) await chat.send(client, { body });
-    expect(dataOf<ChatThreadPayload>(await chat.read(client)).messages.map((m) => m.body)).toEqual(["two", "three"]);
+    const { read, send } = api(config);
+    for (const body of ["one", "two", "three"]) await send(client, { body });
+    expect(dataOf<ChatThreadPayload>(await read(client)).messages.map((m) => m.body)).toEqual(["two", "three"]);
   });
 
   it("falls back to the configured words when the resolver has none for the reader's locale", async () => {
@@ -304,29 +304,29 @@ describe("what the read route marks", () => {
 
   it("marks up to the newest message the reader was shown, never one that arrived after", async () => {
     const { config } = configWith({ clock: ticking() });
-    const chat = api(config);
-    await chat.send(agent, { body: "Arriving" }); // t+1
-    const shown = dataOf<ChatThreadPayload>(await chat.read(client)).messages; // t+2
-    await chat.send(agent, { body: "Downstairs" }); // t+3, not yet on the reader's screen
-    expect(dataOf(await chat.markRead(client, { upTo: shown.at(-1)?.createdAt }))).toEqual({ unread: 1 });
+    const { markRead, read, send } = api(config);
+    await send(agent, { body: "Arriving" }); // t+1
+    const shown = dataOf<ChatThreadPayload>(await read(client)).messages; // t+2
+    await send(agent, { body: "Downstairs" }); // t+3, not yet on the reader's screen
+    expect(dataOf(await markRead(client, { upTo: shown.at(-1)?.createdAt }))).toEqual({ unread: 1 });
   });
 
   it("never moves the marker backwards, and never past now", async () => {
     const { config, db } = configWith({ clock: ticking() });
-    const chat = api(config);
-    await chat.send(agent, { body: "Arriving" }); // t+1
-    await chat.markRead(client, { upTo: at(1) }); // t+2
-    await chat.markRead(client, { upTo: at(0) }); // a slow tab, older screen
+    const { markRead, send } = api(config);
+    await send(agent, { body: "Arriving" }); // t+1
+    await markRead(client, { upTo: at(1) }); // t+2
+    await markRead(client, { upTo: at(0) }); // a slow tab, older screen
     expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(1));
-    await chat.markRead(client, { upTo: at(3600) }); // t+4: clamped
+    await markRead(client, { upTo: at(3600) }); // t+4: clamped
     expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(4));
   });
 
   it.each([[{}], [{ upTo: "not a date" }], [{ upTo: 42 }], [null]])("reads a missing or broken upTo as now: %j", async (body) => {
     const { config, db } = configWith({ clock: ticking() });
-    const chat = api(config);
-    await chat.send(agent, { body: "Arriving" }); // t+1
-    expect(dataOf(await chat.markRead(client, body))).toEqual({ unread: 0 });
+    const { markRead, send } = api(config);
+    await send(agent, { body: "Arriving" }); // t+1
+    expect(dataOf(await markRead(client, body))).toEqual({ unread: 0 });
     expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(2));
   });
 
@@ -363,9 +363,9 @@ describe("the content rules and the people who probe them", () => {
   it("spends a rate slot on every refused attempt, and tells the host who keeps trying", async () => {
     const onRefused = vi.fn();
     const { config } = configWith({ onRefused });
-    const chat = api(config);
-    for (let i = 0; i < 3; i += 1) expect((await chat.send(agent, { body: `ana${i}@example.com` })).status).toBe(422);
-    expect((await chat.send(agent, { body: "On my way" })).status).toBe(429);
+    const { send } = api(config);
+    for (let i = 0; i < 3; i += 1) expect((await send(agent, { body: `ana${i}@example.com` })).status).toBe(422);
+    expect((await send(agent, { body: "On my way" })).status).toBe(429);
     await vi.waitFor(() => expect(onRefused).toHaveBeenCalledTimes(3));
     expect(onRefused).toHaveBeenCalledWith({
       tenantId: "t1",
@@ -379,18 +379,18 @@ describe("the content rules and the people who probe them", () => {
 
   it("does not let ids that contain the old separator share a budget", async () => {
     const { config } = configWith();
-    const chat = api(config);
+    const { send } = api(config);
     const first = { ...agent, tenantId: "a|b", threadKey: "c" };
     const second = { ...agent, tenantId: "a", threadKey: "b|c" };
-    for (let i = 0; i < 3; i += 1) expect((await chat.send(first, { body: `msg ${i}` })).status).toBe(201);
-    expect((await chat.send(second, { body: "mine" })).status).toBe(201);
+    for (let i = 0; i < 3; i += 1) expect((await send(first, { body: `msg ${i}` })).status).toBe(201);
+    expect((await send(second, { body: "mine" })).status).toBe(201);
   });
 
   it("reads a null quick reply as absent, and an invisible-only body as empty", async () => {
     const { config } = configWith();
-    const chat = api(config);
-    expect((await chat.send(client, { body: "hi", quickReply: null })).status).toBe(201);
-    expect((await chat.send(client, { body: "​‍⁠" })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
+    const { send } = api(config);
+    expect((await send(client, { body: "hi", quickReply: null })).status).toBe(201);
+    expect((await send(client, { body: "​‍⁠" })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
   });
 });
 
