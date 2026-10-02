@@ -5,6 +5,7 @@ import type {
   ProviderDescriptor,
 } from '@12-apps/payments-backend';
 
+import { checksLocally } from './checks-locally';
 import type { PendingSave } from './ConfirmCredentialSave';
 import type { CredentialFormCopy } from './settings-copy';
 
@@ -104,8 +105,13 @@ export function saveLabel(
 ): string {
   const required = descriptor.credentialSchema.filter((field) => field.required);
   const only = required.length === 1 ? required[0] : undefined;
-  if (!only) return complete ? copy.saveAndTest : copy.save;
+  if (!only) return complete ? saveAndTestLabel(copy, descriptor) : copy.save;
   return copy.saveOnly(only.label.replace(/\s*\([^)]*\)\s*$/, ''));
+}
+
+/** "Salvar e testar conexão", or "Salvar e conferir" where nothing leaves for a provider. */
+function saveAndTestLabel(copy: CredentialFormCopy, descriptor: ProviderDescriptor): string {
+  return (checksLocally(descriptor) ? copy.saveAndCheck : undefined) ?? copy.saveAndTest;
 }
 
 /**

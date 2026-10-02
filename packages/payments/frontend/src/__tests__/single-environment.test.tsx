@@ -36,8 +36,8 @@ function descriptor(): ProviderDescriptor {
   };
 }
 
-function renderPanel() {
-  const view = { providers: [descriptor()], configs: [], activeProvider: null } as unknown as MerchantSettingsView;
+function renderPanel(configs: unknown[] = []) {
+  const view = { providers: [descriptor()], configs, activeProvider: null } as unknown as MerchantSettingsView;
   const client = {
     baseUrl: '/api/admin/acme/payments',
     getSettings: vi.fn().mockResolvedValue(view),
@@ -80,5 +80,35 @@ describe('a provider with a single environment', () => {
 
     await vi.waitFor(() => expect(client.saveCredentials).toHaveBeenCalled());
     expect(vi.mocked(client.saveCredentials).mock.calls[0]?.[1]).toMatchObject({ environment: 'PRODUCTION' });
+  });
+});
+
+describe('a provider checked locally', () => {
+  it('promises a check of the details, never a test with a provider', async () => {
+    renderPanel();
+    fireEvent.change(await screen.findByLabelText(/Chave Pix da loja/), { target: { value: 'loja@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Nome do recebedor/), { target: { value: 'Padaria Boa' } });
+    fireEvent.change(screen.getByLabelText(/^Cidade/), { target: { value: 'Recife' } });
+
+    const bar = await screen.findByTestId('payments-form-bar');
+    expect(bar.textContent).toContain(PT_BR_PAYMENTS_SETTINGS_COPY.credentials.probeLocalSaveNote);
+    expect(bar.textContent).not.toContain(PT_BR_PAYMENTS_SETTINGS_COPY.credentials.probeSaveNote);
+    expect(screen.getByTestId('payments-save').textContent).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.credentials.saveAndCheck);
+  });
+
+  it('calls a passing check DADOS OK, not a connection', async () => {
+    renderPanel([
+      {
+        provider: 'pixmanual',
+        status: 'VERIFIED',
+        enabled: false,
+        chargeVerifiedAt: null,
+        environment: 'PRODUCTION',
+        environments: { SANDBOX: {}, PRODUCTION: { pixKey: { configured: true, hint: 'loja@example.com' } } },
+      },
+    ]);
+
+    expect(await screen.findByText(PT_BR_PAYMENTS_SETTINGS_COPY.status.detailsOk as string)).toBeTruthy();
+    expect(screen.queryAllByText(PT_BR_PAYMENTS_SETTINGS_COPY.status.connectionOk)).toHaveLength(0);
   });
 });

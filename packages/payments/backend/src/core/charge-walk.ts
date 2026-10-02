@@ -228,7 +228,12 @@ async function recoverUnfinished(
       true,
     );
   }
-  const snapshot = await resolved.adapter.getCharge(unfinished.providerChargeId, resolved.creds);
+  // A store-confirmed provider's read knows nothing (PENDING, no amount, no
+  // code): rebuild through `createCharge` instead, which is local and
+  // deterministic for it — the same code, the same id.
+  const snapshot = resolved.adapter.capabilities.confirmation === 'MANUAL'
+    ? await resolved.adapter.createCharge(ctx.input, resolved.creds)
+    : await resolved.adapter.getCharge(unfinished.providerChargeId, resolved.creds);
   // `recorded: true` — reaching here means a durable ledger row already names
   // this charge, so if the store fails again the evidence still survives.
   return persistCreated(deps, ctx, unfinished.provider, snapshot, true);
@@ -255,7 +260,7 @@ async function resolveChain(
   merchant: MerchantRef,
   options: ChargeWalkOptions,
 ): Promise<ProviderName[]> {
-  if (options.provider) return [options.provider];
+  if (options.provider) return automaticOnly(deps, [options.provider], options);
   const chain = automaticOnly(deps, await deps.credentials.providerChain(merchant), options);
   if (chain.length === 0) {
     throw new CredentialsError(

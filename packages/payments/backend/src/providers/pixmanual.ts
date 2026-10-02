@@ -31,7 +31,9 @@ import { MERCHANT_CITY_MAX, MERCHANT_NAME_MAX, readSettings, settingsChecks } fr
  *   never mints a `stub_` id: hosts auto-settle those, which here would
  *   confirm a payment nobody checked. Its one difference is that a field the
  *   store left blank falls back to a fixed demo value, so a stub connection
- *   charges with nothing configured, as every adapter's stub must.
+ *   charges with nothing configured, as every adapter's stub must — reached by
+ *   the package's contract sweeps; a host never gets there, because stub is
+ *   SANDBOX-only and this provider has no SANDBOX.
  */
 
 export const NAME = 'pixmanual';
@@ -41,7 +43,7 @@ const CHARGE_ID_PREFIX = 'pixmanual_';
 /** What a STUB connection charges with for any field left blank — never used live. */
 const STUB_FIELDS: Readonly<Record<string, string>> = {
   pixKey: 'pix-manual@stub.example',
-  merchantName: 'Loja de teste',
+  merchantName: 'Demo merchant',
   merchantCity: 'Sao Paulo',
 };
 

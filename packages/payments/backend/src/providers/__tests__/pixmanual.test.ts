@@ -165,8 +165,20 @@ describe('normalizePixKey', () => {
     expect(normalizePixKey(raw)).toBe(normalized);
   });
 
-  // An 11-digit number without +55 reads as a CPF — the DICT cannot tell either, so it is accepted as one.
+  // An 11-digit number without +55 reads as a CPF, so it must carry a CPF's check digits to pass.
   it.each(['', '123', '8198888777', 'not a key', '+1 555 0100'])('refuses %j', (raw) => {
+    expect(normalizePixKey(raw)).toBeNull();
+  });
+
+  // A typo'd document or a key the payer's bank would never resolve: the code would pay nobody.
+  it.each([
+    ['a CPF with a wrong check digit', '123.456.789-00'],
+    ['a CPF of one repeated digit', '111.111.111-11'],
+    ['a CNPJ with a wrong check digit', '12.345.678/0001-00'],
+    ['a CNPJ of one repeated digit', '00000000000000'],
+    ['an e-mail with an accent', 'joão@loja.com.br'],
+    ['an e-mail with no domain dot', 'loja@example'],
+  ])('refuses %s', (_case, raw) => {
     expect(normalizePixKey(raw)).toBeNull();
   });
 });

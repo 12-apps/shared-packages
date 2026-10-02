@@ -246,7 +246,17 @@ function environmentChrome(
   onChange: (next: PaymentEnvironment) => void,
   active: PaymentEnvironment | null,
 ): { selector: ReactNode; band: ReactNode; notice: ReactNode } {
-  if (sole) return { selector: null, band: undefined, notice: null };
+  // Nothing to choose with one environment. The notice goes only for a
+  // PRODUCTION-only provider (it would promise no money moves); a sandbox-only
+  // one keeps its truthful "nothing is real" notice.
+  if (sole === 'PRODUCTION') return { selector: null, band: undefined, notice: null };
+  if (sole) {
+    return {
+      selector: null,
+      band: <EnvironmentNotice environment={environment} active={active} />,
+      notice: <EnvironmentNotice environment={environment} active={active} band={false} />,
+    };
+  }
   return {
     selector: <EnvironmentSelector environment={environment} onChange={onChange} />,
     band: <EnvironmentNotice environment={environment} active={active} />,

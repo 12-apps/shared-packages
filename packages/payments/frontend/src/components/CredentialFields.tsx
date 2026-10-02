@@ -117,7 +117,9 @@ export function CredentialField({ spec, state, value, onChange, check }: Credent
       >
         {spec.label}
         {spec.advanced || spec.optional ? (
-          <Box component="span" sx={{ fontWeight: 500, color: T.ink4 }}>
+          // `ink3`, not `ink4`: "opcional" carries real information, and at 12px
+          // the lighter ink fell under AA contrast.
+          <Box component="span" sx={{ fontWeight: 500, color: spec.optional ? T.ink3 : T.ink4 }}>
             {spec.advanced ? copy.advancedSuffix : copy.optionalSuffix}
           </Box>
         ) : null}

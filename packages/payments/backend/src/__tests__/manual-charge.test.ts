@@ -1,21 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { buyerCheckoutConfig } from '../checkout/config';
-import { createSettingsService, credentialStoreFrom } from '../config/service';
 import { createChargeRaiser } from '../core/charge-raise';
 import { UnsupportedOperationError, WebhookVerificationError } from '../core/errors';
-import { createPaymentsGateway } from '../core/gateway';
 import { ManualChargeNotFoundError, ManualChargeNotPendingError } from '../core/manual-charge';
 import type { WebhookEventHandler } from '../core/ports';
+import { createSettingsService } from '../config/service';
 import { defineProviders } from '../core/registry';
-import { createMemoryAttemptLedger, createMemoryChargeStore, createMemoryProviderConfigStore } from '../memory';
-import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
-import { infinitePayProvider } from '../providers/infinitepay';
-import { itauProvider } from '../providers/itau';
+import { createMemoryProviderConfigStore } from '../memory';
 import { PT_BR_PIX_MANUAL_COPY } from '../providers/pix-manual/pt-BR';
 import { pixManualProvider } from '../providers/pixmanual';
-import { PT_BR_INFINITEPAY_COPY, PT_BR_ITAU_COPY } from '../providers/pt-BR';
 import { TENANT, cardInput, pixInput } from './fixtures';
+import { CONFIGURED, raisedPix, store } from './manual-charge-world';
 
 /**
  * A charge only the store can settle, end to end through the REAL gateway:
@@ -23,48 +19,6 @@ import { TENANT, cardInput, pixInput } from './fixtures';
  * reaches the host through the same handler a webhook does, and reading the
  * charge never writes it.
  */
-
-const CONFIGURED = { pixKey: 'loja@example.com', merchantName: 'Padaria Boa', merchantCity: 'Recife' };
-
-type Chain = ReadonlyArray<'pixmanual' | 'itau' | 'infinitepay'>;
-
-async function store(chain: Chain = ['pixmanual'], onWebhookEvent?: WebhookEventHandler) {
-  const configStore = createMemoryProviderConfigStore();
-  const providers = defineProviders({
-    pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY),
-    itau: itauProvider(PT_BR_ITAU_COPY),
-    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
-  } as const);
-  const settings = createSettingsService(providers, configStore, { allowStubMode: true });
-  const charges = createMemoryChargeStore();
-  const attempts = createMemoryAttemptLedger();
-  const credentials = credentialStoreFrom(configStore, { allowStubMode: true });
-  const handler = onWebhookEvent ?? vi.fn<WebhookEventHandler>(async () => undefined);
-  const gateway = createPaymentsGateway({
-    providers,
-    credentials,
-    charges,
-    webhooks: createMemoryWebhookInbox(),
-    attempts,
-    onWebhookEvent: handler,
-  });
-  for (const name of chain) {
-    // Pix manual has no sandbox (every code is real money); the stubbed vendors run in theirs.
-    await settings.saveCredentials(TENANT, name, {
-      environment: name === 'pixmanual' ? 'PRODUCTION' : 'SANDBOX',
-      fields: name === 'pixmanual' ? CONFIGURED : {},
-    });
-    if (name === 'infinitepay') await settings.applyChargeVerification(TENANT, name, true);
-    else await settings.setEnabled(TENANT, name, true);
-  }
-  await settings.setPriorities(TENANT, [...chain]);
-  return { gateway, charges, attempts, handler, providers, configStore, credentials };
-}
-
-async function raisedPix(world: Awaited<ReturnType<typeof store>>, reference = 'order-1') {
-  const stored = await world.gateway.charge(TENANT, pixInput(reference));
-  return stored.snapshot.providerChargeId;
-}
 
 describe('confirmManualCharge', () => {
   it('moves PENDING to PAID at the stored amount and settles through the host webhook handler', async () => {

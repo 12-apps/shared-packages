@@ -13,7 +13,7 @@ const MAX_CONFIRM_MINUTES = 1440;
 export const MERCHANT_NAME_MAX = 25;
 export const MERCHANT_CITY_MAX = 15;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL = /^[\x21-\x3F\x41-\x7E]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$/;
 const PHONE = /^\+55\d{10,11}$/;
 const EVP = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PUNCTUATED_DOCUMENT = /^[\d.\-/\s]+$/;
@@ -33,11 +33,41 @@ export function normalizePixKey(raw: string | undefined): string | null {
   if (PHONE.test(key)) return key;
   if (EVP.test(key)) return key.toLowerCase();
   if (EMAIL.test(key) && key.length <= EMAIL_MAX) return key.toLowerCase();
-  if (PUNCTUATED_DOCUMENT.test(key)) {
-    const digits = key.replace(/\D/g, '');
-    if (digits.length === 11 || digits.length === 14) return digits;
-  }
+  return PUNCTUATED_DOCUMENT.test(key) ? documentKey(key.replace(/\D/g, '')) : null;
+}
+
+/** A CPF (11 digits) or CNPJ (14) whose check digits hold, else null. */
+function documentKey(digits: string): string | null {
+  if (digits.length === 11) return cpfValid(digits) ? digits : null;
+  if (digits.length === 14) return cnpjValid(digits) ? digits : null;
   return null;
+}
+
+/**
+ * The mod-11 check digit over `digits`, weighted right to left by `weights`
+ * (`10` folds to `0`) — the rule CPF and CNPJ share.
+ */
+function checkDigit(digits: string, weights: readonly number[]): number {
+  const sum = weights.reduce((total, weight, index) => total + weight * Number(digits[index]), 0);
+  const rest = sum % 11;
+  return rest < 2 ? 0 : 11 - rest;
+}
+
+/** A CPF whose two check digits hold — a typo'd key would have the buyer pay nobody. */
+function cpfValid(digits: string): boolean {
+  if (/^(\d)\1+$/.test(digits)) return false;
+  const first = checkDigit(digits, [10, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const second = checkDigit(digits, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return first === Number(digits[9]) && second === Number(digits[10]);
+}
+
+const CNPJ_FIRST = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+const CNPJ_SECOND = [6, ...CNPJ_FIRST];
+
+/** A CNPJ whose two check digits hold. */
+function cnpjValid(digits: string): boolean {
+  if (/^(\d)\1+$/.test(digits)) return false;
+  return checkDigit(digits, CNPJ_FIRST) === Number(digits[12]) && checkDigit(digits, CNPJ_SECOND) === Number(digits[13]);
 }
 
 /** The confirmation window in minutes, or null when the owner typed something out of range. */
