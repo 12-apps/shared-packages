@@ -10,7 +10,7 @@
  *
  *   - no provider, or `live: false` (a guest), polls exactly as before;
  *   - live, the wait does not ask at 2.5 s, and still asks by the floor;
- *   - a hint asks NOW, or the moment the re-arm quiet window allows;
+ *   - a hint asks NOW, even just after an ask (FUT-3205; `poll-hint.test.tsx`);
  *   - a channel that drops asks now and goes back to 2.5 s;
  *   - the wall clock is not reset by the channel flapping.
  */
@@ -170,9 +170,11 @@ describe("the payment wait and the host's channel", () => {
     expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
   });
 
-  it("does not drop a hint that lands just after an ask", async () => {
+  it("asks at once for a hint that lands just after an ask", async () => {
     // The ask a moment ago may have been answered before the order moved, so
-    // the loop's re-arm quiet window must defer this hint, never swallow it.
+    // the hint is never swallowed. It used to wait out the re-arm quiet window,
+    // a full second on the pay step with the answer already published
+    // (FUT-3205); a hint is a server fact, not a `visibilitychange` burst.
     const { client, calls, answerWith } = countingClient();
     const { subscribe, hint } = channel();
     render(<Harness client={client} signal={{ live: true, subscribe }} />);
@@ -180,9 +182,6 @@ describe("the payment wait and the host's channel", () => {
     answerWith(PAID);
 
     await deliver(hint);
-    expect(calls()).toBe(1);
-
-    await elapse(1_000);
     expect(calls()).toBe(2);
   });
 

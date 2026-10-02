@@ -1,6 +1,6 @@
 import type { Result } from "../../result";
 import { waitsForDeadline, withLive, type LiveCadence } from "./poll-live";
-import { claimRearm } from "./poll-rearm";
+import { claimRearm, REARM_QUIET_MS } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
 
 /**
@@ -166,6 +166,12 @@ function newRun() {
     askedAt: 0,
     /** Live asks abandoned by a re-arm since the last answer. See `claimRearm`. */
     supersededAsks: 0,
+    /**
+     * A realtime hint landed while an ask was in flight (FUT-3205). That ask
+     * may have been answered before the order moved, so one more is owed the
+     * moment it answers non-terminal. See {@link PollLoop.hint}.
+     */
+    hinted: false,
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     /**
      * The wall clock, as a timer rather than a check after an ask. `outOfTime`
@@ -314,12 +320,35 @@ function scheduleNext(
   run.timer = setTimeout(again, delay);
 }
 
+/** Abandon whatever ask is current and ask now, keeping the clock. */
+function askNow(run: PollRun, tick: () => Promise<void>): void {
+  run.attempt += 1;
+  run.inFlight = false;
+  clearPending(run);
+  void tick();
+}
+
 /** The handle the hook holds on one running wait. */
 export interface PollLoop {
   /** Reset the clock and the counters, then ask immediately. */
   restart: () => void;
   /** Ask immediately, keeping the clock — the re-arm events' entry point. Whether it asked. */
   poke: () => boolean;
+  /**
+   * The host's channel says this buyer's orders moved (FUT-3205). NOT a
+   * re-arm: `poke`'s quiet window exists to collapse `visibilitychange` and
+   * `online` bursts, and a hint is a server fact. Deferring it by that window
+   * cost a paid buyer a full second on the pay step (P-040).
+   *
+   * - The wait ended (settled, stopped, cancelled): nothing.
+   * - No ask in flight: ask now.
+   * - An ask in flight for `REARM_QUIET_MS` or longer: supersede it the way
+   *   `poke` does, within `claimRearm`'s budget — the hung-socket case.
+   * - Otherwise, or with that budget spent: keep the ask, and owe one more the
+   *   moment it answers non-terminal. A hint is never dropped (FUT-649), and a
+   *   burst of hints during one ask costs one extra ask.
+   */
+  hint: () => void;
   /** Tear down: nothing further is scheduled and nothing further is written. */
   stop: () => void;
 }
@@ -353,10 +382,18 @@ export function createPollLoop(
     if (run.attempt === mine) run.inFlight = false;
     if (run.cancelled || run.settled) return;
     if (!absorb(run, result, sink)) {
+      run.hinted = false;
       clearDeadline(run);
       return;
     }
     if (run.attempt !== mine) return;
+    if (run.hinted) {
+      run.hinted = false;
+      // The wait ended while this ask was out: nothing further is owed.
+      if (run.stopped) return;
+      askNow(run, tick);
+      return;
+    }
     scheduleNext(run, options, sink, () => void tick());
   };
 
@@ -372,6 +409,7 @@ export function createPollLoop(
       run.errors = 0;
       run.healthy = 0;
       run.supersededAsks = 0;
+      run.hinted = false;
       run.startedAt = Date.now();
       armDeadline(run, options, sink);
       sink.setTimedOut(false);
@@ -385,11 +423,20 @@ export function createPollLoop(
       // socket that died while the screen was hidden. Abandon it and ask now —
       // but `claimRearm` bounds how many live asks that may abandon in a row.
       if (!claimRearm(run)) return false;
-      run.attempt += 1;
-      run.inFlight = false;
-      clearPending(run);
-      void tick();
+      // The new ask is sent after any hint that marked the old one.
+      run.hinted = false;
+      askNow(run, tick);
       return true;
+    },
+    hint: (): void => {
+      if (run.cancelled || run.settled || run.stopped) return;
+      const young = run.inFlight && Date.now() - run.askedAt < REARM_QUIET_MS;
+      if (!run.inFlight || (!young && claimRearm(run))) {
+        run.hinted = false;
+        askNow(run, tick);
+        return;
+      }
+      run.hinted = true;
     },
     stop: (): void => {
       run.cancelled = true;
