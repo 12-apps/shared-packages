@@ -75,14 +75,14 @@ export function AttentionOthersList({
           {entries.map((entry) => {
             const view = views[entry.kind.id];
             if (view === undefined) return null;
-            const { title, what } = view.describe(entry.item);
+            const { title, what, spoken } = view.describe(entry.item);
             const waited = messages.waited(minutesOf(entry.waitedMs));
             return (
               <Box component="li" key={entry.item.id}>
                 <Box
                   component="button"
                   type="button"
-                  aria-label={`${title}, ${what}, ${waited}, ${messages.severity[entry.severity]}`}
+                  aria-label={`${spoken ?? title}, ${what}, ${waited}, ${messages.severity[entry.severity]}`}
                   data-testid={`attention-others-${entry.item.id}`}
                   data-severity={entry.severity}
                   onClick={() => onPick(entry)}

@@ -149,7 +149,8 @@ export function AttentionHost({
           icon={iconOf(headView, head.item)}
           waited={waited}
           label={messages.button({
-            ...named,
+            title: named.spoken ?? named.title,
+            what: named.what,
             waited,
             urgent: head.severity !== 'calm',
             others: others.length,

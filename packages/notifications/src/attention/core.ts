@@ -83,8 +83,9 @@ export interface AttentionKind<I extends AttentionItem = AttentionItem> {
   readonly permission?: string | readonly string[];
   /**
    * The kind's place inside its category; kinds sharing a rank are one tier,
-   * ordered by wait (a call and a bill, say). Omitted, the order they are
-   * listed in.
+   * ordered by wait (a call and a bill, say). Omitted, the kind's index in
+   * `kinds` — the same number space, so a category that sets ranks should set
+   * them on every kind it lists.
    */
   readonly rank?: number;
 }
@@ -133,6 +134,9 @@ export function defineAttention(wiring: AttentionWiring): AttentionRegistry {
       throw new AttentionWiringError(
         `Kind "${kind.id}" names category "${kind.category}", which is not listed.`,
       );
+    }
+    if (kind.rank !== undefined && !Number.isFinite(kind.rank)) {
+      throw new AttentionWiringError(`Kind "${kind.id}" needs a finite rank.`);
     }
     if (typeof kind.budgetMs === 'number' && !(kind.budgetMs > 0)) {
       throw new AttentionWiringError(`Kind "${kind.id}" needs a budget above zero.`);

@@ -10,10 +10,14 @@ import { AttentionWiringError, type AttentionItem } from '../core';
 export interface AttentionKindView<I extends AttentionItem = AttentionItem> {
   /** The glyph, drawn in the button's ink at 22px. */
   readonly icon: ReactNode | ((item: I) => ReactNode);
-  /** The subject and what it waits for, e.g. "Room 12" and "Rang the bell". */
+  /**
+   * The subject and what it waits for, e.g. "#12" and "Rang the bell" — and
+   * the subject read aloud when the drawn one is a short form ("Room 12").
+   */
   readonly describe: (item: I) => {
     readonly title: string;
     readonly what: string;
+    readonly spoken?: string;
   };
   /** A sheet drawn over the page while open. */
   readonly renderSheet?: (props: { readonly item: I; readonly close: () => void }) => ReactNode;

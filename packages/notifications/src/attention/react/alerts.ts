@@ -104,8 +104,15 @@ function playTones(urgent: boolean): void {
 /** The host's files, primed inside a gesture so they may play later. */
 const primed = new Map<string, HTMLAudioElement>();
 
+/** How often a file that will not play is tried before it is given up on. */
+const PRIME_ATTEMPTS = 3;
+const attempts = new Map<string, number>();
+
 function prime(url: string): void {
   if (primed.has(url) || typeof Audio === 'undefined') return;
+  const tried = attempts.get(url) ?? 0;
+  if (tried >= PRIME_ATTEMPTS) return;
+  attempts.set(url, tried + 1);
   const element = new Audio(url);
   element.muted = true;
   primed.set(url, element);
@@ -126,7 +133,9 @@ function prime(url: string): void {
 function audioUnlocked(sounds?: AttentionSounds): boolean {
   const context = sharedContext;
   const toneReady = context === null || context.state === 'running';
-  const filesReady = [sounds?.urgent, sounds?.calm].every((url) => url === undefined || primed.has(url));
+  const filesReady = [sounds?.urgent, sounds?.calm].every(
+    (url) => url === undefined || primed.has(url) || (attempts.get(url) ?? 0) >= PRIME_ATTEMPTS,
+  );
   return toneReady && filesReady;
 }
 
@@ -200,7 +209,10 @@ function useAudioUnlock(sounds: AttentionSounds | undefined): void {
     const detach = (): void => {
       for (const type of GESTURES) window.removeEventListener(type, unlock, true);
     };
-    const unlock = (): void => {
+    const unlock = (event: Event): void => {
+      // A touch's START is not a gesture on iPhone: priming then would succeed
+      // muted and never be repeated inside the gesture that follows.
+      if (event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'mouse') return;
       unlockAttentionAudio(sounds);
       // `resume()` and `play()` settle asynchronously: check after they do.
       window.setTimeout(() => {

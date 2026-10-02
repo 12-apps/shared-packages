@@ -27,23 +27,39 @@ export interface AttentionMessages {
   readonly preferences: AttentionPreferencesMessages;
 }
 
-export interface AttentionPreferencesMessages {
+/** One channel's words: its heading in the panel and in the compact control, and each level's. */
+export interface AttentionChannelMessages {
+  /** The panel's heading: "Sound of the alerts". */
   readonly title: string;
+  /** The compact control's heading: "Sound". */
+  readonly shortTitle: string;
+  /** One sentence under the panel's heading. */
+  readonly description: string;
+  readonly levels: Readonly<Record<AttentionChannelLevel, string>>;
+  /** Under each level, in the panel only. */
+  readonly hints: Readonly<Record<AttentionChannelLevel, string>>;
+}
+
+export interface AttentionPreferencesMessages {
   /** The compact control's accessible name. */
   readonly quickLabel: string;
-  readonly sound: string;
-  readonly vibration: string;
-  readonly push: string;
-  readonly levels: Readonly<Record<AttentionChannelLevel, string>>;
-  readonly levelHints?: Readonly<Record<AttentionChannelLevel, string>>;
-  readonly vibrationUnavailable: string;
-  readonly pushHint?: string;
-  readonly pushEnable: string;
-  readonly pushUnavailable: string;
-  readonly testSound: string;
-  readonly testVibration: string;
-  readonly position: string;
-  readonly positionMoved: string;
-  readonly positionResting: string;
-  readonly resetPosition: string;
+  readonly sound: AttentionChannelMessages & { readonly test: string };
+  readonly vibration: AttentionChannelMessages & {
+    readonly test: string;
+    /** Under the panel's choices, where the device cannot vibrate. */
+    readonly unavailable: string;
+    /** The same, in the compact control. */
+    readonly unavailableShort: string;
+  };
+  readonly push: AttentionChannelMessages & {
+    readonly enable: string;
+    readonly test: string;
+    readonly unavailable: string;
+  };
+  readonly position: {
+    readonly title: string;
+    readonly moved: string;
+    readonly resting: string;
+    readonly reset: string;
+  };
 }
