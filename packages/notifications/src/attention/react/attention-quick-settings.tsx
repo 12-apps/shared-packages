@@ -7,9 +7,9 @@ import { useState, type JSX, type MouseEvent, type ReactNode } from 'react';
 
 import { Popover } from '@12-apps/ui/data-display/Popover';
 import { Box } from '@12-apps/ui/mui/Box';
-import { Text } from '@12-apps/ui/typography/Text';
 
 import { useCanVibrate } from './alerts';
+import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionPreferencesMessages } from './messages';
 import { Action, Choices, Hint, type AttentionPushState } from './preferences-parts';
 import {
@@ -91,9 +91,9 @@ function QuickGroup({
         ...(first ? {} : { borderTop: 1, borderColor: 'divider', pt: 1 }),
       }}
     >
-      <Text variant="body" size="sm" weight="bold" as="span">
+      <Box component="strong" sx={{ fontSize: 13 }}>
         {title}
-      </Text>
+      </Box>
       {children}
     </Box>
   );
@@ -116,7 +116,7 @@ function QuickChoices({
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
-        width: 'min(280px, calc(100vw - 32px))',
+        width: 'min(276px, calc(100vw - 24px))',
         boxSizing: 'border-box',
         ...(maxHeight === undefined ? {} : { maxHeight, overflowY: 'auto' }),
       }}
@@ -176,12 +176,13 @@ const MIN_ROOM_PX = 200;
  */
 function dropUnder(
   anchor: HTMLElement | null,
+  rightEdge: ((anchor: HTMLElement) => number | null) | undefined,
 ): { readonly top: number; readonly left: number; readonly room: number | undefined } | null {
   if (anchor === null) return null;
   const rect = anchor.getBoundingClientRect();
   const top = rect.bottom + DROP_GAP_PX;
-  const room = window.innerHeight - top - 16;
-  return { top, left: rect.right, room: room >= MIN_ROOM_PX ? room : undefined };
+  const room = window.innerHeight - top - FLOATING_MARGIN_PX;
+  return { top, left: rightEdge?.(anchor) ?? rect.right, room: room >= MIN_ROOM_PX ? room : undefined };
 }
 
 export interface AttentionQuickSettingsProps {
@@ -193,6 +194,12 @@ export interface AttentionQuickSettingsProps {
    * sets its header's own icon size so the bell is its neighbours' twin.
    */
   readonly size?: number;
+  /**
+   * Where the choices' right edge lines up, in viewport px — the header's last
+   * control, say, so they hang under the whole row of round buttons. Omitted,
+   * the bell's own right edge.
+   */
+  readonly rightEdge?: (anchor: HTMLElement) => number | null;
 }
 
 export function AttentionQuickSettings({
@@ -200,11 +207,12 @@ export function AttentionQuickSettings({
   messages,
   push,
   size = 44,
+  rightEdge,
 }: AttentionQuickSettingsProps): JSX.Element {
   const preferences = useAttentionPreferences(store);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const on = anyOn(preferences, push, useCanVibrate());
-  const drop = dropUnder(anchor);
+  const drop = dropUnder(anchor, rightEdge);
   return (
     <>
       <Box
@@ -226,6 +234,8 @@ export function AttentionQuickSettings({
         anchorPosition={drop === null ? undefined : { top: drop.top, left: drop.left }}
         onClose={() => setAnchor(null)}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        marginThreshold={FLOATING_MARGIN_PX}
+        PaperProps={FLOATING_PAPER}
         dataTestId="attention-quick-settings-panel"
       >
         <QuickChoices

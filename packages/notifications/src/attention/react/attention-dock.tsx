@@ -80,7 +80,7 @@ export function AttentionDock({
         // The small things sit on the INNER side, so nothing hangs off the screen.
         flexDirection: side === 'left' ? 'row-reverse' : 'row',
         alignItems: 'center',
-        gap: '14px',
+        gap: '12px',
         touchAction: 'none',
         userSelect: 'none',
         cursor: dragging ? 'grabbing' : 'grab',

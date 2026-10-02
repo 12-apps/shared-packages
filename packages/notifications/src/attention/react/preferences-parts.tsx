@@ -8,10 +8,11 @@ import type { JSX } from 'react';
 import { Button } from '@12-apps/ui/form/Button';
 import { RadioGroup } from '@12-apps/ui/form/RadioGroup';
 import { Box } from '@12-apps/ui/mui/Box';
-import { Text } from '@12-apps/ui/typography/Text';
+import type { Theme } from '@12-apps/ui/mui/styles';
 
 import type { AttentionChannelLevel } from '../core';
 
+import { severityFill } from './attention-button';
 import type { AttentionChannelMessages } from './messages';
 
 const LEVELS: readonly AttentionChannelLevel[] = ['off', 'late', 'all'];
@@ -54,8 +55,12 @@ const TILES_SX = {
     bgcolor: 'action.hover',
     alignItems: 'center',
   },
-  '& .MuiFormControlLabel-label .MuiTypography-root': { display: 'block', lineHeight: 1.3 },
-  '& .MuiFormControlLabel-root.Mui-disabled .MuiTypography-root': { color: 'text.disabled' },
+  '& .MuiFormControlLabel-label .MuiTypography-root': { display: 'block', lineHeight: 1.3, fontSize: 14 },
+  '& .MuiFormControlLabel-label .MuiTypography-caption': { fontSize: 12, color: 'text.secondary' },
+  '& .MuiRadio-root.Mui-checked': { color: 'text.primary' },
+  // The board fades the whole tile the device cannot honour, not just its words.
+  '& .MuiFormControlLabel-root.Mui-disabled': { opacity: 0.45 },
+  '& .MuiFormControlLabel-root.Mui-disabled .MuiTypography-root': { color: 'text.primary' },
 } as const;
 
 const TRACK_SX = {
@@ -148,9 +153,19 @@ export function Hint({
   readonly tone?: 'secondary' | 'warning';
 }): JSX.Element {
   return (
-    <Text variant="body" size="sm" color={tone}>
+    <Box
+      component="p"
+      sx={{
+        m: 0,
+        fontSize: 13,
+        lineHeight: 1.4,
+        // A warning in the darker amber the boards use for words, not the fill.
+        color: (theme: Theme) =>
+          tone === 'warning' ? severityFill(theme, 'spent') : theme.palette.text.secondary,
+      }}
+    >
       {children}
-    </Text>
+    </Box>
   );
 }
 
@@ -165,7 +180,13 @@ export function Action({
 }): JSX.Element {
   return (
     <Box>
-      <Button variant={solid ? 'solid' : 'outline'} color="neutral" size="sm" onClick={onClick}>
+      <Button
+        variant={solid ? 'solid' : 'outline'}
+        color="neutral"
+        size="sm"
+        onClick={onClick}
+        sx={solid ? undefined : { color: 'text.primary', borderColor: 'divider' }}
+      >
         {children}
       </Button>
     </Box>

@@ -19,7 +19,8 @@
 import type { JSX, MouseEvent, ReactNode } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
-import { keyframes, type Theme } from '@12-apps/ui/mui/styles';
+import { alpha, keyframes, type Theme } from '@12-apps/ui/mui/styles';
+import { surfaces } from '@12-apps/ui/tokens';
 
 import { pulseOf, type AttentionEntry, type AttentionPulse, type AttentionSeverity } from '../core';
 
@@ -187,10 +188,11 @@ function Face({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        // The approved boards' own shadows, in the theme's ink.
         boxShadow: (theme: Theme) =>
           spent
-            ? `0 0 0 3px ${theme.palette.background.paper}, 0 0 0 7px ${severityFill(theme, severity)}, ${theme.shadows[6]}`
-            : theme.shadows[4],
+            ? `0 0 0 3px ${surfaces(theme).raised}, 0 0 0 7px ${severityFill(theme, severity)}, 0 8px 18px ${alpha(theme.palette.text.primary, 0.45)}`
+            : `0 6px 16px ${alpha(theme.palette.text.primary, 0.35)}`,
         animation: spent ? `${shake} 2.2s ease-in-out infinite` : 'none',
         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
       }}
@@ -297,7 +299,7 @@ export function AttentionOthersButton({
         color: (theme: Theme) =>
           severity === 'calm' ? theme.palette.success.main : severityFill(theme, severity),
         border: '1.5px solid currentColor',
-        boxShadow: 2,
+        boxShadow: (theme: Theme) => `0 2px 6px ${alpha(theme.palette.text.primary, 0.18)}`,
         font: 'inherit',
         fontSize: 14,
         fontWeight: 700,

@@ -7,12 +7,13 @@ import type { JSX } from 'react';
 
 import { Popover } from '@12-apps/ui/data-display/Popover';
 import { Box } from '@12-apps/ui/mui/Box';
-import { alpha, type Theme } from '@12-apps/ui/mui/styles';
-import { Text } from '@12-apps/ui/typography/Text';
+import type { Theme } from '@12-apps/ui/mui/styles';
+import { softSignal } from '@12-apps/ui/tokens';
 
 import type { AttentionEntry } from '../core';
 
 import { severityFill } from './attention-button';
+import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionMessages } from './messages';
 import { minutesOf, type AttentionKindView, type AttentionViews } from './views';
 
@@ -78,9 +79,8 @@ function OtherRow({
         onClick={() => onPick(entry)}
         sx={{
           ...ROW_SX,
-          // The row's own wash: amber for anything late, green while calm.
-          bgcolor: (theme: Theme) =>
-            alpha(calm ? theme.palette.success.main : theme.palette.warning.main, 0.08),
+          // The row's own wash: the soft amber for anything late, the soft green while calm.
+          bgcolor: (theme: Theme) => softSignal(theme, calm ? 'success' : 'warning'),
         }}
       >
         <Box
@@ -92,7 +92,9 @@ function OtherRow({
             flexShrink: 0,
             // A shape as well as a colour: the late are squares, the calm round.
             borderRadius: calm ? '50%' : '2px',
-            bgcolor: (theme: Theme) => severityFill(theme, entry.severity),
+            // Amber for every late row, the spent ones included: the shape and
+            // the time carry the rest.
+            bgcolor: (theme: Theme) => (calm ? theme.palette.success.main : theme.palette.warning.main),
           }}
         />
         <Box component="span" aria-hidden sx={{ flex: 1, minWidth: 0, fontSize: 14 }}>
@@ -114,6 +116,24 @@ function OtherRow({
   );
 }
 
+/**
+ * Above the dock, 10px clear of the button, unless the reader dragged it into
+ * the top half of the screen — then under it; lined up with its outer edge;
+ * and no taller than the room on that side, so a long list scrolls there
+ * rather than slide over the dock it hangs off.
+ */
+function placeList(
+  anchor: HTMLElement | null,
+  side: 'left' | 'right',
+): { readonly at: { top: number; left: number }; readonly below: boolean; readonly room: number } | null {
+  if (anchor === null) return null;
+  const rect = anchor.getBoundingClientRect();
+  const below = rect.top < window.innerHeight / 2;
+  const room = (below ? window.innerHeight - rect.bottom : rect.top) - LIST_GAP_PX - FLOATING_MARGIN_PX;
+  const top = below ? rect.bottom + LIST_GAP_PX : rect.top - LIST_GAP_PX;
+  return { at: { top, left: rect[side] }, below, room };
+}
+
 export function AttentionOthersList({
   anchor,
   side,
@@ -123,21 +143,16 @@ export function AttentionOthersList({
   onClose,
   onPick,
 }: AttentionOthersListProps): JSX.Element {
-  // Above the dock, 10px clear of the button, unless the reader dragged it into
-  // the top half of the screen — then under it; lined up with its outer edge.
-  const rect = anchor?.getBoundingClientRect() ?? null;
-  const below = rect !== null && rect.top < window.innerHeight / 2;
+  const place = placeList(anchor, side);
   return (
     <Popover
-      open={rect !== null && entries.length > 0}
+      open={place !== null && entries.length > 0}
       anchorReference="anchorPosition"
-      anchorPosition={
-        rect === null
-          ? undefined
-          : { top: below ? rect.bottom + LIST_GAP_PX : rect.top - LIST_GAP_PX, left: rect[side] }
-      }
+      anchorPosition={place?.at}
       onClose={onClose}
-      transformOrigin={{ vertical: below ? 'top' : 'bottom', horizontal: side }}
+      transformOrigin={{ vertical: place?.below === true ? 'top' : 'bottom', horizontal: side }}
+      marginThreshold={FLOATING_MARGIN_PX}
+      PaperProps={FLOATING_PAPER}
       dataTestId="attention-others-list"
     >
       <Box
@@ -148,13 +163,14 @@ export function AttentionOthersList({
           gap: 0.5,
           // Never wider than the screen less the popover's 16px margins: at
           // 320px a fixed width ran 9px off the left edge.
-          width: 'min(270px, calc(100vw - 32px))',
+          width: 'min(270px, calc(100vw - 24px))',
           boxSizing: 'border-box',
+          ...(place === null ? {} : { maxHeight: place.room, overflowY: 'auto' }),
         }}
       >
-        <Text variant="body" size="sm" weight="bold" as="span">
+        <Box component="strong" sx={{ fontSize: 14, p: '4px 6px 6px' }}>
           {messages.othersTitle}
-        </Text>
+        </Box>
         <Box
           component="ul"
           aria-label={messages.othersTitle}

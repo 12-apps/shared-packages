@@ -8,7 +8,6 @@
 import type { JSX, ReactNode } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
-import { Text } from '@12-apps/ui/typography/Text';
 
 import { playAttentionSound, useCanVibrate, vibrateFor, type AttentionSounds } from './alerts';
 import type { AttentionPreferencesMessages } from './messages';
@@ -43,9 +42,9 @@ function Section({
         ...(first ? {} : { borderTop: 1, borderColor: 'divider', pt: 1.75 }),
       }}
     >
-      <Text variant="body" weight="bold" as="h3">
+      <Box component="h3" sx={{ m: 0, fontSize: 15, fontWeight: 700 }}>
         {title}
-      </Text>
+      </Box>
       <Hint>{description}</Hint>
       {children}
     </Box>
