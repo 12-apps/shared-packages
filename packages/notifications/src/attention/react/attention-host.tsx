@@ -89,6 +89,24 @@ function useOpenEntry(
   return { open, sheet };
 }
 
+/** The button read aloud: the next thing, how long it has waited, how many more. */
+function buttonLabel(
+  messages: AttentionMessages,
+  view: AttentionKindView,
+  head: AttentionEntry,
+  waited: string,
+  others: number,
+): string {
+  const named = view.describe(head.item);
+  return messages.button({
+    title: named.spoken ?? named.title,
+    what: named.what,
+    waited,
+    urgent: head.severity !== 'calm',
+    others,
+  });
+}
+
 export function AttentionHost({
   registry,
   views,
@@ -123,7 +141,6 @@ export function AttentionHost({
   }, [hasOthers]);
   if (head === undefined) return sheet === null ? null : <>{sheet}</>;
   const headView = views[head.kind.id] as AttentionKindView;
-  const named = headView.describe(head.item);
   const waited = messages.waited(minutesOf(head.waitedMs));
   const othersSeverity = worstSeverity(others.map((entry) => entry.severity)) ?? 'calm';
 
@@ -148,13 +165,7 @@ export function AttentionHost({
           entry={head}
           icon={iconOf(headView, head.item)}
           waited={waited}
-          label={messages.button({
-            title: named.spoken ?? named.title,
-            what: named.what,
-            waited,
-            urgent: head.severity !== 'calm',
-            others: others.length,
-          })}
+          label={buttonLabel(messages, headView, head, waited, others.length)}
           onOpen={() => open(head)}
         />
       </AttentionDock>

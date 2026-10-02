@@ -18,11 +18,10 @@ export {
 export { AttentionDock, type AttentionDockProps } from './attention-dock';
 export {
   AttentionPreferencesPanel,
-  AttentionQuickSettings,
   type AttentionPreferencesPanelProps,
   type AttentionPushState,
-  type AttentionQuickSettingsProps,
 } from './attention-preferences';
+export { AttentionQuickSettings, type AttentionQuickSettingsProps } from './attention-quick-settings';
 export {
   canVibrate,
   playAttentionSound,
