@@ -40,6 +40,12 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     expiryLocale: 'pt-BR',
     awaiting: 'Aguardando pagamento…',
     chargeMissing: 'Não foi possível gerar o código PIX.',
+    manual: {
+      instructions: (totalLabel) =>
+        `Pague ${totalLabel} com o QR code ou o código abaixo. A loja confere o recebimento e confirma o seu pedido.`,
+      validUntil: (time) => `A loja confirma o pagamento até ${time}.`,
+      awaiting: 'Aguardando a loja confirmar o pagamento…',
+    },
   },
   card: {
     heading: 'Pague com cartão',
