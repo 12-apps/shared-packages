@@ -217,12 +217,12 @@ describe("detectContactInfo — address, money and time lines carry numbers that
 
 describe("detectContactInfo — bidi overrides, look-alike letters, spaced letters", () => {
   it("reads a right-to-left override in display order", () => {
-    expect(detectContactInfo("‮moc.liamg@ana", ALL, PT_BR)).toContain("email");
-    expect(detectContactInfo("‮paz", ["handle"], { extraPatterns: [/zap/] })).toEqual(["handle"]);
-    expect(detectContactInfo("oi ⁧moc.liamg@ana⁩ tchau", ["email"], PT_BR)).toEqual(["email"]);
+    expect(detectContactInfo("\u202Emoc.liamg@ana", ALL, PT_BR)).toContain("email");
+    expect(detectContactInfo("\u202Epaz", ["handle"], { extraPatterns: [/zap/] })).toEqual(["handle"]);
+    expect(detectContactInfo("oi \u2067moc.liamg@ana\u2069 tchau", ["email"], PT_BR)).toEqual(["email"]);
   });
 
-  it.each(["‮Cheguei. Tô aqui", "‮apto 1204‬, chego 19:30", "⁧Ok⁩ já vou"])(
+  it.each(["\u202ECheguei. Tô aqui", "\u202Eapto 1204\u202C, chego 19:30", "\u2067Ok\u2069 já vou"])(
     "adds no refusal for an ordinary line under an override: %s",
     (text) => {
       expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
@@ -242,4 +242,94 @@ describe("detectContactInfo — bidi overrides, look-alike letters, spaced lette
   it.each(["faz a pizza", "e a casa", "Vou a pé e já volto"])("does not join ordinary words: %s", (text) => {
     expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
   });
+});
+
+describe("detectContactInfo — a neutral span still counts as one digit", () => {
+  it.each(["(11) 98765-$4321", "11 98765 $4321", "1198765$4321", "9876543$2", "119876$54321", "11 98765 £4321", "11 98765 € 4321"])(
+    "refuses %s with no host vocabulary",
+    (text) => {
+      expect(detectContactInfo(text, ALL)).toContain("phone");
+    },
+  );
+
+  it.each(["98765 ap 4321", "11 98765 apto 4321", "(11) 98765 casa 4321", "11 98765 e R$ 4321"])(
+    "refuses %s with the host's address units",
+    (text) => {
+      expect(detectContactInfo(text, ALL, PT_BR)).toContain("phone");
+    },
+  );
+
+  it.each([
+    "Rua A, 1234 apto 5678",
+    "R$ 25,00 + R$ 12,50",
+    "Rua 7, 77, ap 7 bl 7 casa 7",
+    "Rua 7 de Setembro, 1234 ap 56",
+    "Bloco 3 apto 1204, interfone 1204",
+    "Condomínio X, casa 12, rua 3",
+    "troco pra 50",
+    "deu 37,90, tem troco pra 100?",
+    "entre 19h e 19h30",
+    "hoje 02/10",
+    "2 pizzas e 3 refris",
+  ])("lets %s through", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
+  });
+});
+
+describe("detectContactInfo — e-mail with no top-level domain or a look-alike dot", () => {
+  it.each([
+    "ana@gmail",
+    "ana@gmail com",
+    "ana@gmail,com",
+    "ana@gmail\u3002com",
+    "ana@gmail\uFF61com",
+    "ana@gmail\u00B7com",
+    "ana@gmail\u2027com",
+    "ana@gmail\u2219com",
+    "ana@gmail\u2022com",
+    "ana@gmail\uA4F8com",
+    "ana@gmail\u0589com",
+    "ana@gmail\u06D4com",
+    "ana@gmail..com",
+    "ana(at)gmail",
+    "ana (arroba) gmail",
+    "ana@gmail.",
+  ])("finds %s as email", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toContain("email");
+  });
+
+  it.each(["www\u3002site\u3002com", "site\u3002com", "site\uFF61com"])("finds %s as url", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toContain("url");
+  });
+
+  it("keeps the spaced forms as they were", () => {
+    expect(detectContactInfo("Estou @ 10h na porta", ALL, PT_BR)).toEqual([]);
+    expect(detectContactInfo("I am at the door", ALL, VOCABULARY)).toEqual([]);
+    expect(detectContactInfo("Chego 25@10h", ALL, PT_BR)).toEqual([]);
+    expect(detectContactInfo("cheguei, estou aqui @ portaria", ALL, PT_BR)).toEqual(["handle"]);
+  });
+});
+
+describe("detectContactInfo — letters on separate lines, short links", () => {
+  it.each(["z\na\np", "w\nh\na\nt\ns", "z\n.\na\n.\np"])("joins single letters across lines: %j", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual(["handle"]);
+  });
+
+  it.each(["e\na\ncasa", "Pode ser\na\ne\nb", "Ok\nJá vou\nA casa é a azul"])("leaves ordinary lines alone: %j", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
+  });
+
+  it.each(["linktr.ee/ana", "goo.gl/x", "youtu.be/x", "bit.do/x", "lnkd.in/x", "instagr.am/ana", "qualquer.coisa/abc"])(
+    "finds %s as url",
+    (text) => {
+      expect(detectContactInfo(text, ALL, PT_BR)).toContain("url");
+    },
+  );
+
+  it.each(["Ok/3x", "S.Paulo/SP", "Av. Brasil/SP", "1/2 pizza", "e/ou", "Centro/SP", "Moro em Sto.Andre/SP"])(
+    "lets %s through",
+    (text) => {
+      expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
+    },
+  );
 });

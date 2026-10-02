@@ -28,10 +28,12 @@ const DEFAULT_LOOKBACK = { messages: 12, windowMs: 10 * 60_000 } as const;
 
 /**
  * Characters that draw nothing: format characters (zero-width spaces,
- * joiners, bidi marks) and the fillers that are letters to Unicode but blank
- * on screen (Hangul fillers, the braille blank).
+ * joiners, bidi marks), the fillers that are letters to Unicode but blank on
+ * screen (Hangul fillers, the braille blank, Khmer inherent vowels), the
+ * grapheme joiner and the variation selectors.
  */
-const INVISIBLE = /[\p{Cf}\u115F\u1160\u2800\u3164\uFFA0]/gu;
+// The combining ones (grapheme joiner, Khmer inherent vowels, variation selectors) sit outside the class, where they cannot attach to a neighbour.
+const INVISIBLE = /[\p{Cf}\u115F\u1160\u2800\u3164\uFFA0]|\u034F|\u17B4|\u17B5|\p{Variation_Selector}/gu;
 
 /**
  * Bidi controls, removed before a message is STORED: an override makes the

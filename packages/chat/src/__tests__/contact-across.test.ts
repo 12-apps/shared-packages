@@ -31,7 +31,12 @@ describe("detectContactInfoAcross", () => {
     [["11", "98765"], "4321", "phone"],
     [["ana", "@"], "gmail.com", "email"],
     [["ana@"], "gmail.com", "email"],
-    [["ana@gmail"], ".com", "email"],
+    [["ana", "@gmail"], ".com", "email"],
+    [["ana arroba gmail."], "com", "email"],
+    [["ana@", "gmail."], "com", "email"],
+    [["meusite."], "com", "url"],
+    [["meusite. "], "com.br", "url"],
+    [["meusite."], "com/promo", "url"],
     [["ana arroba gmail"], "ponto com", "email"],
   ])("finds %j then %s as %s", (recent, draft, kind) => {
     expect(detectContactInfoAcross(recent, draft, ALL, PT_BR)).toContain(kind);
@@ -54,6 +59,9 @@ describe("detectContactInfoAcross", () => {
     [["Estou na esquina da rua 7 com a 12"], "Portão azul ao lado do 230"],
     [["Av Paulista, 1578"], "apto 1204"],
     [["98765"], "Cheguei, pode descer"],
+    [["Cheguei."], "Com certeza, já desço"],
+    [["Estou no ponto."], "Com a moto"],
+    [["Apto 1204."], "Com interfone quebrado"],
   ])("lets %j then %s through", (recent, draft) => {
     expect(detectContactInfoAcross(recent, draft, ALL, PT_BR)).toEqual([]);
   });
@@ -82,7 +90,12 @@ describe("contact scanners on long input", () => {
     ["single letters", "a ".repeat(long / 2)],
     ["digits and letters", "1a".repeat(long / 2)],
     ["clock times", "12:30 ".repeat(long / 6)],
-    ["bidi overrides", "‮ab".repeat(long / 3)],
+    ["bidi overrides", "\u202Eab".repeat(long / 3)],
+    ["currency after digits", "1$1 ".repeat(long / 4)],
+    ["address units", "apto 1 ".repeat(long / 7)],
+    ["glued at signs", "a@".repeat(long / 2)],
+    ["dot look-alikes", "a\u3002".repeat(long / 2)],
+    ["long paths", "a.bc/".repeat(long / 5)],
   ])("finishes on 20k characters of %s", (_shape, text) => {
     expect(Array.isArray(detectContactInfo(text, ALL, PT_BR))).toBe(true);
     expect(Array.isArray(detectContactInfoAcross([text, text], text, ALL, PT_BR))).toBe(true);

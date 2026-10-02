@@ -88,15 +88,20 @@ free text (`contactLookback`, default the last 12 messages within 10
 minutes) joins the draft while each message ends where the next begins with
 a digit, a dot or an at-sign. A number trickled one digit per message is
 one number; `Apto 1204` followed by `Chego 19:30` is two lines. One author's
-sends to a thread are checked one at a time, so parallel requests cannot
-pass the rule against each other's absence. Bidi controls are removed
-before a message is stored, so the screen shows what the filter read.
+sends to a thread are checked one at a time in each process, so parallel
+requests cannot pass the rule against each other's absence (several
+replicas can still interleave). Bidi controls are removed before a message
+is stored, so the screen shows what the filter read.
 
 Every attempt spends a rate-limit slot, including a refused one, so probing
 the filter runs out of attempts. It is a deterrent, not a guarantee: a
 person determined to pass a number can always find an encoding no filter
-reads (a word between every pair of digits, a picture), and `onRefused` is
-how the host sees who keeps trying. A host that wants `arroba` to count
+reads, and `onRefused` is how the host sees who keeps trying. Known misses,
+each the price of letting an ordinary line through: a word between the
+pieces of a number (`98765 e 4321`), both pieces behind an address unit or a
+currency symbol (`apto 98765 apto 4321`, indistinguishable from an address
+with an apartment), a chain broken by a message of something else, and a
+picture. A host that wants `arroba` to count
 toward a social handle adds it to `extraPatterns`.
 
 ### Retention

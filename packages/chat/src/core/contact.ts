@@ -36,23 +36,36 @@ export const CONTACT_KINDS: readonly ContactKind[] = ["phone", "email", "url", "
  * between two groups (`98765 e 4321`), while ordinary money lines stay over
  * it (`100,00, total 37,90` spans 17).
  *
- * Before the window, spans that legitimately carry numbers are blanked to one
- * letter (see NEUTRAL_RULES): clock times, amounts after a currency symbol,
- * and the host's `neutralPatterns` (address units). Each is blanked only when
- * it holds few digits and is not followed straight away by another digit.
+ * Before the window, spans that legitimately carry numbers collapse to ONE
+ * digit (see NEUTRAL_RULES): clock times, amounts after a currency symbol,
+ * and the host's `neutralPatterns` (address units). One digit, not none, so a
+ * span still counts toward the window and cannot launder a phone's tail
+ * (`11 98765 $4321`, `11 98765 apto 4321` are still eight). A span collapses
+ * only when it holds few digits, is not followed straight away by a digit,
+ * and is not preceded straight away by a run of five or more digits — a
+ * mobile's first group (`98765 ap 4321`, `119876$54321`), while a street
+ * number (`Rua A, 1234 apto 5678`) is at most four.
  *
  * Known costs, accepted because a missed number is the harm: a CEP-shaped
  * postcode (`01310-100`), a full date (`02/10/2026`), and money without a
  * currency symbol (`total 100,00 + 37,90`) are eight digits and are refused.
- * Known misses: digits spread wider than the window (`9 oi 8 oi 7 ...`), and
- * a number whose first group is shaped like a time, an amount or a host unit
- * followed by a word (`apt 98765 and 4321`, `12:34 or 5678`) — that is
- * exactly the shape of `apt 1204 and 1205`, and the two cannot be told apart.
+ * A five-digit street number followed by a unit is refused too.
+ * Known misses: digits spread wider than the window (`9 oi 8 oi 7 ...`); a
+ * number whose first group is shaped like a time, an amount or a host unit
+ * followed by a word (`apt 98765 and 4321`, `12:34 or 5678`) — exactly the
+ * shape of `apt 1204 and 1205`; a landline split by a unit
+ * (`1234 apto 5678`) — exactly `Rua A, 1234 apto 5678`; and double
+ * laundering, both groups dressed as spans (`apto 98765 apto 4321`,
+ * `R$ 98765 e R$ 4321`) — indistinguishable from two units or two prices.
  */
 const PHONE_MIN_DIGITS = 8;
 const PHONE_WINDOW = 16;
 /** Host spans: an address unit is at most five digits. */
 const HOST_NEUTRAL_MAX_DIGITS = 5;
+/** A run this long right before a span is a phone's first group, never a street number. */
+const PHONE_GROUP_DIGITS = 5;
+/** What a neutral span becomes: one digit, between spaces. */
+const NEUTRAL_PLACEHOLDER = " 0 ";
 
 interface NeutralRule {
   readonly pattern: RegExp;
@@ -70,12 +83,14 @@ const NEUTRAL_RULES: readonly NeutralRule[] = [
 /*
  * Top-level domains. A curated list, because "any two letters" read `no.de`
  * and `ok.me` as domains. STRONG ones count on their own; PATH ones are also
- * ordinary words (`me`, `to`, `site`) and count only with a path after them
- * (`t.me/x`, `wa.me/55...`). Multi-part ones (`com.br`) need no entry: the
- * `com` already matches.
+ * ordinary words (`me`, `to`, `site`, `do`, `in`) and count only with a path
+ * after them (`t.me/x`, `wa.me/55...`, `goo.gl/x`, `youtu.be/x`). Any other
+ * alphabetic top-level domain counts with a path of three or more characters
+ * (`some.link/abc`); a shorter path is how `S.Paulo/SP` is written. Multi-part
+ * ones (`com.br`) need no entry: the `com` already matches.
  */
 const STRONG_TLDS = ["com", "net", "org", "br", "io", "info", "biz", "xyz", "ly", "gg", "app", "dev"];
-const PATH_TLDS = ["me", "co", "tv", "us", "uk", "pt", "to", "cc", "ai", "link", "site", "online"];
+const PATH_TLDS = ["me", "co", "tv", "us", "uk", "pt", "to", "cc", "ai", "link", "site", "online", "ee", "gl", "be", "do", "in", "am"];
 const STRONG = STRONG_TLDS.join("|");
 const ANY_TLD = [...STRONG_TLDS, ...PATH_TLDS].join("|");
 
@@ -91,6 +106,8 @@ const LOCAL = "(?<![a-z0-9._%+-])[a-z0-9._%+-]+";
 /** Not inside a label, and not right after `label.` (that start was already tried). */
 const HOST_START = "(?<![a-z0-9-])(?<![a-z0-9-]\\.)";
 
+/** `ana@gmail`, glued on both sides, no top-level domain needed (`ana@gmail com`, `ana(at)gmail`). The domain starts with a letter, so `25@10h` is not one. */
+const EMAIL_GLUED = new RegExp(`${LOCAL}@[a-z][a-z0-9-]+`);
 /** `ana@host.tld`, nothing between: any alphabetic top-level domain. */
 const EMAIL_TIGHT = new RegExp(`${LOCAL}@${LABEL}(?:\\.${LABEL})*\\.[a-z]{2,}\\b`);
 /** `ana @ host . com`, `ana <at-word> host <dot-word> com`: spacing allowed, so the domain must be a known one. */
@@ -99,6 +116,7 @@ const URL_SCHEME = /\b(?:https?:\/\/|www\.)\S+/;
 /** A literal dot with nothing around it — `Cheguei. Com` is a sentence, `site.com` is not. */
 const DOMAIN = new RegExp(`${HOST_START}(?:${LABEL}\\.)+(?:${STRONG})\\b`);
 const DOMAIN_WITH_PATH = new RegExp(`${HOST_START}(?:${LABEL}\\.)+(?:${ANY_TLD})\\/\\S`);
+const DOMAIN_WITH_LONG_PATH = new RegExp(`${HOST_START}(?:${LABEL}\\.)+[a-z]{2,}\\/[a-z0-9_-]{3,}`);
 /** `site <dot-word> com`: a label of three or more, so `no ponto com` (at the spot, with) is not one. */
 const DOMAIN_SPELLED = new RegExp(`(?<![a-z0-9-])[a-z0-9-]{3,}\\s*${DOT_MARK}\\s*(?:${STRONG})\\b`);
 /** A literal `@` not glued to a preceding word (that is an e-mail), then a name starting with a letter. */
@@ -107,23 +125,37 @@ const HANDLE = /(?<![a-z0-9_.])@\s*[a-z_][a-z0-9_.]+/;
 const NON_ALPHANUMERIC_RUN = /[^\p{L}\p{N}]+/gu;
 const ASCII_DIGIT = /[0-9]/g;
 const FOLLOWED_BY_DIGIT = /[^\p{L}\p{N}]*[0-9]/uy;
+const SEPARATOR_CHAR = /^[^\p{L}\p{N}]$/u;
+const DIGIT_CHAR = /^[0-9]$/;
 
-function isNeutral(text: string, span: string, end: number, maxDigits: number): boolean {
-  const digits = span.match(ASCII_DIGIT)?.length ?? 0;
-  if (digits === 0 || digits > maxDigits) return false;
-  FOLLOWED_BY_DIGIT.lastIndex = end;
-  return !FOLLOWED_BY_DIGIT.test(text);
+/** How many digits (up to PHONE_GROUP_DIGITS) sit right before `index`, punctuation and spaces skipped. */
+function digitRunBefore(text: string, index: number): number {
+  let at = index - 1;
+  while (at >= 0 && SEPARATOR_CHAR.test(text.charAt(at))) at -= 1;
+  let run = 0;
+  while (run < PHONE_GROUP_DIGITS && at >= 0 && DIGIT_CHAR.test(text.charAt(at))) {
+    run += 1;
+    at -= 1;
+  }
+  return run;
 }
 
-/** Blank every span of `rule` that may be blanked to one letter, `x`. */
+function isNeutral(text: string, match: RegExpExecArray, maxDigits: number): boolean {
+  const digits = match[0].match(ASCII_DIGIT)?.length ?? 0;
+  if (digits === 0 || digits > maxDigits) return false;
+  FOLLOWED_BY_DIGIT.lastIndex = match.index + match[0].length;
+  if (FOLLOWED_BY_DIGIT.test(text)) return false;
+  return digitRunBefore(text, match.index) < PHONE_GROUP_DIGITS;
+}
+
+/** Collapse every span of `rule` that may be collapsed to one digit. */
 function neutralise(text: string, rule: NeutralRule): string {
   let out = "";
   let from = 0;
   for (const match of text.matchAll(rule.pattern)) {
-    const end = match.index + match[0].length;
-    if (!isNeutral(text, match[0], end, rule.maxDigits)) continue;
-    out += `${text.slice(from, match.index)} x `;
-    from = end;
+    if (!isNeutral(text, match, rule.maxDigits)) continue;
+    out += `${text.slice(from, match.index)}${NEUTRAL_PLACEHOLDER}`;
+    from = match.index + match[0].length;
   }
   return out + text.slice(from);
 }
@@ -151,8 +183,8 @@ type Scanner = (reading: View, compiled: CompiledVocabulary) => boolean;
 /** One scanner per kind. `extraPatterns` count as `handle` — they name a way to be reached. */
 const SCANNERS: Readonly<Record<ContactKind, Scanner>> = {
   phone: (reading, compiled) => hasPhone(reading.scan, compiled),
-  email: (reading) => EMAIL_TIGHT.test(reading.scan) || EMAIL_SPACED.test(reading.scan),
-  url: ({ scan }) => URL_SCHEME.test(scan) || DOMAIN.test(scan) || DOMAIN_WITH_PATH.test(scan) || DOMAIN_SPELLED.test(scan),
+  email: ({ scan }) => EMAIL_GLUED.test(scan) || EMAIL_TIGHT.test(scan) || EMAIL_SPACED.test(scan),
+  url: ({ scan }) => [URL_SCHEME, DOMAIN, DOMAIN_WITH_PATH, DOMAIN_WITH_LONG_PATH, DOMAIN_SPELLED].some((pattern) => pattern.test(scan)),
   handle: (reading, compiled) => HANDLE.test(reading.scan) || matchesHost(reading, compiled.extra),
 };
 
@@ -176,6 +208,15 @@ const CONTACT_EDGE = /^[0-9.]$/;
 /** `@` or a host at/dot word: an address cut there needs only ONE side (`ana` | `@` | `gmail.com`). */
 const ADDRESS_EDGE = new RegExp(`^[@${AT_MARK}${DOT_MARK}]$`);
 const EDGE_SKIP = new RegExp(`[^\\p{L}\\p{N}@.${AT_MARK}${DOT_MARK}]`, "u");
+/** A message that is nothing but a top-level domain, maybe with more after it: `com`, `com.br`, `me/ana`. */
+const HOLDS_AT = new RegExp(`[@${AT_MARK}]`);
+const LONE_TLD = new RegExp(`^\\s*(?:${ANY_TLD})(?:[./]\\S*)?\\s*$`);
+
+/** One message as the chain reads it. */
+interface Piece {
+  readonly raw: string;
+  readonly scan: string;
+}
 
 /** The first (or last) character of a reading that is not a space or ordinary punctuation. */
 function edge(scan: string, side: "start" | "end"): string {
@@ -184,45 +225,63 @@ function edge(scan: string, side: "start" | "end"): string {
   return chars.find((char) => !EDGE_SKIP.test(char)) ?? "";
 }
 
+/** `meusite.` then `com`: a domain cut at its dot, re-glued with nothing between. */
+function cutAtDot(earlier: string, later: string): boolean {
+  return edge(earlier, "end") === "." && LONE_TLD.test(later);
+}
+
 /**
  * Whether two consecutive messages may be one contact cut in two: digit (or
- * dot) on both sides of the cut, or an address symbol on either side, or a
- * later message opening with `.` (`.com`). A sentence ending in `.` is not
- * enough on its own — it is how most sentences end.
+ * dot) on both sides of the cut; an address symbol on either side; a later
+ * message opening with `.` (`.com`); or an earlier one ending in `.` when it
+ * holds an `@` (`ana@gmail.` | `com`) or the later one is a lone top-level
+ * domain (`meusite.` | `com`). A sentence ending in `.` is not enough on its
+ * own — it is how most sentences end.
  */
 function touches(earlier: string, later: string): boolean {
   const end = edge(earlier, "end");
   const start = edge(later, "start");
   if (ADDRESS_EDGE.test(end) || ADDRESS_EDGE.test(start) || start === ".") return true;
+  if (end === "." && (HOLDS_AT.test(earlier) || LONE_TLD.test(later))) return true;
   return CONTACT_EDGE.test(end) && CONTACT_EDGE.test(start);
 }
 
 /** The recent messages that run contiguously into the draft, oldest first; stops at the first clean cut. */
-function chainBefore(recent: readonly string[], draft: string, compiled: CompiledVocabulary): string[] {
-  const chain: string[] = [];
-  let later = view(draft, compiled).scan;
-  for (const body of [...recent].reverse()) {
-    const earlier = view(body, compiled).scan;
+function chainBefore(recent: readonly string[], draft: Piece, compiled: CompiledVocabulary): Piece[] {
+  const chain: Piece[] = [];
+  let later = draft.scan;
+  for (const raw of [...recent].reverse()) {
+    const earlier = view(raw, compiled).scan;
     if (!touches(earlier, later)) break;
-    chain.unshift(body);
+    chain.unshift({ raw, scan: earlier });
     later = earlier;
   }
   return chain;
 }
 
+/** The pieces as one text: a line break between two, nothing between a domain cut at its dot. */
+function joinPieces(pieces: readonly Piece[]): string {
+  let text = "";
+  let previous: Piece | null = null;
+  for (const piece of pieces) {
+    if (previous === null) text = piece.raw;
+    else text = cutAtDot(previous.scan, piece.scan) ? `${text.trimEnd()}${piece.raw.trimStart()}` : `${text}\n${piece.raw}`;
+    previous = piece;
+  }
+  return text;
+}
+
 /**
  * {@link detectContactInfo} for a draft that may finish something the author
  * started in earlier messages (`98765`, then `4321`; `9`, `8`, `7`… one digit
- * a message).
+ * a message; `ana arroba gmail.`, then `com`).
  *
  * `recent` is the SAME author's earlier bodies in the thread, oldest first.
- * Only the CHAIN that runs into the draft is read: walking back from the
- * draft, an earlier message joins when its end AND the next message's start
- * are a digit or `.` (trailing and leading punctuation skipped), or when
- * either is `@` or a host at/dot word, or the later one opens with `.`; the
- * walk stops at the first cut that is none of those. `Cheguei` then `1204` is
- * a clean cut; `98765,` then `4321` is not. The chain and the draft are
- * joined with line breaks, which the phone window counts as one character.
+ * Only the CHAIN that runs into the draft is read (see `touches`): walking
+ * back from the draft, the walk stops at the first clean cut. `Cheguei` then
+ * `1204` is a clean cut; `98765,` then `4321` is not. The chain and the draft
+ * are joined with line breaks, which the phone window counts as one
+ * character — except a domain cut at its dot, which is glued back.
  *
  * Known misses, the price of reading only a contiguous chain: a group opened
  * by a word (`98765` then `e 4321`), and a digit trickle with chatter in the
@@ -231,7 +290,8 @@ function chainBefore(recent: readonly string[], draft: string, compiled: Compile
  * Refuses a kind found in the draft alone, or in chain + draft but NOT in the
  * chain alone — a kind the earlier messages already carried (they were sent,
  * so they passed) never refuses an innocent draft; only a draft that
- * contributes to the match does.
+ * contributes to the match does. So `ana@gmail.` then `com` is refused at
+ * `ana@gmail.` (an e-mail on its own), not at `com`.
  */
 export function detectContactInfoAcross(
   recent: readonly string[],
@@ -241,10 +301,10 @@ export function detectContactInfoAcross(
 ): ContactKind[] {
   const compiled = compile(vocabulary);
   const alone = detectCompiled(draft, kinds, compiled);
-  const chain = kinds.length === 0 ? [] : chainBefore(recent, draft, compiled);
+  const last: Piece = { raw: draft, scan: view(draft, compiled).scan };
+  const chain = kinds.length === 0 ? [] : chainBefore(recent, last, compiled);
   if (chain.length === 0) return alone;
-  const before = chain.join("\n");
-  const already = detectCompiled(before, kinds, compiled);
-  const joined = detectCompiled(`${before}\n${draft}`, kinds, compiled);
+  const already = detectCompiled(joinPieces(chain), kinds, compiled);
+  const joined = detectCompiled(joinPieces([...chain, last]), kinds, compiled);
   return CONTACT_KINDS.filter((kind) => alone.includes(kind) || (joined.includes(kind) && !already.includes(kind)));
 }

@@ -431,15 +431,16 @@ describe("round-two hardening", () => {
     const { send } = api(config);
     expect((await send(client, { body: "\u202Eolleh\u202C there" })).status).toBe(201);
     expect(db.messages[0]?.body).toBe("olleh there");
-    // Without its override the reversed address is stored, and shown, reversed — no address at all.
-    expect((await send(agent, { body: "\u202Emoc.liamg@ana" })).status).toBe(201);
-    expect(db.messages[1]?.body).toBe("moc.liamg@ana");
+    // Without its override the text is read, and would be shown, in its stored order.
+    const refused = await send(agent, { body: "\u202Emoc.liamg@ana" });
+    expect(refused.body).toEqual({ error: "contact_info", message: EN_US_CHAT_SERVER_COPY.contactInfo });
+    expect(db.messages).toHaveLength(1);
   });
 
   it("reads a body of blank fillers as empty", async () => {
     const { config } = configWith();
     const { send } = api(config);
-    for (const blank of ["\u3164\u3164", "\u2800", "\u115F\u1160"]) {
+    for (const blank of ["\u3164\u3164", "\u2800", "\u115F\u1160", "\u034F", "\u17B4\u17B5", "\uFE0F\uFE0E"]) {
       expect((await send(client, { body: blank })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
     }
   });

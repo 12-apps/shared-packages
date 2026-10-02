@@ -7,8 +7,9 @@
  * become ASCII), format and private-use characters dropped (zero-width
  * joiners, soft hyphens, BOMs, bidi controls), lowercased, combining marks
  * dropped (accents, the keycap enclosure U+20E3, emoji variation selectors),
- * every decimal digit of any script mapped to ASCII, and the common Cyrillic
- * and Greek look-alikes of Latin letters mapped to the Latin letter.
+ * every decimal digit of any script mapped to ASCII, the common Cyrillic and
+ * Greek look-alikes of Latin letters mapped to the Latin letter, and the full
+ * stops of other scripts mapped to `.`.
  */
 
 /** Host vocabulary that widens the generic patterns. All optional. */
@@ -36,9 +37,10 @@ export interface ContactVocabulary {
    * Spans that legitimately carry numbers — an address unit (`apt 1204`), a
    * lot, a room — blanked before the phone scan, so a street number and a unit
    * number do not add up to eight digits. Matched against the normalised text
-   * (lowercase, no accents). A match is blanked only when it holds at most
-   * five digits and the next thing after it is not another digit, so a host
-   * pattern can never swallow a whole phone number.
+   * (lowercase, no accents). A match counts as ONE digit, and only when it
+   * holds at most five digits, is not followed straight away by a digit and
+   * not preceded straight away by a run of five or more — so a host pattern
+   * can never swallow a phone number's tail.
    */
   readonly neutralPatterns?: readonly RegExp[];
 }
@@ -63,6 +65,8 @@ const CONFUSABLE_FROM = [
 const CONFUSABLE_TO = [..."aeopcyxijsdgkmhtb", ..."oaeikvptux"];
 const CONFUSABLES = new Map(CONFUSABLE_FROM.map((from, index) => [from, CONFUSABLE_TO[index] ?? from]));
 const CONFUSABLE = new RegExp(`[${CONFUSABLE_FROM.join("")}]`, "gu");
+/** Full stops of other scripts and dot-like punctuation (ideographic, half-width, middle dot, bullets, Lisu, Armenian, Arabic), read as `.`. */
+const DOT_LOOKALIKE = /[\u3002\uFF61\u00B7\u2027\u2219\u2022\uA4F8\u0589\u06D4]/g;
 
 /** An override or isolate opening (LRO, RLO, LRI, RLI, FSI), and the run it governs up to PDF, PDI or the end of the line. */
 const BIDI_OPENING = /[\u202D\u202E\u2066-\u2068]/;
@@ -71,8 +75,12 @@ const BIDI_RUN = /[\u202D\u202E\u2066-\u2068]([^\u202C\u2069\n]*)/g;
 /** `(at)`, `[dot]`, `{@}`, `( <at-word> )` — a bracketed stand-in is deliberate, so it becomes the symbol itself. */
 const BRACKETED = new RegExp(`(?<!\\s)\\s*[([{<]\\s*(at|dot|@|\\.|${AT_MARK}|${DOT_MARK})\\s*[)\\]}>]\\s*`, "g");
 
-/** Three or more single letters in a row, one to three separators apart: `w h a t s`, `z-a-p`. `e a casa` is two. */
-const SINGLE_LETTER_RUN = /(?<![\p{L}\p{N}])\p{L}(?![\p{L}\p{N}])(?:[^\p{L}\p{N}\n]{1,3}\p{L}(?![\p{L}\p{N}])){2,}/gu;
+/**
+ * Three or more single letters in a row, one to three separators apart, line
+ * breaks included: `w h a t s`, `z-a-p`, `z` / `a` / `p` on three lines.
+ * `e a casa` is two, so ordinary text is left alone.
+ */
+const SINGLE_LETTER_RUN = /(?<![\p{L}\p{N}])\p{L}(?![\p{L}\p{N}])(?:[^\p{L}\p{N}]{1,3}\p{L}(?![\p{L}\p{N}])){2,}/gu;
 const NON_LETTER = /[^\p{L}]+/gu;
 
 /**
@@ -96,7 +104,8 @@ function fold(text: string): string {
     .normalize("NFD")
     .replace(MARKS, "")
     .replace(NON_ASCII_DIGIT, asciiDigit)
-    .replace(CONFUSABLE, (char) => CONFUSABLES.get(char) ?? char);
+    .replace(CONFUSABLE, (char) => CONFUSABLES.get(char) ?? char)
+    .replace(DOT_LOOKALIKE, ".");
 }
 
 function escapeRegExp(text: string): string {

@@ -58,19 +58,22 @@ export type ChatErrorCode =
   | "contact_info"
   | "rate_limited";
 
+/** Keyed by every code, so a code added above fails to compile until it is listed here. */
+const KNOWN_CODES = {
+  unauthenticated: true,
+  not_found: true,
+  closed: true,
+  invalid_body: true,
+  empty: true,
+  too_long: true,
+  free_text_disabled: true,
+  unknown_quick_reply: true,
+  contact_info: true,
+  rate_limited: true,
+} as const satisfies Record<ChatErrorCode, true>;
+
 /** Every code above, for a client deciding whether a refusal is the package's own. */
-export const CHAT_ERROR_CODES: readonly ChatErrorCode[] = [
-  "unauthenticated",
-  "not_found",
-  "closed",
-  "invalid_body",
-  "empty",
-  "too_long",
-  "free_text_disabled",
-  "unknown_quick_reply",
-  "contact_info",
-  "rate_limited",
-];
+export const CHAT_ERROR_CODES = Object.keys(KNOWN_CODES) as readonly ChatErrorCode[];
 
 /** The body of every refusal. */
 export interface ChatWireError {
