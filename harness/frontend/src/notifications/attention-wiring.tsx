@@ -15,8 +15,8 @@ import {
  * Two categories, most important first, and one kind each. Packing is measured
  * per order (the item carries its promised minutes); a return in review has a
  * fixed half hour. Packing opens a sheet the BUTTON draws (`renderSheet`) —
- * the other way a host can answer a tap, beside `onOpen`, which Future Pay uses
- * to open a sheet it already has.
+ * the other way a host can answer a tap, beside `onOpen`, which the origin host
+ * uses to open a sheet it already has.
  */
 export interface PackingItem extends AttentionItem {
   readonly order: string;
