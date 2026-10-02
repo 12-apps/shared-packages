@@ -32,7 +32,7 @@ export interface HarnessView {
   invoice: string;
   total: number;
   totalLabel: string;
-  pix?: { copyPaste: string; expiresAt: string };
+  pix?: { copyPaste: string; expiresAt: string; confirmation?: 'MANUAL' };
   hostedCheckoutUrl?: string;
 }
 
@@ -44,6 +44,8 @@ export interface PayableBook {
   template: Payable;
   /** How many creates have happened; the next mints `refAt(minted)`. */
   minted: number;
+  /** The host says the STORE confirms this store's PIX (`pixmanual`). */
+  pixConfirmation?: 'MANUAL';
 }
 
 /**
@@ -65,7 +67,7 @@ function refAt(index: number): string {
  * page load resolvable on the next.
  */
 export function seedPayables(
-  spec: Pick<HarnessStoreSpec, 'amountCents' | 'customer' | 'settled'>,
+  spec: Pick<HarnessStoreSpec, 'amountCents' | 'customer' | 'settled' | 'pixConfirmation'>,
 ): PayableBook {
   const template: Payable = {
     ref: refAt(0),
@@ -75,11 +77,16 @@ export function seedPayables(
     customer: spec.customer ?? { name: 'Ana Compradora', email: 'ana@exemplo.com' },
     state: spec.settled ? 'SETTLED' : 'OPEN',
   };
-  return { byRef: new Map([[template.ref, template]]), template, minted: 0 };
+  return {
+    byRef: new Map([[template.ref, template]]),
+    template,
+    minted: 0,
+    ...(spec.pixConfirmation ? { pixConfirmation: spec.pixConfirmation } : {}),
+  };
 }
 
 /** The host's view of one payable, including the PIX payload just raised. */
-function viewOf(payable: Payable, charges: MemoryChargeStore): HarnessView {
+function viewOf(payable: Payable, charges: MemoryChargeStore, confirmation?: 'MANUAL'): HarnessView {
   const raised = charges
     .all()
     .filter((stored) => stored.snapshot.reference?.startsWith(payable.ref))
@@ -94,6 +101,7 @@ function viewOf(payable: Payable, charges: MemoryChargeStore): HarnessView {
           pix: {
             copyPaste: snapshot.pix.qrText,
             expiresAt: snapshot.pix.expiresAt ?? new Date(Date.now() + 15 * 60_000).toISOString(),
+            ...(confirmation ? { confirmation } : {}),
           },
         }
       : {}),
@@ -131,11 +139,11 @@ export function payablesPort(book: PayableBook, charges: MemoryChargeStore) {
       };
       book.minted += 1;
       book.byRef.set(payable.ref, payable);
-      return { payable, view: viewOf(payable, charges) };
+      return { payable, view: viewOf(payable, charges, book.pixConfirmation) };
     },
     view: async (ref: string) => {
       const payable = book.byRef.get(ref);
-      return payable ? viewOf(payable, charges) : null;
+      return payable ? viewOf(payable, charges, book.pixConfirmation) : null;
     },
     stateToken: (payable: Payable) => (payable.state === 'OPEN' ? 'AWAITING_PAYMENT' : 'PAID'),
   };
