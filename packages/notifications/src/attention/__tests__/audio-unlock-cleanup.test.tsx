@@ -7,7 +7,7 @@ import { useAttentionAlerts } from '../react/alerts';
 /**
  * The gesture that unlocks audio schedules a check 250ms later. A host that
  * unmounts first must take that check with it: left running, it fired against
- * a torn-down page — in Future Pay's admin suite, after jsdom was gone, as an
+ * a torn-down page — in one adopter's suite, after jsdom was gone, as an
  * unhandled `window is not defined` that failed an unrelated shard.
  */
 function Host(): null {
