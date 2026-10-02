@@ -258,6 +258,23 @@ describe('the device settings', () => {
     expect(createAttentionPreferences({ storageKey: 'attention-settings' }).read().sound).toBe('all');
   });
 
+  it('lays each channel out as three segments, the chosen one pressed', () => {
+    const store = createAttentionPreferences({ storageKey: 'attention-segments' });
+    render(<AttentionQuickSettings store={store} messages={MESSAGES.preferences} />);
+    fireEvent.click(screen.getByTestId('attention-quick-settings'));
+    const sound = screen.getByTestId('attention-quick-sound');
+    const pressed = (): (string | null)[] =>
+      Array.from(sound.querySelectorAll('button')).map((segment) => segment.getAttribute('aria-pressed'));
+    expect(pressed()).toEqual(['true', 'false', 'false']);
+    fireEvent.click(within(sound).getByRole('button', { name: MESSAGES.preferences.sound.levels.all }));
+    expect(pressed()).toEqual(['false', 'false', 'true']);
+    expect(store.read().sound).toBe('all');
+    // jsdom cannot vibrate: only "off" stays pressable there.
+    const vibration = screen.getByTestId('attention-quick-vibration');
+    const enabled = Array.from(vibration.querySelectorAll('button')).map((segment) => !segment.disabled);
+    expect(enabled).toEqual([true, false, false]);
+  });
+
   it("draws the bell at the host's size, a full touch target by default", () => {
     const store = createAttentionPreferences({ storageKey: 'attention-size' });
     const { unmount } = render(<AttentionQuickSettings store={store} messages={MESSAGES.preferences} />);

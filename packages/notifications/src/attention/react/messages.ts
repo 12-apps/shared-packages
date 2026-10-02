@@ -40,6 +40,11 @@ export interface AttentionChannelMessages {
   /** One sentence under the panel's heading. */
   readonly description: string;
   readonly levels: Readonly<Record<AttentionChannelLevel, string>>;
+  /**
+   * The levels as the compact control's segments print them, three across in
+   * a popover ("Off · Late · All"). Omitted, `levels` — which may not fit.
+   */
+  readonly shortLevels?: Readonly<Record<AttentionChannelLevel, string>>;
   /** Under each level, in the panel only. */
   readonly hints: Readonly<Record<AttentionChannelLevel, string>>;
 }

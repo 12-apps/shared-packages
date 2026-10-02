@@ -116,7 +116,7 @@ function QuickChoices({
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
-        width: 250,
+        width: 'min(280px, calc(100vw - 32px))',
         boxSizing: 'border-box',
         ...(maxHeight === undefined ? {} : { maxHeight, overflowY: 'auto' }),
       }}

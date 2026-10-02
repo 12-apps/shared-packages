@@ -58,15 +58,76 @@ const TILES_SX = {
   '& .MuiFormControlLabel-root.Mui-disabled .MuiTypography-root': { color: 'text.disabled' },
 } as const;
 
+const TRACK_SX = {
+  display: 'flex',
+  p: '2px',
+  gap: '2px',
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 2,
+} as const;
+
+const SEGMENT_SX = {
+  flex: 1,
+  minWidth: 0,
+  minHeight: 36,
+  px: 0.5,
+  border: 0,
+  borderRadius: 1.5,
+  font: 'inherit',
+  fontSize: 13,
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  cursor: 'pointer',
+  bgcolor: 'transparent',
+  color: 'text.primary',
+  '&[aria-pressed="true"]': { bgcolor: 'text.primary', color: 'background.default' },
+  '&:disabled': { cursor: 'default', color: 'text.disabled' },
+  '&:focus-visible': { outline: 2, outlineStyle: 'solid', outlineColor: 'primary.main', outlineOffset: 1 },
+} as const;
+
+/**
+ * The compact control's levels: three segments on one line, the chosen one
+ * inverted — a third of the height three stacked radios took in a popover.
+ * A group of pressed/unpressed buttons, so each is announced with its state.
+ */
+function Segments({ channel, words, value, onChange, disabled }: Omit<ChoicesProps, 'compact'>): JSX.Element {
+  const labels = words.shortLevels ?? words.levels;
+  return (
+    <Box role="group" aria-label={words.shortTitle} data-testid={`attention-quick-${channel}`} sx={TRACK_SX}>
+      {LEVELS.map((level) => (
+        <Box
+          key={level}
+          component="button"
+          type="button"
+          aria-pressed={value === level}
+          aria-label={words.levels[level]}
+          title={words.levels[level]}
+          disabled={disabled && level !== 'off'}
+          onClick={() => onChange(level)}
+          sx={SEGMENT_SX}
+        >
+          {labels[level]}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export function Choices({ channel, words, value, onChange, disabled, compact }: ChoicesProps): JSX.Element {
+  if (compact) {
+    return <Segments channel={channel} words={words} value={value} onChange={onChange} disabled={disabled} />;
+  }
   const group = (
     <RadioGroup
-      name={`attention-${compact ? 'quick-' : ''}${channel}`}
-      aria-label={compact ? words.shortTitle : words.title}
+      name={`attention-${channel}`}
+      aria-label={words.title}
       value={value}
       color="neutral"
-      size={compact ? 'sm' : 'md'}
-      showDescriptions={!compact}
+      size="md"
+      showDescriptions
       onChange={(event) => onChange(event.target.value as AttentionChannelLevel)}
       options={LEVELS.map((level) => ({
         value: level,
@@ -76,7 +137,7 @@ export function Choices({ channel, words, value, onChange, disabled, compact }: 
       }))}
     />
   );
-  return compact ? group : <Box sx={TILES_SX}>{group}</Box>;
+  return <Box sx={TILES_SX}>{group}</Box>;
 }
 
 export function Hint({

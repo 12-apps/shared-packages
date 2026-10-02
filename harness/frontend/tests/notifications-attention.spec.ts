@@ -42,9 +42,9 @@ test("keeps this device's settings across a reload", async ({ page }) => {
   await bell.click();
   await page
     .getByTestId('attention-quick-settings-panel')
-    .getByRole('radiogroup', { name: 'Som' })
-    .getByRole('radio', { name: 'Tudo' })
-    .check();
+    .getByRole('group', { name: 'Som' })
+    .getByRole('button', { name: 'Tudo' })
+    .click();
   await expect(bell).toHaveAttribute('data-on', 'true');
   await page.reload();
   await expect(page.getByTestId('attention-quick-settings')).toHaveAttribute('data-on', 'true');
