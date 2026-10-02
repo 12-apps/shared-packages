@@ -5,6 +5,7 @@ import { Box, Stack, Switch, Tooltip, Typography } from '@mui/material';
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { certificateExpiryProximity, isConnected } from './connection-state';
+import { checksLocally } from './checks-locally';
 import { T } from './panel-tokens';
 import type { ConnectionStatusCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
@@ -54,7 +55,9 @@ export function statusBadge(
   if (config?.status === 'RECONNECT_REQUIRED') {
     return { label: copy.reconnectRequired, color: 'error' };
   }
-  if (isConnected(config)) return { label: copy.connectionOk, color: 'info' };
+  if (isConnected(config)) {
+    return { label: (checksLocally(descriptor) ? copy.detailsOk : undefined) ?? copy.connectionOk, color: 'info' };
+  }
   // A FAILED probe lands here, and it says NÃO VERIFICADO like every other
   // not-yet-connected state. `FALHOU` was a third word for the same fact — the
   // store cannot take money through this provider yet — and it was the only
@@ -125,7 +128,7 @@ function toggleGate(
   if (!lockedOff) return { lockedOff, hint: '' };
   return {
     lockedOff,
-    hint: provable ? copy.threeStepsAhead : copy.connectAndVerifyFirst,
+    hint: provable ? copy.threeStepsAhead : ((checksLocally(descriptor) ? copy.checkDetailsFirst : undefined) ?? copy.connectAndVerifyFirst),
   };
 }
 

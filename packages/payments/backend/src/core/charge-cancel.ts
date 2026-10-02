@@ -1,4 +1,5 @@
 import { UnsupportedOperationError } from './errors';
+import { isManualConfirmation, ManualChargeNotFoundError } from './manual-charge';
 import type { ChargeStore } from './ports';
 import type { PaymentProviderAdapter } from './provider';
 import type { ChargeSnapshot, MerchantRef, ResolvedCredentials } from './types';
@@ -45,6 +46,7 @@ export function cancelChargeAt(charges: ChargeStore, resolve: ResolveFor) {
     providerChargeId: string,
   ): Promise<ChargeSnapshot> {
     const { adapter, creds } = await resolve(merchant, provider);
+    if (isManualConfirmation(adapter)) return cancelManually(charges, merchant, provider, providerChargeId);
     if (!adapter.cancelCharge) {
       throw new UnsupportedOperationError(adapter.name, 'cancelling a charge');
     }
@@ -52,4 +54,28 @@ export function cancelChargeAt(charges: ChargeStore, resolve: ResolveFor) {
     await charges.upsertByProviderChargeId(merchant, snapshot);
     return snapshot;
   };
+}
+
+/**
+ * Voiding a charge only the STORE can settle (`capabilities.confirmation:
+ * 'MANUAL'`): nothing to call — a static Pix code cannot be revoked at any
+ * bank, so the void is the store's own refusal to honour it — and it goes
+ * through the same compare-and-set as a staff "Não recebi"
+ * (`ChargeStore.transitionPending`). The read-then-write upsert would let a
+ * buyer's release land CANCELED over a PAID a staff confirm had just set. A
+ * charge the store already confirmed is answered as it stands (PAID), so the
+ * caller learns it was paid rather than that it was voided.
+ */
+async function cancelManually(
+  charges: ChargeStore,
+  merchant: MerchantRef,
+  provider: string,
+  providerChargeId: string,
+): Promise<ChargeSnapshot> {
+  if (!charges.transitionPending) throw new UnsupportedOperationError(provider, 'cancelling without transitionPending');
+  const stored = await charges.findByProviderChargeId(provider, providerChargeId);
+  const ours = stored && stored.merchant.kind === merchant.kind && stored.merchant.id === merchant.id;
+  if (!stored || !ours) throw new ManualChargeNotFoundError(provider, providerChargeId);
+  const outcome = await charges.transitionPending(merchant, { ...stored.snapshot, status: 'CANCELED' });
+  return (outcome.stored ?? stored).snapshot;
 }

@@ -31,6 +31,8 @@ interface ChargeWalkOptions {
   /** Pin one provider: the chain is that provider alone, with no failover. */
   provider?: ProviderName;
   failoverPolicy?: FailoverPolicy;
+  /** `AUTOMATIC`: leave out providers only the store can confirm (`ChargeOptions.confirmation`). */
+  confirmation?: 'AUTOMATIC';
 }
 
 /** What earlier attempts under this idempotency key already established. */
@@ -226,7 +228,12 @@ async function recoverUnfinished(
       true,
     );
   }
-  const snapshot = await resolved.adapter.getCharge(unfinished.providerChargeId, resolved.creds);
+  // A store-confirmed provider's read knows nothing (PENDING, no amount, no
+  // code): rebuild through `createCharge` instead, which is local and
+  // deterministic for it — the same code, the same id.
+  const snapshot = resolved.adapter.capabilities.confirmation === 'MANUAL'
+    ? await resolved.adapter.createCharge(ctx.input, resolved.creds)
+    : await resolved.adapter.getCharge(unfinished.providerChargeId, resolved.creds);
   // `recorded: true` — reaching here means a durable ledger row already names
   // this charge, so if the store fails again the evidence still survives.
   return persistCreated(deps, ctx, unfinished.provider, snapshot, true);
@@ -253,8 +260,8 @@ async function resolveChain(
   merchant: MerchantRef,
   options: ChargeWalkOptions,
 ): Promise<ProviderName[]> {
-  if (options.provider) return [options.provider];
-  const chain = await deps.credentials.providerChain(merchant);
+  if (options.provider) return automaticOnly(deps, [options.provider], options);
+  const chain = automaticOnly(deps, await deps.credentials.providerChain(merchant), options);
   if (chain.length === 0) {
     throw new CredentialsError(
       'none',
@@ -262,6 +269,17 @@ async function resolveChain(
     );
   }
   return chain;
+}
+
+/**
+ * The chain without the providers only a person can confirm, for a lane where
+ * nobody is watching (a host's self-service market). Left out BEFORE the walk,
+ * so nothing is sent to them and no attempt is recorded — the same as the
+ * merchant never having connected them, for this one charge.
+ */
+function automaticOnly(deps: ChargeWalkDeps, chain: ProviderName[], options: ChargeWalkOptions): ProviderName[] {
+  if (options.confirmation !== 'AUTOMATIC') return chain;
+  return chain.filter((name) => !deps.providers.has(name) || deps.providers.get(name).capabilities.confirmation !== 'MANUAL');
 }
 
 /** Attempt number carried across the resume step and the chain loop. */

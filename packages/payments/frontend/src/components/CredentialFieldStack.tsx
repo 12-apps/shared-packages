@@ -6,6 +6,7 @@ import type { PaymentEnvironment, ProviderDescriptor } from '@12-apps/payments-b
 
 import { CredentialField } from './CredentialFields';
 import { appliesIn, saveLabel } from './credential-rules';
+import { checksLocally } from './checks-locally';
 import { FormActions, ReverifyWarning } from './CredentialFormAlerts';
 import type { CredentialFormState } from './ProviderCredentialForm';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
@@ -58,6 +59,7 @@ export function CredentialFields({
         willTest={form.complete}
         disabled={form.nothingEdited || !form.valid}
         onSave={form.requestSave}
+        local={checksLocally(descriptor)}
       />
     </Stack>
   );

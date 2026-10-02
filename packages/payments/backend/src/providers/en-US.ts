@@ -1,3 +1,4 @@
+import { EN_US_PIX_MANUAL_COPY } from './pix-manual/en-US';
 import {
   EN_US_INFINITEPAY_SETUP_GUIDE_COPY,
   EN_US_ITAU_SETUP_GUIDE_COPY,
@@ -187,4 +188,5 @@ export const EN_US_PROVIDER_COPY: ProviderCopyPacks = {
   infinitepay: EN_US_INFINITEPAY_COPY,
   stripe: EN_US_STRIPE_COPY,
   itau: EN_US_ITAU_COPY,
+  pixmanual: EN_US_PIX_MANUAL_COPY,
 };

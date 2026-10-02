@@ -189,12 +189,20 @@ export function ReverifyWarning({ displayName }: { displayName: string }) {
  * Nothing is learned by separating them: the probe reads what was just stored,
  * so the only useful moment to run it is immediately after a save.
  */
+/** What the bar promises: testing now, what a save will do, or that it only writes down. */
+function barMessage(copy: CredentialFormCopy, verifying: boolean, willTest: boolean, local: boolean): string {
+  if (verifying) return (local ? copy.probeLocalRunning : undefined) ?? copy.probeRunning;
+  if (!willTest) return copy.probeIncompleteNote;
+  return (local ? copy.probeLocalSaveNote : undefined) ?? copy.probeSaveNote;
+}
+
 export function FormActions({
   busy,
   label,
   willTest,
   disabled,
   onSave,
+  local = false,
 }: {
   busy: string | null;
   label: string;
@@ -202,17 +210,14 @@ export function FormActions({
   willTest: boolean;
   disabled: boolean;
   onSave: () => void;
+  /** The "test" is a local check (`checksLocally`): nothing is sent to a provider. */
+  local?: boolean;
 }) {
   // The bar states what pressing it costs, which is the half a verb cannot
   // carry: a complete set is sent to the provider on save, and a partial one is
   // only written down. The owner reads the promise and the button in one line.
   const copy = usePaymentsSettingsCopy().credentials;
-  const message =
-    busy === 'verify'
-      ? copy.probeRunning
-      : willTest
-        ? copy.probeSaveNote
-        : copy.probeIncompleteNote;
+  const message = barMessage(copy, busy === 'verify', willTest, local);
 
   return (
     <Box sx={BAR_SX} data-testid="payments-form-bar">

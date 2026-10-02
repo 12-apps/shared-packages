@@ -4,10 +4,28 @@ The server half of the payments surface: a provider-agnostic gateway, the
 adapters behind it, the credential and charge stores, the webhook pipeline, and
 the background reconciliation that catches what a webhook missed.
 
-Five providers ship today — **PagBank**, **Stripe**, **Stone**,
-**InfinitePay** and **Itaú** (Pix only, over mTLS) — behind one adapter
-contract. Adding a sixth is a catalog entry and an adapter; it is not a change
-to any host.
+Six providers ship today — **PagBank**, **Stripe**, **Stone**,
+**InfinitePay**, **Itaú** (Pix only, over mTLS) and **Pix manual** (the store's
+own Pix key as a static code, confirmed by hand) — behind one adapter contract.
+Adding a seventh is a catalog entry and an adapter; it is not a change to any
+host.
+
+### Charges only the store can confirm
+
+A provider whose `capabilities.confirmation` is `MANUAL` (Pix manual) is never
+told it was paid: nothing calls back, and its `getCharge` answers PENDING
+forever. The host settles it through the gateway instead:
+
+- `gateway.confirmManualCharge(merchant, provider, id)` — someone saw the money
+  arrive. PENDING → PAID in one compare-and-set (`ChargeStore.transitionPending`),
+  then the gateway's `onWebhookEvent` runs exactly as for a provider webhook, so
+  the host settles the order the one way it knows. Over a charge already PAID
+  it re-runs the handler (the recovery after a failed settlement).
+- `refuseManualCharge` / `expireManualCharge` — "não recebi", or the store's
+  window lapsed. PENDING → CANCELED / EXPIRED; refused over a confirmed charge.
+- `refreshCharge` reads the stored snapshot for such a charge and never writes.
+- `ChargeOptions.confirmation: 'AUTOMATIC'` (also on `RaiseChargeRequest` and
+  `buyerCheckoutConfig`) leaves these providers out, for a lane nobody watches.
 
 ## The rule this package exists to enforce
 

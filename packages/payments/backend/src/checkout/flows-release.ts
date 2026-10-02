@@ -1,4 +1,5 @@
 import type { StoredCharge } from '../core/ports';
+import type { ChargeSnapshot } from '../core/types';
 
 import { latestCharge, reconcilePaid } from './flows-read';
 import {
@@ -60,15 +61,16 @@ async function voidCharge<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
   payable: Payable,
   charge: StoredCharge,
-): Promise<void> {
+): Promise<ChargeSnapshot | null> {
   try {
     const gateway = await runtime.gateway();
-    await gateway.cancelCharge(payable.merchant, charge.provider, charge.providerChargeId);
+    return await gateway.cancelCharge(payable.merchant, charge.provider, charge.providerChargeId);
   } catch (error) {
     runtime.log.warn(
       `[checkout] could not void the released charge for ${payable.ref}: ` +
         `${error instanceof Error ? error.message : String(error)}`,
     );
+    return null;
   }
 }
 
@@ -124,6 +126,13 @@ export async function releaseCheckout<C, V extends object, D>(
   const settled = await reconcilePaid(runtime, payable, charge, request.url);
   if (settled !== null) return runtime.respond.ok(settled);
 
-  await voidCharge(runtime, payable, charge);
+  // The void can answer PAID: a charge the STORE confirms (Pix manual) may be
+  // confirmed between the read above and the void, and its void then refuses
+  // to undo that. Settle it, rather than let a paid payable go.
+  const voided = await voidCharge(runtime, payable, charge);
+  if (voided?.status === 'PAID') {
+    const paid = await reconcilePaid(runtime, payable, charge, request.url);
+    if (paid !== null) return runtime.respond.ok(paid);
+  }
   return runtime.respond.ok(await letGo(runtime, payable));
 }

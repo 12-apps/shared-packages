@@ -24,6 +24,7 @@ import type { JSX, ReactNode } from 'react';
 import { defineProviders, type PaymentsIntentKind } from '@12-apps/payments-backend';
 import { infinitePayProvider } from '@12-apps/payments-backend/providers/infinitepay';
 import { itauProvider } from '@12-apps/payments-backend/providers/itau';
+import { pixManualProvider } from '@12-apps/payments-backend/providers/pixmanual';
 import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
@@ -34,6 +35,7 @@ import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
 import {
   PT_BR_INFINITEPAY_COPY,
   PT_BR_ITAU_COPY,
+  PT_BR_PIX_MANUAL_COPY,
   PT_BR_PAGBANK_COPY,
   PT_BR_STONE_COPY,
   PT_BR_STRIPE_COPY,
@@ -46,6 +48,7 @@ const registry = defineProviders({
   infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
   stripe: stripeProvider(PT_BR_STRIPE_COPY),
   itau: itauProvider(PT_BR_ITAU_COPY),
+  pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY),
 });
 
 /**
@@ -67,6 +70,15 @@ const CATALOG_EXCLUDE: PaymentsIntentKind[] = [
   'beginOAuth',
   'disconnectOAuth',
 ];
+
+/**
+ * Pix manual alone, WRITABLE: its probe is local (the key, name, city and
+ * window are checked here, no bank is called), so save and "Testar conexão"
+ * are safe to serve — the one vendor whose settings a harness can drive end to
+ * end. Charges, webhooks and OAuth stay excluded.
+ */
+const PIX_MANUAL_REGISTRY = defineProviders({ pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY) });
+const PIX_MANUAL_EXCLUDE: PaymentsIntentKind[] = ['createCharge', 'getCharge', 'handleWebhook', 'getClientConfig', 'completeOAuth', 'beginOAuth', 'disconnectOAuth'];
 
 /** Same mount for every case; only the baseUrl (case isolation) differs. */
 function catalogSpec(caseId: string): AdminStoreSpec {
@@ -94,7 +106,7 @@ function probeWrite(world: AdminWorld): ReactNode {
 /**
  * Four cases, one mount shape. They exist so each spec lands on its own
  * world (distinct baseUrl = distinct localStorage ack scope and wire log):
- * `catalog` pins the five cards and read-only-ness, `slug-alias` lands
+ * `catalog` pins the six cards and read-only-ness, `slug-alias` lands
  * controlled on the raw `infinitepay` name and watches the canonical
  * `infinite-pay` respelling arrive with `{replace: true}`, `guides` opens the
  * one vendor that ships a setup guide and the one that ships none — plus a
@@ -130,13 +142,19 @@ const CASES: readonly HarnessCase[] = [
     { ...catalogSpec('guide-brand'), stages: { stone: 'connected' } },
     { controlled: true, controls: probeWrite },
   ),
+  adminCase(
+    'pix-manual',
+    'Pix manual: save and test',
+    { registry: PIX_MANUAL_REGISTRY, exclude: PIX_MANUAL_EXCLUDE, baseUrl: '/api/harness/payments/pix-manual' },
+    { controlled: true },
+  ),
 ];
 
 export function PaymentsProviderSettingsPage(): JSX.Element {
   return (
     <>
       <PageIntro title="Provider settings · catalog">
-        The five published vendor adapters, projected by the real settings service into the real
+        The six published vendor adapters, projected by the real settings service into the real
         settings screen — read-only by construction, with selection kept in the hash query
         (controlled mode, the URL contract the production admin implements). The other pages of
         this parent exercise the writes, over fictional providers.

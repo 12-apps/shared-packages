@@ -5,8 +5,7 @@ import type {
   StoredProviderConfig,
 } from './config/types';
 import { PaymentsError } from './core/errors';
-import { mergeRefreshedSnapshot } from './core/snapshot-merge';
-import { isForwardTransition, isTerminal } from './core/status';
+import { isTerminal } from './core/status';
 import type {
   AttemptLedger,
   ChargeAttemptRecord,
@@ -23,6 +22,7 @@ import type {
   ProviderName,
   ResolvedCredentials,
 } from './core/types';
+import { applyRefreshedSnapshot, chargeKey, transitionPendingIn } from './memory-charge-refresh';
 import { merchantKey, scopedKey } from './memory-keys';
 
 /**
@@ -155,48 +155,6 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
   };
 }
 
-/** The `(provider, providerChargeId)` UNIQUE constraint, as a map key. */
-const chargeKey = (provider: ProviderName, providerChargeId: string): string =>
-  `${provider}:${providerChargeId}`;
-
-/**
- * Apply a refreshed snapshot to the row it names — the body of
- * `upsertByProviderChargeId`, outside the factory purely for the size gate.
- *
- * A row can live under the provider's ORDER id when the charge id did not
- * exist yet at creation (PagBank's unpaid PIX, FUT-681), so a snapshot that
- * carries the order id as a hint is looked up there SECOND — a real charge-id
- * match always wins — and the row is then RE-KEYED to the charge id, which is
- * what the next webhook, poll and refund will present.
- */
-function applyRefreshedSnapshot(
-  byChargeKey: Map<string, StoredCharge>,
-  merchant: MerchantRef,
-  snapshot: ChargeSnapshot,
-): StoredCharge | null {
-  const orderId = snapshot.settlementHints?.orderId;
-  const row =
-    byChargeKey.get(chargeKey(snapshot.provider, snapshot.providerChargeId)) ??
-    (orderId && orderId !== snapshot.providerChargeId
-      ? byChargeKey.get(chargeKey(snapshot.provider, orderId))
-      : undefined);
-  if (!row) return null;
-  // Ownership check: a charge owned by another merchant is invisible to
-  // this update — misattributed webhooks mutate nothing.
-  if (merchantKey(row.merchant) !== merchantKey(merchant)) return null;
-  if (!isForwardTransition(row.snapshot.status, snapshot.status)) return row;
-  // Merged, not replaced — same rule as the Prisma store, so "refresh" means
-  // the same thing in a test as in production.
-  row.snapshot = mergeRefreshedSnapshot(row.snapshot, snapshot);
-  if (row.providerChargeId !== row.snapshot.providerChargeId) {
-    byChargeKey.delete(chargeKey(row.provider, row.providerChargeId));
-    row.providerChargeId = row.snapshot.providerChargeId;
-    byChargeKey.set(chargeKey(row.provider, row.providerChargeId), row);
-  }
-  row.updatedAt = new Date();
-  return row;
-}
-
 export function createMemoryChargeStore(): MemoryChargeStore {
   const rows: StoredCharge[] = [];
   const byIdempotencyKey = new Map<string, StoredCharge>();
@@ -252,6 +210,9 @@ export function createMemoryChargeStore(): MemoryChargeStore {
     },
     async upsertByProviderChargeId(merchant: MerchantRef, snapshot: ChargeSnapshot) {
       return applyRefreshedSnapshot(byChargeKey, merchant, snapshot);
+    },
+    async transitionPending(merchant: MerchantRef, snapshot: ChargeSnapshot) {
+      return transitionPendingIn(byChargeKey, merchant, snapshot);
     },
     ...payableQueries(rows),
     all() {
