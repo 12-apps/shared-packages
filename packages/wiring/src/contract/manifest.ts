@@ -13,7 +13,10 @@
  *                            e2e pointers, and the INVENTORY of the two
  *                            runtime manifests;
  *   `<pkg>/manifest/server`  the server capabilities (HTTP, jobs, email);
- *   `<pkg>/manifest/web`     the web capabilities (surface, areas).
+ *   `<pkg>/manifest/web`     the web capabilities (surface, areas);
+ *   `<pkg>/manifest/native`  the React Native capabilities (surface) — its
+ *                            own bundle, since a native app can import
+ *                            neither the DOM nor a web component library.
  *
  * The inventory is what keeps the three honest across bundles: the shared
  * manifest NAMES every runtime capability, `defineServerManifest` /
@@ -32,13 +35,20 @@ import type { McpContribution } from "./mcp";
 import type { AnyNotificationBlueprint } from "./notifications";
 import type { WirePermissionsContribution } from "./permissions";
 import type { PrismaContribution } from "./db";
-import type { AreaContribution, WebSurfaceContribution } from "./web";
+import type { AreaContribution, NativeSurfaceContribution, WebSurfaceContribution } from "./web";
 
 /** Capabilities that live in the server manifest. */
 export type ServerCapabilityKind = "http" | "jobs" | "email";
 
 /** Capabilities that live in the web manifest. */
 export type WebCapabilityKind = "surface" | "areas";
+
+/**
+ * Capabilities that live in the native manifest. The SAME kind as the web
+ * surface — one capability, a second runtime — so the vocabulary every
+ * package answers for does not grow; only where the surface may live does.
+ */
+export type NativeCapabilityKind = "surface";
 
 /** Capabilities the shared manifest carries as data. */
 export type SharedCapabilityKind =
@@ -111,6 +121,8 @@ export interface PackageManifest {
   readonly server?: readonly ServerCapabilityKind[];
   /** Inventory of the web manifest — must match its keys exactly. */
   readonly web?: readonly WebCapabilityKind[];
+  /** Inventory of the native manifest — must match its keys exactly. */
+  readonly native?: readonly NativeCapabilityKind[];
 }
 
 /**
@@ -130,4 +142,10 @@ export interface AnyWebManifest {
   readonly name: string;
   readonly surface?: WebSurfaceContribution<never, unknown>;
   readonly areas?: readonly AreaContribution[];
+}
+
+/** The widest native manifest — the consumer's generic bound. */
+export interface AnyNativeManifest {
+  readonly name: string;
+  readonly surface?: NativeSurfaceContribution<never, unknown>;
 }

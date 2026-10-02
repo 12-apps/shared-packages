@@ -23,8 +23,8 @@
  * package's own test run.
  */
 
-/** Which runtime reads the variable. `server` also covers workers. */
-export type WireEnvScope = "server" | "web" | "worker";
+/** Which runtime reads the variable. `server` also covers workers; `native` is a React Native app. */
+export type WireEnvScope = "server" | "web" | "worker" | "native";
 
 /** One environment variable a package reads. */
 export interface WireEnvVar {
@@ -48,6 +48,7 @@ export interface WireEnvVar {
 export type WireEnvValues = Readonly<Record<string, string | undefined>>;
 
 /** The scopes a host kind answers for. */
-export function envScopesOf(kind: "server" | "web"): readonly WireEnvScope[] {
-  return kind === "server" ? ["server", "worker"] : ["web"];
+export function envScopesOf(kind: "server" | "web" | "native"): readonly WireEnvScope[] {
+  if (kind === "server") return ["server", "worker"];
+  return kind === "web" ? ["web"] : ["native"];
 }

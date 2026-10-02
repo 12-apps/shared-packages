@@ -16,75 +16,26 @@ import type { WireMcpTool } from "../contract/mcp";
 import type { AnyNotificationBlueprint } from "../contract/notifications";
 import type { WirePermissionsContribution } from "../contract/permissions";
 import { isIsolatedDb } from "../contract/db";
-import type { WireEnvValues } from "../contract/env";
-import type { AnyServerManifest, AnyWebManifest, PackageManifest } from "../contract/manifest";
+import type { AnyNativeManifest, AnyServerManifest, AnyWebManifest, PackageManifest } from "../contract/manifest";
 import type { LoggerPort, WiringPorts } from "../ports";
 import { answerE2e, answerEnv, answerObservability } from "./answers";
 import { collectMcpTools, httpMountPathOf, type CollectMcpInput } from "./mcp";
 import { bindEmail, bindHttp, bindJobs, bindSurface, type BindContext, type WiringSinks } from "./apply";
-import { isDeclined, type DeclinedBinding, type MailerOf, type RuntimeBindings, type ServerBindings, type SurfaceOf, type WebBindings } from "./bindings";
+import { isDeclined, type MailerOf, type RuntimeBindings, type SurfaceOf } from "./bindings";
 import { findRouteConflicts, sortRoutes } from "./paths";
 import { unboundEntries, type CapabilityReportEntry, type PackageReportEntry } from "./report";
 import type { AssembledWiring, PackageAreaContribution, PackageDbContribution, PackageEnvContribution } from "./assembled";
+import type { NativeAdoption, ServerAdoption, SharedCapabilityAnswers, WebAdoption } from "./adoptions";
+import { ADOPT_METHOD, foreignOf, type ForeignCapability, type HostKind } from "./runtimes";
 
-export type HostKind = "server" | "web";
+export type { NativeAdoption, ServerAdoption, SharedCapabilityAnswers, WebAdoption } from "./adoptions";
+export type { HostKind } from "./runtimes";
 
 export interface WiringHostOptions {
   /** The host's own name, prefixed on every assembly error. */
   name: string;
   kind: HostKind;
   ports?: WiringPorts;
-}
-
-/**
- * The answers to the ANSWERABLE shared capabilities. Data capabilities
- * (permissions, notifications, mcp, db) are collected without asking; these
- * three each have a host-side half a package cannot supply:
- *
- * - `env`  — the host's actual environment (usually `process.env`). Required
- *   whenever the manifest declares variables for this host's runtime.
- * - `observability` — bound automatically from `ports.loggerFor`/`ports.logger`;
- *   this field only DECLINES it.
- * - `e2e`  — required whenever the manifest declares a WORLD: the
- *   `featuresRoot` its compiled journeys land under, or a written decline.
- *   This is the refusal that would have caught a shipped world going
- *   unadopted while its host re-derived the same journeys by hand.
- */
-export interface SharedCapabilityAnswers {
-  env?: WireEnvValues | DeclinedBinding;
-  observability?: DeclinedBinding;
-  e2e?: { featuresRoot: string } | DeclinedBinding;
-}
-
-/** One package handed to a server host: manifests plus the host's answers. */
-export interface ServerAdoption<TManifest extends AnyServerManifest = AnyServerManifest>
-  extends SharedCapabilityAnswers {
-  manifest: PackageManifest;
-  server?: TManifest;
-  bindings?: ServerBindings<TManifest>;
-  /**
-   * Host-built, vocabulary-dependent MCP tools (the
-   * `lifecycleMcpEndpoints(vocabulary)` pattern) — joined with the
-   * manifest's own so the aggregate still uniqueness-checks every tool.
-   * Absolute paths: the host authored them.
-   */
-  mcpEndpoints?: readonly WireMcpTool[];
-  /**
-   * Host specializations of the MANIFEST's tools, keyed by operationId and
-   * shallow-merged — a narrowed schema (an enum of THIS host's preset keys),
-   * a richer summary, a policy nudge. The escape valve that keeps a host from
-   * forking the package's whole list to change one field; an unknown id is a
-   * wiring error, so an override cannot silently outlive its tool.
-   */
-  mcpOverrides?: Readonly<Record<string, Partial<WireMcpTool>>>;
-}
-
-/** One package handed to a web host. */
-export interface WebAdoption<TManifest extends AnyWebManifest = AnyWebManifest>
-  extends SharedCapabilityAnswers {
-  manifest: PackageManifest;
-  web?: TManifest;
-  bindings?: WebBindings<TManifest>;
 }
 
 export type {
@@ -118,7 +69,7 @@ export class WiringHost {
     const capabilities = this.beginAdoption(adoption.manifest, adoption);
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.server ?? [],
-      foreign: adoption.manifest.web ?? [],
+      foreign: foreignOf(adoption.manifest, "server"),
       bindings: (adoption.bindings ?? {}) as RuntimeBindings,
       bind: (kind, context, binding) => this.bindServerKind(kind, context, adoption.server, binding),
       capabilities,
@@ -140,10 +91,31 @@ export class WiringHost {
     this.collectMcp(adoption.manifest, capabilities, {});
     this.applyRuntime(adoption.manifest, {
       applicable: adoption.manifest.web ?? [],
-      foreign: adoption.manifest.server ?? [],
+      foreign: foreignOf(adoption.manifest, "web"),
       bindings: (adoption.bindings ?? {}) as RuntimeBindings,
       bind: (kind, context, binding) => this.bindWebKind(kind, context, adoption.web, binding),
       auto: (kind) => this.collectAreas(kind, adoption.manifest.name, adoption.web),
+      capabilities,
+    });
+    this.entries.push({ packageName: adoption.manifest.name, capabilities });
+    return { surface: this.sinks.surfaces[adoption.manifest.name] as SurfaceOf<TManifest> };
+  }
+
+  /**
+   * Adopt a package into a React Native host: its native surface, built once,
+   * plus the shared data capabilities every host collects.
+   */
+  adoptNative<TManifest extends AnyNativeManifest = AnyNativeManifest>(
+    adoption: NativeAdoption<TManifest>,
+  ): { surface: SurfaceOf<TManifest> } {
+    this.assertKind("native", adoption.manifest.name);
+    const capabilities = this.beginAdoption(adoption.manifest, adoption);
+    this.collectMcp(adoption.manifest, capabilities, {});
+    this.applyRuntime(adoption.manifest, {
+      applicable: adoption.manifest.native ?? [],
+      foreign: foreignOf(adoption.manifest, "native"),
+      bindings: (adoption.bindings ?? {}) as RuntimeBindings,
+      bind: (kind, context, binding) => this.bindNativeKind(kind, context, adoption.native, binding),
       capabilities,
     });
     this.entries.push({ packageName: adoption.manifest.name, capabilities });
@@ -179,7 +151,7 @@ export class WiringHost {
     if (this.options.kind !== expected) {
       throw new WiringAssemblyError(
         this.options.name,
-        `${packageName}: this is a ${this.options.kind} host — use adopt${expected === "server" ? "Web" : "Server"} instead.`,
+        `${packageName}: this is a ${this.options.kind} host — use ${ADOPT_METHOD[this.options.kind]} instead.`,
       );
     }
   }
@@ -263,7 +235,7 @@ export class WiringHost {
     manifest: PackageManifest,
     walk: {
       applicable: readonly string[];
-      foreign: readonly string[];
+      foreign: readonly ForeignCapability[];
       bindings: RuntimeBindings;
       bind: (kind: string, context: BindContext, binding: unknown) => CapabilityReportEntry;
       auto?: (kind: string) => CapabilityReportEntry | null;
@@ -302,11 +274,11 @@ export class WiringHost {
       }
       walk.capabilities.push(walk.bind(kind, context, binding));
     });
-    walk.foreign.forEach((kind) => {
+    walk.foreign.forEach(({ kind, runtime }) => {
       walk.capabilities.push({
         kind: kind as CapabilityReportEntry["kind"],
         status: "out-of-scope",
-        detail: `a ${this.options.kind === "server" ? "web" : "server"} host answers for this`,
+        detail: `a ${runtime} host answers for this`,
       });
     });
   }
@@ -331,6 +303,16 @@ export class WiringHost {
   ): CapabilityReportEntry {
     if (kind === "surface") return bindSurface(context, web, binding);
     throw new WiringAssemblyError(this.options.name, `${context.packageName}: unknown web capability "${kind}".`);
+  }
+
+  private bindNativeKind(
+    kind: string,
+    context: BindContext,
+    native: AnyNativeManifest | undefined,
+    binding: unknown,
+  ): CapabilityReportEntry {
+    if (kind === "surface") return bindSurface(context, native, binding);
+    throw new WiringAssemblyError(this.options.name, `${context.packageName}: unknown native capability "${kind}".`);
   }
 
   private refuseUnbound(): void {

@@ -1,7 +1,7 @@
 /**
  * The producer half: how a PACKAGE declares its manifests.
  *
- * Three factories, one per manifest (see `../contract/manifest` for why the
+ * Four factories, one per manifest (see `../contract/manifest` for why the
  * split follows bundles), each an identity function plus assertions. The
  * doctrine is report-builder's: no defaults for anything a host must decide,
  * and every rule enforced at ASSEMBLY — a malformed manifest throws in the
@@ -20,8 +20,10 @@ import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
 import type { WireEnvVar } from "../contract/env";
 import type {
+  AnyNativeManifest,
   AnyServerManifest,
   AnyWebManifest,
+  NativeCapabilityKind,
   PackageManifest,
   ServerCapabilityKind,
   WebCapabilityKind,
@@ -165,6 +167,7 @@ function assertDeclarations(manifest: PackageManifest): void {
   }
   if (manifest.server) assertUnique(manifest.name, "server inventory entry", manifest.server);
   if (manifest.web) assertUnique(manifest.name, "web inventory entry", manifest.web);
+  if (manifest.native) assertUnique(manifest.name, "native inventory entry", manifest.native);
 }
 
 /** Declare the shared manifest. Returns its argument, validated. */
@@ -183,7 +186,7 @@ export function defineManifest(manifest: PackageManifest): PackageManifest {
  */
 function assertInventory(
   name: string,
-  which: "server" | "web",
+  which: "server" | "web" | "native",
   listed: readonly string[],
   actual: readonly string[],
 ): void {
@@ -282,4 +285,24 @@ export function defineWebManifest<TManifest extends AnyWebManifest>(
   assertInventory(shared.name, "web", shared.web ?? [], webKindsOf(web));
   if (web.areas) assertAreas(shared.name, web.areas);
   return web;
+}
+
+function nativeKindsOf(native: AnyNativeManifest): NativeCapabilityKind[] {
+  return native.surface ? ["surface"] : [];
+}
+
+/**
+ * Declare the NATIVE manifest (React Native hosts) against its shared half.
+ * Same inventory discipline as the web manifest: the shared manifest's
+ * `native:` list and this manifest's keys must be the same set.
+ */
+export function defineNativeManifest<TManifest extends AnyNativeManifest>(
+  shared: PackageManifest,
+  native: TManifest,
+): TManifest {
+  if (native.name !== shared.name) {
+    fail(shared.name, `native manifest is named "${native.name}" — the two must match.`);
+  }
+  assertInventory(shared.name, "native", shared.native ?? [], nativeKindsOf(native));
+  return native;
 }

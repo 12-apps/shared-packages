@@ -12,10 +12,12 @@ import { pathToFileURL } from "node:url";
 import {
   CAPABILITIES,
   DATA_CAPABILITIES,
+  NATIVE_CAPABILITIES,
   SERVER_CAPABILITIES,
   WEB_CAPABILITIES,
   contractCapabilities,
   declaredCapabilities,
+  declaredRuntimes,
   evaluatePackage,
   findingPackage,
   runtimeWiringImports,
@@ -84,6 +86,10 @@ const cases = [
     "web kinds match WebCapabilityKind in the contract source",
   ],
   [
+    () => contract.native.join(",") === NATIVE_CAPABILITIES.join(","),
+    "native kinds match NativeCapabilityKind in the contract source",
+  ],
+  [
     () => contract.data.join(",") === DATA_CAPABILITIES.join(","),
     "data capabilities match PackageManifest's optional keys",
   ],
@@ -97,6 +103,13 @@ const cases = [
       return expected.every((kind) => declared.has(kind)) && !declared.has("permissions");
     },
     "a multi-manifest module declares the UNION of its data keys and inventories",
+  ],
+  [
+    () => {
+      const source = "  observability: { namespace: 'x' },\n  native: ['surface'],\n";
+      return declaredCapabilities(source).has("surface") && [...declaredRuntimes(source)].join(",") === "native";
+    },
+    "a native inventory declares its surface and names only the native runtime",
   ],
   [
     () => !declaredCapabilities("    db: 'nested inside some other literal',\n").has("db"),
@@ -138,6 +151,22 @@ const cases = [
   [
     () => failuresOf(producer(), "  observability: { namespace: 'x' },\n").some((f) => f.includes("dead subpath")),
     "a server subpath nothing inventories fails as drift",
+  ],
+  [
+    () => {
+      const source = HAPPY_SOURCE + "  native: ['surface'],\n";
+      const missing = failuresOf(producer(), source).some((f) => f.includes('"./manifest/native"'));
+      const exportsMap = { ...producer().exports, "./manifest/native": "./src/manifest/native.ts" };
+      return missing && failuresOf(producer({ exports: exportsMap }), source).length === 0;
+    },
+    "an inventoried native runtime needs its subpath, and a native surface alone demands no web subpath",
+  ],
+  [
+    () => {
+      const exportsMap = { ...producer().exports, "./manifest/native": "./src/manifest/native.ts" };
+      return failuresOf(producer({ exports: exportsMap })).some((f) => f.includes('"./manifest/native"') && f.includes("dead subpath"));
+    },
+    "a native subpath nothing inventories fails as drift",
   ],
   [
     () => failuresOf(producer({ wiring: undefined }), HAPPY_SOURCE).some((f) => f.includes("wiring.db")),

@@ -76,8 +76,43 @@ what turns "the bump shipped a capability the host never wired" from a silent
 | `notifications` | blueprints: `type`, suggested `category`, `generate` | collected | `notifications` — feed the notifications mount |
 | `db` | the Prisma partial + migrations paths | collected | `db` — feed the sync tooling |
 | `surface` | `create(config) → surface` — the existing `createWeb*` factory | `{ config }` | `surfaces[pkg]`, built once (the memoisation rule, held in one place) |
+| `surface` (native) | the same `create(config) → surface`, returning React Native component types, in `<pkg>/manifest/native` | `{ config }` on a `native` host | `surfaces[pkg]`, built once |
 | `areas` | route/nav/gate suggestions per host area | collected | `areas` — project nav from data |
 | `e2e` | the journeys' entry subpath | collected | in the report |
+
+## React Native hosts
+
+A React Native app is a third host kind. A package that ships screens for
+one adds a fourth manifest, `<pkg>/manifest/native`, declared with
+`defineNativeManifest` and inventoried as `native: ["surface"]` in the shared
+manifest. Its surface has the web surface's shape — one config object in,
+component types out — but returns React Native components, because a native
+bundle can import neither `react-dom` nor a web component library, and a web
+bundle must never import React Native.
+
+```ts
+// package: <pkg>/manifest/native
+export const chatNativeManifest = defineNativeManifest(chatManifest, {
+  name: "@12-apps/chat",
+  surface: { create: (config: ChatNativeConfig) => createNativeChat(config) },
+});
+
+// host: the React Native app
+const host = createWiringHost({ name: "courier-app", kind: "native" });
+const { surface } = host.adoptNative({
+  manifest: chatManifest,
+  native: chatNativeManifest,
+  bindings: { surface: { config: { apiBase, fetch, labels } } },
+});
+host.assemble();
+```
+
+`surface` is ONE capability with two possible runtimes, so the vocabulary
+every package answers for does not grow: the conformance gate checks only
+that a `native:` inventory has its `./manifest/native` subpath, and that the
+subpath does not outlive the inventory. A native host has no `areas` (its
+navigation is its own), reports the server and web halves out-of-scope, and
+answers env vars declared with `scope: "native"`.
 
 ## Ports (`@12-apps/wiring/ports`)
 

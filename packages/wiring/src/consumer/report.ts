@@ -44,7 +44,7 @@ export interface PackageReportEntry {
 
 export interface WiringReport {
   host: string;
-  kind: "server" | "web";
+  kind: "server" | "web" | "native";
   packages: readonly PackageReportEntry[];
 }
 
