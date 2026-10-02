@@ -16,7 +16,11 @@ afterEach(() => {
   cleanup();
 });
 
-function link(provider: string, methods: CheckoutChainLink["methods"], confirmation?: "MANUAL"): CheckoutChainLink {
+function link(
+  provider: string,
+  methods: CheckoutChainLink["methods"],
+  confirmation?: "AUTOMATIC" | "MANUAL",
+): CheckoutChainLink {
   return {
     provider,
     tokenization: "NONE",
@@ -38,7 +42,7 @@ function config(chain: CheckoutChainLink[]): CheckoutProviderConfig {
   };
 }
 
-function pixLine(providerConfig: CheckoutProviderConfig): string {
+function pixLine(providerConfig: CheckoutProviderConfig | null): string {
   render(
     <PaymentStep
       method={null}
@@ -75,5 +79,13 @@ describe("the PIX tile says who approves it", () => {
     const line = pixLine(config([link("stripe", ["CARD"]), link("pixmanual", ["PIX"], "MANUAL")]));
 
     expect(line).toContain("Confirmado pela loja");
+  });
+
+  it("keeps the instant line while the config is unknown, or names no confirmation", () => {
+    expect(pixLine(null)).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
+    cleanup();
+    expect(pixLine(config([link("pagbank", ["PIX", "CARD"])]))).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
+    cleanup();
+    expect(pixLine(config([link("itau", ["PIX"], "AUTOMATIC")]))).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
   });
 });
