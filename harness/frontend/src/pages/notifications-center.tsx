@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 
+import { AttentionHost, AttentionQuickSettings } from '@12-apps/notifications/attention/react';
 import { notificationsManifest } from '@12-apps/notifications/manifest';
 import { notificationsWebManifest } from '@12-apps/notifications/manifest/web';
 import { webWiringHost } from '../wiring-web';
 
+import {
+  HARNESS_ATTENTION,
+  HARNESS_ATTENTION_MESSAGES,
+  HARNESS_ATTENTION_PREFERENCES,
+  HARNESS_ATTENTION_VIEWS,
+  type PackingItem,
+  type ReturnItem,
+} from '../notifications/attention-wiring';
 import { HARNESS_NOTIFICATION_MESSAGES } from '../notifications/notification-copy';
 
 /**
@@ -132,6 +141,40 @@ function HostControls({ onNavigated }: { onNavigated: string | null }): JSX.Elem
   );
 }
 
+/**
+ * The attention button (`./attention`), mounted as a host mounts it: its
+ * wiring, its own words, and what waits — here two fixed items around the
+ * moment the page opened, so a spec knows what the button must say. One order
+ * is past its ten promised minutes (amber), one return is fresh (green, behind
+ * the "+1").
+ */
+function AttentionSection(): JSX.Element {
+  const [now] = useState(() => Date.now());
+  const items = useMemo<(PackingItem | ReturnItem)[]>(
+    () => [
+      { id: 'r-77', kind: 'devolucoes.analisar', since: now - 2 * 60_000, order: '#77' },
+      { id: 'p-31', kind: 'pedidos.separar', since: now - 15 * 60_000, order: '#31', promisedMs: 10 * 60_000 },
+    ],
+    [now],
+  );
+  return (
+    <section>
+      <AttentionQuickSettings
+        store={HARNESS_ATTENTION_PREFERENCES}
+        messages={HARNESS_ATTENTION_MESSAGES.preferences}
+      />
+      <AttentionHost
+        registry={HARNESS_ATTENTION}
+        views={HARNESS_ATTENTION_VIEWS}
+        items={items}
+        now={now}
+        messages={HARNESS_ATTENTION_MESSAGES}
+        preferences={HARNESS_ATTENTION_PREFERENCES}
+      />
+    </section>
+  );
+}
+
 export function NotificationsCenterPage(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [navigated, setNavigated] = useState<string | null>(null);
@@ -151,6 +194,9 @@ export function NotificationsCenterPage(): JSX.Element {
 
       <h2>Preferences (package)</h2>
       <PreferencesSurface />
+
+      <h2>Avisos (pacote)</h2>
+      <AttentionSection />
     </div>
   );
 }
