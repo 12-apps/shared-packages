@@ -269,6 +269,9 @@ export function pulseOf(entry: Pick<AttentionEntry, 'severity' | 'progress'>): A
 /** A channel's setting on one device: never, only for urgent items, or for everything. */
 export type AttentionChannelLevel = 'off' | 'late' | 'all';
 
+/** Every level a channel can be set to, quietest first. */
+export const ATTENTION_CHANNEL_LEVELS: readonly AttentionChannelLevel[] = ['off', 'late', 'all'];
+
 /** Does a channel set to `level` fire for an item at `severity`? */
 export function channelWants(level: AttentionChannelLevel, severity: AttentionSeverity): boolean {
   if (level === 'all') return true;

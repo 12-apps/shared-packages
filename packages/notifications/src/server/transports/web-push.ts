@@ -1,3 +1,4 @@
+import { attentionSeverityOf, wantsAttentionPush } from '../../attention/push';
 import { livePushTag } from '../../live';
 import type {
   NotificationContent,
@@ -105,7 +106,7 @@ export interface WebPushSubscriptionSource {
     notificationClientId?: string | null,
     /** The notification's side; `null` for an unclassified one, which every app receives. */
     notificationSide?: string | null,
-  ): Promise<{ id: string; endpoint: string; p256dh: string; auth: string }[]>;
+  ): Promise<{ id: string; endpoint: string; p256dh: string; auth: string; attentionPush?: string | null }[]>;
   prune(id: string): Promise<void>;
 }
 
@@ -174,8 +175,13 @@ export function webPushTransport(
     supports: (recipient: TransportRecipient) => recipient.pushSubscriptionCount > 0,
     format: formatWebPush,
     async send(message, recipient) {
-      const rows = await subscriptions.list(recipient.userId, recipient.clientId, recipient.side);
-      if (rows.length === 0) throw new Error('Recipient no longer has push subscriptions.');
+      const reachable = await subscriptions.list(recipient.userId, recipient.clientId, recipient.side);
+      if (reachable.length === 0) throw new Error('Recipient no longer has push subscriptions.');
+      // An attention push reaches only the devices whose own level wants it.
+      // None wanting it is the devices' choice, not a failure to retry.
+      const severity = attentionSeverityOf(message.data);
+      const rows = reachable.filter((row) => wantsAttentionPush(row.attentionPush, severity));
+      if (rows.length === 0) return;
       const payload = JSON.stringify(message);
       let delivered = 0;
       let lastError: unknown = null;

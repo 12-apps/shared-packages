@@ -401,6 +401,25 @@ describe('the push-subscription endpoints', () => {
     }
   });
 
+  it("keeps the device's attention level, and a plain re-subscribe does not reset it", async () => {
+    await call('POST', '/push-subscriptions', { body: { ...subscription, attentionPush: 'late' } });
+    expect(db.rows.subscriptions[0]?.attentionPush).toBe('late');
+    await call('POST', '/push-subscriptions', { body: subscription });
+    expect(db.rows.subscriptions[0]?.attentionPush).toBe('late');
+    await call('POST', '/push-subscriptions', { body: { ...subscription, attentionPush: 'off' } });
+    expect(db.rows.subscriptions[0]?.attentionPush).toBe('off');
+  });
+
+  it('clears the attention level with null, and refuses an unknown one', async () => {
+    await call('POST', '/push-subscriptions', { body: { ...subscription, attentionPush: 'all' } });
+    await call('POST', '/push-subscriptions', { body: { ...subscription, attentionPush: null } });
+    expect(db.rows.subscriptions[0]?.attentionPush).toBeNull();
+    const response = await call('POST', '/push-subscriptions', {
+      body: { ...subscription, attentionPush: 'loud' },
+    });
+    expect(response.status).toBe(400);
+  });
+
   it('refuses missing or over-long subscription keys', async () => {
     for (const keys of [undefined, {}, { p256dh: 'p' }, { p256dh: 'x'.repeat(501), auth: 'a' }]) {
       const response = await call('POST', '/push-subscriptions', {

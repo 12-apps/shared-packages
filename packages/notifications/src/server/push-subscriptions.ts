@@ -1,3 +1,4 @@
+import type { AttentionChannelLevel } from '../attention/core';
 import type { NotificationLogger } from '../types';
 
 import type { NotificationsDbProvider, PushSubscriptionRow, PushSubscriptionWhere } from './db';
@@ -26,6 +27,12 @@ export interface PushSubscriptionInput {
    * vocabulary), again the host's resolved value. Absent/null = every side.
    */
   side?: string | null;
+  /**
+   * Which ATTENTION pushes this device wants — the device's own setting, sent
+   * by its app. Absent leaves the stored level as it is (a plain re-subscribe
+   * must not reset it); `null` clears it back to "every attention push".
+   */
+  attentionPush?: AttentionChannelLevel | null;
 }
 
 /**
@@ -69,8 +76,16 @@ function reachableBy(
 }
 
 /** What the transport needs of a row to encrypt and send: nothing about its scope. */
-function sendable(row: PushSubscriptionRow): { id: string; endpoint: string; p256dh: string; auth: string } {
-  return { id: row.id, endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth };
+function sendable(
+  row: PushSubscriptionRow,
+): { id: string; endpoint: string; p256dh: string; auth: string; attentionPush: string | null } {
+  return {
+    id: row.id,
+    endpoint: row.endpoint,
+    p256dh: row.p256dh,
+    auth: row.auth,
+    attentionPush: row.attentionPush ?? null,
+  };
 }
 
 export interface PushSubscriptionStore extends WebPushSubscriptionSource {
@@ -119,6 +134,18 @@ export interface PushSubscriptionStore extends WebPushSubscriptionSource {
   isRegisteredTo(userId: string, endpoint: string): Promise<boolean>;
 }
 
+/** The columns every save writes, on create and on update alike. */
+function savedColumns(userId: string, input: PushSubscriptionInput) {
+  return {
+    userId,
+    p256dh: input.keys.p256dh,
+    auth: input.keys.auth,
+    clientId: input.clientId ?? null,
+    side: input.side ?? null,
+    userAgent: input.userAgent ?? null,
+  };
+}
+
 export function createPushSubscriptionStore(
   db: NotificationsDbProvider,
   logger?: NotificationLogger,
@@ -141,25 +168,19 @@ export function createPushSubscriptionStore(
       await client.pushSubscription.upsert({
         where: { endpoint: input.endpoint },
         create: {
-          userId,
+          ...savedColumns(userId, input),
           endpoint: input.endpoint,
-          p256dh: input.keys.p256dh,
-          auth: input.keys.auth,
-          clientId: input.clientId ?? null,
-          side: input.side ?? null,
-          userAgent: input.userAgent ?? null,
+          attentionPush: input.attentionPush ?? null,
         },
         // Re-stamped on every save, so the same browser moving between a store's
         // app and the platform corrects its own scope rather than keeping the
         // first origin it ever subscribed from. A scope change on the SAME user
         // is not a re-own and must not log one.
         update: {
-          userId,
-          p256dh: input.keys.p256dh,
-          auth: input.keys.auth,
-          clientId: input.clientId ?? null,
-          side: input.side ?? null,
-          userAgent: input.userAgent ?? null,
+          ...savedColumns(userId, input),
+          // Only when the app said so: a re-subscribe from a flow that does not
+          // know about attention must not wipe this device's choice.
+          ...(input.attentionPush === undefined ? {} : { attentionPush: input.attentionPush }),
         },
       });
     },

@@ -338,7 +338,7 @@ describe('the whatsapp transport', () => {
 describe('the web push transport', () => {
   /** A subscription source recording what was pruned. */
   function source(
-    rows: { id: string; endpoint: string; p256dh: string; auth: string }[],
+    rows: { id: string; endpoint: string; p256dh: string; auth: string; attentionPush?: string | null }[],
   ): WebPushSubscriptionSource & { pruned: string[] } {
     const pruned: string[] = [];
     return {
@@ -422,6 +422,61 @@ describe('the web push transport', () => {
     // A 503 is not evidence the browser is gone; pruning here would destroy a
     // live destination.
     expect(subscriptions.pruned).toEqual([]);
+  });
+
+  describe('an attention push (data.attention)', () => {
+    interface Device {
+      id: string;
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      attentionPush: string | null;
+    }
+    const devices: readonly Device[] = [
+      { id: 'off', endpoint: 'https://push.example.com/off', p256dh: 'p', auth: 'a', attentionPush: 'off' },
+      { id: 'late', endpoint: 'https://push.example.com/late', p256dh: 'p', auth: 'a', attentionPush: 'late' },
+      { id: 'all', endpoint: 'https://push.example.com/all', p256dh: 'p', auth: 'a', attentionPush: 'all' },
+      { id: 'never', endpoint: 'https://push.example.com/never', p256dh: 'p', auth: 'a', attentionPush: null },
+    ];
+
+    /** The device ids one push reached, for a payload `data`. */
+    async function reached(
+      data: Record<string, unknown>,
+      held: readonly Device[],
+    ): Promise<string[]> {
+      const seen: string[] = [];
+      const transport = webPushTransport(
+        {
+          channel: 'WEB_PUSH',
+          driver: 'vapid',
+          sender: (subscription) => {
+            seen.push(subscription.endpoint.split('/').pop() ?? '');
+            return Promise.resolve();
+          },
+        },
+        source([...held]),
+      );
+      await transport.send(transport.format({ ...CONTENT, data }), reachable);
+      return seen;
+    }
+
+    it("reaches only the devices whose level wants it; a device that never chose takes it", async () => {
+      expect(await reached({ attention: 'calm' }, devices)).toEqual(['all', 'never']);
+      expect(await reached({ attention: 'late' }, devices)).toEqual(['late', 'all', 'never']);
+      expect(await reached({ attention: 'spent' }, devices)).toEqual(['late', 'all', 'never']);
+    });
+
+    it('leaves an ordinary push to every device, whatever its level', async () => {
+      expect(await reached({}, devices)).toEqual(['off', 'late', 'all', 'never']);
+    });
+
+    it('resolves without sending when no device wants it — their choice, not a failure', async () => {
+      const offOrLate: Device[] = [
+        { id: 'off', endpoint: 'https://push.example.com/off', p256dh: 'p', auth: 'a', attentionPush: 'off' },
+        { id: 'late', endpoint: 'https://push.example.com/late', p256dh: 'p', auth: 'a', attentionPush: 'late' },
+      ];
+      expect(await reached({ attention: 'calm' }, offOrLate)).toEqual([]);
+    });
   });
 
   it('refuses the vapid driver with no signer, at mount', () => {
