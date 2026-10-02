@@ -82,8 +82,13 @@ function paintFor(
               ? resolveFieldEdge(theme.palette.divider, theme.palette.background.paper)
               : palette.main,
         },
-        pressed: { backgroundColor: wash, borderColor: palette.dark },
-        label: { color: palette.main },
+        // A neutral one writes in the theme's text ink, a role that turns with
+        // the mode, as on the web — grey 700 was dark on a dark ground.
+        pressed:
+          color === 'neutral'
+            ? { backgroundColor: alpha(theme.palette.text.primary, BUTTON_WASH_ALPHA), borderColor: theme.palette.text.secondary }
+            : { backgroundColor: wash, borderColor: palette.dark },
+        label: { color: color === 'neutral' ? theme.palette.text.primary : palette.main },
       };
     case 'ghost':
       return {

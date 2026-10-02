@@ -226,15 +226,19 @@ const VARIANT_STYLES: Record<
   // a ramp MUI keeps the same in dark: dark on dark, 2.18:1 on a dark bar, so a
   // live "Descartar" read as disabled. A coloured outline keeps its colour,
   // which is the point of asking for one.
-  outline: (theme, palette, color) => ({
-    backgroundColor: 'transparent',
-    color: color === 'neutral' ? theme.palette.text.primary : palette.main,
-    border: color === 'neutral' ? fieldBorder(theme) : `1px solid ${palette.main}`,
-    '&:hover': {
-      backgroundColor: alpha(palette.main, 0.1),
-      borderColor: palette.dark,
-    },
-  }),
+  // Its hover draws from the same role, so it does not dim to grey 800 on a dark ground.
+  outline: (theme, palette, color) => {
+    const ink = color === 'neutral' ? theme.palette.text.primary : palette.main;
+    return {
+      backgroundColor: 'transparent',
+      color: ink,
+      border: color === 'neutral' ? fieldBorder(theme) : `1px solid ${palette.main}`,
+      '&:hover': {
+        backgroundColor: alpha(ink, 0.1),
+        borderColor: color === 'neutral' ? theme.palette.text.secondary : palette.dark,
+      },
+    };
+  },
   ghost: (theme, palette) => ({
     backgroundColor: 'transparent',
     color: quietInk(theme, palette),
