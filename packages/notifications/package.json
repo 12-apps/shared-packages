@@ -45,6 +45,14 @@
       "types": "./dist/web-push/index.d.ts",
       "default": "./dist/web-push/index.js"
     },
+    "./attention": {
+      "types": "./dist/attention/index.d.ts",
+      "default": "./dist/attention/index.js"
+    },
+    "./attention/react": {
+      "types": "./dist/attention/react/index.d.ts",
+      "default": "./dist/attention/react/index.js"
+    },
     "./manifest": {
       "types": "./dist/manifest/index.d.ts",
       "default": "./dist/manifest/index.js"

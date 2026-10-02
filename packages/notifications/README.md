@@ -261,6 +261,40 @@ self.registration.showNotification(payload.title, {
 });
 ```
 
+## Attention — the third kind of entry
+
+An inbox notification is an event that happened; a live activity is state a
+reader follows. **Attention** is something waiting on the person looking at the
+screen, with a clock on it: a plate under the lamp, a call nobody answered, a
+courier at the door. It is never read or dismissed; it leaves when the work is
+done, and until then it grows more urgent.
+
+`@12-apps/notifications/attention` (framework-free) and
+`@12-apps/notifications/attention/react` draw it as ONE round button for the
+next thing to do, wherever the host mounts it.
+
+| piece | what it does |
+|---|---|
+| `defineAttention({ categories, kinds })` | the host's wiring, checked once: category order, and per kind its budget, its conditions (`severity`), its permission |
+| `readAttention(registry, items, { now, can })` | the queue: **severity first** (spent → late → calm), then category order, then kind order, then the longest wait |
+| `AttentionHost` | the button, a quiet "+N" for the rest, sound/vibration for news, and the sheet each kind declares (`renderSheet`) or the host's own action (`onOpen`) |
+| `createAttentionPreferences({ storageKey })` | sound, vibration, push level and the button's position, **per device** |
+| `AttentionPreferencesPanel`, `AttentionQuickSettings` | the same settings, as a section of the host's user settings and as a small control for a sheet's header |
+
+The ladder is fixed so every adopter agrees on "late": calm under one lap of the
+kind's budget, late from one, spent from two — unless a kind's own `severity`
+says otherwise (a courier at the door is late the moment it arrives). The button
+asks harder as the clock runs: still under 40% of the budget, a soft pulse to
+70%, a full one from there and while late, and once spent a faster pulse, a
+shake and a second outline, so a reader who cannot tell green from amber still
+tells the states apart. Nothing moves under `prefers-reduced-motion`.
+
+Every sentence is the host's (`AttentionMessages`); there is no default table.
+Sound is synthesised (or the host's files); vibration is `navigator.vibrate`,
+which Safari on iPhone does not implement — `canVibrate()` says so and the
+settings show it. Push rides the `WEB_PUSH` channel above: the device's push
+level is a preference the host reads when it sends.
+
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,
