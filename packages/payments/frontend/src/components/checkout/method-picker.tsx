@@ -22,9 +22,11 @@ interface MethodOption {
  * host's Portuguese. The order and the icons are still ours — that is layout,
  * not language.
  */
-function methodOptions(copy: MethodPickerCopy): MethodOption[] {
+function methodOptions(copy: MethodPickerCopy, pixByStore: boolean): MethodOption[] {
+  // A Pix the store confirms by hand is not "aprovação imediata" (FUT-3232).
+  const pixDescription = (pixByStore ? copy.pixManualDescription : undefined) ?? copy.pixDescription;
   return [
-    { value: "PIX", label: copy.pixLabel, description: copy.pixDescription, icon: <PixIcon /> },
+    { value: "PIX", label: copy.pixLabel, description: pixDescription, icon: <PixIcon /> },
     {
       value: "CARD",
       label: copy.cardLabel,
@@ -125,8 +127,9 @@ function MethodTile({
 function visibleOptions(
   copy: MethodPickerCopy,
   offered: PaymentMethod[] | null,
+  pixByStore: boolean,
 ): MethodOption[] {
-  return methodOptions(copy).filter(
+  return methodOptions(copy, pixByStore).filter(
     (option) => offered === null || offered.includes(option.value),
   );
 }
@@ -136,6 +139,7 @@ export function MethodPicker({
   onChange,
   cardUnavailable = false,
   offered = null,
+  pixByStore = false,
 }: {
   /** The chosen method, or `null` before the buyer has picked one. */
   value: PaymentMethod | null;
@@ -144,10 +148,12 @@ export function MethodPicker({
   cardUnavailable?: boolean;
   /** Methods the store's chain can charge, or `null` while unknown (fail open). */
   offered?: PaymentMethod[] | null;
+  /** True ⇒ the chain's first PIX provider is one the STORE confirms by hand. */
+  pixByStore?: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.method;
-  const options = visibleOptions(copy, offered);
+  const options = visibleOptions(copy, offered, pixByStore);
   return (
     <Box>
       <Text variant="body" size="sm" weight="bold" as="p" style={{ marginBottom: 8 }}>

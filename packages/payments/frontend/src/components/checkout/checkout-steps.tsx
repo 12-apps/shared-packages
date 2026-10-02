@@ -289,6 +289,7 @@ export function PaymentStep({
           onChange={onMethodChange}
           cardUnavailable={choice.cardUnavailable}
           offered={choice.offered}
+          pixByStore={config?.chain?.find((link) => link.methods.includes("PIX"))?.confirmation === "MANUAL"}
         />
       )}
 
