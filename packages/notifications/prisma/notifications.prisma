@@ -152,6 +152,12 @@ model PushSubscription {
   side      String?
   // Free-form browser/device hint ("Chrome · Linux") for a device list.
   userAgent String?  @map("user_agent")
+  // Which ATTENTION pushes this device wants: `off`, `late` (only what turned
+  // urgent) or `all`. A notification carrying `data.attention` (a severity:
+  // calm, late, spent) reaches this device only when the level wants it; one
+  // without reaches it as before. NULL = every attention push — what every row
+  // registered before this column reads as.
+  attentionPush String? @map("attention_push")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

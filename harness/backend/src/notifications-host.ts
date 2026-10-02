@@ -33,6 +33,7 @@ import { createWiringHost, type WiringReport } from '@12-apps/wiring/consumer';
 import { harnessLoggerFor, honoRouterFor } from './wire-hono';
 
 import { notificationsDb } from './notifications-db';
+import { MESA_WAITING_GENERATOR } from './notifications-attention';
 import { createOutboxLatch, type OutboxLatch } from './notifications-latch';
 import { harnessControls } from './notifications-controls';
 import { ACTOR_HEADER, SIDE_HEADER, harnessActor, sideOf } from './notifications-sides';
@@ -96,6 +97,7 @@ const GENERATORS: readonly NotificationGenerator<never>[] = [
       link: '/payments',
     }),
   } as NotificationGenerator<never>,
+  MESA_WAITING_GENERATOR,
   {
     type: 'stock.low',
     category: 'stock',

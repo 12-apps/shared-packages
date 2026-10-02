@@ -4,6 +4,7 @@
  * settings are `@12-apps/notifications/attention/react`.
  */
 export {
+  ATTENTION_CHANNEL_LEVELS,
   ATTENTION_SEVERITIES,
   AttentionWiringError,
   announcementBetween,
@@ -29,3 +30,4 @@ export {
   type AttentionWiring,
   type ReadAttentionOptions,
 } from './core';
+export { ATTENTION_DATA_KEY, attentionSeverityOf, wantsAttentionPush } from './push';

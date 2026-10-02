@@ -292,10 +292,51 @@ tells the states apart. Nothing moves under `prefers-reduced-motion`.
 Every sentence is the host's (`AttentionMessages`); there is no default table.
 Sound is synthesised (or the host's files); vibration is `navigator.vibrate`,
 which Safari on iPhone does not implement — `canVibrate()` says so and the
-settings show it. Push rides the `WEB_PUSH` channel above. The device's push
-level lives in `localStorage`, where no server or service worker can read it:
-a host that filters what it pushes syncs the level to its server through
-`store.subscribe`.
+settings show it.
+
+### Attention pushes, filtered per device
+
+Push rides the `WEB_PUSH` channel above. A notification is an ATTENTION push
+when its `data` carries the reserved key `attention` (`ATTENTION_DATA_KEY`) set
+to the item's severity — `calm` for an arrival, `late` or `spent` once the clock
+ran out. The transport then sends it only to the devices whose own push level
+wants it (`wantsAttentionPush`): `off` takes none, `late` only the urgent ones,
+`all` everything. A device that never chose takes them all, and a notification
+without the key is not attention and reaches every device as before. None of
+the user's devices wanting it is their choice, so the delivery succeeds without
+sending rather than retrying.
+
+The level is set in the browser (`createAttentionPreferences`, in
+`localStorage`, where no server can read it), so the host's app sends it with
+the subscription: `POST /push-subscriptions` takes an optional
+`attentionPush` (`off` | `late` | `all`), stored on that device's
+`push_subscriptions` row. Leaving it out keeps the stored level, so a
+re-subscribe from a flow that knows nothing about attention cannot reset it;
+`null` clears it. Re-post on every change of the level (`store.subscribe`).
+A host on the packaged client sends it through
+`api.savePushSubscription({ endpoint, keys, attentionPush })`.
+
+On the server, a generator marks its notification with the key from the
+framework-free entry:
+
+```ts
+import { ATTENTION_DATA_KEY } from '@12-apps/notifications/attention';
+
+generate: (p) => ({ title, body, link, data: { [ATTENTION_DATA_KEY]: p.late ? 'late' : 'calm' } }),
+```
+
+A level the transport does not recognise (a newer app's, an older server's)
+fails OPEN — the device takes every attention push — because an over-delivered
+alert costs a glance and a dropped one costs a table. A push filtered out on
+every device is recorded as `SENT` (it was delivered as the devices asked); it
+is not retried. On a live activity (`liveSubject`), give the CLOSING stage a
+severity every non-`off` level takes, or no `attention` key at all: a `late`
+device never receives a `calm` replacement, and its earlier entry stays in the
+tray.
+
+What the push may NOT do while the app is open on that device — interrupt
+someone already looking at the button — is the host's service worker's call:
+skip `showNotification` when a visible client exists.
 
 Sound needs a user gesture first, and Safari holds that per audio context: the
 host unlocks on the page's first tap or key press (`useAttentionAlerts` listens

@@ -67,7 +67,10 @@ export interface NotificationContent {
   /**
    * Structured extras for consumers that want more than text.
    *
-   * ONE KEY IS RESERVED: `liveSubject` (`LIVE_SUBJECT_KEY` in `./live`) ties
+   * TWO KEYS ARE RESERVED. `attention` (`ATTENTION_DATA_KEY` in
+   * `./attention`), set to `calm`, `late` or `spent`, makes this an attention
+   * push: the WEB_PUSH transport sends it only to the devices whose own level
+   * wants that severity. And `liveSubject` (`LIVE_SUBJECT_KEY` in `./live`) ties
    * this notification to a live activity, and the WEB_PUSH transport turns it
    * into the tray `tag` that collapses every push about one subject onto a
    * single entry. A host already using that name for something else acquires

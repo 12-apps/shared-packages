@@ -901,6 +901,38 @@ describe('the side a reader asks as, over real rows', () => {
     expect(reached('Farinha está acabando.')).toEqual(['both', 'staff']);
   });
 
+  it("sends an attention push only to the devices whose level wants it, over real SQL", async () => {
+    const register = async (endpoint: string, level?: string | null): Promise<void> => {
+      const response = await backend.app.request('/api/account/push-subscriptions', {
+        method: 'POST',
+        headers: headers('owner-1'),
+        body: JSON.stringify({
+          endpoint,
+          keys: { p256dh: 'p', auth: 'a' },
+          ...(level === undefined ? {} : { attentionPush: level }),
+        }),
+      });
+      expect(response.status).toBe(200);
+    };
+    await register('https://push.harness.test/off', 'off');
+    await register('https://push.harness.test/late', 'late');
+    await register('https://push.harness.test/never');
+    // A plain re-subscribe keeps the level the SQL stored.
+    await register('https://push.harness.test/off');
+
+    await emit({ type: 'mesa.waiting', payload: { mesa: '7', severity: 'calm' } });
+    await emit({ type: 'mesa.waiting', payload: { mesa: '9', severity: 'late' } });
+
+    const pushes = (await outbox()).filter((entry) => entry.channel === 'WEB_PUSH');
+    const reached = (text: string): string[] =>
+      pushes
+        .filter((entry) => entry.payload.includes(text))
+        .map((entry) => entry.destination.split('/').pop() ?? '')
+        .sort();
+    expect(reached('Mesa 7 chamou.')).toEqual(['never']);
+    expect(reached('Mesa 9 chamou.')).toEqual(['late', 'never']);
+  });
+
   it('stamps a push subscription registered from one side’s app', async () => {
     const response = await backend.app.request('/api/account/push-subscriptions', {
       method: 'POST',
