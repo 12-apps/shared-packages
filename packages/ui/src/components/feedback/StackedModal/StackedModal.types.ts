@@ -32,6 +32,17 @@ export interface StackedModalProps {
    * different action, and it is the only way out of depth ≥2.
    */
   hideClose?: boolean;
+  /**
+   * Draws no navigation bar at all, for a ROOT panel whose content carries its
+   * own header — the ✕ and the panel's name in one sticky bar. A bar above it
+   * holding only a breadcrumb is a second header on a screen that already has
+   * one, and on a phone it costs the first 64px of the viewport.
+   *
+   * Pass `aria-labelledby` with it, naming the content header's title: the bar
+   * is what names the dialog otherwise. Ignored while the panel can go back — a
+   * stacked panel's back arrow lives in the bar and is the only way out.
+   */
+  hideHeader?: boolean;
   /** Modal content */
   children?: ReactNode;
   /** Actions to display in the modal header (desktop) or footer (mobile) */

@@ -61,7 +61,7 @@ type ResolvedProps = StackedModalProps & { modalId: string };
 
 const StackedModalPanel: FC<ResolvedProps> = (props) => {
   const {
-    open, onClose, glass, navigationTitle, backLabel, hideClose, children, actions, modalId,
+    open, onClose, glass, navigationTitle, backLabel, hideClose, hideHeader, children, actions, modalId,
     closeOnClickOutside, closeOnEsc, loading, loadingText, fullScreen, maxWidth, size, disableBackdrop,
     disableFocusTrap, keepMounted, rtl, dataTestId,
     'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...otherProps
@@ -115,6 +115,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
         descId={descId}
         navigationTitle={navigationTitle}
         hideClose={hideClose}
+        hideHeader={hideHeader}
         canGoBack={canGoBack}
         onBack={handleBack}
         onClose={onClose}

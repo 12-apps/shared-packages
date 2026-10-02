@@ -125,6 +125,8 @@ new component that portals should too.
 | `open` | `boolean` | `false` | Controls modal visibility |
 | `onClose` | `() => void` | - | Callback when modal is closed |
 | `navigationTitle` | `string` | - | Title displayed in modal header |
+| `hideClose` | `boolean` | `false` | Drop the header's ✕ — the content owns the dismiss |
+| `hideHeader` | `boolean` | `false` | Draw no header bar at all, for a root panel whose content brings its own header (✕ and name). Pass `aria-labelledby` naming that header's title. Ignored while the panel can go back |
 | `children` | `ReactNode` | - | Modal content |
 | `glass` | `boolean` | `false` | Enable glass morphism effect |
 | `actions` | `ReactNode` | - | Custom action buttons for header/footer |
@@ -179,6 +181,28 @@ and a dialog named by everything in the bar ("close Title Save").
 Without a `navigationTitle` the bar is still MUI's `h2` and holds the id, as
 before. Give such a panel its own `aria-labelledby` if it needs a name.
 
+### A panel that brings its own header
+
+A root panel whose content already has a sticky header — the name and the ✕ in
+one bar — would otherwise show TWO bars, the first holding only a breadcrumb.
+`hideHeader` drops the panel's bar; the dialog is then named by the content's
+own title through `aria-labelledby`:
+
+```tsx
+<StackedModal
+  backLabel="Voltar"
+  open={open}
+  onClose={close}
+  hideHeader
+  aria-labelledby="product-edit-title"
+>
+  <ProductEditHeader titleId="product-edit-title" … />
+</StackedModal>
+```
+
+A stacked panel (one that can go back) keeps its bar whatever this says: the
+back arrow lives there and is the only way out of depth ≥2.
+
 ## Testing
 
 The StackedModal component provides comprehensive test IDs for all interactive elements through the `dataTestId` prop. When provided, it generates consistent test IDs for all child elements.
@@ -190,7 +214,7 @@ When you provide `dataTestId="my-modal"`, the following test IDs are automatical
 | Element | Test ID | Description |
 |---------|---------|-------------|
 | Modal Container | `my-modal` | The root dialog element |
-| Header | `my-modal-header` | The modal header bar (a `div` when there is a title) |
+| Header | `my-modal-header` | The modal header bar (a `div` when there is a title; absent with `hideHeader` on a root panel) |
 | Title | `my-modal-title` | The navigation title — the panel's one `h2` |
 | Close Button | `my-modal-close-button` | The close button (when no modals stacked) |
 | Back Button | `my-modal-back-button` | The back button (when modals are stacked) |

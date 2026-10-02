@@ -300,6 +300,8 @@ export const ModalFooter: FC<{ dataTestId?: string; children?: ReactNode }> = ({
 );
 
 interface PanelContentsProps extends ModalHeaderProps {
+  /** No bar (see `StackedModalProps.hideHeader`); never while it can go back. */
+  hideHeader?: boolean;
   showSkeleton: boolean;
   loadingText?: string;
   descId: string;
@@ -317,13 +319,14 @@ export const ModalPanelContents: FC<PanelContentsProps> = ({
   content,
   modalActions,
   hasMobileActions,
+  hideHeader,
   ...header
 }) => (
   <>
     {showSkeleton && (
       <ModalLoadingOverlay loadingText={loadingText} dataTestId={header.dataTestId} />
     )}
-    <ModalHeader {...header} />
+    {!(hideHeader && !header.canGoBack) && <ModalHeader {...header} />}
     <ModalBody
       descId={descId}
       showSkeleton={showSkeleton}
