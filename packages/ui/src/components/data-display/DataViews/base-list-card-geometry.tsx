@@ -12,7 +12,7 @@ import {
 import { useDragItem } from "./data-views-drag";
 import { DENSITY_ROW_PADDING } from "./data-views-layout-context";
 import { RAIL_COUNT, RAIL_GAP, railsTemplateFor, useListRails } from "./list-card-rails";
-import { STACK_BREAK } from "./base-list-card-slots";
+import { COMPACT_BREAK, STACK_BREAK } from "./base-list-card-slots";
 import type { BaseListCardProps } from "./base-list-card";
 import { rem } from "../../../tokens/relative";
 
@@ -66,6 +66,8 @@ interface RowSxOptions {
   inGroup: boolean;
   railCount: number;
   cellTemplate: string | null;
+  /** A standalone configured row's template in the compact band. */
+  compactTemplate: string | null;
   gutters: { disclose: boolean; drag: boolean; select: boolean };
   metaColumns: number;
   pad: number;
@@ -173,7 +175,7 @@ const stackedRowSx = (inGroup: boolean, railCount: number, stack: StackPlacement
  * {@link rowStyles}.
  */
 export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown> => {
-  const { inGroup, railCount, cellTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable, stack } = opts;
+  const { inGroup, railCount, cellTemplate, compactTemplate, gutters, metaColumns, pad, padY, scale, divider, interactive, draggable, stack } = opts;
   return {
     position: "relative",
     borderRadius: CARD_RADIUS,
@@ -210,6 +212,15 @@ export const rowSx = (theme: Theme, opts: RowSxOptions): Record<string, unknown>
       outlineStyle: "solid",
       outlineColor: "primary.main",
       outlineOffset: rem(theme, 2),
+    },
+    // COMPACT below COMPACT_BREAK: half the rail gap and, standalone, the
+    // first cell's double share. In a group the GROUP's template answers the
+    // width (`list-card-group-tracks`); the gap is the row's, since a subgrid
+    // sets its own. BEFORE the stacked rule, which overrides it below
+    // STACK_BREAK by coming later.
+    [`@container (max-width: ${rem(theme, COMPACT_BREAK)})`]: {
+      columnGap: RAIL_GAP / 2,
+      ...(compactTemplate == null ? {} : { gridTemplateColumns: compactTemplate }),
     },
     // TWO-LINE below STACK_BREAK: see {@link stackedRowSx}.
     [`@container (max-width: ${rem(theme, STACK_BREAK)})`]: stackedRowSx(inGroup, railCount, stack),
@@ -267,8 +278,10 @@ export function useRowShell(props: BaseListCardProps) {
     slot: slotTestIds(props.testId),
     drag: useDragItem(dragIdFor(props, actionable)),
     // Standalone holds no gutter open: there is no list beside it to line up
-    // with, so a reserved-but-empty rail is pure inset.
-    reserve: group?.reserveGutters ?? false,
+    // with, so a reserved-but-empty rail is pure inset. In a group every gutter
+    // renders, empty when unused, and the GROUP decides whether its track
+    // stays (`list-card-group-tracks`): the rows cannot agree among themselves.
+    reserve: group != null,
     // 1, not 1.5. The row's contents still have to line up with the toolbar
     // above them, but 12px of card padding stacked on the checkbox's own 9px
     // and an empty drag gutter's 24px read as a row indented for no reason.
@@ -320,8 +333,9 @@ function rowSurface(
 }
 
 /**
- * Which head gutters this row renders: the ones it uses, or all three when its
- * group reserves them. The template is built from this; the three gutter slots
+ * Which head gutters this row renders: the ones it uses, or all three inside a
+ * group (empty when unused; the group decides which keep a track). The template
+ * is built from this; the three gutter slots
  * (`base-list-card-gutters.tsx`) apply the SAME conditions on their own — keep
  * the two in step, because a template that disagrees with the slots is exactly
  * how cells slid two tracks.
@@ -341,7 +355,7 @@ export function rowGutters(
 export function rowStyles(
   props: BaseListCardProps,
   shell: ReturnType<typeof useRowShell>,
-  cellTemplate: string | null,
+  templates: { cellTemplate: string | null; compactTemplate: string | null },
   stack: StackPlacement,
 ): Record<string, unknown> {
   const { theme, group, drag, pad, padY, scale, acts } = shell;
@@ -350,7 +364,7 @@ export function rowStyles(
     ...rowSx(theme, {
       inGroup: group !== null,
       railCount: group?.railCount ?? RAIL_COUNT,
-      cellTemplate,
+      ...templates,
       gutters: rowGutters(props, shell),
       metaColumns: metaShape(props).columns,
       pad,

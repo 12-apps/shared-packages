@@ -10,6 +10,9 @@ import { Text } from "../../typography/Text";
 import type { Theme } from "@mui/material/styles/index.js";
 
 import { rem, sxRem } from "../../../tokens/relative";
+import { COMPACT_BREAK, META_BREAK } from "./list-card-breaks";
+
+export { COMPACT_BREAK, META_BREAK, STACK_BREAK } from "./list-card-breaks";
 
 /**
  * WHAT SITS IN EACH RAIL.
@@ -17,11 +20,6 @@ import { rem, sxRem } from "../../../tokens/relative";
  * Split from `base-list-card` at the size gate: that module is the shell, the
  * rails and the states; this is the content of each column.
  */
-
-/** Below this the row drops its middle columns. */
-export const META_BREAK = 520;
-/** …and below this it leaves the shared rails and goes two-line. */
-export const STACK_BREAK = 360;
 
 /** Money and dates line up only if their digits are the same width. */
 const TABULAR = { fontVariantNumeric: "tabular-nums" } as const;
@@ -214,6 +212,8 @@ export function ListCardMeta({
  */
 const valueFlush = (theme: Theme) => ({
   marginLeft: rem(theme, -RAIL_GAP_PX),
+  // The gap it cancels is half as wide in the compact band.
+  [`@container (max-width: ${rem(theme, COMPACT_BREAK)})`]: { marginLeft: rem(theme, -RAIL_GAP_PX / 2) },
   [`@container (max-width: ${rem(theme, META_BREAK)})`]: { marginLeft: 0 },
 });
 

@@ -64,6 +64,22 @@ export function cellTracks(cells: readonly ListCardCellConfig<never>[] | undefin
   return (cells ?? []).map((cell) => cell.width ?? DEFAULT_CELL_WIDTH);
 }
 
+/** The first cell's track in the compact band, when it left its width to us. */
+const COMPACT_FIRST_CELL_WIDTH = "minmax(0, 2fr)";
+
+/**
+ * The tracks in the COMPACT band (`COMPACT_BREAK`): the same, except that the
+ * first cell — the one that names the record — takes a double share of the
+ * spare width. Narrow, an even share left every name at "Sab…" beside a date
+ * column with room to spare. A first cell that declared its own `width` keeps
+ * it: the list asked for that track, and only the default is ours to change.
+ */
+export function compactCellTracks(cells: readonly ListCardCellConfig<never>[] | undefined): string[] {
+  return cellTracks(cells).map((track, index) =>
+    index === 0 && cells?.[0]?.width == null ? COMPACT_FIRST_CELL_WIDTH : track,
+  );
+}
+
 /**
  * The config handed down by the list.
  *

@@ -119,6 +119,7 @@ describe("the stacked row, below STACK_BREAK", () => {
     inGroup: true,
     railCount: 7,
     cellTemplate: null,
+    compactTemplate: null,
     gutters: { disclose: true, drag: true, select: true },
     metaColumns: 0,
     pad: 1,
