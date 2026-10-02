@@ -163,7 +163,9 @@ export function AttentionOthersList({
           gap: 0.5,
           // Never wider than the screen less the popover's 16px margins: at
           // 320px a fixed width ran 9px off the left edge.
-          width: 'min(270px, calc(100vw - 24px))',
+          // The board's 270px is its content box; with the 8px padding and the
+          // paper's 1px edge the list is 288px wide.
+          width: 'min(286px, calc(100vw - 26px))',
           boxSizing: 'border-box',
           ...(place === null ? {} : { maxHeight: place.room, overflowY: 'auto' }),
         }}

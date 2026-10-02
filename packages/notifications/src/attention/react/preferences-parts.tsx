@@ -46,17 +46,20 @@ interface ChoicesProps {
  * cannot honour it. The compact popover keeps plain rows.
  */
 const TILES_SX = {
-  '& .MuiRadioGroup-root': { gap: 0.75 },
+  '& .MuiRadioGroup-root': { gap: 1 },
   '& .MuiFormControlLabel-root': {
     m: 0,
+    minHeight: 48,
     px: 1,
-    py: 0.75,
+    py: 0.5,
     borderRadius: 1,
     bgcolor: 'action.hover',
     alignItems: 'center',
   },
   '& .MuiFormControlLabel-label .MuiTypography-root': { display: 'block', lineHeight: 1.3, fontSize: 14 },
   '& .MuiFormControlLabel-label .MuiTypography-caption': { fontSize: 12, color: 'text.secondary' },
+  '& .MuiRadio-root': { p: 0.5, mr: 0.5 },
+  '& .MuiRadio-root .MuiSvgIcon-root': { fontSize: 18 },
   '& .MuiRadio-root.Mui-checked': { color: 'text.primary' },
   // The board fades the whole tile the device cannot honour, not just its words.
   '& .MuiFormControlLabel-root.Mui-disabled': { opacity: 0.45 },
@@ -185,7 +188,8 @@ export function Action({
         color="neutral"
         size="sm"
         onClick={onClick}
-        sx={solid ? undefined : { color: 'text.primary', borderColor: 'divider' }}
+        // The board's 44px controls: a full touch target on a phone.
+        sx={{ minHeight: 44, ...(solid ? {} : { color: 'text.primary', borderColor: 'divider' }) }}
       >
         {children}
       </Button>
