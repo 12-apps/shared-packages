@@ -1238,6 +1238,11 @@ jobs:
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee build.log
+      - name: Exercise interactive consent over real HTTP
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test packages/mcp/tests/integration/consent-wire.test.ts 2>&1 | tee mcp-consent-http.log
       - name: Exercise real PostgreSQL MCP concurrency
         env:
           MCP_CONCURRENCY_DATABASE_URL: postgresql://mcp_test:synthetic-mcp-test@127.0.0.1:${{ job.services.postgres.ports[5432] }}/mcp_concurrency
