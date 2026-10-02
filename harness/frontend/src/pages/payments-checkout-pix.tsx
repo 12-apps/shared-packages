@@ -36,13 +36,18 @@ import { CaseTabs, PageIntro, type HarnessCase } from '../payments/panel';
  * its PIX raise answered as a redirect charge with no link, which throws. See
  * FINDINGS in the PR. `methods` is what actually makes this store PIX-only.
  */
-function pixStore(settlesOnPoll: boolean) {
-  return { chain: [mintable('aurora', ['PIX'], { settlesOnPoll })] };
+function pixStore(settlesOnPoll: boolean, pixConfirmation?: 'MANUAL') {
+  return {
+    chain: [mintable('aurora', ['PIX'], { settlesOnPoll })],
+    ...(pixConfirmation ? { pixConfirmation } : {}),
+  };
 }
 
 const CASES: HarnessCase[] = [
   checkoutCase('awaiting', 'Nobody has paid yet', pixStore(false)),
   checkoutCase('settles', 'The poll settles PAID', pixStore(true)),
+  // FUT-3232: the host marks the code as one only the STORE confirms.
+  checkoutCase('manual', 'The store confirms by hand', pixStore(false, 'MANUAL')),
 ];
 
 export function PaymentsCheckoutPixPage(): JSX.Element {

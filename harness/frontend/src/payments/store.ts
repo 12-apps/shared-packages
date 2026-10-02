@@ -68,6 +68,11 @@ export interface HarnessStoreSpec {
    * real round trip instead of a poll against a store that forgot everything.
    */
   settled?: boolean;
+  /**
+   * The host marks this store's PIX as confirmed by the STORE (`pixmanual`):
+   * the pane waits for the merchant, never for the bank.
+   */
+  pixConfirmation?: 'MANUAL';
 }
 
 /** What a page gets back: the transport to hand the factory, plus the truth. */

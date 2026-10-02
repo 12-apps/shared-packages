@@ -201,6 +201,13 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           expiryLocale: 'pt-BR',
           awaiting: 'Esperando o pagamento…',
           chargeMissing: 'Não deu para gerar o código PIX.',
+          // FUT-3232: a code only the store confirms never says "automática".
+          manual: {
+            instructions: (totalLabel) =>
+              `Pague ${totalLabel} pelo QR code ou pelo código. A loja confere e confirma o seu pedido.`,
+            validUntil: (time) => `A loja confirma o pagamento até ${time}.`,
+            awaiting: 'Esperando a loja confirmar o pagamento…',
+          },
         },
         card: {
           heading: 'Pagar com cartão',

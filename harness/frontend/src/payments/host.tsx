@@ -39,7 +39,7 @@ interface PayableView {
   invoice: string;
   total: number;
   totalLabel: string;
-  pix?: { copyPaste: string; expiresAt: string };
+  pix?: { copyPaste: string; expiresAt: string; confirmation?: 'MANUAL' };
   hostedCheckoutUrl?: string;
 }
 
