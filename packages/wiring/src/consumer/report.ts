@@ -37,7 +37,8 @@ export interface CapabilityReportEntry {
   /** What was bound ("11 routes at /api/…"), or the decline/unbound reason. */
   detail?: string;
   /**
-   * On an `out-of-scope` entry, the runtime whose host answers for it. Set
+   * On a runtime capability's `out-of-scope` entry, the runtime whose host
+   * answers for it (a shared capability like `env` carries none). Set
    * because `kind` alone is no longer unique within a package's entries: a
    * `surface` may be declared for the web AND the native runtime, so a server
    * host reports two `surface` rows. Key a report by `kind` + `runtime`.
