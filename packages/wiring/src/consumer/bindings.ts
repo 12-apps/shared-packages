@@ -86,6 +86,9 @@ type SurfaceSlot<TManifest> = TManifest extends {
 /** The typed bindings a web adoption must supply (`areas` is data — collected). */
 export type WebBindings<TManifest> = SurfaceSlot<TManifest>;
 
+/** The typed bindings a native adoption must supply: its surface, or a written decline. */
+export type NativeBindings<TManifest> = SurfaceSlot<TManifest>;
+
 /** The mailer type an email contribution builds, recovered for adopt's return. */
 export type MailerOf<TManifest> = TManifest extends {
   email: { createMailer(port: EmailPort): infer TMailer };
@@ -93,7 +96,7 @@ export type MailerOf<TManifest> = TManifest extends {
   ? TMailer
   : undefined;
 
-/** The surface type a web contribution builds, recovered for adopt's return. */
+/** The surface type a web or native contribution builds, recovered for adopt's return. */
 export type SurfaceOf<TManifest> = TManifest extends {
   surface: { create(config: never): infer TSurface };
 }

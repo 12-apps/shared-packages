@@ -50,10 +50,12 @@ so:
                                         └────────────────────────────────┘
 ```
 
-Three manifests per package because bundles are physics: the shared manifest
-is data every runtime can hold; the server manifest carries the `createApi*`
-factory and job blueprints; the web manifest carries the `createWeb*` factory.
-The shared manifest **inventories** the other two, and that inventory is the
+Separate manifests per runtime because bundles are physics: the shared
+manifest is data every runtime can hold; the server manifest carries the
+`createApi*` factory and job blueprints; the web manifest carries the
+`createWeb*` factory; a package with React Native screens adds a native
+manifest (see [React Native hosts](#react-native-hosts)). The shared manifest
+**inventories** the runtime manifests, and that inventory is the
 integrity mechanism: the producer refuses a runtime manifest that drifts from
 it, and a host that adopts a manifest without answering an inventoried
 capability gets a red `assemble()` naming the package and the capability.
@@ -76,8 +78,51 @@ what turns "the bump shipped a capability the host never wired" from a silent
 | `notifications` | blueprints: `type`, suggested `category`, `generate` | collected | `notifications` — feed the notifications mount |
 | `db` | the Prisma partial + migrations paths | collected | `db` — feed the sync tooling |
 | `surface` | `create(config) → surface` — the existing `createWeb*` factory | `{ config }` | `surfaces[pkg]`, built once (the memoisation rule, held in one place) |
+| `surface` (native) | the same `create(config) → surface`, returning React Native component types, in `<pkg>/manifest/native` | `{ config }` on a `native` host | `surfaces[pkg]`, built once |
 | `areas` | route/nav/gate suggestions per host area | collected | `areas` — project nav from data |
 | `e2e` | the journeys' entry subpath | collected | in the report |
+
+## React Native hosts
+
+A React Native app is a third host kind. A package that ships screens for
+one adds a fourth manifest, `<pkg>/manifest/native`, declared with
+`defineNativeManifest` and inventoried as `native: ["surface"]` in the shared
+manifest. Its surface has the web surface's shape — one config object in,
+component types out — but returns React Native components, because a native
+bundle can import neither `react-dom` nor a web component library, and a web
+bundle must never import React Native.
+
+```ts
+// package: <pkg>/manifest/native — a plain value; wiring stays a type-only edge
+import type { AnyNativeManifest } from "@12-apps/wiring";
+export const threadsNativeManifest = {
+  name: "@12-apps/threads",
+  surface: { create: createNativeThreads },
+} as const satisfies AnyNativeManifest;
+
+// package: its own test suite runs the producer's assertions
+expect(defineNativeManifest(threadsManifest, threadsNativeManifest)).toBe(threadsNativeManifest);
+
+// host: the React Native app
+const host = createWiringHost({ name: "field-app", kind: "native", ports: { loggerFor } });
+const { surface } = host.adoptNative({
+  manifest: threadsManifest,
+  native: threadsNativeManifest,
+  bindings: { surface: { config: { fetch, copy } } },
+});
+host.assemble();
+```
+
+`surface` is ONE capability with two possible runtimes, so the vocabulary
+every package answers for does not grow: the conformance gate checks only
+that a `native:` inventory has its `./manifest/native` subpath, and that the
+subpath does not outlive the inventory (`assertExportsMirror` checks the same
+in the package's own suite). A native host has no `areas` (its navigation is
+its own; a native manifest carrying `areas` is refused), reports the server
+and web halves out-of-scope with the runtime named on each entry, and answers
+env vars declared with `scope: "native"`. Like a web host, it still collects
+the shared data capabilities (permissions, notifications, MCP, db) into its
+aggregate; it simply has nothing to feed them to.
 
 ## Ports (`@12-apps/wiring/ports`)
 

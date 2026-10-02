@@ -73,15 +73,18 @@ export type {
   AreaContribution,
   AreaNavDeclaration,
   AreaRouteDeclaration,
+  NativeSurfaceContribution,
   WebSurfaceContribution,
   WirePermissionGate,
 } from "./contract/web";
 
 export type {
+  AnyNativeManifest,
   AnyServerManifest,
   AnyWebManifest,
   CapabilityKind,
   E2eContribution,
+  NativeCapabilityKind,
   ObservabilityContribution,
   PackageManifest,
   ServerCapabilityKind,

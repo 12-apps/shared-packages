@@ -2,7 +2,7 @@
 // capability kind the contract names, or CI is red.
 //
 // WHAT COUNTS AS ANSWERED. A capability is declared by the package's shared
-// manifest (data key, or a kind its `server:` / `web:` inventory lists), or
+// manifest (data key, or a kind its `server:` / `web:` / `native:` inventory lists), or
 // it has an entry in `.wiring-conformance.json`: `exempt` with a written
 // argument (the manifest docblocks' narrowings, made machine-readable), or
 // `grandfathered` (debt). A package with no `./manifest` export at all is one
@@ -35,6 +35,7 @@ import { inScope } from "./lib/shipped-source.mjs";
 import {
   CAPABILITIES,
   DATA_CAPABILITIES,
+  NATIVE_CAPABILITIES,
   SERVER_CAPABILITIES,
   WEB_CAPABILITIES,
   contractCapabilities,
@@ -114,6 +115,7 @@ function assertContractVocabulary(failures) {
   const pairs = [
     [kinds.server, SERVER_CAPABILITIES, "server"],
     [kinds.web, WEB_CAPABILITIES, "web"],
+    [kinds.native, NATIVE_CAPABILITIES, "native"],
     [kinds.data, DATA_CAPABILITIES, "data"],
   ];
   for (const [contract, mirrored, label] of pairs) {
