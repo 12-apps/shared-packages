@@ -121,6 +121,23 @@ function failedOutcome(copy: PaymentStatusCopy, decline: CheckoutDecline | null)
 }
 
 /**
+ * A SETTLED outcome's sentences. A Pix only the store confirms swaps FAILED and
+ * EXPIRED for its own pair when the host wrote one (`copy.manual`): neither the
+ * store's "não recebi" nor its lapsed window proves no money moved.
+ */
+function settledOutcome(
+  copy: PaymentStatusCopy,
+  status: OrderStatus,
+  decline: CheckoutDecline | null,
+  manual: boolean,
+): StatusOutcomeCopy {
+  const byStore = manual ? copy.manual : undefined;
+  if (status === "FAILED") return byStore?.failed ?? failedOutcome(copy, decline);
+  if (status === "EXPIRED") return byStore?.expired ?? copy.expired;
+  return copy[OUTCOME_COPY_KEY[status]];
+}
+
+/**
  * The headline block: icon, outcome, and one supporting line.
  *
  * `hero` replaces the PAID icon with the host's own illustration — a store's
@@ -135,23 +152,22 @@ export function OutcomeHero({
   wait,
   decline,
   hero,
+  manual = false,
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
   wait: WaitState;
   decline: CheckoutDecline | null;
   hero?: ReactNode;
+  /** The payment was a Pix only the store confirms — see {@link settledOutcome}. */
+  manual?: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const face = status === "AWAITING_PAYMENT" ? awaitingFace(copy, wait) : null;
   const visual = face
     ? { icon: OUTCOME_VISUAL.AWAITING_PAYMENT.icon, tone: face.tone }
     : OUTCOME_VISUAL[status];
-  const outcome = face
-    ? face.outcome
-    : status === "FAILED"
-      ? failedOutcome(copy, decline)
-      : copy[OUTCOME_COPY_KEY[status]];
+  const outcome = face ? face.outcome : settledOutcome(copy, status, decline, manual);
   return (
     <Box
       // `payment-paid` is load-bearing for the storefront journeys — it is how

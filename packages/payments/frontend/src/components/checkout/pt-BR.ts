@@ -28,6 +28,16 @@ export const PT_BR_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
     heading: "O código expirou",
     support: "Nenhum valor foi cobrado. Gere um novo código para continuar.",
   },
+  manual: {
+    failed: {
+      heading: "A loja não identificou o seu Pix",
+      support: "Se você já pagou, fale com a loja antes de pagar de novo.",
+    },
+    expired: {
+      heading: "A loja não confirmou o pagamento a tempo",
+      support: "Se você já pagou, fale com a loja antes de pagar de novo.",
+    },
+  },
   awaitingTimedOut: {
     heading: "Ainda não recebemos a confirmação",
     support:
