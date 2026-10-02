@@ -333,3 +333,33 @@ describe("detectContactInfo — letters on separate lines, short links", () => {
     },
   );
 });
+
+describe("a span that would hide a phone's tail", () => {
+  it.each([
+    ["11 9876 $54321", {}],
+    ["11 9876-$54321", {}],
+    ["(11) 9876-$54321", {}],
+    ["119 876 $54321", {}],
+    ["9876 $54321", {}],
+    ["98 $7654321", {}],
+    ["9 $8765432", {}],
+    ["11 9876 ap 54321", PT_BR],
+    ["(11) 9876 apto 54321", PT_BR],
+    ["11 9876 casa 54321", PT_BR],
+  ] as const)("still reads %j as a phone number", (text, vocabulary) => {
+    expect(detectContactInfo(text, ["phone"], vocabulary)).toEqual(["phone"]);
+  });
+
+  it.each([
+    "R$ 1.250,00 e R$ 1.300,00",
+    "R$ 25,00 + R$ 12,50",
+    "Deu $ 1234, tem troco?",
+    "Rua A, 1234 apto 5678",
+    "Rua das Flores, 1234, apto 1204",
+    "Bloco 3 apto 1204, interfone 1204",
+    "Apto 1204 e 1205 não atendem",
+    "Chego 19:30 ou 19:50",
+  ])("still lets %j through", (text) => {
+    expect(detectContactInfo(text, ["phone"], PT_BR)).toEqual([]);
+  });
+});

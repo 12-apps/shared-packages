@@ -36,15 +36,18 @@ export const CONTACT_KINDS: readonly ContactKind[] = ["phone", "email", "url", "
  * between two groups (`98765 e 4321`), while ordinary money lines stay over
  * it (`100,00, total 37,90` spans 17).
  *
- * Before the window, spans that legitimately carry numbers collapse to ONE
- * digit (see NEUTRAL_RULES): clock times, amounts after a currency symbol,
- * and the host's `neutralPatterns` (address units). One digit, not none, so a
- * span still counts toward the window and cannot launder a phone's tail
- * (`11 98765 $4321`, `11 98765 apto 4321` are still eight). A span collapses
- * only when it holds few digits, is not followed straight away by a digit,
- * and is not preceded straight away by a run of five or more digits — a
- * mobile's first group (`98765 ap 4321`, `119876$54321`), while a street
- * number (`Rua A, 1234 apto 5678`) is at most four.
+ * Before the window, spans that legitimately carry numbers collapse (see
+ * NEUTRAL_RULES): clock times, amounts after a currency symbol, and the
+ * host's `neutralPatterns` (address units). A collapsed span still counts —
+ * one digit, two when it held four or more — so it cannot launder a phone's
+ * tail (`11 98765 $4321`, `11 98765 apto 4321`). A span collapses only when
+ * it holds few digits (a host span at most four, an amount at most four
+ * unless it is shaped like money: `1.250` or `25,00`), is not followed
+ * straight away by a digit, and is not preceded straight away by a run of
+ * five or more digits — a mobile's first group (`98765 ap 4321`,
+ * `119876$54321`), while a street number (`Rua A, 1234 apto 5678`) is at most
+ * four. So `11 9876 $54321` and `9 $8765432` stay phone numbers: a bare
+ * five-digit "amount" is not money.
  *
  * Known costs, accepted because a missed number is the harm: a CEP-shaped
  * postcode (`01310-100`), a full date (`02/10/2026`), and money without a
@@ -60,24 +63,36 @@ export const CONTACT_KINDS: readonly ContactKind[] = ["phone", "email", "url", "
  */
 const PHONE_MIN_DIGITS = 8;
 const PHONE_WINDOW = 16;
-/** Host spans: an address unit is at most five digits. */
-const HOST_NEUTRAL_MAX_DIGITS = 5;
+/** Host spans: an address unit is at most four digits. */
+const HOST_NEUTRAL_MAX_DIGITS = 4;
 /** A run this long right before a span is a phone's first group, never a street number. */
 const PHONE_GROUP_DIGITS = 5;
-/** What a neutral span becomes: one digit, between spaces. */
-const NEUTRAL_PLACEHOLDER = " 0 ";
+/** What a neutral span becomes: one digit, or two for a span of four or more, between spaces. */
+const placeholderFor = (digits: number): string => (digits >= 4 ? " 00 " : " 0 ");
 
 interface NeutralRule {
   readonly pattern: RegExp;
   readonly maxDigits: number;
+  /** Above this many digits, the span must also pass `shaped` to collapse. */
+  readonly bareMaxDigits?: number;
+  readonly shaped?: RegExp;
 }
 
 /** Domain-free spans that carry digits and are not a phone. */
 const NEUTRAL_RULES: readonly NeutralRule[] = [
   /** A valid clock time: `19:30`, `9h30`. */
   { pattern: /(?<!\d)(?:[01]?\d|2[0-3])[:h][0-5]\d(?!\d)/g, maxDigits: 4 },
-  /** An amount after a currency symbol (`R$` ends in `$`): `$ 1.250,00` is six digits, so seven is the cap. */
-  { pattern: /[$\u20AC\u00A3\u00A5]\s*\d[\d.]*(?:,\d{2})?/g, maxDigits: 7 },
+  /**
+   * An amount after a currency symbol (`R$` ends in `$`): `$ 1.250,00` is six
+   * digits, so seven is the cap — but past four only with money's shape, a
+   * thousands dot or two cents, never a bare run (`$54321`).
+   */
+  {
+    pattern: /[$\u20AC\u00A3\u00A5]\s*\d[\d.]*(?:,\d{2})?/g,
+    maxDigits: 7,
+    bareMaxDigits: 4,
+    shaped: /\d\.\d{3}|,\d{2}$/,
+  },
 ];
 
 /*
@@ -140,9 +155,18 @@ function digitRunBefore(text: string, index: number): number {
   return run;
 }
 
-function isNeutral(text: string, match: RegExpExecArray, maxDigits: number): boolean {
-  const digits = match[0].match(ASCII_DIGIT)?.length ?? 0;
-  if (digits === 0 || digits > maxDigits) return false;
+function digitsIn(span: string): number {
+  return span.match(ASCII_DIGIT)?.length ?? 0;
+}
+
+function hasShape(span: string, digits: number, rule: NeutralRule): boolean {
+  if (rule.bareMaxDigits === undefined || digits <= rule.bareMaxDigits) return true;
+  return rule.shaped?.test(span) ?? false;
+}
+
+function isNeutral(text: string, match: RegExpExecArray, rule: NeutralRule): boolean {
+  const digits = digitsIn(match[0]);
+  if (digits === 0 || digits > rule.maxDigits || !hasShape(match[0], digits, rule)) return false;
   FOLLOWED_BY_DIGIT.lastIndex = match.index + match[0].length;
   if (FOLLOWED_BY_DIGIT.test(text)) return false;
   return digitRunBefore(text, match.index) < PHONE_GROUP_DIGITS;
@@ -153,8 +177,8 @@ function neutralise(text: string, rule: NeutralRule): string {
   let out = "";
   let from = 0;
   for (const match of text.matchAll(rule.pattern)) {
-    if (!isNeutral(text, match, rule.maxDigits)) continue;
-    out += `${text.slice(from, match.index)}${NEUTRAL_PLACEHOLDER}`;
+    if (!isNeutral(text, match, rule)) continue;
+    out += `${text.slice(from, match.index)}${placeholderFor(digitsIn(match[0]))}`;
     from = match.index + match[0].length;
   }
   return out + text.slice(from);

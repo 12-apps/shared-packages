@@ -79,9 +79,12 @@ bidi-reversed run, and spelled-out digits from the host's
 `contactVocabulary`. A phone number is 8 digits within any 16 characters,
 whatever separates them. Clock times, amounts after a currency symbol, and
 spans matching the host's `neutralPatterns` (address units like
-`apto 1204`, at most 5 digits each) are set aside first, so an address with
-an apartment number passes. A CEP or a full date is refused; that is the
-documented price.
+`apto 1204`, at most 4 digits each) are set aside first, so an address with
+an apartment number passes; a set-aside span still counts as one or two
+digits. An amount past 4 digits is set aside only when it is shaped like
+money (`1.250`, `25,00`), so `$54321` is not. A CEP, a full date, or a
+five-digit street number before a unit is refused; that is the documented
+price.
 
 Across messages it reads only a contiguous chain: the same author's recent
 free text (`contactLookback`, default the last 12 messages within 10
