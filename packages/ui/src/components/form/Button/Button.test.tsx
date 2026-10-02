@@ -280,3 +280,31 @@ describe('Button — the gradient variant takes its ink from the palette', () =>
     expect(screen.getByTestId('solid')).toHaveStyle({ color: 'rgb(255, 255, 255)' });
   });
 });
+
+describe('Button — a neutral outline writes in the theme\'s text ink', () => {
+  const inMode = (mode: 'light' | 'dark') => createTheme({ palette: { mode } });
+
+  it.each(['light', 'dark'] as const)('takes text.primary in %s mode, so it reads on either ground', (mode) => {
+    const theme = inMode(mode);
+    render(
+      <ThemeProvider theme={theme}>
+        <Button variant="outline" color="neutral" dataTestId={`neutral-${mode}`}>
+          Descartar
+        </Button>
+      </ThemeProvider>,
+    );
+    expect(screen.getByTestId(`neutral-${mode}`)).toHaveStyle({ color: theme.palette.text.primary });
+  });
+
+  it('leaves a coloured outline its colour', () => {
+    const theme = inMode('light');
+    render(
+      <ThemeProvider theme={theme}>
+        <Button variant="outline" color="primary" dataTestId="coloured">
+          Ver
+        </Button>
+      </ThemeProvider>,
+    );
+    expect(screen.getByTestId('coloured')).toHaveStyle({ color: theme.palette.primary.main });
+  });
+});

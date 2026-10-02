@@ -206,6 +206,9 @@ const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as
 function useAudioUnlock(sounds: AttentionSounds | undefined): void {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    // The checks still waiting. Cleanup cancels them: one that outlived the
+    // host ran against a torn-down page — in a test, after the window was gone.
+    const pending = new Set<ReturnType<typeof setTimeout>>();
     const detach = (): void => {
       for (const type of GESTURES) window.removeEventListener(type, unlock, true);
     };
@@ -215,12 +218,18 @@ function useAudioUnlock(sounds: AttentionSounds | undefined): void {
       if (event.type === 'pointerdown' && (event as PointerEvent).pointerType !== 'mouse') return;
       unlockAttentionAudio(sounds);
       // `resume()` and `play()` settle asynchronously: check after they do.
-      window.setTimeout(() => {
+      const check = setTimeout(() => {
+        pending.delete(check);
         if (audioUnlocked(sounds)) detach();
       }, 250);
+      pending.add(check);
     };
     for (const type of GESTURES) window.addEventListener(type, unlock, true);
-    return detach;
+    return () => {
+      for (const check of pending) clearTimeout(check);
+      pending.clear();
+      detach();
+    };
   }, [sounds]);
 }
 

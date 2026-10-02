@@ -126,6 +126,15 @@ describe('Button (native)', () => {
     expect(screen.getByTestId('neutral')).toHaveStyle({ backgroundColor: theme.palette.grey[700] });
   });
 
+  it('writes a neutral outline in the theme\'s text ink, as the web does', () => {
+    render(
+      <Button dataTestId="neutral-outline" variant="outline" color="neutral">
+        x
+      </Button>,
+    );
+    expect(labelOf('neutral-outline')).toHaveStyle({ color: theme.palette.text.primary });
+  });
+
   it('rounds to one spacing unit and types at weight 500', () => {
     render(<Button dataTestId="r">x</Button>);
     expect(screen.getByTestId('r')).toHaveStyle({ borderTopLeftRadius: '8px', borderBottomRightRadius: '8px' });
