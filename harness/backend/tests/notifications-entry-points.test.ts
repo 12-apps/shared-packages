@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import * as core from '@12-apps/notifications';
+import * as attention from '@12-apps/notifications/attention';
 import * as server from '@12-apps/notifications/server';
 import * as hono from '@12-apps/notifications/hono';
 import * as webPush from '@12-apps/notifications/web-push';
@@ -53,6 +54,9 @@ const COVERED_ELSEWHERE: Record<string, string> = {
   // where a web host would use it: the frontend harness adopts it through
   // `createWiringHost({ kind: "web" })` and renders the surface it hands back.
   './manifest/web': 'harness/frontend — pages/notifications-center.tsx',
+  // The attention button: React and the design system, proven where a web host
+  // mounts it — the notifications page's "Avisos" section and its spec.
+  './attention/react': 'harness/frontend — tests/notifications-attention.spec.ts',
   './package.json': 'read by this very test',
 };
 
@@ -65,6 +69,7 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     const proven = [
       ...[
         '.',
+        './attention',
         './server',
         './hono',
         './web-push',
@@ -145,6 +150,20 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     expect(typeof core.createGeneratorRegistry).toBe('function');
     expect(typeof core.inboxWire).toBe('function');
     expect(core.UnknownNotificationTypeError.name).toBe('UnknownNotificationTypeError');
+  });
+
+  it('the ATTENTION entry carries the framework-free ranking', () => {
+    // Its own subpath, free of React and the DOM, so a server can rank what
+    // waits the way the button does — the future push sender's half.
+    const registry = attention.defineAttention({
+      categories: ['orders'],
+      kinds: [{ id: 'orders.pack', category: 'orders', budgetMs: 60_000 }],
+    });
+    const reading = attention.readAttention(registry, [{ id: 'a', kind: 'orders.pack', since: 0 }], {
+      now: 90_000,
+    });
+    expect(reading.head?.severity).toBe('late');
+    expect(attention.ATTENTION_SEVERITIES).toEqual(['spent', 'late', 'calm']);
   });
 
   it('the EMAIL entry carries the layout, framework-free', () => {

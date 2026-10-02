@@ -123,20 +123,27 @@ export const Popover = React.forwardRef<HTMLDivElement, PopoverProps>(
     maxWidth,
     dataTestId,
     children,
+    PaperProps: callerPaper,
     ...props
   }, ref) => (
       <MuiPopover
         ref={ref}
         data-testid={dataTestId || 'popover-content'}
+        {...props}
+        // After the spread, and merged rather than replaced: a caller's
+        // `PaperProps` used to land last and drop the styled paper, its variant
+        // and the width cap; and its `sx` now adds to the cap instead.
         PaperProps={{
+          ...callerPaper,
           component: StyledPaper as React.ComponentType<PaperProps>,
           customVariant: variant,
           glow,
           pulse,
-          sx: { maxWidth: popoverCap(maxWidth) },
-          ...props.PaperProps,
+          sx: [
+            { maxWidth: popoverCap(maxWidth) },
+            ...(Array.isArray(callerPaper?.sx) ? callerPaper.sx : [callerPaper?.sx ?? {}]),
+          ],
         } as PaperProps & { customVariant?: string; glow?: boolean; pulse?: boolean }}
-        {...props}
       >
         {children}
       </MuiPopover>
