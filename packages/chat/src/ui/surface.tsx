@@ -9,7 +9,7 @@ import { useMemo, type JSX } from "react";
 import { createChatClient, type ChatFetch } from "../client/api";
 import { missingUiCopy } from "../client/assert";
 import type { ChatUiCopy } from "../client/copy";
-import { useChatThread } from "../client/use-chat-thread";
+import { useChatThread, type ChatAutoMarkRead } from "../client/use-chat-thread";
 import { ChatConfigError } from "../core/errors";
 import { ChatThreadView, type ChatPlatform } from "./thread-view";
 
@@ -33,9 +33,13 @@ export interface ChatThreadProps {
   /**
    * Mark the thread read once a load shows unread messages. Default true.
    * A host that mounts the thread hidden only to drive a badge passes false,
-   * so nothing is marked read that nobody saw.
+   * so nothing is marked read that nobody saw. `"visible"` waits until the
+   * message list is on screen: for a thread mounted below the fold (a drawer's
+   * lower half), so mounting it is not reading it. On the web that is an
+   * IntersectionObserver on the list; on native the list is on screen once
+   * it is mounted.
    */
-  readonly autoMarkRead?: boolean;
+  readonly autoMarkRead?: ChatAutoMarkRead;
   /**
    * Native only: the distance from the window top to the thread (a navigator
    * header), in dp, so the composer clears the keyboard exactly. Default 0.

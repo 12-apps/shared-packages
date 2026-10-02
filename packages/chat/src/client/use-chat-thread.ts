@@ -5,7 +5,10 @@
  * when its live channel says the thread moved, so the package needs no socket
  * of its own. A reload keeps the messages on screen (no spinner after the
  * first). Unless `autoMarkRead` is off, the thread is marked read up to the
- * newest message a load SHOWED whenever that load found unread messages.
+ * newest message a load SHOWED whenever that load found unread messages. With
+ * `autoMarkRead: "visible"` a load's unread wait until the list reports itself
+ * on screen (`controls.onVisibleChange(true)`): a thread mounted below the fold
+ * is marked read when it is scrolled to, not when it is mounted.
  *
  * Three races are closed here rather than left to the host:
  *  - a load that resolves after a send never drops the sent message: what is
@@ -41,7 +44,20 @@ export interface ChatThreadControls extends ChatThreadState {
   send(text: string): Promise<boolean>;
   sendQuickReply(key: string): Promise<boolean>;
   reload(): void;
+  /**
+   * Set only with `autoMarkRead: "visible"`. The message list calls it with
+   * whether it is on screen now, and with `false` when it unmounts; nothing is
+   * marked read until it has said `true`.
+   */
+  readonly onVisibleChange?: (visible: boolean) => void;
 }
+
+/**
+ * When the thread marks itself read: after each load that found unread
+ * (`true`, the default), never (`false`, a hidden badge-only mount), or once
+ * the message list is on screen (`"visible"`).
+ */
+export type ChatAutoMarkRead = boolean | "visible";
 
 /** The state, tagged with the client (thread) it belongs to. */
 interface OwnedState extends ChatThreadState {
@@ -113,8 +129,19 @@ interface UseChatThreadOptions {
   refreshSignal?: unknown;
   /** Told the unread count each load found (before marking read), then what is left once marked read. */
   onUnreadChange?: (unread: number) => void;
-  /** Mark the thread read after a load shows unread messages. Default true; off for a hidden badge-only mount. */
-  autoMarkRead?: boolean;
+  /** Mark the thread read after a load shows unread messages. Default true; see {@link ChatAutoMarkRead}. */
+  autoMarkRead?: ChatAutoMarkRead;
+}
+
+/** What a load showed, and whether that load is still the latest. */
+interface Shown {
+  readonly payload: ChatThreadPayload;
+  readonly isCurrent: () => boolean;
+}
+
+interface Loader {
+  readonly load: () => Promise<void>;
+  readonly onVisibleChange: (visible: boolean) => void;
 }
 
 /** The latest value, readable from callbacks without re-creating them. */
@@ -151,22 +178,59 @@ function useOwnedState(client: ChatClient): { state: OwnedState; update: Update;
   return { state, update, latest };
 }
 
-/** Load on mount and on every signal; ignore a load something newer overtook; mark read what a load showed. */
-function useLoader(options: UseChatThreadOptions, update: Update): () => Promise<void> {
-  const { client, refreshSignal } = options;
-  const generation = useRef(0);
-  const onUnread = useLatest(options.onUnreadChange);
-  const autoMarkRead = useLatest(options.autoMarkRead ?? true);
+/**
+ * Mark read what a load showed — at once, or (`"visible"`) once the list is on
+ * screen. Only the latest load's unread wait; a newer load replaces them.
+ */
+function useMarkRead(options: UseChatThreadOptions, onUnread: { readonly current?: (unread: number) => void }) {
+  const { client } = options;
+  const mode = useLatest(options.autoMarkRead ?? true);
+  const visible = useRef(false);
+  const pending = useRef<Shown | null>(null);
 
-  const markShown = useCallback(
-    async (payload: ChatThreadPayload, isCurrent: () => boolean) => {
+  const markRead = useCallback(
+    async ({ payload, isCurrent }: Shown) => {
       const upTo = payload.messages.at(-1)?.createdAt;
-      if (!autoMarkRead.current || payload.unread === 0 || upTo === undefined) return;
+      if (payload.unread === 0 || upTo === undefined) return;
       const left = await client.markRead(upTo).catch(() => null);
       if (left !== null && isCurrent()) report(onUnread, left);
     },
-    [client, autoMarkRead, onUnread],
+    [client, onUnread],
   );
+
+  const markShown = useCallback(
+    async (shown: Shown) => {
+      pending.current = null;
+      if (mode.current === false || shown.payload.unread === 0) return;
+      if (mode.current === "visible" && !visible.current) {
+        pending.current = shown;
+        return;
+      }
+      await markRead(shown);
+    },
+    [mode, markRead],
+  );
+
+  const onVisibleChange = useCallback(
+    (now: boolean) => {
+      visible.current = now;
+      const waiting = pending.current;
+      if (!now || waiting === null || mode.current !== "visible") return;
+      pending.current = null;
+      if (waiting.isCurrent()) void markRead(waiting);
+    },
+    [mode, markRead],
+  );
+
+  return { markShown, onVisibleChange };
+}
+
+/** Load on mount and on every signal; ignore a load something newer overtook; mark read what a load showed. */
+function useLoader(options: UseChatThreadOptions, update: Update): Loader {
+  const { client, refreshSignal } = options;
+  const generation = useRef(0);
+  const onUnread = useLatest(options.onUnreadChange);
+  const { markShown, onVisibleChange } = useMarkRead(options, onUnread);
 
   const load = useCallback(async () => {
     const mine = ++generation.current;
@@ -181,7 +245,7 @@ function useLoader(options: UseChatThreadOptions, update: Update): () => Promise
     if (!isCurrent()) return;
     update(client, (previous) => afterLoad(previous, payload));
     report(onUnread, payload.unread);
-    await markShown(payload, isCurrent);
+    await markShown({ payload, isCurrent });
   }, [client, update, markShown, onUnread]);
 
   useEffect(() => {
@@ -192,13 +256,13 @@ function useLoader(options: UseChatThreadOptions, update: Update): () => Promise
     };
   }, [load, refreshSignal]);
 
-  return load;
+  return { load, onVisibleChange };
 }
 
 export function useChatThread(options: UseChatThreadOptions): ChatThreadControls {
   const { client } = options;
   const { state, update, latest } = useOwnedState(client);
-  const load = useLoader(options, update);
+  const { load, onVisibleChange } = useLoader(options, update);
 
   const deliver = useCallback(
     async (input: ChatSendInput): Promise<boolean> => {
@@ -228,5 +292,6 @@ export function useChatThread(options: UseChatThreadOptions): ChatThreadControls
   }, [client, update, load]);
 
   const visible = state.owner === client ? state : fresh(client);
-  return { ...visibleOf(visible), send, sendQuickReply, reload };
+  const seen = options.autoMarkRead === "visible" ? { onVisibleChange } : {};
+  return { ...visibleOf(visible), send, sendQuickReply, reload, ...seen };
 }

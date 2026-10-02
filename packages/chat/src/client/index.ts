@@ -6,6 +6,7 @@
 export { ChatClientError, createChatClient, type ChatClient, type ChatFetch, type ChatSendInput } from "./api";
 export {
   useChatThread,
+  type ChatAutoMarkRead,
   type ChatSendFailure,
   type ChatThreadControls,
   type ChatThreadPhase,

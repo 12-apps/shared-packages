@@ -6,8 +6,8 @@
  * Native app (the package's `react-native` export condition resolves each
  * primitive to its native twin). The pieces that differ per platform arrive
  * as a {@link ChatPlatform}: the frame (keyboard avoidance on native), the
- * scrolling message list, and the composer, whose change events are not the
- * same shape.
+ * scrolling message list, a message's bubble (its surface is styled beyond the
+ * shared props), and the composer, whose change events are not the same shape.
  *
  * Every word on screen is host copy or server data: role labels come from the
  * server (the host's role config), the rest from {@link ChatUiCopy}.
@@ -46,6 +46,18 @@ export interface ChatMessageListProps {
   /** Changes whenever a message is added — the list scrolls to its end on each change. */
   readonly scrollKey: string;
   readonly testID: string;
+  /**
+   * Set only when the thread marks itself read once SEEN (`autoMarkRead="visible"`):
+   * the list reports whether it is on screen now, and `false` when it unmounts.
+   */
+  readonly onVisibleChange?: (visible: boolean) => void;
+}
+
+/** What a platform's bubble receives: whose message it is, and its label, time and text. */
+export interface ChatBubbleProps {
+  /** The reader's own message: drawn on a tint of the theme's primary colour, others on paper. */
+  readonly mine: boolean;
+  readonly children: ReactNode;
 }
 
 /** What a platform's frame receives: the list above, the writing area pinned below. */
@@ -60,6 +72,7 @@ export interface ChatFrameProps {
 export interface ChatPlatform {
   readonly Frame: ComponentType<ChatFrameProps>;
   readonly MessageList: ComponentType<ChatMessageListProps>;
+  readonly Bubble: ComponentType<ChatBubbleProps>;
   readonly Composer: ComponentType<ChatComposerProps>;
 }
 
@@ -72,10 +85,15 @@ interface ChatThreadViewProps {
   readonly testID?: string;
 }
 
-function Bubble({ message, formatTime }: { message: ChatWireMessage; formatTime: (iso: string) => string }): JSX.Element {
+function Message(props: {
+  message: ChatWireMessage;
+  formatTime: (iso: string) => string;
+  Bubble: ChatPlatform["Bubble"];
+}): JSX.Element {
+  const { message, formatTime, Bubble } = props;
   return (
     <Box direction="row" justify={message.mine ? "end" : "start"} testID={`chat-message-${message.id}`}>
-      <Box bg={message.mine ? "default" : "paper"} bordered radius="md" px={2} py={1} gap={0.5}>
+      <Bubble mine={message.mine}>
         <Stack direction="row" gap={1} align="baseline">
           <Text variant="caption" weight="semibold" color={message.mine ? "primary" : "secondary"}>
             {message.label}
@@ -85,7 +103,7 @@ function Bubble({ message, formatTime }: { message: ChatWireMessage; formatTime:
           </Text>
         </Stack>
         <Text>{message.body}</Text>
-      </Box>
+      </Bubble>
     </Box>
   );
 }
@@ -160,14 +178,19 @@ function Writing(props: ChatThreadViewProps): JSX.Element {
 
 function Messages(props: ChatThreadViewProps & { messages: readonly ChatWireMessage[] }): JSX.Element {
   const { copy, formatTime, messages } = props;
-  const { MessageList } = props.platform;
+  const { MessageList, Bubble } = props.platform;
   const newest = messages.at(-1);
   return (
-    <MessageList label={copy.messagesLabel} scrollKey={`${messages.length}:${newest?.id ?? ""}`} testID="chat-messages">
+    <MessageList
+      label={copy.messagesLabel}
+      scrollKey={`${messages.length}:${newest?.id ?? ""}`}
+      testID="chat-messages"
+      onVisibleChange={props.controls.onVisibleChange}
+    >
       {messages.length === 0 ? (
         <EmptyState variant="minimal" title={copy.emptyTitle} description={copy.emptyDescription} testID="chat-empty" />
       ) : (
-        messages.map((message) => <Bubble key={message.id} message={message} formatTime={formatTime} />)
+        messages.map((message) => <Message key={message.id} message={message} formatTime={formatTime} Bubble={Bubble} />)
       )}
     </MessageList>
   );
@@ -189,9 +212,12 @@ export function ChatThreadView(props: ChatThreadViewProps): JSX.Element {
       />
     );
   }
+  const { thread, messages } = controls.payload;
+  // A closed thread nobody wrote in has nothing to show and nothing to invite: only the notice.
+  const nothingToShow = !thread.canWrite && messages.length === 0;
   return (
     <Frame testID={props.testID ?? "chat-thread"} keyboardOffset={props.keyboardOffset}>
-      <Messages {...props} messages={controls.payload.messages} />
+      {nothingToShow ? null : <Messages {...props} messages={messages} />}
       <Writing {...props} />
     </Frame>
   );

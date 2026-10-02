@@ -1,10 +1,12 @@
+import { DEFAULT_UI_THEME } from "@12-apps/ui/tokens";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { EN_US_CHAT_UI_COPY } from "../client/en-US";
 import { createNativeChat } from "../native/index";
+import { ownBubbleTint } from "../ui/bubble-tint";
 import { seat } from "./fixtures";
-import { formatTime, routedFetch } from "./surface-harness";
+import { formatTime, routedFetch, seedMessage } from "./surface-harness";
 
 /**
  * The native surface, rendered through `@12-apps/ui`'s NATIVE primitives
@@ -14,6 +16,7 @@ import { formatTime, routedFetch } from "./surface-harness";
 
 const agent = seat({ role: "agent", authorId: "u-agent", readerId: "u-agent" });
 const field = (): HTMLInputElement => screen.getByPlaceholderText(EN_US_CHAT_UI_COPY.placeholder) as HTMLInputElement;
+const bubbleOf = (id: string): HTMLElement => screen.getByTestId(`chat-message-${id}`).firstElementChild as HTMLElement;
 
 function mount(actor: () => ReturnType<typeof seat> | null) {
   const harness = routedFetch(actor);
@@ -99,5 +102,46 @@ describe("the native thread", () => {
     render(<ChatThread endpoint="/thread" />);
     expect(await screen.findByText(EN_US_CHAT_UI_COPY.closed)).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("chat-input")).toBeNull());
+  });
+
+  it("draws the reader's own bubble on a tint of the theme's primary colour, and the others' on paper", async () => {
+    const { ChatThread, harness } = mount(() => seat());
+    seedMessage(harness.db, { id: "m-mine", role: "client", body: "Gate 12", createdAt: "2026-10-02T11:50:00.000Z" });
+    seedMessage(harness.db, { id: "m-theirs", body: "Downstairs now", createdAt: "2026-10-02T11:55:00.000Z" });
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByText("Downstairs now");
+
+    const tint = ownBubbleTint(DEFAULT_UI_THEME);
+    expect(getComputedStyle(bubbleOf("m-mine")).backgroundColor).toBe(tint);
+    expect(getComputedStyle(bubbleOf("m-theirs")).backgroundColor).not.toBe(tint);
+    expect(getComputedStyle(bubbleOf("m-theirs")).backgroundColor).not.toBe("");
+  });
+
+  it("announces arriving messages politely", async () => {
+    const { ChatThread } = mount(() => seat());
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle);
+
+    expect(screen.getByTestId("chat-messages").getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("shows only the closed notice for a read-only thread nobody wrote in", async () => {
+    const { ChatThread } = mount(() => seat({ canWrite: false }));
+    render(<ChatThread endpoint="/thread" />);
+
+    expect(await screen.findByText(EN_US_CHAT_UI_COPY.closed)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("chat-empty")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("chat-messages")).toBeNull());
+  });
+
+  it('marks read on mount with autoMarkRead="visible": a mounted native list is on screen', async () => {
+    const onUnread = vi.fn();
+    const { ChatThread, harness } = mount(() => seat());
+    seedMessage(harness.db, { id: "m-theirs", body: "Downstairs now", createdAt: "2026-10-02T11:55:00.000Z" });
+    render(<ChatThread endpoint="/thread" autoMarkRead="visible" onUnreadChange={onUnread} />);
+
+    expect(await screen.findByText("Downstairs now")).toBeTruthy();
+    await waitFor(() => expect(onUnread).toHaveBeenLastCalledWith(0));
+    expect(harness.bodies).toContainEqual({ key: "POST /read", body: { upTo: "2026-10-02T11:55:00.000Z" } });
   });
 });
