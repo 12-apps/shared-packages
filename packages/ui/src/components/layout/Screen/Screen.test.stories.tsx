@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import { Screen } from './Screen';
 import { Box } from '../Box/Box';
@@ -33,7 +33,10 @@ export const InputRemainsInteractive: Story = {
     const input = await within(canvasElement).findByTestId('load');
     await userEvent.click(input);
     await userEvent.type(input, '42');
-    await expect(input).toHaveValue('42');
+    // The field is controlled: a re-render for the first keystroke can land
+    // after the second, so the value settles on '42' rather than being '42'
+    // the instant typing returns.
+    await waitFor(() => expect(input).toHaveValue('42'));
   },
 };
 export const EmptyScreen: Story = {
