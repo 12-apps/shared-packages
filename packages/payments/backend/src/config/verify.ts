@@ -50,6 +50,22 @@ export interface VerifiedProviderConfig extends MaskedProviderConfig {
 }
 
 /**
+ * The fields a probe runs on: the stored set, with the webhook URL the HOST
+ * resolved just now — and never one found on the row. A `notificationUrl`
+ * can still sit in stored fields (written before it was reserved, FUT-694), and
+ * an adapter that registers its webhook through an API (Itaú, BACEN
+ * `PUT /webhook/{chave}`) would announce that stale address to the bank as the
+ * store's own. So the stored one is always dropped, and only a resolved one is
+ * added — to the probe's copy, never to `config`, which `store.save` writes.
+ */
+function probeFields(stored: Record<string, string>, notificationUrl: string | null): Record<string, string> {
+  const fields = { ...stored };
+  delete fields['notificationUrl'];
+  if (notificationUrl) fields['notificationUrl'] = notificationUrl;
+  return fields;
+}
+
+/**
  * Run the credential probe against ONE environment and report what happened.
  *
  * `target` is the environment the caller is looking at, which is not always
@@ -84,10 +100,11 @@ export async function runVerify(
   target: PaymentEnvironment,
   allowStubMode: boolean,
   toMasked: (adapter: PaymentProviderAdapter, config: StoredProviderConfig) => MaskedProviderConfig,
+  notificationUrl: string | null,
 ): Promise<VerifiedProviderConfig> {
   const result = await adapter.verifyCredentials({
     environment: target,
-    fields: config.environments[target],
+    fields: probeFields(config.environments[target], notificationUrl),
     // SANDBOX-only, and only where the deployment said yes — see
     // `stubResolvedFor`, which is the one place this is decided.
     stub: stubResolvedFor(allowStubMode, config.stub, target),

@@ -141,7 +141,12 @@ describe('itau live refund', () => {
 describe('itau verifyCredentials', () => {
   it('passes when the sandbox mints a token', async () => {
     stubItauFetch(() => undefined);
-    await expect(itauProvider(PT_BR_ITAU_COPY).verifyCredentials(SANDBOX_CREDS)).resolves.toEqual({ ok: true });
+    // No webhook URL reached the probe, so nothing was registered — said on the
+    // Pix key rather than left for the owner to assume.
+    await expect(itauProvider(PT_BR_ITAU_COPY).verifyCredentials(SANDBOX_CREDS)).resolves.toEqual({
+      ok: true,
+      checks: [{ key: 'pixKey', status: 'UNCHECKED', message: PT_BR_ITAU_COPY.webhook.notRegistered }],
+    });
   });
 
   it('refuses an incomplete credential set locally, naming what is missing', async () => {

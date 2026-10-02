@@ -10,7 +10,8 @@ import { openPage } from './helpers/checkout';
  * A single-line input folds a PEM's newlines away, and OpenSSL refuses what is
  * left — so the owner "pasted the whole file" and was told it was unreadable.
  * The two fields must be textareas. And like its siblings, the provider ships
- * a walkthrough, because the webhook has to be registered by hand.
+ * a walkthrough: "Testar conexão" registers the webhook for the Pix key, and the
+ * guide keeps the URL for registering it by hand when the bank refuses.
  */
 
 test('production asks for the certificate and its private key, as multi-line fields', async ({ page }) => {

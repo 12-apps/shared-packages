@@ -71,11 +71,31 @@ export function expiryProximity(
   expiresAt: string | null | undefined,
   now: Date = new Date(),
 ): ExpiryProximity | null {
-  if (!expiresAt) return null;
-  const at = new Date(expiresAt).getTime();
+  return proximityWithin(EXPIRY_WARNING_WINDOW_MS, expiresAt, now);
+}
+
+/**
+ * A saved CERTIFICATE's proximity (`credentialExpiresAt`) — a different
+ * window from the OAuth grant's on purpose. No sweep renews a certificate:
+ * the owner generates a new one by hand, and Itaú opens that renewal 30 days
+ * before expiry, so the warning starts the day there is something to do about
+ * it rather than a week before the store's PIX stops.
+ */
+const CERTIFICATE_WARNING_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function certificateExpiryProximity(
+  credentialExpiresAt: string | null | undefined,
+  now: Date = new Date(),
+): ExpiryProximity | null {
+  return proximityWithin(CERTIFICATE_WARNING_WINDOW_MS, credentialExpiresAt, now);
+}
+
+function proximityWithin(windowMs: number, iso: string | null | undefined, now: Date): ExpiryProximity | null {
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
   if (Number.isNaN(at)) return null;
   if (at <= now.getTime()) return 'PAST';
-  return at - now.getTime() <= EXPIRY_WARNING_WINDOW_MS ? 'NEAR' : 'SAFE';
+  return at - now.getTime() <= windowMs ? 'NEAR' : 'SAFE';
 }
 
 /**

@@ -143,14 +143,15 @@ export const PT_BR_ITAU_SETUP_GUIDE_COPY: ItauSetupGuideCopy = {
   },
   webhook: {
     title: 'Cadastrar a URL de notificação',
-    intro: 'O Itaú avisa cada Pix recebido na URL cadastrada para a sua chave Pix.',
+    intro:
+      'O Itaú avisa cada Pix recebido na URL cadastrada para a sua chave Pix. Nós cadastramos essa URL no Itaú quando você salva e testa a conexão.',
     register:
-      'Peça ao Itaú (pelo gerente ou pelo suporte do portal do desenvolvedor) para cadastrar esta URL como webhook da chave Pix desta conexão:',
+      'O resultado aparece embaixo da chave Pix, no formulário. Se o cadastro não der certo, peça ao Itaú (pelo gerente ou pelo suporte do portal do desenvolvedor) para cadastrar esta URL como webhook da chave Pix:',
     withoutIt:
       'Enquanto a URL não estiver cadastrada, um Pix pago é detectado pela tela de pagamento ou pela verificação periódica — o pedido confirma, mas pode demorar.',
     doneLabel: 'Webhook',
     doneValue: 'Cadastrado no Itaú',
-    confirmLabel: 'O Itaú já cadastrou a URL',
+    confirmLabel: 'O webhook está cadastrado',
   },
   webhookUrlLabel: 'URL de notificação',
 };
