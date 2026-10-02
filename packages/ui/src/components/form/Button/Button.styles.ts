@@ -220,12 +220,15 @@ const VARIANT_STYLES: Record<
       boxShadow: theme.shadows[8],
     },
   }),
-  // A NEUTRAL outline is a field-row control ("Mais", "Exibir"), so it rests on
-  // the one field border; a coloured outline keeps its colour, which is the
-  // point of asking for one.
+  // A NEUTRAL outline is a field-row control ("Mais", "Exibir", "Cancelar"), so
+  // it rests on the one field border and writes in the theme's own text ink —
+  // a ROLE, which turns with the mode. It used to write in grey 700, a step on
+  // a ramp MUI keeps the same in dark: dark on dark, 2.18:1 on a dark bar, so a
+  // live "Descartar" read as disabled. A coloured outline keeps its colour,
+  // which is the point of asking for one.
   outline: (theme, palette, color) => ({
     backgroundColor: 'transparent',
-    color: palette.main,
+    color: color === 'neutral' ? theme.palette.text.primary : palette.main,
     border: color === 'neutral' ? fieldBorder(theme) : `1px solid ${palette.main}`,
     '&:hover': {
       backgroundColor: alpha(palette.main, 0.1),
