@@ -95,6 +95,18 @@ describe("the web thread", () => {
     expect(harness.calls).toContain("POST /read");
   });
 
+  it("tolerates trailing slashes on the endpoint", async () => {
+    const { harness, ChatThread } = mount();
+    render(<ChatThread endpoint="/thread///" />);
+
+    expect(await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(EN_US_CHAT_UI_COPY.placeholder), { target: { value: "On my way" } });
+    fireEvent.click(screen.getByTestId("chat-send"));
+
+    expect(await screen.findByText("On my way")).toBeTruthy();
+    expect(harness.calls).toEqual(expect.arrayContaining(["GET /", "POST /messages"]));
+  });
+
   it("refuses to build without the host's fetch, time format or a complete copy", () => {
     expect(() => createWebChat({ fetch: undefined as never, copy: EN_US_CHAT_UI_COPY, formatTime })).toThrow(/fetch is required/);
     expect(() => createWebChat({ fetch: vi.fn(), copy: EN_US_CHAT_UI_COPY, formatTime: undefined as never })).toThrow(/formatTime/);

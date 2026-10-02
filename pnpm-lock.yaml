@@ -1278,6 +1278,9 @@ importers:
       '@12-apps/auth':
         specifier: workspace:*
         version: link:../auth
+      '@12-apps/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@12-apps/discounts':
         specifier: workspace:*
         version: link:../discounts

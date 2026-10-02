@@ -53,13 +53,20 @@ function unwrap(body: unknown): unknown {
   return body;
 }
 
+/** Drop trailing `/`s with one backward scan — no regex to backtrack on. */
+function trimTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === "/") end -= 1;
+  return path.slice(0, end);
+}
+
 /**
  * `endpoint` is the mount of the three routes for ONE thread
  * (`…/threads/abc/chat`): `GET endpoint`, `POST endpoint/messages`,
  * `POST endpoint/read`.
  */
 export function createChatClient(options: { fetch: ChatFetch; endpoint: string }): ChatClient {
-  const base = options.endpoint.replace(/\/+$/, "");
+  const base = trimTrailingSlashes(options.endpoint);
   const call = async (path: string, method: "GET" | "POST", payload?: unknown): Promise<unknown> => {
     let response: Awaited<ReturnType<ChatFetch>>;
     try {

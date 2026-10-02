@@ -294,6 +294,7 @@
         "// import, so knip cannot see it.",
         "@12-apps/audit",
         "@12-apps/auth",
+        "@12-apps/chat",
         "@12-apps/discounts",
         "@12-apps/entitlements",
         "@12-apps/entity-lifecycle",
