@@ -88,12 +88,19 @@ function sameUrl(a: string, b: string): boolean {
   const canonical = (url: string) => {
     try {
       const parsed = new URL(url);
-      return `${parsed.protocol}//${parsed.host}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`;
+      return `${parsed.protocol}//${parsed.host}${withoutTrailingSlashes(parsed.pathname)}${parsed.search}`;
     } catch {
-      return url.replace(/\/+$/, '');
+      return withoutTrailingSlashes(url);
     }
   };
   return canonical(a) === canonical(b);
+}
+
+/** A loop, not `/\/+$/`: the URL is the bank's answer, and that regex is polynomial on it. */
+function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '/') end -= 1;
+  return text.slice(0, end);
 }
 
 function refusedKey(error: unknown): boolean {
