@@ -66,15 +66,15 @@ export interface BuyerInfo {
 }
 
 /**
- * A raised PIX charge. `copyPaste` is the EMV "copia e cola" payload — it is both
- * what the QR code encodes and what the copy button copies. The real backend also
- * returns a provider QR image; the client renders its own QR from `copyPaste`, so
- * no image URL is needed here.
+ * A raised PIX charge. `copyPaste` is the EMV "copia e cola" payload: what the
+ * QR encodes (rendered client-side, so no image URL) and what the button copies.
  */
 export interface PixCharge {
   copyPaste: string;
   /** ISO-8601 instant when the charge expires. */
   expiresAt: string;
+  /** `'MANUAL'`: only the store confirms it (`pixmanual`); absent is automatic. */
+  confirmation?: 'AUTOMATIC' | 'MANUAL';
 }
 
 /**

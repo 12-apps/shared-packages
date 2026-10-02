@@ -107,6 +107,17 @@ export interface PixPaneCopy {
   awaiting: string;
   /** The order came back with no PIX charge on it — nothing to show. */
   chargeMissing: string;
+  /**
+   * The same pane for a Pix the STORE confirms (`PixCharge.confirmation:
+   * 'MANUAL'`). Optional so a host's own table keeps compiling; absent, the
+   * automatic sentences are used — which promise "automática", so a host that
+   * enables a store-confirmed provider should set them.
+   */
+  manual?: {
+    instructions(totalLabel: string): string;
+    validUntil(time: string): string;
+    awaiting: string;
+  };
 }
 
 /** The card pane's own heading. Everything else in it is {@link SettlingCopy}. */
