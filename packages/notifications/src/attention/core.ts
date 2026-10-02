@@ -187,8 +187,14 @@ function place(item: AttentionItem, kind: AttentionKind, now: number): Attention
   const waitedMs = Number.isFinite(item.since) ? Math.max(0, now - item.since) : 0;
   const lap = budget > 0 ? waitedMs / budget : 0;
   const severity = kind.severity ? kind.severity({ item, waitedMs, lap }) : severityOfLap(lap);
+  // A kind may be late before one lap (its own conditions): its ring then
+  // still shows the first lap, so it never sits empty.
   const progress =
-    severity === 'spent' ? 1 : severity === 'late' ? Math.min(1, Math.max(0, lap - 1)) : Math.min(1, lap);
+    severity === 'spent'
+      ? 1
+      : severity === 'late' && lap >= 1
+        ? Math.min(1, lap - 1)
+        : Math.min(1, Math.max(0, lap));
   return { item, kind, severity, waitedMs, lap, progress };
 }
 

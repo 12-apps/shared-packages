@@ -292,8 +292,17 @@ tells the states apart. Nothing moves under `prefers-reduced-motion`.
 Every sentence is the host's (`AttentionMessages`); there is no default table.
 Sound is synthesised (or the host's files); vibration is `navigator.vibrate`,
 which Safari on iPhone does not implement — `canVibrate()` says so and the
-settings show it. Push rides the `WEB_PUSH` channel above: the device's push
-level is a preference the host reads when it sends.
+settings show it. Push rides the `WEB_PUSH` channel above. The device's push
+level lives in `localStorage`, where no server or service worker can read it:
+a host that filters what it pushes syncs the level to its server through
+`store.subscribe`.
+
+Sound needs a user gesture first, and Safari holds that per audio context: the
+host unlocks on the page's first tap or key press (`useAttentionAlerts` listens
+for it), so a later announcement can play. Pass `ready={false}` while the host
+is still loading, so what was already waiting when the page opened never rings.
+Check the views against the registry with `defineAttentionViews` — a typo in a
+key would otherwise drop a whole kind silently.
 
 ## The models
 

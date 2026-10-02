@@ -30,6 +30,8 @@ export interface AttentionPreferences {
 
 export interface AttentionPreferencesStore {
   read(): AttentionPreferences;
+  /** What a device that never chose reads — the server's snapshot, so hydration matches. */
+  readDefaults(): AttentionPreferences;
   write(patch: Partial<AttentionPreferences>): void;
   subscribe(listener: () => void): () => void;
 }
@@ -96,6 +98,9 @@ export function createAttentionPreferences(options: {
   const listeners = new Set<() => void>();
   let cachedRaw: string | null | undefined;
   let cached: AttentionPreferences = defaults;
+  // What this page chose when storage refused it (a full quota, a private
+  // window): the page keeps honouring it, it just does not outlive the tab.
+  let unsaved: string | null = null;
 
   const read = (): AttentionPreferences => {
     let raw: string | null = null;
@@ -104,6 +109,7 @@ export function createAttentionPreferences(options: {
     } catch {
       raw = null;
     }
+    if (raw === null) raw = unsaved;
     // The same object while nothing changed, or `useSyncExternalStore` loops.
     if (raw !== cachedRaw) {
       cachedRaw = raw;
@@ -114,15 +120,15 @@ export function createAttentionPreferences(options: {
 
   return {
     read,
+    readDefaults: () => defaults,
     write(patch) {
-      const next = { ...read(), ...patch };
+      const next = JSON.stringify({ ...read(), ...patch });
       try {
-        storage()?.setItem(options.storageKey, JSON.stringify(next));
+        storage()?.setItem(options.storageKey, next);
+        unsaved = null;
       } catch {
-        // Not persisted on this device; still applied for this page below.
-        cachedRaw = undefined;
+        unsaved = next;
       }
-      cached = next;
       for (const listener of listeners) listener();
     },
     subscribe(listener) {
@@ -140,5 +146,5 @@ export function createAttentionPreferences(options: {
 }
 
 export function useAttentionPreferences(store: AttentionPreferencesStore): AttentionPreferences {
-  return useSyncExternalStore(store.subscribe, store.read, store.read);
+  return useSyncExternalStore(store.subscribe, store.read, store.readDefaults);
 }

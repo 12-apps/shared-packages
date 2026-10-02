@@ -16,7 +16,7 @@
  * who cannot tell green from amber still tells the three apart. Under
  * `prefers-reduced-motion` nothing moves; the outline and the minutes stay.
  */
-import type { JSX, ReactNode } from 'react';
+import type { JSX, MouseEvent, ReactNode } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { keyframes, type Theme } from '@12-apps/ui/mui/styles';
@@ -175,6 +175,7 @@ function Face({
     <Box
       component="span"
       aria-hidden
+      data-outline={spent ? 'double' : 'none'}
       sx={{
         position: 'absolute',
         inset: 0,
@@ -280,7 +281,7 @@ export function AttentionOthersButton({
       aria-label={label}
       data-testid={dataTestId}
       data-severity={severity}
-      onClick={(event: React.MouseEvent<HTMLElement>) => onClick(event.currentTarget)}
+      onClick={(event: MouseEvent<HTMLElement>) => onClick(event.currentTarget)}
       sx={{
         position: 'relative',
         zIndex: 1,

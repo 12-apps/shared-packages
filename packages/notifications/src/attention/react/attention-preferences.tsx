@@ -18,7 +18,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 
 import type { AttentionChannelLevel } from '../core';
 
-import { canVibrate, playAttentionSound, vibrateFor, type AttentionSounds } from './alerts';
+import { playAttentionSound, useCanVibrate, vibrateFor, type AttentionSounds } from './alerts';
 import type { AttentionPreferencesMessages } from './messages';
 import {
   useAttentionPreferences,
@@ -129,7 +129,7 @@ function SoundSection({
 }
 
 function VibrationSection({ store, preferences, messages }: SectionProps): JSX.Element {
-  const vibrates = canVibrate();
+  const vibrates = useCanVibrate();
   return (
     <Box sx={SECTION_SX}>
       <Channel
@@ -256,8 +256,12 @@ const TRIGGER_SX = {
 } as const;
 
 /** Is any channel on, as far as this device can honour it? */
-function anyOn(preferences: AttentionPreferences, push: AttentionPushState | undefined): boolean {
-  const vibrates = canVibrate() && preferences.vibration !== 'off';
+function anyOn(
+  preferences: AttentionPreferences,
+  push: AttentionPushState | undefined,
+  canVibrate: boolean,
+): boolean {
+  const vibrates = canVibrate && preferences.vibration !== 'off';
   const pushes = push?.enabled === true && preferences.push !== 'off';
   return preferences.sound !== 'off' || vibrates || pushes;
 }
@@ -268,7 +272,7 @@ function QuickChoices({
   messages,
   push,
 }: SectionProps & { readonly push?: AttentionPushState }): JSX.Element {
-  const vibrates = canVibrate();
+  const vibrates = useCanVibrate();
   return (
     <Box
       role="group"
@@ -317,7 +321,7 @@ export interface AttentionQuickSettingsProps {
 export function AttentionQuickSettings({ store, messages, push }: AttentionQuickSettingsProps): JSX.Element {
   const preferences = useAttentionPreferences(store);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const on = anyOn(preferences, push);
+  const on = anyOn(preferences, push, useCanVibrate());
   return (
     <>
       <Box

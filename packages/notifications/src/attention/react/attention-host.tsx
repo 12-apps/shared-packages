@@ -11,7 +11,7 @@
  *
  * It draws nothing while nothing waits.
  */
-import { useMemo, useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 
 import {
   readAttention,
@@ -42,6 +42,12 @@ export interface AttentionHostProps {
   /** The resting spot's distance from the foot of the screen (a CSS length). */
   readonly bottom?: string;
   readonly zIndex?: number;
+  /**
+   * False while the host is still loading what waits. Readings taken then only
+   * set the baseline, so what was already waiting when the page opened never
+   * rings. Defaults to true.
+   */
+  readonly ready?: boolean;
 }
 
 /**
@@ -57,6 +63,12 @@ function useOpenEntry(
   readonly sheet: ReactNode;
 } {
   const [openId, setOpenId] = useState<string | null>(null);
+  const stillWaiting = openId !== null && entries.some((entry) => entry.item.id === openId);
+  // Done is done: forget the open item when it leaves, or an item that came
+  // back later under the same id would reopen its sheet unasked.
+  useEffect(() => {
+    if (openId !== null && !stillWaiting) setOpenId(null);
+  }, [openId, stillWaiting]);
   const open = (entry: AttentionEntry): void => {
     beforeOpen();
     const view = views[entry.kind.id];
@@ -88,6 +100,7 @@ export function AttentionHost({
   sounds,
   bottom,
   zIndex,
+  ready = true,
 }: AttentionHostProps): JSX.Element | null {
   const preferences = useAttentionPreferences(store);
   const reading = useMemo(() => readAttention(registry, items, { now, can }), [registry, items, now, can]);
@@ -96,12 +109,18 @@ export function AttentionHost({
     () => reading.entries.filter((entry) => views[entry.kind.id] !== undefined),
     [reading, views],
   );
-  useAttentionAlerts(entries, preferences, sounds);
+  useAttentionAlerts(entries, preferences, sounds, ready);
 
   const [listAnchor, setListAnchor] = useState<HTMLElement | null>(null);
   const { open, sheet } = useOpenEntry(entries, views, () => setListAnchor(null));
 
   const [head, ...others] = entries;
+  // The "+N" the list hangs off is gone once nothing else waits: drop the
+  // anchor with it, or the next arrival would reopen the list unasked.
+  const hasOthers = others.length > 0;
+  useEffect(() => {
+    if (!hasOthers) setListAnchor(null);
+  }, [hasOthers]);
   if (head === undefined) return sheet === null ? null : <>{sheet}</>;
   const headView = views[head.kind.id] as AttentionKindView;
   const named = headView.describe(head.item);
@@ -120,7 +139,7 @@ export function AttentionHost({
           <AttentionOthersButton
             count={others.length}
             severity={othersSeverity}
-            label={messages.others(others.length)}
+            label={messages.others(others.length, othersSeverity)}
             expanded={listAnchor !== null}
             onClick={setListAnchor}
           />

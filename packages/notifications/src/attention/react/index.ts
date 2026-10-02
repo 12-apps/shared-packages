@@ -5,7 +5,7 @@
  * (`AttentionMessages`).
  */
 export { AttentionHost, type AttentionHostProps } from './attention-host';
-export { attentionView, type AttentionKindView, type AttentionViews } from './views';
+export { attentionView, defineAttentionViews, type AttentionKindView, type AttentionViews } from './views';
 export { AttentionOthersList, type AttentionOthersListProps } from './attention-others-list';
 export {
   AttentionButton,
@@ -26,7 +26,9 @@ export {
 export {
   canVibrate,
   playAttentionSound,
+  unlockAttentionAudio,
   useAttentionAlerts,
+  useCanVibrate,
   vibrateFor,
   type AttentionSounds,
 } from './alerts';

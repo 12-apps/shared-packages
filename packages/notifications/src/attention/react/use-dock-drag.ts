@@ -38,79 +38,104 @@ interface DockDrag {
     readonly onPointerMove: (event: PointerEvent<HTMLElement>) => void;
     readonly onPointerUp: () => void;
     readonly onPointerCancel: () => void;
+    readonly onPointerLeave: () => void;
     readonly onClickCapture: (event: MouseEvent<HTMLElement>) => void;
   };
+}
+
+/** Where the pointer has taken the dock, kept inside the screen. */
+function positionFor(event: PointerEvent<HTMLElement>, current: Drag): Live {
+  const margin = EDGE_GAP_PX / 2;
+  return {
+    left: clamp(
+      current.left + event.clientX - current.pointerX,
+      margin,
+      window.innerWidth - current.width - margin,
+    ),
+    top: clamp(
+      current.top + event.clientY - current.pointerY,
+      margin,
+      window.innerHeight - current.height - margin,
+    ),
+  };
+}
+
+/** The drag starting: remember where the press and the dock were. */
+function pressAt(event: PointerEvent<HTMLElement>): Drag {
+  const box = event.currentTarget.getBoundingClientRect();
+  return {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    left: box.left,
+    top: box.top,
+    width: box.width,
+    height: box.height,
+    moved: false,
+  };
+}
+
+/** Past the slop yet? On the first move that is, the drag takes the pointer. */
+function crossedThreshold(event: PointerEvent<HTMLElement>, current: Drag): boolean {
+  if (current.moved) return true;
+  if (Math.hypot(event.clientX - current.pointerX, event.clientY - current.pointerY) < DRAG_THRESHOLD_PX) {
+    return false;
+  }
+  current.moved = true;
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // Older engines: the move still tracks while the pointer stays over us.
+  }
+  return true;
 }
 
 export function useDockDrag(onMove: (position: AttentionDockPosition) => void): DockDrag {
   const drag = useRef<Drag | null>(null);
   const swallowClick = useRef(false);
   const [live, setLive] = useState<Live | null>(null);
+  // The last position, read on release: a quick flick can end before the
+  // render that would have put it in `live`.
+  const latest = useRef<Live | null>(null);
 
-  const follow = (event: PointerEvent<HTMLElement>, current: Drag): void => {
-    const margin = EDGE_GAP_PX / 2;
-    setLive({
-      left: clamp(
-        current.left + event.clientX - current.pointerX,
-        margin,
-        window.innerWidth - current.width - margin,
-      ),
-      top: clamp(
-        current.top + event.clientY - current.pointerY,
-        margin,
-        window.innerHeight - current.height - margin,
-      ),
-    });
-  };
-
-  const settle = (current: Drag, at: Live): void => {
-    swallowClick.current = true;
-    const y = (at.top - EDGE_GAP_PX / 2) / Math.max(1, window.innerHeight - RESTING_SPAN_PX);
-    const side = at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right';
-    onMove({ side, y: clamp(y, 0, 1) });
+  const reset = (): void => {
+    drag.current = null;
+    latest.current = null;
+    setLive(null);
   };
 
   return {
     live,
     handlers: {
       onPointerDown(event) {
-        const box = event.currentTarget.getBoundingClientRect();
-        drag.current = {
-          pointerX: event.clientX,
-          pointerY: event.clientY,
-          left: box.left,
-          top: box.top,
-          width: box.width,
-          height: box.height,
-          moved: false,
-        };
+        // A new press: whatever the last drag armed is spent — a touch drag
+        // ends without any click, so the flag must not outlive it.
+        swallowClick.current = false;
+        if (event.isPrimary === false || event.button !== 0) return;
+        latest.current = null;
+        drag.current = pressAt(event);
       },
       onPointerMove(event) {
         const current = drag.current;
-        if (current === null) return;
-        if (!current.moved) {
-          if (
-            Math.hypot(event.clientX - current.pointerX, event.clientY - current.pointerY) < DRAG_THRESHOLD_PX
-          )
-            return;
-          current.moved = true;
-          try {
-            event.currentTarget.setPointerCapture(event.pointerId);
-          } catch {
-            // Older engines: the move still tracks while the pointer stays over us.
-          }
-        }
-        follow(event, current);
+        if (current === null || !crossedThreshold(event, current)) return;
+        latest.current = positionFor(event, current);
+        setLive(latest.current);
       },
       onPointerUp() {
         const current = drag.current;
-        drag.current = null;
-        if (current !== null && current.moved && live !== null) settle(current, live);
-        setLive(null);
+        const at = latest.current;
+        reset();
+        if (current === null || !current.moved || at === null) return;
+        swallowClick.current = true;
+        const y = (at.top - EDGE_GAP_PX / 2) / Math.max(1, window.innerHeight - RESTING_SPAN_PX);
+        onMove({
+          side: at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right',
+          y: clamp(y, 0, 1),
+        });
       },
-      onPointerCancel() {
-        drag.current = null;
-        setLive(null);
+      onPointerCancel: reset,
+      onPointerLeave() {
+        // Let go outside before it became a drag: nothing is being held any more.
+        if (drag.current !== null && !drag.current.moved) drag.current = null;
       },
       onClickCapture(event) {
         if (!swallowClick.current) return;

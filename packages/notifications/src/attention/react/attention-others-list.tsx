@@ -18,6 +18,7 @@ import { minutesOf, type AttentionViews } from './views';
 
 const ROW_SX = {
   display: 'flex',
+  width: '100%',
   alignItems: 'center',
   gap: 1.25,
   minHeight: 48,
@@ -62,56 +63,53 @@ export function AttentionOthersList({
       transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       dataTestId="attention-others-list"
     >
-      <Box
-        role="list"
-        aria-label={messages.othersTitle}
-        sx={{
-          p: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.5,
-          minWidth: 260,
-          maxWidth: 320,
-        }}
-      >
+      <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 260, maxWidth: 320 }}>
         <Text variant="body" size="sm" weight="bold" as="span">
           {messages.othersTitle}
         </Text>
-        {entries.map((entry) => {
-          const view = views[entry.kind.id];
-          if (view === undefined) return null;
-          const { title, what } = view.describe(entry.item);
-          return (
-            <Box
-              key={entry.item.id}
-              role="listitem"
-              component="button"
-              type="button"
-              data-testid={`attention-others-${entry.item.id}`}
-              data-severity={entry.severity}
-              onClick={() => onPick(entry)}
-              sx={ROW_SX}
-            >
-              <Box
-                component="span"
-                aria-hidden
-                sx={{
-                  width: 12,
-                  height: 12,
-                  flexShrink: 0,
-                  borderRadius: entry.severity === 'calm' ? '50%' : '2px',
-                  bgcolor: (theme: Theme) => severityFill(theme, entry.severity),
-                }}
-              />
-              <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
-                <strong>{title}</strong> · {what}
+        <Box
+          component="ul"
+          aria-label={messages.othersTitle}
+          sx={{ listStyle: 'none', m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}
+        >
+          {entries.map((entry) => {
+            const view = views[entry.kind.id];
+            if (view === undefined) return null;
+            const { title, what } = view.describe(entry.item);
+            const waited = messages.waited(minutesOf(entry.waitedMs));
+            return (
+              <Box component="li" key={entry.item.id}>
+                <Box
+                  component="button"
+                  type="button"
+                  aria-label={`${title}, ${what}, ${waited}, ${messages.severity[entry.severity]}`}
+                  data-testid={`attention-others-${entry.item.id}`}
+                  data-severity={entry.severity}
+                  onClick={() => onPick(entry)}
+                  sx={ROW_SX}
+                >
+                  <Box
+                    component="span"
+                    aria-hidden
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      flexShrink: 0,
+                      borderRadius: entry.severity === 'calm' ? '50%' : '2px',
+                      bgcolor: (theme: Theme) => severityFill(theme, entry.severity),
+                    }}
+                  />
+                  <Box component="span" aria-hidden sx={{ flex: 1, minWidth: 0 }}>
+                    <strong>{title}</strong> · {what}
+                  </Box>
+                  <Box component="span" aria-hidden sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
+                    {waited}
+                  </Box>
+                </Box>
               </Box>
-              <Box component="span" sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}>
-                {messages.waited(minutesOf(entry.waitedMs))}
-              </Box>
-            </Box>
-          );
-        })}
+            );
+          })}
+        </Box>
       </Box>
     </Popover>
   );

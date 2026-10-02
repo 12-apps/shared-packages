@@ -12,13 +12,17 @@
  *
  * ## What the platform allows
  *
- * - **Sound** waits for the first tap on the page (autoplay policy). Before
- *   it, the call is a silent no-op — the button still says it.
+ * - **Sound** needs a user gesture first (autoplay policy; Safari holds it per
+ *   audio context). `useAttentionAlerts` listens for the page's first tap or
+ *   key press, resumes the shared context and primes the host's files there,
+ *   so a later announcement — which never comes from a gesture — can play.
+ *   Before that first gesture, the call is a silent no-op: the button still
+ *   says it.
  * - **Vibration** is `navigator.vibrate`: Chrome on Android. Safari on iPhone
  *   — and so every browser there — does not implement it, and desktops have
  *   nothing to shake. `canVibrate()` is what the settings read to say so.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import {
   announcementBetween,
@@ -97,13 +101,50 @@ function playTones(urgent: boolean): void {
   }
 }
 
+/** The host's files, primed inside a gesture so they may play later. */
+const primed = new Map<string, HTMLAudioElement>();
+
+function prime(url: string): void {
+  if (primed.has(url) || typeof Audio === 'undefined') return;
+  const element = new Audio(url);
+  element.muted = true;
+  primed.set(url, element);
+  void element
+    .play()
+    .then(() => {
+      element.pause();
+      element.currentTime = 0;
+      element.muted = false;
+    })
+    .catch(() => {
+      element.muted = false;
+    });
+}
+
+/**
+ * Called from inside a user gesture: wakes the shared audio context and primes
+ * the host's sound files. Safe to call more than once.
+ */
+export function unlockAttentionAudio(sounds?: AttentionSounds): void {
+  try {
+    const context = audioContext();
+    if (context !== null && context.state === 'suspended') void context.resume().catch(() => undefined);
+    if (sounds?.urgent !== undefined) prime(sounds.urgent);
+    if (sounds?.calm !== undefined) prime(sounds.calm);
+  } catch {
+    // Nothing to unlock here: the button still says it.
+  }
+}
+
 /** Play the sound for this loudness. Silent where the page may not play yet. */
 export function playAttentionSound(severity: AttentionSeverity, sounds?: AttentionSounds): void {
   const urgent = severity !== 'calm';
   const url = urgent ? sounds?.urgent : sounds?.calm;
   try {
     if (url !== undefined && typeof Audio !== 'undefined') {
-      void new Audio(url).play().catch(() => undefined);
+      const element = primed.get(url) ?? new Audio(url);
+      element.currentTime = 0;
+      void element.play().catch(() => undefined);
       return;
     }
     playTones(urgent);
@@ -121,6 +162,13 @@ export function canVibrate(): boolean {
     : false;
 }
 
+const noSubscription = (): (() => void) => () => undefined;
+
+/** `canVibrate()` for a render: false on the server and in the first paint's hydration. */
+export function useCanVibrate(): boolean {
+  return useSyncExternalStore(noSubscription, canVibrate, () => false);
+}
+
 export function vibrateFor(severity: AttentionSeverity): void {
   try {
     if (canVibrate()) navigator.vibrate(severity === 'calm' ? CALM_BUZZ : URGENT_BUZZ);
@@ -129,23 +177,48 @@ export function vibrateFor(severity: AttentionSeverity): void {
   }
 }
 
+/** Unlock audio on the page's first tap or key press, once per mount. */
+function useAudioUnlock(sounds: AttentionSounds | undefined): void {
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const unlock = (): void => {
+      unlockAttentionAudio(sounds);
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+    };
+    window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('keydown', unlock, true);
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+    };
+  }, [sounds]);
+}
+
 /**
  * Ring and buzz for each new arrival or escalation, as the device's settings
- * allow. The first reading after mount only sets the baseline.
+ * allow. Readings taken while `ready` is false — the host still loading — only
+ * move the baseline, so what was already waiting when the page opened never
+ * rings.
  */
 export function useAttentionAlerts(
   entries: readonly AttentionEntry[],
   preferences: Pick<AttentionPreferences, 'sound' | 'vibration'>,
   sounds?: AttentionSounds,
+  ready = true,
 ): void {
+  useAudioUnlock(sounds);
   const seen = useRef<AttentionSnapshot | null>(null);
   useEffect(() => {
     const before = seen.current;
     seen.current = snapshotOf(entries);
-    if (before === null) return;
+    if (before === null || !ready) {
+      if (!ready) seen.current = null;
+      return;
+    }
     const news = announcementBetween(before, entries);
     if (news === null) return;
     if (channelWants(preferences.sound, news.severity)) playAttentionSound(news.severity, sounds);
     if (channelWants(preferences.vibration, news.severity)) vibrateFor(news.severity);
-  }, [entries, preferences.sound, preferences.vibration, sounds]);
+  }, [entries, preferences.sound, preferences.vibration, sounds, ready]);
 }

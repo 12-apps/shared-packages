@@ -1,11 +1,11 @@
 /**
  * Every sentence the attention surface says, supplied by the HOST.
  *
- * There is no default table on purpose (the package's portability suite
- * forbids one): a second host that forgot a key must fail at compile time,
+ * There is no default table on purpose (`attention/__tests__/portability`
+ * holds the line): a second host that forgot a key must fail at compile time,
  * not inherit somebody else's language.
  */
-import type { AttentionChannelLevel } from '../core';
+import type { AttentionChannelLevel, AttentionSeverity } from '../core';
 
 export interface AttentionMessages {
   /** A wait, short enough for the button: "7 min". */
@@ -18,8 +18,10 @@ export interface AttentionMessages {
     readonly urgent: boolean;
     readonly others: number;
   }) => string;
-  /** The "+N" read aloud. */
-  readonly others: (count: number) => string;
+  /** The "+N" read aloud, with the worst of them. */
+  readonly others: (count: number, worst: AttentionSeverity) => string;
+  /** A severity in words, for whoever cannot see the colour: "late". */
+  readonly severity: Readonly<Record<AttentionSeverity, string>>;
   /** The list it opens. */
   readonly othersTitle: string;
   readonly preferences: AttentionPreferencesMessages;

@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { attentionKind, defineAttention, type AttentionItem } from '../core';
+import { AttentionWiringError, attentionKind, defineAttention, type AttentionItem } from '../core';
 import {
   AttentionHost,
   AttentionQuickSettings,
   attentionView,
   createAttentionPreferences,
+  defineAttentionViews,
   type AttentionMessages,
 } from '../react';
 
@@ -45,7 +46,8 @@ const MESSAGES: AttentionMessages = {
   waited: (minutes) => `${minutes} min`,
   button: ({ title, what, waited, others }) =>
     `Next: ${title}, ${what}, ${waited}${others ? `; ${others} more` : ''}`,
-  others: (count) => `See ${count} more`,
+  others: (count, worst) => `See ${count} more, the worst ${worst}`,
+  severity: { calm: 'on time', late: 'late', spent: 'very late' },
   othersTitle: 'Also waiting',
   preferences: {
     title: 'Alerts',
@@ -214,7 +216,9 @@ describe('the device settings', () => {
 
   it('falls back to the defaults when storage holds nonsense', () => {
     window.localStorage.setItem('attention-broken', '{"sound":"loud","dock":{"side":"up"}}');
-    expect(createAttentionPreferences({ storageKey: 'attention-broken', defaults: { sound: 'late' } }).read()).toEqual({
+    expect(
+      createAttentionPreferences({ storageKey: 'attention-broken', defaults: { sound: 'late' } }).read(),
+    ).toEqual({
       sound: 'late',
       vibration: 'off',
       push: 'off',
@@ -339,5 +343,208 @@ describe('the dock', () => {
     // A plain tap still opens it.
     fireEvent.click(screen.getByTestId('attention-button'));
     expect(screen.getByRole('dialog', { name: 'Room 12' })).toBeTruthy();
+  });
+});
+
+describe('what the review caught', () => {
+  beforeEach(() => {
+    if (typeof window.PointerEvent === 'undefined') {
+      class PointerEventStandIn extends MouseEvent {
+        readonly pointerId: number;
+        readonly isPrimary: boolean;
+        constructor(type: string, init: MouseEventInit & { pointerId?: number; isPrimary?: boolean } = {}) {
+          super(type, init);
+          this.pointerId = init.pointerId ?? 1;
+          this.isPrimary = init.isPrimary ?? true;
+        }
+      }
+      Object.defineProperty(window, 'PointerEvent', { configurable: true, value: PointerEventStandIn });
+    }
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  });
+
+  function drag(dock: HTMLElement, to: { x: number; y: number }): void {
+    vi.spyOn(dock, 'getBoundingClientRect').mockReturnValue({
+      left: 320,
+      top: 700,
+      width: 64,
+      height: 64,
+      right: 384,
+      bottom: 764,
+      x: 320,
+      y: 700,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(dock, { clientX: 350, clientY: 730, pointerId: 1 });
+    fireEvent.pointerMove(dock, { clientX: to.x, clientY: to.y, pointerId: 1 });
+    fireEvent.pointerUp(dock, { clientX: to.x, clientY: to.y, pointerId: 1 });
+  }
+
+  it('opens on the next tap after a touch drag that ended with no click', () => {
+    renderHost([bell('12', 2)]);
+    drag(screen.getByTestId('attention-dock'), { x: 60, y: 330 });
+    // A touch drag fires no click; the next real tap begins with a pointerdown.
+    fireEvent.pointerDown(screen.getByTestId('attention-dock'), { clientX: 30, clientY: 300, pointerId: 2 });
+    fireEvent.click(screen.getByTestId('attention-button'));
+    expect(screen.getByRole('dialog', { name: 'Room 12' })).toBeTruthy();
+  });
+
+  it('snaps to the right too, and keeps the small things on the inner side', () => {
+    const { preferences: store } = renderHost([bell('12', 2), bell('3', 1)]);
+    drag(screen.getByTestId('attention-dock'), { x: 330, y: 300 });
+    expect(store.read().dock?.side).toBe('right');
+    const dock = screen.getByTestId('attention-dock');
+    // Right edge: "+N" first in the row, the button outermost.
+    expect(getComputedStyle(dock).flexDirection).toBe('row');
+    const children = Array.from(dock.children).map((child) => child.getAttribute('data-testid'));
+    expect(children).toEqual(['attention-others', 'attention-button']);
+    act(() => store.write({ dock: { side: 'left', y: 0.5 } }));
+    expect(getComputedStyle(screen.getByTestId('attention-dock')).flexDirection).toBe('row-reverse');
+  });
+
+  it('does not reopen the list on its own once the others are gone and come back', async () => {
+    const at = (items: readonly AttentionItem[], store: ReturnType<typeof createAttentionPreferences>) => (
+      <AttentionHost
+        registry={registry}
+        views={views}
+        items={items}
+        now={NOW}
+        messages={MESSAGES}
+        preferences={store}
+      />
+    );
+    const store = createAttentionPreferences({ storageKey: 'attention-list' });
+    const { rerender } = render(at([bell('1', 7), bell('2', 1)], store));
+    fireEvent.click(screen.getByTestId('attention-others'));
+    rerender(at([bell('1', 7)], store));
+    rerender(at([bell('1', 7), bell('9', 1)], store));
+    // The closing list may still be fading out; it must not come back.
+    await waitFor(() => expect(screen.queryAllByTestId('attention-others-9')).toHaveLength(0));
+    expect(screen.getByTestId('attention-others').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('does not reopen a sheet when its item leaves and comes back', () => {
+    const at = (items: readonly AttentionItem[], store: ReturnType<typeof createAttentionPreferences>) => (
+      <AttentionHost
+        registry={registry}
+        views={views}
+        items={items}
+        now={NOW}
+        messages={MESSAGES}
+        preferences={store}
+      />
+    );
+    const store = createAttentionPreferences({ storageKey: 'attention-sheet' });
+    const { rerender } = render(at([bell('12', 2)], store));
+    fireEvent.click(screen.getByTestId('attention-button'));
+    rerender(at([], store));
+    rerender(at([bell('12', 1)], store));
+    expect(screen.queryAllByRole('dialog', { name: 'Room 12' })).toHaveLength(0);
+  });
+
+  it('names each listed row with its severity in words', () => {
+    renderHost([bell('1', 12), bell('2', 7), bell('3', 1)]);
+    expect(screen.getByTestId('attention-others').getAttribute('aria-label')).toBe(
+      'See 2 more, the worst late',
+    );
+    fireEvent.click(screen.getByTestId('attention-others'));
+    expect(screen.getByTestId('attention-others-2').getAttribute('aria-label')).toBe(
+      'Room 2, Rang the bell, 7 min, late',
+    );
+    expect(screen.getByTestId('attention-others-2').tagName).toBe('BUTTON');
+  });
+
+  it('marks spent with a second outline, not only a colour', () => {
+    renderHost([bell('1', 12)]);
+    const face = screen.getByTestId('attention-button').querySelector('[data-outline]');
+    expect(face?.getAttribute('data-outline')).toBe('double');
+  });
+
+  it('stops every animation for a reader who asked for reduced motion', () => {
+    renderHost([bell('1', 12)]);
+    const css = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.textContent ?? '')
+      .join('\n');
+    expect(css).toContain('prefers-reduced-motion: reduce');
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{[^}]*animation:\s*none/);
+  });
+
+  it('keeps a setting for this page when storage refuses it', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const store = createAttentionPreferences({ storageKey: 'attention-full' });
+    store.write({ sound: 'all' });
+    expect(store.read().sound).toBe('all');
+  });
+
+  it('rings for news only once the host is ready', () => {
+    const play = vi.fn(() => Promise.resolve());
+    vi.stubGlobal(
+      'Audio',
+      vi.fn(() => ({ play, pause: vi.fn(), currentTime: 0, muted: false })),
+    );
+    const store = createAttentionPreferences({ storageKey: 'attention-ready' });
+    store.write({ sound: 'all' });
+    const at = (items: readonly AttentionItem[], ready: boolean) => (
+      <AttentionHost
+        registry={registry}
+        views={views}
+        items={items}
+        now={NOW}
+        messages={MESSAGES}
+        preferences={store}
+        sounds={{ urgent: '/u.wav', calm: '/c.wav' }}
+        ready={ready}
+      />
+    );
+    const { rerender } = render(at([], false));
+    // The data lands: what was waiting at load is not news.
+    rerender(at([bell('1', 9)], false));
+    rerender(at([bell('1', 9)], true));
+    expect(play).not.toHaveBeenCalled();
+    // A fresh arrival is.
+    rerender(at([bell('1', 9), bell('2', 0)], true));
+    expect(play).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('plays the urgent sound only for urgent news when set to urgent only', () => {
+    const play = vi.fn(() => Promise.resolve());
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'Audio',
+      vi.fn((url: string) => {
+        urls.push(url);
+        return { play, pause: vi.fn(), currentTime: 0, muted: false };
+      }),
+    );
+    const store = createAttentionPreferences({ storageKey: 'attention-urgent-only' });
+    store.write({ sound: 'late' });
+    const at = (items: readonly AttentionItem[]) => (
+      <AttentionHost
+        registry={registry}
+        views={views}
+        items={items}
+        now={NOW}
+        messages={MESSAGES}
+        preferences={store}
+        sounds={{ urgent: '/u.wav', calm: '/c.wav' }}
+      />
+    );
+    const { rerender } = render(at([]));
+    rerender(at([bell('1', 1)]));
+    expect(play).not.toHaveBeenCalled();
+    rerender(at([bell('1', 6)]));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(urls).toEqual(['/u.wav']);
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses views that do not match the registry', () => {
+    expect(() => defineAttentionViews(registry, { bell: views.bell })).toThrow(AttentionWiringError);
+    expect(() => defineAttentionViews(registry, { ...views, typo: views.bell })).toThrow(/undeclared/);
+    expect(defineAttentionViews(registry, views)).toBe(views);
   });
 });
