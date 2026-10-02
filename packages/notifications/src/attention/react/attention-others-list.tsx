@@ -76,7 +76,7 @@ export function AttentionOthersList({
             const view = views[entry.kind.id];
             if (view === undefined) return null;
             const { title, what, spoken } = view.describe(entry.item);
-            const waited = messages.waited(minutesOf(entry.waitedMs));
+            const waited = messages.waited(minutesOf(entry.waitedMs), entry.waitedMs);
             return (
               <Box component="li" key={entry.item.id}>
                 <Box

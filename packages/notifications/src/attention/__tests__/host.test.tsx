@@ -173,6 +173,24 @@ describe('the attention button', () => {
     expect(screen.getByTestId('attention-others').textContent).toContain('+1');
   });
 
+  it("quotes the wait the host's own screens quote, from the exact time waited", () => {
+    // A host that ROUNDS (its tiles print "13 min" at 12m40s) gets the exact
+    // wait beside the floored minutes, so the button cannot say "12 min" there.
+    const waited = vi.fn((_minutes: number, ms: number) => `${Math.round(ms / 60_000)} min`);
+    render(
+      <AttentionHost
+        registry={registry}
+        views={views}
+        items={[{ ...sample('7', 0), since: NOW - (12 * 60 + 40) * 1000 }]}
+        now={NOW}
+        messages={{ ...MESSAGES, waited }}
+        preferences={createAttentionPreferences({ storageKey: 'attention-exact-wait' })}
+      />,
+    );
+    expect(waited).toHaveBeenCalledWith(12, (12 * 60 + 40) * 1000);
+    expect(screen.getByTestId('attention-button').getAttribute('aria-label')).toContain('13 min');
+  });
+
   it('asks harder as the clock runs', () => {
     const { rerender, preferences } = renderHost([bell('1', 1)]);
     expect(screen.getByTestId('attention-button').getAttribute('data-pulse')).toBe('still');

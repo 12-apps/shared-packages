@@ -141,7 +141,7 @@ export function AttentionHost({
   }, [hasOthers]);
   if (head === undefined) return sheet === null ? null : <>{sheet}</>;
   const headView = views[head.kind.id] as AttentionKindView;
-  const waited = messages.waited(minutesOf(head.waitedMs));
+  const waited = messages.waited(minutesOf(head.waitedMs), head.waitedMs);
   const othersSeverity = worstSeverity(others.map((entry) => entry.severity)) ?? 'calm';
 
   return (

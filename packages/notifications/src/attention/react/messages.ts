@@ -8,8 +8,12 @@
 import type { AttentionChannelLevel, AttentionSeverity } from '../core';
 
 export interface AttentionMessages {
-  /** A wait, short enough for the button: "7 min". */
-  readonly waited: (minutes: number) => string;
+  /**
+   * A wait, short enough for the button: "7 min". `minutes` is whole minutes,
+   * floored; `waitedMs` is the exact wait, for a host whose own screens round
+   * or format it differently — the button must quote what they quote.
+   */
+  readonly waited: (minutes: number, waitedMs: number) => string;
   /** The button read aloud. */
   readonly button: (input: {
     readonly title: string;
