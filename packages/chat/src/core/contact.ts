@@ -39,15 +39,16 @@ export const CONTACT_KINDS: readonly ContactKind[] = ["phone", "email", "url", "
  * Before the window, spans that legitimately carry numbers collapse (see
  * NEUTRAL_RULES): clock times, amounts after a currency symbol, and the
  * host's `neutralPatterns` (address units). A collapsed span still counts —
- * one digit, two when it held four or more — so it cannot launder a phone's
- * tail (`11 98765 $4321`, `11 98765 apto 4321`). A span collapses only when
- * it holds few digits (a host span at most four, an amount at most four
- * unless it is shaped like money: `1.250` or `25,00`), is not followed
- * straight away by a digit, and is not preceded straight away by a run of
- * five or more digits — a mobile's first group (`98765 ap 4321`,
+ * a unit or a time as one digit, an amount as one to three by its length —
+ * so it cannot launder a phone's tail (`11 98765 $4321`,
+ * `11 98765 apto 4321`). A host span collapses only when it holds at most
+ * four digits; an amount only when it is a canonical price of at most four
+ * integer digits (`25`, `1250`, `1.250`, `85,90`, `1.250,00`) — what a
+ * courier quotes — so `$8.765.432`, `$98765,43` and `$54321` stay digits.
+ * No span collapses when a digit follows straight away, or when a run of
+ * five or more digits precedes it — a mobile's first group (`98765 ap 4321`,
  * `119876$54321`), while a street number (`Rua A, 1234 apto 5678`) is at most
- * four. So `11 9876 $54321` and `9 $8765432` stay phone numbers: a bare
- * five-digit "amount" is not money.
+ * four.
  *
  * Known costs, accepted because a missed number is the harm: a CEP-shaped
  * postcode (`01310-100`), a full date (`02/10/2026`), and money without a
@@ -59,7 +60,9 @@ export const CONTACT_KINDS: readonly ContactKind[] = ["phone", "email", "url", "
  * shape of `apt 1204 and 1205`; a landline split by a unit
  * (`1234 apto 5678`) — exactly `Rua A, 1234 apto 5678`; and double
  * laundering, both groups dressed as spans (`apto 98765 apto 4321`,
- * `R$ 98765 e R$ 4321`) — indistinguishable from two units or two prices.
+ * `R$ 98765 e R$ 4321`) — indistinguishable from two units or two prices;
+ * and a landline or ten-digit number split by one canonical price
+ * (`9876 $5.432`) — exactly a street number and a price.
  */
 const PHONE_MIN_DIGITS = 8;
 const PHONE_WINDOW = 16;
@@ -67,31 +70,32 @@ const PHONE_WINDOW = 16;
 const HOST_NEUTRAL_MAX_DIGITS = 4;
 /** A run this long right before a span is a phone's first group, never a street number. */
 const PHONE_GROUP_DIGITS = 5;
-/** What a neutral span becomes: one digit, or two for a span of four or more, between spaces. */
-const placeholderFor = (digits: number): string => (digits >= 4 ? " 00 " : " 0 ");
-
 interface NeutralRule {
   readonly pattern: RegExp;
   readonly maxDigits: number;
-  /** Above this many digits, the span must also pass `shaped` to collapse. */
-  readonly bareMaxDigits?: number;
-  readonly shaped?: RegExp;
+  /** How many digits the collapsed span still counts as. */
+  readonly weight: (digits: number) => number;
+  /** A further test the span must pass to collapse. */
+  readonly accepts?: (span: string) => boolean;
 }
+
+const ONE_DIGIT = (): number => 1;
+/** An amount counts by its length: a phone's tail dressed as a price stays heavy. */
+const amountWeight = (digits: number): number => (digits >= 5 ? 3 : digits === 4 ? 2 : 1);
+/** A price as a courier writes one: at most four integer digits, a thousands dot, cents. */
+const CANONICAL_PRICE = /^(?:\d{1,4}|\d\.\d{3})(?:,\d{2})?$/;
+const amountOf = (span: string): string => span.replace(/^[^\d]+/, "");
 
 /** Domain-free spans that carry digits and are not a phone. */
 const NEUTRAL_RULES: readonly NeutralRule[] = [
   /** A valid clock time: `19:30`, `9h30`. */
-  { pattern: /(?<!\d)(?:[01]?\d|2[0-3])[:h][0-5]\d(?!\d)/g, maxDigits: 4 },
-  /**
-   * An amount after a currency symbol (`R$` ends in `$`): `$ 1.250,00` is six
-   * digits, so seven is the cap — but past four only with money's shape, a
-   * thousands dot or two cents, never a bare run (`$54321`).
-   */
+  { pattern: /(?<!\d)(?:[01]?\d|2[0-3])[:h][0-5]\d(?!\d)/g, maxDigits: 4, weight: ONE_DIGIT },
+  /** A canonical price after a currency symbol (`R$` ends in `$`): `$ 1.250,00` is the largest, six digits. */
   {
     pattern: /[$\u20AC\u00A3\u00A5]\s*\d[\d.]*(?:,\d{2})?/g,
-    maxDigits: 7,
-    bareMaxDigits: 4,
-    shaped: /\d\.\d{3}|,\d{2}$/,
+    maxDigits: 6,
+    weight: amountWeight,
+    accepts: (span) => CANONICAL_PRICE.test(amountOf(span)),
   },
 ];
 
@@ -159,14 +163,9 @@ function digitsIn(span: string): number {
   return span.match(ASCII_DIGIT)?.length ?? 0;
 }
 
-function hasShape(span: string, digits: number, rule: NeutralRule): boolean {
-  if (rule.bareMaxDigits === undefined || digits <= rule.bareMaxDigits) return true;
-  return rule.shaped?.test(span) ?? false;
-}
-
 function isNeutral(text: string, match: RegExpExecArray, rule: NeutralRule): boolean {
   const digits = digitsIn(match[0]);
-  if (digits === 0 || digits > rule.maxDigits || !hasShape(match[0], digits, rule)) return false;
+  if (digits === 0 || digits > rule.maxDigits || !(rule.accepts?.(match[0]) ?? true)) return false;
   FOLLOWED_BY_DIGIT.lastIndex = match.index + match[0].length;
   if (FOLLOWED_BY_DIGIT.test(text)) return false;
   return digitRunBefore(text, match.index) < PHONE_GROUP_DIGITS;
@@ -178,7 +177,7 @@ function neutralise(text: string, rule: NeutralRule): string {
   let from = 0;
   for (const match of text.matchAll(rule.pattern)) {
     if (!isNeutral(text, match, rule)) continue;
-    out += `${text.slice(from, match.index)}${placeholderFor(digitsIn(match[0]))}`;
+    out += `${text.slice(from, match.index)} ${"0".repeat(rule.weight(digitsIn(match[0])))} `;
     from = match.index + match[0].length;
   }
   return out + text.slice(from);
@@ -186,7 +185,7 @@ function neutralise(text: string, rule: NeutralRule): string {
 
 /** See PHONE_MIN_DIGITS / PHONE_WINDOW above. */
 function hasPhone(scan: string, compiled: CompiledVocabulary): boolean {
-  const hostRules = compiled.neutral.map((pattern) => ({ pattern, maxDigits: HOST_NEUTRAL_MAX_DIGITS }));
+  const hostRules = compiled.neutral.map((pattern) => ({ pattern, maxDigits: HOST_NEUTRAL_MAX_DIGITS, weight: ONE_DIGIT }));
   const blanked = [...NEUTRAL_RULES, ...hostRules].reduce(neutralise, scan);
   const compact = blanked.replace(NON_ALPHANUMERIC_RUN, " ");
   const positions = Array.from(compact.matchAll(ASCII_DIGIT), (match) => match.index);

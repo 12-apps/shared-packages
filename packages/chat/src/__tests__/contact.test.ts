@@ -363,3 +363,42 @@ describe("a span that would hide a phone's tail", () => {
     expect(detectContactInfo(text, ["phone"], PT_BR)).toEqual([]);
   });
 });
+
+describe("a phone dressed as a price", () => {
+  it.each([
+    "9 $8.765.432",
+    "1198 $7.654.321",
+    "11 $9.876.543",
+    "11 9 $8.765.432",
+    "$9.876.543 1",
+    "11 $98765,43",
+    "98 $76543,21",
+    "11 $98.765,43",
+    "11 R$ 98765,43",
+    "119 87 $6543,21",
+  ])("still reads %j as a phone number", (text) => {
+    expect(detectContactInfo(text, ["phone"], {})).toEqual(["phone"]);
+    expect(detectContactInfo(text, ["phone"], PT_BR)).toEqual(["phone"]);
+  });
+});
+
+describe("a street, a floor and a unit in one line", () => {
+  it.each([
+    "Rua Augusta, 1520, 12 andar, apto 1204",
+    "Rua Augusta 1520 12 andar apto 1204",
+    "Av. Paulista, 1578, 15 andar, conj 1504",
+    "Rua A, 1234, bloco 12, torre 3, apto 1204",
+    "Rua Augusta, 1520 - 12 andar - apto 1204",
+    "Rua Augusta 1520, andar 12, sala 1204",
+    "Rua A 1234 apto 1204 chego 19:30",
+    "hoje 02/10 às 19:30, apto 1204",
+    "dia 02/10 às 19h, apto 1204",
+    "Rua A, 1234, apto 1204, R$ 37,90",
+    "Rua A 1520 apto 1204 R$ 85,90",
+    "R$ 85,90 R$ 12,00 R$ 5,00",
+    "R$ 1.234,56 + R$ 2.345,67",
+    "R$ 12,00 R$ 13,00 R$ 14,00 R$ 15,00",
+  ])("lets %j through", (text) => {
+    expect(detectContactInfo(text, ["phone"], PT_BR)).toEqual([]);
+  });
+});

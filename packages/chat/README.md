@@ -80,9 +80,10 @@ bidi-reversed run, and spelled-out digits from the host's
 whatever separates them. Clock times, amounts after a currency symbol, and
 spans matching the host's `neutralPatterns` (address units like
 `apto 1204`, at most 4 digits each) are set aside first, so an address with
-an apartment number passes; a set-aside span still counts as one or two
-digits. An amount past 4 digits is set aside only when it is shaped like
-money (`1.250`, `25,00`), so `$54321` is not. A CEP, a full date, or a
+an apartment number passes; a set-aside span still counts as at least one
+digit. An amount is set aside only when it is a price as a courier writes
+one, at most four integer digits (`85,90`, `1.250,00`), so `$54321`,
+`$98765,43` and `$8.765.432` are not. A CEP, a full date, or a
 five-digit street number before a unit is refused; that is the documented
 price.
 
