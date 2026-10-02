@@ -29,17 +29,23 @@ export interface AttentionDockProps {
   readonly children: ReactNode;
 }
 
+/**
+ * Its distance from the side it rests on: 12px on a phone, 24px from `sm` up —
+ * the approved boards' own pads, the screen's edge being closer on a phone.
+ */
+const SIDE_GAP = { xs: '12px', sm: '24px' } as const;
+
 function placement(
   live: { readonly left: number; readonly top: number } | null,
   position: AttentionDockPosition | null,
   bottom: string,
 ): Record<string, number | string | Record<string, string>> {
   if (live !== null) return { left: live.left, top: live.top };
-  if (position === null) return { right: EDGE_GAP_PX, bottom };
+  if (position === null) return { right: SIDE_GAP, bottom };
   const restore = (vh: string): string =>
     `min(calc((${vh} - ${RESTING_SPAN_PX}px) * ${position.y} + ${EDGE_GAP_PX / 2}px), calc(${vh} - ${bottom} - ${RESTING_SPAN_PX - EDGE_GAP_PX}px))`;
   return {
-    [position.side]: EDGE_GAP_PX,
+    [position.side]: SIDE_GAP,
     // Stored against `innerHeight`, which is the DYNAMIC viewport — `100vh` is
     // the large one on a phone and would land it behind the browser's own bar.
     // `100vh` stays as the fallback for engines without `dvh` (older WebViews),
@@ -74,7 +80,7 @@ export function AttentionDock({
         // The small things sit on the INNER side, so nothing hangs off the screen.
         flexDirection: side === 'left' ? 'row-reverse' : 'row',
         alignItems: 'center',
-        gap: 1.5,
+        gap: '14px',
         touchAction: 'none',
         userSelect: 'none',
         cursor: dragging ? 'grabbing' : 'grab',

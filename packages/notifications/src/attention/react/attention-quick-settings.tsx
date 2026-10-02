@@ -104,13 +104,22 @@ function QuickChoices({
   preferences,
   messages,
   push,
-}: PanelParts & { readonly push?: AttentionPushState }): JSX.Element {
+  maxHeight,
+}: PanelParts & { readonly push?: AttentionPushState; readonly maxHeight?: number }): JSX.Element {
   const vibrates = useCanVibrate();
   return (
     <Box
       role="group"
       aria-label={messages.quickLabel}
-      sx={{ p: 1, display: 'flex', flexDirection: 'column', gap: 1, width: 250 }}
+      sx={{
+        p: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        width: 250,
+        boxSizing: 'border-box',
+        ...(maxHeight === undefined ? {} : { maxHeight, overflowY: 'auto' }),
+      }}
     >
       <QuickGroup title={messages.sound.shortTitle} first>
         <Choices
@@ -148,10 +157,31 @@ function QuickChoices({
             disabled={!push.enabled}
             compact
           />
+          {!push.available && <Hint>{messages.push.unavailable}</Hint>}
         </QuickGroup>
       )}
     </Box>
   );
+}
+
+/** The air between the bell and the choices it drops. */
+const DROP_GAP_PX = 8;
+/** Under this much room below the bell, the choices may rise as a popover does. */
+const MIN_ROOM_PX = 200;
+
+/**
+ * Where the choices drop: under the bell, lined up with its right edge, and
+ * no taller than the room left beneath it — so they scroll there rather than
+ * rise over the bell and the header they belong to.
+ */
+function dropUnder(
+  anchor: HTMLElement | null,
+): { readonly top: number; readonly left: number; readonly room: number | undefined } | null {
+  if (anchor === null) return null;
+  const rect = anchor.getBoundingClientRect();
+  const top = rect.bottom + DROP_GAP_PX;
+  const room = window.innerHeight - top - 16;
+  return { top, left: rect.right, room: room >= MIN_ROOM_PX ? room : undefined };
 }
 
 export interface AttentionQuickSettingsProps {
@@ -174,6 +204,7 @@ export function AttentionQuickSettings({
   const preferences = useAttentionPreferences(store);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const on = anyOn(preferences, push, useCanVibrate());
+  const drop = dropUnder(anchor);
   return (
     <>
       <Box
@@ -190,14 +221,20 @@ export function AttentionQuickSettings({
         <AlertsGlyph on={on} />
       </Box>
       <Popover
-        open={anchor !== null}
-        anchorEl={anchor}
+        open={drop !== null}
+        anchorReference="anchorPosition"
+        anchorPosition={drop === null ? undefined : { top: drop.top, left: drop.left }}
         onClose={() => setAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         dataTestId="attention-quick-settings-panel"
       >
-        <QuickChoices store={store} preferences={preferences} messages={messages} push={push} />
+        <QuickChoices
+          store={store}
+          preferences={preferences}
+          messages={messages}
+          push={push}
+          maxHeight={drop?.room}
+        />
       </Popover>
     </>
   );

@@ -27,7 +27,9 @@ import { pulseOf, type AttentionEntry, type AttentionPulse, type AttentionSeveri
 export function severityFill(theme: Theme, severity: AttentionSeverity): string {
   if (severity === 'calm') return theme.palette.success.main;
   if (severity === 'late') return theme.palette.warning.main;
-  return theme.palette.warning.dark;
+  // A step darker than late, from the same token: the approved #6B4D06 is the
+  // warning amber at 78% over black, where MUI's `warning.dark` goes further.
+  return `color-mix(in srgb, ${theme.palette.warning.main} 78%, black)`;
 }
 
 /** The ink on that fill. */
@@ -290,7 +292,8 @@ export function AttentionOthersButton({
         px: 1.25,
         boxSizing: 'border-box',
         borderRadius: 22,
-        bgcolor: 'background.paper',
+        // White, whatever the page's paper: the ball must stand off any ground.
+        bgcolor: 'common.white',
         color: (theme: Theme) =>
           severity === 'calm' ? theme.palette.success.main : severityFill(theme, severity),
         border: '1.5px solid currentColor',

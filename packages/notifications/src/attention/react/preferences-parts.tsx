@@ -39,8 +39,27 @@ interface ChoicesProps {
   readonly compact: boolean;
 }
 
+/**
+ * The full panel's levels as the approved board draws them: each a tinted,
+ * rounded tile, the hint tight under its label, both greyed when the device
+ * cannot honour it. The compact popover keeps plain rows.
+ */
+const TILES_SX = {
+  '& .MuiRadioGroup-root': { gap: 0.75 },
+  '& .MuiFormControlLabel-root': {
+    m: 0,
+    px: 1,
+    py: 0.75,
+    borderRadius: 1,
+    bgcolor: 'action.hover',
+    alignItems: 'center',
+  },
+  '& .MuiFormControlLabel-label .MuiTypography-root': { display: 'block', lineHeight: 1.3 },
+  '& .MuiFormControlLabel-root.Mui-disabled .MuiTypography-root': { color: 'text.disabled' },
+} as const;
+
 export function Choices({ channel, words, value, onChange, disabled, compact }: ChoicesProps): JSX.Element {
-  return (
+  const group = (
     <RadioGroup
       name={`attention-${compact ? 'quick-' : ''}${channel}`}
       aria-label={compact ? words.shortTitle : words.title}
@@ -57,6 +76,7 @@ export function Choices({ channel, words, value, onChange, disabled, compact }: 
       }))}
     />
   );
+  return compact ? group : <Box sx={TILES_SX}>{group}</Box>;
 }
 
 export function Hint({

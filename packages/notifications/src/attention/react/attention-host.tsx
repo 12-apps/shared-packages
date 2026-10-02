@@ -158,7 +158,10 @@ export function AttentionHost({
             severity={othersSeverity}
             label={messages.others(others.length, othersSeverity)}
             expanded={listAnchor !== null}
-            onClick={setListAnchor}
+            // The list hangs off the whole dock, so it never covers the button.
+            onClick={(ball) =>
+              setListAnchor(ball.closest<HTMLElement>('[data-testid="attention-dock"]') ?? ball)
+            }
           />
         )}
         <AttentionButton
@@ -171,6 +174,7 @@ export function AttentionHost({
       </AttentionDock>
       <AttentionOthersList
         anchor={listAnchor}
+        side={preferences.dock?.side ?? 'right'}
         entries={others}
         views={views}
         messages={messages}
