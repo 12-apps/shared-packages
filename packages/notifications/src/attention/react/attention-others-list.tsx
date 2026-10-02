@@ -17,6 +17,16 @@ import { FLOATING_MARGIN_PX, FLOATING_PAPER } from './floating';
 import type { AttentionMessages } from './messages';
 import { minutesOf, type AttentionKindView, type AttentionViews } from './views';
 
+/**
+ * The minutes' ink on a row's soft tint. The light theme's dark tones read on
+ * its pale tints; the dark theme's tints are dark, so there the minutes take
+ * the LIGHT tone of the same signal — a dark tone there was barely legible.
+ */
+function waitedInk(theme: Theme, calm: boolean): string {
+  if (theme.palette.mode === 'dark') return calm ? theme.palette.success.light : theme.palette.warning.light;
+  return calm ? theme.palette.success.dark : severityFill(theme, 'spent');
+}
+
 const ROW_SX = {
   display: 'flex',
   width: '100%',
@@ -106,7 +116,7 @@ function OtherRow({
           sx={{
             whiteSpace: 'nowrap',
             fontSize: 13,
-            color: (theme: Theme) => (calm ? theme.palette.success.dark : severityFill(theme, 'spent')),
+            color: (theme: Theme) => waitedInk(theme, calm),
           }}
         >
           {waited}
