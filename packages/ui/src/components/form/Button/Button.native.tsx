@@ -62,6 +62,33 @@ interface Paint {
  * it paints the gradient's first stop. A host wanting the real thing adds a
  * gradient library; the parity ledger records this.
  */
+/** A coloured outline: its colour for the border and the label, washed when pressed. */
+function outlineOf(palette: UiPaletteColor, wash: string): Paint {
+  return {
+    container: { backgroundColor: 'transparent', borderWidth: FIELD_BORDER_WIDTH, borderColor: palette.main },
+    pressed: { backgroundColor: wash, borderColor: palette.dark },
+    label: { color: palette.main },
+  };
+}
+
+/**
+ * A neutral outline, as on the web: it rests on the one field border and
+ * writes in the theme's text ink, a role that turns with the mode — grey 700
+ * was dark on a dark ground.
+ */
+function neutralOutline(theme: UiTheme): Paint {
+  const ink = theme.palette.text.primary;
+  return {
+    container: {
+      backgroundColor: 'transparent',
+      borderWidth: FIELD_BORDER_WIDTH,
+      borderColor: resolveFieldEdge(theme.palette.divider, theme.palette.background.paper),
+    },
+    pressed: { backgroundColor: alpha(ink, BUTTON_WASH_ALPHA), borderColor: theme.palette.text.secondary },
+    label: { color: ink },
+  };
+}
+
 function paintFor(
   theme: UiTheme,
   variant: ButtonVariant,
@@ -72,24 +99,7 @@ function paintFor(
   const wash = alpha(palette.main, BUTTON_WASH_ALPHA);
   switch (variant) {
     case 'outline':
-      return {
-        // A neutral outline rests on the one field border, as on the web.
-        container: {
-          backgroundColor: 'transparent',
-          borderWidth: FIELD_BORDER_WIDTH,
-          borderColor:
-            color === 'neutral'
-              ? resolveFieldEdge(theme.palette.divider, theme.palette.background.paper)
-              : palette.main,
-        },
-        // A neutral one writes in the theme's text ink, a role that turns with
-        // the mode, as on the web — grey 700 was dark on a dark ground.
-        pressed:
-          color === 'neutral'
-            ? { backgroundColor: alpha(theme.palette.text.primary, BUTTON_WASH_ALPHA), borderColor: theme.palette.text.secondary }
-            : { backgroundColor: wash, borderColor: palette.dark },
-        label: { color: color === 'neutral' ? theme.palette.text.primary : palette.main },
-      };
+      return color === 'neutral' ? neutralOutline(theme) : outlineOf(palette, wash);
     case 'ghost':
       return {
         container: { backgroundColor: 'transparent' },
