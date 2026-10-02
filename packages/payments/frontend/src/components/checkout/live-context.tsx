@@ -59,11 +59,14 @@ interface LiveWait {
 type LoopRef = { readonly current: PollLoop | null };
 
 /**
- * Ask now — and if the loop declines because it asked a moment ago, ask again
- * once that quiet window is over. The window exists so a flapping network does
- * not stampede `/status`; a hint is different, because the ask it lands just
- * after may have been answered BEFORE the order moved. Dropping it would leave
- * the buyer on the live floor with the news already sent.
+ * A channel that DROPS: ask now — and if the loop declines because it asked a
+ * moment ago, ask again once that quiet window is over. The ask it lands just
+ * after may have been answered before the drop, and its next tick sleeps out
+ * the live floor, so declining for good would leave the buyer waiting with
+ * nobody left to wake them.
+ *
+ * A HINT does not come here. It is `PollLoop.hint` (FUT-3205): deferring a
+ * hint by the quiet window cost a paid buyer a full second on the pay step.
  */
 function wake(loop: LoopRef, pending: { timer?: ReturnType<typeof setTimeout> }): void {
   if (loop.current?.poke() !== false) return;
@@ -94,7 +97,7 @@ export function useLiveWait(loop: LoopRef): LiveWait {
   useEffect(() => {
     if (!subscribe) return undefined;
     const retry = pending.current;
-    const unsubscribe = subscribe(() => wake(loop, retry));
+    const unsubscribe = subscribe(() => loop.current?.hint());
     return () => {
       unsubscribe();
       clearTimeout(retry.timer);
