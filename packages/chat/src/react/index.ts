@@ -6,10 +6,15 @@
 
 import { buildChatSurface, type ChatSurface, type ChatSurfaceConfig } from "../ui/surface";
 import { WebComposer } from "./composer";
-import { WebFrame, WebMessageList } from "./layout";
+import { WebBubble, WebFrame, WebMessageList } from "./layout";
 
 export function createWebChat(config: ChatSurfaceConfig): ChatSurface {
-  return buildChatSurface(config, { Frame: WebFrame, MessageList: WebMessageList, Composer: WebComposer });
+  return buildChatSurface(config, {
+    Frame: WebFrame,
+    MessageList: WebMessageList,
+    Bubble: WebBubble,
+    Composer: WebComposer,
+  });
 }
 
 export type { ChatSurface, ChatSurfaceConfig, ChatThreadProps } from "../ui/surface";

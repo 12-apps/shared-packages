@@ -7,10 +7,15 @@
 
 import { buildChatSurface, type ChatSurface, type ChatSurfaceConfig } from "../ui/surface";
 import { NativeComposer } from "./composer";
-import { NativeFrame, NativeMessageList } from "./layout";
+import { NativeBubble, NativeFrame, NativeMessageList } from "./layout";
 
 export function createNativeChat(config: ChatSurfaceConfig): ChatSurface {
-  return buildChatSurface(config, { Frame: NativeFrame, MessageList: NativeMessageList, Composer: NativeComposer });
+  return buildChatSurface(config, {
+    Frame: NativeFrame,
+    MessageList: NativeMessageList,
+    Bubble: NativeBubble,
+    Composer: NativeComposer,
+  });
 }
 
 export type { ChatSurface, ChatSurfaceConfig, ChatThreadProps } from "../ui/surface";

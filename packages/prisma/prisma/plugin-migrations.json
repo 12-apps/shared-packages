@@ -44,6 +44,7 @@
     "20260926230000_discount_first_order_only",
     "20260927140000_add_notification_side",
     "20261002120000_add_chat",
-    "20261002130000_push_attention_level"
+    "20261002130000_push_attention_level",
+    "20261003120000_add_chat_thread_activity_index"
   ]
 }

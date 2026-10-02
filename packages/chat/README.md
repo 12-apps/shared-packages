@@ -14,7 +14,7 @@ same thread screen renders in a web SPA and in a React Native app.
 | `./react` | `createWebChat(config) → { ChatThread }`: the web surface. |
 | `./native` | `createNativeChat(config) → { ChatThread }`: the React Native surface. |
 | `./manifest*` | wiring manifests for the server, web and native runtimes. |
-| `prisma/` | `chat.prisma` (`ChatThread`, `ChatMessage`, `ChatReadMarker`) plus its migration. `pnpm --filter @12-apps/chat prisma:sync` copies the partial into a host schema folder. |
+| `prisma/` | `chat.prisma` (`ChatThread`, `ChatMessage`, `ChatReadMarker`) plus its migrations. `pnpm --filter @12-apps/chat prisma:sync` copies the partial into a host schema folder. |
 
 ## The host decides who is in a thread
 
@@ -118,6 +118,14 @@ or anonymise API: retention (LGPD, GDPR) is the host's. The
 `created_at` comes from the app process's clock, and messages in the same
 millisecond are ordered by id.
 
+### Indexes for the host's own queries
+
+`chat_threads (tenant_id, last_message_at)` (1.1.0, migration
+`20261003120000_add_chat_thread_activity_index`) serves a host badge that
+counts the threads with activity since a moment (`tenant_id = ? AND
+last_message_at >= ?`). A host that copies the package's migrations picks it
+up with its next sync; it is additive, so it needs no release choreography.
+
 ## The screen
 
 ```tsx
@@ -128,6 +136,31 @@ const { ChatThread } = createWebChat({ fetch: credentialedFetch, copy: EN_US_CHA
 The thread marks itself read up to the newest message it showed, and
 `onUnreadChange` then gets the server's remaining count (normally 0). Pass
 `autoMarkRead={false}` to mount it hidden only for its unread count.
+
+`autoMarkRead="visible"` is for a thread that may be mounted out of sight (the
+lower half of a drawer): a load's unread messages wait until the message list
+is on screen, and are marked read then; a load that finds unread while the
+list is already on screen marks at once. On the web the list is watched with
+an `IntersectionObserver` (on screen from its first pixel); a browser without
+one marks at once, as `true` does. On native a mounted list counts as on
+screen. A host testing in jsdom stubs `IntersectionObserver` to drive it.
+A host drawing its own list with `useChatThread({ autoMarkRead: "visible" })`
+reports it through `controls.onVisibleChange(visible)`.
+
+A read-only thread (`canWrite: false`) with no messages shows only the closed
+notice: no empty-thread invitation to write the first message, and no list.
+
+Own messages and the others' are told apart by their surface: the reader's
+own bubbles are a tint of the theme's `palette.primary.main` (8% in light
+mode, 16% in dark), the others' sit on the paper surface. The label is body
+text on the own tint and secondary text on paper; the primary colour itself
+reads under 4.5:1 on its own tint, so it is not used for text there. A bubble is at most 80% of the thread wide (and 60
+characters, on the web).
+
+Accessibility: the list is a polite live region (`aria-live` on the web,
+`accessibilityLiveRegion` on native), so an arriving message is announced.
+On the web a click on the send button hands focus back to the field, and the
+role's `maxLength` sits on the `<input>` itself.
 
 Layout:
 - **Web:** the messages sit in ui's `ScrollArea` (up to 60% of the viewport
@@ -141,7 +174,15 @@ Layout:
 `createNativeChat` takes the same config. Both surfaces draw the thread from
 `@12-apps/ui` primitives using only their cross-platform props, so a React
 Native bundle resolves each primitive to its native twin through ui's
-`react-native` export condition. Only the composer differs per platform.
+`react-native` export condition. What differs per platform is a slot of the
+internal `ChatPlatform`, the one place platform styling lives:
+
+| slot | receives | web | native |
+|---|---|---|---|
+| `Frame` | the list and the writing area | a `Stack` | a keyboard-avoiding `Screen` |
+| `MessageList` | the bubbles, `label`, `scrollKey`, `onVisibleChange?` | `ScrollArea` + `IntersectionObserver` | `ScrollView`, visible on mount |
+| `Bubble` | `{ mine, children }` | ui `Box` with `sx` (tint, `min(80%, 60ch)`) | ui `Box` with `style` (tint, `80%`) |
+| `Composer` | the controlled field and its send action | `Input` + Enter | `Input` + the keyboard's send key |
 
 The package opens no socket. Bump `refreshSignal` when your live channel says
 the thread moved.

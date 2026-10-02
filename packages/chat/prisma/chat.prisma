@@ -22,6 +22,8 @@ model ChatThread {
   readMarkers   ChatReadMarker[]
 
   @@unique([tenantId, threadKey])
+  // A host's "threads with activity since" badge query: tenant, then recency.
+  @@index([tenantId, lastMessageAt])
   @@map("chat_threads")
 }
 
