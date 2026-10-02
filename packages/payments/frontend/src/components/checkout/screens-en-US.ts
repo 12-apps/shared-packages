@@ -22,6 +22,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     pixLabel: 'PIX',
     cardLabel: 'Card',
     pixDescription: 'Approved instantly',
+    pixManualDescription: 'Confirmed by the store',
     cardDescription: 'Credit, paid in full',
     unavailableHere: 'Unavailable in this store',
   },

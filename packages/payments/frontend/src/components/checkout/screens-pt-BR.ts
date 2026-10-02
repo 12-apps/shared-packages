@@ -15,6 +15,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     pixLabel: 'PIX',
     cardLabel: 'Cartão',
     pixDescription: 'Aprovação imediata',
+    pixManualDescription: 'Confirmado pela loja',
     cardDescription: 'Crédito à vista',
     unavailableHere: 'Indisponível nesta loja',
   },
