@@ -305,29 +305,30 @@ describe("what the read route marks", () => {
   it("marks up to the newest message the reader was shown, never one that arrived after", async () => {
     const { config } = configWith({ clock: ticking() });
     const { markRead, read, send } = api(config);
-    await send(agent, { body: "Arriving" }); // t+1
-    const shown = dataOf<ChatThreadPayload>(await read(client)).messages; // t+2
-    await send(agent, { body: "Downstairs" }); // t+3, not yet on the reader's screen
+    // A send reads the clock twice: for the rate limit, then at the insert.
+    await send(agent, { body: "Arriving" }); // stamped t+2
+    const shown = dataOf<ChatThreadPayload>(await read(client)).messages;
+    await send(agent, { body: "Downstairs" }); // stamped t+4, not yet on the reader's screen
     expect(dataOf(await markRead(client, { upTo: shown.at(-1)?.createdAt }))).toEqual({ unread: 1 });
   });
 
   it("never moves the marker backwards, and never past now", async () => {
     const { config, db } = configWith({ clock: ticking() });
     const { markRead, send } = api(config);
-    await send(agent, { body: "Arriving" }); // t+1
-    await markRead(client, { upTo: at(1) }); // t+2
-    await markRead(client, { upTo: at(0) }); // a slow tab, older screen
-    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(1));
-    await markRead(client, { upTo: at(3600) }); // t+4: clamped
-    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(4));
+    await send(agent, { body: "Arriving" }); // stamped t+2
+    await markRead(client, { upTo: at(2) }); // t+3
+    await markRead(client, { upTo: at(0) }); // t+4: a slow tab, older screen
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(2));
+    await markRead(client, { upTo: at(3600) }); // t+5: clamped
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(5));
   });
 
   it.each([[{}], [{ upTo: "not a date" }], [{ upTo: 42 }], [null]])("reads a missing or broken upTo as now: %j", async (body) => {
     const { config, db } = configWith({ clock: ticking() });
     const { markRead, send } = api(config);
-    await send(agent, { body: "Arriving" }); // t+1
+    await send(agent, { body: "Arriving" }); // stamped t+2
     expect(dataOf(await markRead(client, body))).toEqual({ unread: 0 });
-    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(2));
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(3));
   });
 
   it("moves one marker for a shared role, so every member reads as one", async () => {
@@ -390,7 +391,7 @@ describe("the content rules and the people who probe them", () => {
     const { config } = configWith();
     const { send } = api(config);
     expect((await send(client, { body: "hi", quickReply: null })).status).toBe(201);
-    expect((await send(client, { body: "​‍⁠" })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
+    expect((await send(client, { body: "\u200B\u200D\u2060" })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
   });
 });
 
@@ -419,5 +420,48 @@ describe("the host's hooks", () => {
   ])("refuses a hook or lookback that could never run (%#)", (overrides, message) => {
     const { config } = configWith();
     expect(() => createApiChat({ ...config, ...(overrides as unknown as Partial<Config>) })).toThrow(message);
+  });
+});
+
+describe("round-two hardening", () => {
+  const roomy = { ...ROLES, agent: { ...ROLES.agent!, rateLimit: { max: 20, windowMs: 60_000 } } };
+
+  it("stores no bidi control, so the screen shows what the filter read", async () => {
+    const { config, db } = configWith();
+    const { send } = api(config);
+    expect((await send(client, { body: "\u202Eolleh\u202C there" })).status).toBe(201);
+    expect(db.messages[0]?.body).toBe("olleh there");
+    // Without its override the reversed address is stored, and shown, reversed — no address at all.
+    expect((await send(agent, { body: "\u202Emoc.liamg@ana" })).status).toBe(201);
+    expect(db.messages[1]?.body).toBe("moc.liamg@ana");
+  });
+
+  it("reads a body of blank fillers as empty", async () => {
+    const { config } = configWith();
+    const { send } = api(config);
+    for (const blank of ["\u3164\u3164", "\u2800", "\u115F\u1160"]) {
+      expect((await send(client, { body: blank })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
+    }
+  });
+
+  it("checks one author's parallel sends against each other", async () => {
+    const { config, db } = configWith({ roles: roomy });
+    const { send } = api(config);
+    const statuses = (await Promise.all([send(agent, { body: "98765" }), send(agent, { body: "4321" })])).map((r) => r.status);
+    expect(statuses.sort()).toEqual([201, 422]);
+    expect(db.messages).toHaveLength(1);
+  });
+
+  it("stamps a message when it is stored, after the checks", async () => {
+    const { config, db } = configWith({ clock: ticking(), roles: roomy });
+    const { send } = api(config);
+    await send(agent, { body: "Arriving" });
+    expect(db.messages[0]?.createdAt.toISOString()).toBe("2026-10-02T12:00:02.000Z");
+  });
+
+  it("refuses a filtered role longer than the filter is built for", () => {
+    const { config } = configWith();
+    const roles = { ...ROLES, agent: { ...ROLES.agent!, maxLength: 5000 } };
+    expect(() => createApiChat({ ...config, roles })).toThrow(/at most 2000 while blockContact is set/);
   });
 });

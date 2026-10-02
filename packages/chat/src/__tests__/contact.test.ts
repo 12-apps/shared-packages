@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CONTACT_KINDS,
-  detectContactInfo,
-  detectContactInfoAcross,
-  type ContactKind,
-  type ContactVocabulary,
-} from "../core/contact";
+import { CONTACT_KINDS, detectContactInfo, type ContactKind, type ContactVocabulary } from "../core/contact";
+import { PT_BR } from "./contact-fixtures";
 
 /**
  * The contact-info filter: a role it binds must not pass a way to be reached
@@ -24,37 +19,7 @@ const VOCABULARY: ContactVocabulary = {
   extraPatterns: [/\bwhats ?app\b/, /\binsta(gram)?\b/],
 };
 
-/** The vocabulary a Brazilian host passes — the shape the reviewer probed with. */
-const PT_BR: ContactVocabulary = {
-  numberWords: {
-    zero: "0",
-    um: "1",
-    dois: "2",
-    "três": "3",
-    quatro: "4",
-    cinco: "5",
-    seis: "6",
-    sete: "7",
-    oito: "8",
-    nove: "9",
-    meia: "6",
-  },
-  atWords: ["arroba"],
-  dotWords: ["ponto", "dot"],
-  extraPatterns: [
-    /\bwhats\b/,
-    /\bwpp\b/,
-    /\bzap\b/,
-    /\binsta\b/,
-    /\bface\b/,
-    /\btik ?tok\b/,
-    /\btelegram\b/,
-    /\bmeu numero\b/,
-    /\bme liga\b/,
-  ],
-};
-
-const keycaps = (digits: string): string => [...digits].map((digit) => `${digit}️⃣`).join("");
+const keycaps = (digits: string): string => [...digits].map((digit) => `${digit}\uFE0F\u20E3`).join("");
 
 describe("detectContactInfo", () => {
   it.each([
@@ -107,10 +72,10 @@ describe("detectContactInfo — dressed-up contact info is still found", () => {
     ["９８７６５４３２１０", "phone"],
     ["𝟗𝟖𝟕𝟔𝟓𝟒𝟑𝟐", "phone"],
     ["١٢٣٤٥٦٧٨٩", "phone"],
-    ["9​8​7​6​5​4​3​2​1", "phone"],
-    ["9⁠8­7‍6﻿5‌4​3​2", "phone"],
+    ["9\u200B8\u200B7\u200B6\u200B5\u200B4\u200B3\u200B2\u200B1", "phone"],
+    ["9\u20608\u00AD7\u200D6\uFEFF5\u200C4\u200B3\u200B2", "phone"],
     [keycaps("98765432"), "phone"],
-    ["9⃣8⃣7⃣6⃣5⃣4⃣3⃣2⃣", "phone"],
+    ["9\u20E38\u20E37\u20E36\u20E35\u20E34\u20E33\u20E32\u20E3", "phone"],
     // Separators and words between the groups
     ["9,8,7,6,5,4,3,2", "phone"],
     ["9;8;7;6;5;4;3;2", "phone"],
@@ -214,37 +179,67 @@ describe("detectContactInfo — the host's extra patterns", () => {
   });
 });
 
-describe("detectContactInfoAcross", () => {
-  it("refuses a number split across two messages", () => {
-    expect(detectContactInfo("4321", ALL, PT_BR)).toEqual([]);
-    expect(detectContactInfoAcross(["98765"], "4321", ALL, PT_BR)).toEqual(["phone"]);
+describe("detectContactInfo — address, money and time lines carry numbers that are not a phone", () => {
+  it.each([
+    "Av Paulista, 1578, apto 1204",
+    "Estou na Rua Augusta 1520 apto 1204",
+    "Rua das Flores, 1234, apto 1204",
+    "Alameda Santos 1234 conj 1204",
+    "R$ 25,00 + R$ 12,50",
+    "R$ 1.250,00 e R$ 1.300,00",
+    "Chego 19:30 ou 19:50",
+    "são 12:30, chego 12:45 ou 13:00",
+    "Apto 1204 e 1205 não atendem",
+    "Chego 19h30, apto 1204",
+    "nº 1520, bloco 3, apto 1204",
+  ])("lets %s through", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
   });
 
-  it.each<[readonly string[], string, ContactKind]>([
-    [["meu numero 98765"], "e 4321", "phone"],
-    [["nove oito sete seis"], "cinco quatro tres dois", "phone"],
-    [["11", "98765"], "4321", "phone"],
-    [["ana arroba gmail"], "ponto com", "email"],
-  ])("finds %j then %s as %s", (recent, draft, kind) => {
-    expect(detectContactInfoAcross(recent, draft, ALL, PT_BR)).toContain(kind);
+  it.each([
+    "R$ 9876 5432",
+    "apto 98765 4321",
+    "19:30 98765 4321",
+    "R$ 98765432",
+    "apto 987654321",
+  ])("does not let a neutral span swallow a phone: %s", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toContain("phone");
   });
 
-  it("still checks the draft alone", () => {
-    expect(detectContactInfoAcross([], "11987654321", ALL, PT_BR)).toEqual(["phone"]);
-    expect(detectContactInfoAcross(["Ok"], "ana@gmail.com", ALL, PT_BR)).toContain("email");
+  it("refuses money with no currency symbol (accepted cost)", () => {
+    expect(detectContactInfo("total 100,00 + 37,90", ["phone"], PT_BR)).toEqual(["phone"]);
   });
 
-  it("checks only the kinds the role blocks", () => {
-    expect(detectContactInfoAcross(["98765"], "4321", ["email"], PT_BR)).toEqual([]);
+  it("ignores neutral patterns when the host passes none", () => {
+    expect(detectContactInfo("Av Paulista, 1578, apto 1204", ["phone"])).toEqual(["phone"]);
+  });
+});
+
+describe("detectContactInfo — bidi overrides, look-alike letters, spaced letters", () => {
+  it("reads a right-to-left override in display order", () => {
+    expect(detectContactInfo("‮moc.liamg@ana", ALL, PT_BR)).toContain("email");
+    expect(detectContactInfo("‮paz", ["handle"], { extraPatterns: [/zap/] })).toEqual(["handle"]);
+    expect(detectContactInfo("oi ⁧moc.liamg@ana⁩ tchau", ["email"], PT_BR)).toEqual(["email"]);
   });
 
-  it("lets a run of ordinary address lines through", () => {
-    const recent = ["Bloco B apto 34", "Número 1520, casa dos fundos", "Chego em 5 min"];
-    expect(detectContactInfoAcross(recent, "Valor deu 25,90", ALL, PT_BR)).toEqual([]);
-    expect(detectContactInfoAcross(["Estou na esquina da rua 7 com a 12"], "Portão azul ao lado do 230", ALL, PT_BR)).toEqual([]);
+  it.each(["‮Cheguei. Tô aqui", "‮apto 1204‬, chego 19:30", "⁧Ok⁩ já vou"])(
+    "adds no refusal for an ordinary line under an override: %s",
+    (text) => {
+      expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
+    },
+  );
+
+  it("folds Cyrillic and Greek look-alikes to Latin", () => {
+    expect(detectContactInfo("ana@gmail.cоm", ["email"], PT_BR)).toEqual(["email"]);
+    expect(detectContactInfo("whаts", ["handle"], { extraPatterns: [/whats/] })).toEqual(["handle"]);
+    expect(detectContactInfo("ΙNSTA", ["handle"], PT_BR)).toEqual(["handle"]);
   });
 
-  it("does not let something already sent poison an innocent draft", () => {
-    expect(detectContactInfoAcross(["ana@gmail.com", "11987654321"], "Cheguei.", ALL, PT_BR)).toEqual([]);
+  it.each(["w h a t s", "w.h.a.t.s", "z-a-p", "me chama no z . a . p"])("joins single letters for the host's patterns: %s", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual(["handle"]);
+  });
+
+  it.each(["faz a pizza", "e a casa", "Vou a pé e já volto"])("does not join ordinary words: %s", (text) => {
+    expect(detectContactInfo(text, ALL, PT_BR)).toEqual([]);
   });
 });

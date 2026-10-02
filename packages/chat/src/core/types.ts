@@ -58,6 +58,20 @@ export type ChatErrorCode =
   | "contact_info"
   | "rate_limited";
 
+/** Every code above, for a client deciding whether a refusal is the package's own. */
+export const CHAT_ERROR_CODES: readonly ChatErrorCode[] = [
+  "unauthenticated",
+  "not_found",
+  "closed",
+  "invalid_body",
+  "empty",
+  "too_long",
+  "free_text_disabled",
+  "unknown_quick_reply",
+  "contact_info",
+  "rate_limited",
+];
+
 /** The body of every refusal. */
 export interface ChatWireError {
   readonly error: ChatErrorCode;

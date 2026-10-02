@@ -129,7 +129,9 @@ function Writing(props: ChatThreadViewProps): JSX.Element {
   }
   const submit = async (): Promise<void> => {
     if (draft.trim() === "" || controls.sending) return;
-    if (await controls.send(draft)) setDraft("");
+    const sent = draft;
+    // Only what was sent is cleared: the field stays live during the send.
+    if (await controls.send(sent)) setDraft((current) => (current === sent ? "" : current));
   };
   return (
     <Stack gap={2}>

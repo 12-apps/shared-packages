@@ -162,6 +162,19 @@ describe('the contact filter, per role', () => {
     );
   });
 
+  it('reads the role\'s own recent free text with a draft, through the real client', async () => {
+    // Free text twice, so the cross-message query (the nullable quick_key
+    // filter and the `orderBy` pair) runs against the generated client.
+    const agent = as(CHAT_PEOPLE.agent);
+    expect((await agent.send({ body: 'On site soon' })).status).toBe(201);
+    expect((await agent.send({ body: '98765' })).status).toBe(201);
+    const split = await agent.send({ body: '4321' });
+    expect(split.status).toBe(422);
+    expect(await split.json()).toEqual({ error: 'contact_info', message: EN_US_CHAT_SERVER_COPY.contactInfo });
+    // An unrelated line after it is not poisoned by the number before it.
+    expect((await agent.send({ body: 'Ringing the bell now' })).status).toBe(201);
+  });
+
   it('lets a role that blocks nothing send the same line', async () => {
     const sent = await as(CHAT_PEOPLE.requester).send({ body: 'Call me on 555 123 4567' });
     expect(sent.status).toBe(201);

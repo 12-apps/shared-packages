@@ -82,6 +82,55 @@ describe("the web thread", () => {
     expect(await screen.findByText("Gate 12")).toBeTruthy();
   });
 
+  it("keeps what is typed while a message is in flight", async () => {
+    const { ChatThread, hold } = mount();
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle);
+
+    const release = hold("POST /messages");
+    type("Gate 12");
+    fireEvent.click(screen.getByTestId("chat-send"));
+    await screen.findByText(EN_US_CHAT_UI_COPY.sending);
+    type("Block B");
+
+    await act(async () => release());
+    expect(await screen.findByText("Gate 12")).toBeTruthy();
+    expect(field().value).toBe("Block B");
+  });
+
+  it("never shows a sentence from a failure that is not the package's own refusal", async () => {
+    const { ChatThread, answer } = mount();
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle);
+
+    answer("POST /messages", replyWith(500, { message: "relation chat_messages does not exist" }));
+    type("Gate 12");
+    fireEvent.click(screen.getByTestId("chat-send"));
+
+    expect(await screen.findByText(EN_US_CHAT_UI_COPY.sendFailed)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(/chat_messages/)).toBeNull());
+  });
+
+  it("survives a host badge callback that throws", async () => {
+    const { ChatThread } = mount();
+    const onUnread = vi.fn(() => {
+      throw new Error("badge store down");
+    });
+    render(<ChatThread endpoint="/thread" onUnreadChange={onUnread} />);
+    expect(await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle)).toBeTruthy();
+    expect(onUnread).toHaveBeenCalled();
+  });
+
+  it("drops a load that answers after the thread was unmounted", async () => {
+    const { ChatThread, hold, harness } = mount();
+    const release = hold("GET /");
+    const view = render(<ChatThread endpoint="/thread" />);
+    await waitFor(() => expect(harness.calls).toContain("GET /"));
+    view.unmount();
+    await act(async () => release());
+    expect(harness.calls).not.toContain("POST /read");
+  });
+
   it("follows the newest message: the list scrolls to its end when one is added", async () => {
     const { ChatThread } = mount();
     render(<ChatThread endpoint="/thread" />);

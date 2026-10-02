@@ -9,7 +9,7 @@
  * adapter surfaces as a load or send failure, never as a crash while drawing.
  */
 
-import type { ChatErrorCode, ChatThreadPayload, ChatWireMessage } from "../core/types";
+import { CHAT_ERROR_CODES, type ChatErrorCode, type ChatThreadPayload, type ChatWireMessage } from "../core/types";
 
 /** The subset of `fetch` this client uses — the platform's own, or a host wrapper. */
 export type ChatFetch = (
@@ -52,13 +52,15 @@ type Shape = Record<string, unknown>;
 
 const isRecord = (value: unknown): value is Shape => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/**
+ * The refusal, when it is the package's own: a known code carries the
+ * host's sentence, which the screen may show. Anything else — a proxy's 502
+ * page, a framework's 500 with an internal `message` — is a bare failure.
+ */
 function errorOf(status: number, body: unknown): ChatClientError {
   const shaped = isRecord(body) ? body : {};
-  return new ChatClientError(
-    status,
-    typeof shaped.error === "string" ? (shaped.error as ChatErrorCode) : null,
-    typeof shaped.message === "string" ? shaped.message : null,
-  );
+  const code = CHAT_ERROR_CODES.find((known) => known === shaped.error) ?? null;
+  return new ChatClientError(status, code, code !== null && typeof shaped.message === "string" ? shaped.message : null);
 }
 
 const malformed = (status: number): ChatClientError => new ChatClientError(status, null, null);

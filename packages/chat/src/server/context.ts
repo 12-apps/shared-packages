@@ -109,7 +109,7 @@ export interface ChatServerConfig<TActor = unknown> {
   /**
    * How much of the author's own recent free text the contact rules read
    * with a draft, so a number split over several messages is still caught.
-   * Defaults to the last 5 messages within 10 minutes.
+   * Defaults to the last 12 messages within 10 minutes.
    */
   contactLookback?: { readonly messages: number; readonly windowMs: number };
   /** How many messages a thread answers with, newest kept. Defaults to 200. */
@@ -158,9 +158,19 @@ const ROLE_RULES: readonly [(role: ChatRoleConfig) => boolean, string][] = [
   [(role) => isPositiveInt(role.rateLimit?.max) && isPositiveInt(role.rateLimit?.windowMs), "rateLimit needs a positive max and windowMs."],
 ];
 
+/**
+ * The longest message a role that blocks contact info may send. The filter
+ * reads the draft with the author's recent text on every send, so its cost
+ * grows with the length; a few thousand characters is no chat message.
+ */
+const MAX_FILTERED_LENGTH = 2000;
+
 function assertRole(key: string, role: ChatRoleConfig): void {
   for (const [holds, message] of ROLE_RULES) {
     if (!holds(role)) throw new ChatConfigError(`roles.${key}.${message}`);
+  }
+  if (role.blockContact.length > 0 && role.maxLength > MAX_FILTERED_LENGTH) {
+    throw new ChatConfigError(`roles.${key}.maxLength may be at most ${MAX_FILTERED_LENGTH} while blockContact is set.`);
   }
   assertQuickReplies(`roles.${key}`, role);
 }

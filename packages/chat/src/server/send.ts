@@ -20,11 +20,25 @@ import { failure, findThread, inBackground, isResponse, openThread, resolve, suc
 import type { ChatResponse } from "./context";
 import type { SlidingWindow } from "./rate";
 
-/** The author's own recent free text the contact rules read with a draft. */
-const DEFAULT_LOOKBACK = { messages: 5, windowMs: 10 * 60_000 } as const;
+/**
+ * The author's own recent free text the contact rules read with a draft —
+ * deep enough that a number trickled one digit per message still fits.
+ */
+const DEFAULT_LOOKBACK = { messages: 12, windowMs: 10 * 60_000 } as const;
 
-/** Format characters (zero-width spaces, joiners, bidi marks) — invisible on their own. */
-const INVISIBLE = /\p{Cf}/gu;
+/**
+ * Characters that draw nothing: format characters (zero-width spaces,
+ * joiners, bidi marks) and the fillers that are letters to Unicode but blank
+ * on screen (Hangul fillers, the braille blank).
+ */
+const INVISIBLE = /[\p{Cf}\u115F\u1160\u2800\u3164\uFFA0]/gu;
+
+/**
+ * Bidi controls, removed before a message is STORED: an override makes the
+ * screen show text in another order than the one the filter read
+ * (`\u202Emoc.liamg@ana` reads as nothing and shows an address).
+ */
+const BIDI_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 
 type Draft = { body: string; quickKey: string | null };
 
@@ -36,9 +50,9 @@ function quickDraftOf(quickReply: unknown, { role, copy }: Resolved): Draft | Ch
 function textDraftOf(text: unknown, { role, copy }: Resolved): Draft | ChatResponse {
   if (typeof text !== "string") return failure(422, "invalid_body", copy.invalidBody);
   if (!role.freeText) return failure(422, "free_text_disabled", copy.freeTextDisabled);
-  const trimmed = text.trim();
-  // Stored as typed (an emoji's joiners are format characters too), but a
-  // message of nothing BUT invisible characters is an empty bubble.
+  const trimmed = text.replace(BIDI_CONTROLS, "").trim();
+  // Stored otherwise as typed (an emoji's joiners are format characters too),
+  // but a message of nothing BUT invisible characters is an empty bubble.
   if (trimmed.replace(INVISIBLE, "").trim() === "") return failure(422, "empty", copy.empty);
   if (trimmed.length > role.maxLength) return failure(422, "too_long", copy.tooLong.replace("{max}", String(role.maxLength)));
   return { body: trimmed, quickKey: null };
@@ -118,8 +132,11 @@ function rateKeyOf(access: ChatAccess): string {
   return JSON.stringify([access.tenantId, access.threadKey, access.role, access.authorId]);
 }
 
-async function commit<TActor>(config: ChatServerConfig<TActor>, db: ChatDb, draft: Draft, resolved: Resolved, now: Date): Promise<ChatResponse> {
+async function commit<TActor>(config: ChatServerConfig<TActor>, db: ChatDb, draft: Draft, resolved: Resolved): Promise<ChatResponse> {
   const { access, role } = resolved;
+  // Stamped at the insert, not at the request: a message must not carry an
+  // earlier time than one a reader has already seen (and marked read up to).
+  const now = (config.clock ?? (() => new Date()))();
   const thread = await openThread(db, access);
   const row = await db.chatMessage.create({
     data: {
@@ -137,8 +154,28 @@ async function commit<TActor>(config: ChatServerConfig<TActor>, db: ChatDb, draf
   return success(201, { message: wireMessage(config, row, resolved) });
 }
 
+/**
+ * One author's sends to one thread run one at a time, in this process, so
+ * each is checked against the ones before it — parallel requests cannot all
+ * pass the cross-message rule against each other's absence. Several
+ * processes can still interleave; the rule is a deterrent, not a lock.
+ */
+function serialised(): (key: string, run: () => Promise<ChatResponse>) => Promise<ChatResponse> {
+  const tails = new Map<string, Promise<unknown>>();
+  return (key, run) => {
+    const result = (tails.get(key) ?? Promise.resolve()).then(run, run);
+    const tail = result.catch(() => undefined);
+    tails.set(key, tail);
+    void tail.then(() => {
+      if (tails.get(key) === tail) tails.delete(key);
+    });
+    return result;
+  };
+}
+
 export function sendRoute<TActor>(config: ChatServerConfig<TActor>, limiter: SlidingWindow): ChatRoute<TActor> {
   const clock = config.clock ?? (() => new Date());
+  const inTurn = serialised();
   return {
     method: "POST",
     path: "/messages",
@@ -154,9 +191,11 @@ export function sendRoute<TActor>(config: ChatServerConfig<TActor>, limiter: Sli
         return failure(429, "rate_limited", copy.rateLimited);
       }
       const db = await config.db();
-      const kinds = await contactIn(config, db, draft, resolved, now);
-      if (kinds.length > 0) return refuseContact(config, resolved, kinds);
-      return commit(config, db, draft, resolved, now);
+      return inTurn(rateKeyOf(access), async () => {
+        const kinds = await contactIn(config, db, draft, resolved, now);
+        if (kinds.length > 0) return refuseContact(config, resolved, kinds);
+        return commit(config, db, draft, resolved);
+      });
     },
   };
 }

@@ -73,15 +73,31 @@ never creates a thread row; the first message does.
 
 ### The contact filter
 
-It reads the text after Unicode normalisation (full-width and other-script
-digits, invisible characters, spelled-out digits from the host's
-`contactVocabulary`). It also reads the draft joined to the same author's
-recent free text (`contactLookback`, default the last 5 messages within 10
-minutes), so a number split over several messages is still one number.
+It reads the text after Unicode normalisation: full-width and other-script
+digits, invisible characters, look-alike Cyrillic and Greek letters, a
+bidi-reversed run, and spelled-out digits from the host's
+`contactVocabulary`. A phone number is 8 digits within any 16 characters,
+whatever separates them. Clock times, amounts after a currency symbol, and
+spans matching the host's `neutralPatterns` (address units like
+`apto 1204`, at most 5 digits each) are set aside first, so an address with
+an apartment number passes. A CEP or a full date is refused; that is the
+documented price.
+
+Across messages it reads only a contiguous chain: the same author's recent
+free text (`contactLookback`, default the last 12 messages within 10
+minutes) joins the draft while each message ends where the next begins with
+a digit, a dot or an at-sign. A number trickled one digit per message is
+one number; `Apto 1204` followed by `Chego 19:30` is two lines. One author's
+sends to a thread are checked one at a time, so parallel requests cannot
+pass the rule against each other's absence. Bidi controls are removed
+before a message is stored, so the screen shows what the filter read.
+
 Every attempt spends a rate-limit slot, including a refused one, so probing
 the filter runs out of attempts. It is a deterrent, not a guarantee: a
 person determined to pass a number can always find an encoding no filter
-reads, and `onRefused` is how the host sees who keeps trying.
+reads (a word between every pair of digits, a picture), and `onRefused` is
+how the host sees who keeps trying. A host that wants `arroba` to count
+toward a social handle adds it to `extraPatterns`.
 
 ### Retention
 

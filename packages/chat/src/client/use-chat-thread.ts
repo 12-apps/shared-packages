@@ -126,6 +126,15 @@ function useLatest<T>(value: T): { readonly current: T } {
   return ref;
 }
 
+/** Tell the host the unread count; its callback throwing must not reject a load nobody awaits. */
+function report(onUnread: { readonly current?: (unread: number) => void }, unread: number): void {
+  try {
+    onUnread.current?.(unread);
+  } catch {
+    // The host's badge failed to update; the thread itself is fine.
+  }
+}
+
 /** The state, owned by the client it was loaded through; `update` ignores a client the hook has left. */
 function useOwnedState(client: ChatClient): { state: OwnedState; update: Update; latest: { readonly current: ChatClient } } {
   const [state, setState] = useState<OwnedState>(() => fresh(client));
@@ -154,7 +163,7 @@ function useLoader(options: UseChatThreadOptions, update: Update): () => Promise
       const upTo = payload.messages.at(-1)?.createdAt;
       if (!autoMarkRead.current || payload.unread === 0 || upTo === undefined) return;
       const left = await client.markRead(upTo).catch(() => null);
-      if (left !== null && isCurrent()) onUnread.current?.(left);
+      if (left !== null && isCurrent()) report(onUnread, left);
     },
     [client, autoMarkRead, onUnread],
   );
@@ -171,7 +180,7 @@ function useLoader(options: UseChatThreadOptions, update: Update): () => Promise
     }
     if (!isCurrent()) return;
     update(client, (previous) => afterLoad(previous, payload));
-    onUnread.current?.(payload.unread);
+    report(onUnread, payload.unread);
     await markShown(payload, isCurrent);
   }, [client, update, markShown, onUnread]);
 
