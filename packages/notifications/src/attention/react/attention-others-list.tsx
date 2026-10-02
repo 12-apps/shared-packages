@@ -63,7 +63,19 @@ export function AttentionOthersList({
       transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       dataTestId="attention-others-list"
     >
-      <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 260, maxWidth: 320 }}>
+      <Box
+        sx={{
+          p: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          // Never wider than the screen less the popover's 16px margins: at
+          // 320px a fixed 260–320 ran 9px off the left edge.
+          minWidth: 'min(260px, calc(100vw - 32px))',
+          maxWidth: 'min(320px, calc(100vw - 32px))',
+          boxSizing: 'border-box',
+        }}
+      >
         <Text variant="body" size="sm" weight="bold" as="span">
           {messages.othersTitle}
         </Text>
