@@ -131,6 +131,7 @@ async function toBuyerLink(
     googlePay: entry.googlePay,
     customerSchema: [...entry.customerSchema],
     checkoutScreen: entry.checkoutScreen,
+    confirmation: entry.confirmation,
   };
 }
 
@@ -138,11 +139,15 @@ async function toBuyerLink(
 export async function buyerCheckoutConfig(
   deps: CheckoutConfigDeps,
   merchant: MerchantRef,
+  options: { confirmation?: 'AUTOMATIC' } = {},
 ): Promise<BuyerCheckoutConfig> {
-  const entries = await deps.gateway.clientConfigChain(merchant);
+  const all = await deps.gateway.clientConfigChain(merchant);
   // `clientConfigChain` is already the plan-limited, priority-ordered list.
-  // Nothing here sorts, filters or reinterprets it: the order is the merchant's
-  // decision and the storefront is a reader of it.
+  // Nothing here sorts or reinterprets it: the order is the merchant's decision
+  // and the storefront is a reader of it. The one filter is the caller's
+  // (`ChargeOptions.confirmation`): a lane nobody watches leaves out the
+  // providers only a person can confirm, exactly as its charge walk will.
+  const entries = options.confirmation === 'AUTOMATIC' ? all.filter((entry) => entry.confirmation !== 'MANUAL') : all;
   const chain = await Promise.all(entries.map((entry) => toBuyerLink(deps, merchant, entry)));
   const head = chain[0];
   if (!head) return NO_PROVIDER;

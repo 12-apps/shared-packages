@@ -2,6 +2,7 @@ import type { PaymentsRouteParams } from '../http/route-table';
 
 import type {
   CardDetails,
+  ChargeConfirmation,
   ClientTokenization,
   CustomerInfo,
   CustomerSchema,
@@ -141,6 +142,8 @@ export interface BuyerProviderLink {
    * so the client never infers the chain's screens from the head's.
    */
   checkoutScreen: string | null;
+  /** `MANUAL` when the store confirms this entry's charges by hand (`ClientProviderConfig.confirmation`). */
+  confirmation?: ChargeConfirmation;
 }
 
 /** The client-safe protocol read. Nothing in it is secret. */

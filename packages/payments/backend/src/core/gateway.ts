@@ -1,4 +1,5 @@
 import { cancelChargeAt } from './charge-cancel';
+import { isManualConfirmation, manualChargeMethods, refreshManualCharge, type ManualChargeMethods } from './manual-charge';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
 import {
@@ -138,9 +139,15 @@ export interface ChargeOptions<P extends string = string> {
   provider?: P;
   /** Override the gateway-wide decline-cascading policy for one charge. */
   failoverPolicy?: FailoverPolicy;
+  /**
+   * `AUTOMATIC` leaves out every provider whose charges only the store can
+   * confirm (`ProviderCapabilities.confirmation: 'MANUAL'`) — for a lane where
+   * nobody is there to press "Confirmar". Absent: the whole chain.
+   */
+  confirmation?: 'AUTOMATIC';
 }
 
-export interface PaymentsGateway<P extends string = string> {
+export interface PaymentsGateway<P extends string = string> extends ManualChargeMethods<P> {
   /**
    * Create a charge, walking the merchant's provider chain until one
    * succeeds. Throws `AmbiguousChargeError` when a provider's outcome cannot
@@ -275,6 +282,8 @@ async function refreshOneCharge<P extends string>(
   hints?: SettlementHints,
 ): Promise<ChargeSnapshot> {
   const { adapter, creds } = await resolve(merchant, provider);
+  // A store-confirmed charge is read, never re-asked: see `manual-charge.ts`.
+  if (isManualConfirmation(adapter)) return refreshManualCharge(config.charges, merchant, provider, providerChargeId);
   const stored = await config.charges.findByProviderChargeId(provider, providerChargeId);
   const merged = { ...stored?.snapshot.settlementHints, ...hints };
   const snapshot = await adapter.getCharge(providerChargeId, creds, merged);
@@ -291,6 +300,15 @@ function walkDepsOf<P extends string>(config: PaymentsGatewayConfig<P>): ChargeW
     failoverPolicy: config.failoverPolicy ?? 'TECHNICAL',
     failoverPolicyFor: config.failoverPolicyFor,
     health: config.health,
+  };
+}
+
+/** What the store-confirmed charge decisions need from the gateway's config. */
+function manualDepsOf<P extends string>(config: PaymentsGatewayConfig<P>) {
+  return {
+    charges: config.charges,
+    onWebhookEvent: config.onWebhookEvent,
+    adapterOf: (name: string) => config.providers.get(name),
   };
 }
 
@@ -323,6 +341,7 @@ export function createPaymentsGateway<P extends string>(
       refreshOneCharge(config, resolve, merchant, provider, chargeId, hints),
 
     cancelCharge: cancelChargeAt(config.charges, resolve),
+    ...manualChargeMethods<P>(manualDepsOf(config)),
     async refund(merchant, provider, input) {
       const { adapter, creds } = await resolve(merchant, provider);
       if (!adapter.capabilities.refunds || !adapter.refund) {

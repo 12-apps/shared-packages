@@ -194,6 +194,8 @@ export interface CredentialFormCopy {
   configuredKeepBlank: string;
   /** The suffix on an `advanced` field most stores must leave empty. */
   advancedSuffix: string;
+  /** The suffix on an `optional` field: blank keeps its default. */
+  optionalSuffix: string;
   probeAction: string;
   /**
    * What replacing a PROVEN connection's credentials costs.

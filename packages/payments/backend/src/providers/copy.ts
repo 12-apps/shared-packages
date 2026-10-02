@@ -4,6 +4,7 @@ import type {
   StoneSetupGuideCopy,
   StripeSetupGuideCopy,
 } from './setup-guide-copy';
+import type { PixManualCopy } from './pix-manual/copy';
 
 /**
  * Every owner-facing sentence the built-in adapters can produce, as ports
@@ -256,6 +257,7 @@ export interface ProviderCopyPacks {
   infinitepay: InfinitePayCopy;
   stripe: StripeCopy;
   itau: ItauCopy;
+  pixmanual: PixManualCopy;
 }
 
 /**

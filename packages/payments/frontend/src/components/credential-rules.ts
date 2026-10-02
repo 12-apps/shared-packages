@@ -49,7 +49,7 @@ export function credentialsComplete(
 ): boolean {
   const stored = config?.environments[environment] ?? {};
   return descriptor.credentialSchema.every((spec) => {
-    if (spec.advanced || !appliesIn(spec, environment)) return true;
+    if (spec.advanced || spec.optional || !appliesIn(spec, environment)) return true;
     const typed = values[spec.key];
     if (typed !== undefined && typed.trim() !== '') return true;
     return stored[spec.key]?.configured === true;

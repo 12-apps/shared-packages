@@ -119,6 +119,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
   credentials: {
     configuredKeepBlank: 'Configurado — deixe em branco para manter o valor atual.',
     advancedSuffix: ' · só para plataformas Connect',
+    optionalSuffix: ' · opcional',
     probeAction: 'Testar conexão',
     reverifyWarning: (displayName) =>
       `Esta loja já está verificada. Trocar as credenciais **exige uma nova verificação** ` +

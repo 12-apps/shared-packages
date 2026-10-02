@@ -1,6 +1,7 @@
 import type { CustomerSchema } from './customer-schema';
 import type { PaymentProviderAdapter } from './provider';
 import type {
+  ChargeConfirmation,
   ChargeSnapshot,
   ChargeStatus,
   ClientTokenization,
@@ -148,6 +149,12 @@ export interface ClientProviderConfig {
    * provider silently losing its own screen.
    */
   checkoutScreen: string | null;
+  /**
+   * Who confirms this provider's charges were paid — `MANUAL` only for a
+   * provider the store settles by hand (the store's own Pix key), so a buyer's
+   * screen waits for a person and a lane nobody watches can leave it out.
+   */
+  confirmation?: ChargeConfirmation;
 }
 
 /** Build the published config for one adapter — see {@link ClientProviderConfig}. */
@@ -164,5 +171,6 @@ export function toClientProviderConfig(
     wallets: adapter.capabilities.wallets ?? [],
     googlePay: config.googlePay ?? null,
     checkoutScreen: adapter.checkoutScreen ?? null,
+    confirmation: adapter.capabilities.confirmation ?? 'AUTOMATIC',
   };
 }

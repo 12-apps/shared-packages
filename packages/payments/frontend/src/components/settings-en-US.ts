@@ -131,6 +131,7 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     configuredKeepBlank: 'Configured — leave blank to keep the current value.',
     // Leading space: it is appended to a field label.
     advancedSuffix: ' · Connect platforms only',
+    optionalSuffix: ' · optional',
     probeAction: 'Test connection',
     reverifyWarning: (displayName) =>
       `This store is already verified. Changing the credentials **requires re-verification** ` +

@@ -3,6 +3,7 @@ import type {
   ChargeQueryStore,
   ChargeStore,
   PayableChargeQuery,
+  PendingTransition,
   StoredCharge,
 } from '../core/ports';
 import { attemptReferencePrefix } from '../core/reference';
@@ -96,6 +97,11 @@ export interface ChargeDelegate {
       providerChargeId: string;
     };
   }): Promise<ChargeRow>;
+  /** The conditional write behind `transitionPending`: Prisma answers how many rows matched. */
+  updateMany(args: {
+    where: { id: string; status: string };
+    data: { snapshot: unknown; status: string; amountCents: number; method: string; providerChargeId: string };
+  }): Promise<{ count: number }>;
 }
 
 function rowToStoredCharge(row: ChargeRow): StoredCharge {
@@ -285,9 +291,7 @@ export function createPrismaChargeStore(
         });
         return rowToStoredCharge(row);
       } catch (error) {
-        // Unique-violation → someone else won the race; return their row IF
-        // it is ours (idempotency), throw if the charge id belongs to
-        // another merchant.
+        // Unique-violation: return the winner's row IF ours, else throw (another merchant's id).
         if (idempotencyKey) {
           const winner = await this.findByIdempotencyKey(merchant, idempotencyKey);
           if (winner) return winner;
@@ -310,7 +314,6 @@ export function createPrismaChargeStore(
       }
     },
     async upsertByProviderChargeId(merchant, snapshot) {
-      // By charge id, or by the order-id hint — see `storedRowFor` (FUT-681).
       const existing = await storedRowFor(this, snapshot);
       if (!existing) return null;
       if (existing.merchant.kind !== merchant.kind || existing.merchant.id !== merchant.id) return null;
@@ -321,5 +324,31 @@ export function createPrismaChargeStore(
       });
       return rowToStoredCharge(row);
     },
+    transitionPending(merchant, snapshot) {
+      return transitionPendingRow(delegate, this, merchant, snapshot);
+    },
   };
+}
+
+/**
+ * `ChargeStore.transitionPending` over Prisma — outside the factory for its
+ * function-length gate. ONE statement checks and writes: the status in the
+ * WHERE is what makes two concurrent staff taps resolve to exactly one winner.
+ */
+async function transitionPendingRow(
+  delegate: ChargeDelegate,
+  store: Pick<ChargeStore, 'findByProviderChargeId'>,
+  merchant: MerchantRef,
+  snapshot: ChargeSnapshot,
+): Promise<PendingTransition> {
+  const existing = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
+  if (!existing || existing.merchant.kind !== merchant.kind || existing.merchant.id !== merchant.id) {
+    return { applied: false, stored: null };
+  }
+  const { count } = await delegate.updateMany({
+    where: { id: existing.id, status: 'PENDING' },
+    data: refreshedRow(existing.snapshot, snapshot),
+  });
+  const stored = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
+  return { applied: count === 1, stored };
 }

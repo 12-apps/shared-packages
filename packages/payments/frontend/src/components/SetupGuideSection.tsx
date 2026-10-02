@@ -186,12 +186,15 @@ export function SetupGuideSection({
   // have to render: they are the credential form, and swallowing them left a
   // provider with a status chip, a pair of environment tabs and no way to type
   // anything in.
+  // They take the card's 20px inset themselves, as every block in its
+  // unpadded body does (`ProviderCard`) — a guide's step panel carries it for
+  // them, and without one the boxes ran into the card's edges.
   if (!guide) {
     return (
-      <>
+      <Box data-testid="payments-setup-unguided" sx={{ px: '20px' }}>
         {rows}
         {sectionFooter}
-      </>
+      </Box>
     );
   }
 

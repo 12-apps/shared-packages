@@ -62,6 +62,7 @@ export interface ChargeRaiseGateway {
   charge(
     merchant: MerchantRef,
     input: ChargeInput,
+    options?: { confirmation?: 'AUTOMATIC' },
   ): Promise<{ reference: string; idempotencyKey: string | null; snapshot: ChargeSnapshot }>;
   cancelCharge(
     merchant: MerchantRef,
@@ -113,6 +114,11 @@ export interface RaiseChargeRequest {
    * applies its own default.
    */
   locale?: string;
+  /**
+   * `AUTOMATIC` keeps the walk off providers only the store can confirm
+   * (`ChargeOptions.confirmation`) — a lane where nobody can press "Confirmar".
+   */
+  confirmation?: 'AUTOMATIC';
 }
 
 /** A still-payable charge left behind by a reprice. */
@@ -225,7 +231,7 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);
     const idempotencyKey = attemptIdempotencyKey(request.reference, attempt);
-    const stored = await deps.gateway.charge(request.merchant, {
+    const input: ChargeInput = {
       // PER ATTEMPT, not per reference: a provider that dedupes on the
       // reference hands every later attempt the charge it minted for the
       // first, which then collides with that first attempt's stored row.
@@ -236,7 +242,10 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
       card: attributedCard(request.card),
       idempotencyKey,
       locale: request.locale,
-    });
+    };
+    const stored = request.confirmation
+      ? await deps.gateway.charge(request.merchant, input, { confirmation: request.confirmation })
+      : await deps.gateway.charge(request.merchant, input);
 
     const mismatch = chargeIdentityMismatch(stored, {
       reference: request.reference,

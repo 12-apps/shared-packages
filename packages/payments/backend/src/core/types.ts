@@ -301,7 +301,26 @@ export interface ProviderCapabilities {
    * accidentally held to a proof it has no means of producing.
    */
   activationCharge?: boolean;
+  /**
+   * Who says a charge was paid. Absent (every acquirer) means the PROVIDER
+   * does, by webhook or poll. `MANUAL` (the store's own Pix key) means only the
+   * store does, through `gateway.confirmManualCharge` — so the buyer's screen
+   * waits for a person, and a lane nobody watches can skip it
+   * (`ChargeOptions.confirmation`).
+   */
+  confirmation?: ChargeConfirmation;
+  /**
+   * The environments this provider HAS. Absent: both. A provider with no
+   * sandbox at all (the store's own Pix key: every code is real money)
+   * declares `['PRODUCTION']`, so the settings screen offers no "test
+   * environment" that would promise no money moves, and a save into an
+   * environment it does not have is refused.
+   */
+  environments?: readonly PaymentEnvironment[];
 }
+
+/** Who confirms a charge was paid — see `ProviderCapabilities.confirmation`. */
+export type ChargeConfirmation = 'AUTOMATIC' | 'MANUAL';
 
 /**
  * A resolved credential set for one (merchant, provider, environment). The
