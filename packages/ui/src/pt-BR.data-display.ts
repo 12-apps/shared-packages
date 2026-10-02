@@ -174,6 +174,10 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     formats: {
       json: { label: "JSON (.json)", hint: "Para integrações" },
     },
+    scopeLine: (selectedCount, totalCount) =>
+      selectedCount > 0
+        ? `Exportando ${selectedCount} ${selectedCount === 1 ? "item selecionado" : "itens selecionados"}`
+        : `Exportando ${totalCount} ${totalCount === 1 ? "item filtrado" : "itens filtrados"}`,
     visibleColumns: (columnCount) => `${columnCount} colunas visíveis, na ordem atual`,
     trigger: "Exportar",
     triggerLabel: "Exportar",

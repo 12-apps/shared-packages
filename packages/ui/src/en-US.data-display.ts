@@ -177,6 +177,10 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
       // disk in every language.
       json: { label: "JSON (.json)", hint: "For integrations" },
     },
+    scopeLine: (selectedCount, totalCount) =>
+      selectedCount > 0
+        ? `Exporting ${selectedCount} selected ${selectedCount === 1 ? "item" : "items"}`
+        : `Exporting ${totalCount} filtered ${totalCount === 1 ? "item" : "items"}`,
     visibleColumns: (columnCount) => `${columnCount} visible columns, in their current order`,
     trigger: "Export",
     triggerLabel: "Export",

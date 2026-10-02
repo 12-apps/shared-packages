@@ -132,6 +132,13 @@ export interface DataViewsDisplayCopy {
 export interface DataViewsExportCopy {
   /** Format labels and hints, keyed by format id. */
   formats: Readonly<Record<string, { label: string; hint: string }>>;
+  /**
+   * The panel's first line: what the export will contain. The selection when
+   * there is one (`selectedCount > 0`), otherwise every row the filters leave
+   * (`totalCount`). The whole line, verb included — it was a pt-BR literal, so
+   * an en-US host read "Exportando 3 itens selecionados".
+   */
+  scopeLine(selectedCount: number, totalCount: number): string;
   visibleColumns(columnCount: number): string;
   /** The control that opens the menu. */
   trigger: string;

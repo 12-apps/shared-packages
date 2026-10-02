@@ -31,7 +31,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
  */
 const CHECKBOX_PAD = sxRem(-9);
 
-/** The grip. Its gutter is reserved only when the list says to reserve it. */
+/** The grip. Inside a group its slot always renders, empty when unused. */
 export function DragSlot({
   drag,
   reserve,
@@ -60,7 +60,7 @@ export function DragSlot({
   );
 }
 
-/** The select checkbox. Its gutter is reserved only when the list says to. */
+/** The select checkbox. Inside a group its slot always renders, empty when unused. */
 export function SelectSlot({
   selectable,
   selected,
