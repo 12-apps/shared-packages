@@ -22,9 +22,14 @@ library updates, every host updates with **no app changes**. Same contract
 
 1. **The host answers WHO; the package answers WHAT THEY MAY HAVE.**
    `resolveSession` reads the host's cookie session and returns
-   `{ subject, email }` — or `null`, which redirects the caller into the host's
+   `{ subject, email, sessionBinding }` — or `null`, which redirects the caller into the host's
    sign-in flow with a callback back to the authorize URL. **Identity never comes
    from a query parameter**, so a client cannot name the user it wants a token for.
+   Interactive consent requires `sessionBinding` to be a stable per-login nonce;
+   `@12-apps/auth` supplies `session.loginSessionId`. Cookie ciphertext, `iat`
+   and `jti` change during renewal and cannot serve as that binding. Legacy
+   sessions without a nonce must sign in again only when starting a new consent
+   flow; ordinary refresh-token recovery does not require that browser session.
 2. **Mount at the origin root.** Two of the six paths are `.well-known` documents
    and a connector reads them from the origin, not from a prefix — the descriptors
    therefore carry absolute paths. `paths` moves any of them, and the RFC 8414
@@ -119,21 +124,23 @@ library updates, every host updates with **no app changes**. Same contract
    `trustedOrigins` never trusts a forwarded host. An in-process default would be
    the only one that fails OPEN, on the very topology a reusable package exists for.
    Scaling out must not be able to weaken the guard by silence.
-9. **`authorize` has NO consent screen, so it refuses clients nobody approved.**
-   Registration is open whenever `enabled` is true (RFC 7591), and a cookie session
-   proves who is asking, never that they AGREED. Without a gate the chain is one
-   click: an attacker registers a client carrying their own `redirect_uris` and
-   their own `scope`, sends a signed-in admin a link to `authorize`, and the
-   endpoint mints them a code — and the two guards that look like they would stop
-   it, exact redirect-URI matching and the per-client scope ceiling, are both
-   checked against the ATTACKER'S OWN registration. So:
+9. **Interactive consent requires the host's screen and a shared replay store.**
+   Configure `consent: { path, replay, requireClientApproval: true }` to keep
+   existing client eligibility rules and require a human decision. `authorize`
+   validates the request and sends the browser to that same-origin screen with a
+   five-minute, session-bound ticket; it does not issue a code. The screen reads
+   `handlers.consentDetails` and posts an explicit approve/deny decision to
+   `handlers.consentDecision`. Only a valid, single-use approval mints a code.
+   The replay store must retain atomic claims for the full ticket lifetime.
+   See [Interactive OAuth consent and live revocation](./README.md#interactive-oauth-consent-and-live-revocation)
+   for the UI and error-path contract.
 
-   - pass **`resolveApproval(request, client, scopes)`** — your approval screen or
-     policy; returning `false` gives the caller `access_denied`;
-   - or list first-party client ids in **`preApprovedClientIds`** if you register
-     your own clients and have no screen to show;
-   - with neither, every dynamically registered client is refused. That is the
-     default, and it is deliberately the inconvenient one.
+   Without `consent`, the existing `resolveApproval(request, client, scopes)` /
+   `preApprovedClientIds` policy still applies, and with neither every dynamic
+   client is refused. A cookie session proves identity, not consent. With
+   `consent.requireClientApproval: true`, preapproval is only eligibility and
+   cannot skip the human decision; without the flag, consent replaces the legacy
+   approval seam. Preserve a host's existing restrictions explicitly on adoption.
 10. **Connections are per USER, not per tenant** — an MCP bearer is
     auth-passthrough. `connections.resolveUserId(email)` maps the token's email to
     the host's user id (the origin host resolves it by email because `session.user.id` is
@@ -148,9 +155,14 @@ library updates, every host updates with **no app changes**. Same contract
     and the card lights green on the next grant. Since 12-48 the rule IS a
     function: `disconnectAiHost(stores, { userId, email }, host)` does both and
     reports what it ended, so a host cannot import one half without the other.
-    Neither half invalidates an outstanding ACCESS token: those are
-    self-contained JWTs, so a disconnected host keeps working for at most their
-    15-minute TTL and can then obtain nothing further.
+    Enable `isAccessTokenActive: binding =>
+    isRefreshBindingActive(stores.refreshTokens, binding)` for immediate access
+    revocation. It checks the token's exact refresh lineage on every request;
+    reconnecting cannot revive old access. Without this hook, self-contained
+    JWTs remain valid until their expiry. Prisma stores atomically revoke both
+    halves with Serializable retries; custom stores should implement the atomic
+    `connections.disconnect` and `refreshTokens.revokeLineage` ports. Apply the
+    additive `rotated_from` index migration alongside the package pin.
 12. **These bodies are NOT the `{ data }` envelope.** A 302 with a `Location`, RFC
     6749 §5.1/§5.2 JSON, an RFC 8414/9728 document — every shape here is fixed by
     specification, and `Cache-Control: no-store` is on every credential-bearing
@@ -170,7 +182,7 @@ library updates, every host updates with **no app changes**. Same contract
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `stores` | yes | — | `clients` + `refreshTokens` (+ optional `connections`) |
-| `resolveSession` | yes | — | `{ subject, email }` or `null` → sign-in redirect |
+| `resolveSession` | yes | — | Cookie-only `{ subject, email, sessionBinding }` or `null` → sign-in redirect; binding required for interactive consent |
 | `enabled` | no | `true` | `false` ⇒ 404 everywhere, 403 on register |
 | `signingKey` | no | env provider | `null` ⇒ mints nothing, JWKS 503 |
 | `trustedOrigins` | no | `[]` (never trust a forwarded host) | REQUIRED behind a proxy |
@@ -184,6 +196,8 @@ library updates, every host updates with **no app changes**. Same contract
 | `codeReplay` | **yes** | — (no default, on purpose) | a shared atomic store, or `'in-process'` to acknowledge one pod — rule 8 |
 | `resolveApproval` | no | refuse unapproved clients | the consent seam — rule 9 |
 | `preApprovedClientIds` | no | `[]` | first-party client ids exempt from the approval gate — rule 9 |
+| `consent` | no | legacy approval policy | Same-origin UI path, atomic replay store and optional existing-client eligibility ceiling — rule 9 |
+| `isAccessTokenActive` | no | no live revocation check | Use `isRefreshBindingActive` for immediate lineage-bound access revocation — rule 11 |
 | `connections` | no | — | `resolveUserId`, `providerRules`, `activityThrottleMs` |
 
 ## The endpoints
@@ -193,7 +207,9 @@ library updates, every host updates with **no app changes**. Same contract
 | GET | `/.well-known/oauth-authorization-server` | RFC 8414 metadata, built from the resolved paths |
 | GET | `/.well-known/oauth-protected-resource` | RFC 9728 metadata (same origin + scope source) |
 | GET | `/.well-known/jwks.json` | the public JWK (503 while unprovisioned), `max-age=300` |
-| GET | `/api/oauth/authorize` | 302 with `code` + `state`; a plain 400 when the client/`redirect_uri` is unregistered — **never** an error redirect to an unvalidated URI |
+| GET | `/api/oauth/authorize` | With consent: 302 to the host UI with a session-bound ticket; otherwise the legacy approval policy. Unregistered callbacks never receive an error redirect. |
+| GET | `/api/oauth/consent` | When consent is configured: verified account, client, callback, scopes and expiry for the host UI; no code |
+| POST | `/api/oauth/consent` | When consent is configured: same-origin JSON approve/deny; consumes the ticket once and returns a validated redirect URL |
 | POST | `/api/oauth/token` | `authorization_code` (single-use, PKCE-verified, bound `redirect_uri`) and `refresh_token` (rotated, client-bound, narrow-only scope) |
 | POST | `/api/oauth/register` | 201 RFC 7591 client information; the secret exactly once, hashed at rest |
 

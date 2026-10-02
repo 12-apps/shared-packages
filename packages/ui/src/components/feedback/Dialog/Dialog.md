@@ -26,7 +26,7 @@ The Dialog component provides a powerful, flexible modal dialog system with mult
 |------|------|---------|-------------|
 | `open` | `boolean` | (required) | Controls dialog visibility |
 | `onClose` | `() => void` | `undefined` | Callback when dialog is closed |
-| `variant` | `'default' \| 'glass' \| 'fullscreen' \| 'drawer'` | `'default'` | Visual style variant of the dialog |
+| `variant` | `'default' \| 'glass' \| 'fullscreen' \| 'drawer' \| 'bottom-sheet'` | `'default'` | Visual style variant of the dialog |
 | `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Dialog size (xs: 400px, sm: 600px, md: 800px, lg: 1000px, xl: 1200px) |
 | `title` | `ReactNode` | `undefined` | Dialog title content |
 | `description` | `string` | `undefined` | Dialog subtitle/description text |
@@ -584,3 +584,27 @@ slot behaviour, make it a direct child.
 - **Modal** - Lower-level modal component
 - **Popover** - Lightweight overlay for contextual content
 - **Sheet** - Bottom sheet component for mobile-first experiences
+
+## Bottom-anchored confirmation surface
+
+`variant="bottom-sheet"` uses the default dialog paper at the bottom of the
+viewport. Its height follows the content, its width remains capped by `size`,
+and its margins and all four corners continue to use the theme. This is an
+inset modal surface, not a draggable sheet; no swipe-to-dismiss is implied.
+It retains the existing native Modal inset behavior; this variant does not add
+a separate safe-area provider or change platform system-bar settings.
+
+It shares the existing modal lifecycle, focus handling, backdrop/Escape or
+native Back dismissal, `persistent`, title, content and action slots. Native
+keyboard overlap lifts the bottom edge by the same amount as other inset
+dialogs, keeping the body scrollable and action slot visible. Put vertically
+stacked full-width actions in shared layout components inside `DialogContent`
+or `DialogActions`; the variant does not reorder or resize caller actions.
+
+```tsx
+<Dialog open={open} variant="bottom-sheet" size="xs" title="End session?"
+  showCloseButton={false} onClose={onClose}>
+  <DialogContent>Save the completed work before leaving.</DialogContent>
+  <DialogActions>{actions}</DialogActions>
+</Dialog>
+```

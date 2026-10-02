@@ -27,6 +27,8 @@ type SelectionClusterProps = Pick<
   ContentToolbarProps,
   | 'hasSelection'
   | 'selectedCount'
+  | 'selectedCountLabel'
+  | 'allSelected'
   | 'selectAll'
   | 'clearSelection'
   | 'actions'
@@ -39,10 +41,42 @@ type SelectionClusterProps = Pick<
   | 'clearAllText'
 >;
 
+/**
+ * The phone's select-all box. Checked only when everything is ticked and
+ * partial while some is, when the host says which (`allSelected`) — the same
+ * reading as the table's header checkbox. A partial box selects the rest, as
+ * the header does; a full one clears.
+ */
+function SelectAllBox({
+  hasSelection,
+  allSelected,
+  selectAll,
+  clearSelection,
+  selectAllTestId,
+  selectAllLabel,
+}: Pick<
+  ContentToolbarProps,
+  'hasSelection' | 'allSelected' | 'selectAll' | 'clearSelection' | 'selectAllTestId' | 'selectAllLabel'
+>): React.JSX.Element {
+  return (
+    <Checkbox
+      size="small"
+      checked={allSelected ?? hasSelection}
+      indeterminate={hasSelection && allSelected === false}
+      onChange={() => (hasSelection && allSelected !== false ? clearSelection() : selectAll())}
+      data-testid={`${selectAllTestId}-checkbox`}
+      inputProps={{ 'aria-label': selectAllLabel }}
+      sx={{ p: 0.5, display: { xs: 'inline-flex', md: 'none' } }}
+    />
+  );
+}
+
 /** The left cluster: Select All + (when selecting) Clear All / count / actions. */
 function SelectionCluster({
   hasSelection,
+  allSelected,
   selectedCount,
+  selectedCountLabel,
   selectAll,
   clearSelection,
   actions,
@@ -95,17 +129,18 @@ function SelectionCluster({
       >
         {selectAllText}
       </Button>
-      <Checkbox
-        size="small"
-        checked={hasSelection}
-        onChange={(event) => (event.target.checked ? selectAll() : clearSelection())}
-        data-testid={`${selectAllTestId}-checkbox`}
-        inputProps={{ 'aria-label': selectAllLabel }}
-        sx={{ p: 0.5, display: { xs: 'inline-flex', md: 'none' } }}
+      <SelectAllBox
+        hasSelection={hasSelection}
+        allSelected={allSelected}
+        selectAll={selectAll}
+        clearSelection={clearSelection}
+        selectAllTestId={selectAllTestId}
+        selectAllLabel={selectAllLabel}
       />
       {hasSelection ? (
         <SelectionState
           selectedCount={selectedCount}
+          selectedCountLabel={selectedCountLabel}
           clearSelection={clearSelection}
           clearAllTestId={clearAllTestId}
           clearAllText={clearAllText}
@@ -128,13 +163,14 @@ function SelectionCluster({
  */
 function SelectionState({
   selectedCount,
+  selectedCountLabel,
   clearSelection,
   clearAllTestId,
   clearAllText,
   selectionExtra,
 }: Pick<
   ContentToolbarProps,
-  'selectedCount' | 'clearSelection' | 'clearAllTestId' | 'clearAllText' | 'selectionExtra'
+  'selectedCount' | 'selectedCountLabel' | 'clearSelection' | 'clearAllTestId' | 'clearAllText' | 'selectionExtra'
 >): React.JSX.Element {
   return (
     <>
@@ -154,7 +190,7 @@ function SelectionState({
         data-testid="selected-count-indicator"
         sx={{ fontSize: sxRem(14), color: 'text.secondary', whiteSpace: 'nowrap', flexShrink: 0 }}
       >
-        {selectedCount} {selectedCount === 1 ? 'item' : 'items'} selected
+        {selectedCountLabel(selectedCount)}
       </Typography>
       {selectionExtra !== undefined && (
         <>
@@ -246,7 +282,7 @@ function BrowsingClusters({
 /**
  * Shared toolbar for content pages (Favorites, Personal Space, Recents, …). The
  * left cluster owns selection chrome — **Select All**, and once items are
- * selected, **Clear All** + an "N items selected" count + an optional `actions`
+ * selected, **Clear All** + the count (`selectedCountLabel`) + an optional `actions`
  * slot. The right cluster is a free `rightControls` slot for page-specific
  * controls (ViewSelector, SortByDropdown, MultiSelectDropdown, FilterTrigger).
  *
@@ -259,6 +295,7 @@ function BrowsingClusters({
  * <ContentToolbar
  *   hasSelection={selected.size > 0}
  *   selectedCount={selected.size}
+ *   selectedCountLabel={(n) => `${n} ${n === 1 ? 'selecionado' : 'selecionados'}`}
  *   selectAll={selectAll}
  *   clearSelection={clear}
  *   rightControls={
@@ -274,7 +311,9 @@ function BrowsingClusters({
  */
 export function ContentToolbar({
   hasSelection,
+  allSelected,
   selectedCount,
+  selectedCountLabel,
   selectAll,
   clearSelection,
   rightControls,
@@ -316,7 +355,9 @@ export function ContentToolbar({
           selectAllText={selectAllText}
           clearAllText={clearAllText}
           hasSelection={hasSelection}
+          allSelected={allSelected}
           selectedCount={selectedCount}
+          selectedCountLabel={selectedCountLabel}
           selectAll={selectAll}
           clearSelection={clearSelection}
           actions={actions}

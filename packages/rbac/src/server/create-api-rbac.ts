@@ -12,6 +12,7 @@ import { createGrantGovernance, type GrantGovernance } from './grant-governance'
 import { createRbacGuards, type RbacGuards } from './guards';
 import { roleRoutes } from './routes-roles';
 import { teamRoutes } from './routes-team';
+import { inviteRoutes } from './routes-invites';
 import { createRolesStore, type RolesStore } from './roles-store';
 import { tenantRoleSeedRows } from './template-store';
 import { createTeamStore, type TeamStore } from './team-store';
@@ -87,6 +88,7 @@ export function createApiRbac<P extends string>(config: RbacServerConfig<P>): Ap
     routes: [
       ...roleRoutes({ config, guards, governance, roles, wire, requireStaffTier }),
       ...teamRoutes({ config, guards, governance, roles, team, wire }),
+      ...inviteRoutes({ config, guards, governance, roles, team, wire }),
     ],
     guards,
     engine,

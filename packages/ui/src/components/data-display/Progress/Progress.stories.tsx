@@ -6,6 +6,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
 import { Progress } from './Progress';
+import { PROGRESS_SIZES } from './Progress.metrics';
 import { COLOR_VALUES, SIZE_VALUES } from '../../../tokens/scales';
 
 const meta: Meta<typeof Progress> = {
@@ -481,5 +482,18 @@ export const Responsive: Story = {
         </Stack>
       </Box>
     </Stack>
+  ),
+};
+
+export const CustomCircularCenter: Story = {
+  args: { variant: 'circular', value: 50, circularSize: PROGRESS_SIZES.xl.circularSize * 3 },
+  render: (args) => (
+    <Progress {...args} aria-label="Task progress" centerContent={
+      <Stack alignItems="center">
+        <Typography variant="caption">IN PROGRESS</Typography>
+        <Typography variant="h4">00:40</Typography>
+        <Typography variant="caption">Step 2 of 4</Typography>
+      </Stack>
+    } />
   ),
 };

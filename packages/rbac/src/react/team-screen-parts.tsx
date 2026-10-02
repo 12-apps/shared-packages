@@ -158,6 +158,17 @@ export function TeamBanners({
           onOpenMember={onOpenMember}
         />
       )}
+      {actions.resent && (
+        <Alert
+          closeLabel={copy.closeLabel}
+          variant="success"
+          title={copy.teamScreen.inviteResentTitle}
+          description={copy.teamScreen.inviteResentBody(actions.resent)}
+          closable
+          onClose={actions.dismissResent}
+          data-testid="team-invite-resent"
+        />
+      )}
       {actions.notice && (
         <Alert
           closeLabel={copy.closeLabel}

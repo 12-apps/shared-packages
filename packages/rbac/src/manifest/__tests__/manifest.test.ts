@@ -145,7 +145,7 @@ describe('the rbac manifest', () => {
     expect(rbacManifest.server).toEqual(['http']);
   });
 
-  it('declares no STATIC mcp capability — the seventeen tools need a vocabulary', () => {
+  it('declares no STATIC mcp capability — the eighteen tools need a vocabulary', () => {
     // The contract carves this case out by name, and `lifecycleMcpEndpoints`
     // is the precedent: a tool table that cannot exist without the host's
     // mount path, catalog and sentences joins the aggregate through the

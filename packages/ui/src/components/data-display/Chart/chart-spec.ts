@@ -1,6 +1,6 @@
 import type { ChartDataPoint, ChartProps } from './Chart.types';
 import type { ChartSemanticColor, ChartSpec, ChartSpecSeries } from './ChartSpec.types';
-import { chartValueFormatter } from './chart-format';
+import { chartAxisValueFormatter, chartValueFormatter } from './chart-format';
 import {
   getChartSpecRenderer,
   getRegisteredChartSpecTypes,
@@ -176,6 +176,7 @@ export function specToChartProps(
     showTooltip: spec.tooltip ?? true,
     height: spec.height,
     valueFormatter: chartValueFormatter(spec.numberFormat),
+    axisValueFormatter: chartAxisValueFormatter(spec.numberFormat),
     // An integer metric is a COUNT: half a row does not exist, so the axis must
     // not offer half-steps it would then round into duplicates (FUT-755).
     allowDecimalTicks: spec.numberFormat !== 'integer',

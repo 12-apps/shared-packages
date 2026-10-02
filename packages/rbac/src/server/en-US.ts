@@ -26,6 +26,8 @@ export const EN_US_RBAC_MESSAGES: RbacMessages = {
   invalidBody: 'Invalid data',
   notFound: 'Not found.',
   invitesNotConfigured: 'Invitations are not configured.',
+  inviteNotFound: 'This invitation changed or is no longer pending. The list was refreshed.',
+  inviteNotSent: 'The invitation e-mail could not be sent. The previous link still works.',
   unauthenticated: 'Not authenticated.',
   baseRoleNotAssignable: 'This role cannot be set as the primary role.',
   governance: {

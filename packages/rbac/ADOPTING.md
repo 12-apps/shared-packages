@@ -88,6 +88,18 @@ reusable across repositories, exposing standardized surfaces. A host repo only
    screen hides the affordance. The package reports `team.invite` /
    `team.invite_cancel` around the port calls; any richer trail of the port's
    own storage (acceptance at signup, expiry) is the port's to write.
+   **`resend` is optional within it** (FUT-3165): give the port
+   `resend(tenantId, inviteId)` and the roster offers "Reenviar convite" on a
+   pending row (`invitesResendable` on the context says so); omit it and the
+   entry never renders. The contract only the host can keep: scope by tenant
+   AND pending (anything else is `not_found`), and write the new credential
+   only once the mail has left, so `not_sent` leaves the previous link working.
+   A resend reports `team.invite_resend`. It adds required keys an adopter
+   composing its OWN copy must supply (the shipped packs carry all of them):
+   `RbacMessages.inviteNotFound` and `inviteNotSent`; `RbacWebCopy`'s
+   `teamScreen.inviteResentTitle`, `teamScreen.inviteResentBody` and
+   `teamRowMenu.resendInvite`. A hand-written `RbacApiClient` (a test double)
+   needs `resendInvite`.
 6. **Audit is a sink, not a table.** Every write and every governance denial
    reports a `RbacAuditEntry` through `config.audit`, and the package FENCES
    every call — a throwing sink never turns the write (or a DENIAL) into a
@@ -202,7 +214,7 @@ exactly as their permissions already resolve to nothing.
 | GET | `/permissions` | staff tier | `{ data: { permissions, ...permissionsExtras } }` |
 | GET | `/team` | admin tier (ACTIVE membership) | `{ data, pagination }` — `q`, `role_in`, `status_in`, `sort`, paging |
 | POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port. Any number of roles: `role` (first system role, optional) + `customRoles` (every other role, system or custom); each system role must be in `assignableBaseRoles`; the port grants ALL of them additively |
-| GET | `/team/context` | admin tier + `team:read` | custom roles by member, assignable roles, pending invites |
+| GET | `/team/context` | admin tier + `team:read` | custom roles by member, assignable roles, pending invites, `invitesEnabled`, `invitesResendable` |
 | GET | `/team/:userId` | admin tier + `team:read` | member detail, 404 reveals nothing |
 | PATCH | `/team/:userId` | admin tier + `team:manage` + governance | legacy swap of the member's highest system role for another — every other role held stays; the name must be in `assignableBaseRoles` (default: non-owner template names); 409 last owner. The packaged screens never call it: they grant and revoke per role |
 | DELETE | `/team/:userId` | admin tier (owner rules inside) | `{ data: { status: 'removed' } }` |
@@ -210,6 +222,7 @@ exactly as their permissions already resolve to nothing.
 | POST | `/team/:userId/roles` | `roles:manage` + governance | grant one more role — system or custom, any number per member (idempotent) |
 | DELETE | `/team/:userId/roles/:role` | `roles:manage` | revoke (idempotent) |
 | DELETE | `/team/invites/:inviteId` | admin tier + `team:manage` + invites port | cancel a pending invite |
+| POST | `/team/invites/:inviteId/resend` | admin tier + `team:manage` + `invites.resend` | mail a pending invite a fresh link: `{ data: { status: 'resent', email } }`; 404 (`inviteNotFound`) when no longer pending, 502 (`inviteNotSent`) when the mail did not leave, 501 without `resend` |
 
 ## Minimal host (Hono)
 

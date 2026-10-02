@@ -65,6 +65,11 @@ export interface ChartProps {
   /** Formats numeric tooltip values and y-axis ticks (e.g. centavos → BRL). */
   valueFormatter?: (value: number) => string;
   /**
+   * Formats the value-axis ticks only, when they should read shorter than a
+   * tooltip (whole reais without ",00"). Falls back to `valueFormatter`.
+   */
+  axisValueFormatter?: (value: number) => string;
+  /**
    * Whether the value axis may place ticks between whole numbers. Default true.
    *
    * Set it false for a metric that only takes whole values — a COUNT. Recharts

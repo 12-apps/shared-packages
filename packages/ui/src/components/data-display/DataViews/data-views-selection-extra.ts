@@ -47,6 +47,15 @@ export type SelectionExtraRender<T extends Record<string, unknown>> = (
  * Returns `undefined` with nothing selected, so the toolbar renders no empty
  * slot: a widening with nothing to widen is not a control.
  */
+/** Every row the page is rendering is selected — and the page is not empty. */
+export function allOnPageSelected<T extends Record<string, unknown>>(
+  c: DataViewsController<T>,
+  getRowId: (row: T) => string | number,
+): boolean {
+  const page = c.matched;
+  return page.length > 0 && page.every((row) => c.selectedIds.has(getRowId(row)));
+}
+
 export function resolveSelectionExtra<T extends Record<string, unknown>>({
   c,
   getRowId,
@@ -61,7 +70,7 @@ export function resolveSelectionExtra<T extends Record<string, unknown>>({
   return selectionExtra({
     selectedRows: c.selectedRows,
     clearSelection: c.clearSelection,
-    allOnPageSelected: page.length > 0 && page.every((row) => c.selectedIds.has(getRowId(row))),
+    allOnPageSelected: allOnPageSelected(c, getRowId),
     pageRowCount: page.length,
   });
 }

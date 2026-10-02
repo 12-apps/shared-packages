@@ -187,7 +187,7 @@ describe("DataViewsGrid", () => {
 
     fireEvent.click(screen.getByLabelText("Selecionar todas as linhas"));
     await waitFor(() =>
-      expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("3 items selected"),
+      expect(screen.getByTestId("selected-count-indicator")).toHaveTextContent("3 selecionados"),
     );
     const bulk = screen.getByTestId("people-bulk");
     fireEvent.click(bulk);

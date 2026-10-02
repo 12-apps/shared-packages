@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useRowConfirm, type RowConfirm } from '@12-apps/ui/data-display/CardKit';
 
@@ -57,6 +57,15 @@ export interface TeamActions {
   remove: (userId: string) => Promise<void>;
   toggleActive: (row: TeamRow) => Promise<void>;
   cancelInvite: (inviteId: string) => Promise<void>;
+  /** The address a pending invite was just re-mailed to; null otherwise. */
+  resent: string | null;
+  dismissResent: () => void;
+  /**
+   * Mail a pending invite a fresh link. A refusal is SAID in the page's error
+   * banner, and the roster refreshes either way: the commonest refusal is an
+   * invite somebody else cancelled or that was accepted meanwhile.
+   */
+  resendInvite: (row: TeamRow) => Promise<void>;
 }
 
 /** The address as the server keys it — the route trims and lowercases too. */
@@ -96,6 +105,38 @@ function useInviteOutcome(): {
       else setAdded(addedMember(email, result.userId));
     },
   };
+}
+
+/**
+ * Re-mailing a pending invite, and the banner it drives (FUT-3165).
+ *
+ * Its own hook because `useTeamActions` sits on the 80-line ceiling. The
+ * in-flight guard is a ref rather than state: a second click while the first
+ * request is out must not send a second mail — which would also retire the
+ * link the first one just delivered.
+ */
+function useInviteResend(
+  api: RbacApiClient,
+  refresh: () => void,
+  setError: (value: string | null) => void,
+): Pick<TeamActions, 'resent' | 'dismissResent' | 'resendInvite'> {
+  const [resent, setResent] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  async function resendInvite(row: TeamRow): Promise<void> {
+    if (!row.inviteId || inFlight.current) return;
+    inFlight.current = true;
+    setError(null);
+    setResent(null);
+    try {
+      const result = await api.resendInvite(row.inviteId);
+      if (result.ok) setResent(result.data.email);
+      else setError(result.error);
+      refresh();
+    } finally {
+      inFlight.current = false;
+    }
+  }
+  return { resent, dismissResent: () => setResent(null), resendInvite };
 }
 
 /**
@@ -142,6 +183,7 @@ export function useTeamActions(
   const [error, setError] = useState<string | null>(null);
   const outcome = useInviteOutcome();
   const dialog = useInviteDialog();
+  const resend = useInviteResend(api, refresh, setError);
 
   async function invite(selection: InviteSelection): Promise<void> {
     setError(null);
@@ -205,6 +247,7 @@ export function useTeamActions(
     remove,
     toggleActive,
     cancelInvite,
+    ...resend,
   };
 }
 

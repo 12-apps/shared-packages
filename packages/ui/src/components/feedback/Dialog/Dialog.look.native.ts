@@ -117,6 +117,7 @@ function variantPaper(theme: UiTheme, a: DialogLookArgs, radius: number): ViewSt
 function overlayFor(theme: UiTheme, variant: DialogVariant): ViewStyle {
   if (variant === 'fullscreen') return { flex: 1 };
   if (variant === 'drawer') return { flex: 1, alignItems: 'flex-end' };
+  if (variant === 'bottom-sheet') return { ...centredOverlay(theme), justifyContent: 'flex-end' };
   return centredOverlay(theme);
 }
 

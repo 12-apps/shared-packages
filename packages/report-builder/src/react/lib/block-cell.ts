@@ -67,6 +67,22 @@ function heightRules(height: number | undefined): Record<string, unknown> | unde
 }
 
 /**
+ * The tablet span below `md` (600–899px), where half the canvas is too narrow
+ * for what a half-width block holds.
+ *
+ * A block the tablet tier gives HALF the canvas or more takes the whole row
+ * there. Half of 600px, inside a card, is ~276px: a sales table whose numeric
+ * columns alone need ~308px showed its names and nothing else, every figure
+ * behind a sideways scroll (FUT-3167). Splitting the canvas in two waits for
+ * `md`, which is also where the hosts' own screens become two columns. Tiles
+ * the tablet keeps at a quarter or a sixth stay as they are: four KPI figures
+ * read fine side by side at 600.
+ */
+function smallTabletSpan(tablet: number): number {
+  return tablet >= REPORT_GRID_COLUMNS / 2 ? REPORT_GRID_COLUMNS : tablet;
+}
+
+/**
  * One placed block's box: `span` columns wide, widened per tier below desktop,
  * and `height` rows tall when it declares one.
  *
@@ -99,7 +115,12 @@ export function blockCellSx(span: number, height?: number): Record<string, unkno
     // Still shrinkable: a row a fraction of a pixel over its canvas gives the
     // fraction back instead of wrapping its last block onto a line of its own.
     flexShrink: 1,
-    flexBasis: { xs: spanBasis(phone), sm: spanBasis(tablet), lg: spanBasis(desktop) },
+    flexBasis: {
+      xs: spanBasis(phone),
+      sm: spanBasis(smallTabletSpan(tablet)),
+      md: spanBasis(tablet),
+      lg: spanBasis(desktop),
+    },
     minWidth: 0,
     maxWidth: "100%",
     ...heightRules(height),

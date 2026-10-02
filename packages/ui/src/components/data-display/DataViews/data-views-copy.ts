@@ -225,6 +225,13 @@ export interface DataViewsSelectionCopy {
   clearSelection: string;
   selectAll: string;
   onThisPage(count: number): string;
+  /**
+   * The toolbar's count while rows are ticked: "1 selecionado". A plural, so a
+   * function. Keep it SHORT: at 320 it shares line 1 with the clear button and
+   * has about 118px — "20 itens selecionados" (135px) wrapped and stranded the
+   * divider before it; "20 selecionados" fits.
+   */
+  selectedCount(count: number): string;
   /** One row's checkbox, which carries no visible label of its own. */
   selectRow: string;
   /**

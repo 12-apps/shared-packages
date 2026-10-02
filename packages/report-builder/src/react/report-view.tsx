@@ -7,6 +7,7 @@
 import { useState, type JSX } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
 import { DropdownMenu, type DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
@@ -16,13 +17,52 @@ import {
   type ReportStatusWire,
   type SavedReportView,
 } from "./custom-reports-api";
+import { BlockExpandDialog } from "./lib/block-expand-dialog";
 import { BlockToolCluster, useBlockTableView } from "./lib/block-tools";
 import { ConfirmDialog } from "./lib/confirm-dialog";
-import { ReportBlockBody, ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
+import { ReportBlockFrame, ReportGrid, ReportGridItem } from "./report-grid";
 import { viewBlocks } from "./report-model";
+import { ReportRenderView } from "./report-render";
 import { useTransport } from "./transport-context";
 import type { ReportArchiveCopy } from "./screens-copy";
 import { useReportCopy } from "./transport-context";
+
+/**
+ * A rendered block's body: its result, or the compiler's actionable message
+ * when THIS block's stored spec no longer compiles. A broken block never takes
+ * the report down with it — the rest of the canvas still renders.
+ */
+function ReportBlockBody({
+  block,
+  dataTestId,
+  asTable = false,
+  bounded = false,
+}: {
+  block: DashboardBlockRender;
+  dataTestId: string;
+  /** Chart blocks only: draw the rendering as its table (the header toggle). */
+  asTable?: boolean;
+  /** Cap a table at ~10 rows — ignored when the block has a chosen height. */
+  bounded?: boolean;
+}): JSX.Element {
+  if (block.status === "error") {
+    return (
+      <Alert severity="error" data-testid={`${dataTestId}-error`}>
+        {block.error}
+      </Alert>
+    );
+  }
+  const fill = block.height !== undefined;
+  return (
+    <ReportRenderView
+      render={block.render}
+      dataTestId={`${dataTestId}-render`}
+      asTable={asTable}
+      fill={fill}
+      bounded={bounded && !fill}
+    />
+  );
+}
 
 /**
  * One block on the viewer's canvas: title, what it asks for, result, and the
@@ -62,11 +102,21 @@ function ViewBlock({ block }: { block: DashboardBlockRender }): JSX.Element {
             renderTestId={`${testId}-render`}
             menuTestId={`${testId}-menu`}
             csv={{ filename: `bloco-${block.id}`, dataTestId: `${testId}-export` }}
+            // A block with a chosen height fills it and draws its table whole.
+            expandable={block.height === undefined}
           />
         }
       >
-        <ReportBlockBody block={block} dataTestId={testId} asTable={tableView.asTable} />
+        <ReportBlockBody block={block} dataTestId={testId} asTable={tableView.asTable} bounded />
       </ReportBlockFrame>
+      <BlockExpandDialog
+        open={tableView.expanded}
+        onClose={() => tableView.setExpanded(false)}
+        title={heading}
+        dataTestId={`${testId}-expanded`}
+      >
+        <ReportBlockBody block={block} dataTestId={`${testId}-expanded`} asTable={tableView.asTable} />
+      </BlockExpandDialog>
     </ReportGridItem>
   );
 }

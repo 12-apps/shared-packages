@@ -108,14 +108,14 @@ describe('Dialog (native)', () => {
     expect(screen.queryAllByTestId('d-close')).toHaveLength(0);
   });
 
-  it('closes on Escape unless it is persistent, which the stories only half cover', () => {
+  it.each(['default', 'bottom-sheet'] as const)('closes %s on Escape unless persistent', (variant) => {
     // React Native routes Escape through `Modal`'s `onRequestClose`, which the
     // dialog hands `undefined` when persistent. `PersistentDialogTest` covers
     // the refusal; nothing covered the plain dialog answering it.
     // react-native-web listens for `keyup` on the document, not `keydown`.
     const onClose = vi.fn();
     const { unmount } = render(
-      <Dialog open onClose={onClose} dataTestId="plain">
+      <Dialog open variant={variant} onClose={onClose} dataTestId="plain">
         <DialogContent>corpo</DialogContent>
       </Dialog>,
     );
@@ -125,7 +125,7 @@ describe('Dialog (native)', () => {
 
     const onCloseFirm = vi.fn();
     render(
-      <Dialog open persistent onClose={onCloseFirm} dataTestId="firm">
+      <Dialog open variant={variant} persistent onClose={onCloseFirm} dataTestId="firm">
         <DialogContent>corpo</DialogContent>
       </Dialog>,
     );
@@ -133,10 +133,10 @@ describe('Dialog (native)', () => {
     expect(onCloseFirm).not.toHaveBeenCalled();
   });
 
-  it('closes on a backdrop press unless it is persistent', () => {
+  it.each(['default', 'bottom-sheet'] as const)('closes %s on backdrop press unless persistent', (variant) => {
     const onClose = vi.fn();
     const { rerender } = render(
-      <Dialog open onClose={onClose} dataTestId="d">
+      <Dialog open variant={variant} onClose={onClose} dataTestId="d">
         <DialogContent>x</DialogContent>
       </Dialog>,
     );
@@ -144,7 +144,7 @@ describe('Dialog (native)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
 
     rerender(
-      <Dialog open persistent onClose={onClose} dataTestId="d">
+      <Dialog open variant={variant} persistent onClose={onClose} dataTestId="d">
         <DialogContent>x</DialogContent>
       </Dialog>,
     );
@@ -160,6 +160,20 @@ describe('Dialog (native)', () => {
     expect(shadows(paper)).toEqual(DIALOG_PAPER_SHADOW);
     expect(look({ size: 'xs' }).paper.maxWidth).toBe(400);
     expect(look({ size: 'xl' }).paper.maxWidth).toBe(1200);
+  });
+
+  it('bottom-aligns the sheet while keeping the default size, corners and inset', () => {
+    const sheet = look({ variant: 'bottom-sheet', size: 'xs', borderRadius: 'xl' });
+    expect(sheet.overlay).toEqual({ ...look().overlay, justifyContent: 'flex-end' });
+    expect(sheet.paper).toEqual(look({ size: 'xs', borderRadius: 'xl' }).paper);
+    expect(sheet.paper.height).toBeUndefined();
+    expect(dialogKeyboardLift(theme, 'bottom-sheet', 240)).toEqual({ paddingBottom: 256 });
+    expect(dialogKeyboardLift(theme, 'bottom-sheet', 0)).toBeNull();
+    render(<Dialog open variant="bottom-sheet" size="xs" borderRadius="xl" dataTestId="sheet"><DialogContent>Body</DialogContent></Dialog>);
+    const paper = screen.getByTestId('sheet');
+    expect(paper.parentElement?.style.justifyContent).toBe('flex-end');
+    expect(paper.style.maxWidth).toBe('400px');
+    expect(paper.style.borderTopLeftRadius).toBe('24px');
   });
 
   it('cuts every named radius to the web lengths', () => {

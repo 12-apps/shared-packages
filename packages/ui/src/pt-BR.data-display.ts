@@ -222,6 +222,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     clearSelection: "Limpar seleção",
     selectAll: "Selecionar tudo",
     onThisPage: (count) => `${count} nesta página`,
+    selectedCount: (count) => `${count} ${count === 1 ? "selecionado" : "selecionados"}`,
     selectRow: "Selecionar",
     expandRow: "Expandir detalhes",
     collapseRow: "Recolher detalhes",

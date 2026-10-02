@@ -174,6 +174,13 @@ export interface TeamScreenCopy {
   inviteAddedTitle: string;
   inviteAddedBody: (email: string) => string;
   inviteAddedOpenAction: string;
+  /**
+   * The banner after a pending invite was mailed a fresh link. The body names
+   * the address and says the previous link no longer works — the one thing a
+   * resend takes away.
+   */
+  inviteResentTitle: string;
+  inviteResentBody: (email: string) => string;
   /** The banner over a failed roster mutation. */
   errorTitle: string;
   /** The grid's empty state. */
@@ -260,6 +267,8 @@ export interface TeamRowMenuCopy {
   remove: string;
   /** Burning a pending accountless invite. */
   cancelInvite: string;
+  /** Mailing a pending invite a fresh link (the previous one stops working). */
+  resendInvite: string;
   /** The menu's fallback row for an actor who may change nothing. */
   noActions: string;
 }

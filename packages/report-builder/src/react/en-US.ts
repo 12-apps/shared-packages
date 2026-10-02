@@ -180,6 +180,7 @@ export const EN_US_REPORT_SCREENS_COPY: ReportScreensCopy = {
     copyOf: (title) => `${title} (copy)`,
     viewAsChart: "Show as a chart",
     viewAsTable: "Show as a table",
+    expandTable: "Expand table",
     blockMenu: "More actions for this block",
     closePanel: "Close panel",
     panelIdle: "Block",

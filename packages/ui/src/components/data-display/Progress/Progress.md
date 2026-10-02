@@ -98,6 +98,28 @@ Show loading without specific progress value:
 <Progress variant="circular" />
 ```
 
+## Custom circular center
+
+`centerContent` renders non-interactive React content in the center of a circular
+dial, outside its rotating/animated ring. It works for determinate and
+indeterminate progress and does not require `showLabel`. A non-null value
+replaces the visual label; `null`/`undefined` keep the existing `label` and
+`showLabel` behavior. Other variants ignore it.
+
+Compose the content with shared typography/layout components. Native also wraps
+raw strings/numbers (including fragments) in its caption Text style. The slot
+does not name the progressbar: continue to supply an `aria-label` describing
+what the value represents. The value/role semantics remain unchanged.
+
+```tsx
+<Progress
+  variant="circular"
+  value={50}
+  aria-label="Task progress"
+  centerContent={<Typography variant="caption">Step 2 of 4</Typography>}
+/>
+```
+
 ## Props
 
 | Prop           | Type                                                                         | Default     | Description                            |
@@ -109,6 +131,7 @@ Show loading without specific progress value:
 | `glow`         | `boolean`                                                                    | `false`     | Enable glow effect                     |
 | `pulse`        | `boolean`                                                                    | `false`     | Enable pulse animation                 |
 | `showLabel`    | `boolean`                                                                    | `false`     | Display progress percentage            |
+| `centerContent` | `ReactNode` | - | Circular center content; replaces the visual label when non-null |
 | `label`        | `string`                                                                     | -           | Custom label text                      |
 | `segments`     | `number`                                                                     | `8`         | Number of segments (segmented variant) |
 | `thickness`    | `number`                                                                     | -           | Circle thickness (circular variant)    |

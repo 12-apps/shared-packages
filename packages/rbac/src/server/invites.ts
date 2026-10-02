@@ -62,4 +62,21 @@ export interface RbacInvitesPort {
   listPending(tenantId: string): Promise<RbacPendingInvite[]>;
   /** Cancel a pending invite by id. Idempotent. */
   cancel(tenantId: string, inviteId: string): Promise<void>;
+  /**
+   * Mail a PENDING invite a fresh link. OPTIONAL: a host without it answers 501
+   * on the route, and the team context reports `invitesResendable: false` so the
+   * packaged screen never offers the entry.
+   *
+   * The contract a host must keep, because only it can:
+   *  - scope by tenant AND pending — any other row is `not_found`, never a send;
+   *  - write the new credential only once the mail has LEFT, so a failed send
+   *    (`not_sent`) leaves the previous link working rather than none at all.
+   */
+  resend?(tenantId: string, inviteId: string): Promise<RbacInviteResendResult>;
 }
+
+/** What a resend came to. `email` is the address the new link went to. */
+export type RbacInviteResendResult =
+  | { status: 'resent'; email: string }
+  | { status: 'not_found' }
+  | { status: 'not_sent' };

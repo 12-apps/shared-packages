@@ -8,7 +8,7 @@ import { inviteBody as mcpInviteBody } from '../schemas';
 import type { RbacMcpOperation, RbacMcpVocabulary } from '../vocabulary';
 
 /**
- * The seventeen tools, and the two under-declarations that motivated the move.
+ * The eighteen tools, and the two under-declarations that motivated the move.
  *
  * The origin host described these endpoints in two registry files, and both
  * documented that nothing checked them against what the routes returned. Two had
@@ -25,6 +25,7 @@ const OPERATIONS: RbacMcpOperation[] = [
   'revokeMemberRole',
   'setMemberStatus',
   'cancelTenantInvite',
+  'resendTenantInvite',
   'getTeamContext',
   'getTeamMember',
   'listRoles',
@@ -95,6 +96,26 @@ describe('rbacMcpEndpoints', () => {
       data: { customRolesByMember: [], assignableRoles: [], pendingInvites: [] },
     });
     expect(without.success).toBe(false);
+  });
+
+  it('advertises invitesResendable on the roster context, as optional (FUT-3165)', () => {
+    const response = byId().get('getTeamContext')?.response as z.ZodType;
+    const base = { customRolesByMember: [], assignableRoles: [], pendingInvites: [] };
+    expect(
+      response.safeParse({ data: { ...base, invitesEnabled: true, invitesResendable: true } })
+        .success,
+    ).toBe(true);
+    // Optional: a server older than the resend route never sends it.
+    expect(response.safeParse({ data: { ...base, invitesEnabled: true } }).success).toBe(true);
+  });
+
+  it('describes the resend as a write that answers the address mailed', () => {
+    const resend = byId().get('resendTenantInvite');
+    expect(resend?.method).toBe('post');
+    expect(resend?.path).toMatch(/\/team\/invites\/\{inviteId\}\/resend$/);
+    const response = resend?.response as z.ZodType;
+    expect(response.safeParse({ data: { status: 'resent', email: 'a@b.c' } }).success).toBe(true);
+    expect(response.safeParse({ data: { status: 'cancelled' } }).success).toBe(false);
   });
 
   it('advertises whatever the host merges into the permission read', () => {

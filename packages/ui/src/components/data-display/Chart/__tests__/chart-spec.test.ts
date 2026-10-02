@@ -72,6 +72,8 @@ describe('specToChartProps', () => {
       { dataKey: 'count', name: 'count', color: 'auto-1' },
     ]);
     expect(props.valueFormatter?.(100)).toContain('1,00');
+    // The axis reads shorter than the tooltip: a whole real carries no ",00".
+    expect(props.axisValueFormatter?.(100)).not.toContain(',');
   });
 
   it('honors stacked bars and legend/tooltip toggles', () => {

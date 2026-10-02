@@ -26,3 +26,7 @@ list in `src/icons/glyphs.json`. Adding a glyph is one line there and
 Inside the package, a ported component draws its own glyphs through this
 component rather than importing `@mui/icons-material` directly, so its native
 twin can draw the same one.
+
+The shared glyph catalog includes `VolumeUp` and `VolumeOff` for sound controls,
+using the same generated Material paths on web and native. Name the enclosing
+control with its action; leave the icon decorative when that control owns the label.
