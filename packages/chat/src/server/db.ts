@@ -48,8 +48,14 @@ export interface ChatDb {
   };
   chatMessage: {
     findMany(args: {
-      where: { threadId: string };
-      orderBy: { createdAt: "desc" };
+      where: {
+        threadId: string;
+        authorRole?: string;
+        authorId?: string;
+        quickKey?: null;
+        createdAt?: { gt: Date };
+      };
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }];
       take: number;
     }): Promise<ChatMessageRow[]>;
     create(args: {

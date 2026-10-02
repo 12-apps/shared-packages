@@ -12,6 +12,7 @@ export { ChatConfigError } from "./core/errors";
 export {
   CONTACT_KINDS,
   detectContactInfo,
+  detectContactInfoAcross,
   type ContactKind,
   type ContactVocabulary,
 } from "./core/contact";

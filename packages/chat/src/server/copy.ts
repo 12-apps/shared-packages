@@ -49,6 +49,18 @@ export function resolveCopy<T>(source: ChatCopySource<T>, locale: string | undef
   return typeof source === "function" ? (source as ChatCopyResolver<T>)({ locale }) : source;
 }
 
+/**
+ * The words for one request. A resolver that has no complete pack for the
+ * reader's locale (it answers `undefined`, or a pack with a blank key) falls
+ * back to the configured words — the ones assembly checked, with no locale —
+ * rather than failing the request it was only meant to phrase.
+ */
+export function resolveCompleteCopy(source: ChatCopySource<ChatServerCopy>, locale: string | undefined): ChatServerCopy {
+  const words = resolveCopy(source, locale);
+  if (locale === undefined || missingCopy(words, SERVER_COPY_KEYS).length === 0) return words;
+  return resolveCopy(source, undefined);
+}
+
 /** Keys absent or blank — checked at assembly. */
 export function missingCopy<T extends object>(copy: T | undefined, keys: readonly (keyof T)[]): string[] {
   if (copy === undefined || copy === null) return keys.map(String);

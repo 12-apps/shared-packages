@@ -6,9 +6,10 @@
 
 import { buildChatSurface, type ChatSurface, type ChatSurfaceConfig } from "../ui/surface";
 import { WebComposer } from "./composer";
+import { WebFrame, WebMessageList } from "./layout";
 
 export function createWebChat(config: ChatSurfaceConfig): ChatSurface {
-  return buildChatSurface(config, WebComposer);
+  return buildChatSurface(config, { Frame: WebFrame, MessageList: WebMessageList, Composer: WebComposer });
 }
 
 export type { ChatSurface, ChatSurfaceConfig, ChatThreadProps } from "../ui/surface";

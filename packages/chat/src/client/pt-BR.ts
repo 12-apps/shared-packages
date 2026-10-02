@@ -13,4 +13,5 @@ export const PT_BR_CHAT_UI_COPY: ChatUiCopy = {
   quickReplies: "Respostas rápidas",
   sendFailed: "Não foi possível enviar. Confira sua conexão e tente de novo.",
   loading: "Carregando a conversa…",
+  messagesLabel: "Mensagens da conversa",
 };

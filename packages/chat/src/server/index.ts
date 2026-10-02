@@ -20,6 +20,7 @@ export { createChatReads, type ChatReads, type UnreadCountsQuery } from "./reads
 export type {
   ChatAccess,
   ChatMessageEvent,
+  ChatRefusalEvent,
   ChatRequest,
   ChatResponse,
   ChatRoleConfig,

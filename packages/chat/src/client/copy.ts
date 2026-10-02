@@ -23,6 +23,8 @@ export interface ChatUiCopy {
   readonly sendFailed: string;
   /** Shown while the first load is in flight. */
   readonly loading: string;
+  /** The accessible name of the scrolling message list. */
+  readonly messagesLabel: string;
 }
 
 export const UI_COPY_KEYS: readonly (keyof ChatUiCopy)[] = [
@@ -37,4 +39,5 @@ export const UI_COPY_KEYS: readonly (keyof ChatUiCopy)[] = [
   "quickReplies",
   "sendFailed",
   "loading",
+  "messagesLabel",
 ];

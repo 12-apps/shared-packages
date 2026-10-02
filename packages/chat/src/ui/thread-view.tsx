@@ -4,9 +4,10 @@
  * Built only from `@12-apps/ui` primitives and only their cross-platform
  * (`*.base`) props, so the same tree renders on the web (MUI) and in a React
  * Native app (the package's `react-native` export condition resolves each
- * primitive to its native twin). The one piece that differs per platform —
- * the text field and its send button, whose change events are not the same
- * shape — arrives as `Composer`.
+ * primitive to its native twin). The pieces that differ per platform arrive
+ * as a {@link ChatPlatform}: the frame (keyboard avoidance on native), the
+ * scrolling message list, and the composer, whose change events are not the
+ * same shape.
  *
  * Every word on screen is host copy or server data: role labels come from the
  * server (the host's role config), the rest from {@link ChatUiCopy}.
@@ -20,7 +21,7 @@ import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Box } from "@12-apps/ui/layout/Box";
 import { Stack } from "@12-apps/ui/layout/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
-import { useState, type ComponentType, type JSX } from "react";
+import { useState, type ComponentType, type JSX, type ReactNode } from "react";
 
 import type { ChatThreadControls } from "../client/use-chat-thread";
 import type { ChatUiCopy } from "../client/copy";
@@ -31,28 +32,55 @@ export interface ChatComposerProps {
   readonly value: string;
   readonly onChange: (text: string) => void;
   readonly onSubmit: () => void;
+  /** A message is in flight: the send action is gated, the FIELD stays usable. */
   readonly sending: boolean;
   readonly maxLength: number;
   readonly copy: ChatUiCopy;
+}
+
+/** What a platform's message list receives: the bubbles, and when to follow the newest. */
+export interface ChatMessageListProps {
+  readonly children: ReactNode;
+  /** The list's accessible name. */
+  readonly label: string;
+  /** Changes whenever a message is added — the list scrolls to its end on each change. */
+  readonly scrollKey: string;
+  readonly testID: string;
+}
+
+/** What a platform's frame receives: the list above, the writing area pinned below. */
+export interface ChatFrameProps {
+  readonly children: ReactNode;
+  readonly testID: string;
+  /** Native only: the distance from the window top to the thread (a navigator header), in dp. */
+  readonly keyboardOffset?: number;
+}
+
+/** The per-platform pieces of the thread. */
+export interface ChatPlatform {
+  readonly Frame: ComponentType<ChatFrameProps>;
+  readonly MessageList: ComponentType<ChatMessageListProps>;
+  readonly Composer: ComponentType<ChatComposerProps>;
 }
 
 interface ChatThreadViewProps {
   readonly controls: ChatThreadControls;
   readonly copy: ChatUiCopy;
   readonly formatTime: (iso: string) => string;
-  readonly Composer: ComponentType<ChatComposerProps>;
+  readonly platform: ChatPlatform;
+  readonly keyboardOffset?: number;
   readonly testID?: string;
 }
 
 function Bubble({ message, formatTime }: { message: ChatWireMessage; formatTime: (iso: string) => string }): JSX.Element {
   return (
     <Box direction="row" justify={message.mine ? "end" : "start"} testID={`chat-message-${message.id}`}>
-      <Box bg="paper" bordered radius="md" px={2} py={1} gap={0.5}>
+      <Box bg={message.mine ? "default" : "paper"} bordered radius="md" px={2} py={1} gap={0.5}>
         <Stack direction="row" gap={1} align="baseline">
-          <Text variant="caption" weight="semibold" color={message.mine ? "primary" : "neutral"}>
+          <Text variant="caption" weight="semibold" color={message.mine ? "primary" : "secondary"}>
             {message.label}
           </Text>
-          <Text variant="caption" color="neutral">
+          <Text variant="caption" color="secondary">
             {formatTime(message.createdAt)}
           </Text>
         </Stack>
@@ -71,7 +99,7 @@ function QuickReplies(props: {
   if (props.replies.length === 0) return null;
   return (
     <Stack gap={1} testID="chat-quick-replies">
-      <Text variant="caption" color="neutral">
+      <Text variant="caption" color="secondary">
         {props.copy.quickReplies}
       </Text>
       <Box direction="row" wrap gap={1}>
@@ -91,7 +119,8 @@ function QuickReplies(props: {
 }
 
 function Writing(props: ChatThreadViewProps): JSX.Element {
-  const { controls, copy, Composer } = props;
+  const { controls, copy, platform } = props;
+  const { Composer } = platform;
   const [draft, setDraft] = useState("");
   const thread = controls.payload?.thread;
   if (!thread) return <></>;
@@ -127,27 +156,41 @@ function Writing(props: ChatThreadViewProps): JSX.Element {
   );
 }
 
+function Messages(props: ChatThreadViewProps & { messages: readonly ChatWireMessage[] }): JSX.Element {
+  const { copy, formatTime, messages } = props;
+  const { MessageList } = props.platform;
+  const newest = messages.at(-1);
+  return (
+    <MessageList label={copy.messagesLabel} scrollKey={`${messages.length}:${newest?.id ?? ""}`} testID="chat-messages">
+      {messages.length === 0 ? (
+        <EmptyState variant="minimal" title={copy.emptyTitle} description={copy.emptyDescription} testID="chat-empty" />
+      ) : (
+        messages.map((message) => <Bubble key={message.id} message={message} formatTime={formatTime} />)
+      )}
+    </MessageList>
+  );
+}
+
 export function ChatThreadView(props: ChatThreadViewProps): JSX.Element {
-  const { controls, copy, formatTime } = props;
+  const { controls, copy } = props;
+  const { Frame } = props.platform;
   if (controls.phase === "loading") {
     return <LoadingState message={copy.loading} testID="chat-loading" />;
   }
   if (controls.phase === "error" || !controls.payload) {
-    return <ErrorState message={copy.loadError} onRetry={controls.reload} retryLabel={copy.retry} testID="chat-error" />;
+    return (
+      <ErrorState
+        message={controls.loadFailure ?? copy.loadError}
+        onRetry={controls.reload}
+        retryLabel={copy.retry}
+        testID="chat-error"
+      />
+    );
   }
-  const { messages } = controls.payload;
   return (
-    <Stack gap={2} testID={props.testID ?? "chat-thread"}>
-      {messages.length === 0 ? (
-        <EmptyState variant="minimal" title={copy.emptyTitle} description={copy.emptyDescription} testID="chat-empty" />
-      ) : (
-        <Stack gap={1} testID="chat-messages">
-          {messages.map((message) => (
-            <Bubble key={message.id} message={message} formatTime={formatTime} />
-          ))}
-        </Stack>
-      )}
+    <Frame testID={props.testID ?? "chat-thread"} keyboardOffset={props.keyboardOffset}>
+      <Messages {...props} messages={controls.payload.messages} />
       <Writing {...props} />
-    </Stack>
+    </Frame>
   );
 }

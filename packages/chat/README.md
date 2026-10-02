@@ -40,8 +40,15 @@ const { routes } = createApiChat({
   copy: EN_US_CHAT_SERVER_COPY,          // or a per-request resolver
   contactVocabulary: { numberWords: { nine: "9" }, atWords: ["at"] },
   onMessage: async (event) => { /* notify, publish a live hint */ },
+  onRefused: async (event) => { /* who keeps trying to pass contact info */ },
+  onError: (error, { hook }) => logger.error(`chat ${hook} failed`, error),
 });
 ```
+
+`db` may return the client or a promise of it. `onMessage` and `onRefused`
+run in the background: the send answers without waiting for a push
+provider, and a hook that throws or rejects is reported to `onError`, never
+to the sender.
 
 All of this belongs to the host: the write window, which role a caller holds,
 the labels, and the quick replies' words. The package owns the rest:
@@ -50,12 +57,59 @@ the labels, and the quick replies' words. The package owns the rest:
 - the per-author rate limit;
 - what a message looks like on the wire.
 
+### The wire
+
+Every 2xx answers `{ data }`: `GET /` gives `{ thread, messages, unread }`,
+`POST /messages` gives `{ message }` (201), and `POST /read` gives
+`{ unread }`. A refusal answers `{ error, message }`, where `error` is the
+package's code (`contact_info`, `closed`, `rate_limited`, …) and `message` is
+the host's sentence. No person id ever crosses it: authors show only as their
+role's label.
+
+`POST /read` takes `{ upTo }`, the `createdAt` of the newest message the
+reader was actually shown. The marker never moves backwards and never past
+now, so a message that arrived after the screen loaded stays unread. Reading
+never creates a thread row; the first message does.
+
+### The contact filter
+
+It reads the text after Unicode normalisation (full-width and other-script
+digits, invisible characters, spelled-out digits from the host's
+`contactVocabulary`). It also reads the draft joined to the same author's
+recent free text (`contactLookback`, default the last 5 messages within 10
+minutes), so a number split over several messages is still one number.
+Every attempt spends a rate-limit slot, including a refused one, so probing
+the filter runs out of attempts. It is a deterrent, not a guarantee: a
+person determined to pass a number can always find an encoding no filter
+reads, and `onRefused` is how the host sees who keeps trying.
+
+### Retention
+
+Messages keep `author_id` for moderation, and the package ships no delete
+or anonymise API: retention (LGPD, GDPR) is the host's. The
+`chat_messages (tenant_id, created_at)` index is there for the host's sweep.
+`created_at` comes from the app process's clock, and messages in the same
+millisecond are ordered by id.
+
 ## The screen
 
 ```tsx
 const { ChatThread } = createWebChat({ fetch: credentialedFetch, copy: EN_US_CHAT_UI_COPY, formatTime });
 <ChatThread endpoint={`/api/jobs/${id}/chat`} refreshSignal={liveTick} onUnreadChange={setBadge} />
 ```
+
+The thread marks itself read up to the newest message it showed, and
+`onUnreadChange` then gets the server's remaining count (normally 0). Pass
+`autoMarkRead={false}` to mount it hidden only for its unread count.
+
+Layout:
+- **Web:** the messages sit in ui's `ScrollArea` (up to 60% of the viewport
+  tall), which keeps the newest in view. `ScrollArea` needs `ResizeObserver`,
+  so a host testing in jsdom stubs it.
+- **Native:** the thread is a ui `Screen` with keyboard avoidance and its own
+  `ScrollView`. Mount it in a parent with a bounded height (a flex-1 view, or
+  `Screen scroll={false}`), never inside another ScrollView. Pass
+  `keyboardOffset` (dp) when a header sits above it.
 
 `createNativeChat` takes the same config. Both surfaces draw the thread from
 `@12-apps/ui` primitives using only their cross-platform props, so a React

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChatThreadPayload, ChatWireMessage } from "../core/types";
 import { ChatConfigError } from "../core/errors";
 import { createApiChat, createChatReads, PT_BR_CHAT_SERVER_COPY } from "../server/index";
-import type { ChatAccess, ChatServerConfig } from "../server/context";
+import type { ChatAccess, ChatResponse, ChatServerConfig } from "../server/context";
 import { EN_US_CHAT_SERVER_COPY } from "../server/en-US";
 import { configWith, ROLES, seat } from "./fixtures";
 
@@ -22,6 +22,11 @@ function ticking(start = Date.parse("2026-10-02T12:00:00.000Z")): () => Date {
   return tick;
 }
 
+/** The `{ data }` a 2xx answers with. */
+function dataOf<T>(response: ChatResponse): T {
+  return (response.body as { data: T }).data;
+}
+
 function api(config: Config) {
   const { routes } = createApiChat(config);
   const call = (method: "GET" | "POST", path: string, actor: ChatAccess | null, body?: unknown, locale?: string) => {
@@ -32,7 +37,7 @@ function api(config: Config) {
   return {
     read: (actor: ChatAccess | null, locale?: string) => call("GET", "/", actor, undefined, locale),
     send: (actor: ChatAccess | null, body: unknown, locale?: string) => call("POST", "/messages", actor, body, locale),
-    markRead: (actor: ChatAccess | null) => call("POST", "/read", actor, {}),
+    markRead: (actor: ChatAccess | null, body: unknown = {}) => call("POST", "/read", actor, body),
   };
 }
 
@@ -47,11 +52,11 @@ describe("reading a thread", () => {
     expect(response).toEqual({ status: 404, body: { error: "not_found", message: EN_US_CHAT_SERVER_COPY.notFound } });
   });
 
-  it("opens the thread lazily and tells the caller what it may do", async () => {
+  it("tells the caller what it may do, and reading never creates the thread", async () => {
     const { config, db } = configWith();
     const response = await api(config).read(agent);
     expect(response.status).toBe(200);
-    const payload = response.body as ChatThreadPayload;
+    const payload = dataOf<ChatThreadPayload>(response);
     expect(payload.thread).toEqual({
       me: { role: "agent", label: "Agent" },
       canWrite: true,
@@ -60,7 +65,11 @@ describe("reading a thread", () => {
       quickReplies: ROLES.agent?.quickReplies,
     });
     expect(payload.messages).toEqual([]);
-    expect(db.threads).toHaveLength(1);
+    expect(payload.unread).toBe(0);
+    expect(db.threads).toHaveLength(0);
+    expect(dataOf(await api(config).markRead(agent))).toEqual({ unread: 0 });
+    expect(db.threads).toHaveLength(0);
+    expect(db.markers).toHaveLength(0);
   });
 
   it("shows every author only by role label — no person id ever crosses the wire", async () => {
@@ -68,7 +77,7 @@ describe("reading a thread", () => {
     const chat = api(config);
     await chat.send(client, { body: "Hello" });
     await chat.send(agent, { body: "Hi there" });
-    const payload = (await chat.read(client)).body as ChatThreadPayload;
+    const payload = dataOf<ChatThreadPayload>(await chat.read(client));
     expect(payload.messages.map((m) => [m.label, m.body, m.mine])).toEqual([
       ["Client", "Hello", true],
       ["Agent", "Hi there", false],
@@ -81,7 +90,7 @@ describe("reading a thread", () => {
     const { config } = configWith({ clock: ticking() });
     const chat = api(config);
     await chat.send(teamMember("staff-1"), { body: "We are on it" });
-    const payload = (await chat.read(teamMember("staff-2"))).body as ChatThreadPayload;
+    const payload = dataOf<ChatThreadPayload>(await chat.read(teamMember("staff-2")));
     expect(payload.messages[0]?.mine).toBe(true);
   });
 
@@ -90,7 +99,7 @@ describe("reading a thread", () => {
     const chat = api(config);
     await chat.send(agent, { body: "On the way" });
     const successor = seat({ role: "agent", authorId: "u-agent-2", readerId: "u-agent-2" });
-    const payload = (await chat.read(successor)).body as ChatThreadPayload;
+    const payload = dataOf<ChatThreadPayload>(await chat.read(successor));
     expect(payload.messages[0]?.mine).toBe(false);
   });
 
@@ -108,7 +117,7 @@ describe("sending", () => {
     const { config, db } = configWith();
     const response = await api(config).send(client, { body: "  Gate 12, block B  " });
     expect(response.status).toBe(201);
-    const message = (response.body as { message: ChatWireMessage }).message;
+    const message = dataOf<{ message: ChatWireMessage }>(response).message;
     expect(message).toMatchObject({ role: "client", label: "Client", mine: true, body: "Gate 12, block B" });
     expect(db.messages[0]).toMatchObject({ authorId: "u-client", authorRole: "client", quickKey: null });
     expect(db.threads[0]?.lastMessageAt?.toISOString()).toBe("2026-10-02T12:00:00.000Z");
@@ -141,7 +150,7 @@ describe("sending", () => {
   it("sends a quick reply as the host's own words, past the content filter", async () => {
     const { config, db } = configWith();
     const response = await api(config).send(agent, { quickReply: "arrived" });
-    expect((response.body as { message: ChatWireMessage }).message.body).toBe("I have arrived.");
+    expect(dataOf<{ message: ChatWireMessage }>(response).message.body).toBe("I have arrived.");
     expect(db.messages[0]?.quickKey).toBe("arrived");
   });
 
@@ -203,11 +212,11 @@ describe("unread and read markers", () => {
     await chat.send(agent, { body: "Arriving" });
     await chat.send(client, { body: "Thanks" });
     await chat.send(agent, { quickReply: "arrived" });
-    expect(((await chat.read(client)).body as ChatThreadPayload).unread).toBe(2);
-    expect((await chat.markRead(client)).body).toEqual({ unread: 0 });
-    expect(((await chat.read(client)).body as ChatThreadPayload).unread).toBe(0);
+    expect(dataOf<ChatThreadPayload>(await chat.read(client)).unread).toBe(2);
+    expect(dataOf(await chat.markRead(client))).toEqual({ unread: 0 });
+    expect(dataOf<ChatThreadPayload>(await chat.read(client)).unread).toBe(0);
     await chat.send(agent, { body: "Downstairs" });
-    expect(((await chat.read(client)).body as ChatThreadPayload).unread).toBe(1);
+    expect(dataOf<ChatThreadPayload>(await chat.read(client)).unread).toBe(1);
   });
 
   it("gives a host's list its unread badges in one call", async () => {
@@ -250,5 +259,165 @@ describe("assembly", () => {
   it("fails loudly when authorize answers a role the config never declared", async () => {
     const { config } = configWith();
     await expect(api(config).read(seat({ role: "stranger" }))).rejects.toThrow(/roles does not declare/);
+  });
+});
+
+describe("reading order and history", () => {
+  it("keeps one order for messages in the same millisecond, and the newest when it trims", async () => {
+    const { config } = configWith({ historyLimit: 2 });
+    const chat = api(config);
+    for (const body of ["one", "two", "three"]) await chat.send(client, { body });
+    expect(dataOf<ChatThreadPayload>(await chat.read(client)).messages.map((m) => m.body)).toEqual(["two", "three"]);
+  });
+
+  it("falls back to the configured words when the resolver has none for the reader's locale", async () => {
+    const { config } = configWith({
+      copy: ({ locale }) => (locale === "xx" ? (undefined as never) : EN_US_CHAT_SERVER_COPY),
+    });
+    const response = await api(config).read(null, "xx");
+    expect(response.body).toEqual({ error: "not_found", message: EN_US_CHAT_SERVER_COPY.notFound });
+  });
+});
+
+describe("the first message of a thread", () => {
+  it("survives losing the race to create the thread", async () => {
+    const { config, db } = configWith();
+    const upsert = db.chatThread.upsert.bind(db.chatThread);
+    // Another request wins the insert between this one's check and its write.
+    db.chatThread.upsert = vi.fn(async (args) => {
+      await upsert(args);
+      throw new Error("Unique constraint failed");
+    });
+    expect((await api(config).send(client, { body: "Hello" })).status).toBe(201);
+    expect(db.threads).toHaveLength(1);
+  });
+
+  it("still fails when the thread is not there after all", async () => {
+    const { config, db } = configWith();
+    db.chatThread.upsert = vi.fn().mockRejectedValue(new Error("connection lost"));
+    await expect(api(config).send(client, { body: "Hello" })).rejects.toThrow(/connection lost/);
+  });
+});
+
+describe("what the read route marks", () => {
+  const at = (seconds: number) => new Date(Date.parse("2026-10-02T12:00:00.000Z") + seconds * 1000).toISOString();
+
+  it("marks up to the newest message the reader was shown, never one that arrived after", async () => {
+    const { config } = configWith({ clock: ticking() });
+    const chat = api(config);
+    await chat.send(agent, { body: "Arriving" }); // t+1
+    const shown = dataOf<ChatThreadPayload>(await chat.read(client)).messages; // t+2
+    await chat.send(agent, { body: "Downstairs" }); // t+3, not yet on the reader's screen
+    expect(dataOf(await chat.markRead(client, { upTo: shown.at(-1)?.createdAt }))).toEqual({ unread: 1 });
+  });
+
+  it("never moves the marker backwards, and never past now", async () => {
+    const { config, db } = configWith({ clock: ticking() });
+    const chat = api(config);
+    await chat.send(agent, { body: "Arriving" }); // t+1
+    await chat.markRead(client, { upTo: at(1) }); // t+2
+    await chat.markRead(client, { upTo: at(0) }); // a slow tab, older screen
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(1));
+    await chat.markRead(client, { upTo: at(3600) }); // t+4: clamped
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(4));
+  });
+
+  it.each([[{}], [{ upTo: "not a date" }], [{ upTo: 42 }], [null]])("reads a missing or broken upTo as now: %j", async (body) => {
+    const { config, db } = configWith({ clock: ticking() });
+    const chat = api(config);
+    await chat.send(agent, { body: "Arriving" }); // t+1
+    expect(dataOf(await chat.markRead(client, body))).toEqual({ unread: 0 });
+    expect(db.markers[0]?.lastReadAt.toISOString()).toBe(at(2));
+  });
+
+  it("moves one marker for a shared role, so every member reads as one", async () => {
+    const { config } = configWith({ clock: ticking() });
+    const { send, read, markRead } = api(config);
+    const [first, second] = [teamMember("staff-1"), teamMember("staff-2")];
+    await send(client, { body: "Where is it?" });
+    expect(dataOf<ChatThreadPayload>(await read(second)).unread).toBe(1);
+    await markRead(first);
+    expect(dataOf<ChatThreadPayload>(await read(second)).unread).toBe(0);
+  });
+
+  it("never counts the reader's own role as unread in a host's list", async () => {
+    const { config, db } = configWith({ clock: ticking() });
+    await api(config).send(client, { body: "Hello" });
+    const reads = createChatReads({ db: async () => db });
+    expect(await reads.unreadCounts({ tenantId: "t1", threadKeys: ["job:1"], role: "client", readerId: "u-client" })).toEqual({
+      "job:1": 0,
+    });
+  });
+});
+
+describe("the content rules and the people who probe them", () => {
+  it("catches a number split across the author's own messages", async () => {
+    const { config, db } = configWith({ clock: ticking(), roles: { ...ROLES, agent: { ...ROLES.agent!, rateLimit: { max: 10, windowMs: 60_000 } } } });
+    const { send } = api(config);
+    expect((await send(agent, { body: "98765" })).status).toBe(201);
+    const refused = await send(agent, { body: "4321" });
+    expect(refused.body).toEqual({ error: "contact_info", message: EN_US_CHAT_SERVER_COPY.contactInfo });
+    expect(db.messages).toHaveLength(1);
+  });
+
+  it("spends a rate slot on every refused attempt, and tells the host who keeps trying", async () => {
+    const onRefused = vi.fn();
+    const { config } = configWith({ onRefused });
+    const chat = api(config);
+    for (let i = 0; i < 3; i += 1) expect((await chat.send(agent, { body: `ana${i}@example.com` })).status).toBe(422);
+    expect((await chat.send(agent, { body: "On my way" })).status).toBe(429);
+    await vi.waitFor(() => expect(onRefused).toHaveBeenCalledTimes(3));
+    expect(onRefused).toHaveBeenCalledWith({
+      tenantId: "t1",
+      threadKey: "job:1",
+      role: "agent",
+      authorId: "u-agent",
+      code: "contact_info",
+      kinds: expect.arrayContaining(["email"]),
+    });
+  });
+
+  it("does not let ids that contain the old separator share a budget", async () => {
+    const { config } = configWith();
+    const chat = api(config);
+    const first = { ...agent, tenantId: "a|b", threadKey: "c" };
+    const second = { ...agent, tenantId: "a", threadKey: "b|c" };
+    for (let i = 0; i < 3; i += 1) expect((await chat.send(first, { body: `msg ${i}` })).status).toBe(201);
+    expect((await chat.send(second, { body: "mine" })).status).toBe(201);
+  });
+
+  it("reads a null quick reply as absent, and an invisible-only body as empty", async () => {
+    const { config } = configWith();
+    const chat = api(config);
+    expect((await chat.send(client, { body: "hi", quickReply: null })).status).toBe(201);
+    expect((await chat.send(client, { body: "​‍⁠" })).body).toEqual({ error: "empty", message: EN_US_CHAT_SERVER_COPY.empty });
+  });
+});
+
+describe("the host's hooks", () => {
+  it("answers the send without waiting for onMessage, and passes the quick reply key", async () => {
+    const onMessage = vi.fn(() => new Promise<void>(() => undefined));
+    const { config } = configWith({ onMessage });
+    const response = await api(config).send(agent, { quickReply: "arrived" });
+    expect(response.status).toBe(201);
+    expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ message: expect.objectContaining({ quickKey: "arrived" }) }));
+  });
+
+  it("reports a failing hook to onError, naming it", async () => {
+    const failure = new Error("push provider down");
+    const onError = vi.fn();
+    const { config } = configWith({ onMessage: vi.fn().mockRejectedValue(failure), onError });
+    expect((await api(config).send(client, { body: "Hello" })).status).toBe(201);
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(failure, { hook: "onMessage" }));
+  });
+
+  it.each([
+    [{ onMessage: "notify" }, /onMessage must be a function/],
+    [{ onRefused: 1 }, /onRefused must be a function/],
+    [{ onError: {} }, /onError must be a function/],
+    [{ contactLookback: { messages: 0, windowMs: 1 } }, /contactLookback/],
+  ])("refuses a hook or lookback that could never run (%#)", (overrides, message) => {
+    const { config } = configWith();
+    expect(() => createApiChat({ ...config, ...(overrides as unknown as Partial<Config>) })).toThrow(message);
   });
 });

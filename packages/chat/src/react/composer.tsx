@@ -1,6 +1,11 @@
 /**
  * The web composer: the design system's field and button, wired with the
- * DOM's change event. Enter sends; Shift+Enter is left to the field.
+ * DOM's change event. Enter sends; Shift+Enter is left to the field, and so is
+ * the Enter that confirms an IME composition.
+ *
+ * The field stays enabled while a message is in flight: disabling it would
+ * drop focus after every Enter. Only the send action is gated (here, and again
+ * in the thread's submit).
  */
 
 import { Button } from "@12-apps/ui/form/Button";
@@ -12,7 +17,7 @@ import type { ChatComposerProps } from "../ui/thread-view";
 
 export function WebComposer(props: ChatComposerProps): JSX.Element {
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key !== "Enter" || event.shiftKey) return;
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     props.onSubmit();
   };
@@ -25,7 +30,6 @@ export function WebComposer(props: ChatComposerProps): JSX.Element {
           placeholder={props.copy.placeholder}
           aria-label={props.copy.placeholder}
           maxLength={props.maxLength}
-          disabled={props.sending}
           onChange={(event) => props.onChange(event.target.value)}
           onKeyDown={onKeyDown}
           testID="chat-input"
