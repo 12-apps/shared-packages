@@ -230,7 +230,7 @@ export class WiringHost {
     return { kind: "areas", status: "collected", detail: `${areas.length} areas` };
   }
 
-  /** The inventory × bindings walk both runtimes share. */
+  /** The inventory × bindings walk every runtime shares. */
   private applyRuntime(
     manifest: PackageManifest,
     walk: {
@@ -279,6 +279,7 @@ export class WiringHost {
         kind: kind as CapabilityReportEntry["kind"],
         status: "out-of-scope",
         detail: `a ${runtime} host answers for this`,
+        runtime,
       });
     });
   }
@@ -301,7 +302,7 @@ export class WiringHost {
     web: AnyWebManifest | undefined,
     binding: unknown,
   ): CapabilityReportEntry {
-    if (kind === "surface") return bindSurface(context, web, binding);
+    if (kind === "surface") return bindSurface(context, web, binding, "web");
     throw new WiringAssemblyError(this.options.name, `${context.packageName}: unknown web capability "${kind}".`);
   }
 
@@ -311,7 +312,7 @@ export class WiringHost {
     native: AnyNativeManifest | undefined,
     binding: unknown,
   ): CapabilityReportEntry {
-    if (kind === "surface") return bindSurface(context, native, binding);
+    if (kind === "surface") return bindSurface(context, native, binding, "native");
     throw new WiringAssemblyError(this.options.name, `${context.packageName}: unknown native capability "${kind}".`);
   }
 

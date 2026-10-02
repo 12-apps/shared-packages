@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createWiringHost } from "../consumer";
 import { envScopesOf } from "../contract/env";
 import { WiringAssemblyError, WiringDefinitionError } from "../errors";
-import { defineManifest, defineNativeManifest, defineWebManifest } from "../producer";
+import { assertExportsMirror, defineManifest, defineNativeManifest, defineWebManifest } from "../producer";
 
 /**
  * The NATIVE runtime (React Native hosts): a package ships its screens for a
@@ -62,6 +62,29 @@ describe("defineNativeManifest", () => {
     );
   });
 
+  it("makes observability mandatory for a package whose only runtime is native", () => {
+    expect(() => defineManifest({ name: "@12-apps/native-only", contract: 1, native: ["surface"] })).toThrow(
+      /observability/,
+    );
+  });
+
+  it("refuses areas — a native host places the screens itself", () => {
+    const withAreas = { name: shared.name, surface: native.surface, areas: [] };
+    expect(() => defineNativeManifest(shared, withAreas)).toThrow(/a native surface has no areas/);
+  });
+
+  it("mirrors the native subpath in the package's export map, both ways", () => {
+    const exports = { "./manifest": "./m.ts", "./manifest/web": "./w.ts" };
+    expect(() => assertExportsMirror(shared, { name: shared.name, exports })).toThrow(/"\.\/manifest\/native"/);
+    expect(() =>
+      assertExportsMirror(shared, { name: shared.name, exports: { ...exports, "./manifest/native": "./n.ts" } }),
+    ).not.toThrow();
+    const webOnly = defineManifest({ name: "@12-apps/w", contract: 1, web: ["surface"], observability: { namespace: "w" } });
+    expect(() =>
+      assertExportsMirror(webOnly, { name: webOnly.name, exports: { ...exports, "./manifest/native": "./n.ts" } }),
+    ).toThrow(/declares no native inventory/);
+  });
+
   it("refuses a native inventory that names a kind twice", () => {
     expect(() =>
       defineManifest({
@@ -91,7 +114,7 @@ describe("a native host", () => {
     const entries = assembled.report.packages[0]?.capabilities ?? [];
     expect(entries.filter((entry) => entry.kind === "surface")).toEqual([
       { kind: "surface", status: "bound", detail: "surface built once for this host" },
-      { kind: "surface", status: "out-of-scope", detail: "a web host answers for this" },
+      { kind: "surface", status: "out-of-scope", detail: "a web host answers for this", runtime: "web" },
     ]);
   });
 
@@ -120,7 +143,7 @@ describe("a native host", () => {
       ...observed,
       bindings: { surface: { config: { apiBase: "/api" } } },
     });
-    expect(() => host.assemble()).toThrow(/env/);
+    expect(() => host.assemble()).toThrow(/declares 1 vars for this runtime/);
 
     const webHost = createWiringHost({ name: "storefront", kind: "web" });
     webHost.adoptWeb({ manifest: shared, web, ...observed, bindings: { surface: { config: { apiBase: "/api" } } } });
@@ -135,6 +158,50 @@ describe("a native host", () => {
     expect(() => webHost.adoptNative({ manifest: shared })).toThrow(/web host — use adoptWeb/);
     const serverHost = createWiringHost({ name: "api", kind: "server" });
     expect(() => serverHost.adoptNative({ manifest: shared })).toThrow(WiringAssemblyError);
+    expect(() => serverHost.adoptNative({ manifest: shared })).toThrow(/server host — use adoptServer/);
+  });
+});
+
+describe("a server host", () => {
+  it("reports both surfaces out-of-scope, each naming the runtime that answers it", () => {
+    const host = createWiringHost({ name: "api", kind: "server" });
+    host.adoptServer({ manifest: shared, ...observed });
+    const entries = host.assemble().report.packages[0]?.capabilities ?? [];
+    expect(entries.filter((entry) => entry.kind === "surface")).toEqual([
+      { kind: "surface", status: "out-of-scope", detail: "a web host answers for this", runtime: "web" },
+      { kind: "surface", status: "out-of-scope", detail: "a native host answers for this", runtime: "native" },
+    ]);
+  });
+
+  it("leaves a native-scoped variable to the native host", () => {
+    const host = createWiringHost({ name: "api", kind: "server" });
+    host.adoptServer({ manifest: shared, ...observed });
+    const env = host.assemble().report.packages[0]?.capabilities.find((entry) => entry.kind === "env");
+    expect(env).toEqual({ kind: "env", status: "out-of-scope", detail: "no declared var reads in a server runtime" });
+  });
+});
+
+describe("a native host reading the environment", () => {
+  it("leaves web- and server-scoped variables to their hosts", () => {
+    const mixed = defineManifest({
+      name: "@12-apps/mixed",
+      contract: 1,
+      observability: { namespace: "mixed" },
+      native: ["surface"],
+      env: [
+        { name: "WEB_ONLY", scope: "web", required: true },
+        { name: "SERVER_ONLY", required: true },
+      ],
+    });
+    const host = createWiringHost({ name: "field-app", kind: "native" });
+    host.adoptNative({
+      manifest: mixed,
+      native: defineNativeManifest(mixed, { name: mixed.name, surface: { create: () => ({}) } }),
+      ...observed,
+      bindings: { surface: { config: {} } },
+    });
+    const env = host.assemble().report.packages[0]?.capabilities.find((entry) => entry.kind === "env");
+    expect(env).toEqual({ kind: "env", status: "out-of-scope", detail: "no declared var reads in a native runtime" });
   });
 });
 
@@ -143,6 +210,11 @@ describe("a web host", () => {
     const host = createWiringHost({ name: "storefront", kind: "web" });
     host.adoptWeb({ manifest: shared, web, ...observed, bindings: { surface: { config: { apiBase: "/api" } } } });
     const entries = host.assemble().report.packages[0]?.capabilities ?? [];
-    expect(entries).toContainEqual({ kind: "surface", status: "out-of-scope", detail: "a native host answers for this" });
+    expect(entries).toContainEqual({
+      kind: "surface",
+      status: "out-of-scope",
+      detail: "a native host answers for this",
+      runtime: "native",
+    });
   });
 });

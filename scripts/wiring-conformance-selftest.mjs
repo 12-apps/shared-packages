@@ -112,6 +112,14 @@ const cases = [
     "a native inventory declares its surface and names only the native runtime",
   ],
   [
+    () => {
+      const multiLine = "  observability: { namespace: 'x' },\n  native: [\n    'surface',\n  ],\n";
+      const empty = "  observability: { namespace: 'x' },\n  native: [],\n";
+      return declaredRuntimes(multiLine).has("native") && !declaredRuntimes(empty).has("native");
+    },
+    "a multi-line native inventory still names the runtime, and an empty one names none",
+  ],
+  [
     () => !declaredCapabilities("    db: 'nested inside some other literal',\n").has("db"),
     "a nested key at deeper indent is not a manifest declaration",
   ],

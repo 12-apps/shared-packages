@@ -50,10 +50,12 @@ so:
                                         └────────────────────────────────┘
 ```
 
-Three manifests per package because bundles are physics: the shared manifest
-is data every runtime can hold; the server manifest carries the `createApi*`
-factory and job blueprints; the web manifest carries the `createWeb*` factory.
-The shared manifest **inventories** the other two, and that inventory is the
+Separate manifests per runtime because bundles are physics: the shared
+manifest is data every runtime can hold; the server manifest carries the
+`createApi*` factory and job blueprints; the web manifest carries the
+`createWeb*` factory; a package with React Native screens adds a native
+manifest (see [React Native hosts](#react-native-hosts)). The shared manifest
+**inventories** the runtime manifests, and that inventory is the
 integrity mechanism: the producer refuses a runtime manifest that drifts from
 it, and a host that adopts a manifest without answering an inventoried
 capability gets a red `assemble()` naming the package and the capability.
@@ -91,18 +93,22 @@ bundle can import neither `react-dom` nor a web component library, and a web
 bundle must never import React Native.
 
 ```ts
-// package: <pkg>/manifest/native
-export const chatNativeManifest = defineNativeManifest(chatManifest, {
-  name: "@12-apps/chat",
-  surface: { create: (config: ChatNativeConfig) => createNativeChat(config) },
-});
+// package: <pkg>/manifest/native — a plain value; wiring stays a type-only edge
+import type { AnyNativeManifest } from "@12-apps/wiring";
+export const threadsNativeManifest = {
+  name: "@12-apps/threads",
+  surface: { create: createNativeThreads },
+} as const satisfies AnyNativeManifest;
+
+// package: its own test suite runs the producer's assertions
+expect(defineNativeManifest(threadsManifest, threadsNativeManifest)).toBe(threadsNativeManifest);
 
 // host: the React Native app
-const host = createWiringHost({ name: "courier-app", kind: "native" });
+const host = createWiringHost({ name: "field-app", kind: "native", ports: { loggerFor } });
 const { surface } = host.adoptNative({
-  manifest: chatManifest,
-  native: chatNativeManifest,
-  bindings: { surface: { config: { apiBase, fetch, labels } } },
+  manifest: threadsManifest,
+  native: threadsNativeManifest,
+  bindings: { surface: { config: { fetch, copy } } },
 });
 host.assemble();
 ```
@@ -110,9 +116,13 @@ host.assemble();
 `surface` is ONE capability with two possible runtimes, so the vocabulary
 every package answers for does not grow: the conformance gate checks only
 that a `native:` inventory has its `./manifest/native` subpath, and that the
-subpath does not outlive the inventory. A native host has no `areas` (its
-navigation is its own), reports the server and web halves out-of-scope, and
-answers env vars declared with `scope: "native"`.
+subpath does not outlive the inventory (`assertExportsMirror` checks the same
+in the package's own suite). A native host has no `areas` (its navigation is
+its own; a native manifest carrying `areas` is refused), reports the server
+and web halves out-of-scope with the runtime named on each entry, and answers
+env vars declared with `scope: "native"`. Like a web host, it still collects
+the shared data capabilities (permissions, notifications, MCP, db) into its
+aggregate; it simply has nothing to feed them to.
 
 ## Ports (`@12-apps/wiring/ports`)
 

@@ -96,7 +96,7 @@ export type MailerOf<TManifest> = TManifest extends {
   ? TMailer
   : undefined;
 
-/** The surface type a web contribution builds, recovered for adopt's return. */
+/** The surface type a web or native contribution builds, recovered for adopt's return. */
 export type SurfaceOf<TManifest> = TManifest extends {
   surface: { create(config: never): infer TSurface };
 }

@@ -4,13 +4,13 @@
  *
  * One module exporting the server factory next to the React factory would
  * drag Node into every SPA and React into every worker — the exact reason
- * today's packages split `./server` from `./react`. So the manifest is three
- * values behind three conventional subpaths:
+ * today's packages split `./server` from `./react`. So the manifest is up to
+ * four values behind four conventional subpaths:
  *
  *   `<pkg>/manifest`         the SHARED manifest — data every runtime can
  *                            hold: identity, permissions, notification
  *                            blueprints, MCP tools, the Prisma contribution,
- *                            e2e pointers, and the INVENTORY of the two
+ *                            e2e pointers, and the INVENTORY of the
  *                            runtime manifests;
  *   `<pkg>/manifest/server`  the server capabilities (HTTP, jobs, email);
  *   `<pkg>/manifest/web`     the web capabilities (surface, areas);
@@ -18,9 +18,10 @@
  *                            own bundle, since a native app can import
  *                            neither the DOM nor a web component library.
  *
- * The inventory is what keeps the three honest across bundles: the shared
+ * The inventory is what keeps them honest across bundles: the shared
  * manifest NAMES every runtime capability, `defineServerManifest` /
- * `defineWebManifest` refuse a runtime manifest that drifts from it, and a
+ * `defineWebManifest` / `defineNativeManifest` refuse a runtime manifest that
+ * drifts from it, and a
  * host that adopts the shared manifest without binding an inventoried
  * capability gets a red `assemble()` naming it. That is the mechanism that
  * turns "a version bump shipped a capability the host never wired" from a

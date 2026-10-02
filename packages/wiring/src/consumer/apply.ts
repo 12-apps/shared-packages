@@ -152,9 +152,12 @@ export function bindSurface(
   context: BindContext,
   runtime: AnyWebManifest | AnyNativeManifest | undefined,
   binding: unknown,
+  which: "web" | "native",
 ): CapabilityReportEntry {
   const contribution = runtime?.surface;
-  if (!contribution) refuse(context, 'a binding answers "surface" but the runtime manifest declares none.');
+  if (!contribution) {
+    refuse(context, `a binding answers "surface" but the ${which} manifest declares none (or was not provided).`);
+  }
   const value = binding as SurfaceBindingValue<never>;
   // Built ONCE per adoption, which is the memoisation every hand wiring
   // carries as a comment today: `create` returns component TYPES, and a

@@ -18,8 +18,9 @@ import type { CapabilityKind } from "../contract/manifest";
  * - `collected`    — a data capability (permissions, notifications, MCP, db,
  *                    e2e) gathered into the aggregate for the host to feed
  *                    its own composition points;
- * - `out-of-scope` — declared for the OTHER runtime (a web surface on a
- *                    server host); the sibling host answers for it;
+ * - `out-of-scope` — declared for ANOTHER runtime (a web surface on a
+ *                    server host); that runtime's host answers for it, and
+ *                    the entry names it in `runtime`;
  * - `unbound`      — declared, applicable, and unanswered. `assemble()`
  *                    refuses to return while any of these exist.
  */
@@ -35,6 +36,13 @@ export interface CapabilityReportEntry {
   status: CapabilityStatus;
   /** What was bound ("11 routes at /api/…"), or the decline/unbound reason. */
   detail?: string;
+  /**
+   * On an `out-of-scope` entry, the runtime whose host answers for it. Set
+   * because `kind` alone is no longer unique within a package's entries: a
+   * `surface` may be declared for the web AND the native runtime, so a server
+   * host reports two `surface` rows. Key a report by `kind` + `runtime`.
+   */
+  runtime?: "server" | "web" | "native";
 }
 
 export interface PackageReportEntry {

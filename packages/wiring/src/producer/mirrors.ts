@@ -90,7 +90,8 @@ export function assertEnvMirror(manifest: PackageManifest, packageJson: MirrorPa
  * gone points adopters at a module that no longer resolves.
  *
  * Only the wiring-owned conventional subpaths are checked — `./manifest`,
- * `./manifest/server`, `./manifest/web`, and the e2e entry. A package's own
+ * `./manifest/server`, `./manifest/web`, `./manifest/native`, and the e2e
+ * entry. A package's own
  * API subpaths (`./server`, `./react`, …) are its business.
  */
 export function assertExportsMirror(manifest: PackageManifest, packageJson: MirrorPackageJson): void {
@@ -106,12 +107,13 @@ export function assertExportsMirror(manifest: PackageManifest, packageJson: Mirr
   }
   assertRuntimeSubpath(manifest.name, "server", manifest.server !== undefined, exported);
   assertRuntimeSubpath(manifest.name, "web", manifest.web !== undefined, exported);
+  assertRuntimeSubpath(manifest.name, "native", manifest.native !== undefined, exported);
   assertE2eSubpath(manifest, exported);
 }
 
 function assertRuntimeSubpath(
   name: string,
-  which: "server" | "web",
+  which: "server" | "web" | "native",
   declared: boolean,
   exported: Readonly<Record<string, unknown>>,
 ): void {
