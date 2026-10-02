@@ -258,7 +258,7 @@ export function PixView({
     hour: "2-digit",
     minute: "2-digit",
   });
-  const sentences = pixSentences(copy, pix.confirmation === "MANUAL");
+  const manual = pix.confirmation === "MANUAL";
 
   return (
     <Box
@@ -269,7 +269,7 @@ export function PixView({
         {copy.heading}
       </Text>
       <Text variant="body" size="sm" color="secondary" as="p">
-        {sentences.instructions(order.totalLabel)}
+        {pixSentences(copy, manual).instructions(order.totalLabel)}
       </Text>
 
       <Box
@@ -284,10 +284,10 @@ export function PixView({
       <PixCodeBox pix={pix} />
 
       <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
-        {sentences.validUntil(validUntil)}
+        {pixSentences(copy, manual).validUntil(validUntil)}
       </Text>
 
-      <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} manual={sentences !== copy} />
+      <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} manual={manual} />
     </Box>
   );
 }
