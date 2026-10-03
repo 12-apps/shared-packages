@@ -114,6 +114,14 @@ export const absoluteInk = (theme: Theme): { black: string; white: string } => (
 export const modeInk = (theme: Theme): string =>
   theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.common.black;
 
+/**
+ * The well of a field that sits on a tinted panel: white in light mode, so the
+ * field reads as a field against the paper around it; the paper itself in dark
+ * mode, where white would glare.
+ */
+export const fieldWell = (theme: Theme): string =>
+  theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.common.white;
+
 /* ── Neutral tones over the grey ramp ─────────────────────────────────────── */
 
 const step = (theme: Theme, n: keyof typeof NEUTRAL_RAMP): string => theme.palette.grey[n] ?? NEUTRAL_RAMP[n];

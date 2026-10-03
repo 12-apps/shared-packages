@@ -434,6 +434,14 @@ Components for user input and form interactions.
 **Location**: `src/components/form/PhoneInput`
 **Docs**: `src/components/form/PhoneInput/PhoneInput.md`
 
+### PickerSheet
+**Purpose**: Searchable pick-or-create sheet — one picker pattern for an editor's "choose one, or add it" fields
+**Use Cases**: A product's category, kitchen station, add-on product, recipe component — any field that opens a focused choice of its own (the trigger is the caller's)
+**Features**: Centred 520px dialog on a pointer, bottom sheet under `CategorySelect`'s breakpoint; kicker + title (names the dialog), case-insensitive search over `searchText`, tree indent that flattens while searching (`meta` carries the path), selected row tinted with a check, create row when no label matches exactly, empty text, foot note; ↑↓/Enter/Esc; opens above a `StackedModal` stack (`stackedOverlayZIndex`); all copy from the caller
+**Types**: `PickerSheetItem`, `PickerSheetProps`
+**Location**: `src/components/form/PickerSheet`
+**Docs**: `src/components/form/PickerSheet/PickerSheet.md`
+
 ### RadioGroup
 **Purpose**: Single selection from multiple options
 **Use Cases**: Exclusive choices, settings, surveys

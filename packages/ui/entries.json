@@ -88,6 +88,7 @@
   "form/NumberField": "src/components/form/NumberField/index.ts",
   "form/PasswordStrength": "src/components/form/PasswordStrength/index.ts",
   "form/PhoneInput": "src/components/form/PhoneInput/index.ts",
+  "form/PickerSheet": "src/components/form/PickerSheet/index.ts",
   "form/RadioGroup": "src/components/form/RadioGroup/index.ts",
   "form/RichTextEditor": "src/components/form/RichTextEditor/index.ts",
   "form/SearchPalette": "src/components/form/SearchPalette/index.ts",
