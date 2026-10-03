@@ -24,26 +24,14 @@ interface PickerSheetState {
 type HookProps = Pick<PickerSheetProps, 'open' | 'items' | 'onPick' | 'onCreate' | 'createLabel'>;
 
 /**
- * Bring the selected row into view on open, and keep the keyboard cursor in view.
+ * Keep the keyboard cursor in view.
  *
  * Nothing inside is focused on open — the modal focuses its own paper. Focusing
  * the search box raised a phone's keyboard over the list it was opened to show.
- * Deferred a frame: the surface mounts its content in the same commit as this
- * effect.
+ * The list opens at its top, the selected row wherever it falls (the design's
+ * picker does not jump to it).
  */
-function useSheetScroll(
-  open: boolean,
-  activeIndex: number,
-  listRef: React.RefObject<HTMLUListElement | null>,
-): void {
-  useEffect(() => {
-    if (!open) return undefined;
-    const frame = requestAnimationFrame(() => {
-      listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open, listRef]);
-
+function useCursorScroll(activeIndex: number, listRef: React.RefObject<HTMLUListElement | null>): void {
   useEffect(() => {
     if (activeIndex < 0) return;
     const rows = listRef.current?.querySelectorAll('[role="option"]');
@@ -81,7 +69,7 @@ export function usePickerSheet({ open, items, onPick, onCreate, createLabel }: H
   // and `aria-activedescendant` must never name a row that is not there.
   const activeIndex = rawActiveIndex < view.rowCount ? rawActiveIndex : -1;
 
-  useSheetScroll(open, activeIndex, listRef);
+  useCursorScroll(activeIndex, listRef);
 
   const setQuery = useCallback((next: string) => {
     setRawQuery(next);

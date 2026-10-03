@@ -44,7 +44,7 @@ Every word it shows comes from the caller: the package ships no copy for it.
 
 ## Behaviour
 
-- Nothing takes focus inside the sheet on open — the dialog itself does — so a phone does not raise its keyboard over the list; the selected row is scrolled into view. Tab reaches the search box.
+- Nothing takes focus inside the sheet on open — the dialog itself does — so a phone does not raise its keyboard over the list. The list opens at its top. Tab reaches the search box.
 - Filtering is a substring match on each item's label and `searchText`, case and ACCENTS aside ("acai" finds "Açaí", as in `CategorySelect`).
 - ↑/↓ move the keyboard cursor (wrapping at both ends, as `Command` does) and Enter picks the row under it. Typing puts the cursor on the first match, so "type, then Enter" picks it — or creates, when the create row is the only row. The cursor is drawn only once an arrow key has moved it: typing alone shows no ring on a phone.
 - Esc and a tap outside close (through `onClose`).

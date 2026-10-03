@@ -84,22 +84,21 @@ describe("PickerSheet", () => {
     expect(dialog.closest(".MuiDrawer-root")).not.toBeNull();
   });
 
-  it("scrolls the selected row into view on open, and leaves the search box unfocused", async () => {
-    // jsdom has no scrollIntoView: give elements one that records who asked.
-    const scrolled: Element[] = [];
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element) {
-      scrolled.push(this);
-    };
-    try {
-      renderSheet();
-      await waitFor(() => expect(scrolled).toContain(screen.getByTestId("ps-item-juices")));
-      // The open work has run (the scroll is its last step): focus did not go
-      // to the search box, so a phone keeps its keyboard down over the list.
-      await waitFor(() => expect(search()).not.toHaveFocus());
-    } finally {
-      Element.prototype.scrollIntoView = original;
-    }
+  it("hands focus to the dialog on open, not to the search box", async () => {
+    renderSheet();
+    const root = screen.getByTestId("ps").closest(".MuiDialog-root") as Element;
+    await waitFor(() => expect(root.contains(document.activeElement)).toBe(true));
+    expect(search()).not.toBe(document.activeElement);
+  });
+
+  it("keeps a row with a meta line at its full height in a long list", () => {
+    const many = Array.from({ length: 30 }, (_, index) => ({
+      id: `c${index}`,
+      label: `Category ${index}`,
+      meta: `Parent › Category ${index}`,
+    }));
+    renderSheet({ items: many });
+    expect(getComputedStyle(screen.getByTestId("ps-item-c0")).flexShrink).toBe("0");
   });
 
   it("filters case-insensitively on label and meta", () => {

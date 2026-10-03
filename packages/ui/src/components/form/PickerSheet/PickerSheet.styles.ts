@@ -194,6 +194,9 @@ export const rowSx = (theme: Theme, selected: boolean, active: boolean): CSSObje
   gap: rem(theme, 10),
   padding: rem(theme, METRICS.rowPaddingPx),
   minHeight: rem(theme, METRICS.rowMinHeightPx),
+  // The list is a capped flex column: without this a row with a meta line
+  // shrinks to the 44px floor and the two lines overprint.
+  flexShrink: 0,
   boxSizing: 'border-box',
   borderRadius: rem(theme, METRICS.controlRadiusPx),
   textAlign: 'left',
