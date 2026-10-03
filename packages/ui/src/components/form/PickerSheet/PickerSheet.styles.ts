@@ -4,6 +4,7 @@ import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldWell, uiInk } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
+import { surfaces } from '../../../tokens/surfaces';
 
 /**
  * The prototype's measurements, verbatim, in the design's px.
@@ -52,7 +53,8 @@ export const dialogPaperSx = (theme: Theme): CSSObject => ({
   margin: 0,
   borderRadius: rem(theme, METRICS.dialogRadiusPx),
   boxShadow: panelShadow(theme),
-  background: theme.palette.background.paper,
+  // The raised step (`uiSurfaces.raised`): a sheet is nearer than the page.
+  background: surfaces(theme).raised,
   backgroundImage: 'none',
   display: 'flex',
   flexDirection: 'column',
@@ -65,7 +67,8 @@ export const sheetPaperSx = (theme: Theme): CSSObject => ({
   maxHeight: '88%',
   borderRadius: rems(theme, METRICS.sheetRadiusPx, METRICS.sheetRadiusPx, 0, 0),
   boxShadow: panelShadow(theme),
-  background: theme.palette.background.paper,
+  // The raised step (`uiSurfaces.raised`): a sheet is nearer than the page.
+  background: surfaces(theme).raised,
   backgroundImage: 'none',
   display: 'flex',
   flexDirection: 'column',
