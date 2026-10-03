@@ -222,8 +222,9 @@ export const SheetOverlay: React.FC<SheetOverlayProps> = (props) => {
         onClick={onClick}
         className={className}
         sx={{
-          // One below the drawer: this backdrop replaces MUI's own (the drawer
-          // is given a no-op BackdropComponent) and must sit under the panel.
+          // One below the drawer, under the panel. Inside a Sheet this veil is
+          // VISUAL only: the drawer's invisible backdrop above it catches the
+          // tap (`ClickCatcher` in Sheet.tsx). The onClick keeps it usable alone.
           zIndex: theme.zIndex.drawer - 1,
           backgroundColor: scrim(theme, blur ? 0.6 : 0.5),
           backdropFilter: blur ? `blur(${rem(theme, 8)}) saturate(180%)` : 'none',

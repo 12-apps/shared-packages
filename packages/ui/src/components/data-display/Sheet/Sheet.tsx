@@ -59,17 +59,31 @@ const DEFAULTS = {
 type ResolvedSheetProps = SheetProps & Required<Pick<SheetProps, keyof typeof DEFAULTS>>;
 
 /**
- * The drawer supplies its own backdrop, which would sit on top of `SheetOverlay`
- * and swallow its click. Rendering nothing in its place leaves this component's
- * overlay — the one that knows about the `glass` blur — as the only one.
+ * The drawer's own backdrop, made invisible: it only CATCHES the tap.
+ *
+ * The visible veil is {@link SheetOverlay}, which knows about the `glass`
+ * blur. But the drawer's modal root covers the whole viewport above that veil,
+ * so with no backdrop at all a tap on the veil landed on the bare root, which
+ * handles nothing — and no sheet ever closed on an outside tap. This one sits
+ * under the panel, paints nothing, and hands the tap to the drawer's
+ * `onClose('backdropClick')`, which the sheet routes through its own
+ * `closeOnOverlayClick` / `persistent` rules.
  *
  * Defined at module scope: a component built inside a render is a new type on
  * every pass, which remounts the subtree it belongs to.
  */
-const NoBackdrop = React.forwardRef<HTMLDivElement, BackdropProps>(
-  (_props, _ref) => null,
+const ClickCatcher = React.forwardRef<HTMLDivElement, BackdropProps & { 'data-testid'?: string }>(
+  ({ onClick, 'data-testid': testId }, ref) => (
+    <div
+      ref={ref}
+      aria-hidden
+      onClick={onClick}
+      data-testid={testId}
+      style={{ position: 'fixed', inset: 0, backgroundColor: 'transparent' }}
+    />
+  ),
 ) as React.ComponentType<BackdropProps>;
-NoBackdrop.displayName = 'NoBackdrop';
+ClickCatcher.displayName = 'SheetClickCatcher';
 
 /**
  * Which way the sheet is anchored. Four flags rather than four repeated
@@ -111,12 +125,22 @@ export const Sheet: React.FC<SheetProps> = (props) => {
     anchor: position,
     open: isOpen,
     className,
-    onClose: handleClose,
+    // A tap outside obeys `closeOnOverlayClick`. A swipe-to-dismiss (no
+    // reason: SwipeableDrawer calls `onClose()` bare) closes. Escape is the
+    // hook's own listener alone, which honours `closeOnEscape` — the modal's
+    // is switched off below so the key never closes twice or past the flag.
+    onClose: (_event?: object, reason?: 'backdropClick' | 'escapeKeyDown') =>
+      reason === 'backdropClick' ? handleOverlayClick() : handleClose(),
     PaperProps: {
       ref: sheetRef,
       sx: panelSx({ ...resolved, ...orientation, theme, currentHeight, isDragging, isAnimating }),
     },
-    ModalProps: { keepMounted: true, BackdropComponent: NoBackdrop },
+    ModalProps: {
+      keepMounted: true,
+      disableEscapeKeyDown: true,
+      BackdropComponent: ClickCatcher,
+      BackdropProps: { 'data-testid': testId ? `${testId}-click-catcher` : undefined } as Partial<BackdropProps>,
+    },
   };
 
   const body = (
