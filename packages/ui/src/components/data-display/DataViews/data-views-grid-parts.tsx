@@ -200,6 +200,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   listGroup?: ListGroupConfig<T>;
   /** Opt-in expandable rows, drawn by the table layout only. */
   rowDetail?: DataViewRowDetail<T>;
+  /** Row selection, on by default. False ⇒ no checkboxes in any layout, no select-all. */
+  selectable?: boolean;
   /** The page-level partition rendered as tabs under the toolbar. */
   scopes?: ScopeConfig[];
   /**
@@ -304,7 +306,7 @@ function ShellStack<T extends Record<string, unknown>>({
               renderListRow={props.renderListRow}
               listGroup={props.listGroup}
               board={props.board}
-              rowDetail={props.rowDetail}
+              rowDetail={props.rowDetail} selectable={props.selectable !== false}
               dataTestId={dataTestId}
               testIdPrefix={testIdPrefix}
               emptyState={body}

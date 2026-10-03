@@ -48,7 +48,8 @@ export interface RowAction<T extends Record<string, unknown>> {
 /** Selection state handed to a card renderer so it can drive its own checkbox. */
 export interface DataViewCardSelection {
   selected: boolean;
-  onToggleSelect: () => void;
+  /** Absent when the grid is `selectable={false}`: pass it on as-is, and no checkbox is drawn. */
+  onToggleSelect?: () => void;
   /**
    * Card SIZE multiplier from the toolbar zoom slider. The grid sizes the card's
    * width to `base × scale`; a card passes this to {@link BaseCard} `scale` so its

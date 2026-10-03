@@ -180,7 +180,7 @@ interface BoardColumnProps<T extends Record<string, unknown>> {
   getRowId: (row: T) => string | number;
   renderCard: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   selectedIds: Set<string | number>;
-  onToggleId: (id: string | number) => void;
+  onToggleId?: (id: string | number) => void;
   cardScale: number;
   /** The column's width as CSS, already through the type scale. */
   width: string;
@@ -237,7 +237,7 @@ function BoardColumn<T extends Record<string, unknown>>({
             <Box key={id}>
               {renderCard(row, {
                 selected: selectedIds.has(id),
-                onToggleSelect: () => onToggleId(id),
+                onToggleSelect: onToggleId && (() => onToggleId(id)),
                 scale: cardScale,
               })}
             </Box>
@@ -255,7 +255,8 @@ interface DataViewsBoardProps<T extends Record<string, unknown>> {
   getRowId: (row: T) => string | number;
   renderCard: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   selectedIds: Set<string | number>;
-  onToggleId: (id: string | number) => void;
+  /** Absent on a grid that is not selectable: cards get no toggle, so no checkbox. */
+  onToggleId?: (id: string | number) => void;
   /** Card size multiplier from the toolbar zoom slider — the same knob as cards. */
   cardScale: number;
   dataTestId?: string;

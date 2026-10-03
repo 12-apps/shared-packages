@@ -82,6 +82,13 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   selectionExtra?: SelectionExtraRender<T>;
   /** Bespoke per-row menu (an entity's self-contained 3-dots menu) instead of the auto kebab. */
   renderRowMenu?: (row: T) => React.ReactNode;
+  /**
+   * Row selection, default `true`. `false` draws no checkbox in any layout and
+   * no select-all, so the toolbar's selection mode can never hide the search,
+   * the pills and Exportar — for a grid with no bulk action. Row click and the
+   * row menu are unaffected.
+   */
+  selectable?: boolean;
   /** Opt-in expandable rows (table layout only) — see {@link DataViewRowDetail}. */
   rowDetail?: DataViewRowDetail<T>;
   /** Opt-in "Grade" (cards) layout — a card renderer per row; adds a Grade/Tabela toggle. */
