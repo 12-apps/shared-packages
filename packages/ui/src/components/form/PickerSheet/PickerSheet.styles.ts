@@ -43,7 +43,7 @@ const METRICS = {
 
 /**
  * A quiet control's hover: the hairline at half strength, a green-grey step
- * (#E9EDE7 on Future Pay's raised surface) rather than MUI's black wash.
+ * (#E9EDE7 on one adopter's raised surface) rather than MUI's black wash.
  */
 const hoverWash = (theme: Theme): string => alpha(theme.palette.divider, 0.5);
 
