@@ -2,7 +2,7 @@ import { alpha, type CSSObject, type Theme } from '@mui/material/styles/index.js
 
 import { fieldBorder, fieldHeight } from '../../../tokens/field-height';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
-import { uiInk } from '../../../tokens/ink';
+import { fieldWell, uiInk } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 
 /**
@@ -153,7 +153,7 @@ export const searchFieldSx = (theme: Theme): CSSObject => ({
     fontSize: rem(theme, 14),
     border: fieldBorder(theme),
     borderRadius: fieldRadiusPx(theme),
-    background: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.common.white,
+    background: fieldWell(theme),
     color: theme.palette.text.primary,
     '&:focus': {
       outline: 'none',
