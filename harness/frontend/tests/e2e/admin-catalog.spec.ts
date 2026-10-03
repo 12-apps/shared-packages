@@ -23,7 +23,7 @@ test('the published adapters render as cards, and the mount is read-only by cons
 
   // Every published adapter gets a card and an unconnected badge — the real
   // descriptor projection, not a hand-written list.
-  for (const name of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau']) {
+  for (const name of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau', 'pixmanual']) {
     await expect(page.getByTestId(`payments-provider-card-${name}`)).toBeVisible();
     await expect(page.getByTestId(`payments-provider-badge-${name}`)).toHaveText('Não conectado');
   }

@@ -71,6 +71,23 @@ describe('itau production transport', () => {
     expect(plainFetch).not.toHaveBeenCalled();
   });
 
+  it('voids a cob through the same certificate, at the production host', async () => {
+    const merchant = selfSignedIdentity('merchant-a');
+    const sent: Sent[] = [];
+    recordMtls(sent);
+    vi.stubGlobal('fetch', vi.fn());
+
+    await itauProvider(PT_BR_ITAU_COPY).cancelCharge!('TXID123', {
+      environment: 'PRODUCTION',
+      fields: { ...PROD_FIELDS, certificate: merchant.cert, privateKey: merchant.key },
+    });
+
+    const patch = sent[1];
+    expect(patch?.url).toBe('https://secure.gateway.api.itau/pix_recebimentos/v2/cob/TXID123');
+    expect(patch?.init.method).toBe('PATCH');
+    expect(patch?.identity.cert).toBe(normalizePem(merchant.cert));
+  });
+
   it('connects with a PEM whose newlines a single-line paste folded into spaces', async () => {
     const merchant = selfSignedIdentity('merchant-a');
     const sent: Sent[] = [];
@@ -80,7 +97,8 @@ describe('itau production transport', () => {
       environment: 'PRODUCTION',
       fields: { ...PROD_FIELDS, certificate: folded(merchant.cert), privateKey: folded(merchant.key) },
     });
-    expect(outcome).toEqual({ ok: true });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.fault).toBeUndefined();
     expect(sent[0]?.identity.cert).toBe(normalizePem(merchant.cert));
   });
 

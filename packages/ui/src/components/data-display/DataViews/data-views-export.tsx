@@ -75,14 +75,6 @@ interface ExportMenuProps {
   compact?: boolean;
 }
 
-/** "Exportando 214 itens filtrados" / "3 itens selecionados" — never a guess. */
-function scopeLabel(selected: number, total: number): string {
-  if (selected > 0) {
-    return `${selected} ${selected === 1 ? "item selecionado" : "itens selecionados"}`;
-  }
-  return `${total} ${total === 1 ? "item filtrado" : "itens filtrados"}`;
-}
-
 /** The trigger. Shows a spinner while the host's export is still running. */
 function ExportTrigger({
   busy,
@@ -188,7 +180,7 @@ function ExportPanel({
       <Box sx={{ px: 1.5, pt: 1, pb: 1, borderBottom: 1, borderColor: "divider" }}>
         <Text variant="caption" as="p">
           <Box component="span" data-testid={`${testIdPrefix}-export-scope`}>
-            Exportando {scopeLabel(selectedCount, totalCount)}
+            {copy.export.scopeLine(selectedCount, totalCount)}
           </Box>
         </Text>
         <Text variant="caption" as="p">

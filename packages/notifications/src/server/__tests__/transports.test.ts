@@ -4,7 +4,9 @@ import type { NotificationContent, TransportRecipient } from '../../types';
 import { NotificationProviderError, type FetchImpl } from '../transports/drivers';
 import { PT_BR_EMAIL_CHROME } from '../../email/chrome.pt-BR';
 import { emailTransport, formatEmail } from '../transports/email';
+import { createPushSubscriptionStore } from '../push-subscriptions';
 import { createTransportRegistry } from '../transports/registry';
+import { createMemoryDb } from './memory-db';
 import { formatSms, smsTransport } from '../transports/sms';
 import {
   webPushTransport,
@@ -338,7 +340,7 @@ describe('the whatsapp transport', () => {
 describe('the web push transport', () => {
   /** A subscription source recording what was pruned. */
   function source(
-    rows: { id: string; endpoint: string; p256dh: string; auth: string }[],
+    rows: { id: string; endpoint: string; p256dh: string; auth: string; attentionPush?: string | null }[],
   ): WebPushSubscriptionSource & { pruned: string[] } {
     const pruned: string[] = [];
     return {
@@ -422,6 +424,76 @@ describe('the web push transport', () => {
     // A 503 is not evidence the browser is gone; pruning here would destroy a
     // live destination.
     expect(subscriptions.pruned).toEqual([]);
+  });
+
+  describe('an attention push (data.attention)', () => {
+    interface Device {
+      id: string;
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      attentionPush: string | null;
+    }
+    const devices: readonly Device[] = [
+      { id: 'off', endpoint: 'https://push.example.com/off', p256dh: 'p', auth: 'a', attentionPush: 'off' },
+      { id: 'late', endpoint: 'https://push.example.com/late', p256dh: 'p', auth: 'a', attentionPush: 'late' },
+      { id: 'all', endpoint: 'https://push.example.com/all', p256dh: 'p', auth: 'a', attentionPush: 'all' },
+      { id: 'never', endpoint: 'https://push.example.com/never', p256dh: 'p', auth: 'a', attentionPush: null },
+    ];
+
+    /** The device ids one push reached through a subscription source. */
+    async function reachedVia(
+      data: Record<string, unknown>,
+      subscriptions: WebPushSubscriptionSource,
+    ): Promise<string[]> {
+      const seen: string[] = [];
+      const pushes = webPushTransport(
+        {
+          channel: 'WEB_PUSH',
+          driver: 'vapid',
+          sender: (subscription) => {
+            seen.push(subscription.endpoint.split('/').pop() ?? '');
+            return Promise.resolve();
+          },
+        },
+        subscriptions,
+      );
+      await pushes.send(pushes.format({ ...CONTENT, data }), reachable);
+      return seen;
+    }
+
+    /** The device ids one push reached, for a payload `data`. */
+    const reached = (data: Record<string, unknown>, held: readonly Device[]): Promise<string[]> =>
+      reachedVia(data, source([...held]));
+
+    it("reaches only the devices whose level wants it; a device that never chose takes it", async () => {
+      expect(await reached({ attention: 'calm' }, devices)).toEqual(['all', 'never']);
+      expect(await reached({ attention: 'late' }, devices)).toEqual(['late', 'all', 'never']);
+      expect(await reached({ attention: 'spent' }, devices)).toEqual(['late', 'all', 'never']);
+    });
+
+    it('reads the level the store saved — end to end through the store', async () => {
+      const memory = createMemoryDb();
+      const store = createPushSubscriptionStore(() => Promise.resolve(memory));
+      await store.save('u1', {
+        endpoint: 'https://push.example.com/off',
+        keys: { p256dh: 'p', auth: 'a' },
+        attentionPush: 'off',
+      });
+      expect(await reachedVia({ attention: 'late' }, store)).toEqual([]);
+    });
+
+    it('leaves an ordinary push to every device, whatever its level', async () => {
+      expect(await reached({}, devices)).toEqual(['off', 'late', 'all', 'never']);
+    });
+
+    it('resolves without sending when no device wants it — their choice, not a failure', async () => {
+      const offOrLate: Device[] = [
+        { id: 'off', endpoint: 'https://push.example.com/off', p256dh: 'p', auth: 'a', attentionPush: 'off' },
+        { id: 'late', endpoint: 'https://push.example.com/late', p256dh: 'p', auth: 'a', attentionPush: 'late' },
+      ];
+      expect(await reached({ attention: 'calm' }, offOrLate)).toEqual([]);
+    });
   });
 
   it('refuses the vapid driver with no signer, at mount', () => {

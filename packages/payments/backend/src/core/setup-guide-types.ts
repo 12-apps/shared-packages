@@ -100,6 +100,13 @@ export interface CredentialFieldSpec {
    * it. The form still renders it — the platforms that need it are real.
    */
   advanced?: boolean;
+  /**
+   * A field with a working DEFAULT the store may leave blank (Pix manual's
+   * confirmation window: blank is 30 minutes). Completeness skips it like an
+   * `advanced` one, but the form says "opcional" rather than calling it a
+   * platform-only extra — most stores using it should see it, and may change it.
+   */
+  optional?: boolean;
 }
 
 /** A labelled external link rendered inline within a setup step. */

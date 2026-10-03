@@ -254,6 +254,14 @@ export interface MaskedProviderConfig {
   chargeVerifiedAt: string | null;
   /** ISO timestamp when an OAuth connection expires; null when it cannot. */
   expiresAt: string | null;
+  /**
+   * When the saved PRODUCTION credentials lapse on their own (an mTLS
+   * certificate's `validTo`), from the adapter's `credentialExpiry`; null when
+   * they cannot or none is saved. Derived per read, never stored — see
+   * `core/credential-expiry.ts` for why this is not `expiresAt`. Optional, so a
+   * consumer building this type by hand is unaffected.
+   */
+  credentialExpiresAt?: string | null;
   stub: boolean;
   /** Masked hints for BOTH environments, so the form can switch without reload. */
   environments: Record<PaymentEnvironment, MaskedFields>;

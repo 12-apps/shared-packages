@@ -119,6 +119,38 @@
     "kind": "exempt",
     "why": "no packaged screens: the card-on-file UI is host code and the payment flows are @12-apps/payments-frontend's — this package is deliberately the API half only"
   },
+  "@12-apps/chat :: areas": {
+    "kind": "exempt",
+    "why": "a thread is never a page of its own: it sits inside whichever screen shows the thing the conversation is about, which only the host knows, so there is no route or nav row to suggest"
+  },
+  "@12-apps/chat :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys yet: the surfaces are covered by unit suites rendering both renderers against the real routes, and a world would need a host's notion of who may join which thread to drive anything end to end"
+  },
+  "@12-apps/chat :: email": {
+    "kind": "exempt",
+    "why": "never mails anyone: a new message is announced through the host's onMessage hook, where the host already chooses push, inbox or nothing per audience — a mailer here would decide that for it"
+  },
+  "@12-apps/chat :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env at all — the database, the clock, every role rule and every sentence arrive as createApiChat config"
+  },
+  "@12-apps/chat :: jobs": {
+    "kind": "exempt",
+    "why": "nothing here runs on a cadence: threads open lazily on first read, unread counts are computed on demand, and the write window is the host's authorize answer per request"
+  },
+  "@12-apps/chat :: mcp": {
+    "kind": "exempt",
+    "why": "a person-to-person thread is not an agent tool: letting a bearer post into a conversation between strangers is exactly the impersonation the role-label design exists to prevent, so no tool set is shipped"
+  },
+  "@12-apps/chat :: notifications": {
+    "kind": "exempt",
+    "why": "who hears about a new message, and in what words, depends on the host's audiences (a buyer's inbox, a team's bell, a phone's vibration), so the event goes to onMessage rather than to a pre-worded blueprint"
+  },
+  "@12-apps/chat :: permissions": {
+    "kind": "exempt",
+    "why": "access is participation, not a permission class: the host's authorize decides per request whether this person is a party to this thread, so there is no id a role catalog could grant"
+  },
   "@12-apps/desktop-shell": {
     "kind": "exempt",
     "why": "nothing here is wired INTO a web host: it is consumed by a separate desktop process that has no routes, no schema and no request lifecycle to mount against — a manifest would describe seams in an app this package never runs inside"

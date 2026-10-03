@@ -306,6 +306,30 @@ sweep — endpoints and screens included.
     migration, regenerate and migrate BEFORE the bumped package serves traffic,
     or every emit throws on the unknown `side` argument.
 
+15. **Attention pushes: the level is the DEVICE's, so the app sends it.** A
+    notification whose `data` carries `attention` (`ATTENTION_DATA_KEY`) set
+    to `calm`, `late` or `spent` reaches only the devices whose
+    `push_subscriptions.attention_push` level wants it (README, "Attention
+    pushes, filtered per device"). Three things are the host's:
+
+    - **The column.** Additive (`20261002130000_push_attention_level`, NULL =
+      every attention push): sync the partial and the migration, regenerate
+      and migrate BEFORE the bumped package serves a request that sends a
+      level. A host that never sends one writes nothing to the column.
+    - **The level, on every subscribe.** `POST /push-subscriptions` with
+      `attentionPush` — at subscribe time and on every change. Absent keeps
+      the stored level; a re-owned endpoint (another user, same browser) falls
+      back to NULL unless the request names one.
+    - **The open app.** Rule 12's service worker skips `showNotification` when
+      one of its clients is visible: the person is already looking at the
+      button, which has its own sound.
+
+    A HAND-WRITTEN adapter (rule 4) carries `attentionPush` on the row and the
+    upsert arguments. Two silent gaps: an update that writes `null` when the
+    argument is ABSENT wipes every device's choice on re-subscribe, and a
+    `WebPushSubscriptionSource.list` that drops the field makes every device
+    read as "all".
+
 ## The minimum host
 
 ```ts

@@ -22,10 +22,12 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     verified: 'VERIFIED',
     unverified: 'NOT VERIFIED',
     connectionOk: 'CONNECTION OK',
+    detailsOk: 'DETAILS OK',
     reconnectRequired: 'RECONNECT',
     notConnected: 'Not connected',
     threeStepsAhead: 'This provider only starts taking sales after the 3 steps below.',
     connectAndVerifyFirst: 'Connect and verify the provider before switching sales on.',
+    checkDetailsFirst: 'Fill in and check the details before switching sales on.',
     receiving: {
       state: 'Taking sales',
       sub: 'Your store is being paid through this provider.',
@@ -39,6 +41,12 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       state: 'Not taking sales yet',
       sub: 'Everything is ready — flip the switch to start taking payments.',
     },
+    certificateExpires: (iso) =>
+      `The production certificate expires on ${new Date(iso).toLocaleDateString('en-US')}. ` +
+      'Before then, generate a new certificate and private key in the provider’s portal and paste both on the Production tab — with an expired certificate, Pix through this provider does not work.',
+    certificateExpired: (iso) =>
+      `The production certificate expired on ${new Date(iso).toLocaleDateString('en-US')}. ` +
+      'Until it is replaced, Pix through this provider does not work. Generate a new certificate and private key in the provider’s portal and paste both on the Production tab.',
   },
   listBadge: {
     active: 'Active',
@@ -125,12 +133,15 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     configuredKeepBlank: 'Configured — leave blank to keep the current value.',
     // Leading space: it is appended to a field label.
     advancedSuffix: ' · Connect platforms only',
+    optionalSuffix: ' · optional',
     probeAction: 'Test connection',
     reverifyWarning: (displayName) =>
       `This store is already verified. Changing the credentials **requires re-verification** ` +
       `and the store **stops taking payments** through ${displayName} until it finishes.`,
     probeRunning: 'Testing the connection…',
     probeSaveNote: 'We save and test the keys with the provider before going on.',
+    probeLocalRunning: 'Checking the details…',
+    probeLocalSaveNote: 'We check the details before saving.',
     probeIncompleteNote: 'We kept what you have filled in. Complete the fields to test.',
     probeFailed: (environmentName) =>
       `Could not connect in ${environmentName}. Check the credentials for this environment.`,
@@ -138,6 +149,7 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     checkFail: 'Fix',
     uncheckable: 'Not verifiable',
     saveAndTest: 'Save and test connection',
+    saveAndCheck: 'Save and check',
     save: 'Save',
     saveOnly: (fieldLabel) => `Save ${fieldLabel}`,
     changeAction: 'Change',

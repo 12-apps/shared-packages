@@ -66,7 +66,7 @@ test('a guide that names the platform names THIS host', async ({ page }) => {
  * as from a guide step, and those have no seam of their own.
  */
 test('no published provider surface names an adopter of this package', async ({ page }) => {
-  for (const provider of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau'] as const) {
+  for (const provider of ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau', 'pixmanual'] as const) {
     await page.getByTestId(`payments-provider-card-${provider}`).click();
     await expect(page.getByTestId('payments-provider-back')).toBeVisible();
 

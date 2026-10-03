@@ -66,15 +66,15 @@ export interface BuyerInfo {
 }
 
 /**
- * A raised PIX charge. `copyPaste` is the EMV "copia e cola" payload — it is both
- * what the QR code encodes and what the copy button copies. The real backend also
- * returns a provider QR image; the client renders its own QR from `copyPaste`, so
- * no image URL is needed here.
+ * A raised PIX charge. `copyPaste` is the EMV "copia e cola" payload: what the
+ * QR encodes (rendered client-side, so no image URL) and what the button copies.
  */
 export interface PixCharge {
   copyPaste: string;
   /** ISO-8601 instant when the charge expires. */
   expiresAt: string;
+  /** `'MANUAL'`: only the store confirms it (`pixmanual`); absent is automatic. */
+  confirmation?: 'AUTOMATIC' | 'MANUAL';
 }
 
 /**
@@ -275,15 +275,15 @@ export interface CheckoutChainLink {
   provider: string;
   /**
    * The provider's own name as a BUYER should read it ("InfinitePay"), which
-   * `GET /api/checkout/config` publishes per entry.
-   *
-   * Optional, and the DEGRADE DIRECTION IS "SAY NOTHING": an older host serves
-   * no name, and a hand-off screen then describes where the buyer is going
-   * without naming it, rather than printing the internal `provider` id — a
-   * buyer shown "infinitepay" learns less than one shown nothing, and learns
-   * it in a vocabulary that is ours rather than theirs.
+   * `GET /api/checkout/config` publishes per entry. Optional, and the DEGRADE
+   * DIRECTION IS "SAY NOTHING": an older host serves no name, and a hand-off
+   * screen then describes where the buyer is going without naming it, rather
+   * than printing the internal `provider` id — a buyer shown "infinitepay"
+   * learns less than one shown nothing, in a vocabulary ours rather than theirs.
    */
   displayName?: string | null;
+  /** `MANUAL`: only the store confirms this entry's charges (`pixmanual`); absent is automatic. */
+  confirmation?: "AUTOMATIC" | "MANUAL";
   tokenization: "NONE" | "PUBLIC_KEY" | "SDK" | "REDIRECT";
   publicKey: string | null;
   mockTokenization: boolean;

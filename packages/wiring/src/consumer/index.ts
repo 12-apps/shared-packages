@@ -12,6 +12,7 @@ export {
   type PackageEnvContribution,
   type ServerAdoption,
   type SharedCapabilityAnswers,
+  type NativeAdoption,
   type WebAdoption,
   type WiringHostOptions,
 } from "./host";
@@ -26,6 +27,7 @@ export {
   type ServerBindings,
   type SurfaceBindingValue,
   type SurfaceOf,
+  type NativeBindings,
   type WebBindings,
 } from "./bindings";
 

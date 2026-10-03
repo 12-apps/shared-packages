@@ -2,14 +2,17 @@ import type { ProviderSetupGuide, SetupGuideContext, SetupProgress } from '../co
 import type { ItauSetupGuideCopy } from './setup-guide-copy';
 
 /**
- * Itau's onboarding walkthrough — the same shape as Stone's: keys, a webhook
- * registered by hand, and the sectionless last stage every guide keeps for
- * switching sales on. Itau declares no `activationCharge` (it takes no card,
+ * Itau's onboarding walkthrough — the same shape as Stone's: keys, the
+ * webhook, and the sectionless last stage every guide keeps for switching
+ * sales on. Itau declares no `activationCharge` (it takes no card,
  * the only proof the activation flow can run), so no activation card fills
  * that stage: once connected, the owner turns it on with the status toggle.
  *
- * The webhook step is the one no API here can report. BACEN registers it per
- * Pix KEY (`PUT /webhook/{chave}`), and until it is registered Itau notifies
+ * The webhook is registered by the credential probe itself (BACEN
+ * `PUT /webhook/{chave}`, `itau-webhook-registration.ts`), and its result is a
+ * check under the Pix key — the probe result is not stored, so this step
+ * cannot report it and points there instead, keeping the URL for registering
+ * by hand when the bank refused it. Until it is registered Itau notifies
  * nobody — payments are then only found when the checkout or the sweep asks,
  * which is slower but not lost. The step says so, rather than implying a
  * store without it takes no payments.

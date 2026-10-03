@@ -32,6 +32,12 @@ export interface MethodPickerCopy {
   cardLabel: string;
   /** What each method is like to use — shown under its name. */
   pixDescription: string;
+  /**
+   * PIX's line when the store confirms it by hand (the chain's first PIX
+   * provider declares `confirmation: 'MANUAL'`). Optional; absent falls back
+   * to `pixDescription`, so a host enabling such a provider should set it.
+   */
+  pixManualDescription?: string;
   cardDescription: string;
   /** This store's providers cannot take that method. */
   unavailableHere: string;
@@ -107,6 +113,17 @@ export interface PixPaneCopy {
   awaiting: string;
   /** The order came back with no PIX charge on it — nothing to show. */
   chargeMissing: string;
+  /**
+   * The same pane for a Pix the STORE confirms (`PixCharge.confirmation:
+   * 'MANUAL'`). Optional so a host's own table keeps compiling; absent, the
+   * automatic sentences are used — which promise "automática", so a host that
+   * enables a store-confirmed provider should set them.
+   */
+  manual?: {
+    instructions(totalLabel: string): string;
+    validUntil(time: string): string;
+    awaiting: string;
+  };
 }
 
 /** The card pane's own heading. Everything else in it is {@link SettlingCopy}. */

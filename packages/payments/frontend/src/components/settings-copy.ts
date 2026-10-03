@@ -31,6 +31,12 @@ export interface ConnectionStatusCopy {
   /** The credential probe passed; no charge has been made. */
   connectionOk: string;
   /**
+   * `connectionOk` for a provider there is nothing to connect to — the store's
+   * own Pix key, checked here (`checksLocally`). Optional: absent, the chip
+   * falls back to `connectionOk`.
+   */
+  detailsOk?: string;
+  /**
    * A connection that WAS working and stopped — the one red chip, because it
    * is news rather than a step still to finish.
    */
@@ -41,6 +47,8 @@ export interface ConnectionStatusCopy {
   threeStepsAhead: string;
   /** The same, when the store must connect and verify first. */
   connectAndVerifyFirst: string;
+  /** `connectAndVerifyFirst` for a provider checked locally. Optional, falls back to it. */
+  checkDetailsFirst?: string;
   /** Live: this provider is taking money. */
   receiving: { state: string; sub: string };
   /** Proven, and switched off by the owner. */
@@ -49,6 +57,14 @@ export interface ConnectionStatusCopy {
   pausedChip: string;
   /** Proven, not switched on yet. */
   readyNotReceiving: { state: string; sub: string };
+  /**
+   * The saved production certificate lapses inside the renewal window, or has
+   * lapsed. Given the ISO `validTo`; the pack formats the date in its own
+   * locale. Provider-neutral wording — the certificate is the store's, the
+   * portal is the provider's.
+   */
+  certificateExpires: (iso: string) => string;
+  certificateExpired: (iso: string) => string;
 }
 
 /**
@@ -186,6 +202,8 @@ export interface CredentialFormCopy {
   configuredKeepBlank: string;
   /** The suffix on an `advanced` field most stores must leave empty. */
   advancedSuffix: string;
+  /** The suffix on an `optional` field: blank keeps its default. */
+  optionalSuffix: string;
   probeAction: string;
   /**
    * What replacing a PROVEN connection's credentials costs.
@@ -198,6 +216,13 @@ export interface CredentialFormCopy {
   reverifyWarning(displayName: string): string;
   probeRunning: string;
   probeSaveNote: string;
+  /**
+   * `probeRunning` / `probeSaveNote` for a provider checked locally: nothing is
+   * sent anywhere, so saying the keys are tested "no provedor" would be false.
+   * Optional; absent, the provider sentences are used.
+   */
+  probeLocalRunning?: string;
+  probeLocalSaveNote?: string;
   probeIncompleteNote: string;
   probeFailed(environmentName: string): string;
   /** The per-credential marks beside each field. */
@@ -211,6 +236,8 @@ export interface CredentialFormCopy {
    * only written down, and a one-field provider names its field instead.
    */
   saveAndTest: string;
+  /** `saveAndTest` for a provider checked locally (no connection to test). Optional. */
+  saveAndCheck?: string;
   save: string;
   saveOnly(fieldLabel: string): string;
   /** Reopen a finished credential step — unaccented, so only a reading found it. */

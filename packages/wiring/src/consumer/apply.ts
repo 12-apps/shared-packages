@@ -8,7 +8,7 @@
 import { WiringAssemblyError } from "../errors";
 import type { MountedRoute, WireRoute, WireRouteAnswer } from "../contract/http";
 import type { BoundJob, JobsContribution, WireJobBlueprint } from "../contract/jobs";
-import type { AnyServerManifest, AnyWebManifest } from "../contract/manifest";
+import type { AnyNativeManifest, AnyServerManifest, AnyWebManifest } from "../contract/manifest";
 import type { EmailPort } from "../contract/email";
 import type { CapabilityReportEntry } from "./report";
 import type { EmailBindingValue, HttpBindingValue, JobsBindingValue, SurfaceBindingValue } from "./bindings";
@@ -150,11 +150,14 @@ export function bindEmail(
 
 export function bindSurface(
   context: BindContext,
-  web: AnyWebManifest | undefined,
+  runtime: AnyWebManifest | AnyNativeManifest | undefined,
   binding: unknown,
+  which: "web" | "native",
 ): CapabilityReportEntry {
-  const contribution = web?.surface;
-  if (!contribution) refuse(context, 'a binding answers "surface" but the web manifest declares none.');
+  const contribution = runtime?.surface;
+  if (!contribution) {
+    refuse(context, `a binding answers "surface" but the ${which} manifest declares none (or was not provided).`);
+  }
   const value = binding as SurfaceBindingValue<never>;
   // Built ONCE per adoption, which is the memoisation every hand wiring
   // carries as a comment today: `create` returns component TYPES, and a

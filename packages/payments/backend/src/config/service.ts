@@ -37,7 +37,10 @@ import {
   toggleInChain,
 } from './enablement';
 import { applySaveCredentials } from './save-credentials';
+import { resolveWebhookUrl, type SettingsServiceOptions } from './settings-options';
 import { runVerify, type VerifiedProviderConfig } from './verify';
+
+export type { SettingsServiceOptions } from './settings-options';
 
 /**
  * The settings service — the server logic behind the per-provider config
@@ -168,6 +171,7 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
     lastVerifiedAt: config.lastVerifiedAt ? config.lastVerifiedAt.toISOString() : null,
     chargeVerifiedAt: config.chargeVerifiedAt ? config.chargeVerifiedAt.toISOString() : null,
     expiresAt: config.expiresAt ? config.expiresAt.toISOString() : null,
+    credentialExpiresAt: adapter.credentialExpiry?.(config.environments.PRODUCTION) ?? null,
     stub: config.stub,
     environments: {
       SANDBOX: maskEnvironment(adapter, config.environments.SANDBOX),
@@ -242,20 +246,6 @@ async function buildSettingsView(
   };
 }
 
-/** Construction-time options — NOT reachable from any request body. */
-export interface SettingsServiceOptions {
-  /**
-   * Allow SANDBOX configurations to run provider adapters in stub mode
-   * (deterministic fakes, no network). Stub card charges report `PAID`
-   * without money moving, so this is a deployment decision for local dev
-   * and demo tenants: default OFF, and refused for PRODUCTION even when on.
-   *
-   * Take it from `resolveStubMode(process.env)` rather than inferring it from
-   * whatever else happens to be in the environment — see `core/stub-mode.ts`.
-   */
-  allowStubMode?: boolean;
-}
-
 export function createSettingsService(
   providers: ProviderRegistry,
   store: ProviderConfigStore,
@@ -323,16 +313,9 @@ export function createSettingsService(
 
     async verify(merchant, provider, environment) {
       const config = await load(merchant, provider);
+      const notificationUrl = await resolveWebhookUrl(options, merchant, provider);
       const target = environment ?? config.environment;
-      return runVerify(
-        providers.get(provider),
-        store,
-        merchant,
-        config,
-        target,
-        allowStubMode,
-        toMasked,
-      );
+      return runVerify(providers.get(provider), store, merchant, config, target, allowStubMode, toMasked, notificationUrl);
     },
   };
 }

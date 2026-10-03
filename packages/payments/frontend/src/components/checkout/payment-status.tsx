@@ -117,6 +117,12 @@ interface PaymentStatusProps {
    * sentence, and it decides whether a retry is offered at all.
    */
   decline?: CheckoutDecline | null;
+  /**
+   * The payment was a Pix only the STORE confirms (FUT-3232): a FAILED or
+   * EXPIRED screen then says the store did not find it, never that nothing
+   * was charged.
+   */
+  manual?: boolean;
 }
 
 /**
@@ -198,6 +204,7 @@ export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
         wait={view.wait}
         decline={view.decline}
         hero={props.paidHero}
+        manual={props.manual === true}
       />
 
       {view.paid ? (
@@ -220,6 +227,7 @@ export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
         onNotPaid={view.notPaid}
         onBackToMenu={onBackToMenu}
         backActionEmphasis={props.backActionEmphasis}
+        manual={props.manual === true}
       />
 
       {view.paid ? props.paidFooter : null}

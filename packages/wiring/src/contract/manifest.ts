@@ -4,20 +4,24 @@
  *
  * One module exporting the server factory next to the React factory would
  * drag Node into every SPA and React into every worker — the exact reason
- * today's packages split `./server` from `./react`. So the manifest is three
- * values behind three conventional subpaths:
+ * today's packages split `./server` from `./react`. So the manifest is up to
+ * four values behind four conventional subpaths:
  *
  *   `<pkg>/manifest`         the SHARED manifest — data every runtime can
  *                            hold: identity, permissions, notification
  *                            blueprints, MCP tools, the Prisma contribution,
- *                            e2e pointers, and the INVENTORY of the two
+ *                            e2e pointers, and the INVENTORY of the
  *                            runtime manifests;
  *   `<pkg>/manifest/server`  the server capabilities (HTTP, jobs, email);
- *   `<pkg>/manifest/web`     the web capabilities (surface, areas).
+ *   `<pkg>/manifest/web`     the web capabilities (surface, areas);
+ *   `<pkg>/manifest/native`  the React Native capabilities (surface) — its
+ *                            own bundle, since a native app can import
+ *                            neither the DOM nor a web component library.
  *
- * The inventory is what keeps the three honest across bundles: the shared
+ * The inventory is what keeps them honest across bundles: the shared
  * manifest NAMES every runtime capability, `defineServerManifest` /
- * `defineWebManifest` refuse a runtime manifest that drifts from it, and a
+ * `defineWebManifest` / `defineNativeManifest` refuse a runtime manifest that
+ * drifts from it, and a
  * host that adopts the shared manifest without binding an inventoried
  * capability gets a red `assemble()` naming it. That is the mechanism that
  * turns "a version bump shipped a capability the host never wired" from a
@@ -32,13 +36,20 @@ import type { McpContribution } from "./mcp";
 import type { AnyNotificationBlueprint } from "./notifications";
 import type { WirePermissionsContribution } from "./permissions";
 import type { PrismaContribution } from "./db";
-import type { AreaContribution, WebSurfaceContribution } from "./web";
+import type { AreaContribution, NativeSurfaceContribution, WebSurfaceContribution } from "./web";
 
 /** Capabilities that live in the server manifest. */
 export type ServerCapabilityKind = "http" | "jobs" | "email";
 
 /** Capabilities that live in the web manifest. */
 export type WebCapabilityKind = "surface" | "areas";
+
+/**
+ * Capabilities that live in the native manifest. The SAME kind as the web
+ * surface — one capability, a second runtime — so the vocabulary every
+ * package answers for does not grow; only where the surface may live does.
+ */
+export type NativeCapabilityKind = "surface";
 
 /** Capabilities the shared manifest carries as data. */
 export type SharedCapabilityKind =
@@ -111,6 +122,8 @@ export interface PackageManifest {
   readonly server?: readonly ServerCapabilityKind[];
   /** Inventory of the web manifest — must match its keys exactly. */
   readonly web?: readonly WebCapabilityKind[];
+  /** Inventory of the native manifest — must match its keys exactly. */
+  readonly native?: readonly NativeCapabilityKind[];
 }
 
 /**
@@ -130,4 +143,10 @@ export interface AnyWebManifest {
   readonly name: string;
   readonly surface?: WebSurfaceContribution<never, unknown>;
   readonly areas?: readonly AreaContribution[];
+}
+
+/** The widest native manifest — the consumer's generic bound. */
+export interface AnyNativeManifest {
+  readonly name: string;
+  readonly surface?: NativeSurfaceContribution<never, unknown>;
 }

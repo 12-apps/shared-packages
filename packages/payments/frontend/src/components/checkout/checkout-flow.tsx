@@ -233,6 +233,9 @@ function StatusStep({
       // FAILED only, where it picks the sentence and decides whether a retry
       // could work at all.
       decline={c.decline}
+      // A Pix the store confirms by hand ends without proof either way
+      // (FUT-3232), so its refusal and lapse get their own sentences.
+      manual={c.order?.pix?.confirmation === "MANUAL"}
     />
   );
 }

@@ -281,7 +281,7 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   const { actionable, selectable, slot, drag, reserve, pad, padY, acts } = shell;
   const meta = metaShape(props);
   const disclosure = useDisclosure(props);
-  const { cells, configured, cellTemplate, opens, stack } = useRowLayout(props, shell, disclosure.expandable);
+  const { cells, configured, cellTemplate, compactTemplate, opens, stack } = useRowLayout(props, shell, disclosure.expandable);
 
   return (
     <StandaloneContainer inGroup={shell.group != null}>
@@ -295,7 +295,7 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
         {...(acts ? actionProps(onClick) : {})}
         {...drag.itemProps}
         // A PLAIN OBJECT: `Card` merges by spreading, so a function sx vanishes.
-        sx={rowStyles(props, shell, cellTemplate, stack)}
+        sx={rowStyles(props, shell, { cellTemplate, compactTemplate }, stack)}
       >
         {drag.dropEdge != null && <DropIndicator edge={drag.dropEdge} />}
         <DiscloseSlot
@@ -334,4 +334,4 @@ export function BaseListCard(props: BaseListCardProps): React.JSX.Element {
   );
 }
 
-export { META_BREAK, STACK_BREAK } from "./base-list-card-slots";
+export { COMPACT_BREAK, META_BREAK, STACK_BREAK } from "./base-list-card-slots";

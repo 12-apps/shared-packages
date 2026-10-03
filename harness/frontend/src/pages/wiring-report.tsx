@@ -1,8 +1,31 @@
 import type { JSX } from 'react';
 
-import { renderWiringReport } from '@12-apps/wiring/consumer';
+import { renderWiringReport, type WiringReport } from '@12-apps/wiring/consumer';
 
 import { webWiringReport } from '../wiring-web';
+
+type CapabilityEntry = WiringReport['packages'][number]['capabilities'][number];
+
+/**
+ * One capability row's test id.
+ *
+ * `kind` alone stopped being unique once a manifest could declare `surface`
+ * for the web AND the native runtime (`@12-apps/chat` is the first): a web host
+ * reports the web one as bound and the native one as `out-of-scope`, two rows
+ * of one kind. The report's own docs say to key it by `kind` + `runtime`, so
+ * the FOREIGN row of a repeated kind carries its runtime as a suffix — and
+ * every row whose kind is unique keeps the id the specs already address.
+ */
+function capabilityTestId(
+  packageName: string,
+  capability: CapabilityEntry,
+  siblings: readonly CapabilityEntry[],
+): string {
+  const base = `wiring-${packageName}-${capability.kind}`;
+  const repeated = siblings.filter((entry) => entry.kind === capability.kind).length > 1;
+  const foreign = capability.status === 'out-of-scope' && capability.runtime !== undefined;
+  return repeated && foreign ? `${base}-${capability.runtime}` : base;
+}
 
 /**
  * THE REPORT, rendered — the browser half of the question the consumer exists
@@ -37,8 +60,8 @@ export function WiringReportPage(): JSX.Element {
             <ul>
               {entry.capabilities.map((capability) => (
                 <li
-                  key={capability.kind}
-                  data-testid={`wiring-${entry.packageName}-${capability.kind}`}
+                  key={`${capability.kind}:${capability.runtime ?? ''}`}
+                  data-testid={capabilityTestId(entry.packageName, capability, entry.capabilities)}
                   data-status={capability.status}
                 >
                   {`${capability.kind}: ${capability.status} — ${capability.detail}`}

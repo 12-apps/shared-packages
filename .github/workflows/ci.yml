@@ -52,6 +52,7 @@ env:
     packages/payments/frontend
     packages/payments/e2e
     packages/ui
+    packages/chat
     packages/impersonation
     packages/audit
     packages/storage

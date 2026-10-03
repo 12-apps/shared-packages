@@ -1,3 +1,4 @@
+import { ATTENTION_CHANNEL_LEVELS, type AttentionChannelLevel } from '../attention/core';
 import type { NotificationWireMessages } from '../messages';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from '../types';
 
@@ -276,11 +277,33 @@ function parseEndpoint(value: unknown, messages: NotificationWireMessages): stri
   return value;
 }
 
+/**
+ * The device's attention-push level, when the body carries one: absent stays
+ * absent (the stored level is kept), `null` clears it, anything else must be a
+ * level.
+ */
+function attentionPushOf(
+  record: Record<string, unknown>,
+  messages: NotificationWireMessages,
+): { attentionPush?: AttentionChannelLevel | null } {
+  if (!('attentionPush' in record)) return {};
+  const value = record.attentionPush;
+  if (value === null) return { attentionPush: null };
+  if (typeof value === 'string' && (ATTENTION_CHANNEL_LEVELS as readonly string[]).includes(value)) {
+    return { attentionPush: value as AttentionChannelLevel };
+  }
+  throw new NotificationsApiError(400, messages.invalidBody);
+}
+
 /** `POST <mount>/push-subscriptions` — `PushSubscription.toJSON()`. */
 export function parsePushSubscriptionBody(
   body: unknown,
   messages: NotificationWireMessages,
-): { endpoint: string; keys: { p256dh: string; auth: string } } {
+): {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  attentionPush?: AttentionChannelLevel | null;
+} {
   const record = asRecord(body, messages);
   const keys = asRecord(record.keys, messages);
   const key = (value: unknown): string => {
@@ -292,6 +315,7 @@ export function parsePushSubscriptionBody(
   return {
     endpoint: parseEndpoint(record.endpoint, messages),
     keys: { p256dh: key(keys.p256dh), auth: key(keys.auth) },
+    ...attentionPushOf(record, messages),
   };
 }
 

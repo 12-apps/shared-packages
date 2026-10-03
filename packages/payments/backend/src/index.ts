@@ -397,3 +397,4 @@ export * from './activation/index';
 // in `platform/index.ts` (this file is at the size gate); the matching
 // screens live in `@12-apps/payments-frontend`.
 export * from './platform/index';
+export * from './core/manual-charge-public';

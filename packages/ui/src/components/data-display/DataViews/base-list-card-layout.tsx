@@ -6,7 +6,7 @@ import { Box } from "../../../mui/Box";
 import type { BaseListCardProps } from "./base-list-card";
 import { rowGutters, type StackPlacement, type useRowShell } from "./base-list-card-geometry";
 import { cellRailsTemplate } from "./list-card-rails";
-import { cellTracks, useCellConfig, type ListCardCellConfig } from "./list-card-cells";
+import { cellTracks, compactCellTracks, useCellConfig, type ListCardCellConfig } from "./list-card-cells";
 
 /**
  * WHAT SHAPE A ROW TAKES, resolved once: its cells and their template, whether
@@ -33,12 +33,15 @@ function useResolvedCells(
   cells: readonly ListCardCellConfig<never>[] | null;
   configured: boolean;
   cellTemplate: string | null;
+  compactTemplate: string | null;
 } {
   const groupCells = useCellConfig();
   const cells = groupCells ?? props.cells ?? null;
   const configured = cells != null && cells.length > 0 && props.row != null;
-  const cellTemplate = configured && !inGroup ? cellRailsTemplate(cellTracks(cells), gutters) : null;
-  return { cells, configured, cellTemplate };
+  const own = configured && !inGroup;
+  const cellTemplate = own ? cellRailsTemplate(cellTracks(cells), gutters) : null;
+  const compactTemplate = own ? cellRailsTemplate(compactCellTracks(cells), gutters) : null;
+  return { cells, configured, cellTemplate, compactTemplate };
 }
 
 /**

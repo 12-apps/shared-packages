@@ -261,6 +261,90 @@ self.registration.showNotification(payload.title, {
 });
 ```
 
+## Attention — the third kind of entry
+
+An inbox notification is an event that happened; a live activity is state a
+reader follows. **Attention** is something waiting on the person looking at the
+screen, with a clock on it: a plate under the lamp, a call nobody answered, a
+courier at the door. It is never read or dismissed; it leaves when the work is
+done, and until then it grows more urgent.
+
+`@12-apps/notifications/attention` (framework-free) and
+`@12-apps/notifications/attention/react` draw it as ONE round button for the
+next thing to do, wherever the host mounts it.
+
+| piece | what it does |
+|---|---|
+| `defineAttention({ categories, kinds })` | the host's wiring, checked once: category order, and per kind its budget, its conditions (`severity`), its permission |
+| `readAttention(registry, items, { now, can })` | the queue: **severity first** (spent → late → calm), then category order, then kind order, then the longest wait |
+| `AttentionHost` | the button, a quiet "+N" for the rest, sound/vibration for news, and the sheet each kind declares (`renderSheet`) or the host's own action (`onOpen`) |
+| `createAttentionPreferences({ storageKey })` | sound, vibration, push level and the button's position, **per device** |
+| `AttentionPreferencesPanel`, `AttentionQuickSettings` | the same settings, as a section of the host's user settings and as a small control for a sheet's header |
+
+The ladder is fixed so every adopter agrees on "late": calm under one lap of the
+kind's budget, late from one, spent from two — unless a kind's own `severity`
+says otherwise (a courier at the door is late the moment it arrives). The button
+asks harder as the clock runs: still under 40% of the budget, a soft pulse to
+70%, a full one from there and while late, and once spent a faster pulse, a
+shake and a second outline, so a reader who cannot tell green from amber still
+tells the states apart. Nothing moves under `prefers-reduced-motion`.
+
+Every sentence is the host's (`AttentionMessages`); there is no default table.
+Sound is synthesised (or the host's files); vibration is `navigator.vibrate`,
+which Safari on iPhone does not implement — `canVibrate()` says so and the
+settings show it.
+
+### Attention pushes, filtered per device
+
+Push rides the `WEB_PUSH` channel above. A notification is an ATTENTION push
+when its `data` carries the reserved key `attention` (`ATTENTION_DATA_KEY`) set
+to the item's severity — `calm` for an arrival, `late` or `spent` once the clock
+ran out. The transport then sends it only to the devices whose own push level
+wants it (`wantsAttentionPush`): `off` takes none, `late` only the urgent ones,
+`all` everything. A device that never chose takes them all, and a notification
+without the key is not attention and reaches every device as before. None of
+the user's devices wanting it is their choice, so the delivery succeeds without
+sending rather than retrying.
+
+The level is set in the browser (`createAttentionPreferences`, in
+`localStorage`, where no server can read it), so the host's app sends it with
+the subscription: `POST /push-subscriptions` takes an optional
+`attentionPush` (`off` | `late` | `all`), stored on that device's
+`push_subscriptions` row. Leaving it out keeps the stored level, so a
+re-subscribe from a flow that knows nothing about attention cannot reset it;
+`null` clears it. Re-post on every change of the level (`store.subscribe`).
+A host on the packaged client sends it through
+`api.savePushSubscription({ endpoint, keys, attentionPush })`.
+
+On the server, a generator marks its notification with the key from the
+framework-free entry:
+
+```ts
+import { ATTENTION_DATA_KEY } from '@12-apps/notifications/attention';
+
+generate: (p) => ({ title, body, link, data: { [ATTENTION_DATA_KEY]: p.late ? 'late' : 'calm' } }),
+```
+
+A level the transport does not recognise (a newer app's, an older server's)
+fails OPEN — the device takes every attention push — because an over-delivered
+alert costs a glance and a dropped one costs a table. A push filtered out on
+every device is recorded as `SENT` (it was delivered as the devices asked); it
+is not retried. On a live activity (`liveSubject`), give the CLOSING stage a
+severity every non-`off` level takes, or no `attention` key at all: a `late`
+device never receives a `calm` replacement, and its earlier entry stays in the
+tray.
+
+What the push may NOT do while the app is open on that device — interrupt
+someone already looking at the button — is the host's service worker's call:
+skip `showNotification` when a visible client exists.
+
+Sound needs a user gesture first, and Safari holds that per audio context: the
+host unlocks on the page's first tap or key press (`useAttentionAlerts` listens
+for it), so a later announcement can play. Pass `ready={false}` while the host
+is still loading, so what was already waiting when the page opened never rings.
+Check the views against the registry with `defineAttentionViews` — a typo in a
+key would otherwise drop a whole kind silently.
+
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,

@@ -14,10 +14,12 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     verified: 'VERIFICADO',
     unverified: 'NÃO VERIFICADO',
     connectionOk: 'CONEXÃO OK',
+    detailsOk: 'DADOS OK',
     reconnectRequired: 'RECONECTAR',
     notConnected: 'Não conectado',
     threeStepsAhead: 'Este provedor só passa a receber vendas depois dos 3 passos abaixo.',
     connectAndVerifyFirst: 'Conecte e verifique o provedor antes de ativar as vendas.',
+    checkDetailsFirst: 'Preencha e confira os dados antes de ativar as vendas.',
     receiving: {
       state: 'Recebendo vendas',
       sub: 'Sua loja está recebendo por este provedor.',
@@ -31,6 +33,12 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
       state: 'Ainda não está recebendo',
       sub: 'Tudo pronto — ligue a chave para começar a receber.',
     },
+    certificateExpires: (iso) =>
+      `O certificado de produção vence em ${new Date(iso).toLocaleDateString('pt-BR')}. ` +
+      'Antes disso, gere um novo certificado e uma nova chave privada no portal do provedor e cole os dois na aba Produção — com o certificado vencido, o Pix por este provedor não funciona.',
+    certificateExpired: (iso) =>
+      `O certificado de produção venceu em ${new Date(iso).toLocaleDateString('pt-BR')}. ` +
+      'Enquanto ele não for trocado, o Pix por este provedor não funciona. Gere um novo certificado e uma nova chave privada no portal do provedor e cole os dois na aba Produção.',
   },
   listBadge: {
     active: 'Ativo',
@@ -113,12 +121,15 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
   credentials: {
     configuredKeepBlank: 'Configurado — deixe em branco para manter o valor atual.',
     advancedSuffix: ' · só para plataformas Connect',
+    optionalSuffix: ' · opcional',
     probeAction: 'Testar conexão',
     reverifyWarning: (displayName) =>
       `Esta loja já está verificada. Trocar as credenciais **exige uma nova verificação** ` +
       `e a loja **para de receber** pelo ${displayName} até que ela termine.`,
     probeRunning: 'Testando a conexão…',
     probeSaveNote: 'Salvamos e testamos as chaves no provedor antes de seguir.',
+    probeLocalRunning: 'Conferindo os dados…',
+    probeLocalSaveNote: 'Conferimos os dados antes de salvar.',
     probeIncompleteNote: 'Guardamos o que você já preencheu. Complete os campos para testar.',
     probeFailed: (environmentName) =>
       `Não foi possível conectar em ${environmentName}. Confira as credenciais deste ambiente.`,
@@ -126,6 +137,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     checkFail: 'Corrigir',
     uncheckable: 'Não verificável',
     saveAndTest: 'Salvar e testar conexão',
+    saveAndCheck: 'Salvar e conferir',
     save: 'Salvar',
     saveOnly: (fieldLabel) => `Salvar ${fieldLabel}`,
     changeAction: 'Alterar',

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "customConditions": ["react-native"]
+  },
+  "include": [
+    "src/native/**/*",
+    "src/ui/**/*",
+    "src/client/**/*",
+    "src/core/**/*",
+    "src/**/*.native.test.tsx"
+  ]
+}

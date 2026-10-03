@@ -283,6 +283,10 @@ export function assertSaveCredentialsInput(
   input: SaveCredentialsInput,
 ): SaveCredentialsInput {
   const parsed = parseInput(adapter.name, input);
+  const environments = adapter.capabilities.environments;
+  if (environments && !environments.includes(parsed.environment)) {
+    throw new InvalidCredentialsInputError(adapter.name, `${adapter.name} has no ${parsed.environment} environment.`);
+  }
   // The host-owned addresses are checked as URLs and taken OUT of what the
   // schema rule sees; everything left is a credential and is judged as one.
   // Splitting them here rather than inside `assertFieldsMatchSchema` keeps that

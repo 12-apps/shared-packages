@@ -80,6 +80,7 @@ interface SubscriptionSqlRow {
   client_id: string | null;
   side: string | null;
   user_agent: string | null;
+  attention_push: string | null;
 }
 
 const subscriptionRow = (row: SubscriptionSqlRow): PushSubscriptionRow => ({
@@ -91,6 +92,7 @@ const subscriptionRow = (row: SubscriptionSqlRow): PushSubscriptionRow => ({
   clientId: row.client_id,
   side: row.side,
   userAgent: row.user_agent,
+  attentionPush: row.attention_push,
 });
 
 /**
@@ -117,6 +119,14 @@ function reachWhere(where: PushSubscriptionWhere, params: Params): string {
     conditions.push(`(${arms.join(' OR ')})`);
   }
   return conditions.join(' AND ');
+}
+
+/**
+ * The upsert's attention-level assignment: written only when the package passes
+ * one — ABSENT means "keep this device's choice", never NULL.
+ */
+function attentionSet(level: string | null | undefined, params: Params): string {
+  return level === undefined ? '' : `attention_push = ${params.add(level)},`;
 }
 
 export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
@@ -155,11 +165,13 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
         // literal, so a new column that is added to the seam and forgotten in
         // this statement writes NULL for ever with nothing failing to compile.
         `INSERT INTO push_subscriptions
-           (id, user_id, endpoint, p256dh, auth, client_id, side, user_agent, updated_at)
+           (id, user_id, endpoint, p256dh, auth, client_id, side, user_agent, attention_push,
+            updated_at)
          VALUES (${params.add(randomUUID())}, ${params.add(create.userId)},
                  ${params.add(where.endpoint)}, ${params.add(create.p256dh)},
                  ${params.add(create.auth)}, ${params.add(create.clientId)},
-                 ${params.add(create.side)}, ${params.add(create.userAgent)}, NOW())
+                 ${params.add(create.side)}, ${params.add(create.userAgent)},
+                 ${params.add(create.attentionPush ?? null)}, NOW())
          ON CONFLICT (endpoint) DO UPDATE
            SET user_id = ${params.add(update.userId)},
                p256dh = ${params.add(update.p256dh)},
@@ -167,6 +179,7 @@ export function subscriptionDelegate(sql: SqlRunner): PushSubscriptionDelegate {
                client_id = ${params.add(update.clientId)},
                side = ${params.add(update.side)},
                user_agent = ${params.add(update.userAgent)},
+               ${attentionSet(update.attentionPush, params)}
                updated_at = NOW()
          RETURNING *`,
         params.values,

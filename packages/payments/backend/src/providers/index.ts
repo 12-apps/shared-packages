@@ -23,6 +23,7 @@ export type {
   StripeCredentialCopy,
   StripeModeFacts,
 } from './copy';
+export type { PixManualCopy } from './pix-manual/copy';
 export {
   PT_BR_INFINITEPAY_COPY,
   PT_BR_ITAU_COPY,
@@ -39,3 +40,5 @@ export {
   EN_US_STONE_COPY,
   EN_US_STRIPE_COPY,
 } from './en-US';
+export { PT_BR_PIX_MANUAL_COPY } from './pix-manual/pt-BR';
+export { EN_US_PIX_MANUAL_COPY } from './pix-manual/en-US';

@@ -97,6 +97,26 @@ export interface ChargeStore {
    * status only moves forward.
    */
   upsertByProviderChargeId(merchant: MerchantRef, snapshot: ChargeSnapshot): Promise<StoredCharge | null>;
+  /**
+   * Write `snapshot` ONLY while the stored row is still PENDING — one atomic
+   * compare-and-set, merchant-scoped like the upsert. What a MANUAL
+   * confirmation, refusal and expiry race on (`core/manual-charge.ts`): two
+   * staff taps can both read PENDING, and the upsert above, being read-then-
+   * write, would let both win. Optional: a host-written store without it
+   * cannot run manual providers, and the gateway says so.
+   */
+  transitionPending?(merchant: MerchantRef, snapshot: ChargeSnapshot): Promise<PendingTransition>;
+}
+
+/**
+ * What `transitionPending` did: `applied` is whether THIS call moved the row
+ * out of PENDING; `stored` is the row as it now stands (null when the charge
+ * is unknown or another merchant's), so a loser can tell "already confirmed"
+ * from "already refused".
+ */
+export interface PendingTransition {
+  applied: boolean;
+  stored: StoredCharge | null;
 }
 
 // The CHECKOUT-side charge reads (FUT-740) live in `./charge-queries.ts` so this

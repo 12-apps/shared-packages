@@ -12,7 +12,15 @@ import type {
   ResolvedCredentials,
 } from '../core/types';
 import type { ItauCopy } from './copy';
-import { ItauTokenError, itauSession, itauSetupProblem, NAME, readCob, type ItauSetupProblem } from './itau-http';
+import {
+  ItauTokenError,
+  itauCertificateExpiry,
+  itauSession,
+  itauSetupProblem,
+  NAME,
+  readCob,
+  type ItauSetupProblem,
+} from './itau-http';
 import {
   committedRefundCents,
   centsFrom,
@@ -27,6 +35,7 @@ import {
 } from './itau-pix';
 import { itauSetupGuide } from './itau-setup-guide';
 import { parseItauWebhook, verifyItauWebhook } from './itau-webhook';
+import { itauStubWebhookCheck, itauWebhookCheck } from './itau-webhook-registration';
 import { unreachableOutcome } from './probe-shared';
 import { chargeDescription, stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 
@@ -92,6 +101,37 @@ async function createChargeLive(input: ChargeInput, credentials: ResolvedCredent
 
 async function getChargeLive(txid: string, credentials: ResolvedCredentials, reference?: string): Promise<ChargeSnapshot> {
   return snapshotFromCob(await readCob(await itauSession(credentials), txid), reference);
+}
+
+/**
+ * Void a cob nobody has paid yet — BACEN's `PATCH /cob/{txid}` to
+ * `REMOVIDA_PELO_USUARIO_RECEBEDOR` — so a QR the checkout superseded stops
+ * being payable now rather than when its `expiracao` runs out.
+ *
+ * A cob the buyer already paid (`CONCLUIDA`) is refused by Itaú. That refusal
+ * is answered with the cob as it stands, read back, so the gateway records the
+ * PAID it would otherwise never hear about (it stores whatever snapshot comes
+ * back). Only a cob read back CLOSED answers the refusal: one still open, or
+ * one whose status we cannot read, is thrown — that really is "could not
+ * void", and it is never dressed up as a void.
+ */
+const CLOSED_COB = new Set(['CONCLUIDA', 'REMOVIDA_PELO_USUARIO_RECEBEDOR', 'REMOVIDA_PELO_PSP']);
+
+async function cancelChargeLive(txid: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot> {
+  const call = await itauSession(credentials);
+  try {
+    const cob = await call<ItauCob>('pix/cob', `/cob/${encodeURIComponent(txid)}`, {
+      method: 'PATCH',
+      json: { status: 'REMOVIDA_PELO_USUARIO_RECEBEDOR' },
+    });
+    return snapshotFromCob({ txid, ...cob });
+  } catch (error) {
+    const status = error instanceof ProviderRequestError ? error.options.httpStatus : undefined;
+    if (status === undefined || status < 400 || status >= 500) throw error;
+    const cob = await readCob(call, txid);
+    if (!CLOSED_COB.has(cob.status ?? '')) throw error;
+    return snapshotFromCob({ txid, ...cob });
+  }
 }
 
 /**
@@ -231,15 +271,15 @@ function tokenOutcome(error: ItauTokenError, copy: ItauCopy): ProbeOutcome | nul
  * (`probe-shared.ts`): a bug must not look like Itaú being down.
  */
 async function verifyItauCredentials(credentials: ResolvedCredentials, copy: ItauCopy): Promise<ProbeOutcome> {
-  if (credentials.stub) return { ok: true, message: 'stub mode' };
+  if (credentials.stub) return { ok: true, message: 'stub mode', checks: [itauStubWebhookCheck(credentials, copy)] };
   const problem = itauSetupProblem(credentials);
   if (problem) {
     const message = setupMessage(problem, copy);
     return { ok: false, fault: 'REFUSED', message, checks: setupChecks(problem, credentials, message) };
   }
   try {
-    await itauSession(credentials, 'typed');
-    return { ok: true };
+    const call = await itauSession(credentials, 'typed');
+    return { ok: true, checks: [await itauWebhookCheck(call, credentials, copy)] };
   } catch (error) {
     const outcome = error instanceof ItauTokenError ? tokenOutcome(error, copy) : null;
     if (outcome) return outcome;
@@ -289,6 +329,7 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
     ],
 
     verifyCredentials: (credentials, locale) => verifyItauCredentials(credentials, copy(locale ?? undefined)),
+    credentialExpiry: itauCertificateExpiry,
 
     async createCharge(input, credentials) {
       if (input.method !== 'PIX') throw new UnsupportedOperationError(NAME, `createCharge(${input.method})`);
@@ -302,6 +343,11 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
     },
 
     findChargeByReference,
+
+    async cancelCharge(providerChargeId, credentials) {
+      if (credentials.stub) return stubPendingSnapshot(NAME, providerChargeId);
+      return cancelChargeLive(providerChargeId, credentials);
+    },
 
     async refund(input, credentials) {
       if (credentials.stub) return stubRefund(NAME, input);

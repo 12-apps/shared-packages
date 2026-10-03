@@ -22,6 +22,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     pixLabel: 'PIX',
     cardLabel: 'Card',
     pixDescription: 'Approved instantly',
+    pixManualDescription: 'Confirmed by the store',
     cardDescription: 'Credit, paid in full',
     unavailableHere: 'Unavailable in this store',
   },
@@ -51,6 +52,12 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     expiryLocale: 'en-US',
     awaiting: 'Waiting for payment…',
     chargeMissing: 'Could not generate the PIX code.',
+    manual: {
+      instructions: (totalLabel) =>
+        `Pay ${totalLabel} with the QR code or the code below. The store checks it arrived and confirms your order.`,
+      validUntil: (time) => `The store confirms the payment by ${time}.`,
+      awaiting: 'Waiting for the store to confirm the payment…',
+    },
   },
   card: {
     heading: 'Pay by card',

@@ -14,6 +14,7 @@
     "./providers/infinitepay": "./src/providers/infinitepay.ts",
     "./providers/stripe": "./src/providers/stripe.ts",
     "./providers/itau": "./src/providers/itau.ts",
+    "./providers/pixmanual": "./src/providers/pixmanual.ts",
     "./pagbank-public-key": "./src/providers/pagbank-public-key.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",

@@ -4,7 +4,7 @@ import QRCode from "react-qr-code";
 
 import { useCheckoutCopy } from "./copy-context";
 import { ContentCopyIcon } from "./icons";
-import type { SettlingCopy } from "./screens-copy";
+import type { PixPaneCopy, SettlingCopy } from "./screens-copy";
 import { StalledWait } from "./stalled-wait";
 import type { CheckoutOrder, OrderStatus, PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
@@ -163,14 +163,18 @@ function PixPollFooter({
   error,
   timedOut,
   onCheckAgain,
+  manual,
 }: {
   error: string | null;
   timedOut: boolean;
   onCheckAgain: () => void;
+  /** The store confirms this Pix: the wait is for THEM, not for the bank. */
+  manual: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const { pix, settling } = useCheckoutCopy().screens;
   const panel = pixWaitPanel(settling, error, timedOut);
+  const awaiting = (manual ? pix.manual?.awaiting : undefined) ?? pix.awaiting;
   if (panel) {
     // The same panel the card and wallet panes show, held to the width of the
     // copy-and-paste strip above it so the centred PIX column stays a column.
@@ -190,10 +194,21 @@ function PixPollFooter({
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "text.secondary" }}>
       <LoadingDot />
       <Text variant="caption" size="xs" color="secondary" as="span" data-testid="pix-awaiting">
-        {pix.awaiting}
+        {awaiting}
       </Text>
     </Box>
   );
+}
+
+/**
+ * The pane's two sentences that depend on who confirms. A store-confirmed Pix
+ * must not say "a confirmação é automática": nothing confirms it but the store.
+ */
+function pixSentences(
+  copy: PixPaneCopy,
+  manual: boolean,
+): Pick<PixPaneCopy, "instructions" | "validUntil"> {
+  return (manual ? copy.manual : undefined) ?? copy;
 }
 
 export function PixView({
@@ -239,10 +254,9 @@ export function PixView({
   // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
   // clock, so it travels with the sentence it feeds rather than being frozen
   // to the origin host's here.
-  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, { hour: "2-digit", minute: "2-digit" });
+  const manual = pix.confirmation === "MANUAL";
+  const sentences = pixSentences(copy, manual);
 
   return (
     <Box
@@ -253,7 +267,7 @@ export function PixView({
         {copy.heading}
       </Text>
       <Text variant="body" size="sm" color="secondary" as="p">
-        {copy.instructions(order.totalLabel)}
+        {sentences.instructions(order.totalLabel)}
       </Text>
 
       <Box
@@ -268,10 +282,10 @@ export function PixView({
       <PixCodeBox pix={pix} />
 
       <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
-        {copy.validUntil(validUntil)}
+        {sentences.validUntil(validUntil)}
       </Text>
 
-      <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} />
+      <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} manual={manual} />
     </Box>
   );
 }

@@ -213,6 +213,12 @@ export interface PushSubscriptionRow {
   /** The side this browser's app serves; `null` = every side. */
   side: string | null;
   userAgent: string | null;
+  /**
+   * The attention pushes this device wants (`off`, `late`, `all`); `null` or
+   * absent = all. Optional, so an adapter or a generated client from before the
+   * column still type-checks.
+   */
+  attentionPush?: string | null;
 }
 
 /**
@@ -257,6 +263,7 @@ export interface PushSubscriptionDelegate {
       clientId: string | null;
       side: string | null;
       userAgent: string | null;
+      attentionPush?: string | null;
     };
     update: {
       userId: string;
@@ -265,6 +272,7 @@ export interface PushSubscriptionDelegate {
       clientId: string | null;
       side: string | null;
       userAgent: string | null;
+      attentionPush?: string | null;
     };
   }): Promise<PushSubscriptionRow>;
   delete(args: { where: { id: string } }): Promise<PushSubscriptionRow>;

@@ -2,9 +2,9 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { Box } from "../../../mui/Box";
 import { DENSITY_ROW_PADDING, type DataViewsDensity } from "./data-views-layout-context";
-import { CellConfigProvider, cellTracks, type ListCardCellConfig } from "./list-card-cells";
+import { CellConfigProvider, cellTracks, compactCellTracks, type ListCardCellConfig } from "./list-card-cells";
+import { GroupGrid, type GroupTemplate } from "./list-card-group-tracks";
 
 /**
  * THE LIST OWNS THE COLUMNS, NOT THE ROW.
@@ -37,7 +37,11 @@ export interface ListRails {
    * as a rendering fault rather than as a row you can open.
    */
   disclose: string;
-  /** Reserved even when nothing drags: toggling drag mode must not shift the list. */
+  /**
+   * Reserved even when nothing drags: toggling drag mode must not shift the
+   * list. The one exception is the compact band (`COMPACT_BREAK`), where a drag
+   * track no row fills leaves the template (`list-card-group-tracks`).
+   */
   drag: string;
   /** Reserved even when nothing is selectable, for the same reason. */
   select: string;
@@ -108,7 +112,11 @@ export const DEFAULT_RAILS: ListRails = {
 
 export interface ListRailsValue {
   density: DataViewsDensity;
-  /** Whether the gutters are held open even when empty. */
+  /**
+   * Whether the group holds its gutters open even when empty. The GROUP's grid
+   * acts on it (`list-card-group-tracks`); a row inside a group renders every
+   * gutter regardless, empty when unused, so the group can ask.
+   */
   reserveGutters: boolean;
   /**
    * How many tracks a row spans.
@@ -132,9 +140,10 @@ export function useListRails(): ListRailsValue | null {
  *
  * A rail set to `null` is DROPPED rather than sized to zero. The two are not the
  * same: a zero-width track still takes a `column-gap` beside it, so a gutter
- * nobody is using still pushes the row's contents inward. Only a standalone card
- * may drop one — inside a group the rails are subgrid over a shared template and
- * every row must span the same count.
+ * nobody is using still pushes the row's contents inward. A standalone card drops
+ * the ones it does not render; a group drops one only when NO row fills it
+ * (`list-card-group-tracks`), since its rows are subgrid over one template and
+ * must all span the same count.
  */
 export function railsTemplate(rails: RailOverrides): string {
   return [
@@ -172,11 +181,12 @@ export const RAIL_GAP_PX = RAIL_GAP * 8;
  *
  * The only way out is for the track NOT TO EXIST: the slot renders nothing and
  * the rail leaves the template, which is safe because grid auto-placement fills
- * the remaining tracks in DOM order. Standalone only — inside a
+ * the remaining tracks in DOM order. This is the standalone rule — inside a
  * {@link ListCardGroup} the rails are subgrid across a shared template and the
  * count cannot vary per row, which is also where `reserveGutters` earns its
  * keep: a selectable list and a read-only one still line up, and turning drag
- * mode on does not shift every row sideways.
+ * mode on does not shift every row sideways. (A group drops a gutter only when
+ * no row fills it: `list-card-group-tracks`.)
  */
 export function railsTemplateFor(
   gutters: { disclose: boolean; drag: boolean; select: boolean },
@@ -209,8 +219,9 @@ const CELL_FIXED_RAILS = 4;
 /**
  * Tracks for a cell-configured row: gutters, leading, the cells, then the menu.
  *
- * `gutters` says which of the three head gutters RENDER. A group reserves all
- * three (the default), so every row spans the same tracks. A standalone row
+ * `gutters` says which of the three head gutters RENDER. The group passes all
+ * three and drops, in CSS, any no row fills (`list-card-group-tracks`), so every
+ * row spans the same tracks. A standalone row
  * renders a gutter only when it uses it, and a track whose slot renders nothing
  * is not a reserved gap: grid auto-placement fills it with the NEXT slot. So the
  * checkbox landed in the disclosure track, the glyph in the drag track, and
@@ -262,10 +273,28 @@ export interface ListGroupConfig<T extends Record<string, unknown>> {
   /** Override individual rails; anything omitted keeps its default. */
   rails?: Partial<ListRails>;
   /**
-   * Hold the drag and select gutters open even when nothing uses them. On by
-   * default, so a selectable list and a read-only one still line up.
+   * Hold the head gutters open even when nothing uses them. On by default, so a
+   * selectable list and a read-only one still line up. Off, a gutter no row in
+   * the list uses takes no track (see `list-card-group-tracks`).
    */
   reserveGutters?: boolean;
+}
+
+/**
+ * The group's template for a given set of dropped gutters, plain or compact —
+ * from its cells when it has them, from its named-slot rails otherwise.
+ */
+function groupTemplate(cells: readonly ListCardCellConfig<never>[] | null, resolved: ListRails): GroupTemplate {
+  return (dropped, compact) => {
+    const gutters = { disclose: !dropped.has("disclose"), drag: !dropped.has("drag"), select: !dropped.has("select") };
+    if (cells != null) return cellRailsTemplate(compact ? compactCellTracks(cells) : cellTracks(cells), gutters);
+    return railsTemplate({
+      ...resolved,
+      ...(gutters.disclose ? {} : { disclose: null }),
+      ...(gutters.drag ? {} : { drag: null }),
+      ...(gutters.select ? {} : { select: null }),
+    });
+  };
 }
 
 /**
@@ -315,10 +344,18 @@ export function ListCardGroup({
   /** Override individual rails; anything omitted keeps its default. */
   rails?: Partial<ListRails>;
   /**
-   * Hold the drag and select gutters open even when nothing uses them.
+   * Hold the head gutters (disclosure, drag, select) open even when nothing
+   * uses them.
    *
    * On by default: a selectable list and a read-only one should line up, and
-   * turning drag mode on should not shift every row sideways.
+   * turning drag mode on should not shift every row sideways. The one
+   * exception is the compact band, where an empty drag track leaves.
+   *
+   * Off, a gutter that NO row in the list uses takes no track, and one that any
+   * row uses is a track for every row — the list still lines up, it just stops
+   * paying for columns nobody needs. (It used to keep all three tracks while
+   * the rows rendered nothing in the empty ones, so every cell auto-flowed into
+   * the track before its own.)
    */
   reserveGutters?: boolean;
   /** Row gap. Defaults to the density's own spacing. */
@@ -331,27 +368,18 @@ export function ListCardGroup({
     ...rails,
   };
   const configured = cells != null && cells.length > 0;
-  const template = configured ? cellRailsTemplate(cellTracks(cells)) : railsTemplate(resolved);
+  const template = groupTemplate(configured ? cells : null, resolved);
   const railCount = configured ? cellRailCount(cells.length) : RAIL_COUNT;
   return (
     <ListRailsContext.Provider value={{ density, reserveGutters, railCount }}>
      <CellConfigProvider cells={cells}>
-      <Box
-        data-testid={dataTestId}
-        sx={{
-          // The query container for every row inside it — a row cannot be one
-          // itself and a subgrid at the same time (containment drops subgrid).
-          // Every row in a list is the same width anyway, so the group is the
-          // honest place to ask the question.
-          containerType: "inline-size",
-          display: "grid",
-          gridTemplateColumns: template,
-          alignItems: "center",
-          rowGap: gap ?? DENSITY_ROW_PADDING[density],
-        }}
+      <GroupGrid
+        dataTestId={dataTestId}
+        tracks={{ template, railCount, reserveGutters }}
+        rowGap={gap ?? DENSITY_ROW_PADDING[density]}
       >
         {children}
-      </Box>
+      </GroupGrid>
      </CellConfigProvider>
     </ListRailsContext.Provider>
   );

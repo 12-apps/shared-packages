@@ -66,3 +66,18 @@ export interface AreaContribution {
   routes?: readonly AreaRouteDeclaration[];
   nav?: readonly AreaNavDeclaration[];
 }
+
+/**
+ * The NATIVE capability (React Native hosts): the same `create(config) →
+ * surface` convention as the web surface, behind its own runtime manifest
+ * (`<pkg>/manifest/native`) because a native bundle must never import a web
+ * surface — `react-dom`, MUI and the DOM do not exist there — and a web
+ * bundle must never import React Native. The SHAPE is the web surface's
+ * twin; the separation is the bundle physics the three manifests already
+ * encode for server vs web.
+ *
+ * A native surface has no `areas`: there is no SPA router to project rows
+ * into, and a native host's navigation is its own. It renders the package's
+ * screens where the host places them.
+ */
+export type NativeSurfaceContribution<TConfig, TSurface> = WebSurfaceContribution<TConfig, TSurface>;

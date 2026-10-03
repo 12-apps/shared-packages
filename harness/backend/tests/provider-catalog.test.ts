@@ -7,6 +7,7 @@ import {
 } from '@12-apps/payments-backend';
 import { infinitePayProvider } from '@12-apps/payments-backend/providers/infinitepay';
 import { itauProvider } from '@12-apps/payments-backend/providers/itau';
+import { pixManualProvider } from '@12-apps/payments-backend/providers/pixmanual';
 import { pagbankProvider } from '@12-apps/payments-backend/providers/pagbank';
 import { stoneProvider } from '@12-apps/payments-backend/providers/stone';
 import { stripeProvider } from '@12-apps/payments-backend/providers/stripe';
@@ -14,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PT_BR_INFINITEPAY_COPY,
   PT_BR_ITAU_COPY,
+  PT_BR_PIX_MANUAL_COPY,
   PT_BR_PAGBANK_COPY,
   PT_BR_STONE_COPY,
   PT_BR_STRIPE_COPY,
@@ -33,7 +35,7 @@ import {
  * installed tarball, not from `packages/`.
  */
 const MERCHANT: MerchantRef = { kind: 'TENANT', id: 'harness-tenant' };
-const EXPECTED = ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau'];
+const EXPECTED = ['pagbank', 'stone', 'infinitepay', 'stripe', 'itau', 'pixmanual'];
 
 function paymentsHttp() {
   const providers = defineProviders({
@@ -42,6 +44,7 @@ function paymentsHttp() {
     infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
     stripe: stripeProvider(PT_BR_STRIPE_COPY),
     itau: itauProvider(PT_BR_ITAU_COPY),
+    pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY),
   });
 
   // The store is the in-memory one the package itself publishes for hosts that

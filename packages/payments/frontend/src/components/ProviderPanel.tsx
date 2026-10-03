@@ -226,12 +226,49 @@ function oauthWalkthrough(props: ActivePanelProps, path: 'oauth' | 'credentials'
  * a FUNCTION: which steps to show depends on the disclosure, whose state lives
  * in `OAuthPanel`.
  */
+/** The one environment a provider has, when it declares a single one. */
+function soleEnvironment(descriptor: ActivePanelProps['descriptor']): PaymentEnvironment | null {
+  // Read defensively: a host-built descriptor (and many fixtures) may carry no capabilities at all.
+  const declared = (descriptor.capabilities as typeof descriptor.capabilities | undefined)?.environments;
+  return declared && declared.length === 1 ? (declared[0] ?? null) : null;
+}
+
+/**
+ * The environment selector and its notice — full-bleed across the card, and
+ * inset for the manual disclosure, where it no longer spans anything (see
+ * `EnvironmentNotice`). A provider with ONE environment (no sandbox: every code
+ * is real money) gets neither: there is nothing to choose, and a "test
+ * environment" notice would promise that no money moves.
+ */
+function environmentChrome(
+  sole: PaymentEnvironment | null,
+  environment: PaymentEnvironment,
+  onChange: (next: PaymentEnvironment) => void,
+  active: PaymentEnvironment | null,
+): { selector: ReactNode; band: ReactNode; notice: ReactNode } {
+  // Nothing to choose with one environment. The notice goes only for a
+  // PRODUCTION-only provider (it would promise no money moves); a sandbox-only
+  // one keeps its truthful "nothing is real" notice.
+  if (sole === 'PRODUCTION') return { selector: null, band: undefined, notice: null };
+  if (sole) {
+    return {
+      selector: null,
+      band: <EnvironmentNotice environment={environment} active={active} />,
+      notice: <EnvironmentNotice environment={environment} active={active} band={false} />,
+    };
+  }
+  return {
+    selector: <EnvironmentSelector environment={environment} onChange={onChange} />,
+    band: <EnvironmentNotice environment={environment} active={active} />,
+    notice: <EnvironmentNotice environment={environment} active={active} band={false} />,
+  };
+}
+
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
-  const [environment, setEnvironment] = useState<PaymentEnvironment>(
-    config?.environment ?? 'SANDBOX',
-  );
+  const sole = soleEnvironment(descriptor);
+  const [environment, setEnvironment] = useState<PaymentEnvironment>(sole ?? config?.environment ?? 'SANDBOX');
   const [editing, setEditing] = useState(false);
 
   const oauthConnect = oauthWithConnect(props);
@@ -251,12 +288,7 @@ export function ActivePanel(props: ActivePanelProps) {
     />
   );
 
-  const selector = <EnvironmentSelector environment={environment} onChange={setEnvironment} />;
-  // Full-bleed across the card, and the same notice inset for the manual
-  // disclosure, where it no longer spans anything. See `EnvironmentNotice`.
-  const active = config?.environment ?? null;
-  const band = <EnvironmentNotice environment={environment} active={active} />;
-  const notice = <EnvironmentNotice environment={environment} active={active} band={false} />;
+  const { selector, band, notice } = environmentChrome(sole, environment, setEnvironment, config?.environment ?? null);
 
   const storedHere = requiredStored(descriptor, config, environment);
 

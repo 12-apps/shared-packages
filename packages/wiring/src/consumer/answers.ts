@@ -54,7 +54,7 @@ export function answerE2e(e2e: E2eContribution, answer: E2eAnswer): CapabilityRe
 
 /** Names only in every detail — a `secret` var's VALUE never enters the report. */
 export function answerEnv(
-  hostKind: "server" | "web",
+  hostKind: "server" | "web" | "native",
   vars: readonly WireEnvVar[],
   answer: EnvAnswer,
 ): CapabilityReportEntry {

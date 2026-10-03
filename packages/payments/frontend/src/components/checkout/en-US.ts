@@ -34,6 +34,16 @@ export const EN_US_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
     heading: "The code expired",
     support: "Nothing was charged. Generate a new code to carry on.",
   },
+  manual: {
+    failed: {
+      heading: "The store did not find your Pix",
+      support: "If you have already paid, talk to the store before paying again.",
+    },
+    expired: {
+      heading: "The store did not confirm the payment in time",
+      support: "If you have already paid, talk to the store before paying again.",
+    },
+  },
   awaitingTimedOut: {
     heading: "We have not had the confirmation yet",
     support:

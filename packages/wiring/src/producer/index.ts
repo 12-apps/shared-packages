@@ -1,7 +1,7 @@
 /**
  * The producer half: how a PACKAGE declares its manifests.
  *
- * Three factories, one per manifest (see `../contract/manifest` for why the
+ * Four factories, one per manifest (see `../contract/manifest` for why the
  * split follows bundles), each an identity function plus assertions. The
  * doctrine is report-builder's: no defaults for anything a host must decide,
  * and every rule enforced at ASSEMBLY — a malformed manifest throws in the
@@ -20,8 +20,10 @@ import { isIsolatedDb } from "../contract/db";
 import type { PrismaContribution } from "../contract/db";
 import type { WireEnvVar } from "../contract/env";
 import type {
+  AnyNativeManifest,
   AnyServerManifest,
   AnyWebManifest,
+  NativeCapabilityKind,
   PackageManifest,
   ServerCapabilityKind,
   WebCapabilityKind,
@@ -135,9 +137,13 @@ function assertContributions(manifest: PackageManifest): void {
   if (manifest.env) assertEnv(manifest.name, manifest.env);
 }
 
+/** True when any runtime inventory lists at least one kind. */
+function hasRuntimeInventory(manifest: PackageManifest): boolean {
+  return [manifest.server, manifest.web, manifest.native].some((inventory) => (inventory?.length ?? 0) > 0);
+}
+
 function assertObservability(manifest: PackageManifest): void {
-  const hasRuntime =
-    (manifest.server?.length ?? 0) > 0 || (manifest.web?.length ?? 0) > 0;
+  const hasRuntime = hasRuntimeInventory(manifest);
   if (hasRuntime && !manifest.observability) {
     // MANDATORY for runtime packages, deliberately: a package whose failures
     // file nowhere is the incident class the capability exists to end, and
@@ -165,6 +171,7 @@ function assertDeclarations(manifest: PackageManifest): void {
   }
   if (manifest.server) assertUnique(manifest.name, "server inventory entry", manifest.server);
   if (manifest.web) assertUnique(manifest.name, "web inventory entry", manifest.web);
+  if (manifest.native) assertUnique(manifest.name, "native inventory entry", manifest.native);
 }
 
 /** Declare the shared manifest. Returns its argument, validated. */
@@ -176,14 +183,14 @@ export function defineManifest(manifest: PackageManifest): PackageManifest {
 }
 
 /**
- * The inventory check both runtime factories share: the shared manifest's
+ * The inventory check every runtime factory shares: the shared manifest's
  * list and the runtime manifest's actual keys must be the same set — in both
  * directions, so a capability cannot ship undeclared OR stay declared after
  * it is gone.
  */
 function assertInventory(
   name: string,
-  which: "server" | "web",
+  which: "server" | "web" | "native",
   listed: readonly string[],
   actual: readonly string[],
 ): void {
@@ -282,4 +289,32 @@ export function defineWebManifest<TManifest extends AnyWebManifest>(
   assertInventory(shared.name, "web", shared.web ?? [], webKindsOf(web));
   if (web.areas) assertAreas(shared.name, web.areas);
   return web;
+}
+
+function nativeKindsOf(native: AnyNativeManifest): NativeCapabilityKind[] {
+  return native.surface ? ["surface"] : [];
+}
+
+/** A native host has no SPA router, so a native manifest carrying `areas` is a mistake, not a no-op. */
+function assertNoNativeAreas(name: string, native: AnyNativeManifest): void {
+  if ("areas" in native) {
+    fail(name, "native manifest declares areas — a native surface has no areas; the native host places the screens itself.");
+  }
+}
+
+/**
+ * Declare the NATIVE manifest (React Native hosts) against its shared half.
+ * Same inventory discipline as the web manifest: the shared manifest's
+ * `native:` list and this manifest's keys must be the same set.
+ */
+export function defineNativeManifest<TManifest extends AnyNativeManifest>(
+  shared: PackageManifest,
+  native: TManifest,
+): TManifest {
+  if (native.name !== shared.name) {
+    fail(shared.name, `native manifest is named "${native.name}" — the two must match.`);
+  }
+  assertNoNativeAreas(shared.name, native);
+  assertInventory(shared.name, "native", shared.native ?? [], nativeKindsOf(native));
+  return native;
 }

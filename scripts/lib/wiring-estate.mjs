@@ -27,6 +27,14 @@ export const SERVER_CAPABILITIES = ["http", "jobs", "email"];
 /** Web-runtime capability kinds, mirrored from `WebCapabilityKind`. */
 export const WEB_CAPABILITIES = ["surface", "areas"];
 
+/**
+ * Native-runtime capability kinds, mirrored from `NativeCapabilityKind`. The
+ * same `surface` kind as the web runtime — a second place a surface may live,
+ * not a new capability — so it adds no row every package must answer, only a
+ * subpath rule for the packages whose `native:` inventory lists it.
+ */
+export const NATIVE_CAPABILITIES = ["surface"];
+
 /** Data capabilities: the optional keys of `PackageManifest` itself. */
 export const DATA_CAPABILITIES = [
   "permissions",
@@ -42,7 +50,7 @@ export const DATA_CAPABILITIES = [
 export const CAPABILITIES = [...SERVER_CAPABILITIES, ...WEB_CAPABILITIES, ...DATA_CAPABILITIES];
 
 /** `PackageManifest` keys that are identity or inventory, never capabilities. */
-const NON_CAPABILITY_KEYS = new Set(["name", "contract", "server", "web"]);
+const NON_CAPABILITY_KEYS = new Set(["name", "contract", "server", "web", "native"]);
 
 const QUOTED = /"([a-z]+)"|'([a-z]+)'/g;
 
@@ -70,11 +78,16 @@ export function contractCapabilities(manifestTsSource) {
   for (const match of (block?.[1] ?? "").matchAll(/readonly (\w+)\??:/g)) {
     if (!NON_CAPABILITY_KEYS.has(match[1])) data.push(match[1]);
   }
-  return { server: union("ServerCapabilityKind"), web: union("WebCapabilityKind"), data };
+  return {
+    server: union("ServerCapabilityKind"),
+    web: union("WebCapabilityKind"),
+    native: union("NativeCapabilityKind"),
+    data,
+  };
 }
 
 const DATA_KEY_RE = new RegExp(`^ {2}(${DATA_CAPABILITIES.join("|")}) *:`, "gm");
-const INVENTORY_RE = /^ {2}(server|web) *: *\[([^\]]*)\]/gm;
+const INVENTORY_RE = /^ {2}(server|web|native) *: *\[([^\]]*)\]/gm;
 
 /**
  * The capability kinds a shared-manifest module declares: its data keys plus
@@ -89,6 +102,20 @@ export function declaredCapabilities(indexSource) {
     quotedWords(match[2]),
   );
   return new Set([...dataKeys, ...inventoried]);
+}
+
+/**
+ * The runtimes a shared-manifest module inventories: every `server:` /
+ * `web:` / `native:` array that lists at least one kind. Subpaths follow
+ * runtimes, not kinds — `surface` alone cannot say whether it lives in a web
+ * bundle, a native one, or both.
+ */
+export function declaredRuntimes(indexSource) {
+  const runtimes = new Set();
+  for (const match of indexSource.matchAll(INVENTORY_RE)) {
+    if (quotedWords(match[2]).length > 0) runtimes.add(match[1]);
+  }
+  return runtimes;
 }
 
 /**
@@ -132,12 +159,11 @@ function hasExport(exportsMap, subpath) {
   return Boolean(exportsMap && Object.hasOwn(exportsMap, subpath));
 }
 
-function checkSubpaths({ name, exportsMap, declared, failures }) {
-  const wantsServer = SERVER_CAPABILITIES.some((kind) => declared.has(kind));
-  const wantsWeb = WEB_CAPABILITIES.some((kind) => declared.has(kind));
+function checkSubpaths({ name, exportsMap, runtimes, failures }) {
   const rules = [
-    [wantsServer, "./manifest/server", "its inventory names server capabilities"],
-    [wantsWeb, "./manifest/web", "its inventory names web capabilities"],
+    [runtimes.has("server"), "./manifest/server", "its inventory names server capabilities"],
+    [runtimes.has("web"), "./manifest/web", "its inventory names web capabilities"],
+    [runtimes.has("native"), "./manifest/native", "its inventory names native capabilities"],
   ];
   for (const [wanted, subpath, why] of rules) {
     if (wanted && !hasExport(exportsMap, subpath)) {
@@ -208,7 +234,7 @@ export function evaluatePackage({ name, packageJson, indexSource }) {
     failures.push(`${name}: exports "./manifest" but the manifest source could not be read`);
     return { findings, failures, declared };
   }
-  checkSubpaths({ name, exportsMap, declared, failures });
+  checkSubpaths({ name, exportsMap, runtimes: declaredRuntimes(indexSource), failures });
   checkMirrors({ name, wiringMirror: packageJson.wiring, declared, failures });
   checkDependencyEdge({ name, packageJson, failures });
   for (const capability of CAPABILITIES) {
