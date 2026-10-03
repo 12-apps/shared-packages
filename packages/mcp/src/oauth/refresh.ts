@@ -104,6 +104,11 @@ export interface RefreshTokenContext {
    * that keeps replay detection intact.
    */
   graceMs?: number;
+  /** Prepare fallible response material after validation, before consuming a
+   * live parent. A throw writes nothing. Retry/replay paths do not call this;
+   * a concurrent loser must discard material prepared for its unused candidate. */
+  prepareSuccessor?: (candidate: Pick<NewRefreshToken,
+    "tokenHash" | "userEmail" | "userSub" | "clientId" | "scopes">) => Promise<void>;
 }
 
 /** The configured grace window, in milliseconds. `<= 0` disables it. */
@@ -248,6 +253,24 @@ async function graceReissue(
   return { refreshToken: opened.successor, scopes: target.scopes };
 }
 
+/** Preparation may fail without consuming a validated parent. */
+async function preparedCandidate(
+  context: RefreshTokenContext,
+  current: StoredRefreshToken,
+  scopes: string[],
+  tokenHash: string,
+) {
+  const candidate = {
+    tokenHash,
+    userEmail: current.userEmail,
+    userSub: current.userSub,
+    clientId: current.clientId,
+    scopes,
+  };
+  await context.prepareSuccessor?.(candidate);
+  return candidate;
+}
+
 /**
  * Rotate a refresh token on use: validate it (must exist, be BOUND to the
  * presenting client, be unexpired, unrevoked and un-rotated), then issue a NEW
@@ -294,14 +317,12 @@ export async function rotateRefreshToken(
 
   const scopes = narrowedScopes(current, newScopes);
   const successorPlaintext = generateToken();
+  const candidate = await preparedCandidate(context, current, scopes, hashToken(successorPlaintext));
+  // Start the lifetime and retry window at the claim, not before preparation.
   const grace = graceWindowMs(context);
   const claimed = await context.store.rotate(
     {
-      tokenHash: hashToken(successorPlaintext),
-      userEmail: current.userEmail,
-      userSub: current.userSub,
-      clientId: current.clientId,
-      scopes,
+      ...candidate,
       expiresAt: expiryOf(context),
       rotatedFrom: tokenHash,
       // Sealed under the PARENT the caller just presented, so a retry of this

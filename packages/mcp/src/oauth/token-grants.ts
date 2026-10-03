@@ -10,7 +10,7 @@ import {
   hashToken,
   rotateRefreshToken,
 } from "./refresh";
-import type { McpConnectionStore } from "./stores";
+import type { McpConnectionStore, NewRefreshToken } from "./stores";
 import {
   authenticateClient,
   readClientCredentials,
@@ -231,6 +231,40 @@ async function handleAuthorizationCode(
   });
 }
 
+/** Missing material is the existing protocol refusal, not a replay. */
+class RefreshSigningUnavailable extends Error {}
+
+/** Sign before the claim, using the exact candidate binding that would be stored. */
+async function prepareRefreshAccessToken(
+  context: McpOauthContext,
+  origin: string,
+  candidate: Pick<NewRefreshToken, "tokenHash" | "userEmail" | "userSub" | "clientId" | "scopes">,
+): Promise<string> {
+  const accessToken = await signAccessToken(context.signingKey, {
+    email: candidate.userEmail,
+    subject: candidate.userSub,
+    clientId: candidate.clientId,
+    refreshTokenHash: candidate.tokenHash,
+    scopes: candidate.scopes,
+    origin,
+    resourcePath: context.resourcePath,
+    ttlSeconds: context.accessTokenTtlSeconds,
+  });
+  if (!accessToken) throw new RefreshSigningUnavailable();
+  return accessToken;
+}
+
+/** Preserve protocol refusals; unexpected signing/store errors still propagate. */
+function refreshFailure(error: unknown): Response {
+  if (error instanceof RefreshSigningUnavailable) {
+    return tokenError("invalid_request", 400, "token issuance unavailable");
+  }
+  if (error instanceof RefreshTokenError) {
+    return tokenError(error.code, 400, error.message);
+  }
+  throw error;
+}
+
 /** Handle the `refresh_token` grant. */
 async function handleRefreshToken(
   context: McpOauthContext,
@@ -252,10 +286,15 @@ async function handleRefreshToken(
   const clientId = credentials.clientId as string;
 
   const newScopes = requestedScope ? requestedScope.split(/\s+/).filter(Boolean) : undefined;
+  const prepared: { hash?: string; accessToken?: string } = {};
   const refreshContext = {
     store: context.stores.refreshTokens,
     ttlMs: context.refreshTokenTtlMs,
     graceMs: context.refreshRotationGraceMs,
+    prepareSuccessor: async (candidate: Parameters<typeof prepareRefreshAccessToken>[2]) => {
+      prepared.accessToken = await prepareRefreshAccessToken(context, origin, candidate);
+      prepared.hash = candidate.tokenHash;
+    },
   };
 
   // Rotation enforces client binding (the token's stored clientId must equal the
@@ -265,10 +304,7 @@ async function handleRefreshToken(
   try {
     rotated = await rotateRefreshToken(refreshContext, refreshToken, clientId, newScopes);
   } catch (error) {
-    if (error instanceof RefreshTokenError) {
-      return tokenError(error.code, 400, error.message);
-    }
-    throw error;
+    return refreshFailure(error);
   }
 
   // The refresh token binds the user's email AND original OAuth `sub`; recover both
@@ -277,16 +313,18 @@ async function handleRefreshToken(
   const identity = await getRefreshTokenIdentity(refreshContext, rotated.refreshToken);
   if (!identity) return tokenError("invalid_grant", 400, "refresh token binding not found");
 
-  const accessToken = await signAccessToken(context.signingKey, {
-    email: identity.userEmail,
-    subject: identity.userSub,
-    clientId,
-    refreshTokenHash: hashToken(rotated.refreshToken),
-    scopes: rotated.scopes,
-    origin,
-    resourcePath: context.resourcePath,
-    ttlSeconds: context.accessTokenTtlSeconds,
-  });
+  const accessToken = prepared.hash === hashToken(rotated.refreshToken)
+    ? prepared.accessToken
+    : await signAccessToken(context.signingKey, {
+      email: identity.userEmail,
+      subject: identity.userSub,
+      clientId,
+      refreshTokenHash: hashToken(rotated.refreshToken),
+      scopes: rotated.scopes,
+      origin,
+      resourcePath: context.resourcePath,
+      ttlSeconds: context.accessTokenTtlSeconds,
+    });
   if (!accessToken) return tokenError("invalid_request", 400, "token issuance unavailable");
 
   await recordHostConnection(context, identity.userEmail, clientId, hashToken(rotated.refreshToken));
