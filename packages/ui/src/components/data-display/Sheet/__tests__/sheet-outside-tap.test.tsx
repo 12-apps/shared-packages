@@ -15,7 +15,7 @@ import { Sheet } from '../Sheet';
 afterEach(cleanup);
 
 function tapOutside(): void {
-  fireEvent.click(screen.getByTestId('sheet-click-catcher'));
+  fireEvent.click(screen.getByTestId('s-click-catcher'));
 }
 
 describe('a tap outside the sheet', () => {
@@ -61,5 +61,37 @@ describe('a tap outside the sheet', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'inside' }));
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('closes a plain (non-swipeable) drawer too', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Sheet open position="right" swipeable={false} onOpenChange={onOpenChange} dataTestId="s">
+        <p>body</p>
+      </Sheet>,
+    );
+    tapOutside();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('closes on Escape once, and not at all with closeOnEscape off', () => {
+    const closes = vi.fn();
+    const view = render(
+      <Sheet open position="bottom" onOpenChange={closes} dataTestId="s">
+        <p>body</p>
+      </Sheet>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(closes).toHaveBeenCalledTimes(1);
+    view.unmount();
+
+    const kept = vi.fn();
+    render(
+      <Sheet open position="bottom" closeOnEscape={false} onOpenChange={kept} dataTestId="s">
+        <button type="button">inside</button>
+      </Sheet>,
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: 'inside' }), { key: 'Escape' });
+    expect(kept).not.toHaveBeenCalled();
   });
 });

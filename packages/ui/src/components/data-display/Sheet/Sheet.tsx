@@ -72,15 +72,17 @@ type ResolvedSheetProps = SheetProps & Required<Pick<SheetProps, keyof typeof DE
  * Defined at module scope: a component built inside a render is a new type on
  * every pass, which remounts the subtree it belongs to.
  */
-const ClickCatcher = React.forwardRef<HTMLDivElement, BackdropProps>(({ onClick }, ref) => (
-  <div
-    ref={ref}
-    aria-hidden
-    onClick={onClick}
-    data-testid="sheet-click-catcher"
-    style={{ position: 'fixed', inset: 0, backgroundColor: 'transparent' }}
-  />
-)) as React.ComponentType<BackdropProps>;
+const ClickCatcher = React.forwardRef<HTMLDivElement, BackdropProps & { 'data-testid'?: string }>(
+  ({ onClick, 'data-testid': testId }, ref) => (
+    <div
+      ref={ref}
+      aria-hidden
+      onClick={onClick}
+      data-testid={testId}
+      style={{ position: 'fixed', inset: 0, backgroundColor: 'transparent' }}
+    />
+  ),
+) as React.ComponentType<BackdropProps>;
 ClickCatcher.displayName = 'SheetClickCatcher';
 
 /**
@@ -123,14 +125,22 @@ export const Sheet: React.FC<SheetProps> = (props) => {
     anchor: position,
     open: isOpen,
     className,
-    // A tap outside obeys `closeOnOverlayClick`; Escape keeps its own path.
-    onClose: (_event: object, reason: 'backdropClick' | 'escapeKeyDown') =>
+    // A tap outside obeys `closeOnOverlayClick`. A swipe-to-dismiss (no
+    // reason: SwipeableDrawer calls `onClose()` bare) closes. Escape is the
+    // hook's own listener alone, which honours `closeOnEscape` — the modal's
+    // is switched off below so the key never closes twice or past the flag.
+    onClose: (_event?: object, reason?: 'backdropClick' | 'escapeKeyDown') =>
       reason === 'backdropClick' ? handleOverlayClick() : handleClose(),
     PaperProps: {
       ref: sheetRef,
       sx: panelSx({ ...resolved, ...orientation, theme, currentHeight, isDragging, isAnimating }),
     },
-    ModalProps: { keepMounted: true, BackdropComponent: ClickCatcher },
+    ModalProps: {
+      keepMounted: true,
+      disableEscapeKeyDown: true,
+      BackdropComponent: ClickCatcher,
+      BackdropProps: { 'data-testid': testId ? `${testId}-click-catcher` : undefined } as Partial<BackdropProps>,
+    },
   };
 
   const body = (
