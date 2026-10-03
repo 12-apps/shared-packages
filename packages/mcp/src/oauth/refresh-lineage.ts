@@ -69,9 +69,19 @@ export async function revokeLineage(
   scopedTo: Pick<StoredRefreshToken, "userEmail" | "clientId">,
   seedHash: string,
 ): Promise<void> {
+  if (store.revokeLineage) {
+    await store.revokeLineage({
+      userEmail: scopedTo.userEmail, clientId: scopedTo.clientId,
+    }, seedHash, new Date());
+    return;
+  }
   // The lineage is confined to one (userEmail, clientId) pair, so load that set
   // once and walk the `rotatedFrom` links in memory — a small, bounded chain.
   const family = await store.listFamily(scopedTo.userEmail, scopedTo.clientId);
-  const lineage = collectLineage(buildLineageIndex(family), seedHash);
-  await store.revokeHashes([...lineage], new Date());
+  await store.revokeHashes(lineageHashes(family, seedHash), new Date());
+}
+
+/** Shared by transactional adapters, so their atomic path uses the same walk. */
+export function lineageHashes(family: StoredRefreshToken[], seedHash: string): string[] {
+  return [...collectLineage(buildLineageIndex(family), seedHash)];
 }

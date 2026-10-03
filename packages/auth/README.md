@@ -104,3 +104,15 @@ export const { GET, POST, PUT } = mountEmailAuth({
 
 Full wiring, endpoint list and the decisions that are not obvious:
 [ADOPTING.md](./ADOPTING.md). Journeys and harness notes: [E2E.md](./E2E.md).
+
+
+### Stable login-session binding
+
+A verified session exposes optional `loginSessionId`, a random per-login nonce.
+It is minted on genuine sign-in (and `encodeSessionToken`), retained through
+ordinary Auth.js JWT renewal, and replaced on the next login. It is useful for
+binding an OAuth consent request to one cookie-authenticated login: account ids
+are too broad, while encrypted cookie bytes and Auth.js `iat`/`jti` change during
+normal refresh. Always read it from the verified server session, never from a
+client request field. Legacy cookies without the claim remain authenticated but
+have no binding until a fresh sign-in; session reads never invent one.

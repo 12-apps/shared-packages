@@ -1208,6 +1208,18 @@ jobs:
     needs: changes
     if: fromJSON(needs.changes.outputs.changes).publishable
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mcp_test
+          POSTGRES_PASSWORD: synthetic-mcp-test
+          POSTGRES_DB: mcp_concurrency
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U mcp_test -d mcp_concurrency"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -1227,6 +1239,18 @@ jobs:
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee build.log
+      - name: Exercise interactive consent over real HTTP
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test packages/mcp/tests/integration/consent-wire.test.ts 2>&1 | tee mcp-consent-http.log
+      - name: Exercise real PostgreSQL MCP concurrency
+        env:
+          MCP_CONCURRENCY_DATABASE_URL: postgresql://mcp_test:synthetic-mcp-test@127.0.0.1:${{ job.services.postgres.ports[5432] }}/mcp_concurrency
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test packages/mcp/tests/integration/prisma-postgres.test.ts 2>&1 | tee mcp-postgres.log
       - name: Install the harness against the published tarballs
         shell: bash
         run: |

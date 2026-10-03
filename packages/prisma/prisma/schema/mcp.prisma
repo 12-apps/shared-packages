@@ -86,6 +86,7 @@ model OAuthRefreshToken {
   // (it would be redundant). The composite index serves per-user/per-client
   // enumeration and bulk revoke.
   @@index([userEmail, clientId])
+  @@index([rotatedFrom])
   @@map("oauth_refresh_tokens")
 }
 

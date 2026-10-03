@@ -78,3 +78,93 @@ app.route('/', mcpOauth.router);
   `createPrismaMcpStores`), and the signing material.
 - Binding `ToolRegistry` to the **MCP transport** (the `@modelcontextprotocol/sdk`
   HTTP server at `/api/mcp`).
+
+## Interactive OAuth consent and live revocation
+
+A host can require an explicit resource-owner decision before any authorization
+code is issued:
+
+```ts
+createApiMcpOauth({
+  // Existing stores, cookie-only session resolver and signing configuration…
+  consent: {
+    path: "/admin/oauth-consent",
+    replay: sharedConsentReplayStore,
+    requireClientApproval: true,
+  },
+  isAccessTokenActive: (binding) =>
+    isRefreshBindingActive(stores.refreshTokens, binding),
+});
+```
+
+The cookie resolver must return a stable per-login `sessionBinding`, in addition
+to `email` and `subject`. `@12-apps/auth` exposes the verified session's
+`loginSessionId` for this purpose. Raw JWT cookie bytes, `iat` and `jti` rotate on
+ordinary session reads and must not be used. A user id or email alone is not a
+login-session binding. Never resolve bearer authentication as the
+resource-owner session. A changed/expired login session requires restarting the
+flow; the client cannot supply or override its identity. An authenticated legacy
+session with no nonce is sent to the consent UI with `reauthenticate=1` and no
+ticket or code. Show a sign-out/sign-in instruction instead of looping through a
+login page that considers the user already authenticated.
+
+`GET authorize` validates the exact registered callback and PKCE request, then
+redirects to the configured same-origin UI with a five-minute signed `request`
+ticket. It issues no code. The ticket contains the original authorization query
+and a one-way session binding, never the session cookie or the user's identity.
+The UI fetches `handlers.consentDetails` (`GET /api/oauth/consent?request=…`) and
+renders the verified `accountEmail`, registered client name/id, exact callback
+and requested scopes as escaped text. The account identity is response-only. It must offer explicit approve and deny controls. Do not log
+request tickets, include them in telemetry, or send them as referrers.
+
+`handlers.consentDecision` accepts only a same-origin JSON POST containing
+`{ request, decision: "approve" | "deny" }`. It rechecks the cookie session,
+registration and request, atomically consumes the ticket, and returns
+`{ redirectUrl }`. Only approval mints a code. Denial returns the validated
+callback with `error=access_denied` and the original state. Missing/different
+Origin, changed session, modified ticket, OAuth-field overrides, expiry and
+replay fail closed. The UI navigates only after a successful response. A lost
+response, refresh/back or repeated click cannot mint a second code; restart the
+client authorization flow after a terminal error. Separate tabs have separate
+tickets and do not overwrite one another.
+
+When `requireClientApproval` is true, legacy operator/provider rules remain an
+eligibility ceiling, checked before the ticket and again before the decision.
+They never replace the human decision, including preapproved client ids. Without
+that flag, explicit consent replaces the legacy approval seam.
+
+The consent replay store is distinct from the 90-second authorization-code
+store: `consume(jti, nowMs, expiresAtMs)` must be shared, atomic and retain a claim
+until the signed ticket expires. An outage must refuse, with no process-local
+fallback. `inProcessConsentReplayStore()` is only for an explicitly single-process
+host or tests. Consent routes are included in the wiring descriptors only when
+consent is configured; all handlers remain behind the operator gate.
+
+Access tokens now bind the exact issued refresh row by its non-secret SHA-256
+identifier. `isRefreshBindingActive` follows only unique direct successors, so
+normal refresh preserves already-issued access until its own expiry. Disconnect
+and replay invalidate the live lineage on the next verification; reconnecting
+creates an unrelated root and cannot revive old access, even in the same second.
+Legacy access tokens with no binding fail closed when the verifier hook is
+enabled. An existing valid refresh token can rotate into bound access without
+another cookie login or broader scopes; automatic client refresh may recover the
+connection. Reconnection is needed only when refresh is unavailable or revoked.
+A legacy cookie's missing login nonce requires a fresh sign-in only when starting
+a new authorization. There must be no positive-result cache for immediate revocation.
+
+Prisma stores use the indexed `rotated_from` lookup, limited to two rows to refuse
+ambiguous branching. Apply the additive index migration alongside adoption.
+Traversal refuses cycles, malformed links, identity changes and more than 32
+successor hops. A normal 15-minute access token crosses zero or one rotation;
+32 allows aggressive clients while bounding database work. A client exceeding
+that bound must use its newest access token.
+
+Prisma rotation, replay revocation, and both halves of disconnect run in
+Serializable transactions. Write conflicts retry the entire transaction up to
+three times; exhaustion reports failure and rolls back instead of hiding a
+connection with live credentials. Custom stores should implement the optional
+atomic `revokeLineage` and `connections.disconnect` ports with equivalent
+serialization; a non-atomic read-then-revoke can miss a concurrently rotated
+successor. The package tests pin transaction boundaries and complete-operation
+retries; multi-session PostgreSQL validation must exercise actual conflicting
+rotation, replay, disconnect and delayed-activity operations.

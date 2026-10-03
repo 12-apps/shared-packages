@@ -1,3 +1,4 @@
+import { disconnectAtomic, recordConnectionActivity, revokeAtomicLineage, revokeLive, rotateClaim } from "./prisma-transactions";
 import type {
   McpConnectionStore,
   McpOauthStores,
@@ -40,7 +41,8 @@ export interface McpOauthPrisma {
     findUnique(args: { where: { tokenHash: string } }): Promise<StoredRefreshToken | null>;
     findFirst(args: { where: { rotatedFrom: string } }): Promise<{ tokenHash: string } | null>;
     findMany(args: {
-      where: { userEmail: string; clientId: string };
+      where: { userEmail: string; clientId: string } | { rotatedFrom: string };
+      take?: number;
     }): Promise<StoredRefreshToken[]>;
     // No single-row `update`: the rotation used to revoke its parent with one and
     // that was the bug (unconditional, so two concurrent rotations both won). Every
@@ -49,7 +51,7 @@ export interface McpOauthPrisma {
     updateMany(args: {
       where:
         | { tokenHash: { in: string[] } }
-        | { userEmail: string; clientId: string; revokedAt: null };
+        | { userEmail: string; clientId: string | { in: string[] }; revokedAt: null };
       // `graceSeal` rides on every revoke: a revoked row must not keep an
       // openable seal behind it (see `RefreshTokenStore.revokeHashes`).
       data: { revokedAt: Date; graceSeal?: null };
@@ -58,8 +60,8 @@ export interface McpOauthPrisma {
   mcpConnection: {
     findUnique(args: {
       where: ConnectionKey;
-      select: { lastActiveAt: true };
-    }): Promise<{ lastActiveAt: Date } | null>;
+      select: { lastActiveAt: true; revokedAt: true };
+    }): Promise<{ lastActiveAt: Date; revokedAt: Date | null } | null>;
     findFirst(args: {
       where: { userId: string; revokedAt: null; host: null };
       orderBy: { lastActiveAt: "desc" };
@@ -87,19 +89,28 @@ export interface McpOauthPrisma {
    * created once the conditional revoke has reported that it, and not a concurrent
    * sibling, claimed the parent — see `RefreshTokenStore.rotate`.
    */
-  $transaction<T>(fn: (tx: McpOauthTx) => Promise<T>): Promise<T>;
+  $transaction<T>(
+    fn: (tx: McpOauthTx) => Promise<T>,
+    options?: { isolationLevel: "Serializable" },
+  ): Promise<T>;
 }
 
 /**
- * The delegate subset used INSIDE the rotation transaction. Not exported: it is
- * reachable structurally through `McpOauthPrisma.$transaction`, so no host ever
- * needs to name it, and exporting a type nobody imports is what knip flags.
+ * Delegate subset for package-owned serializable transactions. Shared between
+ * the adapter modules, not exported from the public OAuth barrel; a host reaches
+ * it structurally through `McpOauthPrisma.$transaction`.
  */
-interface McpOauthTx {
+export interface McpOauthTx {
+  mcpConnection: Pick<McpOauthPrisma["mcpConnection"], "findMany" | "updateMany" | "upsert">;
   oAuthRefreshToken: {
+    findUnique(args: { where: { tokenHash: string } }): Promise<StoredRefreshToken | null>;
+    findMany(args: { where: { userEmail: string; clientId: string } }): Promise<StoredRefreshToken[]>;
     create(args: { data: NewRefreshToken }): Promise<unknown>;
     updateMany(args: {
-      where: { tokenHash: string; revokedAt: null };
+      where:
+        | { tokenHash: string; revokedAt: null }
+        | { userEmail: string; clientId: string | { in: string[] }; revokedAt: null }
+        | { tokenHash: { in: string[] } };
       data: { revokedAt: Date; graceSeal?: null };
     }): Promise<{ count: number }>;
   };
@@ -131,6 +142,7 @@ function refreshTokenStore(getPrisma: McpOauthPrismaProvider): RefreshTokenStore
       const prisma = await getPrisma();
       return prisma.oAuthRefreshToken.findUnique({ where: { tokenHash } });
     },
+    findSuccessor: (tokenHash) => uniqueRefreshSuccessor(getPrisma, tokenHash),
     async hasSuccessor(tokenHash) {
       const prisma = await getPrisma();
       const successor = await prisma.oAuthRefreshToken.findFirst({
@@ -153,45 +165,9 @@ function refreshTokenStore(getPrisma: McpOauthPrismaProvider): RefreshTokenStore
         data: { revokedAt: at, graceSeal: null },
       });
     },
-    async rotate(successor, parentHash, at) {
-      const prisma = await getPrisma();
-      return prisma.$transaction(async (tx) => {
-        // CLAIM-ONCE. The `revokedAt: null` predicate is what makes this safe under
-        // concurrency, and it is load-bearing rather than defensive: on Postgres's
-        // default READ COMMITTED, a second transaction's `updateMany` blocks on the
-        // row lock, then re-evaluates this WHERE against the COMMITTED row — which
-        // now has a `revokedAt` — and reports 0 rows. So exactly one caller can ever
-        // see count 1, and it is the only one that goes on to create a successor.
-        // An unconditional `update` would let both through: two live successors of
-        // one parent, and replay detection silently defeated (it waits for a third
-        // use of the parent that now never comes).
-        const { count } = await tx.oAuthRefreshToken.updateMany({
-          where: { tokenHash: parentHash, revokedAt: null },
-          // `graceSeal: null` is part of the claim, not a cleanup. The parent's
-          // seal is openable by the plaintext it was rotated from, so leaving it
-          // behind would chain: one historical plaintext plus a copy of this
-          // table walks forward to the live token offline, hop by hop, with no
-          // server call to detect. Cleared here, at most one hop is ever open.
-          data: { revokedAt: at, graceSeal: null },
-        });
-        // Lost the claim: write NOTHING. The zero-row update commits as the no-op
-        // it is, so there is nothing to roll back.
-        if (count !== 1) return false;
-        // Same transaction as the claim, so a crash cannot leave a live parent AND
-        // a live child either.
-        await tx.oAuthRefreshToken.create({ data: successor });
-        return true;
-      });
-    },
-    async revokeLiveForClient(userEmail, clientId) {
-      const prisma = await getPrisma();
-      const { count } = await prisma.oAuthRefreshToken.updateMany({
-        where: { userEmail, clientId, revokedAt: null },
-        // Disconnecting a host must leave nothing openable behind either.
-        data: { revokedAt: new Date(), graceSeal: null },
-      });
-      return count;
-    },
+    rotate: (successor, parentHash, at) => rotateClaim(getPrisma, successor, parentHash, at),
+    revokeLiveForClient: (userEmail, clientId) => revokeLive(getPrisma, userEmail, clientId),
+    revokeLineage: (scope, seed, at) => revokeAtomicLineage(getPrisma, scope, seed, at),
   };
 }
 
@@ -206,29 +182,16 @@ const CONNECTION_SELECT = {
 
 function connectionStore(getPrisma: McpOauthPrismaProvider): McpConnectionStore {
   return {
+    disconnect: (userId, email, host) => disconnectAtomic(getPrisma, userId, email, host),
     async lastActiveAt(userId, oauthClientId) {
       const prisma = await getPrisma();
       const row = await prisma.mcpConnection.findUnique({
         where: { userId_oauthClientId: { userId, oauthClientId } },
-        select: { lastActiveAt: true },
+        select: { lastActiveAt: true, revokedAt: true },
       });
-      return row?.lastActiveAt ?? null;
+      return row && row.revokedAt === null ? row.lastActiveAt : null;
     },
-    async recordActivity({ userId, oauthClientId, clientName, host, at }) {
-      const prisma = await getPrisma();
-      await prisma.mcpConnection.upsert({
-        where: { userId_oauthClientId: { userId, oauthClientId } },
-        create: { userId, oauthClientId, clientName, host, connectedAt: at, lastActiveAt: at },
-        // Never blank a known host on refresh — keep the existing attribution
-        // when this grant cannot derive one.
-        update: {
-          clientName,
-          lastActiveAt: at,
-          revokedAt: null,
-          ...(host ? { host } : {}),
-        },
-      });
-    },
+    recordActivity: (input) => recordConnectionActivity(getPrisma, input),
     async listActive(userId) {
       const prisma = await getPrisma();
       const rows = await prisma.mcpConnection.findMany({
@@ -314,4 +277,14 @@ export function createPrismaMcpStores(getPrisma: McpOauthPrismaProvider): McpOau
     refreshTokens: refreshTokenStore(getPrisma),
     connections: connectionStore(getPrisma),
   };
+}
+
+/** Two rows are enough to detect a corrupt branched lineage, without a scan. */
+async function uniqueRefreshSuccessor(
+  getPrisma: McpOauthPrismaProvider,
+  tokenHash: string,
+): Promise<StoredRefreshToken | null> {
+  const prisma = await getPrisma();
+  const rows = await prisma.oAuthRefreshToken.findMany({ where: { rotatedFrom: tokenHash }, take: 2 });
+  return rows.length === 1 ? rows[0] ?? null : null;
 }

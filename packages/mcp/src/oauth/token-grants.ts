@@ -7,6 +7,7 @@ import {
   RefreshTokenError,
   getRefreshTokenIdentity,
   issueRefreshToken,
+  hashToken,
   rotateRefreshToken,
 } from "./refresh";
 import type { McpConnectionStore } from "./stores";
@@ -55,12 +56,13 @@ async function recordHostConnection(
   context: McpOauthContext,
   email: string,
   clientId: string,
+  refreshTokenHash: string,
 ): Promise<void> {
   const recording = context.connections;
   const store = context.stores.connections;
   if (!recording || !store) return;
   try {
-    await writeConnectionActivity(context, { recording, store }, email, clientId);
+    await writeConnectionActivity(context, { recording, store }, email, clientId, refreshTokenHash);
   } catch {
     // Liveness is non-critical — never fail the grant on it. Nothing is logged
     // either: the only values here are an email and a client id.
@@ -73,6 +75,7 @@ async function writeConnectionActivity(
   ports: { recording: McpConnectionRecording; store: McpConnectionStore },
   email: string,
   clientId: string,
+  refreshTokenHash: string,
 ): Promise<void> {
   const { recording, store } = ports;
   const [userId, client] = await Promise.all([
@@ -89,6 +92,7 @@ async function writeConnectionActivity(
   if (lastActiveAt && now.getTime() - lastActiveAt.getTime() < throttleMs) return;
 
   await store.recordActivity({
+    refreshTokenHash,
     userId,
     oauthClientId: clientId,
     clientName: client?.clientName ?? null,
@@ -190,9 +194,21 @@ async function handleAuthorizationCode(
 
   const scopes = verified.scope.split(/\s+/).filter(Boolean);
 
+  const refresh = await issueRefreshToken(
+    { store: context.stores.refreshTokens, ttlMs: context.refreshTokenTtlMs },
+    {
+      userEmail: verified.email,
+      userSub: verified.sub,
+      clientId: verified.clientId,
+      scopes,
+    },
+  );
+
   const accessToken = await signAccessToken(context.signingKey, {
     email: verified.email,
     subject: verified.sub,
+    clientId: verified.clientId,
+    refreshTokenHash: hashToken(refresh.refreshToken),
     scopes,
     origin,
     resourcePath: context.resourcePath,
@@ -204,17 +220,7 @@ async function handleAuthorizationCode(
     return tokenError("invalid_request", 400, "token issuance unavailable");
   }
 
-  const refresh = await issueRefreshToken(
-    { store: context.stores.refreshTokens, ttlMs: context.refreshTokenTtlMs },
-    {
-      userEmail: verified.email,
-      userSub: verified.sub,
-      clientId: verified.clientId,
-      scopes,
-    },
-  );
-
-  await recordHostConnection(context, verified.email, verified.clientId);
+  await recordHostConnection(context, verified.email, verified.clientId, hashToken(refresh.refreshToken));
 
   return tokenSuccess({
     access_token: accessToken,
@@ -274,6 +280,8 @@ async function handleRefreshToken(
   const accessToken = await signAccessToken(context.signingKey, {
     email: identity.userEmail,
     subject: identity.userSub,
+    clientId,
+    refreshTokenHash: hashToken(rotated.refreshToken),
     scopes: rotated.scopes,
     origin,
     resourcePath: context.resourcePath,
@@ -281,7 +289,7 @@ async function handleRefreshToken(
   });
   if (!accessToken) return tokenError("invalid_request", 400, "token issuance unavailable");
 
-  await recordHostConnection(context, identity.userEmail, clientId);
+  await recordHostConnection(context, identity.userEmail, clientId, hashToken(rotated.refreshToken));
 
   return tokenSuccess({
     access_token: accessToken,

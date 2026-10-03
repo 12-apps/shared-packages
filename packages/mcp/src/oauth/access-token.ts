@@ -26,6 +26,15 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const CLOCK_TOLERANCE_SECONDS = 5;
 
 /** The identity a verified access token resolves to. */
+/** Verified token plus its exact refresh-row binding, for live revocation. */
+export interface AccessTokenBinding {
+  email: string;
+  subject: string;
+  clientId: string;
+  refreshTokenHash: string;
+  issuedAt: number;
+}
+
 export interface VerifiedAccessToken {
   email: string;
   subject: string;
@@ -82,6 +91,9 @@ export class AccessTokenError extends Error {
 
 /** Inputs bound into a minted access token. */
 export interface SignAccessTokenInput {
+  /** Both claims are required by a host opting into live revocation. */
+  clientId?: string;
+  refreshTokenHash?: string;
   email: string;
   subject: string;
   scopes: readonly McpScope[] | readonly string[];
@@ -128,7 +140,12 @@ export async function signAccessToken(
   const exp = iat + (input.ttlSeconds ?? ACCESS_TOKEN_TTL_SECONDS);
   const scope = input.scopes.join(" ");
 
-  return new SignJWT({ email: input.email, scope } satisfies AccessTokenClaims)
+  return new SignJWT({
+    email: input.email,
+    scope,
+    ...(input.clientId ? { client_id: input.clientId } : {}),
+    ...(input.refreshTokenHash ? { refresh_token_id: input.refreshTokenHash } : {}),
+  } satisfies AccessTokenClaims)
     .setProtectedHeader({ alg: SIGNING_ALG, kid: key.kid })
     .setIssuer(issuer(input.origin))
     .setAudience(resourceAudience(input.origin, input.resourcePath ?? DEFAULT_MCP_RESOURCE_PATH))
@@ -141,6 +158,10 @@ export async function signAccessToken(
 
 /** Options for {@link verifyAccessToken}. */
 export interface VerifyAccessTokenOptions extends ClockOption {
+  /** Called ONLY after cryptographic verification. Missing binding and outages
+   * fail closed. Bind to the exact active refresh row, not a reusable user/client
+   * connection: reconnecting must never resurrect older access tokens. */
+  isActive?: (binding: AccessTokenBinding) => Promise<boolean> | boolean;
   /** The deployment origin — derives the expected `iss` and `aud`. */
   origin: string;
   /** Where the MCP resource is mounted. Default `/api/mcp`. */
@@ -235,6 +256,8 @@ export async function verifyAccessToken(
     );
   }
 
+  await enforceActiveBinding(payload, { email, subject }, options);
+
   const scopes = parseScopes(payload.scope);
   if (options.requiredScope && !scopes.includes(options.requiredScope)) {
     throw new AccessTokenError(
@@ -245,4 +268,30 @@ export async function verifyAccessToken(
   }
 
   return { email, subject, scopes };
+}
+
+/** A deliberately opaque failure: expired grant, disconnect and lookup failure
+ * all refuse access without exposing persistence details to the client. */
+async function enforceActiveBinding(
+  payload: JWTPayload,
+  identity: { email: string; subject: string },
+  options: VerifyAccessTokenOptions,
+): Promise<void> {
+  if (!options.isActive) return;
+  const clientId = payload.client_id;
+  const refreshTokenHash = payload.refresh_token_id;
+  if (typeof clientId !== "string" || !clientId ||
+    typeof refreshTokenHash !== "string" || !/^[a-f0-9]{64}$/.test(refreshTokenHash) ||
+    typeof payload.iat !== "number" || !Number.isFinite(payload.iat)) {
+    throw new AccessTokenError("invalid_token", "incomplete", "missing grant binding");
+  }
+  try {
+    const active = await options.isActive({
+      ...identity, clientId, refreshTokenHash, issuedAt: payload.iat,
+    });
+    if (active) return;
+  } catch {
+    // A failed lookup cannot turn a revoked credential back into a live one.
+  }
+  throw new AccessTokenError("invalid_token", "unverified", "grant is not active");
 }

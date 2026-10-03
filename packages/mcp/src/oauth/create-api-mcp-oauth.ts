@@ -2,6 +2,7 @@ import { buildAuthorizationServerMetadata } from "../auth/authorization-server-m
 import { buildProtectedResourceMetadata } from "../auth/resource-metadata";
 
 import { authorizeEndpoint } from "./authorize";
+import { consentDetailsEndpoint, consentDecisionEndpoint } from "./consent";
 import { issuer, resourceAudience } from "./config";
 import {
   notFound,
@@ -50,6 +51,10 @@ export interface McpOauthRoute {
 }
 
 export interface McpOauthHandlers {
+  /** GET — session-bound consent display data; never a code. */
+  consentDetails: (request: Request) => Promise<Response>;
+  /** POST — same-origin explicit approve/deny, claimed once. */
+  consentDecision: (request: Request) => Promise<Response>;
   /** `GET` — Authorization Code + PKCE, identity from the session only. */
   authorize: (request: Request) => Promise<Response>;
   /** `POST` — the two grants, form-encoded, RFC 6749 bodies. */
@@ -157,6 +162,8 @@ function buildHandlers(context: McpOauthContext): McpOauthHandlers {
 
   return {
     authorize: gated((request) => authorizeEndpoint(context, request)),
+    consentDetails: gated((request) => consentDetailsEndpoint(context, request)),
+    consentDecision: gated((request) => consentDecisionEndpoint(context, request)),
     token: gated((request) => tokenEndpoint(context, request)),
     register: async (request) =>
       context.enabled() ? registerEndpoint(context, request) : registrationDisabled(),
@@ -182,6 +189,10 @@ function buildRoutes(context: McpOauthContext, handlers: McpOauthHandlers): McpO
     },
     { method: "GET", path: paths.jwks, handle: handlers.jwks },
     { method: "GET", path: paths.authorize, handle: handlers.authorize },
+    ...(context.consent ? [
+      { method: "GET" as const, path: paths.consent, handle: handlers.consentDetails },
+      { method: "POST" as const, path: paths.consent, handle: handlers.consentDecision },
+    ] : []),
     { method: "POST", path: paths.token, handle: handlers.token },
     { method: "POST", path: paths.register, handle: handlers.register },
   ];
@@ -197,6 +208,7 @@ export function createApiMcpOauth(config: McpOauthConfig): ApiMcpOauth {
     verifyBearer: (token, request, options) =>
       verifyAccessToken(context.signingKey, token, {
         ...options,
+        isActive: context.isAccessTokenActive ?? options?.isActive,
         origin: context.originOf(request),
         resourcePath: context.resourcePath,
       }),

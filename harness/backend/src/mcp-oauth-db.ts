@@ -1,3 +1,5 @@
+import { connectionStore } from "./mcp-oauth-connections";
+import { collectRefreshLineageHashes } from "@12-apps/mcp/oauth";
 /**
  * The three `@12-apps/mcp/oauth` stores, backed by a REAL Postgres (12-23).
  *
@@ -13,13 +15,11 @@
  */
 import type { PGlite } from '@electric-sql/pglite';
 import type {
-  McpConnectionStore,
   McpOauthStores,
   NewOAuthClient,
   NewRefreshToken,
   OAuthClientStore,
   RefreshTokenStore,
-  StoredMcpConnection,
   StoredOAuthClient,
   StoredRefreshToken,
 } from '@12-apps/mcp/oauth';
@@ -192,6 +192,14 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
       return rows[0] ? toToken(rows[0]) : null;
     },
 
+    async findSuccessor(tokenHash) {
+      const { rows } = await pg.query<TokenRaw>(
+        `SELECT ${TOKEN_COLUMNS} FROM oauth_refresh_tokens WHERE rotated_from = $1 LIMIT 2`,
+        [tokenHash],
+      );
+      return rows.length === 1 && rows[0] ? toToken(rows[0]) : null;
+    },
+
     async hasSuccessor(tokenHash) {
       const { rows } = await pg.query<{ one: number }>(
         `SELECT 1 AS one FROM oauth_refresh_tokens WHERE rotated_from = $1 LIMIT 1`,
@@ -221,6 +229,20 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
 
     rotate: (successor, parentHash, at) => claimAndInsert(pg, successor, parentHash, at),
 
+    async revokeLineage(scope, seed, at) {
+      await pg.transaction(async (tx) => {
+        const { rows } = await tx.query<TokenRaw>(
+          `SELECT ${TOKEN_COLUMNS} FROM oauth_refresh_tokens WHERE user_email = $1 AND client_id = $2`,
+          [scope.userEmail, scope.clientId],
+        );
+        const hashes = collectRefreshLineageHashes(rows.map(toToken), seed);
+        await tx.query(
+          `UPDATE oauth_refresh_tokens SET revoked_at = $1, grace_seal = NULL WHERE token_hash = ANY($2)`,
+          [at, hashes],
+        );
+      });
+    },
+
     async revokeLiveForClient(userEmail, clientId) {
       const result = await pg.query(
         `UPDATE oauth_refresh_tokens SET revoked_at = NOW(), grace_seal = NULL
@@ -230,119 +252,6 @@ function refreshTokenStore(pg: PGlite): RefreshTokenStore {
       return result.affectedRows ?? 0;
     },
   };
-}
-
-interface ConnectionRaw {
-  oauth_client_id: string;
-  client_name: string | null;
-  host: string | null;
-  connected_at: Date;
-  last_active_at: Date;
-}
-
-function toConnection(raw: ConnectionRaw): StoredMcpConnection {
-  return {
-    oauthClientId: raw.oauth_client_id,
-    clientName: raw.client_name,
-    host: raw.host,
-    connectedAt: new Date(raw.connected_at),
-    lastActiveAt: new Date(raw.last_active_at),
-  };
-}
-
-function connectionStore(pg: PGlite): McpConnectionStore {
-  return {
-    async lastActiveAt(userId, oauthClientId) {
-      const { rows } = await pg.query<{ last_active_at: Date }>(
-        `SELECT last_active_at FROM mcp_connections
-         WHERE user_id = $1 AND oauth_client_id = $2`,
-        [userId, oauthClientId],
-      );
-      return rows[0] ? new Date(rows[0].last_active_at) : null;
-    },
-
-    async recordActivity({ userId, oauthClientId, clientName, host, at }) {
-      // COALESCE on host: never blank a known attribution when this grant cannot
-      // derive one — the config page would lose the card it just lit.
-      await pg.query(
-        `INSERT INTO mcp_connections
-           (id, user_id, oauth_client_id, client_name, host, connected_at, last_active_at)
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $5)
-         ON CONFLICT (user_id, oauth_client_id) DO UPDATE SET
-           client_name = EXCLUDED.client_name,
-           last_active_at = EXCLUDED.last_active_at,
-           revoked_at = NULL,
-           host = COALESCE(EXCLUDED.host, mcp_connections.host)`,
-        [userId, oauthClientId, clientName, host, at],
-      );
-    },
-
-    async listActive(userId) {
-      const { rows } = await pg.query<ConnectionRaw>(
-        `SELECT oauth_client_id, client_name, host, connected_at, last_active_at
-         FROM mcp_connections
-         WHERE user_id = $1 AND revoked_at IS NULL
-         ORDER BY last_active_at DESC`,
-        [userId],
-      );
-      return rows.map(toConnection);
-    },
-
-    revokeByHost: (userId, host) => revokeByHost(pg, userId, host),
-    announce: (userId, host) => announce(pg, userId, host),
-  };
-}
-
-/** Every read and write scoped by `user_id` — a connection is per-user, always. */
-async function revokeByHost(pg: PGlite, userId: string, host: string): Promise<string[]> {
-  const attributed = await pg.query<{ id: string; oauth_client_id: string }>(
-    `SELECT id, oauth_client_id FROM mcp_connections
-     WHERE user_id = $1 AND revoked_at IS NULL AND host = $2`,
-    [userId, host],
-  );
-  // A legacy `host IS NULL` row is claimed only when the provider has no row of its
-  // own: pre-attribution connections must stay disconnectable, but a provider that
-  // DID attribute can never revoke another assistant's row.
-  const targets =
-    attributed.rows.length > 0
-      ? attributed.rows
-      : (
-          await pg.query<{ id: string; oauth_client_id: string }>(
-            `SELECT id, oauth_client_id FROM mcp_connections
-             WHERE user_id = $1 AND revoked_at IS NULL AND host IS NULL`,
-            [userId],
-          )
-        ).rows;
-  if (targets.length === 0) return [];
-  await pg.query(`UPDATE mcp_connections SET revoked_at = NOW() WHERE id = ANY($1)`, [
-    targets.map((row) => row.id),
-  ]);
-  return targets.map((row) => row.oauth_client_id);
-}
-
-/** A provider's self-report: refresh its own row, or claim the unattributed one. */
-async function announce(pg: PGlite, userId: string, host: string): Promise<number> {
-  const refreshed = await pg.query(
-    `UPDATE mcp_connections SET last_active_at = NOW(), revoked_at = NULL
-     WHERE user_id = $1 AND revoked_at IS NULL AND host = $2`,
-    [userId, host],
-  );
-  if ((refreshed.affectedRows ?? 0) > 0) return refreshed.affectedRows ?? 0;
-
-  const candidate = await pg.query<{ id: string }>(
-    `SELECT id FROM mcp_connections
-     WHERE user_id = $1 AND revoked_at IS NULL AND host IS NULL
-     ORDER BY last_active_at DESC LIMIT 1`,
-    [userId],
-  );
-  const id = candidate.rows[0]?.id;
-  if (!id) return 0;
-  await pg.query(
-    `UPDATE mcp_connections SET host = $1, last_active_at = NOW(), revoked_at = NULL
-     WHERE id = $2`,
-    [host, id],
-  );
-  return 1;
 }
 
 /** The ports a real host fills with Prisma, filled here with SQL over PGlite. */

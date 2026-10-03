@@ -100,6 +100,10 @@ export interface RefreshTokenStore {
   findByHash(tokenHash: string): Promise<StoredRefreshToken | null>;
   /** Whether some token was already rotated FROM this hash (replay detection). */
   hasSuccessor(tokenHash: string): Promise<boolean>;
+  /** The unique DIRECT successor, or null for none/ambiguous branching.
+   * Required for live access-token checks across rotations; use an indexed
+   * rotatedFrom lookup limited to two rows, never an unbounded family scan. */
+  findSuccessor?(tokenHash: string): Promise<StoredRefreshToken | null>;
   /** Every token of one `(userEmail, clientId)` family — the lineage walk's input. */
   listFamily(userEmail: string, clientId: string): Promise<StoredRefreshToken[]>;
   /**
@@ -110,6 +114,14 @@ export interface RefreshTokenStore {
    * chain readable to anyone holding one of its plaintexts.
    */
   revokeHashes(tokenHashes: readonly string[], at: Date): Promise<void>;
+  /** Atomically read and revoke the exact connected lineage against concurrent
+   * rotation. Multi-instance stores should implement this; the Prisma adapter
+   * uses a Serializable transaction with bounded serialization retries. */
+  revokeLineage?(
+    scopedTo: { userEmail: string; clientId: string },
+    seedHash: string,
+    at: Date,
+  ): Promise<void>;
   /**
    * CLAIM the parent and store the successor, atomically. The whole of OAuth 2.1
    * §4.3.1 replay protection rests on this one method, so read the contract before
@@ -163,7 +175,13 @@ export interface StoredMcpConnection {
 }
 
 export interface McpConnectionStore {
-  /** Liveness of one `(user, client)` pair, for the activity throttle. */
+  /** Atomic connection + refresh-token revocation. Prisma-backed stores provide
+   * this so a failed revoke cannot hide the connection and make retries skip it. */
+  disconnect?(userId: string, email: string, host: string): Promise<{
+    disconnectedClientIds: string[];
+    revokedRefreshTokens: number;
+  }>;
+  /** Active liveness only; a revoked connection returns null so reconnect records. */
   lastActiveAt(userId: string, oauthClientId: string): Promise<Date | null>;
   /**
    * Record (or refresh) liveness. Any activity CLEARS a prior `revokedAt` — the
@@ -171,6 +189,8 @@ export interface McpConnectionStore {
    * grant cannot derive one.
    */
   recordActivity(input: {
+    /** When supplied, refuse stale activity after this refresh row is revoked. */
+    refreshTokenHash?: string;
     userId: string;
     oauthClientId: string;
     clientName: string | null;

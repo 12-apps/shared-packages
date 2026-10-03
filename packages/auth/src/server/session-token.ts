@@ -102,6 +102,8 @@ export function encodeSessionToken(
     salt: sessionCookieName(config),
     maxAge: config.maxAgeSeconds,
     token: {
+      // A handoff mints a fresh login; Auth.js keeps this across cookie renewal.
+      loginSessionId: crypto.randomUUID(),
       sub: identity.id,
       id: identity.id,
       email: identity.email,

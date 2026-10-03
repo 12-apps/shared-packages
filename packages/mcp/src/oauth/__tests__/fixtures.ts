@@ -79,6 +79,10 @@ function memoryRefreshTokenStore(): RefreshTokenStore & {
     async findByHash(tokenHash) {
       return rows.get(tokenHash) ?? null;
     },
+    async findSuccessor(tokenHash) {
+      const found = [...rows.values()].filter((row) => row.rotatedFrom === tokenHash);
+      return found.length === 1 ? found[0] ?? null : null;
+    },
     async hasSuccessor(tokenHash) {
       return [...rows.values()].some((row) => row.rotatedFrom === tokenHash);
     },
@@ -136,7 +140,8 @@ function memoryConnectionStore(): McpConnectionStore & { rows: () => ConnectionR
   return {
     rows: () => rows.map((row) => ({ ...row })),
     async lastActiveAt(userId, oauthClientId) {
-      return find(userId, oauthClientId)?.lastActiveAt ?? null;
+      const row = find(userId, oauthClientId);
+      return row && row.revokedAt === null ? row.lastActiveAt : null;
     },
     async recordActivity({ userId, oauthClientId, clientName, host, at }) {
       const existing = find(userId, oauthClientId);
