@@ -56,6 +56,8 @@ export interface PickerSheetProps {
   emptyText?: (query: string) => string;
   /** The note under the list. */
   foot?: string;
+  /** Slide or fade in and out (default). `false` opens and closes at once. */
+  animated?: boolean;
   /**
    * Base test id (default `picker-sheet`). Sub-elements get `${id}-search`,
    * `${id}-item-${item.id}`, `${id}-create`, `${id}-close`.

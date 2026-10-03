@@ -30,6 +30,8 @@ interface SurfaceProps {
   onClose: () => void;
   titleId: string;
   dataTestId: string;
+  /** False: open and close at once, with no slide or fade. */
+  animated: boolean;
   children: React.ReactNode;
 }
 
@@ -37,8 +39,17 @@ interface SurfaceProps {
  * Where the sheet lives. Both surfaces are modal, which gives Esc, the
  * tap-outside dismissal and focus containment for free.
  */
-function PickerSheetSurface({ open, sheet, onClose, titleId, dataTestId, children }: SurfaceProps): React.JSX.Element {
+function PickerSheetSurface({
+  open,
+  sheet,
+  onClose,
+  titleId,
+  dataTestId,
+  animated,
+  children,
+}: SurfaceProps): React.JSX.Element {
   const close = (): void => onClose();
+  const motion = animated ? {} : { transitionDuration: 0 };
   if (sheet) {
     // A Drawer's paper carries no dialog semantics of its own, so it is given them.
     const paper = {
@@ -49,14 +60,14 @@ function PickerSheetSurface({ open, sheet, onClose, titleId, dataTestId, childre
       'data-testid': dataTestId,
     };
     return (
-      <Drawer anchor="bottom" open={open} onClose={close} sx={ABOVE_SHEETS} slotProps={{ paper }}>
+      <Drawer anchor="bottom" open={open} onClose={close} sx={ABOVE_SHEETS} slotProps={{ paper }} {...motion}>
         {children}
       </Drawer>
     );
   }
   const paper = { sx: dialogPaperSx, 'data-testid': dataTestId };
   return (
-    <Dialog open={open} onClose={close} aria-labelledby={titleId} sx={ABOVE_SHEETS} slotProps={{ paper }}>
+    <Dialog open={open} onClose={close} aria-labelledby={titleId} sx={ABOVE_SHEETS} slotProps={{ paper }} {...motion}>
       {children}
     </Dialog>
   );
@@ -86,7 +97,14 @@ export function PickerSheet(props: PickerSheetProps): React.JSX.Element {
   const state = usePickerSheet(props);
 
   return (
-    <PickerSheetSurface open={open} sheet={sheet} onClose={onClose} titleId={titleId} dataTestId={dataTestId}>
+    <PickerSheetSurface
+      open={open}
+      sheet={sheet}
+      onClose={onClose}
+      titleId={titleId}
+      dataTestId={dataTestId}
+      animated={props.animated ?? true}
+    >
       <PickerSheetHead
         kicker={kicker}
         title={title}
