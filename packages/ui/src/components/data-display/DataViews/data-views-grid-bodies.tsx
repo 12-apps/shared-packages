@@ -13,8 +13,8 @@ import {
   useDataViewsLayout,
   type DataViewsDensity,
 } from "./data-views-layout-context";
-import { cardGridTracks } from "./data-views-grid-helpers";
 import { DataViewsBoard, type BoardConfig } from "./DataViewsBoard";
+import { CardBody } from "./data-views-card-body";
 import { SelectAllStrip } from "./data-views-select-all-strip";
 import { ListCardGroup, type ListGroupConfig } from "./list-card-rails";
 import type { DataViewCardSelection } from "./data-views-types";
@@ -31,6 +31,8 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   getRowId: (row: T) => string | number;
   selectedIds: Array<string | number>;
   onChangeSelected: (ids: Array<string | number>) => void;
+  /** False ⇒ no checkbox column at all: no header select-all, no row box, no width. */
+  selectable: boolean;
   sortBy: GridSort[];
   onChangeSortBy: (next: GridSort[]) => void;
   /** "server" defers ordering to the backend (rows render as-is); "client" sorts in-grid. */
@@ -42,13 +44,14 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   emptyState?: React.ReactNode;
 }
 
-/** The dense DataGrid with multi-select, wrapped in the scrollable table region. */
+/** The dense DataGrid with multi-select (unless opted out), wrapped in the scrollable table region. */
 function GridBody<T extends Record<string, unknown>>({
   rows,
   columns,
   getRowId,
   selectedIds,
   onChangeSelected,
+  selectable,
   sortBy,
   onChangeSortBy,
   sortMode,
@@ -79,7 +82,7 @@ function GridBody<T extends Record<string, unknown>>({
         density="compact"
         rowHeight={36}
         headerHeight={36}
-        selection={{ mode: "multi", selectedRowIds: selectedIds, onChangeSelected }}
+        selection={selectable ? { mode: "multi", selectedRowIds: selectedIds, onChangeSelected } : { mode: "none" }}
         sorting={{ mode: sortMode, sortBy, onChangeSortBy }}
         expansion={toGridExpansion(rowDetail, copy)}
         data-testid={dataTestId}
@@ -91,71 +94,6 @@ function GridBody<T extends Record<string, unknown>>({
   );
 }
 
-/* ── Body (cards) ────────────────────────────────────────────────────────── */
-
-interface CardBodyProps<T extends Record<string, unknown>> {
-  rows: T[];
-  renderCard: (row: T, selection: DataViewCardSelection) => React.ReactNode;
-  getRowId: (row: T) => string | number;
-  selectedIds: Set<string | number>;
-  onToggleId: (id: string | number) => void;
-  /** The width each card asks for; `auto-fill` turns it into a column count. */
-  targetCardWidth: number;
-  /** Content scale (padding + type) handed to each card, from the zoom slider. */
-  cardScale: number;
-  dataTestId?: string;
-  emptyState?: React.ReactNode;
-}
-
-/**
- * The "Grade" layout: the filtered/sorted rows rendered as an auto-filling grid
- * of entity-supplied cards. Reuses `rows` (= `c.matched`), so search/filter/sort
- * apply; the column width comes from the zoom slider, and each card is handed its
- * selection state so it can drive its own checkbox (BaseCard) — the same
- * selection model as the table.
- */
-function CardBody<T extends Record<string, unknown>>({
-  rows,
-  renderCard,
-  getRowId,
-  selectedIds,
-  onToggleId,
-  targetCardWidth,
-  cardScale,
-  dataTestId,
-  emptyState,
-}: CardBodyProps<T>): React.JSX.Element {
-  if (rows.length === 0) {
-    return <Box sx={{ mt: 1.5 }}>{emptyState}</Box>;
-  }
-  return (
-    <Box
-      sx={{
-        mt: 1.5,
-        display: "grid",
-        // Fixed inter-card gap — deliberately NOT scaled by the zoom slider, so
-        // only the cards grow while the space between them stays constant.
-        gap: 1.5,
-        ...cardGridTracks(targetCardWidth),
-      }}
-      data-testid={dataTestId ? `${dataTestId}-cards` : "data-views-cards"}
-    >
-      {rows.map((row) => {
-        const id = getRowId(row);
-        return (
-          <Box key={id}>
-            {renderCard(row, {
-              selected: selectedIds.has(id),
-              onToggleSelect: () => onToggleId(id),
-              scale: cardScale,
-            })}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
 /* ── Body (list) ─────────────────────────────────────────────────────────── */
 
 interface ListBodyProps<T extends Record<string, unknown>> {
@@ -163,7 +101,8 @@ interface ListBodyProps<T extends Record<string, unknown>> {
   renderListRow: (row: T, selection: DataViewCardSelection) => React.ReactNode;
   getRowId: (row: T) => string | number;
   selectedIds: Set<string | number>;
-  onToggleId: (id: string | number) => void;
+  /** Absent on a grid that is not selectable: rows get no toggle, so no checkbox. */
+  onToggleId?: (id: string | number) => void;
   /** Gap between rows, from the density preference. */
   rowGap: number;
   /** The list's shared column config. See {@link ListGroupConfig}. */
@@ -207,7 +146,7 @@ function ListBody<T extends Record<string, unknown>>({
   const testId = dataTestId ? `${dataTestId}-list` : "data-views-list";
   const selectionFor = (id: string | number): DataViewCardSelection => ({
     selected: selectedIds.has(id),
-    onToggleSelect: () => onToggleId(id),
+    onToggleSelect: onToggleId && (() => onToggleId(id)),
     scale: 1,
   });
 
@@ -218,7 +157,10 @@ function ListBody<T extends Record<string, unknown>>({
           cells={group.cells}
           metaColumns={group.metaColumns}
           rails={group.rails}
-          reserveGutters={group.reserveGutters}
+          // A list nobody can select holds no checkbox gutter open: reserving
+          // one is how a selectable and a read-only row line up, and here no
+          // row is selectable. Gutters a row DOES use still get their track.
+          reserveGutters={onToggleId ? group.reserveGutters : false}
           density={density}
           gap={rowGap}
           dataTestId={testId}
@@ -268,6 +210,8 @@ interface GridMainProps<T extends Record<string, unknown>> {
   board?: BoardConfig<T>;
   /** Opt-in expandable rows — the TABLE only; the headerless layouts ignore it. */
   rowDetail?: DataViewRowDetail<T>;
+  /** False ⇒ no selection anywhere: no checkboxes, no select-all strip. */
+  selectable: boolean;
   dataTestId?: string;
   emptyState?: React.ReactNode;
   testIdPrefix: string;
@@ -283,14 +227,18 @@ interface GridMainProps<T extends Record<string, unknown>> {
 function Headerless<T extends Record<string, unknown>>({
   c,
   getRowId,
+  selectable,
   testIdPrefix,
   children,
 }: {
   c: DataViewsController<T>;
   getRowId: (row: T) => string | number;
+  selectable: boolean;
   testIdPrefix: string;
   children: React.ReactNode;
 }): React.JSX.Element {
+  // Not selectable ⇒ no strip: a select-all over rows that cannot be selected.
+  if (!selectable) return <>{children}</>;
   return (
     <>
       <SelectAllStrip
@@ -313,9 +261,12 @@ function Headerless<T extends Record<string, unknown>>({
  * which is also what keeps either function inside the line budget.
  */
 function headerlessBody<T extends Record<string, unknown>>(
-  { c, getRowId, renderCard, renderListRow, listGroup, board, dataTestId, emptyState }: GridMainProps<T>,
+  { c, getRowId, renderCard, renderListRow, listGroup, board, selectable, dataTestId, emptyState }: GridMainProps<T>,
   { layout, zoom, density }: ReturnType<typeof useDataViewsLayout>,
 ): React.ReactNode | null {
+  // ONE switch for every headerless body: no toggle reaches a card or row, and
+  // BaseCard / BaseListCard draw no checkbox for a record without one.
+  const onToggleId = selectable ? c.toggleId : undefined;
   if (layout === "list" && renderListRow) {
     return (
       <ListBody
@@ -323,7 +274,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         renderListRow={renderListRow}
         getRowId={getRowId}
         selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
+        onToggleId={onToggleId}
         rowGap={DENSITY_ROW_PADDING[density]}
         group={listGroup}
         density={density}
@@ -340,7 +291,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         getRowId={getRowId}
         renderCard={renderCard}
         selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
+        onToggleId={onToggleId}
         // DENSITY, not zoom: the board's own knob in the Exibição tab is how
         // wide its columns are, and it is the only sizing control the board
         // has since the zoom slider was removed.
@@ -356,7 +307,7 @@ function headerlessBody<T extends Record<string, unknown>>(
         renderCard={renderCard}
         getRowId={getRowId}
         selectedIds={c.selectedIds}
-        onToggleId={c.toggleId}
+        onToggleId={onToggleId}
         targetCardWidth={cardTargetWidthFor(zoom, density)}
         cardScale={cardScaleForZoom(zoom)}
         dataTestId={dataTestId}
@@ -369,12 +320,12 @@ function headerlessBody<T extends Record<string, unknown>>(
 
 /** Picks the body from the layout context: board, list, cards, or the dense grid. */
 export function GridMain<T extends Record<string, unknown>>(props: GridMainProps<T>): React.JSX.Element {
-  const { c, getRowId, dataTestId, emptyState, testIdPrefix } = props;
+  const { c, getRowId, selectable, dataTestId, emptyState, testIdPrefix } = props;
   const layoutState = useDataViewsLayout();
   const body = headerlessBody(props, layoutState);
   if (body) {
     return (
-      <Headerless c={c} getRowId={getRowId} testIdPrefix={testIdPrefix}>
+      <Headerless c={c} getRowId={getRowId} selectable={selectable} testIdPrefix={testIdPrefix}>
         {body}
       </Headerless>
     );
@@ -386,6 +337,7 @@ export function GridMain<T extends Record<string, unknown>>(props: GridMainProps
       getRowId={getRowId}
       selectedIds={[...c.selectedIds]}
       onChangeSelected={(ids) => c.setSelectedIds(new Set(ids))}
+      selectable={selectable}
       sortBy={c.state.sortBy}
       onChangeSortBy={(next: GridSort[]) => c.patch({ sortBy: next })}
       sortMode={c.serverMode ? "server" : "client"}

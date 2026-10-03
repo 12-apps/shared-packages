@@ -118,6 +118,16 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    */
   renderRowMenu?: (row: T) => React.ReactNode;
   /**
+   * Row selection — on by default. `false` opts the grid out entirely: no
+   * checkbox column in the table (and no width reserved for one), no checkbox
+   * or checkbox gutter on cards and list rows, no select-all strip and no
+   * count. With nothing selectable, the toolbar's selection mode never takes
+   * over the search, the filter pills and Exportar. For a grid with no bulk
+   * action, where a selection could only hide the toolbar. Row click and the
+   * row menu are unaffected.
+   */
+  selectable?: boolean;
+  /**
    * Opt-in expandable rows (table layout only): a chevron in a leading column
    * opens `render(row)` under the row. See {@link DataViewRowDetail}.
    */

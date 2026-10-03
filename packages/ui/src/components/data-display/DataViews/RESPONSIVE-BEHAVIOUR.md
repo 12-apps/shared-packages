@@ -60,7 +60,33 @@ selection cluster: the search, the filters, Exibir and Exportar all stand down,
 and what is left is "Limpar filtros", the count, whatever the host puts in
 `selectionExtra`, and the actions menu.
 
-That cluster is not on the ladder, and it must not be. The ladder sheds controls
+### A grid with no selection: `selectable={false}`
+
+That trade is only worth making when the selection has somewhere to go. A grid
+whose last bulk action is removed still drew a checkbox on every row, and
+ticking one took the search, the pills and Exportar away and offered nothing
+back. A control whose only effect is to take the toolbar away is a defect, so
+`DataViewsTableBase` / `DataViewsGrid` take `selectable` (default `true`, which
+is the grid described above, unchanged). With `selectable={false}`:
+
+- the table has no checkbox column: no header select-all, no row box, and no
+  `padding="checkbox"` cell holding its width;
+- cards, board cards and list rows are handed `DataViewCardSelection` without
+  an `onToggleSelect`, so `BaseCard` and `BaseListCard` draw no checkbox (a
+  renderer that passes the field on as-is needs no change), and a `listGroup`
+  holds no empty select gutter open;
+- the headerless layouts get no "Selecionar todos nesta página" strip, and the
+  toolbar never shows a count;
+- `exclusiveSelection` therefore never engages: nothing can be selected, so the
+  browsing row — and everything on the ladder below — is the only row there is.
+
+Row click (`onRowClick`) and the row menu (`renderRowMenu`, the `rowActions`
+kebab) are untouched. `data-views-table.stories.tsx` → **NotSelectable** is
+that grid; `__tests__/data-views-selectable.test.tsx` pins it.
+
+### The selection row is not on the ladder
+
+The selection cluster is not on the ladder, and it must not be. The ladder sheds controls
 because each one it sheds has somewhere else to be — a filter into "Mais", a
 label into an icon, "Limpar" into a panel footer. Nothing here does. Dropping
 the count loses the only statement of what is about to be written to; dropping

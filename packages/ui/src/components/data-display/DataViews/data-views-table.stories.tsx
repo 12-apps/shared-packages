@@ -651,6 +651,31 @@ export const Table: Story = {
   render: screen,
 };
 
+/**
+ * A grid with NO row selection — `selectable={false}`, for a screen with no
+ * bulk action left to offer.
+ *
+ * No checkbox column (and no width held for one), no select-all, no count. With
+ * nothing selectable, the toolbar's selection mode can never take over the line,
+ * so the search, the filter pills and Exportar stay put. A row click still opens
+ * the pedido and the row's "⋮" menu still works. Switch to Cards or Lista in
+ * Exibir: neither draws a checkbox nor keeps a gutter for one.
+ */
+export const NotSelectable: Story = {
+  args: {
+    ...ListWithSharedColumns.args,
+    rowActions: undefined,
+    renderRowMenu: (row: PedidoRow) => (
+      <Button size="sm" variant="text" aria-label={`Ações de ${row.pedido}`} onClick={fn()}>
+        ⋮
+      </Button>
+    ),
+    defaultLayout: "table",
+    selectable: false,
+  },
+  render: screen,
+};
+
 /** Opens with the pinned "Pagamento pendente" view already applied. */
 export const SavedViewApplied: Story = {
   args: { ...base, initialViewId: "pendentes" },
