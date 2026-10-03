@@ -436,6 +436,10 @@
       "types": "./dist/types/components/form/PhoneInput/index.d.ts",
       "default": "./dist/form/PhoneInput.js"
     },
+    "./form/PickerSheet": {
+      "types": "./dist/types/components/form/PickerSheet/index.d.ts",
+      "default": "./dist/form/PickerSheet.js"
+    },
     "./form/RadioGroup": {
       "types": "./dist/types/components/form/RadioGroup/index.d.ts",
       "default": "./dist/form/RadioGroup.js"
