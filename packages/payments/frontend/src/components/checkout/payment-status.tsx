@@ -227,6 +227,7 @@ export function PaymentStatus(props: PaymentStatusProps): JSX.Element {
         onNotPaid={view.notPaid}
         onBackToMenu={onBackToMenu}
         backActionEmphasis={props.backActionEmphasis}
+        manual={props.manual === true}
       />
 
       {view.paid ? props.paidFooter : null}

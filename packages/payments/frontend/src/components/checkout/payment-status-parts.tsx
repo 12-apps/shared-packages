@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from "react";
 import { CheckCircleOutlineIcon, ErrorOutlineIcon, ScheduleIcon } from "./icons";
 import type { CheckoutDecline } from "./decline";
 import type { OrderStatus } from "./types";
+import { PayAgain } from "./payment-status-again";
 import { useCheckoutComponents } from "./ui";
 import type { PaymentStatusCopy, StatusOutcomeCopy } from "./view-copy";
 
@@ -250,23 +251,6 @@ export function PaidFacts({
 }
 
 /**
- * Whether "Tentar novamente" may be offered for a refusal (FUT-1145).
- *
- * `retriable === false` is the provider's OWN verdict that another attempt with
- * this instrument cannot succeed — attempts exhausted (10001), a cancelled
- * recurring mandate (20118), a malformed request. Offering a retry there is
- * offering a button that mints another failed order and shows the same screen
- * again; on a card the issuer is already counting, it is worse than useless.
- *
- * SILENCE MEANS YES. An undefined verdict is a provider that offered no
- * guidance, not a refusal to retry, and withholding the button on silence
- * would strand a buyer whose card is fine.
- */
-function retryable(decline: CheckoutDecline | null): boolean {
-  return decline?.retriable !== false;
-}
-
-/**
  * How much of the eye the way out asks for on a PAID confirmation.
  *
  * `"primary"` is the default and the historical look: back-to-menu is the only
@@ -309,6 +293,7 @@ export function StatusActions({
   onNotPaid,
   onBackToMenu,
   backActionEmphasis = "primary",
+  manual,
 }: {
   copy: PaymentStatusCopy;
   status: OrderStatus;
@@ -326,6 +311,8 @@ export function StatusActions({
   onBackToMenu: () => void;
   /** Whether back-to-menu leads a PAID screen. See {@link BackActionEmphasis}. */
   backActionEmphasis?: BackActionEmphasis;
+  /** The payment was a Pix only the store confirms — see `PayAgain`. */
+  manual?: boolean;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
   const back = backLook(status, backActionEmphasis);
@@ -353,16 +340,14 @@ export function StatusActions({
           {copy.notPaidAction}
         </Button>
       ) : null}
-      {status === "FAILED" && onRetry && retryable(decline) ? (
-        <Button variant="solid" color="primary" size="lg" onClick={onRetry} dataTestId="payment-retry">
-          {copy.retryAction}
-        </Button>
-      ) : null}
-      {status === "EXPIRED" && onRegenerate ? (
-        <Button variant="solid" color="primary" size="lg" onClick={onRegenerate} dataTestId="payment-regenerate">
-          {copy.regenerateAction}
-        </Button>
-      ) : null}
+      <PayAgain
+        copy={copy}
+        status={status}
+        decline={decline}
+        onRetry={onRetry}
+        onRegenerate={onRegenerate}
+        byStore={manual === true}
+      />
       <Button
         // Full width and last, so the thumb lands on the same place in every
         // outcome instead of hunting a button that moves with the state.
