@@ -178,7 +178,10 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
 /** The full rule set for the sliding panel's Dialog root. */
 export const dialogRootStyles = (theme: Theme, props: PanelStyleProps): CSSObject => ({
   direction: props.rtl ? 'rtl' : 'ltr',
-  '& .MuiBackdrop-root': backdropStyles(theme, props.modalRole),
+  // The dialog's OWN backdrop only: a descendant selector also reached the
+  // backdrop of any sheet or drawer rendered inside the panel, and blurred the
+  // very panel that sheet sits on.
+  '& > .MuiBackdrop-root': backdropStyles(theme, props.modalRole),
   '& .MuiDialog-container': { alignItems: 'flex-start', justifyContent: 'flex-end' },
   '& .MuiDialog-paper': panelStyles(theme, props),
   ...KEYFRAMES,
