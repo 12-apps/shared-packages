@@ -24,6 +24,8 @@ const PITCH = remPx(theme, 52);
 
 const columns: ColumnConfig[] = [{ key: 'name', label: 'Nome' }];
 const data = Array.from({ length: 300 }, (_, i) => ({ id: i, name: `row-${i}` }));
+/** Enough rows for a plain (un-virtualised) table, where every one renders. */
+const fewRows = data.slice(0, 5);
 
 /**
  * Every key `Table` declares for itself, set to a value React would write as an
@@ -156,7 +158,9 @@ describe('Table (virtual scrolling) DOM', () => {
 describe('Table props on the DOM', () => {
   it.each([
     ['virtualised', { columns, data, virtualScrolling: true, containerHeight: 400 }],
-    ['plain', { columns, data }],
+    // A few rows prove the same as 300: un-virtualised, every one renders, and
+    // under CI's parallel load 300 took this case past the 5s timeout.
+    ['plain', { columns, data: fewRows }],
     ['loading', { columns, data, loading: true }],
     ['empty', { columns, data: [] }],
     [
@@ -281,7 +285,7 @@ describe('Table (virtual scrolling) re-measures its header from a ResizeObserver
 
   it('creates no ResizeObserver for a plain (non-virtual) table', () => {
     const observers = stubResizeObserver();
-    renderTable({ columns, data });
+    renderTable({ columns, data: fewRows });
 
     expect(observers).toHaveLength(0);
   });

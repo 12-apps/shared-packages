@@ -212,13 +212,15 @@ const OVERLAY_DEFAULTS: Partial<SheetOverlayProps> = {
 };
 
 export const SheetOverlay: React.FC<SheetOverlayProps> = (props) => {
-  const { open, onClick, className, style, blur } = withDefaults(props, OVERLAY_DEFAULTS);
+  const { open, onClick, className, style, blur, animated } = withDefaults(props, OVERLAY_DEFAULTS);
   const theme = useTheme();
+  const timeout = animated === false ? 0 : 300;
 
   return (
-    <Fade in={open} timeout={300}>
+    <Fade in={open} timeout={timeout}>
       <Backdrop
         open={Boolean(open)}
+        transitionDuration={timeout}
         onClick={onClick}
         className={className}
         sx={{

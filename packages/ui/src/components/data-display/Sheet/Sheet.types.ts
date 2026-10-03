@@ -97,4 +97,6 @@ export interface SheetOverlayProps {
   className?: string;
   style?: CSSProperties;
   blur?: boolean;
+  /** False: the veil appears and leaves at once, with no fade. */
+  animated?: boolean;
 }
