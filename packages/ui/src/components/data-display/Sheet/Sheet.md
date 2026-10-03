@@ -41,6 +41,7 @@ A vertical sheet's **width** is one rule rather than one per preset: `min(100%, 
 - **pulse** (boolean): Enable pulse animation effect
 - **rounded** (boolean): Apply rounded corners to the sheet
 - **elevation** (number): Shadow depth level (0-24)
+- **animated** (boolean, default true): `false` opens and closes the panel at once, with no slide
 
 ### Interactive Behavior
 

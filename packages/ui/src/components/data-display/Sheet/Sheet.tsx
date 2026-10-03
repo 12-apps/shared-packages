@@ -125,6 +125,7 @@ export const Sheet: React.FC<SheetProps> = (props) => {
     anchor: position,
     open: isOpen,
     className,
+    ...(resolved.animated === false ? { transitionDuration: 0 } : {}),
     // A tap outside obeys `closeOnOverlayClick`. A swipe-to-dismiss (no
     // reason: SwipeableDrawer calls `onClose()` bare) closes. Escape is the
     // hook's own listener alone, which honours `closeOnEscape` — the modal's

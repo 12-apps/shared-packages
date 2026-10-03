@@ -55,6 +55,8 @@ export interface SheetProps {
   fullHeight?: boolean;
   rounded?: boolean;
   elevation?: number;
+  /** Slide in and out (default). `false` opens and closes at once. */
+  animated?: boolean;
   dataTestId?: string;
 }
 

@@ -41,6 +41,12 @@ const METRICS = {
   lineHeight: 1.4,
 } as const;
 
+/**
+ * A quiet control's hover: the hairline at half strength, a green-grey step
+ * (#E9EDE7 on one adopter's raised surface) rather than MUI's black wash.
+ */
+const hoverWash = (theme: Theme): string => alpha(theme.palette.divider, 0.5);
+
 /** The panel's shadow: `0 16px 48px` of ink at 0.28. */
 const panelShadow = (theme: Theme): string =>
   `${rems(theme, 0, 16, 48)} ${alpha(uiInk(theme).panelShadowInk, 0.28)}`;
@@ -82,7 +88,7 @@ export const headSx = (theme: Theme): CSSObject => ({
   gap: rem(theme, METRICS.headGapPx),
   padding: rems(theme, 14, 16),
   // A shade under the controls' own border: the rule separates, it does not frame.
-  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.66)}`,
   flex: '0 0 auto',
 });
 
@@ -113,8 +119,9 @@ export const closeButtonSx = (theme: Theme): CSSObject => ({
   color: theme.palette.text.primary,
   cursor: 'pointer',
   '& svg': { width: rem(theme, METRICS.closeGlyphPx), height: rem(theme, METRICS.closeGlyphPx) },
-  '&:hover': { background: theme.palette.action.hover },
-  '&:focus-visible': { outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 1) },
+  '&:hover': { background: hoverWash(theme) },
+  // The browser's own ring, as on every control the design draws.
+  '&:focus-visible': { outlineStyle: 'auto', outlineWidth: '1px' },
 });
 
 /** `.sb` — the scrolling body: search, list, foot. */
@@ -187,7 +194,7 @@ export const rowPaddingLeft = (theme: Theme, depth: number): string =>
 /** Background of a row: selected wins over the keyboard cursor, which wins over rest. */
 function rowBackground(theme: Theme, selected: boolean, active: boolean): string {
   if (selected) return alpha(theme.palette.primary.main, 0.1);
-  return active ? theme.palette.action.hover : 'transparent';
+  return active ? hoverWash(theme) : 'transparent';
 }
 
 /** `.pitem` — a row. `active` is the keyboard cursor, drawn as a ring so it reads apart from `selected`. */
@@ -208,7 +215,7 @@ export const rowSx = (theme: Theme, selected: boolean, active: boolean): CSSObje
   color: theme.palette.text.primary,
   background: rowBackground(theme, selected, active),
   boxShadow: active ? `inset 0 0 0 ${rem(theme, 1)} ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
-  '&:hover': { background: selected ? alpha(theme.palette.primary.main, 0.1) : theme.palette.action.hover },
+  '&:hover': { background: selected ? alpha(theme.palette.primary.main, 0.1) : hoverWash(theme) },
 });
 
 export const rowTextSx: CSSObject = { flex: '1 1 auto', minWidth: 0 };

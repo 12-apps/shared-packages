@@ -40,6 +40,7 @@ Every word it shows comes from the caller: the package ships no copy for it.
 - **onCreate** (`(query: string) => void`): called with the TRIMMED query. The create row is offered last when both `createLabel` and `onCreate` are given and the trimmed query matches no item label exactly (case and accents aside).
 - **emptyText** (`(query: string) => string`): shown instead of the list when nothing matches and there is no create row.
 - **foot** (`string`): the note under the list.
+- **animated** (`boolean`, default `true`): `false` opens and closes the sheet at once, with no fade or slide — for a host whose design draws its overlays without motion.
 - **dataTestId** (`string`, default `picker-sheet`): on the sheet's paper. Sub-elements: `${id}-search`, `${id}-item-${item.id}`, `${id}-create`, `${id}-close`, plus `${id}-check-${item.id}`, `${id}-create-meta`, `${id}-empty`, `${id}-foot`, `${id}-list`.
 
 ## Behaviour
