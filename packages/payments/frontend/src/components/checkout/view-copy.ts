@@ -94,6 +94,14 @@ export interface PaymentStatusCopy {
   declined: Partial<Record<CheckoutDeclineReason, StatusOutcomeCopy>>;
   awaitingTimedOut: StatusOutcomeCopy;
   /**
+   * FAILED and EXPIRED for a Pix only the STORE confirms (FUT-3232). The store
+   * answering "não recebi", or letting its window lapse, says nothing about
+   * whether the buyer paid — a static key takes money whatever the store
+   * later says — so "nothing was charged" would be a guess, and "pay again" an
+   * invitation to pay twice. Absent, those two keep their ordinary sentences.
+   */
+  manual?: { failed: StatusOutcomeCopy; expired: StatusOutcomeCopy };
+  /**
    * The wait cannot reach the payment right now (FUT-1144) — and is STILL
    * ASKING, which is the whole difference between this outcome and the one
    * above it, and why the one above it wins when a screen somehow has both. The
