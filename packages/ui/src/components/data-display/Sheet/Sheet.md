@@ -68,7 +68,7 @@ A vertical sheet's **width** is one rule rather than one per preset: `min(100%, 
 ### Overlay and Closing
 
 - **showOverlay** (boolean): Show backdrop overlay behind sheet (default: true)
-- **closeOnOverlayClick** (boolean): Close sheet when overlay is clicked (default: true)
+- **closeOnOverlayClick** (boolean): Close sheet when the veil outside it is tapped (default: true). The drawer's own backdrop is an invisible catcher (`sheet-click-catcher`) that routes the tap here, so `persistent` still holds the sheet open.
 - **closeOnEscape** (boolean): Close sheet on Escape key press (default: true)
 - **showCloseButton** (boolean): Show close button in header (default: true)
 
