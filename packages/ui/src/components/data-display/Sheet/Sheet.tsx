@@ -162,7 +162,12 @@ export const Sheet: React.FC<SheetProps> = (props) => {
   return (
     <>
       {showOverlay && isOpen && (
-        <SheetOverlay open={isOpen} onClick={handleOverlayClick} blur={variant === 'glass'} />
+        <SheetOverlay
+          open={isOpen}
+          onClick={handleOverlayClick}
+          blur={variant === 'glass'}
+          animated={resolved.animated}
+        />
       )}
 
       {isSwipeable ? (
