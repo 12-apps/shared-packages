@@ -84,14 +84,7 @@ describe("PickerSheet", () => {
     expect(dialog.closest(".MuiDrawer-root")).not.toBeNull();
   });
 
-  it("does not focus the search box on open, so a phone keeps its keyboard down", async () => {
-    renderSheet();
-    // Give the deferred open work its frame, then check where focus landed.
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
-    expect(search()).not.toHaveFocus();
-  });
-
-  it("scrolls the selected row into view on open", async () => {
+  it("scrolls the selected row into view on open, and leaves the search box unfocused", async () => {
     // jsdom has no scrollIntoView: give elements one that records who asked.
     const scrolled: Element[] = [];
     const original = Element.prototype.scrollIntoView;
@@ -101,6 +94,9 @@ describe("PickerSheet", () => {
     try {
       renderSheet();
       await waitFor(() => expect(scrolled).toContain(screen.getByTestId("ps-item-juices")));
+      // The open work has run (the scroll is its last step): focus did not go
+      // to the search box, so a phone keeps its keyboard down over the list.
+      await waitFor(() => expect(search()).not.toHaveFocus());
     } finally {
       Element.prototype.scrollIntoView = original;
     }
@@ -124,16 +120,18 @@ describe("PickerSheet", () => {
     expect(rowIds()).toEqual(["ps-item-a"]);
   });
 
-  it("ignores accents, and never offers to create an accented name that exists", () => {
+  it("ignores accents, and never offers to create an accented name that exists", async () => {
     const onCreate = vi.fn();
     renderSheet({
       items: [{ id: "acai", label: "Açaí" }, { id: "agua", label: "Água" }],
       onCreate,
       createLabel: (query) => `Create "${query}"`,
     });
+    enterQuery("acaix");
+    expect(screen.getByTestId("ps-create")).toBeInTheDocument();
     enterQuery("acai");
     expect(rowIds()).toEqual(["ps-item-acai"]);
-    expect(screen.queryByTestId("ps-create")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("ps-create")).not.toBeInTheDocument());
     enterQuery("agua");
     expect(rowIds()).toEqual(["ps-item-agua"]);
   });
@@ -195,7 +193,7 @@ describe("PickerSheet", () => {
   it("drops the cursor when the rows shrink under it", () => {
     const { props, rerender } = renderSheet();
     fireEvent.keyDown(search(), { key: "ArrowUp" }); // the last row, index 3
-    rerender(<PickerSheet {...props} items={ITEMS.slice(0, 2)} />);
+    rerender(<PickerSheet {...props} items={props.items.slice(0, 2)} />);
     expect(search()).not.toHaveAttribute("aria-activedescendant");
     fireEvent.keyDown(search(), { key: "Enter" });
     expect(props.onPick).not.toHaveBeenCalled();
