@@ -31,7 +31,13 @@ const METRICS = {
   /** Left padding per level of `indent` (`.pitem.ind{padding-left:28px}` at depth 1). */
   rowIndentStepPx: 28,
   checkGlyphPx: 16,
-  searchGlyphPx: 15,
+  closeGlyphPx: 18,
+  searchGlyphPx: 16,
+  /** The magnifier's inset from the field's inner edge, and the gap before the text. */
+  searchGlyphInsetPx: 10,
+  searchGlyphGapPx: 6,
+  /** The prototype's body line-height; the sheet sets it rather than inheriting a host's. */
+  lineHeight: 1.4,
 } as const;
 
 /** The panel's shadow: `0 16px 48px` of ink at 0.28. */
@@ -58,6 +64,7 @@ export const sheetPaperSx = (theme: Theme): CSSObject => ({
   width: '100%',
   maxHeight: '88%',
   borderRadius: rems(theme, METRICS.sheetRadiusPx, METRICS.sheetRadiusPx, 0, 0),
+  boxShadow: panelShadow(theme),
   background: theme.palette.background.paper,
   backgroundImage: 'none',
   display: 'flex',
@@ -71,21 +78,22 @@ export const headSx = (theme: Theme): CSSObject => ({
   alignItems: 'center',
   gap: rem(theme, METRICS.headGapPx),
   padding: rems(theme, 14, 16),
-  borderBottom: `1px solid ${theme.palette.divider}`,
+  // A shade under the controls' own border: the rule separates, it does not frame.
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
   flex: '0 0 auto',
 });
 
 export const kickerSx = (theme: Theme): CSSObject => ({
   fontSize: rem(theme, 11.5),
   color: theme.palette.text.secondary,
-  lineHeight: 1.3,
+  lineHeight: METRICS.lineHeight,
 });
 
 export const titleSx = (theme: Theme): CSSObject => ({
   margin: 0,
-  fontSize: rem(theme, 16),
+  fontSize: rem(theme, 14),
   fontWeight: 700,
-  lineHeight: 1.3,
+  lineHeight: METRICS.lineHeight,
   color: theme.palette.text.primary,
 });
 
@@ -101,7 +109,7 @@ export const closeButtonSx = (theme: Theme): CSSObject => ({
   background: 'transparent',
   color: theme.palette.text.primary,
   cursor: 'pointer',
-  '& svg': { width: rem(theme, 16), height: rem(theme, 16) },
+  '& svg': { width: rem(theme, METRICS.closeGlyphPx), height: rem(theme, METRICS.closeGlyphPx) },
   '&:hover': { background: theme.palette.action.hover },
   '&:focus-visible': { outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 1) },
 });
@@ -117,7 +125,11 @@ export const bodySx = (theme: Theme): CSSObject => ({
   flex: '1 1 auto',
 });
 
-/** The search field: the library's field height, border and corner, with a leading magnifier. */
+/**
+ * The search field: the library's field height, border and corner, with a
+ * leading magnifier. White on the light sheet, so the field reads as a field
+ * against the paper behind it.
+ */
 export const searchFieldSx = (theme: Theme): CSSObject => ({
   position: 'relative',
   display: 'flex',
@@ -125,10 +137,11 @@ export const searchFieldSx = (theme: Theme): CSSObject => ({
   flex: '0 0 auto',
   '& > svg': {
     position: 'absolute',
-    left: rem(theme, 11),
+    // + 1 for the input's own border, which the glyph sits inside of.
+    left: rem(theme, METRICS.searchGlyphInsetPx + 1),
     width: rem(theme, METRICS.searchGlyphPx),
     height: rem(theme, METRICS.searchGlyphPx),
-    opacity: 0.55,
+    color: theme.palette.text.secondary,
     pointerEvents: 'none',
     zIndex: 1,
   },
@@ -136,11 +149,11 @@ export const searchFieldSx = (theme: Theme): CSSObject => ({
     width: '100%',
     height: fieldHeight(theme),
     boxSizing: 'border-box',
-    padding: rems(theme, 0, 12, 0, 34),
+    padding: rems(theme, 0, 10, 0, METRICS.searchGlyphInsetPx + METRICS.searchGlyphPx + METRICS.searchGlyphGapPx),
     fontSize: rem(theme, 14),
     border: fieldBorder(theme),
     borderRadius: fieldRadiusPx(theme),
-    background: theme.palette.background.paper,
+    background: theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.common.white,
     color: theme.palette.text.primary,
     '&:focus': {
       outline: 'none',
@@ -197,13 +210,13 @@ export const rowTextSx: CSSObject = { flex: '1 1 auto', minWidth: 0 };
 export const rowLabelSx = (theme: Theme): CSSObject => ({
   display: 'block',
   fontSize: rem(theme, 14),
-  lineHeight: 1.35,
+  lineHeight: METRICS.lineHeight,
 });
 
 export const rowMetaSx = (theme: Theme): CSSObject => ({
   display: 'block',
   fontSize: rem(theme, 12),
-  lineHeight: 1.35,
+  lineHeight: METRICS.lineHeight,
   color: theme.palette.text.secondary,
 });
 
@@ -223,6 +236,7 @@ export const createLabelSx = (theme: Theme): CSSObject => ({
 
 export const emptySx = (theme: Theme): CSSObject => ({
   fontSize: rem(theme, 12),
+  lineHeight: METRICS.lineHeight,
   color: theme.palette.text.secondary,
   padding: rem(theme, 10),
 });
@@ -230,5 +244,6 @@ export const emptySx = (theme: Theme): CSSObject => ({
 export const footSx = (theme: Theme): CSSObject => ({
   margin: 0,
   fontSize: rem(theme, 12),
+  lineHeight: METRICS.lineHeight,
   color: theme.palette.text.secondary,
 });

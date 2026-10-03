@@ -32,18 +32,21 @@ Every word it shows comes from the caller: the package ships no copy for it.
   - **meta** (`string`): a muted second line — a category's path, a price.
   - **indent** (`number`): tree depth, drawn as 28px of left padding per level. Applied only while the query is empty; a search flattens the list, so put the path in `meta`.
   - **selected** (`boolean`): the current value — tinted row, check mark at the right, `aria-selected="true"`.
-  - **searchText** (`string`): what the query matches; defaults to `` `${label} ${meta ?? ''}` ``.
+  - **searchText** (`string`): more text the query matches beside the label, which always matches — a path, synonyms. Defaults to `meta`.
+  - **hideWhileSearching** (`boolean`): a row that is not a thing to find (a "None" row) — shown with an empty query only.
 - **onPick** (`(id: string) => void`, required): called with the chosen item's id, and nothing else happens — close the sheet yourself.
 - **createLabel** (`(query: string) => string`): the create row's text.
-- **onCreate** (`(query: string) => void`): called with the TRIMMED query. The create row is offered last when both `createLabel` and `onCreate` are given and the trimmed query matches no item label exactly (case-insensitive).
+- **createMeta** (`(query: string) => string`): a muted second line under the create row — what creating does.
+- **onCreate** (`(query: string) => void`): called with the TRIMMED query. The create row is offered last when both `createLabel` and `onCreate` are given and the trimmed query matches no item label exactly (case and accents aside).
 - **emptyText** (`(query: string) => string`): shown instead of the list when nothing matches and there is no create row.
 - **foot** (`string`): the note under the list.
-- **dataTestId** (`string`, default `picker-sheet`): on the sheet's paper. Sub-elements: `${id}-search`, `${id}-item-${item.id}`, `${id}-create`, `${id}-close`, plus `${id}-check-${item.id}`, `${id}-empty`, `${id}-foot`, `${id}-list`.
+- **dataTestId** (`string`, default `picker-sheet`): on the sheet's paper. Sub-elements: `${id}-search`, `${id}-item-${item.id}`, `${id}-create`, `${id}-close`, plus `${id}-check-${item.id}`, `${id}-create-meta`, `${id}-empty`, `${id}-foot`, `${id}-list`.
 
 ## Behaviour
 
-- The search box takes focus on open. Filtering is a case-insensitive substring match on each item's `searchText`.
-- ↑/↓ move the keyboard cursor (wrapping at both ends, as `Command` does) and Enter picks the row under it. Typing puts the cursor on the first match, so "type, then Enter" picks it — or creates, when the create row is the only row.
+- Nothing takes focus inside the sheet on open — the dialog itself does — so a phone does not raise its keyboard over the list; the selected row is scrolled into view. Tab reaches the search box.
+- Filtering is a substring match on each item's label and `searchText`, case and ACCENTS aside ("acai" finds "Açaí", as in `CategorySelect`).
+- ↑/↓ move the keyboard cursor (wrapping at both ends, as `Command` does) and Enter picks the row under it. Typing puts the cursor on the first match, so "type, then Enter" picks it — or creates, when the create row is the only row. The cursor is drawn only once an arrow key has moved it: typing alone shows no ring on a phone.
 - Esc and a tap outside close (through `onClose`).
 - The search box is a `combobox` over a `listbox`; rows are `option`s and the cursor is announced through `aria-activedescendant`.
 - Layering: both surfaces sit at `stackedOverlayZIndex` (`tokens/layers`), so a sheet opened from inside a `StackedModal` paints ABOVE it, however deep the stack.

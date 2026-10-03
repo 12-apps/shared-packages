@@ -23,7 +23,7 @@ import {
 } from './PickerSheet.styles';
 import type { PickerSheetItem } from './PickerSheet.types';
 
-/** The close button's cross, at the weight of the search glyph beside it. */
+/** The close button's cross, at the weight of the search glyph under it. */
 function CloseGlyph(): React.JSX.Element {
   return (
     <svg
@@ -78,6 +78,8 @@ interface SearchProps {
   label: string;
   listId: string;
   activeId: string | undefined;
+  /** False when the list shows no row — then there is no listbox to point at. */
+  expanded: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onQueryChange: (next: string) => void;
   onKeyDown: (event: React.KeyboardEvent) => void;
@@ -86,7 +88,7 @@ interface SearchProps {
 
 /** The search field — a combobox over the list below it, so the cursor is announced. */
 export function PickerSheetSearch(props: SearchProps): React.JSX.Element {
-  const { query, placeholder, label, listId, activeId, inputRef, onQueryChange, onKeyDown, dataTestId } = props;
+  const { query, placeholder, label, listId, activeId, expanded, inputRef, onQueryChange, onKeyDown, dataTestId } = props;
   return (
     <Box sx={searchFieldSx}>
       <SearchGlyph />
@@ -101,8 +103,8 @@ export function PickerSheetSearch(props: SearchProps): React.JSX.Element {
         inputProps={{
           role: 'combobox',
           'aria-label': label,
-          'aria-expanded': true,
-          'aria-controls': listId,
+          'aria-expanded': expanded,
+          'aria-controls': expanded ? listId : undefined,
           'aria-autocomplete': 'list',
           'aria-activedescendant': activeId,
           'data-testid': `${dataTestId}-search`,
@@ -133,7 +135,6 @@ function PickerSheetRow({ item, rowId, active, indented, onChoose, dataTestId }:
       role="option"
       aria-selected={selected}
       data-testid={`${dataTestId}-item-${item.id}`}
-      data-indent={depth}
       onClick={onChoose}
       sx={(theme) => ({ ...rowSx(theme, selected, active), paddingLeft: rowPaddingLeft(theme, depth) })}
     >
@@ -159,10 +160,13 @@ function PickerSheetRow({ item, rowId, active, indented, onChoose, dataTestId }:
 interface ListProps {
   view: PickerSheetView;
   activeIndex: number;
+  /** Draw the cursor's ring (an arrow key moved it) — `activeIndex` alone only feeds the screen reader. */
+  cursorShown: boolean;
   listId: string;
   rowId: (index: number) => string;
   listRef: React.RefObject<HTMLUListElement | null>;
   createLabel?: (query: string) => string;
+  createMeta?: (query: string) => string;
   emptyText?: (query: string) => string;
   onChoose: (index: number) => void;
   dataTestId: string;
@@ -170,7 +174,8 @@ interface ListProps {
 
 /** The matching items, then the create row — or the empty text when there is neither. */
 export function PickerSheetList(props: ListProps): React.JSX.Element | null {
-  const { view, activeIndex, listId, rowId, listRef, createLabel, emptyText, onChoose, dataTestId } = props;
+  const { view, listId, rowId, listRef, createLabel, createMeta, emptyText, onChoose, dataTestId } = props;
+  const drawn = props.cursorShown ? props.activeIndex : -1;
   if (view.rowCount === 0) {
     const text = emptyText?.(view.query);
     return text ? (
@@ -187,7 +192,7 @@ export function PickerSheetList(props: ListProps): React.JSX.Element | null {
           key={item.id}
           item={item}
           rowId={rowId(index)}
-          active={index === activeIndex}
+          active={index === drawn}
           indented={view.query.length === 0}
           onChoose={() => onChoose(index)}
           dataTestId={dataTestId}
@@ -201,10 +206,17 @@ export function PickerSheetList(props: ListProps): React.JSX.Element | null {
           aria-selected={false}
           data-testid={`${dataTestId}-create`}
           onClick={() => onChoose(createIndex)}
-          sx={(theme) => rowSx(theme, false, activeIndex === createIndex)}
+          sx={(theme) => rowSx(theme, false, drawn === createIndex)}
         >
-          <Box component="span" sx={createLabelSx}>
-            {createLabel(view.query)}
+          <Box component="span" sx={rowTextSx}>
+            <Box component="span" sx={createLabelSx}>
+              {createLabel(view.query)}
+            </Box>
+            {createMeta ? (
+              <Box component="span" sx={rowMetaSx} data-testid={`${dataTestId}-create-meta`}>
+                {createMeta(view.query)}
+              </Box>
+            ) : null}
           </Box>
         </Box>
       ) : null}

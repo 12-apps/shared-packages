@@ -84,9 +84,26 @@ describe("PickerSheet", () => {
     expect(dialog.closest(".MuiDrawer-root")).not.toBeNull();
   });
 
-  it("focuses the search box on open", async () => {
+  it("does not focus the search box on open, so a phone keeps its keyboard down", async () => {
     renderSheet();
-    await waitFor(() => expect(search()).toHaveFocus());
+    // Give the deferred open work its frame, then check where focus landed.
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    expect(search()).not.toHaveFocus();
+  });
+
+  it("scrolls the selected row into view on open", async () => {
+    // jsdom has no scrollIntoView: give elements one that records who asked.
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    try {
+      renderSheet();
+      await waitFor(() => expect(scrolled).toContain(screen.getByTestId("ps-item-juices")));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("filters case-insensitively on label and meta", () => {
@@ -99,10 +116,33 @@ describe("PickerSheet", () => {
     expect(rowIds()).toEqual(["ps-item-drinks", "ps-item-juices", "ps-item-sodas"]);
   });
 
-  it("matches on searchText when given, instead of label and meta", () => {
+  it("matches on searchText when given, and on the label always", () => {
     renderSheet({ items: [{ id: "a", label: "Apple", searchText: "fruit" }, { id: "b", label: "Bread" }] });
     enterQuery("fruit");
     expect(rowIds()).toEqual(["ps-item-a"]);
+    enterQuery("apple");
+    expect(rowIds()).toEqual(["ps-item-a"]);
+  });
+
+  it("ignores accents, and never offers to create an accented name that exists", () => {
+    const onCreate = vi.fn();
+    renderSheet({
+      items: [{ id: "acai", label: "Açaí" }, { id: "agua", label: "Água" }],
+      onCreate,
+      createLabel: (query) => `Create "${query}"`,
+    });
+    enterQuery("acai");
+    expect(rowIds()).toEqual(["ps-item-acai"]);
+    expect(screen.queryByTestId("ps-create")).not.toBeInTheDocument();
+    enterQuery("agua");
+    expect(rowIds()).toEqual(["ps-item-agua"]);
+  });
+
+  it("hides a hideWhileSearching row once a query is typed", () => {
+    renderSheet({ items: [{ id: "none", label: "None", hideWhileSearching: true }, ...ITEMS] });
+    expect(rowIds()[0]).toBe("ps-item-none");
+    enterQuery("d");
+    expect(rowIds()).toEqual(["ps-item-drinks", "ps-item-juices", "ps-item-sodas", "ps-item-desserts"]);
   });
 
   it("offers the create row only when no label matches exactly, and calls onCreate with the trimmed query", () => {
@@ -120,11 +160,75 @@ describe("PickerSheet", () => {
     expect(onCreate).toHaveBeenCalledWith("Teas");
   });
 
+  it("draws the create row's meta line when createMeta is given", () => {
+    renderSheet({
+      onCreate: vi.fn(),
+      createLabel: (query) => `Create "${query}"`,
+      createMeta: (query) => `Available to every product (${query})`,
+    });
+    enterQuery("Teas");
+    expect(screen.getByTestId("ps-create-meta")).toHaveTextContent("Available to every product (Teas)");
+  });
+
   it("shows the empty text when nothing matches and nothing can be created", () => {
     renderSheet({ emptyText: (query) => `Nothing for "${query}"` });
     enterQuery("zzz");
     expect(screen.getByTestId("ps-empty")).toHaveTextContent('Nothing for "zzz"');
     expect(screen.queryAllByRole("option")).toHaveLength(0);
+    // No listbox on screen: the combobox neither points at one nor names a row.
+    expect(search()).toHaveAttribute("aria-expanded", "false");
+    expect(search()).not.toHaveAttribute("aria-controls");
+    expect(search()).not.toHaveAttribute("aria-activedescendant");
+  });
+
+  it("does nothing on Enter or the arrows when no row is under the cursor", () => {
+    const { props } = renderSheet({ emptyText: () => "Nothing" });
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(props.onPick).not.toHaveBeenCalled();
+
+    enterQuery("zzz");
+    fireEvent.keyDown(search(), { key: "ArrowDown" });
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(props.onPick).not.toHaveBeenCalled();
+  });
+
+  it("drops the cursor when the rows shrink under it", () => {
+    const { props, rerender } = renderSheet();
+    fireEvent.keyDown(search(), { key: "ArrowUp" }); // the last row, index 3
+    rerender(<PickerSheet {...props} items={ITEMS.slice(0, 2)} />);
+    expect(search()).not.toHaveAttribute("aria-activedescendant");
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(props.onPick).not.toHaveBeenCalled();
+  });
+
+  it("draws the cursor only once an arrow key moved it, not from typing", () => {
+    renderSheet();
+    enterQuery("ju");
+    const row = screen.getByTestId("ps-item-juices");
+    expect(search()).toHaveAttribute("aria-activedescendant", row.id);
+    const typed = getComputedStyle(row).boxShadow;
+    fireEvent.keyDown(search(), { key: "ArrowDown" });
+    fireEvent.keyDown(search(), { key: "ArrowUp" });
+    expect(getComputedStyle(row).boxShadow).not.toBe(typed);
+  });
+
+  it("gives two open sheets distinct row ids", () => {
+    renderSheet();
+    render(
+      <PickerSheet
+        open
+        onClose={() => undefined}
+        title="Other"
+        searchPlaceholder="Search"
+        searchLabel="Search"
+        closeLabel="Close"
+        items={ITEMS}
+        onPick={() => undefined}
+        dataTestId="other"
+      />,
+    );
+    const ids = [...document.querySelectorAll('[role="option"]')].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("calls onPick on click, and nothing else", () => {
@@ -165,12 +269,46 @@ describe("PickerSheet", () => {
     expect(props.onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("calls onClose on a tap outside", () => {
+  it("calls onClose on a tap outside the dialog", () => {
     const { props } = renderSheet();
-    const backdrop = document.querySelector(".MuiBackdrop-root") as Element;
-    fireEvent.mouseDown(backdrop);
+    // A real pointer lands on the container that covers the backdrop, not on the backdrop.
+    const outside = document.querySelector(".MuiDialog-container") as Element;
+    fireEvent.mouseDown(outside);
+    fireEvent.click(outside);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onClose on a tap outside the bottom sheet", () => {
+    stubPhoneViewport();
+    const { props } = renderSheet();
+    const backdrop = document.querySelector(".MuiDrawer-root .MuiBackdrop-root") as Element;
     fireEvent.click(backdrop);
     expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes itself on Esc inside a StackedModal, and leaves the stack open", () => {
+    const pickerClose = vi.fn();
+    const stackClose = vi.fn();
+    render(
+      <StackedModalProvider>
+        <StackedModal backLabel="Back" open onClose={stackClose} modalId="outer" dataTestId="outer">
+          <PickerSheet
+            open
+            onClose={pickerClose}
+            title="Choose"
+            searchPlaceholder="Search"
+            searchLabel="Search"
+            closeLabel="Close"
+            items={ITEMS}
+            onPick={() => undefined}
+            dataTestId="ps"
+          />
+        </StackedModal>
+      </StackedModalProvider>,
+    );
+    fireEvent.keyDown(screen.getByTestId("ps-search"), { key: "Escape" });
+    expect(pickerClose).toHaveBeenCalledTimes(1);
+    expect(stackClose).not.toHaveBeenCalled();
   });
 
   it("marks the selected row with aria-selected and a check mark", () => {
@@ -183,11 +321,12 @@ describe("PickerSheet", () => {
 
   it("indents by depth with an empty query, and drops the indent while searching", () => {
     renderSheet();
-    expect(screen.getByTestId("ps-item-juices")).toHaveAttribute("data-indent", "1");
-    expect(screen.getByTestId("ps-item-drinks")).toHaveAttribute("data-indent", "0");
+    const pad = (id: string): string => getComputedStyle(screen.getByTestId(id)).paddingLeft;
+    const root = pad("ps-item-drinks");
+    expect(pad("ps-item-juices")).not.toBe(root);
 
     enterQuery("ju");
-    expect(screen.getByTestId("ps-item-juices")).toHaveAttribute("data-indent", "0");
+    expect(pad("ps-item-juices")).toBe(root);
   });
 
   it("resets the query each time it opens", () => {
@@ -221,6 +360,14 @@ describe("PickerSheet", () => {
     );
     // StackedModal is a Dialog too: find the root this sheet's own paper sits in.
     const root = screen.getByTestId("ps").closest(".MuiDialog-root") as Element;
+    const deepestSheet = MODAL_STACK_BASE_Z_INDEX + MODAL_STACK_Z_INDEX_STEP;
+    expect(Number(getComputedStyle(root).zIndex)).toBeGreaterThan(deepestSheet);
+  });
+
+  it("opens above the stack as a bottom sheet too", () => {
+    stubPhoneViewport();
+    renderSheet();
+    const root = screen.getByTestId("ps").closest(".MuiDrawer-root") as Element;
     const deepestSheet = MODAL_STACK_BASE_Z_INDEX + MODAL_STACK_Z_INDEX_STEP;
     expect(Number(getComputedStyle(root).zIndex)).toBeGreaterThan(deepestSheet);
   });

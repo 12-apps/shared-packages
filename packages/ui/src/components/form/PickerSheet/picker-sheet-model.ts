@@ -1,3 +1,4 @@
+import { foldText } from '../CategorySelect/category-tree';
 import type { PickerSheetItem } from './PickerSheet.types';
 
 /** What the list shows for a query: the matching items, and whether a create row follows them. */
@@ -11,22 +12,32 @@ export interface PickerSheetView {
   rowCount: number;
 }
 
-/** The text an item is matched on, lower-cased. */
+/**
+ * The text an item is matched on, folded: its label always, then its
+ * `searchText` (or its meta line). The label is never left out, so a row whose
+ * label IS the query is always on screen — the create row it suppresses would
+ * otherwise leave the list empty.
+ */
 function haystack(item: PickerSheetItem): string {
-  return (item.searchText ?? `${item.label} ${item.meta ?? ''}`).toLowerCase();
+  return foldText(`${item.label} ${item.searchText ?? item.meta ?? ''}`);
 }
 
-/** Case-insensitive substring match on each item's `searchText`. An empty query keeps everything. */
+/**
+ * Substring match, case and accents aside: "acai" finds "Açaí", as it does in
+ * `CategorySelect` — a hurried phone keyboard drops the accent, and a search
+ * that then finds nothing offers to create a duplicate. An empty query keeps
+ * everything but nothing hides.
+ */
 function filterPickerItems(items: PickerSheetItem[], query: string): PickerSheetItem[] {
-  const needle = query.trim().toLowerCase();
+  const needle = foldText(query.trim());
   if (!needle) return items;
-  return items.filter((item) => haystack(item).includes(needle));
+  return items.filter((item) => !item.hideWhileSearching && haystack(item).includes(needle));
 }
 
-/** True when some item's LABEL is exactly the query, case aside — creating it would duplicate it. */
+/** True when some item's LABEL is the query, case and accents aside — creating it would duplicate it. */
 function hasExactLabel(items: PickerSheetItem[], query: string): boolean {
-  const needle = query.trim().toLowerCase();
-  return items.some((item) => item.label.trim().toLowerCase() === needle);
+  const needle = foldText(query.trim());
+  return items.some((item) => foldText(item.label.trim()) === needle);
 }
 
 /** The list for a query, and whether it ends in a create row. */

@@ -68,12 +68,13 @@ function PickerSheetSurface({ open, sheet, onClose, titleId, dataTestId, childre
  *
  * A centred dialog on a pointer and a bottom sheet under `CategorySelect`'s
  * sheet breakpoint. Typing filters (case-insensitive substring over each
- * item's `searchText`) and flattens the tree; ↑↓ move the cursor, Enter picks,
+ * item's label and `searchText`, accents aside) and flattens the tree; ↑↓ move
+ * the cursor, Enter picks,
  * Esc or a tap outside closes. Picking calls `onPick` and nothing else — the
  * caller decides when to close. All copy comes from the caller.
  */
 export function PickerSheet(props: PickerSheetProps): React.JSX.Element {
-  const { open, onClose, kicker, title, searchPlaceholder, searchLabel, closeLabel, createLabel, emptyText, foot } =
+  const { open, onClose, kicker, title, searchPlaceholder, searchLabel, closeLabel, createLabel, createMeta, emptyText, foot } =
     props;
   const dataTestId = props.dataTestId ?? 'picker-sheet';
   const theme = useTheme();
@@ -101,6 +102,7 @@ export function PickerSheet(props: PickerSheetProps): React.JSX.Element {
           label={searchLabel}
           listId={listId}
           activeId={state.activeIndex >= 0 ? rowId(state.activeIndex) : undefined}
+          expanded={state.view.rowCount > 0}
           inputRef={state.searchInputRef}
           onQueryChange={state.setQuery}
           onKeyDown={state.onSearchKeyDown}
@@ -109,10 +111,12 @@ export function PickerSheet(props: PickerSheetProps): React.JSX.Element {
         <PickerSheetList
           view={state.view}
           activeIndex={state.activeIndex}
+          cursorShown={state.cursorShown}
           listId={listId}
           rowId={rowId}
           listRef={state.listRef}
           createLabel={createLabel}
+          createMeta={createMeta}
           emptyText={emptyText}
           onChoose={state.choose}
           dataTestId={dataTestId}

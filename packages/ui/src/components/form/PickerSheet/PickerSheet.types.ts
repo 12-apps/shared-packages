@@ -13,8 +13,13 @@ export interface PickerSheetItem {
   indent?: number;
   /** The current value: a tinted row with a check mark at the right. */
   selected?: boolean;
-  /** What the query matches against. Defaults to `${label} ${meta ?? ''}`. */
+  /**
+   * More text the query matches, beside the label (which always matches) —
+   * a path, synonyms. Defaults to `meta`.
+   */
   searchText?: string;
+  /** A row that is not a thing to find ("None"): shown with an empty query only. */
+  hideWhileSearching?: boolean;
 }
 
 /**
@@ -39,10 +44,12 @@ export interface PickerSheetProps {
   onPick: (id: string) => void;
   /**
    * The create row's text. The row is offered last when the trimmed query
-   * matches no item LABEL exactly (case-insensitive), and only when `onCreate`
+   * matches no item LABEL exactly (case and accents aside), and only when `onCreate`
    * is given too.
    */
   createLabel?: (query: string) => string;
+  /** A muted second line under the create row — what creating does ("Opens the quick form"). */
+  createMeta?: (query: string) => string;
   /** Called with the trimmed query when the create row is chosen. */
   onCreate?: (query: string) => void;
   /** Shown instead of the list when nothing matches and there is no create row. */

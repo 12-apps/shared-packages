@@ -9,8 +9,10 @@ import type { PickerSheetProps } from './PickerSheet.types';
 interface PickerSheetState {
   query: string;
   view: PickerSheetView;
-  /** The keyboard cursor, an index into `view` (items, then the create row); -1 for none. */
+  /** The keyboard cursor, an index into `view` (items, then the create row); -1 for none. Always a row that exists. */
   activeIndex: number;
+  /** Draw the cursor: only once an arrow key has moved it, never from typing alone. */
+  cursorShown: boolean;
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   listRef: React.RefObject<HTMLUListElement | null>;
   setQuery: (next: string) => void;
@@ -22,22 +24,25 @@ interface PickerSheetState {
 type HookProps = Pick<PickerSheetProps, 'open' | 'items' | 'onPick' | 'onCreate' | 'createLabel'>;
 
 /**
- * Focus the search box on open, and keep the keyboard cursor in view.
+ * Bring the selected row into view on open, and keep the keyboard cursor in view.
  *
- * Deferred a frame, as `CategorySelect` does: the surface mounts its content in
- * the same commit as this effect, and the modal's own focus trap settles first.
+ * Nothing inside is focused on open — the modal focuses its own paper. Focusing
+ * the search box raised a phone's keyboard over the list it was opened to show.
+ * Deferred a frame: the surface mounts its content in the same commit as this
+ * effect.
  */
-function useSheetFocus(
+function useSheetScroll(
   open: boolean,
   activeIndex: number,
-  searchInputRef: React.RefObject<HTMLInputElement | null>,
   listRef: React.RefObject<HTMLUListElement | null>,
 ): void {
   useEffect(() => {
     if (!open) return undefined;
-    const frame = requestAnimationFrame(() => searchInputRef.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' });
+    });
     return () => cancelAnimationFrame(frame);
-  }, [open, searchInputRef]);
+  }, [open, listRef]);
 
   useEffect(() => {
     if (activeIndex < 0) return;
@@ -53,7 +58,8 @@ function useSheetFocus(
  */
 export function usePickerSheet({ open, items, onPick, onCreate, createLabel }: HookProps): PickerSheetState {
   const [query, setRawQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [rawActiveIndex, setActiveIndex] = useState(-1);
+  const [cursorShown, setCursorShown] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
 
@@ -65,13 +71,17 @@ export function usePickerSheet({ open, items, onPick, onCreate, createLabel }: H
     if (open) {
       setRawQuery('');
       setActiveIndex(-1);
+      setCursorShown(false);
     }
   }
 
-  useSheetFocus(open, activeIndex, searchInputRef, listRef);
-
   const creatable = Boolean(onCreate && createLabel);
   const view = useMemo(() => pickerSheetView(items, query, creatable), [items, query, creatable]);
+  // Clamped on read: the rows can shrink under the cursor (a query, new items),
+  // and `aria-activedescendant` must never name a row that is not there.
+  const activeIndex = rawActiveIndex < view.rowCount ? rawActiveIndex : -1;
+
+  useSheetScroll(open, activeIndex, listRef);
 
   const setQuery = useCallback((next: string) => {
     setRawQuery(next);
@@ -95,7 +105,8 @@ export function usePickerSheet({ open, items, onPick, onCreate, createLabel }: H
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         const delta = event.key === 'ArrowDown' ? 1 : -1;
-        setActiveIndex((current) => stepActiveIndex(current, delta, view.rowCount));
+        setActiveIndex(stepActiveIndex(activeIndex, delta, view.rowCount));
+        setCursorShown(true);
         return;
       }
       if (event.key === 'Enter' && activeIndex >= 0) {
@@ -107,5 +118,5 @@ export function usePickerSheet({ open, items, onPick, onCreate, createLabel }: H
     [view.rowCount, activeIndex, choose],
   );
 
-  return { query, view, activeIndex, searchInputRef, listRef, setQuery, choose, onSearchKeyDown };
+  return { query, view, activeIndex, cursorShown, searchInputRef, listRef, setQuery, choose, onSearchKeyDown };
 }
