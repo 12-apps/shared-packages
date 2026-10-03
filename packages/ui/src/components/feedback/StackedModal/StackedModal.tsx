@@ -3,7 +3,7 @@ import Slide from '@mui/material/Slide/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import type { TransitionProps } from '@mui/material/transitions/index.js';
 import type { FC } from 'react';
-import React, { forwardRef, useId } from 'react';
+import React, { forwardRef, useEffect, useId } from 'react';
 import { usePanelChrome } from './StackedModal.hooks';
 import { modalAriaIds, ModalPanelContents, resolveModalContent } from './StackedModal.parts';
 import type { PanelStyleProps } from './StackedModal.styles';
@@ -59,6 +59,23 @@ const withDefaults = (props: StackedModalProps): StackedModalProps => {
 /** The modal's props once defaults are applied and its stack identity is settled. */
 type ResolvedProps = StackedModalProps & { modalId: string };
 
+/**
+ * `hideHeader` removes the bar that names the dialog; without an
+ * `aria-labelledby` of the caller's own, the dialog has no accessible name.
+ */
+const useUnnamedDialogWarning = (unnamed: boolean): void => {
+  useEffect(() => {
+    const development = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+    if (unnamed && development) {
+      // eslint-disable-next-line no-console -- a config warning has no other channel.
+      console.warn(
+        'StackedModal: `hideHeader` without `aria-labelledby` leaves the dialog unnamed. ' +
+          "Point `aria-labelledby` at your content header's title.",
+      );
+    }
+  }, [unnamed]);
+};
+
 const StackedModalPanel: FC<ResolvedProps> = (props) => {
   const {
     open, onClose, glass, navigationTitle, backLabel, hideClose, hideHeader, children, actions, modalId,
@@ -68,7 +85,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
   } = props;
 
   const {
-    dialogRef, modalRole, isAnimating, showSkeleton, zIndex, isMobile, canGoBack,
+    dialogRef, modalRole, isAnimating, showSkeleton, zIndex, isMobile, canGoBack, isRoot,
     handleBack, handleClose,
   } = usePanelChrome({
     open, modalId, loading, closeOnEsc, closeOnClickOutside, disableFocusTrap, onClose,
@@ -83,6 +100,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
     isMobile,
   );
   const { titleId, descId } = modalAriaIds(modalId, ariaLabelledBy, ariaDescribedBy);
+  useUnnamedDialogWarning(Boolean(hideHeader) && !ariaLabelledBy);
 
   return (
     <StyledDialog
@@ -115,7 +133,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
         descId={descId}
         navigationTitle={navigationTitle}
         hideClose={hideClose}
-        hideHeader={hideHeader}
+        hideHeader={Boolean(hideHeader) && isRoot}
         canGoBack={canGoBack}
         onBack={handleBack}
         onClose={onClose}

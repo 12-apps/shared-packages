@@ -39,8 +39,9 @@ export interface StackedModalProps {
    * one, and on a phone it costs the first 64px of the viewport.
    *
    * Pass `aria-labelledby` with it, naming the content header's title: the bar
-   * is what names the dialog otherwise. Ignored while the panel can go back — a
-   * stacked panel's back arrow lives in the bar and is the only way out.
+   * is what names the dialog otherwise (a dev warning says so). Applies to the
+   * ROOT panel only — a stacked panel's back arrow lives in the bar and is the
+   * only way out — and the root stays bar-less while a child is open over it.
    */
   hideHeader?: boolean;
   /** Modal content */

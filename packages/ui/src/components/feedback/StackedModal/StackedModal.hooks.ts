@@ -111,6 +111,12 @@ interface PanelChrome {
   zIndex: number;
   isMobile: boolean;
   canGoBack: boolean;
+  /**
+   * This panel is the bottom of the stack. Read from ITS position, not from the
+   * depth: once a child opens, the depth says "can go back" for every panel,
+   * the receding root included.
+   */
+  isRoot: boolean;
   handleBack: () => void;
   handleClose: (event: object, reason: 'backdropClick' | 'escapeKeyDown') => void;
 }
@@ -125,7 +131,7 @@ export const usePanelChrome = (options: PanelChromeOptions): PanelChrome => {
     options;
 
   const dialogRef = useRef<HTMLDivElement>(null);
-  const { currentDepth } = useModalStack();
+  const { currentDepth, stack } = useModalStack();
   const { modalRole, isAnimating } = useModalRole(Boolean(open), modalId);
   const showSkeleton = useSkeleton(Boolean(loading));
   const zIndex = usePanelZIndex(modalId, FALLBACK_Z_INDEX);
@@ -134,6 +140,9 @@ export const usePanelChrome = (options: PanelChromeOptions): PanelChrome => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isPrimary = modalRole === 'primary';
   const canGoBack = currentDepth > 1;
+  // Not yet pushed (its first render) and something already below it: NOT the
+  // root — so a child never renders a frame without its back arrow.
+  const isRoot = (stack[0]?.id ?? modalId) === modalId;
 
   useFocusTrap(dialogRef, Boolean(open) && isPrimary, disableFocusTrap);
   useEscapeToClose(Boolean(open && closeOnEsc) && isPrimary, onClose);
@@ -154,6 +163,7 @@ export const usePanelChrome = (options: PanelChromeOptions): PanelChrome => {
     zIndex,
     isMobile,
     canGoBack,
+    isRoot,
     handleBack,
     handleClose,
   };

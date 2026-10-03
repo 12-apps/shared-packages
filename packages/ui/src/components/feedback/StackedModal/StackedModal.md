@@ -126,7 +126,7 @@ new component that portals should too.
 | `onClose` | `() => void` | - | Callback when modal is closed |
 | `navigationTitle` | `string` | - | Title displayed in modal header |
 | `hideClose` | `boolean` | `false` | Drop the header's ✕ — the content owns the dismiss |
-| `hideHeader` | `boolean` | `false` | Draw no header bar at all, for a root panel whose content brings its own header (✕ and name). Pass `aria-labelledby` naming that header's title. Ignored while the panel can go back |
+| `hideHeader` | `boolean` | `false` | Draw no header bar at all, for a root panel whose content brings its own header (✕ and name). Pass `aria-labelledby` naming that header's title (a dev warning fires without it). Root panel only |
 | `children` | `ReactNode` | - | Modal content |
 | `glass` | `boolean` | `false` | Enable glass morphism effect |
 | `actions` | `ReactNode` | - | Custom action buttons for header/footer |
@@ -200,8 +200,11 @@ own title through `aria-labelledby`:
 </StackedModal>
 ```
 
-A stacked panel (one that can go back) keeps its bar whatever this says: the
-back arrow lives there and is the only way out of depth ≥2.
+Only the ROOT panel drops its bar, and it stays bar-less while a child panel is
+open over it. A stacked panel keeps its bar whatever this says: the back arrow
+lives there and is the only way out of depth ≥2.
+
+With no bar, initial focus lands on the first focusable element of your content.
 
 ## Testing
 

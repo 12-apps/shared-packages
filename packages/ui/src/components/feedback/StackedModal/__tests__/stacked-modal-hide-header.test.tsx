@@ -3,9 +3,11 @@
  * and is named by that header — but a stacked panel keeps its back arrow.
  */
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { createTheme } from "@mui/material/styles";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StackedModal, StackedModalProvider } from "../index";
+import { dialogRootStyles } from "../StackedModal.styles";
 
 afterEach(cleanup);
 
@@ -65,5 +67,56 @@ describe("StackedModal hideHeader", () => {
       </StackedModalProvider>,
     );
     expect(screen.getByTestId("plain-header")).toBeInTheDocument();
+  });
+
+  it("keeps the root bar-less once a child opens over it", () => {
+    const tree = (child: boolean) => (
+      <StackedModalProvider>
+        <StackedModal
+          backLabel="Voltar"
+          open
+          onClose={() => undefined}
+          hideHeader
+          aria-labelledby="root-title"
+          modalId="root"
+          dataTestId="root"
+        >
+          <h2 id="root-title">Açaí na tigela</h2>
+        </StackedModal>
+        {child && (
+          <StackedModal backLabel="Voltar" open onClose={() => undefined} navigationTitle="Novo adicional" modalId="child" dataTestId="child">
+            <p>child</p>
+          </StackedModal>
+        )}
+      </StackedModalProvider>
+    );
+    const view = render(tree(false));
+    view.rerender(tree(true));
+    // The child carries the back arrow; the receding root still draws no bar,
+    // though the stack is now two deep.
+    expect(screen.getByTestId("child-header")).toBeInTheDocument();
+    // (The receding root is aria-hidden behind the child, hence `hidden`.)
+    expect(within(screen.getByTestId("root")).getAllByRole("heading", { hidden: true })).toHaveLength(1);
+  });
+
+  it("warns when nothing names the dialog", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    render(
+      <StackedModalProvider>
+        <StackedModal backLabel="Voltar" open onClose={() => undefined} hideHeader modalId="unnamed">
+          <p>body</p>
+        </StackedModal>
+      </StackedModalProvider>,
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("aria-labelledby"));
+    warn.mockRestore();
+  });
+});
+
+describe("StackedModal's backdrop style", () => {
+  it("reaches the dialog's own backdrop only, not a sheet's inside the panel", () => {
+    const rules = dialogRootStyles(createTheme(), { modalRole: "primary" } as Parameters<typeof dialogRootStyles>[1]);
+    expect(Object.keys(rules)).toContain("& > .MuiBackdrop-root");
+    expect(Object.keys(rules)).not.toContain("& .MuiBackdrop-root");
   });
 });
