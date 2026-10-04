@@ -194,7 +194,7 @@ reporting. It carries no payload beyond the tenant: a listener re-reads.
 | `authorize` | no | the collection's own gate — `(actor) => { ok }`, async, the host's plan/billing answer (rule 5). Awaited before every collection-scoped route AND inside the shared bin/approvals dispatch; a denial's `status`/`error` pass through unmodified (default 403 + `featureDisabled`). Omitted = always authorized |
 | `routePermission` | no | a permission id required for every collection-scoped route (the origin host's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
 | `ops` | yes | the host's `EntityOps` (rule 3) |
-| `newItemDrafts` | no | opt-in `{ staleAfterDays? }` (default 30): this collection's NEW-item drafts get the two routes below, update-in-place and resume, a parked publish turns its draft `SUBMITTED`, and the host's scheduled `sweepStaleNewItemDrafts()` deletes the ones untouched for `staleAfterDays`. Omitted = none of it, and the collection's surface is unchanged (see [New-item drafts](#new-item-drafts-opt-in)) |
+| `newItemDrafts` | no | opt-in `{ staleAfterDays? }` (default 30): this collection's NEW-item drafts get the two routes below, update-in-place and resume, a parked publish closes its draft, and the host's scheduled `sweepStaleNewItemDrafts()` deletes the ones untouched for `staleAfterDays`. Omitted = none of it, and the collection's surface is unchanged (see [New-item drafts](#new-item-drafts-opt-in)) |
 | `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual". The host is then the authority on it, `null` included → **0** (an archived entity, whose read filters `archived_at IS NULL`, so every row keeps its Restaurar button). Omit the callback entirely and the highest recorded version is used |
 
 ### `createWebEntityLifecycle` config
@@ -281,20 +281,43 @@ reads back.
 A registration with `newItemDrafts` gets the rest:
 
 - **update in place** — `PUT /:slug/drafts/:draftId`, the draft's own id
-  being the only id a new item has;
+  being the only id a new item has. Only its author writes it: a colleague's
+  draft (and another tenant's) answers 404, so an autosave can never land on
+  someone else's work;
 - **resume** — `GET /:slug/drafts/mine`, the caller's own newest open
   new-item draft (`createdBy`), so "+ New" reopens it instead of starting
   another;
-- **submitted, not open** — a publish of a new-item draft that approvals
-  parks (202) turns the draft `SUBMITTED`: the change request holds the data
-  now, so the draft is no longer listed, resumed, written, published again or
-  swept. Without the opt-in a parked publish keeps the draft `OPEN`, as before;
+- **closed on the 202** — a publish of a new-item draft that approvals parks
+  turns the draft `PUBLISHED` right away: the person did publish, and the
+  change request holds the data now, so the draft is no longer listed,
+  resumed, written, published again or swept. Approving or rejecting the
+  request never touches drafts — a rejected author starts over from the
+  request's payload, not from the draft. No new status: the table CHECKs
+  `status IN ('OPEN','PUBLISHED','DISCARDED')`, and this needs no migration.
+  Without the opt-in a parked publish keeps the draft `OPEN`, as before;
 - **the sweep** — `api.sweepStaleNewItemDrafts(now?)` hard-deletes, in every
   tenant, each opted-in collection's OPEN new-item drafts whose `updated_at`
   is older than `staleAfterDays` (30), and returns `[{ entityType, deleted }]`.
   The package schedules nothing: the host runs it from its own job runner
-  (daily is plenty). Item drafts, PUBLISHED / DISCARDED / SUBMITTED rows and
+  (daily is plenty). Item drafts, PUBLISHED / DISCARDED rows and
   every other collection's drafts are never touched.
+
+What the CLIENT owes the server, because the server does not enforce it:
+
+- **resume before starting.** `POST /:slug/drafts` still inserts. "One draft
+  per person" holds when "+ New" asks `drafts/mine` first and starts a draft
+  only on `null`; two tabs racing that both start one, and the older lingers
+  until the sweep.
+- **flush before publishing.** A publish reads the draft it publishes. An
+  in-place update landing between that read and the publish settling is
+  accepted, then closed with the draft — its edit is in neither the record
+  nor the request. So an autosaving editor waits for its pending save before
+  it calls publish.
+
+`staleAfterDays` must be a positive, finite number; anything else throws when
+the collection is plugged in. A sweep that fails throws an `Error` naming the
+collection it stopped at (`cause` carries the original); the collections after
+it are not swept on that run.
 
 MCP: `newItemDraftMcpEndpoints({ collectionPath, noun, summaries })` (from
 `./mcp`) emits the two tools — `getMyNew<Noun>Draft` and
@@ -310,6 +333,10 @@ and the sweep needs `entityDraft.deleteMany` (a Prisma client has it; without
 it the sweep throws). A host's own `DraftStore` implements
 `NewItemDraftStore` for the same; without it the opted-in calls refuse with
 `INVALID_STATE`.
+
+The `EntityLifecycle` / `ApiEntityLifecycle` objects gain members (`updateNewDraft`, `myNewDraft`,
+`sweepStaleNewDrafts`, `sweepStaleNewItemDrafts`), which a hand-written test
+double of either now has to carry.
 
 ## Minimal host (Hono)
 

@@ -92,7 +92,7 @@ export function createDraftMethods(
           : await writes.update(ctx, draft.entityId, draft.data);
       // A publish intercepted by approvals keeps the draft OPEN — it becomes
       // published only when the change is actually applied. (An opted-in
-      // NEW-item draft becomes SUBMITTED instead: `./new-item-drafts`.)
+      // NEW-item draft is closed on the 202 instead: `./new-item-drafts`.)
       if (result.status === 'applied') {
         await kernel.requireDraftStore().setStatus(ctx.tenantId, draftId, 'PUBLISHED');
       }

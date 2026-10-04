@@ -144,10 +144,16 @@ async function sweepNewItemDrafts(
   // names the collection it stopped at rather than racing the others.
   for (const { registration, lifecycle } of entities.values()) {
     if (!registration.newItemDrafts) continue;
-    swept.push({
-      entityType: registration.entityType,
-      deleted: await lifecycle.sweepStaleNewDrafts(now),
-    });
+    try {
+      swept.push({
+        entityType: registration.entityType,
+        deleted: await lifecycle.sweepStaleNewDrafts(now),
+      });
+    } catch (cause) {
+      throw new Error(`The new-item draft sweep stopped at "${registration.entityType}".`, {
+        cause,
+      });
+    }
   }
   return swept;
 }

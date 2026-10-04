@@ -236,7 +236,11 @@ function newItemDraftMethods(rows: DraftRecord[]): NewItemDraftStore {
       const mine = rows.filter(
         (row) => row.tenantId === tenantId && row.createdBy === actorId && isOpenNew(row, entityType),
       );
-      return mine.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+      // Latest touch wins; on a tie, the later-started one.
+      return mine.reduce<DraftRecord | null>(
+        (best, row) => (best && best.updatedAt > row.updatedAt ? best : row),
+        null,
+      );
     },
     async deleteOpenNewBefore(entityType, before) {
       const stale = rows.filter(

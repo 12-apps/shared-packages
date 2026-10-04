@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EntityOps, Snapshot } from '../../types';
 import type { LifecycleActor, LifecycleRoute } from '../context';
+import type { LifecycleDb } from '../db';
 import { createApiEntityLifecycle } from '../create-api-entity-lifecycle';
 import { PT_BR_LIFECYCLE_MESSAGES } from '../pt-BR';
 import type { LifecycleEntityRegistration } from '../registration';
@@ -57,8 +58,12 @@ function memoryOps(): { ops: EntityOps; rows: Map<string, Snapshot> } {
 }
 
 /** Products opt in (unless `optIn: false`); suppliers never do. */
-function buildApi(productOverrides: Partial<LifecycleEntityRegistration> = {}, optIn = true) {
-  const db = createMemoryLifecycleDb();
+function buildApi(
+  productOverrides: Partial<LifecycleEntityRegistration> = {},
+  optIn = true,
+  wrapDb: (db: LifecycleDb) => LifecycleDb = (db) => db,
+) {
+  const db = wrapDb(createMemoryLifecycleDb());
   const { ops, rows } = memoryOps();
   const base = {
     features: { versioning: true, drafts: true, approvals: true },
@@ -97,6 +102,7 @@ const parked: LifecycleActor = {
   settings: { ...owner.settings, approvals: true },
   permissions: new Set(),
 };
+const neighbour: LifecycleActor = { ...owner, tenantId: 't2' };
 const draftsOff: LifecycleActor = { ...owner, settings: { ...owner.settings, drafts: false } };
 
 type Api = ReturnType<typeof buildApi>['api'];
@@ -249,6 +255,19 @@ describe('updating a new-item draft in place', () => {
     expect((await updateDraft(api, owner, draft.id, { data: { name: 'x' } })).status).toBe(422);
   });
 
+  it("answers 404 for a colleague's draft, and leaves it as it was", async () => {
+    const { api } = buildApi();
+    const theirs = await startDraft(api, colleague, { name: 'Deles' });
+    expect((await updateDraft(api, owner, theirs.id, { data: { name: 'Meu' } })).status).toBe(404);
+    expect(draftOf(await myDraft(api, colleague))?.data).toEqual({ name: 'Deles' });
+  });
+
+  it("answers 404 for another tenant's draft", async () => {
+    const { api } = buildApi();
+    const theirs = await startDraft(api, neighbour, { name: 'Vizinho' });
+    expect((await updateDraft(api, owner, theirs.id, { data: { name: 'x' } })).status).toBe(404);
+  });
+
   it("answers 404 for an unknown id and for another collection's draft", async () => {
     const { api } = buildApi();
     expect((await updateDraft(api, owner, 'nope', { data: { name: 'x' } })).status).toBe(404);
@@ -304,7 +323,7 @@ describe("resuming the caller's own new-item draft", () => {
 });
 
 describe('a publish parked for approval', () => {
-  it('submits the draft: no longer resumed, listed, written or published again', async () => {
+  it('closes the draft: no longer resumed, listed, written or published again', async () => {
     const { api } = buildApi();
     const draft = await startDraft(api, parked, { name: 'Novo' });
     expect((await publish(api, parked, draft.id)).status).toBe(202);
@@ -342,10 +361,56 @@ describe('the sweep', () => {
     expect(await api.sweepStaleNewItemDrafts(daysFromNow(31))).toEqual([
       { entityType: 'product', deleted: 1 },
     ]);
-    // What is left: the item's draft (and the submitted one, unlisted).
+    // What is left: the item's draft, the other collection's — and the
+    // parked one, closed but still there.
     expect((await listDrafts(api, owner)).map((row) => row.entityId)).toEqual([created.entityId]);
     expect(await supplier.lifecycle.listDrafts(supplier.context(owner))).toHaveLength(1);
+    expect((await api.stores.drafts?.get('t1', submitted.id))?.status).toBe('PUBLISHED');
   });
+
+  it('keeps published and discarded rows, which are history', async () => {
+    const { api } = buildApi();
+    const published = await startDraft(api, owner, { name: 'Publicado' });
+    await publish(api, owner, published.id);
+    const discarded = await startDraft(api, owner, { name: 'Descartado' });
+    await routeOf(api, 'DELETE', '/products/drafts/:draftId').handle({
+      actor: owner,
+      params: { draftId: discarded.id },
+      query: {},
+    });
+    expect(await api.sweepStaleNewItemDrafts(daysFromNow(400))).toEqual([
+      { entityType: 'product', deleted: 0 },
+    ]);
+    expect((await api.stores.drafts?.get('t1', published.id))?.status).toBe('PUBLISHED');
+    expect((await api.stores.drafts?.get('t1', discarded.id))?.status).toBe('DISCARDED');
+  });
+
+  it('sweeps every tenant in one run', async () => {
+    const { api } = buildApi();
+    await startDraft(api, owner, { name: 'Aqui' });
+    await startDraft(api, neighbour, { name: 'Lá' });
+    expect(await api.sweepStaleNewItemDrafts(daysFromNow(31))).toEqual([
+      { entityType: 'product', deleted: 2 },
+    ]);
+    expect(draftOf(await myDraft(api, neighbour))).toBeNull();
+  });
+
+  it('names the collection it stopped at when the seam cannot delete', async () => {
+    const { api } = buildApi({}, true, (db) => ({
+      ...db,
+      entityDraft: { ...db.entityDraft, deleteMany: undefined },
+    }));
+    await expect(api.sweepStaleNewItemDrafts(daysFromNow(31))).rejects.toThrow(
+      'The new-item draft sweep stopped at "product".',
+    );
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'refuses a staleAfterDays of %s when the collection is plugged in',
+    (staleAfterDays) => {
+      expect(() => buildApi({ newItemDrafts: { staleAfterDays } })).toThrow(/positive number of days/);
+    },
+  );
 
   it("counts from the last touch, and follows the collection's own window", async () => {
     const { api } = buildApi({ newItemDrafts: { staleAfterDays: 7 } });

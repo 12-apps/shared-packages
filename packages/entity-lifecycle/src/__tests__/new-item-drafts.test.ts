@@ -90,12 +90,12 @@ describe('new-item drafts on the in-memory stores', () => {
     expect(await svc.lifecycle.myNewDraft({ ...ctx('u1'), actorId: null })).toBeNull();
   });
 
-  it('submits a parked new-item publish, and only with the opt-in', async () => {
+  it('closes a parked new-item publish, and only with the opt-in', async () => {
     const optedIn = setup();
     const draft = await start(optedIn, 'u1', { name: 'Novo' });
     const result = await optedIn.lifecycle.publishDraft(ctx('u1', true), draft.id);
     expect(result.status).toBe('pending-approval');
-    expect((await optedIn.stores.drafts?.get('t1', draft.id))?.status).toBe('SUBMITTED');
+    expect((await optedIn.stores.drafts?.get('t1', draft.id))?.status).toBe('PUBLISHED');
 
     const plain = setup(false);
     const other = await start(plain, 'u1', { name: 'Novo' });

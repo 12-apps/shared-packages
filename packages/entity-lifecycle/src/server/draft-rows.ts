@@ -4,6 +4,7 @@
  * `./stores` only for its length.
  */
 
+import { LifecycleError } from '../errors';
 import type { NewItemDraftStore } from '../new-item-drafts';
 import type { DraftRecord, DraftStatus } from '../types';
 
@@ -48,7 +49,10 @@ export function createNewItemDraftStore(db: LifecycleDbProvider): NewItemDraftSt
     async deleteOpenNewBefore(entityType, before) {
       const client = await db();
       if (!client.entityDraft.deleteMany) {
-        throw new Error('The lifecycle db seam has no entityDraft.deleteMany; the sweep needs it.');
+        throw new LifecycleError(
+          'INVALID_STATE',
+          'The lifecycle db seam has no entityDraft.deleteMany; the sweep needs it.',
+        );
       }
       const { count } = await client.entityDraft.deleteMany({
         where: { entityType, entityId: null, status: 'OPEN', updatedAt: { lt: before } },

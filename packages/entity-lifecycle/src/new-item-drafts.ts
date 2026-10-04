@@ -20,11 +20,20 @@
  *    and every other collection's drafts are left exactly as they are.
  *
  * And one change to publishing: a new-item draft whose publish is parked for
- * approval becomes `SUBMITTED` rather than staying `OPEN`. The parked change
- * request carries the data now — the draft is not the person's working copy
- * any more, so it must not be resumed, published twice or swept from under
- * the request. Without the opt-in a parked publish keeps the draft OPEN, as
- * it always has.
+ * approval is closed as `PUBLISHED` rather than staying `OPEN`: the person
+ * did publish it, and the parked change request carries the data from then
+ * on. The draft is not their working copy any more, so it must not be
+ * resumed, published twice or swept from under the request. Approving or
+ * rejecting the request never touches drafts, so the row is history from
+ * here, like any other closed draft. (Not a new status: `entity_drafts`
+ * CHECKs `status IN ('OPEN','PUBLISHED','DISCARDED')`, and this needs no
+ * migration.) Without the opt-in a parked publish keeps the draft OPEN, as it
+ * always has.
+ *
+ * A publish reads the draft it publishes. An in-place update landing after
+ * that read and before the publish settles is accepted and then closed with
+ * the draft — so an autosaving client flushes its pending save BEFORE it
+ * publishes, and starts a draft only after `myNewDraft` answered null.
  *
  * Opt-in because a host's surface is checked against what it advertises: a
  * collection that wires nothing gets no new route, no new tool, and no change.
@@ -104,15 +113,33 @@ function requireStore(kernel: LifecycleKernel): DraftStore & NewItemDraftStore {
   return store as DraftStore & NewItemDraftStore;
 }
 
+/**
+ * A window that is not a positive, finite number of days would sweep drafts
+ * saved a second ago (0, negative) or hand the store an Invalid Date (NaN) —
+ * refused when the collection is plugged in, not at 3 a.m. in the job.
+ */
+function assertWindow(entityType: string, options: NewItemDraftsOptions | undefined): void {
+  const days = options?.staleAfterDays;
+  if (days === undefined || (Number.isFinite(days) && days > 0)) return;
+  throw new Error(
+    `newItemDrafts.staleAfterDays for "${entityType}" must be a positive number of days; got ${days}.`,
+  );
+}
+
 export function createNewItemDraftMethods(kernel: LifecycleKernel): NewItemDraftMethods {
   const entityType = kernel.config.entityType;
+  assertWindow(entityType, kernel.config.newItemDrafts);
   return {
     async updateNewDraft(ctx, draftId, data) {
       requireOptIn(kernel);
       kernel.requireFeature(ctx, 'drafts');
       const store = requireStore(kernel);
       const draft = await store.get(ctx.tenantId, draftId);
-      if (!draft || draft.entityType !== entityType) {
+      // A colleague's draft is not one this caller can write: the draft is
+      // personal ("one per user", resumed by its author), and an autosave
+      // must never land on someone else's work. Answered as not found, the
+      // same as another tenant's id.
+      if (!draft || draft.entityType !== entityType || draft.createdBy !== ctx.actorId) {
         throw new LifecycleError('DRAFT_NOT_FOUND', `Draft ${draftId} not found.`);
       }
       if (draft.entityId !== null) {
@@ -154,7 +181,7 @@ export function createNewItemDraftMethods(kernel: LifecycleKernel): NewItemDraft
 
 /**
  * After a publish: an opted-in NEW-item draft whose write was parked for
- * approval is `SUBMITTED` — the change request holds its data from here on.
+ * approval is closed as PUBLISHED — the change request holds its data from here on.
  */
 export async function settleNewItemPublish(
   kernel: LifecycleKernel,
@@ -164,5 +191,5 @@ export async function settleNewItemPublish(
 ): Promise<void> {
   if (!kernel.config.newItemDrafts || draft.entityId !== null) return;
   if (result.status !== 'pending-approval') return;
-  await kernel.requireDraftStore().setStatus(ctx.tenantId, draft.id, 'SUBMITTED');
+  await kernel.requireDraftStore().setStatus(ctx.tenantId, draft.id, 'PUBLISHED');
 }

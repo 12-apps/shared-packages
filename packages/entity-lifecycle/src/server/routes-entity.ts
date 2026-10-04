@@ -11,8 +11,10 @@
  * same order the origin host evaluates them (route gate, then entitled context).
  *
  * Emission keeps the literal `/drafts` routes before the `/:id` ones. That is
- * a stability guarantee of the array, not a collision guard — no emitted pair
- * can shadow another (their segment counts differ). The collision that IS
+ * a stability guarantee of the array, not a collision guard: within one
+ * method, no emitted pair can shadow another — their segment counts differ,
+ * or (the opt-in `PUT /drafts/:draftId` beside `PUT /:id/draft`) the literal
+ * segment sits in a different place, so no single path matches both. The collision that IS
  * real is host-vs-package: a host route shaped `/:slug/:id` registered before
  * this router captures `GET /:slug/drafts`. The wiring rule (mount the
  * package router first) lives in ADOPTING.md and is regression-tested in the

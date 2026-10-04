@@ -178,8 +178,7 @@ export interface RecycleBinStore {
 // Drafts
 // ---------------------------------------------------------------------------
 
-/** `SUBMITTED`: a new-item draft whose publish waits on approval (opt-in, FUT-3244). */
-export type DraftStatus = 'OPEN' | 'PUBLISHED' | 'DISCARDED' | 'SUBMITTED';
+export type DraftStatus = 'OPEN' | 'PUBLISHED' | 'DISCARDED';
 
 /**
  * A per-item draft: unpublished edits kept next to the live record. A draft of
