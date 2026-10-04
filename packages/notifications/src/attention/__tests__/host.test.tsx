@@ -9,6 +9,7 @@ import {
   attentionView,
   createAttentionPreferences,
   defineAttentionViews,
+  type AttentionDockRest,
   type AttentionMessages,
 } from '../react';
 
@@ -126,7 +127,7 @@ const sample = (id: string, minutes: number): RoomItem => ({
   room: id,
 });
 
-function renderHost(items: readonly AttentionItem[], can?: (p: string) => boolean, rest?: 'right' | 'center') {
+function renderHost(items: readonly AttentionItem[], can?: (p: string) => boolean, rest?: AttentionDockRest) {
   // One key per case, named after it: no counter shared between cases.
   const preferences = createAttentionPreferences({
     storageKey: `attention-test:${expect.getState().currentTestName ?? ''}`,
@@ -485,6 +486,19 @@ describe('what the review caught', () => {
     const moved = screen.getByTestId('attention-dock');
     expect(moved.getAttribute('data-side')).toBe('right');
     expect(getComputedStyle(moved).transform).not.toBe('translateX(-50%)');
+  });
+
+  it('rests halfway down a side\'s edge when the host gives a spot, and the reader\'s drag still wins', () => {
+    const { preferences: store } = renderHost([bell('12', 2)], undefined, { side: 'right', y: 0.5 });
+    const resting = screen.getByTestId('attention-dock');
+    expect(resting.getAttribute('data-side')).toBe('right');
+    // Placed by `top`, as a stored spot is, never by the foot's `bottom`.
+    expect(getComputedStyle(resting).top).toContain('0.5');
+    expect(getComputedStyle(resting).bottom).toBe('');
+    act(() => store.write({ dock: { side: 'left', y: 0.2 } }));
+    const moved = screen.getByTestId('attention-dock');
+    expect(moved.getAttribute('data-side')).toBe('left');
+    expect(getComputedStyle(moved).top).toContain('0.2');
   });
 
   it('rests in the right corner by default', () => {

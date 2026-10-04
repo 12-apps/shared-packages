@@ -13,8 +13,9 @@
  * bar — so the resting spot clears whatever the host docks at the foot.
  *
  * `rest` is where it sits before the reader ever moves it: the right corner,
- * or the CENTRE of the foot — for a host whose own last control lives in that
- * corner. A drag still snaps it to the nearer side; centre is only the start.
+ * the CENTRE of the foot, or a spot on a side's edge given as a position (the
+ * same `{ side, y }` a drag stores) — for a host whose own controls live in
+ * the foot. A drag still snaps it to the nearer side; the rest is only the start.
  */
 import type { JSX, ReactNode } from 'react';
 
@@ -23,8 +24,11 @@ import { Box } from '@12-apps/ui/mui/Box';
 import { EDGE_GAP_PX, RESTING_SPAN_PX, useDockDrag } from './use-dock-drag';
 import type { AttentionDockPosition } from './preferences';
 
-/** Where an unmoved dock rests: the foot's right corner, or its centre. */
-export type AttentionDockRest = 'right' | 'center';
+/**
+ * Where an unmoved dock rests: the foot's right corner, its centre, or a spot
+ * on a side's edge — `{ side: 'right', y: 0.5 }` is halfway down the right edge.
+ */
+export type AttentionDockRest = 'right' | 'center' | AttentionDockPosition;
 
 export interface AttentionDockProps {
   readonly position: AttentionDockPosition | null;
@@ -54,7 +58,16 @@ function placement(
   rest: AttentionDockRest,
 ): Record<string, number | string | Record<string, string>> {
   if (live !== null) return { left: live.left, top: live.top };
-  if (position === null) return rest === 'center' ? { ...CENTRE, bottom } : { right: SIDE_GAP, bottom };
+  if (position === null) {
+    if (rest === 'center') return { ...CENTRE, bottom };
+    if (rest === 'right') return { right: SIDE_GAP, bottom };
+    return onEdge(rest, bottom);
+  }
+  return onEdge(position, bottom);
+}
+
+/** A spot on a side's edge, `y` of the way down: where a drag left it, or a host's rest. */
+function onEdge(position: AttentionDockPosition, bottom: string): Record<string, string | Record<string, string>> {
   const restore = (vh: string): string =>
     `min(calc((${vh} - ${RESTING_SPAN_PX}px) * ${position.y} + ${EDGE_GAP_PX / 2}px), calc(${vh} - ${bottom} - ${RESTING_SPAN_PX - EDGE_GAP_PX}px))`;
   return {
@@ -70,10 +83,15 @@ function placement(
   };
 }
 
+/** The position it is at: the reader's, or else a host's resting spot when that is one. */
+function spotOf(position: AttentionDockPosition | null, rest: AttentionDockRest): AttentionDockPosition | null {
+  return position ?? (typeof rest === 'object' ? rest : null);
+}
+
 /** The side it names in `data-side`: `center` while it rests at the foot's centre, so a host can tell. */
 function namedSide(position: AttentionDockPosition | null, rest: AttentionDockRest): string {
   if (position === null && rest === 'center') return 'center';
-  return position?.side ?? 'right';
+  return spotOf(position, rest)?.side ?? 'right';
 }
 
 /** The hand's look: a grabbing cursor and a lifted shadow while it is dragged. */
@@ -92,7 +110,7 @@ export function AttentionDock({
   children,
 }: AttentionDockProps): JSX.Element {
   const { live, handlers } = useDockDrag(onMove);
-  const side = position?.side ?? 'right';
+  const side = spotOf(position, rest)?.side ?? 'right';
   return (
     <Box
       data-testid="attention-dock"
