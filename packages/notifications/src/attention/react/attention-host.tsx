@@ -23,7 +23,7 @@ import {
 
 import { useAttentionAlerts, type AttentionSounds } from './alerts';
 import { AttentionButton, AttentionOthersButton } from './attention-button';
-import { AttentionDock } from './attention-dock';
+import { AttentionDock, type AttentionDockRest } from './attention-dock';
 import { AttentionOthersList } from './attention-others-list';
 import { iconOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
 import type { AttentionMessages } from './messages';
@@ -42,6 +42,8 @@ export interface AttentionHostProps {
   /** The resting spot's distance from the foot of the screen (a CSS length). */
   readonly bottom?: string;
   readonly zIndex?: number;
+  /** Where the dock rests until the reader moves it (`./attention-dock`). */
+  readonly rest?: AttentionDockRest;
   /**
    * False while the host is still loading what waits. Readings taken then only
    * set the baseline, so what was already waiting when the page opened never
@@ -118,6 +120,7 @@ export function AttentionHost({
   sounds,
   bottom,
   zIndex,
+  rest,
   ready = true,
 }: AttentionHostProps): JSX.Element | null {
   const preferences = useAttentionPreferences(store);
@@ -151,6 +154,7 @@ export function AttentionHost({
         onMove={(dock) => store.write({ dock })}
         bottom={bottom}
         zIndex={zIndex}
+        rest={rest}
       >
         {others.length > 0 && (
           <AttentionOthersButton

@@ -15,7 +15,7 @@ export {
   type AttentionButtonProps,
   type AttentionOthersButtonProps,
 } from './attention-button';
-export { AttentionDock, type AttentionDockProps } from './attention-dock';
+export { AttentionDock, type AttentionDockProps, type AttentionDockRest } from './attention-dock';
 export {
   AttentionPreferencesPanel,
   type AttentionPreferencesPanelProps,
