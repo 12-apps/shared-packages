@@ -126,7 +126,7 @@ const sample = (id: string, minutes: number): RoomItem => ({
   room: id,
 });
 
-function renderHost(items: readonly AttentionItem[], can?: (p: string) => boolean) {
+function renderHost(items: readonly AttentionItem[], can?: (p: string) => boolean, rest?: 'right' | 'center') {
   // One key per case, named after it: no counter shared between cases.
   const preferences = createAttentionPreferences({
     storageKey: `attention-test:${expect.getState().currentTestName ?? ''}`,
@@ -140,6 +140,7 @@ function renderHost(items: readonly AttentionItem[], can?: (p: string) => boolea
       can={can}
       messages={MESSAGES}
       preferences={preferences}
+      rest={rest}
     />,
   );
   return { ...view, preferences };
@@ -471,6 +472,26 @@ describe('what the review caught', () => {
     expect(children).toEqual(['attention-others', 'attention-button']);
     act(() => store.write({ dock: { side: 'left', y: 0.5 } }));
     expect(getComputedStyle(screen.getByTestId('attention-dock')).flexDirection).toBe('row-reverse');
+  });
+
+  it('rests at the foot\'s centre when the host asks, and a drag still snaps it to a side', () => {
+    const { preferences: store } = renderHost([bell('12', 2)], undefined, 'center');
+    const resting = screen.getByTestId('attention-dock');
+    expect(resting.getAttribute('data-side')).toBe('center');
+    expect(getComputedStyle(resting).left).toBe('50%');
+    expect(getComputedStyle(resting).transform).toBe('translateX(-50%)');
+    drag(resting, { x: 330, y: 300 });
+    expect(store.read().dock?.side).toBe('right');
+    const moved = screen.getByTestId('attention-dock');
+    expect(moved.getAttribute('data-side')).toBe('right');
+    expect(getComputedStyle(moved).transform).not.toBe('translateX(-50%)');
+  });
+
+  it('rests in the right corner by default', () => {
+    renderHost([bell('12', 2)]);
+    const resting = screen.getByTestId('attention-dock');
+    expect(resting.getAttribute('data-side')).toBe('right');
+    expect(getComputedStyle(resting).left).not.toBe('50%');
   });
 
   it('does not reopen the list on its own once the others are gone and come back', async () => {
