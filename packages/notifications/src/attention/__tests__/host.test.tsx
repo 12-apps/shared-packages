@@ -501,6 +501,14 @@ describe('what the review caught', () => {
     expect(getComputedStyle(moved).top).toContain('0.2');
   });
 
+  it('draws the disc flat, with no drop shadow under it', () => {
+    renderHost([bell('12', 2)]);
+    const face = screen.getByTestId('attention-button').querySelector('[data-outline]');
+    expect(face).not.toBeNull();
+    expect(face?.getAttribute('data-outline')).toBe('none');
+    expect(getComputedStyle(face as Element).boxShadow).toBe('none');
+  });
+
   it('rests in the right corner by default', () => {
     renderHost([bell('12', 2)]);
     const resting = screen.getByTestId('attention-dock');

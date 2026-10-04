@@ -199,11 +199,10 @@ function Face({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        // The approved boards' own shadows, in the theme's ink.
+        // Flat on the page (owner, 2026-10-04): no drop shadow under the disc.
+        // Once spent it keeps the double outline, its own signal.
         boxShadow: (theme: Theme) =>
-          spent
-            ? `0 0 0 3px ${surfaces(theme).raised}, 0 0 0 7px ${severityFill(theme, severity)}, 0 8px 18px ${alpha(theme.palette.text.primary, 0.45)}`
-            : `0 6px 16px ${alpha(theme.palette.text.primary, 0.35)}`,
+          spent ? `0 0 0 3px ${surfaces(theme).raised}, 0 0 0 7px ${severityFill(theme, severity)}` : 'none',
         animation: spent ? `${shake} 2.2s ease-in-out infinite` : 'none',
         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
       }}
