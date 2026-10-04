@@ -70,6 +70,19 @@ function placement(
   };
 }
 
+/** The side it names in `data-side`: `center` while it rests at the foot's centre, so a host can tell. */
+function namedSide(position: AttentionDockPosition | null, rest: AttentionDockRest): string {
+  if (position === null && rest === 'center') return 'center';
+  return position?.side ?? 'right';
+}
+
+/** The hand's look: a grabbing cursor and a lifted shadow while it is dragged. */
+function dragLook(dragging: boolean): { cursor: string; filter: string } {
+  return dragging
+    ? { cursor: 'grabbing', filter: 'drop-shadow(0 12px 18px rgba(0,0,0,0.3))' }
+    : { cursor: 'grab', filter: 'none' };
+}
+
 export function AttentionDock({
   position,
   onMove,
@@ -80,12 +93,10 @@ export function AttentionDock({
 }: AttentionDockProps): JSX.Element {
   const { live, handlers } = useDockDrag(onMove);
   const side = position?.side ?? 'right';
-  const dragging = live !== null;
   return (
     <Box
       data-testid="attention-dock"
-      // `center` while it rests at the foot's centre, so a host can tell.
-      data-side={position === null && rest === 'center' ? 'center' : side}
+      data-side={namedSide(position, rest)}
       {...handlers}
       sx={{
         position: 'fixed',
@@ -98,8 +109,7 @@ export function AttentionDock({
         gap: '12px',
         touchAction: 'none',
         userSelect: 'none',
-        cursor: dragging ? 'grabbing' : 'grab',
-        filter: dragging ? 'drop-shadow(0 12px 18px rgba(0,0,0,0.3))' : 'none',
+        ...dragLook(live !== null),
       }}
     >
       {children}
