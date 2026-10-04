@@ -39,7 +39,10 @@ const StyledDialogActions = styled(DialogActions, {
   flexWrap: 'wrap-reverse',
   columnGap: theme.spacing(2),
   rowGap: theme.spacing(1),
-  ...(fill && { '& > .MuiButton-root': { flexGrow: 1 } }),
+  // A 40px tap target, the floor the kit's own Button keeps (FUT-3269): MUI's
+  // medium button is 37px, short of it on a phone.
+  '& > .MuiButton-root': { minHeight: rem(theme, 40) },
+  ...(fill && { '& > .MuiButton-root': { flexGrow: 1, minHeight: rem(theme, 40) } }),
 }));
 
 const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>
