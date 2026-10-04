@@ -24,8 +24,11 @@
  */
 export {
   lifecycleMcpEndpoints,
+  newItemDraftMcpEndpoints,
   type LifecycleEndpointVocabulary,
   type LifecycleOperation,
+  type NewItemDraftEndpointVocabulary,
+  type NewItemDraftOperation,
 } from './endpoints';
 
 export {

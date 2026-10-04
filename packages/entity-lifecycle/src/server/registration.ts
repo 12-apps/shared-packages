@@ -11,6 +11,7 @@
  */
 
 import type { LifecycleAuthorizeGate } from './context';
+import type { NewItemDraftsOptions } from '../new-item-drafts';
 import type { DiffOptions, EntityOps, FeatureFlagMap, RetentionPolicy, Snapshot } from '../types';
 
 export interface LifecycleEntityRegistration {
@@ -69,4 +70,14 @@ export interface LifecycleEntityRegistration {
    * back to the highest recorded version — identical for every applied write.
    */
   publishedVersion?: (tenantId: string, entityId: string) => Promise<number | null>;
+  /**
+   * Opt-in (FUT-3244): this collection's NEW-item drafts can be updated in
+   * place (`PUT /:slug/drafts/:draftId`), resumed by whoever started one
+   * (`GET /:slug/drafts/mine`) and swept once untouched for `staleAfterDays`
+   * (`ApiEntityLifecycle.sweepStaleNewItemDrafts`, which the host schedules).
+   * Omitted, the collection gets none of it and its surface is unchanged —
+   * which is what keeps a host's route and tool coverage gates green for
+   * every collection that does not wire the two routes.
+   */
+  newItemDrafts?: NewItemDraftsOptions;
 }

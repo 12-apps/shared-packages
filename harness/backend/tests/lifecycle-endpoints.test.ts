@@ -311,6 +311,83 @@ describe('drafts — the unpublished working copy', () => {
   });
 });
 
+/**
+ * New-item drafts, opted into by catalog items and not by suppliers
+ * (FUT-3244) — over the SQL seam, where `entityId: null` has to read as
+ * `IS NULL` and the sweep is a real DELETE.
+ */
+describe('new-item drafts — the opt-in, over real SQL', () => {
+  interface DraftOut {
+    id: string;
+    entityId: string | null;
+    data: { name?: string };
+    status: string;
+  }
+  const draftIn = async (response: Response): Promise<DraftOut | null> =>
+    (await json<{ data: { draft: DraftOut | null } }>(response)).data.draft;
+
+  async function startNew(userId: string, name: string): Promise<DraftOut> {
+    const draft = await draftIn(
+      await asUser(userId).send('POST', '/catalog-items/drafts', { data: { name } }),
+    );
+    if (!draft) throw new Error('no draft started');
+    return draft;
+  }
+
+  it('updates in place and resumes it for its author only', async () => {
+    const mine = await startNew('owner-1', 'Pastel');
+    const put = await asUser('owner-1').send('PUT', `/catalog-items/drafts/${mine.id}`, {
+      data: { name: 'Pastel de queijo' },
+    });
+    expect(put.status).toBe(200);
+
+    const resumed = await draftIn(await asUser('owner-1').get('/catalog-items/drafts/mine'));
+    expect(resumed).toMatchObject({ id: mine.id, entityId: null, data: { name: 'Pastel de queijo' } });
+    expect(await draftIn(await asUser('editor-1').get('/catalog-items/drafts/mine'))).toBeNull();
+    // Someone else's draft is not theirs to write.
+    const foreign = await asUser('editor-1').send('PUT', `/catalog-items/drafts/${mine.id}`, {
+      data: { name: 'x' },
+    });
+    expect(foreign.status).toBe(404);
+
+    const list = await json<{ data: { drafts: DraftOut[] } }>(
+      await asUser('owner-1').get('/catalog-items/drafts'),
+    );
+    expect(list.data.drafts.map((d) => d.id)).toEqual([mine.id]);
+  });
+
+  it('closes a parked publish, so it is not resumed — within the status CHECK', async () => {
+    const draft = await startNew('editor-1', 'Coxinha');
+    const publish = await asUser('editor-1').send('POST', `/catalog-items/drafts/${draft.id}/publish`);
+    expect(publish.status).toBe(202);
+    expect(await draftIn(await asUser('editor-1').get('/catalog-items/drafts/mine'))).toBeNull();
+  });
+
+  it('is not served for a collection that did not opt in', async () => {
+    expect((await asUser('owner-1').get('/demo-suppliers/drafts/mine')).status).toBe(404);
+  });
+
+  it('sweeps the untouched open new-item drafts with a real DELETE, and nothing else', async () => {
+    await startNew('owner-1', 'Esquecido');
+    const parked = await startNew('editor-1', 'Em aprovação');
+    await asUser('editor-1').send('POST', `/catalog-items/drafts/${parked.id}/publish`);
+    await asUser('owner-1').send('POST', '/demo-suppliers/drafts', { data: { name: 'Fornecedor' } });
+
+    // A clock before anything was saved: nothing is old enough.
+    expect(await backend.hosts.lifecycle.sweepStaleNewItemDrafts(new Date('2000-01-01'))).toEqual([
+      { entityType: 'product', deleted: 0 },
+    ]);
+    expect(await backend.hosts.lifecycle.sweepStaleNewItemDrafts(new Date('2999-01-01'))).toEqual([
+      { entityType: 'product', deleted: 1 },
+    ]);
+    expect(await draftIn(await asUser('owner-1').get('/catalog-items/drafts/mine'))).toBeNull();
+    const suppliers = await json<{ data: { drafts: DraftOut[] } }>(
+      await asUser('owner-1').get('/demo-suppliers/drafts'),
+    );
+    expect(suppliers.data.drafts).toHaveLength(1);
+  });
+});
+
 describe('recycle bin — the cross-collection surface', () => {
   it('a deleted item lands in the bin and restores back to the list', async () => {
     const removed = await asUser('owner-1').send('DELETE', '/catalog-items/prod-agua');

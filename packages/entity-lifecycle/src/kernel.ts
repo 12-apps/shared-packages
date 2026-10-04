@@ -12,7 +12,6 @@ import { applyRetention, recordChange, recordCreate } from './versioning';
 import type {
   ApprovalStore,
   ChangeRequestAction,
-  DraftStore,
   EntityLifecycleConfig,
   EntityOps,
   EntityRef,
@@ -31,7 +30,7 @@ interface KernelGuards {
   /** Approvals intercept writes for actors without approve rights. */
   approvalsIntercept(ctx: LifecycleContext): boolean;
   requireApprovalStore(): ApprovalStore;
-  requireDraftStore(): DraftStore;
+  requireDraftStore(): NonNullable<LifecycleStores['drafts']>;
   requireLiveSnapshot(ctx: LifecycleContext, entityId: string): Promise<Snapshot>;
   /** Park a write as a pending change request. */
   submitChange(

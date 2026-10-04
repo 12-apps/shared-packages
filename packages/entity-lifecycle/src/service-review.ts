@@ -7,6 +7,7 @@
 
 import { LifecycleError } from './errors';
 import type { LifecycleKernel } from './kernel';
+import { settleNewItemPublish } from './new-item-drafts';
 import type {
   ChangeRequestListFilter,
   ChangeRequestRecord,
@@ -90,10 +91,12 @@ export function createDraftMethods(
           ? await writes.create(ctx, draft.data)
           : await writes.update(ctx, draft.entityId, draft.data);
       // A publish intercepted by approvals keeps the draft OPEN — it becomes
-      // published only when the change is actually applied.
+      // published only when the change is actually applied. (An opted-in
+      // NEW-item draft is closed on the 202 instead: `./new-item-drafts`.)
       if (result.status === 'applied') {
         await kernel.requireDraftStore().setStatus(ctx.tenantId, draftId, 'PUBLISHED');
       }
+      await settleNewItemPublish(kernel, ctx, draft, result);
       return result;
     },
 

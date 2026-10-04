@@ -11,8 +11,10 @@
  * same order the origin host evaluates them (route gate, then entitled context).
  *
  * Emission keeps the literal `/drafts` routes before the `/:id` ones. That is
- * a stability guarantee of the array, not a collision guard — no emitted pair
- * can shadow another (their segment counts differ). The collision that IS
+ * a stability guarantee of the array, not a collision guard: within one
+ * method, no emitted pair can shadow another — their segment counts differ,
+ * or (the opt-in `PUT /drafts/:draftId` beside `PUT /:id/draft`) the literal
+ * segment sits in a different place, so no single path matches both. The collision that IS
  * real is host-vs-package: a host route shaped `/:slug/:id` registered before
  * this router captures `GET /:slug/drafts`. The wiring rule (mount the
  * package router first) lives in ADOPTING.md and is regression-tested in the
@@ -295,6 +297,38 @@ function draftCollectionRoutes(config: EntityRouteConfig): LifecycleRoute[] {
 }
 
 /**
+ * The opt-in pair (FUT-3244), emitted only for a registration with
+ * `newItemDrafts` — every other collection's surface stays as it was.
+ *
+ * `GET /:slug/drafts/mine` — the caller's own newest OPEN new-item draft, or
+ * null: what "+ Novo" reopens instead of starting another.
+ *
+ * `PUT /:slug/drafts/:draftId` — write a new-item draft's data in place. A new
+ * item has no id but its draft's, so this is the only way to save it twice
+ * without inserting a second draft. 422 for an item's draft (saved on the
+ * item) or one no longer OPEN.
+ */
+function newItemDraftRoutes(config: EntityRouteConfig): LifecycleRoute[] {
+  const { registration, lifecycle } = config;
+  return [
+    route(config, 'GET', `/${registration.slug}/drafts/mine`, async ({ actor }, deps) => {
+      const ctx = await ctxOf(deps, actor);
+      const draft = await foldLifecycle(deps.messages, () => lifecycle.myNewDraft(ctx));
+      return ok(draftJson(draft));
+    }),
+    route(config, 'PUT', `/${registration.slug}/drafts/:draftId`, async ({ actor, params, body }, deps) => {
+      const draftId = requireParam(params, 'draftId', deps.messages);
+      const data = parseSnapshotBody(body, deps.messages);
+      const ctx = await ctxOf(deps, actor);
+      const draft = await foldLifecycle(deps.messages, () =>
+        lifecycle.updateNewDraft(ctx, draftId, data),
+      );
+      return ok(draftJson(draft));
+    }),
+  ];
+}
+
+/**
  * `DELETE /:slug/drafts/:draftId` — discard a draft (the live record is
  * untouched; the row is kept as DISCARDED history). Bodyless 204, matching
  * the declared MCP contract.
@@ -331,6 +365,8 @@ export function entityRoutes(config: EntityRouteConfig): LifecycleRoute[] {
     // is the host's, between this router and its own `/:slug/:id` routes
     // (ADOPTING rule 7).
     ...draftCollectionRoutes(config),
+    // `drafts/mine` is literal too, so it is emitted before `drafts/:draftId`.
+    ...(config.registration.newItemDrafts ? newItemDraftRoutes(config) : []),
     ...draftItemRoutes(config),
     ...itemDraftRoutes(config),
     versionsRoute(config),

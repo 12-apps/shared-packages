@@ -10,6 +10,7 @@ import type {
   ChangeRequestRow,
   EntityDraftDelegate,
   EntityDraftRow,
+  EntityDraftWhere,
 } from '@12-apps/entity-lifecycle/server';
 
 import { Params, type SqlRunner } from './rbac-db-shared';
@@ -40,18 +41,28 @@ const draftRow = (row: DraftSqlRow): EntityDraftRow => ({
   updatedAt: row.updated_at,
 });
 
-function draftWhereSql(
-  where: { clientId: string; id?: string; entityType?: string; entityId?: string; status?: string },
-  params: Params,
-): string {
+function draftWhereSql(where: EntityDraftWhere, params: Params): string {
   const conditions = [`client_id = ${params.add(where.clientId)}`];
   if (where.id !== undefined) conditions.push(`id = ${params.add(where.id)}`);
   if (where.entityType !== undefined) {
     conditions.push(`entity_type = ${params.add(where.entityType)}`);
   }
-  if (where.entityId !== undefined) conditions.push(`entity_id = ${params.add(where.entityId)}`);
+  // `entityId: null` asks for new-item drafts, as Prisma reads it — `= NULL`
+  // would match nothing.
+  if (where.entityId === null) conditions.push('entity_id IS NULL');
+  else if (where.entityId !== undefined) conditions.push(`entity_id = ${params.add(where.entityId)}`);
   if (where.status !== undefined) conditions.push(`status = ${params.add(where.status)}`);
+  if (where.createdBy !== undefined) conditions.push(`created_by = ${params.add(where.createdBy)}`);
   return conditions.join(' AND ');
+}
+
+/** `{ status }` or `{ data, updatedBy }` — the two writes `updateMany` carries. */
+function draftSetSql(
+  data: Parameters<EntityDraftDelegate['updateMany']>[0]['data'],
+  params: Params,
+): string {
+  if ('status' in data) return `status = ${params.add(data.status)}`;
+  return `data = ${params.add(JSON.stringify(data.data))}::jsonb, updated_by = ${params.add(data.updatedBy)}`;
 }
 
 export function draftDelegate(sql: SqlRunner): EntityDraftDelegate {
@@ -84,10 +95,13 @@ export function draftDelegate(sql: SqlRunner): EntityDraftDelegate {
       if (!row) throw new Error(`Draft ${where.id} not found`);
       return draftRow(row);
     },
-    async findFirst({ where }) {
+    async findFirst({ where, orderBy }) {
       const params = new Params();
+      const order = orderBy
+        ? ` ORDER BY updated_at ${orderBy.updatedAt === 'asc' ? 'ASC' : 'DESC'}, id`
+        : '';
       const { rows } = await sql.query<DraftSqlRow>(
-        `SELECT * FROM entity_drafts WHERE ${draftWhereSql(where, params)} LIMIT 1`,
+        `SELECT * FROM entity_drafts WHERE ${draftWhereSql(where, params)}${order} LIMIT 1`,
         params.values,
       );
       const row = rows[0];
@@ -106,9 +120,19 @@ export function draftDelegate(sql: SqlRunner): EntityDraftDelegate {
       const params = new Params();
       const clause = draftWhereSql(where, params);
       const { affectedRows } = await sql.query(
-        `UPDATE entity_drafts
-           SET status = ${params.add(data.status)}, updated_at = NOW()
+        `UPDATE entity_drafts SET ${draftSetSql(data, params)}, updated_at = NOW()
          WHERE ${clause}`,
+        params.values,
+      );
+      return { count: affectedRows ?? 0 };
+    },
+    async deleteMany({ where }) {
+      const params = new Params();
+      const { affectedRows } = await sql.query(
+        `DELETE FROM entity_drafts
+         WHERE entity_type = ${params.add(where.entityType)} AND entity_id IS NULL
+           AND status = ${params.add(where.status)}
+           AND updated_at < ${params.add(where.updatedAt.lt)}`,
         params.values,
       );
       return { count: affectedRows ?? 0 };

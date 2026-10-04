@@ -151,8 +151,18 @@ export interface EntityDraftWhere {
   clientId: string;
   id?: string;
   entityType?: string;
-  entityId?: string;
+  /** `null` selects new-item drafts (FUT-3244). */
+  entityId?: string | null;
   status?: string;
+  createdBy?: string;
+}
+
+/** The new-item sweep's filter: every tenant, one type, untouched since `lt`. */
+export interface EntityDraftSweepWhere {
+  entityType: string;
+  entityId: null;
+  status: string;
+  updatedAt: { lt: Date };
 }
 
 export interface EntityDraftDelegate {
@@ -161,15 +171,24 @@ export interface EntityDraftDelegate {
     where: { id: string };
     data: { data: Snapshot; updatedBy: string | null };
   }): Promise<EntityDraftRow>;
-  findFirst(args: { where: EntityDraftWhere }): Promise<EntityDraftRow | null>;
+  findFirst(args: {
+    where: EntityDraftWhere;
+    orderBy?: { updatedAt: 'asc' | 'desc' };
+  }): Promise<EntityDraftRow | null>;
   findMany(args: {
     where: EntityDraftWhere;
     orderBy: { updatedAt: 'asc' | 'desc' };
   }): Promise<EntityDraftRow[]>;
   updateMany(args: {
     where: EntityDraftWhere;
-    data: { status: string };
+    data: { status: string } | { data: Snapshot; updatedBy: string | null };
   }): Promise<{ count: number }>;
+  /**
+   * The new-item sweep's delete (FUT-3244). Optional so a host's hand-rolled
+   * seam keeps compiling; a Prisma client has it, and the sweep refuses
+   * without it.
+   */
+  deleteMany?(args: { where: EntityDraftSweepWhere }): Promise<{ count: number }>;
 }
 
 // ---------------------------------------------------------------------------

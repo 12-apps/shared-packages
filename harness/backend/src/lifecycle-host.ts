@@ -285,6 +285,10 @@ function apiConfig(pg: PGlite) {
           : 'Produto',
       retention: { maxVersions: 50, maxAgeDays: 365 },
       approvePermission: 'products:approve',
+      // The opt-in (FUT-3244): new-item drafts updated in place, resumed by
+      // their author and swept after 30 untouched days. Suppliers stay out,
+      // so the suite proves both shapes over the same SQL seam.
+      newItemDrafts: {},
       ops: productOps(pg),
       // Soft-delete visibility is the HOST's job on every read it owns
       // (ADOPTING rule 3), this one included: the origin host's twin reads the

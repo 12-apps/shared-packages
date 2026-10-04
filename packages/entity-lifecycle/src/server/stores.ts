@@ -16,8 +16,6 @@ import type {
   ChangeRequestAction,
   ChangeRequestRecord,
   ChangeRequestStatus,
-  DraftRecord,
-  DraftStatus,
   DraftStore,
   LifecycleStores,
   NewRecycleBinEntry,
@@ -28,12 +26,14 @@ import type {
   VersionRecord,
   VersionStore,
 } from '../types';
+import type { NewItemDraftStore } from '../new-item-drafts';
+
+import { createNewItemDraftStore, toDraftRecord } from './draft-rows';
 
 import {
   asSnapshot,
   asStringArray,
   type ChangeRequestRow,
-  type EntityDraftRow,
   type EntityVersionRow,
   type LifecycleDbProvider,
   type RecycleBinRow,
@@ -200,20 +200,8 @@ function createRecycleBinStore(db: LifecycleDbProvider): RecycleBinStore {
   };
 }
 
-const toDraftRecord = (row: EntityDraftRow): DraftRecord => ({
-  id: row.id,
-  tenantId: row.clientId,
-  entityType: row.entityType,
-  entityId: row.entityId,
-  data: asSnapshot(row.data),
-  status: row.status as DraftStatus,
-  createdBy: row.createdBy,
-  updatedBy: row.updatedBy,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt,
-});
 
-function createDraftStore(db: LifecycleDbProvider): DraftStore {
+function createDraftStore(db: LifecycleDbProvider): DraftStore & NewItemDraftStore {
   return {
     async upsertOpen(input) {
       const client = await db();
@@ -280,8 +268,10 @@ function createDraftStore(db: LifecycleDbProvider): DraftStore {
         data: { status },
       });
     },
+    ...createNewItemDraftStore(db),
   };
 }
+
 
 const toRequestRecord = (row: ChangeRequestRow): ChangeRequestRecord => ({
   id: row.id,

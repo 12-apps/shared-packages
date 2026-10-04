@@ -245,3 +245,57 @@ function draftEndpoints(
     },
   ];
 }
+
+/** The two opt-in capabilities (FUT-3244), as summary keys. */
+export type NewItemDraftOperation = 'getMyNewDraft' | 'updateNewDraft';
+
+/**
+ * What one host calls one collection that opted into new-item drafts — the
+ * same `collectionPath` and `noun` its {@link LifecycleEndpointVocabulary}
+ * carries, and the two sentences these tools tell an agent.
+ */
+export interface NewItemDraftEndpointVocabulary
+  extends Omit<LifecycleEndpointVocabulary, 'summaries'> {
+  summaries: Record<NewItemDraftOperation, string>;
+}
+
+/**
+ * The tools of a collection registered with `newItemDrafts`: read the caller's
+ * own open new-item draft, and write one in place by its id.
+ *
+ * A SEPARATE factory, not two more entries in {@link lifecycleMcpEndpoints}:
+ * those eight are what every plugged collection serves, and a host's coverage
+ * gate maps each advertised tool back to a route the host mounts. Only the
+ * collections that opted in mount these two routes, so only they advertise
+ * them — the host concatenates this after the eight, for those collections.
+ */
+export function newItemDraftMcpEndpoints(
+  vocabulary: NewItemDraftEndpointVocabulary,
+): McpEndpoint[] {
+  const { collectionPath, noun, summaries } = vocabulary;
+  const tags = [...(vocabulary.tags ?? ['lifecycle'])];
+  return [
+    {
+      operationId: `getMyNew${noun}Draft`,
+      annotations: READS,
+      method: 'get',
+      path: `${collectionPath}/drafts/mine`,
+      summary: summaries.getMyNewDraft,
+      tags,
+      params: lifecycleTenantParams,
+      response: draftResponse,
+    },
+    {
+      // Replaces the draft's data — the draft itself, never the live record.
+      operationId: `updateNew${noun}Draft`,
+      annotations: WRITES,
+      method: 'put',
+      path: `${collectionPath}/drafts/{draftId}`,
+      summary: summaries.updateNewDraft,
+      tags,
+      params: draftItemParams,
+      body: saveDraftBody,
+      response: draftResponse,
+    },
+  ];
+}
