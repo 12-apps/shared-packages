@@ -5,6 +5,8 @@
  * business rules, with zero runtime dependencies.
  */
 
+import type { NewItemDraftStore, NewItemDraftsOptions } from './new-item-drafts';
+
 /** JSON-compatible values — entity snapshots must be serializable. */
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -26,11 +28,7 @@ export interface EntityRef {
 /** The lifecycle features that can be feature-flagged per tenant. */
 export type LifecycleFeature = 'versioning' | 'drafts' | 'approvals';
 
-export const LIFECYCLE_FEATURES: readonly LifecycleFeature[] = [
-  'versioning',
-  'drafts',
-  'approvals',
-];
+export const LIFECYCLE_FEATURES: readonly LifecycleFeature[] = ['versioning', 'drafts', 'approvals'];
 
 // ---------------------------------------------------------------------------
 // Versioning
@@ -89,10 +87,7 @@ export interface VersionStore {
   latest(ref: EntityRef): Promise<VersionRecord | null>;
   /** Hard-delete the given version numbers (retention pruning). */
   deleteVersions(ref: EntityRef, versions: readonly number[]): Promise<void>;
-  /**
-   * Rewrite an existing row as a full snapshot (retention compaction folds the
-   * pruned prefix into the oldest surviving row).
-   */
+  /** Rewrite a row as a full snapshot (compaction folds the pruned prefix into it). */
   promoteToSnapshot(ref: EntityRef, version: number, data: Snapshot): Promise<void>;
 }
 
@@ -183,7 +178,8 @@ export interface RecycleBinStore {
 // Drafts
 // ---------------------------------------------------------------------------
 
-export type DraftStatus = 'OPEN' | 'PUBLISHED' | 'DISCARDED';
+/** `SUBMITTED`: a new-item draft whose publish waits on approval (opt-in, FUT-3244). */
+export type DraftStatus = 'OPEN' | 'PUBLISHED' | 'DISCARDED' | 'SUBMITTED';
 
 /**
  * A per-item draft: unpublished edits kept next to the live record. A draft of
@@ -337,6 +333,8 @@ export interface EntityLifecycleConfig {
   diff?: DiffOptions;
   /** Version-history auto-clean policy. */
   retention?: RetentionPolicy;
+  /** Opt-in: update, resume and sweep NEW-item drafts (`./new-item-drafts`). */
+  newItemDrafts?: NewItemDraftsOptions;
 }
 
 /**
@@ -375,7 +373,7 @@ export interface EntityOps {
 export interface LifecycleStores {
   versions: VersionStore;
   recycleBin: RecycleBinStore;
-  drafts?: DraftStore;
+  drafts?: DraftStore & Partial<NewItemDraftStore>;
   approvals?: ApprovalStore;
 }
 

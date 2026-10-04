@@ -9,6 +9,7 @@ export {
   createApiEntityLifecycle,
   type ApiEntityLifecycle,
   type EntityLifecycleHandle,
+  type NewItemDraftSweep,
   type EntityLifecycleServerConfig,
 } from './create-api-entity-lifecycle';
 export type { ApprovalsChangedListener } from './approvals-changed';
@@ -45,6 +46,7 @@ export type {
   EntityDraftCreateData,
   EntityDraftDelegate,
   EntityDraftRow,
+  EntityDraftSweepWhere,
   EntityDraftWhere,
   EntityVersionCreateData,
   EntityVersionDelegate,

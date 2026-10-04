@@ -88,6 +88,6 @@ export interface DraftWire {
   id: string;
   entityId: string | null;
   data: Snapshot;
-  status: 'OPEN' | 'PUBLISHED' | 'DISCARDED';
+  status: 'OPEN' | 'PUBLISHED' | 'DISCARDED' | 'SUBMITTED';
   updatedAt: string;
 }

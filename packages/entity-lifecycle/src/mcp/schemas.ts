@@ -189,7 +189,7 @@ const draftSchema = z.object({
   // assertion can hold to, over the same open runtime schema (see `jsonWire`).
   // The draft BODY above stays open on purpose; this is the read.
   data: z.record(z.string(), jsonWire<JsonValue>()),
-  status: z.enum(['OPEN', 'PUBLISHED', 'DISCARDED']),
+  status: z.enum(['OPEN', 'PUBLISHED', 'DISCARDED', 'SUBMITTED']),
   updatedAt: z.string(),
 }) satisfies z.ZodType<DraftWire>;
 

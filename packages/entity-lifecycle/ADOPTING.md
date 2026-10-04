@@ -194,6 +194,7 @@ reporting. It carries no payload beyond the tenant: a listener re-reads.
 | `authorize` | no | the collection's own gate — `(actor) => { ok }`, async, the host's plan/billing answer (rule 5). Awaited before every collection-scoped route AND inside the shared bin/approvals dispatch; a denial's `status`/`error` pass through unmodified (default 403 + `featureDisabled`). Omitted = always authorized |
 | `routePermission` | no | a permission id required for every collection-scoped route (the origin host's `roles:manage`); `isSuper` bypasses; denial is 403 `routeNotAllowed`. Does not gate the shared bin/inbox (rule 6) |
 | `ops` | yes | the host's `EntityOps` (rule 3) |
+| `newItemDrafts` | no | opt-in `{ staleAfterDays? }` (default 30): this collection's NEW-item drafts get the two routes below, update-in-place and resume, a parked publish turns its draft `SUBMITTED`, and the host's scheduled `sweepStaleNewItemDrafts()` deletes the ones untouched for `staleAfterDays`. Omitted = none of it, and the collection's surface is unchanged (see [New-item drafts](#new-item-drafts-opt-in)) |
 | `publishedVersion` | no | read back a mirrored version column for the history dialog's "Versão atual". The host is then the authority on it, `null` included → **0** (an archived entity, whose read filters `archived_at IS NULL`, so every row keeps its Restaurar button). Omit the callback entirely and the highest recorded version is used |
 
 ### `createWebEntityLifecycle` config
@@ -241,6 +242,13 @@ registration's own slug), in mount order:
 | GET | `/:slug/:id/versions` | `{ data: { versions, publishedVersion } }` — newest first, actor names resolved. With `?compare=N`, also `comparison`: version N beside its previous, its next and the current one, field by field |
 | POST | `/:slug/:id/versions/:version/restore` | `{ data: { applied, entityId, requestId } }` — 200 applied / 202 parked |
 
+Only for a registration with `newItemDrafts` (emitted after `/:slug/drafts`):
+
+| Method | Path | Answers |
+|---|---|---|
+| GET | `/:slug/drafts/mine` | `{ data: { draft } }` (or `draft: null`) — the CALLER's newest OPEN new-item draft |
+| PUT | `/:slug/drafts/:draftId` | `{ data: { draft } }` — writes a new-item draft's data in place; body `{ data: <snapshot> }`; 422 for an item's draft or one no longer OPEN |
+
 Shared, dispatched across every registered collection by the record's own
 `entityType`:
 
@@ -260,6 +268,48 @@ for a feature that is off for the tenant, a denied approval or a missing
 `1abc` and `0` are rejected, never truncated) or an empty `?entityType=`. A
 collection's `authorize` denial answers whatever the host returned (403 by
 default).
+
+## New-item drafts (opt-in)
+
+`POST /:slug/drafts` starts a draft of an item that does not exist yet
+(`entityId: null`). Every collection has that. What a collection does NOT have
+by default is a way to write to that draft again: `upsertOpen` matches on the
+entity id, a new item has none, so each save inserts another draft — an editor
+that saves as you type leaves one row per pause, none of which any screen
+reads back.
+
+A registration with `newItemDrafts` gets the rest:
+
+- **update in place** — `PUT /:slug/drafts/:draftId`, the draft's own id
+  being the only id a new item has;
+- **resume** — `GET /:slug/drafts/mine`, the caller's own newest open
+  new-item draft (`createdBy`), so "+ New" reopens it instead of starting
+  another;
+- **submitted, not open** — a publish of a new-item draft that approvals
+  parks (202) turns the draft `SUBMITTED`: the change request holds the data
+  now, so the draft is no longer listed, resumed, written, published again or
+  swept. Without the opt-in a parked publish keeps the draft `OPEN`, as before;
+- **the sweep** — `api.sweepStaleNewItemDrafts(now?)` hard-deletes, in every
+  tenant, each opted-in collection's OPEN new-item drafts whose `updated_at`
+  is older than `staleAfterDays` (30), and returns `[{ entityType, deleted }]`.
+  The package schedules nothing: the host runs it from its own job runner
+  (daily is plenty). Item drafts, PUBLISHED / DISCARDED / SUBMITTED rows and
+  every other collection's drafts are never touched.
+
+MCP: `newItemDraftMcpEndpoints({ collectionPath, noun, summaries })` (from
+`./mcp`) emits the two tools — `getMyNew<Noun>Draft` and
+`updateNew<Noun>Draft` — for the host to concatenate after
+`lifecycleMcpEndpoints(...)`, for the opted-in collections only. A host whose
+coverage gate maps every advertised tool to a mounted route keeps that gate
+green by construction: the tools exist exactly where the routes do.
+
+The db seam grows with it, every addition optional so a hand-rolled seam keeps
+compiling: `entityDraft.findFirst` may take `orderBy`, `EntityDraftWhere` takes
+`entityId: null` and `createdBy`, `updateMany` may write `{ data, updatedBy }`,
+and the sweep needs `entityDraft.deleteMany` (a Prisma client has it; without
+it the sweep throws). A host's own `DraftStore` implements
+`NewItemDraftStore` for the same; without it the opted-in calls refuse with
+`INVALID_STATE`.
 
 ## Minimal host (Hono)
 

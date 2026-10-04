@@ -9,7 +9,7 @@ Four features, each plug-and-play per collection:
 | --- | --- |
 | **Versioning** | Diff-based history (only changed fields stored), restore to any version, retention policies (max count / max age) with safe compaction, `publishedVersion` mirroring |
 | **Recycle bin** | Soft delete with a tree registry of dependents, restore / permanent-delete |
-| **Drafts** | One unpublished working copy per item (or of a brand-new item), publish/discard |
+| **Drafts** | One unpublished working copy per item (or of a brand-new item), publish/discard; opt-in per collection: new-item drafts updated in place, resumed by their author, swept after 30 untouched days (ADOPTING.md › New-item drafts) |
 | **Approvals** | Writes by non-approvers become pending change requests; approvers apply/reject |
 
 Versioning, drafts and approvals are **feature-flaggable per tenant** through a

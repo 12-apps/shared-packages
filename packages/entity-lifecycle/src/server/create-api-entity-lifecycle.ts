@@ -104,6 +104,20 @@ export interface ApiEntityLifecycle {
    * the same context the generated endpoints build. Throws on an unknown type.
    */
   entity(entityType: string): EntityLifecycleHandle;
+  /**
+   * The new-item draft sweep (FUT-3244), for the host to SCHEDULE — daily is
+   * plenty. Deletes, in every tenant, each opted-in collection's OPEN
+   * new-item drafts untouched for its `staleAfterDays` (30), and reports how
+   * many per collection. Collections that did not opt in are not listed and
+   * nothing of theirs is read.
+   */
+  sweepStaleNewItemDrafts(now?: Date): Promise<NewItemDraftSweep[]>;
+}
+
+/** One opted-in collection's share of a sweep. */
+export interface NewItemDraftSweep {
+  entityType: string;
+  deleted: number;
 }
 
 const RESERVED_SLUGS = new Set(['recycle-bin', 'approvals']);
@@ -118,6 +132,24 @@ function withApprovalsListener(
 ): LifecycleStores {
   if (!listener || !stores.approvals) return stores;
   return { ...stores, approvals: notifyingApprovalStore(stores.approvals, listener) };
+}
+
+/** Each opted-in collection's sweep, in registration order. */
+async function sweepNewItemDrafts(
+  entities: ReadonlyMap<string, RegisteredEntity>,
+  now: Date,
+): Promise<NewItemDraftSweep[]> {
+  const swept: NewItemDraftSweep[] = [];
+  // One collection after another: a sweep is a background job, and a failure
+  // names the collection it stopped at rather than racing the others.
+  for (const { registration, lifecycle } of entities.values()) {
+    if (!registration.newItemDrafts) continue;
+    swept.push({
+      entityType: registration.entityType,
+      deleted: await lifecycle.sweepStaleNewDrafts(now),
+    });
+  }
+  return swept;
 }
 
 export function createApiEntityLifecycle(
@@ -155,6 +187,9 @@ export function createApiEntityLifecycle(
           label: registration.label,
           ...(registration.diff !== undefined ? { diff: registration.diff } : {}),
           ...(registration.retention !== undefined ? { retention: registration.retention } : {}),
+          ...(registration.newItemDrafts !== undefined
+            ? { newItemDrafts: registration.newItemDrafts }
+            : {}),
         },
         stores,
         registration.ops,
@@ -194,5 +229,6 @@ export function createApiEntityLifecycle(
         context: (actor) => contextOf(actor, entry.registration.approvePermission),
       };
     },
+    sweepStaleNewItemDrafts: (now = new Date()) => sweepNewItemDrafts(entities, now),
   };
 }

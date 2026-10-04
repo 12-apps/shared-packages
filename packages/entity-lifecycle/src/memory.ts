@@ -5,6 +5,7 @@
  */
 
 import { cloneJson } from './diff';
+import type { NewItemDraftStore } from './new-item-drafts';
 import type {
   ApprovalStore,
   ChangeRequestRecord,
@@ -211,8 +212,40 @@ function buildDraftStore() {
         row.updatedAt = new Date();
       }
     },
+    ...newItemDraftMethods(rows),
   };
   return store;
+}
+
+/** The opt-in new-item draft methods (`./new-item-drafts`), over the same rows. */
+function newItemDraftMethods(rows: DraftRecord[]): NewItemDraftStore {
+  const isOpenNew = (row: DraftRecord, entityType: string): boolean =>
+    row.entityType === entityType && row.entityId === null && row.status === 'OPEN';
+  return {
+    async updateOpen({ tenantId, draftId, data, actorId }) {
+      const row = rows.find(
+        (r) => r.tenantId === tenantId && r.id === draftId && r.status === 'OPEN',
+      );
+      if (!row) return null;
+      row.data = cloneJson(data);
+      row.updatedBy = actorId;
+      row.updatedAt = new Date();
+      return row;
+    },
+    async latestOpenNewBy(tenantId, entityType, actorId) {
+      const mine = rows.filter(
+        (row) => row.tenantId === tenantId && row.createdBy === actorId && isOpenNew(row, entityType),
+      );
+      return mine.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+    },
+    async deleteOpenNewBefore(entityType, before) {
+      const stale = rows.filter(
+        (row) => isOpenNew(row, entityType) && row.updatedAt.getTime() < before.getTime(),
+      );
+      for (const row of stale) rows.splice(rows.indexOf(row), 1);
+      return stale.length;
+    },
+  };
 }
 
 export function createMemoryApprovalStore(): ApprovalStore & { rows: ChangeRequestRecord[] } {

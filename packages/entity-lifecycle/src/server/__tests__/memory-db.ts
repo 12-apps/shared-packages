@@ -186,17 +186,18 @@ function client(state: MemoryState): LifecycleDbClient {
         row.updatedAt = new Date();
         return row;
       },
-      async findFirst({ where }) {
-        return (
-          state.drafts.find(
-            (row) =>
-              row.clientId === where.clientId &&
-              (where.id === undefined || row.id === where.id) &&
-              (where.entityType === undefined || row.entityType === where.entityType) &&
-              (where.entityId === undefined || row.entityId === where.entityId) &&
-              (where.status === undefined || row.status === where.status),
-          ) ?? null
+      async findFirst({ where, orderBy }) {
+        const matches = state.drafts.filter(
+          (row) =>
+            row.clientId === where.clientId &&
+            (where.id === undefined || row.id === where.id) &&
+            (where.entityType === undefined || row.entityType === where.entityType) &&
+            (where.entityId === undefined || row.entityId === where.entityId) &&
+            (where.status === undefined || row.status === where.status) &&
+            (where.createdBy === undefined || row.createdBy === where.createdBy),
         );
+        if (orderBy) matches.sort((a, b) => byDate(orderBy.updatedAt)(a.updatedAt, b.updatedAt));
+        return matches[0] ?? null;
       },
       async findMany({ where, orderBy }) {
         return state.drafts
@@ -213,10 +214,25 @@ function client(state: MemoryState): LifecycleDbClient {
         for (const row of state.drafts) {
           if (row.clientId !== where.clientId) continue;
           if (where.id !== undefined && row.id !== where.id) continue;
-          row.status = data.status;
+          if (where.status !== undefined && row.status !== where.status) continue;
+          if ('status' in data) row.status = data.status;
+          else Object.assign(row, { data: data.data, updatedBy: data.updatedBy });
+          // As Prisma's `@updatedAt` does, on every write.
+          row.updatedAt = new Date();
           count += 1;
         }
         return { count };
+      },
+      async deleteMany({ where }) {
+        const stale = state.drafts.filter(
+          (row) =>
+            row.entityType === where.entityType &&
+            row.entityId === where.entityId &&
+            row.status === where.status &&
+            row.updatedAt < where.updatedAt.lt,
+        );
+        state.drafts = state.drafts.filter((row) => !stale.includes(row));
+        return { count: stale.length };
       },
     },
     changeRequest: {

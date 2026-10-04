@@ -13,6 +13,7 @@
 import { compareVersions, type CompareOptions, type VersionComparison } from './comparison';
 import { LifecycleError } from './errors';
 import { createKernel, type LifecycleKernel } from './kernel';
+import { createNewItemDraftMethods, type NewItemDraftMethods } from './new-item-drafts';
 import {
   createApprovalMethods,
   createDraftMethods,
@@ -33,7 +34,7 @@ import type {
   WriteResult,
 } from './types';
 
-export interface EntityLifecycle extends DraftMethods, ApprovalMethods {
+export interface EntityLifecycle extends DraftMethods, NewItemDraftMethods, ApprovalMethods {
   readonly config: EntityLifecycleConfig;
   /** Resolve one feature for the calling tenant. */
   feature(ctx: LifecycleContext, feature: LifecycleFeature): FeatureDecision;
@@ -226,6 +227,7 @@ export function createEntityLifecycle(
     ...createVersionMethods(kernel),
     ...createBinMethods(kernel),
     ...createDraftMethods(kernel, writes),
+    ...createNewItemDraftMethods(kernel),
     ...createApprovalMethods(kernel),
   };
 }

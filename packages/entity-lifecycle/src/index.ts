@@ -50,6 +50,12 @@ export {
 export { resolveFeature } from './features';
 export { createEntityLifecycle, type EntityLifecycle } from './service';
 export {
+  DEFAULT_STALE_AFTER_DAYS,
+  type NewItemDraftMethods,
+  type NewItemDraftStore,
+  type NewItemDraftsOptions,
+} from './new-item-drafts';
+export {
   createMemoryVersionStore,
   createMemoryRecycleBinStore,
   createMemoryDraftStore,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { lifecycleMcpEndpoints, type LifecycleEndpointVocabulary } from '../endpoints';
+import {
+  lifecycleMcpEndpoints,
+  newItemDraftMcpEndpoints,
+  type LifecycleEndpointVocabulary,
+} from '../endpoints';
 import {
   draftItemParams,
   draftResponse,
@@ -180,5 +184,48 @@ describe('the behaviour a host no longer has to restate', () => {
     expect(products.map((endpoint) => endpoint.annotations)).toEqual(
       suppliers().map((endpoint) => endpoint.annotations),
     );
+  });
+});
+
+/**
+ * The opt-in pair (FUT-3244). Written out by hand like the eight: these are
+ * tool names an agent learns and paths a host serves.
+ */
+describe('newItemDraftMcpEndpoints', () => {
+  const products = () =>
+    newItemDraftMcpEndpoints({
+      collectionPath: '/api/admin/{tenantSlug}/products',
+      noun: 'Product',
+      summaries: { getMyNewDraft: 'resume', updateNewDraft: 'autosave' },
+    });
+
+  it('emits the two tools, where an opted-in collection serves them', () => {
+    expect(products().map((e) => `${e.operationId} ${e.method.toUpperCase()} ${e.path}`)).toEqual([
+      'getMyNewProductDraft GET /api/admin/{tenantSlug}/products/drafts/mine',
+      'updateNewProductDraft PUT /api/admin/{tenantSlug}/products/drafts/{draftId}',
+    ]);
+  });
+
+  it('binds them to the shared schemas, with the host summaries unedited', () => {
+    const [mine, update] = products();
+    expect(mine?.params).toBe(lifecycleTenantParams);
+    expect(mine?.response).toBe(draftResponse);
+    expect(mine?.summary).toBe('resume');
+    expect(update?.params).toBe(draftItemParams);
+    expect(update?.body).toBe(saveDraftBody);
+    expect(update?.response).toBe(draftResponse);
+    expect(update?.summary).toBe('autosave');
+  });
+
+  it('classifies the read as a read and the write as a non-destructive write', () => {
+    expect(products().map((e) => e.annotations)).toEqual([
+      { readOnly: true, destructive: false, openWorld: false },
+      { readOnly: false, destructive: false, openWorld: false },
+    ]);
+  });
+
+  it('adds nothing to the eight every collection serves', () => {
+    expect(suppliers().map((e) => e.operationId)).not.toContain('getMyNewSupplierDraft');
+    expect(suppliers()).toHaveLength(8);
   });
 });
