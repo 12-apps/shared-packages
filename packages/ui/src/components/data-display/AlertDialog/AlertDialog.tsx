@@ -141,6 +141,9 @@ const CloseButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   right: theme.spacing(1),
   top: theme.spacing(1),
+  // 40px, not the small IconButton's 34: the floor a phone's tap needs (FUT-3269).
+  width: rem(theme, 40),
+  height: rem(theme, 40),
   color: neutralTones(theme).muted,
 }));
 
