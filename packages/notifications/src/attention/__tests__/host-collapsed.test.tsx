@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AttentionItem } from '../core';
 import { AttentionHost, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
@@ -41,6 +41,7 @@ function host(items: readonly AttentionItem[], { folds = true }: { readonly fold
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
   window.localStorage.clear();
 });
 
@@ -63,6 +64,14 @@ describe('the folded button', () => {
     expect(screen.queryAllByTestId('attention-button')).toHaveLength(0);
   });
 
+  it('prints a single digit, then 9+, with the full number in its name', () => {
+    host(Array.from({ length: 12 }, (_, i) => bell(`r${i}`, 2)));
+    const tab = screen.getByTestId('attention-tab');
+    expect(tab.textContent).toBe('9+');
+    expect(tab.getAttribute('data-count')).toBe('12');
+    expect(tab.getAttribute('aria-label')).toBe('12 waiting, the worst calm — open');
+  });
+
   it('is narrower than the gutter a page keeps from the edge', () => {
     expect(TAB_WIDTH_PX).toBeLessThan(16);
   });
@@ -79,12 +88,6 @@ describe('the folded button', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
     expect(screen.getByTestId('attention-tab')).toBeTruthy();
     expect(screen.queryAllByTestId('attention-button')).toHaveLength(0);
-  });
-
-  it('opens halfway down the right edge, where the tab is', () => {
-    host([bell('12', 2)]);
-    fireEvent.click(screen.getByTestId('attention-tab'));
-    expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('right');
   });
 
   it('says there is nothing to see, and folds itself back a moment later', () => {
@@ -124,11 +127,85 @@ describe('the folded button', () => {
     expect(screen.getByRole('dialog', { name: 'Room 12' })).toBeTruthy();
   });
 
-  it('leaves the drag out of the device: folding back always returns to the same spot', () => {
+  it('keeps an open sheet mounted when the button folds', () => {
+    host([bell('12', 2)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    fireEvent.click(screen.getByTestId('attention-button'));
+    const sheet = screen.getByRole('dialog', { name: 'Room 12' });
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    expect(screen.getByTestId('attention-tab')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Room 12' })).toBe(sheet);
+  });
+});
+
+describe("focus follows the reader's own taps", () => {
+  it('lands on the button when the tab opens it, and back on the tab when the minus folds it', async () => {
+    host([bell('12', 2)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('attention-button')));
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('attention-tab')));
+  });
+
+  it('lands on the minus when nothing waits', async () => {
+    host([]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('attention-collapse')));
+  });
+
+  it('leaves focus alone when it folds by itself', async () => {
+    const { update } = host([bell('12', 2)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('attention-button')));
+    // Nobody tapped the minus: the fold is the data's, and focus is not pulled to the tab.
+    update([]);
+    const tab = await screen.findByTestId('attention-tab');
+    await waitFor(() => expect(document.activeElement).not.toBe(tab));
+  });
+});
+
+describe('the drag, while it is open', () => {
+  beforeEach(() => {
+    if (typeof window.PointerEvent === 'undefined') {
+      class PointerEventStandIn extends MouseEvent {
+        readonly pointerId: number;
+        constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+          super(type, init);
+          this.pointerId = init.pointerId ?? 1;
+        }
+      }
+      Object.defineProperty(window, 'PointerEvent', { configurable: true, value: PointerEventStandIn });
+    }
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  });
+
+  it("moves it while open, never into the device, and folding back returns it to the tab's side", () => {
     const mounted = host([bell('12', 2)]);
     fireEvent.click(screen.getByTestId('attention-tab'));
-    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    const dock = screen.getByTestId('attention-dock');
+    vi.spyOn(dock, 'getBoundingClientRect').mockReturnValue({
+      left: 320,
+      top: 368,
+      width: 64,
+      height: 64,
+      right: 384,
+      bottom: 432,
+      x: 320,
+      y: 368,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(dock, { clientX: 350, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(dock, { clientX: 60, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(dock, { clientX: 60, clientY: 300, pointerId: 1 });
+    // The click a browser fires at the end of the drag, which the dock swallows.
+    fireEvent.click(dock);
+    expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('left');
     expect(mounted.preferences.read().dock).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('right');
   });
 });
 

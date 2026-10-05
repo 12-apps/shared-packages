@@ -221,81 +221,72 @@ export function AttentionHost({
   const { open, sheet } = useOpenEntry(entries, views, () => setListAnchor(null));
   const dock = useDockSpot(store, preferences, collapsed !== undefined);
 
-  if (collapsed !== undefined && !fold.open) {
-    return (
-      <FoldedTab
-        entries={entries}
-        words={collapsed}
-        zIndex={zIndex}
-        sheet={sheet}
-        onExpand={() => {
-          dock.reset();
-          fold.expand();
-        }}
-      />
-    );
-  }
   if (entries.length === 0 && collapsed === undefined) return sheet === null ? null : <>{sheet}</>;
+  const folded = collapsed !== undefined && !fold.open;
   return (
     <>
-      <AttentionDock
-        position={dock.position}
-        onMove={dock.onMove}
-        bottom={bottom}
-        zIndex={zIndex}
-        rest={rest ?? dock.rest}
-      >
-        <DockContents
+      {folded ? (
+        <FoldedTab
           entries={entries}
-          views={views}
-          messages={messages}
           words={collapsed}
-          listOpen={listAnchor !== null}
-          onCollapse={fold.collapse}
-          onOthers={setListAnchor}
-          onOpen={open}
+          zIndex={zIndex}
+          onExpand={() => {
+            dock.reset();
+            fold.expand();
+          }}
         />
-      </AttentionDock>
-      <AttentionOthersList
-        anchor={listAnchor}
-        side={dock.side}
-        entries={entries.slice(1)}
-        views={views}
-        messages={messages}
-        onClose={() => setListAnchor(null)}
-        onPick={open}
-      />
+      ) : (
+        <>
+          <AttentionDock position={dock.position} onMove={dock.onMove} bottom={bottom} zIndex={zIndex} rest={rest ?? dock.rest}>
+            <DockContents
+              entries={entries}
+              views={views}
+              messages={messages}
+              words={collapsed}
+              listOpen={listAnchor !== null}
+              onCollapse={fold.collapse}
+              onOthers={setListAnchor}
+              onOpen={open}
+            />
+          </AttentionDock>
+          <AttentionOthersList
+            anchor={listAnchor}
+            side={dock.side}
+            entries={entries.slice(1)}
+            views={views}
+            messages={messages}
+            onClose={() => setListAnchor(null)}
+            onPick={open}
+          />
+        </>
+      )}
+      {/* One place, folded or not: folding never remounts an open sheet. */}
       {sheet}
     </>
   );
 }
 
-/** The folded button: the tab, and any sheet a tap already opened. */
+/** The folded button: the tab, with the count and the worst of what waits. */
 function FoldedTab({
   entries,
   words,
   zIndex,
-  sheet,
   onExpand,
 }: {
   readonly entries: readonly AttentionEntry[];
   readonly words: AttentionCollapsedMessages;
   readonly zIndex: number;
-  readonly sheet: ReactNode;
   readonly onExpand: () => void;
 }): JSX.Element {
   const worst = worstSeverity(entries.map((entry) => entry.severity));
   return (
-    <>
-      <AttentionTab
-        count={entries.length}
-        worst={worst}
-        label={words.tab(entries.length, worst)}
-        zIndex={zIndex}
-        onExpand={onExpand}
-      />
-      {sheet}
-    </>
+    <AttentionTab
+      count={entries.length}
+      worst={worst}
+      label={words.tab(entries.length, worst)}
+      zIndex={zIndex}
+      onExpand={onExpand}
+    />
   );
 }
 

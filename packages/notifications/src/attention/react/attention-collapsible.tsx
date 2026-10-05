@@ -41,13 +41,30 @@ export interface AttentionCollapsedMessages {
 export const TAB_WIDTH_PX = 14;
 const TAB_HEIGHT_PX = 64;
 
+/** The most the tab prints: a 14px tab holds one digit; past it, "9+" (the label says the number). */
+const TAB_MAX = 9;
+
+/** What the tab prints: nothing with nothing waiting, the count, or "9+" past it. */
+function tabCount(count: number): string {
+  if (count === 0) return '';
+  return count > TAB_MAX ? `${TAB_MAX}+` : String(count);
+}
+
 /** How long "nothing to see" stays before the button folds itself back. */
 export const EMPTY_NOTE_MS = 4000;
 
+/** Where focus goes once a reader's own tap has folded or opened it. */
+const FOCUS_OPEN = '[data-testid="attention-dock"] [data-testid="attention-button"]';
+const FOCUS_OPEN_EMPTY = '[data-testid="attention-dock"] [data-testid="attention-collapse"]';
+const FOCUS_FOLDED = '[data-testid="attention-tab"]';
+
 /**
  * Folded or open, and when it folds by itself: when what waited is all gone,
- * and a few seconds after "nothing to see". Opening resets the reader's drag,
- * so the open button always starts from the same spot.
+ * and a few seconds after "nothing to see".
+ *
+ * Focus follows only the reader's own taps: opening lands on the button (on the
+ * "−" when nothing waits), folding with the "−" lands back on the tab. A fold
+ * of its own leaves focus where it is — the reader did not ask for it.
  */
 export function useCollapse(count: number): {
   readonly open: boolean;
@@ -56,6 +73,7 @@ export function useCollapse(count: number): {
 } {
   const [open, setOpen] = useState(false);
   const before = useRef(count);
+  const focusAfter = useRef<'open' | 'folded' | null>(null);
   useEffect(() => {
     const had = before.current;
     before.current = count;
@@ -67,7 +85,35 @@ export function useCollapse(count: number): {
     const fold = setTimeout(() => setOpen(false), EMPTY_NOTE_MS);
     return () => clearTimeout(fold);
   }, [open, count]);
-  return { open, expand: () => setOpen(true), collapse: () => setOpen(false) };
+  useEffect(() => {
+    const target = focusAfter.current;
+    focusAfter.current = null;
+    if (target === null) return;
+    const selector = target === 'folded' ? FOCUS_FOLDED : `${FOCUS_OPEN}, ${FOCUS_OPEN_EMPTY}`;
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(selector));
+    // The button when there is one, the "−" otherwise.
+    (candidates.find((element) => element.dataset.testid === 'attention-button') ?? candidates[0])?.focus();
+  }, [open]);
+  return {
+    open,
+    expand: () => {
+      focusAfter.current = 'open';
+      setOpen(true);
+    },
+    collapse: () => {
+      focusAfter.current = 'folded';
+      setOpen(false);
+    },
+  };
+}
+
+/**
+ * The ink of the white "−" and note. They are white in every theme, like the
+ * "+N" ball (`./attention-button`), so their ink cannot take the dark theme's
+ * light `text.primary` — it would be white on white.
+ */
+function inkOnPaper(theme: Theme, opacity: number): string {
+  return alpha(theme.palette.common.black, opacity);
 }
 
 /** The tab's fill: the worst severity's, or the quiet surface when nothing waits. */
@@ -108,15 +154,21 @@ export function AttentionTab({ count, worst, label, zIndex, onExpand }: Attentio
         width: TAB_WIDTH_PX,
         height: TAB_HEIGHT_PX,
         p: 0,
-        border: 0,
         borderRadius: '8px 0 0 8px',
         bgcolor: (theme: Theme) => tabFill(theme, worst),
+        // A bare tab is the quiet surface on the page's own paper: its edge is
+        // what finds it, so it keeps one even with nothing waiting.
+        border: (theme: Theme) => (worst === null ? `1px solid ${theme.palette.text.secondary}` : 0),
+        borderRight: 0,
         color: (theme: Theme) => tabInk(theme, worst),
         boxShadow: (theme: Theme) => `-1px 0 4px ${alpha(theme.palette.text.primary, 0.18)}`,
         font: 'inherit',
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: 700,
         lineHeight: 1,
+        letterSpacing: '-0.04em',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
         cursor: 'pointer',
         '&:focus-visible': {
           outline: 2,
@@ -126,7 +178,7 @@ export function AttentionTab({ count, worst, label, zIndex, onExpand }: Attentio
         },
       }}
     >
-      {count > 0 ? count : null}
+      {tabCount(count)}
     </Box>
   );
 }
@@ -156,9 +208,9 @@ export function AttentionCollapseButton({ label, onCollapse }: AttentionCollapse
         placeItems: 'center',
         borderRadius: '50%',
         bgcolor: 'common.white',
-        color: 'text.primary',
-        border: (theme: Theme) => `1.5px solid ${alpha(theme.palette.text.primary, 0.3)}`,
-        boxShadow: (theme: Theme) => `0 2px 6px ${alpha(theme.palette.text.primary, 0.18)}`,
+        color: (theme: Theme) => inkOnPaper(theme, 0.87),
+        border: (theme: Theme) => `1.5px solid ${inkOnPaper(theme, 0.3)}`,
+        boxShadow: (theme: Theme) => `0 2px 6px ${inkOnPaper(theme, 0.18)}`,
         cursor: 'pointer',
         '&:focus-visible': {
           outline: 2,
@@ -186,9 +238,9 @@ export function AttentionEmptyNote({ text }: { readonly text: string }): JSX.Ele
         py: 1.25,
         borderRadius: 3,
         bgcolor: 'common.white',
-        color: 'text.primary',
-        border: (theme: Theme) => `1px solid ${alpha(theme.palette.text.primary, 0.12)}`,
-        boxShadow: (theme: Theme) => `0 2px 6px ${alpha(theme.palette.text.primary, 0.18)}`,
+        color: (theme: Theme) => inkOnPaper(theme, 0.87),
+        border: (theme: Theme) => `1px solid ${inkOnPaper(theme, 0.12)}`,
+        boxShadow: (theme: Theme) => `0 2px 6px ${inkOnPaper(theme, 0.18)}`,
         fontSize: 14,
         fontWeight: 600,
         whiteSpace: 'nowrap',
