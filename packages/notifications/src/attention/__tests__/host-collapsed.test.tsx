@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AttentionItem } from '../core';
 import { AttentionHost, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
-import { EMPTY_NOTE_MS, TAB_WIDTH_PX } from '../react/attention-collapsible';
+import { EMPTY_NOTE_MS } from '../react/attention-collapsible';
 
 import { MESSAGES, NOW, bell, registry, sample, views } from './attention-fixture';
 
 /**
- * The folded mode (FUT-3316): a host that gives the words gets a thin tab on
- * the right edge instead of a button resting over its pages.
+ * The folded mode: a host that gives the words gets a half disc on the right
+ * edge instead of a button resting over its pages.
  */
 const FOLDED: AttentionCollapsedMessages = {
   tab: (count, worst) => (count === 0 ? 'Nothing waiting — open' : `${count} waiting, the worst ${worst} — open`),
@@ -64,16 +64,47 @@ describe('the folded button', () => {
     expect(screen.queryAllByTestId('attention-button')).toHaveLength(0);
   });
 
-  it('prints a single digit, then 9+, with the full number in its name', () => {
+  it('prints two digits, with the full number in its name', () => {
     host(Array.from({ length: 12 }, (_, i) => bell(`r${i}`, 2)));
     const tab = screen.getByTestId('attention-tab');
-    expect(tab.textContent).toBe('9+');
+    expect(tab.textContent).toBe('12');
     expect(tab.getAttribute('data-count')).toBe('12');
     expect(tab.getAttribute('aria-label')).toBe('12 waiting, the worst calm — open');
   });
 
-  it('is narrower than the gutter a page keeps from the edge', () => {
-    expect(TAB_WIDTH_PX).toBeLessThan(16);
+  it('prints 99+ past two digits', () => {
+    host(Array.from({ length: 120 }, (_, i) => bell(`r${i}`, 2)));
+    expect(screen.getByTestId('attention-tab').textContent).toBe('99+');
+  });
+
+  it('pulses as the open button does', () => {
+    host([sample('7', 12), bell('12', 2)]);
+    const tab = screen.getByTestId('attention-tab');
+    const pulse = tab.getAttribute('data-pulse');
+    expect(pulse).not.toBe('still');
+    expect(tab.querySelectorAll('span[aria-hidden]').length).toBeGreaterThan(0);
+    fireEvent.click(tab);
+    expect(screen.getByTestId('attention-button').getAttribute('data-pulse')).toBe(pulse);
+  });
+
+  it('stays still with nothing waiting', () => {
+    host([]);
+    const tab = screen.getByTestId('attention-tab');
+    expect(tab.getAttribute('data-pulse')).toBe('still');
+    expect(tab.querySelectorAll('span[aria-hidden]')).toHaveLength(0);
+  });
+
+  it('puts the minus under the button at its rest, halfway down', () => {
+    host([bell('12', 2)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    expect(screen.getByTestId('attention-collapse-spot').getAttribute('data-place')).toBe('below');
+  });
+
+  it('hides the minus while the list of the others is open', () => {
+    host([bell('12', 2), bell('3', 1)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    fireEvent.click(screen.getByTestId('attention-others'));
+    expect(screen.queryAllByTestId('attention-collapse-spot')).toHaveLength(0);
   });
 
   it('opens into the ordinary button beside a round minus, and folds back on it', () => {
@@ -206,6 +237,28 @@ describe('the drag, while it is open', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
     fireEvent.click(screen.getByTestId('attention-tab'));
     expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('right');
+  });
+
+  it('puts the minus over the button once it is dragged into the bottom half', () => {
+    host([bell('12', 2)]);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    const dock = screen.getByTestId('attention-dock');
+    vi.spyOn(dock, 'getBoundingClientRect').mockReturnValue({
+      left: 320,
+      top: 368,
+      width: 64,
+      height: 64,
+      right: 384,
+      bottom: 432,
+      x: 320,
+      y: 368,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(dock, { clientX: 350, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(dock, { clientX: 350, clientY: 740, pointerId: 1 });
+    fireEvent.pointerUp(dock, { clientX: 350, clientY: 740, pointerId: 1 });
+    fireEvent.click(dock);
+    expect(screen.getByTestId('attention-collapse-spot').getAttribute('data-place')).toBe('above');
   });
 });
 

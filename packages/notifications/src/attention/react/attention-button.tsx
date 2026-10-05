@@ -66,7 +66,7 @@ const shake = keyframes`
 `;
 
 /** One halo: which animation, how long, and how late it starts. */
-function halos(pulse: AttentionPulse): readonly { readonly animation: string }[] {
+export function halos(pulse: AttentionPulse): readonly { readonly animation: string }[] {
   switch (pulse) {
     case 'still':
       return [];
@@ -107,7 +107,7 @@ const BUTTON_SX = {
   },
 } as const;
 
-const HALO_SX = {
+export const HALO_SX = {
   position: 'absolute',
   inset: 0,
   borderRadius: '50%',
@@ -299,18 +299,18 @@ export function AttentionOthersButton({
       sx={{
         position: 'relative',
         zIndex: 1,
-        minWidth: 44,
-        height: 44,
-        px: 1.25,
+        minWidth: 34,
+        height: 34,
+        px: 1,
         boxSizing: 'border-box',
-        borderRadius: 22,
+        borderRadius: 17,
         // White, whatever the page's paper: the ball must stand off any ground.
         bgcolor: 'common.white',
         color: (theme: Theme) => inkOnWhite(theme, severity),
         border: '1.5px solid currentColor',
         boxShadow: (theme: Theme) => `0 2px 6px ${alpha(theme.palette.text.primary, 0.18)}`,
         font: 'inherit',
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: 700,
         cursor: 'pointer',
         '&:focus-visible': {
