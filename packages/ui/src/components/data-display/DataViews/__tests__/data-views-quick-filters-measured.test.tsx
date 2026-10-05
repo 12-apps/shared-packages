@@ -89,7 +89,7 @@ describe("quick chips on a measured bar", () => {
     expect(chipsOnBar()).toEqual(["stock-quick-empty", "stock-quick-below"]);
   });
 
-  it.each([1600, 1100, 900])("keep their slot when pressed, at %ipx", (width) => {
+  it.each([1600, 1100])("keep their slot when pressed where the bar has room, at %ipx", (width) => {
     renderBar(width);
     const before = chipsOnBar();
     expect(before.length).toBeGreaterThan(0);
@@ -97,6 +97,20 @@ describe("quick chips on a measured bar", () => {
     expect(chipsOnBar()).toEqual(before);
     expect(screen.getByTestId(before[0] ?? "")).toHaveAttribute("aria-pressed", "true");
   });
+
+  it.each([1600, 1100, 900, 800, 700])(
+    "never swap a pressed chip for another one, at %ipx: it stays, or the chips leave together",
+    (width) => {
+      renderBar(width);
+      const before = chipsOnBar();
+      if (before[0] === undefined) return;
+      fireEvent.click(screen.getByTestId(before[0]));
+      const after = chipsOnBar();
+      // Either the same chips in the same order, or none — never a different first chip.
+      expect(after.length === 0 || after[0] === before[0]).toBe(true);
+      expect(before.slice(0, after.length)).toEqual(after);
+    },
+  );
 
   it.each([1100, 900, 800, 700, 600, 500, 420, 360])(
     "stay a prefix of their order at %ipx: never the second without the first",

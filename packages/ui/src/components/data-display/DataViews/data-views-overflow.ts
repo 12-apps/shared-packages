@@ -166,10 +166,11 @@ function splitFilters<T extends Record<string, unknown>>(
 
   // "Limpar" rides the end of the cluster whenever anything is applied —
   // ANYTHING, a pinned field and a chip's field included, since the bar draws
-  // it on the active count, not on what it can see. A bar with quick chips
-  // reserves it always: pressing a chip must never re-split the bar, or the
-  // chip just pressed leaves it and another slides into its place.
-  const clearCost = chips.length > 0 || anyApplied(pills, ranges) ? price.clearAll + gap : 0;
+  // it on the active count, not on what it can see. Pressing a chip can
+  // therefore cost the bar room; chips rank first and stay a prefix (below),
+  // so what leaves is an idle pill, or the chips together — never one chip
+  // swapped for another.
+  const clearCost = anyApplied(pills, ranges) ? price.clearAll + gap : 0;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was
