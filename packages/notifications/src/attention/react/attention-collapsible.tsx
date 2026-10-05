@@ -1,6 +1,6 @@
 /**
  * The button, folded: a thin tab on the screen's right edge, halfway down,
- * that never covers what a page draws (FUT-3316).
+ * that never covers what a page draws.
  *
  *                     ┃▌3  ← the tab: the count, in the colour of the worst
  *                     ┃      of them; a bare tab when nothing waits
