@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 
 import { DataGrid, type GridColumn, type GridSort } from "../DataGrid";
 import { Box } from "../../../mui/Box";
@@ -22,6 +22,7 @@ import { toGridExpansion, type DataViewRowDetail } from "./data-views-row-detail
 import type { DataViewsController } from "./use-data-views-state";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { sxRem } from "../../../tokens/relative";
+import { useStickyTableHead } from "./data-views-sticky-head";
 
 /* ── Body (grid) ─────────────────────────────────────────────────────────── */
 
@@ -42,6 +43,8 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   rowDetail?: DataViewRowDetail<T>;
   dataTestId?: string;
   emptyState?: React.ReactNode;
+  /** The header row follows the page scroll under the sticky toolbar. */
+  stickyHead?: boolean;
 }
 
 /** The dense DataGrid with multi-select (unless opted out), wrapped in the scrollable table region. */
@@ -59,10 +62,14 @@ function GridBody<T extends Record<string, unknown>>({
   rowDetail,
   dataTestId,
   emptyState,
+  stickyHead = false,
 }: GridBodyProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  useStickyTableHead(wrapperRef, stickyHead);
   return (
     <Box
+      ref={wrapperRef}
       sx={{
         width: "100%",
         overflowX: "auto",
@@ -215,6 +222,8 @@ interface GridMainProps<T extends Record<string, unknown>> {
   dataTestId?: string;
   emptyState?: React.ReactNode;
   testIdPrefix: string;
+  /** The table's header row follows the page under a sticky toolbar. */
+  stickyHead?: boolean;
 }
 
 /**
@@ -345,6 +354,7 @@ export function GridMain<T extends Record<string, unknown>>(props: GridMainProps
       rowDetail={props.rowDetail}
       dataTestId={dataTestId}
       emptyState={emptyState}
+      stickyHead={props.stickyHead}
     />
   );
 }

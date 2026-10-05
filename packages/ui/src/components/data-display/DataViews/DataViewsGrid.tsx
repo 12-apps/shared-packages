@@ -19,6 +19,7 @@ import {
   type DataViewState,
   type DataViewSyncState,
   type FilterFieldConfig,
+  type QuickFilterConfig,
   type RangeFieldConfig,
   type RowAction,
 } from "./data-views-types";
@@ -184,6 +185,20 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
   inlineFilters?: boolean;
   /** Keep the inline search visible with no filter fields and no active search. */
   alwaysShowSearch?: boolean;
+  /**
+   * One-click filters drawn as toggle chips at the head of the toolbar, each
+   * applying one value of a declared pill field. See {@link QuickFilterConfig}.
+   */
+  quickFilters?: QuickFilterConfig[];
+  /**
+   * Pin the toolbar to the top of the page's scroll area, and the table's
+   * header row right under it, while the rows scroll past. For a list that IS
+   * the page: what sits above the grid (title, summaries, notices) scrolls
+   * away, and the controls and column names stay in reach. The table keeps its
+   * own sideways scroll, which is why the header follows the page scroll
+   * rather than relying on `position: sticky` (see `useStickyTableHead`).
+   */
+  stickyToolbar?: boolean;
   /** Server-mode wiring; when set the grid is backend-driven (no client filter/sort/paginate). */
   server?: DataViewServer;
 }

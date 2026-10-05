@@ -27,6 +27,7 @@ import {
   type DataViewPersistence,
   type DataViewRouter,
   type FilterFieldConfig,
+  type QuickFilterConfig,
   type RangeFieldConfig,
   type DataViewCardSelection,
   type RowAction,
@@ -115,6 +116,10 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   inlineFilters?: boolean;
   /** Keep the inline search visible with no filter fields and no active search. */
   alwaysShowSearch?: boolean;
+  /** One-click toggle chips at the head of the toolbar — see `QuickFilterConfig`. */
+  quickFilters?: QuickFilterConfig[];
+  /** Pin the toolbar and the table header while the page scrolls — see `DataViewsGrid`. */
+  stickyToolbar?: boolean;
   /** Server-mode wiring (FUT-180): backend-driven rows/total + re-fetch. Omit for client mode. */
   server?: DataViewServer;
   /** Seed the initial view state (search/pills/ranges/sort) from the URL when no saved view applies. */

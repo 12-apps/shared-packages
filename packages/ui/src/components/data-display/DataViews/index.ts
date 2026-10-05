@@ -62,6 +62,7 @@ export type {
   DataViewsLayout,
   DataViewColumn,
   FilterFieldConfig,
+  QuickFilterConfig,
   RangeFieldConfig,
   RangeFieldKind,
   RangeValue,

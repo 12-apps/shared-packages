@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { TableFilter } from "../../layout/TableFilter";
 import { Stack } from "../../../mui/Stack";
@@ -21,15 +21,18 @@ import { ShellToolbar } from "./data-views-shell-toolbar";
 import type { DisplayPanelView } from "./data-views-display-panel";
 import type { DataViewExport } from "./data-views-export";
 import { useDataViewsCopy } from "./data-views-copy-context";
-import { DataViewsEmpty } from "./data-views-empty";
+import { ShellEmpty } from "./data-views-empty";
 import { DataViewsPagination } from "./data-views-pagination";
 import type { BoardConfig } from "./DataViewsBoard";
 import { type ScopeConfig } from "./data-views-scopes";
 import { ScopeTabsSlot } from "./data-views-scope-tabs";
+import { SHELL_PROPS, useStickyBarTop } from "./data-views-sticky-head";
 import { togglePillValues } from "./data-views-grid-helpers";
+import { toggleQuick } from "./data-views-overflow-fields";
 import type {
   DataViewCardSelection,
   FilterFieldConfig,
+  QuickFilterConfig,
   RangeFieldConfig,
   RangeValue,
   RowAction,
@@ -82,6 +85,8 @@ interface FilterSurfaceProps<T extends Record<string, unknown>> {
   onChangeRange: (fieldId: string, range: RangeValue) => void;
   onClearField: (fieldId: string) => void;
   onClearAll: () => void;
+  /** Press a quick chip (its field becomes `[value]`), or release the pressed one. */
+  onToggleQuick: (quick: QuickFilterConfig) => void;
 }
 
 /**
@@ -99,6 +104,7 @@ interface GridShellFiltersArgs<T extends Record<string, unknown>> {
   alwaysShowSearch: boolean;
   /** Is "Exportar" on the bar? Half the right cluster's cost when it is not. */
   hasExport: boolean;
+  quickFilters: QuickFilterConfig[];
 }
 
 function useGridShellFilters<T extends Record<string, unknown>>({
@@ -109,6 +115,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   testIdPrefix,
   alwaysShowSearch,
   hasExport,
+  quickFilters,
 }: GridShellFiltersArgs<T>): {
   showInline: boolean;
   useModal: boolean;
@@ -125,7 +132,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   // it can keep, and the TOOLBAR needs the same answer to drop its labels.
   // Measuring twice would let the two disagree at the crossover width.
   const split = useFilterOverflow(
-    toOverflowFields(fields, rangeFields),
+    toOverflowFields(fields, rangeFields, quickFilters),
     state.pills,
     c.ranges,
     openControls > 0,
@@ -144,7 +151,11 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   const useModal = false;
   const inlineVisible =
     showInline &&
-    (alwaysShowSearch || fields.length > 0 || rangeFields.length > 0 || state.search !== "");
+    (alwaysShowSearch ||
+      fields.length > 0 ||
+      rangeFields.length > 0 ||
+      quickFilters.length > 0 ||
+      state.search !== "");
   const filterProps: FilterSurfaceProps<T> = {
     testIdPrefix,
     search: state.search,
@@ -159,6 +170,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     onChangeRange: (fieldId, range) => c.patch({ ranges: { ...c.ranges, [fieldId]: range } }),
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
     onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
+    onToggleQuick: (quick) => c.patch(({ pills }) => ({ pills: toggleQuick(pills, quick) })),
   };
   return {
     showInline,
@@ -237,6 +249,10 @@ interface GridShellProps<T extends Record<string, unknown>> {
    * every grid that ships filter fields already shows the row.
    */
   alwaysShowSearch?: boolean;
+  /** One-click toggle chips at the head of the bar — see `QuickFilterConfig`. */
+  quickFilters?: QuickFilterConfig[];
+  /** Pin the toolbar and the table header while the page scrolls. */
+  stickyToolbar?: boolean;
 }
 
 /** The scrollable content region: scope tabs, toolbar, filter bar, body, pager. */
@@ -250,22 +266,15 @@ function ShellStack<T extends Record<string, unknown>>({
   const copy = useDataViewsCopy();
   const { c, testIdPrefix, dataTestId, scopes = [], emptyState, inlineFilters = false } = props;
   const { showInline, useModal, inlineVisible, filterProps, split, onControlOpenChange } = filters;
-  // The grid renders the FILTERED empty state itself — it is the only party
-  // that knows a filter is applied. See {@link DataViewsEmpty}.
-  const body = (
-    <DataViewsEmpty
-      filtered={c.activeFilterCount > 0 || c.state.search !== ""}
-      onClearFilters={() => c.patch({ search: "", pills: {}, ranges: {} })}
-      emptyState={emptyState}
-      testIdPrefix={testIdPrefix}
-    />
-  );
+  const shellRef = useRef<HTMLDivElement>(null);
+  useStickyBarTop(shellRef, props.stickyToolbar === true);
+  const body = <ShellEmpty c={c} emptyState={emptyState} testIdPrefix={testIdPrefix} />;
   return (
     <TableFilter
       copy={copy.tableFilter} open={c.filterOpen} onOpenChange={c.setFilterOpen}
       hasActiveFilters={c.activeFilterCount > 0}
     >
-      <Stack spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined}>
+      <Stack ref={shellRef} spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined} {...SHELL_PROPS}>
         <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
         <ShellToolbar
           c={c}
@@ -278,6 +287,7 @@ function ShellStack<T extends Record<string, unknown>>({
               <InlineFilterControls
                 {...filterProps} split={split} activeFilterCount={c.activeFilterCount}
                 onControlOpenChange={onControlOpenChange}
+                onToggleQuick={filterProps.onToggleQuick}
               />
             ) : undefined
           }
@@ -291,6 +301,7 @@ function ShellStack<T extends Record<string, unknown>>({
           compactControls={showInline && split.compactControls}
           counterHidden={showInline && split.counterHidden}
           showInline={showInline}
+          sticky={props.stickyToolbar === true}
         />
         <ScopeTabsSlot
           scopes={scopes} scopeFieldId={props.scopeFieldId} board={props.board}
@@ -310,6 +321,7 @@ function ShellStack<T extends Record<string, unknown>>({
               dataTestId={dataTestId}
               testIdPrefix={testIdPrefix}
               emptyState={body}
+              stickyHead={props.stickyToolbar === true}
             />
             <DataViewsPagination c={c} testIdPrefix={testIdPrefix} />
           </TableFilter.Main>
@@ -343,6 +355,7 @@ export function GridShell<T extends Record<string, unknown>>(props: GridShellPro
     testIdPrefix,
     alwaysShowSearch,
     hasExport: props.exportConfig !== undefined,
+    quickFilters: props.quickFilters ?? [],
   });
   return (
     <DataViewsLayoutProvider

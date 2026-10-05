@@ -137,21 +137,17 @@ export interface FilterFieldConfig<T extends Record<string, unknown>> {
    * its values is selected. Defaults to `String(row[id])`.
    */
   accessor?: (row: T) => string | string[];
+  /** Never on the bar, always behind "Mais" (beside quick chips); still counted, saved, cleared. */
+  inMore?: boolean;
 }
 
 /**
- * The range types live in `data-views-range-types` (this file outgrew the
- * size gate); they are re-exported here so `data-views-types` stays the one
- * name every consumer imports the model from.
+ * The range and quick-chip types live in their own modules (this file outgrew
+ * the size gate); re-exported so `data-views-types` stays the one import.
  */
-export type {
-  DayRangeFieldConfig,
-  NumberRangeFieldConfig,
-  RangeFieldConfig,
-  RangeFieldKind,
-  RangePreset,
-  RangeValue,
-} from "./data-views-range-types";
+export type { QuickFilterConfig } from "./data-views-quick-types";
+export type { DayRangeFieldConfig, NumberRangeFieldConfig, RangeFieldConfig } from "./data-views-range-types";
+export type { RangeFieldKind, RangePreset, RangeValue } from "./data-views-range-types";
 
 /** A grid column that can join the search scan and the column-visibility menu. */
 export interface DataViewColumn<T extends Record<string, unknown>> extends GridColumn<T> {

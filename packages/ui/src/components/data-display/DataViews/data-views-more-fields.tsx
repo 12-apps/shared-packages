@@ -21,7 +21,8 @@ import { PillControl } from "./data-views-category-pill";
 import type { OverflowField } from "./data-views-overflow";
 import { RangeBounds } from "./data-views-range-pill";
 import { isRangeSet } from "./data-views-range-values";
-import type { RangeValue } from "./data-views-types";
+import type { QuickFilterConfig, RangeValue } from "./data-views-types";
+import { QuickRow } from "./data-views-quick-chip";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { fieldHeight } from "../../../tokens/field-height";
@@ -34,6 +35,8 @@ export interface MoreFieldProps {
   ranges: Record<string, RangeValue>;
   onTogglePill: (fieldId: string, value: string, checked: boolean) => void;
   onChangeRange: (fieldId: string, range: RangeValue) => void;
+  /** Presses or releases a quick chip shed into the panel. */
+  onToggleQuick?: (quick: QuickFilterConfig) => void;
   testIdPrefix: string;
 }
 
@@ -202,6 +205,11 @@ export function fieldClearing<T extends Record<string, unknown>>({
   applied: boolean;
   clear: () => void;
 } {
+  if (field.group === "quick" && field.quick) {
+    const quick = field.quick;
+    const applied = (pills[quick.fieldId] ?? []).includes(quick.value);
+    return { applied, clear: () => onTogglePill(quick.fieldId, quick.value, false) };
+  }
   if (field.group === "range") {
     return {
       applied: isRangeSet(ranges[field.id] ?? {}),
@@ -215,6 +223,30 @@ export function fieldClearing<T extends Record<string, unknown>>({
   };
 }
 
+
+/**
+ * A quick chip shed into the panel: its own line, because label and count are
+ * already the whole control — no heading above it, no "Limpar" beside it.
+ */
+export function MoreQuick({
+  quick,
+  pills,
+  onToggleQuick,
+  testIdPrefix,
+}: {
+  quick: QuickFilterConfig;
+} & Pick<MoreFieldProps, "pills" | "onToggleQuick" | "testIdPrefix">): React.JSX.Element {
+  return (
+    <Box sx={{ mb: 1, "&:last-of-type": { mb: 0 } }}>
+      <QuickRow
+        quick={quick}
+        active={(pills[quick.fieldId] ?? []).includes(quick.value)}
+        onToggle={() => onToggleQuick?.(quick)}
+        testIdPrefix={testIdPrefix}
+      />
+    </Box>
+  );
+}
 
 /** One labelled group in the panel: the field's name, then its control. */
 export function MoreGroup<T extends Record<string, unknown>>({

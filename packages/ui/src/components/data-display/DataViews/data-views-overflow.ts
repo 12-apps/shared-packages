@@ -15,7 +15,11 @@ import {
   rightClusterCost,
   type Prices,
 } from "./data-views-overflow-costs";
-import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
+import type { FilterFieldConfig, QuickFilterConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
+import { isQuickActive } from "./data-views-overflow-fields";
+
+// Declaring the controls lives in its own module (size gate); re-exported for its callers.
+export { isQuickActive, toOverflowFields } from "./data-views-overflow-fields";
 
 /**
  * PROGRESSIVE COLLAPSE — which filter controls fit on the toolbar, measured.
@@ -44,14 +48,17 @@ import type { FilterFieldConfig, RangeFieldConfig, RangeValue } from "./data-vie
  * or changes a rendered row.
  */
 
-/** A filter control on the bar: a multi-select pill or a min/max range. */
+/** A filter control on the bar: a multi-select pill, a min/max range or a quick chip. */
 export interface OverflowField<T extends Record<string, unknown>> {
   id: string;
   label: string;
   /** Which control it is — the caller renders the right one. */
-  group: "pill" | "range";
+  group: "pill" | "range" | "quick";
   pill?: FilterFieldConfig<T>;
   range?: RangeFieldConfig<T>;
+  quick?: QuickFilterConfig;
+  /** Declared `inMore`: never on the bar, always behind "Mais". */
+  pinned?: boolean;
 }
 
 /** What the caller renders inline, and what goes behind "Mais". */
@@ -98,24 +105,13 @@ export interface OverflowSplit<T extends Record<string, unknown>> {
   barRef: React.RefObject<HTMLDivElement | null>;
 }
 
-/** Every declared control, pills first, in the order the bar renders them. */
-export function toOverflowFields<T extends Record<string, unknown>>(
-  fields: FilterFieldConfig<T>[],
-  rangeFields: RangeFieldConfig<T>[],
-): OverflowField<T>[] {
-  return [
-    ...fields.map((pill) => ({ id: pill.id, label: pill.label, group: "pill" as const, pill })),
-    ...rangeFields.map((range) => ({ id: range.id, label: range.label, group: "range" as const, range })),
-  ];
-}
-
-
 /** Is this control carrying a value the operator set? */
 function isActiveField<T extends Record<string, unknown>>(
   field: OverflowField<T>,
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
 ): boolean {
+  if (field.group === "quick" && field.quick) return isQuickActive(field.quick, pills);
   return field.group === "pill"
     ? (pills[field.id]?.length ?? 0) > 0
     : isRangeSet(ranges[field.id]);
@@ -128,6 +124,8 @@ function fieldWidth<T extends Record<string, unknown>>(
   pills: Record<string, string[]>,
   ranges: Record<string, RangeValue>,
 ): number {
+  // A chip is a pill with its count beside the label and no chevron.
+  if (field.group === "quick") return estimateWidth(theme, `${field.label} ${field.quick?.count ?? ""}`, -20);
   if (field.group === "pill") return estimateWidth(theme, pillText(field, pills[field.id] ?? []), 0);
   // A bounded range renders two number inputs (100 design px) beside its label.
   return estimateWidth(theme, field.label, isRangeSet(ranges[field.id]) ? 100 : 0);
@@ -154,9 +152,14 @@ function splitFilters<T extends Record<string, unknown>>(
   /** Whose type scale every price is read at — the bar's own. */
   theme: Theme,
 ): Split<T> {
-  const active = all.filter((field) => isActiveField(field, pills, ranges));
-  const idle = all.filter((field) => !isActiveField(field, pills, ranges));
+  // `inMore` fields never compete for the bar: they are behind "Mais" from the
+  // start, so "Mais" is on the bar whatever else fits.
+  const pinned = all.filter((field) => field.pinned);
+  const candidates = all.filter((field) => !field.pinned);
+  const active = candidates.filter((field) => isActiveField(field, pills, ranges));
+  const idle = candidates.filter((field) => !isActiveField(field, pills, ranges));
   const price = pricesFor(theme);
+  const moreCost = compact ? price.overflowButtonCompact : price.overflowButton;
   const gap = remPx(theme, RESERVED.betweenControls);
 
   // "Limpar" rides the end of the cluster whenever anything is applied.
@@ -177,17 +180,24 @@ function splitFilters<T extends Record<string, unknown>>(
   // The keep-what-fits loop itself is `splitToFit` (`utility/Overflow`) — the
   // one part of this that is not filter-shaped, and the part a second cluster
   // in the design system would otherwise have had to reimplement.
-  const split = splitToFit(all, {
+  // With pinned fields "Mais" is always drawn, so its cost is paid up front
+  // rather than only when something else overflows.
+  const pinnedCost = pinned.length > 0 ? moreCost + gap : 0;
+  const split = splitToFit(candidates, {
     widthOf: (field) => fieldWidth(theme, field, pills, ranges),
     keyOf: (field) => field.id,
     gap,
-    available: width - furniture - clearCost,
+    available: width - furniture - clearCost - pinnedCost,
     // The overflow button at the width it will actually have, which on a phone
     // is the icon-and-badge one.
-    overflowCost: compact ? price.overflowButtonCompact : price.overflowButton,
+    overflowCost: pinned.length > 0 ? 0 : moreCost,
     priority: [...active, ...idle],
   });
-  return { ...split, used: split.used + clearCost };
+  return {
+    inline: split.inline,
+    overflow: [...split.overflow, ...pinned],
+    used: split.used + clearCost + pinnedCost,
+  };
 }
 
 /**
@@ -219,8 +229,8 @@ function computeSplit<T extends Record<string, unknown>>(
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
     return {
-      inline: all,
-      overflow: [],
+      inline: all.filter((field) => !field.pinned),
+      overflow: all.filter((field) => field.pinned),
       compactControls: false,
       counterHidden: false,
       searchCollapsed: false,

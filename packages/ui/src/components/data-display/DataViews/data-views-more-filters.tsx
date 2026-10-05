@@ -16,7 +16,7 @@ import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
-import { fieldClearing, MoreGroup, type MoreFieldProps } from "./data-views-more-fields";
+import { fieldClearing, MoreGroup, MoreQuick, type MoreFieldProps } from "./data-views-more-fields";
 import type { OverflowField } from "./data-views-overflow";
 import { rem, sxRem } from "../../../tokens/relative";
 
@@ -182,6 +182,24 @@ function MoreFooter({
   );
 }
 
+/** The panel's body: a shed quick chip as a toggle row, anything else as a labelled group. */
+function MoreFields<T extends Record<string, unknown>>({
+  fields,
+  ...rest
+}: MoreFiltersProps<T>): React.JSX.Element {
+  return (
+    <>
+      {fields.map((field) =>
+        field.quick ? (
+          <MoreQuick key={field.id} quick={field.quick} {...rest} />
+        ) : (
+          <MoreGroup key={field.id} field={field} {...rest} />
+        ),
+      )}
+    </>
+  );
+}
+
 /** The overflow trigger + panel. Renders nothing when everything fits. */
 export function MoreFilters<T extends Record<string, unknown>>({
   fields,
@@ -249,9 +267,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
               means something refused to, which is a bug to fix rather than a
               scrollbar to live with. */}
           <Box sx={{ maxHeight: sxRem(320), overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
-            {fields.map((field) => (
-              <MoreGroup key={field.id} field={field} {...rest} />
-            ))}
+            <MoreFields fields={fields} {...rest} />
           </Box>
           {anyApplied && (
             <MoreFooter onClearAll={onClearAll} testIdPrefix={rest.testIdPrefix} />

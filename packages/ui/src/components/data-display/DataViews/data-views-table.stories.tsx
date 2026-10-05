@@ -683,6 +683,34 @@ export const SavedViewApplied: Story = {
 };
 
 /**
+ * Quick chips + a sticky toolbar: the one question this list answers is one
+ * click away ("Pagamento pendente"), the facets that are not daily sit behind
+ * "Mais" (`inMore`), and while the rows scroll the toolbar and the table
+ * header stay in reach. The chips write the "Pagamento" field, so it is not
+ * drawn as a pill of its own.
+ */
+export const QuickFiltersSticky: Story = {
+  args: {
+    ...base,
+    inlineFilters: true,
+    stickyToolbar: true,
+    defaultLayout: "table",
+    fields: fields.map((field) => (field.id === "pagamento" ? field : { ...field, inMore: true })),
+    quickFilters: [
+      {
+        id: "pendente",
+        label: "Pagamento pendente",
+        fieldId: "pagamento",
+        value: optionsFor("pagamento")[0]?.value ?? "",
+        count: 4,
+        tone: "warning",
+      },
+    ],
+  },
+  render: screen,
+};
+
+/**
  * The responsive filter UX, stated explicitly rather than relied on as the
  * default: filters sit in a row beside the search box (and collapse into a
  * modal on small screens). Collapsing is presentation only — it never drops a

@@ -18,6 +18,7 @@ import { renderBulkActions } from "./data-views-grid-helpers";
 import type { RowAction } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
 import { sxRem } from "../../../tokens/relative";
+import { STICKY_BAR_ATTR } from "./data-views-sticky-head";
 
 export interface GridToolbarProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
@@ -72,6 +73,12 @@ export interface GridToolbarProps<T extends Record<string, unknown>> {
    * line instead of spilling outside the toolbar.
    */
   counterHidden?: boolean;
+  /**
+   * Pin the band to the top of the page's scroll area (`stickyToolbar`). It
+   * takes the page background so rows scrolling under it do not show through,
+   * and sits above the table header that follows it (`useStickyTableHead`).
+   */
+  sticky?: boolean;
 }
 
 /** The right-aligned toolbar controls: Sort By, the counter, zoom/layout/columns, filters. */
@@ -147,7 +154,9 @@ export function GridToolbar<T extends Record<string, unknown>>(props: GridToolba
   return (
     <Box
       ref={props.barRef}
+      {...(props.sticky ? { [STICKY_BAR_ATTR]: "" } : {})}
       sx={{
+        ...(props.sticky && { position: "sticky", top: 0, zIndex: 3, bgcolor: "background.default" }),
         borderTop: 1,
         borderBottom: 1,
         borderColor: "divider",

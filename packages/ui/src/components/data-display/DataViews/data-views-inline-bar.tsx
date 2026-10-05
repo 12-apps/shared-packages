@@ -25,8 +25,10 @@ import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
 import { CollapsedSearch, InlineKeyword } from "./data-views-search";
 import { PillControl } from "./data-views-category-pill";
+import { isQuickActive } from "./data-views-overflow";
+import { QuickChip } from "./data-views-quick-chip";
 import { RangePill } from "./data-views-range-pill";
-import type { RangeValue } from "./data-views-types";
+import type { QuickFilterConfig, RangeValue } from "./data-views-types";
 
 
 
@@ -102,10 +104,12 @@ function InlineControl<T extends Record<string, unknown>>({
   onTogglePill,
   onChangeRange,
   onClearField,
+  onToggleQuick,
   onOpenChange,
   testIdPrefix,
 }: {
   field: OverflowField<T>;
+  onToggleQuick?: (quick: QuickFilterConfig) => void;
   onOpenChange?: (open: boolean) => void;
   pills: Record<string, string[]>;
   ranges: Record<string, RangeValue>;
@@ -114,6 +118,17 @@ function InlineControl<T extends Record<string, unknown>>({
   onClearField: (fieldId: string) => void;
   testIdPrefix: string;
 }): React.JSX.Element | null {
+  if (field.group === "quick" && field.quick) {
+    const quick = field.quick;
+    return (
+      <QuickChip
+        quick={quick}
+        active={isQuickActive(quick, pills)}
+        onToggle={() => onToggleQuick?.(quick)}
+        testIdPrefix={testIdPrefix}
+      />
+    );
+  }
   if (field.group === "pill" && field.pill) {
     return (
       <PillControl
@@ -202,7 +217,10 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   onClearAll,
   activeFilterCount,
   onControlOpenChange,
+  onToggleQuick,
 }: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields"> & {
+  /** Presses or releases a quick chip — see `QuickFilterConfig`. */
+  onToggleQuick?: (quick: QuickFilterConfig) => void;
   /** How many filters are applied — decides whether "Limpar" is on the bar at all. */
   activeFilterCount: number;
   /** Reports a control opening/closing so the shell can freeze the measurement. */
@@ -250,6 +268,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         onTogglePill={onTogglePill}
         onChangeRange={onChangeRange}
         onClearField={onClearField}
+        onToggleQuick={onToggleQuick}
         onClearAll={onClearAll}
         onControlOpenChange={onControlOpenChange}
         activeFilterCount={activeFilterCount}
@@ -276,6 +295,7 @@ function FilterSlots<T extends Record<string, unknown>>({
   onTogglePill,
   onChangeRange,
   onClearField,
+  onToggleQuick,
   onClearAll,
   onControlOpenChange,
   activeFilterCount,
@@ -283,6 +303,7 @@ function FilterSlots<T extends Record<string, unknown>>({
   clearAllHidden,
   testIdPrefix,
 }: {
+  onToggleQuick?: (quick: QuickFilterConfig) => void;
   inline: OverflowField<T>[];
   overflow: OverflowField<T>[];
   pills: Record<string, string[]>;
@@ -309,6 +330,7 @@ function FilterSlots<T extends Record<string, unknown>>({
           onTogglePill={onTogglePill}
           onChangeRange={onChangeRange}
           onClearField={onClearField}
+          onToggleQuick={onToggleQuick}
           testIdPrefix={testIdPrefix}
         />
       ))}
@@ -322,6 +344,7 @@ function FilterSlots<T extends Record<string, unknown>>({
         ranges={ranges}
         onTogglePill={onTogglePill}
         onChangeRange={onChangeRange}
+        onToggleQuick={onToggleQuick}
         testIdPrefix={testIdPrefix}
       />
       {activeFilterCount > 0 && !clearAllHidden && (
