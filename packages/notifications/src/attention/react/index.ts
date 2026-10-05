@@ -17,6 +17,14 @@ export {
 } from './attention-button';
 export { AttentionDock, type AttentionDockProps, type AttentionDockRest } from './attention-dock';
 export {
+  AttentionCollapseButton,
+  AttentionEmptyNote,
+  AttentionTab,
+  type AttentionCollapseButtonProps,
+  type AttentionCollapsedMessages,
+  type AttentionTabProps,
+} from './attention-collapsible';
+export {
   AttentionPreferencesPanel,
   type AttentionPreferencesPanelProps,
   type AttentionPushState,

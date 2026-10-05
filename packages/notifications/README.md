@@ -278,6 +278,7 @@ next thing to do, wherever the host mounts it.
 | `defineAttention({ categories, kinds })` | the host's wiring, checked once: category order, and per kind its budget, its conditions (`severity`), its permission |
 | `readAttention(registry, items, { now, can })` | the queue: **severity first** (spent → late → calm), then category order, then kind order, then the longest wait |
 | `AttentionHost` | the button, a quiet "+N" for the rest, sound/vibration for news, and the sheet each kind declares (`renderSheet`) or the host's own action (`onOpen`) |
+| `AttentionHost` + `collapsed` | the folded mode: given its words (`tab`, `collapse`, `empty`), the button rests as a thin tab on the right edge, halfway down, at every width — always drawn, even with nothing waiting, carrying the count in the worst severity's colour. A tap opens the button beside a round "−" that folds it back; with nothing waiting it says so. It folds itself back when the last item leaves; a drag holds only while it is open. Sound, vibration and push keep working while it is folded |
 | `createAttentionPreferences({ storageKey })` | sound, vibration, push level and the button's position, **per device** |
 | `AttentionPreferencesPanel`, `AttentionQuickSettings` | the same settings, as a section of the host's user settings and as a small control for a sheet's header |
 
