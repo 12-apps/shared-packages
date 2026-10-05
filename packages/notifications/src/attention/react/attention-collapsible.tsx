@@ -18,7 +18,7 @@
  * Sound, vibration and push do not care whether it is folded: the host keeps
  * listening either way (`./alerts`).
  */
-import { useEffect, useRef, useState, type JSX, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type JSX, type MouseEvent, type ReactNode } from 'react';
 
 import { Box } from '@12-apps/ui/mui/Box';
 import { alpha, type Theme } from '@12-apps/ui/mui/styles';
@@ -41,7 +41,7 @@ export interface AttentionCollapsedMessages {
  * How far the half disc reaches into the page: half its height. Wide enough to
  * be seen at a glance and to hold two digits — a thinner tab was missed.
  */
-export const TAB_WIDTH_PX = 28;
+const TAB_WIDTH_PX = 28;
 const TAB_HEIGHT_PX = TAB_WIDTH_PX * 2;
 
 /** The most the tab prints: two digits; past it, "99+" (the label says the number). */
@@ -274,5 +274,58 @@ export function AttentionEmptyNote({ text }: { readonly text: string }): JSX.Ele
     >
       {text}
     </Box>
+  );
+}
+
+interface AttentionCollapseSpotProps {
+  readonly label: string;
+  /** Under the button (it rests in the screen's top half) or over it. */
+  readonly below: boolean;
+  /** Left out while something else hangs off the same side. */
+  readonly hidden: boolean;
+  readonly onCollapse: () => void;
+  /** The button the "−" is set against. */
+  readonly children: ReactNode;
+}
+
+/**
+ * The open button with its "−" over or under it — never beside it — centred on
+ * the button and away from the nearer edge of the screen, so it stays on it.
+ */
+export function AttentionCollapseSpot({ label, below, hidden, onCollapse, children }: AttentionCollapseSpotProps): JSX.Element {
+  return (
+    <Box sx={{ position: 'relative', display: 'flex' }}>
+      {children}
+      {!hidden && (
+        <Box
+          data-testid="attention-collapse-spot"
+          data-place={below ? 'below' : 'above'}
+          sx={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            [below ? 'top' : 'bottom']: 'calc(100% + 6px)',
+          }}
+        >
+          <AttentionCollapseButton label={label} onCollapse={onCollapse} />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+/** The open button with nothing waiting: the "−" beside "nothing to see". */
+export function AttentionFoldedEmpty({
+  words,
+  onCollapse,
+}: {
+  readonly words: AttentionCollapsedMessages;
+  readonly onCollapse: () => void;
+}): JSX.Element {
+  return (
+    <>
+      <AttentionCollapseButton label={words.collapse} onCollapse={onCollapse} />
+      <AttentionEmptyNote text={words.empty} />
+    </>
   );
 }

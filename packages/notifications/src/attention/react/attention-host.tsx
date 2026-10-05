@@ -15,8 +15,6 @@
  */
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 
-import { Box } from '@12-apps/ui/mui/Box';
-
 import {
   pulseOf,
   readAttention,
@@ -29,8 +27,8 @@ import {
 import { useAttentionAlerts, type AttentionSounds } from './alerts';
 import { AttentionButton, AttentionOthersButton } from './attention-button';
 import {
-  AttentionCollapseButton,
-  AttentionEmptyNote,
+  AttentionCollapseSpot,
+  AttentionFoldedEmpty,
   AttentionTab,
   useCollapse,
   type AttentionCollapsedMessages,
@@ -330,13 +328,13 @@ function DockContents({
 }): JSX.Element {
   const [head, ...others] = entries;
   const othersSeverity = worstSeverity(others.map((entry) => entry.severity)) ?? 'calm';
+  const button = head && (
+    <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
+  );
   return (
     <>
       {words !== undefined && head === undefined && (
-        <>
-          <AttentionCollapseButton label={words.collapse} onCollapse={onCollapse} />
-          <AttentionEmptyNote text={words.empty} />
-        </>
+        <AttentionFoldedEmpty words={words} onCollapse={onCollapse} />
       )}
       {others.length > 0 && (
         <AttentionOthersButton
@@ -348,28 +346,13 @@ function DockContents({
           onClick={(ball) => onOthers(ball.closest<HTMLElement>('[data-testid="attention-dock"]') ?? ball)}
         />
       )}
-      {head !== undefined && words === undefined && (
-        <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
-      )}
-      {head !== undefined && words !== undefined && (
-        <Box sx={{ position: 'relative', display: 'flex' }}>
-          <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
-          {/* Hidden while the list is open: the list hangs off the same side. */}
-          {!listOpen && (
-            <Box
-              data-testid="attention-collapse-spot"
-              data-place={collapseBelow ? 'below' : 'above'}
-              sx={{
-                position: 'absolute',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                [collapseBelow ? 'top' : 'bottom']: 'calc(100% + 6px)',
-              }}
-            >
-              <AttentionCollapseButton label={words.collapse} onCollapse={onCollapse} />
-            </Box>
-          )}
-        </Box>
+      {words === undefined || button === undefined ? (
+        button
+      ) : (
+        // Hidden while the list is open: the list hangs off the same side.
+        <AttentionCollapseSpot label={words.collapse} below={collapseBelow} hidden={listOpen} onCollapse={onCollapse}>
+          {button}
+        </AttentionCollapseSpot>
       )}
     </>
   );
