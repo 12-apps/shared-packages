@@ -5,7 +5,7 @@
  * not promise "a confirmação é automática", and the wait runs for as long as
  * the store has to answer — up to the code's own expiry, a day at most.
  */
-import { act, cleanup, render, screen } from "./test-utils";
+import { act, cleanup, fireEvent, render, screen } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX, ReactNode } from "react";
@@ -119,5 +119,39 @@ describe("a Pix the store confirms", () => {
 
     expect(screen.getByTestId("pix-awaiting").textContent).toBe(PT_BR_CHECKOUT_SCREENS_COPY.pix.awaiting);
     expect(screen.getByTestId("pix-expiry").textContent).toMatch(/automática/);
+  });
+
+  it("tells the buyer, once the code is copied, to wait here for the store", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const { client } = storeServer();
+    render(<PixView order={pixOrder("MANUAL", 30 * 60_000)} onResolved={vi.fn()} />, { wrapper: withClient(client) });
+    await elapse(0);
+    expect(screen.queryAllByTestId("pix-manual-copied")).toHaveLength(0);
+
+    fireEvent.click(screen.getByTestId("pix-copy"));
+    await elapse(0);
+
+    const notice = screen.getByTestId("pix-manual-copied").textContent ?? "";
+    expect(notice).toContain(PT_BR_CHECKOUT_SCREENS_COPY.pix.manual?.copied?.title);
+    expect(notice).toContain("a loja confere o recebimento e confirma o seu pedido aqui mesmo");
+    // It outlives the button's own two-second "Copiado!".
+    await elapse(5_000);
+    expect(screen.getByTestId("pix-manual-copied")).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it("adds no notice to an automatic Pix's copy", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const { client } = storeServer();
+    render(<PixView order={pixOrder(undefined, 30 * 60_000)} onResolved={vi.fn()} />, { wrapper: withClient(client) });
+
+    fireEvent.click(screen.getByTestId("pix-copy"));
+    await elapse(0);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(screen.queryAllByTestId("pix-manual-copied")).toHaveLength(0);
+    vi.unstubAllGlobals();
   });
 });
