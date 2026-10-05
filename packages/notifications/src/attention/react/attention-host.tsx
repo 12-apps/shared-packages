@@ -10,12 +10,13 @@
  * navigation to the screen that already draws that sheet).
  *
  * It draws nothing while nothing waits — unless the host gives it the words of
- * the folded mode (`collapsed`, `./attention-collapsible`): then a thin tab on
+ * the folded mode (`collapsed`, `./attention-collapsible`): then a half disc on
  * the right edge is always there, and a tap opens the button.
  */
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 
 import {
+  pulseOf,
   readAttention,
   worstSeverity,
   type AttentionEntry,
@@ -26,8 +27,8 @@ import {
 import { useAttentionAlerts, type AttentionSounds } from './alerts';
 import { AttentionButton, AttentionOthersButton } from './attention-button';
 import {
-  AttentionCollapseButton,
-  AttentionEmptyNote,
+  AttentionCollapseSpot,
+  AttentionFoldedEmpty,
   AttentionTab,
   useCollapse,
   type AttentionCollapsedMessages,
@@ -65,7 +66,7 @@ export interface AttentionHostProps {
    */
   readonly ready?: boolean;
   /**
-   * The words of the folded mode. Given, the button rests folded into a tab on
+   * The words of the folded mode. Given, the button rests folded into a half disc on
    * the right edge, halfway down, at every width — always drawn, even with
    * nothing waiting — and a tap opens it (`./attention-collapsible`). Omitted,
    * nothing changes.
@@ -177,6 +178,8 @@ function useDockSpot(
   readonly side: 'left' | 'right';
   /** Where it rests until moved: the folded mode's spot, or the dock's own default. */
   readonly rest: AttentionDockRest | undefined;
+  /** In the screen's top half: what hangs off it goes below, never off the top. */
+  readonly high: boolean;
 } {
   const [spot, setSpot] = useState<AttentionDockPosition | null>(null);
   if (!folding) {
@@ -186,6 +189,7 @@ function useDockSpot(
       reset: () => undefined,
       side: preferences.dock?.side ?? 'right',
       rest: undefined,
+      high: preferences.dock !== null && preferences.dock.y < 0.5,
     };
   }
   return {
@@ -194,6 +198,8 @@ function useDockSpot(
     reset: () => setSpot(null),
     side: (spot ?? FOLDED_REST).side,
     rest: FOLDED_REST,
+    // The rest is halfway down, where the list opens below; the "−" goes with it.
+    high: (spot ?? FOLDED_REST).y <= 0.5,
   };
 }
 
@@ -243,6 +249,7 @@ export function AttentionHost({
               views={views}
               messages={messages}
               words={collapsed}
+              collapseBelow={dock.high}
               listOpen={listAnchor !== null}
               onCollapse={fold.collapse}
               onOthers={setListAnchor}
@@ -279,10 +286,12 @@ function FoldedTab({
   readonly onExpand: () => void;
 }): JSX.Element {
   const worst = worstSeverity(entries.map((entry) => entry.severity));
+  const head = entries[0];
   return (
     <AttentionTab
       count={entries.length}
       worst={worst}
+      pulse={head === undefined ? 'still' : pulseOf(head)}
       label={words.tab(entries.length, worst)}
       zIndex={zIndex}
       onExpand={onExpand}
@@ -291,14 +300,17 @@ function FoldedTab({
 }
 
 /**
- * What the dock holds, from the inner edge outwards: the folded mode's "−"
- * (and its "nothing to see"), the "+N", then the button.
+ * What the dock holds, from the inner edge outwards: the "+N", then the button,
+ * with the folded mode's "−" over or under the button — under it in the
+ * screen's top half, over it in the bottom half, so it never leaves the screen.
+ * With nothing waiting there is no button: the "−" sits beside "nothing to see".
  */
 function DockContents({
   entries,
   views,
   messages,
   words,
+  collapseBelow,
   listOpen,
   onCollapse,
   onOthers,
@@ -308,6 +320,7 @@ function DockContents({
   readonly views: AttentionViews;
   readonly messages: AttentionMessages;
   readonly words: AttentionCollapsedMessages | undefined;
+  readonly collapseBelow: boolean;
   readonly listOpen: boolean;
   readonly onCollapse: () => void;
   readonly onOthers: (anchor: HTMLElement) => void;
@@ -315,10 +328,14 @@ function DockContents({
 }): JSX.Element {
   const [head, ...others] = entries;
   const othersSeverity = worstSeverity(others.map((entry) => entry.severity)) ?? 'calm';
+  const button = head && (
+    <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
+  );
   return (
     <>
-      {words !== undefined && <AttentionCollapseButton label={words.collapse} onCollapse={onCollapse} />}
-      {words !== undefined && head === undefined && <AttentionEmptyNote text={words.empty} />}
+      {words !== undefined && head === undefined && (
+        <AttentionFoldedEmpty words={words} onCollapse={onCollapse} />
+      )}
       {others.length > 0 && (
         <AttentionOthersButton
           count={others.length}
@@ -329,8 +346,13 @@ function DockContents({
           onClick={(ball) => onOthers(ball.closest<HTMLElement>('[data-testid="attention-dock"]') ?? ball)}
         />
       )}
-      {head !== undefined && (
-        <HeadButton head={head} others={others.length} views={views} messages={messages} onOpen={onOpen} />
+      {words === undefined || button === undefined ? (
+        button
+      ) : (
+        // Hidden while the list is open: the list hangs off the same side.
+        <AttentionCollapseSpot label={words.collapse} below={collapseBelow} hidden={listOpen} onCollapse={onCollapse}>
+          {button}
+        </AttentionCollapseSpot>
       )}
     </>
   );
