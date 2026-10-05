@@ -9,7 +9,7 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STICKY_BAR_ATTR, paint, useStickyBarTop, useStickyTableHead } from "../data-views-sticky-head";
+import { SHELL_ATTR, STICKY_BAR_ATTR, paint, useStickyBarTop, useStickyTableHead } from "../data-views-sticky-head";
 
 
 /** A scroll pane padded 24px holding the shell, its sticky bar and a one-row table. */
@@ -18,6 +18,7 @@ function buildPage(): { pane: HTMLDivElement; shell: HTMLDivElement; bar: HTMLDi
   pane.style.overflowY = "auto";
   pane.style.paddingTop = "24px";
   const shell = document.createElement("div");
+  shell.setAttribute(SHELL_ATTR, "");
   const bar = document.createElement("div");
   bar.setAttribute(STICKY_BAR_ATTR, "");
   const wrapper = document.createElement("div");
@@ -102,5 +103,26 @@ describe("useStickyTableHead", () => {
     unmount();
     expect(remove.mock.calls.map(([type]) => type)).toEqual(expect.arrayContaining(["scroll", "resize"]));
     expect(page.wrapper.querySelector("th")?.style.transform).toBe("");
+  });
+});
+
+describe("useStickyTableHead — a header cell added while the page is scrolled", () => {
+  it("follows the page too, without waiting for the next scroll", async () => {
+    stubMatrix();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function rect(this: HTMLElement) {
+      const box = { top: 0, bottom: 0, height: 0, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON: () => ({}) };
+      if (this.tagName === "TABLE") return { ...box, top: -100, height: 800 };
+      if (this.tagName === "THEAD") return { ...box, height: 36 };
+      if (this.hasAttribute("data-dv-sticky-bar")) return { ...box, bottom: 120 };
+      return box;
+    });
+    const { unmount } = renderHook(() => useStickyTableHead({ current: page.wrapper }, true));
+    await vi.waitFor(() => expect(page.wrapper.querySelector("th")?.style.transform).toContain("220"));
+
+    const added = document.createElement("th");
+    added.textContent = "Margem";
+    page.wrapper.querySelector("thead tr")?.append(added);
+    await vi.waitFor(() => expect(added.style.transform).toContain("220"));
+    unmount();
   });
 });

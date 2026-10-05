@@ -170,7 +170,7 @@ function splitFilters<T extends Record<string, unknown>>(
   // therefore cost the bar room; chips rank first and stay a prefix (below),
   // so what leaves is an idle pill, or the chips together — never one chip
   // swapped for another.
-  const clearCost = anyApplied(pills, ranges) ? price.clearAll + gap : 0;
+  const clearCost = anyApplied(all, pills, ranges) ? price.clearAll + gap : 0;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was

@@ -306,7 +306,9 @@ is behind "Mais" from the start, so "Mais" is always drawn. Use it beside quick
 chips, so the daily question is not crowded by the facets that are not.
 
 Chips keep their slots: they rank ahead of everything in their DECLARED order
-whatever is pressed, stay a prefix of that order (never the second without the
+whatever is pressed — ahead of APPLIED pills too, which reverses the "applied
+first" rule for them: a chip is the page's fixed question, and an applied pill
+in "Mais" still shows in the trigger's applied badge — stay a prefix of that order (never the second without the
 first). Pressing one adds "Limpar", which can cost room: what leaves the bar is
 an idle pill first, or the chips together — never one chip swapped for another
 under the hand that pressed it. A chip reads as pressed

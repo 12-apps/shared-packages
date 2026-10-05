@@ -56,9 +56,10 @@ function stubResizeObserver(width: number): void {
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
 }
 
-function renderBar(width: number, props: Partial<React.ComponentProps<typeof DataViewsGrid<Row>>> = {}): void {
-  stubResizeObserver(width);
-  render(
+type GridProps = Partial<React.ComponentProps<typeof DataViewsGrid<Row>>>;
+
+function bar(props: GridProps = {}): React.JSX.Element {
+  return (
     <ThemeProvider theme={createTheme()}>
       <DataViewsGrid<Row>
         inlineFilters
@@ -70,8 +71,18 @@ function renderBar(width: number, props: Partial<React.ComponentProps<typeof Dat
         testIdPrefix="stock"
         {...props}
       />
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+}
+
+function renderBar(width: number, props: GridProps = {}): ReturnType<typeof render> {
+  stubResizeObserver(width);
+  return render(bar(props));
+}
+
+/** A view state carrying these pill values — the shape a saved view or the URL hands the grid. */
+function withPills(pills: Record<string, string[]>): GridProps {
+  return { appliedState: { search: "", pills, ranges: {}, sortBy: [], visibleColumns: ["name"] } };
 }
 
 /** The chips on the bar, in render order. */
@@ -98,13 +109,13 @@ describe("quick chips on a measured bar", () => {
     expect(screen.getByTestId(before[0] ?? "")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it.each([1600, 1100, 900, 800, 700])(
+  it.each([1600, 1100, 880, 800])(
     "never swap a pressed chip for another one, at %ipx: it stays, or the chips leave together",
     (width) => {
       renderBar(width);
       const before = chipsOnBar();
-      if (before[0] === undefined) return;
-      fireEvent.click(screen.getByTestId(before[0]));
+      expect(before.length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByTestId(before[0] ?? ""));
       const after = chipsOnBar();
       // Either the same chips in the same order, or none — never a different first chip.
       expect(after.length === 0 || after[0] === before[0]).toBe(true);
@@ -158,5 +169,32 @@ describe("quick chips in server mode", () => {
     expect(queries.at(-1)?.pills.shelf).toEqual(["below"]);
     fireEvent.click(screen.getByTestId("stock-quick-below"));
     expect(queries.at(-1)?.pills.shelf ?? []).toEqual([]);
+  });
+});
+
+describe("the split follows what changes a control's price or its place", () => {
+  it("re-splits when a chip's count grows at a fixed width — the count is part of the key", () => {
+    const view = renderBar(880);
+    expect(chipsOnBar()).toEqual(["stock-quick-empty", "stock-quick-below"]);
+    view.rerender(
+      bar({ quickFilters: [quickFilters[0] as QuickFilterConfig, { ...(quickFilters[1] as QuickFilterConfig), count: 1234567890 }] }),
+    );
+    expect(chipsOnBar()).toEqual(["stock-quick-empty"]);
+  });
+
+  it("budgets Limpar when the only filter applied sits behind Mais (inMore)", () => {
+    renderBar(880, withPills({ kind: ["MENU"] }));
+    expect(screen.getByTestId("stock-clear-all")).toBeInTheDocument();
+    // The same width fits both chips with nothing applied (above); Limpar's room cost one.
+    expect(chipsOnBar()).toEqual(["stock-quick-empty"]);
+  });
+
+  it("reads neither chip as pressed when the field holds both values, and a press keeps only its own", () => {
+    renderBar(1600, withPills({ shelf: ["empty", "below"] }));
+    expect(screen.getByTestId("stock-quick-empty")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("stock-quick-below")).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByTestId("stock-quick-empty"));
+    expect(screen.getByTestId("stock-quick-empty")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("stock-counter")).toHaveTextContent("1 de 2");
   });
 });

@@ -53,12 +53,22 @@ export function isQuickActive(quick: QuickFilterConfig, pills: Record<string, st
   return selected.length === 1 && selected[0] === quick.value;
 }
 
-/** Is any filter applied at all — a pill value or a bounded range, wherever it is drawn? */
-export function anyApplied(pills: Record<string, string[]>, ranges: Record<string, RangeValue>): boolean {
-  return (
-    Object.values(pills).some((values) => values.length > 0) ||
-    Object.values(ranges).some((range) => isRangeSet(range))
-  );
+/**
+ * Is any DECLARED filter applied — a pill value or a bounded range, wherever it
+ * is drawn (on the bar, in "Mais", or as a chip)? Only declared ids count: the
+ * bar draws "Limpar" on the active count, which ignores a stale key a saved view
+ * still carries for a field since removed.
+ */
+export function anyApplied<T extends Record<string, unknown>>(
+  all: OverflowField<T>[],
+  pills: Record<string, string[]>,
+  ranges: Record<string, RangeValue>,
+): boolean {
+  return all.some((field) => {
+    if (field.group === "range") return isRangeSet(ranges[field.id]);
+    const id = field.quick?.fieldId ?? field.id;
+    return (pills[id]?.length ?? 0) > 0;
+  });
 }
 
 /**
@@ -68,7 +78,8 @@ export function anyApplied(pills: Record<string, string[]>, ranges: Record<strin
  * which for pills is right (any narrower one is worth the room) and for chips
  * is not: "Zerado" alone on the bar, with "Estoque baixo" in "Mais", reads as a
  * different bar from the one declared. So the first chip that went to "Mais"
- * takes every later chip with it, and their room is handed back.
+ * takes every later chip with it. Their room is NOT re-spent here — `used`
+ * drops, and the ladder's later passes can hand it to the furniture.
  */
 export function keepChipsInOrder<T extends Record<string, unknown>>(
   split: { inline: OverflowField<T>[]; overflow: OverflowField<T>[]; used: number },
