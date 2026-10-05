@@ -4,7 +4,8 @@
  * lists them, in the order the bar renders them.
  */
 import type { OverflowField } from "./data-views-overflow";
-import type { FilterFieldConfig, QuickFilterConfig, RangeFieldConfig } from "./data-views-types";
+import { isRangeSet } from "./data-views-overflow-costs";
+import type { FilterFieldConfig, QuickFilterConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
 
 /**
  * Every declared control in the order the bar renders them: quick chips first,
@@ -40,9 +41,49 @@ export function toOverflowFields<T extends Record<string, unknown>>(
   ];
 }
 
-/** Is this quick chip pressed — its one value the field's whole selection? */
+/**
+ * Is this quick chip pressed — its one value the field's WHOLE selection?
+ *
+ * Exactly, not "includes": a field holding two values (from a saved view, the
+ * URL or the side panel) is not what either chip applies, and reading both as
+ * pressed made pressing one clear the other.
+ */
 export function isQuickActive(quick: QuickFilterConfig, pills: Record<string, string[]>): boolean {
-  return (pills[quick.fieldId] ?? []).includes(quick.value);
+  const selected = pills[quick.fieldId] ?? [];
+  return selected.length === 1 && selected[0] === quick.value;
+}
+
+/** Is any filter applied at all — a pill value or a bounded range, wherever it is drawn? */
+export function anyApplied(pills: Record<string, string[]>, ranges: Record<string, RangeValue>): boolean {
+  return (
+    Object.values(pills).some((values) => values.length > 0) ||
+    Object.values(ranges).some((range) => isRangeSet(range))
+  );
+}
+
+/**
+ * Quick chips stay a PREFIX of their declared order on the bar.
+ *
+ * The keep-what-fits loop skips a control that does not fit and tries the next,
+ * which for pills is right (any narrower one is worth the room) and for chips
+ * is not: "Zerado" alone on the bar, with "Estoque baixo" in "Mais", reads as a
+ * different bar from the one declared. So the first chip that went to "Mais"
+ * takes every later chip with it, and their room is handed back.
+ */
+export function keepChipsInOrder<T extends Record<string, unknown>>(
+  split: { inline: OverflowField<T>[]; overflow: OverflowField<T>[]; used: number },
+  chips: OverflowField<T>[],
+  cost: (field: OverflowField<T>) => number,
+): { inline: OverflowField<T>[]; overflow: OverflowField<T>[]; used: number } {
+  const firstOut = chips.findIndex((chip) => split.overflow.includes(chip));
+  if (firstOut < 0) return split;
+  const evicted = chips.slice(firstOut).filter((chip) => split.inline.includes(chip));
+  if (evicted.length === 0) return split;
+  return {
+    inline: split.inline.filter((field) => !evicted.includes(field)),
+    overflow: [...chips.slice(firstOut), ...split.overflow.filter((field) => !chips.includes(field))],
+    used: split.used - evicted.reduce((sum, chip) => sum + cost(chip), 0),
+  };
 }
 
 
@@ -52,7 +93,7 @@ export function isQuickActive(quick: QuickFilterConfig, pills: Record<string, st
  * value REPLACES the selection, and pressing the pressed chip empties it.
  */
 export function toggleQuick(pills: Record<string, string[]>, quick: QuickFilterConfig): Record<string, string[]> {
-  const pressed = (pills[quick.fieldId] ?? []).includes(quick.value);
+  const pressed = isQuickActive(quick, pills);
   return { ...pills, [quick.fieldId]: pressed ? [] : [quick.value] };
 }
 

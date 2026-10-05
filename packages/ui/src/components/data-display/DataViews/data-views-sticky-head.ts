@@ -69,8 +69,26 @@ export function useStickyBarTop(ref: RefObject<HTMLElement | null>, enabled: boo
     };
     apply();
     window.addEventListener("resize", apply);
-    return () => window.removeEventListener("resize", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      bar.style.top = "";
+    };
   }, [ref, enabled]);
+}
+
+/** Move every header cell down by `shift` px (0 puts them back), above the rows they cover. */
+export function paint(head: HTMLElement, shift: number): void {
+  // A measured offset, so a matrix rather than a design length. No DOMMatrix
+  // (jsdom), no translation: the header simply stays in the table.
+  const transform =
+    shift > 0 && typeof DOMMatrixReadOnly !== "undefined"
+      ? new DOMMatrixReadOnly().translate(0, shift).toString()
+      : "";
+  head.querySelectorAll<HTMLElement>("th").forEach((cell) => {
+    cell.style.transform = transform;
+    // Above the rows it now covers, below the toolbar (z-index 3).
+    cell.style.zIndex = transform ? "2" : "";
+  });
 }
 
 /** Translate the header cells of the table inside `ref` so they follow the page. */
@@ -86,13 +104,7 @@ export function useStickyTableHead(ref: RefObject<HTMLElement | null>, enabled: 
       if (!table || !head) return;
       const box = table.getBoundingClientRect();
       const shift = headShift(box.top, box.height, head.getBoundingClientRect().height, stickyEdge(wrapper));
-      // A measured offset, so a matrix rather than a design length.
-      const transform = shift > 0 ? new DOMMatrixReadOnly().translate(0, shift).toString() : "";
-      head.querySelectorAll<HTMLElement>("th").forEach((cell) => {
-        cell.style.transform = transform;
-        // Above the rows it now covers, below the toolbar (z-index 3).
-        cell.style.zIndex = shift > 0 ? "2" : "";
-      });
+      paint(head, shift);
     };
     const schedule = (): void => {
       if (frame === 0) frame = requestAnimationFrame(apply);
@@ -101,12 +113,20 @@ export function useStickyTableHead(ref: RefObject<HTMLElement | null>, enabled: 
     window.addEventListener("resize", schedule);
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     observer?.observe(wrapper);
+    // A header cell added while scrolled (a column shown from "Exibir") must
+    // follow too, not wait for the next scroll.
+    const mutations = typeof MutationObserver === "undefined" ? null : new MutationObserver(schedule);
+    mutations?.observe(wrapper, { childList: true, subtree: true });
     schedule();
     return () => {
       window.removeEventListener("scroll", schedule, { capture: true });
       window.removeEventListener("resize", schedule);
       observer?.disconnect();
+      mutations?.disconnect();
       if (frame !== 0) cancelAnimationFrame(frame);
+      // Turned off mid-scroll: the header goes back where it belongs.
+      const head = wrapper.querySelector("thead");
+      if (head) paint(head, 0);
     };
   }, [ref, enabled]);
 }

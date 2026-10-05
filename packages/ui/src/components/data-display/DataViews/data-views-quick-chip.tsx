@@ -8,6 +8,11 @@
  * room for it, as a toggle row with the same label and count. Both write the
  * same state through `onToggleQuick`, so where the chip sits never changes what
  * it does.
+ *
+ * Hand-drawn rather than `Toggle` (MUI ToggleButton), as the range preset chips
+ * beside it are: a ToggleButton is a squared group member with its own
+ * selected tint, and this is a standalone pill whose pressed state INVERTS —
+ * the approved Estoque prototype's chip, pill radius included.
  */
 import Checkbox from "@mui/material/Checkbox/index.js";
 import type { Theme } from "@mui/material/styles/index.js";
@@ -65,7 +70,9 @@ export function QuickChip({
           outlineWidth: sxRem(2),
           outlineStyle: "solid",
           outlineColor: "primary.main",
-          outlineOffset: sxRem(2),
+          // Inset, as the scope tabs draw theirs: the chip is the bar's full
+          // field height, and an outset ring is clipped above and below.
+          outlineOffset: sxRem(-2),
         },
       }}
     >

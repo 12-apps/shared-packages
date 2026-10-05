@@ -23,6 +23,7 @@ import { RangeBounds } from "./data-views-range-pill";
 import { isRangeSet } from "./data-views-range-values";
 import type { QuickFilterConfig, RangeValue } from "./data-views-types";
 import { QuickRow } from "./data-views-quick-chip";
+import { isQuickActive } from "./data-views-overflow-fields";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { fieldHeight } from "../../../tokens/field-height";
@@ -207,7 +208,7 @@ export function fieldClearing<T extends Record<string, unknown>>({
 } {
   if (field.group === "quick" && field.quick) {
     const quick = field.quick;
-    const applied = (pills[quick.fieldId] ?? []).includes(quick.value);
+    const applied = isQuickActive(quick, pills);
     return { applied, clear: () => onTogglePill(quick.fieldId, quick.value, false) };
   }
   if (field.group === "range") {
@@ -240,7 +241,7 @@ export function MoreQuick({
     <Box sx={{ mb: 1, "&:last-of-type": { mb: 0 } }}>
       <QuickRow
         quick={quick}
-        active={(pills[quick.fieldId] ?? []).includes(quick.value)}
+        active={isQuickActive(quick, pills)}
         onToggle={() => onToggleQuick?.(quick)}
         testIdPrefix={testIdPrefix}
       />

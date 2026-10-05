@@ -16,7 +16,7 @@ import {
   type Prices,
 } from "./data-views-overflow-costs";
 import type { FilterFieldConfig, QuickFilterConfig, RangeFieldConfig, RangeValue } from "./data-views-types";
-import { isQuickActive } from "./data-views-overflow-fields";
+import { anyApplied, isQuickActive, keepChipsInOrder } from "./data-views-overflow-fields";
 
 // Declaring the controls lives in its own module (size gate); re-exported for its callers.
 export { isQuickActive, toOverflowFields } from "./data-views-overflow-fields";
@@ -156,14 +156,20 @@ function splitFilters<T extends Record<string, unknown>>(
   // start, so "Mais" is on the bar whatever else fits.
   const pinned = all.filter((field) => field.pinned);
   const candidates = all.filter((field) => !field.pinned);
-  const active = candidates.filter((field) => isActiveField(field, pills, ranges));
-  const idle = candidates.filter((field) => !isActiveField(field, pills, ranges));
+  const chips = candidates.filter((field) => field.group === "quick");
+  const rest = candidates.filter((field) => field.group !== "quick");
+  const active = rest.filter((field) => isActiveField(field, pills, ranges));
+  const idle = rest.filter((field) => !isActiveField(field, pills, ranges));
   const price = pricesFor(theme);
   const moreCost = compact ? price.overflowButtonCompact : price.overflowButton;
   const gap = remPx(theme, RESERVED.betweenControls);
 
-  // "Limpar" rides the end of the cluster whenever anything is applied.
-  const clearCost = active.length > 0 ? price.clearAll + gap : 0;
+  // "Limpar" rides the end of the cluster whenever anything is applied —
+  // ANYTHING, a pinned field and a chip's field included, since the bar draws
+  // it on the active count, not on what it can see. A bar with quick chips
+  // reserves it always: pressing a chip must never re-split the bar, or the
+  // chip just pressed leaves it and another slides into its place.
+  const clearCost = chips.length > 0 || anyApplied(pills, ranges) ? price.clearAll + gap : 0;
   // APPLIED FIRST, BUT NOT EXEMPT.
   //
   // Applied controls take the visible slots ahead of idle ones — that part was
@@ -177,22 +183,25 @@ function splitFilters<T extends Record<string, unknown>>(
   // are in there (see `MoreTrigger`), which is the same signal the pill itself
   // was carrying. A control you scroll off-screen carries no signal at all.
   //
-  // The keep-what-fits loop itself is `splitToFit` (`utility/Overflow`) — the
-  // one part of this that is not filter-shaped, and the part a second cluster
-  // in the design system would otherwise have had to reimplement.
-  // With pinned fields "Mais" is always drawn, so its cost is paid up front
-  // rather than only when something else overflows.
+  // Quick chips come before all of it, in their DECLARED order whatever is
+  // pressed: they are the bar's fixed vocabulary, so their slots never move.
+  //
+  // The keep-what-fits loop is `splitToFit` (`utility/Overflow`). With pinned
+  // fields "Mais" is always drawn, so its cost is paid up front.
   const pinnedCost = pinned.length > 0 ? moreCost + gap : 0;
-  const split = splitToFit(candidates, {
-    widthOf: (field) => fieldWidth(theme, field, pills, ranges),
-    keyOf: (field) => field.id,
-    gap,
-    available: width - furniture - clearCost - pinnedCost,
-    // The overflow button at the width it will actually have, which on a phone
-    // is the icon-and-badge one.
-    overflowCost: pinned.length > 0 ? 0 : moreCost,
-    priority: [...active, ...idle],
-  });
+  const widthOf = (field: OverflowField<T>): number => fieldWidth(theme, field, pills, ranges);
+  const split = keepChipsInOrder(
+    splitToFit(candidates, {
+      widthOf,
+      keyOf: (field) => field.id,
+      gap,
+      available: width - furniture - clearCost - pinnedCost,
+      overflowCost: pinned.length > 0 ? 0 : moreCost,
+      priority: [...chips, ...active, ...idle],
+    }),
+    chips,
+    (field) => widthOf(field) + gap,
+  );
   return {
     inline: split.inline,
     overflow: [...split.overflow, ...pinned],
@@ -360,7 +369,9 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   // The prices follow the theme's type scale, so the answer does too.
   const theme = useTheme();
   const signature = JSON.stringify({
-    ids: all.map((field) => field.id),
+    // A chip's count and a field's `inMore` change its price or its place
+    // without changing its id, so both are part of the key.
+    ids: all.map((field) => [field.id, field.quick?.count ?? null, field.pinned === true]),
     pills,
     ranges,
     width,

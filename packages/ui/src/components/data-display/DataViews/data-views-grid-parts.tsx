@@ -274,7 +274,7 @@ function ShellStack<T extends Record<string, unknown>>({
       copy={copy.tableFilter} open={c.filterOpen} onOpenChange={c.setFilterOpen}
       hasActiveFilters={c.activeFilterCount > 0}
     >
-      <Stack ref={shellRef} spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined} {...SHELL_PROPS}>
+      <Stack ref={shellRef} spacing={0} data-testid={dataTestId ? `${dataTestId}-container` : undefined} {...(props.stickyToolbar ? SHELL_PROPS : {})}>
         <GridHeaderRow title={props.title} headerActions={props.headerActions} testIdPrefix={testIdPrefix} />
         <ShellToolbar
           c={c}
@@ -287,7 +287,6 @@ function ShellStack<T extends Record<string, unknown>>({
               <InlineFilterControls
                 {...filterProps} split={split} activeFilterCount={c.activeFilterCount}
                 onControlOpenChange={onControlOpenChange}
-                onToggleQuick={filterProps.onToggleQuick}
               />
             ) : undefined
           }

@@ -305,7 +305,16 @@ applied badge.
 is behind "Mais" from the start, so "Mais" is always drawn. Use it beside quick
 chips, so the daily question is not crowded by the facets that are not.
 
-`data-views-quick-filters.test.tsx` pins both; **QuickFiltersSticky** in
+Chips keep their slots: they rank ahead of everything in their DECLARED order
+whatever is pressed, stay a prefix of that order (never the second without the
+first), and a bar carrying chips always budgets "Limpar" — so pressing a chip
+never re-splits the bar under the hand that pressed it. A chip reads as pressed
+only when its value is the field's WHOLE selection.
+
+Both are inline-bar features: in the classic slide-in panel (`inlineFilters`
+off) there is no bar, and the chips' field is drawn as its ordinary pill.
+
+`data-views-quick-filters.test.tsx` and `data-views-quick-filters-measured.test.tsx` pin both; **QuickFiltersSticky** in
 `data-views-table.stories.tsx` shows them.
 
 ## The sticky toolbar
