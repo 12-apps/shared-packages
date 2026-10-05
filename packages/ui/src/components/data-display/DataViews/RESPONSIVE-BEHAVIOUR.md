@@ -284,3 +284,53 @@ overflow, and how anything looks. Those are verified in a real browser against
 the running Storybook, at 1600 / 1280 / 1024 / 900 / 768 / 600 / 500 / 430 / 390
 / 360 / 320, measured on the toolbar row, the filter cluster's own scroll box,
 and the document.
+
+---
+
+## Quick chips and `inMore` fields
+
+`quickFilters` puts one-click toggle chips at the head of the bar, each applying
+ONE value of a declared pill field (`pills[fieldId] = [value]`). The field they
+write to is not drawn as a pill: the chips stand in for it. Everything else —
+the counter, "Limpar", saved views, the URL — treats a pressed chip as the
+filter it is.
+
+Chips are on the ladder like any control. They rank ahead of idle pills for the
+bar's slots, and on a row with no room they move into "Mais" as a toggle row
+with the same label and count — never a sideways-scrolling strip, which the one
+rule above forbids. A pressed chip in "Mais" counts towards the trigger's
+applied badge.
+
+`inMore: true` on a pill or range field keeps it off the bar at every width: it
+is behind "Mais" from the start, so "Mais" is always drawn. Use it beside quick
+chips, so the daily question is not crowded by the facets that are not.
+
+Chips keep their slots: they rank ahead of everything in their DECLARED order
+whatever is pressed — ahead of APPLIED pills too, which reverses the "applied
+first" rule for them: a chip is the page's fixed question, and an applied pill
+in "Mais" still shows in the trigger's applied badge — stay a prefix of that order (never the second without the
+first). Pressing one adds "Limpar", which can cost room: what leaves the bar is
+an idle pill first, or the chips together — never one chip swapped for another
+under the hand that pressed it. A chip reads as pressed
+only when its value is the field's WHOLE selection.
+
+Both are inline-bar features: in the classic slide-in panel (`inlineFilters`
+off) there is no bar, and the chips' field is drawn as its ordinary pill.
+
+`data-views-quick-filters.test.tsx` and `data-views-quick-filters-measured.test.tsx` pin both; **QuickFiltersSticky** in
+`data-views-table.stories.tsx` shows them.
+
+## The sticky toolbar
+
+`stickyToolbar` pins the toolbar band to the visible top of the page's scroll
+area, and the table's header row right under it, while what is above the grid
+scrolls away. Two details make it work on a real page:
+
+- **The bar's `top` is the negative of the scroll container's top padding**,
+  read from the live layout (`useStickyBarTop`). `top: 0` sticks to the content
+  edge, inside the padding, which left a padded pane showing rows above the bar.
+- **The header is translated, not `position: sticky`** (`useStickyTableHead`).
+  The table keeps its own sideways scroll, which makes its wrapper a scroll
+  container that never scrolls vertically, so a sticky cell would stick to a box
+  that never moves. The cells follow the page by `translateY`, clamped inside
+  their own table.

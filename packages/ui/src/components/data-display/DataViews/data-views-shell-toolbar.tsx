@@ -12,28 +12,11 @@ import { GridToolbar } from "./data-views-toolbar";
 import type { RowAction } from "./data-views-types";
 import type { DataViewsController } from "./use-data-views-state";
 
-/**
- * The toolbar band, fed from the controller. Split out of `GridShell` for that
- * function's size budget — it is ~25 props of pure forwarding and nothing else.
- */
-export function ShellToolbar<T extends Record<string, unknown>>({
-  c,
-  rows,
-  testIdPrefix,
-  rowActions,
-  bulkActions,
-  selectionExtra,
-  allOnPageSelected,
-  toolbarRightSlot,
-  showInline,
-  compactControls,
-  counterHidden,
-  sortKinds,
-  displayView,
-  exportConfig,
-  filterControls,
-  barRef,
-}: {
+/** What the shell hands the toolbar band. */
+interface ShellToolbarProps<T extends Record<string, unknown>> {
+
+  /** Pin the band to the top of the page's scroll area. */
+  sticky?: boolean;
   c: DataViewsController<T>;
   rows: T[];
   testIdPrefix: string;
@@ -55,7 +38,31 @@ export function ShellToolbar<T extends Record<string, unknown>>({
   compactControls?: boolean;
   /** Step 5, last resort: drop the counter so the row still fits one line. */
   counterHidden?: boolean;
-}): React.JSX.Element {
+}
+
+/**
+ * The toolbar band, fed from the controller. Split out of `GridShell` for that
+ * function's size budget — it is ~25 props of pure forwarding and nothing else.
+ */
+export function ShellToolbar<T extends Record<string, unknown>>({
+  c,
+  rows,
+  testIdPrefix,
+  rowActions,
+  bulkActions,
+  selectionExtra,
+  allOnPageSelected,
+  toolbarRightSlot,
+  showInline,
+  compactControls,
+  counterHidden,
+  sortKinds,
+  displayView,
+  exportConfig,
+  filterControls,
+  barRef,
+  sticky = false,
+}: ShellToolbarProps<T>): React.JSX.Element {
   const columnOptions: ColumnVisibilityOption[] = c.hideableColumns.map((col) => ({
     id: col.id,
     label: col.label,
@@ -69,6 +76,7 @@ export function ShellToolbar<T extends Record<string, unknown>>({
       exportConfig={exportConfig}
       filterControls={filterControls}
       barRef={barRef}
+      sticky={sticky}
       compactControls={compactControls}
       counterHidden={counterHidden}
       testIdPrefix={testIdPrefix}

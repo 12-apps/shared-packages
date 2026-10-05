@@ -60,6 +60,8 @@ interface RangeFieldBase {
    * field to suppress the defaults.
    */
   presets?: RangePreset[];
+  /** Never on the bar — always behind "Mais". See `FilterFieldConfig.inMore`. */
+  inMore?: boolean;
 }
 
 /** "Filter by amount": price, stock, margin, order total. */

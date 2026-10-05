@@ -9,6 +9,7 @@ import { sxRem } from "../../../tokens/relative";
 import { Text } from "../../typography/Text";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
+import type { DataViewsController } from "./use-data-views-state";
 
 /**
  * TWO EMPTY STATES, NOT ONE.
@@ -93,3 +94,27 @@ export function DataViewsEmpty({
     </Box>
   );
 }
+
+/**
+ * The grid renders the FILTERED empty state itself — it is the only party that
+ * knows a filter is applied. See {@link DataViewsEmpty}.
+ */
+export function ShellEmpty<T extends Record<string, unknown>>({
+  c,
+  emptyState,
+  testIdPrefix,
+}: {
+  c: DataViewsController<T>;
+  emptyState?: React.ReactNode;
+  testIdPrefix: string;
+}): React.JSX.Element {
+  return (
+    <DataViewsEmpty
+      filtered={c.activeFilterCount > 0 || c.state.search !== ""}
+      onClearFilters={() => c.patch({ search: "", pills: {}, ranges: {} })}
+      emptyState={emptyState}
+      testIdPrefix={testIdPrefix}
+    />
+  );
+}
+
