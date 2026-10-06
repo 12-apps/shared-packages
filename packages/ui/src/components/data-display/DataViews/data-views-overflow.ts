@@ -235,8 +235,7 @@ function computeSplit<T extends Record<string, unknown>>(
   /** Does the host render "Exportar" beside "Exibir"? Half the cluster if not. */
   hasExport: boolean,
   theme: Theme,
-  /** The host shows the "N de N" counter — priced at 0 when it does not. */
-  showCounter = true,
+  showCounter = true, // the host shows the "N de N" counter — priced at 0 when not
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
@@ -250,9 +249,7 @@ function computeSplit<T extends Record<string, unknown>>(
       searchTakeover: false,
     };
   }
-  // A counter the host turned off costs nothing at any rung: pricing it
-  // anyway left a gap where it would have been, and shed controls for it.
-  const price = showCounter ? pricesFor(theme) : { ...pricesFor(theme), counter: 0 };
+  const price = pricesFor(theme, showCounter);
   // Pass 1 prices the furniture at its widest — no rung has been taken yet.
   let budget = furnitureCost(price, UNCOLLAPSED, hasExport);
   let split = splitFilters(all, pills, ranges, width, budget, false, theme);
@@ -364,8 +361,7 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   frozen = false,
   /** Whether "Exportar" is on the bar — see `rightClusterCost`. */
   hasExport = true,
-  /** Whether the "N de N" counter is on the bar — see `computeSplit`. */
-  showCounter = true,
+  showCounter = true, // whether the "N de N" counter is on the bar — see `computeSplit`
 ): OverflowSplit<T> {
   // The measurement is `useMeasuredWidth` (`utility/Overflow`): the same
   // ResizeObserver every collapsing cluster in the design system reads, so
@@ -376,8 +372,7 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   // The prices follow the theme's type scale, so the answer does too.
   const theme = useTheme();
   const signature = JSON.stringify({
-    // A chip's count and a field's `inMore` change its price or its place
-    // without changing its id, so both are part of the key.
+    // A chip's count and `inMore` move its price or place, not its id: both key.
     ids: all.map((field) => [field.id, field.quick?.count ?? null, field.pinned === true]),
     pills,
     ranges,

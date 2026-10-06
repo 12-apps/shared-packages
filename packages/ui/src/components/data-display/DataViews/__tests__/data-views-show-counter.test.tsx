@@ -81,6 +81,16 @@ function chipsOnBar(): string[] {
   );
 }
 
+const APPLIED = { search: "", pills: { kind: ["RAW"] }, ranges: {}, sortBy: [], visibleColumns: [] };
+
+/** Is "Limpar" on a bar of `width` with a filter applied, with or without the counter? */
+function limparAt(width: number, showCounter: boolean): boolean {
+  const view = renderBar(width, { showCounter, appliedState: APPLIED });
+  const kept = screen.queryAllByTestId("stock-clear-all").length > 0;
+  view.unmount();
+  return kept;
+}
+
 /** How many chips a bar of `width` keeps, with or without the counter. */
 function keptAt(width: number, showCounter: boolean): number {
   const view = renderBar(width, { showCounter });
@@ -116,4 +126,16 @@ describe("showCounter", () => {
     expect(decided.length).toBeGreaterThan(0);
   }, 30_000);
 
+
+  it("keeps a chip at 690px only without the counter", () => {
+    // Pinned so a regression to "priced but hidden" fails here, not just in the sweep.
+    expect(keptAt(690, false)).toBe(1);
+    expect(keptAt(690, true)).toBe(0);
+  });
+
+  it("keeps Limpar on a narrower bar without the counter, with a filter applied", () => {
+    // The counter's room also pays for the Limpar rung: at 360px it stays only without it.
+    expect(limparAt(360, false)).toBe(true);
+    expect(limparAt(360, true)).toBe(false);
+  });
 });

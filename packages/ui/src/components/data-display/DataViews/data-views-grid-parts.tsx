@@ -125,6 +125,8 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   inlineVisible: boolean;
   filterProps: FilterSurfaceProps<T>;
   split: OverflowSplit<T>;
+  /** The counter is off: the host turned it off, or the ladder shed it. */
+  counterHidden: boolean;
   onControlOpenChange: (open: boolean) => void;
 } {
   const { state } = c;
@@ -182,6 +184,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     inlineVisible,
     filterProps,
     split,
+    counterHidden: !showCounter || (showInline && split.counterHidden),
     onControlOpenChange: (open) =>
       setOpenControls((count) => Math.max(0, count + (open ? 1 : -1))),
   };
@@ -304,7 +307,7 @@ function ShellStack<T extends Record<string, unknown>>({
           allOnPageSelected={allOnPageSelected(c, props.getRowId)}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
-          counterHidden={props.showCounter === false || (showInline && split.counterHidden)}
+          counterHidden={filters.counterHidden}
           showInline={showInline}
           sticky={props.stickyToolbar === true}
         />
