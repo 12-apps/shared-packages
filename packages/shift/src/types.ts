@@ -225,3 +225,6 @@ export interface ShiftService<Kind extends string = string> {
   listShifts(input: ShiftListInput<Kind>): Promise<ShiftPage>;
   autoCloseOverdue(input: AutoCloseInput): Promise<AutoCloseResult>;
 }
+
+// The schedule's types, on the type-only entry too (see `schedule-types.ts`).
+export type * from './schedule-types';
