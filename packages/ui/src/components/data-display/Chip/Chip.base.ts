@@ -9,7 +9,11 @@ import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
  * declaration outputs (`dist/types` and `dist/types-native`), and a native
  * consumer has no `@mui/material` to resolve a type import against.
  */
-export type ChipVariant = 'filled' | 'outlined';
+/**
+ * `soft` is a status chip's look: the colour's tint for a ground and its dark
+ * step for ink, so a row of states reads without a row of solid blocks.
+ */
+export type ChipVariant = 'filled' | 'outlined' | 'soft';
 
 /**
  * The house size scale, abbreviated like every other component's.

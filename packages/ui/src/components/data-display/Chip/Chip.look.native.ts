@@ -10,6 +10,8 @@ import {
   DELETE_ICON_ON_COLOR_ALPHA,
   OUTLINED_BORDER_ALPHA,
   OUTLINED_HOVER_ALPHA,
+  SOFT_GROUND_ALPHA,
+  SOFT_HOVER_ALPHA,
   type ChipMuiSize,
   type ChipSizeMetrics,
 } from './Chip.metrics';
@@ -52,6 +54,24 @@ function filledPaint(theme: UiTheme, color: ChipColor): ChipPaint {
   };
 }
 
+function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
+  if (!isAccented(color)) {
+    return {
+      container: { backgroundColor: theme.palette.action.selected },
+      pressed: { backgroundColor: theme.palette.action.hover },
+      label: { color: theme.palette.text.secondary },
+      deleteColor: alpha(theme.palette.text.secondary, DELETE_ICON_ALPHA),
+    };
+  }
+  const accent = theme.palette[color];
+  return {
+    container: { backgroundColor: alpha(accent.main, SOFT_GROUND_ALPHA) },
+    pressed: { backgroundColor: alpha(accent.main, SOFT_HOVER_ALPHA) },
+    label: { color: accent.dark },
+    deleteColor: alpha(accent.dark, DELETE_ICON_ALPHA),
+  };
+}
+
 function outlinedPaint(theme: UiTheme, color: ChipColor): ChipPaint {
   const border: ViewStyle = { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'solid' };
   if (!isAccented(color)) {
@@ -82,7 +102,8 @@ export function chipPaint(
   color: ChipColor,
   selected: boolean,
 ): ChipPaint {
-  const paint = variant === 'outlined' ? outlinedPaint(theme, color) : filledPaint(theme, color);
+  const paint =
+    variant === 'outlined' ? outlinedPaint(theme, color) : variant === 'soft' ? softPaint(theme, color) : filledPaint(theme, color);
   if (variant !== 'outlined' || !selected) return paint;
   return {
     ...paint,

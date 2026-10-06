@@ -4,7 +4,17 @@ import type { KeyboardEvent, ReactElement } from 'react';
 import React from 'react';
 
 import { chipKeyAction, type ChipKeyArgs } from './Chip.helpers';
-import { CHIP_SIZES, CHIP_TRANSITION_EASING, CHIP_TRANSITION_MS, HOVER_LIFT_PX, HOVER_SHADOW } from './Chip.metrics';
+import { alpha } from '@mui/material/styles/index.js';
+
+import {
+  CHIP_SIZES,
+  CHIP_TRANSITION_EASING,
+  CHIP_TRANSITION_MS,
+  HOVER_LIFT_PX,
+  HOVER_SHADOW,
+  SOFT_GROUND_ALPHA,
+  SOFT_HOVER_ALPHA,
+} from './Chip.metrics';
 import type { ChipProps } from './Chip.types';
 import { shadowInk } from '../../../tokens/ink';
 import { rem, rems, sxRem } from '../../../tokens/relative';
@@ -43,6 +53,7 @@ export const avatarFor = (
 
 interface ChipStyleArgs {
   variant: ChipProps['variant'];
+  color?: ChipProps['color'];
   selected?: boolean;
   clickable?: boolean;
   disabled?: boolean;
@@ -61,8 +72,31 @@ const hoverShadow = (theme: Theme): string =>
  * state); an outlined selected chip gets a subtle theme-driven `action.selected`
  * tint so it reads as active without muddying the fill.
  */
+/** The palette entry a colour paints with; `neutral` has none and takes the ink. */
+const paletteKey = (color: NonNullable<ChipProps['color']>): 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' | null => {
+  if (color === 'neutral') return null;
+  return color === 'danger' ? 'error' : color;
+};
+
+/** `soft`: the colour's tint for a ground, its dark step for ink (and the icon). */
+const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
+  const key = paletteKey(color);
+  const ground = (theme: Theme): string =>
+    key ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : theme.palette.action.selected;
+  const ink = (theme: Theme): string => (key ? theme.palette[key].dark : theme.palette.text.secondary);
+  return {
+    backgroundColor: ground,
+    color: ink,
+    '& .MuiChip-icon': { color: ink },
+    '&.MuiChip-clickable:hover': {
+      backgroundColor: (theme: Theme) => (key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : theme.palette.action.hover),
+    },
+  };
+};
+
 export const chipStyles = ({
   variant,
+  color = 'primary',
   selected,
   clickable,
   disabled,
@@ -70,6 +104,7 @@ export const chipStyles = ({
   const lifts = clickable && !disabled;
 
   return {
+    ...(variant === 'soft' ? (softStyles(color) as object) : {}),
     // Enhanced styling for outlined variant
     ...(variant === 'outlined' && {
       borderWidth: '1px',

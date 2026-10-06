@@ -66,7 +66,8 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
     <MuiChip
       ref={ref}
       label={<span data-testid={testId('label')}>{label}</span>}
-      variant={variant}
+      // `soft` is ours: MUI paints it as `filled`, and `chipStyles` tints it.
+      variant={variant === 'soft' ? 'filled' : variant}
       size={chipMuiSize(size)}
       color={muiColorFor(color)}
       avatar={avatarFor(avatar, avatarSrc)}
@@ -81,7 +82,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       role={chipRole(selectable, onClick)}
       aria-selected={selectable ? selected : undefined}
       data-testid={chipId || 'chip'}
-      sx={chipStyles({ variant, selected, clickable, disabled })}
+      sx={chipStyles({ variant, color, selected, clickable, disabled })}
       {...props}
     />
   );

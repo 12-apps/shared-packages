@@ -5,7 +5,7 @@
 ```ts
 interface ChipProps {
   label: string;
-  variant?: 'filled' | 'outlined';
+  variant?: 'filled' | 'outlined' | 'soft';
   size?: SizeValue; // all five stops; MUI's two heights, xs/sm small and md up medium
   /**
    * The house vocabulary, identical to Button's. `danger` and `neutral` are
@@ -28,7 +28,7 @@ interface ChipProps {
 
 **Features**
 
-- Filled/Outlined variants; optional avatar or icon.
+- Filled/Outlined/Soft variants; optional avatar or icon. `soft` is a status chip: the colour's tint for a ground and its dark step for ink.
 - Selectable (toggle) and/or deletable (× button).
 - Keyboard: Space/Enter activates; Delete/Backspace triggers remove when focused.
 

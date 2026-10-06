@@ -100,3 +100,8 @@ export const HOVER_LIFT_PX = 1;
 export const HOVER_SHADOW = { offsetY: 4, blur: 12, alphaLight: 0.15, alphaDark: 0.3 } as const;
 export const CHIP_TRANSITION_MS = 200;
 export const CHIP_TRANSITION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
+
+/** A soft chip's ground: the colour at this alpha over the page. */
+export const SOFT_GROUND_ALPHA = 0.14;
+/** A soft chip's hover ground. */
+export const SOFT_HOVER_ALPHA = 0.22;
