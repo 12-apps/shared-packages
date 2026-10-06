@@ -27,7 +27,7 @@
     "prisma:sync:check": "node scripts/sync-chat-schema.mjs --check"
   },
   "peerDependencies": {
-    "@12-apps/ui": ">=6.59.0",
+    "@12-apps/ui": ">=6.69.0",
     "@12-apps/wiring": ">=1.17.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-native": ">=0.79.0"

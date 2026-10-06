@@ -26,4 +26,5 @@ export const EN_US_BREADCRUMB_COPY: BreadcrumbCopy = {
 export const EN_US_SECTION_NAV_COPY: SectionNavCopy = {
   close: "Close",
   badge: (count) => (count === 1 ? "1 pending" : `${count} pending`),
+  attention: "Needs attention",
 };

@@ -27,6 +27,11 @@ export interface SectionNavCopy {
   close: string;
   /** A badge's accessible name — "3 pending", for a count of 3. */
   badge: (count: number) => string;
+  /**
+   * The "!" badge's accessible name — something waits on the viewer that is
+   * not a count. Optional for a host's own copy; the shipped packs carry it.
+   */
+  attention?: string;
 }
 
 /** The breadcrumb's overflow control, in its two spellings. */

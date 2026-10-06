@@ -2,6 +2,9 @@ import type { ElementType, ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
 
+/** A slot's badge: how many wait, or `'!'` for something that is not a count. */
+export type SectionNavBadge = number | '!';
+
 /**
  * One slot of the section — a bar slot on a phone, a row in the rail.
  *
@@ -50,9 +53,10 @@ export interface SectionNavDestination {
   /**
    * How many things behind this destination wait on the viewer. `0` and
    * `undefined` render no badge — "nothing waiting" and "not known yet" are
-   * different claims and neither is a number.
+   * different claims and neither is a number. `'!'` says something waits that
+   * is not a count (money still owed, a state to resolve).
    */
-  badge?: number;
+  badge?: SectionNavBadge;
   /**
    * For a link: the destination the viewer is on (`aria-current="page"`). For
    * an action slot: a toggle that is ON (`aria-pressed`). The host decides;
@@ -75,7 +79,7 @@ export interface SectionNavEntry {
   icon: ReactNode;
   href?: string;
   onSelect?: () => void;
-  badge?: number;
+  badge?: SectionNavBadge;
   active?: boolean;
   /** Drawn dimmed and not operable — a print already on its way, an act this state refuses. */
   disabled?: boolean;

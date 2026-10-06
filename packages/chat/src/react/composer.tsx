@@ -15,6 +15,7 @@
 
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
+import { Icon } from "@12-apps/ui/icons";
 import { Box } from "@12-apps/ui/layout/Box";
 import { useRef, type JSX, type KeyboardEvent } from "react";
 
@@ -45,14 +46,17 @@ export function WebComposer(props: ChatComposerProps): JSX.Element {
           testID="chat-input"
         />
       </Box>
+      {/* Icon-only: the field says what it is for, the arrow is the act. Its name is the copy's. */}
       <Button
         variant="solid"
+        icon={<Icon name="Send" size={18} />}
+        aria-label={props.sending ? props.copy.sending : props.copy.send}
+        title={props.copy.send}
+        loading={props.sending}
         onClick={onSend}
         disabled={props.sending || props.value.trim() === ""}
         testID="chat-send"
-      >
-        {props.sending ? props.copy.sending : props.copy.send}
-      </Button>
+      />
     </Box>
   );
 }

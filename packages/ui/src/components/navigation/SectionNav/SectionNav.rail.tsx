@@ -24,6 +24,7 @@ import type {
   SectionNavMenu,
   SectionNavProps,
 } from './SectionNav.types';
+import type { SectionNavBadge } from './SectionNav.types';
 
 /**
  * One rail row: icon, label, and the count at the far end.
@@ -51,7 +52,7 @@ function RailRow({
   label: string;
   description?: string;
   icon: ReactNode;
-  count: number | undefined;
+  count: SectionNavBadge | undefined;
   active: boolean;
   current?: boolean;
   copy: SectionNavCopy;
@@ -89,6 +90,7 @@ function RailRow({
         icon={<SlotIcon icon={icon} loading={loading} />}
         count={count}
         label={copy.badge}
+        attentionLabel={copy.attention}
         testId={`${testId}-badge`}
       />
       <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>

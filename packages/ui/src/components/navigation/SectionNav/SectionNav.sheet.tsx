@@ -52,7 +52,7 @@ function GridEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
         '&:disabled': { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
       }}
     >
-      <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} testId={`${testId}-badge-${entry.id}`} />
+      <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} attentionLabel={copy.attention} testId={`${testId}-badge-${entry.id}`} />
       <Typography component="span" variant="caption" sx={{ lineHeight: 1.2, fontWeight: entry.active ? 700 : 500 }}>
         {entry.label}
       </Typography>
@@ -93,7 +93,7 @@ function ListEntry({ entry, linkComponent, copy, testId, onDone }: EntryProps): 
         '&:disabled': { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
       }}
     >
-      <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} testId={`${testId}-badge-${entry.id}`} />
+      <CountedIcon icon={entry.icon} count={entry.badge} label={copy.badge} attentionLabel={copy.attention} testId={`${testId}-badge-${entry.id}`} />
       <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
           {entry.label}

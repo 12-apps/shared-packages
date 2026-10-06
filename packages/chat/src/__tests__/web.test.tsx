@@ -74,7 +74,8 @@ describe("the web thread", () => {
     type("Gate 12");
     fireEvent.click(screen.getByTestId("chat-send"));
 
-    expect(await screen.findByText(EN_US_CHAT_UI_COPY.sending)).toBeTruthy();
+    // The send button is icon-only (FUT-3347): "Sending…" is its accessible name while in flight.
+    expect(await screen.findByLabelText(EN_US_CHAT_UI_COPY.sending)).toBeTruthy();
     expect(field().disabled).toBe(false);
     expect((screen.getByTestId("chat-send") as HTMLButtonElement).disabled).toBe(true);
 
@@ -90,7 +91,7 @@ describe("the web thread", () => {
     const release = hold("POST /messages");
     type("Gate 12");
     fireEvent.click(screen.getByTestId("chat-send"));
-    await screen.findByText(EN_US_CHAT_UI_COPY.sending);
+    await screen.findByLabelText(EN_US_CHAT_UI_COPY.sending);
     type("Block B");
 
     await act(async () => release());
@@ -192,6 +193,28 @@ describe("the web thread", () => {
     fireEvent.click(await screen.findByText("On my way."));
     await waitFor(() => expect(screen.getAllByText("On my way.")).toHaveLength(2));
     expect(screen.getByText("Agent")).toBeTruthy();
+  });
+
+  it("draws an icon-only send named by the copy, and a bolt on each quick reply", async () => {
+    const { ChatThread } = mount(() => agent);
+    render(<ChatThread endpoint="/thread" />);
+    const reply = (await screen.findByText("On my way.")).closest(".MuiChip-root");
+    expect(reply?.querySelector("svg")).not.toBeNull();
+    const send = screen.getByRole("button", { name: EN_US_CHAT_UI_COPY.send });
+    expect(send.textContent).toBe("");
+    expect(send.querySelector("svg")).not.toBeNull();
+  });
+
+  it("puts who wrote a message over its text, and when under it", async () => {
+    const { ChatThread } = mount();
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByText(EN_US_CHAT_UI_COPY.emptyTitle);
+    type("Gate 12");
+    fireEvent.click(screen.getByTestId("chat-send"));
+    const body = await screen.findByText("Gate 12");
+    const lines = Array.from(body.parentElement?.children ?? []).map((line) => line.textContent);
+    expect(lines.indexOf("Client")).toBeLessThan(lines.indexOf("Gate 12"));
+    expect(lines.indexOf("Gate 12")).toBeLessThan(lines.length - 1);
   });
 
   it("turns read-only when the caller may no longer write", async () => {
