@@ -30,4 +30,17 @@ export interface QuickFilterConfig {
   count?: number;
   /** Colours the count: what kind of attention the rows need. */
   tone?: "error" | "warning" | "info" | "success";
+  /**
+   * The page's DEFAULT view: this chip reads pressed while its field is EMPTY,
+   * and pressing it empties the field rather than writing `[value]`.
+   *
+   * For a page whose unfiltered view is already one of the chips ("Precisa
+   * repor"): seeding `[value]` to light the chip made the default view count as
+   * a filter, so "Limpar" showed on arrival and did nothing — it cleared the
+   * field and the host put it back. An empty field is no filter, so "Limpar",
+   * the active count and the ladder see the default view as unfiltered, and
+   * "Limpar" from any other chip lands back here. The HOST owns what an empty
+   * field means: the grid applies no filter for it.
+   */
+  default?: boolean;
 }

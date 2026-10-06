@@ -50,6 +50,8 @@ export function toOverflowFields<T extends Record<string, unknown>>(
  */
 export function isQuickActive(quick: QuickFilterConfig, pills: Record<string, string[]>): boolean {
   const selected = pills[quick.fieldId] ?? [];
+  // A `default` chip is the empty field (see `QuickFilterConfig.default`).
+  if (quick.default === true && selected.length === 0) return true;
   return selected.length === 1 && selected[0] === quick.value;
 }
 
@@ -104,6 +106,8 @@ export function keepChipsInOrder<T extends Record<string, unknown>>(
  * value REPLACES the selection, and pressing the pressed chip empties it.
  */
 export function toggleQuick(pills: Record<string, string[]>, quick: QuickFilterConfig): Record<string, string[]> {
+  // A `default` chip only ever empties its field: pressing it again stays put.
+  if (quick.default === true) return { ...pills, [quick.fieldId]: [] };
   const pressed = isQuickActive(quick, pills);
   return { ...pills, [quick.fieldId]: pressed ? [] : [quick.value] };
 }

@@ -208,7 +208,8 @@ export function fieldClearing<T extends Record<string, unknown>>({
 } {
   if (field.group === "quick" && field.quick) {
     const quick = field.quick;
-    const applied = isQuickActive(quick, pills);
+    // A `default` chip lit by an empty field has nothing to clear.
+    const applied = isQuickActive(quick, pills) && (pills[quick.fieldId]?.length ?? 0) > 0;
     return { applied, clear: () => onTogglePill(quick.fieldId, quick.value, false) };
   }
   if (field.group === "range") {
