@@ -235,6 +235,7 @@ function computeSplit<T extends Record<string, unknown>>(
   /** Does the host render "Exportar" beside "Exibir"? Half the cluster if not. */
   hasExport: boolean,
   theme: Theme,
+  showCounter = true, // the host shows the "N de N" counter — priced at 0 when not
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
@@ -248,7 +249,7 @@ function computeSplit<T extends Record<string, unknown>>(
       searchTakeover: false,
     };
   }
-  const price = pricesFor(theme);
+  const price = pricesFor(theme, showCounter);
   // Pass 1 prices the furniture at its widest — no rung has been taken yet.
   let budget = furnitureCost(price, UNCOLLAPSED, hasExport);
   let split = splitFilters(all, pills, ranges, width, budget, false, theme);
@@ -360,6 +361,7 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   frozen = false,
   /** Whether "Exportar" is on the bar — see `rightClusterCost`. */
   hasExport = true,
+  showCounter = true, // whether the "N de N" counter is on the bar — see `computeSplit`
 ): OverflowSplit<T> {
   // The measurement is `useMeasuredWidth` (`utility/Overflow`): the same
   // ResizeObserver every collapsing cluster in the design system reads, so
@@ -370,18 +372,18 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   // The prices follow the theme's type scale, so the answer does too.
   const theme = useTheme();
   const signature = JSON.stringify({
-    // A chip's count and a field's `inMore` change its price or its place
-    // without changing its id, so both are part of the key.
+    // A chip's count and `inMore` move its price or place, not its id: both key.
     ids: all.map((field) => [field.id, field.quick?.count ?? null, field.pinned === true]),
     pills,
     ranges,
     width,
     hasExport,
+    showCounter,
     scale: remPx(theme, 1),
   });
   const cache = useRef<{ signature: string; split: ReturnType<typeof computeSplit<T>> } | null>(null);
   if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
-    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme) };
+    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme, showCounter) };
   }
   // The cache holds the ARRANGEMENT — which ids sit on the bar, which in "Mais"
   // — never the fields themselves. The signature keys on ids, so a field whose

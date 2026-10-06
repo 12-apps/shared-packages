@@ -142,6 +142,16 @@ but not without a way to search.
 
 ---
 
+### A host without the counter (`showCounter={false}`)
+
+A list whose rows are not all records — section headings handed in as rows —
+cannot use the counter: it counts every row it is given, so six items under
+three headings read "9 de 9". `showCounter={false}` takes it off the bar AND
+out of the ladder's budget (it is priced at 0 at every rung), so nothing is shed
+and no gap is left for a control that is not there. Hiding it from the outside
+with CSS does neither: the ladder still pays for it. Pinned in
+`__tests__/data-views-show-counter.test.tsx`.
+
 ## Behaviour by class
 
 Read this as "what the Pedidos table does", not "what the code hard-codes".

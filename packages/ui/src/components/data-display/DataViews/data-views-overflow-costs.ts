@@ -153,10 +153,15 @@ export const RESERVED = {
 /** {@link RESERVED} at a theme's type scale — the px the measured bar is in. */
 export type Prices = Record<keyof typeof RESERVED, number>;
 
-/** Price the furniture for `theme`: every {@link RESERVED} entry through `remPx`. */
-export function pricesFor(theme: Theme): Prices {
+/**
+ * Price the furniture for `theme`: every {@link RESERVED} entry through `remPx`.
+ * A counter the host turned off costs nothing at any rung: pricing it anyway
+ * left a gap where it would have been, and shed controls for it.
+ */
+export function pricesFor(theme: Theme, showCounter = true): Prices {
   const entries = Object.entries(RESERVED).map(([key, px]) => [key, remPx(theme, px)]);
-  return Object.fromEntries(entries) as Prices;
+  const prices = Object.fromEntries(entries) as Prices;
+  return showCounter ? prices : { ...prices, counter: 0 };
 }
 
 /** What the right-hand cluster costs, given what the host actually renders. */
