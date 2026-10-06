@@ -3,7 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import { scrim } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 import { dynamicViewportHeight } from '../../../utils/viewport';
-import type { ModalPanelRole, PanelMaxWidth, PanelSize } from './StackedModal.types';
+import type { ModalPanelRole, PanelMaxWidth, PanelSize, PanelWidth } from './StackedModal.types';
 
 /** Props that drive the panel's look but must not reach the DOM. */
 export interface PanelStyleProps {
@@ -13,10 +13,11 @@ export interface PanelStyleProps {
   rtl?: boolean;
   customMaxWidth?: PanelMaxWidth;
   panelSize?: PanelSize;
+  panelWidth?: PanelWidth;
 }
 
 /** Style-only props, filtered out before they can land on a DOM node. */
-export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth', 'panelSize'];
+export const STYLE_ONLY_PROPS = ['modalRole', 'isAnimating', 'glass', 'rtl', 'customMaxWidth', 'panelSize', 'panelWidth'];
 
 /** MUI breakpoint names mapped to the pixel width they cap the panel at. */
 const MAX_WIDTH_PX: Record<Exclude<PanelMaxWidth, false>, number> = {
@@ -36,6 +37,15 @@ const BACKDROP_ALPHA_BY_ROLE: Partial<Record<ModalPanelRole, number>> = {
 const ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
   secondary: 'expandModal 300ms ease-in-out forwards',
   primary: 'contractModal 300ms ease-in-out forwards',
+};
+
+/** The custom property an exact-width panel's width and keyframes share. */
+const EXACT_WIDTH_VAR = '--stacked-modal-width';
+
+/** An exact-width panel settles at its own width, so its keyframes read it too. */
+const EXACT_ANIMATION_BY_ROLE: Partial<Record<ModalPanelRole, string>> = {
+  secondary: 'expandModalExact 300ms ease-in-out forwards',
+  primary: 'contractModalExact 300ms ease-in-out forwards',
 };
 
 /** A wide panel settles at 90vw, so its keyframes must end there too, or it snaps. */
@@ -62,6 +72,15 @@ const KEYFRAMES: CSSObject = {
   '@keyframes contractModalWide': {
     from: { width: '100vw', transform: 'translateX(0)' },
     to: { width: '90vw', transform: 'translateX(0)' },
+  },
+  // An exact-width panel settles at its own width, carried by the custom property.
+  '@keyframes expandModalExact': {
+    from: { width: `var(${EXACT_WIDTH_VAR})`, transform: 'translateX(0)' },
+    to: { width: '100vw', transform: 'translateX(0)' },
+  },
+  '@keyframes contractModalExact': {
+    from: { width: '100vw', transform: 'translateX(0)' },
+    to: { width: `var(${EXACT_WIDTH_VAR})`, transform: 'translateX(0)' },
   },
 };
 
@@ -106,6 +125,22 @@ const widePrimaryPanelStyles = (theme: Theme, capPx: number | null): CSSObject =
   [theme.breakpoints.up(2200)]: panelWidth(theme, '60vw', capPx),
 });
 
+/**
+ * `panelWidth`: `min(share, maxPx)` from `sm` up, the whole screen under `sm`
+ * and under `fullBelowPx`. Viewport media queries only — never the panel's size.
+ */
+const exactPrimaryPanelStyles = (theme: Theme, exact: PanelWidth): CSSObject => {
+  const width = `min(${exact.share}, ${rem(theme, exact.maxPx)})`;
+  const full = { [EXACT_WIDTH_VAR]: '100%', width: '100%', maxWidth: '100%' };
+  return {
+    [EXACT_WIDTH_VAR]: width,
+    width: `var(${EXACT_WIDTH_VAR})`,
+    maxWidth: `var(${EXACT_WIDTH_VAR})`,
+    [theme.breakpoints.down('sm')]: full,
+    ...(exact.fullBelowPx ? { [theme.breakpoints.down(exact.fullBelowPx)]: full } : {}),
+  };
+};
+
 /** Panels below the top one expand to full width, producing the GTM stacking effect. */
 const secondaryPanelStyles = (): CSSObject => ({
   width: '100vw !important',
@@ -123,8 +158,10 @@ const rolePanelStyles = (
   role: ModalPanelRole | undefined,
   capPx: number | null,
   size?: PanelSize,
+  exact?: PanelWidth,
 ): CSSObject => {
   if (role === 'primary') {
+    if (exact) return exactPrimaryPanelStyles(theme, exact);
     return size === 'wide' ? widePrimaryPanelStyles(theme, capPx) : primaryPanelStyles(theme, capPx);
   }
   if (role === 'secondary') return secondaryPanelStyles();
@@ -143,8 +180,18 @@ const glassStyles = (theme: Theme, glass?: boolean, role?: ModalPanelRole): CSSO
       }
     : {};
 
-const animationStyles = (isAnimating?: boolean, role?: ModalPanelRole, size?: PanelSize): CSSObject => {
-  const byRole = size === 'wide' ? WIDE_ANIMATION_BY_ROLE : ANIMATION_BY_ROLE;
+const animationByRole = (size?: PanelSize, exact?: PanelWidth): Partial<Record<ModalPanelRole, string>> => {
+  if (exact) return EXACT_ANIMATION_BY_ROLE;
+  return size === 'wide' ? WIDE_ANIMATION_BY_ROLE : ANIMATION_BY_ROLE;
+};
+
+const animationStyles = (
+  isAnimating?: boolean,
+  role?: ModalPanelRole,
+  size?: PanelSize,
+  exact?: PanelWidth,
+): CSSObject => {
+  const byRole = animationByRole(size, exact);
   return isAnimating ? { animation: (role && byRole[role]) ?? 'none' } : {};
 };
 
@@ -169,9 +216,9 @@ const panelStyles = (theme: Theme, props: PanelStyleProps): CSSObject => {
   const capPx = cap(props.customMaxWidth);
   return {
     ...panelBaseStyles(theme),
-    ...rolePanelStyles(theme, props.modalRole, capPx, props.panelSize),
+    ...rolePanelStyles(theme, props.modalRole, capPx, props.panelSize, props.panelWidth),
     ...glassStyles(theme, props.glass, props.modalRole),
-    ...animationStyles(props.isAnimating, props.modalRole, props.panelSize),
+    ...animationStyles(props.isAnimating, props.modalRole, props.panelSize, props.panelWidth),
   };
 };
 

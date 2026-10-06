@@ -25,7 +25,7 @@ const meta: Meta<typeof Chip> = {
     },
     variant: {
       control: 'select',
-      options: ['filled', 'outlined'],
+      options: ['filled', 'outlined', 'soft'],
       description: 'Visual style variant',
     },
     size: {

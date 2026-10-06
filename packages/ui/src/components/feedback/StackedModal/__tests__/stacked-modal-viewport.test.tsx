@@ -8,7 +8,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StackedModal, StackedModalProvider } from "../index";
+import { StackedModal, StackedModalProvider, type PanelWidth } from "../index";
 
 /**
  * Answers `max-width` media queries with `true` so `useMediaQuery` reports a
@@ -46,11 +46,12 @@ function injectedCss(): string {
     .join("");
 }
 
-function renderModal(actions?: React.ReactNode, size?: "default" | "wide"): void {
+function renderModal(actions?: React.ReactNode, size?: "default" | "wide", panelWidth?: PanelWidth): void {
   render(
     <StackedModalProvider>
       <StackedModal backLabel="Voltar"
         size={size}
+        panelWidth={panelWidth}
         open
         onClose={() => undefined}
         navigationTitle="Novo produto"
@@ -131,5 +132,30 @@ describe("StackedModal size", () => {
     expect(paper).toBeInTheDocument();
     expect(paper?.hasAttribute("panelsize")).toBe(false);
     expect(paper?.hasAttribute("panelSize")).toBe(false);
+  });
+});
+
+describe("StackedModal panelWidth", () => {
+  const SHEET: PanelWidth = { share: "72vw", maxPx: 1040, fullBelowPx: 1000 };
+
+  it("takes min(share, cap) of the viewport, read from the viewport alone", async () => {
+    renderModal(undefined, undefined, SHEET);
+    await screen.findByTestId("viewport-modal-header");
+    const css = injectedCss();
+    expect(css).toMatch(/--stacked-modal-width:\s*min\(72vw,\s*65rem\)/);
+    expect(css).toMatch(/max-width:\s*var\(--stacked-modal-width\)/);
+  });
+
+  it("takes the whole screen under fullBelowPx", async () => {
+    renderModal(undefined, undefined, SHEET);
+    await screen.findByTestId("viewport-modal-header");
+    expect(injectedCss()).toMatch(/@media \(max-width:\s*999\.95px\)\s*\{[^}]*--stacked-modal-width:\s*100%/);
+  });
+
+  it("animates to its own width, and keeps the prop off the DOM", async () => {
+    renderModal(undefined, undefined, SHEET);
+    const header = await screen.findByTestId("viewport-modal-header");
+    expect(injectedCss()).toContain("contractModalExact");
+    expect(header.closest(".MuiDialog-paper")?.hasAttribute("panelwidth")).toBe(false);
   });
 });

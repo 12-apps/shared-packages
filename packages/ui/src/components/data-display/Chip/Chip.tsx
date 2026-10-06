@@ -37,6 +37,10 @@ const muiColorFor = (color: NonNullable<ChipProps['color']>): MuiChipColor => {
   return color === 'neutral' ? 'default' : color;
 };
 
+/** `soft` is ours: MUI has two variants, so it paints as `filled` and `chipStyles` tints it. */
+const muiVariantFor = (variant: NonNullable<ChipProps['variant']>): 'filled' | 'outlined' =>
+  variant === 'soft' ? 'filled' : variant;
+
 export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
   label,
   variant = 'filled',
@@ -66,7 +70,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
     <MuiChip
       ref={ref}
       label={<span data-testid={testId('label')}>{label}</span>}
-      variant={variant}
+      variant={muiVariantFor(variant)}
       size={chipMuiSize(size)}
       color={muiColorFor(color)}
       avatar={avatarFor(avatar, avatarSrc)}
@@ -81,7 +85,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(({
       role={chipRole(selectable, onClick)}
       aria-selected={selectable ? selected : undefined}
       data-testid={chipId || 'chip'}
-      sx={chipStyles({ variant, selected, clickable, disabled })}
+      sx={chipStyles({ variant, color, selected, clickable, disabled })}
       {...props}
     />
   );
