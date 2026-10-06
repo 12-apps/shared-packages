@@ -59,7 +59,7 @@ function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
     return {
       container: { backgroundColor: theme.palette.action.selected },
       pressed: { backgroundColor: theme.palette.action.hover },
-      label: { color: theme.palette.text.secondary },
+      label: { color: theme.palette.text.secondary, fontWeight: '600' },
       deleteColor: alpha(theme.palette.text.secondary, DELETE_ICON_ALPHA),
     };
   }
@@ -67,7 +67,7 @@ function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
   return {
     container: { backgroundColor: alpha(accent.main, SOFT_GROUND_ALPHA) },
     pressed: { backgroundColor: alpha(accent.main, SOFT_HOVER_ALPHA) },
-    label: { color: accent.dark },
+    label: { color: accent.dark, fontWeight: '600' },
     deleteColor: alpha(accent.dark, DELETE_ICON_ALPHA),
   };
 }

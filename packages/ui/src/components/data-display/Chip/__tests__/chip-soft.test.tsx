@@ -27,6 +27,7 @@ describe("Chip variant soft", () => {
     const style = getComputedStyle(chip);
     expect(style.color).toBe("rgb(198, 40, 40)"); // error.dark
     expect(style.backgroundColor).toBe("rgba(211, 47, 47, 0.14)"); // error.main at the soft alpha
+    expect(style.fontWeight).toBe("600");
   });
 
   it("gives a neutral soft chip the selected ground and the secondary ink", () => {

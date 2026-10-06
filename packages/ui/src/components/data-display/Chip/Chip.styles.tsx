@@ -87,6 +87,8 @@ const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
   return {
     backgroundColor: ground,
     color: ink,
+    // A state is read at a glance: the label is set semibold.
+    fontWeight: 600,
     '& .MuiChip-icon': { color: ink },
     '&.MuiChip-clickable:hover': {
       backgroundColor: (theme: Theme) => (key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : theme.palette.action.hover),
