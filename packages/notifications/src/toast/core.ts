@@ -67,6 +67,12 @@ export interface ToastOptions {
   duration?: number | null;
   /** Draw the close button. Default `true`; a `loading` toast should usually say `false`. */
   dismissible?: boolean;
+  /**
+   * Interrupt a screen reader (`role="alert"`) even though it is not an error.
+   * Errors always do; everything else waits its turn in the column's polite
+   * region unless it says so here.
+   */
+  assertive?: boolean;
   testId?: string;
   onDismiss?: (reason: ToastDismissReason) => void;
 }
@@ -80,6 +86,7 @@ export interface ToastItem {
   actions: readonly ToastAction[];
   duration: number | null;
   dismissible: boolean;
+  assertive: boolean;
   testId?: string;
   onDismiss?: (reason: ToastDismissReason) => void;
   /** Bumped on every replace/update, so a view can restart its clock. */
@@ -124,6 +131,7 @@ function toItem(id: string, message: string, options: ToastOptions, revision: nu
     actions: options.actions ?? [],
     duration: options.duration === undefined ? defaultToastDuration(severity) : options.duration,
     dismissible: options.dismissible ?? true,
+    assertive: options.assertive ?? false,
     testId: options.testId,
     onDismiss: options.onDismiss,
     revision,

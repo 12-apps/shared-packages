@@ -8,6 +8,10 @@
  * The column takes no room in the page (it is an overlay) and no taps (only the
  * cards do), so the page under its gaps stays usable.
  *
+ * It carries `data-ui-toast-column`: everything in it either leaves on its own
+ * or has a close button, which is what lets a screen-review probe treat a
+ * control it briefly covers differently from one a fixed bar covers for good.
+ *
  * Two lanes inside it, in this order:
  *  1. the queue (`toast(…)`): newest first, at most `max` drawn; the rest wait
  *     their turn with their clocks stopped, and a quiet line says how many;
@@ -123,7 +127,7 @@ function QueuedToast({
     <Box
       // An error is news that must interrupt; everything else waits its turn
       // in the column's polite region.
-      role={item.severity === 'error' ? 'alert' : undefined}
+      role={item.severity === 'error' || item.assertive ? 'alert' : undefined}
       onMouseEnter={pause}
       onMouseLeave={resume}
       onFocus={pause}
@@ -163,7 +167,7 @@ export function ToastHost({
     <ToastViewportContext.Provider value={{ slot, dismissLabel }}>
       {children}
       {inBody(
-      <Box ref={announced} data-testid="toast-viewport" sx={TOAST_VIEWPORT_SX}>
+      <Box ref={announced} data-testid="toast-viewport" data-ui-toast-column="" sx={TOAST_VIEWPORT_SX}>
         {/* Always mounted, so a toast added to it is announced: a live region
             has to be in the tree before its content changes. */}
         <Box

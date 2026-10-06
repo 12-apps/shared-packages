@@ -121,7 +121,7 @@ describe('the ambient wiring', () => {
     );
     fireEvent.click(screen.getByText('fail'));
     expect(onError).toHaveBeenCalledWith('Action failed', 'It broke.');
-    expect(screen.queryByTestId('card-action-error')).toBeNull();
+    expect(screen.queryAllByTestId('card-action-error')).toHaveLength(0);
   });
 
   it('K8: THROWS outside a provider instead of answering a silent no-op', () => {

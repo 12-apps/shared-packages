@@ -35,7 +35,7 @@ export function ToastPortal({ children }: { children: ReactNode }): JSX.Element 
   return (
     <>
       {inBody(
-        <Box ref={announced} data-testid="toast-viewport-standalone" sx={TOAST_VIEWPORT_SX}>
+        <Box ref={announced} data-testid="toast-viewport-standalone" data-ui-toast-column="" sx={TOAST_VIEWPORT_SX}>
           {children}
         </Box>,
       )}
@@ -58,6 +58,8 @@ export interface ToastProps {
   duration?: number | null;
   restartKey?: unknown;
   dismissible?: boolean;
+  /** Interrupt a screen reader even though it is not an error. */
+  assertive?: boolean;
   /** The close button's name. Defaults to the host's `dismissLabel`. */
   dismissLabel?: string;
   onClose: (reason: 'timeout' | 'close' | 'action') => void;
@@ -72,6 +74,7 @@ function OpenToast({
   duration,
   restartKey,
   dismissible = true,
+  assertive = false,
   dismissLabel,
   onClose,
   testId,
@@ -89,8 +92,8 @@ function OpenToast({
   return (
     <ToastPortal>
       <Box
-        role={severity === 'error' ? 'alert' : 'status'}
-        aria-live={severity === 'error' ? 'assertive' : 'polite'}
+        role={severity === 'error' || assertive ? 'alert' : 'status'}
+        aria-live={severity === 'error' || assertive ? 'assertive' : 'polite'}
         onMouseEnter={pause}
         onMouseLeave={resume}
         onFocus={pause}

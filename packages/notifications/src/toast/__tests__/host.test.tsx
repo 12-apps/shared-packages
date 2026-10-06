@@ -35,7 +35,7 @@ describe('ToastHost', () => {
   it('draws a raised toast in the column at the top of the screen', () => {
     const { toaster } = mount();
     act(() => {
-      toaster.success('Saved', { testId: 'saved' });
+      toaster('Saved', { severity: 'success', testId: 'saved' });
     });
 
     const viewport = screen.getByTestId('toast-viewport');
@@ -92,7 +92,7 @@ describe('ToastHost', () => {
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(screen.queryByTestId('moved')).toBeNull();
+    expect(screen.queryAllByTestId('moved')).toHaveLength(0);
     expect(onDismiss).toHaveBeenCalledWith('timeout');
   });
 
@@ -110,21 +110,21 @@ describe('ToastHost', () => {
     act(() => {
       vi.advanceTimersByTime(TOAST_DURATION_MS);
     });
-    expect(screen.queryByTestId('read')).toBeNull();
+    expect(screen.queryAllByTestId('read')).toHaveLength(0);
   });
 
   it('keeps a persistent toast until it is closed, and names the close button', () => {
     const { toaster } = mount();
     const onDismiss = vi.fn();
     act(() => {
-      toaster.error('Not saved', { testId: 'err', duration: null, onDismiss });
+      toaster('Not saved', { severity: 'error', testId: 'err', duration: null, onDismiss });
     });
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
     const close = screen.getByRole('button', { name: 'Close it' });
     fireEvent.click(close);
-    expect(screen.queryByTestId('err')).toBeNull();
+    expect(screen.queryAllByTestId('err')).toHaveLength(0);
     expect(onDismiss).toHaveBeenCalledWith('close');
   });
 
@@ -146,7 +146,7 @@ describe('ToastHost', () => {
     expect(screen.getByTestId('moved')).toBeTruthy();
     fireEvent.click(screen.getByTestId('undo'));
     expect(undo).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('moved')).toBeNull();
+    expect(screen.queryAllByTestId('moved')).toHaveLength(0);
   });
 
   it('draws a disabled action as disabled', () => {
@@ -175,7 +175,7 @@ describe('ToastHost', () => {
   it('announces an error assertively and everything else politely', () => {
     const { toaster } = mount();
     act(() => {
-      toaster.error('Refused', { testId: 'err' });
+      toaster('Refused', { severity: 'error', testId: 'err' });
       toaster('Fine', { testId: 'ok' });
     });
     expect(screen.getByRole('alert').textContent).toContain('Refused');
@@ -194,13 +194,26 @@ describe('ToastHost', () => {
     expect(viewport.hasAttribute('aria-hidden')).toBe(false);
   });
 
+  it('announces a non-error assertively when the caller asks it to', () => {
+    const { toaster } = mount();
+    act(() => {
+      toaster('Mesa 4 chamou', { testId: 'call', assertive: true });
+    });
+    expect(screen.getByRole('alert').textContent).toContain('Mesa 4 chamou');
+  });
+
+  it('marks the column as the toast column for a screen-review probe', () => {
+    mount();
+    expect(screen.getByTestId('toast-viewport').hasAttribute('data-ui-toast-column')).toBe(true);
+  });
+
   it('shows a spinner for a loading toast and no close button when not dismissible', () => {
     const { toaster } = mount();
     act(() => {
-      toaster.loading('Sending', { testId: 'load', dismissible: false });
+      toaster('Sending', { severity: 'loading', testId: 'load', dismissible: false });
     });
     expect(screen.getByTestId('toast-spinner')).toBeTruthy();
-    expect(screen.queryByTestId('load-close')).toBeNull();
+    expect(screen.queryAllByTestId('load-close')).toHaveLength(0);
   });
 });
 
@@ -265,7 +278,7 @@ describe('declarative toasts', () => {
 
   it('draws nothing while closed', () => {
     render(<Toast open={false} message="x" onClose={vi.fn()} testId="shut" />);
-    expect(screen.queryByTestId('shut')).toBeNull();
+    expect(screen.queryAllByTestId('shut')).toHaveLength(0);
   });
 });
 

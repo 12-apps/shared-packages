@@ -72,5 +72,8 @@ export function toastSurfaceSx(theme: Theme): Record<string, unknown> {
     pointerEvents: 'auto',
     '& .MuiButton-root:not(.Mui-disabled)': { color: ink, borderColor: alpha(ink, 0.48) },
     '& .MuiButton-root.Mui-disabled': { color: alpha(ink, 0.4), borderColor: alpha(ink, 0.2) },
+    // MUI's ripple alone is faint on near-black: a keyboard focus gets a ring
+    // in the card's ink.
+    '& .Mui-focusVisible': { outline: `2px solid ${ink}`, outlineOffset: '2px' },
   };
 }
