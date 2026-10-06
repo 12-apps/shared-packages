@@ -232,6 +232,19 @@ describe('declarative toasts', () => {
     expect(screen.getByTestId('receipt').getAttribute('data-ui-overlay')).toBe('');
   });
 
+  it('finds a host mounted beside it rather than around it', () => {
+    render(
+      <>
+        <ToastPortal>
+          <span data-testid="beside">x</span>
+        </ToastPortal>
+        <ToastHost {...WORDS} store={createToastStore()} />
+      </>,
+    );
+    expect(within(screen.getByTestId('toast-slot')).getByTestId('beside').textContent).toBe('x');
+    expect(screen.queryAllByTestId('toast-viewport-standalone')).toHaveLength(0);
+  });
+
   it('stands alone in the same place when no host is mounted', () => {
     render(
       <ToastPortal>

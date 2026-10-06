@@ -9,16 +9,17 @@
 import { type JSX, type ReactNode } from 'react';
 
 import { Button } from '@12-apps/ui/form/Button';
-import { Icon, type IconName } from '@12-apps/ui/icons';
 import { Box } from '@12-apps/ui/mui/Box';
 import { keyframes, useTheme, type Theme } from '@12-apps/ui/mui/styles';
 import { Text } from '@12-apps/ui/typography/Text';
 
 import type { ToastAction, ToastSeverity } from '../core';
 
+import { ToastGlyph, type ToastGlyphName } from './glyphs';
+
 import { InverseTheme, toastSurfaceSx } from './inverse';
 
-const ICONS: Partial<Record<ToastSeverity, IconName>> = {
+const ICONS: Partial<Record<ToastSeverity, ToastGlyphName>> = {
   success: 'CheckCircle',
   info: 'Info',
   warning: 'WarningAmber',
@@ -64,7 +65,7 @@ function SeverityMark({ severity }: { severity: ToastSeverity }): JSX.Element | 
   if (name === undefined || severity === 'neutral') return null;
   return (
     <Box aria-hidden="true" sx={{ display: 'flex', flexShrink: 0 }}>
-      <Icon name={name} size="sm" color={signalOnInverse(theme, severity)} />
+      <ToastGlyph name={name} color={signalOnInverse(theme, severity)} />
     </Box>
   );
 }
@@ -169,7 +170,7 @@ export function ToastCard({
                 dataTestId={`${testId}-close`}
                 sx={{ minWidth: 40, minHeight: 40, px: 1 }}
               >
-                <Icon name="Close" size="sm" color="inherit" />
+                <ToastGlyph name="Close" />
               </Button>
             )}
           </Box>

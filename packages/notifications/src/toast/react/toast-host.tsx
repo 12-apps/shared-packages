@@ -25,6 +25,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
   type JSX,
@@ -89,9 +91,35 @@ interface ToastViewportValue {
 
 const ToastViewportContext = createContext<ToastViewportValue | null>(null);
 
-/** The host's slot and words, or `null` outside a `ToastHost`. */
+/**
+ * The mounted host, for a portal that is NOT inside it.
+ *
+ * The context answers for what the host wraps. A host may also be mounted as
+ * a SIBLING — the storefront loads it lazily, off its critical path, after the
+ * first render — so the host also registers here, and a portal outside it
+ * finds it all the same. One host per page is the contract; the last one
+ * mounted answers.
+ */
+let registered: ToastViewportValue | null = null;
+const registryListeners = new Set<() => void>();
+
+function register(value: ToastViewportValue | null): void {
+  registered = value;
+  for (const listener of [...registryListeners]) listener();
+}
+
+function subscribeRegistry(listener: () => void): () => void {
+  registryListeners.add(listener);
+  return () => registryListeners.delete(listener);
+}
+
+const readRegistry = (): ToastViewportValue | null => registered;
+
+/** The host's slot and words — the enclosing host's, else the mounted one's, else `null`. */
 export function useToastViewport(): ToastViewportValue | null {
-  return useContext(ToastViewportContext);
+  const enclosing = useContext(ToastViewportContext);
+  const mounted = useSyncExternalStore(subscribeRegistry, readRegistry, () => null);
+  return enclosing ?? mounted;
 }
 
 export interface ToastHostProps {
@@ -158,13 +186,20 @@ export function ToastHost({
 }: ToastHostProps): JSX.Element {
   const items = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const value = useMemo(() => ({ slot, dismissLabel }), [slot, dismissLabel]);
+  useEffect(() => {
+    register(value);
+    return () => {
+      if (registered === value) register(null);
+    };
+  }, [value]);
   const announced = useStaysAnnounced();
   // Newest first: the toast nearest the top edge is the answer to the last tap.
   const visible = items.slice(-max).reverse();
   const waiting = items.length - visible.length;
 
   return (
-    <ToastViewportContext.Provider value={{ slot, dismissLabel }}>
+    <ToastViewportContext.Provider value={value}>
       {children}
       {inBody(
       <Box ref={announced} data-testid="toast-viewport" data-ui-toast-column="" sx={TOAST_VIEWPORT_SX}>
