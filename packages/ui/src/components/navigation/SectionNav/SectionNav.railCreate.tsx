@@ -46,6 +46,7 @@ function entryItem(
           icon={entry.icon}
           count={entry.badge}
           label={copy.badge}
+          attentionLabel={copy.attention}
           testId={`${itemTestId}-badge`}
         />
       </ListItemIcon>

@@ -1,5 +1,5 @@
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
+import { alpha, useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import { useState, type ElementType, type ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
@@ -19,7 +19,7 @@ import {
 } from './SectionNav.parts';
 import { RaisedActionButton } from './SectionNav.primary';
 import { SectionNavSheet } from './SectionNav.sheet';
-import type { SectionNavAction, SectionNavDestination, SectionNavMenu, SectionNavProps } from './SectionNav.types';
+import type { SectionNavAction, SectionNavBadge, SectionNavDestination, SectionNavMenu, SectionNavProps } from './SectionNav.types';
 
 /** Which of the bar's two menus is open, if any. */
 type OpenMenu = 'primary' | 'more' | null;
@@ -65,7 +65,7 @@ function Slot({
 }: {
   label: string;
   icon: ReactNode;
-  count: number | undefined;
+  count: SectionNavBadge | undefined;
   current: boolean;
   lit: boolean;
   copy: SectionNavCopy;
@@ -86,9 +86,14 @@ function Slot({
       sx={slotSx(theme, lit)}
     >
       <CountedIcon
-        icon={<SlotIcon icon={icon} loading={loading} />}
+        icon={
+          <Box component="span" data-slot-pill="" sx={pillSx(theme)}>
+            <SlotIcon icon={icon} loading={loading} />
+          </Box>
+        }
         count={count}
         label={copy.badge}
+        attentionLabel={copy.attention}
         testId={`${testId}-badge`}
       />
       <Typography
@@ -100,7 +105,8 @@ function Slot({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           lineHeight: 1.3,
-          fontWeight: lit ? 700 : 400,
+          fontWeight: lit ? 700 : 600,
+          color: lit ? 'text.primary' : 'inherit',
         }}
       >
         {label}
@@ -109,7 +115,20 @@ function Slot({
   );
 }
 
-/** A slot's look: icon over label, the lit rule on its top edge, dimmed when disabled. */
+/** The pill behind a slot's icon — tinted while the slot is lit. */
+function pillSx(theme: Theme): SxProps<Theme> {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    px: 1.75,
+    py: 0.25,
+    borderRadius: rem(theme, 999),
+    transition: theme.transitions.create('background-color', { duration: theme.transitions.duration.shorter }),
+  };
+}
+
+/** A slot's look: icon over label, a pill behind the lit icon, dimmed when disabled. */
 function slotSx(theme: Theme, lit: boolean): SxProps<Theme> {
   return {
     ...CONTROL_RESET,
@@ -123,18 +142,9 @@ function slotSx(theme: Theme, lit: boolean): SxProps<Theme> {
     gap: 0.25,
     position: 'relative',
     color: lit ? 'primary.main' : 'text.secondary',
-    // The current slot is marked by more than its colour: a short rule on
-    // its top edge, so the state survives a colour-blind reading.
-    '&[data-lit="true"]::before': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      insetInline: '22%',
-      height: rem(theme, 3),
-      borderBottomLeftRadius: rem(theme, 3),
-      borderBottomRightRadius: rem(theme, 3),
-      bgcolor: 'primary.main',
-    },
+    // The current slot is marked by more than its colour: a tinted pill behind
+    // its icon and a bolder label, so the state survives a colour-blind reading.
+    '&[data-lit="true"] [data-slot-pill]': { bgcolor: alpha(theme.palette.primary.main, 0.14) },
     '& svg': { fontSize: rem(theme, 22) },
     [NOT_LIVE]: { color: 'text.disabled' },
   } as SxProps<Theme>;

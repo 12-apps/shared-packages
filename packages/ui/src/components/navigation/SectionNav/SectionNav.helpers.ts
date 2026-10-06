@@ -1,8 +1,8 @@
-import type { SectionNavAction, SectionNavDestination, SectionNavMenu } from './SectionNav.types';
+import type { SectionNavAction, SectionNavBadge, SectionNavDestination, SectionNavMenu } from './SectionNav.types';
 
 /** A count worth drawing: positive and finite. Zero and "unknown" draw nothing. */
-export function shownCount(count: number | undefined): number | undefined {
-  return count !== undefined && Number.isFinite(count) && count > 0 ? count : undefined;
+export function shownCount(count: SectionNavBadge | undefined): number | undefined {
+  return typeof count === 'number' && Number.isFinite(count) && count > 0 ? count : undefined;
 }
 
 /**

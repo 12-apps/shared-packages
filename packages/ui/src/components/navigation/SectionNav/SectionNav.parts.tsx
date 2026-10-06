@@ -7,7 +7,7 @@ import { rem } from '../../../tokens/scales';
 import { Badge } from '../../data-display/Badge';
 
 import { shownCount } from './SectionNav.helpers';
-import type { SectionNavDestination } from './SectionNav.types';
+import type { SectionNavBadge, SectionNavDestination } from './SectionNav.types';
 
 /**
  * An icon with its count on the shoulder.
@@ -21,12 +21,22 @@ export function CountedIcon({
   count,
   label,
   testId,
+  attentionLabel,
 }: {
   icon: ReactNode;
-  count: number | undefined;
+  count: SectionNavBadge | undefined;
   label: (count: number) => string;
   testId: string;
+  /** The "!" badge's accessible name (`SectionNavCopy.attention`). */
+  attentionLabel?: string;
 }): React.JSX.Element {
+  if (count === '!') {
+    return (
+      <Badge content="!" variant="count" color="warning" aria-label={attentionLabel ?? label(1)} aria-live="off" data-testid={testId}>
+        {icon}
+      </Badge>
+    );
+  }
   const shown = shownCount(count);
   if (shown === undefined) return <>{icon}</>;
   return (

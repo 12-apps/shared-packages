@@ -94,6 +94,13 @@ an entry closes the sheet.
 numbers. The count's accessible name is `copy.badge(n)`, and it is quiet
 (`aria-live="off"`) because it moves on a poll.
 
+`badge: '!'` says something waits that is not a count — money still owed, a
+state to resolve. It is named by `copy.attention` (optional on a host's own
+copy, falling back to `copy.badge(1)`) and never adds to a menu's roll-up.
+
+The bar's current slot wears a tinted pill behind its icon and a bolder label;
+every label is semibold.
+
 ## Docking the bar
 
 Dock the bar at the foot of a flex column. `sectionNavBarInset(theme)` is its

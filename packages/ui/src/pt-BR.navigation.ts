@@ -24,4 +24,5 @@ export const PT_BR_BREADCRUMB_COPY: BreadcrumbCopy = {
 export const PT_BR_SECTION_NAV_COPY: SectionNavCopy = {
   close: "Fechar",
   badge: (count) => (count === 1 ? "1 pendente" : `${count} pendentes`),
+  attention: "Precisa de atenção",
 };

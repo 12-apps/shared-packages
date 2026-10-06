@@ -5,6 +5,7 @@ export type { RaisedActionButtonProps } from './SectionNav.primary';
 export type {
   SectionNavAction,
   SectionNavBack,
+  SectionNavBadge,
   SectionNavDestination,
   SectionNavEntry,
   SectionNavGroup,
