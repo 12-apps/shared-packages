@@ -37,7 +37,7 @@ describe('SectionNav attention badge', () => {
   it('is not a count: it never adds to a roll-up', () => {
     expect(shownCount('!')).toBeUndefined();
     expect(
-      menuCount({ label: 'More', icon, groups: [{ id: 'g', entries: [{ id: 'a', label: 'A', icon, href: '/a', badge: '!' }] }] }),
+      menuCount({ label: 'More', icon, title: 'More', groups: [{ id: 'g', entries: [{ id: 'a', label: 'A', icon, href: '/a', badge: '!' }] }] }),
     ).toBeUndefined();
   });
 
