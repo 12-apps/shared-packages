@@ -27,10 +27,14 @@ const ICONS: Partial<Record<ToastSeverity, IconName>> = {
 
 const PALETTE_KEY = { success: 'success', info: 'info', warning: 'warning', error: 'error' } as const;
 
-/** A signal's colour that reads on the inverse ground: the light step on black, the dark one on white. */
-function signalOnInverse(theme: Theme, severity: keyof typeof PALETTE_KEY): string {
+/**
+ * A signal's colour that reads on the card: the light step on a dark card, the
+ * dark one on a light card. `theme` is the card's own (inverse) theme, so its
+ * mode IS the card's ground.
+ */
+export function signalOnInverse(theme: Theme, severity: keyof typeof PALETTE_KEY): string {
   const colour = theme.palette[PALETTE_KEY[severity]];
-  return theme.palette.mode === 'dark' ? colour.dark : colour.light;
+  return theme.palette.mode === 'dark' ? colour.light : colour.dark;
 }
 
 const spin = keyframes({ to: { transform: 'rotate(360deg)' } });

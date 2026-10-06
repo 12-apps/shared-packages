@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTheme, ThemeProvider } from '@12-apps/ui/mui/styles';
 
 import { TOAST_DURATION_MS, createToastStore, createToaster } from '../core';
-import { Toast, ToastHost, ToastPortal, ToastSurface, inverseColors } from '../react';
+import { Toast, ToastHost, ToastPortal, ToastSurface, inverseColors, inverseTheme } from '../react';
+import { signalOnInverse } from '../react/toast-card';
 
 /**
  * The column as a host mounts it: one `ToastHost`, toasts raised from outside
@@ -63,6 +64,14 @@ describe('ToastHost', () => {
     expect(getComputedStyle(card).backgroundColor).toBe(hexToRgb(ground));
     expect(ink).toBe('#fff');
     expect(getComputedStyle(card).color).toBe('rgb(255, 255, 255)');
+  });
+
+  it('picks the signal step that reads on the card: light on near-black, dark on near-white', () => {
+    const light = createTheme();
+    const dark = createTheme({ palette: { mode: 'dark' } });
+    // The card reads its OWN theme — the inverse of the page's.
+    expect(signalOnInverse(inverseTheme(light), 'error')).toBe(light.palette.error.light);
+    expect(signalOnInverse(inverseTheme(dark), 'error')).toBe(dark.palette.error.dark);
   });
 
   it('turns over on a dark theme: a light card', () => {
