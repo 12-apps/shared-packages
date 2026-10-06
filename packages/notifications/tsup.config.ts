@@ -37,6 +37,8 @@ export default defineConfig({
     'web-push/index': 'src/web-push/index.ts',
     'attention/index': 'src/attention/index.ts',
     'attention/react/index': 'src/attention/react/index.ts',
+    'toast/index': 'src/toast/index.ts',
+    'toast/react/index': 'src/toast/react/index.ts',
     'manifest/index': 'src/manifest/index.ts',
     'manifest/server': 'src/manifest/server.ts',
     'manifest/web': 'src/manifest/web.ts',

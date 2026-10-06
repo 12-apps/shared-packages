@@ -39,6 +39,7 @@ export function CardActionsProvider({
   errorTitle,
   errorDismissLabel,
   autoHideMs = 6_000,
+  onError,
   children,
 }: {
   tenantSlug: string;
@@ -55,14 +56,27 @@ export function CardActionsProvider({
   errorDismissLabel: string;
   /** How long the snackbar stays up. */
   autoHideMs?: number;
+  /**
+   * Hand a failure to the HOST's own toast channel instead of this provider's
+   * snackbar. Given, the provider draws nothing of its own: an app with one
+   * toast column (every toast in one place, in one look) passes its `toast`
+   * here, so a card's failure lands with every other toast rather than in a
+   * corner of its own. It receives the same heading and message the snackbar
+   * would have shown.
+   */
+  onError?: (title: string, message: string) => void;
   children: ReactNode;
 }): JSX.Element {
   const [error, setError] = useState<string | null>(null);
-  const notifyError = useCallback((message: string) => setError(message), []);
+  const notifyError = useCallback(
+    (message: string) => (onError ? onError(errorTitle, message) : setError(message)),
+    [onError, errorTitle],
+  );
 
   return (
     <CardActionsContext.Provider value={{ tenantSlug, onRefresh, notifyError }}>
       {children}
+      {onError === undefined && (
       <Snackbar
         open={error !== null}
         autoHideDuration={autoHideMs}
@@ -81,6 +95,7 @@ export function CardActionsProvider({
           />
         </span>
       </Snackbar>
+      )}
     </CardActionsContext.Provider>
   );
 }

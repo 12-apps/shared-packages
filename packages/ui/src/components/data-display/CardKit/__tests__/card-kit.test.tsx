@@ -107,6 +107,23 @@ describe('the ambient wiring', () => {
     expect(screen.getByText('acme')).toBeInTheDocument();
   });
 
+  it('K7b: hands a failure to the host toast channel and draws no snackbar of its own', () => {
+    const onError = vi.fn();
+    function Failing(): JSX.Element {
+      const { notifyError } = useCardActions();
+      return <button onClick={() => notifyError('It broke.')}>fail</button>;
+    }
+    render(
+      <CardActionsProvider tenantSlug="acme" onRefresh={vi.fn()} errorTitle="Action failed"
+      errorDismissLabel="Fechar o aviso" onError={onError}>
+        <Failing />
+      </CardActionsProvider>,
+    );
+    fireEvent.click(screen.getByText('fail'));
+    expect(onError).toHaveBeenCalledWith('Action failed', 'It broke.');
+    expect(screen.queryByTestId('card-action-error')).toBeNull();
+  });
+
   it('K8: THROWS outside a provider instead of answering a silent no-op', () => {
     // A menu whose `onRefresh` quietly did nothing would leave the operator
     // looking at a stale row after a delete that worked — which reads as the
