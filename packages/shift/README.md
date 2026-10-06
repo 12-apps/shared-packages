@@ -57,6 +57,49 @@ to cannot drift apart.
 `resourceType` and `resourceId` have always worked this way: carried by value,
 with the host owning what they mean. Kinds simply joined them.
 
+## The schedule
+
+A shift is a fact: it started, and it may have ended. A **slot** is a plan: who
+should work which kind, from when to when. They live in different tables
+(`shift_slots` beside `shifts`) and different services, on the same vocabulary:
+
+```ts
+const schedule = createShiftScheduleService(scheduleDb, { kinds: HOST_KINDS });
+
+await schedule.scheduleSlot({
+  clientId, userId, kind: 'ward', actorUserId,
+  startsAt, endsAt,
+  repeatWeeks: 3, timeZone: 'America/New_York', // this week and the next three
+});
+```
+
+- **Repeats keep the wall clock.** Each weekly copy lands on the same local time
+  in `timeZone`, across a daylight-saving change. A repeated call needs a known
+  zone; a single slot does not.
+- **No overlap per worker per tenant**, across the whole repeat, all or nothing:
+  `SLOT_OVERLAP` and nothing written. Back-to-back is fine. The host's
+  `lockUserSchedule` must serialise two writers of the same worker (a
+  transaction-scoped advisory lock on Postgres) — the overlap read is only as
+  safe as that lock.
+- **Canceling keeps the row** (`canceledAt`, `canceledByUserId`,
+  `cancelReason`), so a host can say why a slot was freed. `scope: 'following'`
+  also cancels the later live slots of the same series. A slot already over
+  cannot be canceled.
+- **`slotStanding({ slot, openShift, now })`** answers `canceled`, `over`,
+  `on_shift`, `late` (with `lateMinutes`), `due` (inside the window before the
+  start, 15 minutes by default) or `later`. It trusts the host's `openShift`:
+  pass the worker's open shift **of the slot's kind**, or null — the package
+  does not decide which shift covers which slot.
+- **`nextSlots({ clientIds, userId, limit })`** reads one person's live slots
+  across the tenants the HOST allows, filtered before the limit. Who still works
+  where is the host's knowledge, so an empty list is refused rather than read
+  as "everywhere".
+
+`ShiftScheduleError` carries its own codes (`INVALID_SLOT`, `SLOT_OVERLAP`,
+`SLOT_NOT_FOUND`, `SLOT_CANCELED`, `SLOT_OVER`) and
+`SHIFT_SCHEDULE_ERROR_STATUS` maps them to HTTP statuses; `ShiftError`'s codes
+are unchanged, so a host that matches them exhaustively keeps compiling.
+
 ## Upgrading from 3.x
 
 `createShiftService(db)` no longer compiles: `options.kinds` is required.
@@ -81,6 +124,9 @@ rules, the sweep and every error code are as they were.
 | `createShiftService(db, options)` | The service. `options.kinds` is required. |
 | `defineShiftVocabulary(kinds)` | Validates a host's kinds; returns the type guard over them. |
 | `createMemoryShiftDb()` | An in-memory `ShiftDb`, for host tests. |
+| `createShiftScheduleService(db, options)` | The schedule of planned slots. |
+| `createMemoryShiftScheduleDb()` | An in-memory `ShiftScheduleDb`, for host tests. |
+| `ShiftScheduleError` / `SHIFT_SCHEDULE_ERROR_STATUS` | A schedule refusal, and its HTTP status. |
 | `ShiftError` / `ShiftConfigError` | A request outcome, and a wiring mistake. |
 | `@12-apps/shift/jobs` | The auto-close blueprint, deps left open. |
 | `@12-apps/shift/manifest` | The wiring manifest and its server half. |

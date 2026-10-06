@@ -46,6 +46,7 @@
     "20261001160000_index_mcp_refresh_lineage",
     "20261002120000_add_chat",
     "20261002130000_push_attention_level",
-    "20261003120000_add_chat_thread_activity_index"
+    "20261003120000_add_chat_thread_activity_index",
+    "20261006120000_shift_slots"
   ]
 }

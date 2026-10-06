@@ -72,6 +72,7 @@
   "packages/prisma/prisma/migrations/20261002120000_add_chat/migration.sql": "e1dff2c462e51ba09b3006173d11ea908123fa44f843f393ee5ccb80d354de31",
   "packages/prisma/prisma/migrations/20261002130000_push_attention_level/migration.sql": "5864a4554d24cfb4f79f258ed25b924ee095e52cb3997105303a0e86ddafcc34",
   "packages/prisma/prisma/migrations/20261003120000_add_chat_thread_activity_index/migration.sql": "4aa5d1f8b2470a52baabb422944e86a5ad9884b1fb540d59f855bd0c52b4cc8a",
+  "packages/prisma/prisma/migrations/20261006120000_shift_slots/migration.sql": "854df50f19b925d46c524ff49fdef1a798bf32e7df6d741e20e26a569817270f",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",
@@ -90,5 +91,6 @@
   "packages/report-builder/prisma/migrations/20260810180000_add_report_working_copy/migration.sql": "7bf10a19f0da1a7a734f10e3be0eaaaf3121896723f72df446e770dc0714912d",
   "packages/shift/prisma/migrations/20260730210000_add_shifts/migration.sql": "4c647d92314f7b8f1b34e78403e5f55867492cd3d95bbec964a09ca728f962f0",
   "packages/shift/prisma/migrations/20260731210000_shift_delete_guard/migration.sql": "e1e78eeb8bfe81323003b996c02123a59566348af9cd0c874b29af5d9ecd1c1f",
-  "packages/shift/prisma/migrations/20260821120000_shift_kind_host_vocabulary/migration.sql": "462ac12ba1466bcfbf258bf6e162bc02dd169e21a77021ff8128698382ac3bdb"
+  "packages/shift/prisma/migrations/20260821120000_shift_kind_host_vocabulary/migration.sql": "462ac12ba1466bcfbf258bf6e162bc02dd169e21a77021ff8128698382ac3bdb",
+  "packages/shift/prisma/migrations/20261006120000_shift_slots/migration.sql": "854df50f19b925d46c524ff49fdef1a798bf32e7df6d741e20e26a569817270f"
 }
