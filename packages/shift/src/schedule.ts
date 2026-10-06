@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { ShiftConfigError } from './errors';
 import { ShiftScheduleError } from './schedule-errors';
 import { slotStandingAt } from './schedule-standing';
 import { addZonedDays, isKnownTimeZone } from './schedule-time';
@@ -96,6 +97,16 @@ function buildSlots(ctx: ScheduleContext, input: ScheduleSlotInput, weeks: numbe
   });
 }
 
+/** Each built slot, not just the first: a repeat across a fall-back day is an hour longer. */
+function validateBuilt(slots: readonly ShiftSlot[]): void {
+  slots.forEach((slot, week) => {
+    const length = slot.endsAt.getTime() - slot.startsAt.getTime();
+    if (!(length > 0) || length > MAX_SLOT_MS) {
+      throw invalid(`The repeat in week ${week} would not last between 0 and 24 hours in that time zone.`);
+    }
+  });
+}
+
 async function refuseOverlap(tx: ShiftScheduleTransaction, slots: readonly ShiftSlot[]): Promise<void> {
   const first = slots[0];
   const last = slots[slots.length - 1];
@@ -112,6 +123,7 @@ async function refuseOverlap(tx: ShiftScheduleTransaction, slots: readonly Shift
 async function scheduleSlot(ctx: ScheduleContext, input: ScheduleSlotInput): Promise<ShiftSlot[]> {
   const weeks = validateInput(ctx, input);
   const slots = buildSlots(ctx, input, weeks);
+  validateBuilt(slots);
   const first = slots[0] as ShiftSlot;
   return ctx.db.transaction(async (tx) => {
     await tx.lockUserSchedule(input.clientId, input.userId);
@@ -150,8 +162,10 @@ async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise
   requireText(input.slotId, 'slotId');
   const now = ctx.now();
   return ctx.db.transaction(async (tx) => {
+    const found = await slotToCancel(tx, input, now);
+    await tx.lockUserSchedule(found.clientId, found.userId);
+    // Again under the lock: a concurrent cancel may have won while we waited.
     const slot = await slotToCancel(tx, input, now);
-    await tx.lockUserSchedule(slot.clientId, slot.userId);
     const following =
       input.scope === 'following' && slot.seriesId !== null
         ? await tx.listSeriesFrom(slot.clientId, slot.seriesId, slot.startsAt)
@@ -173,7 +187,7 @@ async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise
       before: { startsAt: slot.startsAt.toISOString(), seriesId: slot.seriesId },
       after: { reason: input.reason ?? null, count: String(canceled.length) },
     });
-    return canceled;
+    return [...canceled].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   });
 }
 
@@ -191,7 +205,9 @@ async function nextSlots(ctx: ScheduleContext, input: NextSlotsInput): Promise<S
 
 function listSlots(ctx: ScheduleContext, input: ListSlotsInput): Promise<ShiftSlot[]> {
   requireText(input.clientId, 'clientId');
-  if (input.to <= input.from) throw invalid('to must be after from.');
+  const from = input.from.getTime();
+  const to = input.to.getTime();
+  if (Number.isNaN(from) || Number.isNaN(to) || to <= from) throw invalid('to must be a valid date after from.');
   return ctx.db.listSlots(input);
 }
 
@@ -203,13 +219,21 @@ export function createShiftScheduleService<const Kinds extends ShiftKindTuple>(
   db: ShiftScheduleDb,
   options: ShiftScheduleServiceOptions<Kinds>,
 ): ShiftScheduleService<Kinds[number]> {
+  const maxRepeatWeeks = options.maxRepeatWeeks ?? DEFAULT_MAX_REPEAT_WEEKS;
+  const dueWindowMinutes = options.dueWindowMinutes ?? DEFAULT_DUE_WINDOW_MINUTES;
+  if (!Number.isInteger(maxRepeatWeeks) || maxRepeatWeeks < 0) {
+    throw new ShiftConfigError('maxRepeatWeeks must be a whole number of weeks, 0 or more.');
+  }
+  if (!Number.isFinite(dueWindowMinutes) || dueWindowMinutes < 0) {
+    throw new ShiftConfigError('dueWindowMinutes must be a number of minutes, 0 or more.');
+  }
   const ctx: ScheduleContext = {
     db,
     vocabulary: defineShiftVocabulary(options.kinds),
     now: options.now ?? (() => new Date()),
     createId: options.createId ?? randomUUID,
-    maxRepeatWeeks: options.maxRepeatWeeks ?? DEFAULT_MAX_REPEAT_WEEKS,
-    dueWindowMinutes: options.dueWindowMinutes ?? DEFAULT_DUE_WINDOW_MINUTES,
+    maxRepeatWeeks,
+    dueWindowMinutes,
   };
   return {
     scheduleSlot: (input) => scheduleSlot(ctx, input),

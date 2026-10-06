@@ -26,7 +26,7 @@ export function slotStandingAt(
   const dueFrom = startMs - dueWindowMinutes * MINUTE_MS;
   if (slot.canceledAt !== null) return { standing: 'canceled', lateMinutes: 0 };
   if (at >= slot.endsAt.getTime()) return { standing: 'over', lateMinutes: 0 };
-  if (openShift !== null && at >= dueFrom) return { standing: 'on_shift', lateMinutes: 0 };
+  if (openShift != null && at >= dueFrom) return { standing: 'on_shift', lateMinutes: 0 };
   if (at >= startMs) {
     return { standing: 'late', lateMinutes: Math.floor((at - startMs) / MINUTE_MS) };
   }

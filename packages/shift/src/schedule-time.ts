@@ -82,7 +82,12 @@ function instantOf(wall: WallClock, timeZone: string): number {
   const naive = asUtcMs(wall);
   const first = naive - offsetAt(naive, timeZone);
   const second = naive - offsetAt(first, timeZone);
-  return Math.min(first, second);
+  const candidates = [first, second];
+  // A candidate is exact when the zone shows the requested wall time at it.
+  const exact = candidates.filter((ms) => asUtcMs(wallClockOf(new Date(ms), timeZone)) === naive);
+  // Both exact: a repeated hour, take the first. Neither: a gap, and the later
+  // candidate is the wall time pushed forward by the gap (02:30 -> 03:30).
+  return exact.length > 0 ? Math.min(...exact) : Math.max(...candidates);
 }
 
 /** `instant` moved by `days` calendar days, keeping its wall-clock time in `timeZone`. */

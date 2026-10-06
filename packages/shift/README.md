@@ -74,7 +74,10 @@ await schedule.scheduleSlot({
 ```
 
 - **Repeats keep the wall clock.** Each weekly copy lands on the same local time
-  in `timeZone`, across a daylight-saving change. A repeated call needs a known
+  in `timeZone`, across a daylight-saving change: a time the change skips moves
+  past the gap (02:30 becomes 03:30), a time it repeats takes its first
+  occurrence. Every copy is checked against the 24-hour limit, so a 24-hour slot
+  whose repeat would span a fall-back is refused. A repeated call needs a known
   zone; a single slot does not.
 - **No overlap per worker per tenant**, across the whole repeat, all or nothing:
   `SLOT_OVERLAP` and nothing written. Back-to-back is fine. The host's

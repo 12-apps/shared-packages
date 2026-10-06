@@ -35,6 +35,16 @@ function overlaps(slot: ShiftSlot, from: Date, to: Date): boolean {
   return slot.startsAt < to && from < slot.endsAt;
 }
 
+const MAX_SLOT_MS = 24 * 60 * 60_000;
+
+/** What the table's CHECK constraints refuse, so a test cannot pass what Postgres would not. */
+function assertStorable(slot: ShiftSlot): void {
+  const length = slot.endsAt.getTime() - slot.startsAt.getTime();
+  if (slot.kind.trim() === '' || !(length > 0) || length > MAX_SLOT_MS) {
+    throw new Error(`shift_slots CHECK violated by slot ${slot.id}.`);
+  }
+}
+
 function transactionOver(state: ScheduleState): ShiftScheduleTransaction {
   return {
     lockUserSchedule: async () => undefined,
@@ -48,6 +58,7 @@ function transactionOver(state: ScheduleState): ShiftScheduleTransaction {
       return found ? cloneSlot(found) : null;
     },
     createSlots: async (slots) => {
+      for (const slot of slots) assertStorable(slot);
       state.slots.push(...slots.map(cloneSlot));
     },
     cancelSlots: async ({ clientId, slotIds, canceledAt, canceledByUserId, cancelReason }) => {
@@ -83,12 +94,19 @@ export interface MemoryShiftScheduleDb extends ShiftScheduleDb {
  */
 export function createMemoryShiftScheduleDb(): MemoryShiftScheduleDb {
   let state: ScheduleState = { slots: [], audits: [] };
+  // One transaction at a time, as the host's per-worker lock would make them:
+  // without it two overlapping drafts both commit and the first is lost.
+  let queue: Promise<unknown> = Promise.resolve();
   return {
-    async transaction(work) {
-      const draft = cloneState(state);
-      const result = await work(transactionOver(draft));
-      state = draft;
-      return result;
+    transaction(work) {
+      const run = queue.then(async () => {
+        const draft = cloneState(state);
+        const result = await work(transactionOver(draft));
+        state = draft;
+        return result;
+      });
+      queue = run.catch(() => undefined);
+      return run;
     },
     async listSlots(input: ListSlotsInput) {
       return state.slots

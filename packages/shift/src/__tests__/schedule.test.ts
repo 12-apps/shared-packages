@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ShiftConfigError,
   ShiftScheduleError,
   createMemoryShiftScheduleDb,
   createShiftScheduleService,
@@ -130,6 +131,32 @@ describe('scheduleSlot', () => {
     await expect(fixture.schedule.scheduleSlot({ ...slotAt(DAY_MS), clientId: 'clinic-b' })).resolves.toHaveLength(1);
   });
 
+  it('accepts twelve repeats and refuses a negative count', async () => {
+    const fixture = setup();
+    const slots = await fixture.schedule.scheduleSlot({ ...slotAt(DAY_MS), repeatWeeks: 12, timeZone: 'UTC' });
+    expect(slots).toHaveLength(13);
+    const negative = { ...slotAt(DAY_MS), repeatWeeks: -1, timeZone: 'UTC' };
+    expect(await refusal(fixture.schedule.scheduleSlot(negative))).toBe('INVALID_SLOT');
+  });
+
+  it('lets exactly one of two concurrent identical writes in', async () => {
+    const fixture = setup();
+    const results = await Promise.allSettled([
+      fixture.schedule.scheduleSlot(slotAt(DAY_MS)),
+      fixture.schedule.scheduleSlot(slotAt(DAY_MS + HOUR_MS)),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(fixture.db.slots()).toHaveLength(1);
+  });
+
+  it('refuses a bad configuration up front', () => {
+    const db = createMemoryShiftScheduleDb();
+    expect(() => createShiftScheduleService(db, { kinds: KINDS, maxRepeatWeeks: -1 })).toThrow(ShiftConfigError);
+    expect(() => createShiftScheduleService(db, { kinds: KINDS, dueWindowMinutes: Number.NaN })).toThrow(
+      ShiftConfigError,
+    );
+  });
+
   it('allows back-to-back slots', async () => {
     const fixture = setup();
     await fixture.schedule.scheduleSlot(slotAt(DAY_MS, 4));
@@ -172,6 +199,31 @@ describe('cancelSlot', () => {
     expect(live.map((slot) => slot.id)).toEqual([slots[0]?.id]);
   });
 
+  it('cancels only the slot itself when it has no series, and audits the cancel', async () => {
+    const fixture = setup();
+    const [slot] = await fixture.schedule.scheduleSlot(slotAt(DAY_MS));
+    const canceled = await fixture.schedule.cancelSlot({
+      clientId: BASE.clientId,
+      slotId: slot?.id ?? '',
+      actorUserId: 'head-1',
+      scope: 'following',
+    });
+    expect(canceled.map((one) => one.id)).toEqual([slot?.id]);
+    expect(fixture.db.audits().at(-1)).toMatchObject({ action: 'shift.schedule.cancel', resourceId: slot?.id });
+  });
+
+  it('lets one of two concurrent cancels win and refuses the other', async () => {
+    const fixture = setup();
+    const [slot] = await fixture.schedule.scheduleSlot(slotAt(DAY_MS));
+    const cancel = { clientId: BASE.clientId, slotId: slot?.id ?? '', actorUserId: 'head-1' };
+    const [first, second] = await Promise.allSettled([
+      fixture.schedule.cancelSlot(cancel),
+      fixture.schedule.cancelSlot(cancel),
+    ]);
+    expect(first?.status).toBe('fulfilled');
+    expect(second?.status === 'rejected' && (second.reason as ShiftScheduleError).code).toBe('SLOT_CANCELED');
+  });
+
   it('refuses another tenant, a canceled slot and a slot already over', async () => {
     const clock = { now: NOW };
     const fixture = setup(() => clock.now);
@@ -202,6 +254,21 @@ describe('reads', () => {
     expect((await fixture.schedule.listSlots(window)).map((slot) => slot.id)).toEqual([kept?.id]);
     const all = await fixture.schedule.listSlots({ ...window, includeCanceled: true });
     expect(all.map((slot) => slot.cancelReason)).toEqual([null, 'absence']);
+  });
+
+  it('reads a slot under way as next, and never an over or canceled one', async () => {
+    const clock = { now: NOW };
+    const fixture = setup(() => clock.now);
+    const [running] = await fixture.schedule.scheduleSlot(slotAt(HOUR_MS));
+    await fixture.schedule.scheduleSlot(slotAt(-10 * HOUR_MS + DAY_MS, 1));
+    const [dropped] = await fixture.schedule.scheduleSlot(slotAt(2 * DAY_MS));
+    await fixture.schedule.cancelSlot({ clientId: BASE.clientId, slotId: dropped?.id ?? '', actorUserId: null });
+    clock.now = at(DAY_MS - 8 * HOUR_MS);
+    const next = await fixture.schedule.nextSlots({ clientIds: [BASE.clientId], userId: BASE.userId, limit: 5 });
+    expect(next).toEqual([]);
+    clock.now = at(2 * HOUR_MS);
+    const during = await fixture.schedule.nextSlots({ clientIds: [BASE.clientId], userId: BASE.userId, limit: 5 });
+    expect(during[0]?.id).toBe(running?.id);
   });
 
   it('reads the next slots only in the tenants allowed, filtering before the limit', async () => {
@@ -246,10 +313,17 @@ describe('slotStanding', () => {
     ['on shift, early inside the window', -10 * MINUTE_MS, OPEN, 'on_shift', 0],
     ['on shift, under way', HOUR_MS, OPEN, 'on_shift', 0],
     ['later, even with an open shift before the window', -HOUR_MS, OPEN, 'later', 0],
+    ['on shift, exactly at the window', -15 * MINUTE_MS, OPEN, 'on_shift', 0],
+    ['late, a millisecond before the end', 4 * HOUR_MS - 1, null, 'late', 239],
     ['over, at the end', 4 * HOUR_MS, null, 'over', 0],
     ['over, even with an open shift', 4 * HOUR_MS, OPEN, 'over', 0],
   ])('%s', (_, offset, open, expected, minutes) => {
     expect(standing(offset, open)).toEqual({ standing: expected, lateMinutes: minutes });
+  });
+
+  it('reads an undefined open shift as none', () => {
+    const undefinedShift = undefined as unknown as Shift | null;
+    expect(standing(HOUR_MS, undefinedShift)).toEqual({ standing: 'late', lateMinutes: 60 });
   });
 
   it('is canceled before anything else', () => {
