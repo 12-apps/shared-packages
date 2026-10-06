@@ -137,7 +137,7 @@ const exactPrimaryPanelStyles = (theme: Theme, exact: PanelWidth): CSSObject => 
     width: `var(${EXACT_WIDTH_VAR})`,
     maxWidth: `var(${EXACT_WIDTH_VAR})`,
     [theme.breakpoints.down('sm')]: full,
-    ...(exact.fullBelowPx ? { [`@media (max-width: ${exact.fullBelowPx - 0.02}px)`]: full } : {}),
+    ...(exact.fullBelowPx ? { [theme.breakpoints.down(exact.fullBelowPx)]: full } : {}),
   };
 };
 

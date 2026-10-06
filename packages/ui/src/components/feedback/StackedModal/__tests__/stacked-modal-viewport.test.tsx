@@ -149,7 +149,7 @@ describe("StackedModal panelWidth", () => {
   it("takes the whole screen under fullBelowPx", async () => {
     renderModal(undefined, undefined, SHEET);
     await screen.findByTestId("viewport-modal-header");
-    expect(injectedCss()).toMatch(/@media \(max-width:\s*999\.98px\)\s*\{[^}]*--stacked-modal-width:\s*100%/);
+    expect(injectedCss()).toMatch(/@media \(max-width:\s*999\.95px\)\s*\{[^}]*--stacked-modal-width:\s*100%/);
   });
 
   it("animates to its own width, and keeps the prop off the DOM", async () => {
