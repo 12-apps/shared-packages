@@ -174,6 +174,17 @@ describe('ToastHost', () => {
     expect(polite?.textContent).toContain('Fine');
   });
 
+  it('stays announced when a sheet marks the rest of the page aria-hidden', async () => {
+    mount();
+    const viewport = screen.getByTestId('toast-viewport');
+    // What MUI's modal manager does to every other child of <body>.
+    viewport.setAttribute('aria-hidden', 'true');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(viewport.hasAttribute('aria-hidden')).toBe(false);
+  });
+
   it('shows a spinner for a loading toast and no close button when not dismissible', () => {
     const { toaster } = mount();
     act(() => {

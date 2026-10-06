@@ -20,12 +20,14 @@ import type { ToastAction, ToastSeverity } from '../core';
 import { defaultToastDuration } from '../core';
 
 import { ToastCard } from './toast-card';
+import { useStaysAnnounced } from './stays-announced';
 import { TOAST_VIEWPORT_SX, inBody, useToastViewport } from './toast-host';
 import { useToastClock } from './use-toast-clock';
 
 /** Render `children` in the toast column: the host's slot, or a column of their own. */
 export function ToastPortal({ children }: { children: ReactNode }): JSX.Element | null {
   const viewport = useToastViewport();
+  const announced = useStaysAnnounced();
   if (viewport !== null) {
     // The host's slot mounts in the host's own commit; until then, nothing.
     return viewport.slot === null ? null : createPortal(children, viewport.slot);
@@ -33,7 +35,7 @@ export function ToastPortal({ children }: { children: ReactNode }): JSX.Element 
   return (
     <>
       {inBody(
-        <Box data-testid="toast-viewport-standalone" sx={TOAST_VIEWPORT_SX}>
+        <Box ref={announced} data-testid="toast-viewport-standalone" sx={TOAST_VIEWPORT_SX}>
           {children}
         </Box>,
       )}

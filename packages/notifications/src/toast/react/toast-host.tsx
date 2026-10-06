@@ -35,6 +35,7 @@ import { Text } from '@12-apps/ui/typography/Text';
 
 import { defaultToastStore, type ToastAction, type ToastItem, type ToastStore } from '../core';
 
+import { useStaysAnnounced } from './stays-announced';
 import { ToastCard, ToastSurface } from './toast-card';
 import { useToastClock } from './use-toast-clock';
 
@@ -153,6 +154,7 @@ export function ToastHost({
 }: ToastHostProps): JSX.Element {
   const items = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const announced = useStaysAnnounced();
   // Newest first: the toast nearest the top edge is the answer to the last tap.
   const visible = items.slice(-max).reverse();
   const waiting = items.length - visible.length;
@@ -161,7 +163,7 @@ export function ToastHost({
     <ToastViewportContext.Provider value={{ slot, dismissLabel }}>
       {children}
       {inBody(
-      <Box data-testid="toast-viewport" sx={TOAST_VIEWPORT_SX}>
+      <Box ref={announced} data-testid="toast-viewport" sx={TOAST_VIEWPORT_SX}>
         {/* Always mounted, so a toast added to it is announced: a live region
             has to be in the tree before its content changes. */}
         <Box
