@@ -1,14 +1,24 @@
 import { Box } from "@mui/material";
 import { useEffect, useMemo, useState, type JSX } from "react";
-import QRCode from "react-qr-code";
 
 import { useCheckoutCopy } from "./copy-context";
-import { ContentCopyIcon } from "./icons";
+import { PixAfterCopy } from "./pix-after-copy";
+import { PixPane, type PixTab } from "./pix-pane";
+import { PIX_CONTAINER, PIX_WIDE, useClipboardCopy } from "./pix-parts";
+import { usePixStage } from "./pix-stage";
 import type { PixPaneCopy, SettlingCopy } from "./screens-copy";
 import { StalledWait } from "./stalled-wait";
 import type { CheckoutOrder, OrderStatus, PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
 import { usePaymentPolling } from "./use-payment-polling";
+
+/**
+ * PIX payment view: the pane to pay from (tabs on a phone, QR and code side by
+ * side on a desktop — `./pix-pane`), and after a copy the wait that follows
+ * (`./pix-after-copy`). Polls the order in the background throughout and hands
+ * a terminal status up to the parent, which then shows the payment-status
+ * screen. The 2026-10-06 redesign moved the layout out; the wait stays here.
+ */
 
 /**
  * PIX payment view: a scannable QR (rendered client-side from the "copia e cola"
@@ -65,62 +75,6 @@ function pixWaitMs(expiresAt: string | undefined): number {
   return Math.max(0, deadline - Date.now()) + PIX_EXPIRY_GRACE_MS;
 }
 
-/** The copyable "copia e cola" strip with its copy button. */
-function PixCodeBox({ pix, onCopied }: { pix: PixCharge; onCopied: () => void }): JSX.Element {
-  const { Button, Text } = useCheckoutComponents();
-  const copy = useCheckoutCopy().screens.pix;
-  const [copied, setCopied] = useState(false);
-
-  const copyCode = async (): Promise<void> => {
-    try {
-      await navigator.clipboard?.writeText(pix.copyPaste);
-      setCopied(true);
-      onCopied();
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard unavailable — the code is still visible to copy manually */
-    }
-  };
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1,
-        width: "100%",
-        maxWidth: 420,
-        p: 1,
-        borderRadius: 1,
-        border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "background.default",
-      }}
-    >
-      <Text
-        variant="code"
-        size="xs"
-        as="span"
-        data-testid="pix-code"
-        style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-      >
-        {pix.copyPaste}
-      </Text>
-      <Button
-        variant="outline"
-        color="neutral"
-        size="sm"
-        icon={<ContentCopyIcon fontSize="small" />}
-        onClick={() => {
-          void copyCode();
-        }}
-        dataTestId="pix-copy"
-      >
-        {copied ? copy.copiedAction : copy.copyAction}
-      </Button>
-    </Box>
-  );
-}
 
 /**
  * Which of the wait's three faces the footer is showing — STOPPED, then STILL
@@ -164,18 +118,17 @@ function PixPollFooter({
   error,
   timedOut,
   onCheckAgain,
-  manual,
+  awaiting,
 }: {
   error: string | null;
   timedOut: boolean;
   onCheckAgain: () => void;
-  /** The store confirms this Pix: the wait is for THEM, not for the bank. */
-  manual: boolean;
+  /** What the healthy wait says: whose confirmation it is waiting for, or "Verificando…" after a copy. */
+  awaiting: string;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const { pix, settling } = useCheckoutCopy().screens;
+  const { settling } = useCheckoutCopy().screens;
   const panel = pixWaitPanel(settling, error, timedOut);
-  const awaiting = (manual ? pix.manual?.awaiting : undefined) ?? pix.awaiting;
   if (panel) {
     // The same panel the card and wallet panes show, held to the width of the
     // copy-and-paste strip above it so the centred PIX column stays a column.
@@ -202,51 +155,120 @@ function PixPollFooter({
 }
 
 /**
- * What a store-confirmed Pix says once its code is copied (FUT-3232).
- *
- * The footer's caption already names the store's wait, but in a grey line
- * under the QR that a buyer on their way to the bank app does not read. Copying
- * is that moment, so it answers with a notice that stays: the wait can run for
- * minutes, and "volte para esta tela" is the instruction that keeps the buyer
- * where the confirmation will land.
+ * The words that depend on who confirms. A store-confirmed Pix must not say
+ * "a confirmação é automática": nothing confirms it but the store.
  */
-function ManualCopiedNotice({ manual, copied }: { manual: boolean; copied: boolean }): JSX.Element | null {
-  const { Alert } = useCheckoutComponents();
-  const notice = useCheckoutCopy().screens.pix.manual?.copied;
-  if (!manual || !copied || !notice) return null;
+function pixSentences(copy: PixPaneCopy, manual: boolean): Pick<PixPaneCopy, "validUntil" | "awaiting" | "afterCopy"> {
+  return (manual ? copy.manual : undefined) ?? copy;
+}
+
+/**
+ * The deadline and the wait, rendered once for both layouts: narrow, two
+ * centred lines under the pane; wide, one footer row under a hairline with the
+ * wait on the left and the deadline on the right.
+ */
+function PixFooter({ deadline, children }: { deadline: string; children: JSX.Element }): JSX.Element {
+  const { Text } = useCheckoutComponents();
   return (
-    <Box sx={{ width: "100%", maxWidth: 420, textAlign: "left" }}>
-      <Alert
-        variant="info"
-        title={notice.title}
-        description={notice.description}
-        showIcon
-        data-testid="pix-manual-copied"
-      />
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 1,
+        textAlign: "center",
+        [PIX_WIDE]: { flexDirection: "row-reverse", justifyContent: "space-between", textAlign: "left", pt: 2.25, borderTop: "1px solid", borderColor: "divider" },
+      }}
+    >
+      <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry" style={{ margin: 0 }}>
+        {deadline}
+      </Text>
+      {children}
     </Box>
   );
 }
 
-/** The code strip and, once it has been copied, what that copy means. */
-function PixCopyRow({ pix, manual }: { pix: PixCharge; manual: boolean }): JSX.Element {
-  const [copied, setCopied] = useState(false);
-  return (
-    <>
-      <PixCodeBox pix={pix} onCopied={() => setCopied(true)} />
-      <ManualCopiedNotice manual={manual} copied={copied} />
-    </>
-  );
+/** The poll, bounded by the charge's own expiry (FUT-1170). */
+function usePixPolling(order: CheckoutOrder, onResolved: (status: OrderStatus) => void, pollIntervalMs: number) {
+  // Fixed once per charge (FUT-1170): the bound is a span, so recomputing it
+  // every render would keep pushing the deadline out — and it is an effect
+  // dependency, so it would also restart the wait on every render.
+  const expiresAt = order.pix?.expiresAt;
+  const maxWaitMs = useMemo(() => pixWaitMs(expiresAt), [expiresAt]);
+  const polling = usePaymentPolling(order.orderId, {
+    intervalMs: pollIntervalMs,
+    slowAfterPolls: PIX_FAST_POLLS,
+    // Never FASTER than the opening cadence: a host that opens slowly means it.
+    slowIntervalMs: Math.max(pollIntervalMs, PIX_SLOW_INTERVAL_MS),
+    maxWaitMs,
+  });
+  const { status } = polling;
+  // Bubble a terminal status up once, so the parent can advance to the status step.
+  useEffect(() => {
+    if (status && status !== "AWAITING_PAYMENT") onResolved(status);
+  }, [status, onResolved]);
+  return polling;
 }
 
-/**
- * The pane's two sentences that depend on who confirms. A store-confirmed Pix
- * must not say "a confirmação é automática": nothing confirms it but the store.
- */
-function pixSentences(
-  copy: PixPaneCopy,
-  manual: boolean,
-): Pick<PixPaneCopy, "instructions" | "validUntil"> {
-  return (manual ? copy.manual : undefined) ?? copy;
+function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; poll: ReturnType<typeof usePixPolling> }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.pix;
+  const stage = usePixStage();
+  const [tab, setTab] = useState<PixTab>("copy");
+  const { copy: writeClipboard, justCopied } = useClipboardCopy(pix.copyPaste);
+  // Leaving the payment step (a method switch, a terminal status) ends the
+  // after-copy face with it: the next pane starts on the code.
+  const { setAfterCopy } = stage;
+  useEffect(() => () => setAfterCopy(false), [setAfterCopy]);
+
+  // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
+  // clock, so it travels with the sentence it feeds rather than being frozen
+  // to the origin host's here.
+  const time = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, { hour: "2-digit", minute: "2-digit" });
+  const sentences = pixSentences(copy, pix.confirmation === "MANUAL");
+  const footerLine = (awaiting: string): JSX.Element => (
+    <PixPollFooter error={poll.error} timedOut={poll.timedOut} onCheckAgain={poll.checkAgain} awaiting={awaiting} />
+  );
+
+  if (stage.afterCopy) {
+    return (
+      <PixAfterCopy
+        pix={pix}
+        words={sentences.afterCopy}
+        totalLabel={order.totalLabel}
+        deadline={time}
+        justCopied={justCopied}
+        onCopyAgain={() => void writeClipboard()}
+        onShowQr={() => {
+          setTab("qr");
+          setAfterCopy(false);
+        }}
+        onPreferCard={stage.preferCard}
+        footer={footerLine(copy.verifying)}
+      />
+    );
+  }
+  return (
+    <>
+      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
+        {copy.heading}
+      </Text>
+      <PixPane
+        pix={pix}
+        tab={tab}
+        onTab={setTab}
+        onCopy={() => {
+          // Only a copy the clipboard TOOK moves on: the next face opens on
+          // "Código Pix copiado", and a failed write leaves the code on screen
+          // to select by hand.
+          void writeClipboard().then((ok) => {
+            if (ok) setAfterCopy(true);
+          });
+        }}
+      />
+      <PixFooter deadline={sentences.validUntil(time)}>{footerLine(sentences.awaiting)}</PixFooter>
+    </>
+  );
 }
 
 export function PixView({
@@ -260,26 +282,7 @@ export function PixView({
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
-  // Fixed once per charge (FUT-1170): the bound is a span, so recomputing it
-  // every render would keep pushing the deadline out — and it is an effect
-  // dependency, so it would also restart the wait on every render.
-  const expiresAt = order.pix?.expiresAt;
-  const maxWaitMs = useMemo(() => pixWaitMs(expiresAt), [expiresAt]);
-  const { status, error, timedOut, checkAgain } = usePaymentPolling(order.orderId, {
-    intervalMs: pollIntervalMs,
-    slowAfterPolls: PIX_FAST_POLLS,
-    // Never FASTER than the opening cadence: a host that opens slowly means it.
-    slowIntervalMs: Math.max(pollIntervalMs, PIX_SLOW_INTERVAL_MS),
-    maxWaitMs,
-  });
-
-  // Bubble a terminal status up once, so the parent can advance to the status step.
-  useEffect(() => {
-    if (status && status !== "AWAITING_PAYMENT") {
-      onResolved(status);
-    }
-  }, [status, onResolved]);
-
+  const poll = usePixPolling(order, onResolved, pollIntervalMs);
   const pix = order.pix;
   if (!pix) {
     return (
@@ -288,42 +291,9 @@ export function PixView({
       </Text>
     );
   }
-
-  // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
-  // clock, so it travels with the sentence it feeds rather than being frozen
-  // to the origin host's here.
-  const validUntil = new Date(pix.expiresAt).toLocaleTimeString(copy.expiryLocale, { hour: "2-digit", minute: "2-digit" });
-  const manual = pix.confirmation === "MANUAL";
-  const sentences = pixSentences(copy, manual);
-
   return (
-    <Box
-      data-testid="pix-view"
-      sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, textAlign: "center" }}
-    >
-      <Text variant="heading" size="md" weight="bold" as="h2">
-        {copy.heading}
-      </Text>
-      <Text variant="body" size="sm" color="secondary" as="p">
-        {sentences.instructions(order.totalLabel)}
-      </Text>
-
-      <Box
-        data-testid="pix-qr"
-        role="img"
-        aria-label={copy.qrAlt}
-        sx={{ bgcolor: "background.paper", p: 2, borderRadius: 2, border: "1px solid", borderColor: "divider" }}
-      >
-        <QRCode value={pix.copyPaste} size={200} />
-      </Box>
-
-      <PixCopyRow pix={pix} manual={manual} />
-
-      <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
-        {sentences.validUntil(validUntil)}
-      </Text>
-
-      <PixPollFooter error={error} timedOut={timedOut} onCheckAgain={checkAgain} manual={manual} />
+    <Box data-testid="pix-view" sx={{ ...PIX_CONTAINER, display: "flex", flexDirection: "column", gap: 2 }}>
+      <PixBody order={order} pix={pix} poll={poll} />
     </Box>
   );
 }

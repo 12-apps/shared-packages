@@ -21,25 +21,35 @@
 
 /** The method tiles, and what each one promises. */
 export interface MethodPickerCopy {
-  /** The group's heading, and its `aria-label` — one string, said once. */
+  /**
+   * The group's accessible name. Not drawn: the tiles are self-explaining
+   * ("Pix", "Cartão") and the heading cost the phone a line above the code
+   * (the 2026-10-06 Pix redesign).
+   */
   groupLabel: string;
   /**
-   * What each method is CALLED. "PIX" is a Brazilian instrument and keeps its
+   * What each method is CALLED. "Pix" is a Brazilian instrument and keeps its
    * name everywhere, the way "Visa" does; "Cartão" is just the word for card,
    * and was the tile's label — so both are stated rather than one assumed.
    */
   pixLabel: string;
   cardLabel: string;
-  /** What each method is like to use — shown under its name. */
+  /**
+   * What each method is like to use. The checkout's tiles no longer draw it
+   * (the 2026-10-06 Pix redesign kept the picker to one line); the flow
+   * pipeline's method list (`flows/pipeline/methods.ts`) still says it.
+   */
   pixDescription: string;
   /**
-   * PIX's line when the store confirms it by hand (the chain's first PIX
-   * provider declares `confirmation: 'MANUAL'`). Optional; absent falls back
-   * to `pixDescription`, so a host enabling such a provider should set it.
+   * PIX's line when the store confirms it by hand. Optional; absent falls
+   * back to `pixDescription`.
    */
   pixManualDescription?: string;
   cardDescription: string;
-  /** This store's providers cannot take that method. */
+  /**
+   * This store's providers cannot take that method: the disabled tile's
+   * accessible description, and a caption under the picker.
+   */
   unavailableHere: string;
 }
 
@@ -88,16 +98,59 @@ export interface SettlingCopy {
   checkAgainAction: string;
 }
 
+/**
+ * The words the after-copy state says (the 2026-10-06 Pix redesign). One shape
+ * for both kinds of Pix: the manual one says the STORE confirms, the automatic
+ * one that the BANK does — the screen around it is the same.
+ */
+export interface PixAfterCopyCopy {
+  title: string;
+  /**
+   * The sentence under the title. `wide` is the desktop layout, whose reader is
+   * on a "page" rather than a "screen"; `**…**` marks the bold span.
+   */
+  body(totalLabel: string, wide: boolean): string;
+  /** The three steps: copied (done), pay (current), the confirmation (pending). */
+  stepCopied: string;
+  stepPay(wide: boolean): string;
+  stepConfirm(time: string): string;
+}
+
 /** The PIX pane: the QR, the copyable code, and the wait. */
 export interface PixPaneCopy {
   heading: string;
-  /** What to do with the QR, carrying the order total the buyer is paying. */
-  instructions(totalLabel: string): string;
   /** The QR image's alternative text — the only thing a screen reader gets. */
   qrAlt: string;
+  /** The primary copy button. */
   copyAction: string;
-  /** The same button for the two seconds after a successful copy. */
+  /** "Copiar de novo" for the two seconds after a successful copy. */
   copiedAction: string;
+  /** The after-copy state's copy-again button. */
+  copyAgainAction: string;
+  /** The after-copy state's way back to the QR (narrow layout only). */
+  showQrAction: string;
+  /** The after-copy state's way to the card, when the store takes one. */
+  preferCardAction: string;
+  /** The after-copy state's poll line. */
+  verifying: string;
+  /** The narrow layout's tabs: their group name and the two labels. */
+  tabsLabel: string;
+  copyPasteTab: string;
+  qrTab: string;
+  /** The wide layout's two column headings and the word between them. */
+  qrHeading: string;
+  copyPasteHeading: string;
+  or: string;
+  /** Under the QR in the wide layout; `**…**` marks the bold span. */
+  qrInstructions: string;
+  /** Under the QR in the narrow layout's QR tab. */
+  qrTabCaption: string;
+  /** Under the copy button: narrow and wide. `**…**` marks the bold span. */
+  copyPasteHint: string;
+  internetBankingHint: string;
+  /** The wide after-copy state's QR box. */
+  notPaidYet: string;
+  scanFromPhone: string;
   /**
    * How long the code lasts. Takes the already-formatted clock time, and
    * {@link expiryLocale} is what formatted it.
@@ -113,6 +166,8 @@ export interface PixPaneCopy {
   awaiting: string;
   /** The order came back with no PIX charge on it — nothing to show. */
   chargeMissing: string;
+  /** After a copy, for a Pix the BANK confirms. */
+  afterCopy: PixAfterCopyCopy;
   /**
    * The same pane for a Pix the STORE confirms (`PixCharge.confirmation:
    * 'MANUAL'`). Optional so a host's own table keeps compiling; absent, the
@@ -120,16 +175,9 @@ export interface PixPaneCopy {
    * enables a store-confirmed provider should set them.
    */
   manual?: {
-    instructions(totalLabel: string): string;
     validUntil(time: string): string;
     awaiting: string;
-    /**
-     * Shown once the buyer copies the code, and kept: copying is the moment
-     * they leave for their bank app, so it is when they must learn the wait
-     * that follows is the STORE's, and that the answer arrives on this screen.
-     * Optional so a host's own copy without it simply shows no notice.
-     */
-    copied?: { title: string; description: string };
+    afterCopy: PixAfterCopyCopy;
   };
 }
 

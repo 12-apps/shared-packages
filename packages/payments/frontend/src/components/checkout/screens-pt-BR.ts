@@ -12,7 +12,7 @@ import type { CheckoutScreensCopy } from './screens-copy';
 export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
   method: {
     groupLabel: 'Forma de pagamento',
-    pixLabel: 'PIX',
+    pixLabel: 'Pix',
     cardLabel: 'Cartão',
     pixDescription: 'Aprovação imediata',
     pixManualDescription: 'Confirmado pela loja',
@@ -31,25 +31,50 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     checkAgainAction: 'Verificar de novo',
   },
   pix: {
-    heading: 'Pague com PIX',
-    instructions: (totalLabel) =>
-      `Escaneie o QR code no app do seu banco ou copie o código. Total ${totalLabel}.`,
+    heading: 'Pague com Pix',
     qrAlt: 'QR Code PIX para pagamento',
-    copyAction: 'Copiar',
+    copyAction: 'Copiar código',
     copiedAction: 'Copiado!',
+    copyAgainAction: 'Copiar de novo',
+    showQrAction: 'Ver QR code',
+    preferCardAction: 'Prefere pagar com cartão?',
+    verifying: 'Verificando automaticamente…',
+    tabsLabel: 'Forma de pagar o Pix',
+    copyPasteTab: 'Copia e cola',
+    qrTab: 'QR code',
+    qrHeading: 'Pelo celular',
+    copyPasteHeading: 'Pix Copia e Cola',
+    or: 'ou',
+    qrInstructions: 'Abra o app do seu banco no celular, escolha **Pix › Ler QR code** e aponte para a tela.',
+    qrTabCaption: 'Escaneie com o app do banco em outro celular.',
+    copyPasteHint: 'Cole no app do seu banco em **Pix Copia e Cola**.',
+    internetBankingHint: 'Pagando pelo internet banking? Cole o código em **Pix Copia e Cola**.',
+    notPaidYet: 'Ainda não pagou?',
+    scanFromPhone: 'Escaneie com o app do banco no celular.',
     validUntil: (time) => `Válido até ${time}. A confirmação é automática.`,
     expiryLocale: 'pt-BR',
     awaiting: 'Aguardando pagamento…',
     chargeMissing: 'Não foi possível gerar o código PIX.',
+    afterCopy: {
+      title: 'Aguardando o pagamento',
+      body: (totalLabel, wide) =>
+        `Assim que o banco confirmar o pagamento de ${wide ? `**${totalLabel}**` : totalLabel}, seu pedido aparece aqui. Pode deixar esta ${wide ? 'página' : 'tela'} aberta.`,
+      stepCopied: 'Código Pix copiado',
+      stepPay: (wide) =>
+        wide ? 'Pague no app ou no internet banking (Pix Copia e Cola)' : 'Pague no app do seu banco (Pix Copia e Cola)',
+      stepConfirm: () => 'O banco confirma o pagamento automaticamente',
+    },
     manual: {
-      instructions: (totalLabel) =>
-        `Pague ${totalLabel} com o QR code ou o código abaixo. A loja confere o recebimento e confirma o seu pedido.`,
       validUntil: (time) => `A loja confirma o pagamento até ${time}.`,
-      awaiting: 'Aguardando confirmação do pagamento pela loja…',
-      copied: {
-        title: 'Código copiado. Agora pague no app do seu banco',
-        description:
-          'Depois de pagar, volte para esta tela e aguarde: a loja confere o recebimento e confirma o seu pedido aqui mesmo.',
+      awaiting: 'Aguardando confirmação da loja…',
+      afterCopy: {
+        title: 'Aguardando a loja',
+        body: (totalLabel, wide) =>
+          `Assim que a loja confirmar o recebimento de ${wide ? `**${totalLabel}**` : totalLabel}, seu pedido aparece aqui. Pode deixar esta ${wide ? 'página' : 'tela'} aberta.`,
+        stepCopied: 'Código Pix copiado',
+        stepPay: (wide) =>
+          wide ? 'Pague no app ou no internet banking (Pix Copia e Cola)' : 'Pague no app do seu banco (Pix Copia e Cola)',
+        stepConfirm: (time) => `A loja confirma o pagamento — até ${time}`,
       },
     },
   },

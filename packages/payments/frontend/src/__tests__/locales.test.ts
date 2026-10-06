@@ -126,9 +126,11 @@ describe('the locale packs', () => {
 
   it('keeps the schemes a buyer looks for by name', () => {
     // PIX and CPF are Brazilian and are what the buyer will search their
-    // banking app for; translating them leaves them hunting.
+    // banking app for; translating them leaves them hunting. The CASE is the
+    // brand's own ("Pix", the 2026-10-06 redesign) — what must not change is
+    // the word.
     for (const copy of Object.values(CHECKOUT_SCREENS_COPY)) {
-      expect(copy.method.pixLabel).toBe('PIX');
+      expect(copy.method.pixLabel).toMatch(/^pix$/i);
       expect(copy.validation.taxIdInvalid).toContain('CPF');
       expect(copy.payer.taxId('000')).toContain('CPF');
     }
