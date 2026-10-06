@@ -46,6 +46,11 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
         `Pague ${totalLabel} com o QR code ou o código abaixo. A loja confere o recebimento e confirma o seu pedido.`,
       validUntil: (time) => `A loja confirma o pagamento até ${time}.`,
       awaiting: 'Aguardando confirmação do pagamento pela loja…',
+      copied: {
+        title: 'Código copiado. Agora pague no app do seu banco',
+        description:
+          'Depois de pagar, volte para esta tela e aguarde: a loja confere o recebimento e confirma o seu pedido aqui mesmo.',
+      },
     },
   },
   card: {

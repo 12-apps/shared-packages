@@ -123,6 +123,13 @@ export interface PixPaneCopy {
     instructions(totalLabel: string): string;
     validUntil(time: string): string;
     awaiting: string;
+    /**
+     * Shown once the buyer copies the code, and kept: copying is the moment
+     * they leave for their bank app, so it is when they must learn the wait
+     * that follows is the STORE's, and that the answer arrives on this screen.
+     * Optional so a host's own copy without it simply shows no notice.
+     */
+    copied?: { title: string; description: string };
   };
 }
 

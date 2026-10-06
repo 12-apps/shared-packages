@@ -66,7 +66,7 @@ function pixWaitMs(expiresAt: string | undefined): number {
 }
 
 /** The copyable "copia e cola" strip with its copy button. */
-function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
+function PixCodeBox({ pix, onCopied }: { pix: PixCharge; onCopied: () => void }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   const [copied, setCopied] = useState(false);
@@ -75,6 +75,7 @@ function PixCodeBox({ pix }: { pix: PixCharge }): JSX.Element {
     try {
       await navigator.clipboard?.writeText(pix.copyPaste);
       setCopied(true);
+      onCopied();
       setTimeout(() => setCopied(false), 2000);
     } catch {
       /* clipboard unavailable — the code is still visible to copy manually */
@@ -201,6 +202,43 @@ function PixPollFooter({
 }
 
 /**
+ * What a store-confirmed Pix says once its code is copied (FUT-3232).
+ *
+ * The footer's caption already names the store's wait, but in a grey line
+ * under the QR that a buyer on their way to the bank app does not read. Copying
+ * is that moment, so it answers with a notice that stays: the wait can run for
+ * minutes, and "volte para esta tela" is the instruction that keeps the buyer
+ * where the confirmation will land.
+ */
+function ManualCopiedNotice({ manual, copied }: { manual: boolean; copied: boolean }): JSX.Element | null {
+  const { Alert } = useCheckoutComponents();
+  const notice = useCheckoutCopy().screens.pix.manual?.copied;
+  if (!manual || !copied || !notice) return null;
+  return (
+    <Box sx={{ width: "100%", maxWidth: 420, textAlign: "left" }}>
+      <Alert
+        variant="info"
+        title={notice.title}
+        description={notice.description}
+        showIcon
+        data-testid="pix-manual-copied"
+      />
+    </Box>
+  );
+}
+
+/** The code strip and, once it has been copied, what that copy means. */
+function PixCopyRow({ pix, manual }: { pix: PixCharge; manual: boolean }): JSX.Element {
+  const [copied, setCopied] = useState(false);
+  return (
+    <>
+      <PixCodeBox pix={pix} onCopied={() => setCopied(true)} />
+      <ManualCopiedNotice manual={manual} copied={copied} />
+    </>
+  );
+}
+
+/**
  * The pane's two sentences that depend on who confirms. A store-confirmed Pix
  * must not say "a confirmação é automática": nothing confirms it but the store.
  */
@@ -279,7 +317,7 @@ export function PixView({
         <QRCode value={pix.copyPaste} size={200} />
       </Box>
 
-      <PixCodeBox pix={pix} />
+      <PixCopyRow pix={pix} manual={manual} />
 
       <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry">
         {sentences.validUntil(validUntil)}
