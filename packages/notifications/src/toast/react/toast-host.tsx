@@ -97,8 +97,9 @@ const ToastViewportContext = createContext<ToastViewportValue | null>(null);
  * The context answers for what the host wraps. A host may also be mounted as
  * a SIBLING — the storefront loads it lazily, off its critical path, after the
  * first render — so the host also registers here, and a portal outside it
- * finds it all the same. One host per page is the contract; the last one
- * mounted answers.
+ * finds it all the same. One host per page is the contract: the last one
+ * mounted answers, and two at once leave a portal outside both answered by
+ * whichever registered last (or, after it unmounts, by none).
  */
 let registered: ToastViewportValue | null = null;
 const registryListeners = new Set<() => void>();
