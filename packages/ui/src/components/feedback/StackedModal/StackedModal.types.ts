@@ -12,6 +12,21 @@ export type PanelMaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | false;
  * 60vw starves on a laptop.
  */
 export type PanelSize = 'default' | 'wide';
+/**
+ * An exact width for the top panel, for a screen whose owner set one: the
+ * panel takes `min(share, maxPx)` of the viewport, and the whole screen when
+ * the viewport is narrower than `fullBelowPx`. It replaces `size` and
+ * `maxWidth`. Everything here reads the VIEWPORT, never the panel, so nothing
+ * inside the panel can feed back into the width that laid it out.
+ */
+export interface PanelWidth {
+  /** The viewport share, as a CSS length (`'72vw'`). */
+  share: string;
+  /** The cap, in px; converted to rem like every other size here. */
+  maxPx: number;
+  /** Under this viewport width (px) the panel takes the whole screen. */
+  fullBelowPx?: number;
+}
 
 export interface StackedModalProps {
   /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
@@ -64,6 +79,8 @@ export interface StackedModalProps {
   maxWidth?: PanelMaxWidth;
   /** Viewport share of the top panel — `wide` gives a dense editor more room */
   size?: PanelSize;
+  /** An exact width for the top panel; replaces `size` and `maxWidth` (see `PanelWidth`). */
+  panelWidth?: PanelWidth;
   /** Disable the backdrop click behavior */
   disableBackdrop?: boolean;
   /** Disable focus trap functionality */

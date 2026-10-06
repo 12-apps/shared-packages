@@ -138,6 +138,7 @@ new component that portals should too.
 | `fullScreen` | `boolean` | `false` | Full screen mode |
 | `maxWidth` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl' \| false` | `'md'` | Maximum modal width |
 | `size` | `'default' \| 'wide'` | `'default'` | Viewport share of the top panel: default is 80vw (`sm`–`lg`), 60vw (`lg`+), 40vw (≥2200px); `wide` is 90vw up to `xl`, 75vw above, 60vw ≥2200px — for a dense two-column editor |
+| `panelWidth` | `{ share: string; maxPx: number; fullBelowPx?: number }` | - | An exact width for the top panel: `min(share, maxPx)` of the viewport, the whole screen under `fullBelowPx`. Replaces `size` and `maxWidth`. Viewport only — nothing inside the panel feeds back into it |
 | `disableBackdrop` | `boolean` | `false` | Hide backdrop |
 | `disableFocusTrap` | `boolean` | `false` | Disable focus trapping |
 | `keepMounted` | `boolean` | `false` | Keep modal mounted when closed |
