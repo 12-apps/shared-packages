@@ -50,6 +50,7 @@ The Tabs component provides an intuitive way to organize related content into se
 | `content`  | `ReactNode` | Yes      | Content to display in panel         |
 | `icon`     | `ReactNode` | No       | Icon to display before label        |
 | `badge`    | `string \| number` | No | Badge content (notification count)  |
+| `count`    | `{ value: string \| number; tone?: 'neutral' \| 'warning' \| 'danger' }` | No | A count said inside the tab, after its label, as a small pill (lines, events, charges); `tone` marks one asking for action |
 | `disabled` | `boolean`   | No       | Whether tab is disabled             |
 | `closable` | `boolean`   | No       | Whether tab can be closed           |
 | `className`| `string`    | No       | Custom CSS class for the tab        |

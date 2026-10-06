@@ -2,6 +2,13 @@ import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { TabsProps as MuiTabsProps } from '@mui/material/Tabs/index.js';
 import type { ReactNode } from 'react';
 
+/** A tab's inline count — see `TabItem.count`. */
+export interface TabCount {
+  value: string | number;
+  /** `warning` asks for attention, `danger` for action; neutral otherwise. */
+  tone?: 'neutral' | 'warning' | 'danger';
+}
+
 export interface TabItem {
   /**
    * Unique identifier for the tab
@@ -32,6 +39,13 @@ export interface TabItem {
    * Badge content to show on the tab
    */
   badge?: string | number;
+
+  /**
+   * A count said INSIDE the tab, after its label, as a small pill: how many
+   * lines, events or charges the pane holds. `tone` marks one that asks for
+   * action. Unlike `badge` it never floats over the label.
+   */
+  count?: TabCount;
   
   /**
    * Custom className for the tab

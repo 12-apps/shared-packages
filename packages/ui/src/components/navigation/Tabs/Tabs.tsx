@@ -10,7 +10,7 @@ import React from 'react';
 
 import { CustomTabPanel } from './TabsPanel';
 import { tabsRootStyles } from './Tabs.styles';
-import type { TabItem, TabsProps } from './Tabs.types';
+import type { TabCount, TabItem, TabsProps } from './Tabs.types';
 import { rem, sxRem } from '../../../tokens/relative';
 
 const StyledTabs = styled(MuiTabs, {
@@ -42,6 +42,30 @@ const BadgeWrapper = styled(Badge)(({ theme }) => ({
     minWidth: rem(theme, 16),
     height: rem(theme, 16),
     padding: 0 } }));
+
+/** A tab's inline count pill, toned by what it asks for. */
+const CountPill = styled('span', {
+  shouldForwardProp: (prop) => prop !== 'tone',
+})<{ tone: NonNullable<TabCount['tone']> }>(({ theme, tone }) => {
+  const look = {
+    neutral: { backgroundColor: theme.palette.action.selected, color: theme.palette.text.secondary },
+    warning: { backgroundColor: alpha(theme.palette.warning.main, 0.16), color: theme.palette.warning.dark },
+    danger: { backgroundColor: theme.palette.error.main, color: theme.palette.error.contrastText },
+  }[tone];
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: rem(theme, 20),
+    minWidth: rem(theme, 20),
+    padding: theme.spacing(0, 0.875),
+    borderRadius: rem(theme, 999),
+    fontSize: rem(theme, 11.5),
+    fontWeight: 600,
+    lineHeight: 1,
+    ...look,
+  };
+});
 
 const TABS_DEFAULTS: Partial<TabsProps> = {
   variant: 'default',
@@ -154,6 +178,11 @@ const TabLabel: React.FC<{
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {item.icon}
       <span>{item.label}</span>
+      {item.count !== undefined && (
+        <CountPill tone={item.count.tone ?? 'neutral'} data-tone={item.count.tone ?? 'neutral'}>
+          {item.count.value}
+        </CountPill>
+      )}
       {item.closable && (
         <CloseButton
           onClick={(e) => onClose(e, item.id)}
