@@ -33,6 +33,9 @@ language shipped as a finished-looking silence:
   verbatim by a screen reader.
 - `CardActionsProvider`'s **`errorTitle`** — the one sentence the provider
   renders on its own. The message beside it comes from whatever failed.
+  An app with one toast channel passes **`onError(title, message)`** instead of
+  living with the provider's bottom snackbar: given, the provider draws
+  nothing of its own and the failure lands with every other toast.
 - Both hooks' **`confirmText`** — the verb. `ConfirmOptions` already refuses to
   default one, for the same reason: a confirm button reading "OK" tells the
   operator nothing about what is about to happen.

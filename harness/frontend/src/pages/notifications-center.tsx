@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 
 import { AttentionHost, AttentionQuickSettings } from '@12-apps/notifications/attention/react';
+import { toast } from '@12-apps/notifications/toast';
+import { Toast, ToastHost } from '@12-apps/notifications/toast/react';
 import { notificationsManifest } from '@12-apps/notifications/manifest';
 import { notificationsWebManifest } from '@12-apps/notifications/manifest/web';
 import { webWiringHost } from '../wiring-web';
@@ -175,6 +177,43 @@ function AttentionSection(): JSX.Element {
   );
 }
 
+/**
+ * The toast column, mounted as a host mounts it: ONE `ToastHost` with the
+ * host's two sentences, a queued toast raised from outside React (`toast(…)`)
+ * and a declarative one whose live state the host owns (`<Toast>`). Both land
+ * in the same column at the top of the screen.
+ */
+function ToastSection(): JSX.Element {
+  const [held, setHeld] = useState(false);
+  return (
+    <ToastHost dismissLabel="Fechar aviso" moreLabel={(count) => `+${count} avisos`}>
+      <button
+        type="button"
+        data-testid="host-toast-raise"
+        onClick={() =>
+          toast.success('Pedido salvo', {
+            testId: 'host-toast-saved',
+            actions: [{ label: 'Desfazer', onClick: () => undefined, testId: 'host-toast-undo' }],
+          })
+        }
+      >
+        Avisar
+      </button>
+      <button type="button" data-testid="host-toast-hold" onClick={() => setHeld(true)}>
+        Aviso fixo
+      </button>
+      <Toast
+        open={held}
+        severity="error"
+        message="Não foi possível salvar"
+        duration={null}
+        onClose={() => setHeld(false)}
+        testId="host-toast-held"
+      />
+    </ToastHost>
+  );
+}
+
 export function NotificationsCenterPage(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [navigated, setNavigated] = useState<string | null>(null);
@@ -197,6 +236,9 @@ export function NotificationsCenterPage(): JSX.Element {
 
       <h2>Avisos (pacote)</h2>
       <AttentionSection />
+
+      <h2>Toasts (pacote)</h2>
+      <ToastSection />
     </div>
   );
 }
