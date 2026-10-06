@@ -40,7 +40,8 @@ export interface QuickFilterConfig {
    * field and the host put it back. An empty field is no filter, so "Limpar",
    * the active count and the ladder see the default view as unfiltered, and
    * "Limpar" from any other chip lands back here. The HOST owns what an empty
-   * field means: the grid applies no filter for it.
+   * field means: the grid applies no filter for it. At most ONE per `fieldId`:
+   * two would both read pressed on the empty field.
    */
   default?: boolean;
 }
