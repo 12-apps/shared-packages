@@ -324,6 +324,14 @@ an idle pill first, or the chips together — never one chip swapped for another
 under the hand that pressed it. A chip reads as pressed
 only when its value is the field's WHOLE selection.
 
+A chip declared `default: true` is the page's unfiltered view ("Precisa repor"):
+it reads pressed while its field is EMPTY, and pressing it empties the field
+rather than writing its value. So the default view is no filter: no "Limpar" on
+arrival, no applied badge on "Mais", and "Limpar" from any other chip lands back
+on it. The host owns what the empty field means (the grid filters nothing for
+it); seeding the value instead made "Limpar" show on arrival and do nothing.
+`data-views-quick-default.test.tsx` pins it.
+
 Both are inline-bar features: in the classic slide-in panel (`inlineFilters`
 off) there is no bar, and the chips' field is drawn as its ordinary pill.
 
