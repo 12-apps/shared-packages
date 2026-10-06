@@ -120,6 +120,8 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   quickFilters?: QuickFilterConfig[];
   /** Pin the toolbar and the table header while the page scrolls — see `DataViewsGrid`. */
   stickyToolbar?: boolean;
+  /** Show the "N de N" counter (default `true`) — see `DataViewsGrid`. */
+  showCounter?: boolean;
   /** Server-mode wiring (FUT-180): backend-driven rows/total + re-fetch. Omit for client mode. */
   server?: DataViewServer;
   /** Seed the initial view state (search/pills/ranges/sort) from the URL when no saved view applies. */

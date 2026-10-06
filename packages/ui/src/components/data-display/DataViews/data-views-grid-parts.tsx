@@ -105,6 +105,8 @@ interface GridShellFiltersArgs<T extends Record<string, unknown>> {
   /** Is "Exportar" on the bar? Half the right cluster's cost when it is not. */
   hasExport: boolean;
   quickFilters: QuickFilterConfig[];
+  /** Is the "N de N" counter on the bar? Priced at 0 when it is not. */
+  showCounter: boolean;
 }
 
 function useGridShellFilters<T extends Record<string, unknown>>({
@@ -116,6 +118,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
   alwaysShowSearch,
   hasExport,
   quickFilters,
+  showCounter,
 }: GridShellFiltersArgs<T>): {
   showInline: boolean;
   useModal: boolean;
@@ -137,6 +140,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
     c.ranges,
     openControls > 0,
     hasExport,
+    showCounter,
   );
   // THE BAR RENDERS AT EVERY WIDTH. It used to be swapped for a full-screen
   // filter MODAL below `lg`, which was the responsive strategy before the
@@ -253,6 +257,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   quickFilters?: QuickFilterConfig[];
   /** Pin the toolbar and the table header while the page scrolls. */
   stickyToolbar?: boolean;
+  /** Hide the "N de N" counter — see `DataViewsGrid`. */
+  showCounter?: boolean;
 }
 
 /** The scrollable content region: scope tabs, toolbar, filter bar, body, pager. */
@@ -298,7 +304,7 @@ function ShellStack<T extends Record<string, unknown>>({
           allOnPageSelected={allOnPageSelected(c, props.getRowId)}
           toolbarRightSlot={props.toolbarRightSlot}
           compactControls={showInline && split.compactControls}
-          counterHidden={showInline && split.counterHidden}
+          counterHidden={props.showCounter === false || (showInline && split.counterHidden)}
           showInline={showInline}
           sticky={props.stickyToolbar === true}
         />
@@ -355,6 +361,7 @@ export function GridShell<T extends Record<string, unknown>>(props: GridShellPro
     alwaysShowSearch,
     hasExport: props.exportConfig !== undefined,
     quickFilters: props.quickFilters ?? [],
+    showCounter: props.showCounter !== false,
   });
   return (
     <DataViewsLayoutProvider

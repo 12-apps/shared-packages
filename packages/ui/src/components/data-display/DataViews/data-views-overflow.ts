@@ -235,6 +235,8 @@ function computeSplit<T extends Record<string, unknown>>(
   /** Does the host render "Exportar" beside "Exibir"? Half the cluster if not. */
   hasExport: boolean,
   theme: Theme,
+  /** The host shows the "N de N" counter — priced at 0 when it does not. */
+  showCounter = true,
 ): Omit<OverflowSplit<T>, "barRef"> {
   // Unmeasured (SSR, or jsdom without a ResizeObserver) ⇒ degrade nothing.
   if (width === 0) {
@@ -248,7 +250,9 @@ function computeSplit<T extends Record<string, unknown>>(
       searchTakeover: false,
     };
   }
-  const price = pricesFor(theme);
+  // A counter the host turned off costs nothing at any rung: pricing it
+  // anyway left a gap where it would have been, and shed controls for it.
+  const price = showCounter ? pricesFor(theme) : { ...pricesFor(theme), counter: 0 };
   // Pass 1 prices the furniture at its widest — no rung has been taken yet.
   let budget = furnitureCost(price, UNCOLLAPSED, hasExport);
   let split = splitFilters(all, pills, ranges, width, budget, false, theme);
@@ -360,6 +364,8 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
   frozen = false,
   /** Whether "Exportar" is on the bar — see `rightClusterCost`. */
   hasExport = true,
+  /** Whether the "N de N" counter is on the bar — see `computeSplit`. */
+  showCounter = true,
 ): OverflowSplit<T> {
   // The measurement is `useMeasuredWidth` (`utility/Overflow`): the same
   // ResizeObserver every collapsing cluster in the design system reads, so
@@ -377,11 +383,12 @@ export function useFilterOverflow<T extends Record<string, unknown>>(
     ranges,
     width,
     hasExport,
+    showCounter,
     scale: remPx(theme, 1),
   });
   const cache = useRef<{ signature: string; split: ReturnType<typeof computeSplit<T>> } | null>(null);
   if (cache.current === null || (!frozen && cache.current.signature !== signature)) {
-    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme) };
+    cache.current = { signature, split: computeSplit(all, pills, ranges, width, hasExport, theme, showCounter) };
   }
   // The cache holds the ARRANGEMENT — which ids sit on the bar, which in "Mais"
   // — never the fields themselves. The signature keys on ids, so a field whose

@@ -199,6 +199,13 @@ interface DataViewsGridProps<T extends Record<string, unknown>> {
    * rather than relying on `position: sticky` (see `useStickyTableHead`).
    */
   stickyToolbar?: boolean;
+  /**
+   * Show the "N de N" counter (default `true`). `false` removes it from the
+   * bar AND from the ladder's budget, so nothing is shed to make room for it —
+   * for a list whose rows are not all records (section headings handed in as
+   * rows would be counted as results).
+   */
+  showCounter?: boolean;
   /** Server-mode wiring; when set the grid is backend-driven (no client filter/sort/paginate). */
   server?: DataViewServer;
 }
