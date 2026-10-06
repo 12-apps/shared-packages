@@ -4,7 +4,7 @@
  * Not `@12-apps/ui/icons`: its `Icon` brings the whole glyph table and the
  * native-renderer bridge with it (~15 KiB raw), and a host mounts the toast
  * column on its CRITICAL path — the storefront's entry chunk went over its
- * byte ceiling with it (FUT-3358). The paths are the library's own
+ * byte ceiling with it. The paths are the library's own
  * (`@12-apps/ui/src/icons/paths.generated.ts`, from `@mui/icons-material`), so
  * the glyphs are identical; `SvgIcon` is MUI's, already on every page.
  */

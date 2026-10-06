@@ -66,21 +66,24 @@ export interface ToastProps {
   testId?: string;
 }
 
-function OpenToast({
-  message,
-  severity = 'neutral',
-  title,
-  actions = [],
-  duration,
-  restartKey,
-  dismissible = true,
-  assertive = false,
-  dismissLabel,
-  onClose,
-  testId,
-}: Omit<ToastProps, 'open'>): JSX.Element {
+/** The props with their defaults stated once, so `OpenToast` reads as what it draws. */
+function withDefaults(props: Omit<ToastProps, 'open'>) {
+  const severity = props.severity ?? 'neutral';
+  return {
+    ...props,
+    severity,
+    actions: props.actions ?? [],
+    dismissible: props.dismissible ?? true,
+    lifetime: props.duration === undefined ? defaultToastDuration(severity) : props.duration,
+    // An error interrupts a screen reader; so does a toast that asks to.
+    interrupts: severity === 'error' || props.assertive === true,
+  };
+}
+
+function OpenToast(props: Omit<ToastProps, 'open'>): JSX.Element {
+  const { message, severity, title, actions, lifetime, restartKey, dismissible, interrupts, dismissLabel, onClose, testId } =
+    withDefaults(props);
   const viewport = useToastViewport();
-  const lifetime = duration === undefined ? defaultToastDuration(severity) : duration;
   const { pause, resume } = useToastClock(lifetime, restartKey, () => onClose('timeout'));
   const onAction = useCallback(
     (action: ToastAction) => {
@@ -92,8 +95,8 @@ function OpenToast({
   return (
     <ToastPortal>
       <Box
-        role={severity === 'error' || assertive ? 'alert' : 'status'}
-        aria-live={severity === 'error' || assertive ? 'assertive' : 'polite'}
+        role={interrupts ? 'alert' : 'status'}
+        aria-live={interrupts ? 'assertive' : 'polite'}
         onMouseEnter={pause}
         onMouseLeave={resume}
         onFocus={pause}
