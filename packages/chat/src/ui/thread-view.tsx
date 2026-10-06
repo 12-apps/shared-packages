@@ -20,6 +20,7 @@ import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
 import { Box } from "@12-apps/ui/layout/Box";
 import { Stack } from "@12-apps/ui/layout/Stack";
+import { Icon } from "@12-apps/ui/icons";
 import { Text } from "@12-apps/ui/typography/Text";
 import { useState, type ComponentType, type JSX, type ReactNode } from "react";
 
@@ -94,16 +95,15 @@ function Message(props: {
   return (
     <Box direction="row" justify={message.mine ? "end" : "start"} testID={`chat-message-${message.id}`}>
       <Bubble mine={message.mine}>
-        <Stack direction="row" gap={1} align="baseline">
-          {/* Body-text colour on the own tint: the primary colour on its own tint falls under 4.5:1. */}
-          <Text variant="caption" weight="semibold" color={message.mine ? "neutral" : "secondary"}>
-            {message.label}
-          </Text>
-          <Text variant="caption" color="secondary">
-            {formatTime(message.createdAt)}
-          </Text>
-        </Stack>
+        {/* Who wrote it over the text, when under it: a bubble reads top to bottom. */}
+        {/* Body-text colour on the own tint: the primary colour on its own tint falls under 4.5:1. */}
+        <Text variant="caption" weight="semibold" color={message.mine ? "neutral" : "secondary"}>
+          {message.label}
+        </Text>
         <Text>{message.body}</Text>
+        <Text variant="caption" color="secondary">
+          {formatTime(message.createdAt)}
+        </Text>
       </Bubble>
     </Box>
   );
@@ -126,6 +126,7 @@ function QuickReplies(props: {
           <Chip
             key={reply.key}
             label={reply.text}
+            icon={<Icon name="Bolt" size={14} />}
             variant="outlined"
             disabled={props.disabled}
             onClick={() => props.onPick(reply.key)}
