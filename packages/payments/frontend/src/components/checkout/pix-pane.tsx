@@ -48,7 +48,7 @@ function ColumnHeading({ children, center }: { children: ReactNode; center?: boo
   const { Text } = useCheckoutComponents();
   return (
     <Box sx={{ ...wideOnly("block"), textAlign: center ? "center" : "left" }}>
-      <Text variant="caption" size="xs" weight="bold" color="secondary" as="p" style={{ textTransform: "uppercase", letterSpacing: "0.04em", margin: 0 }}>
+      <Text variant="body" size="xs" weight="bold" color="secondary" as="p" style={{ textTransform: "uppercase", letterSpacing: "0.04em", margin: 0 }}>
         {children}
       </Text>
     </Box>
@@ -144,9 +144,12 @@ function CopyPanel({ pix, shown, onCopy }: { pix: PixCharge; shown: boolean; onC
           {pix.copyPaste}
         </Text>
       </Box>
-      <Button variant="solid" color="primary" size="lg" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopy} dataTestId="pix-copy">
-        {copy.copyAction}
-      </Button>
+      {/* The one action on the pane: the prototype's 56px bar (52 wide), whatever the host's lg is. */}
+      <Box sx={{ "& > *": { minHeight: 56 }, [PIX_WIDE]: { "& > *": { minHeight: 52 } } }}>
+        <Button variant="solid" color="primary" size="lg" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopy} dataTestId="pix-copy">
+          {copy.copyAction}
+        </Button>
+      </Box>
       <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0 }}>
         <Box component="span" sx={{ display: "block", textAlign: "center", ...NARROW_ONLY }}>
           <Emphasized text={copy.copyPasteHint} />
@@ -167,7 +170,7 @@ function OrDivider(): JSX.Element {
   return (
     <Box aria-hidden sx={{ ...wideOnly("flex"), flexDirection: "column", alignItems: "center", alignSelf: "center", gap: 1 }}>
       <Box sx={line} />
-      <Text variant="caption" size="xs" weight="semibold" color="secondary" as="span">
+      <Text variant="body" size="xs" weight="semibold" color="secondary" as="span">
         {copy.or}
       </Text>
       <Box sx={line} />

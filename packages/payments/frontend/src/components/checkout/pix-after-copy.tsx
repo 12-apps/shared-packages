@@ -58,7 +58,7 @@ function Step({ state, index, children }: { state: StepState; index: number; chi
   return (
     <Box component="li" data-testid={`pix-after-copy-step-${index}`} data-state={state} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
       <StepMark state={state} index={index} />
-      <Text variant="body" size="sm" weight={state === "current" ? "bold" : undefined} color={state === "current" ? "primary" : "secondary"} as="span">
+      <Text variant="body" size="sm" weight={state === "current" ? "bold" : undefined} color={state === "current" ? undefined : "secondary"} as="span">
         {children}
       </Text>
     </Box>
@@ -91,9 +91,12 @@ function Heading({ words, totalLabel }: { words: PixAfterCopyCopy; totalLabel: s
         <ScheduleIcon sx={{ fontSize: 30 }} />
       </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-        <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }} data-testid="pix-after-copy-title">
-          {words.title}
-        </Text>
+        {/* The screen's title outranks the checklist: 22px, 28px wide (the prototype's scale). */}
+        <Box sx={{ "& > *": { fontSize: "1.375rem", lineHeight: 1.25 }, [PIX_WIDE]: { "& > *": { fontSize: "1.75rem" } } }}>
+          <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }} data-testid="pix-after-copy-title">
+            {words.title}
+          </Text>
+        </Box>
         <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0 }}>
           <Box component="span" sx={{ [PIX_WIDE]: { display: "none" } }}>{words.body(totalLabel, false)}</Box>
           <Box component="span" sx={{ display: "none", [PIX_WIDE]: { display: "inline" } }}>
@@ -123,7 +126,7 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.25, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5 } }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
       {/* Narrow, a grid cell; wide, its own width beside the link (the prototype's row). */}
       <Box sx={{ minWidth: 0, [PIX_WIDE]: { flex: "none", "& > *": { width: "auto" } } }}>
         <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} dataTestId="pix-copy-again">
@@ -166,11 +169,11 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
         ) : null}
       </Box>
       <Box sx={{ display: "none", [PIX_WIDE]: { display: "flex" }, flex: "1 1 240px", minWidth: 0, flexDirection: "column", alignItems: "center", gap: 1.5, p: 2.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
-        <Text variant="caption" size="xs" weight="bold" color="secondary" as="p" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <Text variant="body" size="xs" weight="bold" color="secondary" as="p" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {copy.notPaidYet}
         </Text>
         <PixQr payload={pix.copyPaste} size={168} alt={copy.qrAlt} />
-        <Text variant="caption" size="xs" color="secondary" as="p" style={{ margin: 0, textAlign: "center" }}>
+        <Text variant="body" size="xs" color="secondary" as="p" style={{ margin: 0, textAlign: "center" }}>
           {copy.scanFromPhone}
         </Text>
       </Box>

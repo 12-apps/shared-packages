@@ -147,7 +147,7 @@ function PixPollFooter({
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "text.secondary" }}>
       <LoadingDot />
-      <Text variant="caption" size="xs" color="secondary" as="span" data-testid="pix-awaiting">
+      <Text variant="body" size="xs" color="secondary" as="span" data-testid="pix-awaiting">
         {awaiting}
       </Text>
     </Box>
@@ -180,7 +180,7 @@ function PixFooter({ deadline, children }: { deadline: string; children: JSX.Ele
         [PIX_WIDE]: { flexDirection: "row-reverse", justifyContent: "space-between", textAlign: "left", pt: 2.25, borderTop: "1px solid", borderColor: "divider" },
       }}
     >
-      <Text variant="caption" size="xs" color="secondary" as="p" data-testid="pix-expiry" style={{ margin: 0 }}>
+      <Text variant="body" size="xs" color="secondary" as="p" data-testid="pix-expiry" style={{ margin: 0 }}>
         {deadline}
       </Text>
       {children}
