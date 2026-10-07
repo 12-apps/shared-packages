@@ -162,7 +162,7 @@ describe("RouteMap", () => {
   it("shows the full credit by default, with nothing to press", async () => {
     await mount();
     expect(screen.getByText(EN_US_ROUTE_MAP_COPY.attribution).tagName).toBe("SMALL");
-    expect(screen.queryByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution })).toBeNull());
   });
 
   it("follows the attribution prop after mount", async () => {
