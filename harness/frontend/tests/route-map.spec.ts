@@ -25,6 +25,6 @@ test('the mounted surface renders the map region in the host words', async ({ pa
   await expect(map).toHaveAttribute('data-state', /^(ready|error)$/, { timeout: 30_000 });
   // Drawn, or refused in the package's words — both are the surface answering.
   await expect(
-    map.getByRole('button', { name: 'Alex, on the way' }).or(map.getByRole('button', { name: 'Try again' })),
+    map.getByRole('img', { name: 'Alex, on the way' }).or(map.getByRole('button', { name: 'Try again' })),
   ).toBeVisible({ timeout: 10_000 });
 });
