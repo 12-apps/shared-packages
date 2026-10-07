@@ -251,9 +251,12 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   }
   return (
     <>
-      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
-        {copy.heading}
-      </Text>
+      {/* The pane's title, at the prototype's scale: 20px, 26px wide. */}
+      <Box sx={{ "&& > *": { fontSize: "1.25rem", lineHeight: 1.25 }, [PIX_WIDE]: { "&& > *": { fontSize: "1.625rem" } } }}>
+        <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
+          {copy.heading}
+        </Text>
+      </Box>
       <PixPane
         pix={pix}
         tab={tab}
@@ -293,8 +296,22 @@ export function PixView({
     );
   }
   return (
-    <Box data-testid="pix-view" sx={{ ...PIX_CONTAINER, display: "flex", flexDirection: "column", gap: 2 }}>
-      <PixBody order={order} pix={pix} poll={poll} />
+    <Box data-testid="pix-view" sx={PIX_CONTAINER}>
+      {/*
+        Wide, the pane is one white card on the page (the prototype's desktop
+        frame): heading, the two columns and the footer read as one unit. The
+        card is a child because a container query cannot style its container.
+      */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          [PIX_WIDE]: { gap: 2.5, p: 3.5, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2 },
+        }}
+      >
+        <PixBody order={order} pix={pix} poll={poll} />
+      </Box>
     </Box>
   );
 }
