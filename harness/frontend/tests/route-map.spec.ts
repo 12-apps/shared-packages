@@ -21,8 +21,10 @@ test('the mounted surface renders the map region in the host words', async ({ pa
   const map = page.getByTestId('route-map');
   await expect(map).toBeVisible();
   await expect(map).toHaveAttribute('aria-label', 'Map');
+  // Settled first, so a failure names WHICH state it never left.
+  await expect(map).toHaveAttribute('data-state', /^(ready|error)$/, { timeout: 30_000 });
   // Drawn, or refused in the package's words — both are the surface answering.
   await expect(
     map.getByRole('button', { name: 'Alex, on the way' }).or(map.getByRole('button', { name: 'Try again' })),
-  ).toBeVisible({ timeout: 30_000 });
+  ).toBeVisible({ timeout: 10_000 });
 });

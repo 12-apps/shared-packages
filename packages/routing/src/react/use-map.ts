@@ -2,8 +2,8 @@
  * The MapLibre instance behind one `RouteMap`: load the library lazily, build
  * the map with both line layers, report `loading | ready | error`, and tear it
  * down on unmount or before a retry. A failure before the first `load` (no
- * WebGL, a style that fails or does not arrive within `readyTimeoutMs`) is
- * `error`; a tile failing later is not.
+ * WebGL, a library or style that fails or does not arrive within
+ * `readyTimeoutMs`, counted from mount) is `error`; a tile failing later is not.
  * Readiness is the style's, not the tiles' (`style.load`).
  */
 
@@ -56,9 +56,14 @@ export function useMapInstance(setup: MapSetup): MapHandle {
   useEffect(() => {
     injectCss();
     let disposed = false;
-    let readyTimer: ReturnType<typeof setTimeout> | undefined;
+    let ready = false;
     setStatus("loading");
     const current = setupRef.current;
+    // From the START, not from when the library arrives: a library chunk that
+    // never finishes downloading must reach the error state too.
+    const readyTimer = setTimeout(() => {
+      if (!ready && !disposed) setStatus("error");
+    }, current.readyTimeoutMs);
     void current
       .load()
       .then((lib) => {
@@ -66,19 +71,15 @@ export function useMapInstance(setup: MapSetup): MapHandle {
         libRef.current = lib;
         const map = new lib.Map({ container: current.container.current, style: current.styleUrl, attributionControl: false, center: centreOf(current.propsRef.current), zoom: 13 });
         mapRef.current = map;
-        let loaded = false;
-        readyTimer = setTimeout(() => {
-          if (!loaded && !disposed) setStatus("error");
-        }, current.readyTimeoutMs);
         map.on("error", () => {
-          if (!loaded && !disposed) setStatus("error");
+          if (!ready && !disposed) setStatus("error");
         });
         // Ready as soon as the STYLE is in: sources, layers and markers need
         // nothing more. `load` waits for every first tile too, which over a
         // slow link can be many seconds of an empty map; it stays as a backstop.
         const onReady = (): void => {
-          if (disposed || loaded) return;
-          loaded = true;
+          if (disposed || ready) return;
+          ready = true;
           clearTimeout(readyTimer);
           addLines(map, current.theme);
           setStatus("ready");
