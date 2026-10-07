@@ -12,7 +12,7 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
 import { createHarnessBackend, type HarnessBackend } from '../src/app';
-import { ROUTING_PERSON_COOKIE, routingOutage } from '../src/routing-host';
+import { ROUTING_PERSON_COOKIE, setOsrmDown } from '../src/routing-host';
 
 let backend: HarnessBackend;
 
@@ -73,7 +73,7 @@ it('routes on the road through the second provider when the first is unconfigure
 });
 
 it('falls back to straight segments with no durations when the road provider is down', async () => {
-  routingOutage.osrmDown = true;
+  setOsrmDown(true);
   const response = await plan(TRIP);
   expect(response.status).toBe(200);
   const route = (await response.json()) as Planned;

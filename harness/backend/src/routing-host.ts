@@ -21,7 +21,7 @@
  *   route — the swap from one provider to the next is a config change here
  *   and nowhere else, which is what the package promises.
  *
- * `ROUTING_OSRM_DOWN` lets a case take OSRM away, and then the answer must be
+ * `setOsrmDown` lets a case take OSRM away, and then the answer must be
  * the straight-line fallback with no durations.
  */
 import { routingManifest } from '@12-apps/routing/manifest';
@@ -45,8 +45,13 @@ export const ROUTING_OSRM_URL = 'http://osrm.harness.invalid';
 /** The only callers allowed to plan a route. */
 const DISPATCHERS = new Set(['dispatcher']);
 
-/** A switch the suite flips to take the road provider away. */
-export const routingOutage = { osrmDown: false };
+/** Whether the fake OSRM is down. Flipped through {@link setOsrmDown}, reset by `/__harness/reset`. */
+let osrmDown = false;
+
+/** Take the road provider away (or bring it back) — the suite's one switch. */
+export function setOsrmDown(down: boolean): void {
+  osrmDown = down;
+}
 
 /**
  * The host's fetch: answers the fake OSRM with one straight-ish leg per hop,
@@ -55,7 +60,7 @@ export const routingOutage = { osrmDown: false };
 const hostFetch: typeof fetch = async (input) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
   if (url.origin !== ROUTING_OSRM_URL) return new Response('not here', { status: 599 });
-  if (routingOutage.osrmDown) return new Response('down', { status: 503 });
+  if (osrmDown) return new Response('down', { status: 503 });
   const coordinates = url.pathname.split('/').pop()!.split(';').map((pair) => pair.split(',').map(Number));
   const legs = coordinates.slice(1).map(() => ({ distance: 1200, duration: 240 }));
   return Response.json({ code: 'Ok', routes: [{ geometry: { type: 'LineString', coordinates }, legs }] });
