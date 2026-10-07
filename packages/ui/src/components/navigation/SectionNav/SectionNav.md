@@ -50,6 +50,22 @@ screen.
   carries no words. `PT_BR_SECTION_NAV_COPY` and `EN_US_SECTION_NAV_COPY` are
   named packs; `SECTION_NAV_COPY` is the locale pack.
 - **dataTestId**: the prefix for every test id (`section-nav`).
+- **compact**: `boolean`, default `false`. Icons only, a size down, for a host
+  that folds its chrome so the content gets the screen. See *Compact*.
+
+## Compact
+
+`compact` draws the same navigation as icons only. Nothing is removed: every
+label stays its control's accessible name (out of sight) and its `title`
+tooltip, every count stays on its icon, every menu still opens.
+
+| `layout` | compact draws |
+|---|---|
+| `bar` | 48px instead of 60; each slot its icon; the raised button 40px instead of 52 and lifted less; no caption under an action. The change of height animates (200ms) unless the reader asked for reduced motion. |
+| `rail` | each row, the way back and a `primary` menu's button as their icon, centred; the heading, `more`'s title and its group titles out of sight. Made for a column 64px wide; the host sets the width. |
+
+`sectionNavBarInset(theme, { compact: true })` is the compact bar's full
+height, so a host's reserved foot follows the bar as it folds.
 
 ## A bar of verbs
 
@@ -103,8 +119,8 @@ every label is semibold.
 
 ## Docking the bar
 
-Dock the bar at the foot of a flex column. `sectionNavBarInset(theme)` is its
-full height, the phone's safe area included. Reserve it at the foot of the
+Dock the bar at the foot of a flex column. `sectionNavBarInset(theme)` (with
+`{ compact: true }` for the compact bar) is its full height, the phone's safe area included. Reserve it at the foot of the
 content, so nothing the page floats (a toast, a receipt) lands under the bar.
 
 The bar rises above a modal backdrop only while one of its OWN sheets is open,
@@ -123,7 +139,8 @@ the slot reports the sheet through `aria-expanded`.
 The raised round button on its own, for a host that already draws its own bar:
 drop it between two tabs in a flex row. Without `open` it is a plain action.
 With `captioned` its label is drawn under it, hidden from assistive tech so
-the button is named once. `disabled` is native; `loading` keeps it focusable
+the button is named once. `compact` draws it 40px rather than 52, with no
+caption. `disabled` is native; `loading` keeps it focusable
 with `aria-busy` and `aria-disabled`, and drops the click.
 With `open` it reports `aria-expanded`, takes `closeLabel` as its name, and its
 icon turns 45° while open.

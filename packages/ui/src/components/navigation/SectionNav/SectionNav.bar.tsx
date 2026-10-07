@@ -13,6 +13,7 @@ import {
   CountedIcon,
   NOT_LIVE,
   SlotIcon,
+  VISUALLY_HIDDEN,
   controlProps,
   destinationControl,
   focusRing,
@@ -24,16 +25,24 @@ import type { SectionNavAction, SectionNavBadge, SectionNavDestination, SectionN
 /** Which of the bar's two menus is open, if any. */
 type OpenMenu = 'primary' | 'more' | null;
 
-/** The bar's height above the safe area — tall enough for an icon over a label. */
-const barHeight = (theme: Parameters<typeof rem>[0]): string => rem(theme, 60);
+/**
+ * The bar's height above the safe area — tall enough for an icon over a label;
+ * a compact bar holds the icon alone.
+ */
+const barHeight = (theme: Parameters<typeof rem>[0], compact = false): string => rem(theme, compact ? 48 : 60);
+
+/** How the bar is drawn — `compact` is `SectionNavProps.compact`. */
+export interface SectionNavBarOptions {
+  compact?: boolean;
+}
 
 /**
  * The bar's full height on screen, the safe area included — where its sheets
  * stop, and what a host reserves at the foot of its content so nothing it
  * floats (a toast, a receipt) lands under the bar.
  */
-export function sectionNavBarInset(theme: Parameters<typeof rem>[0]): string {
-  return `calc(${barHeight(theme)} + env(safe-area-inset-bottom))`;
+export function sectionNavBarInset(theme: Parameters<typeof rem>[0], options: SectionNavBarOptions = {}): string {
+  return `calc(${barHeight(theme, options.compact === true)} + env(safe-area-inset-bottom))`;
 }
 
 /**
@@ -62,6 +71,7 @@ function Slot({
   control,
   expanded,
   loading = false,
+  compact = false,
 }: {
   label: string;
   icon: ReactNode;
@@ -73,11 +83,14 @@ function Slot({
   control: Record<string, unknown>;
   expanded?: boolean;
   loading?: boolean;
+  /** Icon only: the label stays the slot's name, out of sight, and its tooltip. */
+  compact?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   return (
     <Box
       {...control}
+      title={compact ? label : undefined}
       aria-current={current ? 'page' : undefined}
       aria-expanded={expanded}
       aria-busy={loading || undefined}
@@ -107,6 +120,7 @@ function Slot({
           lineHeight: 1.3,
           fontWeight: lit ? 700 : 600,
           color: lit ? 'text.primary' : 'inherit',
+          ...(compact ? VISUALLY_HIDDEN : {}),
         }}
       >
         {label}
@@ -158,6 +172,7 @@ interface SlotContext {
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   dataTestId: string;
+  compact: boolean;
 }
 
 /** The raised button: an action runs on tap; a menu opens its sheet. */
@@ -175,6 +190,7 @@ function PrimarySlot({
         label={primary.label}
         icon={primary.icon}
         captioned
+        compact={context.compact}
         disabled={primary.disabled}
         loading={primary.loading}
         dataTestId={testId}
@@ -191,6 +207,7 @@ function PrimarySlot({
       icon={primary.icon}
       open={context.open === 'primary'}
       closeLabel={context.copy.close}
+      compact={context.compact}
       disabled={primary.disabled}
       dataTestId={testId}
       onClick={() => context.toggle('primary')}
@@ -211,6 +228,7 @@ function MoreSlot({ more, context }: { more: SectionNavMenu; context: SlotContex
       expanded={open === 'more'}
       copy={context.copy}
       testId={more.dataTestId ?? `${context.dataTestId}-more`}
+      compact={context.compact}
       control={controlProps({
         href: undefined,
         linkComponent: context.linkComponent,
@@ -240,6 +258,7 @@ function DestinationSlot({
       copy={context.copy}
       testId={destination.dataTestId ?? `${context.dataTestId}-dest-${destination.id}`}
       loading={destination.loading === true}
+      compact={context.compact}
       control={destinationControl(destination, context.linkComponent, () => {
         context.close();
         destination.onSelect?.();
@@ -265,6 +284,32 @@ function BarSlotView({
   return <DestinationSlot destination={slot.destination} context={context} />;
 }
 
+/** The bar's own box: docked, a hairline on top, raised over the backdrop only while its sheet is open. */
+function barSx(theme: Theme, sheetOpen: boolean, compact: boolean): SxProps<Theme> {
+  return {
+    flex: 'none',
+    display: 'flex',
+    alignItems: 'stretch',
+    boxSizing: 'border-box',
+    height: sectionNavBarInset(theme, { compact }),
+    // Folding to icons and back is a change of height the eye follows;
+    // with reduced motion it simply happens.
+    transition: theme.transitions.create('height', { duration: theme.transitions.duration.shorter }),
+    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+    paddingBottom: 'env(safe-area-inset-bottom)',
+    borderTop: `1px solid ${theme.palette.divider}`,
+    bgcolor: 'background.paper',
+    // Above the backdrop ONLY while one of its own sheets is open, so the
+    // primary button can close what it opened. Raised all the time it
+    // would sit over every dialog the page opens, and on a small phone a
+    // dialog's own footer is exactly where the bar is. `stackedOverlayZIndex`,
+    // not `zIndex.modal + 1`: a host lifting a bottom Drawer clear of a
+    // stacked sheet catches this bar's OWN sheets too.
+    position: 'relative',
+    zIndex: sheetOpen ? stackedOverlayZIndex(theme) + 1 : 'auto',
+  } as SxProps<Theme>;
+}
+
 /** The phone layout: a bottom bar, with its menus as bottom sheets. */
 export function SectionNavBar({
   label,
@@ -274,8 +319,9 @@ export function SectionNavBar({
   linkComponent,
   copy,
   dataTestId,
+  compact = false,
 }: Required<Pick<SectionNavProps, 'label' | 'destinations' | 'copy' | 'dataTestId'>> &
-  Pick<SectionNavProps, 'primary' | 'more'> & { linkComponent: ElementType | undefined }): React.JSX.Element {
+  Pick<SectionNavProps, 'primary' | 'more' | 'compact'> & { linkComponent: ElementType | undefined }): React.JSX.Element {
   const sheetMenu = isMenu(primary) ? primary : undefined;
   const theme = useTheme();
   const [open, setOpen] = useState<OpenMenu>(null);
@@ -288,24 +334,7 @@ export function SectionNavBar({
         component="nav"
         aria-label={label}
         data-testid={dataTestId}
-        sx={{
-          flex: 'none',
-          display: 'flex',
-          alignItems: 'stretch',
-          boxSizing: 'border-box',
-          height: sectionNavBarInset(theme),
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          borderTop: `1px solid ${theme.palette.divider}`,
-          bgcolor: 'background.paper',
-          // Above the backdrop ONLY while one of its own sheets is open, so the
-          // primary button can close what it opened. Raised all the time it
-          // would sit over every dialog the page opens, and on a small phone a
-          // dialog's own footer is exactly where the bar is. `stackedOverlayZIndex`,
-          // not `zIndex.modal + 1`: a host lifting a bottom Drawer clear of a
-          // stacked sheet catches this bar's OWN sheets too.
-          position: 'relative',
-          zIndex: open === null ? 'auto' : stackedOverlayZIndex(theme) + 1,
-        }}
+        sx={barSx(theme, open !== null, compact)}
       >
         {barSlots(destinations, more !== undefined, primary !== undefined).map((slot) => (
           <BarSlotView
@@ -313,7 +342,7 @@ export function SectionNavBar({
             slot={slot}
             primary={primary}
             more={more}
-            context={{ open, toggle, close, linkComponent, copy, dataTestId }}
+            context={{ open, toggle, close, linkComponent, copy, dataTestId, compact }}
           />
         ))}
       </Box>
@@ -325,7 +354,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-primary-sheet`}
-          bottomOffset={sectionNavBarInset(theme)}
+          bottomOffset={sectionNavBarInset(theme, { compact })}
         />
       ) : null}
       {more ? (
@@ -336,7 +365,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-more-sheet`}
-          bottomOffset={sectionNavBarInset(theme)}
+          bottomOffset={sectionNavBarInset(theme, { compact })}
         />
       ) : null}
     </>

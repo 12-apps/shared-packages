@@ -82,11 +82,14 @@ export function RailCreateMenu({
   linkComponent,
   copy,
   testId,
+  compact = false,
 }: {
   menu: SectionNavMenu;
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   testId: string;
+  /** The button as its icon only — the label stays its name and its tooltip. */
+  compact?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   const menuId = useId();
@@ -109,7 +112,9 @@ export function RailCreateMenu({
       <Button
         variant="contained"
         fullWidth
-        startIcon={menu.icon}
+        startIcon={compact ? undefined : menu.icon}
+        aria-label={compact ? menu.label : undefined}
+        title={compact ? menu.label : undefined}
         disabled={menu.disabled === true}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -119,14 +124,15 @@ export function RailCreateMenu({
         sx={{
           my: 1,
           minHeight: rem(theme, 40),
-          justifyContent: 'flex-start',
-          px: 1.75,
+          justifyContent: compact ? 'center' : 'flex-start',
+          minWidth: 0,
+          px: compact ? 0 : 1.75,
           fontWeight: 600,
           // A place in the rail reads in sentence case, like the rows under it.
           textTransform: 'none',
         }}
       >
-        {menu.label}
+        {compact ? menu.icon : menu.label}
       </Button>
       <Menu
         id={menuId}

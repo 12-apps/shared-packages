@@ -28,6 +28,12 @@ export interface RaisedActionButtonProps {
    * bar of places can leave its one action to the icon.
    */
   captioned?: boolean;
+  /**
+   * A size down — 40px rather than 52, lifted less — for a compact bar. It
+   * draws no caption: a compact bar is icons only, and the name stays the
+   * button's `aria-label`.
+   */
+  compact?: boolean;
   /** Dimmed and not operable: a native `disabled` button. */
   disabled?: boolean;
   /**
@@ -58,6 +64,7 @@ export function RaisedActionButton({
   open,
   closeLabel,
   captioned = false,
+  compact = false,
   disabled = false,
   loading = false,
   dataTestId = 'raised-action',
@@ -82,11 +89,11 @@ export function RaisedActionButton({
         aria-label={expanded && closeLabel ? closeLabel : label}
         aria-expanded={open}
         data-testid={dataTestId}
-        sx={raisedSx(theme, expanded)}
+        sx={raisedSx(theme, expanded, compact)}
       >
         <SlotIcon icon={icon} loading={loading} />
       </Box>
-      {captioned ? <RaisedCaption label={label} inert={disabled || loading} /> : null}
+      <RaisedCaption shown={captioned && !compact} label={label} inert={disabled || loading} />
     </Box>
   );
 }
@@ -114,10 +121,11 @@ function raisedState({
 }
 
 /**
- * The label under a captioned button. Hidden from assistive tech: the button
+ * The label under a captioned button — none on a compact bar. Hidden from assistive tech: the button
  * already carries the same words as its name, and reading them twice is noise.
  */
-function RaisedCaption({ label, inert }: { label: string; inert: boolean }): React.JSX.Element {
+function RaisedCaption({ shown, label, inert }: { shown: boolean; label: string; inert: boolean }): React.JSX.Element | null {
+  if (!shown) return null;
   return (
     <Typography
       component="span"
@@ -131,15 +139,15 @@ function RaisedCaption({ label, inert }: { label: string; inert: boolean }): Rea
 }
 
 /** The round button: lifted half out of the bar, its icon turning while what it opened is open. */
-function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
-  const size = rem(theme, 52);
+function raisedSx(theme: Theme, expanded: boolean, compact: boolean): SxProps<Theme> {
+  const size = rem(theme, compact ? 40 : 52);
   return {
     ...CONTROL_RESET,
     ...focusRing(theme),
     width: size,
     height: size,
     // Lifted half out of the bar: the one control that is not a place.
-    marginTop: rem(theme, -18),
+    marginTop: rem(theme, compact ? -12 : -18),
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
@@ -149,7 +157,7 @@ function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
     boxShadow: theme.shadows[6],
     [NOT_LIVE]: { cursor: 'default', bgcolor: 'action.disabledBackground', color: 'text.disabled', boxShadow: 'none' },
     '& svg': {
-      fontSize: rem(theme, 26),
+      fontSize: rem(theme, compact ? 22 : 26),
       transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
       transform: expanded ? 'rotate(45deg)' : 'none',
     },

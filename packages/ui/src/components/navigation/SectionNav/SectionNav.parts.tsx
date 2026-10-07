@@ -3,7 +3,7 @@ import CircularProgress from '@mui/material/CircularProgress/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import type { ElementType, ReactNode } from 'react';
 
-import { rem } from '../../../tokens/scales';
+import { rem, sxRem } from '../../../tokens/scales';
 import { Badge } from '../../data-display/Badge';
 
 import { shownCount } from './SectionNav.helpers';
@@ -152,5 +152,22 @@ export const CONTROL_RESET = {
   margin: 0,
   [NOT_LIVE]: { cursor: 'default' },
 } as const;
+
+/**
+ * Out of sight, still read: a compact nav draws its controls as icons only and
+ * keeps each label as the control's accessible name — the same box `Label`'s
+ * `srOnly` uses (`SR_ONLY_SX`).
+ */
+export const VISUALLY_HIDDEN: SxProps<Theme> = {
+  position: 'absolute',
+  width: sxRem(1),
+  height: sxRem(1),
+  padding: 0,
+  margin: sxRem(-1),
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
 
 export { Box };
