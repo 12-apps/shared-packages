@@ -19,15 +19,19 @@ import {
   CircularProgress,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   FormLabel,
+  InputLabel,
+  OutlinedInput,
   Radio,
   RadioGroup as MuiRadioGroup,
   Step,
   StepLabel,
   Stepper as MuiStepper,
-  TextField,
   Typography,
+  styled,
 } from '@mui/material';
+import { useId } from 'react';
 import type { JSX } from 'react';
 
 import type {
@@ -93,25 +97,44 @@ function DefaultButton({ variant = 'solid', color = 'primary', size = 'md', full
   );
 }
 
+/**
+ * An outlined text field, composed from the parts MUI's `TextField` composes
+ * (FUT-3402). `TextField` itself imports `Select` unconditionally, and through
+ * it `Menu`, `MenuList`, `Popover` and `List`; this slot is in every host's
+ * checkout bundle whether or not the host fills it, so it paid for a dropdown
+ * it can never render. Same DOM, pinned by `default-input-parity.test.tsx`.
+ */
+/**
+ * `TextField`'s root, by name: a theme's `components.MuiTextField` overrides
+ * keep applying, and the root carries the same generated class.
+ */
+const TextFieldRoot = styled(FormControl, {
+  name: 'MuiTextField',
+  slot: 'Root',
+  overridesResolver: (_props, styles) => styles.root,
+})({});
+
 function DefaultInput({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, ...rest }: CheckoutInputProps): JSX.Element {
+  const id = useId();
+  const helperTextId = helperText ? `${id}-helper-text` : undefined;
   return (
-    <TextField
-      label={label}
-      type={type}
-      size="small"
-      fullWidth={fullWidth}
-      required={required}
-      placeholder={placeholder}
-      value={value}
-      error={error}
-      helperText={helperText}
-      onChange={onChange}
-      onBlur={onBlur}
-      slotProps={{
-        htmlInput: { inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] },
-        input: { endAdornment },
-      }}
-    />
+    <TextFieldRoot className="MuiTextField-root" size="small" fullWidth={fullWidth} required={required} error={error}>
+      {label ? <InputLabel htmlFor={id} id={`${id}-label`}>{label}</InputLabel> : null}
+      <OutlinedInput
+        id={id}
+        label={label}
+        type={type}
+        fullWidth={fullWidth}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        endAdornment={endAdornment}
+        aria-describedby={helperTextId}
+        inputProps={{ inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] }}
+      />
+      {helperText ? <FormHelperText id={helperTextId}>{helperText}</FormHelperText> : null}
+    </TextFieldRoot>
   );
 }
 
