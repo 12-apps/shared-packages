@@ -152,6 +152,10 @@ export function AttentionTab({ count, worst, pulse, label, zIndex, onExpand }: A
       data-severity={worst ?? 'none'}
       data-count={count}
       data-pulse={pulse}
+      // It floats over the page by design, flush with the right edge: an
+      // overlay that takes no room (ADR "an overlay takes no room"), which a
+      // screen's checks read through this attribute — so it is drawn OPAQUE.
+      data-ui-overlay=""
       onClick={onExpand}
       sx={{
         position: 'fixed',
@@ -164,7 +168,10 @@ export function AttentionTab({ count, worst, pulse, label, zIndex, onExpand }: A
         p: 0,
         pl: '3px',
         borderRadius: HALF_DISC,
-        bgcolor: (theme: Theme) => tabFill(theme, worst),
+        // The quiet fill is a see-through token, so it is laid over the page's
+        // own paper: the same colour on that paper, and nothing under it shows.
+        bgcolor: 'background.default',
+        backgroundImage: (theme: Theme) => `linear-gradient(${tabFill(theme, worst)}, ${tabFill(theme, worst)})`,
         // A bare tab is the quiet surface on the page's own paper: its edge is
         // what finds it, so it keeps one even with nothing waiting.
         border: (theme: Theme) => (worst === null ? `1px solid ${theme.palette.text.secondary}` : 0),

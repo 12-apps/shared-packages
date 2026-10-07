@@ -18,7 +18,7 @@ import {
   destinationControl,
   focusRing,
 } from './SectionNav.parts';
-import { RaisedActionButton } from './SectionNav.primary';
+import { raisedLift, RaisedActionButton } from './SectionNav.primary';
 import { SectionNavSheet } from './SectionNav.sheet';
 import type { SectionNavAction, SectionNavBadge, SectionNavDestination, SectionNavMenu, SectionNavProps } from './SectionNav.types';
 
@@ -43,6 +43,12 @@ export interface SectionNavBarOptions {
  */
 export function sectionNavBarInset(theme: Parameters<typeof rem>[0], options: SectionNavBarOptions = {}): string {
   return `calc(${barHeight(theme, options.compact === true)} + env(safe-area-inset-bottom))`;
+}
+
+/** Where the bar's sheets stop: clear of the raised button's {@link raisedLift}, which drew over their last row (FUT-3399). */
+export function sectionNavSheetOffset(theme: Parameters<typeof rem>[0], raised: boolean, options: SectionNavBarOptions = {}): string {
+  const inset = sectionNavBarInset(theme, options);
+  return raised ? `calc(${inset} + ${rem(theme, raisedLift(options.compact === true))})` : inset;
 }
 
 /**
@@ -373,7 +379,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-primary-sheet`}
-          bottomOffset={sectionNavBarInset(theme, { compact })}
+          bottomOffset={sectionNavSheetOffset(theme, primary !== undefined, { compact })}
         />
       ) : null}
       {more ? (
@@ -384,7 +390,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-more-sheet`}
-          bottomOffset={sectionNavBarInset(theme, { compact })}
+          bottomOffset={sectionNavSheetOffset(theme, primary !== undefined, { compact })}
         />
       ) : null}
     </>

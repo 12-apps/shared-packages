@@ -156,6 +156,19 @@ function RaisedCaption({ shown, label, inert }: { shown: boolean; label: string;
   );
 }
 
+/**
+ * How far the round button stands out of the bar's top edge, in design px — what
+ * the bar's sheets must clear so the button never draws over one (FUT-3399).
+ * The compact bar's smaller button stands out less.
+ */
+export const RAISED_LIFT = 18;
+export const RAISED_LIFT_COMPACT = 12;
+
+/** The lift of the round button on a bar of this form. */
+export function raisedLift(compact: boolean): number {
+  return compact ? RAISED_LIFT_COMPACT : RAISED_LIFT;
+}
+
 /** The round button: lifted half out of the bar, its icon turning while what it opened is open. */
 function raisedSx(theme: Theme, expanded: boolean, compact: boolean): SxProps<Theme> {
   const size = rem(theme, compact ? 40 : 52);
@@ -167,7 +180,7 @@ function raisedSx(theme: Theme, expanded: boolean, compact: boolean): SxProps<Th
     width: size,
     height: size,
     // Lifted half out of the bar: the one control that is not a place.
-    marginTop: rem(theme, compact ? -12 : -18),
+    marginTop: rem(theme, -raisedLift(compact)),
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
