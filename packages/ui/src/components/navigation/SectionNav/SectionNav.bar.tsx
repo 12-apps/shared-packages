@@ -45,18 +45,8 @@ export function sectionNavBarInset(theme: Parameters<typeof rem>[0], options: Se
   return `calc(${barHeight(theme, options.compact === true)} + env(safe-area-inset-bottom))`;
 }
 
-/**
- * Where the bar's sheets stop. The bar sits above the backdrop while a sheet is
- * open (so its own buttons can close it), and the raised button stands
- * {@link raisedLift} out of the bar's top edge — so a sheet that stopped at the
- * bar had the button drawn over its last row (FUT-3399). With a raised button,
- * the sheet stops clear of it, on either form of the bar.
- */
-export function sectionNavSheetOffset(
-  theme: Parameters<typeof rem>[0],
-  raised: boolean,
-  options: SectionNavBarOptions = {},
-): string {
+/** Where the bar's sheets stop: clear of the raised button's {@link raisedLift}, which drew over their last row (FUT-3399). */
+export function sectionNavSheetOffset(theme: Parameters<typeof rem>[0], raised: boolean, options: SectionNavBarOptions = {}): string {
   const inset = sectionNavBarInset(theme, options);
   return raised ? `calc(${inset} + ${rem(theme, raisedLift(options.compact === true))})` : inset;
 }
