@@ -13,7 +13,7 @@ import QRCode from "react-qr-code";
  * window's: the same checkout is mounted in a 720px column, a 1040px one and a
  * phone, and only the room it was given says whether two columns fit.
  */
-export const PIX_WIDE = "@container pixpane (min-width: 640px)";
+export const PIX_WIDE = "@container pixpane (min-width: 760px)";
 
 /** The container the {@link PIX_WIDE} query reads. */
 export const PIX_CONTAINER = { containerType: "inline-size", containerName: "pixpane" } as const;

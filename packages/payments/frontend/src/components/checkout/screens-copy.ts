@@ -123,7 +123,7 @@ export interface PixPaneCopy {
   qrAlt: string;
   /** The primary copy button. */
   copyAction: string;
-  /** "Copiar de novo" for the two seconds after a successful copy. */
+  /** Replaces a copy button's label for the two seconds after a successful copy. */
   copiedAction: string;
   /** The after-copy state's copy-again button. */
   copyAgainAction: string;
@@ -166,6 +166,12 @@ export interface PixPaneCopy {
   awaiting: string;
   /** The order came back with no PIX charge on it — nothing to show. */
   chargeMissing: string;
+  /**
+   * @deprecated Unread since the 2026-10-06 redesign (FUT-3368): the pane's
+   * hints replaced the one instructions line. Kept optional so a host's pack
+   * written for the old pane still compiles; remove it from your pack.
+   */
+  instructions?: string;
   /** After a copy, for a Pix the BANK confirms. */
   afterCopy: PixAfterCopyCopy;
   /**
@@ -177,7 +183,12 @@ export interface PixPaneCopy {
   manual?: {
     validUntil(time: string): string;
     awaiting: string;
-    afterCopy: PixAfterCopyCopy;
+    /** Absent, the automatic {@link PixPaneCopy.afterCopy} is used — set it. */
+    afterCopy?: PixAfterCopyCopy;
+    /** @deprecated Unread since FUT-3368; see {@link PixPaneCopy.instructions}. */
+    instructions?: string;
+    /** @deprecated Unread since FUT-3368: the after-copy screen replaced the notice. */
+    copied?: string;
   };
 }
 

@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { useEffect, useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import { useCheckoutCopy } from "./copy-context";
 import { PixAfterCopy } from "./pix-after-copy";
@@ -18,13 +18,6 @@ import { usePaymentPolling } from "./use-payment-polling";
  * (`./pix-after-copy`). Polls the order in the background throughout and hands
  * a terminal status up to the parent, which then shows the payment-status
  * screen. The 2026-10-06 redesign moved the layout out; the wait stays here.
- */
-
-/**
- * PIX payment view: a scannable QR (rendered client-side from the "copia e cola"
- * payload), the copyable code, and a live pending indicator. Polls the order in
- * the background and hands a terminal status up to the parent, which then shows
- * the payment-status screen.
  */
 
 /**
@@ -74,7 +67,6 @@ function pixWaitMs(expiresAt: string | undefined): number {
   if (Number.isNaN(deadline)) return PIX_FALLBACK_WAIT_MS;
   return Math.max(0, deadline - Date.now()) + PIX_EXPIRY_GRACE_MS;
 }
-
 
 /**
  * Which of the wait's three faces the footer is showing — STOPPED, then STILL
@@ -159,7 +151,9 @@ function PixPollFooter({
  * "a confirmação é automática": nothing confirms it but the store.
  */
 function pixSentences(copy: PixPaneCopy, manual: boolean): Pick<PixPaneCopy, "validUntil" | "awaiting" | "afterCopy"> {
-  return (manual ? copy.manual : undefined) ?? copy;
+  const store = manual ? copy.manual : undefined;
+  if (!store) return copy;
+  return { validUntil: store.validUntil, awaiting: store.awaiting, afterCopy: store.afterCopy ?? copy.afterCopy };
 }
 
 /**
@@ -219,7 +213,16 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   // Leaving the payment step (a method switch, a terminal status) ends the
   // after-copy face with it: the next pane starts on the code.
   const { setAfterCopy } = stage;
-  useEffect(() => () => setAfterCopy(false), [setAfterCopy]);
+  // A clipboard write that settles after the pane is gone must not reopen the
+  // after-copy face over whatever replaced it (it would hide the picker).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      setAfterCopy(false);
+    };
+  }, [setAfterCopy]);
 
   // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
   // clock, so it travels with the sentence it feeds rather than being frozen
@@ -262,7 +265,7 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
           // "Código Pix copiado", and a failed write leaves the code on screen
           // to select by hand.
           void writeClipboard().then((ok) => {
-            if (ok) setAfterCopy(true);
+            if (ok && mounted.current) setAfterCopy(true);
           });
         }}
       />

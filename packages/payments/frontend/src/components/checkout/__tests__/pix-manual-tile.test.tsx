@@ -90,7 +90,7 @@ describe("the method tiles are one line (the 2026-10-06 Pix redesign)", () => {
     const reason = screen.getByTestId("method-reason-CARD");
     expect(tile.disabled).toBe(true);
     expect(reason.textContent).toBe(method.unavailableHere);
-    expect(tile.getAttribute("aria-describedby")).toBe("method-reason-CARD");
+    expect(tile.getAttribute("aria-label")).toBe(`${method.cardLabel}, ${reason.textContent}`);
   });
 
 });

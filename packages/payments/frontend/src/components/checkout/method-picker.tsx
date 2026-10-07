@@ -29,19 +29,20 @@ function tileColor(unavailable: boolean, selected: boolean): string {
  * One method: its icon and its name on one line (the 2026-10-06 Pix
  * redesign). The line under the name went: it cost the phone a row above the
  * Pix code, and the name says enough. A tile the store cannot charge is
- * disabled and points at the caption that says why.
+ * disabled, and the reason is part of its accessible name ("Cartão, …") as
+ * well as the caption under it.
  */
 function MethodTile({
   option,
   selected,
   unavailable,
-  reasonId,
+  reason,
   onSelect,
 }: {
   option: MethodOption;
   selected: boolean;
   unavailable: boolean;
-  reasonId: string;
+  reason: string;
   onSelect: () => void;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
@@ -52,7 +53,7 @@ function MethodTile({
       type="button"
       role="radio"
       aria-checked={selected}
-      aria-describedby={unavailable ? reasonId : undefined}
+      aria-label={unavailable ? `${option.label}, ${reason}` : undefined}
       disabled={unavailable}
       onClick={unavailable ? undefined : onSelect}
       data-testid={`checkout-method-${option.value}`}
@@ -126,11 +127,11 @@ export function MethodPicker({
               option={option}
               selected={option.value === value && !unavailable}
               unavailable={unavailable}
-              reasonId={reasonId}
+              reason={copy.unavailableHere}
               onSelect={() => onChange(option.value)}
             />
             {unavailable ? (
-              <Box id={reasonId} data-testid={reasonId} sx={{ textAlign: "center" }}>
+              <Box aria-hidden data-testid={reasonId} sx={{ textAlign: "center" }}>
                 <Text variant="caption" size="xs" color="secondary" as="p" style={{ margin: 0 }}>
                   {copy.unavailableHere}
                 </Text>

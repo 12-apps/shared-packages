@@ -127,6 +127,23 @@ describe("the pane before a copy", () => {
     expect(screen.getByRole("tab", { name: pix.copyPasteTab }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("moves between the tabs with the arrow keys, one tab stop at a time", async () => {
+    mount(pixOrder(), server().client);
+    await elapse(0);
+
+    const copyTab = screen.getByRole("tab", { name: pix.copyPasteTab });
+    const qrTab = screen.getByRole("tab", { name: pix.qrTab });
+    // Roving tab stop: only the selected tab is in the Tab order.
+    expect([copyTab, qrTab].map((tab) => tab.tabIndex)).toEqual([0, -1]);
+
+    fireEvent.keyDown(copyTab, { key: "ArrowRight" });
+    expect(qrTab.getAttribute("aria-selected")).toBe("true");
+    expect([copyTab, qrTab].map((tab) => tab.tabIndex)).toEqual([-1, 0]);
+
+    fireEvent.keyDown(qrTab, { key: "Home" });
+    expect(copyTab.getAttribute("aria-selected")).toBe("true");
+  });
+
   it("says the heading in the brand's case", async () => {
     mount(pixOrder(), server().client);
     await elapse(0);
@@ -211,6 +228,40 @@ describe("after a copy", () => {
 
     expect(screen.queryAllByTestId("pix-after-copy")).toHaveLength(0);
     expect(screen.getByTestId("pix-code")).toBeTruthy();
+  });
+
+  it("does not reopen the after-copy face when the write settles after the pane is gone", async () => {
+    const pending: { resolve: () => void } = { resolve: () => undefined };
+    stubClipboard(() => new Promise<void>((resolve) => {
+      pending.resolve = resolve;
+    }));
+    const flags: boolean[] = [];
+    function Spy({ children }: { children: ReactNode }): JSX.Element {
+      const [afterCopy, setAfterCopy] = useState(false);
+      flags.push(afterCopy);
+      return <PixStageProvider stage={{ afterCopy, setAfterCopy }}>{children}</PixStageProvider>;
+    }
+    const view = render(
+      <CheckoutClientProvider client={server().client}>
+        <Spy>
+          <PixView order={pixOrder("MANUAL")} onResolved={vi.fn()} />
+        </Spy>
+      </CheckoutClientProvider>,
+    );
+    await elapse(0);
+    fireEvent.click(screen.getByTestId("pix-copy"));
+
+    view.rerender(
+      <CheckoutClientProvider client={server().client}>
+        <Spy>{null}</Spy>
+      </CheckoutClientProvider>,
+    );
+    await act(async () => {
+      pending.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(flags.at(-1)).toBe(false);
   });
 
   it("stays on the pane when the browser has no clipboard at all (R13)", async () => {

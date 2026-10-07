@@ -108,7 +108,7 @@ function Heading({ words, totalLabel }: { words: PixAfterCopyCopy; totalLabel: s
   );
 }
 
-export interface PixAfterCopyProps {
+interface PixAfterCopyProps {
   pix: PixCharge;
   words: PixAfterCopyCopy;
   totalLabel: string;

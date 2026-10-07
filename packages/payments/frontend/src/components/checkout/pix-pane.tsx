@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import type { JSX, ReactNode } from "react";
+import { useId, type JSX, type KeyboardEvent, type ReactNode } from "react";
 
 import { useCheckoutCopy } from "./copy-context";
 import { ContentCopyIcon } from "./icons";
@@ -55,16 +55,41 @@ function ColumnHeading({ children, center }: { children: ReactNode; center?: boo
   );
 }
 
-function PixTabs({ tab, onTab }: { tab: PixTab; onTab: (tab: PixTab) => void }): JSX.Element {
+const TAB_ORDER: readonly PixTab[] = ["copy", "qr"];
+
+/** The ARIA tabs pattern's keys: arrows move and select, Home and End jump. */
+function nextTab(key: string, tab: PixTab): PixTab | null {
+  const at = TAB_ORDER.indexOf(tab);
+  if (key === "ArrowRight") return TAB_ORDER[(at + 1) % TAB_ORDER.length] ?? null;
+  if (key === "ArrowLeft") return TAB_ORDER[(at + TAB_ORDER.length - 1) % TAB_ORDER.length] ?? null;
+  if (key === "Home") return TAB_ORDER[0] ?? null;
+  if (key === "End") return TAB_ORDER[TAB_ORDER.length - 1] ?? null;
+  return null;
+}
+
+/** DOM ids for the tabs and panels, unique per pane (two panes on one page must not collide). */
+function paneIds(base: string, id: PixTab): { tab: string; panel: string } {
+  return { tab: `${base}-tab-${id}`, panel: `${base}-panel-${id}` };
+}
+
+function PixTabs({ tab, onTab, idBase }: { tab: PixTab; onTab: (tab: PixTab) => void; idBase: string }): JSX.Element {
   const copy = useCheckoutCopy().screens.pix;
   const tabs: { id: PixTab; label: string }[] = [
     { id: "copy", label: copy.copyPasteTab },
     { id: "qr", label: copy.qrTab },
   ];
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
+    const next = nextTab(event.key, tab);
+    if (!next) return;
+    event.preventDefault();
+    onTab(next);
+    document.getElementById(paneIds(idBase, next).tab)?.focus();
+  };
   return (
     <Box
       role="tablist"
       aria-label={copy.tabsLabel}
+      onKeyDown={onKeyDown}
       sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", borderBottom: "1px solid", borderColor: "divider", ...NARROW_ONLY }}
     >
       {tabs.map((item) => {
@@ -75,9 +100,10 @@ function PixTabs({ tab, onTab }: { tab: PixTab; onTab: (tab: PixTab) => void }):
             component="button"
             type="button"
             role="tab"
-            id={`pix-tab-${item.id}`}
+            id={paneIds(idBase, item.id).tab}
             aria-selected={selected}
-            aria-controls={`pix-panel-${item.id}`}
+            aria-controls={paneIds(idBase, item.id).panel}
+            tabIndex={selected ? 0 : -1}
             data-testid={`pix-tab-${item.id}`}
             onClick={() => onTab(item.id)}
             sx={{
@@ -102,14 +128,14 @@ function PixTabs({ tab, onTab }: { tab: PixTab; onTab: (tab: PixTab) => void }):
   );
 }
 
-function QrPanel({ pix, shown }: { pix: PixCharge; shown: boolean }): JSX.Element {
+function QrPanel({ pix, shown, idBase }: { pix: PixCharge; shown: boolean; idBase: string }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   return (
     <Box
-      id="pix-panel-qr"
+      id={paneIds(idBase, "qr").panel}
       role="tabpanel"
-      aria-labelledby="pix-tab-qr"
+      aria-labelledby={paneIds(idBase, "qr").tab}
       sx={{
         ...panelSx(shown),
         alignItems: "center",
@@ -131,11 +157,11 @@ function QrPanel({ pix, shown }: { pix: PixCharge; shown: boolean }): JSX.Elemen
   );
 }
 
-function CopyPanel({ pix, shown, onCopy }: { pix: PixCharge; shown: boolean; onCopy: () => void }): JSX.Element {
+function CopyPanel({ pix, shown, onCopy, idBase }: { pix: PixCharge; shown: boolean; onCopy: () => void; idBase: string }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   return (
-    <Box id="pix-panel-copy" role="tabpanel" aria-labelledby="pix-tab-copy" sx={{ ...panelSx(shown), [PIX_WIDE]: { display: "flex", justifyContent: "center" } }}>
+    <Box id={paneIds(idBase, "copy").panel} role="tabpanel" aria-labelledby={paneIds(idBase, "copy").tab} sx={{ ...panelSx(shown), [PIX_WIDE]: { display: "flex", justifyContent: "center" } }}>
       <ColumnHeading>{copy.copyPasteHeading}</ColumnHeading>
       <Box
         sx={{ px: 2, py: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.5, bgcolor: "action.hover" }}
@@ -179,9 +205,10 @@ function OrDivider(): JSX.Element {
 }
 
 export function PixPane({ pix, tab, onTab, onCopy }: { pix: PixCharge; tab: PixTab; onTab: (tab: PixTab) => void; onCopy: () => void }): JSX.Element {
+  const idBase = useId();
   return (
     <>
-      <PixTabs tab={tab} onTab={onTab} />
+      <PixTabs tab={tab} onTab={onTab} idBase={idBase} />
       <Box
         sx={{
           display: "grid",
@@ -189,9 +216,9 @@ export function PixPane({ pix, tab, onTab, onCopy }: { pix: PixCharge; tab: PixT
           [PIX_WIDE]: { gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: 4, alignItems: "stretch" },
         }}
       >
-        <QrPanel pix={pix} shown={tab === "qr"} />
+        <QrPanel pix={pix} shown={tab === "qr"} idBase={idBase} />
         <OrDivider />
-        <CopyPanel pix={pix} shown={tab === "copy"} onCopy={onCopy} />
+        <CopyPanel pix={pix} shown={tab === "copy"} onCopy={onCopy} idBase={idBase} />
       </Box>
     </>
   );
