@@ -284,7 +284,7 @@ describe("a hint at a wait that has ended", () => {
     expect(calls()).toBe(before);
   });
 
-  it("owes nothing for a mark the deadline overtook, over a whole live floor", async () => {
+  it("owes nothing for a mark the deadline overtook, sixteen seconds on", async () => {
     const { client, calls, release } = heldClient();
     const { subscribe, hint } = channel();
     const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
@@ -337,6 +337,25 @@ describe("a hint at a wait that has ended", () => {
 
     await outside(() => release(PAID));
 
+    expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
+  });
+});
+
+describe("a channel that re-opens (FUT-3223)", () => {
+  it("owes one more ask when it re-opens during an ask, so a pre-open answer is never the last word", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: false, subscribe }} maxWaitMs={600_000} />);
+    await elapse(50);
+    expect(calls()).toBe(1);
+
+    view.rerender(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={600_000} />);
+    await elapse(0);
+    expect(calls()).toBe(1);
+    await outside(() => release(PENDING));
+
+    expect(calls()).toBe(2);
+    await outside(() => release(PAID));
     expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
   });
 });

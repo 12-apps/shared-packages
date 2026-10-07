@@ -4,6 +4,7 @@ import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutCopy } from "./copy-context";
 import { createPollLoop, type PollLoop, type PollingOptions, type PollSink } from "./poll-loop";
 import { useLiveWait } from "./live-context";
+import { carriesSettlementPair } from "./transport";
 import type { OrderStatus } from "./types";
 
 /** What a consumer reads off the wait, and the one action it can take. */
@@ -110,6 +111,10 @@ function listenForRearm(poke: () => void): () => void {
  * QR under a red alert with no retry, a card spinner replaced by one, and the
  * hosted return spinning forever. None of the three could recover on its own,
  * which is what made a blip cost a payment nobody was ever told about.
+ *
+ * WHILE LIVE it keeps no timer (FUT-3223, `poll-live.ts`), except on a hosted
+ * return carrying the settlement pair, where the read itself confirms the
+ * payment and the live floor is kept.
  */
 export function usePaymentPolling(
   orderId: string | null,
@@ -149,7 +154,8 @@ export function usePaymentPolling(
         slowIntervalMs,
         askTimeoutMs,
         askTimeoutError: transportCopy.offline,
-        ...{ isLive, liveIntervalMs },
+        isLive,
+        liveIntervalMs: carriesSettlementPair() ? liveIntervalMs : undefined,
       },
       sinkFor(orderId, setAnswer),
     );

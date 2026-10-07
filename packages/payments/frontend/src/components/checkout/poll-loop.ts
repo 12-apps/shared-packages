@@ -1,6 +1,6 @@
 import type { Result } from "../../result";
 import { pollDelay } from "./poll-delay";
-import { waitsForDeadline, type LiveCadence } from "./poll-live";
+import { idlesWhileLive, waitsForDeadline, type LiveCadence } from "./poll-live";
 import { claimHint, owedAfterAnswer } from "./poll-hint";
 import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
@@ -254,13 +254,19 @@ function mayWrite(run: PollRun, mine: number, result: Result<OrderStatus>): bool
   return run.attempt === mine || (result.ok && TERMINAL_STATUSES.includes(result.data));
 }
 
-/** Book the next tick, or end the wait because its clock has run out. */
+/**
+ * Book the next tick, or end the wait because its clock has run out — or, live
+ * with a healthy answer, book nothing: the hint, the re-arm events and the
+ * channel re-opening are what ask next (`poll-live.ts`, FUT-3223).
+ */
 function scheduleNext(
   run: PollRun,
   options: PollingOptions,
   sink: PollSink,
   again: () => void,
 ): void {
+  clearPending(run);
+  if (idlesWhileLive(run.errors, options)) return;
   const delay = pollDelay(run.healthy, run.errors, options);
   if (outOfTime(run, options, delay)) {
     run.stopped = true;
@@ -268,7 +274,6 @@ function scheduleNext(
     sink.setTimedOut(true);
     return;
   }
-  clearPending(run);
   run.timer = setTimeout(again, delay);
 }
 
