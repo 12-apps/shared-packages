@@ -15,11 +15,10 @@
 import { setTagSide, TAG_TAIL_PX, type TagSide } from "./map-elements";
 import type { MapLike, MarkerLike } from "./maplibre-types";
 
-export type { TagSide } from "./map-elements";
 
-export const TAG_SIDES: readonly TagSide[] = ["above", "below", "right", "left"];
+const TAG_SIDES: readonly TagSide[] = ["above", "below", "right", "left"];
 
-export interface Box {
+interface Box {
   left: number;
   top: number;
   right: number;
@@ -37,7 +36,7 @@ interface Size {
 }
 
 /** The visible tag (pill plus tail) for a pill of `size`, on `side` of `pin`. */
-export function tagBox(pin: Point, size: Size, side: TagSide): Box {
+function tagBox(pin: Point, size: Size, side: TagSide): Box {
   const along = TAG_TAIL_PX;
   if (side === "above") return { left: pin.x - size.width / 2, right: pin.x + size.width / 2, top: pin.y - size.height - along, bottom: pin.y };
   if (side === "below") return { left: pin.x - size.width / 2, right: pin.x + size.width / 2, top: pin.y, bottom: pin.y + along + size.height };
@@ -45,7 +44,7 @@ export function tagBox(pin: Point, size: Size, side: TagSide): Box {
   return { left: pin.x - along - size.width, right: pin.x, top: pin.y - size.height / 2, bottom: pin.y + size.height / 2 };
 }
 
-export function overlapArea(a: Box, b: Box): number {
+function overlapArea(a: Box, b: Box): number {
   const width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
   const height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
   return width > 0 && height > 0 ? width * height : 0;
@@ -61,17 +60,17 @@ function fits(box: Box, bounds: Size): boolean {
  * How far clear a side other than the current one must be to win it: a pin
  * jittering a pixel or two at an obstacle's edge must not flip its tag.
  */
-export const SWITCH_MARGIN_PX = 4;
+const SWITCH_MARGIN_PX = 4;
 
 /** In the least-overlap fallback, leave the current side only for this much less overlap. */
-export const SWITCH_OVERLAP_RATIO = 0.75;
+const SWITCH_OVERLAP_RATIO = 0.75;
 
 /**
  * How far past an obstacle's edge a pin that was standing ON it still counts
  * as on it: a pin jittering across a badge's edge must not flip its tag. A
  * pin arriving must be on the badge itself.
  */
-export const CONTAIN_MARGIN_PX = 6;
+const CONTAIN_MARGIN_PX = 6;
 
 function grow(box: Box, by: number): Box {
   return { left: box.left - by, top: box.top - by, right: box.right + by, bottom: box.bottom + by };
@@ -122,7 +121,7 @@ function leastOverlap(pin: Point, size: Size, obstacles: readonly Box[], bounds:
  *
  * The caller leaves out any obstacle under the pin itself (`underPin`).
  */
-export function chooseSide(pin: Point, size: Size, obstacles: readonly Box[], bounds: Size, current: TagSide = "above"): TagSide {
+function chooseSide(pin: Point, size: Size, obstacles: readonly Box[], bounds: Size, current: TagSide = "above"): TagSide {
   const margined = TAG_SIDES.find((side) => {
     const box = tagBox(pin, size, side);
     return side === current ? clear(box, obstacles, bounds) : clear(grow(box, SWITCH_MARGIN_PX), obstacles, bounds);
@@ -137,7 +136,7 @@ export function chooseSide(pin: Point, size: Size, obstacles: readonly Box[], bo
  * they do not block his tag, since every side would clip them about equally.
  * A pin that was `standing` on one keeps it until `CONTAIN_MARGIN_PX` clear.
  */
-export function underPin(pin: Point, obstacles: readonly Box[], standing: boolean): Box[] {
+function underPin(pin: Point, obstacles: readonly Box[], standing: boolean): Box[] {
   const reach = standing ? CONTAIN_MARGIN_PX : 0;
   return obstacles.filter((obstacle) => contains(grow(obstacle, reach), pin));
 }
@@ -145,7 +144,7 @@ export function underPin(pin: Point, obstacles: readonly Box[], standing: boolea
 export type Anchor = "bottom" | "center";
 
 /** An element's layout box when MapLibre puts its `anchor` on `point`. */
-export function anchoredBox(point: Point, anchor: Anchor, size: Size): Box {
+function anchoredBox(point: Point, anchor: Anchor, size: Size): Box {
   const left = point.x - size.width / 2;
   const top = anchor === "bottom" ? point.y - size.height : point.y - size.height / 2;
   return { left, top, right: left + size.width, bottom: top + size.height };
@@ -156,7 +155,7 @@ export function anchoredBox(point: Point, anchor: Anchor, size: Size): Box {
  * laid out for `side` (anchor `bottom`: the frame's bottom-centre is the
  * point before the offset).
  */
-export function offsetFor(side: TagSide, size: Size): [number, number] {
+function offsetFor(side: TagSide, size: Size): [number, number] {
   if (side === "below") return [0, size.height];
   if (side === "right") return [size.width / 2, size.height / 2];
   if (side === "left") return [-size.width / 2, size.height / 2];
