@@ -65,16 +65,18 @@ interface LiveWait {
 type LoopRef = { readonly current: PollLoop | null };
 
 /**
- * A channel that DROPS or (RE-)OPENS: ask now — and if the loop declines
- * because it asked a moment ago, ask again once that quiet window is over.
+ * A channel that DROPS: ask now — and if the loop declines because it asked a
+ * moment ago, ask again once that quiet window is over. The ask it lands just
+ * after may have been answered before the drop, and a live wait books no next
+ * tick, so declining for good would leave the buyer waiting with nobody left
+ * to wake them.
  *
- * A drop: the ask it lands just after may have been answered before the drop,
- * and a live wait books no next tick, so declining for good would leave the
- * buyer waiting with nobody left to wake them.
- *
- * An open: a hint sent while the channel was down was never heard, and a live
- * wait has no timer to catch it, so the open is the re-read that bounds a lost
- * hint (FUT-3223).
+ * A channel that (RE-)OPENS does not come here either: it is taken as a HINT
+ * (FUT-3223). A hint sent while the channel was down was never heard, and a
+ * live wait has no timer to catch it, so the open is the re-read that bounds a
+ * lost hint — and `PollLoop.hint` never drops it: with an ask in flight it
+ * owes one more the moment that ask answers, where a declined poke could leave
+ * a pre-open answer as the last word.
  *
  * A HINT does not come here. It is `PollLoop.hint` (FUT-3205): deferring a
  * hint by the quiet window cost a paid buyer a full second on the pay step.
@@ -86,9 +88,10 @@ function wake(loop: LoopRef, pending: { timer?: ReturnType<typeof setTimeout> })
 }
 
 /**
- * Tie one wait to the host's channel: a hint asks now, and a channel that
- * DROPS or (RE-)OPENS asks now too — see {@link wake}. The channel's state at
- * mount needs no ask of its own: the wait's first ask is already that read.
+ * Tie one wait to the host's channel: a hint asks now, a channel that DROPS
+ * asks now too (see {@link wake}), and a channel that (RE-)OPENS is taken as a
+ * hint. The channel's state at mount needs no ask of its own: the wait's first
+ * ask is already that read.
  *
  * `loop` is the hook's own ref to its running loop, read when the event lands.
  */
@@ -102,7 +105,8 @@ export function useLiveWait(loop: LoopRef): LiveWait {
   useEffect(() => {
     const was = liveRef.current;
     liveRef.current = live;
-    if (was !== live) wake(loop, pending.current);
+    if (was && !live) wake(loop, pending.current);
+    else if (!was && live) loop.current?.hint();
   }, [live, loop]);
 
   useEffect(() => {

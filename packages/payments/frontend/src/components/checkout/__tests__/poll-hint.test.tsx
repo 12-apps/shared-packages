@@ -341,6 +341,25 @@ describe("a hint at a wait that has ended", () => {
   });
 });
 
+describe("a channel that re-opens (FUT-3223)", () => {
+  it("owes one more ask when it re-opens during an ask, so a pre-open answer is never the last word", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: false, subscribe }} maxWaitMs={600_000} />);
+    await elapse(50);
+    expect(calls()).toBe(1);
+
+    view.rerender(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={600_000} />);
+    await elapse(0);
+    expect(calls()).toBe(1);
+    await outside(() => release(PENDING));
+
+    expect(calls()).toBe(2);
+    await outside(() => release(PAID));
+    expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
+  });
+});
+
 describe("a channel that drops", () => {
   it("still asks one second after a drop that lands just after an answer, then at 2.5 s", async () => {
     const { client, calls, answerInstantly } = heldClient();

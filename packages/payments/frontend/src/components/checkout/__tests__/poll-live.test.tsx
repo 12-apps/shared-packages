@@ -260,7 +260,7 @@ describe("the payment wait and the host's channel", () => {
     expect(calls()).toBe(2);
   });
 
-  it("defers a re-open that lands just after an ask by the quiet window, never drops it", async () => {
+  it("asks at once on a re-open that lands just after an ask, as a hint does, then idles", async () => {
     const { client, calls } = countingClient();
     const { subscribe } = channel();
     const view = render(<Harness client={client} signal={{ live: false, subscribe }} maxWaitMs={600_000} />);
@@ -269,9 +269,7 @@ describe("the payment wait and the host's channel", () => {
     await elapse(100);
 
     view.rerender(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={600_000} />);
-    await elapse(999);
-    expect(calls()).toBe(2);
-    await elapse(1);
+    await elapse(0);
 
     expect(calls()).toBe(3);
     await elapse(60_000);

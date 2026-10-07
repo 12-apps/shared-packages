@@ -16,8 +16,10 @@
  * Two exceptions keep a timer while live:
  *
  * - A FAILED ask is a read that did not happen, not a check for news, so it
- *   keeps its error backoff. Otherwise a hint whose ask hit a 500 would leave a
- *   paid buyer waiting for a second hint that is never sent.
+ *   retries on the ordinary error backoff (`poll-delay.ts`: 2.5 s, 5 s, then
+ *   every 10 s), as a wait with no channel does — no longer stretched to the
+ *   15 s live floor. Otherwise a hint whose ask hit a 500 would leave a paid
+ *   buyer waiting for a second hint that is never sent.
  * - A wait given {@link LiveCadence.liveIntervalMs} keeps that floor. The hook
  *   gives it one only on a hosted-checkout return carrying the settlement pair
  *   (`carriesSettlementPair`), where the buyer's own read is what confirms the
