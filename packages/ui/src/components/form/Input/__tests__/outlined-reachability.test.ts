@@ -25,6 +25,8 @@ const SOURCES = import.meta.glob<string>(['/src/**/*.{ts,tsx}', '!/src/**/__test
 /** Where the components live, as the glob keys spell it. */
 const COMPONENTS = '/src/components';
 const FORBIDDEN = ['@mui/material/FilledInput/index.js', '@mui/material/Input/index.js'];
+/** Either input under any spelling: with or without `/index.js`, or a file inside its folder. */
+const FORBIDDEN_SPELLING = /^@mui\/material\/(?:FilledInput|Input)(?:\/|$)/;
 
 /** A static import or re-export, from the start of its statement (`m`), so a word in a comment cannot open one. */
 const SPECIFIER = /^[ \t]*(?:(?:import|export)\s+(?:type\s+)?[^'"]*?from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"])/gm;
@@ -77,6 +79,10 @@ describe.each([
 
   it.each(FORBIDDEN)('never reaches %s', (forbidden) => {
     expect(packages).not.toContain(forbidden);
+  });
+
+  it('never reaches either input under another spelling', () => {
+    expect([...packages].filter((specifier) => FORBIDDEN_SPELLING.test(specifier))).toEqual([]);
   });
 });
 

@@ -24,13 +24,14 @@ import { rem } from '../../../tokens/relative';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
- * `TextFieldSlim`, not `TextField` — see `text-field-slim.tsx`. MUI's own
- * `TextField` imports `Select` unconditionally, and through it `Menu`,
+ * The field `Input` renders, styled, over whichever text field it is given.
+ *
+ * Always a `TextFieldSlim`, never MUI's `TextField` — see `text-field-slim.tsx`.
+ * MUI's own `TextField` imports `Select` unconditionally, and through it `Menu`,
  * `Popover`, `Modal` and seven more component modules, so every screen with one
  * text box shipped a dropdown it can never render. Same composition, same DOM,
  * same prop routing; the select branch is the only thing missing.
  */
-/** The field `Input` renders, styled, over whichever text field it is given. */
 function styledField(TextField: TextFieldSlimComponent) {
   return styled(TextField, {
     shouldForwardProp: (prop) =>
