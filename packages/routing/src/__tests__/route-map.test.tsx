@@ -133,11 +133,11 @@ describe("RouteMap", () => {
     expect(marker.textContent).toBe("MD");
     const place = await screen.findByText("Store");
     expect(place.querySelector("svg")).not.toBeNull();
-    // Lifted above a pin standing on the same point, drawn over it, and never
-    // in the way of a click on that pin.
+    // Lifted above a pin standing on the same point, drawn under the pins so
+    // the stem never crosses a name, and never in the way of a click.
     const wrapper = place.parentElement!;
     expect(wrapper.style.pointerEvents).toBe("none");
-    expect(Number(wrapper.style.zIndex)).toBeGreaterThan(3);
+    expect(wrapper.style.zIndex).toBe("1");
   });
 
   it("marks the zoom pair so a phone-width map can hide it", async () => {
@@ -194,6 +194,11 @@ describe("RouteMap", () => {
     const fitButton = screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.fitAll });
     expect(fitButton.parentElement?.style.left).toBe("12px");
     expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { left: 76, right: 40 } });
+  });
+
+  it("leaves room above a place for its lifted label, and ignores a bad inset", async () => {
+    const { fake } = await mount({ places: [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store" }], insets: { bottom: Number.NaN, left: -20 } });
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 120, bottom: 48, left: 40, right: 76 } });
   });
 
   it("fits on the fit control and tells the host", async () => {

@@ -98,7 +98,8 @@ const { RouteMap } = createWebRouting({
   other top corner when the host's floating chrome covers the top-right.
 - No WebGL, a library or style that does not arrive within `readyTimeoutMs`
   (default 15 s), shows `copy.mapError` with a retry. The region's
-  `data-state` reads `loading`, `ready` or `error`.
+  `data-state` reads `loading`, `ready` or `error`. The host's `overlay` is
+  hidden while the error shows — the error panel carries its own retry.
 
 ## Wiring
 
