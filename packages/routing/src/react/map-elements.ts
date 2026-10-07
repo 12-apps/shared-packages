@@ -135,8 +135,13 @@ export function stopElement(stop: RouteMapStop, theme: RouteMapTheme): HTMLEleme
 }
 
 export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme): HTMLElement {
-  const element = span("", { display: "inline-flex", alignItems: "center", gap: "6px", background: theme.place, color: theme.paper, padding: "4px 10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap" });
-  if (spot.icon) element.appendChild(glyph(spot.icon));
-  element.appendChild(document.createTextNode(spot.label));
+  // The label rides ABOVE a pin-high stem, so a courier standing at the place
+  // (a pin anchored on the same point) never covers it — and it draws over
+  // pins but lets clicks through to them.
+  const element = span("", { display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none", zIndex: "4" });
+  const label = span("", { display: "inline-flex", alignItems: "center", gap: "6px", background: theme.place, color: theme.paper, padding: "4px 10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap" });
+  if (spot.icon) label.appendChild(glyph(spot.icon));
+  label.appendChild(document.createTextNode(spot.label));
+  element.append(label, span("", { width: "2px", height: "46px", background: theme.place }), span("", { width: "8px", height: "8px", borderRadius: "50%", background: theme.place }));
   return element;
 }

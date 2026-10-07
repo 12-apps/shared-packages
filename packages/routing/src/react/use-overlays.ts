@@ -31,6 +31,7 @@ interface Overlays {
   draw: () => void;
   clear: () => void;
   fitAll: () => void;
+  fitTo: (points: readonly LngLat[]) => void;
 }
 
 interface Drawn {
@@ -112,7 +113,12 @@ export function useOverlays(
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 0 });
   };
 
-  return { draw, clear, fitAll };
+  const fitTo = (points: readonly LngLat[]): void => {
+    const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
+    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
+  };
+
+  return { draw, clear, fitAll, fitTo };
 }
 
 type Edge = "top" | "right" | "bottom" | "left";
@@ -123,7 +129,9 @@ type Edge = "top" | "right" | "bottom" | "left";
  */
 function fitPadding({ controls, insets }: RouteMapProps): Record<Edge, number> {
   const showsControls = (controls?.zoom ?? true) || (controls?.fit ?? true);
-  const base: Record<Edge, number> = { top: 40, right: showsControls ? 76 : 40, bottom: 48, left: 40 };
+  const column: Edge = controls?.placement === "top-left" ? "left" : "right";
+  const base: Record<Edge, number> = { top: 40, right: 40, bottom: 48, left: 40 };
+  if (showsControls) base[column] = 76;
   const edges: Edge[] = ["top", "right", "bottom", "left"];
   return Object.fromEntries(edges.map((edge) => [edge, base[edge] + (insets?.[edge] ?? 0)])) as Record<Edge, number>;
 }
@@ -170,4 +178,9 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
   useEffect(() => {
     if (ready) overlays.fitAll();
   }, [ready, props.fitKey]);
+
+  // After the fit above, so a selection made before the map was ready wins.
+  useEffect(() => {
+    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })));
+  }, [ready, props.focus?.key]);
 }
