@@ -21,7 +21,7 @@ import { isValidPoint } from "../core/geo";
 import type { LngLat } from "../core/types";
 
 import type { RouteMapCopy } from "./copy";
-import { groupElement, markerElement, placeElement, stopElement } from "./map-elements";
+import { groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
 import { boundsOf, groupMarkers, PLANNED_LAYER, pointsOf, setLine, TRAVELLED_LAYER } from "./map-geometry";
 import type { MarkerLike } from "./maplibre-types";
 import type { MapHandle } from "./use-map";
@@ -31,6 +31,7 @@ interface Overlays {
   draw: () => void;
   clear: () => void;
   fitAll: () => void;
+  fitTo: (points: readonly LngLat[]) => void;
 }
 
 interface Drawn {
@@ -108,13 +109,47 @@ export function useOverlays(
   const fitAll = (): void => {
     // The control column sits on the right edge: keep fitted content clear of
     // it, or the farthest stop lands under the fit button.
-    const controls = propsRef.current.controls;
-    const right = (controls?.zoom ?? true) || (controls?.fit ?? true) ? 76 : 40;
     const bounds = boundsOf(pointsOf(propsRef.current));
-    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: { top: 40, bottom: 48, left: 40, right }, maxZoom: 16, duration: 0 });
+    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 0 });
   };
 
-  return { draw, clear, fitAll };
+  const fitTo = (points: readonly LngLat[]): void => {
+    const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
+    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
+  };
+
+  return { draw, clear, fitAll, fitTo };
+}
+
+type Edge = "top" | "right" | "bottom" | "left";
+
+/**
+ * The fit's padding: a margin on every edge, the control column on the right
+ * when it shows, plus whatever the host's own overlays cover (`insets`).
+ */
+function fitPadding(props: RouteMapProps): Record<Edge, number> {
+  const base = basePadding(props);
+  const insets = props.insets;
+  const edges: Edge[] = ["top", "right", "bottom", "left"];
+  return Object.fromEntries(edges.map((edge) => [edge, base[edge] + insetOf(insets?.[edge])])) as Record<Edge, number>;
+}
+
+/** The package's own margins, before the host's insets. */
+function basePadding({ controls, places }: RouteMapProps): Record<Edge, number> {
+  // A place's label rides PLACE_LIFT px above its point (map-elements.ts), so
+  // a place fitted at the top edge needs that much more room or it is clipped.
+  const base: Record<Edge, number> = { top: 40 + (places?.length ? PLACE_LIFT : 0), right: 40, bottom: 48, left: 40 };
+  if (showsControls(controls)) base[controls?.placement === "top-left" ? "left" : "right"] = 76;
+  return base;
+}
+
+function showsControls(controls: RouteMapProps["controls"]): boolean {
+  return (controls?.zoom ?? true) || (controls?.fit ?? true);
+}
+
+/** A host inset as a usable number of pixels: finite and never negative. */
+function insetOf(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 type Place = (element: HTMLElement, anchor: Wanted["anchor"], at: [number, number]) => MarkerLike;
@@ -159,4 +194,9 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
   useEffect(() => {
     if (ready) overlays.fitAll();
   }, [ready, props.fitKey]);
+
+  // After the fit above, so a selection made before the map was ready wins.
+  useEffect(() => {
+    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })));
+  }, [ready, props.focus?.key]);
 }

@@ -65,15 +65,31 @@ export interface RouteMapProps {
   travelledColor?: string;
   /** Change it to refit the viewport to everything drawn. */
   fitKey?: string;
+  /**
+   * Fit to just these points (a selected trip) whenever `key` changes — a
+   * viewer's selection, never a data refresh. Wins over `fitKey` on the same
+   * render.
+   */
+  focus?: { key: string; points: readonly Position[] };
   /** CSS height of the map area. */
   height: number | string;
-  controls?: { zoom?: boolean; fit?: boolean };
+  /**
+   * Which controls show, and in which top corner (default `top-right`). A
+   * host whose own floating chrome covers one corner moves them to the other.
+   */
+  controls?: { zoom?: boolean; fit?: boolean; placement?: "top-right" | "top-left" };
   /** Called when the viewer presses the fit control (after it fits). */
   onFitAll?: () => void;
   /** Called with the ids of a pressed group of overlapping markers. */
   onGroupSelect?: (markerIds: string[]) => void;
   /** Rendered over the map (a legend), bottom edge. */
   overlay?: ReactNode;
+  /**
+   * Pixels the host's own overlays cover on each edge (a legend along the
+   * bottom, a sheet). Added to the fit padding, so "fit all" never parks a
+   * pin or a stop under them.
+   */
+  insets?: { top?: number; right?: number; bottom?: number; left?: number };
   testId?: string;
 }
 

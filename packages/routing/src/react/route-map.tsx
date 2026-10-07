@@ -71,8 +71,7 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
           <MapControls
             copy={copy}
             theme={theme}
-            zoom={props.controls?.zoom ?? true}
-            fit={props.controls?.fit ?? true}
+            {...controlsOf(props)}
             onZoomIn={() => handle.mapRef.current?.zoomIn()}
             onZoomOut={() => handle.mapRef.current?.zoomOut()}
             onFit={() => {
@@ -81,11 +80,16 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
             }}
           />
         )}
-        {props.overlay ? <div style={{ position: "absolute", left: 12, right: 12, bottom: 28, zIndex: 2 }}>{props.overlay}</div> : null}
+        {props.overlay && handle.status !== "error" ? <div style={{ position: "absolute", left: 12, right: 12, bottom: 28, zIndex: 2 }}>{props.overlay}</div> : null}
         <small style={{ position: "absolute", right: 6, bottom: 4, fontSize: 10, color: theme.ink, background: theme.paper, padding: "0 4px", borderRadius: 4, zIndex: 2 }}>{copy.attribution}</small>
       </div>
     );
   };
+}
+
+/** The controls the host asked for, with their defaults: both, top-right. */
+function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement"> {
+  return { zoom: controls?.zoom ?? true, fit: controls?.fit ?? true, placement: controls?.placement ?? "top-right" };
 }
 
 interface ControlsProps {
@@ -93,15 +97,17 @@ interface ControlsProps {
   theme: RouteMapTheme;
   zoom: boolean;
   fit: boolean;
+  placement: "top-right" | "top-left";
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFit: () => void;
 }
 
-function MapControls({ copy, theme, zoom, fit, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
+function MapControls({ copy, theme, zoom, fit, placement, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
   if (!zoom && !fit) return null;
+  const corner = placement === "top-left" ? { left: 12 } : { right: 12 };
   return (
-    <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: 8, zIndex: 2 }}>
+    <div style={{ position: "absolute", top: 12, ...corner, display: "flex", flexDirection: "column", gap: 8, zIndex: 2 }}>
       {zoom ? (
         <>
           <button type="button" className="routing-zoom" aria-label={copy.zoomIn} onClick={onZoomIn} style={controlStyle(theme)}>

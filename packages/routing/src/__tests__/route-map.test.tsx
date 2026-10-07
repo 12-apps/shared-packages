@@ -133,6 +133,11 @@ describe("RouteMap", () => {
     expect(marker.textContent).toBe("MD");
     const place = await screen.findByText("Store");
     expect(place.querySelector("svg")).not.toBeNull();
+    // Lifted above a pin standing on the same point, drawn under the pins so
+    // the stem never crosses a name, and never in the way of a click.
+    const wrapper = place.parentElement!;
+    expect(wrapper.style.pointerEvents).toBe("none");
+    expect(wrapper.style.zIndex).toBe("1");
   });
 
   it("marks the zoom pair so a phone-width map can hide it", async () => {
@@ -167,6 +172,33 @@ describe("RouteMap", () => {
     expect(fake.maps[0]!.fitBounds).toHaveBeenCalledTimes(2);
     // Fitted content stays clear of the control column on the right edge.
     expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { right: 76 } });
+  });
+
+  it("keeps fitted content clear of the host's own overlays", async () => {
+    const { fake } = await mount({ insets: { bottom: 40, left: 8 } });
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 40, bottom: 88, left: 48, right: 76 } });
+  });
+
+  it("fits to a focused selection when its key changes, not on a refresh", async () => {
+    const { fake, rerender, RouteMap } = await mount();
+    const points: [number, number][] = [[-46.6, -23.5], [-46.7, -23.6]];
+    rerender(<RouteMap height={400} markers={MARKERS} focus={{ key: "rider-1", points }} />);
+    await waitFor(() => expect(fake.maps[0]!.fitBounds).toHaveBeenCalledTimes(2));
+    expect(fake.maps[0]!.fitBounds.mock.calls[1]?.[0]).toEqual([[-46.7, -23.6], [-46.6, -23.5]]);
+    rerender(<RouteMap height={400} markers={[...MARKERS!]} focus={{ key: "rider-1", points: [...points] }} />);
+    expect(fake.maps[0]!.fitBounds).toHaveBeenCalledTimes(2);
+  });
+
+  it("puts the controls in the top-left corner and pads the fit on that side", async () => {
+    const { fake } = await mount({ controls: { placement: "top-left" } });
+    const fitButton = screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.fitAll });
+    expect(fitButton.parentElement?.style.left).toBe("12px");
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { left: 76, right: 40 } });
+  });
+
+  it("leaves room above a place for its lifted label, and ignores a bad inset", async () => {
+    const { fake } = await mount({ places: [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store" }], insets: { bottom: Number.NaN, left: -20 } });
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 120, bottom: 48, left: 40, right: 76 } });
   });
 
   it("fits on the fit control and tells the host", async () => {
@@ -205,10 +237,11 @@ describe("RouteMap", () => {
   it("shows the error when the style never arrives, instead of a blank map forever", async () => {
     const fake = fakeMapLibre();
     const { RouteMap } = createWebRouting({ copy: EN_US_ROUTE_MAP_COPY, theme: THEME, loadMapLibre: async () => fake.lib, readyTimeoutMs: 30 });
-    render(<RouteMap height={400} markers={MARKERS} />);
+    render(<RouteMap height={400} markers={MARKERS} overlay={<span>Legend</span>} />);
     await waitFor(() => expect(fake.maps).toHaveLength(1));
     // No `style.load`, no `error`: the request hung.
     expect(await screen.findByRole("button", { name: EN_US_ROUTE_MAP_COPY.retry })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("Legend")).toBeNull());
     expect(screen.getByRole("region").getAttribute("data-state")).toBe("error");
   });
 

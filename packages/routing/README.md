@@ -90,7 +90,16 @@ const { RouteMap } = createWebRouting({
   fit control is pressed. A data refresh never moves a map someone panned.
 - Markers that overlap on screen fold into one group button. `onGroupSelect`
   receives their ids; without that callback, the map zooms in on them.
-- No WebGL, or a style that does not load, shows `copy.mapError` with a retry.
+- `focus={{ key, points }}` fits to just those points (a selected trip)
+  whenever `key` changes — a viewer's selection, never a refresh.
+- `insets={{ bottom: legendHeight }}` tells the fit what the host's own
+  overlays cover, so fitted pins never land under a legend or a sheet.
+- `controls={{ placement: "top-left" }}` moves the zoom and fit column to the
+  other top corner when the host's floating chrome covers the top-right.
+- No WebGL, a library or style that does not arrive within `readyTimeoutMs`
+  (default 15 s), shows `copy.mapError` with a retry. The region's
+  `data-state` reads `loading`, `ready` or `error`. The host's `overlay` is
+  hidden while the error shows — the error panel carries its own retry.
 
 ## Wiring
 
