@@ -184,7 +184,7 @@ function CopyPanel({ pix, shown, onCopy, idBase }: { pix: PixCharge; shown: bool
         </Text>
       </Box>
       {/* The one action on the pane: the prototype's 56px bar (52 wide), whatever the host's lg is. */}
-      <Box sx={{ "& > *": { minHeight: 56 }, [PIX_WIDE]: { "& > *": { minHeight: 52 } } }}>
+      <Box sx={{ "& > *": { minHeight: 56 }, "& > *, & > * *": { fontWeight: 700 }, [PIX_WIDE]: { "& > *": { minHeight: 52 } } }}>
         <Button variant="solid" color="primary" size="lg" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopy} dataTestId="pix-copy">
           {copy.copyAction}
         </Button>

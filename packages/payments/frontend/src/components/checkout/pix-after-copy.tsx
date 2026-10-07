@@ -22,6 +22,9 @@ import { useCheckoutComponents } from "./ui";
 
 type StepState = "done" | "current" | "pending";
 
+/** The way to the card is a link: underlined, so it does not lean on colour alone. */
+const LINK_SX = { "& button": { textDecoration: "underline", textUnderlineOffset: "3px" }, "& button, & button *": { fontWeight: 600 } } as const;
+
 function StepMark({ state, index }: { state: StepState; index: number }): JSX.Element {
   const size = { width: 26, height: 26, [PIX_WIDE]: { width: 28, height: 28 } };
   if (state === "done") {
@@ -92,7 +95,7 @@ function Heading({ words, totalLabel }: { words: PixAfterCopyCopy; totalLabel: s
       </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
         {/* The screen's title outranks the checklist: 22px, 28px wide (the prototype's scale). */}
-        <Box sx={{ "& > *": { fontSize: "1.375rem", lineHeight: 1.25 }, [PIX_WIDE]: { "& > *": { fontSize: "1.75rem" } } }}>
+        <Box sx={{ "&& > *": { fontSize: "1.375rem", lineHeight: 1.25 }, [PIX_WIDE]: { "&& > *": { fontSize: "1.75rem" } } }}>
           <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }} data-testid="pix-after-copy-title">
             {words.title}
           </Text>
@@ -126,7 +129,7 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
       {/* Narrow, a grid cell; wide, its own width beside the link (the prototype's row). */}
       <Box sx={{ minWidth: 0, [PIX_WIDE]: { flex: "none", "& > *": { width: "auto" } } }}>
         <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} dataTestId="pix-copy-again">
@@ -139,7 +142,7 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
         </Button>
       </Box>
       {onPreferCard ? (
-        <Box sx={{ display: "none", [PIX_WIDE]: { display: "block" } }}>
+        <Box sx={{ ...LINK_SX, display: "none", [PIX_WIDE]: { display: "block" } }}>
           <Button variant="text" color="primary" size="md" icon={<CreditCardIcon fontSize="small" />} onClick={onPreferCard} dataTestId="pix-prefer-card-wide">
             {copy.preferCardAction}
           </Button>
@@ -161,7 +164,7 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
         <Actions {...props} />
         {footer}
         {onPreferCard ? (
-          <Box sx={{ display: "flex", justifyContent: "center", [PIX_WIDE]: { display: "none" } }}>
+          <Box sx={{ ...LINK_SX, display: "flex", justifyContent: "center", [PIX_WIDE]: { display: "none" } }}>
             <Button variant="text" color="primary" size="md" icon={<CreditCardIcon fontSize="small" />} onClick={onPreferCard} dataTestId="pix-prefer-card">
               {copy.preferCardAction}
             </Button>
