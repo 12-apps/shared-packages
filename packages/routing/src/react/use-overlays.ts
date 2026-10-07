@@ -190,7 +190,7 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
 
   useEffect(() => {
     if (ready) overlays.draw();
-  }, [ready, props.markers, props.stops, props.places]);
+  }, [ready, props.markers, props.stops, props.places, props.placeLabels]);
 
   useEffect(() => {
     if (ready) overlays.fitAll();

@@ -13,7 +13,7 @@
  * - **Failure is visible, not blank**: the host's error copy and a retry.
  */
 
-import { useRef, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 
 import type { RouteMapCopy } from "./copy";
 import type { MapLibreLike } from "./maplibre-types";
@@ -94,15 +94,16 @@ function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "
 
 /** The basemap's required credit: the full line, or an "i" that opens it. */
 function Attribution({ copy, theme, compact }: { copy: RouteMapCopy; theme: RouteMapTheme; compact: boolean }): JSX.Element {
-  const [open, setOpen] = useState(!compact);
+  const [open, setOpen] = useState(false);
+  // Switching to compact folds the credit again; switching to full always shows it.
+  useEffect(() => setOpen(false), [compact]);
   const line: CSSProperties = { position: "absolute", right: 6, bottom: 4, fontSize: 10, color: theme.ink, background: theme.paper, padding: "0 4px", borderRadius: 4, zIndex: 2 };
+  if (!compact) return <small style={line}>{copy.attribution}</small>;
   if (open) {
-    return compact ? (
+    return (
       <button type="button" aria-expanded={true} onClick={() => setOpen(false)} style={{ ...line, border: 0, cursor: "pointer" }}>
         {copy.attribution}
       </button>
-    ) : (
-      <small style={line}>{copy.attribution}</small>
     );
   }
   return (
