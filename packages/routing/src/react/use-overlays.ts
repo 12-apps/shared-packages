@@ -13,9 +13,16 @@
  * array never drops the keyboard focus a viewer put on a marker. Click
  * handlers read the host's CURRENT callback by key, so a kept element never
  * calls a stale one.
+ *
+ * ## Tags step aside, stops and places never move
+ *
+ * After every draw, fit and zoom (unless `tagPlacement="fixed"`), each marker's tag (pill and tail) takes the
+ * first side of its pin — above, below, right, left — clear of every stop
+ * badge and place label (`tag-placement.ts`). The element is restyled and
+ * re-offset in place, never rebuilt, so the focus rule above still holds.
  */
 
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 
 import { isValidPoint } from "../core/geo";
 import type { LngLat } from "../core/types";
@@ -24,17 +31,20 @@ import type { RouteMapCopy } from "./copy";
 import { groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
 import { boundsOf, groupMarkers, PLANNED_LAYER, pointsOf, setLine, TRAVELLED_LAYER } from "./map-geometry";
 import type { MarkerLike } from "./maplibre-types";
+import { placeTags, type Placed } from "./tag-placement";
 import type { MapHandle } from "./use-map";
 import type { RouteMapMarker, RouteMapProps, RouteMapTheme } from "./types";
 
 interface Overlays {
   draw: () => void;
+  /** Re-place the markers' tags around the stops and places, as drawn now. */
+  place: () => void;
   clear: () => void;
   fitAll: () => void;
   fitTo: (points: readonly LngLat[]) => void;
 }
 
-interface Drawn {
+interface Drawn extends Placed {
   marker: MarkerLike;
   element: HTMLElement;
   signature: string;
@@ -45,11 +55,12 @@ interface Wanted {
   signature: string;
   position: LngLat;
   anchor: "bottom" | "center";
+  role: Placed["role"];
   build: () => HTMLElement;
 }
 
 export function useOverlays(
-  handle: Pick<MapHandle, "mapRef" | "libRef">,
+  handle: Pick<MapHandle, "mapRef" | "libRef"> & { container: RefObject<HTMLElement | null> },
   propsRef: MutableRefObject<RouteMapProps>,
   copy: RouteMapCopy,
   theme: RouteMapTheme,
@@ -77,10 +88,10 @@ export function useOverlays(
     const out: Wanted[] = [];
     for (const spot of (props.places ?? []).filter((item) => isValidPoint(item.position))) {
       const lifted = props.placeLabels !== "at-point";
-      out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", build: () => placeElement(spot, theme, lifted) });
+      out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) });
     }
     for (const stop of (props.stops ?? []).filter((item) => isValidPoint(item.position))) {
-      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant, !!stop.emphasized]), position: stop.position, anchor: "center", build: () => stopElement(stop, theme) });
+      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant, !!stop.emphasized]), position: stop.position, anchor: "center", role: "stop", build: () => stopElement(stop, theme) });
     }
     const valid = (props.markers ?? []).filter((marker) => isValidPoint(marker.position));
     for (const group of groupMarkers(valid, map)) out.push(group.length === 1 ? markerWanted(group[0]!) : groupWanted(group));
@@ -92,34 +103,46 @@ export function useOverlays(
     if (marker.onSelect) actions.current.set(key, marker.onSelect);
     const act = marker.onSelect ? () => actions.current.get(key)?.() : null;
     const signature = JSON.stringify([marker.text, marker.ariaLabel, marker.color, !!marker.emphasized, !!marker.faded, marker.icon, !!marker.onSelect]);
-    return { key, signature, position: marker.position, anchor: "bottom", build: () => markerElement(marker, theme, act) };
+    return { key, signature, position: marker.position, anchor: "bottom", role: "tag", build: () => markerElement(marker, theme, act) };
   };
 
   const groupWanted = (group: RouteMapMarker[]): Wanted => {
     const key = `g:${group.map((marker) => marker.id).join(",")}`;
     actions.current.set(key, () => onGroup(group));
-    return { key, signature: String(group.length), position: group[0]!.position, anchor: "bottom", build: () => groupElement(group.length, copy, theme, () => actions.current.get(key)?.()) };
+    return { key, signature: String(group.length), position: group[0]!.position, anchor: "bottom", role: "tag", build: () => groupElement(group.length, copy, theme, () => actions.current.get(key)?.()) };
   };
 
   const draw = (): void => {
     const lib = handle.libRef.current;
     const map = handle.mapRef.current;
     if (lib && map) reconcile(drawn.current, wanted(propsRef.current), (element, anchor, at) => new lib.Marker({ element, anchor }).setLngLat(at).addTo(map));
+    place();
   };
+
+  const place = (): void => placeAll(handle, drawn.current, propsRef.current.tagPlacement);
 
   const fitAll = (): void => {
     // The control column sits on the right edge: keep fitted content clear of
     // it, or the farthest stop lands under the fit button.
     const bounds = boundsOf(pointsOf(propsRef.current));
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 0 });
+    place();
   };
 
   const fitTo = (points: readonly LngLat[]): void => {
     const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
+    // Animated: its zoomend/moveend re-place the tags where it lands.
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
   };
 
-  return { draw, clear, fitAll, fitTo };
+  return { draw, place, clear, fitAll, fitTo };
+}
+
+/** Re-place every drawn marker's tag, inside the map container as laid out now. */
+function placeAll(handle: Pick<MapHandle, "mapRef"> & { container: RefObject<HTMLElement | null> }, drawn: Map<string, Drawn>, mode: RouteMapProps["tagPlacement"]): void {
+  const map = handle.mapRef.current;
+  const box = handle.container.current;
+  if (map) placeTags(map, [...drawn.values()], { width: box?.clientWidth ?? 0, height: box?.clientHeight ?? 0 }, mode ?? "avoid");
 }
 
 type Edge = "top" | "right" | "bottom" | "left";
@@ -168,12 +191,13 @@ function reconcile(drawn: Map<string, Drawn>, next: readonly Wanted[], place: Pl
     const current = drawn.get(item.key);
     if (current?.signature === item.signature) {
       current.marker.setLngLat(at);
+      current.at = at;
       continue;
     }
     const hadFocus = !!current && current.element.contains(document.activeElement);
     current?.marker.remove();
     const element = item.build();
-    drawn.set(item.key, { marker: place(element, item.anchor, at), element, signature: item.signature });
+    drawn.set(item.key, { marker: place(element, item.anchor, at), element, signature: item.signature, at, anchor: item.anchor, role: item.role });
     if (hadFocus) element.focus();
   }
 }
@@ -190,7 +214,7 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
 
   useEffect(() => {
     if (ready) overlays.draw();
-  }, [ready, props.markers, props.stops, props.places, props.placeLabels]);
+  }, [ready, props.markers, props.stops, props.places, props.placeLabels, props.tagPlacement]);
 
   useEffect(() => {
     if (ready) overlays.fitAll();

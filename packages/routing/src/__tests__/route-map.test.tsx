@@ -33,6 +33,8 @@ interface FakeMap {
  */
 function fakeMapLibre(options: { failConstruct?: boolean } = {}) {
   const maps: FakeMap[] = [];
+  /** Each marker element's last `setOffset`, as MapLibre would apply it. */
+  const offsets = new Map<HTMLElement, [number, number]>();
   const lib: MapLibreLike = {
     Map: class {
       readonly fake: FakeMap;
@@ -93,9 +95,13 @@ function fakeMapLibre(options: { failConstruct?: boolean } = {}) {
       remove() {
         this.element.remove();
       }
+      setOffset(offset: [number, number]) {
+        offsets.set(this.element, offset);
+        return this;
+      }
     } as unknown as MapLibreLike["Marker"],
   };
-  return { lib, maps };
+  return { lib, maps, offsets };
 }
 
 const MARKERS: RouteMapProps["markers"] = [
@@ -384,5 +390,250 @@ describe("RouteMap's worker", () => {
     render(<RouteMap height={200} markers={MARKERS} />);
     await waitFor(() => expect(fake.maps).toHaveLength(1));
     expect(setWorkerUrl).toHaveBeenCalledWith("/assets/worker.mjs");
+  });
+});
+
+/** A marker's pill, as laid out (jsdom lays nothing out, so the stub below does). */
+const PILL = { width: 50, height: 26 };
+const TAIL = 9;
+
+/** Layout sizes by what each element is: a marker frame, its pill, a stop, a place. */
+function layoutOf(element: HTMLElement): [number, number] {
+  const parent = element.parentElement;
+  if (element.style.minWidth === "44px") {
+    const row = element.style.flexDirection.startsWith("row");
+    return row ? [Math.max(PILL.width + TAIL, 44), Math.max(PILL.height, 44)] : [Math.max(PILL.width, 44), Math.max(PILL.height + TAIL, 44)];
+  }
+  if (parent?.style.minWidth === "44px" && parent.firstElementChild === element) return [PILL.width, PILL.height];
+  if (element.style.width === "28px") return [28, 28];
+  if (element.style.borderRadius === "10px") return [60, 26];
+  if (element.style.pointerEvents === "none") return [60, element.children.length > 1 ? 80 : 26];
+  return [0, 0];
+}
+
+/** Where a place's label sits inside its wrapper (MapLibre's marker is its offset parent). */
+function offsetOf(element: HTMLElement, label: [number, number]): [number, number] {
+  return element.style.borderRadius === "10px" ? label : [0, 0];
+}
+
+function stubLayout(container: { width: number; height: number } = { width: 0, height: 0 }, label: [number, number] = [0, 0]): void {
+  vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockImplementation(function (this: HTMLElement) {
+    return offsetOf(this, label)[0];
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) {
+    return offsetOf(this, label)[1];
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+    return layoutOf(this)[0];
+  });
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    return layoutOf(this)[1];
+  });
+  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(container.width);
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(container.height);
+}
+
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** The visible tag (pill and tail) on `side` of a pin at screen `pin`, recomputed here independently. */
+function tagBoxAt(pin: { x: number; y: number }, side: string): Box {
+  const { width, height } = PILL;
+  const sides: Record<string, Box> = {
+    above: { left: pin.x - width / 2, right: pin.x + width / 2, top: pin.y - height - TAIL, bottom: pin.y },
+    below: { left: pin.x - width / 2, right: pin.x + width / 2, top: pin.y, bottom: pin.y + TAIL + height },
+    right: { left: pin.x, right: pin.x + TAIL + width, top: pin.y - height / 2, bottom: pin.y + height / 2 },
+    left: { left: pin.x - TAIL - width, right: pin.x, top: pin.y - height / 2, bottom: pin.y + height / 2 },
+  };
+  return sides[side]!;
+}
+
+function centredBox(at: { x: number; y: number }, width: number, height: number): Box {
+  return { left: at.x - width / 2, right: at.x + width / 2, top: at.y - height / 2, bottom: at.y + height / 2 };
+}
+
+function intersects(a: Box, b: Box): boolean {
+  return Math.min(a.right, b.right) > Math.max(a.left, b.left) && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top);
+}
+
+/** The fake projects 1 degree to 1000 px, so a pin at (0.1, 0.1) sits at (100, 100) on screen. */
+const PIN = { x: 100, y: 100 };
+const COURIER = { id: "m", position: { lng: 0.1, lat: 0.1 }, text: "Márcio", ariaLabel: "Márcio, Em rota", color: "#a40", icon: "motorbike" as const, onSelect: () => undefined };
+
+function stopAt(id: string, x: number, y: number) {
+  return { id, position: { lng: x / 1000, lat: y / 1000 }, mark: id, title: `Parada ${id}`, variant: "next" as const };
+}
+
+describe("RouteMap's marker tags", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("moves a courier's tag below his pin when a stop badge sits where the tag would be", async () => {
+    stubLayout();
+    const { fake } = await mount({ markers: [COURIER], stops: [stopAt("2", 100, 80)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    expect(intersects(tagBoxAt(PIN, "below"), centredBox({ x: 100, y: 80 }, 28, 28))).toBe(false);
+    // The frame's top now sits on the point and the tail points up at it.
+    expect(fake.offsets.get(marker)).toEqual([0, 44]);
+    expect(marker.style.flexDirection).toBe("column-reverse");
+    expect(marker.lastElementChild!.getAttribute("style")).toContain("border-bottom: 9px solid");
+  });
+
+  it("moves a courier's tag off a place label drawn on its point", async () => {
+    stubLayout();
+    await mount({ markers: [COURIER], places: [{ id: "shop", position: { lng: 0.1, lat: 0.085 }, label: "Loja" }], placeLabels: "at-point" });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    expect(intersects(tagBoxAt(PIN, "below"), centredBox({ x: 100, y: 85 }, 60, 26))).toBe(false);
+  });
+
+  it("keeps the tag above when nothing is in the way, untouched", async () => {
+    stubLayout();
+    const { fake } = await mount({ markers: [COURIER], stops: [stopAt("2", 100, 300)], places: [{ id: "shop", position: { lng: 0.1, lat: 0.1 }, label: "Loja" }] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    // A lifted place's LABEL rides above the pin's tag; its stem is not in the way.
+    expect(marker.dataset.tagSide).toBe("above");
+    expect(fake.offsets.has(marker)).toBe(false);
+    expect(marker.style.flexDirection).toBe("column");
+  });
+
+  it("keeps the tag inside the map when above would leave it", async () => {
+    stubLayout({ width: 245, height: 200 });
+    await mount({ markers: [{ ...COURIER, position: { lng: 0.1, lat: 0.03 } }] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+  });
+
+  it("takes the least-overlapping side when every side is blocked", async () => {
+    stubLayout();
+    // Above and below are covered whole (784 px²); right only clips a badge (460 px²); left is worse (980 px²).
+    const stops = [stopAt("1", 100, 82), stopAt("2", 100, 118), stopAt("3", 165, 100), stopAt("4", 60, 100)];
+    const { fake } = await mount({ markers: [COURIER], stops });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("right"));
+    expect(fake.offsets.get(marker)).toEqual([(PILL.width + TAIL) / 2, 22]);
+  });
+
+  it("keeps the tag above a courier standing on a stop (arrival), instead of jumping aside", async () => {
+    stubLayout();
+    await mount({ markers: [COURIER], stops: [stopAt("2", 100, 100)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    expect(marker.dataset.tagSide).toBe("above");
+  });
+
+  it("keeps a stable side while a pin jitters across a stop's edge, and steps aside once clearly off it", async () => {
+    stubLayout();
+    // The badge spans x 86–114; the pin sits `dx` px left of its centre, crossing its edge at 14.
+    const stops = [stopAt("2", 100, 100)];
+    const at = (dx: number) => [{ ...COURIER, position: { lng: (100 - dx) / 1000, lat: 0.1 } }];
+    const { rerender, RouteMap } = await mount({ markers: at(13), stops });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    const sideAt = (dx: number): string => {
+      rerender(<RouteMap height={400} markers={at(dx)} stops={stops} />);
+      return marker.dataset.tagSide ?? "";
+    };
+    expect([13, 15, 13, 15, 13.5, 14.5].map(sideAt)).toEqual(["above", "above", "above", "above", "above", "above"]);
+    expect(sideAt(22)).not.toBe("above");
+  });
+
+  it("does not treat a pin arriving just off a badge's edge as standing on it", async () => {
+    stubLayout();
+    // 4 px off the badge's edge — within the release margin, but the pin never stood on it.
+    await mount({ markers: [{ ...COURIER, position: { lng: 0.082, lat: 0.1 } }], stops: [stopAt("2", 100, 100)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("left"));
+  });
+
+  it("does not flip back and forth as a pin jitters a pixel or two at the threshold", async () => {
+    stubLayout();
+    // A badge whose bottom edge is at y=64: above the pin at y=98 it clips the tag by 1 px; at y=100 it clears it by 1 px.
+    const stops = [stopAt("2", 100, 50)];
+    const { rerender, RouteMap } = await mount({ markers: [{ ...COURIER, position: { lng: 0.1, lat: 0.098 } }], stops });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    const sideAt = (lat: number): string => {
+      rerender(<RouteMap height={400} markers={[{ ...COURIER, position: { lng: 0.1, lat } }]} stops={stops} />);
+      return marker.dataset.tagSide ?? "";
+    };
+    expect([0.1, 0.098, 0.1, 0.0985, 0.1].map(sideAt)).toEqual(["below", "below", "below", "below", "below"]);
+  });
+
+  it("takes the left side when above, below and right are each blocked", async () => {
+    stubLayout();
+    const { fake } = await mount({ markers: [COURIER], stops: [stopAt("1", 115, 75), stopAt("2", 115, 125), stopAt("3", 130, 100)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("left"));
+    expect(fake.offsets.get(marker)).toEqual([-(PILL.width + TAIL) / 2, 22]);
+    expect(marker.style.flexDirection).toBe("row");
+    expect(marker.lastElementChild!.getAttribute("style")).toContain("border-left: 9px solid");
+  });
+
+  it("returns the tag above once the obstacle has gone", async () => {
+    stubLayout();
+    const { fake, rerender, RouteMap } = await mount({ markers: [COURIER], stops: [stopAt("2", 100, 80)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    rerender(<RouteMap height={400} markers={[COURIER]} stops={[]} />);
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("above"));
+    expect(fake.offsets.get(marker)).toEqual([0, 0]);
+    expect(marker.style.flexDirection).toBe("column");
+    expect(marker.lastElementChild!.getAttribute("style")).toContain("border-top: 9px solid");
+  });
+
+  it("moves a group's pill off a stop badge too", async () => {
+    stubLayout();
+    const near = { ...COURIER, id: "n", ariaLabel: "Rafa, Em rota", position: { lng: 0.10001, lat: 0.10001 } };
+    await mount({ markers: [COURIER, near], stops: [stopAt("2", 100, 80)] });
+    const group = await screen.findByRole("button", { name: EN_US_ROUTE_MAP_COPY.group(2) });
+    await waitFor(() => expect(group.dataset.tagSide).toBe("below"));
+  });
+
+  it("measures a lifted place by its label's own box inside the wrapper", async () => {
+    // The wrapper (60×80) spans y 70–150 above its point at y=150. With the label at the
+    // wrapper's top it would cover the tag above the pin; laid out 54 px lower it covers only below.
+    stubLayout(undefined, [0, 54]);
+    await mount({ markers: [COURIER], places: [{ id: "shop", position: { lng: 0.1, lat: 0.15 }, label: "Loja" }] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    expect(marker.dataset.tagSide).toBe("above");
+  });
+
+  it("covers a lifted label at the wrapper's top, so the tag steps below", async () => {
+    stubLayout();
+    await mount({ markers: [COURIER], places: [{ id: "shop", position: { lng: 0.1, lat: 0.15 }, label: "Loja" }] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+  });
+
+  it("keeps every tag above, untouched, with tagPlacement=fixed — and puts a moved one back", async () => {
+    stubLayout();
+    const stops = [stopAt("2", 100, 80)];
+    const { fake, rerender, RouteMap } = await mount({ markers: [COURIER], stops, tagPlacement: "fixed" });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    expect(marker.dataset.tagSide).toBe("above");
+    expect(fake.offsets.has(marker)).toBe(false);
+    rerender(<RouteMap height={400} markers={[COURIER]} stops={stops} />);
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    rerender(<RouteMap height={400} markers={[COURIER]} stops={stops} tagPlacement="fixed" />);
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("above"));
+    expect(fake.offsets.get(marker)).toEqual([0, 0]);
+  });
+
+  it("keeps keyboard focus on a marker whose tag changes side", async () => {
+    stubLayout();
+    const { fake, rerender, RouteMap } = await mount({ markers: [COURIER], stops: [stopAt("2", 100, 300)] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    expect(marker.dataset.tagSide).toBe("above");
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- real focus: what is under test is that a re-placement keeps `document.activeElement`
+    marker.focus();
+    rerender(<RouteMap height={400} markers={[{ ...COURIER }]} stops={[stopAt("2", 100, 80)]} />);
+    await waitFor(() => expect(marker.dataset.tagSide).toBe("below"));
+    act(() => fake.maps[0]!.fire("zoomend"));
+    act(() => fake.maps[0]!.fire("moveend"));
+    await waitFor(() => expect(document.activeElement).toBe(marker));
+    expect(screen.getByRole("button", { name: "Márcio, Em rota" })).toBe(marker);
   });
 });
