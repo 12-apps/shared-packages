@@ -16,6 +16,8 @@ export interface RouteMapMarker {
   emphasized?: boolean;
   /** An old position: dashed outline, translucent. */
   faded?: boolean;
+  /** A glyph before the text: a motorbike for a courier. */
+  icon?: "motorbike";
   onSelect?: () => void;
 }
 
@@ -33,6 +35,8 @@ export interface RouteMapPlace {
   id: string;
   position: LngLat;
   label: string;
+  /** A glyph before the label: a shopfront for a store. */
+  icon?: "store";
 }
 
 /** Colours, from the host's theme — the component never picks one itself. */

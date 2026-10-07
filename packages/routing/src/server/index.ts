@@ -60,7 +60,11 @@ export function createApiRouting<TActor = unknown>(config: RoutingServerConfig<T
       if (!(await config.authorize(request.actor))) return { status: 403, body: { error: "forbidden" } };
       const parsed = parseRouteRequest(request.body, maxStops);
       if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
-      return { status: 200, body: await planRoute(parsed.request) };
+      const route = await planRoute(parsed.request);
+      // `detail` is for the host's logs (it can name an internal host); the
+      // caller gets which provider failed and how, never the raw text.
+      const failures = route.failures.map(({ provider, kind, status }) => ({ provider, kind, ...(status === undefined ? {} : { status }) }));
+      return { status: 200, body: { ...route, failures } };
     },
   };
   return { routes: [route], planRoute };
@@ -92,7 +96,7 @@ export function parseRouteRequest(body: unknown, maxStops = DEFAULT_MAX_STOPS): 
   if (!from) return { ok: false, error: "origin must be a valid point" };
   const parsedStops = stopsOf(stops, maxStops);
   if (typeof parsedStops === "string") return { ok: false, error: parsedStops };
-  const back = returnTo === undefined ? undefined : pointOf(returnTo);
+  const back = returnTo === undefined || returnTo === null ? undefined : pointOf(returnTo);
   if (back === null) return { ok: false, error: "returnTo must be a valid point" };
   return { ok: true, request: { origin: from, stops: parsedStops, ...(back ? { returnTo: back } : {}) } };
 }

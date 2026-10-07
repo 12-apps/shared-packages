@@ -59,12 +59,24 @@ async function attempt(
   timeoutMs: number,
 ): Promise<ProviderOutcome> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The timer RACES the adapter rather than only aborting it: an adapter (or
+  // a host fetch wrapper) that ignores the signal must not hang the planner,
+  // or "there is always a route" stops being true.
+  const timedOut = new Promise<ProviderOutcome>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve({ ok: false, kind: "timeout" });
+    }, timeoutMs);
+  });
+  // `Promise.resolve().then` so an adapter that throws synchronously is
+  // caught like one that rejects.
+  const answered = Promise.resolve()
+    .then(() => provider.route(request, { fetch: doFetch, signal: controller.signal }))
+    .then((outcome) => (outcome.ok ? checkShape(outcome, request) : outcome))
+    .catch((error: unknown) => failureOfThrown(error, controller.signal));
   try {
-    const outcome = await provider.route(request, { fetch: doFetch, signal: controller.signal });
-    return outcome.ok ? checkShape(outcome, request) : outcome;
-  } catch (error) {
-    return failureOfThrown(error, controller.signal);
+    return await Promise.race([answered, timedOut]);
   } finally {
     clearTimeout(timer);
   }

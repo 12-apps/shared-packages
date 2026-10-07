@@ -36,7 +36,7 @@ export function osrmProvider(options: OsrmOptions): RoutingProvider {
         .join(";");
       const profile = encodeURIComponent(options.profile ?? "driving");
       const url = `${options.baseUrl.replace(/\/+$/, "")}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=false`;
-      const answer = await fetchJson({ fetch, signal, url, init: { headers: { accept: "application/json" } } });
+      const answer = await fetchJson({ fetch, signal, url, init: { headers: { accept: "application/json" } }, isNoRoute: osrmNoRoute });
       if (!answer.ok) return answer;
       const body = answer.body as OsrmBody;
       if (body.code === "NoRoute") return { ok: false, kind: "no-route" };
@@ -45,6 +45,12 @@ export function osrmProvider(options: OsrmOptions): RoutingProvider {
       return routeOutcome(positionsOf(route?.geometry?.coordinates), legsOf(route?.legs, legOf));
     },
   };
+}
+
+/** OSRM answers an impossible route with HTTP 400 and a `code` in the body. */
+function osrmNoRoute(status: number, body: unknown): boolean {
+  const code = (body as { code?: unknown } | null)?.code;
+  return status === 400 && (code === "NoRoute" || code === "NoSegment");
 }
 
 function legOf(leg: OsrmLeg): RouteLeg | null {

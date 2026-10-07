@@ -41,7 +41,7 @@ export function openRouteServiceProvider(options: OpenRouteServiceOptions): Rout
         fetch,
         signal,
         url: `${base}/v2/directions/${encodeURIComponent(profile)}/geojson`,
-        noRouteStatuses: [404],
+        isNoRoute: orsNoRoute,
         init: {
           method: "POST",
           headers: { authorization: options.apiKey, "content-type": "application/json", accept: "application/geo+json" },
@@ -53,6 +53,15 @@ export function openRouteServiceProvider(options: OpenRouteServiceOptions): Rout
       return routeOutcome(positionsOf(feature?.geometry?.coordinates), legsOf(feature?.properties?.segments, legOf));
     },
   };
+}
+
+/**
+ * ORS answers "no route" (2009) and "no routable point near a waypoint" (2010)
+ * with 404 — the same status as a wrong profile or URL, so the body decides.
+ */
+function orsNoRoute(status: number, body: unknown): boolean {
+  const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
+  return status === 404 && (code === 2009 || code === 2010);
 }
 
 function legOf(segment: OrsSegment): RouteLeg | null {

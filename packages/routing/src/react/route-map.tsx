@@ -58,7 +58,7 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
 
     const height = typeof props.height === "number" ? `${props.height}px` : props.height;
     return (
-      <div data-testid={props.testId} role="region" aria-label={copy.mapLabel} style={{ position: "relative", height, width: "100%", overflow: "hidden", borderRadius: "inherit" }}>
+      <div className="routing-map" data-testid={props.testId} role="region" aria-label={copy.mapLabel} style={{ position: "relative", height, width: "100%", overflow: "hidden", borderRadius: "inherit" }}>
         <div ref={container} style={{ position: "absolute", inset: 0 }} />
         {handle.status === "error" ? (
           <MapError copy={copy} theme={theme} onRetry={handle.retry} />
@@ -99,10 +99,10 @@ function MapControls({ copy, theme, zoom, fit, onZoomIn, onZoomOut, onFit }: Con
     <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", gap: 8, zIndex: 2 }}>
       {zoom ? (
         <>
-          <button type="button" aria-label={copy.zoomIn} onClick={onZoomIn} style={controlStyle(theme)}>
+          <button type="button" className="routing-zoom" aria-label={copy.zoomIn} onClick={onZoomIn} style={controlStyle(theme)}>
             +
           </button>
-          <button type="button" aria-label={copy.zoomOut} onClick={onZoomOut} style={controlStyle(theme)}>
+          <button type="button" className="routing-zoom" aria-label={copy.zoomOut} onClick={onZoomOut} style={controlStyle(theme)}>
             −
           </button>
         </>

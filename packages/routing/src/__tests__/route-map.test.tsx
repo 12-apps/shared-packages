@@ -99,8 +99,8 @@ function fakeMapLibre(options: { failConstruct?: boolean } = {}) {
 }
 
 const MARKERS: RouteMapProps["markers"] = [
-  { id: "a", position: { lng: -46.63, lat: -23.55 }, text: "MD", ariaLabel: "Márcio, Em rota", color: "#a40" },
-  { id: "b", position: { lng: -46.5, lat: -23.4 }, text: "RS", ariaLabel: "Rafa, Em rota", color: "#a40" },
+  { id: "a", position: { lng: -46.63, lat: -23.55 }, text: "MD", ariaLabel: "Márcio, Em rota", color: "#a40", onSelect: () => undefined },
+  { id: "b", position: { lng: -46.5, lat: -23.4 }, text: "RS", ariaLabel: "Rafa, Em rota", color: "#a40", onSelect: () => undefined },
 ];
 
 async function mount(props: Partial<RouteMapProps> = {}, options: { failConstruct?: boolean } = {}) {
@@ -124,6 +124,22 @@ describe("RouteMap", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Márcio, Em rota" }));
     expect(onSelect).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Rafa, Em rota" })).toBeTruthy();
+  });
+
+  it("draws a marker's and a place's glyph before its text", async () => {
+    await mount({ markers: [{ ...MARKERS[0]!, icon: "motorbike" }], places: [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store", icon: "store" }] });
+    const marker = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    expect(marker.querySelector("svg")).not.toBeNull();
+    expect(marker.textContent).toBe("MD");
+    const place = await screen.findByText("Store");
+    expect(place.querySelector("svg")).not.toBeNull();
+  });
+
+  it("marks the zoom pair so a phone-width map can hide it", async () => {
+    await mount();
+    expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.zoomIn }).className).toBe("routing-zoom");
+    expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.fitAll }).className).toBe("");
+    expect(document.getElementById("routing-map-css")?.textContent).toContain("@container routing-map (max-width: 599px)");
   });
 
   it("folds overlapping markers into one group that hands the host their ids", async () => {
@@ -179,11 +195,55 @@ describe("RouteMap", () => {
     expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.retry })).toBeTruthy();
   });
 
-  it("shows the error when the style fails before the map loads, and retries", async () => {
+  it("ignores an error after the map is ready (a tile, not the map)", async () => {
     const { fake } = await mount({}, { failConstruct: false });
+    expect(await screen.findByRole("button", { name: "Márcio, Em rota" })).toBeTruthy();
     act(() => fake.maps[0]!.fire("error"));
-    // Loaded already: a later tile error is not a failed map.
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("shows the error when the style fails before the map is ready, and Retry builds a fresh map", async () => {
+    const fake = fakeMapLibre();
+    const { RouteMap } = createWebRouting({ copy: EN_US_ROUTE_MAP_COPY, theme: THEME, loadMapLibre: async () => fake.lib });
+    render(<RouteMap height={400} markers={MARKERS} />);
+    await waitFor(() => expect(fake.maps).toHaveLength(1));
+    act(() => fake.maps[0]!.fire("error"));
+    fireEvent.click(await screen.findByRole("button", { name: EN_US_ROUTE_MAP_COPY.retry }));
+    await waitFor(() => expect(fake.maps).toHaveLength(2));
+    expect(fake.maps[0]!.removed).toBe(true);
+    act(() => fake.maps[1]!.fire("style.load"));
+    expect(await screen.findByRole("button", { name: "Márcio, Em rota" })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(fake.maps[1]!.fitBounds).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps keyboard focus on a marker across a refresh, a selection and a pan", async () => {
+    const { fake, rerender, RouteMap } = await mount();
+    const button = await screen.findByRole("button", { name: "Márcio, Em rota" });
+    // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- real focus: what is under test is that a redraw keeps `document.activeElement`, so the marker has to hold it for real
+    button.focus();
+    rerender(<RouteMap height={400} markers={MARKERS!.map((marker) => ({ ...marker }))} />);
+    await waitFor(() => expect(document.activeElement).toBe(button));
+    act(() => fake.maps[0]!.fire("moveend"));
+    await waitFor(() => expect(document.activeElement).toBe(button));
+    rerender(<RouteMap height={400} markers={MARKERS!.map((marker, i) => ({ ...marker, emphasized: i === 0, text: i === 0 ? "Márcio" : marker.text }))} />);
+    const replaced = screen.getByRole("button", { name: "Márcio, Em rota" });
+    expect(replaced.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(document.activeElement).toBe(replaced));
+  });
+
+  it("calls the host's current onSelect from a marker it kept", async () => {
+    const { rerender, RouteMap } = await mount();
+    const later = vi.fn();
+    rerender(<RouteMap height={400} markers={[{ ...MARKERS![0]!, onSelect: later }, MARKERS![1]!]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Márcio, Em rota" }));
+    expect(later).toHaveBeenCalledOnce();
+  });
+
+  it("draws a marker nobody can act on as a labelled image, not an empty button", async () => {
+    await mount({ markers: [{ ...MARKERS![0]!, onSelect: undefined }] });
+    expect(await screen.findByRole("img", { name: "Márcio, Em rota" })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Márcio, Em rota" })).toBeNull());
   });
 
   it("is ready on style.load without waiting for every tile, and adds the lines once", async () => {

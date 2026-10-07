@@ -25,6 +25,20 @@ describe("createApiRouting", () => {
     expect(answer.body).toMatchObject({ fallback: true, provider: null });
   });
 
+  it("never hands the caller a provider's raw error text", async () => {
+    const leaky = createApiRouting<string>({
+      providers: [{ name: "osrm", route: async () => ({ ok: false, kind: "transport", detail: "getaddrinfo ENOTFOUND osrm.internal" }) }],
+      authorize: () => true,
+    });
+    const answer = await call(leaky, "staff", BODY);
+    expect((answer.body as { failures: unknown[] }).failures).toEqual([{ provider: "osrm", kind: "transport" }]);
+    await expect(leaky.planRoute(BODY)).resolves.toMatchObject({ failures: [{ detail: "getaddrinfo ENOTFOUND osrm.internal" }] });
+  });
+
+  it("reads a null returnTo as absent", () => {
+    expect(parseRouteRequest({ ...BODY, returnTo: null })).toMatchObject({ ok: true });
+  });
+
   it("caps the stops a caller may send", () => {
     const stops = Array.from({ length: 3 }, () => BODY.stops[0]);
     expect(parseRouteRequest({ ...BODY, stops }, 2)).toEqual({ ok: false, error: "at most 2 stops" });

@@ -60,6 +60,20 @@ describe("the planner", () => {
     expect(route.failures).toEqual([{ provider: "slow", kind: "timeout" }]);
   });
 
+  it("times out a provider that ignores the abort signal, instead of hanging", async () => {
+    const deaf = provider("deaf", () => new Promise<ProviderOutcome>(() => undefined));
+    const route = await createRoutePlanner({ providers: [deaf], timeoutMs: 10 })(REQUEST);
+    expect(route).toMatchObject({ fallback: true, failures: [{ provider: "deaf", kind: "timeout" }] });
+  });
+
+  it("records an adapter that throws synchronously as a transport failure", async () => {
+    const broken = provider("broken", () => {
+      throw new Error("boom");
+    });
+    const route = await createRoutePlanner({ providers: [broken] })(REQUEST);
+    expect(route.failures).toEqual([{ provider: "broken", kind: "transport", detail: "boom" }]);
+  });
+
   it("treats a 2xx with the wrong number of legs as an unreadable body", async () => {
     const plan = createRoutePlanner({ providers: [provider("a", async () => ({ ...OK, legs: [] }))] });
     const route = await plan(REQUEST);

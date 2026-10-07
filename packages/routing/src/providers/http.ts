@@ -13,8 +13,12 @@ interface JsonCall {
   signal: AbortSignal;
   url: string;
   init?: RequestInit;
-  /** Statuses the service uses for "there is no route between these points". */
-  noRouteStatuses?: readonly number[];
+  /**
+   * Whether a non-2xx answer means "there is no route between these points"
+   * rather than a failed request — read from the status AND the error body,
+   * because services reuse a generic status for it (OSRM answers 400).
+   */
+  isNoRoute?: (status: number, body: unknown) => boolean;
 }
 
 export async function fetchJson(call: JsonCall): Promise<{ ok: true; body: unknown } | Failure> {
@@ -24,11 +28,27 @@ export async function fetchJson(call: JsonCall): Promise<{ ok: true; body: unkno
   } catch (error) {
     return failureOfThrown(error, call.signal) as Failure;
   }
-  if (call.noRouteStatuses?.includes(response.status)) return { ok: false, kind: "no-route", status: response.status };
+  if (!response.ok && call.isNoRoute) {
+    const text = await response.text().catch(() => "");
+    if (call.isNoRoute(response.status, parseJson(text))) return { ok: false, kind: "no-route", status: response.status };
+    return { ok: false, kind: "http", status: response.status, detail: text.slice(0, 200) };
+  }
   const failed = await failureOfResponse(response);
   if (failed) return failed as Failure;
-  const body: unknown = await response.json().catch(() => undefined);
-  return body === undefined ? { ok: false, kind: "body" } : { ok: true, body };
+  try {
+    return { ok: true, body: (await response.json()) as unknown };
+  } catch (error) {
+    // An abort while the body streams is the planner's timeout, not a bad body.
+    return call.signal.aborted ? (failureOfThrown(error, call.signal) as Failure) : { ok: false, kind: "body" };
+  }
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /** `[lng, lat][]` from an untrusted value, or `null`. */

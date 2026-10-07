@@ -37,7 +37,12 @@ describe("openrouteservice", () => {
 
   it("names its failures instead of throwing", async () => {
     await expect(ors("").route(REQUEST, context(vi.fn()))).resolves.toEqual({ ok: false, kind: "unconfigured" });
-    await expect(ors().route(REQUEST, context(vi.fn(async () => json({}, 404))))).resolves.toMatchObject({ kind: "no-route" });
+    await expect(ors().route(REQUEST, context(vi.fn(async () => json({ error: { code: 2009, message: "Route could not be found" } }, 404))))).resolves.toMatchObject({
+      kind: "no-route",
+      status: 404,
+    });
+    // A 404 without the routing code is a wrong profile or URL, not "no route".
+    await expect(ors().route(REQUEST, context(vi.fn(async () => json({ error: "Not Found" }, 404))))).resolves.toMatchObject({ kind: "http", status: 404 });
     await expect(ors().route(REQUEST, context(vi.fn(async () => json({ error: "quota" }, 429))))).resolves.toMatchObject({
       ok: false,
       kind: "http",
@@ -54,6 +59,19 @@ describe("openrouteservice", () => {
         ),
       ),
     ).resolves.toMatchObject({ kind: "transport" });
+  });
+});
+
+describe("the shared http step", () => {
+  it("names a timeout while the body streams as a timeout, not a bad body", async () => {
+    const controller = new AbortController();
+    const response = new Response(JSON.stringify({}), { status: 200 });
+    vi.spyOn(response, "json").mockImplementation(async () => {
+      controller.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+    const outcome = await openRouteServiceProvider({ apiKey: "k" }).route(REQUEST, { fetch: vi.fn(async () => response), signal: controller.signal });
+    expect(outcome).toMatchObject({ ok: false, kind: "timeout" });
   });
 });
 
@@ -75,8 +93,16 @@ describe("osrm", () => {
   });
 
   it("names NoRoute and a missing base URL", async () => {
-    await expect(osrmProvider({ baseUrl: "https://osrm.test" }).route(REQUEST, context(vi.fn(async () => json({ code: "NoRoute" }))))).resolves.toMatchObject({
-      kind: "no-route",
+    // Real OSRM answers an impossible route with HTTP 400 and the code in the body.
+    for (const code of ["NoRoute", "NoSegment"]) {
+      await expect(osrmProvider({ baseUrl: "https://osrm.test" }).route(REQUEST, context(vi.fn(async () => json({ code }, 400))))).resolves.toMatchObject({
+        kind: "no-route",
+        status: 400,
+      });
+    }
+    await expect(osrmProvider({ baseUrl: "https://osrm.test" }).route(REQUEST, context(vi.fn(async () => json({ code: "InvalidQuery" }, 400))))).resolves.toMatchObject({
+      kind: "http",
+      status: 400,
     });
     await expect(osrmProvider({ baseUrl: undefined }).route(REQUEST, context(vi.fn()))).resolves.toMatchObject({ kind: "unconfigured" });
   });
