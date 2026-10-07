@@ -102,6 +102,15 @@ export interface RouteMapProps {
    */
   placeLabels?: "lifted" | "at-point";
   /**
+   * Where a marker's tag (pill and tail) sits around its pin. `avoid`
+   * (default) keeps it above unless a stop badge or place label is in the
+   * way, then takes the first clear side — below, right, left — with the tail
+   * still on the pin; stops, places and the pin's point never move. `fixed`
+   * always draws it above, as before. Either way the marker element carries
+   * `data-tag-side="above|below|right|left"`.
+   */
+  tagPlacement?: "avoid" | "fixed";
+  /**
    * `full` (default) prints the basemap's attribution line; `compact` shows an
    * "i" control that expands to it, for a small map. Either satisfies the
    * tile terms.

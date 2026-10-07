@@ -33,6 +33,8 @@ interface MapSetup {
   propsRef: MutableRefObject<RouteMapProps>;
   /** Called after each pan or zoom, to regroup markers. */
   onMoveEnd: () => void;
+  /** Called after each zoom, to re-place the markers' tags. */
+  onZoomEnd: () => void;
   /** Called before the map goes away, to drop markers. */
   onDispose: () => void;
 }
@@ -87,6 +89,7 @@ export function useMapInstance(setup: MapSetup): MapHandle {
         map.on("style.load", onReady);
         map.on("load", onReady);
         map.on("moveend", () => setupRef.current.onMoveEnd());
+        map.on("zoomend", () => setupRef.current.onZoomEnd());
       })
       .catch(() => {
         if (!disposed) setStatus("error");

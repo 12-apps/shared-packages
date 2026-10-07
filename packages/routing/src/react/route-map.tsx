@@ -55,9 +55,10 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
       container,
       propsRef,
       onMoveEnd: () => overlaysRef.current?.draw(),
+      onZoomEnd: () => overlaysRef.current?.place(),
       onDispose: () => overlaysRef.current?.clear(),
     });
-    const overlays = useOverlays(handle, propsRef, copy, theme);
+    const overlays = useOverlays({ ...handle, container }, propsRef, copy, theme);
     overlaysRef.current = overlays;
     useOverlaySync(handle.status === "ready", handle, props, overlays, theme);
 

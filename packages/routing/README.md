@@ -99,6 +99,21 @@ const { RouteMap } = createWebRouting({
   the basemap credit into an "i" that opens it.
 - A stop with `emphasized: true` (the one the screen is about) is drawn above
   the pins; other stops sit beneath them.
+- A marker's (or group's) tag — its pill and tail — steps aside from stop
+  badges and place labels (`tagPlacement="avoid"`, the default). After every
+  draw, fit, pan and zoom it keeps its current side while that is clear;
+  otherwise it takes the first clear side of its pin in the order above,
+  below, right, left (a side other than the current one must be clear by a
+  few pixels, so a jittering GPS fix never flips it), and when every side is
+  blocked, the least-covering one. A stop or place under the pin's own point
+  (a courier arriving) does not count. Stops, places and the pin's point never
+  move; the tail follows the side, and the element is restyled in place, so
+  keyboard focus survives. `tagPlacement="fixed"` keeps every tag above, as
+  before this release.
+- **DOM change:** every marker and group element now carries
+  `data-tag-side="above|below|right|left"` (in both modes), so a host's DOM
+  snapshot of the map gains that attribute. A host's own `loadMapLibre` fake
+  needs `Marker#setOffset` for a tag to move.
 - `controls={{ placement: "top-left" }}` moves the zoom and fit column to the
   other top corner when the host's floating chrome covers the top-right.
 - No WebGL, a library or style that does not arrive within `readyTimeoutMs`

@@ -51,6 +51,58 @@ function span(text: string, style: Partial<CSSStyleDeclaration>): HTMLSpanElemen
   return element;
 }
 
+/** Which side of its pin a marker's tag (pill and tail) is drawn on. */
+export type TagSide = "above" | "below" | "right" | "left";
+
+/** How far the tail reaches from the pill to the pin. */
+export const TAG_TAIL_PX = 9;
+
+/** Each tail's colour, so a side change can redraw it pointing elsewhere. */
+const tailColours = new WeakMap<HTMLElement, string>();
+
+/** The tail under a pill, pointing down at the pin (the `above` side). */
+function tailElement(colour: string): HTMLElement {
+  const tail = span("", { width: "0", height: "0", borderLeft: "7px solid transparent", borderRight: "7px solid transparent", borderTop: `${TAG_TAIL_PX}px solid ${colour}` });
+  tailColours.set(tail, colour);
+  return tail;
+}
+
+/**
+ * Per side: how the frame stacks pill and tail (the tail always at the edge
+ * that meets the pin), and which tail border is filled (the triangle points
+ * the opposite way) versus transparent (its two flanks).
+ */
+const SIDE_LAYOUT: Record<TagSide, { flexDirection: string; filled: Edge; flanks: readonly Edge[] }> = {
+  above: { flexDirection: "column", filled: "top", flanks: ["left", "right"] },
+  below: { flexDirection: "column-reverse", filled: "bottom", flanks: ["left", "right"] },
+  right: { flexDirection: "row-reverse", filled: "right", flanks: ["top", "bottom"] },
+  left: { flexDirection: "row", filled: "left", flanks: ["top", "bottom"] },
+};
+
+type Edge = "top" | "bottom" | "left" | "right";
+
+function tailBorder(edge: Edge, side: TagSide, colour: string): string {
+  const layout = SIDE_LAYOUT[side];
+  if (edge === layout.filled) return `${TAG_TAIL_PX}px solid ${colour}`;
+  return layout.flanks.includes(edge) ? "7px solid transparent" : "0";
+}
+
+/**
+ * Lay a marker's (or group's) tag out on `side` of its pin, in place — the
+ * element is never rebuilt, so keyboard focus survives. The caller re-offsets
+ * the MapLibre marker so the tail's tip stays on the point. `false` when the
+ * element is not a tag this module built (nothing changed).
+ */
+export function setTagSide(element: HTMLElement, side: TagSide): boolean {
+  const tail = element.children[1] as HTMLElement | undefined;
+  const colour = tail ? tailColours.get(tail) : undefined;
+  if (!tail || colour === undefined) return false;
+  element.style.flexDirection = SIDE_LAYOUT[side].flexDirection;
+  for (const edge of ["top", "bottom", "left", "right"] as const) tail.style.setProperty(`border-${edge}`, tailBorder(edge, side, colour));
+  element.dataset.tagSide = side;
+  return true;
+}
+
 /**
  * A marker the viewer can act on is a `<button>` with `aria-pressed` (it
  * selects); one they can only read is an `img` with a label — never an empty
@@ -84,8 +136,8 @@ export function markerElement(marker: RouteMapMarker, theme: RouteMapTheme, onSe
   });
   if (marker.icon) bubble.appendChild(glyph(marker.icon));
   bubble.appendChild(document.createTextNode(marker.text));
-  const tail = span("", { width: "0", height: "0", borderLeft: "7px solid transparent", borderRight: "7px solid transparent", borderTop: `9px solid ${marker.color}` });
-  element.append(bubble, tail);
+  element.append(bubble, tailElement(marker.color));
+  element.dataset.tagSide = "above";
   return element;
 }
 
@@ -106,8 +158,8 @@ export function groupElement(count: number, copy: RouteMapCopy, theme: RouteMapT
     border: `2px solid ${theme.paper}`,
     boxShadow: SHADOW,
   });
-  const tail = span("", { width: "0", height: "0", borderLeft: "7px solid transparent", borderRight: "7px solid transparent", borderTop: `9px solid ${theme.ink}` });
-  element.append(bubble, tail);
+  element.append(bubble, tailElement(theme.ink));
+  element.dataset.tagSide = "above";
   return element;
 }
 

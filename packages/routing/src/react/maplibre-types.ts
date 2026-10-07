@@ -5,7 +5,7 @@
  */
 
 export interface MapLike {
-  on(event: "load" | "style.load" | "error" | "moveend", listener: () => void): unknown;
+  on(event: "load" | "style.load" | "error" | "moveend" | "zoomend", listener: () => void): unknown;
   remove(): void;
   addSource(id: string, source: { type: "geojson"; data: unknown }): unknown;
   getSource(id: string): { setData(data: unknown): unknown } | undefined;
@@ -21,6 +21,12 @@ export interface MarkerLike {
   setLngLat(lngLat: [number, number]): MarkerLike;
   addTo(map: MapLike): MarkerLike;
   remove(): unknown;
+  /**
+   * Shift the element from its anchor, in pixels — how a marker's tag moves
+   * to another side of its pin. Optional so an older fake still drives the
+   * map; without it the tag keeps its default side.
+   */
+  setOffset?(offset: [number, number]): MarkerLike;
 }
 
 export interface MapLibreLike {
