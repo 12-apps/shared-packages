@@ -168,10 +168,10 @@ export interface PixPaneCopy {
   chargeMissing: string;
   /**
    * @deprecated Unread since the 2026-10-06 redesign (FUT-3368): the pane's
-   * hints replaced the one instructions line. Kept optional so a host's pack
-   * written for the old pane still compiles; remove it from your pack.
+   * hints replaced the one instructions line. Kept, optional and in its old
+   * shape, so an old pack only has to ADD the new keys; remove it from yours.
    */
-  instructions?: string;
+  instructions?: (totalLabel: string) => string;
   /** After a copy, for a Pix the BANK confirms. */
   afterCopy: PixAfterCopyCopy;
   /**
@@ -183,12 +183,12 @@ export interface PixPaneCopy {
   manual?: {
     validUntil(time: string): string;
     awaiting: string;
-    /** Absent, the automatic {@link PixPaneCopy.afterCopy} is used — set it. */
-    afterCopy?: PixAfterCopyCopy;
+    /** Required: the automatic sentences promise "automática" (FUT-3232). */
+    afterCopy: PixAfterCopyCopy;
     /** @deprecated Unread since FUT-3368; see {@link PixPaneCopy.instructions}. */
-    instructions?: string;
+    instructions?: (totalLabel: string) => string;
     /** @deprecated Unread since FUT-3368: the after-copy screen replaced the notice. */
-    copied?: string;
+    copied?: { title: string; description: string };
   };
 }
 

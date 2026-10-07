@@ -151,9 +151,7 @@ function PixPollFooter({
  * "a confirmação é automática": nothing confirms it but the store.
  */
 function pixSentences(copy: PixPaneCopy, manual: boolean): Pick<PixPaneCopy, "validUntil" | "awaiting" | "afterCopy"> {
-  const store = manual ? copy.manual : undefined;
-  if (!store) return copy;
-  return { validUntil: store.validUntil, awaiting: store.awaiting, afterCopy: store.afterCopy ?? copy.afterCopy };
+  return (manual ? copy.manual : undefined) ?? copy;
 }
 
 /**
