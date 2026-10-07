@@ -26,13 +26,14 @@ const SOURCES = import.meta.glob<string>(['/src/**/*.{ts,tsx}', '!/src/**/__test
 const COMPONENTS = '/src/components';
 const FORBIDDEN = ['@mui/material/FilledInput/index.js', '@mui/material/Input/index.js'];
 
-const SPECIFIER = /(?:import|export)\s+(?:type\s+)?[^'"]*?from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]/g;
+/** A static import or re-export, from the start of its statement (`m`), so a word in a comment cannot open one. */
+const SPECIFIER = /^[ \t]*(?:(?:import|export)\s+(?:type\s+)?[^'"]*?from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"])/gm;
 
 /** Every runtime import of a module: type-only imports are erased and do not count. */
 function runtimeImports(file: string): string[] {
   const out: string[] = [];
   for (const match of (SOURCES[file] ?? '').matchAll(SPECIFIER)) {
-    if (/^(?:import|export)\s+type\s/.test(match[0])) continue;
+    if (/^\s*(?:import|export)\s+type\s/.test(match[0])) continue;
     const specifier = match[1] ?? match[2];
     if (specifier) out.push(specifier);
   }

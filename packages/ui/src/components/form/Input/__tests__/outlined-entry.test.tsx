@@ -36,6 +36,9 @@ const CASES: Record<string, Omit<InputProps, 'variant'>> = {
   loading: { id: 'f', label: 'CEP', loading: true },
   'small, not full width': { id: 'f', size: 'sm', fullWidth: false, 'aria-label': 'Buscar produtos', type: 'search' },
   'test id and ARIA': { id: 'f', 'data-testid': 'cep', 'aria-describedby': 'cep-status', 'aria-busy': true },
+  floating: { id: 'f', label: 'CEP', floating: true },
+  glow: { id: 'f', label: 'CEP', glow: true },
+  pulse: { id: 'f', label: 'CEP', pulse: true },
 };
 
 describe('the outlined Input entry', () => {

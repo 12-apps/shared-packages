@@ -33,34 +33,34 @@ import type { SizeValue } from '../../../tokens/vocabulary';
 /** The field `Input` renders, styled, over whichever text field it is given. */
 function styledField(TextField: TextFieldSlimComponent) {
   return styled(TextField, {
-  shouldForwardProp: (prop) =>
-    !['customVariant', 'fieldSize', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
-})<{
-  customVariant?: InputProps['variant'];
-  fieldSize: SizeValue;
-  floating?: boolean;
-  glow?: boolean;
-  pulse?: boolean;
-  loading?: boolean;
-}>(({ theme, customVariant, fieldSize, floating, glow, pulse, loading }) => ({
-  position: 'relative',
-  // The theme's field height for this size (outlined family, one line).
-  ...fieldControlStyles(theme, fieldSize),
-  opacity: loading ? INPUT_LOADING.opacity : 1,
+    shouldForwardProp: (prop) =>
+      !['customVariant', 'fieldSize', 'floating', 'glow', 'pulse', 'loading'].includes(prop as string),
+  })<{
+    customVariant?: InputProps['variant'];
+    fieldSize: SizeValue;
+    floating?: boolean;
+    glow?: boolean;
+    pulse?: boolean;
+    loading?: boolean;
+  }>(({ theme, customVariant, fieldSize, floating, glow, pulse, loading }) => ({
+    position: 'relative',
+    // The theme's field height for this size (outlined family, one line).
+    ...fieldControlStyles(theme, fieldSize),
+    opacity: loading ? INPUT_LOADING.opacity : 1,
 
-  ...(glow ? glowStyles(theme) : {}),
-  ...(pulse ? pulseStyles(theme, fieldSize) : {}),
-  ...(floating ? floatingLabelStyles(theme) : {}),
+    ...(glow ? glowStyles(theme) : {}),
+    ...(pulse ? pulseStyles(theme, fieldSize) : {}),
+    ...(floating ? floatingLabelStyles(theme) : {}),
 
-  '& .MuiInputBase-root': {
-    transition: 'all 0.3s ease',
-    ...inputRadiusStyles(theme, customVariant),
-    ...inputBaseStyles(theme, customVariant),
-  },
+    '& .MuiInputBase-root': {
+      transition: 'all 0.3s ease',
+      ...inputRadiusStyles(theme, customVariant),
+      ...inputBaseStyles(theme, customVariant),
+    },
 
-  '& .MuiOutlinedInput-root': outlinedStyles(theme),
-  '& .MuiFilledInput-root': filledStyles(theme),
-}));
+    '& .MuiOutlinedInput-root': outlinedStyles(theme),
+    '& .MuiFilledInput-root': filledStyles(theme),
+  }));
 }
 
 /** Only one adornment shows at a time: the spinner replaces the caller's while loading. */

@@ -207,41 +207,42 @@ function fieldPropsOf(props: TextFieldSlimProps, ids: FieldIds): Record<string, 
  *
  * A factory rather than a component so the variant table lives in the CALLER's
  * module: this module imports none of `Input`, `FilledInput` or
- * `OutlinedInput`, and calls nothing at its own top level — a module-scope
- * call keeps its module's whole import graph reachable (FUT-3402), which is
- * exactly what pinning a variant has to avoid.
+ * `OutlinedInput`, so what `inputFor` returns is the only input a caller's
+ * bundle keeps. The caller's own module-scope `createTextFieldSlim(...)` call
+ * is kept by the bundler, and with it every module its argument reaches
+ * (FUT-3402), so that argument must name only the variants it serves.
  */
 export function createTextFieldSlim(inputFor: InputForVariant): TextFieldSlimComponent {
   return React.forwardRef<HTMLDivElement, TextFieldSlimProps>(
-  function TextFieldSlim(rawProps, ref) {
-    const props = withDefaults(rawProps, DEFAULTS);
-    // `TextField` uses `@mui/utils`'s `useId`, which is React's with a fallback
-    // for React 17. The peer here is React 19, so React's own is the same thing
-    // without the dependency. The override still wins, exactly as it did — and
-    // it is read from the RAW props, before `withDefaults` could supply one.
-    const ids = idsOf(rawProps, React.useId());
-    const InputComponent = inputFor(props.variant ?? 'outlined');
-    const { label, helperText } = props;
+    function TextFieldSlim(rawProps, ref) {
+      const props = withDefaults(rawProps, DEFAULTS);
+      // `TextField` uses `@mui/utils`'s `useId`, which is React's with a fallback
+      // for React 17. The peer here is React 19, so React's own is the same thing
+      // without the dependency. The override still wins, exactly as it did — and
+      // it is read from the RAW props, before `withDefaults` could supply one.
+      const ids = idsOf(rawProps, React.useId());
+      const InputComponent = inputFor(props.variant ?? 'outlined');
+      const { label, helperText } = props;
 
-    return (
-      <TextFieldSlimRoot
-        className={[TEXT_FIELD_ROOT_CLASS, props.className].filter(Boolean).join(' ')}
-        ref={ref}
-        {...rootPropsOf(props)}
-      >
-        {label !== null && label !== undefined && label !== '' ? (
-          <InputLabel htmlFor={ids.id} id={ids.inputLabelId} {...props.InputLabelProps}>
-            {label}
-          </InputLabel>
-        ) : null}
-        <InputComponent {...fieldPropsOf(props, ids)} />
-        {helperText ? (
-          <FormHelperText id={ids.helperTextId} {...props.FormHelperTextProps}>
-            {helperText}
-          </FormHelperText>
-        ) : null}
-      </TextFieldSlimRoot>
-    );
-  },
+      return (
+        <TextFieldSlimRoot
+          className={[TEXT_FIELD_ROOT_CLASS, props.className].filter(Boolean).join(' ')}
+          ref={ref}
+          {...rootPropsOf(props)}
+        >
+          {label !== null && label !== undefined && label !== '' ? (
+            <InputLabel htmlFor={ids.id} id={ids.inputLabelId} {...props.InputLabelProps}>
+              {label}
+            </InputLabel>
+          ) : null}
+          <InputComponent {...fieldPropsOf(props, ids)} />
+          {helperText ? (
+            <FormHelperText id={ids.helperTextId} {...props.FormHelperTextProps}>
+              {helperText}
+            </FormHelperText>
+          ) : null}
+        </TextFieldSlimRoot>
+      );
+    },
   );
 }
