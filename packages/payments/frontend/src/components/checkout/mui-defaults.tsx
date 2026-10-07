@@ -30,7 +30,9 @@ import {
   Stepper as MuiStepper,
   Typography,
   styled,
+  useThemeProps,
 } from '@mui/material';
+import type { TextFieldProps } from '@mui/material';
 import { useId } from 'react';
 import type { JSX } from 'react';
 
@@ -97,43 +99,150 @@ function DefaultButton({ variant = 'solid', color = 'primary', size = 'md', full
   );
 }
 
+type OwnerState = Record<string, unknown>;
+type SlotProps = Record<string, unknown> | ((ownerState: OwnerState) => Record<string, unknown>) | undefined;
+
 /**
- * An outlined text field, composed from the parts MUI's `TextField` composes
- * (FUT-3402). `TextField` itself imports `Select` unconditionally, and through
- * it `Menu`, `MenuList`, `Popover` and `List`; this slot is in every host's
- * checkout bundle whether or not the host fills it, so it paid for a dropdown
- * it can never render. Same DOM, pinned by `default-input-parity.test.tsx`.
- */
-/**
- * `TextField`'s root, by name: a theme's `components.MuiTextField` overrides
- * keep applying, and the root carries the same generated class.
+ * `TextField`'s root, by name and with its `ownerState`: a theme's
+ * `components.MuiTextField` (`styleOverrides`, including functions reading
+ * `ownerState`, and `variants`) applies exactly as it did to `TextField`.
  */
 const TextFieldRoot = styled(FormControl, {
   name: 'MuiTextField',
   slot: 'Root',
   overridesResolver: (_props, styles) => styles.root,
-})({});
+})<{ ownerState: OwnerState }>({});
 
-function DefaultInput({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, ...rest }: CheckoutInputProps): JSX.Element {
-  const id = useId();
-  const helperTextId = helperText ? `${id}-helper-text` : undefined;
+/** A theme's slot props may be a function of `ownerState`, as `useSlot` allows. */
+function slotPropsOf(slotProps: SlotProps, ownerState: OwnerState): Record<string, unknown> {
+  return (typeof slotProps === 'function' ? slotProps(ownerState) : slotProps) ?? {};
+}
+
+/** `TextField`'s `ownerState`, for the outlined, non-select field this slot is. */
+function ownerStateOf(props: TextFieldProps): OwnerState {
+  return {
+    ...props,
+    autoFocus: false,
+    color: props.color ?? 'primary',
+    disabled: props.disabled ?? false,
+    error: props.error ?? false,
+    fullWidth: props.fullWidth ?? false,
+    multiline: false,
+    required: props.required ?? false,
+    select: false,
+    variant: 'outlined',
+  };
+}
+
+/**
+ * The slot's own props, run through the theme's `MuiTextField` defaults the way
+ * `TextField` runs them (`useDefaultProps` is `useThemeProps` by another name).
+ */
+function useTextFieldProps({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, ...rest }: CheckoutInputProps): TextFieldProps {
+  return useThemeProps({
+    name: 'MuiTextField',
+    props: {
+      label,
+      type,
+      size: 'small',
+      fullWidth,
+      required,
+      placeholder,
+      value,
+      error,
+      helperText,
+      onChange,
+      onBlur,
+      slotProps: {
+        htmlInput: { inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] },
+        input: { endAdornment },
+      },
+    } as TextFieldProps,
+  });
+}
+
+/**
+ * An outlined text field, composed from the parts MUI's `TextField` composes
+ * (FUT-3402). `TextField` itself imports `Select` unconditionally, and through
+ * it `Menu`, `MenuList`, `Popover` and `List`; this slot is in every host's
+ * checkout bundle whether or not the host fills it, so it paid for a dropdown
+ * it can never render.
+ *
+ * Same DOM and the same theme hooks — `defaultProps`, `styleOverrides`,
+ * `variants`, slot props — pinned by `default-input-parity.test.tsx`, with two
+ * deliberate exceptions: a theme default `variant` other than `outlined`, and
+ * `slots` replacing a part, are not honoured. Either would need the very
+ * components this slot exists to leave out; a host that wants them fills the
+ * `Input` slot.
+ */
+/**
+ * What `TextField` consumes by name rather than handing to its root. A key LIST
+ * rather than a destructure, which would bind every one of them only to drop it.
+ */
+const CONSUMED_BY_FIELD: ReadonlySet<string> = new Set([
+  'autoComplete', 'autoFocus', 'className', 'color', 'defaultValue', 'disabled', 'error', 'fullWidth',
+  'helperText', 'id', 'inputRef', 'label', 'name', 'onBlur', 'onChange', 'onFocus', 'placeholder',
+  'required', 'slotProps', 'type', 'value', 'variant',
+]);
+
+/** The root: what `TextField` did not consume, then the props it hands the root by name. */
+function rootPropsOf(props: TextFieldProps, ownerState: OwnerState): Record<string, unknown> {
+  return {
+    ...Object.fromEntries(Object.entries(props).filter(([key]) => !CONSUMED_BY_FIELD.has(key))),
+    ownerState,
+    className: ['MuiTextField-root', props.className].filter(Boolean).join(' '),
+    disabled: ownerState.disabled,
+    error: ownerState.error,
+    fullWidth: ownerState.fullWidth,
+    required: ownerState.required,
+    color: ownerState.color,
+    variant: 'outlined',
+  };
+}
+
+/** The input: the props `TextField` names, then the theme's and the slot's `input` slot props. */
+function inputPropsOf(props: TextFieldProps, ownerState: OwnerState, ids: { id: string; helperTextId?: string }): Record<string, unknown> {
+  const slots = (props.slotProps ?? {}) as Record<string, SlotProps>;
+  const shrink = slotPropsOf(slots.inputLabel, ownerState).shrink;
+  return {
+    'aria-describedby': ids.helperTextId,
+    autoComplete: props.autoComplete,
+    autoFocus: ownerState.autoFocus,
+    defaultValue: props.defaultValue,
+    fullWidth: ownerState.fullWidth,
+    name: props.name,
+    inputRef: props.inputRef,
+    onFocus: props.onFocus,
+    type: props.type,
+    value: props.value,
+    id: ids.id,
+    onBlur: props.onBlur,
+    onChange: props.onChange,
+    placeholder: props.placeholder,
+    inputProps: slotPropsOf(slots.htmlInput, ownerState),
+    label: props.label,
+    ...(shrink === undefined ? {} : { notched: shrink }),
+    ...slotPropsOf(slots.input, ownerState),
+  };
+}
+
+function DefaultInput(slotProps: CheckoutInputProps): JSX.Element {
+  const props = useTextFieldProps(slotProps);
+  const ownerState = ownerStateOf(props);
+  const generatedId = useId();
+  const id = props.id ?? generatedId;
+  const helperTextId = props.helperText ? `${id}-helper-text` : undefined;
+  const slots = (props.slotProps ?? {}) as Record<string, SlotProps>;
+  const { label, helperText } = props;
   return (
-    <TextFieldRoot className="MuiTextField-root" size="small" fullWidth={fullWidth} required={required} error={error}>
-      {label ? <InputLabel htmlFor={id} id={`${id}-label`}>{label}</InputLabel> : null}
-      <OutlinedInput
-        id={id}
-        label={label}
-        type={type}
-        fullWidth={fullWidth}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        endAdornment={endAdornment}
-        aria-describedby={helperTextId}
-        inputProps={{ inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] }}
-      />
-      {helperText ? <FormHelperText id={helperTextId}>{helperText}</FormHelperText> : null}
+    <TextFieldRoot {...(rootPropsOf(props, ownerState) as { ownerState: OwnerState })}>
+      {label != null && label !== '' ? (
+        <InputLabel htmlFor={id} id={`${id}-label`} {...slotPropsOf(slots.inputLabel, ownerState)}>{label}</InputLabel>
+      ) : null}
+      <OutlinedInput {...inputPropsOf(props, ownerState, { id, helperTextId })} />
+      {helperText ? (
+        <FormHelperText id={helperTextId} {...slotPropsOf(slots.formHelperText, ownerState)}>{helperText}</FormHelperText>
+      ) : null}
     </TextFieldRoot>
   );
 }
