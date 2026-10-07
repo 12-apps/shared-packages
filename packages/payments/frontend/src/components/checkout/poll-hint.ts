@@ -19,8 +19,9 @@ import { claimRearm, REARM_QUIET_MS } from "./poll-rearm";
  *
  * The mark is cleared by `restart`, by a `poke` that supersedes the marked
  * ask, by sending its follow-up and by a terminal answer. The deadline does
- * NOT clear it: a marked ask answering after the deadline is caught by
- * {@link owedAfterAnswer} and neither asks nor schedules.
+ * NOT clear it: a marked ask answering after the deadline is stopped by the
+ * loop's `carriesOn` (FUT-3222) before the mark is read, and neither asks nor
+ * schedules; the next `restart` clears the mark.
  *
  * Structural state, as in `poll-rearm.ts`: the loop's run satisfies it.
  */
@@ -47,12 +48,12 @@ export function claimHint(run: HintState): boolean {
 }
 
 /**
- * After a non-terminal answer: `"ask"` when a mark owes one more ask now,
- * `"ended"` when the wait stopped while that ask was out, `"none"` when nothing
- * is owed and the loop schedules as usual. Clears the mark.
+ * After a non-terminal answer to a wait that is still running: whether a mark
+ * owes one more ask now, rather than the usual schedule. Clears the mark. A
+ * wait that stopped while the ask was out never gets here (`carriesOn`).
  */
-export function owedAfterAnswer(run: Pick<HintState, "hinted" | "stopped">): "ask" | "ended" | "none" {
-  if (!run.hinted) return "none";
+export function owedAfterAnswer(run: Pick<HintState, "hinted">): boolean {
+  if (!run.hinted) return false;
   run.hinted = false;
-  return run.stopped ? "ended" : "ask";
+  return true;
 }
