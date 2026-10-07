@@ -54,6 +54,7 @@ packages/ui
 # `@12-apps/chat` peers on ui (its thread screen is built from ui's primitives,
 # web and native) and on wiring, so it is released after both.
 packages/chat
+packages/routing
 packages/impersonation
 packages/audit
 packages/storage

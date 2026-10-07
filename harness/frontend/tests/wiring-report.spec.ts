@@ -52,6 +52,7 @@ test.describe('the frontend host wiring report', () => {
       '@12-apps/rbac',
       '@12-apps/realtime',
       '@12-apps/report-builder',
+      '@12-apps/routing',
     ]) {
       await expect(page.getByTestId(`wiring-package-${name}`)).toBeVisible();
       // Every one of them binds a surface — that is what a web adoption IS.
