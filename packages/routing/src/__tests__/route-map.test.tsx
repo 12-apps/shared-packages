@@ -169,6 +169,11 @@ describe("RouteMap", () => {
     expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { right: 76 } });
   });
 
+  it("keeps fitted content clear of the host's own overlays", async () => {
+    const { fake } = await mount({ insets: { bottom: 40, left: 8 } });
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 40, bottom: 88, left: 48, right: 76 } });
+  });
+
   it("fits on the fit control and tells the host", async () => {
     const onFitAll = vi.fn();
     const { fake } = await mount({ onFitAll });

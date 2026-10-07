@@ -108,13 +108,24 @@ export function useOverlays(
   const fitAll = (): void => {
     // The control column sits on the right edge: keep fitted content clear of
     // it, or the farthest stop lands under the fit button.
-    const controls = propsRef.current.controls;
-    const right = (controls?.zoom ?? true) || (controls?.fit ?? true) ? 76 : 40;
     const bounds = boundsOf(pointsOf(propsRef.current));
-    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: { top: 40, bottom: 48, left: 40, right }, maxZoom: 16, duration: 0 });
+    if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 0 });
   };
 
   return { draw, clear, fitAll };
+}
+
+type Edge = "top" | "right" | "bottom" | "left";
+
+/**
+ * The fit's padding: a margin on every edge, the control column on the right
+ * when it shows, plus whatever the host's own overlays cover (`insets`).
+ */
+function fitPadding({ controls, insets }: RouteMapProps): Record<Edge, number> {
+  const showsControls = (controls?.zoom ?? true) || (controls?.fit ?? true);
+  const base: Record<Edge, number> = { top: 40, right: showsControls ? 76 : 40, bottom: 48, left: 40 };
+  const edges: Edge[] = ["top", "right", "bottom", "left"];
+  return Object.fromEntries(edges.map((edge) => [edge, base[edge] + (insets?.[edge] ?? 0)])) as Record<Edge, number>;
 }
 
 type Place = (element: HTMLElement, anchor: Wanted["anchor"], at: [number, number]) => MarkerLike;

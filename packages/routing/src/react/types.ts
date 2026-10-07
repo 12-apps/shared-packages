@@ -74,6 +74,12 @@ export interface RouteMapProps {
   onGroupSelect?: (markerIds: string[]) => void;
   /** Rendered over the map (a legend), bottom edge. */
   overlay?: ReactNode;
+  /**
+   * Pixels the host's own overlays cover on each edge (a legend along the
+   * bottom, a sheet). Added to the fit padding, so "fit all" never parks a
+   * pin or a stop under them.
+   */
+  insets?: { top?: number; right?: number; bottom?: number; left?: number };
   testId?: string;
 }
 
