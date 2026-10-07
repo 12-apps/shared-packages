@@ -115,6 +115,7 @@ import { provisionResearch, researchHost, reseedResearch } from './research-host
 import { observability } from './observability-host';
 import { reseedBilling } from './billing-host';
 import { reseedChat } from './chat-host';
+import { routingOutage } from './routing-host';
 import { provisionHosts, type Hosts } from './provision-hosts';
 
 // Re-exported: `mount-surfaces.ts` and the suites address `Hosts` through the
@@ -192,6 +193,7 @@ function mountReset(app: Hono, pg: PGlite, hosts: Hosts): void {
     await hosts.storage.reset();
     hosts.entitlements.reset();
     hosts.appShell.reset();
+    routingOutage.osrmDown = false;
     hosts.impersonation.reset();
     // Back to NO DSN — the default, and the state every other page in this app
     // needs, since `startObservability` runs once for the whole bundle.

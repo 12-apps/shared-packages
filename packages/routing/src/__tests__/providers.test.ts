@@ -80,7 +80,7 @@ describe("osrm", () => {
     const fetch = vi.fn(async () =>
       json({ code: "Ok", routes: [{ geometry: { coordinates: LINE }, legs: [{ distance: 1, duration: 2 }, { distance: 3, duration: 4 }] }] }),
     );
-    await expect(osrmProvider({ baseUrl: "https://osrm.test/" }).route(REQUEST, context(fetch))).resolves.toMatchObject({
+    await expect(osrmProvider({ baseUrl: "https://osrm.test///" }).route(REQUEST, context(fetch))).resolves.toMatchObject({
       ok: true,
       legs: [
         { distanceM: 1, durationS: 2 },

@@ -41,6 +41,7 @@ import {
 } from './notifications-host';
 import { applyOnboardingMigrations, onboardingHost } from './onboarding-host';
 import { pwaHost } from './pwa-host';
+import { routingHost } from './routing-host';
 import { applyRbacMigrations } from './rbac-db';
 import { rbacHost, reseedRbac } from './rbac-host';
 import { paymentsHost } from './payments-host';
@@ -146,6 +147,9 @@ export async function provisionHosts(pg: PGlite): Promise<Hosts> {
     discounts: discountsHost(pg),
     mcpOauth: mcpOauthHost(pg),
     pwa: pwaHost(),
+    // No migrations and no table: @12-apps/routing plans and answers, it keeps
+    // nothing. Where a planned route is stored is the adopter's business.
+    routing: routingHost(),
     entitlements: createEntitlementsHost(),
     // No migrations and no table: @12-apps/impersonation owns no model. The
     // session IS the cookie, and the trail is a port the host implements —
@@ -197,6 +201,7 @@ export interface Hosts {
   billing: ReturnType<typeof billingHost>;
   mcpOauth: ReturnType<typeof mcpOauthHost>;
   pwa: ReturnType<typeof pwaHost>;
+  routing: ReturnType<typeof routingHost>;
   entitlements: ReturnType<typeof createEntitlementsHost>;
   impersonation: ReturnType<typeof impersonationHost>;
   appShell: ReturnType<typeof appShellHost>;

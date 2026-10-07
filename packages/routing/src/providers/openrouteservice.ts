@@ -8,7 +8,7 @@ import { toPosition } from "../core/geo";
 import { waypointsOf, type ProviderOutcome, type RoutingProvider } from "../core/provider";
 import type { RouteLeg } from "../core/types";
 
-import { fetchJson, legsOf, numberOr, positionsOf, routeOutcome } from "./http";
+import { fetchJson, legsOf, numberOr, positionsOf, routeOutcome, trimBase } from "./http";
 
 export interface OpenRouteServiceOptions {
   /** The account's API key. Empty/absent = every attempt is `unconfigured`. */
@@ -31,7 +31,7 @@ interface OrsBody {
 }
 
 export function openRouteServiceProvider(options: OpenRouteServiceOptions): RoutingProvider {
-  const base = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const base = trimBase(options.baseUrl ?? DEFAULT_BASE_URL);
   const profile = options.profile ?? "driving-car";
   return {
     name: "openrouteservice",

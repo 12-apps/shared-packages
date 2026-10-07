@@ -7,7 +7,7 @@
 import { waypointsOf, type ProviderOutcome, type RoutingProvider } from "../core/provider";
 import type { RouteLeg } from "../core/types";
 
-import { fetchJson, legsOf, positionsOf, routeOutcome } from "./http";
+import { fetchJson, legsOf, positionsOf, routeOutcome, trimBase } from "./http";
 
 export interface OsrmOptions {
   /** e.g. `https://osrm.example.net`. Empty/absent = `unconfigured`. */
@@ -35,7 +35,7 @@ export function osrmProvider(options: OsrmOptions): RoutingProvider {
         .map((point) => `${point.lng},${point.lat}`)
         .join(";");
       const profile = encodeURIComponent(options.profile ?? "driving");
-      const url = `${options.baseUrl.replace(/\/+$/, "")}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=false`;
+      const url = `${trimBase(options.baseUrl)}/route/v1/${profile}/${coords}?overview=full&geometries=geojson&steps=false`;
       const answer = await fetchJson({ fetch, signal, url, init: { headers: { accept: "application/json" } }, isNoRoute: osrmNoRoute });
       if (!answer.ok) return answer;
       const body = answer.body as OsrmBody;

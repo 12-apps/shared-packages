@@ -77,3 +77,14 @@ export function routeOutcome(geometry: Position[] | null, legs: RouteLeg[] | nul
 /** A number, with a missing value read as `fallback` (services omit zero-length legs). */
 export const numberOr = (value: unknown, fallback: number): number | null =>
   value === undefined ? fallback : typeof value === "number" ? value : null;
+
+/**
+ * A base URL without its trailing slashes. A loop rather than `/\/+$/`: that
+ * pattern backtracks polynomially on a long run of slashes, and a base URL is
+ * host config this package does not control.
+ */
+export function trimBase(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end -= 1;
+  return url.slice(0, end);
+}

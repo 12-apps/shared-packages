@@ -12,7 +12,7 @@ import { decodePolyline } from "../core/geo";
 import type { ProviderOutcome, RoutingProvider } from "../core/provider";
 import type { LngLat, RouteLeg, RouteRequest } from "../core/types";
 
-import { fetchJson, legsOf, numberOr, routeOutcome } from "./http";
+import { fetchJson, legsOf, numberOr, routeOutcome, trimBase } from "./http";
 
 export interface GoogleRoutesOptions {
   apiKey: string | undefined;
@@ -49,7 +49,7 @@ function requestBody(request: RouteRequest, options: GoogleRoutesOptions): strin
 }
 
 export function googleRoutesProvider(options: GoogleRoutesOptions): RoutingProvider {
-  const base = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const base = trimBase(options.baseUrl ?? DEFAULT_BASE_URL);
   return {
     name: "google-routes",
     async route(request, { fetch, signal }): Promise<ProviderOutcome> {
