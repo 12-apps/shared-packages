@@ -743,6 +743,42 @@
     "kind": "exempt",
     "why": "generic ambient request scope a host mounts once as middleware around everything; portable to any web-standard host and carrying no capability a manifest could inventory"
   },
+  "@12-apps/routing :: areas": {
+    "kind": "exempt",
+    "why": "a route map is never a page of its own: it sits inside whichever screen shows the trip or the order, which only the host knows, so there is no route or nav row to suggest"
+  },
+  "@12-apps/routing :: db": {
+    "kind": "exempt",
+    "why": "owns no models: a planned route is the host's to keep (or not), next to whatever trip it belongs to, so there is no partial to declare and nothing for the sync tooling to copy"
+  },
+  "@12-apps/routing :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: what a route map shows is the host's data, and the planner's fallback and adapters are covered by unit suites against faked services"
+  },
+  "@12-apps/routing :: email": {
+    "kind": "exempt",
+    "why": "never mails anyone: planning a route reaches no person, and a mailer here would invent a moment to write about"
+  },
+  "@12-apps/routing :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env at all — every provider credential and base URL arrives in the adapter factories from the host, which owns where secrets live"
+  },
+  "@12-apps/routing :: jobs": {
+    "kind": "exempt",
+    "why": "nothing runs on a cadence: a route is planned when the host asks, and when to ask (a trip starting, a retry) is the host's scheduling"
+  },
+  "@12-apps/routing :: mcp": {
+    "kind": "exempt",
+    "why": "exposes no agent tool: a route carries people's addresses as coordinates, and whether an agent may read one is the host's call over its own data"
+  },
+  "@12-apps/routing :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts: a provider failing is handled by the fallback, and anything worth telling a person about belongs to the host's trip model"
+  },
+  "@12-apps/routing :: permissions": {
+    "kind": "exempt",
+    "why": "contributes no permission ids: who may plan a route is the host's authorize, answered per request against the host's own catalog"
+  },
   "@12-apps/shared-helpers": {
     "kind": "exempt",
     "why": "domain-free utilities (cache, requests, aws, dates) — a deliberately host-wired-free grab bag; the day something here grows a route or a model it graduates into its own package instead"

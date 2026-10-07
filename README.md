@@ -23,6 +23,7 @@ lives here is the machinery.
 | `@12-apps/rbac` | Role-Based Access Control: framework-free core plus optional React and server adapters. |
 | `@12-apps/realtime` | Typed topic/event envelopes and a publish/subscribe bus behind a swappable driver port (Redis pub/sub in production). |
 | `@12-apps/report-builder` | Reporting plugin: spec engine, host-mounted endpoints and screens, the saved-report lifecycle and the period. The catalog, the built-ins and the adapter are the host's and arrive as config. |
+| `@12-apps/routing` | Road routes through an ordered list of stops, with the routing service picked by host configuration (openrouteservice, OSRM, Google Routes, or your own adapter) and a straight-line fallback when none answers, plus a MapLibre route map (markers, numbered stops, a planned and a travelled line). Every credential, word and colour is the host's. |
 | `@12-apps/shift` | Headless tenant-scoped work shifts with resource bindings and audit ports. |
 | `@12-apps/ui` | ~90 MUI-based components with stories and interaction tests. |
 | `@12-apps/auth` | NextAuth wrapper plus an env-var admin allowlist. |
