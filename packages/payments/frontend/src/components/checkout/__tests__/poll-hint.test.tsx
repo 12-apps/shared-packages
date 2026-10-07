@@ -284,7 +284,7 @@ describe("a hint at a wait that has ended", () => {
     expect(calls()).toBe(before);
   });
 
-  it("owes nothing for a mark the deadline overtook, over a whole live floor", async () => {
+  it("owes nothing for a mark the deadline overtook, sixteen seconds on", async () => {
     const { client, calls, release } = heldClient();
     const { subscribe, hint } = channel();
     const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
