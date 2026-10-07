@@ -1,11 +1,11 @@
 import type { ConfirmActionCopy } from "../../../copy";
 import Alert from '@mui/material/Alert/index.js';
 import Stack from '@mui/material/Stack/index.js';
-import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import React, { type ReactNode } from 'react';
 
 import { AlertDialog } from '../../data-display/AlertDialog';
+import { OutlinedTextFieldSlim } from '../../form/Input/outlined/text-field-slim-outlined';
 
 import type {
   ConfirmInitialFocus,
@@ -79,7 +79,13 @@ function TypeToConfirmField({
       <Typography variant="body2" color="text.secondary">
         {label ?? copy.typeToConfirm(expected)}
       </Typography>
-      <TextField
+      {/*
+       * The outlined slim field, not MUI's `TextField` (FUT-3429): same
+       * composition and DOM, but no `Select` branch, so a screen that can open
+       * this popup no longer ships `Select`, `Menu`, `MenuList`, `NativeSelect`
+       * and `List` for a box that only ever takes a word.
+       */}
+      <OutlinedTextFieldSlim
         size="small"
         value={value}
         disabled={disabled}
