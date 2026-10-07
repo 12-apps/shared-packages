@@ -12,6 +12,9 @@ import { expect, test } from '@playwright/test';
  * package's own error state. Never on a blank page.
  */
 test('the mounted surface renders the map region in the host words', async ({ page }) => {
+  // The basemap is remote: a runner that cannot reach it waits out the
+  // host's 8 s ready timeout before the error state, on top of a cold load.
+  test.slow();
   await page.goto('#/route-map');
 
   await expect(page.getByTestId('page-route-map')).toBeVisible();

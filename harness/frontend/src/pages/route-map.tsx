@@ -23,8 +23,9 @@ import { webWiringHost } from '../wiring-web';
  * ridden.
  *
  * The basemap is OpenFreeMap's public style. When it cannot be reached (an
- * offline runner), the package's own error state with its Retry is what
- * renders, which is a state worth seeing too.
+ * offline runner, or a request that hangs and never errors), the package's
+ * own error state with its Retry is what renders after `readyTimeoutMs`,
+ * which is a state worth seeing too.
  */
 
 const THEME: RouteMapTheme = {
@@ -43,7 +44,13 @@ const THEME: RouteMapTheme = {
 const { surface } = webWiringHost.adoptWeb({
   manifest: routingManifest,
   web: routingWebManifest,
-  bindings: { surface: { config: { copy: EN_US_ROUTE_MAP_COPY, theme: THEME, workerUrl } } },
+  bindings: {
+    surface: {
+      // 8 s rather than the package's 15: a runner that cannot reach the
+      // basemap should reach the error state well inside one test's budget.
+      config: { copy: EN_US_ROUTE_MAP_COPY, theme: THEME, workerUrl, readyTimeoutMs: 8_000 },
+    },
+  },
 });
 
 const { RouteMap } = surface as { RouteMap: (props: RouteMapProps) => JSX.Element };
