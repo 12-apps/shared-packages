@@ -29,6 +29,11 @@ export interface RouteMapStop {
   /** Accessible title, e.g. "Parada 2 — Av. Vilarinho, 1731". */
   title: string;
   variant: "done" | "next" | "pending";
+  /**
+   * Drawn above every pin (the stop a screen is about, e.g. "this order"), so
+   * a courier standing next to it never hides it. Default: under the pins.
+   */
+  emphasized?: boolean;
 }
 
 export interface RouteMapPlace {
@@ -90,6 +95,18 @@ export interface RouteMapProps {
    * pin or a stop under them.
    */
   insets?: { top?: number; right?: number; bottom?: number; left?: number };
+  /**
+   * How a place's label is drawn. `lifted` (default) raises it above a pin
+   * standing on the same point; `at-point` draws it on the point, for a small
+   * map where the lift would cost a third of the height.
+   */
+  placeLabels?: "lifted" | "at-point";
+  /**
+   * `full` (default) prints the basemap's attribution line; `compact` shows an
+   * "i" control that expands to it, for a small map. Either satisfies the
+   * tile terms.
+   */
+  attribution?: "full" | "compact";
   testId?: string;
 }
 

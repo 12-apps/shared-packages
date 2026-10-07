@@ -140,6 +140,59 @@ describe("RouteMap", () => {
     expect(wrapper.style.zIndex).toBe("1");
   });
 
+  it("draws a place's label on its point when asked, without the lift's padding", async () => {
+    const { fake } = await mount({ places: [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store" }], placeLabels: "at-point" });
+    const place = await screen.findByText("Store");
+    expect(place.parentElement!.children).toHaveLength(1);
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 40 } });
+  });
+
+  it("shows a compact attribution that opens to the full credit and folds again", async () => {
+    await mount({ attribution: "compact" });
+    const toggle = screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution });
+    expect(toggle.textContent).toBe("i");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    const open = await screen.findByText(EN_US_ROUTE_MAP_COPY.attribution);
+    expect(open.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(open);
+    expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution }).textContent).toBe("i");
+  });
+
+  it("shows the full credit by default, with nothing to press", async () => {
+    await mount();
+    expect(screen.getByText(EN_US_ROUTE_MAP_COPY.attribution).tagName).toBe("SMALL");
+    await waitFor(() => expect(screen.queryByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution })).toBeNull());
+  });
+
+  it("follows the attribution prop after mount", async () => {
+    const { rerender, RouteMap } = await mount({ attribution: "compact" });
+    fireEvent.click(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution }));
+    rerender(<RouteMap height={400} markers={MARKERS} attribution="full" />);
+    expect(screen.getByText(EN_US_ROUTE_MAP_COPY.attribution).tagName).toBe("SMALL");
+    rerender(<RouteMap height={400} markers={MARKERS} attribution="compact" />);
+    expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution }).textContent).toBe("i");
+  });
+
+  it("redraws a place's label when placeLabels changes", async () => {
+    const places = [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store" }];
+    const { rerender, RouteMap } = await mount({ places });
+    expect((await screen.findByText("Store")).parentElement!.children.length).toBeGreaterThan(1);
+    rerender(<RouteMap height={400} markers={MARKERS} places={places} placeLabels="at-point" />);
+    await waitFor(() => expect(screen.getByText("Store").parentElement!.children).toHaveLength(1));
+  });
+
+  it("draws an emphasised stop above the pins and the rest beneath", async () => {
+    await mount({
+      stops: [
+        { id: "a", position: { lng: -46.61, lat: -23.51 }, mark: "1", title: "Parada 1", variant: "done" },
+        { id: "b", position: { lng: -46.62, lat: -23.52 }, mark: "2", title: "Parada 2 — este pedido", variant: "next", emphasized: true },
+      ],
+    });
+    expect((await screen.findByRole("img", { name: "Parada 1" })).style.zIndex).toBe("1");
+    expect(screen.getByRole("img", { name: "Parada 2 — este pedido" }).style.zIndex).toBe("4");
+  });
+
   it("marks the zoom pair so a phone-width map can hide it", async () => {
     await mount();
     expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.zoomIn }).className).toBe("routing-zoom");

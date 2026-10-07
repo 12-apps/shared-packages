@@ -76,10 +76,11 @@ export function useOverlays(
     actions.current.clear();
     const out: Wanted[] = [];
     for (const spot of (props.places ?? []).filter((item) => isValidPoint(item.position))) {
-      out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon]), position: spot.position, anchor: "bottom", build: () => placeElement(spot, theme) });
+      const lifted = props.placeLabels !== "at-point";
+      out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", build: () => placeElement(spot, theme, lifted) });
     }
     for (const stop of (props.stops ?? []).filter((item) => isValidPoint(item.position))) {
-      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant]), position: stop.position, anchor: "center", build: () => stopElement(stop, theme) });
+      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant, !!stop.emphasized]), position: stop.position, anchor: "center", build: () => stopElement(stop, theme) });
     }
     const valid = (props.markers ?? []).filter((marker) => isValidPoint(marker.position));
     for (const group of groupMarkers(valid, map)) out.push(group.length === 1 ? markerWanted(group[0]!) : groupWanted(group));
@@ -135,10 +136,10 @@ function fitPadding(props: RouteMapProps): Record<Edge, number> {
 }
 
 /** The package's own margins, before the host's insets. */
-function basePadding({ controls, places }: RouteMapProps): Record<Edge, number> {
+function basePadding({ controls, places, placeLabels }: RouteMapProps): Record<Edge, number> {
   // A place's label rides PLACE_LIFT px above its point (map-elements.ts), so
   // a place fitted at the top edge needs that much more room or it is clipped.
-  const base: Record<Edge, number> = { top: 40 + (places?.length ? PLACE_LIFT : 0), right: 40, bottom: 48, left: 40 };
+  const base: Record<Edge, number> = { top: 40 + (places?.length && placeLabels !== "at-point" ? PLACE_LIFT : 0), right: 40, bottom: 48, left: 40 };
   if (showsControls(controls)) base[controls?.placement === "top-left" ? "left" : "right"] = 76;
   return base;
 }
@@ -189,7 +190,7 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
 
   useEffect(() => {
     if (ready) overlays.draw();
-  }, [ready, props.markers, props.stops, props.places]);
+  }, [ready, props.markers, props.stops, props.places, props.placeLabels]);
 
   useEffect(() => {
     if (ready) overlays.fitAll();

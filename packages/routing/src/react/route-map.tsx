@@ -13,7 +13,7 @@
  * - **Failure is visible, not blank**: the host's error copy and a retry.
  */
 
-import { useRef, type CSSProperties, type JSX } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 
 import type { RouteMapCopy } from "./copy";
 import type { MapLibreLike } from "./maplibre-types";
@@ -81,7 +81,7 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
           />
         )}
         {props.overlay && handle.status !== "error" ? <div style={{ position: "absolute", left: 12, right: 12, bottom: 28, zIndex: 2 }}>{props.overlay}</div> : null}
-        <small style={{ position: "absolute", right: 6, bottom: 4, fontSize: 10, color: theme.ink, background: theme.paper, padding: "0 4px", borderRadius: 4, zIndex: 2 }}>{copy.attribution}</small>
+        <Attribution copy={copy} theme={theme} compact={props.attribution === "compact"} />
       </div>
     );
   };
@@ -90,6 +90,27 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
 /** The controls the host asked for, with their defaults: both, top-right. */
 function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement"> {
   return { zoom: controls?.zoom ?? true, fit: controls?.fit ?? true, placement: controls?.placement ?? "top-right" };
+}
+
+/** The basemap's required credit: the full line, or an "i" that opens it. */
+function Attribution({ copy, theme, compact }: { copy: RouteMapCopy; theme: RouteMapTheme; compact: boolean }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  // Switching to compact folds the credit again; switching to full always shows it.
+  useEffect(() => setOpen(false), [compact]);
+  const line: CSSProperties = { position: "absolute", right: 6, bottom: 4, fontSize: 10, color: theme.ink, background: theme.paper, padding: "0 4px", borderRadius: 4, zIndex: 2 };
+  if (!compact) return <small style={line}>{copy.attribution}</small>;
+  if (open) {
+    return (
+      <button type="button" aria-expanded={true} onClick={() => setOpen(false)} style={{ ...line, border: 0, cursor: "pointer" }}>
+        {copy.attribution}
+      </button>
+    );
+  }
+  return (
+    <button type="button" aria-label={copy.attribution} aria-expanded={false} onClick={() => setOpen(true)} style={{ ...line, width: 18, height: 18, padding: 0, borderRadius: 9, border: `1px solid ${theme.controlBorder}`, fontWeight: 700, cursor: "pointer" }}>
+      i
+    </button>
+  );
 }
 
 interface ControlsProps {
