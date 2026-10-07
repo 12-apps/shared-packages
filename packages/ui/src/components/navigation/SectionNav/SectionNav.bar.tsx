@@ -13,8 +13,8 @@ import {
   CountedIcon,
   NOT_LIVE,
   SlotIcon,
-  VISUALLY_HIDDEN,
   controlProps,
+  useMounted,
   destinationControl,
   focusRing,
 } from './SectionNav.parts';
@@ -87,6 +87,7 @@ function Slot({
   compact?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
+  const animate = useMounted();
   return (
     <Box
       {...control}
@@ -96,7 +97,7 @@ function Slot({
       aria-busy={loading || undefined}
       data-lit={lit ? 'true' : undefined}
       data-testid={testId}
-      sx={slotSx(theme, lit)}
+      sx={slotSx(theme, lit, compact)}
     >
       <CountedIcon
         icon={
@@ -120,13 +121,30 @@ function Slot({
           lineHeight: 1.3,
           fontWeight: lit ? 700 : 600,
           color: lit ? 'text.primary' : 'inherit',
-          ...(compact ? VISUALLY_HIDDEN : {}),
+          ...labelFoldSx(theme, compact, animate),
         }}
       >
         {label}
       </Typography>
     </Box>
   );
+}
+
+/**
+ * The label folding away in a compact bar: it shrinks to no height and fades
+ * while the bar shrinks, rather than leaving in one frame. Never `display:
+ * none` — it is still the slot's accessible name. With reduced motion it
+ * simply goes.
+ */
+function labelFoldSx(theme: Theme, compact: boolean, animate: boolean): Record<string, unknown> {
+  return {
+    maxHeight: compact ? 0 : rem(theme, 24),
+    opacity: compact ? 0 : 1,
+    transition: animate
+      ? theme.transitions.create(['max-height', 'opacity'], { duration: theme.transitions.duration.shorter })
+      : 'none',
+    '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+  };
 }
 
 /** The pill behind a slot's icon — tinted while the slot is lit. */
@@ -143,7 +161,7 @@ function pillSx(theme: Theme): SxProps<Theme> {
 }
 
 /** A slot's look: icon over label, a pill behind the lit icon, dimmed when disabled. */
-function slotSx(theme: Theme, lit: boolean): SxProps<Theme> {
+function slotSx(theme: Theme, lit: boolean, compact: boolean): SxProps<Theme> {
   return {
     ...CONTROL_RESET,
     ...focusRing(theme),
@@ -153,7 +171,7 @@ function slotSx(theme: Theme, lit: boolean): SxProps<Theme> {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 0.25,
+    gap: compact ? 0 : 0.25,
     position: 'relative',
     color: lit ? 'primary.main' : 'text.secondary',
     // The current slot is marked by more than its colour: a tinted pill behind
@@ -285,7 +303,7 @@ function BarSlotView({
 }
 
 /** The bar's own box: docked, a hairline on top, raised over the backdrop only while its sheet is open. */
-function barSx(theme: Theme, sheetOpen: boolean, compact: boolean): SxProps<Theme> {
+function barSx(theme: Theme, sheetOpen: boolean, compact: boolean, animate: boolean): SxProps<Theme> {
   return {
     flex: 'none',
     display: 'flex',
@@ -294,7 +312,7 @@ function barSx(theme: Theme, sheetOpen: boolean, compact: boolean): SxProps<Them
     height: sectionNavBarInset(theme, { compact }),
     // Folding to icons and back is a change of height the eye follows;
     // with reduced motion it simply happens.
-    transition: theme.transitions.create('height', { duration: theme.transitions.duration.shorter }),
+    transition: animate ? theme.transitions.create('height', { duration: theme.transitions.duration.shorter }) : 'none',
     '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
     paddingBottom: 'env(safe-area-inset-bottom)',
     borderTop: `1px solid ${theme.palette.divider}`,
@@ -324,6 +342,7 @@ export function SectionNavBar({
   Pick<SectionNavProps, 'primary' | 'more' | 'compact'> & { linkComponent: ElementType | undefined }): React.JSX.Element {
   const sheetMenu = isMenu(primary) ? primary : undefined;
   const theme = useTheme();
+  const animate = useMounted();
   const [open, setOpen] = useState<OpenMenu>(null);
   const toggle = (menu: Exclude<OpenMenu, null>): void => setOpen((current) => (current === menu ? null : menu));
   const close = (): void => setOpen(null);
@@ -334,7 +353,7 @@ export function SectionNavBar({
         component="nav"
         aria-label={label}
         data-testid={dataTestId}
-        sx={barSx(theme, open !== null, compact)}
+        sx={barSx(theme, open !== null, compact, animate)}
       >
         {barSlots(destinations, more !== undefined, primary !== undefined).map((slot) => (
           <BarSlotView

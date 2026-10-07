@@ -61,11 +61,15 @@ tooltip, every count stays on its icon, every menu still opens.
 
 | `layout` | compact draws |
 |---|---|
-| `bar` | 48px instead of 60; each slot its icon; the raised button 40px instead of 52 and lifted less; no caption under an action. The change of height animates (200ms) unless the reader asked for reduced motion. |
-| `rail` | each row, the way back and a `primary` menu's button as their icon, centred; the heading, `more`'s title and its group titles out of sight. Made for a column 64px wide; the host sets the width. |
+| `bar` | 48px instead of 60; each slot its icon, its label folding away (shrinking and fading) as the bar shrinks; the raised button 40px instead of 52, lifted less, with its label as a tooltip and no caption under an action. Height and labels animate (200ms) unless the reader asked for reduced motion. |
+| `rail` | each row, the way back (an arrow when it brings no icon) and a `primary` menu's button as their icon, centred; the heading, `more`'s title and its group titles out of sight. Made for a column 64px wide; the host sets the width. |
 
 `sectionNavBarInset(theme, { compact: true })` is the compact bar's full
 height, so a host's reserved foot follows the bar as it folds.
+
+A slot's name includes its count ("Board, 3 pending") while its tooltip is the
+label alone, so a screen reader may read the label a second time as the
+description; the tooltip is there for a pointer, which sees no words otherwise.
 
 ## A bar of verbs
 

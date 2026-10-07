@@ -72,7 +72,11 @@ describe('SectionNav bar, compact', () => {
     const nav = screen.getByRole('navigation', { name: 'Operations' });
     const board = within(nav).getByRole('link', { name: /Board/ });
     expect(board).toHaveAttribute('title', 'Board');
-    expectVisuallyHidden(within(board).getByText('Board'));
+    // The label folds away (no height, no ink) but stays in the tree as the name.
+    const words = getComputedStyle(within(board).getByText('Board'));
+    expect(words.maxHeight).toBe('0');
+    expect(words.opacity).toBe('0');
+    expect(words.display).not.toBe('none');
     expect(within(board).getByLabelText('3 pending')).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Floor/ })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByTestId('section-nav-more')).toHaveAttribute('title', 'More');
@@ -82,7 +86,7 @@ describe('SectionNav bar, compact', () => {
     render(<SectionNav layout="bar" label="Operations" destinations={DESTINATIONS} copy={EN_US_SECTION_NAV_COPY} />);
     const board = screen.getByRole('link', { name: /Board/ });
     expect(board).not.toHaveAttribute('title');
-    expect(getComputedStyle(within(board).getByText('Board')).position).not.toBe('absolute');
+    expect(getComputedStyle(within(board).getByText('Board')).opacity).toBe('1');
   });
 
   it('still opens the raised menu, named as before', () => {
@@ -98,6 +102,9 @@ describe('SectionNav bar, compact', () => {
     );
     const button = screen.getByTestId('section-nav-primary');
     expect(button).toHaveAttribute('aria-label', 'Create');
+    // The bar hands its size down: the raised button is the compact one, named on hover too.
+    expect(getComputedStyle(button).width).toBe(createTheme().typography.pxToRem(40));
+    expect(button).toHaveAttribute('title', 'Create');
     fireEvent.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Create now')).toBeInTheDocument();
@@ -168,6 +175,38 @@ describe('SectionNav rail, compact', () => {
     expect(create).not.toHaveTextContent('Create');
     fireEvent.click(create);
     expect(screen.getByRole('menu', { name: 'Create now' })).toBeInTheDocument();
+  });
+
+  it('draws the arrow for a way back that brings no icon, since the icon is all it shows', () => {
+    render(
+      <SectionNav
+        layout="rail"
+        label="Operations"
+        destinations={DESTINATIONS}
+        back={{ label: 'Back', href: '/' }}
+        copy={EN_US_SECTION_NAV_COPY}
+        compact
+      />,
+    );
+    const back = screen.getByTestId('section-nav-back');
+    expect(back.querySelector('svg')).not.toBeNull();
+    expect(back).toHaveAccessibleName('Back');
+  });
+
+  it('leaves the default way back as it was: its own height, no drawn arrow added', () => {
+    render(
+      <SectionNav
+        layout="rail"
+        label="Operations"
+        destinations={DESTINATIONS}
+        back={{ label: 'Back', href: '/' }}
+        copy={EN_US_SECTION_NAV_COPY}
+      />,
+    );
+    const back = screen.getByTestId('section-nav-back');
+    expect(getComputedStyle(back).minHeight).toBe('');
+    expect(back.querySelectorAll('svg')).toHaveLength(0);
+    expect(back).toHaveTextContent('Back');
   });
 
   it('keeps the rail as it was when not compact', () => {

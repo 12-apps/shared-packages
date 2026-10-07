@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { rem } from '../../../tokens/scales';
 
-import { Box, CONTROL_RESET, NOT_LIVE, SlotIcon, focusRing } from './SectionNav.parts';
+import { Box, CONTROL_RESET, NOT_LIVE, SlotIcon } from './SectionNav.parts';
 
 export interface RaisedActionButtonProps {
   /**
@@ -86,7 +86,7 @@ export function RaisedActionButton({
         component="button"
         type="button"
         {...raisedState({ onClick, disabled, loading })}
-        aria-label={expanded && closeLabel ? closeLabel : label}
+        {...raisedNames({ label, closeLabel, expanded, compact })}
         aria-expanded={open}
         data-testid={dataTestId}
         sx={raisedSx(theme, expanded, compact)}
@@ -96,6 +96,24 @@ export function RaisedActionButton({
       <RaisedCaption shown={captioned && !compact} label={label} inert={disabled || loading} />
     </Box>
   );
+}
+
+/**
+ * The button's name — `closeLabel` while what it opened is open — and, on a
+ * compact bar where no word is drawn, the label as its tooltip.
+ */
+function raisedNames({
+  label,
+  closeLabel,
+  expanded,
+  compact,
+}: {
+  label: string;
+  closeLabel: string | undefined;
+  expanded: boolean;
+  compact: boolean;
+}): { 'aria-label': string; title: string | undefined } {
+  return { 'aria-label': expanded && closeLabel ? closeLabel : label, title: compact ? label : undefined };
 }
 
 /**
@@ -143,7 +161,9 @@ function raisedSx(theme: Theme, expanded: boolean, compact: boolean): SxProps<Th
   const size = rem(theme, compact ? 40 : 52);
   return {
     ...CONTROL_RESET,
-    ...focusRing(theme),
+    // The ring OUTSIDE the button: the shared ring sits inside the box, in the
+    // primary colour, where this button's own fill swallowed it whole.
+    '&:focus-visible': { outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 2) },
     width: size,
     height: size,
     // Lifted half out of the bar: the one control that is not a place.

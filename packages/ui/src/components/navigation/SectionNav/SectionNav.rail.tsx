@@ -1,3 +1,4 @@
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Typography from '@mui/material/Typography/index.js';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import type { ElementType, ReactNode } from 'react';
@@ -35,7 +36,7 @@ function railRowSx(theme: Theme, active: boolean, compact: boolean): SxProps<The
   return {
     ...CONTROL_RESET,
     ...focusRing(theme),
-    position: 'relative',
+    position: compact ? 'relative' : undefined,
     display: 'flex',
     alignItems: 'center',
     justifyContent: compact ? 'center' : 'flex-start',
@@ -210,12 +211,12 @@ function RailBack({
       sx={{
         ...CONTROL_RESET,
         ...focusRing(theme),
-        position: 'relative',
+        position: compact ? 'relative' : undefined,
         display: 'flex',
         alignItems: 'center',
         justifyContent: compact ? 'center' : 'flex-start',
         gap: compact ? 0 : 1,
-        minHeight: rem(theme, 40),
+        minHeight: compact ? rem(theme, 40) : undefined,
         px: compact ? 0 : 1.25,
         py: 0.75,
         mb: 0.5,
@@ -225,7 +226,8 @@ function RailBack({
         '& svg': { fontSize: rem(theme, 20) },
       }}
     >
-      {back.icon}
+      {/* Compact, the icon is all that is drawn: a back with none gets the arrow. */}
+      {back.icon ?? (compact ? <ArrowBackIcon aria-hidden /> : null)}
       <Typography component="span" variant="body2" sx={compact ? VISUALLY_HIDDEN : { fontWeight: 600 }}>
         {back.label}
       </Typography>

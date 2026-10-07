@@ -1,9 +1,10 @@
 import Box from '@mui/material/Box/index.js';
 import CircularProgress from '@mui/material/CircularProgress/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
-import type { ElementType, ReactNode } from 'react';
+import { useEffect, useState, type ElementType, type ReactNode } from 'react';
 
-import { rem, sxRem } from '../../../tokens/scales';
+import { rem } from '../../../tokens/scales';
+import { SR_ONLY_SX } from '../../form/Label/Label.styles';
 import { Badge } from '../../data-display/Badge';
 
 import { shownCount } from './SectionNav.helpers';
@@ -154,20 +155,20 @@ export const CONTROL_RESET = {
 } as const;
 
 /**
- * Out of sight, still read: a compact nav draws its controls as icons only and
- * keeps each label as the control's accessible name — the same box `Label`'s
- * `srOnly` uses (`SR_ONLY_SX`).
+ * Out of sight, still read: a compact nav keeps each label as its control's
+ * accessible name. The same box `Label`'s `srOnly` draws.
  */
-export const VISUALLY_HIDDEN: SxProps<Theme> = {
-  position: 'absolute',
-  width: sxRem(1),
-  height: sxRem(1),
-  padding: 0,
-  margin: sxRem(-1),
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
+export const VISUALLY_HIDDEN = SR_ONLY_SX;
+
+/**
+ * False on the first render, true from then on — so a fold animates when the
+ * host CHANGES `compact`, never when a page simply opens folded (which drew
+ * the labels sliding out over the neighbouring badges on every load).
+ */
+export function useMounted(): boolean {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted;
+}
 
 export { Box };
