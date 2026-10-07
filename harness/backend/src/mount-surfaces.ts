@@ -3,6 +3,7 @@ import type { PGlite } from '@electric-sql/pglite';
 
 import type { Hosts } from './app';
 import { CHAT_MOUNT_PATH } from './chat-host';
+import { ROUTING_MOUNT_PATH } from './routing-host';
 import { DISCOUNTS_MOUNT_PATH } from './discounts-host';
 import { SHIFT_MOUNT_PATH } from './shift-host';
 import { RESEARCH_MOUNT_PATH, researchListingRoutes } from './research-host';
@@ -97,6 +98,9 @@ function mountTenantSurfaces(app: Hono, hosts: Hosts, pg: PGlite): void {
   // literals (`requests/…/chat`) that no mount above declares, so nothing
   // above can answer for it and its position among them is free.
   app.route(CHAT_MOUNT_PATH, hosts.chat.router);
+  // @12-apps/routing: one route, `POST …/routing/route`, under a literal no
+  // mount above declares.
+  app.route(ROUTING_MOUNT_PATH, hosts.routing.router);
 
 }
 

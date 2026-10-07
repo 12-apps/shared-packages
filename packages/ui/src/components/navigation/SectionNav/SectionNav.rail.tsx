@@ -1,5 +1,6 @@
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Typography from '@mui/material/Typography/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import type { ElementType, ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
@@ -12,6 +13,7 @@ import {
   CountedIcon,
   NOT_LIVE,
   SlotIcon,
+  VISUALLY_HIDDEN,
   controlProps,
   destinationControl,
   focusRing,
@@ -25,6 +27,33 @@ import type {
   SectionNavProps,
 } from './SectionNav.types';
 import type { SectionNavBadge } from './SectionNav.types';
+
+/** The row's words, stacked: the label over its description. */
+const ROW_WORDS_SX = { display: 'flex', flexDirection: 'column', minWidth: 0 } as const;
+
+/** A rail row's look: icon and words, or the icon alone, centred, when compact. */
+function railRowSx(theme: Theme, active: boolean, compact: boolean): SxProps<Theme> {
+  return {
+    ...CONTROL_RESET,
+    ...focusRing(theme),
+    position: compact ? 'relative' : undefined,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: compact ? 'center' : 'flex-start',
+    gap: compact ? 0 : 1.5,
+    width: '100%',
+    minHeight: rem(theme, 40),
+    px: compact ? 0 : 1.25,
+    py: 0.75,
+    borderRadius: 1,
+    textAlign: 'start',
+    color: active ? 'primary.main' : 'text.primary',
+    bgcolor: active ? 'action.selected' : 'transparent',
+    '&:hover': { bgcolor: active ? 'action.selected' : 'action.hover' },
+    '& svg': { color: 'primary.main', fontSize: rem(theme, 20) },
+    [NOT_LIVE]: { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
+  } as SxProps<Theme>;
+}
 
 /**
  * One rail row: icon, label, and the count at the far end.
@@ -48,6 +77,7 @@ function RailRow({
   testId,
   control,
   loading = false,
+  compact = false,
 }: {
   label: string;
   description?: string;
@@ -59,6 +89,8 @@ function RailRow({
   testId: string;
   control: Record<string, unknown>;
   loading?: boolean;
+  /** Icon only, centred: the label stays the row's name, out of sight, and its tooltip. */
+  compact?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   return (
@@ -66,25 +98,9 @@ function RailRow({
       {...control}
       aria-current={current ? 'page' : undefined}
       aria-busy={loading || undefined}
+      title={compact ? label : undefined}
       data-testid={testId}
-      sx={{
-        ...CONTROL_RESET,
-        ...focusRing(theme),
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1.5,
-        width: '100%',
-        minHeight: rem(theme, 40),
-        px: 1.25,
-        py: 0.75,
-        borderRadius: 1,
-        textAlign: 'start',
-        color: active ? 'primary.main' : 'text.primary',
-        bgcolor: active ? 'action.selected' : 'transparent',
-        '&:hover': { bgcolor: active ? 'action.selected' : 'action.hover' },
-        '& svg': { color: 'primary.main', fontSize: rem(theme, 20) },
-        [NOT_LIVE]: { color: 'text.disabled', '& svg': { color: 'text.disabled' } },
-      }}
+      sx={railRowSx(theme, active, compact)}
     >
       <CountedIcon
         icon={<SlotIcon icon={icon} loading={loading} />}
@@ -93,7 +109,7 @@ function RailRow({
         attentionLabel={copy.attention}
         testId={`${testId}-badge`}
       />
-      <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <Box component="span" sx={compact ? VISUALLY_HIDDEN : ROW_WORDS_SX}>
         <Typography component="span" variant="body2" sx={{ fontWeight: active ? 700 : 500 }}>
           {label}
         </Typography>
@@ -108,9 +124,13 @@ function RailRow({
 }
 
 /** A heading between the rail's sections, in the sidebar's small-caps voice. */
-function RailHeading({ children }: { children: ReactNode }): React.JSX.Element {
+function RailHeading({ children, compact = false }: { children: ReactNode; compact?: boolean }): React.JSX.Element {
   return (
-    <Typography variant="overline" color="text.secondary" sx={{ px: 1.25, pt: 1.5, lineHeight: 1.6 }}>
+    <Typography
+      variant="overline"
+      color="text.secondary"
+      sx={compact ? VISUALLY_HIDDEN : { px: 1.25, pt: 1.5, lineHeight: 1.6 }}
+    >
       {children}
     </Typography>
   );
@@ -127,19 +147,21 @@ function RailMenu({
   linkComponent,
   copy,
   testId,
+  compact,
 }: {
   menu: SectionNavMenu;
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   testId: string;
+  compact: boolean;
 }): React.JSX.Element {
   return (
     <Box component="section" data-testid={testId} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-      <RailHeading>{menu.title}</RailHeading>
+      <RailHeading compact={compact}>{menu.title}</RailHeading>
       {menu.groups.map((group) => (
         <Box key={group.id} sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
           {group.title ? (
-            <Typography variant="caption" color="text.secondary" sx={{ px: 1.25, pt: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={compact ? VISUALLY_HIDDEN : { px: 1.25, pt: 0.5 }}>
               {group.title}
             </Typography>
           ) : null}
@@ -151,6 +173,7 @@ function RailMenu({
               icon={entry.icon}
               count={entry.badge}
               active={entry.active === true}
+              compact={compact}
               copy={copy}
               testId={entry.dataTestId ?? `${testId}-entry-${entry.id}`}
               control={controlProps({
@@ -172,23 +195,29 @@ function RailBack({
   back,
   linkComponent,
   testId,
+  compact,
 }: {
   back: SectionNavBack;
   linkComponent: ElementType | undefined;
   testId: string;
+  compact: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   return (
     <Box
       {...controlProps({ href: back.href, linkComponent })}
+      title={compact ? back.label : undefined}
       data-testid={testId}
       sx={{
         ...CONTROL_RESET,
         ...focusRing(theme),
+        position: compact ? 'relative' : undefined,
         display: 'flex',
         alignItems: 'center',
-        gap: 1,
-        px: 1.25,
+        justifyContent: compact ? 'center' : 'flex-start',
+        gap: compact ? 0 : 1,
+        minHeight: compact ? rem(theme, 40) : undefined,
+        px: compact ? 0 : 1.25,
         py: 0.75,
         mb: 0.5,
         borderRadius: 1,
@@ -197,8 +226,9 @@ function RailBack({
         '& svg': { fontSize: rem(theme, 20) },
       }}
     >
-      {back.icon}
-      <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
+      {/* Compact, the icon is all that is drawn: a back with none gets the arrow. */}
+      {back.icon ?? (compact ? <ArrowBackIcon aria-hidden /> : null)}
+      <Typography component="span" variant="body2" sx={compact ? VISUALLY_HIDDEN : { fontWeight: 600 }}>
         {back.label}
       </Typography>
     </Box>
@@ -211,14 +241,17 @@ function RailAction({
   linkComponent,
   copy,
   testId,
+  compact,
 }: {
   action: SectionNavAction;
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   testId: string;
+  compact: boolean;
 }): React.JSX.Element {
   return (
     <RailRow
+      compact={compact}
       label={action.label}
       icon={action.icon}
       count={undefined}
@@ -243,15 +276,18 @@ function RailDestination({
   linkComponent,
   copy,
   testId,
+  compact,
 }: {
   destination: SectionNavDestination;
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   testId: string;
+  compact: boolean;
 }): React.JSX.Element {
   const { current, lit } = destinationState(destination);
   return (
     <RailRow
+      compact={compact}
       label={destination.label}
       icon={destination.icon}
       count={destination.badge}
@@ -271,7 +307,8 @@ function RailDestination({
  * `primary` action as a row, then `more` listed in full.
  *
  * It fills the column the host gives it and scrolls on its own, like the
- * sidebar it stands in for.
+ * sidebar it stands in for. `compact` draws every row as its icon for a
+ * column 64px wide; the words stay the rows' names.
  */
 export function SectionNavRail({
   label,
@@ -283,8 +320,9 @@ export function SectionNavRail({
   linkComponent,
   copy,
   dataTestId,
+  compact = false,
 }: Required<Pick<SectionNavProps, 'label' | 'destinations' | 'copy' | 'dataTestId'>> &
-  Pick<SectionNavProps, 'primary' | 'more' | 'back' | 'heading'> & {
+  Pick<SectionNavProps, 'primary' | 'more' | 'back' | 'heading' | 'compact'> & {
     linkComponent: ElementType | undefined;
   }): React.JSX.Element {
   return (
@@ -303,10 +341,18 @@ export function SectionNavRail({
         bgcolor: 'background.paper',
       }}
     >
-      {back ? <RailBack back={back} linkComponent={linkComponent} testId={`${dataTestId}-back`} /> : null}
-      {heading ? <RailHeading>{heading}</RailHeading> : null}
+      {back ? (
+        <RailBack back={back} linkComponent={linkComponent} testId={`${dataTestId}-back`} compact={compact} />
+      ) : null}
+      {heading ? <RailHeading compact={compact}>{heading}</RailHeading> : null}
       {isMenu(primary) ? (
-        <RailCreateMenu menu={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
+        <RailCreateMenu
+          menu={primary}
+          linkComponent={linkComponent}
+          copy={copy}
+          testId={`${dataTestId}-primary`}
+          compact={compact}
+        />
       ) : null}
       {destinations.map((destination) => (
         <RailDestination
@@ -315,12 +361,21 @@ export function SectionNavRail({
           linkComponent={linkComponent}
           copy={copy}
           testId={destination.dataTestId ?? `${dataTestId}-dest-${destination.id}`}
+          compact={compact}
         />
       ))}
       {primary && !isMenu(primary) ? (
-        <RailAction action={primary} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-primary`} />
+        <RailAction
+          action={primary}
+          linkComponent={linkComponent}
+          copy={copy}
+          testId={`${dataTestId}-primary`}
+          compact={compact}
+        />
       ) : null}
-      {more ? <RailMenu menu={more} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-more`} /> : null}
+      {more ? (
+        <RailMenu menu={more} linkComponent={linkComponent} copy={copy} testId={`${dataTestId}-more`} compact={compact} />
+      ) : null}
     </Box>
   );
 }

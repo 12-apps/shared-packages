@@ -187,4 +187,16 @@ export interface SectionNavProps {
   copy: SectionNavCopy;
   /** Prefix for every `data-testid`. Defaults to `"section-nav"`. */
   dataTestId?: string;
+  /**
+   * Icons only, a size down — for a host that folds its chrome so the content
+   * gets the screen (a "focus mode"). Every label stays its control's
+   * accessible name and `title`; nothing is removed, only drawn smaller.
+   *
+   * `bar` — 48px instead of 60, the raised button 40px instead of 52, no
+   * captions; `sectionNavBarInset(theme, { compact: true })` is its inset.
+   * `rail` — every row, the way back and the create button as their icon only,
+   * headings out of sight, for a column 64px wide (the host sets the width).
+   * Defaults to `false`.
+   */
+  compact?: boolean;
 }

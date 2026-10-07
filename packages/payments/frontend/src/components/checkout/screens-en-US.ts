@@ -19,12 +19,12 @@ import type { CheckoutScreensCopy } from './screens-copy';
 export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
   method: {
     groupLabel: 'Payment method',
-    pixLabel: 'PIX',
+    pixLabel: 'Pix',
     cardLabel: 'Card',
     pixDescription: 'Approved instantly',
     pixManualDescription: 'Confirmed by the store',
     cardDescription: 'Credit, paid in full',
-    unavailableHere: 'Unavailable in this store',
+    unavailableHere: 'Not available at this store',
   },
   settling: {
     cannotConfirm: 'Could not confirm the payment',
@@ -42,25 +42,50 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     checkAgainAction: 'Check again',
   },
   pix: {
-    heading: 'Pay with PIX',
-    instructions: (totalLabel) =>
-      `Scan the QR code in your banking app, or copy the code. Total ${totalLabel}.`,
+    heading: 'Pay with Pix',
     qrAlt: 'PIX QR code for payment',
-    copyAction: 'Copy',
+    copyAction: 'Copy code',
     copiedAction: 'Copied!',
+    copyAgainAction: 'Copy again',
+    showQrAction: 'Show QR code',
+    preferCardAction: 'Rather pay by card?',
+    verifying: 'Checking automatically…',
+    tabsLabel: 'How to pay the Pix',
+    copyPasteTab: 'Copy and paste',
+    qrTab: 'QR code',
+    qrHeading: 'On your phone',
+    copyPasteHeading: 'Pix copy and paste',
+    or: 'or',
+    qrInstructions: 'Open your banking app on your phone, choose **Pix › Scan QR code** and point it at the screen.',
+    qrTabCaption: 'Scan it with the banking app on another phone.',
+    copyPasteHint: 'Paste it into your banking app under **Pix copy and paste**.',
+    internetBankingHint: 'Paying through internet banking? Paste the code under **Pix copy and paste**.',
+    notPaidYet: 'Not paid yet?',
+    scanFromPhone: 'Scan it with the banking app on your phone.',
     validUntil: (time) => `Valid until ${time}. Confirmation is automatic.`,
     expiryLocale: 'en-US',
     awaiting: 'Waiting for payment…',
     chargeMissing: 'Could not generate the PIX code.',
+    afterCopy: {
+      title: 'Waiting for the payment',
+      body: (totalLabel, wide) =>
+        `As soon as the bank confirms the payment of ${wide ? `**${totalLabel}**` : totalLabel}, your order shows up here. You can leave this ${wide ? 'page' : 'screen'} open.`,
+      stepCopied: 'Pix code copied',
+      stepPay: (wide) =>
+        wide ? 'Pay in your banking app or internet banking (Pix copy and paste)' : 'Pay in your banking app (Pix copy and paste)',
+      stepConfirm: () => 'The bank confirms the payment automatically',
+    },
     manual: {
-      instructions: (totalLabel) =>
-        `Pay ${totalLabel} with the QR code or the code below. The store checks it arrived and confirms your order.`,
       validUntil: (time) => `The store confirms the payment by ${time}.`,
-      awaiting: 'Waiting for the store to confirm the payment…',
-      copied: {
-        title: 'Code copied. Now pay in your bank app',
-        description:
-          'Once you have paid, come back to this screen and wait: the store checks it arrived and confirms your order right here.',
+      awaiting: 'Waiting for the store to confirm…',
+      afterCopy: {
+        title: 'Waiting for the store',
+        body: (totalLabel, wide) =>
+          `As soon as the store confirms it received ${wide ? `**${totalLabel}**` : totalLabel}, your order shows up here. You can leave this ${wide ? 'page' : 'screen'} open.`,
+        stepCopied: 'Pix code copied',
+        stepPay: (wide) =>
+          wide ? 'Pay in your banking app or internet banking (Pix copy and paste)' : 'Pay in your banking app (Pix copy and paste)',
+        stepConfirm: (time) => `The store confirms the payment — by ${time}`,
       },
     },
   },

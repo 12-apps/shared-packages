@@ -346,6 +346,39 @@ is still loading, so what was already waiting when the page opened never rings.
 Check the views against the registry with `defineAttentionViews` — a typo in a
 key would otherwise drop a whole kind silently.
 
+## Toasts — the fourth kind of entry
+
+An inbox notification is kept; a live activity is followed; attention waits
+with a clock on it. A **toast** is the answer to the tap that just happened —
+"Saved", "Item moved · Undo", "Could not move" — and it leaves
+on its own unless it must be acknowledged.
+
+Every toast in an app goes through ONE queue and is drawn in ONE place: a
+column at the **top of the screen, centred**, no wider than `sm`, on the
+**inverse surface** — near-black on a light theme, near-white on a dark one
+(`neutralTones(theme).inverseSurface`, the tooltip's ground). Before this
+surface each package drew its own, and the same news landed in four corners in
+four looks.
+
+| piece | what it does |
+|---|---|
+| `toast(message, options?)` (`@12-apps/notifications/toast`) | raise into the process-wide queue; `toast.success/info/warning/error/loading`, `toast.update(id, patch)`, `toast.dismiss(id?)`, `toast.promise(p, { loading, success, error })`. Framework-free |
+| `options.id` | the same id REPLACES the toast in place and restarts its clock — a "last move" receipt, a retry |
+| `options.actions` | buttons (`{ label, onClick, disabled?, keepOpen? }`); a tap runs it and the toast leaves unless `keepOpen` |
+| `options.duration` | ms, or `null` to stay until closed. Defaults: 5s, 8s for `error`, `null` for `loading` |
+| `ToastHost` (`@12-apps/notifications/toast/react`) | mount ONCE at the root with `dismissLabel` and `moreLabel(n)` — the only words it says. Draws the newest `max` (3) toasts; the rest wait with their clocks stopped |
+| `<Toast open …>` | the packaged card for a toast whose state the HOST owns (an undo that greys out while its write is in flight) — live props, same column |
+| `<ToastPortal>` + `<ToastSurface>` | a body of the host's own (its own buttons, a scroller) in the same column and the same frame. The subtree reads the inverse palette (`InverseTheme`), so library components inside it need no overrides |
+
+The column is portalled under `<body>`, sits over every stacked sheet, takes
+no room in the page and no taps outside its cards. A toast's clock stops under
+the pointer and while focus is inside it. Errors are announced assertively
+(`role="alert"`), everything else through the column's polite live region.
+
+A `<ToastPortal>` with no `ToastHost` above it stands in a column of its own in
+the same place, so a screen mounted alone (a test, a story) keeps its toasts
+where the app would draw them.
+
 ## The models
 
 `prisma/notifications.prisma` — `Notification`, `NotificationDelivery`,

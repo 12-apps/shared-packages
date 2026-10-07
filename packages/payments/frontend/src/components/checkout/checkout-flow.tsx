@@ -13,6 +13,7 @@ import { CheckoutCopyProvider } from "./copy-context";
 import { OneClickProvider, useOneClick } from "./one-click";
 import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
+import { STEP_COLUMN_MAX } from "./payment-step-layout";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 
 /** Step ids are the flow's own contract; the labels beside them are host copy. */
@@ -340,7 +341,8 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 } }}>
+    // Pagamento alone takes the host's full width (its PIX pane, FUT-3367).
+    <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 }, width: "100%", mx: "auto", maxWidth: c.step === "payment" ? "none" : STEP_COLUMN_MAX }}>
       <CheckoutHeader copy={copy} step={c.step} onBack={c.back} />
 
       <ProgressHeader copy={copy} step={c.step} completed={c.completed} />

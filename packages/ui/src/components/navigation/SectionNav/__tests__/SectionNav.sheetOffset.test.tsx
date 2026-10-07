@@ -11,7 +11,7 @@ import { EN_US_SECTION_NAV_COPY } from '../../../../en-US.navigation';
 import { rem } from '../../../../tokens/scales';
 import { SectionNav } from '../SectionNav';
 import { sectionNavBarInset, sectionNavSheetOffset } from '../SectionNav.bar';
-import { RAISED_LIFT } from '../SectionNav.primary';
+import { RAISED_LIFT, RAISED_LIFT_COMPACT } from '../SectionNav.primary';
 import type { SectionNavMenu } from '../SectionNav.types';
 
 afterEach(cleanup);
@@ -34,6 +34,14 @@ describe('sectionNavSheetOffset', () => {
 
   it('stops it at the bar when there is no raised button to clear', () => {
     expect(sectionNavSheetOffset(theme, false)).toBe(sectionNavBarInset(theme));
+  });
+
+  it('clears the compact bar\'s smaller lift above the compact bar', () => {
+    const compact = { compact: true };
+    expect(sectionNavSheetOffset(theme, true, compact)).toBe(
+      `calc(${sectionNavBarInset(theme, compact)} + ${rem(theme, RAISED_LIFT_COMPACT)})`,
+    );
+    expect(sectionNavSheetOffset(theme, false, compact)).toBe(sectionNavBarInset(theme, compact));
   });
 });
 

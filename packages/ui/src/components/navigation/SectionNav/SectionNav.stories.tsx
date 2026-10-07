@@ -87,6 +87,45 @@ export const Rail: Story = {
   ),
 };
 
+/**
+ * The bar a host folds its chrome to (`compact`): icons only, 48px, the raised
+ * button 40px. Every label is still the slot's name and its tooltip.
+ */
+export const BarCompact: Story = {
+  args: { compact: true },
+  render: (args) => (
+    <PhoneFrame>
+      <SectionNav {...args} />
+    </PhoneFrame>
+  ),
+};
+
+/** The compact bar on the narrowest phone, 320px wide. */
+export const BarCompactNarrow: Story = {
+  args: { compact: true },
+  render: (args) => (
+    <Box sx={{ width: sxRem(320), height: sxRem(568), display: 'flex', flexDirection: 'column', border: 1, borderColor: 'divider' }}>
+      <Box sx={{ flex: 1 }} />
+      <SectionNav {...args} />
+    </Box>
+  ),
+};
+
+/** The rail folded to its icons (`compact`), in the 64px column a host gives it. */
+export const RailCompact: Story = {
+  args: {
+    layout: 'rail',
+    compact: true,
+    heading: 'Operations',
+    back: { label: 'Back', href: '#home', icon: <ArrowBackIcon /> },
+  },
+  render: (args) => (
+    <Box sx={{ width: sxRem(64), height: sxRem(560), border: 1, borderColor: 'divider' }}>
+      <SectionNav {...args} />
+    </Box>
+  ),
+};
+
 /** The raised button alone, for a bar the host already draws. */
 export const RaisedButtonInAHostBar: Story = {
   render: () => (

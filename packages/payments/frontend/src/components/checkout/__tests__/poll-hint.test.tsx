@@ -284,7 +284,7 @@ describe("a hint at a wait that has ended", () => {
     expect(calls()).toBe(before);
   });
 
-  it("owes nothing for a mark the deadline overtook, over a whole live floor", async () => {
+  it("owes nothing for a mark the deadline overtook, sixteen seconds on", async () => {
     const { client, calls, release } = heldClient();
     const { subscribe, hint } = channel();
     const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
@@ -297,6 +297,66 @@ describe("a hint at a wait that has ended", () => {
     await elapse(16_000);
 
     expect(calls()).toBe(1);
+  });
+
+  // FUT-3222: the answer to an ask the deadline overtook went straight on to
+  // `scheduleNext`, which never ends a LIVE wait, so it kept asking behind the
+  // timed-out panel for as long as the page stayed open.
+  it("books no ask after an ask the LIVE deadline overtook answers non-terminal", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
+    await elapse(5_000);
+    expect(view.container.querySelector("output")?.getAttribute("data-timed-out")).toBe("true");
+
+    await outside(() => release(PENDING));
+    await elapse(16_000);
+
+    expect(calls()).toBe(1);
+  });
+
+  it("books no retry after an ask the LIVE deadline overtook answers an error", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
+    await elapse(5_000);
+
+    await outside(() => release({ ok: false, error: "boom" }));
+    await elapse(16_000);
+
+    expect(calls()).toBe(1);
+    expect(view.container.querySelector("output")?.getAttribute("data-timed-out")).toBe("true");
+  });
+
+  // Pins the ORDER of the FUT-3222 guard: checked before `absorb`, it would drop this PAID.
+  it("still writes a PAID that the overtaken ask brings back", async () => {
+    const { client, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={5_000} />);
+    await elapse(5_000);
+
+    await outside(() => release(PAID));
+
+    expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
+  });
+});
+
+describe("a channel that re-opens (FUT-3223)", () => {
+  it("owes one more ask when it re-opens during an ask, so a pre-open answer is never the last word", async () => {
+    const { client, calls, release } = heldClient();
+    const { subscribe } = channel();
+    const view = render(<Harness client={client} signal={{ live: false, subscribe }} maxWaitMs={600_000} />);
+    await elapse(50);
+    expect(calls()).toBe(1);
+
+    view.rerender(<Harness client={client} signal={{ live: true, subscribe }} maxWaitMs={600_000} />);
+    await elapse(0);
+    expect(calls()).toBe(1);
+    await outside(() => release(PENDING));
+
+    expect(calls()).toBe(2);
+    await outside(() => release(PAID));
+    expect(view.container.querySelector("output")?.getAttribute("data-status")).toBe("PAID");
   });
 });
 

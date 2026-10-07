@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import { AppShellPage } from './app-shell';
 import { AuditLogPage } from './audit-log';
 import { ChatThreadPage } from './chat-thread';
+import { RouteMapPage } from './route-map';
 import { DiscountsPage } from './discounts';
 import { McpAiConnectPage } from './mcp-ai-connect';
 import { AUTH_PAGES, AUTH_SETTINGS_PAGE } from './auth-pages';
@@ -273,6 +274,15 @@ export const PAGES: readonly HarnessPage[] = [
     pkg: '@12-apps/chat',
     group: 'backoffice',
     Component: ChatThreadPage,
+  },
+  // @12-apps/routing: one demo run on the map. Backoffice because a route is
+  // what a store watches its rider ride, never something a buyer opens.
+  {
+    slug: 'route-map',
+    title: 'Route map',
+    pkg: '@12-apps/routing',
+    group: 'backoffice',
+    Component: RouteMapPage,
   },
   {
     slug: 'feature-flags',

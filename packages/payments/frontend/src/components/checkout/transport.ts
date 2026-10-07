@@ -153,6 +153,16 @@ function refused<T>(json: ApiEnvelope<T> | null, copy: CheckoutTransportCopy): R
 }
 
 /**
+ * Whether this page is a hosted-checkout return carrying the WHOLE settlement
+ * pair — the one case where a `/status` read is itself what confirms the
+ * payment, so a live wait keeps reading on its floor (FUT-3223, `poll-live.ts`).
+ */
+export function carriesSettlementPair(): boolean {
+  const { transactionNsu, slug } = returnedSettlement();
+  return Boolean(transactionNsu && slug);
+}
+
+/**
  * What a hosted checkout appended to the return URL when it sent the buyer
  * back, or undefined.
  *

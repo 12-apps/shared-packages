@@ -5,9 +5,10 @@
  * Nothing here knows what the channel is. A host that can hear an order move —
  * a signed-in buyer's own topic, say — passes whether that channel is live and
  * a way to be told when it fires; every wait under the provider then asks the
- * moment it fires and slows its own timer while the channel is live. A tree with
- * no provider, or a host that passes `live: false` (a guest, who has no channel
- * of their own), polls exactly as before.
+ * moment it fires, and keeps no timer of its own while the channel is live
+ * (FUT-3223, `poll-live.ts`). A tree with no provider, or a host that passes
+ * `live: false` (a guest, who has no channel of their own), polls exactly as
+ * before.
  *
  * The hint carries nothing and is never trusted as an answer: it only makes the
  * wait ask `/status` now. The endpoint stays the truth.
@@ -26,14 +27,19 @@ export interface CheckoutLiveSignal {
    * unsubscribe. Should be stable across renders: a new function re-subscribes.
    */
   subscribe: (onHint: () => void) => () => void;
-  /** The wait's healthy delay while live (ms). Defaults to {@link DEFAULT_LIVE_INTERVAL_MS}. */
+  /**
+   * The healthy delay while live (ms) for the one wait that keeps reading while
+   * live: a hosted-checkout return carrying the settlement pair (`poll-live.ts`).
+   * Every other wait keeps no timer while live. Defaults to
+   * {@link DEFAULT_LIVE_INTERVAL_MS}.
+   */
   liveIntervalMs?: number;
 }
 
 /**
- * The floor under a lost hint while the channel is live: the same 15 s the PIX
- * wait already backs off to, so a wait whose channel is up never asks faster
- * than the slowest wait it would have become anyway.
+ * The floor a hosted-checkout return keeps while the channel is live: the same
+ * 15 s the PIX wait already backs off to, so a wait whose channel is up never
+ * asks faster than the slowest wait it would have become anyway.
  */
 export const DEFAULT_LIVE_INTERVAL_MS = 15_000;
 
@@ -61,9 +67,16 @@ type LoopRef = { readonly current: PollLoop | null };
 /**
  * A channel that DROPS: ask now — and if the loop declines because it asked a
  * moment ago, ask again once that quiet window is over. The ask it lands just
- * after may have been answered before the drop, and its next tick sleeps out
- * the live floor, so declining for good would leave the buyer waiting with
- * nobody left to wake them.
+ * after may have been answered before the drop, and a live wait books no next
+ * tick, so declining for good would leave the buyer waiting with nobody left
+ * to wake them.
+ *
+ * A channel that (RE-)OPENS does not come here either: it is taken as a HINT
+ * (FUT-3223). A hint sent while the channel was down was never heard, and a
+ * live wait has no timer to catch it, so the open is the re-read that bounds a
+ * lost hint — and `PollLoop.hint` never drops it: with an ask in flight it
+ * owes one more the moment that ask answers, where a declined poke could leave
+ * a pre-open answer as the last word.
  *
  * A HINT does not come here. It is `PollLoop.hint` (FUT-3205): deferring a
  * hint by the quiet window cost a paid buyer a full second on the pay step.
@@ -75,9 +88,10 @@ function wake(loop: LoopRef, pending: { timer?: ReturnType<typeof setTimeout> })
 }
 
 /**
- * Tie one wait to the host's channel: a hint asks now, and a channel that
- * DROPS asks now too — the timer may be sleeping out the live floor, and the
- * buyer should not wait the rest of it with nobody left to wake them.
+ * Tie one wait to the host's channel: a hint asks now, a channel that DROPS
+ * asks now too (see {@link wake}), and a channel that (RE-)OPENS is taken as a
+ * hint. The channel's state at mount needs no ask of its own: the wait's first
+ * ask is already that read.
  *
  * `loop` is the hook's own ref to its running loop, read when the event lands.
  */
@@ -92,6 +106,7 @@ export function useLiveWait(loop: LoopRef): LiveWait {
     const was = liveRef.current;
     liveRef.current = live;
     if (was && !live) wake(loop, pending.current);
+    else if (!was && live) loop.current?.hint();
   }, [live, loop]);
 
   useEffect(() => {

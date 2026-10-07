@@ -1,0 +1,78 @@
+{
+  "name": "@12-apps/routing",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Road routes through an ordered list of stops, with the routing service chosen by host configuration (openrouteservice, OSRM, Google Routes, or your own adapter) and a straight-line fallback when none answers, plus a MapLibre route map for web hosts that draws markers, stops, a planned and a travelled line.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./react": "./src/react/index.ts",
+    "./manifest": "./src/manifest/index.ts",
+    "./manifest/server": "./src/manifest/server.ts",
+    "./manifest/web": "./src/manifest/web.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "clean": "rm -rf node_modules coverage dist",
+    "test": "node ../../scripts/vitest-with-teardown.mjs run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@12-apps/wiring": ">=1.17.0",
+    "maplibre-gl": ">=5.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@12-apps/wiring": {
+      "optional": true
+    },
+    "maplibre-gl": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@12-apps/eslint-config": "workspace:*",
+    "@12-apps/typescript-config": "workspace:*",
+    "@12-apps/wiring": "workspace:*",
+    "@testing-library/react": "^16.3.1",
+    "@types/node": "^22.10.6",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-test-flakiness": "^1.4.0",
+    "jsdom": "^26.1.0",
+    "maplibre-gl": "6.13.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/12-apps/shared-packages.git",
+    "directory": "packages/routing"
+  },
+  "files": [
+    "src",
+    "*.md",
+    "!eslint.config.js",
+    "!**/__tests__/**",
+    "!**/*.test.*"
+  ]
+}

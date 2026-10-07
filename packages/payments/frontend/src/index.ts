@@ -125,6 +125,7 @@ export type {
   MethodPickerCopy,
   PayerSummaryCopy,
   PaymentErrorCopy,
+  PixAfterCopyCopy,
   PixPaneCopy,
   SettlingCopy,
   WalletCopy,

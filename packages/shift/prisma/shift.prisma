@@ -32,3 +32,32 @@ model ShiftTenantConfig {
 
   @@map("shift_tenant_configs")
 }
+
+// A PLANNED work period (a schedule slot): who should work, of which kind,
+// from when to when. Apart from Shift on purpose: a shift is a fact that
+// happened, a slot is a plan, edited by cancelling it. Tenant, user, kind and
+// resource are stored by value, as on Shift; the migration adds the CHECKs.
+model ShiftSlot {
+  id               String    @id @default(uuid())
+  clientId         String    @map("client_id")
+  userId           String    @map("user_id")
+  kind             String
+  startsAt         DateTime  @map("starts_at")
+  endsAt           DateTime  @map("ends_at")
+  resourceType     String?   @map("resource_type")
+  resourceId       String?   @map("resource_id")
+  // The host's own coverage, as a list of { type, id } pairs.
+  coverage         Json?
+  // Shared by the slots one weekly repeat created.
+  seriesId         String?   @map("series_id")
+  createdByUserId  String    @map("created_by_user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  canceledAt       DateTime? @map("canceled_at")
+  canceledByUserId String?   @map("canceled_by_user_id")
+  cancelReason     String?   @map("cancel_reason")
+
+  @@index([clientId, startsAt])
+  @@index([clientId, userId, startsAt])
+  @@index([seriesId])
+  @@map("shift_slots")
+}

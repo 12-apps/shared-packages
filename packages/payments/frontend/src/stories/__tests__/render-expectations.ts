@@ -141,7 +141,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "Screens/BuyerDetailsServerRefusal": { testIds: ["buyer-cpf"], text: ["Informe: taxId."] },
   "Screens/PixPaymentLive": {
     testIds: ["pix-view", "pix-qr", "pix-code", "pix-awaiting"],
-    text: ["Pague com PIX"],
+    text: ["Pague com Pix"],
   },
   "Screens/CardEntryNewCard": {
     testIds: ["card-view", "card-number", "card-pay"],
@@ -251,7 +251,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // ------------------------------------------------------- ProviderScreens
   "ProviderScreens/PixCodeOnOurPage": {
     testIds: ["pix-view", "pix-code"],
-    text: ["Pague com PIX"],
+    text: ["Pague com Pix"],
   },
   // Pinned EMPTINESS: no payable yet, so the screen deliberately stays out of
   // the way — anything on screen here (an error alert included) is a failure.
@@ -269,11 +269,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "ProviderScreens/DeclaresNothingAndStillWorks": {
     testIds: ["pix-view", "pix-code"],
-    text: ["Pague com PIX"],
+    text: ["Pague com Pix"],
   },
   "ProviderScreens/UnknownIdFromANewerServer": {
     testIds: ["pix-view", "pix-code"],
-    text: ["Pague com PIX"],
+    text: ["Pague com Pix"],
   },
   "ProviderScreens/UnknownIdOnAHandoffStore": { testIds: ["checkout-handoff-pending"] },
   "ProviderScreens/CapabilityDefaultDirect": { testIds: ["checkout-handoff-pending"] },

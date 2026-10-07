@@ -1,6 +1,6 @@
 import type { Result } from "../../result";
 import { pollDelay } from "./poll-delay";
-import { waitsForDeadline, type LiveCadence } from "./poll-live";
+import { idlesWhileLive, waitsForDeadline, type LiveCadence } from "./poll-live";
 import { claimHint, owedAfterAnswer } from "./poll-hint";
 import { claimRearm } from "./poll-rearm";
 import { TERMINAL_STATUSES, type OrderStatus } from "./types";
@@ -254,13 +254,19 @@ function mayWrite(run: PollRun, mine: number, result: Result<OrderStatus>): bool
   return run.attempt === mine || (result.ok && TERMINAL_STATUSES.includes(result.data));
 }
 
-/** Book the next tick, or end the wait because its clock has run out. */
+/**
+ * Book the next tick, or end the wait because its clock has run out — or, live
+ * with a healthy answer, book nothing: the hint, the re-arm events and the
+ * channel re-opening are what ask next (`poll-live.ts`, FUT-3223).
+ */
 function scheduleNext(
   run: PollRun,
   options: PollingOptions,
   sink: PollSink,
   again: () => void,
 ): void {
+  clearPending(run);
+  if (idlesWhileLive(run.errors, options)) return;
   const delay = pollDelay(run.healthy, run.errors, options);
   if (outOfTime(run, options, delay)) {
     run.stopped = true;
@@ -268,7 +274,6 @@ function scheduleNext(
     sink.setTimedOut(true);
     return;
   }
-  clearPending(run);
   run.timer = setTimeout(again, delay);
 }
 
@@ -280,11 +285,21 @@ function askNow(run: PollRun, tick: () => Promise<void>): void {
   void tick();
 }
 
+/**
+ * Whether the ask that just answered may book what comes next. Not when a newer
+ * ask superseded it, and not when the wall clock ended the wait while it was out
+ * (FUT-3222): live, `outOfTime` never ends a wait, so an ask the deadline
+ * overtook kept booking more behind the timed-out panel. Read AFTER `absorb`, so
+ * a PAID landing just past the deadline is still written.
+ */
+function carriesOn(run: PollRun, mine: number): boolean {
+  return run.attempt === mine && !run.stopped;
+}
+
 /** After a non-terminal answer: the ask a hint owes, or the usual schedule. */
 function continueAfter(run: PollRun, tick: () => Promise<void>, schedule: () => void): void {
-  const owed = owedAfterAnswer(run);
-  if (owed === "ask") askNow(run, tick);
-  else if (owed === "none") schedule();
+  if (owedAfterAnswer(run)) askNow(run, tick);
+  else schedule();
 }
 
 /** The handle the hook holds on one running wait. */
@@ -332,7 +347,7 @@ export function createPollLoop(
       clearDeadline(run);
       return;
     }
-    if (run.attempt !== mine) return;
+    if (!carriesOn(run, mine)) return;
     continueAfter(run, tick, () => scheduleNext(run, options, sink, () => void tick()));
   };
 

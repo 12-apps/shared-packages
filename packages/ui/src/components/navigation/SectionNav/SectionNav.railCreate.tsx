@@ -4,7 +4,7 @@ import ListItemText from '@mui/material/ListItemText/index.js';
 import ListSubheader from '@mui/material/ListSubheader/index.js';
 import Menu from '@mui/material/Menu/index.js';
 import MenuItem from '@mui/material/MenuItem/index.js';
-import { useTheme } from '@mui/material/styles/index.js';
+import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import { useId, useState, type ElementType, type ReactNode } from 'react';
 
 import type { SectionNavCopy } from '../../../copy';
@@ -63,6 +63,20 @@ function entryItem(
   );
 }
 
+/** The button's icon and names: the icon in front of the label, or — compact — the icon alone, named by the label. */
+function createButtonForm(
+  menu: SectionNavMenu,
+  compact: boolean,
+): { startIcon: ReactNode; 'aria-label': string | undefined; title: string | undefined } {
+  if (!compact) return { startIcon: menu.icon, 'aria-label': undefined, title: undefined };
+  return { startIcon: undefined, 'aria-label': menu.label, title: menu.label };
+}
+
+/** Where the button's content sits: the label's start, or — compact — the icon centred. */
+function createButtonLayoutSx(compact: boolean): SxProps<Theme> {
+  return compact ? { justifyContent: 'center', minWidth: 0, px: 0 } : { justifyContent: 'flex-start', px: 1.75 };
+}
+
 /**
  * A rail's `primary` menu as ONE button at the top of the rail, opening an
  * anchored menu of its groups (FUT-3015).
@@ -82,11 +96,14 @@ export function RailCreateMenu({
   linkComponent,
   copy,
   testId,
+  compact = false,
 }: {
   menu: SectionNavMenu;
   linkComponent: ElementType | undefined;
   copy: SectionNavCopy;
   testId: string;
+  /** The button as its icon only — the label stays its name and its tooltip. */
+  compact?: boolean;
 }): React.JSX.Element {
   const theme = useTheme();
   const menuId = useId();
@@ -109,7 +126,7 @@ export function RailCreateMenu({
       <Button
         variant="contained"
         fullWidth
-        startIcon={menu.icon}
+        {...createButtonForm(menu, compact)}
         disabled={menu.disabled === true}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -119,14 +136,15 @@ export function RailCreateMenu({
         sx={{
           my: 1,
           minHeight: rem(theme, 40),
-          justifyContent: 'flex-start',
-          px: 1.75,
+          ...(createButtonLayoutSx(compact) as object),
           fontWeight: 600,
           // A place in the rail reads in sentence case, like the rows under it.
           textTransform: 'none',
+          // The ring outside the filled button, where it can be seen.
+          '&.Mui-focusVisible': { outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 2) },
         }}
       >
-        {menu.label}
+        {compact ? menu.icon : menu.label}
       </Button>
       <Menu
         id={menuId}

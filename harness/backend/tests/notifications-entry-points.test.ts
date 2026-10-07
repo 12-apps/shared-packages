@@ -18,6 +18,7 @@ import * as email from '@12-apps/notifications/email';
 import * as emailLocales from '@12-apps/notifications/email/locales';
 import * as emailPreviews from '@12-apps/notifications/email/previews';
 import * as emailPreviewsHono from '@12-apps/notifications/email/previews/hono';
+import * as toastCore from '@12-apps/notifications/toast';
 
 /**
  * Every published subpath, imported from the INSTALLED tarball and touched.
@@ -57,6 +58,9 @@ const COVERED_ELSEWHERE: Record<string, string> = {
   // The attention button: React and the design system, proven where a web host
   // mounts it — the notifications page's "Avisos" section and its spec.
   './attention/react': 'harness/frontend — tests/notifications-attention.spec.ts',
+  // The toast column: React and the design system, proven where a web host
+  // mounts it — the notifications page's "Toasts" section and its spec.
+  './toast/react': 'harness/frontend — tests/notifications-toast.spec.ts',
   './package.json': 'read by this very test',
 };
 
@@ -79,6 +83,7 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
         './email/locales',
         './email/previews',
         './email/previews/hono',
+        './toast',
       ],
       ...Object.keys(COVERED_ELSEWHERE),
     ].sort();
@@ -125,6 +130,20 @@ describe('@12-apps/notifications — every advertised subpath resolves', () => {
     expect(manifestServer.notificationsServerManifest.name).toBe('@12-apps/notifications');
     expect(typeof manifestServer.createWireApiNotifications).toBe('function');
     expect(typeof manifestServer.notificationsServerManifest.http.create).toBe('function');
+  });
+
+  it('the TOAST entry carries the framework-free queue', () => {
+    // A queue a host can raise into without React — a data hook, a worker
+    // bridge. Raised, replaced by id, and dismissed, from the tarball.
+    const store = toastCore.createToastStore();
+    const raise = toastCore.createToaster(store);
+    raise('Saved', { id: 'one' });
+    raise.error('Not saved', { id: 'one' });
+    expect(store.getSnapshot()).toHaveLength(1);
+    expect(store.getSnapshot()[0]).toMatchObject({ id: 'one', severity: 'error', message: 'Not saved' });
+    raise.dismiss('one');
+    expect(store.getSnapshot()).toEqual([]);
+    expect(typeof toastCore.toast).toBe('function');
   });
 
   it('the ROOT entry carries the framework-free core', () => {

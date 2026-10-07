@@ -63,3 +63,9 @@ export const PersonOutlineIcon = makeIcon([
 export const CloseIcon = makeIcon([
   'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
 ]);
+
+export const QrCodeIcon = makeIcon([
+  'M3 11h8V3H3zm2-6h4v4H5zM3 21h8v-8H3zm2-6h4v4H5zm8-12v8h8V3zm6 6h-4V5h4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z',
+]);
+
+export const CheckIcon = makeIcon(['M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z']);

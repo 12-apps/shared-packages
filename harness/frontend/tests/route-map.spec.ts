@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+/**
+ * `@12-apps/routing` — the route map, mounted through the wiring consumer's
+ * web half from the packed tarball.
+ *
+ * The drawing rules are unit-tested inside the package against a fake
+ * MapLibre. What only a consumer can show is that the tarball's surface,
+ * built with the host's words, colours and worker URL, mounts in a real
+ * bundle and loads its optional peer lazily: the map region renders, and it
+ * settles either on the drawn run or — with no basemap reachable — on the
+ * package's own error state. Never on a blank page.
+ */
+test('the mounted surface renders the map region in the host words', async ({ page }) => {
+  // The basemap is remote: a runner that cannot reach it waits out the
+  // host's 8 s ready timeout before the error state, on top of a cold load.
+  test.slow();
+  await page.goto('#/route-map');
+
+  await expect(page.getByTestId('page-route-map')).toBeVisible();
+  const map = page.getByTestId('route-map');
+  await expect(map).toBeVisible();
+  await expect(map).toHaveAttribute('aria-label', 'Map');
+  // Settled first, so a failure names WHICH state it never left.
+  await expect(map).toHaveAttribute('data-state', /^(ready|error)$/, { timeout: 30_000 });
+  // Drawn, or refused in the package's words — both are the surface answering.
+  await expect(
+    map.getByRole('img', { name: 'Alex, on the way' }).or(map.getByRole('button', { name: 'Try again' })),
+  ).toBeVisible({ timeout: 10_000 });
+});
