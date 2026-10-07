@@ -86,6 +86,16 @@ const THEMES: Record<string, Theme> = {
   'defaultProps pinning the label shrunk': createTheme({
     components: { MuiTextField: { defaultProps: { slotProps: { inputLabel: { shrink: true } } } } },
   }),
+  'defaultProps under the legacy prop names': createTheme({
+    components: {
+      MuiTextField: {
+        defaultProps: { InputLabelProps: { shrink: true }, FormHelperTextProps: { component: 'span' } },
+      },
+    },
+  }),
+  'defaultProps with field-level and root-level props': createTheme({
+    components: { MuiTextField: { defaultProps: { margin: 'dense', classes: { root: 'host-tf' }, name: 'host' } } },
+  }),
   'defaultProps helper-text and html-input slot props': createTheme({
     components: {
       MuiTextField: {

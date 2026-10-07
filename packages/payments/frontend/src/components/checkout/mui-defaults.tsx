@@ -162,35 +162,40 @@ function useTextFieldProps({ label, type = 'text', inputMode, fullWidth, require
 }
 
 /**
- * An outlined text field, composed from the parts MUI's `TextField` composes
- * (FUT-3402). `TextField` itself imports `Select` unconditionally, and through
- * it `Menu`, `MenuList`, `Popover` and `List`; this slot is in every host's
- * checkout bundle whether or not the host fills it, so it paid for a dropdown
- * it can never render.
- *
- * Same DOM and the same theme hooks — `defaultProps`, `styleOverrides`,
- * `variants`, slot props — pinned by `default-input-parity.test.tsx`, with two
- * deliberate exceptions: a theme default `variant` other than `outlined`, and
- * `slots` replacing a part, are not honoured. Either would need the very
- * components this slot exists to leave out; a host that wants them fills the
- * `Input` slot.
- */
-/**
  * What `TextField` consumes by name rather than handing to its root. A key LIST
  * rather than a destructure, which would bind every one of them only to drop it.
  */
 const CONSUMED_BY_FIELD: ReadonlySet<string> = new Set([
-  'autoComplete', 'autoFocus', 'className', 'color', 'defaultValue', 'disabled', 'error', 'fullWidth',
-  'helperText', 'id', 'inputRef', 'label', 'name', 'onBlur', 'onChange', 'onFocus', 'placeholder',
-  'required', 'slotProps', 'type', 'value', 'variant',
+  'autoComplete', 'autoFocus', 'children', 'className', 'color', 'defaultValue', 'disabled', 'error',
+  'FormHelperTextProps', 'fullWidth', 'helperText', 'id', 'InputLabelProps', 'inputProps', 'InputProps',
+  'inputRef', 'label', 'maxRows', 'minRows', 'multiline', 'name', 'onBlur', 'onChange', 'onFocus',
+  'placeholder', 'required', 'rows', 'select', 'SelectProps', 'slotProps', 'slots', 'type', 'value',
+  'variant',
 ]);
+
+/**
+ * The slot props as `TextField` resolves them: the legacy `InputProps`,
+ * `InputLabelProps`, `inputProps` and `FormHelperTextProps` first, then
+ * `slotProps` over them.
+ */
+function slotPropsFor(props: TextFieldProps): Record<string, SlotProps> {
+  return {
+    input: props.InputProps as SlotProps,
+    inputLabel: props.InputLabelProps as SlotProps,
+    htmlInput: props.inputProps as SlotProps,
+    formHelperText: props.FormHelperTextProps as SlotProps,
+    ...((props.slotProps ?? {}) as Record<string, SlotProps>),
+  };
+}
 
 /** The root: what `TextField` did not consume, then the props it hands the root by name. */
 function rootPropsOf(props: TextFieldProps, ownerState: OwnerState): Record<string, unknown> {
   return {
     ...Object.fromEntries(Object.entries(props).filter(([key]) => !CONSUMED_BY_FIELD.has(key))),
     ownerState,
-    className: ['MuiTextField-root', props.className].filter(Boolean).join(' '),
+    className: ['MuiTextField-root', (props.classes as { root?: string } | undefined)?.root, props.className]
+      .filter(Boolean)
+      .join(' '),
     disabled: ownerState.disabled,
     error: ownerState.error,
     fullWidth: ownerState.fullWidth,
@@ -202,7 +207,7 @@ function rootPropsOf(props: TextFieldProps, ownerState: OwnerState): Record<stri
 
 /** The input: the props `TextField` names, then the theme's and the slot's `input` slot props. */
 function inputPropsOf(props: TextFieldProps, ownerState: OwnerState, ids: { id: string; helperTextId?: string }): Record<string, unknown> {
-  const slots = (props.slotProps ?? {}) as Record<string, SlotProps>;
+  const slots = slotPropsFor(props);
   const shrink = slotPropsOf(slots.inputLabel, ownerState).shrink;
   return {
     'aria-describedby': ids.helperTextId,
@@ -226,13 +231,27 @@ function inputPropsOf(props: TextFieldProps, ownerState: OwnerState, ids: { id: 
   };
 }
 
+/**
+ * An outlined text field, composed from the parts MUI's `TextField` composes
+ * (FUT-3402). `TextField` itself imports `Select` unconditionally, and through
+ * it `Menu`, `MenuList`, `Popover` and `List`; this slot is in every host's
+ * checkout bundle whether or not the host fills it, so it paid for a dropdown
+ * it can never render.
+ *
+ * Same DOM and the same theme hooks — `defaultProps`, `styleOverrides`,
+ * `variants`, slot props — pinned by `default-input-parity.test.tsx`, with two
+ * deliberate exceptions: a theme default `variant` other than `outlined`, and
+ * `slots` replacing a part, are not honoured. Either would need the very
+ * components this slot exists to leave out; a host that wants them fills the
+ * `Input` slot.
+ */
 function DefaultInput(slotProps: CheckoutInputProps): JSX.Element {
   const props = useTextFieldProps(slotProps);
   const ownerState = ownerStateOf(props);
   const generatedId = useId();
   const id = props.id ?? generatedId;
   const helperTextId = props.helperText ? `${id}-helper-text` : undefined;
-  const slots = (props.slotProps ?? {}) as Record<string, SlotProps>;
+  const slots = slotPropsFor(props);
   const { label, helperText } = props;
   return (
     <TextFieldRoot {...(rootPropsOf(props, ownerState) as { ownerState: OwnerState })}>
