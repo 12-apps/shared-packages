@@ -2,7 +2,8 @@
  * The MapLibre instance behind one `RouteMap`: load the library lazily, build
  * the map with both line layers, report `loading | ready | error`, and tear it
  * down on unmount or before a retry. A failure before the first `load` (no
- * WebGL, a style that does not arrive) is `error`; a tile failing later is not.
+ * WebGL, a style that fails or does not arrive within `readyTimeoutMs`) is
+ * `error`; a tile failing later is not.
  * Readiness is the style's, not the tiles' (`style.load`).
  */
 
@@ -25,6 +26,8 @@ export interface MapHandle {
 interface MapSetup {
   load: () => Promise<MapLibreLike>;
   styleUrl: string;
+  /** Not ready by then is `error`: a hung style request fires no error event. */
+  readyTimeoutMs: number;
   theme: RouteMapTheme;
   container: MutableRefObject<HTMLDivElement | null>;
   propsRef: MutableRefObject<RouteMapProps>;
@@ -53,6 +56,7 @@ export function useMapInstance(setup: MapSetup): MapHandle {
   useEffect(() => {
     injectCss();
     let disposed = false;
+    let readyTimer: ReturnType<typeof setTimeout> | undefined;
     setStatus("loading");
     const current = setupRef.current;
     void current
@@ -63,6 +67,9 @@ export function useMapInstance(setup: MapSetup): MapHandle {
         const map = new lib.Map({ container: current.container.current, style: current.styleUrl, attributionControl: false, center: centreOf(current.propsRef.current), zoom: 13 });
         mapRef.current = map;
         let loaded = false;
+        readyTimer = setTimeout(() => {
+          if (!loaded && !disposed) setStatus("error");
+        }, current.readyTimeoutMs);
         map.on("error", () => {
           if (!loaded && !disposed) setStatus("error");
         });
@@ -72,6 +79,7 @@ export function useMapInstance(setup: MapSetup): MapHandle {
         const onReady = (): void => {
           if (disposed || loaded) return;
           loaded = true;
+          clearTimeout(readyTimer);
           addLines(map, current.theme);
           setStatus("ready");
         };
@@ -84,6 +92,7 @@ export function useMapInstance(setup: MapSetup): MapHandle {
       });
     return () => {
       disposed = true;
+      clearTimeout(readyTimer);
       setupRef.current.onDispose();
       mapRef.current?.remove();
       mapRef.current = null;

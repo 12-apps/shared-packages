@@ -202,6 +202,15 @@ describe("RouteMap", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 
+  it("shows the error when the style never arrives, instead of a blank map forever", async () => {
+    const fake = fakeMapLibre();
+    const { RouteMap } = createWebRouting({ copy: EN_US_ROUTE_MAP_COPY, theme: THEME, loadMapLibre: async () => fake.lib, readyTimeoutMs: 30 });
+    render(<RouteMap height={400} markers={MARKERS} />);
+    await waitFor(() => expect(fake.maps).toHaveLength(1));
+    // No `style.load`, no `error`: the request hung.
+    expect(await screen.findByRole("button", { name: EN_US_ROUTE_MAP_COPY.retry })).toBeTruthy();
+  });
+
   it("shows the error when the style fails before the map is ready, and Retry builds a fresh map", async () => {
     const fake = fakeMapLibre();
     const { RouteMap } = createWebRouting({ copy: EN_US_ROUTE_MAP_COPY, theme: THEME, loadMapLibre: async () => fake.lib });

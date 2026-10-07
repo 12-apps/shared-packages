@@ -23,6 +23,9 @@ import { useOverlays, useOverlaySync } from "./use-overlays";
 
 export const DEFAULT_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
+/** How long a map may take to load its style before it shows the error state. */
+export const DEFAULT_READY_TIMEOUT_MS = 15_000;
+
 const defaultLoader = async (): Promise<MapLibreLike> => {
   const lib = (await import("maplibre-gl")) as unknown as { default?: MapLibreLike } & MapLibreLike;
   return lib.default ?? lib;
@@ -37,6 +40,7 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
     return lib;
   };
   const styleUrl = config.styleUrl ?? DEFAULT_STYLE_URL;
+  const readyTimeoutMs = config.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
 
   return function RouteMap(props: RouteMapProps): JSX.Element {
     const container = useRef<HTMLDivElement | null>(null);
@@ -46,6 +50,7 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
     const handle = useMapInstance({
       load,
       styleUrl,
+      readyTimeoutMs,
       theme,
       container,
       propsRef,

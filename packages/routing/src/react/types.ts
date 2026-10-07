@@ -91,4 +91,10 @@ export interface RouteMapConfig {
   workerUrl?: string;
   /** How to load MapLibre — swapped in tests, or for a host that preloads it. */
   loadMapLibre?: () => Promise<MapLibreLike>;
+  /**
+   * How long the map may take to become ready (its style loaded) before it
+   * shows the error state with Retry. Default 15 000 ms. A style request that
+   * hangs fires no error, so without this the map would stay blank forever.
+   */
+  readyTimeoutMs?: number;
 }
