@@ -191,22 +191,50 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           checkAgainAction: 'Verificar agora',
         },
         pix: {
-          heading: 'Pagar com PIX',
-          instructions: (totalLabel) =>
-            `Leia o QR code no app do seu banco ou copie o código. São ${totalLabel}.`,
+          heading: 'Pagar com Pix',
           qrAlt: 'Código QR do PIX',
-          copyAction: 'Copiar código',
+          copyAction: 'Copiar o código',
           copiedAction: 'Código copiado!',
+          copyAgainAction: 'Copiar outra vez',
+          showQrAction: 'Mostrar o QR code',
+          preferCardAction: 'Quer pagar no cartão?',
+          verifying: 'Conferindo sozinho…',
+          tabsLabel: 'Como pagar o Pix',
+          copyPasteTab: 'Código',
+          qrTab: 'QR code',
+          qrHeading: 'No celular',
+          copyPasteHeading: 'Pix copia e cola',
+          or: 'ou',
+          qrInstructions: 'No app do banco do seu celular, escolha **Pix › Ler QR code** e aponte para cá.',
+          qrTabCaption: 'Leia com o app do banco de outro celular.',
+          copyPasteHint: 'Cole no app do banco em **Pix copia e cola**.',
+          internetBankingHint: 'No internet banking? Cole em **Pix copia e cola**.',
+          notPaidYet: 'Ainda falta pagar?',
+          scanFromPhone: 'Leia com o app do banco no celular.',
           validUntil: (time) => `Vale até ${time}. A baixa é automática.`,
           expiryLocale: 'pt-BR',
           awaiting: 'Esperando o pagamento…',
           chargeMissing: 'Não deu para gerar o código PIX.',
+          afterCopy: {
+            title: 'Esperando o pagamento',
+            body: (totalLabel, wide) =>
+              `Quando o banco confirmar ${wide ? `**${totalLabel}**` : totalLabel}, o pedido aparece aqui. Pode deixar ${wide ? 'a página' : 'a tela'} aberta.`,
+            stepCopied: 'Código copiado',
+            stepPay: (wide) => (wide ? 'Pague no app ou no internet banking' : 'Pague no app do banco'),
+            stepConfirm: () => 'O banco dá a baixa sozinho',
+          },
           // FUT-3232: a code only the store confirms never says "automática".
           manual: {
-            instructions: (totalLabel) =>
-              `Pague ${totalLabel} pelo QR code ou pelo código. A loja confere e confirma o seu pedido.`,
             validUntil: (time) => `A loja confirma o pagamento até ${time}.`,
             awaiting: 'Esperando a loja confirmar o pagamento…',
+            afterCopy: {
+              title: 'Esperando a loja',
+              body: (totalLabel, wide) =>
+                `Quando a loja conferir ${wide ? `**${totalLabel}**` : totalLabel}, o pedido aparece aqui. Pode deixar ${wide ? 'a página' : 'a tela'} aberta.`,
+              stepCopied: 'Código copiado',
+              stepPay: (wide) => (wide ? 'Pague no app ou no internet banking' : 'Pague no app do banco'),
+              stepConfirm: (time) => `A loja confere — até ${time}`,
+            },
           },
         },
         card: {

@@ -6,6 +6,8 @@ import { displayTotals, PayBarTotal } from "./checkout-totals";
 import { useCheckoutCopy } from "./copy-context";
 import { useMethodChoice } from "./method-choice";
 import { MethodPicker } from "./method-picker";
+import { PixStageProvider } from "./pix-stage";
+import { StepColumn, usePaymentPixStage } from "./payment-step-layout";
 import { PaymentErrorPanel } from "./payment-error-panel";
 import { PayerSummary } from "./payer-summary";
 import { resolveCheckoutScreen } from "./providers/registry";
@@ -228,22 +230,6 @@ interface PaymentStepProps {
   onResolved: OnCheckoutResolved;
 }
 
-/**
- * Step 2 "Pagamento" — pick PIX or card and pay on the SAME page. Selecting a
- * method auto-raises its order and reveals its UI (PIX QR / card form) with no
- * intermediate tap; switching method clears the previous order (controller).
- *
- * ## Unless the choice is not ours to ask
- *
- * A store that finishes checkout on the provider's own page gets NO picker
- * here (`methodChosenAtProvider`). Its screen renders a single "Seguir para o
- * pagamento" instead, and pressing it selects the store's hand-off method —
- * which is the same event a tile press is, so the auto-raise, the error panel
- * and the retry below all keep working unchanged. Preselection is suppressed
- * for the same flow, and deliberately: it exists to spare a buyer a tap that
- * buys them nothing, but here the tap is the buyer's consent to LEAVE, and
- * taking it for them would redirect a checkout the moment it rendered.
- */
 export function PaymentStep({
   method,
   onMethodChange,
@@ -270,55 +256,58 @@ export function PaymentStep({
   const config = providerConfig ?? null;
   const choice = useMethodChoice(config, method, onMethodChange);
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
+  const pixStage = usePaymentPixStage(choice, onMethodChange);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {/* THE AMOUNT, before anything asks for it (FUT-1179). At the top rather
-          than in a sticky bar of its own: this step's actions belong to the
-          pane below it — the PIX code, the card form's own pay bar, the
-          hand-off button — and a second bar would put two "pay" controls on
-          one screen. */}
-      <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
+    <PixStageProvider stage={pixStage}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {/* THE AMOUNT, before anything asks for it (FUT-1179). At the top rather
+            than in a sticky bar of its own: this step's actions belong to the
+            pane below it — the PIX code, the card form's own pay bar, the
+            hand-off button — and a second bar would put two "pay" controls on
+            one screen. */}
+        <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
 
-      {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
-      <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
+        {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
+        <StepColumn>
+          <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
+        </StepColumn>
 
-      {choice.atProvider ? null : (
-        <MethodPicker
-          value={method}
-          onChange={onMethodChange}
-          cardUnavailable={choice.cardUnavailable}
-          offered={choice.offered}
-          pixByStore={config?.chain?.find((link) => link.methods.includes("PIX"))?.confirmation === "MANUAL"}
-        />
-      )}
+        {choice.atProvider || pixStage.afterCopy ? null : (
+          <MethodPicker value={method} onChange={onMethodChange} cardUnavailable={choice.cardUnavailable} offered={choice.offered} />
+        )}
 
-      <PaymentBody
-        order={order}
-        buyer={buyer}
-        providerConfig={config}
-        method={method}
-        tenantSlug={tenantSlug}
-        onResolved={onResolved}
-        onStart={choice.onStart}
-        creating={creating}
-        pollIntervalMs={pollIntervalMs}
-        freshInstrument={freshInstrument}
-        basket={basket}
-        validateApplePayMerchant={validateApplePayMerchant}
-      />
+        <StepColumn full={order?.method === "PIX"}>
+          <PaymentBody
+            order={order}
+            buyer={buyer}
+            providerConfig={config}
+            method={method}
+            tenantSlug={tenantSlug}
+            onResolved={onResolved}
+            onStart={choice.onStart}
+            creating={creating}
+            pollIntervalMs={pollIntervalMs}
+            freshInstrument={freshInstrument}
+            basket={basket}
+            validateApplePayMerchant={validateApplePayMerchant}
+          />
+        </StepColumn>
 
-      <RaisingState
-        order={order}
-        method={method}
-        creating={creating && !choice.atProvider}
-        createError={createError}
-        errorField={errorField}
-        errorCode={errorCode}
-        onUseEmail={onUseEmail}
-        onGenerate={onGenerate}
-      />
-    </Box>
+        <StepColumn>
+          <RaisingState
+            order={order}
+            method={method}
+            creating={creating && !choice.atProvider}
+            createError={createError}
+            errorField={errorField}
+            errorCode={errorCode}
+            onUseEmail={onUseEmail}
+            onGenerate={onGenerate}
+          />
+        </StepColumn>
+      </Box>
+    </PixStageProvider>
   );
 }
 

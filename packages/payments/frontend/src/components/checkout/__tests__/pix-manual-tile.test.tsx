@@ -9,6 +9,7 @@ import { cleanup, render, screen } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PaymentStep } from "../checkout-steps";
+import { MethodPicker } from "../method-picker";
 import { PT_BR_CHECKOUT_SCREENS_COPY } from "../screens-pt-BR";
 import type { CheckoutChainLink, CheckoutProviderConfig } from "../types";
 
@@ -42,7 +43,7 @@ function config(chain: CheckoutChainLink[]): CheckoutProviderConfig {
   };
 }
 
-function pixLine(providerConfig: CheckoutProviderConfig | null): string {
+function renderStep(providerConfig: CheckoutProviderConfig | null): void {
   render(
     <PaymentStep
       method={null}
@@ -58,34 +59,38 @@ function pixLine(providerConfig: CheckoutProviderConfig | null): string {
       onResolved={vi.fn()}
     />,
   );
-  return screen.getByTestId("checkout-method-PIX").textContent ?? "";
 }
 
-describe("the PIX tile says who approves it", () => {
-  it("says the store confirms it when the first PIX provider is manual", () => {
-    const line = pixLine(config([link("pixmanual", ["PIX"], "MANUAL"), link("pagbank", ["PIX", "CARD"])]));
+const method = PT_BR_CHECKOUT_SCREENS_COPY.method;
 
-    expect(line).toContain("Confirmado pela loja");
-    expect(line).not.toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
+describe("the method tiles are one line (the 2026-10-06 Pix redesign)", () => {
+  it("names each method and nothing else, whoever confirms the Pix", () => {
+    renderStep(config([link("pixmanual", ["PIX"], "MANUAL"), link("pagbank", ["PIX", "CARD"])]));
+
+    expect(screen.getByTestId("checkout-method-PIX").textContent).toBe(method.pixLabel);
+    expect(screen.getByTestId("checkout-method-CARD").textContent).toBe(method.cardLabel);
+    // The old description lines are gone from the tiles, manual and instant alike.
+    const picker = screen.getByTestId("checkout-method").textContent ?? "";
+    expect(picker).not.toContain(method.pixManualDescription ?? "never");
+    expect(picker).not.toContain(method.pixDescription);
+    expect(picker).not.toContain(method.cardDescription);
   });
 
-  it("keeps the instant line when a bank-confirmed provider comes first", () => {
-    const line = pixLine(config([link("itau", ["PIX"]), link("pixmanual", ["PIX"], "MANUAL")]));
+  it("keeps the group's name for a screen reader, without drawing it", () => {
+    renderStep(config([link("pagbank", ["PIX", "CARD"])]));
 
-    expect(line).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
+    expect(screen.getByRole("radiogroup", { name: method.groupLabel })).toBeTruthy();
+    expect(screen.getByTestId("checkout-method").textContent).not.toContain(method.groupLabel);
   });
 
-  it("skips a card-only head to find the provider PIX actually reaches", () => {
-    const line = pixLine(config([link("stripe", ["CARD"]), link("pixmanual", ["PIX"], "MANUAL")]));
+  it("says why a card tile is disabled, and ties the reason to the tile", () => {
+    render(<MethodPicker value={null} onChange={vi.fn()} offered={["PIX", "CARD"]} cardUnavailable />);
 
-    expect(line).toContain("Confirmado pela loja");
+    const tile = screen.getByTestId("checkout-method-CARD") as HTMLButtonElement;
+    const reason = screen.getByTestId("method-reason-CARD");
+    expect(tile.disabled).toBe(true);
+    expect(reason.textContent).toBe(method.unavailableHere);
+    expect(tile.getAttribute("aria-label")).toBe(`${method.cardLabel}, ${reason.textContent}`);
   });
 
-  it("keeps the instant line while the config is unknown, or names no confirmation", () => {
-    expect(pixLine(null)).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
-    cleanup();
-    expect(pixLine(config([link("pagbank", ["PIX", "CARD"])]))).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
-    cleanup();
-    expect(pixLine(config([link("itau", ["PIX"], "AUTOMATIC")]))).toContain(PT_BR_CHECKOUT_SCREENS_COPY.method.pixDescription);
-  });
 });
