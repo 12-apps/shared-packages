@@ -17,7 +17,7 @@ import {
   destinationControl,
   focusRing,
 } from './SectionNav.parts';
-import { RaisedActionButton } from './SectionNav.primary';
+import { RAISED_LIFT, RaisedActionButton } from './SectionNav.primary';
 import { SectionNavSheet } from './SectionNav.sheet';
 import type { SectionNavAction, SectionNavBadge, SectionNavDestination, SectionNavMenu, SectionNavProps } from './SectionNav.types';
 
@@ -34,6 +34,17 @@ const barHeight = (theme: Parameters<typeof rem>[0]): string => rem(theme, 60);
  */
 export function sectionNavBarInset(theme: Parameters<typeof rem>[0]): string {
   return `calc(${barHeight(theme)} + env(safe-area-inset-bottom))`;
+}
+
+/**
+ * Where the bar's sheets stop. The bar sits above the backdrop while a sheet is
+ * open (so its own buttons can close it), and the raised button stands
+ * {@link RAISED_LIFT} out of the bar's top edge — so a sheet that stopped at the
+ * bar had the button drawn over its last row (the owner's "zindex errado",
+ * FUT-3328). With a raised button, the sheet stops clear of it.
+ */
+export function sectionNavSheetOffset(theme: Parameters<typeof rem>[0], raised: boolean): string {
+  return raised ? `calc(${sectionNavBarInset(theme)} + ${rem(theme, RAISED_LIFT)})` : sectionNavBarInset(theme);
 }
 
 /**
@@ -325,7 +336,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-primary-sheet`}
-          bottomOffset={sectionNavBarInset(theme)}
+          bottomOffset={sectionNavSheetOffset(theme, primary !== undefined)}
         />
       ) : null}
       {more ? (
@@ -336,7 +347,7 @@ export function SectionNavBar({
           linkComponent={linkComponent}
           copy={copy}
           testId={`${dataTestId}-more-sheet`}
-          bottomOffset={sectionNavBarInset(theme)}
+          bottomOffset={sectionNavSheetOffset(theme, primary !== undefined)}
         />
       ) : null}
     </>

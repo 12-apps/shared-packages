@@ -130,6 +130,12 @@ function RaisedCaption({ label, inert }: { label: string; inert: boolean }): Rea
   );
 }
 
+/**
+ * How far the round button stands out of the bar's top edge, in design px — what
+ * the bar's sheets must clear so the button never draws over one (FUT-3328).
+ */
+export const RAISED_LIFT = 18;
+
 /** The round button: lifted half out of the bar, its icon turning while what it opened is open. */
 function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
   const size = rem(theme, 52);
@@ -139,7 +145,7 @@ function raisedSx(theme: Theme, expanded: boolean): SxProps<Theme> {
     width: size,
     height: size,
     // Lifted half out of the bar: the one control that is not a place.
-    marginTop: rem(theme, -18),
+    marginTop: rem(theme, -RAISED_LIFT),
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',

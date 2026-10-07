@@ -19,7 +19,7 @@ action, the sheets, and the rail's sections.
 
 | `layout` | draws | menus |
 |---|---|---|
-| `bar` | a bottom row: the destinations, `more` last, `primary` raised in the middle | open as bottom sheets over the page, stopping above the bar |
+| `bar` | a bottom row: the destinations, `more` last, `primary` raised in the middle | open as bottom sheets over the page, stopping above the bar — and above the raised `primary` when there is one, so it never draws over a sheet |
 | `rail` | a vertical list: `back`, `heading`, a `primary` menu as one button, the destinations, then `more` | `primary` opens as a menu anchored to its button (named by `title`); `more` is listed under its `title` |
 
 Which layout to use is the HOST's call. A bar beside a sidebar is two
