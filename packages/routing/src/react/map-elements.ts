@@ -139,7 +139,7 @@ export function stopElement(stop: RouteMapStop, theme: RouteMapTheme): HTMLEleme
 /** How far above its point a place's label sits: label (~26) + stem (46) + dot (8). */
 export const PLACE_LIFT = 80;
 
-export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme): HTMLElement {
+export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme, lifted = true): HTMLElement {
   // The label rides ABOVE a pin-high stem, so a courier standing at the place
   // (a pin anchored on the same point) never covers it. It stays UNDER the
   // pins (z 1 against their 2–3), so the stem never crosses a pin's name, and
@@ -148,6 +148,10 @@ export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme): HTMLEle
   const label = span("", { display: "inline-flex", alignItems: "center", gap: "6px", background: theme.place, color: theme.paper, padding: "4px 10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap" });
   if (spot.icon) label.appendChild(glyph(spot.icon));
   label.appendChild(document.createTextNode(spot.label));
+  if (!lifted) {
+    element.append(label);
+    return element;
+  }
   element.append(label, span("", { width: "2px", height: "46px", background: theme.place }), span("", { width: "8px", height: "8px", borderRadius: "50%", background: theme.place }));
   return element;
 }

@@ -94,6 +94,9 @@ const { RouteMap } = createWebRouting({
   whenever `key` changes — a viewer's selection, never a refresh.
 - `insets={{ bottom: legendHeight }}` tells the fit what the host's own
   overlays cover, so fitted pins never land under a legend or a sheet.
+- For a small map (a card): `placeLabels="at-point"` draws a place's label on
+  its point instead of lifted above a pin, and `attribution="compact"` folds
+  the basemap credit into an "i" that opens it.
 - A stop with `emphasized: true` (the one the screen is about) is drawn above
   the pins; other stops sit beneath them.
 - `controls={{ placement: "top-left" }}` moves the zoom and fit column to the

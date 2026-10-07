@@ -140,6 +140,21 @@ describe("RouteMap", () => {
     expect(wrapper.style.zIndex).toBe("1");
   });
 
+  it("draws a place's label on its point when asked, without the lift's padding", async () => {
+    const { fake } = await mount({ places: [{ id: "shop", position: { lng: -46.6, lat: -23.5 }, label: "Store" }], placeLabels: "at-point" });
+    const place = await screen.findByText("Store");
+    expect(place.parentElement!.children).toHaveLength(1);
+    expect(fake.maps[0]!.fitBounds.mock.calls[0]?.[1]).toMatchObject({ padding: { top: 40 } });
+  });
+
+  it("shows a compact attribution that opens to the full credit", async () => {
+    await mount({ attribution: "compact" });
+    const toggle = screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.attribution });
+    expect(toggle.textContent).toBe("i");
+    fireEvent.click(toggle);
+    expect(await screen.findByText(EN_US_ROUTE_MAP_COPY.attribution)).toBeTruthy();
+  });
+
   it("draws an emphasised stop above the pins and the rest beneath", async () => {
     await mount({
       stops: [
