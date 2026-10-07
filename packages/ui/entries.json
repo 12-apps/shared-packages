@@ -81,6 +81,7 @@
   "form/HeaderButton": "src/components/form/HeaderButton/index.ts",
   "form/total-form": "src/components/form/total-form/index.ts",
   "form/Input": "src/components/form/Input/index.ts",
+  "form/Input/outlined": "src/components/form/Input/outlined/index.ts",
   "form/InputOTP": "src/components/form/InputOTP/index.ts",
   "form/Label": "src/components/form/Label/index.ts",
   "form/Menubar": "src/components/form/Menubar/index.ts",

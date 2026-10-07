@@ -115,6 +115,26 @@ The Input component provides a flexible text input field with comprehensive vali
 />
 ```
 
+## The outlined entry: `@12-apps/ui/form/Input/outlined`
+
+The same `Input`, with the same props, styles and DOM, built on a field that imports MUI's `OutlinedInput` and no other MUI input (FUT-1054).
+
+The generic `@12-apps/ui/form/Input` chooses MUI's input at runtime from `variant`. A bundler therefore ships `OutlinedInput`, `FilledInput` and `Input` (about 7 KB raw for the last two) to every screen that renders one. The outlined entry ships only the first.
+
+```tsx
+import { Input } from '@12-apps/ui/form/Input/outlined';
+
+<Input type="search" size="sm" aria-label="Buscar produtos" />
+```
+
+**When to use it:** a control that only ever renders the outlined family (`outlined`, `glass` or `gradient`, the variants `muiVariantFor` draws as an outline), and that sits where its bytes matter: a storefront header, a first screen, or a library component such as `CepField`.
+
+**What it refuses:** `variant="filled"` and `variant="underline"` are type errors. They need the inputs this entry exists to leave out, so use the generic entry for them.
+
+**What stays the same:** `__tests__/outlined-entry.test.tsx` renders both entries from the same props and compares the DOM. `__tests__/outlined-reachability.test.ts` fails if `FilledInput` or MUI's `Input` becomes reachable from this entry or from `CepField`.
+
+**Reachable only through this subpath.** The entry is not re-exported from `form/Input` or from the `form` barrel, where a second `Input` would collide.
+
 ## Accessibility
 
 ### ARIA Attributes

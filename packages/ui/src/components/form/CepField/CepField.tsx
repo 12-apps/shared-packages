@@ -6,7 +6,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cepDigits, formatCep, isValidCep } from '@12-apps/forms-core';
 
 import { FormControl, FormLabel, FormMessage } from '../Form';
-import { Input } from '../Input';
+// The outlined entry: CepField renders no variant, and the generic one would
+// ship MUI's FilledInput and Input to every screen with a CEP field (FUT-1054).
+import { Input } from '../Input/outlined';
 import type { CepAddress, CepFieldProps, CepLookupStatus } from './CepField.types';
 
 /** Everything {@link useCepLookup} needs, so the hook signature stays flat. */

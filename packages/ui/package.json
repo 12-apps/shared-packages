@@ -408,6 +408,10 @@
       "types": "./dist/types/components/form/Input/index.d.ts",
       "default": "./dist/form/Input.js"
     },
+    "./form/Input/outlined": {
+      "types": "./dist/types/components/form/Input/outlined/index.d.ts",
+      "default": "./dist/form/Input/outlined.js"
+    },
     "./form/InputOTP": {
       "types": "./dist/types/components/form/InputOTP/index.d.ts",
       "default": "./dist/form/InputOTP.js"
