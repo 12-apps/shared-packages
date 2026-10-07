@@ -30,7 +30,7 @@ describe("openrouteservice", () => {
       ],
     });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://api.openrouteservice.org/v2/directions/driving-car/geojson");
+    expect(url).toBe("https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson");
     expect(JSON.parse(String(init.body))).toEqual({ coordinates: LINE });
     expect((init.headers as Record<string, string>).authorization).toBe("key");
   });

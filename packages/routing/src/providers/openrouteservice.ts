@@ -19,7 +19,8 @@ export interface OpenRouteServiceOptions {
   baseUrl?: string;
 }
 
-const DEFAULT_BASE_URL = "https://api.openrouteservice.org";
+/** `api.openrouteservice.org` is deprecated in favour of this host. */
+const DEFAULT_BASE_URL = "https://api.heigit.org/openrouteservice";
 
 interface OrsSegment {
   distance?: unknown;
