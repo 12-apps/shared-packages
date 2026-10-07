@@ -163,8 +163,21 @@ function CopyPanel({ pix, shown, onCopy, idBase }: { pix: PixCharge; shown: bool
   return (
     <Box id={paneIds(idBase, "copy").panel} role="tabpanel" aria-labelledby={paneIds(idBase, "copy").tab} sx={{ ...panelSx(shown), [PIX_WIDE]: { display: "flex", justifyContent: "center" } }}>
       <ColumnHeading>{copy.copyPasteHeading}</ColumnHeading>
+      {/*
+        The box IS the code's frame, so whatever the host draws for inline code
+        (a tinted chip, its own border and padding) is undone inside it:
+        otherwise a wrapped code reads as a box inside a box.
+      */}
       <Box
-        sx={{ px: 2, py: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.5, bgcolor: "action.hover" }}
+        sx={{
+          px: 2,
+          py: 1.5,
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1.5,
+          bgcolor: "action.hover",
+          "&& > *": { bgcolor: "transparent", border: 0, borderRadius: 0, p: 0 },
+        }}
       >
         <Text variant="code" size="xs" as="p" data-testid="pix-code" style={{ margin: 0, wordBreak: "break-all", lineHeight: 1.55 }}>
           {pix.copyPaste}
