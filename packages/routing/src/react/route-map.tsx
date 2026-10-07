@@ -24,7 +24,7 @@ import { useOverlays, useOverlaySync } from "./use-overlays";
 export const DEFAULT_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 /** How long a map may take to load its style before it shows the error state. */
-export const DEFAULT_READY_TIMEOUT_MS = 15_000;
+const DEFAULT_READY_TIMEOUT_MS = 15_000;
 
 const defaultLoader = async (): Promise<MapLibreLike> => {
   const lib = (await import("maplibre-gl")) as unknown as { default?: MapLibreLike } & MapLibreLike;
