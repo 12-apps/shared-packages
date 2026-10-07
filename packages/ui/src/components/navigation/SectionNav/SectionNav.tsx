@@ -11,6 +11,9 @@ import type { SectionNavProps } from './SectionNav.types';
  * (`linkComponent`). The nav decides only how they are drawn: the order of the
  * bar's slots, the raised primary action, the sheets, the rail's sections.
  *
+ * `compact` draws either layout as icons only, a size down, for a host that
+ * folds its chrome; the labels stay the controls' names.
+ *
  * Which layout to use is the host's call too, because the host knows what
  * else is on screen: a bar next to a sidebar is two navigations competing for
  * one glance.
@@ -26,6 +29,7 @@ export function SectionNav({
   linkComponent,
   copy,
   dataTestId = 'section-nav',
+  compact = false,
 }: SectionNavProps): React.JSX.Element {
   if (layout === 'rail') {
     return (
@@ -39,6 +43,7 @@ export function SectionNav({
         linkComponent={linkComponent}
         copy={copy}
         dataTestId={dataTestId}
+        compact={compact}
       />
     );
   }
@@ -51,6 +56,7 @@ export function SectionNav({
       linkComponent={linkComponent}
       copy={copy}
       dataTestId={dataTestId}
+      compact={compact}
     />
   );
 }

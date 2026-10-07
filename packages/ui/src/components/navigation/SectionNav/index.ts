@@ -1,5 +1,6 @@
 export { SectionNav } from './SectionNav';
 export { sectionNavBarInset } from './SectionNav.bar';
+export type { SectionNavBarOptions } from './SectionNav.bar';
 export { RaisedActionButton } from './SectionNav.primary';
 export type { RaisedActionButtonProps } from './SectionNav.primary';
 export type {
