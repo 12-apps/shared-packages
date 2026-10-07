@@ -29,6 +29,11 @@ export interface RouteMapStop {
   /** Accessible title, e.g. "Parada 2 — Av. Vilarinho, 1731". */
   title: string;
   variant: "done" | "next" | "pending";
+  /**
+   * Drawn above every pin (the stop a screen is about, e.g. "this order"), so
+   * a courier standing next to it never hides it. Default: under the pins.
+   */
+  emphasized?: boolean;
 }
 
 export interface RouteMapPlace {

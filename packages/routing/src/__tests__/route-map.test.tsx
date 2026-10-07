@@ -140,6 +140,17 @@ describe("RouteMap", () => {
     expect(wrapper.style.zIndex).toBe("1");
   });
 
+  it("draws an emphasised stop above the pins and the rest beneath", async () => {
+    await mount({
+      stops: [
+        { id: "a", position: { lng: -46.61, lat: -23.51 }, mark: "1", title: "Parada 1", variant: "done" },
+        { id: "b", position: { lng: -46.62, lat: -23.52 }, mark: "2", title: "Parada 2 — este pedido", variant: "next", emphasized: true },
+      ],
+    });
+    expect((await screen.findByRole("img", { name: "Parada 1" })).style.zIndex).toBe("1");
+    expect(screen.getByRole("img", { name: "Parada 2 — este pedido" }).style.zIndex).toBe("4");
+  });
+
   it("marks the zoom pair so a phone-width map can hide it", async () => {
     await mount();
     expect(screen.getByRole("button", { name: EN_US_ROUTE_MAP_COPY.zoomIn }).className).toBe("routing-zoom");

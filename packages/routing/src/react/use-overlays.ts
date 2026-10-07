@@ -79,7 +79,7 @@ export function useOverlays(
       out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon]), position: spot.position, anchor: "bottom", build: () => placeElement(spot, theme) });
     }
     for (const stop of (props.stops ?? []).filter((item) => isValidPoint(item.position))) {
-      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant]), position: stop.position, anchor: "center", build: () => stopElement(stop, theme) });
+      out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant, !!stop.emphasized]), position: stop.position, anchor: "center", build: () => stopElement(stop, theme) });
     }
     const valid = (props.markers ?? []).filter((marker) => isValidPoint(marker.position));
     for (const group of groupMarkers(valid, map)) out.push(group.length === 1 ? markerWanted(group[0]!) : groupWanted(group));

@@ -127,6 +127,8 @@ export function stopElement(stop: RouteMapStop, theme: RouteMapTheme): HTMLEleme
     color: stop.variant === "pending" ? theme.ink : theme.paper,
     border: `2px solid ${stop.variant === "done" ? theme.paper : theme.ink}`,
     boxShadow: SHADOW,
+    // Pins are z 2–3; an emphasised stop sits above them, the rest beneath.
+    zIndex: stop.emphasized ? "4" : "1",
   });
   element.setAttribute("role", "img");
   element.setAttribute("aria-label", stop.title);

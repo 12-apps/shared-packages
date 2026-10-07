@@ -94,6 +94,8 @@ const { RouteMap } = createWebRouting({
   whenever `key` changes — a viewer's selection, never a refresh.
 - `insets={{ bottom: legendHeight }}` tells the fit what the host's own
   overlays cover, so fitted pins never land under a legend or a sheet.
+- A stop with `emphasized: true` (the one the screen is about) is drawn above
+  the pins; other stops sit beneath them.
 - `controls={{ placement: "top-left" }}` moves the zoom and fit column to the
   other top corner when the host's floating chrome covers the top-right.
 - No WebGL, a library or style that does not arrive within `readyTimeoutMs`
