@@ -83,6 +83,8 @@ const { RouteMap } = createWebRouting({
 />;
 ```
 
+- `travelledParts` draws the solid line as separate strokes (a track with a
+  gap that must not be bridged by a straight line); it wins over `travelled`.
 - `maplibre-gl` is an optional peer dependency: install it in the web host.
   It is imported the first time a map mounts, so a page without a map never
   downloads it.

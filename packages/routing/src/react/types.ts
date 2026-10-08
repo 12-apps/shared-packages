@@ -66,6 +66,12 @@ export interface RouteMapProps {
   planned?: readonly Position[];
   /** The solid line, `[lng, lat][]`. */
   travelled?: readonly Position[];
+  /**
+   * The solid line in separate strokes, each `[lng, lat][]` — for a track with
+   * a gap that must not be bridged by a straight line. Wins over `travelled`
+   * when set; a part with fewer than two points draws nothing.
+   */
+  travelledParts?: readonly (readonly Position[])[];
   /** Overrides `theme.travelled` (a status colour). */
   travelledColor?: string;
   /** Change it to refit the viewport to everything drawn. */

@@ -80,3 +80,20 @@ export function addLines(map: MapLike, theme: RouteMapTheme): void {
 export function setLine(map: MapLike, id: string, positions: readonly Position[] | undefined): void {
   map.getSource(id)?.setData(lineFeature(positions ?? []));
 }
+
+/** Several strokes as one MultiLineString; a part under two points is dropped. */
+function partsFeature(parts: readonly (readonly Position[])[]) {
+  const coordinates = parts.filter((part) => part.length > 1).map((part) => part.map((p) => [p[0], p[1]]));
+  return { type: "Feature" as const, properties: {}, geometry: { type: "MultiLineString" as const, coordinates } };
+}
+
+/** The travelled line: its parts when given, else the one line. */
+export function setTravelled(
+  map: MapLike,
+  id: string,
+  line: readonly Position[] | undefined,
+  parts: readonly (readonly Position[])[] | undefined,
+): void {
+  if (parts) map.getSource(id)?.setData(partsFeature(parts));
+  else setLine(map, id, line);
+}
