@@ -279,6 +279,45 @@ describe("RouteMap", () => {
     expect(fake.maps[0]!.setData).toHaveBeenCalledWith(expect.objectContaining({ geometry: { type: "LineString", coordinates: planned.map((p) => [...p]) } }));
   });
 
+  it("draws the travelled parts as separate strokes, dropping a lone point", async () => {
+    const { fake } = await mount({
+      travelled: [
+        [-46.6, -23.5],
+        [-46.5, -23.4],
+      ],
+      travelledParts: [
+        [
+          [-46.63, -23.55],
+          [-46.62, -23.54],
+        ],
+        [[-46.6, -23.5]],
+        [
+          [-46.5, -23.4],
+          [-46.49, -23.39],
+        ],
+      ],
+    });
+    const travelled = fake.maps[0]!.setData.mock.calls.map(([data]) => data as { geometry: { type: string } });
+    expect(travelled).toContainEqual(
+      expect.objectContaining({
+        geometry: {
+          type: "MultiLineString",
+          coordinates: [
+            [
+              [-46.63, -23.55],
+              [-46.62, -23.54],
+            ],
+            [
+              [-46.5, -23.4],
+              [-46.49, -23.39],
+            ],
+          ],
+        },
+      }),
+    );
+    expect(travelled.filter((data) => data.geometry.type === "LineString")).toHaveLength(1);
+  });
+
   it("shows the host's error copy with a retry when the map cannot render", async () => {
     await mount({}, { failConstruct: true });
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringContaining(EN_US_ROUTE_MAP_COPY.mapError));

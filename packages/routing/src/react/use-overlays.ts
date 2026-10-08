@@ -29,7 +29,7 @@ import type { LngLat } from "../core/types";
 
 import type { RouteMapCopy } from "./copy";
 import { groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
-import { boundsOf, groupMarkers, PLANNED_LAYER, pointsOf, setLine, TRAVELLED_LAYER } from "./map-geometry";
+import { boundsOf, groupMarkers, PLANNED_LAYER, pointsOf, setLine, setTravelled, TRAVELLED_LAYER } from "./map-geometry";
 import type { MarkerLike } from "./maplibre-types";
 import { placeTags, type Placed } from "./tag-placement";
 import type { MapHandle } from "./use-map";
@@ -208,9 +208,9 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
     const map = handle.mapRef.current;
     if (!ready || !map) return;
     setLine(map, PLANNED_LAYER, props.planned);
-    setLine(map, TRAVELLED_LAYER, props.travelled);
+    setTravelled(map, TRAVELLED_LAYER, props.travelled, props.travelledParts);
     map.setPaintProperty(TRAVELLED_LAYER, "line-color", props.travelledColor ?? theme.travelled);
-  }, [ready, props.planned, props.travelled, props.travelledColor]);
+  }, [ready, props.planned, props.travelled, props.travelledParts, props.travelledColor]);
 
   useEffect(() => {
     if (ready) overlays.draw();
