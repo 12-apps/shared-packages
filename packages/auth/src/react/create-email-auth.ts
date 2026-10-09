@@ -39,6 +39,13 @@ export interface SignUpClientData {
   status: "verification-sent" | "signed-up";
 }
 
+/** What a spent confirmation link reports — see `VerifiedResult`. */
+export interface VerifyEmailClientData {
+  email: string;
+  /** This browser signed up, so `signInWithLink` will open a session. */
+  canSignIn: boolean;
+}
+
 /** The signed-in account's credential state, for the security screen. */
 export interface AccountSecurityData {
   hasPassword: boolean;
@@ -75,8 +82,10 @@ export interface EmailAuth {
     email: string;
     password: string;
     name?: string;
+    /** Where the person started; the confirmation link brings them back. */
+    callbackUrl?: string;
   }): Promise<EmailAuthClientResult<SignUpClientData>>;
-  verifyEmail(token: string): Promise<EmailAuthClientResult<null>>;
+  verifyEmail(token: string): Promise<EmailAuthClientResult<VerifyEmailClientData>>;
   resendVerification(email: string): Promise<EmailAuthClientResult<null>>;
   requestPasswordReset(email: string): Promise<EmailAuthClientResult<null>>;
   resetPassword(token: string, newPassword: string): Promise<EmailAuthClientResult<null>>;
@@ -171,7 +180,8 @@ export function createEmailAuth(config: EmailAuthConfig = {}): EmailAuth {
   return {
     getSettings: () => call<EmailAuthSettings>("/settings", { method: "GET" }),
     signUp: (input) => call<SignUpClientData>("/signup", { method: "POST", body: input }),
-    verifyEmail: (token) => call<null>("/verify", { method: "POST", body: { token } }),
+    verifyEmail: (token) =>
+      call<VerifyEmailClientData>("/verify", { method: "POST", body: { token } }),
     resendVerification: (email) =>
       call<null>("/resend-verification", { method: "POST", body: { email } }),
     requestPasswordReset: (email) =>

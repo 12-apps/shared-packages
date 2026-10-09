@@ -50,10 +50,12 @@ model AuthToken {
   id         String    @id @default(uuid())
   /// The host's user id, opaque. See the header — no FK.
   userId     String    @map("user_id")
-  /// EMAIL_VERIFICATION | PASSWORD_RESET — a String + DB CHECK, the house style
-  /// used elsewhere rather than a Prisma enum. The two purposes never share a
-  /// namespace: a verification token presented to the reset endpoint is not a
-  /// token at all.
+  /// EMAIL_VERIFICATION | PASSWORD_RESET | SIGN_IN_GRANT — a String + DB CHECK,
+  /// the house style used elsewhere rather than a Prisma enum. The purposes
+  /// never share a namespace: a verification token presented to the reset
+  /// endpoint is not a token at all. SIGN_IN_GRANT is never mailed: it is the
+  /// verification link's hash together with the signing-up browser's binding
+  /// cookie, so only that browser can turn the link into a session.
   purpose    String
   /// SHA-256 of the raw token, lower-case hex. Unique because it IS the lookup
   /// key, and a collision would mean two accounts sharing one link.

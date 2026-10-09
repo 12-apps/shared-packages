@@ -29,6 +29,7 @@ function credentialsStub(overrides: Partial<EmailCredentials>): EmailCredentials
   return {
     signUp: refuse("signUp"),
     verifyEmail: refuse("verifyEmail"),
+    signInWithLink: refuse("signInWithLink"),
     resendVerification: refuse("resendVerification"),
     requestPasswordReset: refuse("requestPasswordReset"),
     resetPassword: refuse("resetPassword"),

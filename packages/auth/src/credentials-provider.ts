@@ -5,6 +5,7 @@ import type { User } from "@auth/core/types";
 
 import { CREDENTIALS_PROVIDER_ID } from "./credentials-provider-id";
 import type { AuthenticateResult, EmailAuthFailure } from "./email-credentials/types";
+import { parseCookieHeader, SIGNUP_BINDING_COOKIE } from "./server/auth-cookies";
 
 /**
  * The bridge between {@link createEmailCredentials} and Auth.js: an
@@ -58,6 +59,14 @@ export interface CredentialsProviderConfig {
     email: string;
     password: string;
   }) => Promise<AuthenticateResult>;
+  /**
+   * The flow's `signInWithLink`: a submission carrying `linkToken` instead of
+   * an e-mail and password is a confirmation link being turned into a session
+   * in the browser that signed up (FUT-3474). The binding comes off the
+   * request's own cookie, never off the form. Absent, such a submission is
+   * refused like a wrong password.
+   */
+  authenticateLink?: (token: string, binding: string | undefined) => Promise<AuthenticateResult>;
   /** Provider id. Defaults to {@link CREDENTIALS_PROVIDER_ID}. */
   id?: string;
   /** Human label, for hosts that render Auth.js's own sign-in page. */
@@ -71,6 +80,17 @@ function field(
 ): string {
   const value = credentials?.[key];
   return typeof value === "string" ? value : "";
+}
+
+/** The link half of `authorize`: the binding is read off the request's cookie. */
+async function signInFromLink(
+  config: CredentialsProviderConfig,
+  linkToken: string,
+  request: Request,
+): Promise<AuthenticateResult> {
+  if (!config.authenticateLink) return { ok: false, reason: "token-invalid" };
+  const binding = parseCookieHeader(request.headers.get("cookie"))[SIGNUP_BINDING_COOKIE];
+  return config.authenticateLink(linkToken, binding);
 }
 
 /**
@@ -89,13 +109,17 @@ export function credentialsProvider(config: CredentialsProviderConfig): Provider
       email: { label: "Email", type: "email" },
       password: { label: "Password", type: "password" },
     },
-    authorize: async (credentials): Promise<User | null> => {
-      const email = field(credentials, "email");
-      const password = field(credentials, "password");
-      // Auth.js treats an empty submission as a failed sign-in like any other;
-      // going through `authenticate` anyway keeps the timing uniform with a
-      // populated one.
-      const result = await config.authenticate({ email, password });
+    authorize: async (credentials, request): Promise<User | null> => {
+      const linkToken = field(credentials, "linkToken");
+      const result = linkToken
+        ? await signInFromLink(config, linkToken, request)
+        : // Auth.js treats an empty submission as a failed sign-in like any
+          // other; going through `authenticate` anyway keeps the timing
+          // uniform with a populated one.
+          await config.authenticate({
+            email: field(credentials, "email"),
+            password: field(credentials, "password"),
+          });
       if (!result.ok) throw new EmailPasswordSignin(result.reason);
       return {
         id: result.user.id,

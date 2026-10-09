@@ -8,10 +8,12 @@ import {
   refuse,
   type EmailCredentialsContext,
 } from "./context";
+import { grantHash, holdsGrant, mintBinding, safeCallbackPath } from "./link-sign-in";
 import type {
   AcknowledgeResult,
   EmailCredentialUser,
   SignUpResult,
+  VerifyEmailResult,
 } from "./types";
 
 /**
@@ -31,6 +33,12 @@ export interface SignUpInput {
   email: string;
   password: string;
   name?: string | null;
+  /**
+   * Where the person was when they started, as a path on this origin. Carried
+   * on the confirmation link as `callbackUrl`, so the page it opens can take
+   * them back. Anything that is not a same-origin path is dropped.
+   */
+  callbackUrl?: string | null;
 }
 
 /**
@@ -67,7 +75,18 @@ async function noticeExistingAccount(
     token: issued.token,
     expiresAt: issued.expiresAt,
   });
-  return { ok: true, status: "verification-sent" };
+  // A binding all the same, minted the same way and stored nowhere: it binds
+  // nothing, and its absence would be the answer this branch must not give.
+  return { ok: true, status: "verification-sent", binding: mintBinding() };
+}
+
+/** The verification link, with the destination on it when there is a safe one. */
+function withDestination(link: string, callbackUrl: string | null | undefined): string {
+  const destination = safeCallbackPath(callbackUrl);
+  if (destination === undefined) return link;
+  const url = new URL(link);
+  url.searchParams.set("callbackUrl", destination);
+  return url.toString();
 }
 
 /** Create the account and send it its verification link. */
@@ -83,15 +102,24 @@ async function registerPending(
     emailVerifiedAt: null,
   });
   const issued = await issueLink(ctx, user.id, "EMAIL_VERIFICATION");
+  // The grant the link and THIS browser's binding unlock together, expiring
+  // with the link. See `./link-sign-in` for why the link alone may not.
+  const binding = mintBinding();
+  await ctx.store.saveToken({
+    userId: user.id,
+    purpose: "SIGN_IN_GRANT",
+    tokenHash: grantHash(issued.token, binding),
+    expiresAt: issued.expiresAt,
+  });
   await ctx.mailer.sendVerification({
     to: user.email,
     name: user.name,
     locale: user.locale,
-    link: issued.link,
+    link: withDestination(issued.link, input.callbackUrl),
     token: issued.token,
     expiresAt: issued.expiresAt,
   });
-  return { ok: true, status: "verification-sent" };
+  return { ok: true, status: "verification-sent", binding };
 }
 
 /**
@@ -149,31 +177,55 @@ export async function signUp(
   return { ok: true, status: "signed-up", user };
 }
 
+/** The page's answer once a link has proven its address. */
+async function verified(
+  ctx: EmailCredentialsContext,
+  token: string,
+  binding: string | undefined,
+  userId: string,
+): Promise<VerifyEmailResult> {
+  const user = await ctx.store.findById(userId);
+  if (!user) return refuse("token-invalid");
+  const canSignIn = await holdsGrant(ctx, token, binding, userId);
+  return { ok: true, email: user.email, canSignIn };
+}
+
 /**
  * Finish verification by spending the token from the link.
  *
  * Deliberately NOT rate-limited by address: the caller has a 256-bit token and
  * no address to be limited by. The token's own unguessability is the control.
+ *
+ * `binding` is the sign-up binding cookie, when the caller sent one. It never
+ * changes whether the address is verified; it only decides `canSignIn`.
+ *
+ * A link already spent still answers success to the browser that signed up,
+ * while its grant is unspent: mail scanners open links, and the person who
+ * then clicks theirs did nothing wrong. Anyone else gets `token-invalid`, as
+ * before.
  */
 export async function verifyEmail(
   ctx: EmailCredentialsContext,
   token: string,
-): Promise<AcknowledgeResult> {
+  binding?: string,
+): Promise<VerifyEmailResult> {
   const { enabled } = await ctx.readSettings();
   if (!enabled) return refuse("method-disabled");
 
   const tokenHash = hashToken(token);
   const row = await ctx.store.findToken("EMAIL_VERIFICATION", tokenHash);
-  if (!row || row.consumedAt || isTokenExpired(row.expiresAt, ctx.now())) {
-    return refuse("token-invalid");
-  }
+  if (!row || isTokenExpired(row.expiresAt, ctx.now())) return refuse("token-invalid");
   // The conditional write is the single-use guarantee; the read above is only
   // an early exit. Two clicks race here and exactly one wins.
-  const consumed = await ctx.store.consumeToken("EMAIL_VERIFICATION", tokenHash, ctx.now());
-  if (!consumed) return refuse("token-invalid");
-
-  await ctx.store.markEmailVerified(row.userId, ctx.now());
-  return { ok: true };
+  const consumed =
+    !row.consumedAt &&
+    (await ctx.store.consumeToken("EMAIL_VERIFICATION", tokenHash, ctx.now()));
+  if (consumed) {
+    await ctx.store.markEmailVerified(row.userId, ctx.now());
+    return verified(ctx, token, binding, row.userId);
+  }
+  const bound = await holdsGrant(ctx, token, binding, row.userId);
+  return bound ? verified(ctx, token, binding, row.userId) : refuse("token-invalid");
 }
 
 /**

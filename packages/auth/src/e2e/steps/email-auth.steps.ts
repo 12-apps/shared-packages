@@ -203,6 +203,15 @@ When(new RegExp(`^${THEY} opens that same link again$`), async ({ page, account 
   await page.goto(account.lastLink);
 });
 
+When(new RegExp(`^${THEY} opens that same link in another browser$`), async ({ page, account }) => {
+  // Another browser is one without the sign-up's binding cookie (FUT-3474):
+  // the browser that signed up keeps getting an answer for a link a mail
+  // scanner spent first, and that is not what "somebody else" is.
+  await page.context().clearCookies();
+  await page.goto('about:blank');
+  await page.goto(account.lastLink);
+});
+
 When(
   new RegExp(`^${THEY} chooses "(.+)" as ${THEIR} new password$`),
   async ({ page, account }, password: string) => {

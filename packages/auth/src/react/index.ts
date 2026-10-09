@@ -15,6 +15,7 @@ export type {
   EmailAuthClientResult,
   EmailAuthConfig,
   SignUpClientData,
+  VerifyEmailClientData,
 } from "./create-email-auth";
 export { useAuthAction } from "./use-auth-action";
 export type { AuthAction, AuthActionState } from "./use-auth-action";

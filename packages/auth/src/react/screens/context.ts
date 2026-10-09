@@ -27,6 +27,15 @@ export interface ScreensSession {
     password: string;
     callbackUrl?: string;
   }) => Promise<PasswordSignInResult>;
+  /**
+   * Turn a just-verified confirmation link into a session. Optional: a host
+   * whose session is not `createWebAuth`'s leaves it out, and the verify
+   * screen then reports the link verified and signs nobody in.
+   */
+  signInWithLink?: (input: {
+    token: string;
+    callbackUrl?: string;
+  }) => Promise<PasswordSignInResult>;
 }
 
 export interface EmailAuthScreensConfig {

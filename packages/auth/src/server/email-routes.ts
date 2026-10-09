@@ -2,6 +2,8 @@ import type { EmailCredentials } from "../email-credentials";
 import type { EmailAuthRefusal } from "../email-credentials/types";
 import type { PasswordPolicyViolation } from "../password";
 
+import { SIGNUP_BINDING_COOKIE } from "./auth-cookies";
+
 import {
   EMAIL_AUTH_STATUS,
   resolveEmailAuthCopy,
@@ -48,13 +50,35 @@ export interface EmailAuthRequest {
    * with rather than invent a language.
    */
   locale?: string;
+  /**
+   * The request's cookies, by name. Only the sign-up binding is ever read
+   * (`SIGNUP_BINDING_COOKIE`); an adapter that passes none simply never signs
+   * anybody in from a confirmation link.
+   */
+  cookies?: Readonly<Record<string, string>>;
+}
+
+/** A cookie a handler asks the adapter to set. */
+export interface EmailAuthCookie {
+  name: string;
+  value: string;
+  /** Seconds. */
+  maxAge: number;
 }
 
 /** What a handler answers with. `body` rides a `{ data }` envelope on success. */
 export interface EmailAuthResponse {
   status: number;
   body: unknown;
+  /**
+   * Cookies to set, always `HttpOnly; Secure; SameSite=Lax; Path=/` — the
+   * attributes are the adapter's to apply and NOT the handler's to vary, so
+   * the two sign-up branches cannot drift apart on them.
+   */
+  cookies?: readonly EmailAuthCookie[];
 }
+
+export { SIGNUP_BINDING_COOKIE };
 
 export interface EmailAuthRoute {
   method: "GET" | "POST" | "PUT";
@@ -141,6 +165,19 @@ function ok(data: unknown): EmailAuthResponse {
   return { status: 200, body: { data } };
 }
 
+/**
+ * How long the binding cookie lives: as long as the link it pairs with. One
+ * fixed value rather than the link's own expiry, so it is the same on the
+ * branch that issued no link.
+ */
+const BINDING_MAX_AGE_SECONDS = 24 * 60 * 60;
+
+function bindingCookie(binding: string | undefined): EmailAuthCookie[] | undefined {
+  return binding === undefined
+    ? undefined
+    : [{ name: SIGNUP_BINDING_COOKIE, value: binding, maxAge: BINDING_MAX_AGE_SECONDS }];
+}
+
 /** Narrow an untrusted body to a record without reaching for `any`. */
 function fields(body: unknown): Record<string, unknown> {
   return typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
@@ -169,6 +206,56 @@ function optionalStr(body: unknown, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+/** A refusal in the caller's language, as `refuserFor` binds it. */
+type Refuser = (refusalResult: EmailAuthRefusal, locale: string | undefined) => EmailAuthResponse;
+
+/**
+ * `POST /signup`. `user` is deliberately absent from the answer: on the
+ * `verification-sent` branch there may not be one, and answering with it on
+ * the other branch would make the two distinguishable by shape alone. The
+ * binding cookie is set on BOTH of those branches, for the same reason.
+ */
+function signupRoute(
+  credentials: EmailCredentials,
+  refuse: Refuser,
+  onSignedUp: EmailAuthRoutesConfig["onSignedUp"],
+): EmailAuthRoute {
+  return {
+    method: "POST",
+    path: "/signup",
+    handle: async ({ body, locale }) => {
+      const email = str(body, "email");
+      const name = optionalStr(body, "name");
+      const result = await credentials.signUp({
+        email,
+        password: str(body, "password"),
+        name,
+        callbackUrl: optionalStr(body, "callbackUrl"),
+      });
+      if (!result.ok) return refuse(result, locale);
+      await onSignedUp?.({ email, name });
+      return { ...ok({ status: result.status }), cookies: bindingCookie(result.binding) };
+    },
+  };
+}
+
+/** `POST /verify`: the binding cookie, when sent, decides `canSignIn`. */
+function verifyRoute(credentials: EmailCredentials, refuse: Refuser): EmailAuthRoute {
+  return {
+    method: "POST",
+    path: "/verify",
+    handle: async ({ body, locale, cookies }) => {
+      const result = await credentials.verifyEmail(
+        str(body, "token"),
+        cookies?.[SIGNUP_BINDING_COOKIE],
+      );
+      return result.ok
+        ? ok({ email: result.email, canSignIn: result.canSignIn })
+        : refuse(result, locale);
+    },
+  };
+}
+
 /**
  * Build the eight descriptors.
  *
@@ -183,29 +270,8 @@ export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[]
   const refuse = refuserFor(config.messages);
 
   return [
-    {
-      method: "POST",
-      path: "/signup",
-      handle: async ({ body, locale }) => {
-        const email = str(body, "email");
-        const name = optionalStr(body, "name");
-        const result = await credentials.signUp({ email, password: str(body, "password"), name });
-        if (!result.ok) return refuse(result, locale);
-        await onSignedUp?.({ email, name });
-        // `user` is deliberately absent: on the `verification-sent` branch there
-        // may not be one, and answering with it on the other branch would make
-        // the two distinguishable by shape alone.
-        return ok({ status: result.status });
-      },
-    },
-    {
-      method: "POST",
-      path: "/verify",
-      handle: async ({ body, locale }) => {
-        const result = await credentials.verifyEmail(str(body, "token"));
-        return result.ok ? ok(null) : refuse(result, locale);
-      },
-    },
+    signupRoute(credentials, refuse, onSignedUp),
+    verifyRoute(credentials, refuse),
     {
       method: "POST",
       path: "/resend-verification",

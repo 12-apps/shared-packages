@@ -9,7 +9,7 @@ import { PasswordField } from "./password-field";
 import { ResetPasswordScreen } from "./reset-password";
 import { PasswordSecurityCard } from "./security-card";
 import { FailureBanner, LinkButton } from "./shared";
-import { VerifyEmailScreen } from "./verify-email";
+import { VerifyEmailScreen, type VerifiedOutcome } from "./verify-email";
 
 /**
  * The e-mail + password SCREENS, as one factory.
@@ -46,6 +46,7 @@ export interface EmailAuthScreens {
     callbackUrl: string;
     onSignedIn: () => void;
     onForgotPassword: () => void;
+    initialEmail?: string;
   }>;
   /** Create an account. Both success shapes handled; see the component. */
   EmailSignupForm: ComponentType<SignupConfig>;
@@ -58,7 +59,12 @@ export interface EmailAuthScreens {
     onRequestNewLink: () => void;
   }>;
   /** The page the confirmation link opens. */
-  VerifyEmailScreen: ComponentType<{ token: string | null; onContinue: () => void }>;
+  VerifyEmailScreen: ComponentType<{
+    token: string | null;
+    onContinue: () => void;
+    onVerified?: (outcome: VerifiedOutcome) => void;
+    callbackUrl?: string;
+  }>;
   /** Add or change a password for the signed-in account. */
   PasswordSecurityCard: ComponentType<Record<string, never>>;
   /** A password input with a show/hide toggle, for a host's own forms. */
@@ -129,3 +135,4 @@ export { PT_BR } from "./pt-BR";
 export { EN_US } from "./en-US";
 export { failureMessage } from "./copy";
 export type { SignupConfig } from "./email-signup-form";
+export type { VerifiedOutcome } from "./verify-email";

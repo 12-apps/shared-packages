@@ -38,6 +38,8 @@ export type {
   SignUpInput,
   SignUpResult,
   StoredAuthToken,
+  VerifiedResult,
+  VerifyEmailResult,
 } from "./email-credentials";
 export type { PasswordPolicy, PasswordPolicyViolation } from "./password";
 export type { IssuedToken, IssueTokenOptions } from "./tokens";

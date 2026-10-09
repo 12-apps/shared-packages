@@ -1,6 +1,7 @@
 import { toContext } from "./context";
 import { authenticate, type AuthenticateInput } from "./authenticate";
 import { resendVerification, signUp, verifyEmail, type SignUpInput } from "./signup";
+import { signInWithLink } from "./link-sign-in";
 import { hasPassword, requestPasswordReset, resetPassword, setPassword } from "./reset";
 import type {
   AcknowledgeResult,
@@ -8,6 +9,7 @@ import type {
   EmailAuthSettings,
   EmailCredentialsConfig,
   SignUpResult,
+  VerifyEmailResult,
 } from "./types";
 
 /**
@@ -49,7 +51,16 @@ import type {
  */
 export interface EmailCredentials {
   signUp(input: SignUpInput): Promise<SignUpResult>;
-  verifyEmail(token: string): Promise<AcknowledgeResult>;
+  /**
+   * Spend a confirmation link. `binding` is the caller's sign-up binding
+   * cookie, if it sent one; it only decides whether `canSignIn` is true.
+   */
+  verifyEmail(token: string, binding?: string): Promise<VerifyEmailResult>;
+  /**
+   * Open a session from a confirmation link, in the browser that signed up —
+   * the credentials provider's second way in. See `./link-sign-in`.
+   */
+  signInWithLink(token: string, binding: string | undefined): Promise<AuthenticateResult>;
   resendVerification(email: string): Promise<AcknowledgeResult>;
   requestPasswordReset(email: string): Promise<AcknowledgeResult>;
   resetPassword(token: string, newPassword: string): Promise<AcknowledgeResult>;
@@ -85,7 +96,8 @@ export function createEmailCredentials(
   const ctx = toContext(config);
   return {
     signUp: (input) => signUp(ctx, input),
-    verifyEmail: (token) => verifyEmail(ctx, token),
+    verifyEmail: (token, binding) => verifyEmail(ctx, token, binding),
+    signInWithLink: (token, binding) => signInWithLink(ctx, token, binding),
     resendVerification: (email) => resendVerification(ctx, email),
     requestPasswordReset: (email) => requestPasswordReset(ctx, email),
     resetPassword: (token, newPassword) => resetPassword(ctx, token, newPassword),
@@ -126,4 +138,6 @@ export type {
   EmailCredentialsStore,
   SignUpResult,
   StoredAuthToken,
+  VerifiedResult,
+  VerifyEmailResult,
 } from "./types";

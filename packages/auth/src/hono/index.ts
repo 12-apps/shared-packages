@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 
-import { emailAuthRoutes, type EmailAuthRoute, type EmailAuthRoutesConfig } from "../server/email-routes";
+import { isForgedPost, parseCookieHeader, serializeAuthCookie } from "../server/auth-cookies";
+import {
+  emailAuthRoutes,
+  type EmailAuthResponse,
+  type EmailAuthRoute,
+  type EmailAuthRoutesConfig,
+} from "../server/email-routes";
 import {
   emailAuthSettingsRoutes,
   type EmailAuthSettingsRoutesConfig,
@@ -52,18 +58,31 @@ async function readBody(c: Context): Promise<unknown> {
   }
 }
 
+/** Write the cookies a handler asked for, with the package's fixed attributes. */
+function setCookies(c: Context, cookies: EmailAuthResponse["cookies"]): void {
+  for (const cookie of cookies ?? []) {
+    c.header("Set-Cookie", serializeAuthCookie(cookie), { append: true });
+  }
+}
+
 /** Turn descriptors into a Hono app. Shared by both routers below. */
 function toRouter(routes: EmailAuthRoute[], resolveUserId: ResolveUserId): Hono {
   const app = new Hono();
 
   for (const route of routes) {
     const handler = async (c: Context): Promise<Response> => {
+      if (isForgedPost(c.req.raw)) return c.json({ error: "forbidden" }, 403);
       let userId: string | null = null;
       if (route.session) {
         userId = await resolveUserId(c);
         if (!userId) return c.json({ error: "unauthenticated" }, 401);
       }
-      const result = await route.handle({ body: await readBody(c), userId });
+      const result = await route.handle({
+        body: await readBody(c),
+        userId,
+        cookies: parseCookieHeader(c.req.header("cookie")),
+      });
+      setCookies(c, result.cookies);
       return c.json(result.body as object, result.status as 200);
     };
 
@@ -96,11 +115,13 @@ export function emailAuthSettingsRouter(config: EmailAuthSettingsHonoConfig): Ho
 
 export { emailAuthRoutes } from "../server/email-routes";
 export type {
+  EmailAuthCookie,
   EmailAuthRoute,
   EmailAuthRequest,
   EmailAuthResponse,
   EmailAuthRoutesConfig,
 } from "../server/email-routes";
+export { SIGNUP_BINDING_COOKIE } from "../server/email-routes";
 export { EMAIL_AUTH_STATUS } from "../server/messages";
 export { PT_BR_MESSAGES } from "../server/pt-BR";
 export { EN_US_MESSAGES } from "../server/en-US";

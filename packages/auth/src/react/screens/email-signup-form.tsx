@@ -129,7 +129,14 @@ function useSignup(config: SignupConfig): SignupState {
 
   /** Register, then take whichever of the two paths the server reports. */
   async function register(): Promise<void> {
-    const result = await client.signUp({ email, password, name: name || undefined });
+    // The destination rides the confirmation link, so the person comes back
+    // to where they started rather than to a sign-in screen (FUT-3474).
+    const result = await client.signUp({
+      email,
+      password,
+      name: name || undefined,
+      callbackUrl: config.callbackUrl,
+    });
     if (!result.ok) {
       setReason(result.reason);
       setViolations(result.violations ?? null);

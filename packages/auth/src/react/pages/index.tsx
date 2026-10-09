@@ -135,6 +135,13 @@ export interface LoginPageProps {
   branding?: ReactNode;
   /** Rendered above the form: the host's own error alerts, notices, banners. */
   notice?: ReactNode;
+  /**
+   * The address to prefill, when the host already knows it — a confirmation
+   * link opened in a browser that could not be signed in. Handed over as
+   * state, never read from the URL: an address in a query string lands in
+   * history and in referrers.
+   */
+  initialEmail?: string;
 }
 
 export interface SignupPageProps {
@@ -195,6 +202,7 @@ function LoginView({
   providers,
   branding,
   notice,
+  initialEmail,
 }: LoginPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailPasswordForm } = screens;
@@ -214,13 +222,14 @@ function LoginView({
           callbackUrl={callbackUrl}
           onSignedIn={onSignedIn}
           onForgotPassword={onForgotPassword}
+          initialEmail={initialEmail}
         />
       )}
       {routes.signup !== undefined && Link !== undefined && (
         <AuthFooter
           prompt={copy.login.signupPrompt}
           linkText={copy.login.signupLink}
-          to={routes.signup}
+          to={keepingCallback(routes.signup, callbackUrl)}
           Link={Link}
           dataTestId="go-to-signup"
         />
@@ -243,6 +252,20 @@ export const TERMS_GATE_TEST_ID = "signup-terms-gate";
 function TermsGateBlock({ gate }: { gate: ReactNode }): JSX.Element | null {
   if (!present(gate)) return null;
   return <div data-testid={TERMS_GATE_TEST_ID}>{gate}</div>;
+}
+
+/**
+ * A route to the other auth page that keeps where the person is going.
+ *
+ * Moving between "Entrar" and "Cadastre-se" used to drop the `callbackUrl`, so
+ * a shopper who came from a store and chose to sign up ended on the default
+ * landing instead of the store (FUT-3474). A destination that is just the root
+ * is left off: it is every page's default, and the link stays the bare route.
+ */
+function keepingCallback(route: string, callbackUrl: string): string {
+  if (!callbackUrl || callbackUrl === "/") return route;
+  const joiner = route.includes("?") ? "&" : "?";
+  return `${route}${joiner}callbackUrl=${encodeURIComponent(callbackUrl)}`;
 }
 
 /** Whether a host slot has anything in it to render. */
@@ -311,7 +334,7 @@ function SignupView({
         <AuthFooter
           prompt={copy.signup.loginPrompt}
           linkText={copy.signup.loginLink}
-          to={routes.login}
+          to={keepingCallback(routes.login, callbackUrl)}
           Link={Link}
           dataTestId="go-to-login"
         />

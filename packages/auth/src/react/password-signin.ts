@@ -71,8 +71,11 @@ interface PasswordSignInInput {
   basePath: string;
   providerId: string;
   csrfToken: string;
-  email: string;
-  password: string;
+  /**
+   * What the provider's `authorize` reads: `email` and `password`, or — for
+   * a confirmation link opened in the browser that signed up — `linkToken`.
+   */
+  fields: Readonly<Record<string, string>>;
   callbackUrl: string;
   /**
    * The `fetch` to post through. Defaults to the global one.
@@ -106,9 +109,8 @@ export async function postPasswordSignIn(
         "X-Auth-Return-Redirect": "1",
       },
       body: new URLSearchParams({
+        ...input.fields,
         csrfToken: input.csrfToken,
-        email: input.email,
-        password: input.password,
         callbackUrl: input.callbackUrl,
         redirect: "false",
       }).toString(),

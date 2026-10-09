@@ -150,7 +150,10 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        padding: theme.spacing(2),
+        // 12px above and below: the close button is 40px tall, so the header lands on
+        // its own 64px minimum instead of 72 — the height of the page header beside
+        // a docked drawer (FUT-3476).
+        padding: theme.spacing(1.5, 2),
         borderBottom: `1px solid ${theme.palette.divider}`,
         minHeight: rem(theme, 64),
         justifyContent: 'space-between',

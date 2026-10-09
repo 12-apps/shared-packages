@@ -112,6 +112,7 @@ export type { DefaultSession, Session, User } from "@auth/core/types";
  * entry point to do it.
  */
 export { createEmailCredentials } from "../email-credentials";
+export { SIGNUP_BINDING_COOKIE } from "./auth-cookies";
 export {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
