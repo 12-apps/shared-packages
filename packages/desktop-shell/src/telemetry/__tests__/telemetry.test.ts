@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BREADCRUMB_LIMIT,
+  INSTALL_VERDICT_MS,
   QUEUE_LIMIT,
   createTelemetry,
   type SessionMarker,
@@ -355,5 +356,78 @@ describe("telemetry", () => {
     await Promise.all([telemetry.flush(send), telemetry.flush(send)]);
 
     expect(sent).toEqual(["once"]);
+  });
+});
+
+/**
+ * The install verdict waits (FUT-3309). On Windows the old binary can come back
+ * seconds into an update's hand-off and be closed by the installer, which then
+ * starts the new version: the old run's start is too early to call it failed.
+ */
+describe("an install the old version came back from", () => {
+  /** Asked to restart into 0.1.67 ten seconds before NOW. */
+  const askedRecently = (): SessionMarker =>
+    previousRun({ installing: "0.1.67", installingSince: "2026-09-25T17:59:50.000Z" });
+
+  function run(box: ReturnType<typeof memory>, version: string) {
+    return createTelemetry({ files: box.files, version, now: NOW, later: box.later });
+  }
+
+  it("is not called failed at the old run's start", async () => {
+    const box = memory({ marker: askedRecently() });
+    const old = run(box, "0.1.60");
+
+    await old.start();
+
+    expect(box.disk.queue).toEqual([]);
+    // Still not retried by itself while the verdict waits.
+    expect(old.failedInstall()).toBe("0.1.67");
+    // Its marker still names the version being installed, for the next start.
+    expect(box.disk.marker).toMatchObject({ version: "0.1.60", installing: "0.1.67" });
+  });
+
+  it("says nothing once the installer closes the old run and starts the new version", async () => {
+    const box = memory({ marker: askedRecently() });
+    await run(box, "0.1.60").start();
+
+    const installed = run(box, "0.1.67");
+    await installed.start();
+
+    expect(box.disk.queue).toEqual([]);
+    expect(installed.startedByUpdate()).toBe(true);
+  });
+
+  it("is called failed when the old run is still alive after the wait", async () => {
+    const box = memory({ marker: askedRecently() });
+    await run(box, "0.1.60").start();
+
+    for (const fire of box.timers.splice(0)) fire();
+
+    expect(box.disk.queue).toEqual([
+      expect.objectContaining({
+        kind: "install-failed",
+        message: "restarted to install 0.1.67 but came back as 0.1.60",
+      }),
+    ]);
+    expect(box.disk.marker).toMatchObject({ installing: null });
+  });
+
+  it("is called failed at once when the wait is already over", async () => {
+    const asked = new Date(NOW().getTime() - INSTALL_VERDICT_MS - 1_000).toISOString();
+    const box = memory({ marker: previousRun({ installing: "0.1.67", installingSince: asked }) });
+
+    await run(box, "0.1.60").start();
+
+    expect(box.disk.queue).toEqual([expect.objectContaining({ kind: "install-failed" })]);
+  });
+
+  it("dates the restart it asks for, so the next start can judge it", async () => {
+    const box = memory();
+    const telemetry = run(box, "0.1.60");
+    await telemetry.start();
+
+    await telemetry.installing("0.1.67");
+
+    expect(box.disk.marker).toMatchObject({ installing: "0.1.67", installingSince: NOW().toISOString() });
   });
 });
