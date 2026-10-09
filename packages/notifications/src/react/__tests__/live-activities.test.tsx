@@ -785,7 +785,7 @@ describe('a host-rendered live card', () => {
     expect(screen.getByTestId('live-activity-title-visit-42').textContent).toBe(
       'Consulta em andamento',
     );
-    expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull());
   });
 
   it('draws the host body INSIDE the shell, beside the link rather than in it', async () => {
@@ -803,7 +803,7 @@ describe('a host-rendered live card', () => {
     const card = screen.getByTestId('live-activity-visit-42');
     expect(card.contains(screen.getByTestId('mesa-visit-42'))).toBe(true);
     // The host's body REPLACES the default one — no lane, no default heading.
-    expect(screen.queryByTestId('live-activity-steps-visit-42')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('live-activity-steps-visit-42')).toBeNull());
 
     // The link is still the package's: named by the host copy, stretched over
     // the whole card, and never wrapping the host's node.
@@ -845,7 +845,7 @@ describe('a host-rendered live card', () => {
     render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
 
     await waitFor(() => expect(screen.getByTestId('mesa-visit-42')).toBeTruthy());
-    expect(screen.queryByTestId('live-activity-open-visit-42')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('live-activity-open-visit-42')).toBeNull());
     const body = screen.getByTestId('live-activity-body-visit-42');
     expect(body.hasAttribute('inert')).toBe(false);
     expect(body.hasAttribute('aria-hidden')).toBe(false);
@@ -865,10 +865,40 @@ describe('a host-rendered live card', () => {
     await waitFor(() => expect(screen.getByTestId('mesa-mesa-7')).toBeTruthy());
     // The visit card is the package's own: its lane and its visible heading.
     expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy();
-    expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull());
     expect(screen.getByTestId('live-activities').textContent).toContain(
       'A Nina já está com a veterinária.',
     );
+  });
+
+  it('falls back to the default card when the renderer returns undefined', async () => {
+    const config: LiveActivitiesConfig = {
+      ...source([activity()]),
+      renderCard: () => undefined,
+    };
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull());
+  });
+
+  it('does not draw renderIcon on a host-rendered card', async () => {
+    const config: LiveActivitiesConfig = {
+      ...source([
+        activity({ id: 'mesa-7', kind: 'mesa', title: 'Mesa 7' }),
+        activity({ id: 'visit-42', kind: 'visit' }),
+      ]),
+      renderIcon: (item) => <span data-testid={`mark-${item.id}`}>◆</span>,
+      renderCard: (item) => (item.kind === 'mesa' ? <MesaBody item={item} /> : null),
+    };
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('mesa-mesa-7')).toBeTruthy());
+    await waitFor(() => expect(screen.queryByTestId('mark-mesa-7')).toBeNull());
+    // The default card beside it still draws its icon.
+    expect(screen.getByTestId('mark-visit-42')).toBeTruthy();
   });
 
   it('hands the renderer the section clock, and re-renders it on the tick', async () => {
@@ -880,6 +910,7 @@ describe('a host-rendered live card', () => {
         return <span data-testid="host-updated">{context.updated}</span>;
       },
     };
+    const start = new Date('2026-08-13T09:10:00.000Z').getTime();
     const { Panel } = mount(config);
     render(<Panel open onClose={() => undefined} />);
 
@@ -890,8 +921,8 @@ describe('a host-rendered live card', () => {
     );
     // The section's minute, not a clock the renderer read for itself. (The fake
     // clock still advances with real time, hence a window rather than equality.)
-    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(NOW.getTime());
-    expect(seen.at(-1)?.now).toBeLessThan(NOW.getTime() + 60_000);
+    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(start);
+    expect(seen.at(-1)?.now).toBeLessThan(start + 60_000);
 
     // Nothing but the section's tick can move this — the host's data is the
     // same object throughout.
@@ -903,7 +934,7 @@ describe('a host-rendered live card', () => {
         CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(7)),
       ),
     );
-    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(NOW.getTime() + 120_000);
+    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(start + 120_000);
   });
 });
 

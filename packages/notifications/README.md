@@ -263,6 +263,18 @@ follows it, so it must be PRESENTATIONAL — no controls. `renderIcon` is not
 drawn on a host-rendered card. Exported types: `LiveActivityCardRenderer`,
 `LiveActivityRenderContext` (from `@12-apps/notifications/react`).
 
+Three things the shell cannot do for you:
+
+- **Use block elements, or whitespace, between the parts of the body.** The
+  description is the body's text, and adjacent inline `<span>`s are read run
+  together ("2 pratos na cozinha1 no passe").
+- **Without a link, do not repeat the title in the body.** The body is then
+  plain content beside the title's live region, so a screen reader in browse
+  mode reads both.
+- **Do not throw.** `renderCard` runs during the section's render with no error
+  boundary of its own; an activity you cannot draw returns `null` and gets the
+  default card.
+
 ### On a phone: one tray entry, one buzz
 
 The other half is the OS notification, and it is one field. A generator whose
