@@ -47,8 +47,10 @@ Feature: Signing up with an e-mail and a password
     Then she is told her e-mail is confirmed
 
     # Somebody else opening the same link later — a forwarded mail, a shared
-    # inbox — gets nothing. The row it spent is gone, not merely stale.
-    When she opens that same link again
+    # inbox — gets nothing. The row it spent is gone, not merely stale. "Somebody
+    # else" is another browser: the one that signed up holds the binding that
+    # still answers it, for the mail scanner that may have spent it first.
+    When she opens that same link in another browser
     Then she is told the link is no longer valid
 
   Scenario: With confirmation switched off, the account works straight away
