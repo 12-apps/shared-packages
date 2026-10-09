@@ -39,6 +39,8 @@ export type DesktopPlatform = "windows" | "macos" | "linux";
  * a bad credential, an unreachable endpoint, a missing key surfaced as an
  * error — reads the same: the package catches it and answers the coded 404,
  * because that is the honest answer when this deploy cannot hand over a file.
+ * But a throw is not a miss to whoever runs the deploy, so it is handed to
+ * the spec's `onStorageError` first (FUT-2681).
  */
 export interface DesktopStoragePort {
   /** Whether the object exists — asked BEFORE signing, see {@link serveDesktopAsset}. */
@@ -77,6 +79,14 @@ interface StorageSpec {
   missingCode: string;
   /** The host's bucket. Absent: disk only. */
   storage?: DesktopStoragePort | null;
+  /**
+   * Told when the bucket THREW — a 403 from bad credentials, a wrong region, a
+   * DNS failure — rather than answered "not there" (FUT-2681). The caller still
+   * gets the coded 404; without this, a broken bucket setup told the merchant
+   * the build does not exist and told the host nothing. The logger is the
+   * host's, like the route and the auth.
+   */
+  onStorageError?: (error: unknown, key: string) => void;
 }
 
 export interface DesktopAssetSpec extends StorageSpec {
@@ -124,7 +134,7 @@ export async function serveDesktopAsset(request: Request, spec: DesktopAssetSpec
 
   const found = await fromDisk(join(spec.directory, asset));
   if (!found) {
-    const link = await presigned(spec.storage, `${spec.objectPrefix}/${asset}`, asset);
+    const link = await presigned(spec, `${spec.objectPrefix}/${asset}`, asset);
     if (link === null) {
       return Response.json({ error: { code: spec.missingCode, platform } }, { status: 404 });
     }
@@ -156,10 +166,10 @@ export async function serveNamedDesktopAsset(spec: NamedDesktopAssetSpec): Promi
   const key = `${spec.objectPrefix}/${spec.file}`;
   const onDisk = await fromDisk(join(spec.directory, spec.file));
   if (!onDisk && !isChannelFile(spec.file)) {
-    const link = await presigned(spec.storage, key, spec.file);
+    const link = await presigned(spec, key, spec.file);
     if (link !== null) return redirect(link);
   }
-  const found = onDisk ?? (await fromBucket(spec.storage, key));
+  const found = onDisk ?? (await fromBucket(spec, key));
 
   if (!found) {
     return Response.json({ error: { code: spec.missingCode, file: spec.file } }, { status: 404 });
@@ -204,29 +214,26 @@ async function fromDisk(path: string): Promise<StoredAsset | null> {
 }
 
 /** The bucket's copy, streamed; any failure of the port reads as "not there". */
-async function fromBucket(
-  storage: DesktopStoragePort | null | undefined,
-  key: string,
-): Promise<StoredAsset | null> {
+async function fromBucket(spec: StorageSpec, key: string): Promise<StoredAsset | null> {
+  const { storage } = spec;
   if (!storage) return null;
   try {
     return await storage.get(key);
-  } catch {
+  } catch (error) {
+    spec.onStorageError?.(error, key);
     return null;
   }
 }
 
 /** A link straight to the bucket's copy, or `null` when there is none. */
-async function presigned(
-  storage: DesktopStoragePort | null | undefined,
-  key: string,
-  filename: string,
-): Promise<string | null> {
+async function presigned(spec: StorageSpec, key: string, filename: string): Promise<string | null> {
+  const { storage } = spec;
   if (!storage) return null;
   try {
     if (!(await storage.head(key))) return null;
     return await storage.presign(key, filename, PRESIGNED_TTL_SECONDS);
-  } catch {
+  } catch (error) {
+    spec.onStorageError?.(error, key);
     return null;
   }
 }

@@ -28,6 +28,10 @@
  * person at the machine, which is why they are English and not a copy port.
  */
 
+import { awaitVerdict, verdictWait, type PreviousRun } from "./install-verdict";
+
+export { INSTALL_VERDICT_MS } from "./install-verdict";
+
 /** One step of what the agent was doing. */
 interface Breadcrumb {
   at: string;
@@ -41,6 +45,11 @@ export interface SessionMarker {
   breadcrumbs: Breadcrumb[];
   /** The version this run restarted to install, when it did. */
   installing: string | null;
+  /**
+   * When the restart into `installing` was asked for. Absent on a marker from
+   * a build before FUT-3309, which is then judged at once, as it always was.
+   */
+  installingSince?: string | null;
 }
 
 export type TelemetryKind = "crash" | "error" | "process-gone" | "install-failed";
@@ -74,7 +83,6 @@ export const BREADCRUMB_LIMIT = 30;
 export const QUEUE_LIMIT = 20;
 /** How often, at most, breadcrumbs are written into the marker. */
 const MARKER_WRITE_MS = 1000;
-
 interface TelemetryOptions {
   files: TelemetryFiles;
   version: string;
@@ -152,7 +160,14 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
       const previous = await readPrevious(options, now(), listDumps);
       state.byUpdate = previous.byUpdate;
       state.failedInstall = previous.lost?.kind === "install-failed" ? previous.target : null;
-      if (previous.lost !== null) enqueue(previous.lost);
+      const { lost } = previous;
+      if (lost !== null && previous.verdictInMs > 0) {
+        const report = (): void => {
+          enqueue(lost);
+          void persistMarker();
+        };
+        awaitVerdict(marker, previous, report, later);
+      } else if (lost !== null) enqueue(lost);
       state.queue.splice(0, Math.max(0, state.queue.length - QUEUE_LIMIT));
       state.loaded = true;
       await persistMarker();
@@ -174,6 +189,7 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
 
     async installing(version) {
       marker.installing = version;
+      marker.installingSince = now().toISOString();
       await persistMarker();
     },
 
@@ -232,12 +248,13 @@ async function readPrevious(
   options: TelemetryOptions,
   now: Date,
   listDumps: ((since: Date) => Promise<string[]>) | undefined,
-): Promise<{ byUpdate: boolean; lost: TelemetryReport | null; target: string | null }> {
+): Promise<PreviousRun> {
   const previous = await options.files.readMarker().catch(() => null);
   const byUpdate = installedAsPlanned(previous, options.version);
-  if (previous === null || byUpdate) return { byUpdate, lost: null, target: null };
+  if (previous === null || byUpdate) return { byUpdate, lost: null, target: null, since: null, verdictInMs: 0 };
   const lost = await lostRun(previous, options.version, now, listDumps);
-  return { byUpdate, lost, target: previous.installing };
+  const since = previous.installingSince ?? null;
+  return { byUpdate, lost, target: previous.installing, since, verdictInMs: verdictWait(since, now) };
 }
 
 /** Send oldest first; drop what will never be accepted, stop at anything else. */

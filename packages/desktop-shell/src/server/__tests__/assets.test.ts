@@ -191,3 +191,50 @@ describe("serving the update feed", () => {
     }
   });
 });
+
+/**
+ * A bucket that THREW is still the coded 404 for the caller, but no longer a
+ * silent one for the host (FUT-2681): a 403 from a broken credential used to
+ * read exactly like a build that was never uploaded.
+ */
+describe("a bucket that fails, as the host hears it", () => {
+  /** Every error the spec's `onStorageError` was told, with its key. */
+  function heard(): { told: string[]; onStorageError: (error: unknown, key: string) => void } {
+    const told: string[] = [];
+    return {
+      told,
+      onStorageError: (error, key) => told.push(`${key}: ${error instanceof Error ? error.message : String(error)}`),
+    };
+  }
+
+  it("tells the host when the installer's bucket throws, and still answers the coded 404", async () => {
+    const host = heard();
+    const answer = await serveDesktopAsset(ask("windows"), { ...spec(BROKEN), onStorageError: host.onStorageError });
+
+    expect(answer.status).toBe(404);
+    expect(host.told).toEqual([`${PREFIX}/app.exe: AccessDenied`]);
+  });
+
+  it("tells the host when the update feed's bucket throws", async () => {
+    const host = heard();
+    const answer = await serveNamedDesktopAsset({
+      directory: DIRECTORY,
+      objectPrefix: PREFIX,
+      missingCode: "not_built",
+      file: "latest.yml",
+      storage: BROKEN,
+      onStorageError: host.onStorageError,
+    });
+
+    expect(answer.status).toBe(404);
+    expect(host.told).toEqual([`${PREFIX}/latest.yml: AccessDenied`]);
+  });
+
+  it("says nothing for a build that is simply not there", async () => {
+    const host = heard();
+    const answer = await serveDesktopAsset(ask("linux"), { ...spec(), onStorageError: host.onStorageError });
+
+    expect(answer.status).toBe(404);
+    expect(host.told).toEqual([]);
+  });
+});

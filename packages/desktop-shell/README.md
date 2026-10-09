@@ -84,7 +84,11 @@ make an agent maintainable from a distance:
   removes it on a clean quit. A marker left behind is reported as a crash only
   when Crashpad wrote a dump in that run — a Windows shutdown leaves one too,
   with no dump. A restart to install that came back as the OLD version is
-  reported as `install-failed` and never retried by itself. Reports queue on
+  reported as `install-failed` and never retried by itself — but only two
+  minutes after the restart was asked for: on Windows the old binary can come
+  back for a few seconds before the installer closes it and starts the new
+  version, which then reads the restart as planned and reports nothing
+  (FUT-3309). Reports queue on
   disk and `flush(send)` delivers them through whatever route the host owns; a
   4xx that will not change is dropped instead of blocking the queue.
 - **Updates.** `createUpdateManager` checks once a day plus whenever the host
