@@ -760,6 +760,154 @@ describe('the live section', () => {
 });
 
 /**
+ * `renderCard` — a host's own BODY inside the package's SHELL (FUT-1797).
+ *
+ * The body is the host's; the link, its name, the stretched target, the live
+ * announcement and the clock stay the package's. Each case pins one half.
+ */
+describe('a host-rendered live card', () => {
+  /** A mesa-shaped body: counts, not one lit stop. */
+  function MesaBody({ item }: { item: LiveActivity }): JSX.Element {
+    return (
+      <div data-testid={`mesa-${item.id}`}>
+        <span>2 pratos na cozinha</span>
+        <span>1 no passe</span>
+      </div>
+    );
+  }
+
+  it('draws the default card, lane and all, when the host passes no renderer', async () => {
+    const config = source([activity()]);
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy());
+    expect(screen.getByTestId('live-activity-title-visit-42').textContent).toBe(
+      'Consulta em andamento',
+    );
+    expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull();
+  });
+
+  it('draws the host body INSIDE the shell, beside the link rather than in it', async () => {
+    const config: LiveActivitiesConfig = {
+      ...source([activity({ kind: 'mesa' })]),
+      renderCard: (item) => <MesaBody item={item} />,
+    };
+    const { Panel } = mount(config);
+    const gone: string[] = [];
+    render(
+      <Panel open onClose={() => undefined} onNavigate={(link) => gone.push(link)} />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('mesa-visit-42')).toBeTruthy());
+    const card = screen.getByTestId('live-activity-visit-42');
+    expect(card.contains(screen.getByTestId('mesa-visit-42'))).toBe(true);
+    // The host's body REPLACES the default one — no lane, no default heading.
+    expect(screen.queryByTestId('live-activity-steps-visit-42')).toBeNull();
+
+    // The link is still the package's: named by the host copy, stretched over
+    // the whole card, and never wrapping the host's node.
+    const link = screen.getByRole('button', {
+      name: CLINIC_LIVE_MESSAGES.openActivity('Consulta em andamento'),
+    });
+    expect(link.getAttribute('data-testid')).toBe('live-activity-open-visit-42');
+    expect(link.contains(screen.getByTestId('mesa-visit-42'))).toBe(false);
+    expect(card.querySelectorAll('button button')).toHaveLength(0);
+    const rule = overlayRuleFor(link);
+    expect(rule).toMatch(/content:/);
+    expect(rule).toMatch(/position:\s*absolute/);
+    expect(rule).toMatch(/inset:\s*0/);
+
+    // The body is inert (clicks fall through to the overlay, no tab stops) and
+    // hidden from the tree — but READ, as the link's description.
+    const body = screen.getByTestId('live-activity-body-visit-42');
+    expect(body.hasAttribute('inert')).toBe(true);
+    expect(body.getAttribute('aria-hidden')).toBe('true');
+    expect(link.getAttribute('aria-describedby')).toBe(body.id);
+    expect(body.textContent).toContain('2 pratos na cozinha');
+
+    // One polite live region, on the title, as the default card has it.
+    const announced = card.querySelectorAll('[aria-live]');
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.textContent).toBe('Consulta em andamento');
+    expect(announced[0]?.getAttribute('aria-live')).toBe('polite');
+
+    fireEvent.click(link);
+    expect(gone).toEqual(['/consultas/42']);
+  });
+
+  it('renders the host body as plain content when there is nothing to follow', async () => {
+    const config: LiveActivitiesConfig = {
+      ...source([activity({ link: null })]),
+      renderCard: (item) => <MesaBody item={item} />,
+    };
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('mesa-visit-42')).toBeTruthy());
+    expect(screen.queryByTestId('live-activity-open-visit-42')).toBeNull();
+    const body = screen.getByTestId('live-activity-body-visit-42');
+    expect(body.hasAttribute('inert')).toBe(false);
+    expect(body.hasAttribute('aria-hidden')).toBe(false);
+  });
+
+  it('falls back to the default card for an activity the renderer returns null for', async () => {
+    const config: LiveActivitiesConfig = {
+      ...source([
+        activity({ id: 'mesa-7', kind: 'mesa', title: 'Mesa 7' }),
+        activity({ id: 'visit-42', kind: 'visit' }),
+      ]),
+      renderCard: (item) => (item.kind === 'mesa' ? <MesaBody item={item} /> : null),
+    };
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} onNavigate={() => undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId('mesa-mesa-7')).toBeTruthy());
+    // The visit card is the package's own: its lane and its visible heading.
+    expect(screen.getByTestId('live-activity-steps-visit-42')).toBeTruthy();
+    expect(screen.queryByTestId('live-activity-body-visit-42')).toBeNull();
+    expect(screen.getByTestId('live-activities').textContent).toContain(
+      'A Nina já está com a veterinária.',
+    );
+  });
+
+  it('hands the renderer the section clock, and re-renders it on the tick', async () => {
+    const seen: { now: number; updated: string }[] = [];
+    const config: LiveActivitiesConfig = {
+      ...source([activity()]),
+      renderCard: (_activity, context) => {
+        seen.push(context);
+        return <span data-testid="host-updated">{context.updated}</span>;
+      },
+    };
+    const { Panel } = mount(config);
+    render(<Panel open onClose={() => undefined} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('host-updated').textContent).toBe(
+        CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(5)),
+      ),
+    );
+    // The section's minute, not a clock the renderer read for itself. (The fake
+    // clock still advances with real time, hence a window rather than equality.)
+    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(NOW.getTime());
+    expect(seen.at(-1)?.now).toBeLessThan(NOW.getTime() + 60_000);
+
+    // Nothing but the section's tick can move this — the host's data is the
+    // same object throughout.
+    act(() => {
+      vi.advanceTimersByTime(120_000);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('host-updated').textContent).toBe(
+        CLINIC_LIVE_MESSAGES.updated(CLINIC_MESSAGES.minutesAgo(7)),
+      ),
+    );
+    expect(seen.at(-1)?.now).toBeGreaterThanOrEqual(NOW.getTime() + 120_000);
+  });
+});
+
+/**
  * `useBellBadge` — the door for a host that draws its OWN trigger.
  *
  * Not every host can take this package's bell. A storefront header whose cart

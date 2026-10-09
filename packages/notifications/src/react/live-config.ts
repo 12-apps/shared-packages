@@ -56,6 +56,39 @@ export interface LiveActivityMessages {
   updated: (relative: string) => string;
 }
 
+/**
+ * What the section hands {@link LiveActivitiesConfig.renderCard} besides the
+ * activity: the section's CLOCK, and the line it would have drawn from it.
+ *
+ * The clock is passed rather than read because the section owns the minute tick
+ * (see `live-section.tsx`): a host body that called `Date.now()` itself would
+ * freeze its "há 5 min" at the minute the card first rendered, which is the
+ * defect `relative-time.ts` was changed to prevent.
+ */
+export interface LiveActivityRenderContext {
+  /** The section's current minute, in epoch milliseconds. Moves once a minute. */
+  now: number;
+  /**
+   * The default card's "last moved" line, already worded —
+   * `messages.updated(relativeTime(activity.updatedAt, …, now))` — so a host
+   * body can show it without a second vocabulary for the same duration.
+   */
+  updated: string;
+}
+
+/**
+ * A host's own body for one live activity, or `null`/`undefined` for the
+ * package's default card.
+ *
+ * Called during the section's render, once per activity per render (the minute
+ * tick included), so keep it cheap and free of hooks — return an ELEMENT, and
+ * put any hooks in the component it names.
+ */
+export type LiveActivityCardRenderer = (
+  activity: LiveActivity,
+  context: LiveActivityRenderContext,
+) => ReactNode;
+
 /** Live activities, as a host turns them on. */
 export interface LiveActivitiesConfig {
   useActivities: LiveActivitiesHook;
@@ -76,4 +109,28 @@ export interface LiveActivitiesConfig {
    * accessibility tree. An icon or an `<svg>`; not a control.
    */
   renderIcon?: (activity: LiveActivity) => ReactNode;
+  /**
+   * The host's own BODY for an activity whose shape the default card cannot
+   * draw — a mesa counting plates per lane per round rather than lighting one
+   * stop on one lane. Return `null` or `undefined` for any activity the default
+   * card should draw; only those two fall back (`false` or `''` render as an
+   * empty body).
+   *
+   * **The body is the host's; the SHELL stays the package's.** The section
+   * keeps its clock (it arrives as `context.now`), and the node is drawn inside
+   * the same card: the wash and border, the `live-activity-<id>` test id, the
+   * stretched `<button>` named by `messages.openActivity(title)` when the
+   * activity has a link and the host a router, the polite announcement of
+   * `title` when it changes, and the seen record the bell reads.
+   *
+   * With a link, the node sits BESIDE the button rather than inside it, in an
+   * `inert`, `aria-hidden` wrapper the button names as its description — so
+   * its text is still read with the link, a click anywhere on it reaches the
+   * card, and nothing in it can nest inside the button or take a tab stop.
+   * That makes it PRESENTATIONAL for the same reason `renderIcon` is: a
+   * control in it is unreachable. Without a link it renders as plain content.
+   * `renderIcon` is not drawn for a host-rendered card — draw the mark in the
+   * body.
+   */
+  renderCard?: LiveActivityCardRenderer;
 }

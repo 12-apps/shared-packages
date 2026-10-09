@@ -186,6 +186,7 @@ export function LiveSection({
             now={now}
             {...(onOpen ? { onOpen } : {})}
             {...(config.renderIcon ? { renderIcon: config.renderIcon } : {})}
+            {...(config.renderCard ? { renderCard: config.renderCard } : {})}
           />
             ))}
           </Box>

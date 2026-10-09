@@ -159,6 +159,8 @@ interface LiveActivityCardProps {
   messages: NotificationMessages;
   live: LiveActivityMessages;
   renderIcon?: LiveActivitiesConfig['renderIcon'];
+  /** The host's own body, drawn inside this card's shell — see `HostCardBody`. */
+  renderCard?: LiveActivitiesConfig['renderCard'];
   /** The clock this render reads, so the "last moved" line can be ticked. */
   now: number;
   /**
@@ -233,14 +235,121 @@ function ActivityTarget({
   );
 }
 
+/**
+ * Visually hidden, still in the accessibility tree — so a host-drawn card keeps
+ * the announcement of its title moving without drawing the title twice.
+ */
+const srOnlySx = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  p: 0,
+  m: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+} as const;
+
+/**
+ * The SHELL around a host's own body (`LiveActivitiesConfig.renderCard`).
+ *
+ * Everything the default card guarantees that is not about how the body looks
+ * stays here, so a host cannot opt out of it by drawing its own card:
+ *
+ * - the stretched `<button>` and its accessible name, when the card is
+ *   followable. The host's node is its SIBLING, never its child — the same
+ *   reason the lane is — and is `inert` (skipped by hit-testing, so a click on
+ *   it reaches the overlay, and no tab stops) and `aria-hidden`; the button
+ *   names it as its DESCRIPTION, so its text is still read with the link.
+ * - the one polite live region, on the title, as the default card has it. The
+ *   host draws its own heading, so this one is visually hidden.
+ */
+function HostCardShell({
+  activity,
+  live,
+  body,
+  onOpen,
+}: {
+  activity: LiveActivity;
+  live: LiveActivityMessages;
+  body: ReactNode;
+  onOpen: ((activity: LiveActivity) => void) | undefined;
+}): JSX.Element {
+  const bodyId = useId();
+  const followable = activity.link !== null && onOpen !== undefined;
+  return (
+    <Box data-testid={`live-activity-${activity.id}`} sx={cardSx}>
+      <Box
+        component="span"
+        aria-live="polite"
+        data-testid={`live-activity-title-${activity.id}`}
+        sx={srOnlySx}
+      >
+        {activity.title}
+      </Box>
+      {followable ? (
+        <>
+          <Box
+            component="button"
+            type="button"
+            onClick={() => onOpen(activity)}
+            aria-label={live.openActivity(activity.title)}
+            aria-describedby={bodyId}
+            data-testid={`live-activity-open-${activity.id}`}
+            sx={stretchedSx}
+          />
+          <Box
+            id={bodyId}
+            aria-hidden
+            inert
+            data-testid={`live-activity-body-${activity.id}`}
+          >
+            {body}
+          </Box>
+        </>
+      ) : (
+        <Box data-testid={`live-activity-body-${activity.id}`}>{body}</Box>
+      )}
+    </Box>
+  );
+}
+
 export function LiveActivityCard({
   activity,
   messages,
   live,
   renderIcon,
+  renderCard,
   now,
   onOpen,
 }: LiveActivityCardProps): JSX.Element {
+  const updated = live.updated(relativeTime(activity.updatedAt, messages, now));
+  const custom = renderCard?.(activity, { now, updated });
+  if (custom !== undefined && custom !== null) {
+    return <HostCardShell activity={activity} live={live} body={custom} onOpen={onOpen} />;
+  }
+  return (
+    <DefaultActivityCard
+      activity={activity}
+      live={live}
+      updated={updated}
+      {...(renderIcon ? { renderIcon } : {})}
+      {...(onOpen ? { onOpen } : {})}
+    />
+  );
+}
+
+/** The package's own card: the mark, the heading, the lane and the timestamp. */
+function DefaultActivityCard({
+  activity,
+  live,
+  renderIcon,
+  updated,
+  onOpen,
+}: Pick<LiveActivityCardProps, 'activity' | 'live' | 'renderIcon' | 'onOpen'> & {
+  updated: string;
+}): JSX.Element {
   const followable = activity.link !== null && onOpen !== undefined;
   const bodyId = useId();
   const target = (
@@ -272,7 +381,7 @@ export function LiveActivityCard({
       )}
       <ActivityLane activity={activity} />
       <Text variant="caption" size="xs" color="secondary" as="span" italic>
-        {live.updated(relativeTime(activity.updatedAt, messages, now))}
+        {updated}
       </Text>
     </Box>
   );

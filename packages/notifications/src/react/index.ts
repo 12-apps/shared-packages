@@ -62,11 +62,14 @@ export {
 // prop, and the minute tick that produces one lives in `LiveSection` — so an
 // external composer would either reimplement the tick or pass `Date.now()` once
 // and get the frozen timestamp `relative-time.ts` was changed to prevent.
-// `LiveSection` is the composable unit and carries its own clock.
+// `LiveSection` is the composable unit and carries its own clock. A host that
+// needs a card of its own shape passes `renderCard` and gets the clock with it.
 export {
   type LiveActivitiesConfig,
   type LiveActivitiesHook,
+  type LiveActivityCardRenderer,
   type LiveActivityMessages,
+  type LiveActivityRenderContext,
 } from './live-config';
 
 /**
