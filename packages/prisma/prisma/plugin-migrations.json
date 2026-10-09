@@ -47,6 +47,7 @@
     "20261002120000_add_chat",
     "20261002130000_push_attention_level",
     "20261003120000_add_chat_thread_activity_index",
-    "20261006120000_shift_slots"
+    "20261006120000_shift_slots",
+    "20261009200000_auth_sign_in_grant"
   ]
 }
