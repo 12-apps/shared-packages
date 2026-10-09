@@ -144,6 +144,10 @@ export function sameOriginCallbackUrl(
   // none of them is ever part of a destination.
   // eslint-disable-next-line no-control-regex -- refusing control characters is the point
   if (/[\u0000-\u001f\u007f\\]/.test(raw)) return fallback;
+  // Only a path or an absolute URL is a destination: Auth.js's redirect
+  // callback takes nothing else, and `foo` or `?a=1` would reach it as given.
+  const shaped = raw.startsWith("/") || raw === location.origin || raw.startsWith(`${location.origin}/`);
+  if (!shaped) return fallback;
   // Resolved against the ORIGIN, not `href`: callers pass a bare path as the
   // fallback `href`, which is no base at all.
   const base = location.origin && location.origin !== "null" ? location.origin : "http://callback.invalid";

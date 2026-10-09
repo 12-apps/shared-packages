@@ -39,6 +39,10 @@ describe("sameOriginCallbackUrl", () => {
     },
   );
 
+  it.each(["foo", "?a=1", "#x", " /ok"])("rejects %j, which is no path", (raw) => {
+    expect(sameOriginCallbackUrl(raw, LOCATION)).toBe(LOCATION.href);
+  });
+
   it("rejects a javascript: URL", () => {
     expect(sameOriginCallbackUrl("javascript:alert(1)", LOCATION)).toBe(LOCATION.href);
   });

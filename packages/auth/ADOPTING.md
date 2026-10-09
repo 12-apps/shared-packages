@@ -28,9 +28,14 @@ THAT browser only. What a host has to do:
   `WireRouteAnswer` (the breaking change), because the sign-up's `Set-Cookie`
   cannot ride `{ status, body }`. Without `request` nothing breaks, but no
   binding is set and links sign nobody in. `@12-apps/wiring` ≥ 1.9.0.
-- **Send JSON.** Every POST/PUT must be `application/json` and not cross-site
-  (`Sec-Fetch-Site`), or it is refused 403 — that is what stops another site
-  planting a binding (login CSRF). The packaged client already does.
+- **Send JSON, from the same origin.** Every POST/PUT must be
+  `application/json` and not cross-site or same-site (`Sec-Fetch-Site`), or it
+  is refused 403 — that is what stops another site planting a binding (login
+  CSRF). The packaged client already does; an SPA on a sibling origin calling
+  these routes directly does not, and must go through its own origin.
+- **Local development in Safari** verifies links but does not sign in: Safari
+  refuses a `Secure` (`__Host-`) cookie on `http://localhost`. Chrome and
+  Firefox accept it.
 - **Wire `authenticateLink`** into `credentialsProvider` from
   `credentials.signInWithLink`.
 - **On the verify page, pass `onVerified` and `callbackUrl`** to
