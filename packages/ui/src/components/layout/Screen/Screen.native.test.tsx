@@ -54,7 +54,7 @@ describe('Screen (native)', () => {
     // Structural ownership; actual device keyboard geometry is a separate QA lane.
     expect((lastProps(SafeAreaView).children as React.ReactElement).type).toBe(KeyboardAvoidingView);
     expect(lastProps(ScrollView)).toMatchObject({
-      horizontal: false, keyboardShouldPersistTaps: 'handled', keyboardDismissMode: 'on-drag',
+      horizontal: false, keyboardShouldPersistTaps: 'handled',
       automaticallyAdjustKeyboardInsets: false, automaticallyAdjustContentInsets: false, contentInsetAdjustmentBehavior: 'never',
     });
     expect(screen.getByTestId('page-viewport').firstElementChild).toHaveStyle({ paddingTop: '8px', gap: '4px', flexGrow: '1' });
@@ -64,6 +64,12 @@ describe('Screen (native)', () => {
     render(wrap(<Screen keyboardVerticalOffset={48} />));
     expect(lastProps(KeyboardAvoidingView)).toMatchObject({ enabled: true, behavior: platform === 'ios' ? 'padding' : 'height', keyboardVerticalOffset: 48 });
   });
+  it.each([['ios', 'on-drag'], ['android', 'on-drag'], ['web', 'none']] as const)(
+    'dismisses the keyboard on drag on %s: %s', (platform, mode) => {
+      vi.spyOn(Platform, 'OS', 'get').mockReturnValue(platform);
+      render(wrap(<Screen />));
+      expect(lastProps(ScrollView).keyboardDismissMode).toBe(mode);
+    });
   it('turns off scrolling and keyboard avoidance without losing children', () => {
     render(wrap(<Screen dataTestId="page" scroll={false} keyboardAvoiding={false}><Screen dataTestId="child" scroll={false} keyboardAvoiding={false} /></Screen>));
     expect(ScrollView).not.toHaveBeenCalled();

@@ -39,6 +39,26 @@ export const InputRemainsInteractive: Story = {
     await waitFor(() => expect(input).toHaveValue('42'));
   },
 };
+// A scroll of the viewport must not take focus from the field being edited:
+// react-native-web blurred it on every scroll event of an on-drag ScrollView,
+// including the browser's own scroll to a just-focused field.
+export const FocusSurvivesScroll: Story = {
+  render: () => <Screen dataTestId="scrolling" p={2} gap={1}>
+    <Input dataTestId="note" label="Note" />
+    {Array.from({ length: 30 }, (_, i) => <Text key={i}>Row {i + 1}</Text>)}
+  </Screen>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = await canvas.findByTestId('note');
+    const viewport = await canvas.findByTestId('scrolling-viewport');
+    await userEvent.click(input);
+    await waitFor(() => expect(input).toHaveFocus());
+    // dispatchEvent returns once every scroll listener has run, and the blur
+    // react-native-web's handler did is synchronous: what focus is now is final.
+    viewport.dispatchEvent(new Event('scroll'));
+    await waitFor(() => expect(input).toHaveFocus());
+  },
+};
 export const EmptyScreen: Story = {
   render: () => <Screen dataTestId="empty" safeAreaEdges={[]} />,
   play: async ({ canvasElement }) => { await expect(await within(canvasElement).findByTestId('empty')).toBeVisible(); },

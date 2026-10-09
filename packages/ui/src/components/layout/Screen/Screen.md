@@ -45,7 +45,9 @@ on iOS and height on Android. Its measured viewport already excludes the bottom
 safe area, so the home-indicator inset is not added again above the keyboard.
 ScrollView automatic keyboard and content insets are off so those owners do not
 also apply the same lift/insets. Handled child taps remain usable with the
-keyboard open; dragging dismisses it. `scrollViewProps` can change tap/dismiss
+keyboard open; on a device, dragging dismisses it. On the web nothing is dismissed
+on scroll: react-native-web would blur the focused field on every scroll event,
+including the browser's own scroll to a just-focused field. `scrollViewProps` can change tap/dismiss
 policy, but cannot override the viewport geometry or automatic inset ownership.
 
 ## Layout and accessibility
