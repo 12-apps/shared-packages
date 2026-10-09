@@ -163,7 +163,7 @@ function fakeClient(overrides: ClientOverrides = {}): EmailAuth {
   return {
     getSettings: () => Promise.resolve({ ok: true, data: { enabled: true, requireEmailVerification: true } }),
     signUp: () => Promise.resolve({ ok: true, data: { status: "verification-sent" } }),
-    verifyEmail: () => Promise.resolve({ ok: true, data: null }),
+    verifyEmail: () => Promise.resolve({ ok: true, data: { email: "ana@example.com", canSignIn: false } }),
     resendVerification: () => Promise.resolve({ ok: true, data: null }),
     requestPasswordReset: () => Promise.resolve({ ok: true, data: null }),
     resetPassword: () => Promise.resolve({ ok: true, data: null }),

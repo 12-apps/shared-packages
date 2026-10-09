@@ -153,6 +153,34 @@ describe("LoginPage", () => {
     expect(screen.getByTestId("go-to-signup").getAttribute("href")).toBe("/signup");
   });
 
+  it("keeps where the person is going on the link to sign-up", () => {
+    // FUT-3474: a shopper who came from a store and chose "Cadastre-se" ended
+    // on the default landing, because the link dropped the callbackUrl.
+    const { LoginPage } = pages();
+    render(<LoginPage {...loginProps} callbackUrl="/aliment-sabor?x=1" />);
+
+    expect(screen.getByTestId("go-to-signup").getAttribute("href")).toBe(
+      "/signup?callbackUrl=%2Faliment-sabor%3Fx%3D1",
+    );
+  });
+
+  it("hands the host's initial e-mail to the form", () => {
+    const seen: unknown[] = [];
+    const Form = (props: { initialEmail?: string }): JSX.Element => {
+      seen.push(props.initialEmail);
+      return <div />;
+    };
+    const { LoginPage } = createAuthPages({
+      screens: { ...screensStub(), EmailPasswordForm: Form },
+      copy: PT_BR_PAGES,
+      routes: { login: "/login", signup: "/signup" },
+      Link,
+    });
+    render(<LoginPage {...loginProps} initialEmail="ana@example.com" />);
+
+    expect(seen).toContain("ana@example.com");
+  });
+
   it("renders no footer at all when the host has no sign-up route", () => {
     // A backoffice provisions its accounts. A link to a page that does not
     // exist is worse than no link.
@@ -221,6 +249,15 @@ describe("SignupPage", () => {
     render(<SignupPage {...signupProps} />);
 
     expect(screen.getByTestId("go-to-login").getAttribute("href")).toBe("/login");
+  });
+
+  it("keeps where the person is going on the link back to login", () => {
+    const { SignupPage } = pages();
+    render(<SignupPage {...signupProps} callbackUrl="/aliment-sabor" />);
+
+    expect(screen.getByTestId("go-to-login").getAttribute("href")).toBe(
+      "/login?callbackUrl=%2Faliment-sabor",
+    );
   });
 
   it("drops the divider when e-mail sign-up is off, keeping the providers", () => {

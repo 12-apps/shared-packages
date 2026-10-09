@@ -7,8 +7,44 @@ import { Container } from "@12-apps/ui/layout/Container";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
 import { SocialLoginContainer } from "@12-apps/ui/social-login-button";
 
-import { useScreens } from "./context";
+import type { EmailAuth } from "../create-email-auth";
+import { useScreens, type ScreensSession } from "./context";
 import { failureMessage, type EmailAuthScreenReason } from "./copy";
+
+/** What a verified link led to, for the host to route on. */
+export interface VerifiedOutcome {
+  /** The address the link proved — to prefill a sign-in when `signedIn` is false. */
+  email: string;
+  /** This browser signed up, and is now signed in. */
+  signedIn: boolean;
+}
+
+type VerifyState =
+  | { state: "pending" }
+  | { state: "done" }
+  | { state: "failed"; reason: EmailAuthScreenReason };
+
+/**
+ * Spend the token and, when this browser signed up, sign in with it.
+ *
+ * Signing in is only attempted for a host that asked (`onVerified`): the
+ * others keep the old screen, "confirmed — sign in". A failed sign-in is
+ * still a verified address, so it reports `signedIn: false` rather than an
+ * error — the host's sign-in page is the right next step either way.
+ */
+async function verifyAndSignIn(
+  client: EmailAuth,
+  session: ScreensSession,
+  token: string,
+  callbackUrl: string | undefined,
+): Promise<{ ok: true; outcome: VerifiedOutcome } | { ok: false; reason: EmailAuthScreenReason }> {
+  const verified = await client.verifyEmail(token);
+  if (!verified.ok) return verified;
+  const { email, canSignIn } = verified.data;
+  if (!canSignIn || !session.signInWithLink) return { ok: true, outcome: { email, signedIn: false } };
+  const signedIn = await session.signInWithLink({ token, callbackUrl });
+  return { ok: true, outcome: { email, signedIn: signedIn.ok } };
+}
 
 /**
  * The page the confirmation link opens: spend the token, then say what
@@ -33,33 +69,48 @@ import { failureMessage, type EmailAuthScreenReason } from "./copy";
 export function VerifyEmailScreen({
   token,
   onContinue,
+  onVerified,
+  callbackUrl,
 }: {
   token: string | null;
   onContinue: () => void;
+  /**
+   * Take over once the link is verified (FUT-3474). With it, the browser that
+   * signed up is signed in on the spot and the host is told so; any other is
+   * told the address, so the host can send it to sign in with it filled in.
+   * The screen keeps showing its spinner: the host is expected to navigate.
+   * Without it, the screen says "confirmed" and waits for `onContinue`.
+   */
+  onVerified?: (outcome: VerifiedOutcome) => void;
+  /** Where the sign-in should land, passed through to the session. */
+  callbackUrl?: string;
 }): JSX.Element {
-  const { client, copy } = useScreens();
-  const [state, setState] = useState<"pending" | "done" | "failed">("pending");
-  const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
+  const { client, copy, useSession } = useScreens();
+  const session = useSession();
+  const [view, setView] = useState<VerifyState>({ state: "pending" });
   const attempted = useRef(false);
 
   useEffect(() => {
     if (attempted.current) return;
     attempted.current = true;
     if (!token) {
-      setState("failed");
-      setReason("token-invalid");
+      setView({ state: "failed", reason: "token-invalid" });
       return;
     }
-    void client.verifyEmail(token).then((result) => {
-      if (result.ok) {
-        setState("done");
-      } else {
-        setState("failed");
-        setReason(result.reason);
-      }
+    if (!onVerified) {
+      void client.verifyEmail(token).then((result) => {
+        setView(result.ok ? { state: "done" } : { state: "failed", reason: result.reason });
+      });
+      return;
+    }
+    void verifyAndSignIn(client, session, token, callbackUrl).then((result) => {
+      if (result.ok) onVerified(result.outcome);
+      else setView({ state: "failed", reason: result.reason });
     });
-  }, [client, token]);
+  }, [client, session, token, callbackUrl, onVerified]);
 
+  const { state } = view;
+  const reason = view.state === "failed" ? view.reason : null;
   if (state === "pending") {
     return (
       <Container variant="centered" padding="lg">

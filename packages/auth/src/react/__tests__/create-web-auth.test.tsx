@@ -32,6 +32,17 @@ describe("sameOriginCallbackUrl", () => {
     expect(sameOriginCallbackUrl("/\\evil.example/steal", LOCATION)).toBe(LOCATION.href);
   });
 
+  it.each(["/\t/evil.example/steal", "/\n/evil.example", "/\r\\evil.example", "/\t\\evil.example"])(
+    "rejects %j, which a browser resolves to another origin",
+    (raw) => {
+      expect(sameOriginCallbackUrl(raw, LOCATION)).toBe(LOCATION.href);
+    },
+  );
+
+  it("rejects a javascript: URL", () => {
+    expect(sameOriginCallbackUrl("javascript:alert(1)", LOCATION)).toBe(LOCATION.href);
+  });
+
   it("rejects a different origin", () => {
     expect(sameOriginCallbackUrl("https://evil.example/steal", LOCATION)).toBe(
       LOCATION.href,

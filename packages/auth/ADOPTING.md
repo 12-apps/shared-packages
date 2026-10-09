@@ -13,6 +13,37 @@ const credentials = createEmailCredentials({ store, mailer, settings, appUrl });
 const { SessionProvider, useSession } = createWebAuth();
 ```
 
+## 2.26 — the confirmation link signs in, in the browser that signed up
+
+FUT-3474. A sign-up now leaves an `__Host-auth-signup-binding` cookie in the
+browser that made it (on the taken-address branch too, so the answer still says
+nothing about the address), and the confirmation link can open a session in
+THAT browser only. What a host has to do:
+
+- **Run the migration.** `auth_tokens.purpose` gains `SIGN_IN_GRANT`
+  (`prisma/migrations/20261009200000_auth_sign_in_grant`); a store that refuses
+  the value fails every sign-up.
+- **On the wiring view, pass the raw `request`** to every e-mail route and map a
+  raw answer (`{ response }`) through: `createApiEmailAuth` now answers
+  `WireRouteAnswer` (the breaking change), because the sign-up's `Set-Cookie`
+  cannot ride `{ status, body }`. Without `request` nothing breaks, but no
+  binding is set and links sign nobody in. `@12-apps/wiring` ≥ 1.9.0.
+- **Send JSON.** Every POST/PUT must be `application/json` and not cross-site
+  (`Sec-Fetch-Site`), or it is refused 403 — that is what stops another site
+  planting a binding (login CSRF). The packaged client already does.
+- **Wire `authenticateLink`** into `credentialsProvider` from
+  `credentials.signInWithLink`.
+- **On the verify page, pass `onVerified` and `callbackUrl`** to
+  `VerifyEmailScreen` to take over: `{ signedIn: true }` means navigate to the
+  destination; `{ signedIn: false, email }` means send the person to sign in
+  with `LoginPage`'s new `initialEmail` (hand it over as state, never in the
+  URL). `/verify` now answers `{ email, canSignIn }` instead of `null`.
+
+Limits, on purpose: a RESENT link carries no grant, so it verifies and signs
+nobody in; a second sign-up in the same browser replaces the binding; an
+unspent grant lives as long as its link (24 hours) and is not cleared by a
+password change — it still needs both the mailed token and this browser.
+
 ## Migrating 1.x → 2.0 — one entry point per peer
 
 This package shipped **fifteen** entry points; report-builder ships five. Eleven

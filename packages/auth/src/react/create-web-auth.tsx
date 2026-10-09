@@ -80,6 +80,12 @@ export interface SessionContextValue {
     password: string;
     callbackUrl?: string;
   }) => Promise<PasswordSignInResult>;
+  /**
+   * Sign in with the confirmation link just verified on this page, WITHOUT
+   * leaving it — only the browser that signed up can (its binding cookie
+   * rides the request). Same outcome shape as `signInWithPassword`.
+   */
+  signInWithLink: (input: { token: string; callbackUrl?: string }) => Promise<PasswordSignInResult>;
   /** End the session, then refresh local state. */
   signOut: () => Promise<void>;
 }
@@ -123,9 +129,9 @@ export interface WebAuth {
 /**
  * Restrict a callback URL to same-origin targets (open-redirect defence).
  *
- * A relative path must have a single leading `/`: browsers resolve `//host` and
- * `/\\host` as protocol-relative EXTERNAL URLs, so both are rejected rather than
- * treated as paths.
+ * Judged by where the browser would actually go: `//host`, `/\\host` and a
+ * path hiding a tab or newline all resolve to another origin, and are
+ * rejected rather than treated as paths.
  */
 export function sameOriginCallbackUrl(
   raw: string | undefined,
@@ -133,13 +139,21 @@ export function sameOriginCallbackUrl(
 ): string {
   const fallback = location.href;
   if (!raw) return fallback;
-  const isRelativePath =
-    raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\");
-  return isRelativePath ||
-    raw.startsWith(`${location.origin}/`) ||
-    raw === location.origin
-    ? raw
-    : fallback;
+  // A tab, a newline or a backslash turns "/…" into another origin once the
+  // browser parses it (`/\t/evil.example` is `https://evil.example/`), so
+  // none of them is ever part of a destination.
+  // eslint-disable-next-line no-control-regex -- refusing control characters is the point
+  if (/[\u0000-\u001f\u007f\\]/.test(raw)) return fallback;
+  // Resolved against the ORIGIN, not `href`: callers pass a bare path as the
+  // fallback `href`, which is no base at all.
+  const base = location.origin && location.origin !== "null" ? location.origin : "http://callback.invalid";
+  let resolved: URL;
+  try {
+    resolved = new URL(raw, base);
+  } catch {
+    return fallback;
+  }
+  return resolved.origin === new URL(base).origin ? raw : fallback;
 }
 
 async function fetchSession(basePath: string, fetchImpl: typeof fetch): Promise<Session | null> {
@@ -215,7 +229,7 @@ async function startPasswordSignIn(
   basePath: string,
   fetchImpl: typeof fetch,
   providerId: string,
-  input: { email: string; password: string; callbackUrl?: string },
+  input: { fields: Readonly<Record<string, string>>; callbackUrl?: string },
 ): Promise<PasswordSignInResult> {
   const target = sameOriginCallbackUrl(input.callbackUrl, window.location);
   let csrfToken: string;
@@ -231,8 +245,7 @@ async function startPasswordSignIn(
     fetchImpl,
     providerId,
     csrfToken,
-    email: input.email,
-    password: input.password,
+    fields: input.fields,
     callbackUrl: target,
   });
 }
@@ -333,14 +346,24 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
         password: string;
         callbackUrl?: string;
       }): Promise<PasswordSignInResult> => {
-        const result = await startPasswordSignIn(
-          basePath,
-          fetchImpl,
-          credentialsProviderId,
-          input,
-        );
+        const result = await startPasswordSignIn(basePath, fetchImpl, credentialsProviderId, {
+          fields: { email: input.email, password: input.password },
+          callbackUrl: input.callbackUrl,
+        });
         // The cookie is already set by that response; this is what makes the
         // tree re-render as authenticated without a reload.
+        if (result.ok) await refresh();
+        return result;
+      },
+      [refresh],
+    );
+
+    const signInWithLink = useCallback(
+      async (input: { token: string; callbackUrl?: string }): Promise<PasswordSignInResult> => {
+        const result = await startPasswordSignIn(basePath, fetchImpl, credentialsProviderId, {
+          fields: { linkToken: input.token },
+          callbackUrl: input.callbackUrl,
+        });
         if (result.ok) await refresh();
         return result;
       },
@@ -353,8 +376,8 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
     }, [refresh]);
 
     const value = useMemo(
-      () => ({ session, status, refresh, signIn, signInWithPassword, signOut }),
-      [session, status, refresh, signIn, signInWithPassword, signOut],
+      () => ({ session, status, refresh, signIn, signInWithPassword, signInWithLink, signOut }),
+      [session, status, refresh, signIn, signInWithPassword, signInWithLink, signOut],
     );
 
     return (

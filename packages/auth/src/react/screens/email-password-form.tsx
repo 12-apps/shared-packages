@@ -38,9 +38,13 @@ interface SignInState {
 }
 
 /** The form's state and its one action, so the component below is only markup. */
-function useSignIn(callbackUrl: string, onSignedIn: () => void): SignInState {
+function useSignIn(
+  callbackUrl: string,
+  onSignedIn: () => void,
+  initialEmail: string,
+): SignInState {
   const { signInWithPassword } = useScreens().useSession();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
@@ -160,13 +164,19 @@ export function EmailPasswordForm({
   callbackUrl,
   onSignedIn,
   onForgotPassword,
+  initialEmail = "",
 }: {
   callbackUrl: string;
   onSignedIn: () => void;
   onForgotPassword: () => void;
+  /**
+   * The address to start with — the one a confirmation link just proved,
+   * when it was opened somewhere that could not be signed in. Read once.
+   */
+  initialEmail?: string;
 }): JSX.Element {
   const { copy } = useScreens();
-  const form = useSignIn(callbackUrl, onSignedIn);
+  const form = useSignIn(callbackUrl, onSignedIn, initialEmail);
   const [resent, setResent] = useState(false);
   const unverified = form.reason === "email-not-verified";
 

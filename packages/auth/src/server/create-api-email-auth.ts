@@ -1,7 +1,10 @@
-import type { WireRequest, WireResponse, WireRoute } from "@12-apps/wiring";
+import type { WireRequest, WireRoute, WireRouteAnswer } from "@12-apps/wiring";
+
+import { isForgedPost, parseCookieHeader, serializeAuthCookie } from "./auth-cookies";
 
 import {
   emailAuthRoutes,
+  type EmailAuthResponse,
   type EmailAuthRoute,
   type EmailAuthRoutesConfig,
 } from "./email-routes";
@@ -41,8 +44,22 @@ import {
  */
 type AuthActor = string | null;
 
+/**
+ * A handler's answer as the wire contract carries it.
+ *
+ * `{ status, body }` has nowhere to put a header, so an answer that sets a
+ * cookie (only sign-up's binding, today) goes out RAW, as the same JSON with
+ * its `Set-Cookie` lines. Everything else stays on the JSON half.
+ */
+function toAnswer(result: EmailAuthResponse, canSetCookies: boolean): WireRouteAnswer {
+  if (!canSetCookies || !result.cookies?.length) return { status: result.status, body: result.body };
+  const headers = new Headers({ "Content-Type": "application/json" });
+  for (const cookie of result.cookies) headers.append("Set-Cookie", serializeAuthCookie(cookie));
+  return { response: new Response(JSON.stringify(result.body), { status: result.status, headers }) };
+}
+
 /** Turn one descriptor into a wire route, keeping the session refusal. */
-function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
+function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor, WireRouteAnswer> {
   return {
     method: route.method,
     path: route.path,
@@ -61,7 +78,7 @@ function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
      * Only the wire view has to SAY it, and this is the line that does.
      */
     kind: route.session === true ? "authenticated" : "public",
-    handle: async (request: WireRequest<AuthActor>): Promise<WireResponse> => {
+    handle: async (request: WireRequest<AuthActor>): Promise<WireRouteAnswer> => {
       // Still refused HERE rather than left to the host, because `session` is a
       // property of the ROUTE — which endpoints need a caller is this package's
       // answer, and a host that had to restate it per route would eventually
@@ -70,7 +87,17 @@ function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
       if (route.session && !request.actor) {
         return { status: 401, body: { error: "unauthenticated" } };
       }
-      return route.handle({ body: request.body, userId: request.actor });
+      // Cookies come off the raw request, which a host's adapter may pass for
+      // any route. Without it there is no proving the call came from this
+      // site, so no binding is set and none is read: confirmation links then
+      // verify and sign nobody in, which is the safe way to be miswired.
+      const raw = request.request;
+      if (raw && isForgedPost(raw)) return { status: 403, body: { error: "forbidden" } };
+      const cookies = parseCookieHeader(raw?.headers.get("cookie"));
+      return toAnswer(
+        await route.handle({ body: request.body, userId: request.actor, cookies }),
+        raw !== undefined,
+      );
     },
   };
 }
@@ -80,7 +107,7 @@ function toWireRoute(route: EmailAuthRoute): WireRoute<AuthActor> {
  * account's own password card.
  */
 export function createApiEmailAuth(config: EmailAuthRoutesConfig): {
-  routes: WireRoute<AuthActor>[];
+  routes: WireRoute<AuthActor, WireRouteAnswer>[];
 } {
   return { routes: emailAuthRoutes(config).map(toWireRoute) };
 }
@@ -96,7 +123,7 @@ export function createApiEmailAuth(config: EmailAuthRoutesConfig): {
  * registration on the whole platform in one call.
  */
 export function createApiEmailAuthSettings(config: EmailAuthSettingsRoutesConfig): {
-  routes: WireRoute<AuthActor>[];
+  routes: WireRoute<AuthActor, WireRouteAnswer>[];
 } {
   return { routes: emailAuthSettingsRoutes(config).map(toWireRoute) };
 }

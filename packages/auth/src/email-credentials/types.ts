@@ -10,8 +10,15 @@ import type { PasswordPolicy } from "../password";
  * (optionally) a rate limiter — and gets the whole flow back as functions.
  */
 
-/** What a token is for. The two purposes never share a namespace. */
-export type AuthTokenPurpose = "EMAIL_VERIFICATION" | "PASSWORD_RESET";
+/**
+ * What a token is for. The purposes never share a namespace.
+ *
+ * `SIGN_IN_GRANT` is never mailed. It is the half of a verification link that
+ * only the browser which signed up can spend: its hash is the verification
+ * token's together with the binding cookie that browser was given, so the link
+ * alone does not open a session. See `signUp` and `signInWithLink`.
+ */
+export type AuthTokenPurpose = "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "SIGN_IN_GRANT";
 
 /** The account, as this flow needs to see it. A host's row is much wider. */
 export interface EmailCredentialUser {
@@ -242,6 +249,31 @@ export interface SignUpSuccess {
   status: "verification-sent" | "signed-up";
   /** Absent for `verification-sent`, because that answer must not reveal a user. */
   user?: EmailCredentialUser;
+  /**
+   * `verification-sent` only: the value the caller's browser keeps as the
+   * sign-up binding cookie, so the confirmation link signs in THAT browser
+   * and no other.
+   *
+   * Present on BOTH branches, the same length and minted the same way. On a
+   * taken address it binds nothing, and that is the point: a binding that was
+   * only issued for a free address would answer the question sign-up refuses
+   * to answer.
+   */
+  binding?: string;
+}
+
+/** What a spent verification link tells the page that opened it. */
+export interface VerifiedResult {
+  ok: true;
+  /** The address the link proved, so a page that cannot sign in can prefill it. */
+  email: string;
+  /**
+   * Can THIS browser be signed in with the same link (`signInWithLink`)?
+   *
+   * True only where the caller presented the binding cookie the sign-up left,
+   * and its grant is still unspent.
+   */
+  canSignIn: boolean;
 }
 
 export interface AuthenticatedResult {
@@ -256,6 +288,7 @@ export interface AcknowledgedResult {
 export type SignUpResult = SignUpSuccess | EmailAuthRefusal;
 export type AuthenticateResult = AuthenticatedResult | EmailAuthRefusal;
 export type AcknowledgeResult = AcknowledgedResult | EmailAuthRefusal;
+export type VerifyEmailResult = VerifiedResult | EmailAuthRefusal;
 
 /** What {@link createEmailCredentials} takes. Ports first, then tuning. */
 export interface EmailCredentialsConfig {

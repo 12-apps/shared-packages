@@ -26,6 +26,8 @@ const APP_URL = "https://app.example.com";
 const GOOD_PASSWORD = "uma senha boa 42";
 /** A fixed moment; these tests only need "already verified, at some point". */
 const VERIFIED_AT = new Date("2026-01-01T00:00:00.000Z");
+/** A sign-up binding: 32 random bytes, base64url — the same shape on every branch. */
+const BINDING = expect.stringMatching(/^[A-Za-z0-9_-]{43}$/);
 
 /**
  * A fresh host and flow per test, wired in `beforeEach`.
@@ -62,7 +64,7 @@ describe("signUp", () => {
   it("creates an unverified account and mails it a verification link", async () => {
     const result = await flow.signUp({ email: "Ana@Example.com ", password: GOOD_PASSWORD });
 
-    expect(result).toEqual({ ok: true, status: "verification-sent" });
+    expect(result).toEqual({ ok: true, status: "verification-sent", binding: BINDING });
     const user = await host.findByEmail("ana@example.com");
     expect(user).toBeTruthy();
     expect(user?.emailVerifiedAt).toBeNull();
@@ -113,10 +115,12 @@ describe("signUp", () => {
     const taken = await flow.signUp({ email: "ana@example.com", password: "outra senha 7" });
     const free = await flow.signUp({ email: "bia@example.com", password: "outra senha 7" });
 
-    // Byte-identical. This is the anti-enumeration property; if these ever
-    // differ, sign-up has become a directory of who banks here.
-    expect(taken).toEqual(free);
-    expect(taken).toEqual({ ok: true, status: "verification-sent" });
+    // Identical but for the binding's random bytes, which are the same SHAPE
+    // on both: this is the anti-enumeration property; if these ever differ,
+    // sign-up has become a directory of who banks here.
+    expect(taken).toEqual({ ok: true, status: "verification-sent", binding: BINDING });
+    expect(free).toEqual({ ok: true, status: "verification-sent", binding: BINDING });
+    expect(taken.ok && taken.binding?.length).toBe(free.ok && free.binding?.length);
   });
 
   it("tells the ADDRESS ITSELF that somebody tried, with a way back in", async () => {
@@ -191,6 +195,8 @@ describe("verifyEmail", () => {
 
     await expect(flow.verifyEmail(tokenFromLink(host, "verification"))).resolves.toEqual({
       ok: true,
+      email: "ana@example.com",
+      canSignIn: false,
     });
     expect((await host.findByEmail("ana@example.com"))?.emailVerifiedAt).toBeInstanceOf(Date);
   });
@@ -199,7 +205,7 @@ describe("verifyEmail", () => {
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });
     const token = tokenFromLink(host, "verification");
 
-    await expect(flow.verifyEmail(token)).resolves.toEqual({ ok: true });
+    await expect(flow.verifyEmail(token)).resolves.toMatchObject({ ok: true });
     await expect(flow.verifyEmail(token)).resolves.toEqual({
       ok: false,
       reason: "token-invalid",
