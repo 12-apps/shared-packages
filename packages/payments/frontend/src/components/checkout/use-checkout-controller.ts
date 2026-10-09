@@ -11,7 +11,8 @@ import {
   useSettledPort,
   type Step,
 } from "./checkout-actions";
-import { useStartPayment } from "./start-payment";
+import { useOrderRefresh } from "./cart-changed";
+import { useRaisedOrderRoute, useStartPayment } from "./start-payment";
 import { useConfirmationWait } from "./confirmation-wait";
 import { useCheckoutCopy } from "./copy-context";
 
@@ -144,6 +145,9 @@ export function useCheckoutController(
   const { payWithEmail, handleResolved } = useResolutionActions({
     buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep,
   });
+  // Re-price the order in place when the cart moved under it (FUT-1139), routed as a raise is.
+  const route = useRaisedOrderRoute({ navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep });
+  const refresh = useOrderRefresh({ order, buyer, saveProfile, createOrder, route });
   const retry = useRetryAction({
     decline, order, clearError, setOrder, setDecline, setFinalStatus, setStep, setFreshInstrument,
   });
@@ -166,6 +170,6 @@ export function useCheckoutController(
     ...resumeSurface(resume, confirming),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
-    goToPayment, startPayment, payWithEmail, handleResolved, retry, completed,
+    goToPayment, startPayment, refresh, payWithEmail, handleResolved, retry, completed,
   };
 }

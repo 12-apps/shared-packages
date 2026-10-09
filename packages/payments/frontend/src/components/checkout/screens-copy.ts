@@ -266,6 +266,21 @@ export interface HostedHandoverCopy {
   preparing: string;
 }
 
+/**
+ * The cart changed after this payment was prepared (FUT-1139): another tab, a
+ * price the store moved, a line it stopped selling. The charge prepared for the
+ * OLD basket must not be the one paid, so the step says so and offers the one
+ * control that brings the payment up to date.
+ */
+export interface CartChangedCopy {
+  heading: string;
+  support: string;
+  /** Re-prepares the payment for the cart as it stands now. */
+  refreshAction: string;
+  /** The heading over a refresh that failed; the host's own sentence is the body. */
+  refreshFailed: string;
+}
+
 /** What the browser says when the wire itself failed. */
 export interface CheckoutTransportCopy {
   /** A refusal whose envelope carried no sentence of its own. */
@@ -298,6 +313,7 @@ export interface CheckoutScreensCopy {
   hosted: HostedHandoverCopy;
   transport: CheckoutTransportCopy;
   validation: CheckoutValidationCopy;
+  cartChanged: CartChangedCopy;
   /** The step wrapper's own wait, while the charge is being raised. */
   generatingPayment: string;
   /**

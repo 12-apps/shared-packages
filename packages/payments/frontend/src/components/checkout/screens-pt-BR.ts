@@ -129,6 +129,12 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     invalidResponse: 'Resposta inválida do servidor.',
     offline: 'Não foi possível conectar. Verifique sua conexão e tente novamente.',
   },
+  cartChanged: {
+    heading: 'Seu carrinho mudou',
+    support: 'O pagamento foi preparado para o carrinho anterior. Atualize para pagar o valor certo.',
+    refreshAction: 'Atualizar pagamento',
+    refreshFailed: 'Não foi possível atualizar o pagamento',
+  },
   validation: {
     taxIdInvalid: 'CPF inválido.',
     nameRequired: 'Informe seu nome.',

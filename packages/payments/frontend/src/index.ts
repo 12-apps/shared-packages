@@ -118,6 +118,7 @@ export {
 // pack section by section types the section it is writing (FUT-760).
 export type {
   CardPaneCopy,
+  CartChangedCopy,
   CheckoutScreensCopy,
   CheckoutTransportCopy,
   CheckoutValidationCopy,

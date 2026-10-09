@@ -3,6 +3,7 @@ import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
 import { displayTotals, PayBarTotal } from "./checkout-totals";
+import { CartChangedBoundary, type OrderRefresh } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { useMethodChoice } from "./method-choice";
 import { MethodPicker } from "./method-picker";
@@ -180,6 +181,11 @@ interface PaymentStepProps {
  */
   errorCode?: string | null;
   onGenerate: (method: PaymentMethod) => void;
+  /**
+   * Re-price the raised order IN PLACE, keeping the card form (FUT-1139). Absent,
+   * the step falls back to raising the payment again.
+   */
+  refresh?: OrderRefresh;
   onUseEmail: (email: string) => void;
   /**
    * Present ⇒ the buyer reached this step without a Dados step (FUT-465), so
@@ -240,6 +246,7 @@ export function PaymentStep({
   errorField,
   errorCode,
   onGenerate,
+  refresh,
   onUseEmail,
   onEditBuyer,
   providerConfig,
@@ -261,11 +268,8 @@ export function PaymentStep({
   return (
     <PixStageProvider stage={pixStage}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {/* THE AMOUNT, before anything asks for it (FUT-1179). At the top rather
-            than in a sticky bar of its own: this step's actions belong to the
-            pane below it — the PIX code, the card form's own pay bar, the
-            hand-off button — and a second bar would put two "pay" controls on
-            one screen. */}
+        {/* THE AMOUNT, before anything asks for it (FUT-1179) — at the top, not in a
+            bar of its own: a second bar would put two "pay" controls on one screen. */}
         <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
 
         {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
@@ -278,20 +282,22 @@ export function PaymentStep({
         )}
 
         <StepColumn full={order?.method === "PIX"}>
-          <PaymentBody
-            order={order}
-            buyer={buyer}
-            providerConfig={config}
-            method={method}
-            tenantSlug={tenantSlug}
-            onResolved={onResolved}
-            onStart={choice.onStart}
-            creating={creating}
-            pollIntervalMs={pollIntervalMs}
-            freshInstrument={freshInstrument}
-            basket={basket}
-            validateApplePayMerchant={validateApplePayMerchant}
-          />
+          <CartChangedBoundary {...{ order, creating, onGenerate, refresh }} basket={totalOverride ? undefined : basket}>
+            <PaymentBody
+              order={order}
+              buyer={buyer}
+              providerConfig={config}
+              method={method}
+              tenantSlug={tenantSlug}
+              onResolved={onResolved}
+              onStart={choice.onStart}
+              creating={creating}
+              pollIntervalMs={pollIntervalMs}
+              freshInstrument={freshInstrument}
+              basket={basket}
+              validateApplePayMerchant={validateApplePayMerchant}
+            />
+          </CartChangedBoundary>
         </StepColumn>
 
         <StepColumn>

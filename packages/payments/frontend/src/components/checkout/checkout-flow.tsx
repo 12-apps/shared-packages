@@ -297,6 +297,7 @@ function PagamentoStep({
       errorField={c.errorField}
       errorCode={c.errorCode}
       onGenerate={(chosen) => void c.startPayment(chosen)}
+      refresh={c.refresh}
       onUseEmail={c.payWithEmail}
       // Set only for a skipped-Dados flow (the controller decides); the payer
       // block hides itself when it is absent.
@@ -307,8 +308,7 @@ function PagamentoStep({
       cartTotals={cart}
       totalOverride={settlementTotalOverride(settlement)}
       discountLines={cart.discountLines}
-      // Retrying a refused card: the saved card that failed is not chosen for
-      // them again (FUT-1145).
+      // Retrying a refused card: the failed saved card is not chosen again (FUT-1145).
       freshInstrument={c.freshInstrument}
       // The card path parks an order of its own for a 3-D Secure challenge, so
       // it needs the same basket the flow was mounted for (FUT-1213).
