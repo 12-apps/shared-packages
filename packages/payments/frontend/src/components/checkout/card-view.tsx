@@ -8,6 +8,7 @@ import {
   type CardTokenizationConfig,
 } from "../../card";
 
+import { useRefreshOnCartChanged } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { StalledWait } from "./stalled-wait";
@@ -192,11 +193,11 @@ export function CardView({
     freshInstrument,
     { tenantSlug, basket },
   );
-  // A charge NOBODY can confirm yet is not a decline (FUT-563). Some provider
-  // may be holding the buyer's money, so it gets its own presentation: the
-  // danger heading "Não foi possível pagar" contradicts the body's "não pague
-  // de novo" and pushes the buyer toward exactly the retry it forbids.
+  // A charge NOBODY can confirm yet is not a decline (FUT-563): a provider may
+  // hold the money, and "Não foi possível pagar" over "não pague de novo"
+  // pushes the buyer toward exactly the retry it forbids.
   const unresolved = cc.errorCode === UNRESOLVED_CODE;
+  useRefreshOnCartChanged(cc.errorCode); // re-priced by the host (FUT-1139)
 
   if (cc.submitted) {
     return <SubmittedState card={cc} />;

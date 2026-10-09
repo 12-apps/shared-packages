@@ -143,6 +143,12 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     invalidResponse: 'Invalid response from the server.',
     offline: 'Could not connect. Check your connection and try again.',
   },
+  cartChanged: {
+    heading: 'Your cart changed',
+    support: 'This payment was prepared for your previous cart. Update it to pay the right amount.',
+    refreshAction: 'Update payment',
+    refreshFailed: 'Could not update the payment',
+  },
   validation: {
     taxIdInvalid: 'That CPF is not valid.',
     nameRequired: 'Enter your name.',

@@ -124,28 +124,57 @@ export function useStartPayment(input: {
         failure.fail(result.error);
         return;
       }
-      // NOTHING LEFT TO PAY — see the docblock. Parked first for the same
-      // reason every other raised order is: the confirmation this is about to
-      // show has to survive a tab the phone discards on the way to it.
-      if (result.data.status !== "AWAITING_PAYMENT") {
-        rememberHostedOrder(result.data, { tenantSlug, basket: parkedBasket(basket) });
-        setOrder(result.data);
-        setFinalStatus(result.data.status);
-        setStep("status");
-        return;
-      }
-      if (handOverToProvider(result.data, navigate, tenantSlug, basket)) return;
-      // PARKED EVEN THOUGH NOBODY IS LEAVING (FUT-1140). A low-memory phone
-      // discards this tab while the shopper is in their bank app, and the SPA
-      // that comes back has never heard of the order it raised — so the buyer
-      // meets an empty cart and a retry button instead of the confirmation for
-      // the payment they just made.
-      rememberHostedOrder(result.data, { tenantSlug, basket: parkedBasket(basket) });
-      setOrder(result.data);
+      routeRaisedOrder(result.data, { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep });
     },
     [
       buyer, saveProfile, createOrder, failure, navigate, tenantSlug, basket,
       setCreating, setDecline, setOrder, setFinalStatus, setStep,
     ],
+  );
+}
+
+/**
+ * What becomes of an order the host just raised — or re-priced (FUT-1139): the
+ * three outcomes of {@link useStartPayment} after its refusal branch, shared so
+ * a refresh routes a PAID or handed-off answer exactly as a raise does.
+ */
+export function routeRaisedOrder(
+  order: CheckoutOrder,
+  ctx: {
+    navigate: CheckoutNavigate;
+    tenantSlug: string | undefined;
+    basket: CheckoutBasketIdentity | undefined;
+    setOrder: Dispatch<SetStateAction<CheckoutOrder | null>>;
+    setFinalStatus: Dispatch<SetStateAction<OrderStatus | null>>;
+    setStep: Dispatch<SetStateAction<Step>>;
+  },
+): void {
+  const { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep } = ctx;
+  // NOTHING LEFT TO PAY — see the docblock. Parked first for the same
+  // reason every other raised order is: the confirmation this is about to
+  // show has to survive a tab the phone discards on the way to it.
+  if (order.status !== "AWAITING_PAYMENT") {
+    rememberHostedOrder(order, { tenantSlug, basket: parkedBasket(basket) });
+    setOrder(order);
+    setFinalStatus(order.status);
+    setStep("status");
+    return;
+  }
+  if (handOverToProvider(order, navigate, tenantSlug, basket)) return;
+  // PARKED EVEN THOUGH NOBODY IS LEAVING (FUT-1140). A low-memory phone
+  // discards this tab while the shopper is in their bank app, and the SPA
+  // that comes back has never heard of the order it raised — so the buyer
+  // meets an empty cart and a retry button instead of the confirmation for
+  // the payment they just made.
+  rememberHostedOrder(order, { tenantSlug, basket: parkedBasket(basket) });
+  setOrder(order);
+}
+
+/** {@link routeRaisedOrder}, bound to one checkout and stable while its inputs are. */
+export function useRaisedOrderRoute(ctx: Parameters<typeof routeRaisedOrder>[1]): (order: CheckoutOrder) => void {
+  const { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep } = ctx;
+  return useCallback(
+    (order: CheckoutOrder) => routeRaisedOrder(order, { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep }),
+    [navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep],
   );
 }
