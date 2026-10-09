@@ -1,4 +1,4 @@
-import type { PreviousRun, SessionMarker } from "./index";
+import type { SessionMarker, TelemetryReport } from "./index";
 
 /**
  * When a run that came back as the OLD version calls an install failed
@@ -18,11 +18,26 @@ import type { PreviousRun, SessionMarker } from "./index";
  */
 export const INSTALL_VERDICT_MS = 120_000;
 
+/** The previous run, as this one finds it. */
+export interface PreviousRun {
+  /** This run is the relaunch an update started. */
+  byUpdate: boolean;
+  /** What to report about it, if anything. */
+  lost: TelemetryReport | null;
+  /** The version it restarted to install, when it did. */
+  target: string | null;
+  /** When that restart was asked for, when the marker says. */
+  since: string | null;
+  /** How long an install's verdict must still wait; 0 to give it now. */
+  verdictInMs: number;
+}
+
 /** How much of {@link INSTALL_VERDICT_MS} is left since `since` — 0 for no `since`. */
 export function verdictWait(since: string | null, now: Date): number {
   const asked = since === null ? Number.NaN : Date.parse(since);
   if (Number.isNaN(asked)) return 0;
-  return Math.max(0, asked + INSTALL_VERDICT_MS - now.getTime());
+  // Capped: a clock set back since the request must not stretch the wait.
+  return Math.min(INSTALL_VERDICT_MS, Math.max(0, asked + INSTALL_VERDICT_MS - now.getTime()));
 }
 
 /**
@@ -41,7 +56,8 @@ export function awaitVerdict(
   marker.installing = previous.target;
   marker.installingSince = previous.since;
   later(() => {
-    if (marker.installing !== previous.target) return;
+    // Still waiting on THAT request — not on a later one for the same version.
+    if (marker.installing !== previous.target || marker.installingSince !== previous.since) return;
     marker.installing = null;
     marker.installingSince = null;
     report();

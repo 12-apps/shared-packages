@@ -431,3 +431,21 @@ describe("an install the old version came back from", () => {
     expect(box.disk.marker).toMatchObject({ installing: "0.1.67", installingSince: NOW().toISOString() });
   });
 });
+
+describe("an install asked for again while the first one's verdict waits (FUT-3309)", () => {
+  it("leaves the new request standing when the old verdict comes due", async () => {
+    const box = memory({
+      marker: previousRun({ installing: "0.1.67", installingSince: "2026-09-25T17:59:50.000Z" }),
+    });
+    let clock = NOW();
+    const old = createTelemetry({ files: box.files, version: "0.1.60", now: () => clock, later: box.later });
+    await old.start();
+
+    clock = new Date(NOW().getTime() + 90_000);
+    await old.installing("0.1.67");
+    for (const fire of box.timers.splice(0)) fire();
+
+    expect(box.disk.marker).toMatchObject({ installing: "0.1.67", installingSince: clock.toISOString() });
+    expect(box.disk.queue).toEqual([]);
+  });
+});

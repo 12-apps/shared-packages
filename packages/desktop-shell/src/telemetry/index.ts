@@ -28,7 +28,7 @@
  * person at the machine, which is why they are English and not a copy port.
  */
 
-import { awaitVerdict, verdictWait } from "./install-verdict";
+import { awaitVerdict, verdictWait, type PreviousRun } from "./install-verdict";
 
 export { INSTALL_VERDICT_MS } from "./install-verdict";
 
@@ -154,19 +154,20 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
     void persistQueue();
   };
 
-
   return {
     async start(listDumps) {
       state.queue.push(...(await options.files.readQueue().catch(() => [])));
       const previous = await readPrevious(options, now(), listDumps);
       state.byUpdate = previous.byUpdate;
       state.failedInstall = previous.lost?.kind === "install-failed" ? previous.target : null;
-      if (previous.lost !== null && previous.verdictInMs > 0) {
-        awaitVerdict(marker, previous, () => {
-          if (previous.lost !== null) enqueue(previous.lost);
+      const { lost } = previous;
+      if (lost !== null && previous.verdictInMs > 0) {
+        const report = (): void => {
+          enqueue(lost);
           void persistMarker();
-        }, later);
-      } else if (previous.lost !== null) enqueue(previous.lost);
+        };
+        awaitVerdict(marker, previous, report, later);
+      } else if (lost !== null) enqueue(lost);
       state.queue.splice(0, Math.max(0, state.queue.length - QUEUE_LIMIT));
       state.loaded = true;
       await persistMarker();
@@ -242,20 +243,6 @@ function complete(
   };
 }
 
-/** The previous run, as this one finds it. */
-export interface PreviousRun {
-  /** This run is the relaunch an update started. */
-  byUpdate: boolean;
-  /** What to report about it, if anything. */
-  lost: TelemetryReport | null;
-  /** The version it restarted to install, when it did. */
-  target: string | null;
-  /** When that restart was asked for, when the marker says. */
-  since: string | null;
-  /** How long an install's verdict must still wait; 0 to give it now. */
-  verdictInMs: number;
-}
-
 /** The previous run, as this one finds it: an update's relaunch, or a loss to report. */
 async function readPrevious(
   options: TelemetryOptions,
@@ -269,7 +256,6 @@ async function readPrevious(
   const since = previous.installingSince ?? null;
   return { byUpdate, lost, target: previous.installing, since, verdictInMs: verdictWait(since, now) };
 }
-
 
 /** Send oldest first; drop what will never be accepted, stop at anything else. */
 async function flushQueue(
