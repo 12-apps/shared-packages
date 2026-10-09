@@ -47,6 +47,44 @@ async function verifyAndSignIn(
 }
 
 /**
+ * Spend the token once, and say what happened.
+ *
+ * The ref is the StrictMode guard the screen's docblock explains: a second
+ * mount must not spend a single-use token a second time.
+ */
+function useVerification(
+  token: string | null,
+  onVerified: ((outcome: VerifiedOutcome) => void) | undefined,
+  callbackUrl: string | undefined,
+): VerifyState {
+  const { client, useSession } = useScreens();
+  const session = useSession();
+  const [view, setView] = useState<VerifyState>({ state: "pending" });
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (attempted.current) return;
+    attempted.current = true;
+    if (!token) {
+      setView({ state: "failed", reason: "token-invalid" });
+      return;
+    }
+    if (!onVerified) {
+      void client.verifyEmail(token).then((result) => {
+        setView(result.ok ? { state: "done" } : { state: "failed", reason: result.reason });
+      });
+      return;
+    }
+    void verifyAndSignIn(client, session, token, callbackUrl).then((result) => {
+      if (result.ok) onVerified(result.outcome);
+      else setView({ state: "failed", reason: result.reason });
+    });
+  }, [client, session, token, callbackUrl, onVerified]);
+
+  return view;
+}
+
+/**
  * The page the confirmation link opens: spend the token, then say what
  * happened.
  *
@@ -85,30 +123,8 @@ export function VerifyEmailScreen({
   /** Where the sign-in should land, passed through to the session. */
   callbackUrl?: string;
 }): JSX.Element {
-  const { client, copy, useSession } = useScreens();
-  const session = useSession();
-  const [view, setView] = useState<VerifyState>({ state: "pending" });
-  const attempted = useRef(false);
-
-  useEffect(() => {
-    if (attempted.current) return;
-    attempted.current = true;
-    if (!token) {
-      setView({ state: "failed", reason: "token-invalid" });
-      return;
-    }
-    if (!onVerified) {
-      void client.verifyEmail(token).then((result) => {
-        setView(result.ok ? { state: "done" } : { state: "failed", reason: result.reason });
-      });
-      return;
-    }
-    void verifyAndSignIn(client, session, token, callbackUrl).then((result) => {
-      if (result.ok) onVerified(result.outcome);
-      else setView({ state: "failed", reason: result.reason });
-    });
-  }, [client, session, token, callbackUrl, onVerified]);
-
+  const { copy } = useScreens();
+  const view = useVerification(token, onVerified, callbackUrl);
   const { state } = view;
   const reason = view.state === "failed" ? view.reason : null;
   if (state === "pending") {

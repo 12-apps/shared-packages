@@ -73,9 +73,15 @@ describe("sign-up's binding cookie, through the Hono mount", () => {
     expect(taken).toEqual(free);
     expect(taken.status).toBe(200);
     expect(taken.body).toEqual({ data: { status: "verification-sent" } });
-    expect(taken.cookie.shape).toBe(
-      `${SIGNUP_BINDING_COOKIE}=…; Max-Age=86400; Path=/; HttpOnly; Secure; SameSite=Lax`,
-    );
+    // Every attribute, in order: the whole line is the contract.
+    expect(taken.cookie.shape.split("; ")).toEqual([
+      `${SIGNUP_BINDING_COOKIE}=…`,
+      "Max-Age=86400",
+      "Path=/",
+      "HttpOnly",
+      "Secure",
+      "SameSite=Lax",
+    ]);
   });
 
   it("lets only the browser carrying it sign in from the verify answer", async () => {

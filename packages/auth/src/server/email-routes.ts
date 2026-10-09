@@ -206,6 +206,56 @@ function optionalStr(body: unknown, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+/** A refusal in the caller's language, as `refuserFor` binds it. */
+type Refuser = (refusalResult: EmailAuthRefusal, locale: string | undefined) => EmailAuthResponse;
+
+/**
+ * `POST /signup`. `user` is deliberately absent from the answer: on the
+ * `verification-sent` branch there may not be one, and answering with it on
+ * the other branch would make the two distinguishable by shape alone. The
+ * binding cookie is set on BOTH of those branches, for the same reason.
+ */
+function signupRoute(
+  credentials: EmailCredentials,
+  refuse: Refuser,
+  onSignedUp: EmailAuthRoutesConfig["onSignedUp"],
+): EmailAuthRoute {
+  return {
+    method: "POST",
+    path: "/signup",
+    handle: async ({ body, locale }) => {
+      const email = str(body, "email");
+      const name = optionalStr(body, "name");
+      const result = await credentials.signUp({
+        email,
+        password: str(body, "password"),
+        name,
+        callbackUrl: optionalStr(body, "callbackUrl"),
+      });
+      if (!result.ok) return refuse(result, locale);
+      await onSignedUp?.({ email, name });
+      return { ...ok({ status: result.status }), cookies: bindingCookie(result.binding) };
+    },
+  };
+}
+
+/** `POST /verify`: the binding cookie, when sent, decides `canSignIn`. */
+function verifyRoute(credentials: EmailCredentials, refuse: Refuser): EmailAuthRoute {
+  return {
+    method: "POST",
+    path: "/verify",
+    handle: async ({ body, locale, cookies }) => {
+      const result = await credentials.verifyEmail(
+        str(body, "token"),
+        cookies?.[SIGNUP_BINDING_COOKIE],
+      );
+      return result.ok
+        ? ok({ email: result.email, canSignIn: result.canSignIn })
+        : refuse(result, locale);
+    },
+  };
+}
+
 /**
  * Build the eight descriptors.
  *
@@ -220,40 +270,8 @@ export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[]
   const refuse = refuserFor(config.messages);
 
   return [
-    {
-      method: "POST",
-      path: "/signup",
-      handle: async ({ body, locale }) => {
-        const email = str(body, "email");
-        const name = optionalStr(body, "name");
-        const result = await credentials.signUp({
-          email,
-          password: str(body, "password"),
-          name,
-          callbackUrl: optionalStr(body, "callbackUrl"),
-        });
-        if (!result.ok) return refuse(result, locale);
-        await onSignedUp?.({ email, name });
-        // `user` is deliberately absent: on the `verification-sent` branch there
-        // may not be one, and answering with it on the other branch would make
-        // the two distinguishable by shape alone. The binding cookie is set on
-        // BOTH of those branches, for the same reason.
-        return { ...ok({ status: result.status }), cookies: bindingCookie(result.binding) };
-      },
-    },
-    {
-      method: "POST",
-      path: "/verify",
-      handle: async ({ body, locale, cookies }) => {
-        const result = await credentials.verifyEmail(
-          str(body, "token"),
-          cookies?.[SIGNUP_BINDING_COOKIE],
-        );
-        return result.ok
-          ? ok({ email: result.email, canSignIn: result.canSignIn })
-          : refuse(result, locale);
-      },
-    },
+    signupRoute(credentials, refuse, onSignedUp),
+    verifyRoute(credentials, refuse),
     {
       method: "POST",
       path: "/resend-verification",

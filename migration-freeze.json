@@ -1,6 +1,7 @@
 {
   "packages/audit/prisma/migrations/20260813120000_add_audit_log/migration.sql": "06f18dc3f4ba5c975a3446ccd2332ce7cebf6299c31bc44803236327c3e72a73",
   "packages/auth/prisma/migrations/20260819230000_auth_email_password/migration.sql": "e0d2ee4a595f18307b00a19707d4253da78a03f8d0f823d38fa4c18b7250c977",
+  "packages/auth/prisma/migrations/20261009200000_auth_sign_in_grant/migration.sql": "6145f2b1b7f5f04de668be1869c9d81f3345524a65573b40487c62fc02adb623",
   "packages/chat/prisma/migrations/20261002120000_add_chat/migration.sql": "e1dff2c462e51ba09b3006173d11ea908123fa44f843f393ee5ccb80d354de31",
   "packages/chat/prisma/migrations/20261003120000_add_chat_thread_activity_index/migration.sql": "4aa5d1f8b2470a52baabb422944e86a5ad9884b1fb540d59f855bd0c52b4cc8a",
   "packages/discounts/prisma/migrations/20260821140000_discounts_package_owned/migration.sql": "a10924dab134019fbeb62b772db79a36dc423d7581644c3a20e3105798abd5c1",
@@ -73,6 +74,7 @@
   "packages/prisma/prisma/migrations/20261002130000_push_attention_level/migration.sql": "5864a4554d24cfb4f79f258ed25b924ee095e52cb3997105303a0e86ddafcc34",
   "packages/prisma/prisma/migrations/20261003120000_add_chat_thread_activity_index/migration.sql": "4aa5d1f8b2470a52baabb422944e86a5ad9884b1fb540d59f855bd0c52b4cc8a",
   "packages/prisma/prisma/migrations/20261006120000_shift_slots/migration.sql": "854df50f19b925d46c524ff49fdef1a798bf32e7df6d741e20e26a569817270f",
+  "packages/prisma/prisma/migrations/20261009200000_auth_sign_in_grant/migration.sql": "6145f2b1b7f5f04de668be1869c9d81f3345524a65573b40487c62fc02adb623",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",

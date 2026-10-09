@@ -160,12 +160,7 @@ function UnverifiedNotice({
   );
 }
 
-export function EmailPasswordForm({
-  callbackUrl,
-  onSignedIn,
-  onForgotPassword,
-  initialEmail = "",
-}: {
+interface EmailPasswordFormProps {
   callbackUrl: string;
   onSignedIn: () => void;
   onForgotPassword: () => void;
@@ -174,7 +169,14 @@ export function EmailPasswordForm({
    * when it was opened somewhere that could not be signed in. Read once.
    */
   initialEmail?: string;
-}): JSX.Element {
+}
+
+export function EmailPasswordForm({
+  callbackUrl,
+  onSignedIn,
+  onForgotPassword,
+  initialEmail = "",
+}: EmailPasswordFormProps): JSX.Element {
   const { copy } = useScreens();
   const form = useSignIn(callbackUrl, onSignedIn, initialEmail);
   const [resent, setResent] = useState(false);

@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
+import { useCredentialsSignIn } from "./credentials-sign-in";
 import { postPasswordSignIn, type PasswordSignInResult } from "./password-signin";
 
 /**
@@ -344,35 +345,12 @@ export function createWebAuth(config: WebAuthConfig = {}): WebAuth {
       [],
     );
 
-    const signInWithPassword = useCallback(
-      async (input: {
-        email: string;
-        password: string;
-        callbackUrl?: string;
-      }): Promise<PasswordSignInResult> => {
-        const result = await startPasswordSignIn(basePath, fetchImpl, credentialsProviderId, {
-          fields: { email: input.email, password: input.password },
-          callbackUrl: input.callbackUrl,
-        });
-        // The cookie is already set by that response; this is what makes the
-        // tree re-render as authenticated without a reload.
-        if (result.ok) await refresh();
-        return result;
-      },
-      [refresh],
+    const post = useCallback(
+      (fields: Record<string, string>, callbackUrl?: string) =>
+        startPasswordSignIn(basePath, fetchImpl, credentialsProviderId, { fields, callbackUrl }),
+      [],
     );
-
-    const signInWithLink = useCallback(
-      async (input: { token: string; callbackUrl?: string }): Promise<PasswordSignInResult> => {
-        const result = await startPasswordSignIn(basePath, fetchImpl, credentialsProviderId, {
-          fields: { linkToken: input.token },
-          callbackUrl: input.callbackUrl,
-        });
-        if (result.ok) await refresh();
-        return result;
-      },
-      [refresh],
-    );
+    const { signInWithPassword, signInWithLink } = useCredentialsSignIn(post, refresh);
 
     const signOut = useCallback(async () => {
       await postSignOut(basePath, fetchImpl);

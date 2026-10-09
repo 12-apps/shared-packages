@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 
 import { isForgedPost, parseCookieHeader, serializeAuthCookie } from "../server/auth-cookies";
-import { emailAuthRoutes, type EmailAuthRoute, type EmailAuthRoutesConfig } from "../server/email-routes";
+import {
+  emailAuthRoutes,
+  type EmailAuthResponse,
+  type EmailAuthRoute,
+  type EmailAuthRoutesConfig,
+} from "../server/email-routes";
 import {
   emailAuthSettingsRoutes,
   type EmailAuthSettingsRoutesConfig,
@@ -53,6 +58,13 @@ async function readBody(c: Context): Promise<unknown> {
   }
 }
 
+/** Write the cookies a handler asked for, with the package's fixed attributes. */
+function setCookies(c: Context, cookies: EmailAuthResponse["cookies"]): void {
+  for (const cookie of cookies ?? []) {
+    c.header("Set-Cookie", serializeAuthCookie(cookie), { append: true });
+  }
+}
+
 /** Turn descriptors into a Hono app. Shared by both routers below. */
 function toRouter(routes: EmailAuthRoute[], resolveUserId: ResolveUserId): Hono {
   const app = new Hono();
@@ -70,9 +82,7 @@ function toRouter(routes: EmailAuthRoute[], resolveUserId: ResolveUserId): Hono 
         userId,
         cookies: parseCookieHeader(c.req.header("cookie")),
       });
-      for (const cookie of result.cookies ?? []) {
-        c.header("Set-Cookie", serializeAuthCookie(cookie), { append: true });
-      }
+      setCookies(c, result.cookies);
       return c.json(result.body as object, result.status as 200);
     };
 
