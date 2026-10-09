@@ -180,10 +180,13 @@ function Message(props: {
   );
 }
 
-/** The web's quick-reply row (and native's `chip` look): ui's outlined chips, wrapping. */
+/**
+ * The web's quick-reply row, and native's default (`chip`, wrapping, heading
+ * shown): ui's outlined chips, wrapping. A hidden heading stays the row's
+ * accessible name (`aria-label`; native routes that case to its own row).
+ */
 export function ChipQuickReplies(props: ChatQuickRepliesProps): JSX.Element {
-  // Hidden heading: still the row's accessible name. A bag, so both renderers' Stack types accept it.
-  const named = props.headingVisible ? {} : { "aria-label": props.heading, accessibilityLabel: props.heading };
+  const named = props.headingVisible ? {} : { "aria-label": props.heading };
   return (
     <Stack gap={1} testID="chat-quick-replies" {...named}>
       {props.headingVisible ? (
@@ -191,7 +194,7 @@ export function ChipQuickReplies(props: ChatQuickRepliesProps): JSX.Element {
           {props.heading}
         </Text>
       ) : null}
-      <Box direction="row" wrap gap={1} testID="chat-quick-row">
+      <Box direction="row" wrap gap={1}>
         {props.replies.map((reply) => (
           <Chip
             key={reply.key}
@@ -224,7 +227,7 @@ function noticeOf(options: ChatViewOptions, copy: ChatUiCopy, failure: ChatSendF
 }
 
 /** Tell the host 0 whenever no notice is drawn, and when the writing area goes away. */
-function useNoticeHeight(drawn: boolean, onNoticeHeight?: (height: number) => void): (height: number) => void {
+function useNoticeHeight(drawn: boolean, onNoticeHeight?: (height: number) => void): ((height: number) => void) | undefined {
   const latest = useRef(onNoticeHeight);
   useEffect(() => {
     latest.current = onNoticeHeight;
@@ -233,13 +236,21 @@ function useNoticeHeight(drawn: boolean, onNoticeHeight?: (height: number) => vo
     if (!drawn) latest.current?.(0);
   }, [drawn]);
   useEffect(() => () => latest.current?.(0), []);
-  return (height) => latest.current?.(height);
+  // Measured only for a host that asked: the default path draws the notice exactly as before.
+  return onNoticeHeight ? (height) => latest.current?.(height) : undefined;
 }
 
-/** The failure on screen: none once the draft was edited after it, in the compact look. */
-function useShownFailure(failure: ChatSendFailure | null): { shown: ChatSendFailure | null; dismiss: () => void } {
+/**
+ * The failure on screen. In the compact look an edit made while one shows
+ * dismisses it (`onEdit`); a later failure is a new one, and shows again.
+ */
+function useShownFailure(
+  failure: ChatSendFailure | null,
+  compact: boolean,
+): { shown: ChatSendFailure | null; onEdit?: () => void } {
   const [dismissed, setDismissed] = useState<ChatSendFailure | null>(null);
-  return { shown: failure !== null && failure !== dismissed ? failure : null, dismiss: () => setDismissed(failure) };
+  const shown = failure !== null && failure !== dismissed ? failure : null;
+  return { shown, onEdit: compact && shown ? () => setDismissed(shown) : undefined };
 }
 
 /** The chips under the list, unless the host folded them or the role has none. */
@@ -258,38 +269,45 @@ function ReplyRow(props: ChatThreadViewProps & { thread: ChatWireThread }): JSX.
   );
 }
 
-/** The field and its send action, with the compact notice (if any) right on it. */
+/**
+ * The field and its send action. In the compact look it is wrapped with the
+ * notice slot right over it — always, so the field is never remounted (and
+ * the keyboard never dropped) when a notice comes or goes; in the default
+ * look it is the writing area's own child, as it always was.
+ */
 function ComposerBlock(
-  props: ChatThreadViewProps & { thread: ChatWireThread; notice: ReactNode; onEdit: () => void },
+  props: ChatThreadViewProps & { thread: ChatWireThread; compact: boolean; notice: ReactNode; onEdit?: () => void },
 ): JSX.Element | null {
-  const { controls, copy, options, thread, notice } = props;
+  const { controls, copy, options, thread } = props;
   const { Composer } = props.platform;
   const [draft, setDraft] = useState("");
-  if (notice === null && !thread.freeText) return null;
   const submit = async (): Promise<void> => {
     if (draft.trim() === "" || controls.sending) return;
     const sent = draft;
     // Only what was sent is cleared: the field stays live during the send.
     if (await controls.send(sent)) setDraft((current) => (current === sent ? "" : current));
   };
+  const composer = thread.freeText ? (
+    <Composer
+      value={draft}
+      onChange={(text) => {
+        props.onEdit?.();
+        setDraft(text);
+      }}
+      onSubmit={() => void submit()}
+      sending={controls.sending}
+      maxLength={thread.maxLength}
+      copy={copy}
+      disableSendWhenEmpty={options.sendWhenEmpty === "disabled"}
+      onFocusChange={props.onComposerFocusChange}
+    />
+  ) : null;
+  if (!props.compact) return composer;
+  if (props.notice === null && composer === null) return null;
   return (
     <Stack gap={0.5}>
-      {notice}
-      {thread.freeText ? (
-        <Composer
-          value={draft}
-          onChange={(text) => {
-            props.onEdit();
-            setDraft(text);
-          }}
-          onSubmit={() => void submit()}
-          sending={controls.sending}
-          maxLength={thread.maxLength}
-          copy={copy}
-          disableSendWhenEmpty={options.sendWhenEmpty === "disabled"}
-          onFocusChange={props.onComposerFocusChange}
-        />
-      ) : null}
+      {props.notice}
+      {composer}
     </Stack>
   );
 }
@@ -298,7 +316,7 @@ function Writing(props: ChatThreadViewProps): JSX.Element {
   const { controls, copy, options } = props;
   const { Notice } = props.platform;
   const compact = options.sendFailureNotice === "compact";
-  const failure = useShownFailure(controls.sendFailure);
+  const failure = useShownFailure(controls.sendFailure, compact);
   const thread = controls.payload?.thread;
   const onHeight = useNoticeHeight(thread?.canWrite === true && failure.shown !== null, props.onNoticeHeight);
   if (!thread) return <></>;
@@ -313,12 +331,16 @@ function Writing(props: ChatThreadViewProps): JSX.Element {
     <Stack gap={2}>
       {compact ? null : notice}
       <ReplyRow {...props} thread={thread} />
-      <ComposerBlock {...props} thread={thread} notice={compact ? notice : null} onEdit={compact ? failure.dismiss : noop} />
+      <ComposerBlock
+        {...props}
+        thread={thread}
+        compact={compact}
+        notice={compact ? notice : null}
+        onEdit={failure.onEdit}
+      />
     </Stack>
   );
 }
-
-const noop = (): void => undefined;
 
 function Messages(props: ChatThreadViewProps & { messages: readonly ChatWireMessage[] }): JSX.Element {
   const { copy, formatTime, messages, options } = props;

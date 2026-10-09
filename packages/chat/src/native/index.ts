@@ -30,9 +30,9 @@ export interface NativeChatSurfaceConfig extends ChatSurfaceConfig {
 const LOOKS: readonly NativeQuickReplyLook[] = ["chip", "pill"];
 
 export function createNativeChat(config: NativeChatSurfaceConfig): ChatSurface {
-  const look = config?.quickReplyLook ?? "chip";
+  const look = config.quickReplyLook ?? "chip";
   if (!LOOKS.includes(look)) throw new ChatConfigError(`quickReplyLook must be one of ${LOOKS.join(", ")}.`);
-  const below = config?.quickReplyScrollBelowWidth;
+  const below = config.quickReplyScrollBelowWidth;
   if (below !== undefined && !(Number.isFinite(below) && below > 0)) {
     throw new ChatConfigError("quickReplyScrollBelowWidth must be a positive number of dp when given.");
   }

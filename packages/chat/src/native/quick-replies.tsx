@@ -6,7 +6,8 @@
  *    touch target on the road. Drawn here rather than with ui's `Chip`, whose
  *    pill is 32 tall and whose filled neutral label is regular weight.
  *
- * The chips wrap, {@link NATIVE_CHAT_METRICS.quickReplyGap} dp apart. Below
+ * The default (chips, wrapping, heading drawn) is the shared row the web
+ * draws. Otherwise the chips wrap, {@link NATIVE_CHAT_METRICS.quickReplyGap} dp apart. Below
  * `scrollBelowWidth` (the window's width, in dp) they sit on ONE line that
  * scrolls sideways instead, so a narrow phone does not give the messages'
  * height to four rows of chips.
@@ -19,7 +20,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import type { ComponentType, JSX, ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type TextProps } from "react-native";
 
-import type { ChatQuickRepliesProps } from "../ui/thread-view";
+import { ChipQuickReplies, type ChatQuickRepliesProps } from "../ui/thread-view";
 
 /** The quick-reply row's numbers, for a host that sizes the room around the thread. */
 export const NATIVE_CHAT_METRICS = {
@@ -99,6 +100,8 @@ export function nativeQuickReplies(look: NativeQuickReplyLook, scrollBelowWidth?
   return function NativeQuickReplies(props: ChatQuickRepliesProps): JSX.Element {
     const { width } = useWindowDimensions();
     const oneLine = scrollBelowWidth !== undefined && width < scrollBelowWidth;
+    // The default — chips, wrapping, heading drawn — is the shared row, the same tree as the web's.
+    if (look === "chip" && !oneLine && props.headingVisible) return <ChipQuickReplies {...props} />;
     return (
       <View
         style={styles.block}

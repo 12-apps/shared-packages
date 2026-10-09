@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { EN_US_CHAT_UI_COPY } from "../client/en-US";
+import { ChatConfigError } from "../core/errors";
 import { createWebChat } from "../react/index";
 import type { ChatSurfaceConfig } from "../ui/surface";
 import { seat } from "./fixtures";
@@ -92,5 +93,35 @@ describe("the web thread's host options", () => {
     expect(onFocus).toHaveBeenLastCalledWith(true);
     fireEvent.focusOut(field());
     expect(onFocus).toHaveBeenLastCalledWith(false);
+  });
+
+  it('shows the empty description only while chips are drawn below, with emptyDescription="withQuickReplies"', async () => {
+    const { ChatThread } = mount({ emptyDescription: "withQuickReplies" });
+    const { rerender } = render(<ChatThread endpoint="/thread" />);
+    expect(await screen.findByText(EN_US_CHAT_UI_COPY.emptyDescription)).toBeTruthy();
+
+    rerender(<ChatThread endpoint="/thread" foldQuickReplies />);
+    await waitFor(() => expect(screen.queryByText(EN_US_CHAT_UI_COPY.emptyDescription)).toBeNull());
+  });
+
+  it("shows the host's line for a failed send in the default alert, and the server's when the host returns null", async () => {
+    const line = (code: string | null): string | null => (code === "contact_info" ? "No contacts here." : null);
+    const { ChatThread } = mount({ sendFailureMessage: (failure) => line(failure.code) });
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByTestId("chat-quick-arrived");
+
+    fireEvent.change(field(), { target: { value: "ana@example.com" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    expect((await screen.findByTestId("chat-send-failed")).textContent).toContain("No contacts here.");
+  });
+
+  it("refuses an unknown option value or a non-function hook at build time", () => {
+    const base = { fetch: routedFetch(() => agent).fetch, copy: EN_US_CHAT_UI_COPY, formatTime };
+    expect(() => createWebChat({ ...base, quickRepliesHeading: "hidden" as never })).toThrow(ChatConfigError);
+    expect(() => createWebChat({ ...base, emptyDescription: "never" as never })).toThrow(ChatConfigError);
+    expect(() => createWebChat({ ...base, sendFailureNotice: "toast" as never })).toThrow(ChatConfigError);
+    expect(() => createWebChat({ ...base, sendWhenEmpty: "hidden" as never })).toThrow(ChatConfigError);
+    expect(() => createWebChat({ ...base, sendFailureMessage: "No" as never })).toThrow(ChatConfigError);
+    expect(() => createWebChat({ ...base, quickReplyLabel: "Here" as never })).toThrow(ChatConfigError);
   });
 });

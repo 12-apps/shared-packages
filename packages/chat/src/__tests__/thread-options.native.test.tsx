@@ -67,8 +67,16 @@ describe("the native thread's quick replies", () => {
     await waitFor(() => expect(screen.queryByText(EN_US_CHAT_UI_COPY.quickReplies)).toBeNull());
   });
 
-  it("wraps the chips by default, and puts them on one sideways-scrolling line below the given width", async () => {
-    const wide = mount();
+  it("draws the default row as before: the shared chips, with no row id of its own", async () => {
+    const { ChatThread } = mount();
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByTestId("chat-quick-arrived");
+    expect(screen.getByText(EN_US_CHAT_UI_COPY.quickReplies)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("chat-quick-row")).toBeNull());
+  });
+
+  it("wraps pills, and puts the chips on one sideways-scrolling line below the given width", async () => {
+    const wide = mount({ quickReplyLook: "pill" });
     const { unmount } = render(<wide.ChatThread endpoint="/thread" />);
     expect(getComputedStyle(await screen.findByTestId("chat-quick-row")).flexWrap).toBe("wrap");
     unmount();
@@ -125,6 +133,22 @@ describe("the native thread's compact notice", () => {
     expect(onNoticeHeight).toHaveBeenLastCalledWith(0);
   });
 
+  it("shows a NEW failure again after the last one was dismissed by an edit", async () => {
+    const { ChatThread } = mount({ sendFailureNotice: "compact" });
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByTestId("chat-quick-arrived");
+
+    fireEvent.change(field(), { target: { value: "ana@example.com" } });
+    fireEvent.click(screen.getByTestId("chat-send"));
+    await screen.findByTestId("chat-send-failed");
+
+    fireEvent.change(field(), { target: { value: "bob@example.com" } });
+    await waitFor(() => expect(screen.queryByTestId("chat-send-failed")).toBeNull());
+
+    fireEvent.click(screen.getByTestId("chat-send"));
+    expect(await screen.findByTestId("chat-send-failed")).toBeTruthy();
+  });
+
   it("falls back to the server's sentence when the host has no line for the failure", async () => {
     const { ChatThread } = mount({ sendFailureNotice: "compact", sendFailureMessage: () => null });
     render(<ChatThread endpoint="/thread" />);
@@ -133,6 +157,20 @@ describe("the native thread's compact notice", () => {
     fireEvent.change(field(), { target: { value: "ana@example.com" } });
     fireEvent.click(screen.getByTestId("chat-send"));
     expect((await screen.findByTestId("chat-send-failed")).textContent).toMatch(/e-mail addresses/);
+  });
+
+  it("draws the default notice as before: ui's alert under the thread's own ids, announced once", async () => {
+    const { ChatThread } = mount();
+    render(<ChatThread endpoint="/thread" />);
+    await screen.findByTestId("chat-quick-arrived");
+
+    fireEvent.change(field(), { target: { value: "ana@example.com" } });
+    fireEvent.click(screen.getByTestId("chat-send"));
+
+    const alert = await screen.findByTestId("chat-send-failed");
+    expect(screen.getByTestId("chat-send-failed-message").textContent).toMatch(/e-mail addresses/);
+    expect(screen.getByTestId("chat-send-failed-icon")).toBeTruthy();
+    expect(alert.parentElement?.closest('[role="alert"]')).toBeNull();
   });
 
   it("keeps the default alert until the next send, even while the draft is edited", async () => {
