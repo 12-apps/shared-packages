@@ -113,5 +113,5 @@ Ported: **28 of 149** public subpaths carry a `react-native` condition.
 | `@12-apps/ui/typography/Heading` | 26 | 1 | `gradient` paints the gradient's first stop as a flat colour: React Native has no `background-clip: text` and no gradient fill in core. A host wanting the real thing adds a masked-gradient library. |
 | `@12-apps/ui/typography/Paragraph` | 17 | 1 | — |
 | `@12-apps/ui/typography/Text` | 26 | 3 | — |
-| `@12-apps/ui/layout/Screen` | 10 | 0 | Keyboard geometry uses React Native KeyboardAvoidingView; react-native-web unit/story lanes verify its wiring, not a real Android/iOS keyboard. Device keyboard/rotation QA remains explicit.; Web safe-area values come from CSS environment variables; native values come from the existing navigator or an internal safe-area provider. Browser keyboard resizing remains browser-managed. |
+| `@12-apps/ui/layout/Screen` | 11 | 0 | Keyboard geometry uses React Native KeyboardAvoidingView; react-native-web unit/story lanes verify its wiring, not a real Android/iOS keyboard. Device keyboard/rotation QA remains explicit.; Web safe-area values come from CSS environment variables; native values come from the existing navigator or an internal safe-area provider. Browser keyboard resizing remains browser-managed. |
 <!-- native-parity:end -->
