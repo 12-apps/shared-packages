@@ -539,6 +539,13 @@ createWebNotifications({
    section you never render is the tax that gets a required-config change
    reverted instead of adopted.
 
+Optional: `renderIcon` (the mark on the left of the default card) and
+`renderCard` (your own BODY for an activity the default card cannot draw —
+return `null` for the rest). With `renderCard` the link, its name, the live
+announcement, the seen record and the clock (`context.now`) stay ours; your node
+must be presentational. `README.md` › *A card of your own shape* has the
+contract.
+
 **Two rules that are ours, not yours:**
 
 - A live activity DOES count on the bell, and it is not counted as unread. The

@@ -231,6 +231,50 @@ this" is the shape almost every ongoing subject has; both are optional in effect
 moving. An `activeStepId` naming no step draws NO lane rather than a lane with
 nothing lit, which would read as a process that has stopped.
 
+### A card of your own shape: `renderCard`
+
+Some subjects are not one stop on one lane — a mesa counts plates per lane per
+round. `renderCard` draws your own BODY for such an activity while the SHELL
+stays this package's:
+
+```tsx
+liveActivities: {
+  useActivities,
+  messages,
+  // `null` / `undefined` → the default card, so switch on `kind`.
+  renderCard: (activity, { now, updated }) =>
+    activity.kind === 'mesa' ? <MesaCard activity={activity} updated={updated} /> : null,
+},
+```
+
+`context.now` is the SECTION's clock, re-read once a minute while the panel is
+open — use it rather than `Date.now()`, or your "há 5 min" freezes at the minute
+the card first rendered. `context.updated` is the line the default card would
+have drawn (`messages.updated(relativeTime(…))`), already worded.
+
+What you cannot opt out of by drawing your own card: the wash and border, the
+`live-activity-<id>` test id, the stretched `<button>` named by
+`openActivity(title)` (when the activity has a link and the panel a router),
+the one polite live region announcing `title` (visually hidden — your body draws
+the heading), and the seen record the bell reads. With a link your node sits
+BESIDE the button in an `inert`, `aria-hidden` wrapper that the button names as
+its description: its text is read with the link and a click anywhere on it
+follows it, so it must be PRESENTATIONAL — no controls. `renderIcon` is not
+drawn on a host-rendered card. Exported types: `LiveActivityCardRenderer`,
+`LiveActivityRenderContext` (from `@12-apps/notifications/react`).
+
+Three things the shell cannot do for you:
+
+- **Use block elements, or whitespace, between the parts of the body.** The
+  description is the body's text, and adjacent inline `<span>`s are read run
+  together ("2 pratos na cozinha1 no passe").
+- **Without a link, do not repeat the title in the body.** The body is then
+  plain content beside the title's live region, so a screen reader in browse
+  mode reads both.
+- **Do not throw.** `renderCard` runs during the section's render with no error
+  boundary of its own; an activity you cannot draw returns `null` and gets the
+  default card.
+
 ### On a phone: one tray entry, one buzz
 
 The other half is the OS notification, and it is one field. A generator whose
