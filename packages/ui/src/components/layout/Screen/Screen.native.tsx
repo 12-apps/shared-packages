@@ -15,6 +15,16 @@ function keyboardBehavior(enabled: boolean): 'padding' | 'height' | undefined {
   return Platform.OS === 'ios' ? 'padding' : 'height';
 }
 
+/**
+ * Drag-to-dismiss on a device only. react-native-web runs `dismissKeyboard()`
+ * on EVERY scroll event of an `on-drag` ScrollView, including the one the
+ * browser fires to bring a just-focused field into view, so on the web the
+ * field the user tapped lost focus as soon as the viewport moved.
+ */
+function keyboardDismissMode(): 'on-drag' | 'none' {
+  return Platform.OS === 'web' ? 'none' : 'on-drag';
+}
+
 /** Reuse a navigator's context, or own one outside the scrolling view. */
 function ScreenBoundary({ children }: { children: React.ReactNode }): React.JSX.Element {
   const insets = React.useContext(SafeAreaInsetsContext);
@@ -39,7 +49,7 @@ export const Screen = React.forwardRef<View, ScreenProps>(({
           <KeyboardAvoidingView style={styles.fill} enabled={keyboardAvoiding}
             behavior={keyboardBehavior(keyboardAvoiding)} keyboardVerticalOffset={keyboardVerticalOffset}>
             {scroll ? (
-              <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" {...scrollViewProps}
+              <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode={keyboardDismissMode()} {...scrollViewProps}
                 testID={scrollViewProps?.testID ?? (testID ? `${testID}-viewport` : undefined)}
                 style={styles.fill} contentContainerStyle={contentStyle}
                 horizontal={false} automaticallyAdjustKeyboardInsets={false}
