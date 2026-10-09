@@ -55,8 +55,35 @@ export function PasswordField({
     if (next instanceof Node && event.currentTarget.contains(next)) return;
     onBlur?.();
   };
+  // The toggle is the input's END ADORNMENT, so the field lays it out: centred
+  // on the input's own box at every height, and the `<input>` stops short of
+  // it. Positioned by hand (`top: 18`) it sat on the bottom border and the
+  // input ran underneath it — drawn over each other, U2 (FUT-3475).
+  const toggle = (
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => setVisible((current) => !current)}
+      data-testid={`${dataTestId}-toggle`}
+      aria-label={visible ? copy.passwordField.hideAria : copy.passwordField.showAria}
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontSize: "0.8rem",
+        // A 40px tap target, the floor below 600px (`ui-quality` Q3); the
+        // field's box is at least that tall, so the adornment does not grow it.
+        minHeight: 40,
+        padding: "0 8px",
+        color: "inherit",
+        opacity: 0.7,
+      }}
+    >
+      {visible ? copy.passwordField.hide : copy.passwordField.show}
+    </button>
+  );
   return (
-    <div style={{ position: "relative" }} onBlur={leave}>
+    <div onBlur={leave}>
       <Input
         id={id}
         name={id}
@@ -67,31 +94,11 @@ export function PasswordField({
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         fullWidth
+        endAdornment={toggle}
         {...(error === undefined ? {} : { error })}
         {...(helperText === undefined ? {} : { helperText })}
         data-testid={dataTestId}
       />
-      <button
-        type="button"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setVisible((current) => !current)}
-        data-testid={`${dataTestId}-toggle`}
-        aria-label={visible ? copy.passwordField.hideAria : copy.passwordField.showAria}
-        style={{
-          position: "absolute",
-          right: 8,
-          top: 18,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          fontSize: "0.8rem",
-          padding: "4px 8px",
-          color: "inherit",
-          opacity: 0.7,
-        }}
-      >
-        {visible ? copy.passwordField.hide : copy.passwordField.show}
-      </button>
     </div>
   );
 }
