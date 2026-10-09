@@ -6,7 +6,9 @@
 
 import { buildChatSurface, type ChatSurface, type ChatSurfaceConfig } from "../ui/surface";
 import { WebComposer } from "./composer";
+import { ChipQuickReplies } from "../ui/thread-view";
 import { WebBubble, WebFrame, WebMessageList } from "./layout";
+import { WebNotice } from "./notice";
 
 export function createWebChat(config: ChatSurfaceConfig): ChatSurface {
   return buildChatSurface(config, {
@@ -14,6 +16,8 @@ export function createWebChat(config: ChatSurfaceConfig): ChatSurface {
     MessageList: WebMessageList,
     Bubble: WebBubble,
     Composer: WebComposer,
+    QuickReplies: ChipQuickReplies,
+    Notice: WebNotice,
   });
 }
 

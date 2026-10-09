@@ -16,14 +16,23 @@ import { Box } from "@12-apps/ui/layout/Box";
 import type { JSX } from "react";
 import type { TextInputProps } from "react-native";
 
+import { useFocusReport } from "../ui/focus";
 import type { ChatComposerProps } from "../ui/thread-view";
 
 /** The native field's own events, typed by react-native itself. */
 type NativeFieldEvents = Required<
-  Pick<TextInputProps, "onChangeText" | "onSubmitEditing" | "returnKeyType" | "submitBehavior" | "accessibilityLabel">
->;
+  Pick<
+    TextInputProps,
+    "onChangeText" | "onSubmitEditing" | "returnKeyType" | "submitBehavior" | "accessibilityLabel"
+  >
+> & {
+  /** Argument-free, so the same handler also fits the web `Input`'s focus events the web type-check sees. */
+  readonly onFocus: () => void;
+  readonly onBlur: () => void;
+};
 
 export function NativeComposer(props: ChatComposerProps): JSX.Element {
+  const focus = useFocusReport(props.onFocusChange);
   // A bag rather than attributes so the web type-check (`tsc -p tsconfig.json`,
   // which sees the web `Input`) accepts the file too; `tsconfig.native.json`
   // checks the same spread against the native `Input`.
@@ -33,6 +42,8 @@ export function NativeComposer(props: ChatComposerProps): JSX.Element {
     returnKeyType: "send",
     submitBehavior: "submit",
     accessibilityLabel: props.copy.placeholder,
+    onFocus: focus.onFocus,
+    onBlur: focus.onBlur,
   };
   return (
     <Box direction="row" gap={1} align="center">
@@ -42,7 +53,7 @@ export function NativeComposer(props: ChatComposerProps): JSX.Element {
       <Button
         variant="solid"
         onClick={props.onSubmit}
-        disabled={props.sending || props.value.trim() === ""}
+        disabled={props.sending || (props.disableSendWhenEmpty && props.value.trim() === "")}
         testID="chat-send"
       >
         {props.sending ? props.copy.sending : props.copy.send}

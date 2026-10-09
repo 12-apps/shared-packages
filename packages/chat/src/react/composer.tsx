@@ -19,10 +19,12 @@ import { Icon } from "@12-apps/ui/icons";
 import { Box } from "@12-apps/ui/layout/Box";
 import { useRef, type JSX, type KeyboardEvent } from "react";
 
+import { useFocusReport } from "../ui/focus";
 import type { ChatComposerProps } from "../ui/thread-view";
 
 export function WebComposer(props: ChatComposerProps): JSX.Element {
   const field = useRef<HTMLInputElement | null>(null);
+  const focus = useFocusReport(props.onFocusChange);
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
@@ -43,6 +45,8 @@ export function WebComposer(props: ChatComposerProps): JSX.Element {
           inputProps={{ maxLength: props.maxLength, ref: field }}
           onChange={(event) => props.onChange(event.target.value)}
           onKeyDown={onKeyDown}
+          onFocus={focus.onFocus}
+          onBlur={focus.onBlur}
           testID="chat-input"
         />
       </Box>
@@ -54,7 +58,7 @@ export function WebComposer(props: ChatComposerProps): JSX.Element {
         title={props.copy.send}
         loading={props.sending}
         onClick={onSend}
-        disabled={props.sending || props.value.trim() === ""}
+        disabled={props.sending || (props.disableSendWhenEmpty && props.value.trim() === "")}
         testID="chat-send"
       />
     </Box>

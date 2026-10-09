@@ -183,9 +183,48 @@ internal `ChatPlatform`, the one place platform styling lives:
 | `MessageList` | the bubbles, `label`, `scrollKey`, `onVisibleChange?` | `ScrollArea` + `IntersectionObserver` | `ScrollView`, visible on mount |
 | `Bubble` | `{ mine, children }` | ui `Box` with `sx` (tint, `min(80%, 60ch)`) | ui `Box` with `style` (tint, `80%`) |
 | `Composer` | the controlled field and its send action | `Input` + Enter | `Input` + the keyboard's send key |
+| `QuickReplies` | the chips' keys and labels, the heading | ui `Chip`s, wrapping | ui `Chip`s or pills; wrapping, or one sideways line |
+| `Notice` | a failed send's line, tone and look | ui `Alert`, or icon + caption | the same, measured for `onNoticeHeight` |
 
 The package opens no socket. Bump `refreshSignal` when your live channel says
 the thread moved.
+
+### Host options
+
+Both surfaces take these on the config, all optional; a config without them
+draws the thread exactly as before. A value outside the listed ones throws
+`ChatConfigError` when the surface is built.
+
+| config | default | what it changes |
+|---|---|---|
+| `quickReplyLabel(key, text)` | the server's sentence | A chip's label. For chips that are shorter names for the replies: a tap still sends the KEY, so the thread stores the full sentence. Return `text` (or a blank) for a key you do not know. |
+| `quickRepliesHeading` | `"visible"` | `"label"` drops `copy.quickReplies` from the screen and keeps it as the row's accessible name. |
+| `emptyDescription` | `"always"` | `"withQuickReplies"` shows `copy.emptyDescription` only while chips are drawn below, for a description that points at them. |
+| `sendFailureMessage(failure)` | server sentence, else `copy.sendFailed` | The line a failed send shows; return null for the default. `failure.code` is the package's (`contact_info`, …). |
+| `sendFailureNotice` | `"alert"` | `"compact"`: an icon and at most two lines right on the composer, gone once the draft is edited; a `contact_info` refusal reads as a warning, anything else as an error. `"alert"` stays over the chips until the next send. |
+| `sendWhenEmpty` | `"disabled"` | `"inert"` keeps the send button drawn enabled on a blank field; a blank send does nothing. |
+
+`createNativeChat` also takes two that only the native row draws:
+
+| config | default | what it changes |
+|---|---|---|
+| `quickReplyLook` | `"chip"` | `"pill"`: neutral filled pills with bold labels, at least `NATIVE_CHAT_METRICS.quickReplyMinHeight` (40) dp tall, instead of ui's 32-tall outlined chips. |
+| `quickReplyScrollBelowWidth` | none (always wrap) | Below this window width, in dp, the chips sit on one line that scrolls sideways instead of wrapping. |
+
+Chips sit `NATIVE_CHAT_METRICS.quickReplyGap` (8) dp apart either way.
+
+`ChatThread` takes three props for a host that sizes the room around the
+thread (a small phone with the keyboard up):
+
+- `foldQuickReplies` leaves the chips out; the draft and the list stay.
+- `onNoticeHeight(height)` (native) gets the send-failure notice's height in dp
+  on every layout, and 0 whenever none is drawn (dismissed, the thread turned
+  read-only, unmounted). It excludes the gap over the notice:
+  `theme.spacing(0.5)` on the composer in the compact look, `theme.spacing(2)`
+  in the alert look.
+- `onComposerFocusChange(focused)` reports the field taking and losing the
+  focus, and `false` when it goes away focused, so a host that hides its
+  chrome while someone types never stays hidden.
 
 ## Copy
 
