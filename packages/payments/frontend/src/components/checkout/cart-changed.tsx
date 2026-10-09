@@ -236,7 +236,7 @@ export function CartChangedBoundary({
 }
 
 /** "Seu carrinho mudou" — what the step says, and the one thing to do about it. */
-export function CartChangedNotice({
+function CartChangedNotice({
   onRefresh,
   pending = false,
   error = null,
