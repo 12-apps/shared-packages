@@ -8,6 +8,7 @@ import { Spacer } from "@12-apps/ui/layout/Spacer";
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { PasswordField } from "./password-field";
+import { ResendVerification } from "./resend-verification";
 import { FailureBanner, LinkButton, RevealOnAppear } from "./shared";
 
 /**
@@ -76,45 +77,6 @@ function useSignIn(
     dismiss: () => setReason(null),
     submit,
   };
-}
-
-/**
- * The "send it again" action inside the unverified warning.
- *
- * Its own component so the button owns its pending state — inlining it would
- * put a fourth piece of state on the form and make "which request is in flight"
- * ambiguous while both can be.
- */
-function ResendVerification({
-  email,
-  onSent,
-}: {
-  email: string;
-  onSent: () => void;
-}): JSX.Element {
-  const { client, copy } = useScreens();
-  const [pending, setPending] = useState(false);
-  return (
-    <Button
-      variant="outline"
-      color="primary"
-      fullWidth
-      loading={pending}
-      disabled={pending}
-      dataTestId="resend-verification"
-      onClick={() => {
-        setPending(true);
-        // The endpoint always acknowledges — it must not reveal whether the
-        // address is registered — so there is no failure branch to render.
-        void client
-          .resendVerification(email)
-          .then(onSent)
-          .finally(() => setPending(false));
-      }}
-    >
-      {copy.signIn.resend}
-    </Button>
-  );
 }
 
 /** The unverified state: a warning plus the only action that helps. */
@@ -228,6 +190,9 @@ export function EmailPasswordForm({
         onChange={form.setPassword}
         autoComplete="current-password"
         dataTestId="login-password"
+        // An address handed over by a confirmation link leaves one field to
+        // fill: start the shopper there, not on the field already done.
+        autoFocus={initialEmail.length > 0}
       />
       <Spacer size="md" />
       <Button
