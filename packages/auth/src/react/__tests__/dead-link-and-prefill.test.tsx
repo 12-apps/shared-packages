@@ -86,6 +86,19 @@ describe("a confirmation link that cannot be confirmed", () => {
     await waitFor(() => expect(screen.queryByTestId("resend-verification")).toBeNull());
   });
 
+  it("sends the new link on Enter in the address field", async () => {
+    const { client, resendVerification } = clientFailing("token-invalid");
+    renderVerify(client);
+
+    const field = (await screen.findByTestId("verify-resend-email")).querySelector("input")
+      ?? (document.getElementById("verify-resend-email") as HTMLInputElement);
+    fireEvent.change(field, { target: { value: "ana@example.com" } });
+    fireEvent.submit(screen.getByTestId("verify-resend-form"));
+
+    await waitFor(() => expect(resendVerification).toHaveBeenCalledWith("ana@example.com"));
+    expect(await screen.findByTestId("verify-resent")).toBeTruthy();
+  });
+
   it("does not blame the link, nor offer a new one, for a server error", async () => {
     const { client } = clientFailing("unknown");
     renderVerify(client);
