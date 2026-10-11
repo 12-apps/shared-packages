@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useState, type FormEvent, type JSX } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Button } from "@12-apps/ui/form/Button";
@@ -58,16 +58,30 @@ export function ResendVerification({
  * nothing.
  */
 export function ResendForDeadLink(): JSX.Element {
-  const { copy } = useScreens();
+  const { client, copy } = useScreens();
   const [email, setEmail] = useState("");
+  const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
   if (sent) {
     return (
       <Alert variant="success" description={copy.signIn.resentDescription} data-testid="verify-resent" />
     );
   }
+  const ready = email.includes("@") && !pending;
+  // A form, so Enter in the field sends it as the button does.
+  const send = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!ready) return;
+    setPending(true);
+    // The endpoint always acknowledges — it must not reveal whether the
+    // address is registered — so there is no failure branch to render.
+    void client
+      .resendVerification(email)
+      .then(() => setSent(true))
+      .finally(() => setPending(false));
+  };
   return (
-    <>
+    <form onSubmit={send} data-testid="verify-resend-form">
       <Input
         id="verify-resend-email"
         name="email"
@@ -80,7 +94,17 @@ export function ResendForDeadLink(): JSX.Element {
         data-testid="verify-resend-email"
       />
       <Spacer size="sm" />
-      <ResendVerification email={email} onSent={() => setSent(true)} disabled={!email.includes("@")} />
-    </>
+      <Button
+        type="submit"
+        variant="outline"
+        color="primary"
+        fullWidth
+        loading={pending}
+        disabled={!ready}
+        dataTestId="resend-verification"
+      >
+        {copy.signIn.resend}
+      </Button>
+    </form>
   );
 }
