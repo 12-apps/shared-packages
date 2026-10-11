@@ -10,6 +10,7 @@ import { SocialLoginContainer } from "@12-apps/ui/social-login-button";
 import type { EmailAuth } from "../create-email-auth";
 import { useScreens, type ScreensSession } from "./context";
 import { failureMessage, type EmailAuthScreenReason } from "./copy";
+import { ResendForDeadLink } from "./resend-verification";
 
 /** What a verified link led to, for the host to route on. */
 export interface VerifiedOutcome {
@@ -85,6 +86,35 @@ function useVerification(
 }
 
 /**
+ * Why the link could not be confirmed, and — for a dead link — the new one the
+ * copy tells the shopper to ask for (FUT-3474).
+ */
+function VerifyFailure({ reason }: { reason: EmailAuthScreenReason }): JSX.Element {
+  const { copy } = useScreens();
+  // A link never valid, expired or already spent. "Link inválido" belongs to
+  // that case only: a server error or a switched-off method is not the link's
+  // fault, and a new link would not help with either.
+  const deadLink = reason === "token-invalid";
+  return (
+    <>
+      <Alert
+        variant="warning"
+        title={deadLink ? copy.verifyEmail.failedAlertTitle : undefined}
+        description={failureMessage(copy, reason)}
+        data-testid="verify-failed"
+        data-reason={reason}
+      />
+      {deadLink && (
+        <>
+          <Spacer size="md" />
+          <ResendForDeadLink />
+        </>
+      )}
+    </>
+  );
+}
+
+/**
  * The page the confirmation link opens: spend the token, then say what
  * happened.
  *
@@ -150,12 +180,7 @@ export function VerifyEmailScreen({
             data-testid="verify-success"
           />
         ) : (
-          <Alert
-            variant="warning"
-            title={copy.verifyEmail.failedAlertTitle}
-            description={failureMessage(copy, reason ?? "token-invalid")}
-            data-testid="verify-failed"
-          />
+          <VerifyFailure reason={reason ?? "token-invalid"} />
         )}
         <Spacer size="md" />
         <Button
