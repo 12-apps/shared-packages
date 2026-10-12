@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EmailAuth } from "../create-email-auth";
@@ -15,8 +15,9 @@ describe("inboxLink", () => {
   it("searches Gmail for the sender, in every folder, in the account the address names", () => {
     const link = inboxLink("Ana@Gmail.com", "Paladira");
     expect(link?.provider).toBe("Gmail");
-    expect(link?.href).toBe(
-      "https://mail.google.com/mail/u/Ana%40Gmail.com/#search/from%3APaladira%20in%3Aanywhere%20newer_than%3A1h",
+    expect(link?.href).toMatch(/^https:\/\/mail\.google\.com\/mail\/u\/Ana%40Gmail\.com\/#search\//);
+    expect(decodeURIComponent(link?.href.split("#search/")[1] ?? "")).toBe(
+      "from:Paladira in:anywhere newer_than:1h",
     );
   });
 
@@ -29,7 +30,9 @@ describe("inboxLink", () => {
     (domain) => {
       const link = inboxLink(`ana@${domain}`, "Paladira");
       expect(link?.provider).toBe("Outlook");
-      expect(link?.href).toBe(`https://outlook.live.com/mail/0/?login_hint=ana%40${domain}`);
+      const url = new URL(link?.href ?? "");
+      expect(url.origin + url.pathname).toBe("https://outlook.live.com/mail/0/");
+      expect(url.searchParams.get("login_hint")).toBe(`ana@${domain}`);
     },
   );
 
@@ -90,6 +93,6 @@ describe("the account-created screen", () => {
   it("offers no button for an address whose webmail it cannot tell", async () => {
     await signUp("ana@empresa.com.br", "Paladira");
 
-    expect(screen.queryByTestId("signup-open-inbox")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("signup-open-inbox")).toBeNull());
   });
 });

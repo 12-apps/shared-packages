@@ -13,7 +13,7 @@
  * inbox instead, which is still the tab the person was about to look for.
  */
 
-export interface InboxLink {
+interface InboxLink {
   /** The provider's own name, for the button's label. */
   provider: string;
   href: string;
