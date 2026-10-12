@@ -30,8 +30,6 @@ type ResolvedProps = SettingsLayoutProps &
       | 'testIdPrefix'
       | 'railBreakpoint'
       | 'navVariant'
-      | 'searchable'
-      | 'railVariant'
       | 'atIndex'
       | 'backLabel'
     >
@@ -44,11 +42,20 @@ const DEFAULTS = {
   testIdPrefix: 'settings',
   railBreakpoint: 'md',
   navVariant: 'switcher',
-  searchable: true,
-  railVariant: 'divided',
   atIndex: false,
   backLabel: 'Back',
 } satisfies Partial<SettingsLayoutProps>;
+
+/**
+ * How the rail looks: its search field, and its frame from the breakpoint up.
+ * Both default to the shape every consumer had before they existed.
+ */
+function railLookOf({
+  searchable = true,
+  railVariant = 'divided',
+}: SettingsLayoutProps): Required<Pick<SettingsLayoutProps, 'searchable' | 'railVariant'>> {
+  return { searchable, railVariant };
+}
 
 /** Stacked below the rail's breakpoint, two columns at and above it. */
 function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: boolean): SxProps<Theme> {
@@ -112,8 +119,6 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     railBreakpoint,
     fillHeight = false,
     navVariant,
-    searchable,
-    railVariant,
     atIndex,
     indexHref,
     backLabel,
@@ -151,8 +156,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         onNavigate={() => setNavOpen(false)}
         testIdPrefix={testIdPrefix}
         variant={navVariant}
-        searchable={searchable}
-        railVariant={railVariant}
+        {...railLookOf(props)}
         breakpoint={railBreakpoint}
         atIndex={atIndex}
         fillHeight={fillHeight}

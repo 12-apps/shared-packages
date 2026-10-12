@@ -257,12 +257,12 @@ function railColumnSx(theme: Theme, railVariant: SettingsRailVariant): Record<st
       border: `1px solid ${theme.palette.divider}`,
       borderRadius: sxRem(14),
       bgcolor: 'background.paper',
-      px: 1.5,
-      py: 2,
+      px: sxRem(12),
+      py: sxRem(16),
     };
   }
   const width = railWidth(theme);
-  return { flex: `0 0 ${width}`, width, borderRight: `1px solid ${theme.palette.divider}`, pr: 2 };
+  return { flex: `0 0 ${width}`, width, borderRight: `1px solid ${theme.palette.divider}`, pr: sxRem(16) };
 }
 
 /** The navigation column: title, the `switcher`'s disclosure, and the body. */
