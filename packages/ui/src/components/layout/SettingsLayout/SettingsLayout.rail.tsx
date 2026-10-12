@@ -6,17 +6,19 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import InputAdornment from '@mui/material/InputAdornment/index.js';
 import TextField from '@mui/material/TextField/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import React from 'react';
 
 import { SettingsRailGroup, type RailShape } from './SettingsLayout.items';
-import { atLeastRail, displayAcrossRail, railWidth, TOUCH_TARGET } from './SettingsLayout.styles';
+import { atLeastRail, displayAcrossRail, railCardWidth, railWidth, TOUCH_TARGET } from './SettingsLayout.styles';
 import { rem, sxRem } from '../../../tokens/relative';
 import type {
   SettingsEmptySearchAction,
   SettingsLayoutProps,
   SettingsNavGroup,
   SettingsRailBreakpoint,
+  SettingsRailVariant,
 } from './SettingsLayout.types';
 
 interface RailToggleProps {
@@ -139,9 +141,39 @@ export interface RailBodyProps extends RailShape {
   onSelectItem?: (id: string) => void;
   onNavigate?: () => void;
   testIdPrefix: string;
+  /** Whether the search field is drawn (`SettingsLayoutProps.searchable`). */
+  searchable: boolean;
 }
 
-/** The searchable rail body (search + groups). */
+/** The rail's search field. */
+function RailSearch({
+  query,
+  onQueryChange,
+  searchPlaceholder,
+  testIdPrefix,
+}: Pick<RailBodyProps, 'query' | 'onQueryChange' | 'searchPlaceholder' | 'testIdPrefix'>): React.JSX.Element {
+  return (
+    <TextField
+      value={query}
+      onChange={(event) => onQueryChange(event.target.value)}
+      placeholder={searchPlaceholder}
+      size="small"
+      fullWidth
+      aria-label={searchPlaceholder}
+      data-testid={`${testIdPrefix}-search`}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          </InputAdornment>
+        ),
+      }}
+      sx={{ mb: 2 }}
+    />
+  );
+}
+
+/** The rail body: the search field when the area has one, then the groups. */
 function SettingsRailBody({
   navOpen,
   query,
@@ -155,6 +187,7 @@ function SettingsRailBody({
   onSelectItem,
   onNavigate,
   testIdPrefix,
+  searchable,
   ...shape
 }: RailBodyProps): React.JSX.Element {
   // `drilldown` has no disclosure to be closed behind: below the breakpoint the
@@ -169,23 +202,14 @@ function SettingsRailBody({
           : displayAcrossRail(theme, shape.breakpoint, hidden, 'block')
       }
     >
-      <TextField
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
-        placeholder={searchPlaceholder}
-        size="small"
-        fullWidth
-        aria-label={searchPlaceholder}
-        data-testid={`${testIdPrefix}-search`}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-            </InputAdornment>
-          ),
-        }}
-        sx={{ mb: 2 }}
-      />
+      {searchable ? (
+        <RailSearch
+          query={query}
+          onQueryChange={onQueryChange}
+          searchPlaceholder={searchPlaceholder}
+          testIdPrefix={testIdPrefix}
+        />
+      ) : null}
       {filteredGroups.length === 0 ? (
         <SettingsSearchEmpty
           label={emptySearchLabel}
@@ -218,7 +242,28 @@ export type SettingsRailProps = RailBodyProps & {
   onToggleNav: () => void;
   /** Scroll inside the rail rather than with the page. See `fillHeight`. */
   fillHeight?: boolean;
+  /** How the rail's own column is drawn. See `SettingsLayoutProps.railVariant`. */
+  railVariant?: SettingsRailVariant;
 };
+
+/** The rail's own column, as the variant draws it: ruled off, or a card. */
+function railColumnSx(theme: Theme, railVariant: SettingsRailVariant): Record<string, unknown> {
+  if (railVariant === 'card') {
+    const width = railCardWidth(theme);
+    return {
+      flex: `0 0 ${width}`,
+      width,
+      alignSelf: 'flex-start',
+      border: `1px solid ${theme.palette.divider}`,
+      borderRadius: sxRem(14),
+      bgcolor: 'background.paper',
+      px: 1.5,
+      py: 2,
+    };
+  }
+  const width = railWidth(theme);
+  return { flex: `0 0 ${width}`, width, borderRight: `1px solid ${theme.palette.divider}`, pr: 2 };
+}
 
 /** The navigation column: title, the `switcher`'s disclosure, and the body. */
 export function SettingsRail({
@@ -228,6 +273,7 @@ export function SettingsRail({
   onToggleNav,
   testIdPrefix,
   fillHeight = false,
+  railVariant = 'divided',
   ...bodyProps
 }: SettingsRailProps): React.JSX.Element {
   const { variant, breakpoint, atIndex } = bodyProps;
@@ -243,16 +289,14 @@ export function SettingsRail({
       component="nav"
       aria-label={typeof title === 'string' ? title : 'Settings'}
       data-testid={`${testIdPrefix}-rail`}
+      data-rail-variant={railVariant}
       sx={(theme) => ({
         display: hiddenWhileInSection ? 'none' : 'block',
         flex: '0 0 auto',
         width: '100%',
         [atLeastRail(theme, breakpoint)]: {
           display: 'block',
-          flex: `0 0 ${railWidth(theme)}`,
-          width: railWidth(theme),
-          borderRight: `1px solid ${theme.palette.divider}`,
-          pr: 2,
+          ...railColumnSx(theme, railVariant),
           // Its own scrollbar, so a settings area with twenty categories does
           // not make the thing you NAVIGATE with scroll away while you read the
           // panel. `minHeight: 0` is the load-bearing half: without it a flex

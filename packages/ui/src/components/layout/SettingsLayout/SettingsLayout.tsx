@@ -30,6 +30,8 @@ type ResolvedProps = SettingsLayoutProps &
       | 'testIdPrefix'
       | 'railBreakpoint'
       | 'navVariant'
+      | 'searchable'
+      | 'railVariant'
       | 'atIndex'
       | 'backLabel'
     >
@@ -42,6 +44,8 @@ const DEFAULTS = {
   testIdPrefix: 'settings',
   railBreakpoint: 'md',
   navVariant: 'switcher',
+  searchable: true,
+  railVariant: 'divided',
   atIndex: false,
   backLabel: 'Back',
 } satisfies Partial<SettingsLayoutProps>;
@@ -108,6 +112,8 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     railBreakpoint,
     fillHeight = false,
     navVariant,
+    searchable,
+    railVariant,
     atIndex,
     indexHref,
     backLabel,
@@ -145,6 +151,8 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         onNavigate={() => setNavOpen(false)}
         testIdPrefix={testIdPrefix}
         variant={navVariant}
+        searchable={searchable}
+        railVariant={railVariant}
         breakpoint={railBreakpoint}
         atIndex={atIndex}
         fillHeight={fillHeight}

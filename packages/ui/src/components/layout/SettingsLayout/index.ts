@@ -10,5 +10,6 @@ export type {
   SettingsNavItem,
   SettingsNavStatus,
   SettingsNavVariant,
+  SettingsRailVariant,
   SettingsRailBreakpoint,
 } from './SettingsLayout.types';

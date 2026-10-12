@@ -180,6 +180,33 @@ export const NoIcons: Story = {
 };
 
 /**
+ * A small area drawn as a card: no search field, no icons, a 200px bordered
+ * rail beside the panel — the storefront's "Minha conta" prototype. Eight rows
+ * read at a glance need no field to filter them.
+ */
+export const CardRailNoSearch: Story = {
+  render: () => {
+    const plainGroups: SettingsNavGroup[] = GROUPS.map((group) => ({
+      ...group,
+      items: group.items.map(({ icon: _icon, ...rest }) => rest),
+    }));
+    return (
+      <Box sx={{ p: 3, minHeight: 480 }}>
+        <SettingsLayout
+          title="Settings"
+          groups={plainGroups}
+          activeItemId="appearance"
+          searchable={false}
+          railVariant="card"
+        >
+          <ExamplePanel itemId="appearance" />
+        </SettingsLayout>
+      </Box>
+    );
+  },
+};
+
+/**
  * Below `md` the rail stacks full-width above the panel.
  *
  * Storybook 9 moved viewport selection to `globals.viewport.value` — the
