@@ -333,7 +333,12 @@ export function SettingsRail({
           testIdPrefix={testIdPrefix}
         />
       ) : null}
-      <SettingsRailBody navOpen={navOpen} testIdPrefix={testIdPrefix} {...bodyProps} />
+      <SettingsRailBody
+        navOpen={navOpen}
+        testIdPrefix={testIdPrefix}
+        card={railVariant === 'card'}
+        {...bodyProps}
+      />
     </Box>
   );
 }
