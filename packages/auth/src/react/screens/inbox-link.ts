@@ -30,11 +30,17 @@ interface Provider {
  * Gmail search, limited to the last day and to every folder — `in:anywhere`
  * so a message the spam filter took is found too. A day rather than an hour:
  * the page stays open, and somebody who comes back to it later must not meet
- * an empty search. `/u/<email>/` picks the right account for somebody signed
- * in to several.
+ * an empty search.
+ *
+ * `/u/0/` — the browser's default Gmail account — and never `/u/<address>/`.
+ * The address-shaped slot only resolves an address Gmail has signed in under
+ * that exact spelling: a `+alias` (`ana+loja@gmail.com`), or a person signed in
+ * as somebody else, gets Gmail's "Temporary Error (404)" page instead of an
+ * inbox (FUT-3533, seen in production). A person signed in to several accounts
+ * may land on their main one; that is an inbox and a switcher, not an error.
  */
-function gmail(email: string, sender: string | undefined): string {
-  const account = `https://mail.google.com/mail/u/${encodeURIComponent(email)}/`;
+function gmail(_email: string, sender: string | undefined): string {
+  const account = "https://mail.google.com/mail/u/0/";
   if (!sender) return account;
   const query = encodeURIComponent(`from:${searchTerm(sender)} in:anywhere newer_than:1d`);
   return `${account}#search/${query}`;

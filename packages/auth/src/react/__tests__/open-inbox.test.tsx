@@ -12,10 +12,10 @@ import { PT_BR as SCREEN_COPY } from "../screens/pt-BR";
  */
 
 describe("inboxLink", () => {
-  it("searches Gmail for the sender, in every folder, in the account the address names", () => {
+  it("searches Gmail for the sender, in every folder, in the default account", () => {
     const link = inboxLink("Ana@Gmail.com", "Paladira");
     expect(link?.provider).toBe("Gmail");
-    expect(link?.href).toMatch(/^https:\/\/mail\.google\.com\/mail\/u\/Ana%40Gmail\.com\/#search\//);
+    expect(link?.href).toMatch(/^https:\/\/mail\.google\.com\/mail\/u\/0\/#search\//);
     expect(decodeURIComponent(link?.href.split("#search/")[1] ?? "")).toBe(
       "from:Paladira in:anywhere newer_than:1d",
     );
@@ -29,7 +29,15 @@ describe("inboxLink", () => {
   });
 
   it("opens the Gmail account unfiltered without a sender", () => {
-    expect(inboxLink("ana@googlemail.com")?.href).toBe("https://mail.google.com/mail/u/ana%40googlemail.com/");
+    expect(inboxLink("ana@googlemail.com")?.href).toBe("https://mail.google.com/mail/u/0/");
+  });
+
+  it("never puts the address in Gmail's account slot, a +alias included", () => {
+    // `/u/<address>/` answered "Temporary Error (404)" in production for
+    // `thomfilg.bingo+teste@gmail.com` (FUT-3533).
+    const href = inboxLink("ana.souza+loja@gmail.com", "Paladira")?.href ?? "";
+    expect(href.startsWith("https://mail.google.com/mail/u/0/#search/")).toBe(true);
+    expect(href).not.toContain("ana.souza");
   });
 
   it.each(["hotmail.com", "hotmail.com.br", "hotmail.co.uk", "hotmail.fr", "outlook.com", "outlook.com.br", "live.com", "msn.com"])(
