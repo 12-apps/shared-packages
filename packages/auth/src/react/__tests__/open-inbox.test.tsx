@@ -38,6 +38,7 @@ describe("inboxLink", () => {
     const href = inboxLink("ana.souza+loja@gmail.com", "Paladira")?.href ?? "";
     expect(href.startsWith("https://mail.google.com/mail/u/0/#search/")).toBe(true);
     expect(href).not.toContain("ana.souza");
+    expect(inboxLink("ana.souza+loja@gmail.com")?.href).toBe("https://mail.google.com/mail/u/0/");
   });
 
   it.each(["hotmail.com", "hotmail.com.br", "hotmail.co.uk", "hotmail.fr", "outlook.com", "outlook.com.br", "live.com", "msn.com"])(
