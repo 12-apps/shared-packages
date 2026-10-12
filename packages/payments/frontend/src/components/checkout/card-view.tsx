@@ -15,6 +15,7 @@ import { StalledWait } from "./stalled-wait";
 import type { CheckoutBasketIdentity } from "./basket";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "./types";
+import { useCheckoutLayout } from "./payment-step-layout";
 import { useCheckoutComponents } from "./ui";
 import { useCardCheckout, type CardCheckout } from "./use-card-checkout";
 
@@ -197,6 +198,7 @@ export function CardView({
   // hold the money, and "Não foi possível pagar" over "não pague de novo"
   // pushes the buyer toward exactly the retry it forbids.
   const unresolved = cc.errorCode === UNRESOLVED_CODE;
+  const inStep = useCheckoutLayout() !== null;
   useRefreshOnCartChanged(cc.errorCode); // re-priced by the host (FUT-1139)
 
   if (cc.submitted) {
@@ -204,10 +206,16 @@ export function CardView({
   }
 
   return (
-    <Box data-testid="card-view" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Text variant="heading" size="md" weight="bold" as="h2">
-        {copy.heading}
-      </Text>
+    <Box
+      data-testid="card-view"
+      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+    >
+      {/* Inside the Pagamento step the "Cartão" tab names the pane already (FUT-3525). */}
+      {inStep ? null : (
+        <Text variant="heading" size="md" weight="bold" as="h2">
+          {copy.heading}
+        </Text>
+      )}
 
       <CardInstrumentFields card={cc} />
 

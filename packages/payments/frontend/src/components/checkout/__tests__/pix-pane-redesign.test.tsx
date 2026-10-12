@@ -93,17 +93,32 @@ afterEach(() => {
 });
 
 describe("the pane before a copy", () => {
-  it("opens on the Copia e cola tab, with the QR mounted behind the other tab", async () => {
+  it("opens on the code, with the QR under it for another device (FUT-3525)", async () => {
     mount(pixOrder(), server().client);
     await elapse(0);
 
-    expect(screen.getByRole("tablist", { name: pix.tabsLabel })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: pix.copyPasteTab }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("tab", { name: pix.qrTab }).getAttribute("aria-selected")).toBe("false");
-    expect(screen.getByTestId("pix-code").textContent).toBe("00020126BR.GOV.BCB.PIX-redesign");
-    expect(screen.getByTestId("pix-copy").textContent).toContain(pix.copyAction);
-    // R14: mounted, merely hidden — so `pix-qr` is always in the document.
+    // No Copia/QR tabs any more: both are on screen, the code first.
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByTestId("pix-code").textContent).toBe(
+      "00020126BR.GOV.BCB.PIX-redesign",
+    );
+    expect(screen.getByTestId("pix-copy").textContent).toContain(
+      pix.copyAction,
+    );
     expect(screen.getByTestId("pix-qr")).toBeTruthy();
+    expect(screen.getByText(pix.otherDeviceHeading)).toBeTruthy();
+  });
+
+  it("puts the code before the QR in reading order (FUT-3525)", async () => {
+    mount(pixOrder(), server().client);
+    await elapse(0);
+
+    const code = screen.getByTestId("pix-copy-panel");
+    const qr = screen.getByTestId("pix-qr-panel");
+    // eslint-disable-next-line no-bitwise
+    expect(
+      code.compareDocumentPosition(qr) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("renders each kept test id exactly once (R16)", async () => {
@@ -113,35 +128,6 @@ describe("the pane before a copy", () => {
     for (const id of ["pix-view", "pix-qr", "pix-code", "pix-copy", "pix-expiry", "pix-awaiting"]) {
       expect(screen.getAllByTestId(id)).toHaveLength(1);
     }
-  });
-
-  it("switches to the QR tab and back", async () => {
-    mount(pixOrder(), server().client);
-    await elapse(0);
-
-    fireEvent.click(screen.getByRole("tab", { name: pix.qrTab }));
-    expect(screen.getByRole("tab", { name: pix.qrTab }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByText(pix.qrTabCaption)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("tab", { name: pix.copyPasteTab }));
-    expect(screen.getByRole("tab", { name: pix.copyPasteTab }).getAttribute("aria-selected")).toBe("true");
-  });
-
-  it("moves between the tabs with the arrow keys, one tab stop at a time", async () => {
-    mount(pixOrder(), server().client);
-    await elapse(0);
-
-    const copyTab = screen.getByRole("tab", { name: pix.copyPasteTab });
-    const qrTab = screen.getByRole("tab", { name: pix.qrTab });
-    // Roving tab stop: only the selected tab is in the Tab order.
-    expect([copyTab, qrTab].map((tab) => tab.tabIndex)).toEqual([0, -1]);
-
-    fireEvent.keyDown(copyTab, { key: "ArrowRight" });
-    expect(qrTab.getAttribute("aria-selected")).toBe("true");
-    expect([copyTab, qrTab].map((tab) => tab.tabIndex)).toEqual([-1, 0]);
-
-    fireEvent.keyDown(qrTab, { key: "Home" });
-    expect(copyTab.getAttribute("aria-selected")).toBe("true");
   });
 
   it("says the heading in the brand's case", async () => {
@@ -202,7 +188,7 @@ describe("after a copy", () => {
     expect(screen.getByTestId("pix-copy-again").textContent).toContain(pix.copyAgainAction);
   });
 
-  it("goes back to the pane on its QR tab from Ver QR code", async () => {
+  it("goes back to the pane, QR on screen, from Ver QR code", async () => {
     stubClipboard(vi.fn(async () => undefined));
     mount(pixOrder("MANUAL"), server().client);
     await elapse(0);
@@ -213,7 +199,7 @@ describe("after a copy", () => {
     await elapse(0);
 
     expect(screen.queryAllByTestId("pix-after-copy")).toHaveLength(0);
-    expect(screen.getByRole("tab", { name: pix.qrTab }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("pix-qr")).toBeTruthy();
   });
 
   it("stays on the pane when the clipboard refuses the write (R13)", async () => {

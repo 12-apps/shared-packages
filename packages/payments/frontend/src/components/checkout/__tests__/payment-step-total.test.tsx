@@ -195,12 +195,13 @@ describe("the caption beside the amount", () => {
       </CheckoutCopyProvider>,
     );
 
-    expect(screen.getByText("Total · 2 items")).toBeTruthy();
+    // The phone frame heads the step with "Total due" since FUT-3525.
+    expect(screen.getByText("Total due · 2 items")).toBeTruthy();
   });
 
-  it("keeps the pt-BR wording exactly as it shipped", () => {
-    // Byte-identical to the template the component carried, so nothing changes
-    // for a Brazilian shopper.
+  it("words the phone's caption in pt-BR", () => {
+    // The phone frame's caption over the big amount (FUT-3525, layout C); the
+    // Dados bar keeps "Total · 1 item".
     render(
       <PaymentStep
         method={null}
@@ -218,6 +219,6 @@ describe("the caption beside the amount", () => {
       />,
     );
 
-    expect(screen.getByText("Total · 1 item")).toBeTruthy();
+    expect(screen.getByText("Total a pagar · 1 item")).toBeTruthy();
   });
 });

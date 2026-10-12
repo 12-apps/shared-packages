@@ -1,9 +1,10 @@
 import { Box } from "@mui/material";
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, type JSX } from "react";
 
 import { useCheckoutCopy } from "./copy-context";
 import { PixAfterCopy } from "./pix-after-copy";
-import { PixPane, type PixTab } from "./pix-pane";
+import { PixPane } from "./pix-pane";
+import { useCheckoutLayout } from "./payment-step-layout";
 import { PIX_CONTAINER, PIX_WIDE, useClipboardCopy } from "./pix-parts";
 import { usePixStage } from "./pix-stage";
 import type { PixPaneCopy, SettlingCopy } from "./screens-copy";
@@ -206,7 +207,8 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   const stage = usePixStage();
-  const [tab, setTab] = useState<PixTab>("copy");
+  // Inside the Pagamento step the method tab names the pane already (FUT-3525).
+  const inStep = useCheckoutLayout() !== null;
   const { copy: writeClipboard, justCopied } = useClipboardCopy(pix.copyPaste);
   // Leaving the payment step (a method switch, a terminal status) ends the
   // after-copy face with it: the next pane starts on the code.
@@ -240,10 +242,8 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
         deadline={time}
         justCopied={justCopied}
         onCopyAgain={() => void writeClipboard()}
-        onShowQr={() => {
-          setTab("qr");
-          setAfterCopy(false);
-        }}
+        // Back to the pane, where the QR is always on screen now.
+        onShowQr={() => setAfterCopy(false)}
         onPreferCard={stage.preferCard}
         footer={footerLine(copy.verifying)}
       />
@@ -252,15 +252,26 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   return (
     <>
       {/* The pane's title, at the prototype's scale: 20px, 26px wide. */}
-      <Box sx={{ "&& > *": { fontSize: "1.25rem", lineHeight: 1.25 }, [PIX_WIDE]: { "&& > *": { fontSize: "1.625rem" } } }}>
-        <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
-          {copy.heading}
-        </Text>
-      </Box>
+      {inStep ? null : (
+        <Box
+          sx={{
+            "&& > *": { fontSize: "1.25rem", lineHeight: 1.25 },
+            [PIX_WIDE]: { "&& > *": { fontSize: "1.625rem" } },
+          }}
+        >
+          <Text
+            variant="heading"
+            size="md"
+            weight="bold"
+            as="h2"
+            style={{ margin: 0 }}
+          >
+            {copy.heading}
+          </Text>
+        </Box>
+      )}
       <PixPane
         pix={pix}
-        tab={tab}
-        onTab={setTab}
         onCopy={() => {
           // Only a copy the clipboard TOOK moves on: the next face opens on
           // "Código Pix copiado", and a failed write leaves the code on screen
@@ -287,6 +298,9 @@ export function PixView({
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   const poll = usePixPolling(order, onResolved, pollIntervalMs);
+  // The Pagamento step's panel is the card there (FUT-3525); drawing another
+  // inside it would be a box in a box.
+  const inStep = useCheckoutLayout() !== null;
   const pix = order.pix;
   if (!pix) {
     return (
@@ -307,7 +321,16 @@ export function PixView({
           display: "flex",
           flexDirection: "column",
           gap: 2,
-          [PIX_WIDE]: { gap: 2.5, p: 3.5, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2 },
+          [PIX_WIDE]: inStep
+            ? { gap: 2.5 }
+            : {
+                gap: 2.5,
+                p: 3.5,
+                bgcolor: "background.paper",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 2,
+              },
         }}
       >
         <PixBody order={order} pix={pix} poll={poll} />

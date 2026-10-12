@@ -1,16 +1,27 @@
 import { Box } from "@mui/material";
-import { useEffect, useRef, type JSX, type ReactNode } from "react";
+import { useEffect, useRef, useId, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
-import { displayTotals, PayBarTotal } from "./checkout-totals";
+import { displayTotals } from "./checkout-totals";
 import { CartChangedBoundary, type OrderRefresh } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { useMethodChoice } from "./method-choice";
-import { MethodPicker } from "./method-picker";
+import { MethodTabs, methodPanelId, methodTabId } from "./method-tabs";
 import { PixStageProvider } from "./pix-stage";
-import { StepColumn, usePaymentPixStage } from "./payment-step-layout";
+import {
+  PANEL_PAD_PHONE,
+  PayBarTotalProvider,
+  useCheckoutLayout,
+  usePaymentPixStage,
+} from "./payment-step-layout";
 import { PaymentErrorPanel } from "./payment-error-panel";
-import { PayerSummary } from "./payer-summary";
+import {
+  OrderSummaryCard,
+  PhoneOrderSummary,
+  type CheckoutDeliverySummary,
+  type CheckoutSummaryLine,
+  type OrderSummaryParts,
+} from "./payment-summary";
 import { resolveCheckoutScreen } from "./providers/registry";
 import type {
   BuyerField,
@@ -133,7 +144,8 @@ interface StepMoney {
 }
 
 /**
- * The Pagamento step's own money line (FUT-1179).
+ * The Pagamento step's own money line (FUT-1179), and everything the order
+ * summary shows beside it (FUT-3525).
  *
  * THE RAISED ORDER'S TOTAL WINS, exactly as the confirmation screen's does
  * (`statusTotalLabel`). Once a charge exists, that charge's amount is what is
@@ -146,24 +158,40 @@ interface StepMoney {
  * The item COUNT stays the cart's — an order carries no line count, and the
  * caption is a description of the basket rather than of the charge.
  *
- * Renders nothing at all when the host supplied no totals and no order — a step
- * that would otherwise print "Total ·" with a blank beside it is worse than the
- * silence this ticket is about. Every host mounting `CheckoutFlow` gets them;
- * only a hand-composed step can be missing them.
+ * `null` when the host supplied no totals and no order — a step that would
+ * otherwise print "Total ·" with a blank beside it is worse than the silence
+ * FUT-1179 is about. Every host mounting `CheckoutFlow` gets them; only a
+ * hand-composed step can be missing them.
  */
-function PaymentStepTotal({ money }: { money: StepMoney }): JSX.Element | null {
+function summaryParts(
+  money: StepMoney,
+  extras: SummaryExtras,
+): OrderSummaryParts | null {
   const { order, cartTotals, totalOverride, discountLines } = money;
   if (!cartTotals && !totalOverride && !order) return null;
-  const { label, items } = displayTotals(totalOverride, cartTotals ?? { totalLabel: "", totalItems: 0 });
-  return (
-    <Box data-testid="payment-step-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
-      <PayBarTotal totalLabel={order?.totalLabel ?? label} totalItems={items}>
-        {/* Suppressed while settling a balance: those totals come from the
-            frozen ticket, not the cart. */}
-        {totalOverride ? null : discountLines}
-      </PayBarTotal>
-    </Box>
+  const { label, items } = displayTotals(
+    totalOverride,
+    cartTotals ?? { totalLabel: "", totalItems: 0 },
   );
+  return {
+    totalLabel: order?.totalLabel ?? label,
+    totalItems: items,
+    // Suppressed while settling a balance: those totals come from the frozen
+    // ticket, not the cart — and so do its lines.
+    discountLines: totalOverride ? undefined : discountLines,
+    lines: totalOverride ? undefined : extras.lines,
+    payer: extras.payer,
+    delivery: extras.delivery,
+    orderNote: extras.orderNote,
+  };
+}
+
+/** The order facts a host may hand the summary, beyond the money (FUT-3525). */
+interface SummaryExtras {
+  lines?: CheckoutSummaryLine[];
+  payer?: OrderSummaryParts["payer"];
+  delivery?: CheckoutDeliverySummary;
+  orderNote?: ReactNode;
 }
 
 /** Props for {@link PaymentStep} — step 2's inputs, wired by the flow. */
@@ -221,6 +249,12 @@ interface PaymentStepProps {
   totalOverride?: { label: string; items: number };
   /** The host's own rendered discount itemization, under the total (FUT-246). */
   discountLines?: ReactNode;
+  /** The cart's lines, listed in the computer's order summary (FUT-3525). */
+  lines?: CheckoutSummaryLine[];
+  /** Where a delivery goes — Entrega only; absent hides the row (FUT-3525). */
+  delivery?: CheckoutDeliverySummary;
+  /** The host's note control, shown in the summary (FUT-3525). */
+  orderNote?: ReactNode;
   pollIntervalMs?: number;
   /** Retrying a refused card — preselect no saved instrument (FUT-1145). */
   freshInstrument?: boolean;
@@ -254,6 +288,9 @@ export function PaymentStep({
   cartTotals,
   totalOverride,
   discountLines,
+  lines,
+  delivery,
+  orderNote,
   pollIntervalMs,
   freshInstrument,
   basket,
@@ -265,56 +302,159 @@ export function PaymentStep({
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
   const pixStage = usePaymentPixStage(choice, onMethodChange);
 
+  const { Text } = useCheckoutComponents();
+  const layoutCopy = useCheckoutCopy().screens.layout;
+  const wide = useCheckoutLayout()?.wide ?? false;
+  const payer = onEditBuyer
+    ? { name: buyer.name, taxId: buyer.taxId, onEdit: onEditBuyer }
+    : undefined;
+  const parts = summaryParts(
+    { order, cartTotals, totalOverride, discountLines },
+    { lines, payer, delivery, orderNote },
+  );
+  const showTabs = !(choice.atProvider || pixStage.afterCopy);
+  const idBase = useId();
+  // Labelled only by a tab that is actually chosen: a card the store cannot
+  // charge stays disabled and unselected even while `method` names it.
+  const chosenTab = method && !(method === "CARD" && choice.cardUnavailable) ? method : null;
+  const panelLabelledBy = showTabs && chosenTab ? methodTabId(idBase, chosenTab) : undefined;
+
+  // The payment body keeps ONE place in the tree whichever layout is showing
+  // (FUT-3525): a tablet turned on its side changes the frame, and remounting
+  // the card form there would throw away what the buyer typed.
   return (
     <PixStageProvider stage={pixStage}>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {/* THE AMOUNT, before anything asks for it (FUT-1179) — at the top, not in a
-            bar of its own: a second bar would put two "pay" controls on one screen. */}
-        <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
+      <PayBarTotalProvider value={parts?.totalLabel ?? null}>
+        <Box
+          data-testid="payment-step"
+          data-layout={wide ? "wide" : "narrow"}
+          sx={
+            wide
+              ? {
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 380px",
+                  gap: 4,
+                  alignItems: "start",
+                }
+              : {
+                  display: "flex",
+                  flexDirection: "column",
+                  width: "100%",
+                  maxWidth: 560,
+                  mx: "auto",
+                }
+          }
+        >
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: wide ? 2 : 2.5,
+              minWidth: 0,
+            }}
+          >
+            {wide ? (
+              // The prototype's 26px heading, whatever the host's md is.
+              <Box
+                sx={{
+                  "&& > *": { fontSize: "1.625rem", lineHeight: 1.2, m: 0 },
+                }}
+              >
+                <Text variant="heading" size="md" weight="bold" as="h2">
+                  {layoutCopy.payHeading}
+                </Text>
+              </Box>
+            ) : parts ? (
+              <PhoneOrderSummary parts={parts} />
+            ) : null}
 
-        {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
-        <StepColumn>
-          <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
-        </StepColumn>
+            {showTabs ? (
+              <MethodTabs
+                idBase={idBase}
+                shape={wide ? "folder" : "pill"}
+                value={method}
+                onChange={onMethodChange}
+                cardUnavailable={choice.cardUnavailable}
+                offered={choice.offered}
+              />
+            ) : null}
 
-        {choice.atProvider || pixStage.afterCopy ? null : (
-          <MethodPicker value={method} onChange={onMethodChange} cardUnavailable={choice.cardUnavailable} offered={choice.offered} />
-        )}
-
-        <StepColumn full={order?.method === "PIX"}>
-          <CartChangedBoundary {...{ order, creating, onGenerate, refresh }} basket={totalOverride ? undefined : basket}>
-            <PaymentBody
-              order={order}
-              buyer={buyer}
-              providerConfig={config}
-              method={method}
-              tenantSlug={tenantSlug}
-              onResolved={onResolved}
-              onStart={choice.onStart}
-              creating={creating}
-              pollIntervalMs={pollIntervalMs}
-              freshInstrument={freshInstrument}
-              basket={basket}
-              validateApplePayMerchant={validateApplePayMerchant}
-            />
-          </CartChangedBoundary>
-        </StepColumn>
-
-        <StepColumn>
-          <RaisingState
-            order={order}
-            method={method}
-            creating={creating && !choice.atProvider}
-            createError={createError}
-            errorField={errorField}
-            errorCode={errorCode}
-            onUseEmail={onUseEmail}
-            onGenerate={onGenerate}
-          />
-        </StepColumn>
-      </Box>
+            <Box
+              id={methodPanelId(idBase)}
+              role={panelLabelledBy ? "tabpanel" : undefined}
+              aria-labelledby={panelLabelledBy}
+              data-testid="checkout-method-panel"
+              sx={panelSx(wide, showTabs, Boolean(method || order))}
+            >
+              <CartChangedBoundary
+                {...{ order, creating, onGenerate, refresh }}
+                basket={totalOverride ? undefined : basket}
+              >
+                <PaymentBody
+                  order={order}
+                  buyer={buyer}
+                  providerConfig={config}
+                  method={method}
+                  tenantSlug={tenantSlug}
+                  onResolved={onResolved}
+                  onStart={choice.onStart}
+                  creating={creating}
+                  pollIntervalMs={pollIntervalMs}
+                  freshInstrument={freshInstrument}
+                  basket={basket}
+                  validateApplePayMerchant={validateApplePayMerchant}
+                />
+              </CartChangedBoundary>
+              <RaisingState
+                order={order}
+                method={method}
+                creating={creating && !choice.atProvider}
+                createError={createError}
+                errorField={errorField}
+                errorCode={errorCode}
+                onUseEmail={onUseEmail}
+                onGenerate={onGenerate}
+              />
+            </Box>
+          </Box>
+          {wide && parts ? <OrderSummaryCard parts={parts} /> : null}
+        </Box>
+      </PayBarTotalProvider>
     </PixStageProvider>
   );
+}
+
+/**
+ * The panel under the method tabs: on a computer a card the chosen folder tab
+ * opens into (no top border, so the tab and the card are one shape); on a
+ * phone a rounded card under the pill. Empty — nothing chosen, nothing raised
+ * — it draws nothing, so an unanswered choice is not an empty box.
+ */
+function panelSx(wide: boolean, attached: boolean, filled: boolean) {
+  const base = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    minWidth: 0,
+    "&:empty": { display: "none" },
+  } as const;
+  if (!filled) return base;
+  if (wide) {
+    return {
+      ...base,
+      p: 3,
+      bgcolor: "background.paper",
+      border: "1px solid",
+      borderColor: "divider",
+      borderTop: attached ? 0 : "1px solid",
+      borderTopColor: "divider",
+      borderRadius: attached ? "0 0 10px 10px" : "10px",
+      // Flush under the folder tabs: the column's gap would open a seam
+      // between the chosen tab and the card it opens into.
+      mt: attached ? -2 : 0,
+    } as const;
+  }
+  return { ...base, p: `${PANEL_PAD_PHONE}px`, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 4 } as const;
 }
 
 /**

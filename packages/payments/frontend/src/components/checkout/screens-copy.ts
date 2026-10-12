@@ -133,17 +133,22 @@ export interface PixPaneCopy {
   preferCardAction: string;
   /** The after-copy state's poll line. */
   verifying: string;
-  /** The narrow layout's tabs: their group name and the two labels. */
+  /** @deprecated Unread since FUT-3525, which took the narrow layout's Copia/QR tabs out. */
   tabsLabel: string;
+  /** @deprecated Unread since FUT-3525 — see {@link PixPaneCopy.tabsLabel}. */
   copyPasteTab: string;
+  /** @deprecated Unread since FUT-3525 — see {@link PixPaneCopy.tabsLabel}. */
   qrTab: string;
-  /** The wide layout's two column headings and the word between them. */
+  /** The wide layout's two column headings. */
   qrHeading: string;
+  /** The phone's heading over the QR, under the code (FUT-3525). */
+  otherDeviceHeading: string;
   copyPasteHeading: string;
+  /** @deprecated Unread since FUT-3525, which took the "ou" between the wide columns out. */
   or: string;
   /** Under the QR in the wide layout; `**…**` marks the bold span. */
   qrInstructions: string;
-  /** Under the QR in the narrow layout's QR tab. */
+  /** Under the QR in the narrow layout (a tab until FUT-3525, hence the name). */
   qrTabCaption: string;
   /** Under the copy button: narrow and wide. `**…**` marks the bold span. */
   copyPasteHint: string;
@@ -301,6 +306,29 @@ export interface CheckoutValidationCopy {
   required: string;
 }
 
+/**
+ * The Pagamento step's own frame (FUT-3525): the order summary beside the
+ * payment on a computer, and the phone's header, total and pay bar.
+ */
+export interface PaymentLayoutCopy {
+  /** Over the method tabs on a computer. */
+  payHeading: string;
+  /** The summary card's title. */
+  summaryTitle: string;
+  /** The summary's and the pay bar's label over the amount. */
+  total: string;
+  /** The phone's caption over the big amount — "Total a pagar · 2 itens". */
+  totalDueCaption(items: number): string;
+  /** One cart line in the summary — "2× X-Burger". */
+  lineLabel(quantity: number, name: string): string;
+  /** The phone's payer chip, for a CPF the store already holds — "CPF ✓". A typed one is shown masked. */
+  taxIdOnFileShort: string;
+  /** The address control's accessible name; its visible word is {@link PayerSummaryCopy.changeAction}. */
+  changeAddress: string;
+  /** The phone's step line — "Etapa 2 de 3 · Pagamento". */
+  stepProgress(step: number, steps: number, label: string): string;
+}
+
 /** Everything above, in the shape the checkout context carries. */
 export interface CheckoutScreensCopy {
   method: MethodPickerCopy;
@@ -308,6 +336,7 @@ export interface CheckoutScreensCopy {
   pix: PixPaneCopy;
   card: CardPaneCopy;
   payer: PayerSummaryCopy;
+  layout: PaymentLayoutCopy;
   error: PaymentErrorCopy;
   wallet: WalletCopy;
   hosted: HostedHandoverCopy;

@@ -206,9 +206,19 @@ function Fact({ label, value, testId }: { label: string; value: string; testId?:
       <Text variant="body" size="sm" as="span" style={{ opacity: 0.75 }}>
         {label}
       </Text>
-      <Text variant="body" size="sm" weight="bold" as="span" data-testid={testId}>
-        {value}
-      </Text>
+      {/* A long e-mail breaks rather than pushing the receipt off a 320px
+          phone: an address has no spaces to wrap at. */}
+      <Box sx={{ minWidth: 0, textAlign: "right", overflowWrap: "anywhere" }}>
+        <Text
+          variant="body"
+          size="sm"
+          weight="bold"
+          as="span"
+          data-testid={testId}
+        >
+          {value}
+        </Text>
+      </Box>
     </Box>
   );
 }

@@ -79,7 +79,8 @@ describe("the method tiles are one line (the 2026-10-06 Pix redesign)", () => {
   it("keeps the group's name for a screen reader, without drawing it", () => {
     renderStep(config([link("pagbank", ["PIX", "CARD"])]));
 
-    expect(screen.getByRole("radiogroup", { name: method.groupLabel })).toBeTruthy();
+    // Tabs since FUT-3525; the group keeps its name.
+    expect(screen.getByRole("tablist", { name: method.groupLabel })).toBeTruthy();
     expect(screen.getByTestId("checkout-method").textContent).not.toContain(method.groupLabel);
   });
 

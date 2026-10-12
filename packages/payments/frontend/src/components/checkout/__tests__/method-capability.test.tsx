@@ -51,7 +51,7 @@ function renderPaymentStep(providerConfig: CheckoutProviderConfig | null): void 
   );
 }
 
-/** The offered methods, read off the rendered radiogroup's testids. */
+/** The offered methods, read off the rendered tablist's testids. */
 function offeredTestIds(): string[] {
   return Array.from(
     screen.getByTestId("checkout-method").querySelectorAll("[data-testid^='checkout-method-']"),
@@ -107,7 +107,7 @@ describe("PaymentStep — the config's methods reach the picker (FUT-698)", () =
     // boleto UI yet (phase 2) — the picker offers only what it can honour.
     expect(screen.getByTestId("checkout-method-PIX")).toBeTruthy();
     expect(screen.getByTestId("checkout-method-CARD")).toBeTruthy();
-    expect(screen.getByTestId("checkout-method").querySelectorAll("[role='radio']")).toHaveLength(
+    expect(screen.getByTestId("checkout-method").querySelectorAll("[role='tab']")).toHaveLength(
       2,
     );
   });

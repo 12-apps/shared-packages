@@ -9,11 +9,13 @@ import QRCode from "react-qr-code";
  */
 
 /**
- * The pane switches from tabs to two columns by its OWN width, never the
- * window's: the same checkout is mounted in a 720px column, a 1040px one and a
- * phone, and only the room it was given says whether two columns fit.
+ * The pane switches from one column to two by its OWN width, never the
+ * window's: the same checkout is mounted beside an order summary, alone in a
+ * column and on a phone, and only the room it was given says whether two
+ * columns fit. 680px is what the Pagamento step's payment column leaves it
+ * beside the summary card (FUT-3525).
  */
-export const PIX_WIDE = "@container pixpane (min-width: 760px)";
+export const PIX_WIDE = "@container pixpane (min-width: 680px)";
 
 /** The container the {@link PIX_WIDE} query reads. */
 export const PIX_CONTAINER = { containerType: "inline-size", containerName: "pixpane" } as const;

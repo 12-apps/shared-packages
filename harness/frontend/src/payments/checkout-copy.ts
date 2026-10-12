@@ -203,6 +203,7 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           copyPasteTab: 'Código',
           qrTab: 'QR code',
           qrHeading: 'No celular',
+          otherDeviceHeading: 'Ou pague de outro aparelho',
           copyPasteHeading: 'Pix copia e cola',
           or: 'ou',
           qrInstructions: 'No app do banco do seu celular, escolha **Pix › Ler QR code** e aponte para cá.',
@@ -246,6 +247,17 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           payingAs: (name) => `Em nome de ${name}`,
           payingWithSavedDetails: 'Com os dados que você já deixou aqui',
           changeAction: 'Trocar',
+        },
+        // FUT-3525: the Pagamento step's summary column and the phone's pay bar.
+        layout: {
+          payHeading: 'Como prefere pagar?',
+          summaryTitle: 'Seu pedido',
+          total: 'Total',
+          totalDueCaption: (items) => `A pagar · ${items} ${items === 1 ? 'item' : 'itens'}`,
+          lineLabel: (quantity, name) => `${quantity}× ${name}`,
+          taxIdOnFileShort: 'CPF ok',
+          changeAddress: 'Trocar o endereço',
+          stepProgress: (step, steps, label) => `Passo ${step} de ${steps} · ${label}`,
         },
         error: {
           confirming: 'Conferindo seu pagamento',
