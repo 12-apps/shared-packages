@@ -82,6 +82,8 @@ export interface WebEmailAuthConfig {
   routes?: Partial<AuthRoutes>;
   /** How wide the card may get. See `AuthPagesConfig.maxWidth`. */
   maxWidth?: number;
+  /** Who the confirmation e-mail is from. See `EmailAuthScreensConfig.inboxSender`. */
+  inboxSender?: string;
 }
 
 export interface WebEmailAuth extends EmailAuthScreens, AuthPages {
@@ -125,6 +127,7 @@ export function createWebEmailAuth(config: WebEmailAuthConfig): WebEmailAuth {
     client,
     copy: config.copy,
     useSession: config.useSession,
+    ...(config.inboxSender === undefined ? {} : { inboxSender: config.inboxSender }),
   });
   const pages = createAuthPages({
     screens,

@@ -69,6 +69,12 @@ export interface EmailAuthCopy {
     failureTitle: string;
     sentTitle: string;
     sentDescription: (email: string) => string;
+    /**
+     * The button under "check your e-mail" that opens the person's webmail on
+     * the message (`inbox-link.ts`), named for the provider. Optional so a
+     * host's own pack keeps compiling; without it there is no button.
+     */
+    openInbox?: (provider: string) => string;
   };
   forgotPassword: {
     title: string;
