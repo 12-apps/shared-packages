@@ -7,6 +7,9 @@ import type { SettingsNavStatus, SettingsRailBreakpoint } from './SettingsLayout
 /** Fixed width of the left navigation rail once it has its own column (300 design px). */
 export const railWidth = (theme: Theme): string => rem(theme, 300);
 
+/** Width of the rail drawn as a card (`railVariant="card"`, 200 design px). */
+export const railCardWidth = (theme: Theme): string => rem(theme, 200);
+
 /** Visually hidden, still read aloud — for text a marker's colour cannot carry. */
 export const SR_ONLY_SX: SxProps<Theme> = {
   position: 'absolute',

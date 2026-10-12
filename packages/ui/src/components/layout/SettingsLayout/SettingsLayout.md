@@ -165,6 +165,23 @@ it: a `position: sticky` toolbar inside `children` pins to the top of the
 the scroll container.
 
 
+## A small area: no search, a card rail (`searchable`, `railVariant`)
+
+The search field earns its place in an area of twenty categories. In one of
+eight rows a reader takes in at a glance it is a control nobody needs, so
+`searchable={false}` leaves it out and the rail shows every group.
+
+`railVariant="card"` draws the rail, from `railBreakpoint` up, as a 200px
+bordered card beside the panel instead of the default 300px column ruled off
+from it. Below the breakpoint both variants look the same.
+
+```tsx
+<SettingsLayout searchable={false} railVariant="card" …>
+```
+
+Both default to today's shape, so an upgrade changes nothing for an area that
+does not ask.
+
 ## Props
 
 ### SettingsLayoutProps
@@ -184,6 +201,8 @@ the scroll container.
 | railBreakpoint    | `'sm' \| 'md' \| 'lg' \| 'xl'`                          | `'md'`              | Width at which the rail takes its own column                       |
 | fillHeight        | boolean                                                | `false`             | Rail and panel each scroll themselves (needs a definite height)     |
 | navVariant        | `'switcher' \| 'drilldown'`                            | `'switcher'`        | Narrow-width navigation shape                                      |
+| searchable        | boolean                                                | `true`              | Whether the rail carries its search field                          |
+| railVariant       | `'divided' \| 'card'`                                  | `'divided'`         | From the breakpoint up: a 300px ruled column, or a 200px card      |
 | atIndex           | boolean                                                | `false`             | `drilldown`: the router is at the area's index, not in a section    |
 | indexHref         | string                                                 | -                   | `drilldown`: where the back link goes                              |
 | backLabel         | string                                                 | `'Back'`            | Label on the back control                                          |

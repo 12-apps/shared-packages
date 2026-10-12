@@ -89,6 +89,12 @@ export type SettingsRailBreakpoint = 'sm' | 'md' | 'lg' | 'xl' | number;
  */
 export type SettingsNavVariant = 'switcher' | 'drilldown';
 
+/**
+ * How the rail is drawn once it has its own column: `divided` — a 300px column
+ * ruled off from the panel; `card` — a 200px bordered card beside it.
+ */
+export type SettingsRailVariant = 'divided' | 'card';
+
 /** The exit offered inside the empty-search state, so the dead end has a door. */
 export interface SettingsEmptySearchAction {
   /** Button label, e.g. `"Limpar a busca"`. */
@@ -168,6 +174,20 @@ export interface SettingsLayoutProps {
   railBreakpoint?: SettingsRailBreakpoint;
   /** Narrow-width navigation shape. Defaults to `"switcher"`. */
   navVariant?: SettingsNavVariant;
+  /**
+   * Whether the rail carries its search field. Defaults to `true`.
+   *
+   * A settings area with twenty categories needs the field; an area of eight
+   * rows a reader takes in at a glance is better without one, which is how a
+   * storefront's own account area draws it. Off, the rail shows every group.
+   */
+  searchable?: boolean;
+  /**
+   * How the rail is drawn from `railBreakpoint` up. Defaults to `"divided"`
+   * (a 300px column ruled off from the panel); `"card"` draws it as a 200px
+   * bordered card. Below the breakpoint both look the same.
+   */
+  railVariant?: SettingsRailVariant;
   /**
    * True when the router is at the area's index rather than inside a section.
    *
