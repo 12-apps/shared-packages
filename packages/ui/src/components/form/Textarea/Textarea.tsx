@@ -65,12 +65,17 @@ const StyledTextarea = styled(TextareaAutosize, {
   const colorPalette = getColorFromTheme(theme, customColor);
   const errorColor = theme.palette.error;
 
+  // No min-height here: the box's height is counted in LINES of its own text
+  // (`minRows`). A pixel floor broke that twice over — it ignored the font, and
+  // `TextareaAutosize` measures one row on a hidden copy carrying this same
+  // class, so a "row" came out as the whole floor and `minRows={2}` drew about
+  // 200px (FUT-3504, FUT-3534).
   const sizeMap = {
-    xs: { padding: rems(theme, 6, 8), fontSize: rem(theme, 12), minHeight: rem(theme, 60) },
-    sm: { padding: rems(theme, 8, 10), fontSize: rem(theme, 14), minHeight: rem(theme, 80) },
-    md: { padding: rems(theme, 10, 12), fontSize: rem(theme, 16), minHeight: rem(theme, 100) },
-    lg: { padding: rems(theme, 12, 14), fontSize: rem(theme, 18), minHeight: rem(theme, 120) },
-    xl: { padding: rems(theme, 14, 16), fontSize: rem(theme, 20), minHeight: rem(theme, 140) } };
+    xs: { padding: rems(theme, 6, 8), fontSize: rem(theme, 12) },
+    sm: { padding: rems(theme, 8, 10), fontSize: rem(theme, 14) },
+    md: { padding: rems(theme, 10, 12), fontSize: rem(theme, 16) },
+    lg: { padding: rems(theme, 12, 14), fontSize: rem(theme, 18) },
+    xl: { padding: rems(theme, 14, 16), fontSize: rem(theme, 20) } };
 
   const baseStyles = {
     width: '100%',
@@ -143,7 +148,9 @@ const TEXTAREA_DEFAULTS = {
   glass: false,
   gradient: false,
   iconPosition: 'start',
-  minRows: 3 } satisfies Partial<TextareaProps>;
+  // Four lines of its own text, whatever the variant or size (FUT-3534); a
+  // screen that wants another height passes `minRows`.
+  minRows: 4 } satisfies Partial<TextareaProps>;
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}`
 // still falls back to the default as a destructuring default would.
@@ -304,7 +311,7 @@ export const Textarea: React.FC<TextareaProps> = (textareaProps) => {
           glass={glass}
           gradient={gradient}
           error={error}
-          minRows={variant === 'autosize' ? minRows : undefined}
+          minRows={minRows}
           maxRows={variant === 'autosize' ? maxRows : undefined}
           style={textareaStyle}
           aria-label={label || props['aria-label']}

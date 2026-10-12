@@ -285,10 +285,9 @@ function IdentityFields({
       <Textarea
         label={copy.descriptionLabel}
         variant="autosize"
-        // `sm`, not the default `md`: the default carries a 100px floor and
-        // grew the field to a third of the dialog for a one-line description.
+        // `sm`, not the default `md`: the description is a line or two of
+        // secondary text in a dialog, set at the dialog's own body size.
         size="sm"
-        minRows={3}
         placeholder={copy.descriptionPlaceholder}
         helperText={copy.descriptionHelper}
         value={value.description}

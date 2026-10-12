@@ -237,7 +237,6 @@ export function WriteOptIn({
           <Textarea
             label={labels.writeOptIn.reasonLabel}
             value={writeReason}
-            minRows={2}
             helperText={labels.writeOptIn.reasonHelper({ min: reasonMin })}
             onChange={(event) => onWriteReason(event.target.value)}
             dataTestId="impersonation-write-reason"
