@@ -91,6 +91,14 @@ describe("the account-created screen", () => {
     expect(button.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("puts the button inside the alert, with the provider's mark", async () => {
+    await signUp("ana@gmail.com", "Paladira");
+
+    const button = screen.getByTestId("signup-open-inbox");
+    expect(screen.getByTestId("signup-verification-sent").contains(button)).toBe(true);
+    expect(button.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+  });
+
   it("offers to open Outlook for a Hotmail address", async () => {
     await signUp("ana@hotmail.com", "Paladira");
 

@@ -9,6 +9,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { inboxLink } from "./inbox-link";
+import { InboxLogo } from "./inbox-logos";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
 
@@ -226,27 +227,33 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
 function VerificationSent({ email }: { email: string }): JSX.Element {
   const { copy, inboxSender } = useScreens();
   const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
-  // One element, so a host laying its page out as a gapped flex column puts
-  // its gap around the pair, not twice between the alert and its button.
+  // The button sits INSIDE the alert, under its sentence: it is the way to do
+  // what the alert asks, so the two read as one card rather than a message and
+  // an unrelated call to action below it.
   return (
-    <div data-testid="signup-verification-sent-block">
-      <Alert
-        variant="success"
-        title={copy.signUp.sentTitle}
-        description={copy.signUp.sentDescription(email)}
-        data-testid="signup-verification-sent"
-      />
+    <Alert
+      variant="success"
+      title={copy.signUp.sentTitle}
+      description={copy.signUp.sentDescription(email)}
+      data-testid="signup-verification-sent"
+    >
       {inbox && copy.signUp.openInbox ? (
         <>
-          <Spacer size="md" />
+          <Spacer size="sm" />
+          {/* White, not the brand's solid: the provider's own colours carry
+              the button, and a multicolour mark on red is unreadable. */}
           <Button
             component="a"
             href={inbox.href}
             target="_blank"
             rel="noopener noreferrer"
-            variant="solid"
-            color="primary"
+            variant="outline"
+            color="neutral"
+            icon={<InboxLogo provider={inbox.provider} />}
+            iconPosition="left"
+            size="lg"
             fullWidth
+            sx={{ bgcolor: "background.paper" }}
             dataTestId="signup-open-inbox"
             data-provider={inbox.provider}
           >
@@ -254,7 +261,7 @@ function VerificationSent({ email }: { email: string }): JSX.Element {
           </Button>
         </>
       ) : null}
-    </div>
+    </Alert>
   );
 }
 
