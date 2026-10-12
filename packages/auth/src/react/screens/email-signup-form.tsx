@@ -237,29 +237,26 @@ function VerificationSent({ email }: { email: string }): JSX.Element {
       description={copy.signUp.sentDescription(email)}
       data-testid="signup-verification-sent"
     >
+      {/* White, not the brand's solid: the provider's own colours carry the
+          button, and a multicolour mark on red is unreadable. */}
       {inbox && copy.signUp.openInbox ? (
-        <>
-          <Spacer size="sm" />
-          {/* White, not the brand's solid: the provider's own colours carry
-              the button, and a multicolour mark on red is unreadable. */}
-          <Button
-            component="a"
-            href={inbox.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="outline"
-            color="neutral"
-            icon={<InboxLogo provider={inbox.provider} />}
-            iconPosition="left"
-            size="lg"
-            fullWidth
-            sx={{ bgcolor: "background.paper" }}
-            dataTestId="signup-open-inbox"
-            data-provider={inbox.provider}
-          >
-            {copy.signUp.openInbox(inbox.provider)}
-          </Button>
-        </>
+        <Button
+          component="a"
+          href={inbox.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          variant="outline"
+          color="neutral"
+          icon={<InboxLogo provider={inbox.provider} />}
+          iconPosition="left"
+          size="lg"
+          fullWidth
+          sx={{ bgcolor: "background.paper" }}
+          dataTestId="signup-open-inbox"
+          data-provider={inbox.provider}
+        >
+          {copy.signUp.openInbox(inbox.provider)}
+        </Button>
       ) : null}
     </Alert>
   );

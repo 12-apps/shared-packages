@@ -13,7 +13,7 @@ import type { JSX } from "react";
 
 function GmailLogo(): JSX.Element {
   return (
-    <svg viewBox="0 0 24 18" width="1em" height="1em" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 18" width="1.25em" height="1.25em" aria-hidden="true" focusable="false">
       <path fill="#4285F4" d="M1.64 18h3.82V8.73L0 4.64v11.73C0 17.27.73 18 1.64 18z" />
       <path fill="#34A853" d="M18.55 18h3.81c.9 0 1.64-.73 1.64-1.64V4.64l-5.45 4.09z" />
       <path fill="#FBBC04" d="M18.55 1.64v7.09L24 4.64V2.45C24 .43 21.69-.73 20.07.49z" />
@@ -25,7 +25,7 @@ function GmailLogo(): JSX.Element {
 
 function OutlookLogo(): JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false">
       <rect x="8" y="3" width="15" height="18" rx="2" fill="#28A8EA" />
       <path fill="#0364B8" d="M8 12h15v7a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" />
       <rect x="1" y="6" width="12" height="12" rx="1.5" fill="#0078D4" />
@@ -36,7 +36,7 @@ function OutlookLogo(): JSX.Element {
 
 function YahooLogo(): JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false">
       <rect width="24" height="24" rx="5" fill="#6001D2" />
       <path fill="#fff" d="M5 7h3l2.3 5.4L12.6 7h2.9l-4.4 9.6V20H8.6v-3.4zm11.6 0h3l-2.6 7h-2.4z" />
       <circle cx="16.3" cy="16.6" r="1.4" fill="#fff" />
