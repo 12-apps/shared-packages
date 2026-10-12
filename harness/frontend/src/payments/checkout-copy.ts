@@ -305,6 +305,15 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           phoneInvalid: 'Esse telefone não confere.',
           required: 'Preencha este campo.',
         },
+        // The cart moved under a prepared payment (FUT-1139), and the Pix
+        // drawn while it stands veiled (FUT-3535).
+        cartChanged: {
+          heading: 'O carrinho mudou',
+          support: 'Este pagamento é do carrinho de antes. Atualize para pagar o valor de agora.',
+          refreshAction: 'Atualizar o pagamento',
+          refreshFailed: 'Não deu para atualizar o pagamento',
+          pixVeil: 'Atualize para receber um Pix novo',
+        },
         generatingPayment: 'Criando o pagamento…',
         // The caption beside the amount, on both the details and the payment
         // step. A function because the count inflects.
