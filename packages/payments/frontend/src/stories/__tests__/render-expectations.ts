@@ -101,7 +101,8 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "Checkout/TaxIdOnFile": {
     testIds: ["checkout-payer", "checkout-method", "checkout-method-PIX", "checkout-method-CARD"],
-    text: ["Pagando como Ana Compradora", "CPF já cadastrado"],
+    // The phone frame's payer chip (FUT-3525); "Pagando como" is its accessible name.
+    text: ["Ana Compradora · CPF ✓"],
   },
   "Checkout/SavedCardsAvailable": DADOS_STEP,
   "Checkout/SavedCardNotUsableHere": DADOS_STEP,

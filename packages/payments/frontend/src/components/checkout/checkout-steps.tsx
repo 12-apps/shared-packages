@@ -2,15 +2,14 @@ import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
-import { displayTotals, PayBarTotal } from "./checkout-totals";
 import { CartChangedBoundary, type OrderRefresh } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { useMethodChoice } from "./method-choice";
-import { MethodPicker } from "./method-picker";
 import { PixStageProvider } from "./pix-stage";
-import { StepColumn, usePaymentPixStage } from "./payment-step-layout";
+import { PayBarTotalProvider, useCheckoutLayout, usePaymentPixStage } from "./payment-step-layout";
 import { PaymentErrorPanel } from "./payment-error-panel";
-import { PayerSummary } from "./payer-summary";
+import { PaymentStepFrame, summaryParts } from "./payment-step-frame";
+import type { CheckoutDeliverySummary, CheckoutSummaryLine, OrderSummaryParts } from "./payment-summary";
 import { resolveCheckoutScreen } from "./providers/registry";
 import type {
   BuyerField,
@@ -124,48 +123,6 @@ export function EmptyCart({ copy, onBack }: { copy: EmptyCartCopy; onBack: () =>
   );
 }
 
-/** What the step knows about the amount: the charge's, the balance's, the cart's. */
-interface StepMoney {
-  order: CheckoutOrder | null;
-  cartTotals?: { totalLabel: string; totalItems: number };
-  totalOverride?: { label: string; items: number };
-  discountLines?: ReactNode;
-}
-
-/**
- * The Pagamento step's own money line (FUT-1179).
- *
- * THE RAISED ORDER'S TOTAL WINS, exactly as the confirmation screen's does
- * (`statusTotalLabel`). Once a charge exists, that charge's amount is what is
- * being taken — a repriced cart, or an order resumed from a parked entry, makes
- * the cart's total a different number from the one about to leave the buyer's
- * account. Showing the cart's number above a QR for the order's would be this
- * ticket's own defect in a new place: an amount on screen that is not the
- * amount being charged.
- *
- * The item COUNT stays the cart's — an order carries no line count, and the
- * caption is a description of the basket rather than of the charge.
- *
- * Renders nothing at all when the host supplied no totals and no order — a step
- * that would otherwise print "Total ·" with a blank beside it is worse than the
- * silence this ticket is about. Every host mounting `CheckoutFlow` gets them;
- * only a hand-composed step can be missing them.
- */
-function PaymentStepTotal({ money }: { money: StepMoney }): JSX.Element | null {
-  const { order, cartTotals, totalOverride, discountLines } = money;
-  if (!cartTotals && !totalOverride && !order) return null;
-  const { label, items } = displayTotals(totalOverride, cartTotals ?? { totalLabel: "", totalItems: 0 });
-  return (
-    <Box data-testid="payment-step-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
-      <PayBarTotal totalLabel={order?.totalLabel ?? label} totalItems={items}>
-        {/* Suppressed while settling a balance: those totals come from the
-            frozen ticket, not the cart. */}
-        {totalOverride ? null : discountLines}
-      </PayBarTotal>
-    </Box>
-  );
-}
-
 /** Props for {@link PaymentStep} — step 2's inputs, wired by the flow. */
 interface PaymentStepProps {
   method: PaymentMethod | null;
@@ -221,6 +178,12 @@ interface PaymentStepProps {
   totalOverride?: { label: string; items: number };
   /** The host's own rendered discount itemization, under the total (FUT-246). */
   discountLines?: ReactNode;
+  /** The cart's lines, listed in the computer's order summary (FUT-3525). */
+  lines?: CheckoutSummaryLine[];
+  /** Where a delivery goes — Entrega only; absent hides the row (FUT-3525). */
+  delivery?: CheckoutDeliverySummary;
+  /** The host's note control, shown in the summary (FUT-3525). */
+  orderNote?: ReactNode;
   pollIntervalMs?: number;
   /** Retrying a refused card — preselect no saved instrument (FUT-1145). */
   freshInstrument?: boolean;
@@ -254,6 +217,9 @@ export function PaymentStep({
   cartTotals,
   totalOverride,
   discountLines,
+  lines,
+  delivery,
+  orderNote,
   pollIntervalMs,
   freshInstrument,
   basket,
@@ -265,23 +231,23 @@ export function PaymentStep({
   useAutoRaiseOrder(order, method, creating, createError, onGenerate);
   const pixStage = usePaymentPixStage(choice, onMethodChange);
 
+  const wide = useCheckoutLayout()?.wide ?? false;
+  const parts = summaryParts(
+    { order, cartTotals, totalOverride, discountLines },
+    { lines, payer: payerOf(buyer, onEditBuyer), delivery, orderNote },
+  );
+  const tabs = {
+    show: !(choice.atProvider || pixStage.afterCopy),
+    method,
+    onChange: onMethodChange,
+    cardUnavailable: choice.cardUnavailable,
+    offered: choice.offered,
+  };
+
   return (
     <PixStageProvider stage={pixStage}>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {/* THE AMOUNT, before anything asks for it (FUT-1179) — at the top, not in a
-            bar of its own: a second bar would put two "pay" controls on one screen. */}
-        <PaymentStepTotal money={{ order, cartTotals, totalOverride, discountLines }} />
-
-        {/* Self-hiding: renders only for a flow whose Dados step was skipped. */}
-        <StepColumn>
-          <PayerSummary name={buyer.name} taxId={buyer.taxId} onEdit={onEditBuyer} />
-        </StepColumn>
-
-        {choice.atProvider || pixStage.afterCopy ? null : (
-          <MethodPicker value={method} onChange={onMethodChange} cardUnavailable={choice.cardUnavailable} offered={choice.offered} />
-        )}
-
-        <StepColumn full={order?.method === "PIX"}>
+      <PayBarTotalProvider value={parts?.totalLabel ?? null}>
+        <PaymentStepFrame wide={wide} parts={parts} tabs={tabs} filled={Boolean(method || order)}>
           <CartChangedBoundary {...{ order, creating, onGenerate, refresh }} basket={totalOverride ? undefined : basket}>
             <PaymentBody
               order={order}
@@ -298,9 +264,6 @@ export function PaymentStep({
               validateApplePayMerchant={validateApplePayMerchant}
             />
           </CartChangedBoundary>
-        </StepColumn>
-
-        <StepColumn>
           <RaisingState
             order={order}
             method={method}
@@ -311,10 +274,15 @@ export function PaymentStep({
             onUseEmail={onUseEmail}
             onGenerate={onGenerate}
           />
-        </StepColumn>
-      </Box>
+        </PaymentStepFrame>
+      </PayBarTotalProvider>
     </PixStageProvider>
   );
+}
+
+/** The payer line's facts — only for a flow whose Dados step was skipped (FUT-465). */
+function payerOf(buyer: BuyerInfo, onEditBuyer: (() => void) | undefined): OrderSummaryParts["payer"] {
+  return onEditBuyer ? { name: buyer.name, taxId: buyer.taxId, onEdit: onEditBuyer } : undefined;
 }
 
 /**

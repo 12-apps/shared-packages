@@ -1,29 +1,20 @@
-import { Box } from "@mui/material";
 import { useMemo, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
 import { buyerFieldsFor } from "./buyer-fields";
 import { EmptyCart, PaymentStep } from "./checkout-steps";
 import { DadosStep } from "./dados-step";
-import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BackActionEmphasis } from "./payment-status-parts";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutCopyProvider } from "./copy-context";
 import { OneClickProvider, useOneClick } from "./one-click";
-import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
+import { CheckoutComponentsProvider, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
-import { STEP_COLUMN_MAX } from "./payment-step-layout";
+import { CheckoutFrame, FlowHeader } from "./checkout-frame";
+import type { CheckoutDeliverySummary, CheckoutSummaryLine } from "./payment-summary";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 
-/** Step ids are the flow's own contract; the labels beside them are host copy. */
-function stepperSteps(copy: CheckoutViewCopy): { id: string; label: string }[] {
-  return [
-    { id: "dados", label: copy.steps.dados },
-    { id: "payment", label: copy.steps.payment },
-    { id: "status", label: copy.steps.status },
-  ];
-}
 
 /** What the flow reads off the host's cart — display facts, never money math. */
 export interface CheckoutCartView {
@@ -33,6 +24,19 @@ export interface CheckoutCartView {
   totalItems: number;
   /** Host-rendered discount itemization under the pay-bar total (FUT-246). */
   discountLines?: ReactNode;
+  /**
+   * The cart's lines, worded by the host, for the order summary the Pagamento
+   * step shows beside the payment on a computer (FUT-3525). Absent, the
+   * summary shows the total alone.
+   */
+  lines?: CheckoutSummaryLine[];
+  /**
+   * Where the order is delivered, and the host's way back to change it — set
+   * only for a delivery (FUT-3525). Absent, no address is shown.
+   */
+  delivery?: CheckoutDeliverySummary;
+  /** The host's note control, shown in the Pagamento step's summary (FUT-3525). */
+  orderNote?: ReactNode;
   /**
    * WHICH basket this is, so a payment raised from another one cannot resume
    * itself over it (FUT-1213).
@@ -147,36 +151,6 @@ function statusTotalLabel(
   return order?.totalLabel ?? settlement?.totalLabel ?? cart.totalLabel;
 }
 
-/**
- * The slim checkout header — the flow's only nav: a step-aware back link
- * (Pagamento → Dados, else the menu).
- *
- * Deliberately nothing else. A "limpar carrinho" trash used to sit on the right
- * of the Dados step; it was removed because emptying the cart is a CART action
- * and belongs where the cart is edited — the drawer, which already offers a
- * per-line remove. Offering it here put a destructive control next to the form
- * a buyer is filling in, one tap away from the field they are typing into.
- */
-function CheckoutHeader({ copy, step, onBack }: { copy: CheckoutViewCopy; step: string; onBack: () => void }): JSX.Element {
-  const { Button } = useCheckoutComponents();
-  return (
-    <Box sx={{ minHeight: 36, display: "flex", alignItems: "center", gap: 1 }}>
-      <Button variant="text" color="neutral" size="sm" icon={<ArrowBackIcon fontSize="small" />} iconPosition="left" onClick={onBack} dataTestId="checkout-back">
-        {step === "dados" ? copy.dados.keepShopping : copy.dados.back}
-      </Button>
-    </Box>
-  );
-}
-
-/** Compact 50px progress header so the form stays above the fold on mobile. */
-function ProgressHeader({ copy, step, completed }: { copy: CheckoutViewCopy; step: string; completed: Set<string> }): JSX.Element {
-  const { Stepper } = useCheckoutComponents();
-  return (
-    <Box sx={{ height: 50, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <Stepper steps={stepperSteps(copy)} activeId={step} completed={completed} orientation="horizontal" size="sm" data-testid="checkout-stepper" />
-    </Box>
-  );
-}
 
 /**
  * The 3-step flow body, below the slot provider. Ported from the storefront's
@@ -308,6 +282,10 @@ function PagamentoStep({
       cartTotals={cart}
       totalOverride={settlementTotalOverride(settlement)}
       discountLines={cart.discountLines}
+      // The order around the payment, for the summary (FUT-3525).
+      lines={cart.lines}
+      delivery={cart.delivery}
+      orderNote={cart.orderNote}
       // Retrying a refused card: the failed saved card is not chosen again (FUT-1145).
       freshInstrument={c.freshInstrument}
       // The card path parks an order of its own for a 3-D Secure challenge, so
@@ -341,46 +319,52 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   }
 
   return (
-    // Pagamento alone takes the host's full width (its PIX pane, FUT-3367).
-    <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, sm: 3 }, width: "100%", mx: "auto", maxWidth: c.step === "payment" ? "none" : STEP_COLUMN_MAX }}>
-      <CheckoutHeader copy={copy} step={c.step} onBack={c.back} />
+    <CheckoutFrame payment={c.step === "payment"}>
+      <FlowHeader copy={copy} step={c.step} completed={c.completed} onBack={c.back} />
 
-      <ProgressHeader copy={copy} step={c.step} completed={c.completed} />
+          {c.step === "dados" ? (
+            <DadosStep
+              copy={copy.dados}
+              buyer={c.buyer}
+              onBuyerChange={c.setBuyer}
+              saveProfile={c.saveProfile}
+              onSaveProfileChange={c.setSaveProfile}
+              createError={c.createError}
+              errorField={c.errorField}
+              onContinue={c.goToPayment}
+              cartTotals={cart}
+              buyerFields={buyerFields}
+              discountLines={cart.discountLines}
+              totalOverride={settlementTotalOverride(settlement)}
+            />
+          ) : null}
 
-      {c.step === "dados" ? (
-        <DadosStep
-          copy={copy.dados}
-          buyer={c.buyer}
-          onBuyerChange={c.setBuyer}
-          saveProfile={c.saveProfile}
-          onSaveProfileChange={c.setSaveProfile}
-          createError={c.createError}
-          errorField={c.errorField}
-          onContinue={c.goToPayment}
-          cartTotals={cart}
-          buyerFields={buyerFields}
-          discountLines={cart.discountLines}
-          totalOverride={settlementTotalOverride(settlement)}
-        />
-      ) : null}
+          {c.step === "payment" ? (
+            <OneClickProvider armed={armed}>
+              <PagamentoStep
+                c={c}
+                cart={cart}
+                settlement={settlement}
+                providerConfig={providerConfig}
+                tenantSlug={tenantSlug}
+                validateApplePayMerchant={validateApplePayMerchant}
+              />
+            </OneClickProvider>
+          ) : null}
 
-      {c.step === "payment" ? (
-        <OneClickProvider armed={armed}>
-          <PagamentoStep
-            c={c}
-            cart={cart}
-            settlement={settlement}
-            providerConfig={providerConfig}
-            tenantSlug={tenantSlug}
-            validateApplePayMerchant={validateApplePayMerchant}
-          />
-        </OneClickProvider>
-      ) : null}
-
-      {c.step === "status" ? (
-        <StatusStep copy={copy} c={c} settlement={settlement} cart={cart} confirmationExtra={confirmationExtra} confirmationHero={confirmationHero} confirmationFooter={confirmationFooter} backActionEmphasis={backActionEmphasis} />
-      ) : null}
-    </Box>
+          {c.step === "status" ? (
+            <StatusStep
+              copy={copy}
+              c={c}
+              settlement={settlement}
+              cart={cart}
+              confirmationExtra={confirmationExtra}
+              confirmationHero={confirmationHero}
+              confirmationFooter={confirmationFooter}
+              backActionEmphasis={backActionEmphasis}
+            />
+          ) : null}
+    </CheckoutFrame>
   );
 }
 

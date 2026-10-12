@@ -15,8 +15,22 @@ import { StalledWait } from "./stalled-wait";
 import type { CheckoutBasketIdentity } from "./basket";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "./types";
+import { useCheckoutLayout } from "./payment-step-layout";
 import { useCheckoutComponents } from "./ui";
 import { useCardCheckout, type CardCheckout } from "./use-card-checkout";
+
+/** The pane's heading — left out inside the Pagamento step, where the "Cartão" tab names the pane (FUT-3525). */
+function CardHeading(): JSX.Element | null {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.card;
+  const inStep = useCheckoutLayout() !== null;
+  if (inStep) return null;
+  return (
+    <Text variant="heading" size="md" weight="bold" as="h2">
+      {copy.heading}
+    </Text>
+  );
+}
 
 /**
  * Post-submit confirmation state: timeout > error > spinner.
@@ -180,8 +194,6 @@ export function CardView({
    */
   basket?: CheckoutBasketIdentity;
 }): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  const copy = useCheckoutCopy().screens.card;
   const cc = useCardCheckout(
     order,
     buyer,
@@ -204,10 +216,11 @@ export function CardView({
   }
 
   return (
-    <Box data-testid="card-view" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Text variant="heading" size="md" weight="bold" as="h2">
-        {copy.heading}
-      </Text>
+    <Box
+      data-testid="card-view"
+      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+    >
+      <CardHeading />
 
       <CardInstrumentFields card={cc} />
 

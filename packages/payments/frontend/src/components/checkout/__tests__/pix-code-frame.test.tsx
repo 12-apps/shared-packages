@@ -37,8 +37,6 @@ describe("the Pix code box", () => {
       <CheckoutComponentsProvider components={{ Text: ChipCodeText }}>
         <PixPane
           pix={{ copyPaste: "00020126BR.GOV.BCB.PIX-frame", expiresAt: new Date(0).toISOString() }}
-          tab="copy"
-          onTab={vi.fn()}
           onCopy={vi.fn()}
         />
       </CheckoutComponentsProvider>,

@@ -3,6 +3,10 @@ import type { JSX } from "react";
 
 import { useCheckoutCopy } from "../components/checkout/copy-context";
 import { useCheckoutComponents } from "../components/checkout/ui";
+import {
+  StickyPayBar,
+  useCheckoutLayout,
+} from "../components/checkout/payment-step-layout";
 
 import {
   cvvLength,
@@ -110,7 +114,9 @@ function ExpiryCvvFields({
   const { Input } = useCheckoutComponents();
   const copy = useCheckoutCopy().card.fields;
   return (
-    <Box sx={{ display: "flex", gap: 2 }}>
+    // Side by side while "Validade (MM/AA)" fits whole; stacked below that
+    // (a phone's Pagamento card, FUT-3525) rather than cut to "Validade (MM/…".
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, "& > *": { flex: "1 1 170px" } }}>
       <Input
         label={copy.expiryLabel}
         type="text"
@@ -216,7 +222,14 @@ export function NewCardForm({
   );
 }
 
-/** Sticky primary "Pagar" action — pinned to the bottom of the viewport on mobile. */
+/**
+ * The primary "Pagar" action.
+ *
+ * On the Pagamento step it is the step's pay bar (FUT-3525): pinned to the
+ * bottom of the viewport with the total beside it on a phone, in the form on
+ * a computer. Composed anywhere else it keeps the look it always had —
+ * pinned to the bottom on a small screen, in the form on a wide one.
+ */
 export function CardPayBar({
   totalLabel,
   submitting,
@@ -227,6 +240,23 @@ export function CardPayBar({
   onPay: () => void;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
+  const inStep = useCheckoutLayout() !== null;
+  const button = (
+    <Button
+      variant="solid"
+      color="primary"
+      size="lg"
+      fullWidth
+      loading={submitting}
+      disabled={submitting}
+      onClick={onPay}
+      dataTestId="card-pay"
+    >
+      Pagar {totalLabel}
+    </Button>
+  );
+  if (inStep)
+    return <StickyPayBar dataTestId="card-pay-bar">{button}</StickyPayBar>;
   return (
     <Box
       data-testid="card-pay-bar"
@@ -242,18 +272,7 @@ export function CardPayBar({
         borderColor: "divider",
       }}
     >
-      <Button
-        variant="solid"
-        color="primary"
-        size="lg"
-        fullWidth
-        loading={submitting}
-        disabled={submitting}
-        onClick={onPay}
-        dataTestId="card-pay"
-      >
-        Pagar {totalLabel}
-      </Button>
+      {button}
     </Box>
   );
 }
