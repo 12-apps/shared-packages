@@ -12,7 +12,7 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { atLeastRail, TOUCH_TARGET } from './SettingsLayout.styles';
-import { rem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 import { SettingsStatusMarker } from './SettingsStatusMarker';
 import type {
   SettingsLayoutProps,
@@ -27,6 +27,8 @@ export interface RailShape {
   variant: SettingsNavVariant;
   breakpoint: SettingsRailBreakpoint;
   atIndex: boolean;
+  /** The rail is drawn as a card (`railVariant="card"`): denser rows, darker text. */
+  card?: boolean;
 }
 
 interface RailItemProps extends RailShape {
@@ -69,6 +71,34 @@ function RailItemContent({
   );
 }
 
+/**
+ * The row's text colour. On the card the active row's red is the darker one,
+ * since `primary.main` on its 12% wash measured 4.19:1 — under AA at 16px —
+ * and the rest read in the body colour, as the card's prototype draws them.
+ */
+function railItemColor(active: boolean, card: boolean): string {
+  if (active) return card ? 'primary.dark' : 'primary.main';
+  return card ? 'text.primary' : 'text.secondary';
+}
+
+/**
+ * Keyboard focus as a ring, not MUI's grey fill: the fill measured 1.3:1
+ * against the rail, under the 3:1 a focus indicator needs.
+ */
+const FOCUS_RING_SX = {
+  '&.Mui-focusVisible': {
+    outlineStyle: 'solid',
+    outlineWidth: sxRem(2),
+    outlineColor: 'primary.main',
+    outlineOffset: sxRem(-2),
+  },
+} as const;
+
+/** The card's rows from the breakpoint up: 36px, the prototype's rail density. */
+function cardRowSx(theme: Theme, breakpoint: SettingsRailBreakpoint): Record<string, unknown> {
+  return { [atLeastRail(theme, breakpoint)]: { minHeight: rem(theme, 36), py: sxRem(6) } };
+}
+
 /** One rail entry — a link when it has `href`, inert text when it says so, else a button. */
 export function SettingsRailItem({
   item,
@@ -79,6 +109,7 @@ export function SettingsRailItem({
   testIdPrefix,
   variant,
   breakpoint,
+  card = false,
 }: RailItemProps): React.JSX.Element {
   const theme = useTheme();
   // In `drilldown` the narrow rail IS the page's list, so its rows are the
@@ -95,11 +126,13 @@ export function SettingsRailItem({
       mb: 0.25,
       gap: 1.5,
       ...touchFloor,
-      color: active ? 'primary.main' : 'text.secondary',
+      ...(card ? cardRowSx(theme, breakpoint) : null),
+      color: railItemColor(active, card),
       '&.Mui-selected': {
         bgcolor: alpha(theme.palette.primary.main, 0.12),
         '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.18) },
       },
+      ...FOCUS_RING_SX,
     },
   };
   const content = <RailItemContent item={item} active={active} testIdPrefix={testIdPrefix} />;
@@ -171,7 +204,9 @@ function indexListSx(shape: RailShape): Extract<SxProps<Theme>, (theme: Theme) =
     // One spacing unit (8px). This is an `sx` callback, where a bare 8 is
     // EIGHT units — it drew a 64px gutter between the two columns.
     columnGap: 1,
-    [theme.breakpoints.up('sm')]: { gridTemplateColumns: '1fr 1fr' },
+    // From `md`, not `sm`: at 600 two columns of bare text rows read as one
+    // list with a hole in it, and a row's status dot sat nearer the next column.
+    [theme.breakpoints.up('md')]: { gridTemplateColumns: '1fr 1fr' },
     [atLeastRail(theme, shape.breakpoint)]: { gridTemplateColumns: '1fr' },
   });
 }

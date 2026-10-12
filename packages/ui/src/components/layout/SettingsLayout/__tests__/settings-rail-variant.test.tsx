@@ -6,6 +6,7 @@
  * 300px column ruled off from the panel — so an upgrade changes nothing for an
  * area that does not ask.
  */
+import { createTheme } from '@mui/material/styles';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
@@ -80,5 +81,38 @@ describe('railVariant', () => {
     expect(rail).toHaveAttribute('data-rail-variant', 'card');
     expect(css).toContain('border:1pxsolid');
     expect(css).not.toContain('border-right:1pxsolid');
+  });
+});
+
+describe('the card rail rows', () => {
+  const theme = createTheme();
+  const norm = (colour: string): string => colour.toLowerCase();
+
+  it('draws the active row in the darker red, which keeps AA on its wash', () => {
+    renderLayout({ railVariant: 'card' });
+    const active = screen.getByTestId('settings-item-profile');
+    expect(styleTextOf(active).toLowerCase()).toContain(`color:${norm(theme.palette.primary.dark)}`);
+  });
+
+  it('keeps the active row in primary.main on the ruled column, so an upgrade changes nothing', () => {
+    renderLayout();
+    const active = screen.getByTestId('settings-item-profile');
+    expect(styleTextOf(active).toLowerCase()).not.toContain(`color:${norm(theme.palette.primary.dark)}`);
+  });
+
+  it('rings keyboard focus instead of the grey fill', () => {
+    renderLayout({ railVariant: 'card' });
+    const css = styleTextOf(screen.getByTestId('settings-item-addresses'));
+    expect(css).toContain('.Mui-focusVisible{outline-style:solid');
+  });
+});
+
+describe('the drilldown index list', () => {
+  it('takes a second column from md, not from sm', () => {
+    renderLayout({ navVariant: 'drilldown', atIndex: true });
+    const list = screen.getByTestId('settings-group-account').querySelector('ul') as HTMLElement;
+    const css = styleTextOf(list);
+    expect(css).toContain('@media(min-width:900px){');
+    expect(css).not.toContain('@media(min-width:600px){');
   });
 });

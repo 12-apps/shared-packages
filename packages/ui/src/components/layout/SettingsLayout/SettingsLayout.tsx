@@ -58,7 +58,11 @@ function railLookOf({
 }
 
 /** Stacked below the rail's breakpoint, two columns at and above it. */
-function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: boolean): SxProps<Theme> {
+function shellSx(
+  breakpoint: SettingsLayoutProps['railBreakpoint'],
+  fillHeight: boolean,
+  railVariant: SettingsLayoutProps['railVariant'],
+): SxProps<Theme> {
   return (theme: Theme) => ({
     display: 'flex',
     flexDirection: 'column' as const,
@@ -71,7 +75,9 @@ function shellSx(breakpoint: SettingsLayoutProps['railBreakpoint'], fillHeight: 
     // convenience.
     [atLeastRail(theme, breakpoint ?? 'md')]: {
       flexDirection: 'row',
-      gap: 3,
+      // A card stands apart from the panel by 32px, as its prototype draws it;
+      // the ruled column keeps its 24.
+      gap: railVariant === 'card' ? 4 : 3,
       ...(fillHeight ? { height: '100%', minHeight: 0 } : {}),
     },
   });
@@ -137,7 +143,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
       data-testid={testIdPrefix}
       data-nav-variant={navVariant}
       data-at-index={atIndex ? 'true' : 'false'}
-      sx={shellSx(railBreakpoint, fillHeight)}
+      sx={shellSx(railBreakpoint, fillHeight, railLookOf(props).railVariant)}
     >
       <SettingsRail
         title={title}
