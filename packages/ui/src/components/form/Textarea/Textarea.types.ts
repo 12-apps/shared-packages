@@ -77,12 +77,14 @@ export interface TextareaBaseProps
   gradient?: boolean;
   
   /**
-   * Minimum number of rows for autosize variant
+   * How many lines of its own text the box opens at, in every variant.
+   * Defaults to 4; pass it to override.
    */
   minRows?: number;
   
   /**
-   * Maximum number of rows for autosize variant
+   * The most lines the `autosize` variant grows to before it scrolls.
+   * The other variants ignore it.
    */
   maxRows?: number;
 

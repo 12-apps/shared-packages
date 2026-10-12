@@ -178,7 +178,6 @@ function DialogFields({
       <Textarea
         label={labels.reasonField.label}
         value={state.reason}
-        minRows={2}
         helperText={labels.reasonField.helper({ min: rules.reasonLength.min })}
         onChange={(event) => patch({ reason: event.target.value })}
         dataTestId="impersonation-reason"
