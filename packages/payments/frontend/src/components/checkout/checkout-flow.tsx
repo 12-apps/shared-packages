@@ -1,30 +1,20 @@
-import { Box } from "@mui/material";
 import { useMemo, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
 import { buyerFieldsFor } from "./buyer-fields";
 import { EmptyCart, PaymentStep } from "./checkout-steps";
 import { DadosStep } from "./dados-step";
-import { ArrowBackIcon } from "./icons";
 import { PaymentStatus } from "./payment-status";
 import type { BackActionEmphasis } from "./payment-status-parts";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
-import { CheckoutCopyProvider, useCheckoutCopy } from "./copy-context";
+import { CheckoutCopyProvider } from "./copy-context";
 import { OneClickProvider, useOneClick } from "./one-click";
-import { CheckoutComponentsProvider, useCheckoutComponents, type CheckoutComponents } from "./ui";
+import { CheckoutComponentsProvider, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
-import { CheckoutLayoutProvider, STEP_COLUMN_MAX, useWideLayout } from "./payment-step-layout";
+import { CheckoutFrame, FlowHeader } from "./checkout-frame";
 import type { CheckoutDeliverySummary, CheckoutSummaryLine } from "./payment-summary";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
 
-/** Step ids are the flow's own contract; the labels beside them are host copy. */
-function stepperSteps(copy: CheckoutViewCopy): { id: string; label: string }[] {
-  return [
-    { id: "dados", label: copy.steps.dados },
-    { id: "payment", label: copy.steps.payment },
-    { id: "status", label: copy.steps.status },
-  ];
-}
 
 /** What the flow reads off the host's cart — display facts, never money math. */
 export interface CheckoutCartView {
@@ -161,116 +151,6 @@ function statusTotalLabel(
   return order?.totalLabel ?? settlement?.totalLabel ?? cart.totalLabel;
 }
 
-/**
- * The slim checkout header — the flow's only nav: a step-aware back link
- * (Pagamento → Dados, else the menu).
- *
- * Deliberately nothing else. A "limpar carrinho" trash used to sit on the right
- * of the Dados step; it was removed because emptying the cart is a CART action
- * and belongs where the cart is edited — the drawer, which already offers a
- * per-line remove. Offering it here put a destructive control next to the form
- * a buyer is filling in, one tap away from the field they are typing into.
- */
-function CheckoutHeader({ copy, step, onBack }: { copy: CheckoutViewCopy; step: string; onBack: () => void }): JSX.Element {
-  const { Button } = useCheckoutComponents();
-  return (
-    <Box sx={{ minHeight: 36, display: "flex", alignItems: "center", gap: 1 }}>
-      <Button variant="text" color="neutral" size="sm" icon={<ArrowBackIcon fontSize="small" />} iconPosition="left" onClick={onBack} dataTestId="checkout-back">
-        {step === "dados" ? copy.dados.keepShopping : copy.dados.back}
-      </Button>
-    </Box>
-  );
-}
-
-/**
- * The phone's header (FUT-3525, layout C): "← Voltar" with "Etapa 2 de 3 ·
- * Pagamento" on the same row, and a thin bar filled to the step — the dots
- * of the computer's stepper cost a phone a row for the same fact.
- */
-function CompactHeader({
-  copy,
-  step,
-  onBack,
-}: {
-  copy: CheckoutViewCopy;
-  step: string;
-  onBack: () => void;
-}): JSX.Element {
-  const { Button, Text } = useCheckoutComponents();
-  const layout = useCheckoutCopy().screens.layout;
-  const steps = stepperSteps(copy);
-  const at = Math.max(
-    0,
-    steps.findIndex((item) => item.id === step),
-  );
-  const current = steps[at];
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Box
-        sx={{
-          minHeight: 44,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 1,
-        }}
-      >
-        {/* Its label on the column's edge, as the prototype draws it: the text
-            button's own padding would push it 12px in. */}
-        <Box sx={{ ml: -1.5 }}>        <Button
-            variant="text"
-            color="neutral"
-            size="sm"
-            icon={<ArrowBackIcon fontSize="small" />}
-            iconPosition="left"
-            onClick={onBack}
-            dataTestId="checkout-back"
-          >
-            {step === "dados" ? copy.dados.keepShopping : copy.dados.back}
-          </Button>
-        </Box>
-        <Text
-          variant="body"
-          size="xs"
-          as="span"
-          data-testid="checkout-step-progress"
-        >
-          {layout.stepProgress(at + 1, steps.length, current?.label ?? "")}
-        </Text>
-      </Box>
-      <Box
-        // The bar draws the sentence beside it; a reader hears that once.
-        aria-hidden
-        data-testid="checkout-stepper"
-        sx={{
-          height: 4,
-          borderRadius: 2,
-          bgcolor: "divider",
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          sx={{
-            height: "100%",
-            width: `${((at + 1) / steps.length) * 100}%`,
-            bgcolor: "primary.main",
-            borderRadius: 2,
-          }}
-        />
-      </Box>
-    </Box>
-  );
-}
-
-/** Compact 50px progress header so the form stays above the fold on mobile. */
-function ProgressHeader({ copy, step, completed }: { copy: CheckoutViewCopy; step: string; completed: Set<string> }): JSX.Element {
-  const { Stepper } = useCheckoutComponents();
-  return (
-    <Box sx={{ height: 50, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      <Stepper steps={stepperSteps(copy)} activeId={step} completed={completed} orientation="horizontal" size="sm" data-testid="checkout-stepper" />
-    </Box>
-  );
-}
 
 /**
  * The 3-step flow body, below the slot provider. Ported from the storefront's
@@ -425,8 +305,6 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   // that declares nothing degrades to CPF-required, never to "ask nothing".
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
   const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug, cart.identity);
-  const [wide, frame] = useWideLayout();
-  const layout = useMemo(() => ({ wide }), [wide]);
   const armed = useOneClick({ requested: oneClick, config: providerConfig, taxIdOnFile, step: c.step, method: c.method, setMethod: c.setMethod });
 
   // A settlement settlement pays already-sent kitchen items — the cart is
@@ -441,32 +319,8 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
   }
 
   return (
-    // Measured at the HOST's full width (FUT-3525): one frame for the whole flow.
-    <Box ref={frame} sx={{ width: "100%" }}>
-      <CheckoutLayoutProvider value={layout}>
-        {/* Pagamento alone takes the host's full width (its summary column, FUT-3525). */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: { xs: 2, sm: 3 },
-            width: "100%",
-            mx: "auto",
-            maxWidth: c.step === "payment" ? "none" : STEP_COLUMN_MAX,
-          }}
-        >
-          {layout.wide ? (
-            <>
-              <CheckoutHeader copy={copy} step={c.step} onBack={c.back} />
-              <ProgressHeader
-                copy={copy}
-                step={c.step}
-                completed={c.completed}
-              />
-            </>
-          ) : (
-            <CompactHeader copy={copy} step={c.step} onBack={c.back} />
-          )}
+    <CheckoutFrame payment={c.step === "payment"}>
+      <FlowHeader copy={copy} step={c.step} completed={c.completed} onBack={c.back} />
 
           {c.step === "dados" ? (
             <DadosStep
@@ -510,9 +364,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
               backActionEmphasis={backActionEmphasis}
             />
           ) : null}
-        </Box>
-      </CheckoutLayoutProvider>
-    </Box>
+    </CheckoutFrame>
   );
 }
 

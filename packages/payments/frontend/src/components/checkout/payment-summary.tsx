@@ -69,7 +69,7 @@ const ICON_SX = {
   mt: 0.25,
 } as const;
 
-function NoteIcon({ size = 20 }: { size?: number }): JSX.Element {
+export function NoteIcon({ size = 20 }: { size?: number }): JSX.Element {
   return (
     <Box
       component="svg"
@@ -91,7 +91,7 @@ function NoteIcon({ size = 20 }: { size?: number }): JSX.Element {
 }
 
 /** The amount, the one number the whole step is about. */
-function TotalAmount({
+export function TotalAmount({
   totalLabel,
   big,
 }: {
@@ -211,275 +211,80 @@ function AddressRow({
 
 const DIVIDER = <Box sx={{ height: "1px", bgcolor: "divider" }} />;
 
+/** The cart's lines, "2× X-Burger … R$ 36,00", when the host passed them. */
+function SummaryLines({ lines }: { lines: CheckoutSummaryLine[] }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.layout;
+  return (
+    <Box component="ul" data-testid="checkout-summary-lines" sx={{ m: 0, p: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 1 }}>
+      {lines.map((line) => (
+        <Box component="li" key={line.key} sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+          <Text variant="body" size="sm" as="span">
+            {copy.lineLabel(line.quantity, line.name)}
+          </Text>
+          <Text variant="body" size="sm" as="span">
+            {line.totalLabel}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/** "Total" and the amount on one line, the host's money rows under it. */
+function SummaryTotal({ totalLabel, discountLines }: { totalLabel: string; discountLines?: ReactNode }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.layout;
+  return (
+    <Box data-testid="payment-step-total" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
+        <Text variant="body" size="md" weight="semibold" as="span">
+          {copy.total}
+        </Text>
+        <TotalAmount totalLabel={totalLabel} big={false} />
+      </Box>
+      {discountLines}
+    </Box>
+  );
+}
+
+/** The host's note control, on a row of its own with the note icon. */
+function NoteRow({ note }: { note: ReactNode }): JSX.Element {
+  return (
+    <Box sx={{ ...ROW_SX, alignItems: "center" }}>
+      <NoteIcon />
+      <Box sx={{ flex: 1, minWidth: 0, "& .MuiButton-root, & button": { px: 0 } }}>{note}</Box>
+    </Box>
+  );
+}
+
 /**
  * The computer's summary card, beside the payment (FUT-3525, layout A).
  * Sticky, so the total and the address stay in view while the buyer fills
  * the card form.
  */
-export function OrderSummaryCard({
-  parts,
-}: {
-  parts: OrderSummaryParts;
-}): JSX.Element {
+export function OrderSummaryCard({ parts }: { parts: OrderSummaryParts }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.layout;
-  const { lines = [] } = parts;
+  const lines = parts.lines ?? [];
+  const hasWho = Boolean(parts.payer || parts.delivery || parts.orderNote);
   return (
     <Box
       component="aside"
       aria-label={copy.summaryTitle}
       data-testid="checkout-summary"
-      sx={{
-        position: "sticky",
-        top: 24,
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        p: 2.75,
-        bgcolor: "background.paper",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2.5,
-      }}
+      sx={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 2, p: 2.75, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}
     >
       <Text variant="heading" size="md" weight="bold" as="h2">
         {copy.summaryTitle}
       </Text>
-      {lines.length > 0 ? (
-        <Box
-          component="ul"
-          data-testid="checkout-summary-lines"
-          sx={{
-            m: 0,
-            p: 0,
-            listStyle: "none",
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-          }}
-        >
-          {lines.map((line) => (
-            <Box
-              component="li"
-              key={line.key}
-              sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}
-            >
-              <Text variant="body" size="sm" as="span">
-                {copy.lineLabel(line.quantity, line.name)}
-              </Text>
-              <Text variant="body" size="sm" as="span">
-                {line.totalLabel}
-              </Text>
-            </Box>
-          ))}
-        </Box>
-      ) : null}
+      {lines.length > 0 ? <SummaryLines lines={lines} /> : null}
       {lines.length > 0 ? DIVIDER : null}
-      <Box
-        data-testid="payment-step-total"
-        sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            gap: 2,
-          }}
-        >
-          <Text variant="body" size="md" weight="semibold" as="span">
-            {copy.total}
-          </Text>
-          <TotalAmount totalLabel={parts.totalLabel} big={false} />
-        </Box>
-        {parts.discountLines}
-      </Box>
-      {parts.payer || parts.delivery || parts.orderNote ? DIVIDER : null}
+      <SummaryTotal totalLabel={parts.totalLabel} discountLines={parts.discountLines} />
+      {hasWho ? DIVIDER : null}
       {parts.payer ? <PayerRow payer={parts.payer} /> : null}
       {parts.delivery ? <AddressRow delivery={parts.delivery} /> : null}
-      {parts.orderNote ? (
-        <Box sx={{ ...ROW_SX, alignItems: "center" }}>
-          <NoteIcon />
-          <Box
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              "& .MuiButton-root, & button": { px: 0 },
-            }}
-          >
-            {parts.orderNote}
-          </Box>
-        </Box>
-      ) : null}
-    </Box>
-  );
-}
-
-/** One of the phone's chips: an icon, a fact, and the word that changes it. */
-function Chip({
-  icon,
-  text,
-  action,
-  onClick,
-  label,
-  testId,
-}: {
-  icon: JSX.Element;
-  text: ReactNode;
-  action: string;
-  onClick: () => void;
-  label: string;
-  testId: string;
-}): JSX.Element {
-  return (
-    <Box
-      component="button"
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      data-testid={testId}
-      sx={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 1,
-        minHeight: 44,
-        maxWidth: "100%",
-        px: 1.75,
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 999,
-        bgcolor: "background.paper",
-        color: "text.primary",
-        font: "inherit",
-        fontSize: "0.8125rem",
-        cursor: "pointer",
-        "&:focus-visible": {
-          outline: "2px solid",
-          outlineColor: "primary.main",
-          outlineOffset: 2,
-        },
-      }}
-    >
-      {icon}
-      <Box
-        component="span"
-        sx={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          minWidth: 0,
-        }}
-      >
-        {text}
-      </Box>
-      <Box
-        component="span"
-        sx={{ color: "primary.main", fontWeight: 600, flex: "none" }}
-      >
-        {action}
-      </Box>
-    </Box>
-  );
-}
-
-/**
- * The phone's head of the step (FUT-3525, layout C): the amount big at the
- * top, then who pays, where it goes and the note as chips that wrap. The
- * note is the host's own control; once it opens into a field, that field
- * takes the whole row.
- */
-export function PhoneOrderSummary({
-  parts,
-}: {
-  parts: OrderSummaryParts;
-}): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  const screens = useCheckoutCopy().screens;
-  const copy = screens.layout;
-  const chipIcon = { fontSize: 18, color: "text.secondary" } as const;
-  const hasChips = Boolean(parts.payer || parts.delivery || parts.orderNote);
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-      <Box
-        data-testid="payment-step-total"
-        sx={{ display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}
-      >
-        <Text variant="body" size="sm" color="secondary" as="span">
-          {copy.totalDueCaption(parts.totalItems)}
-        </Text>
-        <TotalAmount totalLabel={parts.totalLabel} big />
-        {parts.discountLines}
-      </Box>
-      {hasChips ? (
-        <Box
-          data-testid="checkout-chips"
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1,
-            alignItems: "center",
-          }}
-        >
-          {parts.payer ? (
-            <Box data-testid="checkout-payer" sx={{ display: "contents" }}>
-              <Chip
-                icon={<PersonOutlineIcon sx={chipIcon} />}
-                text={
-                  <>
-                    {parts.payer.name ? `${parts.payer.name} · ` : null}
-                    <span data-testid="checkout-payer-cpf">
-                      {parts.payer.taxId?.trim()
-                        ? screens.payer.taxId(formatCpf(parts.payer.taxId))
-                        : copy.taxIdOnFileShort}
-                    </span>
-                  </>
-                }
-                action={screens.payer.changeAction}
-                onClick={parts.payer.onEdit}
-                label={`${parts.payer.name ? screens.payer.payingAs(parts.payer.name) : screens.payer.payingWithSavedDetails} — ${screens.payer.changeAction}`}
-                testId="checkout-payer-edit"
-              />
-            </Box>
-          ) : null}
-          {parts.delivery ? (
-            <Box data-testid="checkout-address" sx={{ display: "contents" }}>
-              <Chip
-                icon={<PlaceOutlinedIcon sx={chipIcon} />}
-                text={parts.delivery.line1}
-                action={screens.payer.changeAction}
-                onClick={parts.delivery.onEdit}
-                label={`${parts.delivery.line1} — ${copy.changeAddress}`}
-                testId="checkout-address-edit"
-              />
-            </Box>
-          ) : null}
-          {parts.orderNote ? (
-<Box
-              data-testid="checkout-note-slot"
-              sx={{
-                // Closed, the host's note button reads as the third chip;
-                // open, its field takes the whole row (FUT-3525).
-                minWidth: 0,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 0.5,
-                minHeight: 44,
-                pl: 1.75,
-                pr: 0.5,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 999,
-                bgcolor: "background.paper",
-                "&:has(textarea)": { flexBasis: "100%", display: "block", p: 0, border: 0, bgcolor: "transparent" },
-                "&:has(textarea) > svg": { display: "none" },
-              }}
-            >
-              <NoteIcon size={18} />
-              {parts.orderNote}
-            </Box>
-          ) : null}
-        </Box>
-      ) : null}
+      {parts.orderNote ? <NoteRow note={parts.orderNote} /> : null}
     </Box>
   );
 }

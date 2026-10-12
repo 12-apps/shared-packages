@@ -203,12 +203,27 @@ function usePixPolling(order: CheckoutOrder, onResolved: (status: OrderStatus) =
   return polling;
 }
 
-function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; poll: ReturnType<typeof usePixPolling> }): JSX.Element {
+/**
+ * The pane's title, at the prototype's scale: 20px, 26px wide — left out
+ * inside the Pagamento step, where the "Pix" tab names the pane (FUT-3525).
+ */
+function PixTitle(): JSX.Element | null {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
-  const stage = usePixStage();
-  // Inside the Pagamento step the method tab names the pane already (FUT-3525).
   const inStep = useCheckoutLayout() !== null;
+  if (inStep) return null;
+  return (
+    <Box sx={{ "&& > *": { fontSize: "1.25rem", lineHeight: 1.25 }, [PIX_WIDE]: { "&& > *": { fontSize: "1.625rem" } } }}>
+      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
+        {copy.heading}
+      </Text>
+    </Box>
+  );
+}
+
+function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; poll: ReturnType<typeof usePixPolling> }): JSX.Element {
+  const copy = useCheckoutCopy().screens.pix;
+  const stage = usePixStage();
   const { copy: writeClipboard, justCopied } = useClipboardCopy(pix.copyPaste);
   // Leaving the payment step (a method switch, a terminal status) ends the
   // after-copy face with it: the next pane starts on the code.
@@ -251,25 +266,7 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   }
   return (
     <>
-      {/* The pane's title, at the prototype's scale: 20px, 26px wide. */}
-      {inStep ? null : (
-        <Box
-          sx={{
-            "&& > *": { fontSize: "1.25rem", lineHeight: 1.25 },
-            [PIX_WIDE]: { "&& > *": { fontSize: "1.625rem" } },
-          }}
-        >
-          <Text
-            variant="heading"
-            size="md"
-            weight="bold"
-            as="h2"
-            style={{ margin: 0 }}
-          >
-            {copy.heading}
-          </Text>
-        </Box>
-      )}
+      <PixTitle />
       <PixPane
         pix={pix}
         onCopy={() => {

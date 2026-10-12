@@ -98,7 +98,7 @@ describe("the pane before a copy", () => {
     await elapse(0);
 
     // No Copia/QR tabs any more: both are on screen, the code first.
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryAllByRole("tablist")).toHaveLength(0);
     expect(screen.getByTestId("pix-code").textContent).toBe(
       "00020126BR.GOV.BCB.PIX-redesign",
     );

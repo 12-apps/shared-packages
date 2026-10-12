@@ -131,7 +131,7 @@ describe("on a computer (layout A)", () => {
       totalOverride: { label: "R$ 10,00", items: 1 },
     });
 
-    expect(screen.queryByTestId("checkout-summary-lines")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-summary-lines")).toHaveLength(0);
     expect(screen.getByTestId("pay-bar-total").textContent).toBe("R$ 10,00");
   });
 });
@@ -143,8 +143,8 @@ describe("on a phone (layout C)", () => {
     expect(screen.getByTestId("payment-step").getAttribute("data-layout")).toBe(
       "narrow",
     );
-    expect(screen.getByText(layout.totalDueCaption(2))).toBeTruthy();
-    expect(screen.queryByTestId("checkout-summary")).toBeNull();
+    expect(screen.getByText("Total a pagar · 2 itens")).toBeTruthy();
+    expect(screen.queryAllByTestId("checkout-summary")).toHaveLength(0);
     const chips = screen.getByTestId("checkout-chips");
     expect(chips.textContent).toContain("Ana Compradora · CPF ✓");
     // The chip shows the street line only.
@@ -163,7 +163,7 @@ describe("on a phone (layout C)", () => {
   it("shows no address when the host passes none (Retirada, Mesa)", () => {
     renderStep(false);
 
-    expect(screen.queryByTestId("checkout-address")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-address")).toHaveLength(0);
   });
 });
 
@@ -244,7 +244,7 @@ describe("the phone's pay bar", () => {
       </CheckoutLayoutProvider>,
     );
 
-    expect(screen.queryByTestId("pay-bar-sticky-total")).toBeNull();
+    expect(screen.queryAllByTestId("pay-bar-sticky-total")).toHaveLength(0);
   });
 });
 
@@ -313,7 +313,7 @@ describe("the review's round-1 cases", () => {
 
   it("shows no payer when the buyer filled Dados in this checkout", () => {
     renderStep(true);
-    expect(screen.queryByTestId("checkout-payer")).toBeNull();
+    expect(screen.queryAllByTestId("checkout-payer")).toHaveLength(0);
   });
 
   it("does not raise again when a key lands on the tab already chosen", () => {
@@ -344,7 +344,7 @@ describe("the review's round-1 cases", () => {
         ],
       } as unknown as StepProps["providerConfig"],
     });
-    expect(screen.queryByRole("tabpanel")).toBeNull();
+    expect(screen.queryAllByRole("tabpanel")).toHaveLength(0);
   });
 
   it("gives two flows on one page their own tab and panel ids", () => {
