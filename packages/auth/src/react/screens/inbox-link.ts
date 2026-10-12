@@ -27,15 +27,22 @@ interface Provider {
 }
 
 /**
- * Gmail search, limited to the last hour and to every folder — `in:anywhere`
- * so a message the spam filter took is found too. `/u/<email>/` picks the
- * right account for somebody signed in to several.
+ * Gmail search, limited to the last day and to every folder — `in:anywhere`
+ * so a message the spam filter took is found too. A day rather than an hour:
+ * the page stays open, and somebody who comes back to it later must not meet
+ * an empty search. `/u/<email>/` picks the right account for somebody signed
+ * in to several.
  */
 function gmail(email: string, sender: string | undefined): string {
   const account = `https://mail.google.com/mail/u/${encodeURIComponent(email)}/`;
   if (!sender) return account;
-  const query = encodeURIComponent(`from:${sender} in:anywhere newer_than:1h`);
+  const query = encodeURIComponent(`from:${searchTerm(sender)} in:anywhere newer_than:1d`);
   return `${account}#search/${query}`;
+}
+
+/** A sender of several words, quoted, so the search reads it as one name. */
+function searchTerm(sender: string): string {
+  return /\s/u.test(sender) ? `"${sender.replaceAll('"', "")}"` : sender;
 }
 
 function outlook(email: string): string {
@@ -45,19 +52,23 @@ function outlook(email: string): string {
 function yahoo(_email: string, sender: string | undefined): string {
   if (!sender) return "https://mail.yahoo.com/";
   // Yahoo reads the keyword encoded twice.
-  return `https://mail.yahoo.com/d/search/keyword=${encodeURIComponent(encodeURIComponent(`from:${sender}`))}`;
+  return `https://mail.yahoo.com/d/search/keyword=${encodeURIComponent(encodeURIComponent(`from:${searchTerm(sender)}`))}`;
 }
+
+/** `.com`, or a country's own: `.com.br`, `.co.uk`, `.fr`. */
+const TLD = String.raw`\.(com|com\.[a-z]{2}|co\.[a-z]{2}|[a-z]{2})$`;
 
 const PROVIDERS: readonly Provider[] = [
   { name: "Gmail", domain: /^(gmail|googlemail)\.com$/, link: gmail },
   // The country variants are the common case in Brazil (`hotmail.com.br`).
-  { name: "Outlook", domain: /^(hotmail|outlook|live|msn)(\.com)?(\.[a-z]{2})?$/, link: outlook },
-  { name: "Yahoo", domain: /^(yahoo|ymail)(\.com)?(\.[a-z]{2})?$/, link: yahoo },
+  { name: "Outlook", domain: new RegExp(`^(hotmail|outlook|live|msn)${TLD}`), link: outlook },
+  { name: "Yahoo", domain: new RegExp(`^(yahoo|ymail)${TLD}`), link: yahoo },
 ];
 
 /** The link for `email`'s webmail, or `null` when the address does not say which. */
 export function inboxLink(email: string, sender?: string): InboxLink | null {
-  const domain = email.trim().toLowerCase().split("@")[1];
+  const parts = email.trim().toLowerCase().split("@");
+  const domain = parts.length === 2 ? parts[1] : undefined;
   if (!domain) return null;
   const provider = PROVIDERS.find((candidate) => candidate.domain.test(domain));
   if (!provider) return null;

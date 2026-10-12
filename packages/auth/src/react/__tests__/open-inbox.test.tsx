@@ -17,7 +17,14 @@ describe("inboxLink", () => {
     expect(link?.provider).toBe("Gmail");
     expect(link?.href).toMatch(/^https:\/\/mail\.google\.com\/mail\/u\/Ana%40Gmail\.com\/#search\//);
     expect(decodeURIComponent(link?.href.split("#search/")[1] ?? "")).toBe(
-      "from:Paladira in:anywhere newer_than:1h",
+      "from:Paladira in:anywhere newer_than:1d",
+    );
+  });
+
+  it("quotes a sender of several words, so the search reads it as one name", () => {
+    const link = inboxLink("ana@gmail.com", "Paladira Pay");
+    expect(decodeURIComponent(link?.href.split("#search/")[1] ?? "")).toBe(
+      'from:"Paladira Pay" in:anywhere newer_than:1d',
     );
   });
 
@@ -25,7 +32,7 @@ describe("inboxLink", () => {
     expect(inboxLink("ana@googlemail.com")?.href).toBe("https://mail.google.com/mail/u/ana%40googlemail.com/");
   });
 
-  it.each(["hotmail.com", "hotmail.com.br", "outlook.com", "outlook.com.br", "live.com", "msn.com"])(
+  it.each(["hotmail.com", "hotmail.com.br", "hotmail.co.uk", "hotmail.fr", "outlook.com", "outlook.com.br", "live.com", "msn.com"])(
     "opens Outlook for @%s, signed in as the address",
     (domain) => {
       const link = inboxLink(`ana@${domain}`, "Paladira");
@@ -42,7 +49,7 @@ describe("inboxLink", () => {
     );
   });
 
-  it.each(["ana@empresa.com.br", "ana@uol.com.br", "not-an-address"])("offers nothing for %s", (email) => {
+  it.each(["ana@empresa.com.br", "ana@uol.com.br", "not-an-address", "ana@hotmail", "ana@outlook.example.com", "x@gmail.com@evil.com"])("offers nothing for %s", (email) => {
     expect(inboxLink(email, "Paladira")).toBeNull();
   });
 });
