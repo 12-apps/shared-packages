@@ -91,10 +91,19 @@ describe("the account-created screen", () => {
     expect(button.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("puts the button inside the alert, with the provider's mark", async () => {
+    await signUp("ana@gmail.com", "Paladira");
+
+    const button = screen.getByTestId("signup-open-inbox");
+    expect(screen.getByTestId("signup-verification-sent").contains(button)).toBe(true);
+    expect(button.querySelector("svg[aria-hidden='true']")).not.toBeNull();
+  });
+
   it("offers to open Outlook for a Hotmail address", async () => {
     await signUp("ana@hotmail.com", "Paladira");
 
     expect(screen.getByTestId("signup-open-inbox").textContent).toBe("Abrir o Outlook");
+    expect(screen.getByTestId("signup-open-inbox").querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
   it("offers no button for an address whose webmail it cannot tell", async () => {
