@@ -145,6 +145,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     support: 'O pagamento foi preparado para o carrinho anterior. Atualize para pagar o valor certo.',
     refreshAction: 'Atualizar pagamento',
     refreshFailed: 'Não foi possível atualizar o pagamento',
+    pixVeil: 'Atualize para gerar um novo Pix',
   },
   validation: {
     taxIdInvalid: 'CPF inválido.',

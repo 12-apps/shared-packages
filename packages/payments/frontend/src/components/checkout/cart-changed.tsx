@@ -199,6 +199,23 @@ export function useRefreshOnCartChanged(errorCode: string | null): void {
   }, [errorCode]);
 }
 
+/** Where a refresh stands, for a step that may not have one (a settlement). */
+function refreshStatus(refresh: OrderRefresh | undefined): { pending: boolean; error: string | null } {
+  return { pending: refresh?.pending ?? false, error: refresh?.error ?? null };
+}
+
+const PaymentStaleContext = createContext(false);
+
+/**
+ * Whether the payment on screen was prepared for a cart that has since changed
+ * (FUT-3535). A PIX pane reads it to veil its QR and code and to stop the copy
+ * controls: the amount is IN the code, so a buyer who pays it now pays the old
+ * order. False outside a {@link CartChangedBoundary}.
+ */
+export function usePaymentStale(): boolean {
+  return useContext(PaymentStaleContext);
+}
+
 /**
  * The payment pane, with the step's warning above it when the cart moved, and
  * the refresh handed down to the card form. Nothing changes on screen while the
@@ -222,15 +239,19 @@ export function CartChangedBoundary({
 }): JSX.Element {
   const changed = useBasketChanged(order, basket) && !creating;
   const run = paymentRefresh(order, onGenerate, refresh?.run);
-  const pending = refresh?.pending ?? false;
-  const error = refresh?.error ?? null;
+  const { pending, error } = refreshStatus(refresh);
   // ONE tree shape whether or not the warning shows: wrapping the pane only
   // while it does would remount the card form the moment the refresh lands,
   // dropping what the buyer typed and the refusal that explains the new total.
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {(changed || error) && run ? <CartChangedNotice onRefresh={run} pending={pending} error={error} /> : null}
-      <PaymentRefreshProvider refresh={run}>{children}</PaymentRefreshProvider>
+      {/* Stale while the warning stands, so the veil goes with it the moment the
+          new order lands. A PIX refresh mints a new code, which takes the old
+          one off the screen first, so a failed one leaves nothing to copy. */}
+      <PaymentStaleContext.Provider value={changed && run !== null}>
+        <PaymentRefreshProvider refresh={run}>{children}</PaymentRefreshProvider>
+      </PaymentStaleContext.Provider>
     </Box>
   );
 }

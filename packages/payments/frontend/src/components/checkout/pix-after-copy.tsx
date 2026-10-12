@@ -1,9 +1,10 @@
 import { Box } from "@mui/material";
 import type { JSX, ReactNode } from "react";
 
+import { usePaymentStale } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { CheckIcon, ContentCopyIcon, CreditCardIcon, QrCodeIcon, ScheduleIcon } from "./icons";
-import { Emphasized, PIX_WIDE, PixQr } from "./pix-parts";
+import { Emphasized, PIX_WIDE, PixQr, StaleVeil } from "./pix-parts";
 import type { PixAfterCopyCopy } from "./screens-copy";
 import type { PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
@@ -128,11 +129,14 @@ interface PixAfterCopyProps {
 function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAfterCopyProps, "justCopied" | "onCopyAgain" | "onShowQr" | "onPreferCard">): JSX.Element {
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
+  // The code already copied is the OLD order's once the cart changed
+  // (FUT-3535): copying it again would only hand the buyer the wrong amount.
+  const stale = usePaymentStale();
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
       {/* Narrow, a grid cell; wide, its own width beside the link (the prototype's row). */}
       <Box sx={{ minWidth: 0, [PIX_WIDE]: { flex: "none", "& > *": { width: "auto" } } }}>
-        <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} dataTestId="pix-copy-again">
+        <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} disabled={stale} dataTestId="pix-copy-again">
           {justCopied ? copy.copiedAction : copy.copyAgainAction}
         </Button>
       </Box>
@@ -156,6 +160,7 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
   const { pix, words, totalLabel, deadline, onPreferCard, footer } = props;
+  const stale = usePaymentStale();
   return (
     <Box data-testid="pix-after-copy" sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
       <Box sx={{ flex: "999 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -175,7 +180,9 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
         <Text variant="body" size="xs" weight="bold" color="secondary" as="p" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {copy.notPaidYet}
         </Text>
-        <PixQr payload={pix.copyPaste} size={168} alt={copy.qrAlt} />
+        <StaleVeil stale={stale}>
+          <PixQr payload={pix.copyPaste} size={168} alt={copy.qrAlt} />
+        </StaleVeil>
         <Text variant="body" size="xs" color="secondary" as="p" style={{ margin: 0, textAlign: "center" }}>
           {copy.scanFromPhone}
         </Text>
