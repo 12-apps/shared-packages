@@ -159,6 +159,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     support: 'This payment was prepared for your previous cart. Update it to pay the right amount.',
     refreshAction: 'Update payment',
     refreshFailed: 'Could not update the payment',
+    pixVeil: 'Update to get a new Pix code',
   },
   validation: {
     taxIdInvalid: 'That CPF is not valid.',

@@ -1,6 +1,8 @@
 import { Box } from "@mui/material";
-import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 import QRCode from "react-qr-code";
+
+import { useCheckoutCopy } from "./copy-context";
 
 /**
  * The pieces the PIX pane and its after-copy face share (the 2026-10-06 Pix
@@ -78,4 +80,48 @@ export function useClipboardCopy(text: string): { copy: () => Promise<boolean>; 
     return true;
   }, [text]);
   return { copy, justCopied };
+}
+
+/**
+ * A PIX's QR or code, veiled while the cart has changed under it (FUT-3535):
+ * blurred past reading, out of reach of a pointer, a selection and a screen
+ * reader, with "Atualize para gerar um novo Pix" over it. The step's warning
+ * above says why and carries the control that brings a new code. One tree
+ * shape either way, so lifting the veil redraws nothing.
+ */
+export function StaleVeil({ stale, children }: { stale: boolean; children: ReactNode }): JSX.Element {
+  const words = useCheckoutCopy().screens.cartChanged.pixVeil;
+  return (
+    <Box sx={{ position: "relative", minWidth: 0 }} data-testid={stale ? "pix-stale-veil" : undefined}>
+      <Box
+        aria-hidden={stale || undefined}
+        sx={stale ? { filter: "blur(6px)", opacity: 0.5, pointerEvents: "none", userSelect: "none" } : undefined}
+      >
+        {children}
+      </Box>
+      {stale ? (
+        <Box
+          sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", p: 1.5 }}
+        >
+          <Box
+            component="p"
+            sx={{
+              m: 0,
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 999,
+              bgcolor: "background.paper",
+              boxShadow: 1,
+              color: "text.primary",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              textAlign: "center",
+            }}
+          >
+            {words}
+          </Box>
+        </Box>
+      ) : null}
+    </Box>
+  );
 }

@@ -284,6 +284,12 @@ export interface CartChangedCopy {
   refreshAction: string;
   /** The heading over a refresh that failed; the host's own sentence is the body. */
   refreshFailed: string;
+  /**
+   * Drawn over a PIX's QR and code while they are veiled (FUT-3535): the code
+   * on screen asks for the old amount, so it cannot be copied or scanned until
+   * the payment is updated.
+   */
+  pixVeil: string;
 }
 
 /** What the browser says when the wire itself failed. */

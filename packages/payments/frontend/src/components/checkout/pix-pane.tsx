@@ -1,10 +1,11 @@
 import { Box } from "@mui/material";
 import type { JSX, ReactNode } from "react";
 
+import { usePaymentStale } from "./cart-changed";
 import { useCheckoutCopy } from "./copy-context";
 import { ContentCopyIcon } from "./icons";
 import { StickyPayBar, useCheckoutLayout } from "./payment-step-layout";
-import { Emphasized, PIX_WIDE, PixQr } from "./pix-parts";
+import { Emphasized, PIX_WIDE, PixQr, StaleVeil } from "./pix-parts";
 import type { PixCharge } from "./types";
 import { useCheckoutComponents } from "./ui";
 
@@ -64,6 +65,7 @@ function ColumnHeading({
 function QrPanel({ pix }: { pix: PixCharge }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
+  const stale = usePaymentStale();
   return (
     <Box
       data-testid="pix-qr-panel"
@@ -100,12 +102,14 @@ function QrPanel({ pix }: { pix: PixCharge }): JSX.Element {
           [PIX_WIDE]: { "& svg": { width: 232, height: 232 } },
         }}
       >
-        <PixQr
-          payload={pix.copyPaste}
-          size={232}
-          alt={copy.qrAlt}
-          testId="pix-qr"
-        />
+        <StaleVeil stale={stale}>
+          <PixQr
+            payload={pix.copyPaste}
+            size={232}
+            alt={copy.qrAlt}
+            testId="pix-qr"
+          />
+        </StaleVeil>
       </Box>
       <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0, maxWidth: 280 }}>
         <Box component="span" sx={NARROW_ONLY}>{copy.qrTabCaption}</Box>
@@ -125,6 +129,9 @@ function QrPanel({ pix }: { pix: PixCharge }): JSX.Element {
 function CopyButton({ onCopy }: { onCopy: () => void }): JSX.Element {
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
+  // A changed cart makes this code the OLD order's (FUT-3535): nothing to copy
+  // until the step's "Atualizar pagamento" brings a new one.
+  const stale = usePaymentStale();
   return (
     <StickyPayBar>
       <Box
@@ -141,6 +148,7 @@ function CopyButton({ onCopy }: { onCopy: () => void }): JSX.Element {
           fullWidth
           icon={<ContentCopyIcon fontSize="small" />}
           onClick={onCopy}
+          disabled={stale}
           dataTestId="pix-copy"
         >
           {copy.copyAction}
@@ -162,6 +170,7 @@ function CopyPanel({
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
+  const stale = usePaymentStale();
   return (
     <Box
       data-testid="pix-copy-panel"
@@ -179,21 +188,23 @@ function CopyPanel({
         (a tinted chip, its own border and padding) is undone inside it:
         otherwise a wrapped code reads as a box inside a box.
       */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1.5,
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1.5,
-          bgcolor: "action.hover",
-          "&& > *": { bgcolor: "transparent", border: 0, borderRadius: 0, p: 0 },
-        }}
-      >
-        <Text variant="code" size="xs" as="p" data-testid="pix-code" style={{ margin: 0, wordBreak: "break-all", lineHeight: 1.55 }}>
-          {pix.copyPaste}
-        </Text>
-      </Box>
+      <StaleVeil stale={stale}>
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1.5,
+            bgcolor: "action.hover",
+            "&& > *": { bgcolor: "transparent", border: 0, borderRadius: 0, p: 0 },
+          }}
+        >
+          <Text variant="code" size="xs" as="p" data-testid="pix-code" style={{ margin: 0, wordBreak: "break-all", lineHeight: 1.55 }}>
+            {pix.copyPaste}
+          </Text>
+        </Box>
+      </StaleVeil>
       {inPanel ? <CopyButton onCopy={onCopy} /> : null}
       <Text
         variant="body"
