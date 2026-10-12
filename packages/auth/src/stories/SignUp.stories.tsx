@@ -30,10 +30,14 @@ const meta: Meta = {
 };
 export default meta;
 
-async function register(canvasElement: HTMLElement, password = "correct horse 9"): Promise<void> {
+async function register(
+  canvasElement: HTMLElement,
+  password = "correct horse 9",
+  email = "ana@example.com",
+): Promise<void> {
   const canvas = within(canvasElement);
   await userEvent.type(canvas.getByTestId("signup-name"), "Ana");
-  await userEvent.type(canvas.getByTestId("signup-email"), "ana@example.com");
+  await userEvent.type(canvas.getByTestId("signup-email"), email);
   await userEvent.type(canvas.getByTestId("signup-password"), password);
   await userEvent.click(canvas.getByTestId("signup-submit"));
 }
@@ -64,6 +68,24 @@ export const VerificationSent: StoryObj = {
     );
   },
   play: ({ canvasElement }) => register(canvasElement),
+};
+
+/**
+ * Verification is ON and the address names its webmail: the screen offers to
+ * open it, searched for the sender's mail.
+ */
+export const VerificationSentToGmail: StoryObj = {
+  render: () => {
+    const screens = storyScreens();
+    return (
+      <screens.EmailSignupForm
+        callbackUrl="/"
+        onBeforeSubmit={asyncNoop}
+        onSignedIn={noop}
+      />
+    );
+  },
+  play: ({ canvasElement }) => register(canvasElement, undefined, "ana@gmail.com"),
 };
 
 /**

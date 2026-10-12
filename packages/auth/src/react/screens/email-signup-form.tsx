@@ -8,6 +8,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
+import { inboxLink } from "./inbox-link";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
 
@@ -217,20 +218,49 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
   );
 }
 
+/**
+ * "Check your e-mail", and — when the address names its webmail — a button
+ * that opens it on the message (`inbox-link.ts`). In a new tab, so this page
+ * is still here for a person who comes back to read it again.
+ */
+function VerificationSent({ email }: { email: string }): JSX.Element {
+  const { copy, inboxSender } = useScreens();
+  const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
+  return (
+    <>
+      <Alert
+        variant="success"
+        title={copy.signUp.sentTitle}
+        description={copy.signUp.sentDescription(email)}
+        data-testid="signup-verification-sent"
+      />
+      {inbox && copy.signUp.openInbox ? (
+        <>
+          <Spacer size="md" />
+          <Button
+            component="a"
+            href={inbox.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="solid"
+            color="primary"
+            fullWidth
+            dataTestId="signup-open-inbox"
+            data-provider={inbox.provider}
+          >
+            {copy.signUp.openInbox(inbox.provider)}
+          </Button>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export function EmailSignupForm(props: SignupConfig): JSX.Element {
   const { copy } = useScreens();
   const form = useSignup(props);
 
-  if (form.sent) {
-    return (
-      <Alert
-        variant="success"
-        title={copy.signUp.sentTitle}
-        description={copy.signUp.sentDescription(form.email)}
-        data-testid="signup-verification-sent"
-      />
-    );
-  }
+  if (form.sent) return <VerificationSent email={form.email} />;
 
   const submit = <SubmitButton form={form} gateClosed={props.disabled === true} />;
 

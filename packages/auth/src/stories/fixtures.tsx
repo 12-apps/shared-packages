@@ -73,6 +73,7 @@ export const STORY_COPY: EmailAuthCopy = {
     sentTitle: "Check your e-mail",
     sentDescription: (email) =>
       `We sent a confirmation link to ${email}. Once you confirm it, you can sign in.`,
+    openInbox: (provider) => `Open ${provider}`,
   },
   forgotPassword: {
     title: "Forgot your password?",
@@ -189,6 +190,7 @@ export function storyScreens(
     client: fakeClient(overrides),
     copy: STORY_COPY,
     useSession: session,
+    inboxSender: "Acme",
   });
 }
 

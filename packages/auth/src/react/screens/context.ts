@@ -51,6 +51,14 @@ export interface EmailAuthScreensConfig {
    * forms that sign somebody in; the other screens never touch it.
    */
   useSession: () => ScreensSession;
+  /**
+   * Who the confirmation e-mail comes from, as the person's webmail search
+   * should match it — the display name (`"Paladira"`) or the address.
+   *
+   * The button under "check your e-mail" opens their inbox searched for it
+   * (`inbox-link.ts`). Omitted, the button still opens the inbox, unfiltered.
+   */
+  inboxSender?: string;
 }
 
 const ScreensContext = createContext<EmailAuthScreensConfig | null>(null);

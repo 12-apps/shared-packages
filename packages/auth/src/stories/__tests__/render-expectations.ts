@@ -143,6 +143,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["We sent a confirmation link to ana@example.com"],
     absentTestIds: ["email-signup-form"],
   },
+  "SignUp/VerificationSentToGmail": {
+    testIds: ["signup-verification-sent", "signup-open-inbox"],
+    text: ["Open Gmail"],
+    absentTestIds: ["email-signup-form"],
+  },
   // Deliberately identical to the story above — that is the security property.
   "SignUp/AddressAlreadyRegistered": {
     testIds: ["signup-verification-sent"],

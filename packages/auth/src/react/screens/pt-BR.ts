@@ -81,6 +81,7 @@ export const PT_BR: EmailAuthCopy = {
     sentTitle: "Confira seu e-mail",
     sentDescription: (email) =>
       `Enviamos um link de confirmação para ${email}. Depois de confirmar, você já pode entrar.`,
+    openInbox: (provider) => `Abrir o ${provider}`,
   },
   forgotPassword: {
     title: "Esqueceu sua senha?",
