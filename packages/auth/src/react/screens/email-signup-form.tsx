@@ -226,8 +226,10 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
 function VerificationSent({ email }: { email: string }): JSX.Element {
   const { copy, inboxSender } = useScreens();
   const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
+  // One element, so a host laying its page out as a gapped flex column puts
+  // its gap around the pair, not twice between the alert and its button.
   return (
-    <>
+    <div data-testid="signup-verification-sent-block">
       <Alert
         variant="success"
         title={copy.signUp.sentTitle}
@@ -252,7 +254,7 @@ function VerificationSent({ email }: { email: string }): JSX.Element {
           </Button>
         </>
       ) : null}
-    </>
+    </div>
   );
 }
 
