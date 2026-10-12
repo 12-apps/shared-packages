@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
+import { Box } from "@12-apps/ui/mui/Box";
 import { Button } from "@12-apps/ui/form/Button";
 import { Input } from "@12-apps/ui/form/Input";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
@@ -9,7 +10,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { inboxLink } from "./inbox-link";
-import { InboxLogo } from "./inbox-logos";
+import { inboxLogo } from "./inbox-logos";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
 
@@ -224,6 +225,8 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
  * that opens it on the message (`inbox-link.ts`). In a new tab, so this page
  * is still here for a person who comes back to read it again.
  */
+const WHITE_BUTTON = { "& .MuiButton-root": { bgcolor: "background.paper" } } as const;
+
 function VerificationSent({ email }: { email: string }): JSX.Element {
   const { copy, inboxSender } = useScreens();
   const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
@@ -238,25 +241,26 @@ function VerificationSent({ email }: { email: string }): JSX.Element {
       data-testid="signup-verification-sent"
     >
       {/* White, not the brand's solid: the provider's own colours carry the
-          button, and a multicolour mark on red is unreadable. */}
+          button, and a multicolour mark on red is unreadable. The fill is set
+          from a wrapper because a Button's own `sx` replaces its size styles. */}
       {inbox && copy.signUp.openInbox ? (
-        <Button
-          component="a"
-          href={inbox.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          variant="outline"
-          color="neutral"
-          icon={<InboxLogo provider={inbox.provider} />}
-          iconPosition="left"
-          size="lg"
-          fullWidth
-          sx={{ bgcolor: "background.paper" }}
-          dataTestId="signup-open-inbox"
-          data-provider={inbox.provider}
-        >
-          {copy.signUp.openInbox(inbox.provider)}
-        </Button>
+        <Box sx={WHITE_BUTTON}>
+          <Button
+            component="a"
+            href={inbox.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
+            color="neutral"
+            icon={inboxLogo(inbox.provider)}
+            iconPosition="left"
+            fullWidth
+            dataTestId="signup-open-inbox"
+            data-provider={inbox.provider}
+          >
+            {copy.signUp.openInbox(inbox.provider)}
+          </Button>
+        </Box>
       ) : null}
     </Alert>
   );

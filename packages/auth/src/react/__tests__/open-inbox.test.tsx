@@ -103,6 +103,7 @@ describe("the account-created screen", () => {
     await signUp("ana@hotmail.com", "Paladira");
 
     expect(screen.getByTestId("signup-open-inbox").textContent).toBe("Abrir o Outlook");
+    expect(screen.getByTestId("signup-open-inbox").querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
   it("offers no button for an address whose webmail it cannot tell", async () => {

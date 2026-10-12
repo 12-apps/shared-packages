@@ -50,8 +50,12 @@ const LOGOS: Readonly<Record<string, () => JSX.Element>> = {
   Yahoo: YahooLogo,
 };
 
-/** The provider's mark, or nothing for a name this file has no mark for. */
-export function InboxLogo({ provider }: { provider: string }): JSX.Element | null {
+/**
+ * The provider's mark, or `undefined` for a name this file has no mark for —
+ * undefined rather than an element that renders nothing, so the button draws no
+ * empty icon slot (and its margin) beside the label.
+ */
+export function inboxLogo(provider: string): JSX.Element | undefined {
   const Logo = LOGOS[provider];
-  return Logo ? <Logo /> : null;
+  return Logo ? <Logo /> : undefined;
 }
