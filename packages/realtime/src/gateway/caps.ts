@@ -4,7 +4,7 @@ import type { RealtimeLogger } from "../core/types";
 import type { GatewayConfig } from "./config";
 
 /**
- * Per-class socket caps (future-pay FUT-3554): a bound on how many of the gateway's
+ * Per-class socket caps: a bound on how many of the gateway's
  * sockets one KIND of subscriber may hold, so a flood of one kind can never take the
  * slots another kind needs.
  *
