@@ -247,6 +247,7 @@ REALTIME_GATEWAY_PORT=3100 REDIS_URL=redis://redis:6379 npx realtime-gateway
 | `REALTIME_TICKET_SECRET` | falls back to `AUTH_SECRET` | must match the API side |
 | `REALTIME_GATEWAY_PORT` | `3100` | |
 | `REALTIME_GATEWAY_MAX_CONNECTIONS` | `2000` | per process; over it, upgrades get 503. GLOBAL, not per subject — see the `connectionCap` caveat above |
+| `REALTIME_GATEWAY_TOPIC_CAPS` | _(none)_ | per-class bounds inside the global one, `pattern=max` pairs comma-separated (`tenant:*:catalog=500`; `*` is one `:` segment). A socket whose ticket topics ALL match a pattern holds one of its slots; over it, upgrades get 503. Counted after the ticket is verified. Set one for every surface that mints tickets without a session, so a flood of it cannot take the slots staff screens need (`src/gateway/caps.ts`) |
 | `REDIS_URL` | — | **required.** Unset, the gateway REFUSES TO START unless inline was explicitly asked for |
 | `REALTIME_DRIVER` | — | `inline` is the explicit opt-in to running with no cross-process bus |
 

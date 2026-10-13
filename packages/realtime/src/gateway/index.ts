@@ -5,6 +5,7 @@ import { TicketReplayGuard, verifyRealtimeTicket } from "../core/ticket";
 import type { RealtimeDriver, RealtimeLogger } from "../core/types";
 import { createInlineRealtimeDriver } from "../drivers/inline";
 
+import { CapLedger, capFor } from "./caps";
 import { readGatewayConfig, type GatewayConfig, type GatewayConfigInput } from "./config";
 import { attachConnection, type GatewaySocket } from "./connection";
 import { MAX_INBOUND_BYTES } from "./inbound";
@@ -173,6 +174,7 @@ interface UpgradeDeps {
   replayGuard: TicketReplayGuard;
   wss: WebSocketServerLike;
   logger: RealtimeLogger;
+  caps: CapLedger<GatewaySocket>;
 }
 
 /**
@@ -187,7 +189,7 @@ function handleUpgrade(
   socket: { destroy(): void; write(chunk: string): void },
   head: Buffer,
 ): void {
-  const { config, sockets, replayGuard, wss, logger } = deps;
+  const { config, sockets, replayGuard, wss, logger, caps } = deps;
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
   if (url.pathname !== config.socketPath) {
     socket.destroy();
@@ -215,12 +217,31 @@ function handleUpgrade(
     return;
   }
 
+  // The class bound (see `./caps.ts`), checked only now that the ticket is real: an
+  // unverified upgrade must never count against the budget it is there to protect.
+  // The same 503 as the global bound — the client backs off and retries either way.
+  const cap = capFor(config.topicCaps, ticket.topics);
+  if (cap !== null && !caps.hasRoom(cap)) {
+    socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
   wss.handleUpgrade(request, socket, head, (ws) => {
+    // Admitted again here because the handshake is asynchronous: two upgrades can
+    // pass `hasRoom` for the last slot. The loser is closed with 1013 (try again later).
+    if (cap !== null && !caps.admit(cap, ws)) {
+      ws.close(1013, "class at capacity");
+      return;
+    }
     sockets.add(ws);
     void attachConnection({
       ws,
       topics: ticket.topics,
-      onClose: () => sockets.delete(ws),
+      onClose: () => {
+        sockets.delete(ws);
+        caps.release(ws);
+      },
       ticketSecret: config.ticketSecret,
       replayGuard,
       logger,
@@ -245,6 +266,7 @@ export async function startRealtimeGateway(
   // depend on Redis being reachable, which turns a hardening measure into an
   // outage path.
   const replayGuard = new TicketReplayGuard();
+  const caps = new CapLedger<GatewaySocket>();
 
   configureRealtime({
     driver: options.driver ?? (await createDriver(config, logger)),
@@ -268,7 +290,7 @@ export async function startRealtimeGateway(
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_INBOUND_BYTES });
 
   server.on("upgrade", (request, socket, head) => {
-    handleUpgrade({ config, sockets, replayGuard, wss, logger }, request, socket, head);
+    handleUpgrade({ config, sockets, replayGuard, wss, logger, caps }, request, socket, head);
   });
 
   if (ownsServer) {
@@ -292,7 +314,10 @@ export async function startRealtimeGateway(
       closed = true;
       // Clients see a clean close and reconnect to whichever instance survives;
       // their polling fallback covers the gap either way.
-      for (const ws of sockets) ws.close(1001, "server shutting down");
+      for (const ws of sockets) {
+        ws.close(1001, "server shutting down");
+        caps.release(ws);
+      }
       sockets.clear();
       wss.close();
       if (ownsServer) await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -337,7 +362,7 @@ export async function runRealtimeGateway(
  * granularity as the API half's (`resolveRealtimeDriver`, pinned by
  * `../server/__tests__/surface-internals.test.ts`) — no port, no socket, no `ws`.
  */
-export const __testables = { createDriver };
+export const __testables = { createDriver, handleUpgrade };
 
 export {
   readGatewayConfig,
@@ -348,6 +373,7 @@ export {
   type GatewayConfig,
   type GatewayConfigInput,
 } from "./config";
+export { capFor, parseTopicCaps, topicMatches, type TopicCap } from "./caps";
 export {
   attachConnection,
   Subscriptions,

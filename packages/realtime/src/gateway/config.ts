@@ -1,5 +1,7 @@
 import type { RealtimeLogger } from "../core/types";
 
+import { parseTopicCaps, type TopicCap } from "./caps";
+
 /**
  * Everything the gateway process reads from the environment, resolved once and
  * validated loudly. Ported from the origin host's `apps/realtime-gateway/src/config.ts`.
@@ -42,6 +44,13 @@ export interface GatewayConfig {
   inlineConsent: boolean;
   /** Upper bound of simultaneous sockets, per process. */
   maxConnections: number;
+  /**
+   * Per-class bounds inside {@link maxConnections} (see `./caps.ts`): a socket whose
+   * ticket topics all match a cap's pattern holds one of that cap's slots. Empty =
+   * no class is bounded beyond the global count, which is every gateway before them.
+   * From `REALTIME_GATEWAY_TOPIC_CAPS` (`tenant:*:catalog=500`).
+   */
+  topicCaps: TopicCap[];
   /** The path the upgrade must arrive on. Everything else is destroyed. */
   socketPath: string;
   /** Where the health probe answers. */
@@ -127,6 +136,7 @@ export function readGatewayConfig(input: GatewayConfigInput = {}): GatewayConfig
     maxConnections:
       input.maxConnections ??
       readInt("REALTIME_GATEWAY_MAX_CONNECTIONS", DEFAULT_GATEWAY_MAX_CONNECTIONS),
+    topicCaps: input.topicCaps ?? parseTopicCaps(process.env.REALTIME_GATEWAY_TOPIC_CAPS),
     socketPath: input.socketPath ?? DEFAULT_GATEWAY_SOCKET_PATH,
     healthPath: input.healthPath ?? DEFAULT_GATEWAY_HEALTH_PATH,
   };
