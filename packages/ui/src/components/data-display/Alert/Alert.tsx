@@ -11,7 +11,7 @@ import { absoluteInk, modeInk } from '../../../tokens/ink';
 
 import { AlertContent } from './Alert.content';
 import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
-import { resolveIconPlacement } from './Alert.placement';
+import { resolveIconPlacement, type AlertIconPlacement } from './Alert.placement';
 import type { AlertPalette } from './Alert.metrics';
 import {
   ACTIVE,
@@ -248,6 +248,31 @@ function dismissButton(
   return <AlertCloseButton dataTestId={dataTestId} label={props.closeLabel} onClose={onClose} />;
 }
 
+/**
+ * Where the icon goes: MUI's own slot (`slot`), or the title's row
+ * (`titleIcon`) — never both. On the title's row only when there IS a title
+ * and an icon to put on it (`Alert.placement.ts`).
+ */
+function placeIcon({
+  icon,
+  dataTestId,
+  hasTitle,
+  placement,
+}: {
+  icon: React.ReactNode;
+  dataTestId: string | undefined;
+  hasTitle: boolean;
+  placement: AlertIconPlacement;
+}): { slot: React.ReactNode; titleIcon?: React.ReactNode } {
+  if (icon === null) return { slot: false };
+  const glyph = (
+    <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
+      {icon}
+    </Box>
+  );
+  return placement === 'title' && hasTitle ? { slot: false, titleIcon: glyph } : { slot: glyph };
+}
+
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, ref) => {
   const {
     variant,
@@ -292,28 +317,12 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
 
   const severity = toMuiSeverity(variant);
 
-  const displayIcon = showIcon ? (
-    <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
-      {icon || getVariantIcon(variant)}
-    </Box>
-  ) : (
-    false
-  );
-
-  // On the title's line only when there IS a title and an icon to put on it.
-  const onTitle =
-    resolveIconPlacement(theme, iconPlacement) === 'title' && Boolean(title) && displayIcon !== false;
-
-  const content = (
-    <AlertContent
-      title={title}
-      description={description}
-      titleIcon={onTitle ? displayIcon : undefined}
-      dataTestId={dataTestId}
-    >
-      {children}
-    </AlertContent>
-  );
+  const { slot, titleIcon } = placeIcon({
+    icon: showIcon ? (icon ?? getVariantIcon(variant)) : null,
+    dataTestId,
+    hasTitle: Boolean(title),
+    placement: resolveIconPlacement(theme, iconPlacement),
+  });
 
   return (
     <Collapse in={open && !isClosing} timeout={COLLAPSE_MS}>
@@ -326,7 +335,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
         glow={glow}
         pulse={pulse}
         animate={animate}
-        icon={onTitle ? false : displayIcon}
+        icon={slot}
         role={announcement.role}
         aria-live={announcement['aria-live']}
         aria-atomic={ariaAtomic}
@@ -334,7 +343,9 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
         action={dismissButton(alertProps, dataTestId, handleClose)}
         {...props}
       >
-        {content}
+        <AlertContent title={title} description={description} titleIcon={titleIcon} dataTestId={dataTestId}>
+          {children}
+        </AlertContent>
       </StyledAlert>
     </Collapse>
   );

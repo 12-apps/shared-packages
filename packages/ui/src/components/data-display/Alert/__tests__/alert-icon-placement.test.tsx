@@ -22,13 +22,16 @@ const rendered = (ui: React.ReactElement, placement?: 'gutter' | 'title'): HTMLE
 };
 
 const iconSlot = (root: HTMLElement): Element | null => root.querySelector('.MuiAlert-icon');
+/** How many elements carry this test id — 0 is an assertion, not a missed query. */
+const count = (root: HTMLElement, testId: string): number =>
+  root.querySelectorAll(`[data-testid="${testId}"]`).length;
 
 describe('Given an alert under a theme that states nothing', () => {
   it('then the icon keeps its own column, as before', () => {
     const root = rendered(<Alert variant="success" title={TITLE} description={BODY} />);
 
     expect(iconSlot(root)).toContainElement(within(root).getByTestId('alert-icon'));
-    expect(within(root).queryByTestId('alert-title-row')).toBeNull();
+    expect(count(root, 'alert-title-row')).toBe(0);
   });
 });
 
@@ -40,21 +43,21 @@ describe("Given a theme that puts the icon on the title's line", () => {
     expect(row).toContainElement(within(root).getByTestId('alert-icon'));
     expect(row).toContainElement(within(root).getByTestId('alert-title'));
     expect(row).not.toContainElement(within(root).getByTestId('alert-message'));
-    expect(iconSlot(root)).toBeNull();
+    expect(root.querySelectorAll('.MuiAlert-icon')).toHaveLength(0);
   });
 
   it('then an alert with no title keeps the icon in its column — there is no title line', () => {
     const root = rendered(<Alert variant="info" description={BODY} />, 'title');
 
     expect(iconSlot(root)).toContainElement(within(root).getByTestId('alert-icon'));
-    expect(within(root).queryByTestId('alert-title-row')).toBeNull();
+    expect(count(root, 'alert-title-row')).toBe(0);
   });
 
   it('then an alert that hides its icon draws no row for it', () => {
     const root = rendered(<Alert variant="info" title={TITLE} showIcon={false} />, 'title');
 
-    expect(within(root).queryByTestId('alert-title-row')).toBeNull();
-    expect(within(root).queryByTestId('alert-icon')).toBeNull();
+    expect(count(root, 'alert-title-row')).toBe(0);
+    expect(count(root, 'alert-icon')).toBe(0);
   });
 
   it('then a call site that asks for the gutter still gets it', () => {
