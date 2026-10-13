@@ -11,8 +11,12 @@ import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { inboxLink } from "./inbox-link";
 import { inboxLogo } from "./inbox-logos";
+import type { EmailAuth } from "../create-email-auth";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
+import { PhoneField, usePhone, type PhoneState, type SignupPhoneField } from "./signup-phone";
+
+export type { SignupPhoneField } from "./signup-phone";
 
 /**
  * Create an account with an e-mail and a password.
@@ -38,6 +42,7 @@ interface SignupState {
   name: string;
   email: string;
   password: string;
+  phone: PhoneState;
   /** The password broke the rule its hint states, so the field and hint say so in red. */
   passwordFailed: boolean;
   leavePassword: () => void;
@@ -67,6 +72,8 @@ export interface SignupConfig {
    * on its own, as it always has.
    */
   renderActions?: (submit: ReactNode) => ReactNode;
+  /** Ask for a phone too. See {@link SignupPhoneField}. */
+  phone?: SignupPhoneField;
 }
 
 /**
@@ -118,6 +125,25 @@ function usePasswordFailure(
   };
 }
 
+/**
+ * What the form sends. The destination rides the confirmation link, so the
+ * person comes back to where they started rather than to a sign-in screen
+ * (FUT-3474); the phone goes only when the host asked for one.
+ */
+function signUpRequest(
+  config: SignupConfig,
+  account: { email: string; password: string; name: string },
+  phone: string,
+): Parameters<EmailAuth["signUp"]>[0] {
+  return {
+    email: account.email,
+    password: account.password,
+    name: account.name || undefined,
+    callbackUrl: config.callbackUrl,
+    ...(config.phone && phone ? { phone } : {}),
+  };
+}
+
 function useSignup(config: SignupConfig): SignupState {
   const { client } = useScreens();
   const { signInWithPassword } = useScreens().useSession();
@@ -129,17 +155,11 @@ function useSignup(config: SignupConfig): SignupState {
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
   const passwordCheck = usePasswordFailure(password, setPassword);
+  const phone = usePhone(config.phone);
 
   /** Register, then take whichever of the two paths the server reports. */
   async function register(): Promise<void> {
-    // The destination rides the confirmation link, so the person comes back
-    // to where they started rather than to a sign-in screen (FUT-3474).
-    const result = await client.signUp({
-      email,
-      password,
-      name: name || undefined,
-      callbackUrl: config.callbackUrl,
-    });
+    const result = await client.signUp(signUpRequest(config, { email, password, name }, phone.value));
     if (!result.ok) {
       setReason(result.reason);
       setViolations(result.violations ?? null);
@@ -164,7 +184,7 @@ function useSignup(config: SignupConfig): SignupState {
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
-    if (pending || config.disabled) return;
+    if (pending || config.disabled || phone.blocking !== null) return;
     setPending(true);
     setReason(null);
     setViolations(null);
@@ -185,6 +205,7 @@ function useSignup(config: SignupConfig): SignupState {
     name,
     email,
     password,
+    phone,
     passwordFailed: passwordCheck.failed,
     leavePassword: passwordCheck.leave,
     pending,
@@ -212,7 +233,13 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
       color="primary"
       fullWidth
       loading={form.pending}
-      disabled={gateClosed || form.pending || form.email.length === 0 || form.password.length === 0}
+      disabled={
+        gateClosed ||
+        form.pending ||
+        form.email.length === 0 ||
+        form.password.length === 0 ||
+        form.phone.blocking !== null
+      }
       dataTestId="signup-submit"
     >
       {copy.signUp.submit}
@@ -307,6 +334,7 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         data-testid="signup-email"
       />
       <Spacer size="sm" />
+      {props.phone ? <PhoneField field={props.phone} phone={form.phone} /> : null}
       <PasswordField
         id="signup-password"
         label={copy.signUp.passwordLabel}

@@ -78,13 +78,20 @@ export class FakeHost implements EmailCredentialsStore, EmailCredentialsMailer {
     return this.users.get(id) ?? null;
   }
 
+  /** The phone each `createUser` was handed, by user id — the host's column. */
+  readonly phones = new Map<string, string | null>();
+
   async createUser(input: {
     email: string;
     name?: string | null;
+    phone?: string | null;
     passwordHash: string;
     emailVerifiedAt?: Date | null;
   }): Promise<EmailCredentialUser> {
-    return this.withUser(input);
+    const { phone, ...user } = input;
+    const row = this.withUser(user);
+    this.phones.set(row.id, phone ?? null);
+    return row;
   }
 
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {

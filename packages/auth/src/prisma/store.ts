@@ -64,7 +64,17 @@ export interface EmailIdentity {
 export interface EmailIdentityDelegate {
   findByEmail(email: string): Promise<EmailIdentity | null>;
   findById(id: string): Promise<EmailIdentity | null>;
-  upsert(input: { email: string; name?: string | null }): Promise<EmailIdentity>;
+  /**
+   * `phone` arrives only when the host's sign-up form asked for one, as the
+   * person typed it. Validating and normalising it is the host's: a number this
+   * package cannot read is the host's to drop, never a reason to refuse the
+   * sign-up.
+   */
+  upsert(input: {
+    email: string;
+    name?: string | null;
+    phone?: string | null;
+  }): Promise<EmailIdentity>;
 }
 
 /** A credential row as this package stores it. */
@@ -189,6 +199,7 @@ export function createPrismaEmailCredentialsStore(
       const found = await identity.upsert({
         email: normalize(input.email),
         name: input.name ?? null,
+        ...(input.phone ? { phone: input.phone } : {}),
       });
       await writeCredential(found.id, {
         passwordHash: input.passwordHash,

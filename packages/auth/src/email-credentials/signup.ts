@@ -39,6 +39,13 @@ export interface SignUpInput {
    * them back. Anything that is not a same-origin path is dropped.
    */
   callbackUrl?: string | null;
+  /**
+   * A phone the host asked for on the form, as typed. Handed to the store
+   * ONLY when this call creates the account: the taken-address branch writes
+   * nothing, or a stranger could set the owner's number by "signing up" as
+   * them. The host's identity delegate is the judge of whether it is a phone.
+   */
+  phone?: string | null;
 }
 
 /**
@@ -98,6 +105,7 @@ async function registerPending(
   const user = await ctx.store.createUser({
     email,
     name: input.name ?? null,
+    phone: input.phone ?? null,
     passwordHash: await hashPassword(input.password),
     emailVerifiedAt: null,
   });
@@ -171,6 +179,7 @@ export async function signUp(
   const user = await ctx.store.createUser({
     email,
     name: input.name ?? null,
+    phone: input.phone ?? null,
     passwordHash: await hashPassword(input.password),
     emailVerifiedAt: ctx.now(),
   });
