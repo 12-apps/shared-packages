@@ -60,6 +60,8 @@ export interface EmailCredentialsStore {
   createUser(input: {
     email: string;
     name?: string | null;
+    /** As typed on the form, when the host asked for one. The host's to judge. */
+    phone?: string | null;
     passwordHash: string;
     emailVerifiedAt?: Date | null;
   }): Promise<EmailCredentialUser>;

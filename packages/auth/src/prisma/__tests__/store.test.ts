@@ -147,6 +147,22 @@ describe("createPrismaEmailCredentialsStore", () => {
     expect(upsert).toHaveBeenCalledWith({ email: "ana@b.co", name: "Ana" });
   });
 
+  it("hands the host the phone the form asked for, and only then", async () => {
+    // The host's column, judged by the host: the package passes it as typed.
+    const upsert = vi.fn().mockResolvedValue(ANA);
+    const { db } = dbStub();
+    const store = createPrismaEmailCredentialsStore({
+      getDb: async () => db,
+      identity: identityStub({ upsert }),
+    });
+
+    await store.createUser({ email: "ana@b.co", name: "Ana", phone: "(31) 99876-5432", passwordHash: "scrypt$…" });
+    await store.createUser({ email: "bia@b.co", name: "Bia", phone: null, passwordHash: "scrypt$…" });
+
+    expect(upsert).toHaveBeenNthCalledWith(1, { email: "ana@b.co", name: "Ana", phone: "(31) 99876-5432" });
+    expect(upsert).toHaveBeenNthCalledWith(2, { email: "bia@b.co", name: "Bia" });
+  });
+
   it("refuses a token presented to the wrong purpose", async () => {
     // The hash is unique across BOTH purposes. A verification token handed to
     // the reset endpoint must read as "no such token", not as a token of the

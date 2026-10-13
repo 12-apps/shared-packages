@@ -231,6 +231,7 @@ function signupRoute(
         password: str(body, "password"),
         name,
         callbackUrl: optionalStr(body, "callbackUrl"),
+        phone: optionalStr(body, "phone"),
       });
       if (!result.ok) return refuse(result, locale);
       await onSignedUp?.({ email, name });

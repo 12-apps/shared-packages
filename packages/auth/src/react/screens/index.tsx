@@ -134,5 +134,5 @@ export type { EmailAuthCopy, EmailAuthScreenReason } from "./copy";
 export { PT_BR } from "./pt-BR";
 export { EN_US } from "./en-US";
 export { failureMessage } from "./copy";
-export type { SignupConfig } from "./email-signup-form";
+export type { SignupConfig, SignupPhoneField } from "./email-signup-form";
 export type { VerifiedOutcome } from "./verify-email";

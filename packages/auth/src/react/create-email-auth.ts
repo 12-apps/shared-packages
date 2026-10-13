@@ -84,6 +84,8 @@ export interface EmailAuth {
     name?: string;
     /** Where the person started; the confirmation link brings them back. */
     callbackUrl?: string;
+    /** Only when the host's form asked for one (`SignupPhoneField`). */
+    phone?: string;
   }): Promise<EmailAuthClientResult<SignUpClientData>>;
   verifyEmail(token: string): Promise<EmailAuthClientResult<VerifyEmailClientData>>;
   resendVerification(email: string): Promise<EmailAuthClientResult<null>>;

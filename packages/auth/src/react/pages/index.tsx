@@ -2,7 +2,7 @@ import type { ComponentType, JSX, ReactNode } from "react";
 
 import { AuthCard, AuthFooter, ProviderBlock, type AuthLink } from "./card";
 import { SignupActions } from "./signup-actions";
-import type { EmailAuthScreens } from "../screens";
+import type { EmailAuthScreens, SignupPhoneField } from "../screens";
 import { RevealOnAppear } from "../screens/shared";
 
 /**
@@ -181,6 +181,13 @@ export interface SignupPageProps {
    * `type="button"` or it submits the e-mail form.
    */
   termsGate?: ReactNode;
+  /**
+   * Ask for a phone on the e-mail form — a host that cannot serve the account
+   * without one (a store that delivers) asks at the door rather than at the
+   * first order. The provider buttons cannot carry it; the host still asks
+   * those accounts later. See `SignupPhoneField`.
+   */
+  phone?: SignupPhoneField;
 }
 
 export interface AuthPages {
@@ -284,6 +291,7 @@ function SignupView({
   branding,
   notice,
   termsGate,
+  phone,
 }: SignupPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailSignupForm } = screens;
@@ -314,6 +322,7 @@ function SignupView({
           onBeforeSubmit={onBeforeSubmit}
           onSignedIn={onSignedIn}
           disabled={disabled}
+          {...(phone === undefined ? {} : { phone })}
           renderActions={(submit) => (
             <SignupActions>
               {gate}
