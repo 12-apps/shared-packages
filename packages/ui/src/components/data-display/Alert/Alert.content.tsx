@@ -35,9 +35,11 @@ export const AlertContent: React.FC<{
       sx={{
         fontWeight: TITLE.fontWeight,
         fontSize: sxRem(TITLE.fontSize),
-        // On the icon's row the title is centred against the glyph, so MUI's
-        // 2px lift would only push it off that centre.
-        ...(titleIcon ? { margin: 0 } : { marginBottom: description ? TITLE.marginBottomUnits : 0 }),
+        // On the icon's row MUI's 2px lift would push the title off the glyph,
+        // and the line height is stated so the glyph can be centred on it.
+        ...(titleIcon
+          ? { margin: 0, lineHeight: TITLE_ICON.lineHeight }
+          : { marginBottom: description ? TITLE.marginBottomUnits : 0 }),
         ...BREAK_WORDS,
       }}
     >
@@ -52,10 +54,19 @@ export const AlertContent: React.FC<{
           data-testid={testIdFor(dataTestId, 'title-row')}
           sx={{
             display: 'flex',
-            alignItems: 'center',
+            // The FIRST line, not the block: a title that wraps to three lines
+            // on a phone would otherwise float its icon beside the second.
+            alignItems: 'flex-start',
             gap: TITLE_ICON.gapUnits,
             marginBottom: description ? TITLE.marginBottomUnits : 0,
-            '& > span': { display: 'flex', flex: 'none', fontSize: sxRem(ICON_SLOT.size) },
+            '& > span': {
+              display: 'flex',
+              flex: 'none',
+              alignItems: 'center',
+              fontSize: sxRem(ICON_SLOT.size),
+              // One title line tall, so the glyph is centred on that line.
+              height: sxRem(TITLE.fontSize * TITLE_ICON.lineHeight),
+            },
           }}
         >
           {titleIcon}

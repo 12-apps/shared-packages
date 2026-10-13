@@ -76,3 +76,12 @@ describe("Given a theme that puts the icon on the title's line", () => {
     expect(root).not.toHaveAttribute('iconplacement');
   });
 });
+
+describe('Given a title that wraps on a narrow screen', () => {
+  it("then the icon is aligned to the title's FIRST line, not centred on the block", () => {
+    const root = rendered(<Alert variant="info" title={TITLE} description={BODY} />, 'title');
+
+    const row = within(root).getByTestId('alert-title-row');
+    expect(getComputedStyle(row).alignItems).toBe('flex-start');
+  });
+});
