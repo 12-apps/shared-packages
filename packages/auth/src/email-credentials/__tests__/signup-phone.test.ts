@@ -65,6 +65,17 @@ describe("a phone on sign-up", () => {
     expect(host.phones.has(owner.id)).toBe(false);
   });
 
+  it("is never written over a taken address with verification off, either", async () => {
+    const { host, flow } = wire(false);
+    host.withUser({ email: "ana@example.com", passwordHash: "x", emailVerifiedAt: VERIFIED_AT });
+    const createUser = vi.spyOn(host, "createUser");
+
+    const result = await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD, phone: "(11) 91111-1111" });
+
+    expect(result).toMatchObject({ ok: false, reason: "email-taken" });
+    expect(createUser).not.toHaveBeenCalled();
+  });
+
   it("leaves the store's phone empty when the form asked for none", async () => {
     const { host, flow } = wire(true);
     await flow.signUp({ email: "ana@example.com", password: GOOD_PASSWORD });

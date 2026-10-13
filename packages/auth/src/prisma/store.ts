@@ -70,7 +70,11 @@ export interface EmailIdentityDelegate {
    * package cannot read is the host's to drop, never a reason to refuse the
    * sign-up.
    */
-  upsert(input: { email: string; name?: string | null; phone?: string | null }): Promise<EmailIdentity>;
+  upsert(input: {
+    email: string;
+    name?: string | null;
+    phone?: string | null;
+  }): Promise<EmailIdentity>;
 }
 
 /** A credential row as this package stores it. */

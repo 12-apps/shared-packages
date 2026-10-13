@@ -11,6 +11,10 @@ import { Spacer } from "@12-apps/ui/layout/Spacer";
  * package is not: `format` is the mask applied as the person types, and
  * `problem` is the whole of the validation — it is asked about the EMPTY value
  * too, so whether the field is required is the host's answer, not a flag here.
+ *
+ * An empty field is never shown as an error, even when the host requires it:
+ * tabbing past a field is not getting it wrong. It holds the submit all the
+ * same, so a required field should carry a `hint` that says it is needed.
  */
 export interface SignupPhoneField {
   label: string;
