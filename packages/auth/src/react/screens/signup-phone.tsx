@@ -2,6 +2,7 @@ import { useState, type JSX } from "react";
 
 import { Input } from "@12-apps/ui/form/Input";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
+import { Text } from "@12-apps/ui/typography/Text";
 
 /**
  * A phone, asked for on the form when the host needs one to serve the account
@@ -18,6 +19,11 @@ import { Spacer } from "@12-apps/ui/layout/Spacer";
  */
 export interface SignupPhoneField {
   label: string;
+  /**
+   * Mark the label required, as the e-mail's is. Only the marker: whether an
+   * empty value holds the submit is still `problem`'s answer.
+   */
+  required?: boolean;
   /** Under the field until something is wrong with it. */
   hint?: string;
   /** The value as it should read after this keystroke. */
@@ -64,6 +70,9 @@ export function usePhone(field: SignupPhoneField | undefined): PhoneState {
 
 /** The phone input and the line under it, when the host asked for one. */
 export function PhoneField({ field, phone }: { field: SignupPhoneField; phone: PhoneState }): JSX.Element {
+  // The line under the field is drawn the way the password hint below it is,
+  // not as the input's own helper text: two hint styles stacked in one form
+  // read as two kinds of thing (UI review, FUT-3550).
   return (
     <>
       <Input
@@ -77,10 +86,24 @@ export function PhoneField({ field, phone }: { field: SignupPhoneField; phone: P
         onBlur={phone.leave}
         autoComplete="tel"
         fullWidth
+        required={field.required === true}
         error={phone.failed}
-        {...(phone.shown ? { helperText: phone.shown } : {})}
+        {...(phone.shown ? { inputProps: { "aria-describedby": "signup-phone-hint" } } : {})}
         data-testid="signup-phone"
       />
+      {phone.shown ? (
+        <>
+          <Spacer size="xs" />
+          <Text
+            id="signup-phone-hint"
+            color={phone.failed ? "danger" : "secondary"}
+            size="sm"
+            data-testid="signup-phone-hint"
+          >
+            {phone.shown}
+          </Text>
+        </>
+      ) : null}
       <Spacer size="sm" />
     </>
   );

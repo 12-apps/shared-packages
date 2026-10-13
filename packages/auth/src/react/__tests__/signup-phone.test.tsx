@@ -59,7 +59,7 @@ function fillAccount(): void {
   });
 }
 
-const phoneInput = (): HTMLInputElement => screen.getByLabelText(PHONE.label) as HTMLInputElement;
+const phoneInput = (): HTMLInputElement => screen.getByTestId("signup-phone") as HTMLInputElement;
 const submit = (): HTMLButtonElement => screen.getByTestId("signup-submit") as HTMLButtonElement;
 
 afterEach(() => {
@@ -78,6 +78,24 @@ describe("the sign-up phone", () => {
     ]);
     fillAccount();
     expect(submit().disabled).toBe(false);
+  });
+
+  it("marks the label required when the host says so, as the e-mail's is", () => {
+    renderSignup({ ...PHONE, required: true });
+    expect(phoneInput().required).toBe(true);
+  });
+
+  it("leaves the label unmarked when the host does not", () => {
+    renderSignup(PHONE);
+    expect(phoneInput().required).toBe(false);
+  });
+
+  it("draws its hint the way the password hint is drawn, and ties it to the input", () => {
+    renderSignup(PHONE);
+    fireEvent.change(phoneInput(), { target: { value: "3198" } });
+    const hint = screen.getByTestId("signup-phone-hint");
+    expect(hint.tagName).toBe(screen.getByTestId("signup-password-hint").tagName);
+    expect(phoneInput().getAttribute("aria-describedby")).toContain(hint.id);
   });
 
   it("masks as typed, with the host's rule", () => {
