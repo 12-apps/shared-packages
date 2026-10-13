@@ -1,6 +1,6 @@
 import type { RealtimeLogger } from "../core/types";
 
-import { parseTopicCaps, type TopicCap } from "./caps";
+import { parseTopicCaps, validateTopicCaps, type TopicCap } from "./caps";
 
 /**
  * Everything the gateway process reads from the environment, resolved once and
@@ -115,7 +115,8 @@ function readInlineConsent(input: GatewayConfigInput): boolean {
 
 /** The class bounds — explicit, or `REALTIME_GATEWAY_TOPIC_CAPS` (see `./caps.ts`). */
 function readTopicCaps(input: GatewayConfigInput): TopicCap[] {
-  return input.topicCaps ?? parseTopicCaps(process.env.REALTIME_GATEWAY_TOPIC_CAPS);
+  if (input.topicCaps !== undefined) return validateTopicCaps(input.topicCaps);
+  return parseTopicCaps(process.env.REALTIME_GATEWAY_TOPIC_CAPS);
 }
 
 /**

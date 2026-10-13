@@ -68,6 +68,12 @@ describe("parseTopicCaps", () => {
     expect(() => parseTopicCaps("tenant::catalog=5")).toThrow(/not a topic pattern/);
     expect(() => parseTopicCaps("*:*:*=5")).toThrow(/not a topic pattern/);
     expect(() => parseTopicCaps("a:*=1,a:*=2")).toThrow(/listed twice/);
+    expect(() =>
+      readGatewayConfig({
+        ticketSecret: SECRET,
+        topicCaps: [{ pattern: "*:*", maxConnections: 1 }],
+      }),
+    ).toThrow(/not a topic pattern/);
   });
 
   it("is read from the environment by the config", () => {

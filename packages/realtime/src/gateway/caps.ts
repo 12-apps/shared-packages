@@ -92,20 +92,33 @@ export function parseTopicCaps(raw: string | undefined): TopicCap[] {
         `REALTIME_GATEWAY_TOPIC_CAPS: "${entry.trim()}" is not "pattern=positive-integer"`,
       );
     }
-    if (!isUsablePattern(match[1])) {
+    return { pattern: match[1], maxConnections: max };
+  });
+  return validateTopicCaps(caps);
+}
+
+/**
+ * Refuse caps that cannot mean what they say, from the environment or from code alike:
+ * a pattern that is not one, a bound that is not a positive integer, a pattern twice.
+ */
+export function validateTopicCaps(caps: readonly TopicCap[]): TopicCap[] {
+  caps.forEach((cap) => {
+    if (!isUsablePattern(cap.pattern)) {
       throw new Error(
-        `REALTIME_GATEWAY_TOPIC_CAPS: "${match[1]}" is not a topic pattern (non-empty ` +
+        `REALTIME_GATEWAY_TOPIC_CAPS: "${cap.pattern}" is not a topic pattern (non-empty ` +
           "segments, at least one of them literal)",
       );
     }
-    return { pattern: match[1], maxConnections: max };
+    if (!Number.isInteger(cap.maxConnections) || cap.maxConnections <= 0) {
+      throw new Error(`REALTIME_GATEWAY_TOPIC_CAPS: "${cap.pattern}" needs a positive bound`);
+    }
   });
   const patterns = caps.map((cap) => cap.pattern);
   const duplicate = patterns.find((pattern, index) => patterns.indexOf(pattern) !== index);
   if (duplicate !== undefined) {
     throw new Error(`REALTIME_GATEWAY_TOPIC_CAPS: "${duplicate}" is listed twice`);
   }
-  return caps;
+  return [...caps];
 }
 
 /**
