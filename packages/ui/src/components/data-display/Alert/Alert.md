@@ -34,6 +34,7 @@ A beautiful and versatile Alert component with multiple variants, animations, an
 | `pulse` | `boolean` | `false` | Add a pulsing animation effect |
 | `animate` | `boolean` | `true` | Whether to animate the alert on mount |
 | `announce` | `'polite' \| 'assertive'` | - | Sets `role` and `aria-live` together — see [Accessibility](#accessibility) |
+| `iconPlacement` | `'gutter' \| 'title'` | theme's `uiAlert.iconPlacement`, else `'gutter'` | Icon in its own column, or on the title's line — see [Theming](#theming) |
 | `className` | `string` | - | Additional CSS classes |
 
 ## Usage Examples
@@ -188,6 +189,23 @@ The Alert component integrates with the MUI theme system and responds to:
 - Border radius settings
 - Shadow/elevation tokens
 
+### Where the icon sits — `uiAlert.iconPlacement`
+
+A house style, so the host states it ONCE on its theme rather than at each call:
+
+```ts
+createTheme({ uiAlert: { iconPlacement: 'title' } });
+```
+
+| value | layout |
+|---|---|
+| `'gutter'` (default) | the icon has a column of its own; title and description start to its right |
+| `'title'` | the icon sits on the title's line; the description starts at the alert's edge and uses the whole line |
+
+An alert with no title, or with `showIcon={false}`, has no title line for the
+icon, so `'title'` renders as `'gutter'`. A call site that must differ passes
+`iconPlacement`, which wins over the theme. Web only.
+
 ## Testing
 
 ### Test IDs
@@ -198,6 +216,7 @@ The Alert component integrates with the MUI theme system and responds to:
 | `alert-icon` | Icon | Alert severity icon |
 | `alert-title` | Title | Alert title text |
 | `alert-message` | Message | Alert message content |
+| `alert-title-row` | Row | Icon and title together (`iconPlacement: 'title'` only) |
 | `alert-close` | Button | Close button (when closable) |
 
 Custom test IDs can be provided via the `dataTestId` prop:

@@ -1,2 +1,8 @@
 export { Alert } from './Alert';
-export type { AlertBaseProps, AlertProps, AlertVariant } from './Alert.types';
+export type {
+  AlertBaseProps,
+  AlertIconPlacement,
+  AlertProps,
+  AlertVariant,
+  UiAlertTheme,
+} from './Alert.types';
