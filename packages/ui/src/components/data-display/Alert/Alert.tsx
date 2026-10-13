@@ -1,16 +1,17 @@
 import Close from '@mui/icons-material/Close';
 import MuiAlert from '@mui/material/Alert/index.js';
-import AlertTitle from '@mui/material/AlertTitle/index.js';
 import Box from '@mui/material/Box/index.js';
 import Collapse from '@mui/material/Collapse/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
-import { alpha, styled } from '@mui/material/styles/index.js';
+import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { absoluteInk, modeInk } from '../../../tokens/ink';
 
+import { AlertContent } from './Alert.content';
 import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
+import { resolveIconPlacement, type AlertIconPlacement } from './Alert.placement';
 import type { AlertPalette } from './Alert.metrics';
 import {
   ACTIVE,
@@ -21,12 +22,10 @@ import {
   CLOSE_BUTTON,
   CLOSE_DELAY_MS,
   COLLAPSE_MS,
-  DESCRIPTION,
   FADE_IN,
   FOCUS,
   HOVER,
   seconds,
-  TITLE,
 } from './Alert.metrics';
 import {
   alertEmphasisStyles,
@@ -39,7 +38,7 @@ import {
 import type { AlertColor } from '@mui/material/Alert/index.js';
 import type { AlertProps } from './Alert.types';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
-import { rem, rems, sxRem } from '../../../tokens/relative';
+import { rem, rems } from '../../../tokens/relative';
 
 const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
 
@@ -176,47 +175,6 @@ const MUI_SEVERITY: Record<string, AlertColor> = {
 const toMuiSeverity = (variant: string): AlertColor =>
   MUI_SEVERITY[variant] ?? (variant as AlertColor);
 
-const AlertContent: React.FC<{
-  title?: AlertProps['title'];
-  description?: AlertProps['description'];
-  dataTestId?: string;
-  children?: React.ReactNode;
-}> = ({ title, description, dataTestId, children }) => (
-  <>
-    {title && (
-      <AlertTitle
-        data-testid={testIdFor(dataTestId, 'title')}
-        sx={{
-          fontWeight: TITLE.fontWeight,
-          fontSize: sxRem(TITLE.fontSize),
-          marginBottom: description ? TITLE.marginBottomUnits : 0,
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word',
-          wordBreak: 'break-word',
-        }}
-      >
-        {title}
-      </AlertTitle>
-    )}
-    {description && (
-      <Box
-        component="div"
-        data-testid={testIdFor(dataTestId, 'message')}
-        sx={{
-          opacity: DESCRIPTION.opacity,
-          fontSize: sxRem(DESCRIPTION.fontSize),
-          wordWrap: 'break-word',
-          overflowWrap: 'break-word',
-          wordBreak: 'break-word',
-        }}
-      >
-        {description}
-      </Box>
-    )}
-    {children}
-  </>
-);
-
 const AlertCloseButton: React.FC<{ dataTestId?: string; label: string; onClose: () => void }> = ({
   dataTestId,
   label,
@@ -290,6 +248,31 @@ function dismissButton(
   return <AlertCloseButton dataTestId={dataTestId} label={props.closeLabel} onClose={onClose} />;
 }
 
+/**
+ * Where the icon goes: MUI's own slot (`slot`), or the title's row
+ * (`titleIcon`) — never both. On the title's row only when there IS a title
+ * and an icon to put on it (`Alert.placement.ts`).
+ */
+function placeIcon({
+  icon,
+  dataTestId,
+  hasTitle,
+  placement,
+}: {
+  icon: React.ReactNode;
+  dataTestId: string | undefined;
+  hasTitle: boolean;
+  placement: AlertIconPlacement;
+}): { slot: React.ReactNode; titleIcon?: React.ReactNode } {
+  if (icon === null) return { slot: false };
+  const glyph = (
+    <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
+      {icon}
+    </Box>
+  );
+  return placement === 'title' && hasTitle ? { slot: false, titleIcon: glyph } : { slot: glyph };
+}
+
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, ref) => {
   const {
     variant,
@@ -303,6 +286,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
     description,
     children,
     animate,
+    iconPlacement,
     role: _role, announce: _announce, // resolved from `alertProps` — see `resolveAnnouncement`
     'aria-atomic': ariaAtomic,
     ...others
@@ -319,6 +303,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
 
   // Depends on `variant`, so it cannot live in the static defaults above.
   const announcement = resolveAnnouncement(alertProps, variant);
+  const theme = useTheme();
   const [open, setOpen] = React.useState(true);
   const [isClosing, setIsClosing] = React.useState(false);
 
@@ -332,19 +317,12 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
 
   const severity = toMuiSeverity(variant);
 
-  const displayIcon = showIcon ? (
-    <Box component="span" data-testid={testIdFor(dataTestId, 'icon')}>
-      {icon || getVariantIcon(variant)}
-    </Box>
-  ) : (
-    false
-  );
-
-  const content = (
-    <AlertContent title={title} description={description} dataTestId={dataTestId}>
-      {children}
-    </AlertContent>
-  );
+  const { slot, titleIcon } = placeIcon({
+    icon: showIcon ? (icon ?? getVariantIcon(variant)) : null,
+    dataTestId,
+    hasTitle: Boolean(title),
+    placement: resolveIconPlacement(theme, iconPlacement),
+  });
 
   return (
     <Collapse in={open && !isClosing} timeout={COLLAPSE_MS}>
@@ -357,7 +335,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
         glow={glow}
         pulse={pulse}
         animate={animate}
-        icon={displayIcon}
+        icon={slot}
         role={announcement.role}
         aria-live={announcement['aria-live']}
         aria-atomic={ariaAtomic}
@@ -365,7 +343,9 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>((alertProps, r
         action={dismissButton(alertProps, dataTestId, handleClose)}
         {...props}
       >
-        {content}
+        <AlertContent title={title} description={description} titleIcon={titleIcon} dataTestId={dataTestId}>
+          {children}
+        </AlertContent>
       </StyledAlert>
     </Collapse>
   );

@@ -156,6 +156,18 @@ export const WithTitle: Story = {
   },
 };
 
+// The icon on the title's line, so the description uses the whole line.
+// Hosts usually set this once, on the theme: `uiAlert: { iconPlacement: 'title' }`.
+export const IconOnTitleLine: Story = {
+  args: {
+    variant: 'success',
+    iconPlacement: 'title',
+    title: 'Payment Successful',
+    description:
+      'Your payment has been processed successfully. You will receive a confirmation email shortly.',
+  },
+};
+
 // With custom icon
 export const WithCustomIcon: Story = {
   args: {

@@ -40,6 +40,8 @@ export const TITLE = { fontSize: 16.8, fontWeight: 600, marginTop: -2, marginBot
 /** The description: 0.925rem, slightly faded. */
 export const DESCRIPTION = { fontSize: 14.8, opacity: 0.9 } as const;
 
+/** The icon on the title's line (`iconPlacement: 'title'`): 10px from the title. */
+export const TITLE_ICON = { gapUnits: 1.25 } as const;
 /** The icon slot: MUI's 22px glyph at 0.9, 14px from the words, 2px down (MUI's 7px stays below). */
 export const ICON_SLOT = { size: 22, opacity: 0.9, marginRightUnits: 1.75, paddingTopUnits: 0.25, paddingBottom: 7 } as const;
 /** The action slot: MUI's `4px 0 0 16px` with the 16px ours, pushed right, 8px into the padding. */
