@@ -50,7 +50,7 @@ export interface GatewayConfig {
    * no class is bounded beyond the global count, which is every gateway before them.
    * From `REALTIME_GATEWAY_TOPIC_CAPS` (`tenant:*:catalog=500`).
    */
-  topicCaps: TopicCap[];
+  topicCaps?: TopicCap[];
   /** The path the upgrade must arrive on. Everything else is destroyed. */
   socketPath: string;
   /** Where the health probe answers. */
@@ -113,6 +113,11 @@ function readInlineConsent(input: GatewayConfigInput): boolean {
   return process.env.REALTIME_DRIVER?.trim().toLowerCase() === "inline";
 }
 
+/** The class bounds — explicit, or `REALTIME_GATEWAY_TOPIC_CAPS` (see `./caps.ts`). */
+function readTopicCaps(input: GatewayConfigInput): TopicCap[] {
+  return input.topicCaps ?? parseTopicCaps(process.env.REALTIME_GATEWAY_TOPIC_CAPS);
+}
+
 /**
  * Resolve the gateway's configuration.
  *
@@ -136,7 +141,7 @@ export function readGatewayConfig(input: GatewayConfigInput = {}): GatewayConfig
     maxConnections:
       input.maxConnections ??
       readInt("REALTIME_GATEWAY_MAX_CONNECTIONS", DEFAULT_GATEWAY_MAX_CONNECTIONS),
-    topicCaps: input.topicCaps ?? parseTopicCaps(process.env.REALTIME_GATEWAY_TOPIC_CAPS),
+    topicCaps: readTopicCaps(input),
     socketPath: input.socketPath ?? DEFAULT_GATEWAY_SOCKET_PATH,
     healthPath: input.healthPath ?? DEFAULT_GATEWAY_HEALTH_PATH,
   };

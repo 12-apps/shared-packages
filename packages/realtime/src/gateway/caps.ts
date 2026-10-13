@@ -1,3 +1,8 @@
+import { isValidTopic } from "../core/topics";
+import type { RealtimeLogger } from "../core/types";
+
+import type { GatewayConfig } from "./config";
+
 /**
  * Per-class socket caps (future-pay FUT-3554): a bound on how many of the gateway's
  * sockets one KIND of subscriber may hold, so a flood of one kind can never take the
@@ -40,14 +45,22 @@ export interface TopicCap {
   maxConnections: number;
 }
 
+/**
+ * Two things a class does NOT know, both by design:
+ *
+ *  - **who minted the ticket.** A staff screen whose ticket carries ONLY topics a cap
+ *    matches is counted in that class. A host keeps its anonymous surface on a topic
+ *    no staff screen subscribes to alone, so a pattern cannot catch a staff ticket.
+ *  - **a later subscription.** The class is fixed at the handshake; a socket that
+ *    widens or narrows its topics mid-connection keeps the slot it was admitted with.
+ */
+
 /** Whether `topic` matches `pattern`, segment by segment. */
 export function topicMatches(pattern: string, topic: string): boolean {
   const want = pattern.split(":");
   const have = topic.split(":");
   if (want.length !== have.length) return false;
-  return want.every(
-    (segment, index) => segment === "*" || segment === have[index],
-  );
+  return want.every((segment, index) => segment === "*" || segment === have[index]);
 }
 
 /**
@@ -56,15 +69,11 @@ export function topicMatches(pattern: string, topic: string): boolean {
  * class — it subscribes to nothing, and a pattern cannot be vacuously true of it.
  */
 export function capFor(
-  caps: readonly TopicCap[],
+  caps: readonly TopicCap[] | undefined,
   topics: readonly string[],
 ): TopicCap | null {
-  if (topics.length === 0) return null;
-  return (
-    caps.find((cap) =>
-      topics.every((topic) => topicMatches(cap.pattern, topic)),
-    ) ?? null
-  );
+  if (caps === undefined || topics.length === 0) return null;
+  return caps.find((cap) => topics.every((topic) => topicMatches(cap.pattern, topic))) ?? null;
 }
 
 /**
@@ -75,7 +84,7 @@ export function capFor(
 export function parseTopicCaps(raw: string | undefined): TopicCap[] {
   const text = raw?.trim();
   if (!text) return [];
-  return text.split(",").map((entry) => {
+  const caps = text.split(",").map((entry) => {
     const match = /^\s*([^=\s]+)\s*=\s*(\d+)\s*$/.exec(entry);
     const max = match ? Number.parseInt(match[2] ?? "", 10) : Number.NaN;
     if (!match || !match[1] || !Number.isFinite(max) || max <= 0) {
@@ -83,16 +92,39 @@ export function parseTopicCaps(raw: string | undefined): TopicCap[] {
         `REALTIME_GATEWAY_TOPIC_CAPS: "${entry.trim()}" is not "pattern=positive-integer"`,
       );
     }
+    if (!isUsablePattern(match[1])) {
+      throw new Error(
+        `REALTIME_GATEWAY_TOPIC_CAPS: "${match[1]}" is not a topic pattern (non-empty ` +
+          "segments, at least one of them literal)",
+      );
+    }
     return { pattern: match[1], maxConnections: max };
   });
+  const patterns = caps.map((cap) => cap.pattern);
+  const duplicate = patterns.find((pattern, index) => patterns.indexOf(pattern) !== index);
+  if (duplicate !== undefined) {
+    throw new Error(`REALTIME_GATEWAY_TOPIC_CAPS: "${duplicate}" is listed twice`);
+  }
+  return caps;
+}
+
+/**
+ * A pattern is a topic with `*` allowed for a segment — and at least one literal
+ * segment, since `*:*:*` would class nearly every ticket of that length.
+ */
+function isUsablePattern(pattern: string): boolean {
+  const segments = pattern.split(":");
+  const literal = segments.filter((segment) => segment !== "*");
+  return literal.length > 0 && literal.every((segment) => isValidTopic(segment));
 }
 
 /** Who holds a slot in which cap — admission and release, one place. */
 export class CapLedger<Socket> {
   private readonly held = new Map<TopicCap, Set<Socket>>();
 
-  /** Take a slot in `cap` for `socket`; false when the class is full. */
-  admit(cap: TopicCap, socket: Socket): boolean {
+  /** Take a slot in `cap` for `socket`; false when the class is full. No class, always true. */
+  admit(cap: TopicCap | null, socket: Socket): boolean {
+    if (cap === null) return true;
     const sockets = this.held.get(cap) ?? new Set<Socket>();
     if (sockets.size >= cap.maxConnections) return false;
     sockets.add(socket);
@@ -100,8 +132,9 @@ export class CapLedger<Socket> {
     return true;
   }
 
-  /** Whether `cap` has a free slot right now. */
-  hasRoom(cap: TopicCap): boolean {
+  /** Whether `cap` has a free slot right now. No class always has room. */
+  hasRoom(cap: TopicCap | null): boolean {
+    if (cap === null) return true;
     return (this.held.get(cap)?.size ?? 0) < cap.maxConnections;
   }
 
@@ -113,5 +146,23 @@ export class CapLedger<Socket> {
   /** How many sockets hold a slot in `cap`. */
   count(cap: TopicCap): number {
     return this.held.get(cap)?.size ?? 0;
+  }
+}
+
+/**
+ * A class bound only protects the rest of the gateway when it leaves room: the global
+ * count is checked before any ticket is read and counts class sockets too, so staff
+ * headroom is `maxConnections − Σ caps`. Said at start, where an operator reads it.
+ */
+export function warnOnUnsafeCaps(
+  config: Pick<GatewayConfig, "topicCaps" | "maxConnections">,
+  logger: Pick<RealtimeLogger, "warn">,
+): void {
+  const total = (config.topicCaps ?? []).reduce((sum, cap) => sum + cap.maxConnections, 0);
+  if (total > 0 && total >= config.maxConnections) {
+    logger.warn(
+      `REALTIME_GATEWAY_TOPIC_CAPS adds up to ${total}, at least the global ${config.maxConnections}: ` +
+        "a flood of a capped class can still take every slot. Size the caps well below the global count.",
+    );
   }
 }

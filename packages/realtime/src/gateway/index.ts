@@ -5,7 +5,7 @@ import { TicketReplayGuard, verifyRealtimeTicket } from "../core/ticket";
 import type { RealtimeDriver, RealtimeLogger } from "../core/types";
 import { createInlineRealtimeDriver } from "../drivers/inline";
 
-import { CapLedger, capFor } from "./caps";
+import { CapLedger, capFor, warnOnUnsafeCaps } from "./caps";
 import { readGatewayConfig, type GatewayConfig, type GatewayConfigInput } from "./config";
 import { attachConnection, type GatewaySocket } from "./connection";
 import { MAX_INBOUND_BYTES } from "./inbound";
@@ -177,6 +177,12 @@ interface UpgradeDeps {
   caps: CapLedger<GatewaySocket>;
 }
 
+/** Answer an upgrade at the HTTP layer and drop it — it never becomes a socket. */
+function refuse(socket: { destroy(): void; write(chunk: string): void }, status: string): void {
+  socket.write(`HTTP/1.1 ${status}\r\n\r\n`);
+  socket.destroy();
+}
+
 /**
  * Verify the ticket and complete the handshake, or refuse at the HTTP layer.
  *
@@ -196,11 +202,7 @@ function handleUpgrade(
     return;
   }
 
-  if (sockets.size >= config.maxConnections) {
-    socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
-    socket.destroy();
-    return;
-  }
+  if (sockets.size >= config.maxConnections) return refuse(socket, "503 Service Unavailable");
 
   // The ticket travels in the query string because the browser's WebSocket constructor
   // cannot set headers — the one real constraint the client API imposes. It is safe here
@@ -211,26 +213,22 @@ function handleUpgrade(
   // its owner connects — which, the mint being one round trip away from the handshake, is
   // immediately. A replay is refused with the SAME 401 as a bad signature: a prober
   // learns nothing from being told which half failed.
-  if (!ticket || !replayGuard.consume(ticket)) {
-    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-    socket.destroy();
-    return;
-  }
+  if (!ticket) return refuse(socket, "401 Unauthorized");
 
-  // The class bound (see `./caps.ts`), checked only now that the ticket is real: an
-  // unverified upgrade must never count against the budget it is there to protect.
-  // The same 503 as the global bound — the client backs off and retries either way.
+  // The class bound (see `./caps.ts`), checked only once the signature is real (an
+  // unverified upgrade must never count against the budget it is there to protect) and
+  // BEFORE the ticket is burned, so a refusal for capacity leaves it usable exactly
+  // like the global 503 above does. The same 503 — the client backs off either way.
   const cap = capFor(config.topicCaps, ticket.topics);
-  if (cap !== null && !caps.hasRoom(cap)) {
-    socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n");
-    socket.destroy();
-    return;
-  }
+  if (!caps.hasRoom(cap)) return refuse(socket, "503 Service Unavailable");
+
+  if (!replayGuard.consume(ticket)) return refuse(socket, "401 Unauthorized");
 
   wss.handleUpgrade(request, socket, head, (ws) => {
-    // Admitted again here because the handshake is asynchronous: two upgrades can
-    // pass `hasRoom` for the last slot. The loser is closed with 1013 (try again later).
-    if (cap !== null && !caps.admit(cap, ws)) {
+    // Admitted here, defensively: `ws` calls back synchronously today, but should the
+    // handshake ever become asynchronous two upgrades could pass `hasRoom` for the last
+    // slot. The loser is closed with 1013 (try again later) and holds nothing.
+    if (!caps.admit(cap, ws)) {
       ws.close(1013, "class at capacity");
       return;
     }
@@ -267,6 +265,7 @@ export async function startRealtimeGateway(
   // outage path.
   const replayGuard = new TicketReplayGuard();
   const caps = new CapLedger<GatewaySocket>();
+  warnOnUnsafeCaps(config, logger);
 
   configureRealtime({
     driver: options.driver ?? (await createDriver(config, logger)),
@@ -287,7 +286,10 @@ export async function startRealtimeGateway(
   // before a frame is buffered, so an oversized push is refused without this process ever
   // allocating it. The check inside the handler is the second line, for anything that
   // arrives under the cap and is still nonsense.
-  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_INBOUND_BYTES });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_INBOUND_BYTES,
+  });
 
   server.on("upgrade", (request, socket, head) => {
     handleUpgrade({ config, sockets, replayGuard, wss, logger, caps }, request, socket, head);
