@@ -3,7 +3,8 @@ import { SkillCursorError, type SkillCatalog } from "./skills";
 
 /** All skill reads share the host's catalog authorization boundary. */
 export function isSkillReadMethod(method: unknown): boolean {
-  return method === "skills/list" || method === "skills/get" || method === "resources/read";
+  return method === "skills/list" || method === "skills/get" || method === "resources/read"
+    || method === "resources/list" || method === "resources/templates/list";
 }
 
 class SkillParamsError extends Error {
@@ -14,7 +15,7 @@ function paramsFor(request: JsonRpcRequest): Record<string, unknown> {
   const params: unknown = request.params === undefined ? {} : request.params;
   if (!params || typeof params !== "object" || Array.isArray(params)) throw new SkillParamsError("Invalid params");
   const values = params as Record<string, unknown>;
-  const key = request.method === "skills/list" ? "cursor" : "uri";
+  const key = request.method.endsWith("/list") ? "cursor" : "uri";
   if (Object.keys(values).some((field) => field !== key && field !== "_meta")) throw new SkillParamsError("Invalid params");
   if (values._meta !== undefined) validateMetadata(values._meta);
   return values;
@@ -34,6 +35,10 @@ function list(catalog: SkillCatalog, values: Record<string, unknown>) {
 function read(request: JsonRpcRequest, catalog: SkillCatalog) {
   const values = paramsFor(request);
   if (request.method === "skills/list") return list(catalog, values);
+  if (request.method === "resources/list" || request.method === "resources/templates/list") {
+    if (values.cursor !== undefined) throw new SkillParamsError("Invalid resources cursor");
+    return request.method === "resources/list" ? { resources: [] } : { resourceTemplates: [] };
+  }
   if (typeof values.uri !== "string") throw new SkillParamsError("Missing resource URI");
   if (request.method === "skills/get") {
     const skill = catalog.get(values.uri);

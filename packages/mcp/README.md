@@ -195,6 +195,9 @@ Skill content does not grant permission to execute tools or publish changes.
 Cursors are bound to the catalog digest; malformed or stale cursors return
 `-32602`. `skills/get` takes the catalog's `SKILL.md` URI and returns `{skill}`.
 `resources/read` returns `{contents: [content]}` with exactly the requested URI.
+Standard `resources/list` and `resources/templates/list` return empty lists:
+skill resources are discovered through the skill manifest. Both require the same
+catalog authentication and reject cursors because they have no subsequent page.
 Unknown skill URIs return `-32602`; unknown resources return `-32002`. Invalid
 parameters return `-32602`, unauthenticated reads use the existing authentication
 error code, and unconfigured hosts retain `-32601` for these methods. Include

@@ -92,8 +92,8 @@ describe("static skills catalog", () => {
 });
 
 describe("skills JSON-RPC", () => {
-  it.each(["skills/list", "skills/get", "resources/read"])("accepts MCP request metadata for %s", async (method) => {
-    const params = method === "skills/list" ? {} : { uri: "skill://sample/example-skill/SKILL.md" };
+  it.each(["skills/list", "skills/get", "resources/read", "resources/list", "resources/templates/list"])("accepts MCP request metadata for %s", async (method) => {
+    const params = method.endsWith("/list") ? {} : { uri: "skill://sample/example-skill/SKILL.md" };
     expect(await rpc(method, { ...params, _meta: { progressToken: "probe", "example/context": true } })).not.toHaveProperty("error");
     expect(await rpc(method, { ...params, _meta: [] })).toMatchObject({ error: { code: -32602 } });
   });
@@ -125,7 +125,16 @@ describe("skills JSON-RPC", () => {
     expect(await rpc("resources/read", {})).toMatchObject({ error: { code: -32602 } });
   });
 
-  it.each(["skills/list", "skills/get", "resources/read"])("preserves optional support and requires auth for %s", async (method) => {
+  it("supports standard discovery while skill resources stay in the skill manifest", async () => {
+    expect(await rpc("resources/list")).toMatchObject({ result: { resources: [] } });
+    expect(await rpc("resources/templates/list")).toMatchObject({ result: { resourceTemplates: [] } });
+    for (const method of ["resources/list", "resources/templates/list"]) {
+      expect(await rpc(method, { cursor: "invalid" })).toMatchObject({ error: { code: -32602 } });
+      expect(await rpc(method, { uri: "file:///etc/passwd" })).toMatchObject({ error: { code: -32602 } });
+    }
+  });
+
+  it.each(["skills/list", "skills/get", "resources/read", "resources/list", "resources/templates/list"])("preserves optional support and requires auth for %s", async (method) => {
     const options = { serverInfo: { name: "test", version: "1" } };
     expect(await rpc(method, {}, options)).toMatchObject({ error: { code: -32601 } });
     const configured = { ...options, skills: createSkillCatalog("sample", [source()]) };
