@@ -9,6 +9,8 @@
  */
 
 export * from "./types";
+export { createSkillCatalog, type SkillCatalog, type SkillEntry, type SkillSource } from "./server/skills";
+export { isSkillReadMethod } from "./server/skills-rpc";
 // Shared AI-connect guide content (pure data, no React) — the single source of
 // truth for BOTH the `@12-apps/mcp/react` onboarding UI and the server-side connect
 // tools, so what an agent reads via MCP cannot drift from what owners see.

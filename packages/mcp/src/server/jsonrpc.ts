@@ -6,6 +6,8 @@ import {
   type McpAuthFailureReason,
 } from "./auth-failure";
 import type { ToolRegistry } from "./registry";
+import type { SkillCatalog } from "./skills";
+import { handleSkillRead, isSkillReadMethod } from "./skills-rpc";
 
 /**
  * The MCP JSON-RPC 2.0 request half of the Streamable HTTP transport.
@@ -82,6 +84,8 @@ export interface McpServerInfo {
 }
 
 export interface McpJsonRpcOptions {
+  /** Optional deployment-owned static skills; reads require authenticated callers. */
+  skills?: SkillCatalog;
   /** The host's identity, returned verbatim in `initialize`. */
   serverInfo: McpServerInfo;
   /**
@@ -154,7 +158,10 @@ function handleInitialize(
     // Deliberately does NOT claim `listChanged`: this transport has no
     // server→client stream, so the notification could never be sent, and
     // advertising it would stop a host from ever re-reading `tools/list`.
-    capabilities: { tools: {} },
+    capabilities: {
+      tools: {},
+      ...(options.skills ? { resources: {}, extensions: { "io.modelcontextprotocol/skills": {} } } : {}),
+    },
     serverInfo: options.serverInfo,
     ...(options.instructions ? { instructions: options.instructions } : {}),
   });
@@ -174,6 +181,22 @@ function handleInitialize(
  * refusal an agent can only report into one it can act on — see
  * `./auth-failure.ts`.
  */
+function authenticatedSkillRead(request: JsonRpcRequest, catalog: SkillCatalog, auth: RequestAuth | null) {
+  if (request.id === undefined) return null;
+  if (!auth) return fail(request.id, UNAUTHORIZED_CODE, "Authentication required");
+  return handleSkillRead(request, catalog);
+}
+
+function unknownMethod(request: JsonRpcRequest) {
+  // JSON-RPC notifications expect no reply, including unknown notifications.
+  if (request.method.startsWith("notifications/")) return null;
+  return fail(request.id, METHOD_NOT_FOUND_CODE, `Method not found: ${request.method}`);
+}
+
+function skillCatalogFor(request: JsonRpcRequest, options: McpJsonRpcOptions) {
+  return isSkillReadMethod(request.method) ? options.skills : undefined;
+}
+
 export async function handleMcpJsonRpc(
   request: JsonRpcRequest,
   registry: ToolRegistry,
@@ -188,6 +211,10 @@ export async function handleMcpJsonRpc(
   if (!isWellFormed(request)) {
     return fail(request?.id ?? null, INVALID_REQUEST_CODE, "Invalid Request");
   }
+  const skills = skillCatalogFor(request, options);
+  if (skills) {
+    return authenticatedSkillRead(request, skills, auth);
+  }
   switch (request.method) {
     case "initialize":
       return handleInitialize(request, options);
@@ -200,7 +227,6 @@ export async function handleMcpJsonRpc(
     default:
       // JSON-RPC notifications (`notifications/*`) expect no reply — silently
       // ignore any we don't explicitly handle, rather than returning an error.
-      if (request.method.startsWith("notifications/")) return null;
-      return fail(request.id, METHOD_NOT_FOUND_CODE, `Method not found: ${request.method}`);
+      return unknownMethod(request);
   }
 }

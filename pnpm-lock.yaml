@@ -896,6 +896,9 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.0
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
     devDependencies:
       '@12-apps/eslint-config':
         specifier: workspace:*
