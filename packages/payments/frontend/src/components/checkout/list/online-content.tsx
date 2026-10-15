@@ -45,6 +45,11 @@ function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): 
   );
 }
 
+/** Whether a chosen online row has anything to open — a row with nothing opens no box (L5). */
+export function opensContent(method: string, asked: readonly CheckoutCustomerField[], failure: ListChargeFailure | null): boolean {
+  return method === "CARD" || asked.length > 0 || failure !== null;
+}
+
 /** Move the focus to the card number — the next thing to type once the CPF is complete. */
 function focusCardNumber(scope: HTMLElement | null): void {
   scope?.querySelector<HTMLInputElement>('input[data-testid="card-number"]')?.focus();

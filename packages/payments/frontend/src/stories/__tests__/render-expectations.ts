@@ -690,4 +690,30 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["Pagar agora, pelo app"],
     absentTestIds: ["list-door-cash"],
   },
+  // ------------------------------------------- PaymentListStates (FUT-3591/3592)
+  // The starting points of the harder runs; the visual gate plays the clicks.
+  "PaymentListStates/GooglePay": {
+    testIds: ["payment-list", "list-option-GOOGLE_PAY"],
+    text: ["Google Pay"],
+  },
+  "PaymentListStates/StalePix": {
+    testIds: ["payment-list", "host-bump-cart", "host-hold"],
+  },
+  "PaymentListStates/HostHold": {
+    testIds: ["payment-list", "host-bump-cart", "host-hold"],
+  },
+  "PaymentListStates/RaiseRefused": {
+    testIds: ["payment-list", "list-pay"],
+  },
+  "PaymentListStates/ChargeUnresolved": {
+    testIds: ["payment-list", "list-card-vault_1"],
+  },
+  "PaymentListStates/DoorOnly": {
+    testIds: ["payment-list", "list-door-cash", "list-door-reader"],
+    absentTestIds: ["list-option-PIX", "list-option-CARD"],
+  },
+  "PaymentListStates/LongPayerName": {
+    testIds: ["payment-list", "list-payer", "list-payer-change"],
+    text: ["Maria Aparecida dos Santos"],
+  },
 };

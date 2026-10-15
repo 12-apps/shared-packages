@@ -86,7 +86,7 @@ export function BuyerInline({
           <Box key={field.key} component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
             <Text variant="body" size="sm" as="span">
               {nameOf(field, copy)}{" "}
-              <Text variant="caption" size="sm" color="secondary" as="span">
+              <Text variant="body" size="sm" color="secondary" as="span">
                 {copy.why(provider)}
               </Text>
             </Text>

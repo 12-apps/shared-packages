@@ -41,6 +41,7 @@ function selectAll(target: HTMLElement): void {
 
 function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; onCopy: () => void }): JSX.Element {
   const stale = usePaymentStale();
+  const { Text } = useCheckoutComponents();
   const press = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
     if (stale) return;
     selectAll(event.currentTarget);
@@ -60,9 +61,11 @@ function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; o
             press(event);
           }
         }}
-        sx={{ cursor: "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, typography: "caption", fontFamily: "monospace", wordBreak: "break-all" }}
+        sx={{ cursor: "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, wordBreak: "break-all" }}
       >
-        {pix.copyPaste}
+        <Text variant="code" size="xs" as="span">
+          {pix.copyPaste}
+        </Text>
       </Box>
     </StaleVeil>
   );
@@ -71,7 +74,7 @@ function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; o
 function TextLink({ onClick, testId, children }: { onClick: () => void; testId: string; children: ReactNode }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
-    <Box sx={{ alignSelf: "flex-start", ml: -1, "& button": { textDecoration: "underline", textUnderlineOffset: "0.2em" } }}>
+    <Box sx={{ alignSelf: "flex-start", ml: -1, "& button": { textDecoration: "underline", textUnderlineOffset: (t) => t.spacing(0.375), minHeight: (t) => t.spacing(5) } }}>
       <Button variant="text" color="primary" size="md" onClick={onClick} dataTestId={testId}>
         {children}
       </Button>

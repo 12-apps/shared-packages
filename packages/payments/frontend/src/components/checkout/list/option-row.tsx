@@ -55,11 +55,14 @@ export function OptionRow({
         borderRadius: 2.5,
         px: 1.5,
         opacity: disabled ? 0.6 : 1,
+        // The keyboard's place in the group, drawn on the whole row (5.1 item 6).
+        "&:has(input:focus-visible)": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
       }}
     >
       <Box
         component="label"
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(5.5), py: 0.75, cursor: disabled ? "default" : "pointer" }}
+        // 48 + the border = the prototype's 50px row, with or without a hint (L3).
+        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(6), py: 0, cursor: disabled ? "default" : "pointer" }}
       >
         <Radio
           name={name}
@@ -76,14 +79,17 @@ export function OptionRow({
             {label}
           </Text>
           {hint ? (
-            <Text variant="caption" size="sm" color="secondary" as="span">
+            <Text variant="body" size="sm" color="secondary" as="span">
               {hint}
             </Text>
           ) : null}
         </Box>
       </Box>
+      {/* Only a row with something to open draws the box for it — no empty band. */}
       {chosen && children ? (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5 }}>{children}</Box>
+        <Box data-testid={`${testId}-content`} sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5 }}>
+          {children}
+        </Box>
       ) : null}
     </Box>
   );

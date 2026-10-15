@@ -7,7 +7,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
-import { OnlineContent } from "./online-content";
+import { OnlineContent, opensContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
 import type { CheckoutDoorOption, CheckoutOnlineChoice, PaymentListCopy } from "./types";
 import type { ListState } from "./use-list-state";
@@ -62,7 +62,8 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
       onChoose={() => state.choose({ kind: "online", method: row.method })}
       testId={`list-option-${row.method}`}
     >
-      <OnlineContent
+      {opensContent(row.method, state.asked, props.failure) ? (
+        <OnlineContent
         method={row.method}
         asked={state.asked}
         buyer={props.buyer}
@@ -71,7 +72,8 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
         copy={copy}
         provider={provider}
         failure={props.failure}
-      />
+        />
+      ) : null}
     </OptionRow>
   );
 }
@@ -133,7 +135,7 @@ export function ChoiceList({
       data-locked={locked ? "true" : "false"}
       aria-disabled={locked || undefined}
       inert={locked || undefined}
-      sx={{ display: "flex", flexDirection: "column", gap: 1.5, opacity: locked ? 0.6 : 1 }}
+      sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
     >
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }}>
         {copy.title}

@@ -829,6 +829,10 @@ Rebuild the array whenever any field changes: the list draws what it is
 handed on every render. `usePaymentList` on `createPaymentFlows` is the same
 thing for the mounted flow, read as a hook.
 
+**Known limitation.** The rows' radios are MUI's own `Radio`, not a checkout
+slot, so a host on another component kit gets MUI's radio dressed by its
+theme; the keyboard ring is drawn on the whole row (`:has(input:focus-visible)`).
+
 ## 4. Migrating the existing PagBank integration
 
 1. Wrap `apps/web/lib/payments/pagbank.ts` as `pagbankProvider():

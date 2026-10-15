@@ -50,7 +50,7 @@ export function ListBar({ summary, extras, payer, reason, live, children }: {
         {children}
         <Box role="status" aria-live="polite" data-testid="list-bar-live">
           {reason ? (
-            <Text variant="caption" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+            <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
               {reason}
             </Text>
           ) : (
@@ -82,9 +82,11 @@ export function ActionButton({ label, total, disabled, loading, onClick, focusOn
   return (
     <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600 } }}>
       <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
-        <Box component="span" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1, width: "100%" }}>
-          <span>{label}</span>
-          {total ? <span>{total}</span> : null}
+        {/* The amount never breaks ("R$ / 27,00"); the label may wrap, at the left. An action with
+            no amount ("Copiar código Pix") is centred (C20). */}
+        <Box component="span" sx={{ display: "flex", justifyContent: total ? "space-between" : "center", alignItems: "center", gap: 1, width: "100%" }}>
+          <Box component="span" sx={{ minWidth: 0, textAlign: total ? "left" : "center" }}>{label}</Box>
+          {total ? <Box component="span" sx={{ flex: "none", whiteSpace: "nowrap" }}>{total}</Box> : null}
         </Box>
       </Button>
     </Box>
@@ -116,7 +118,10 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
       <Box
         data-testid="list-charge-bar"
         data-full={full ? "true" : "false"}
-        sx={{ position: "relative", minHeight: (t) => t.spacing(ACTION_HEIGHT), borderRadius: 2, bgcolor: "primary.main", overflow: "hidden", display: "flex", alignItems: "center", px: 2.25 }}
+        // White on the primary's DARK shade, and on a darker fill still, in
+        // either theme: `primary.contrastText` turns dark in a dark theme and
+        // falls under 4.5:1 on the fill (E13 says white).
+        sx={{ position: "relative", minHeight: (t) => t.spacing(ACTION_HEIGHT), borderRadius: 2, bgcolor: "primary.dark", overflow: "hidden", display: "flex", alignItems: "center", px: 2.25 }}
       >
         <Box
           aria-hidden
@@ -124,12 +129,13 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
             position: "absolute",
             insetBlock: 0,
             left: 0,
-            bgcolor: "primary.dark",
+            bgcolor: "common.black",
+            opacity: 0.3,
             width: full ? "100%" : 0,
             animation: full ? "none" : `${fill} ${CHARGE_WINDOW_MS}ms linear forwards`,
           }}
         />
-        <Box component="span" sx={{ position: "relative", color: "primary.contrastText", fontWeight: 600, typography: "body1" }}>
+        <Box component="span" sx={{ position: "relative", color: "common.white", typography: "body1", fontWeight: 600 }}>
           {text}
         </Box>
       </Box>

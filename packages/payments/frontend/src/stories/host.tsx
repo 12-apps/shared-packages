@@ -118,7 +118,13 @@ export interface StoryHost {
   configRead?: "ok" | "pending" | "failing";
   /** The one-list Pagamento (FUT-3591), as the host's hook — door options and all. */
   usePaymentList?: PaymentFlowsConfig["usePaymentList"];
+  /** The cart as a HOOK, over `cart` — for a story whose basket moves under a raised payment. */
+  useCart?: () => Partial<CheckoutCartView>;
+  /** The host refuses to raise the payable at all — the screen's own error panel. */
+  refuseRaise?: { code: string; message: string };
 }
+
+const noCart = (): Partial<CheckoutCartView> => ({});
 
 /**
  * Wrap the mount's fetch so `/config` can stall or refuse. Exported for the
@@ -161,13 +167,15 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
 } {
   const world = createStoryStore(spec);
   const amountCents = spec.amountCents ?? 7500;
+  const useHostCart = host.useCart ?? noCart;
+  const refused = host.refuseRaise;
   const flows = createPaymentFlows({
     // The DEFAULT base url is left in place on purpose: `/api/checkout`,
     // verbatim, is what the shipped client posts and what the mount's shim
     // below answers. A story that re-prefixed it would stop testing that.
     transport: { fetchImpl: withConfigRead(world.fetchImpl, host.configRead) },
     useScope: () => ({ tenantSlug: host.tenantSlug ?? "loja-1" }),
-    useCart: () => cartOf(amountCents, host.cart),
+    useCart: () => cartOf(amountCents, { ...host.cart, ...useHostCart() }),
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useSettlement: () => host.settlement ?? null,
     usePaymentList: host.usePaymentList,
@@ -178,7 +186,8 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
         ? { extra: host.confirmationExtra, hero: host.confirmationHero }
         : undefined,
     ports: {
-      createPayable: (input) => raisePayable(world, input),
+      createPayable: (input) =>
+        refused ? Promise.resolve<CreateOrderResult>({ ok: false, error: { ...refused, field: null } }) : raisePayable(world, input),
       saveBuyerContact: () => undefined,
       exitToCatalog: () => undefined,
       // Recorded rather than followed: a story that really navigated would

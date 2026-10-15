@@ -124,12 +124,19 @@ function PayerLine({ props }: { props: ListFaceProps }): JSX.Element | null {
   const name = c.buyer.name?.trim();
   if (!taxIdOnFile || !name || state.choice?.kind !== "online") return null;
   return (
-    <Box data-testid="list-payer" sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", columnGap: 0.5 }}>
-      <Text variant="caption" size="sm" color="secondary" as="span">
+    // Left-aligned, "Alterar" ~4px after "CPF ✓" and wrapping under it when
+    // the name is long; the link keeps a 40px target and a visible focus ring.
+    <Box data-testid="list-payer" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", columnGap: 0 }}>
+      <Text variant="body" size="sm" color="secondary" as="span">
         {list.copy.payer(name)}
       </Text>
       {c.editBuyer ? (
-        <Box sx={{ "& button": { textDecoration: "underline", minHeight: 0, p: 0 } }}>
+        <Box
+          sx={{
+            "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5), minWidth: 0, px: 0.5, py: 0 },
+            "& button:focus-visible": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
+          }}
+        >
           <Button variant="text" color="primary" size="sm" onClick={c.editBuyer} dataTestId="list-payer-change">
             {list.copy.payerChange}
           </Button>
