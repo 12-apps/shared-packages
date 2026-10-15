@@ -5,6 +5,7 @@ import {
   resumeSurface,
   useCheckoutNav,
   useCreateFailure,
+  useDropOrder,
   useGoToPayment,
   useResumedCheckout,
   useRetryAction,
@@ -135,6 +136,7 @@ export function useCheckoutController(
       return next;
     });
   }, [clearError, tenantSlug]);
+  const dropOrder = useDropOrder(setOrder, tenantSlug, clearError);
   const goToPayment = useGoToPayment({
     buyer, buyerFields, taxIdOnFile, saveProfile, saveBuyerContact, validation, failure, setStep,
   });
@@ -170,6 +172,6 @@ export function useCheckoutController(
     ...resumeSurface(resume, confirming),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu, back, editBuyer,
-    goToPayment, startPayment, refresh, payWithEmail, handleResolved, retry, completed,
+    goToPayment, startPayment, refresh, payWithEmail, handleResolved, retry, completed, dropOrder,
   };
 }

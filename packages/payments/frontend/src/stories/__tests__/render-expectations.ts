@@ -668,4 +668,52 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["tender-split-option-CASH", "tender-split-confirm"],
     text: ["Left $82.00", "Pick a method"],
   },
+  // ------------------------------------------------- PaymentList (FUT-3591)
+  // The one list at rest: the saved card comes chosen and Pagar is live; a new
+  // buyer has nothing chosen; a hand-off store offers its one row; no door
+  // options means no door heading.
+  "PaymentList/SavedCard": {
+    testIds: ["payment-list", "list-card-vault_1", "list-door-cash", "list-pay"],
+    text: ["Pagar agora, pelo app", "Pagar na entrega", "Visa final 4242 ou outro cartão"],
+  },
+  "PaymentList/NewBuyer": {
+    testIds: ["payment-list", "list-option-PIX", "list-option-CARD"],
+    text: ["Escolha como pagar."],
+  },
+  "PaymentList/HandOffStore": {
+    testIds: ["payment-list", "list-option-HAND_OFF"],
+    text: ["Pix ou cartão"],
+    absentTestIds: ["list-option-PIX"],
+  },
+  "PaymentList/OnlineOnly": {
+    testIds: ["payment-list", "list-card-vault_1"],
+    text: ["Pagar agora, pelo app"],
+    absentTestIds: ["list-door-cash"],
+  },
+  // ------------------------------------------- PaymentListStates (FUT-3591/3592)
+  // The starting points of the harder runs; the visual gate plays the clicks.
+  "PaymentListStates/GooglePay": {
+    testIds: ["payment-list", "list-option-GOOGLE_PAY"],
+    text: ["Google Pay"],
+  },
+  "PaymentListStates/StalePix": {
+    testIds: ["payment-list", "host-bump-cart", "host-hold"],
+  },
+  "PaymentListStates/HostHold": {
+    testIds: ["payment-list", "host-bump-cart", "host-hold"],
+  },
+  "PaymentListStates/RaiseRefused": {
+    testIds: ["payment-list", "list-pay"],
+  },
+  "PaymentListStates/ChargeUnresolved": {
+    testIds: ["payment-list", "list-card-vault_1"],
+  },
+  "PaymentListStates/DoorOnly": {
+    testIds: ["payment-list", "list-door-cash", "list-door-reader"],
+    absentTestIds: ["list-option-PIX", "list-option-CARD"],
+  },
+  "PaymentListStates/LongPayerName": {
+    testIds: ["payment-list", "list-payer", "list-payer-change"],
+    text: ["Maria Aparecida dos Santos"],
+  },
 };

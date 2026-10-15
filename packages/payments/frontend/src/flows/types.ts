@@ -19,6 +19,7 @@
  * `chain[].provider`, looked up in the tokenizer registry and used verbatim as
  * a `tokensByProvider` key. A host never types one.
  */
+import type { CheckoutPaymentList } from "../components/checkout/list/types";
 import type { ComponentType, ReactNode } from "react";
 
 import type { SavedCard } from "../card";
@@ -115,6 +116,12 @@ export interface PaymentFlowsConfig extends CheckoutPipelineConfig {
   useBuyerDefaults?(): { buyer?: BuyerInfo; taxIdOnFile?: boolean; pending?: boolean };
   /** Present ⇒ this checkout settles a settlement rather than the cart. */
   useSettlement?(): SettlementCheckout | null;
+  /**
+   * The Pagamento step as ONE list (FUT-3591) — `CheckoutFlowProps.paymentList`,
+   * read through a HOOK because the host's door options follow its own state.
+   * Absent, or answering `undefined`, keeps the method tabs.
+   */
+  usePaymentList?(): CheckoutPaymentList | undefined;
 
   /** Design-system slots, filled ONCE instead of per screen. */
   components?: Partial<CheckoutComponents>;

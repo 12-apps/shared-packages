@@ -45,7 +45,11 @@ function CardHeading(): JSX.Element | null {
  * ending; now the clock is, and a wait that failed its way to the clock carries
  * both. "We keep trying" over a wait nothing is scheduled for is the lie.
  */
-function SubmittedState({ card }: { card: CardCheckout }): JSX.Element {
+export function SubmittedState({
+  card,
+}: {
+  card: Pick<CardCheckout, "pollTimedOut" | "pollError" | "pollCheckAgain">;
+}): JSX.Element {
   const { LoadingState } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.settling;
   if (card.pollTimedOut) {
@@ -88,7 +92,7 @@ function SubmittedState({ card }: { card: CardCheckout }): JSX.Element {
  * "Não foi possível pagar" above a body that says "não pague de novo" — pushes
  * the buyer toward exactly the second payment it forbids.
  */
-function ChargeFailure({
+export function ChargeFailure({
   message,
   unresolved,
 }: {

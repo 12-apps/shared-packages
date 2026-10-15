@@ -278,3 +278,21 @@ export function useRetryAction(input: {
     clearError, decline, order, setDecline, setFinalStatus, setFreshInstrument, setOrder, setStep,
   ]);
 }
+
+/**
+ * Leave the raised order without choosing another method (FUT-3592): the one
+ * list's "Trocar a forma de pagamento" goes back to the list from a Pix, and
+ * the order — and its parked entry, scoped to this store — go with it, as a
+ * method switch takes them.
+ */
+export function useDropOrder(
+  setOrder: Dispatch<SetStateAction<CheckoutOrder | null>>,
+  tenantSlug: string | undefined,
+  clearError: () => void,
+): () => void {
+  return useCallback(() => {
+    setOrder(null);
+    forgetHostedOrder(tenantSlug);
+    clearError();
+  }, [setOrder, tenantSlug, clearError]);
+}

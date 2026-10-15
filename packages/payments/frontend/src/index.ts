@@ -54,11 +54,10 @@ export { PT_BR_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-pt-BR
 // mounted by a host in one line. See ADOPTING.md §3 for the ports and the
 // design-system slot contract.
 // ---------------------------------------------------------------------------
-export {
-  CheckoutFlow,
-  type CheckoutCartView,
-  type CheckoutFlowProps,
-} from './components/checkout/checkout-flow';
+export { CheckoutFlow, type CheckoutCartView, type CheckoutFlowProps } from './components/checkout/checkout-flow';
+// The Pagamento step as ONE list (FUT-3591/3592) — opt-in via `CheckoutFlowProps.paymentList`.
+export type { CheckoutDoorOption, CheckoutListChoice, CheckoutListHold, CheckoutOnlineChoice, CheckoutPaymentList, PaymentListCopy } from './components/checkout/list/types';
+export { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
 export type { BackActionEmphasis } from './components/checkout/payment-status-parts';
 export type { CheckoutDeliverySummary, CheckoutSummaryLine } from './components/checkout/payment-summary';
 

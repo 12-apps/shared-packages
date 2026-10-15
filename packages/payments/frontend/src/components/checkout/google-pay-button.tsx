@@ -109,9 +109,9 @@ function isReadyToPayRequest(): Record<string, unknown> {
 }
 
 /** Step 4's request: the same card method, now carrying gateway + price. */
-function paymentDataRequest(
+export function paymentDataRequest(
   params: GooglePayGatewayParams,
-  order: CheckoutOrder,
+  order: Pick<CheckoutOrder, "totalCents">,
 ): Record<string, unknown> {
   return {
     apiVersion: 2,
@@ -144,7 +144,7 @@ function paymentDataRequest(
 }
 
 /** The buyer closed the sheet — a choice, not a failure to report. */
-function sheetDismissed(error: unknown): boolean {
+export function sheetDismissed(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
@@ -157,7 +157,7 @@ function sheetDismissed(error: unknown): boolean {
  * the button exists at all. `api` is injectable for tests and harnesses;
  * `undefined` means "load pay.js".
  */
-function useGooglePayClient(
+export function useGooglePayClient(
   api: GooglePayApi | null | undefined,
   environment: "TEST" | "PRODUCTION",
 ): GooglePaymentsClient | null {

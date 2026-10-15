@@ -767,6 +767,84 @@ Dados → Pagamento → card form with NO `@12-apps/ui` present (it is not even
 resolvable from the package), rendering entirely through the raw-MUI default
 slots.
 
+### The Pagamento step as ONE list (`paymentList`, FUT-3591/3592)
+
+Opt-in, and additive: a host that passes nothing keeps the method tabs, the
+order summary and raise-on-pick, exactly as above. Pass `paymentList` and the
+Pagamento step becomes one radio group — the store's online options under
+"PAGAR AGORA, PELO APP" and the HOST's own pay-at-the-door options under
+"PAGAR NA ENTREGA" — over one bar whose button is the only thing that raises an
+order or a charge:
+
+```tsx
+import { PAYMENT_LIST_COPY } from "@12-apps/payments-frontend/locales";
+
+<CheckoutFlow
+  /* …every prop from the table above… */
+  paymentList={{
+    copy: PAYMENT_LIST_COPY[locale],           // REQUIRED, no default
+    summary: "2 itens · Taxa de entrega R$ 5,00", // the bar's first line, yours
+    onlineExtras: <StoreCreditCheckbox />,     // in the bar while an ONLINE option is chosen
+    door: useDoorOptions(),                    // CheckoutDoorOption[] — see below
+    hold: addressOpen ? { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } : null,
+    totalCents: 2200,                          // integer cents, AFTER credit: what the order will cost
+    onChoiceChange: (choice) => setChoice(choice),
+  }}
+/>
+```
+
+What changes for the buyer:
+
+- **Picking creates nothing.** No order is raised on a pick, and a store's only
+  method is no longer chosen for them. A saved card is the one thing that comes
+  chosen — "Cartão de crédito" with the head of the saved list selected, so list
+  your cards last-used first.
+- **The missing CPF (or mobile) is asked inside the chosen option**, above the
+  card fields, instead of on a Dados step first; a complete CPF moves the focus
+  to the card number. A buyer with one on file is never asked.
+- **No confirmation dialog.** The card's "Pagar" becomes a bar that fills in
+  five seconds (`CHARGE_WINDOW_MS`) with "Cancelar" under it; nothing is sent
+  before it fills. "Gerar Pix" raises the order and the code at once, and the
+  code copies on a tap. Google Pay is a row of its own, offered only where the
+  head declares it and `isReadyToPay` agrees; its button raises the order and
+  opens Google's sheet. A hand-off store's single "Pix ou cartão" row goes
+  straight to the provider's page. Apple Pay is not a row (its sheet must open
+  inside the tap, before an order could exist) — the tabs layout keeps it.
+- No method tabs, no order summary, no `orderNote`, and no step header on
+  Pagamento: the host's own stepper is the chrome around it.
+
+**The list's own fields.**
+
+| field | what it is |
+| --- | --- |
+| `copy` | the list's words — `PAYMENT_LIST_COPY[locale]`; required |
+| `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
+| `door?` | your pay-at-the-door options — the slot below |
+| `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
+| `totalCents?` | integer cents, after credit — the amount the order will cost; Google Pay's sheet is priced with it. **A host without it gets no Google Pay row.** Once given, a moment without it (you are re-pricing) keeps a chosen Google Pay and holds its button until it returns |
+| `onChoiceChange?` | every change of choice, door ids included |
+
+**The door slot.** Paying at the door raises no charge, so it is the host's:
+
+| field | what it is |
+| --- | --- |
+| `id`, `label`, `hint?` | the row; `id` comes back through `onChoiceChange` |
+| `content?` | what opens INSIDE the row while chosen (troco, tender chips, brand lines) |
+| `hideHintWhileChosen?` | drop the hint while the content says the same at length |
+| `action` | the bar button's verb while chosen — "Enviar pedido" |
+| `totalLabel?` | the amount beside it; absent ⇒ the cart's |
+| `blocked` | why it cannot send yet, shown under the button; `null` ⇒ it can |
+| `pending?`, `error?` | your send in flight; a refusal of the last one |
+| `onSend()` | the press — place the order yourself |
+
+Rebuild the array whenever any field changes: the list draws what it is
+handed on every render. `usePaymentList` on `createPaymentFlows` is the same
+thing for the mounted flow, read as a hook.
+
+**Known limitation.** The rows' radios are MUI's own `Radio`, not a checkout
+slot, so a host on another component kit gets MUI's radio dressed by its
+theme; the keyboard ring is drawn on the whole row (`:has(input:focus-visible)`).
+
 ## 4. Migrating the existing PagBank integration
 
 1. Wrap `apps/web/lib/payments/pagbank.ts` as `pagbankProvider():
