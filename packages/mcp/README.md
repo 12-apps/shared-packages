@@ -168,3 +168,42 @@ serialization; a non-atomic read-then-revoke can miss a concurrently rotated
 successor. The package tests pin transaction boundaries and complete-operation
 retries; multi-session PostgreSQL validation must exercise actual conflicting
 rotation, replay, disconnect and delayed-activity operations.
+
+## Static skills import
+
+`createSkillCatalog(namespace, sources, pageSize?)` snapshots deployment-owned
+UTF-8 resources. Each source has a `name` and a `files` map including `SKILL.md`.
+Pass the returned catalog as `McpJsonRpcOptions.skills`. Hosts without that
+option keep their existing capabilities and methods.
+
+The transport advertises `capabilities.extensions["io.modelcontextprotocol/skills"]`
+and `resources`, then serves `skills/list`, `skills/get`, and `resources/read`.
+The catalog parses all YAML frontmatter, hashes the exact served UTF-8 bytes,
+rejects unsafe or ambiguous paths, and bounds files and total size. It accepts
+one to five skills, up to 100 files per skill, 256 KiB for `SKILL.md`, 1 MiB per
+supporting file, 5 MiB per skill and a conservative 7 MiB across the catalog.
+It supports text resources only. It never reads a caller-supplied filesystem
+path or fetches a URL. Returned values cannot mutate the catalog snapshot.
+
+Reads require an authenticated caller. A host with additional catalog scope
+checks must apply the same policy to `isSkillReadMethod(request.method)` as to
+`tools/list`; the library cannot infer the host's tenant or scope policy.
+Only serve reviewed static instructions, never private or tenant-specific data.
+Skill content does not grant permission to execute tools or publish changes.
+
+`skills/list` accepts `{}` initially and a returned `{cursor}` for later pages.
+Cursors are bound to the catalog digest; malformed or stale cursors return
+`-32602`. `skills/get` takes the catalog's `SKILL.md` URI and returns `{skill}`.
+`resources/read` returns `{contents: [content]}` with exactly the requested URI.
+Standard `resources/list` and `resources/templates/list` return empty lists:
+skill resources are discovered through the skill manifest. Both require the same
+catalog authentication and reject cursors because they have no subsequent page.
+Unknown skill URIs return `-32602`; unknown resources return `-32002`. Invalid
+parameters return `-32602`, unauthenticated reads use the existing authentication
+error code, and unconfigured hosts retain `-32601` for these methods. Include
+`catalog.digest` in a host's version if skill updates must change its handshake.
+
+Contract: [OpenAI MCP skills import](https://developers.openai.com/plugins/build/mcp-server#import-skills-from-the-mcp-server).
+These methods support a submission-time snapshot. Unit tests and HTTP probes do
+not prove a ChatGPT import: after deployment, run Scan Tools, verify the imported
+files, then submit the plugin version through the separate publication process.
