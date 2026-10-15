@@ -1,5 +1,5 @@
 import { Box, Chip } from "@mui/material";
-import { useRef, type JSX } from "react";
+import { useRef, type JSX, type KeyboardEvent } from "react";
 
 import { NEW_CARD, NewCardForm, detectBrand, onlyDigits } from "../../../card";
 import { ChargeFailure } from "../card-view";
@@ -12,35 +12,58 @@ import type { ListChargeFailure } from "./charge-runners";
 import type { PaymentListCopy } from "./types";
 import type { ListCard } from "./use-list-state";
 
+/** Where an arrow, Home or End moves from `at` among `count` chips, or `null` for another key. */
+function nextChip(key: string, at: number, count: number): number | null {
+  if (key === "ArrowRight" || key === "ArrowDown") return (at + 1) % count;
+  if (key === "ArrowLeft" || key === "ArrowUp") return (at - 1 + count) % count;
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  return null;
+}
+
 /**
  * The saved cards as chips — "Visa final 4242", "Outro cartão" — the
  * storefront's chip look (the owner's "use the chips system is using today"):
  * MUI's own `Chip`, which the host's theme already dresses, filled in the
  * primary colour when chosen.
+ *
+ * One radio group, one Tab stop: only the checked chip (or the first) is
+ * tabbable, and the arrows, Home and End move AND select, as radios do.
  */
 function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): JSX.Element | null {
+  const group = useRef<HTMLDivElement | null>(null);
   if (card.saved.length === 0) return null;
-  const chip = (id: string, label: string) => {
-    const on = card.selection === id;
-    return (
-      <Chip
-        key={id}
-        label={label}
-        clickable
-        color={on ? "primary" : "default"}
-        variant="filled"
-        role="radio"
-        aria-checked={on}
-        onClick={() => card.setSelection(id)}
-        data-testid={id === NEW_CARD ? "list-card-new" : `list-card-${id}`}
-        sx={{ fontWeight: on ? 600 : 400 }}
-      />
-    );
+  const options = [...card.saved.map((saved) => ({ id: saved.id, label: cardName(copy, saved) })), { id: NEW_CARD, label: copy.otherCard }];
+  const checked = options.findIndex((option) => option.id === card.selection);
+  const stop = checked === -1 ? 0 : checked;
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const to = nextChip(event.key, stop, options.length);
+    const target = to === null ? undefined : options[to];
+    if (to === null || !target) return;
+    event.preventDefault();
+    card.setSelection(target.id);
+    group.current?.querySelectorAll<HTMLElement>('[role="radio"]')[to]?.focus();
   };
   return (
-    <Box role="radiogroup" aria-label={copy.card.label} sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-      {card.saved.map((saved) => chip(saved.id, cardName(copy, saved)))}
-      {chip(NEW_CARD, copy.otherCard)}
+    <Box ref={group} role="radiogroup" aria-label={copy.card.label} onKeyDown={onKeyDown} sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+      {options.map((option, index) => {
+        const on = option.id === card.selection;
+        return (
+          <Chip
+            key={option.id}
+            label={option.label}
+            clickable
+            color={on ? "primary" : "default"}
+            variant="filled"
+            role="radio"
+            aria-checked={on}
+            tabIndex={index === stop ? 0 : -1}
+            onClick={() => card.setSelection(option.id)}
+            data-testid={option.id === NEW_CARD ? "list-card-new" : `list-card-${option.id}`}
+            sx={{ fontWeight: on ? 600 : 400 }}
+          />
+        );
+      })}
     </Box>
   );
 }

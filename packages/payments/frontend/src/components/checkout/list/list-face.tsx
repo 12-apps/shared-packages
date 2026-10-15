@@ -169,6 +169,12 @@ function buttonFacts(props: ListFaceProps): { label: string; total: string; busy
   };
 }
 
+/** Google Pay chosen while the host re-prices: the row stays, its button waits for the price. */
+function googlePayRepricing(props: ListFaceProps): boolean {
+  const { choice } = props.state;
+  return choice?.kind === "online" && choice.method === "GOOGLE_PAY" && !props.cap.googlePay;
+}
+
 /** Google Pay is chosen and nothing holds it: Google's own button takes the action's place. */
 function googlePayLive(props: ListFaceProps, reason: string | null, busy: boolean): boolean {
   const { choice } = props.state;
@@ -193,6 +199,7 @@ function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnF
   // all under "não pague de novo" (FUT-563), as the card pane does today.
   if (failure?.code === UNRESOLVED_CODE) return null;
   const { label, total, busy } = buttonFacts(props);
+  if (googlePayRepricing(props)) return <ActionButton label={label} total={total} disabled loading onClick={act} />;
   if (googlePayLive(props, reason, busy) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
   return <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={act} focusOnMount={returnFocus} />;
 }

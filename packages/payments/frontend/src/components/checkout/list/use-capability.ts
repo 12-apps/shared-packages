@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
 import { cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
@@ -9,7 +9,7 @@ import type { OnlineCapability } from "./choice";
 
 /** What the store's chain lets THIS browser offer in the list, Google Pay's client included. */
 export interface ListCapability extends OnlineCapability {
-  /** Google Pay, ready to open its sheet — or `null` when the row must not exist. */
+  /** Google Pay, ready to open its sheet — `null` when there is no row, or while the host re-prices. */
   googlePay: { client: GooglePaymentsClient; params: GooglePayGatewayParams } | null;
 }
 
@@ -34,15 +34,20 @@ export function useListCapability(
   const declared = googlePayConfig(config) !== null;
   // `null` tells the client hook not to load pay.js at all.
   const client = useGooglePayClient(declared ? undefined : null, "TEST");
+  // Once the host has priced the sheet, a moment without a price (it is
+  // re-pricing — the credit was toggled) keeps the row and holds its button;
+  // only a host that never priced it offers no row.
+  const [priced, setPriced] = useState(false);
+  if (totalCents !== undefined && !priced) setPriced(true);
   return useMemo(() => {
     const params = googlePayConfig(config);
-    const googlePay = params && client && totalCents !== undefined ? { client, params } : null;
+    const usable = params && client ? { client, params } : null;
     return {
       handOff: methodChosenAtProvider(config?.chain?.[0]?.checkoutScreen, config),
       offered: offeredMethods(config),
       cardUnavailable: !cardPathAvailable(config),
-      googlePayReady: googlePay !== null,
-      googlePay,
+      googlePayReady: usable !== null && (totalCents !== undefined || priced),
+      googlePay: totalCents === undefined ? null : usable,
     };
-  }, [config, client, totalCents]);
+  }, [config, client, totalCents, priced]);
 }

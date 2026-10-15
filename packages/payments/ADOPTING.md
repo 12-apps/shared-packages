@@ -787,6 +787,7 @@ import { PAYMENT_LIST_COPY } from "@12-apps/payments-frontend/locales";
     onlineExtras: <StoreCreditCheckbox />,     // in the bar while an ONLINE option is chosen
     door: useDoorOptions(),                    // CheckoutDoorOption[] — see below
     hold: addressOpen ? { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } : null,
+    totalCents: 2200,                          // integer cents, AFTER credit: what the order will cost
     onChoiceChange: (choice) => setChoice(choice),
   }}
 />
@@ -811,6 +812,17 @@ What changes for the buyer:
   inside the tap, before an order could exist) — the tabs layout keeps it.
 - No method tabs, no order summary, no `orderNote`, and no step header on
   Pagamento: the host's own stepper is the chrome around it.
+
+**The list's own fields.**
+
+| field | what it is |
+| --- | --- |
+| `copy` | the list's words — `PAYMENT_LIST_COPY[locale]`; required |
+| `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
+| `door?` | your pay-at-the-door options — the slot below |
+| `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
+| `totalCents?` | integer cents, after credit — the amount the order will cost; Google Pay's sheet is priced with it. **A host without it gets no Google Pay row.** Once given, a moment without it (you are re-pricing) keeps a chosen Google Pay and holds its button until it returns |
+| `onChoiceChange?` | every change of choice, door ids included |
 
 **The door slot.** Paying at the door raises no charge, so it is the host's:
 
