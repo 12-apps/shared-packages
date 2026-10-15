@@ -62,6 +62,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
   payer: (name) => `Pagando como ${name} · CPF ✓`,
   payerChange: "Alterar",
   charging: (total, card) => `Pagando ${total} no ${card ?? "cartão informado"}…`,
+  chargingCovered: "Confirmando o pedido, pago com o seu saldo…",
   cancel: "Cancelar",
   pixFace: {
     title: (total) => `Pague ${total} com Pix`,

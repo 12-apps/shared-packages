@@ -2,11 +2,10 @@
  * The buyer checkout's payment vocabulary (FUT-7 / FUT-44 / FUT-58, moved into
  * the library by FUT-564).
  *
- * Pure types with no runtime imports. Everything here is PAYMENT: what a
- * charge, an order-in-payment, a buyer identity or a provider protocol looks
- * like to the screens in this folder. The host-side halves — the cart, the
- * catalog, order CREATION — stay in the host app and reach the flow through
- * the ports declared on `CheckoutFlowProps`.
+ * Pure types with no runtime imports. Everything here is PAYMENT: what a charge, an
+ * order-in-payment, a buyer identity or a provider protocol looks like to the screens in
+ * this folder. The host-side halves — the cart, the catalog, order CREATION — stay in the
+ * host app and reach the flow through the ports declared on `CheckoutFlowProps`.
  */
 
 import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
@@ -15,10 +14,9 @@ import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
 export type PaymentMethod = "PIX" | "CARD";
 
 /**
- * The digital wallets a chain entry can charge (FUT-471/472). Mirrors the
- * backend's `WalletType` — a wallet is not a fourth method: it is another way
- * of producing the CARD instrument, so it rides the CARD tile and the CARD
- * charge.
+ * The digital wallets a chain entry can charge (FUT-471/472). Mirrors the backend's
+ * `WalletType` — a wallet is not a fourth method: it is another way of producing the
+ * CARD instrument, so it rides the CARD tile and the CARD charge.
  */
 export type CheckoutWalletType = "GOOGLE_PAY" | "APPLE_PAY";
 
@@ -114,6 +112,8 @@ export interface CheckoutOrder {
   appliedDiscounts: CheckoutDiscount[];
   /** Pre-formatted BRL grand total (e.g. `R$ 42,90`). */
   totalLabel: string;
+  /** Cents the provider is asked for when a balance the host holds pays part of {@link totalCents}; absent ⇒ the total. */
+  amountDueCents?: number;
   /** Present only when {@link method} is `"PIX"`. */
   pix?: PixCharge;
   /**

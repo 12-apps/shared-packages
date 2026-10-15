@@ -109,8 +109,9 @@ export function CardRun({
 /**
  * Google Pay: the sheet was opened INSIDE the buyer's tap (`sheet`, priced at
  * `sheetCents`) while the order was raised; its key is charged against that
- * order only if the order costs what the sheet showed. A closed sheet sends
- * nothing more.
+ * order only if the order asks the provider for what the sheet showed — its
+ * amount due, which a balance the host holds may have made less than its
+ * total. A closed sheet sends nothing more.
  */
 export function WalletRun({
   order,
@@ -140,7 +141,7 @@ export function WalletRun({
       .then((key) => {
         if (key === null) return onFailed(null);
         // The sheet showed one amount; never charge another under it.
-        if (order.totalCents !== sheetCents) return onFailed(refused);
+        if ((order.amountDueCents ?? order.totalCents) !== sheetCents) return onFailed(refused);
         return void wallet.payWithKey("GOOGLE_PAY", key);
       })
       .catch(() => onFailed(refused));

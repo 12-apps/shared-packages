@@ -5,7 +5,7 @@ import { useSavedCardList } from "../card-sources";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig } from "../types";
 
-import { askedFields, cardComplete, onlineRows, preselection, raisedMethod, type OnlineCapability, type OnlineRow } from "./choice";
+import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, type OnlineCapability, type OnlineRow } from "./choice";
 import type { CheckoutListChoice } from "./types";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
@@ -72,12 +72,12 @@ function usePreselect(
 }
 
 /**
- * The card chosen again: the head of the saved list — or, for a buyer back from
- * a refused card (FUT-1145), no saved card at all (the head may be the one that
- * failed), or the fields when nothing is saved.
+ * The card chosen again: the one used last (else the head of the saved list) —
+ * or, for a buyer back from a refused card (FUT-1145), no saved card at all
+ * (that one may be the card that failed), or the fields when nothing is saved.
  */
 function reopenedSelection(cards: readonly SavedCard[], fresh: boolean): string | null {
-  const head = cards[0];
+  const head = lastUsedCard(cards);
   if (!head) return NEW_CARD;
   return fresh ? null : head.id;
 }

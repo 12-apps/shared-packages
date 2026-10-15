@@ -46,6 +46,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
   payer: (name) => `Paying as ${name} · CPF ✓`,
   payerChange: "Change",
   charging: (total, card) => `Paying ${total} with ${card ?? "the card entered"}…`,
+  chargingCovered: "Confirming the order, paid with your balance…",
   cancel: "Cancel",
   pixFace: {
     title: (total) => `Pay ${total} with Pix`,

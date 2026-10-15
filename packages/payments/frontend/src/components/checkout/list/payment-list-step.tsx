@@ -132,7 +132,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     taxIdOnFile: props.taxIdOnFile,
     onChoiceChange: list.onChoiceChange,
   });
-  const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label });
+  const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });
   const [handingOff, startHandOff] = useHandingOff(c.createError);
   const pixStage = usePaymentPixStage(cap, usePreferMethod(c, state.choose));
   const pix = c.order?.method === "PIX" ? c.order : null;

@@ -14,6 +14,14 @@ import { useCheckoutClientApi } from "./client-context";
  */
 
 /**
+ * A list answer as a list: a host whose card route answers `null` (or
+ * nothing) has no saved card, and must not take the checkout down with it.
+ */
+function asList(cards: SavedCard[] | null | undefined): SavedCard[] {
+  return Array.isArray(cards) ? cards : [];
+}
+
+/**
  * The buyer's saved cards at this store (FUT-697), loaded once per store, and
  * whether the list has answered — "no saved card" and "not asked yet" are
  * different facts to a screen that preselects one.
@@ -29,7 +37,7 @@ export function useSavedCardList(tenantSlug: string | undefined): { cards: Saved
       .listInstruments(tenantSlug)
       .catch((): SavedCard[] => [])
       .then((cards) => {
-        if (active) setState({ cards, loaded: true });
+        if (active) setState({ cards: asList(cards), loaded: true });
       });
     return () => {
       active = false;
@@ -68,8 +76,9 @@ export function useSavedCards(
     void client
       .listInstruments(tenantSlug)
       .catch((): SavedCard[] => [])
-      .then((cards) => {
+      .then((answer) => {
         if (!active) return;
+        const cards = asList(answer);
         const first = cards[0];
         setState((prev) => ({ savedCards: cards, selection: first && !freshInstrument ? first.id : prev.selection }));
       });

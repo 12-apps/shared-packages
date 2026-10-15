@@ -32,6 +32,8 @@ interface RaisePorts {
   startPayment: (method: PaymentMethod) => Promise<void>;
   /** The amount the buyer is shown now (the cart's, or the balance's). */
   cartTotal: string;
+  /** What an online payment asks the provider for now, when the host prices it (`paymentList.totalCents`). */
+  dueCents?: number;
 }
 
 export interface ListCharge {
@@ -57,9 +59,14 @@ export interface ListCharge {
   chargeable: CheckoutOrder | null;
 }
 
-/** A held CARD order still awaiting payment AND priced as the buyer now sees — reusable for the charge. */
-function reusable(order: CheckoutOrder | null, cartTotal: string): boolean {
-  return order?.method === "CARD" && order.status === "AWAITING_PAYMENT" && order.totalLabel === cartTotal;
+/**
+ * A held CARD order still awaiting payment AND priced as the buyer now sees —
+ * reusable for the charge. A balance ticked or unticked moves what the charge
+ * asks for and not the order's total, so the amount due is compared too.
+ */
+function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined): boolean {
+  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || order.totalLabel !== cartTotal) return false;
+  return dueCents === undefined || (order.amountDueCents ?? order.totalCents) === dueCents;
 }
 
 /** The order `send` meant: the one it reused, or the CARD order raised to replace a stale one. */
@@ -108,8 +115,8 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     // must not let the bar's own timer charge past it.
     if (!allowed.current) return cancel();
     setPhase("sending");
-    const { order, cartTotal } = latest.current;
-    if (reusable(order, cartTotal) && order) {
+    const { order, cartTotal, dueCents } = latest.current;
+    if (reusable(order, cartTotal, dueCents) && order) {
       target.current = { reuse: order };
       return;
     }
