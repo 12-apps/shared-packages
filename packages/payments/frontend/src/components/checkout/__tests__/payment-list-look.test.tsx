@@ -41,7 +41,7 @@ describe("a chosen row", () => {
 });
 
 describe("the fields a chosen row opens", () => {
-  it("stand on the surface, label included, not on the row's tint", async () => {
+  it("stand on the surface, not on the row's tint, and their floating label draws no fill", async () => {
     renderList({ config: onPageStore(), client: stubClient() });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-CARD"));
@@ -53,7 +53,10 @@ describe("the fields a chosen row opens", () => {
     const paper = "rgb(255, 255, 255)";
     expect(getComputedStyle(root).backgroundColor).toBe(paper);
     const label = await waitFor(() => content.querySelector<HTMLElement>(".MuiInputLabel-shrink") ?? Promise.reject(new Error("no floating label")));
-    expect(getComputedStyle(label).backgroundColor).toBe(paper);
+    // The label itself draws no surface: a filled one stands above the outline as a tab.
+    const fill = getComputedStyle(label).backgroundColor;
+    expect(fill === "" || fill === "transparent" || fill === "rgba(0, 0, 0, 0)").toBe(true);
+    expect(getComputedStyle(label).boxShadow || "none").toBe("none");
     // The row itself keeps its tint.
     expect(getComputedStyle(screen.getByTestId("list-option-CARD")).backgroundColor).not.toBe(paper);
   });

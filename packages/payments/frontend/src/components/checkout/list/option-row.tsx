@@ -22,18 +22,12 @@ const chosenTint = (theme: Theme): string => alpha(theme.palette.primary.main, t
 
 /**
  * The fields opened inside a chosen row stand on the surface, not on its tint
- * (the prototype's `.inp`, `background: var(--surface)`), and so does a
- * floating label over the field's top edge: a focused label is drawn in the
- * primary colour, and the primary over its own tint reads weaker than over the
- * surface (#6366F1: 4.47:1 on white, 4.04:1 on the 8% tint). The surface
- * around the label is a shadow, so the label does not move off the notch.
+ * (the prototype's `.inp`, `background: var(--surface)`). The floating label
+ * keeps no fill of its own: a filled label would stand above the outline as a
+ * tab of surface on the tint.
  */
 const FIELDS_ON_SURFACE = {
   "& .MuiOutlinedInput-root": { bgcolor: "background.paper" },
-  "& .MuiInputLabel-shrink": {
-    bgcolor: "background.paper",
-    boxShadow: (t: Theme) => `0 0 0 ${t.spacing(0.5)} ${t.palette.background.paper}`,
-  },
   // A field's complaint stays on the tint, under the field: at night the error
   // role's lighter tone (MUI dark #f44336 is 4.05:1 on the 16% tint).
   "& .MuiFormHelperText-root.Mui-error": {
