@@ -106,10 +106,13 @@ export interface CheckoutPaymentList {
    * the cart's total, or what is left of it after a balance the host holds
    * (store credit). It is what Google Pay's sheet is priced with, since that
    * sheet must open INSIDE the tap, before any order exists to read a price
-   * from. Absent, or zero (a balance covers everything) ⇒ no Google Pay row,
-   * and a Google Pay choice is dropped. The key is refused if the order raised
-   * behind the sheet asks the provider for another amount
-   * (`CheckoutOrder.amountDueCents`, else its total).
+   * from. Never given, or zero (a balance covers everything) ⇒ no Google Pay
+   * row, and a Google Pay choice is dropped. Once given, a moment without it
+   * (the host re-pricing) keeps a chosen Google Pay with its button held —
+   * plainly, with `copy.reasons.repricing` — until it returns. The key is
+   * refused if the order raised behind the sheet asks the provider for another
+   * amount (`CheckoutOrder.amountDueCents`, else its total) — so a host that
+   * takes a balance off the charge MUST answer `amountDueCents`.
    */
   totalCents?: number;
   /**
@@ -117,8 +120,15 @@ export interface CheckoutPaymentList {
    * the cart's total — a balance the host holds pays part of it. The card's
    * button, the 5-second bar and Google Pay's press name THIS while an online
    * option is chosen; a door option and an empty choice keep the cart's total,
-   * since no balance pays at the door. Absent ⇒ the cart's total. With
-   * `totalCents` at zero the bar names no card: `copy.chargingCovered`.
+   * since no balance pays at the door. Absent ⇒ the cart's total. It is also
+   * the amount the Pix face asks for.
+   *
+   * **A balance that covers everything** (`totalCents: 0`): the card option
+   * asks for no card, the bar says `copy.chargingCovered`, and the order the
+   * button raises must come back SETTLED by the host — paid from the balance,
+   * with no provider call — so the list goes to its paid screen. An order that
+   * comes back `AWAITING_PAYMENT` with `amountDueCents: 0` is never charged:
+   * the list returns to its rows.
    */
   amountDueLabel?: string;
 }
@@ -168,6 +178,8 @@ export interface PaymentListCopy {
     details: string;
     chooseCard: string;
     cardDetails: string;
+    /** Google Pay is chosen while the host re-prices (`totalCents` briefly absent). Absent ⇒ no sentence. */
+    repricing?: string;
   };
   /** The button's verb, beside the total. */
   actions: {

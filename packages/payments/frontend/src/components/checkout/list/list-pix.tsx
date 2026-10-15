@@ -180,13 +180,13 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
-        {copy.title(order.totalLabel)}
+        {copy.title(mode.list.amountDueLabel ?? order.totalLabel)}
       </Text>
       {afterCopy ? (
         <PixAfterCopy
           pix={pix}
           words={props.words}
-          totalLabel={order.totalLabel}
+          totalLabel={mode.list.amountDueLabel ?? order.totalLabel}
           deadline={props.time}
           justCopied={props.justCopied}
           onCopyAgain={props.onCopyAgain}

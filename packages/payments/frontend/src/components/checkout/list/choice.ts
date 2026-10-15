@@ -175,6 +175,8 @@ export function blockedReason(input: {
   buyer: BuyerInfo;
   selection: string | null;
   cardIsComplete: boolean;
+  /** The host's balance pays the whole amount: no card needs choosing. */
+  covered?: boolean;
 }): string | null {
   const { copy, choice } = input;
   if (input.hold) return input.hold;
@@ -182,7 +184,7 @@ export function blockedReason(input: {
   if (choice.kind === "door") return input.door ? input.door.blocked : copy.reasons.choose;
   const buyer = buyerReason(input.asked, input.buyer, copy.reasons);
   if (buyer) return buyer;
-  if (choice.method !== "CARD") return null;
+  if (choice.method !== "CARD" || input.covered) return null;
   return cardReason(input.selection, input.cardIsComplete, copy.reasons);
 }
 

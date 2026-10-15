@@ -72,9 +72,13 @@ function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): 
   );
 }
 
-/** Whether a chosen online row has anything to open — a row with nothing opens no box (L5). */
-export function opensContent(method: string, asked: readonly CheckoutCustomerField[], failure: ListChargeFailure | null): boolean {
-  return method === "CARD" || asked.length > 0 || failure !== null;
+/**
+ * Whether a chosen online row has anything to open — a row with nothing opens
+ * no box (L5). The card opens nothing of its own when the host's balance pays
+ * the whole amount: no card is charged, so none is asked for.
+ */
+export function opensContent(method: string, asked: readonly CheckoutCustomerField[], failure: ListChargeFailure | null, covered = false): boolean {
+  return (method === "CARD" && !covered) || asked.length > 0 || failure !== null;
 }
 
 /** Move the focus to the card number — the next thing to type once the CPF is complete. */
@@ -97,6 +101,7 @@ export function OnlineContent({
   copy,
   provider,
   failure,
+  covered = false,
 }: {
   method: "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
   asked: readonly CheckoutCustomerField[];
@@ -106,9 +111,11 @@ export function OnlineContent({
   copy: PaymentListCopy;
   provider: string | null;
   failure: ListChargeFailure | null;
+  /** The host's balance pays the whole amount — no chips, no card fields. */
+  covered?: boolean;
 }): JSX.Element {
   const scope = useRef<HTMLDivElement | null>(null);
-  const isCard = method === "CARD";
+  const isCard = method === "CARD" && !covered;
   return (
     <Box ref={scope} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
       <BuyerInline

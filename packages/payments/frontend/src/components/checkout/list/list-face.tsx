@@ -165,7 +165,7 @@ function cardCharging(charge: ListCharge): boolean {
  */
 function chargingText(props: ListFaceProps): string {
   const { charge, list, state } = props;
-  if (list.totalCents === 0 && list.copy.chargingCovered) return list.copy.chargingCovered;
+  if (coveredByHost(list) && list.copy.chargingCovered) return list.copy.chargingCovered;
   const selected = state.card.saved.find((card) => card.id === state.card.selection);
   return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
 }
@@ -183,8 +183,9 @@ function buttonFacts(props: ListFaceProps): { label: string; total: string; busy
 }
 
 /**
- * Google Pay still chosen for the one render before the list drops a choice
- * the host no longer prices: a plain disabled button, never a spinner.
+ * Google Pay chosen while the host re-prices (or for the one render before the
+ * list drops a choice nobody prices any more): a plain disabled button, never
+ * a spinner, with `copy.reasons.repricing` under it.
  */
 function googlePayUnpriced(props: ListFaceProps): boolean {
   const { choice } = props.state;
@@ -215,7 +216,7 @@ function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnF
   // all under "não pague de novo" (FUT-563), as the card pane does today.
   if (failure?.code === UNRESOLVED_CODE) return null;
   const { label, total, busy } = buttonFacts(props);
-  if (googlePayUnpriced(props)) return <ActionButton label={label} total={total} disabled onClick={act} />;
+  if (googlePayUnpriced(props)) return <ActionButton label={label} total={total} disabled loading={false} onClick={act} />;
   if (googlePayLive(props, reason, busy) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
   return <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={act} focusOnMount={returnFocus} />;
 }
@@ -246,13 +247,19 @@ function RaiseError({ c, onRetry }: { c: Controller; onRetry: () => void }): JSX
   return <PaymentErrorPanel message={c.createError} emailFlagged={c.errorField === "email"} code={c.errorCode} onUseEmail={c.payWithEmail} onRetry={onRetry} />;
 }
 
+/** The host's balance pays the whole amount (`totalCents: 0`): no card is asked for or charged. */
+function coveredByHost(list: CheckoutPaymentList): boolean {
+  return list.totalCents === 0;
+}
+
 /** Why the button is held: the host's hold, then the list's own reasons, in the prototype's order. */
 function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined): string | null {
   const { c, list, state } = props;
-  return blockedReason({
+  const reason = blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door, asked: state.asked,
-    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete,
+    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
   });
+  return reason ?? (googlePayUnpriced(props) ? (list.copy.reasons.repricing ?? null) : null);
 }
 
 /**
@@ -317,7 +324,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   return (
     <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
-        <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} />
+        <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} />
       ) : null}
       <Runners props={props} sheet={sheet.current} onFailed={onFailed} />
       <RaiseError c={c} onRetry={act} />

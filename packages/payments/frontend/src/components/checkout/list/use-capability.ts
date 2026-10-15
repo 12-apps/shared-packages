@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
 import { cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
@@ -21,10 +21,11 @@ export interface ListCapability extends OnlineCapability {
  * always had (FUT-471), so the list never offers a wallet that cannot work.
  *
  * The sheet must open inside the tap, before any order exists, so it is priced
- * with the host's `totalCents` — the amount DUE. Without one, or with zero (a
- * balance the host holds covers everything), there is no row: a host that
- * stops pricing it withdraws it, and the list drops a choice of it rather
- * than holding a button that cannot say why it waits.
+ * with the host's `totalCents` — the amount DUE. A host that never priced it,
+ * or prices it at zero (a balance it holds covers everything), offers no row.
+ * Once priced, a moment without a price (the host re-pricing — the credit was
+ * toggled) keeps the row, and the list holds a chosen Google Pay's button,
+ * plainly, until the price returns.
  *
  * Apple Pay is not a row here: its sheet must open synchronously inside the
  * tap, before any order could be raised for it. The tabs layout keeps it.
@@ -38,15 +39,20 @@ export function useListCapability(
   // `null` tells the client hook not to load pay.js at all.
   const client = useGooglePayClient(declared ? undefined : null, "TEST");
   const priced = totalCents !== undefined && totalCents > 0;
+  // Priced once, and not since withdrawn by an explicit zero.
+  const [wasPriced, setWasPriced] = useState(false);
+  if (priced && !wasPriced) setWasPriced(true);
+  if (totalCents === 0 && wasPriced) setWasPriced(false);
+  const repricing = totalCents === undefined && wasPriced;
   return useMemo(() => {
     const params = googlePayConfig(config);
-    const usable = priced && params && client ? { client, params } : null;
+    const usable = params && client ? { client, params } : null;
     return {
       handOff: methodChosenAtProvider(config?.chain?.[0]?.checkoutScreen, config),
       offered: offeredMethods(config),
       cardUnavailable: !cardPathAvailable(config),
-      googlePayReady: usable !== null,
-      googlePay: usable,
+      googlePayReady: usable !== null && (priced || repricing),
+      googlePay: priced ? usable : null,
     };
-  }, [config, client, priced]);
+  }, [config, client, priced, repricing]);
 }

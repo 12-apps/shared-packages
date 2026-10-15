@@ -14,14 +14,26 @@
  *    cart's amount; a balance that covers everything names no card (P3);
  *  - with several saved cards, the one used LAST is preselected (P4);
  *  - a field focused inside a chosen row draws one ring, its own — the row's
- *    ring is the radio's alone.
+ *    ring is the radio's alone;
+ *  - a balance that covers everything asks for no card and charges none: the
+ *    host settles that order, and one left awaiting is never charged;
+ *  - the Pix face names the amount due; the tabs layout keeps its own card
+ *    order; the wire's card list is a list whatever the route answers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ReactNode } from "react";
+
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
+import { renderHook } from "./test-utils";
+
+import { useSavedCards } from "../card-sources";
+import { CheckoutClientProvider } from "../client-context";
 import type { CheckoutDoorOption } from "../list/types";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
+import { PT_BR_CHECKOUT_SCREENS_COPY } from "../screens-pt-BR";
+import { createCheckoutClient, type CheckoutClient } from "../transport";
 import type { CheckoutProviderConfig, CreateOrderRequest, CreateOrderResult } from "../types";
 import { SAVED_MASTER, SAVED_VISA, listFlow, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
@@ -127,7 +139,7 @@ describe("Google Pay priced with the amount due", () => {
     await waitFor(() => expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull());
   });
 
-  it("withdraws the row when the host stops pricing it, and never leaves a spinning button", async () => {
+  it("withdraws the row, and a choice of it, when the host prices the sheet at zero", async () => {
     installGoogle();
     const host = { config: walletStore(), client: stubClient() };
     const { rerender } = renderList({ ...host, list: { totalCents: 2700 } });
@@ -135,7 +147,7 @@ describe("Google Pay priced with the amount due", () => {
     fireEvent.click(radio("list-option-GOOGLE_PAY"));
     await screen.findByTestId("google-pay-native");
 
-    rerender(listFlow({ ...host, list: {} }));
+    rerender(listFlow({ ...host, list: { totalCents: 0 } }));
     await waitFor(() => {
       expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull();
       expect(payButton().querySelector('[role="progressbar"]')).toBeNull();
@@ -144,6 +156,17 @@ describe("Google Pay priced with the amount due", () => {
 
     rerender(listFlow({ ...host, list: { totalCents: 2500 } }));
     await screen.findByTestId("list-option-GOOGLE_PAY");
+  });
+
+  it("warns a developer whose order view answers no amount due", async () => {
+    installGoogle();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 2200 } });
+    await screen.findByTestId("list-option-GOOGLE_PAY");
+    fireEvent.click(radio("list-option-GOOGLE_PAY"));
+    fireEvent.click(await screen.findByTestId("google-pay-native"));
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining("CheckoutOrder.amountDueCents")));
+    warn.mockRestore();
   });
 });
 
@@ -170,6 +193,19 @@ describe("the amount due on the bar", () => {
     renderList({ config: onPageStore(), client: stubClient(), list: { amountDueLabel: "R$ 22,00" } });
     await screen.findByTestId("list-option-CARD");
     expect(payButton().textContent).toBe("Escolha como pagarR$ 27,00");
+  });
+
+  it("names the amount due on the Pix face, not the order's total", async () => {
+    const raise = vi.fn(async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({
+      ok: true,
+      data: orderFor(input.method, { amountDueCents: 2200 }),
+    }));
+    renderList({ config: onPageStore(), client: stubClient(), createOrder: raise, list: { amountDueLabel: "R$ 22,00", totalCents: 2200 } });
+    await screen.findByTestId("list-option-PIX");
+    fireEvent.click(radio("list-option-PIX"));
+    await waitFor(() => expect(payButton().textContent).toBe("Gerar PixR$ 22,00"));
+    fireEvent.click(payButton());
+    expect((await screen.findByTestId("list-pix-title")).textContent).toBe("Pague R$ 22,00 com Pix");
   });
 
   it("names no card when the balance covers the whole amount", async () => {
@@ -237,5 +273,68 @@ describe("the row's focus ring", () => {
     const rings = css.match(/:has\([^{]*focus-visible\)/g) ?? [];
     expect(rings.length).toBeGreaterThan(0);
     for (const ring of rings) expect(ring).toContain("input[type='radio']");
+  });
+});
+
+describe("a balance that covers everything", () => {
+  it("asks for no card, raises the order, charges nothing and lands on the host's settled answer", async () => {
+    const client = stubClient();
+    const raise = vi.fn(async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({
+      ok: true,
+      data: orderFor(input.method, { status: "PAID", amountDueCents: 0 }),
+    }));
+    renderList({ config: onPageStore(), client, createOrder: raise, list: { amountDueLabel: "R$ 0,00", totalCents: 0 } });
+    await screen.findByTestId("list-option-CARD");
+    fireEvent.click(radio("list-option-CARD"));
+    await waitFor(() => {
+      expect(payButton().disabled).toBe(false);
+      expect(screen.queryByTestId("card-number")).toBeNull();
+    });
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    await advance(CHARGE_WINDOW_MS);
+    vi.useRealTimers();
+    await waitFor(() => expect(raise).toHaveBeenCalledTimes(1));
+    await screen.findByTestId("payment-status");
+    expect(client.charge).not.toHaveBeenCalled();
+  });
+
+  it("never charges an order the host left awaiting with nothing due, and gives the list back", async () => {
+    const client = stubClient([SAVED_VISA]);
+    const raise = vi.fn(async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({
+      ok: true,
+      data: orderFor(input.method, { amountDueCents: 0 }),
+    }));
+    renderList({ config: onPageStore(), client, createOrder: raise, list: { amountDueLabel: "R$ 0,00", totalCents: 0 } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    await advance(CHARGE_WINDOW_MS);
+    vi.useRealTimers();
+    await waitFor(() => expect(raise).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
+    expect(client.charge).not.toHaveBeenCalled();
+    expect(payButton().disabled).toBe(false);
+  });
+});
+
+describe("the tabs layout keeps its own card order", () => {
+  it("selects the head of the list, whichever card was used last", async () => {
+    const head = { ...SAVED_VISA };
+    const usedLater = { ...SAVED_MASTER, lastUsedAt: "2026-10-14T10:00:00.000Z" };
+    const client = stubClient([head, usedLater]);
+    const { result } = renderHook(() => useSavedCards("loja-1", false), {
+      wrapper: ({ children }: { children: ReactNode }) => <CheckoutClientProvider client={client as unknown as CheckoutClient}>{children}</CheckoutClientProvider>,
+    });
+    await waitFor(() => expect(result.current.savedCards).toHaveLength(2));
+    expect(result.current.selection).toBe("vault-1");
+  });
+});
+
+describe("the wire's saved-card list", () => {
+  it.each([null, undefined, { cards: [] }])("is an empty list when the route answers %j", async (data) => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data }), { status: 200, headers: { "content-type": "application/json" } }));
+    const wire = createCheckoutClient({ copy: PT_BR_CHECKOUT_SCREENS_COPY.transport, fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(await wire.listInstruments("loja-1")).toEqual([]);
   });
 });

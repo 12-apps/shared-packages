@@ -43,6 +43,8 @@ interface RowProps {
   onBuyerChange: (buyer: BuyerInfo) => void;
   provider: string | null;
   failure: ListChargeFailure | null;
+  /** The host's balance pays the whole amount: the card asks for no card at all. */
+  covered?: boolean;
 }
 
 /** One of the store's online options, with what opens inside it. */
@@ -62,7 +64,7 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
       onChoose={() => state.choose({ kind: "online", method: row.method })}
       testId={`list-option-${row.method}`}
     >
-      {opensContent(row.method, state.asked, props.failure) ? (
+      {opensContent(row.method, state.asked, props.failure, props.covered) ? (
         <OnlineContent
         method={row.method}
         asked={state.asked}
@@ -72,6 +74,7 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
         copy={copy}
         provider={provider}
         failure={props.failure}
+        covered={props.covered}
         />
       ) : null}
     </OptionRow>
