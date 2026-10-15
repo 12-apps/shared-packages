@@ -185,6 +185,11 @@ export function PaymentRefreshProvider({
  * The card pane's half: a charge the host refused with
  * {@link CART_CHANGED_CODE} re-reads the order, once per refusal.
  */
+/** The step's "Atualizar pagamento" for the order on screen, or `null` when there is nothing to refresh. */
+export function usePaymentRefresh(): (() => void) | null {
+  return useContext(PaymentRefreshContext);
+}
+
 export function useRefreshOnCartChanged(errorCode: string | null): void {
   const refresh = useContext(PaymentRefreshContext);
   // Held in a ref: the step hands down a fresh closure on every render, and
@@ -227,8 +232,11 @@ export function CartChangedBoundary({
   creating,
   onGenerate,
   refresh,
+  actionInBar = false,
   children,
 }: {
+  /** The step's bar carries "Atualizar pagamento" itself (the one list): the notice only says why. */
+  actionInBar?: boolean;
   order: CheckoutOrder | null;
   /** Absent for a settlement: it pays a balance, not the cart, so its basket is no signal. */
   basket: CheckoutBasketIdentity | undefined;
@@ -245,7 +253,7 @@ export function CartChangedBoundary({
   // dropping what the buyer typed and the refusal that explains the new total.
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {(changed || error) && run ? <CartChangedNotice onRefresh={run} pending={pending} error={error} /> : null}
+      {(changed || error) && run ? <CartChangedNotice onRefresh={actionInBar ? undefined : run} pending={pending} error={error} /> : null}
       {/* Stale while the warning stands, so the veil goes with it the moment the
           new order lands. A PIX refresh mints a new code, which takes the old
           one off the screen first, so a failed one leaves nothing to copy. */}
@@ -262,7 +270,8 @@ function CartChangedNotice({
   pending = false,
   error = null,
 }: {
-  onRefresh: () => void;
+  /** Absent: the bar carries the control. */
+  onRefresh?: () => void;
   pending?: boolean;
   /** A refresh that failed, in the host's words: said, with the same control to try again. */
   error?: string | null;
@@ -276,19 +285,21 @@ function CartChangedNotice({
       ) : (
         <Alert variant="warning" title={copy.heading} description={copy.support} showIcon />
       )}
-      <Box>
-        <Button
-          variant="solid"
-          color="primary"
-          size="md"
-          onClick={onRefresh}
-          loading={pending}
-          disabled={pending}
-          dataTestId="checkout-cart-changed-refresh"
-        >
-          {copy.refreshAction}
-        </Button>
-      </Box>
+      {onRefresh ? (
+        <Box>
+          <Button
+            variant="solid"
+            color="primary"
+            size="md"
+            onClick={onRefresh}
+            loading={pending}
+            disabled={pending}
+            dataTestId="checkout-cart-changed-refresh"
+          >
+            {copy.refreshAction}
+          </Button>
+        </Box>
+      ) : null}
     </Box>
   );
 }

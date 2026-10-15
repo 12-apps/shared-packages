@@ -17,7 +17,6 @@ import { useRefreshOnCartChanged } from "../cart-changed";
 import { SubmittedState } from "../card-view";
 import type { ChallengeScope } from "../card-outcome";
 import { useCheckoutCopy } from "../copy-context";
-import { paymentDataRequest, sheetDismissed, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
 import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "../types";
 import { useCardSubmit } from "../use-card-checkout";
 import { useWalletCharge } from "../use-wallet-charge";
@@ -107,12 +106,17 @@ export function CardRun({
   return submitted ? <SubmittedState card={submit} /> : null;
 }
 
-/** Google Pay: the sheet opens as soon as the order is held, and its key is charged. */
+/**
+ * Google Pay: the sheet was opened INSIDE the buyer's tap (`sheet`, priced at
+ * `sheetCents`) while the order was raised; its key is charged against that
+ * order only if the order costs what the sheet showed. A closed sheet sends
+ * nothing more.
+ */
 export function WalletRun({
   order,
   buyer,
-  client,
-  params,
+  sheet,
+  sheetCents,
   scope,
   onResolved,
   pollIntervalMs,
@@ -121,8 +125,9 @@ export function WalletRun({
 }: RunnerCallbacks & {
   order: CheckoutOrder;
   buyer: BuyerInfo;
-  client: GooglePaymentsClient;
-  params: GooglePayGatewayParams;
+  /** The sheet's answer: the wallet key, or `null` when the buyer closed it. */
+  sheet: Promise<string | null>;
+  sheetCents: number;
   scope: ChallengeScope;
   onResolved: OnCheckoutResolved;
   pollIntervalMs: number;
@@ -130,10 +135,15 @@ export function WalletRun({
   const words = useCheckoutCopy().screens.wallet.googlePay;
   const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs, scope);
   useFireOnce(true, () => {
-    client
-      .loadPaymentData(paymentDataRequest(params, order))
-      .then((data) => wallet.payWithKey("GOOGLE_PAY", data.paymentMethodData.tokenizationData.token))
-      .catch((error: unknown) => onFailed(sheetDismissed(error) ? null : { message: words.cannotComplete, code: null }));
+    const refused = { message: words.cannotComplete, code: null };
+    sheet
+      .then((key) => {
+        if (key === null) return onFailed(null);
+        // The sheet showed one amount; never charge another under it.
+        if (order.totalCents !== sheetCents) return onFailed(refused);
+        return void wallet.payWithKey("GOOGLE_PAY", key);
+      })
+      .catch(() => onFailed(refused));
   });
   const { error, errorCode, phase } = wallet;
   useEffect(() => {

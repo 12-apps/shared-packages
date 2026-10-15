@@ -102,7 +102,7 @@ describe("the card's 5-second bar", () => {
     expect(client.refreshBrowserKey).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
     expect(radio("list-option-CARD").checked).toBe(true);
-    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("true");
     expect(payButton().disabled).toBe(false);
   });
 

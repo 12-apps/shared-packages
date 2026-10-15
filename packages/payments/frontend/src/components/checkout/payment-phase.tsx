@@ -100,6 +100,7 @@ export function PaymentPhase({
         taxIdOnFile={props.taxIdOnFile ?? false}
         defaultBuyer={props.defaultBuyer}
         saveBuyerContact={props.saveBuyerContact}
+        consentLabel={props.copy.dados.saveProfile}
       />
     );
   }

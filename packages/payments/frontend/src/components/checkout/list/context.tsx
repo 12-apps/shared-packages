@@ -17,6 +17,18 @@ export interface PaymentListMode {
   setQrOpen: (open: boolean) => void;
   /** "Trocar a forma de pagamento": leave the raised Pix for the list. */
   onLeavePix: () => void;
+  /**
+   * The Dados step's "Salvar meus dados para a próxima compra" (LGPD), offered
+   * wherever the list asks the buyer's details instead — same words, same
+   * default — because the list skips that step.
+   */
+  consent: ListConsent;
+}
+
+export interface ListConsent {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
 }
 
 const PaymentListContext = createContext<PaymentListMode | null>(null);
@@ -24,14 +36,16 @@ const PaymentListContext = createContext<PaymentListMode | null>(null);
 export function PaymentListProvider({
   list,
   onLeavePix,
+  consent,
   children,
 }: {
   list: CheckoutPaymentList;
   onLeavePix: () => void;
+  consent: ListConsent;
   children: ReactNode;
 }): JSX.Element {
   const [qrOpen, setQrOpen] = useState(false);
-  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix }), [list, qrOpen, onLeavePix]);
+  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix, consent }), [list, qrOpen, onLeavePix, consent]);
   return <PaymentListContext.Provider value={value}>{children}</PaymentListContext.Provider>;
 }
 

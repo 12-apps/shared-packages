@@ -1,10 +1,21 @@
 import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import type { JSX, ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode } from "react";
 
+import { useCheckoutCopy } from "../copy-context";
+import type { GooglePaymentsClient } from "../google-pay-button";
 import { useCheckoutComponents } from "../ui";
 
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
+
+/** The prototype's 52px action and 44px secondary, on the theme's spacing scale. */
+const ACTION_HEIGHT = 6.5;
+const SECONDARY_HEIGHT = 5.5;
+
+/** Focus the first button under `scope` — the slot owns the element, so it is found, not referenced. */
+function focusButtonIn(scope: HTMLElement | null): void {
+  scope?.querySelector<HTMLButtonElement>("button")?.focus();
+}
 
 /**
  * The one list's bar (FUT-3591 #7, M12), top to bottom: the host's line
@@ -13,13 +24,19 @@ import { CHARGE_WINDOW_MS } from "./use-list-charge";
  *
  * Drawn through the host's `ActionBar` slot, which is what pins it to the
  * bottom of the screen: the storefront passes its sticky action bar.
+ *
+ * ONE live region, always mounted, says what changes under the button — the
+ * reason it is held, the charge under way, the wait — because a region that
+ * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, children }: {
+export function ListBar({ summary, extras, payer, reason, live, children }: {
   summary?: ReactNode;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
   reason?: string | null;
+  /** What the region announces when there is no reason: the bar's own sentence. */
+  live?: string | null;
   /** The action, or the charge bar, or the wait. */
   children: ReactNode;
 }): JSX.Element {
@@ -31,27 +48,39 @@ export function ListBar({ summary, extras, payer, reason, children }: {
         {extras ? <Box data-testid="list-bar-extras">{extras}</Box> : null}
         {payer}
         {children}
-        {reason ? (
-          <Text variant="caption" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
-            {reason}
-          </Text>
-        ) : null}
+        <Box role="status" aria-live="polite" data-testid="list-bar-live">
+          {reason ? (
+            <Text variant="caption" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+              {reason}
+            </Text>
+          ) : (
+            <Box component="span" sx={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
+              {live ?? ""}
+            </Box>
+          )}
+        </Box>
       </Box>
     </ActionBar>
   );
 }
 
 /** "Pagar" on the left, "R$ 22,00" on the right — the prototype's 52px bar of a button. */
-export function ActionButton({ label, total, disabled, loading, onClick }: {
+export function ActionButton({ label, total, disabled, loading, onClick, focusOnMount = false }: {
   label: string;
   total: string | null;
   disabled: boolean;
   loading?: boolean;
   onClick: () => void;
+  /** Take the focus as it appears — back from a cancelled charge, where the focus was on Cancelar. */
+  focusOnMount?: boolean;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
+  const scope = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (focusOnMount) focusButtonIn(scope.current);
+  }, [focusOnMount]);
   return (
-    <Box sx={{ "& button": { minHeight: 52 }, "& button, & button *": { fontWeight: 600 } }}>
+    <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600 } }}>
       <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
         <Box component="span" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1, width: "100%" }}>
           <span>{label}</span>
@@ -67,7 +96,8 @@ const fill = keyframes`from { width: 0; } to { width: 100%; }`;
 /**
  * The card's 5-second bar, in the button's own place (FUT-3592 #2): the
  * sentence in white on the primary colour, a darker fill growing left to
- * right, and "Cancelar" under it while there is still nothing sent. `full`
+ * right, and "Cancelar" under it while there is still nothing sent — which
+ * takes the focus as it appears, since the button that had it is gone. `full`
  * draws it filled, with no Cancelar — the charge is on its way.
  */
 export function ChargeBar({ text, full, cancelLabel, onCancel }: {
@@ -77,13 +107,16 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
   onCancel: () => void;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
+  const cancelScope = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!full) focusButtonIn(cancelScope.current);
+  }, [full]);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       <Box
-        role="status"
         data-testid="list-charge-bar"
         data-full={full ? "true" : "false"}
-        sx={{ position: "relative", minHeight: 52, borderRadius: 2, bgcolor: "primary.main", overflow: "hidden", display: "flex", alignItems: "center", px: 2.25 }}
+        sx={{ position: "relative", minHeight: (t) => t.spacing(ACTION_HEIGHT), borderRadius: 2, bgcolor: "primary.main", overflow: "hidden", display: "flex", alignItems: "center", px: 2.25 }}
       >
         <Box
           aria-hidden
@@ -101,26 +134,47 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
         </Box>
       </Box>
       {full ? null : (
-        <Button variant="outline" color="primary" size="lg" fullWidth onClick={onCancel} dataTestId="list-charge-cancel">
-          {cancelLabel}
-        </Button>
+        <Box ref={cancelScope} sx={{ "& button": { minHeight: (t) => t.spacing(SECONDARY_HEIGHT) } }}>
+          <Button variant="outline" color="primary" size="lg" fullWidth onClick={onCancel} dataTestId="list-charge-cancel">
+            {cancelLabel}
+          </Button>
+        </Box>
       )}
     </Box>
   );
 }
 
-/** A muted, inert line in the action's place — "Aguardando o pagamento do Pix…". */
+/** A muted, inert line in the action's place — "Aguardando o pagamento do Pix…" (the bar's live region says it). */
 export function WaitingLine({ text }: { text: string }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
     <Box
-      role="status"
       data-testid="list-waiting"
-      sx={{ minHeight: 44, borderRadius: 2, bgcolor: "action.hover", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", px: 1 }}
+      sx={{ minHeight: (t) => t.spacing(SECONDARY_HEIGHT), borderRadius: 2, bgcolor: "action.hover", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", px: 1 }}
     >
       <Text variant="body" size="sm" color="secondary" as="span">
         {text}
       </Text>
     </Box>
   );
+}
+
+/**
+ * Google Pay's own button in the action's place (FUT-471's brand rule: the
+ * buyer presses Google's button, drawn by `createButton`, never a look-alike).
+ * Its press opens the sheet SYNCHRONOUSLY — inside the tap, as the browser
+ * requires — through `onPress`.
+ */
+export function GooglePayAction({ client, onPress }: { client: GooglePaymentsClient; onPress: () => void }): JSX.Element {
+  const mount = useRef<HTMLDivElement | null>(null);
+  const latest = useRef(onPress);
+  latest.current = onPress;
+  const locale = useCheckoutCopy().screens.wallet.googlePay.buttonLocale;
+  useEffect(() => {
+    const element = mount.current;
+    if (!element) return undefined;
+    element.replaceChildren(client.createButton({ onClick: () => latest.current(), buttonSizeMode: "fill", buttonLocale: locale }));
+    return () => element.replaceChildren();
+  }, [client, locale]);
+  return <Box ref={mount} data-testid="list-google-pay" sx={{ minHeight: (t) => t.spacing(ACTION_HEIGHT), "& > *": { width: "100%" } }} />;
 }

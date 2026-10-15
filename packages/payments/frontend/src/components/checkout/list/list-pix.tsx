@@ -1,7 +1,7 @@
-import { Box } from "@mui/material";
+import { Box, useTheme } from "@mui/material";
 import type { JSX, KeyboardEvent, MouseEvent, ReactNode } from "react";
 
-import { usePaymentStale } from "../cart-changed";
+import { usePaymentRefresh, usePaymentStale } from "../cart-changed";
 import { useCheckoutCopy } from "../copy-context";
 import { PixAfterCopy } from "../pix-after-copy";
 import { PixQr, StaleVeil } from "../pix-parts";
@@ -60,7 +60,7 @@ function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; o
             press(event);
           }
         }}
-        sx={{ cursor: "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, fontFamily: "monospace", fontSize: "0.75rem", lineHeight: 1.5, wordBreak: "break-all" }}
+        sx={{ cursor: "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, typography: "caption", fontFamily: "monospace", wordBreak: "break-all" }}
       >
         {pix.copyPaste}
       </Box>
@@ -71,7 +71,7 @@ function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; o
 function TextLink({ onClick, testId, children }: { onClick: () => void; testId: string; children: ReactNode }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
-    <Box sx={{ alignSelf: "flex-start", ml: -1, "& button": { textDecoration: "underline", textUnderlineOffset: "3px" } }}>
+    <Box sx={{ alignSelf: "flex-start", ml: -1, "& button": { textDecoration: "underline", textUnderlineOffset: "0.2em" } }}>
       <Button variant="text" color="primary" size="md" onClick={onClick} dataTestId={testId}>
         {children}
       </Button>
@@ -90,13 +90,15 @@ function BeforeCopy({ mode, pix, time, onCopy, onChangeMethod, footer }: {
   const { Text } = useCheckoutComponents();
   const copy = mode.list.copy.pixFace;
   const qrAlt = useCheckoutCopy().screens.pix.qrAlt;
+  // The prototype's 150px QR, on the theme's spacing scale (the QR draws in px).
+  const qrSize = Number.parseFloat(useTheme().spacing(18.75));
   const stale = usePaymentStale();
   return (
     <Box sx={{ containerType: "inline-size", containerName: "listpix" }}>
       <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start", flexDirection: "column", [WIDE]: { flexDirection: "row" } }}>
         <Box data-testid="list-pix-qr" sx={{ display: mode.qrOpen ? "block" : "none", alignSelf: "center", flex: "none", [WIDE]: { display: "block", alignSelf: "flex-start" } }}>
           <StaleVeil stale={stale}>
-            <PixQr payload={pix.copyPaste} size={150} alt={qrAlt} />
+            <PixQr payload={pix.copyPaste} size={qrSize} alt={qrAlt} />
           </StaleVeil>
         </Box>
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -137,12 +139,35 @@ interface ListPixFaceProps {
   footer: ReactNode;
 }
 
+/**
+ * The Pix's bar: the host's hold first (a step reopened above), then — over a
+ * code the cart has outgrown — "Atualizar pagamento" (FUT-3535, E20), then
+ * the copy before it and the wait after it.
+ */
+function ListPixBar({ mode, afterCopy, onCopy }: { mode: PaymentListMode; afterCopy: boolean; onCopy: () => void }): JSX.Element {
+  const copy = mode.list.copy.pixFace;
+  const stale = usePaymentStale();
+  const refresh = usePaymentRefresh();
+  const refreshLabel = useCheckoutCopy().screens.cartChanged.refreshAction;
+  const { hold } = mode.list;
+  const action = (): JSX.Element => {
+    if (hold) return <ActionButton label={hold.action} total={null} disabled onClick={() => undefined} />;
+    if (stale && refresh) return <ActionButton label={refreshLabel} total={null} disabled={false} onClick={refresh} />;
+    if (afterCopy) return <WaitingLine text={copy.waiting} />;
+    return <ActionButton label={copy.copyCode} total={null} disabled={stale} onClick={onCopy} />;
+  };
+  return (
+    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} live={afterCopy && !hold && !stale ? copy.waiting : null}>
+      {action()}
+    </ListBar>
+  );
+}
+
 /** Both faces of the list's Pix, and the bar under them. */
 export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const { mode, order, pix, afterCopy } = props;
   const copy = mode.list.copy.pixFace;
-  const stale = usePaymentStale();
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
@@ -166,16 +191,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
       ) : (
         <BeforeCopy mode={mode} pix={pix} time={props.time} onCopy={props.onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
       )}
-      <ListBar summary={mode.list.summary} reason={mode.list.hold?.reason ?? null}>
-        {/* A step the host reopened above (Endereço) holds the bar too: no copy while it is open. */}
-        {mode.list.hold ? (
-          <ActionButton label={mode.list.hold.action} total={null} disabled onClick={() => undefined} />
-        ) : afterCopy ? (
-          <WaitingLine text={copy.waiting} />
-        ) : (
-          <ActionButton label={copy.copyCode} total={null} disabled={stale} onClick={props.onCopy} />
-        )}
-      </ListBar>
+      <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={props.onCopy} />
     </Box>
   );
 }

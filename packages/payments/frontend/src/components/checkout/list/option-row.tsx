@@ -18,8 +18,7 @@ import { useCheckoutComponents } from "../ui";
  * is already this package's peer. Every row shares one `name`, so the online
  * and the door options are ONE group to the keyboard and to a screen reader.
  */
-const chosenTint = (theme: Theme): string =>
-  alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.05);
+const chosenTint = (theme: Theme): string => alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity);
 
 export function OptionRow({
   name,
@@ -60,7 +59,7 @@ export function OptionRow({
     >
       <Box
         component="label"
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: 44, py: 0.75, cursor: disabled ? "default" : "pointer" }}
+        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(5.5), py: 0.75, cursor: disabled ? "default" : "pointer" }}
       >
         <Radio
           name={name}
@@ -90,19 +89,14 @@ export function OptionRow({
   );
 }
 
-/** "PAGAR AGORA, PELO APP" / "PAGAR NA ENTREGA" — small capitals by CSS only. */
-export function GroupHeading({ children }: { children: string }): JSX.Element {
-  const { Text } = useCheckoutComponents();
+/**
+ * "PAGAR AGORA, PELO APP" / "PAGAR NA ENTREGA" — the theme's overline (small
+ * capitals, its own tracking), bold and muted. `id` labels the group under it.
+ */
+export function GroupHeading({ id, children }: { id: string; children: string }): JSX.Element {
   return (
-    <Text
-      variant="body"
-      size="xs"
-      weight="bold"
-      color="secondary"
-      as="p"
-      style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" }}
-    >
+    <Box component="p" id={id} sx={{ m: 0, typography: "overline", lineHeight: 1.5, fontWeight: 700, color: "text.secondary" }}>
       {children}
-    </Text>
+    </Box>
   );
 }

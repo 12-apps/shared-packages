@@ -62,7 +62,7 @@ describe("what comes chosen", () => {
   it("chooses the card and its saved card for a buyer with one, and Pagar is live", async () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
-    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("true");
     expect(screen.getByTestId("list-option-CARD").textContent).toContain("Visa final 4242 ou outro cartão");
     expect(payButton().disabled).toBe(false);
     expect(payButton().textContent).toBe("PagarR$ 27,00");
@@ -70,8 +70,8 @@ describe("what comes chosen", () => {
 
   it("chooses the head of the saved list when there are several — the host orders it last-used first", async () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_MASTER, SAVED_VISA]) });
-    await waitFor(() => expect(screen.getByTestId("list-card-vault-2").getAttribute("aria-pressed")).toBe("true"));
-    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-pressed")).toBe("false");
+    await waitFor(() => expect(screen.getByTestId("list-card-vault-2").getAttribute("aria-checked")).toBe("true"));
+    expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("false");
   });
 
   it("chooses nothing for a buyer with no saved card, and says so under a held button", async () => {
@@ -115,7 +115,7 @@ describe("picking creates nothing", () => {
     fireEvent.change(screen.getByTestId("card-holder"), { target: { value: "ANA TESTE" } });
     fireEvent.click(radio("list-option-PIX"));
     fireEvent.click(radio("list-option-CARD"));
-    await waitFor(() => expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-pressed")).toBe("true"));
+    await waitFor(() => expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("true"));
     fireEvent.click(screen.getByTestId("list-card-new"));
     expect((screen.getByTestId("card-holder") as HTMLInputElement).value).toBe("ANA TESTE");
   });

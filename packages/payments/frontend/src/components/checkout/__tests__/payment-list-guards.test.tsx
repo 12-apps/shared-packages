@@ -1,0 +1,255 @@
+// @vitest-environment jsdom
+/**
+ * FUT-3591/3592, review round 1 — what keeps the list from charging the wrong
+ * thing, twice, or without the buyer's say.
+ *
+ *  - a hold the host raises mid-bar, a total that moves mid-bar, or the screen
+ *    going away mid-bar: nothing is sent;
+ *  - a held CARD order priced differently from the cart is raised again, never
+ *    charged at its old amount; the button names the cart's amount;
+ *  - a host send in flight locks the list;
+ *  - the details asked inline come with the Dados step's LGPD consent;
+ *  - a stale Pix offers "Atualizar pagamento" in the bar;
+ *  - the focus follows the bar and comes back after Cancelar.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+
+import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
+import type { CheckoutDoorOption } from "../list/types";
+import type { CreateOrderRequest, CreateOrderResult } from "../types";
+import { SAVED_VISA, listFlow, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+
+const radio = (testId: string): HTMLInputElement => screen.getByTestId(`${testId}-radio`) as HTMLInputElement;
+const payButton = (): HTMLButtonElement => screen.getByTestId("list-pay") as HTMLButtonElement;
+const raising = () => vi.fn(async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({ ok: true, data: orderFor(input.method) }));
+
+beforeEach(() => window.sessionStorage.clear());
+afterEach(() => {
+  vi.useRealTimers();
+  cleanup();
+});
+
+async function advance(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+describe("a bar that must stop", () => {
+  it("cancels when the host raises a hold mid-bar, and sends nothing", async () => {
+    const createOrder = raising();
+    const host = { config: onPageStore(), client: stubClient([SAVED_VISA]), createOrder };
+    const { rerender } = renderList(host);
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    await advance(2000);
+    rerender(listFlow({ ...host, list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } } }));
+    await advance(CHARGE_WINDOW_MS * 2);
+    vi.useRealTimers();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
+    expect(createOrder).not.toHaveBeenCalled();
+    expect(host.client.charge).not.toHaveBeenCalled();
+    expect(payButton().textContent).toBe("Confirme o endereço" + "R$ 27,00");
+  });
+
+  it("cancels when the total moves mid-bar, and names the amount frozen at the press", async () => {
+    const createOrder = raising();
+    const host = { config: onPageStore(), client: stubClient([SAVED_VISA]), createOrder };
+    const { rerender } = renderList(host);
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa final 4242…");
+    rerender(listFlow({ ...host, cartTotal: "R$ 22,00" }));
+    await advance(CHARGE_WINDOW_MS * 2);
+    vi.useRealTimers();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
+    expect(createOrder).not.toHaveBeenCalled();
+    expect(payButton().textContent).toBe("PagarR$ 22,00");
+  });
+
+  it("sends nothing when the checkout goes away mid-bar", async () => {
+    const createOrder = raising();
+    const client = stubClient([SAVED_VISA]);
+    const { unmount } = renderList({ config: onPageStore(), client, createOrder });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    unmount();
+    await advance(CHARGE_WINDOW_MS * 2);
+    expect(createOrder).not.toHaveBeenCalled();
+    expect(client.charge).not.toHaveBeenCalled();
+  });
+});
+
+describe("the amount charged is the amount shown", () => {
+  /** A card refused once leaves its CARD order held at R$ 27,00. */
+  async function refusedOnce(createOrder: ReturnType<typeof vi.fn>, client: ReturnType<typeof stubClient>, extra = {}) {
+    client.charge.mockResolvedValueOnce({ ok: false, error: "Recusado.", code: "INVALID" } as never);
+    const host = { config: onPageStore(), client, createOrder, ...extra };
+    const view = renderList(host);
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    await advance(CHARGE_WINDOW_MS);
+    vi.useRealTimers();
+    await screen.findByText("Recusado.");
+    return { host, ...view };
+  }
+
+  it("raises again, at the new price, when the cart was re-priced under a held order", async () => {
+    const createOrder = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, data: orderFor("CARD") })
+      .mockResolvedValueOnce({ ok: true, data: orderFor("CARD", { orderId: "o-card-2", totalCents: 2200, totalLabel: "R$ 22,00" }) });
+    const client = stubClient([SAVED_VISA]);
+    const { host, rerender } = await refusedOnce(createOrder, client);
+    rerender(listFlow({ ...host, cartTotal: "R$ 22,00" }));
+    await waitFor(() => expect(payButton().textContent).toBe("PagarR$ 22,00"));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    await advance(CHARGE_WINDOW_MS);
+    vi.useRealTimers();
+    await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(2));
+    expect(createOrder).toHaveBeenCalledTimes(2);
+    expect(client.charge).toHaveBeenLastCalledWith(expect.objectContaining({ orderId: "o-card-2" }));
+  });
+
+  it("names the cart's amount, not the held card order's, for a door option with no amount of its own", async () => {
+    const createOrder = vi.fn().mockResolvedValue({ ok: true, data: orderFor("CARD", { totalLabel: "R$ 22,00", totalCents: 2200 }) });
+    const door: CheckoutDoorOption = { id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: null, onSend: vi.fn() };
+    await refusedOnce(createOrder, stubClient([SAVED_VISA]), { list: { door: [door] } });
+    fireEvent.click(radio("list-door-cash"));
+    await waitFor(() => expect(payButton().textContent).toBe("Enviar pedidoR$ 27,00"));
+  });
+});
+
+describe("a send in flight locks the list", () => {
+  it("locks the list and holds the button while the host's door send is pending", async () => {
+    const onSend = vi.fn();
+    const door: CheckoutDoorOption = { id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: null, onSend, pending: true };
+    renderList({ config: onPageStore(), client: stubClient(), list: { door: [door] } });
+    await screen.findByTestId("payment-list");
+    expect(screen.getByTestId("payment-list").getAttribute("data-locked")).toBe("true");
+    expect(screen.getByTestId("payment-list").hasAttribute("inert")).toBe(true);
+    expect(payButton().disabled).toBe(true);
+  });
+
+  it("locks the list while a Pix is being raised", async () => {
+    const finishers: ((value: CreateOrderResult) => void)[] = [];
+    const createOrder = vi.fn(() => new Promise<CreateOrderResult>((resolve) => finishers.push(resolve)));
+    renderList({ config: onPageStore(), client: stubClient(), createOrder });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(payButton());
+    await waitFor(() => expect(screen.getByTestId("payment-list").getAttribute("data-locked")).toBe("true"));
+    fireEvent.click(payButton());
+    expect(createOrder).toHaveBeenCalledTimes(1);
+    await act(async () => finishers[0]?.({ ok: true, data: orderFor("PIX") }));
+  });
+});
+
+describe("the LGPD consent beside the asked details", () => {
+  async function newBuyerPix(saveBuyerContact: ReturnType<typeof vi.fn>, createOrder: ReturnType<typeof raising>) {
+    renderList({ config: onPageStore(), client: stubClient(), taxIdOnFile: false, createOrder, saveBuyerContact });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.change(screen.getByTestId("list-buyer-taxId"), { target: { value: "529.982.247-25" } });
+  }
+
+  it("offers 'Salvar meus dados para a próxima compra' ticked, as Dados does, and saves with it", async () => {
+    const save = vi.fn();
+    const createOrder = raising();
+    await newBuyerPix(save, createOrder);
+    const consent = within(screen.getByTestId("list-option-PIX")).getByLabelText("Salvar meus dados para a próxima compra") as HTMLInputElement;
+    expect(consent.checked).toBe(true);
+    fireEvent.click(payButton());
+    await waitFor(() => expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ saveProfile: true })));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ taxId: "529.982.247-25" }));
+  });
+
+  it("saves nothing when the buyer unticks it", async () => {
+    const save = vi.fn();
+    const createOrder = raising();
+    await newBuyerPix(save, createOrder);
+    fireEvent.click(screen.getByLabelText("Salvar meus dados para a próxima compra"));
+    fireEvent.click(payButton());
+    await waitFor(() => expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ saveProfile: false })));
+    expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe("a stale Pix in the list", () => {
+  it("puts 'Atualizar pagamento' in the bar, which raises a new Pix", async () => {
+    const createOrder = raising();
+    const host = { config: onPageStore(), client: stubClient(), createOrder, basket: "l1x1" };
+    const { rerender } = renderList(host);
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(payButton());
+    await screen.findByTestId("list-pix");
+    rerender(listFlow({ ...host, basket: "l1x3" }));
+    await waitFor(() => expect(payButton().textContent).toBe("Atualizar pagamento"));
+    await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed-refresh")).toBeNull());
+    fireEvent.click(payButton());
+    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("the focus", () => {
+  it("moves to Cancelar when the bar replaces Pagar, and back to Pagar after it", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    vi.useFakeTimers();
+    fireEvent.click(payButton());
+    vi.useRealTimers();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("list-charge-cancel")));
+    fireEvent.click(screen.getByTestId("list-charge-cancel"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("list-pay")));
+  });
+});
+
+describe("what the list says", () => {
+  it("names each group by its heading, and keeps one live region in the bar", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { door: [{ id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: "Diga se precisa de troco.", onSend: vi.fn() }] } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    const online = screen.getByRole("group", { name: "Pagar agora, pelo app" });
+    expect(within(online).getByTestId("list-option-PIX-radio")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "Pagar na entrega" })).getByTestId("list-door-cash-radio")).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Cartão de crédito" })).toBeTruthy();
+    const live = screen.getByTestId("list-bar-live");
+    fireEvent.click(radio("list-door-cash"));
+    await waitFor(() => expect(live.textContent).toBe("Diga se precisa de troco."));
+    expect(screen.getByTestId("list-bar-live")).toBe(live);
+  });
+
+  it("names a card of an unknown network 'Cartão final …'", async () => {
+    renderList({ config: onPageStore(), client: stubClient([{ ...SAVED_VISA, brand: "Unknown", last4: "1234" }]) });
+    await waitFor(() => expect(screen.getByTestId("list-card-vault-1").textContent).toBe("Cartão final 1234"));
+  });
+
+  it("clears a choice the store no longer offers once its config resolves", async () => {
+    const client = stubClient([SAVED_VISA]);
+    const { rerender } = renderList({ config: onPageStore(), client });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    const { handOffStore } = await import("./list-harness");
+    rerender(listFlow({ config: handOffStore(), client }));
+    await screen.findByTestId("list-option-HAND_OFF");
+    expect(radio("list-option-HAND_OFF").checked).toBe(false);
+    expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Escolha como pagar.");
+  });
+});
+
+describe("a wire that fails", () => {
+  it("treats a saved-card list that cannot be read as empty: nothing chosen, the list usable", async () => {
+    const client = stubClient();
+    client.listInstruments.mockRejectedValue(new Error("offline"));
+    renderList({ config: onPageStore(), client });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-CARD"));
+    expect(screen.getByTestId("card-number")).toBeTruthy();
+  });
+});

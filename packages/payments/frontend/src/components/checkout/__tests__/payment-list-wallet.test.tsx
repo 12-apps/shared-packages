@@ -34,7 +34,13 @@ function installGoogle(load: () => Promise<unknown>) {
   const loadPaymentData = vi.fn(load);
   class PaymentsClient {
     isReadyToPay = async () => ({ result: true });
-    createButton = () => document.createElement("button");
+    // Google's own button: a press calls the onClick it was built with.
+    createButton = ({ onClick }: { onClick: () => void }) => {
+      const button = document.createElement("button");
+      button.setAttribute("data-testid", "google-pay-native");
+      button.addEventListener("click", onClick);
+      return button;
+    };
     loadPaymentData = loadPaymentData;
   }
   (window as { google?: unknown }).google = { payments: { api: { PaymentsClient } } };
@@ -52,37 +58,57 @@ const createOrder = () => vi.fn(async (input: CreateOrderRequest): Promise<Creat
 
 describe("Google Pay in the list", () => {
   it("is a row only where the browser can pay with it", async () => {
-    renderList({ config: walletStore(), client: stubClient() });
+    renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 2700 } });
     await screen.findByTestId("payment-list");
     await waitFor(() => expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull());
   });
 
-  it("raises the order and opens Google's sheet on 'Pagar com Google Pay', then charges its key", async () => {
+  it("is no row when the host gives no price for the sheet", async () => {
+    installGoogle(async () => ({ paymentMethodData: { tokenizationData: { token: "k" } } }));
+    renderList({ config: walletStore(), client: stubClient() });
+    await screen.findByTestId("list-option-CARD");
+    await waitFor(() => expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull());
+  });
+
+  it("puts Google's own button in the bar, opens the sheet INSIDE the press, then charges its key", async () => {
     const load = installGoogle(async () => ({ paymentMethodData: { tokenizationData: { token: "gpay-key" } } }));
     const client = stubClient();
     client.chargeWallet.mockResolvedValue({ ok: true, data: { status: "PAID" } });
     const raise = createOrder();
-    renderList({ config: walletStore(), client, createOrder: raise });
+    renderList({ config: walletStore(), client, createOrder: raise, list: { totalCents: 2700 } });
     await screen.findByTestId("list-option-GOOGLE_PAY");
     expect(screen.getByTestId("list-option-GOOGLE_PAY").textContent).toContain("Com o cartão salvo no seu Google");
     fireEvent.click(radio("list-option-GOOGLE_PAY"));
-    expect(payButton().textContent).toBe("Pagar com Google PayR$ 27,00");
-    fireEvent.click(payButton());
+    const native = await screen.findByTestId("google-pay-native");
+    fireEvent.click(native);
+    // Synchronously, in the press: the browser opens a sheet only inside the tap.
+    expect(load).toHaveBeenCalledTimes(1);
+    expect((load.mock.calls as unknown as [Record<string, unknown>][])[0]?.[0]).toMatchObject({ transactionInfo: { totalPrice: "27.00" } });
     await waitFor(() => expect(client.chargeWallet).toHaveBeenCalledTimes(1));
     expect(raise).toHaveBeenCalledWith(expect.objectContaining({ method: "CARD" }));
-    expect(load).toHaveBeenCalledTimes(1);
     expect(client.chargeWallet).toHaveBeenCalledWith(expect.objectContaining({ orderId: "o-card", wallet: { type: "GOOGLE_PAY", key: "gpay-key" } }));
     await screen.findByTestId("payment-status");
+  });
+
+  it("refuses to charge a key whose sheet showed another amount than the order", async () => {
+    installGoogle(async () => ({ paymentMethodData: { tokenizationData: { token: "gpay-key" } } }));
+    const client = stubClient();
+    renderList({ config: walletStore(), client, createOrder: createOrder(), list: { totalCents: 2500 } });
+    await screen.findByTestId("list-option-GOOGLE_PAY");
+    fireEvent.click(radio("list-option-GOOGLE_PAY"));
+    fireEvent.click(await screen.findByTestId("google-pay-native"));
+    await screen.findByText(/^Não foi possível concluir o pagamento com o Google Pay/);
+    expect(client.chargeWallet).not.toHaveBeenCalled();
   });
 
   it("sends nothing more when the buyer closes the sheet, and the list is back", async () => {
     installGoogle(async () => Promise.reject(Object.assign(new Error("closed"), { statusCode: "CANCELED" })));
     const client = stubClient();
-    renderList({ config: walletStore(), client, createOrder: createOrder() });
+    renderList({ config: walletStore(), client, createOrder: createOrder(), list: { totalCents: 2700 } });
     await screen.findByTestId("list-option-GOOGLE_PAY");
     fireEvent.click(radio("list-option-GOOGLE_PAY"));
-    fireEvent.click(payButton());
-    await waitFor(() => expect(payButton().disabled).toBe(false));
+    fireEvent.click(await screen.findByTestId("google-pay-native"));
+    await screen.findByTestId("google-pay-native");
     expect(client.chargeWallet).not.toHaveBeenCalled();
     expect(radio("list-option-GOOGLE_PAY").checked).toBe(true);
   });

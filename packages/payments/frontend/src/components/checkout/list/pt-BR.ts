@@ -33,7 +33,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     hint: (provider) =>
       provider ? `Você paga na página ${of(provider)} e volta` : "Você paga na página de pagamento e volta",
   },
-  savedCard: (brand, last4) => `${brand} final ${last4}`,
+  savedCard: (brand, last4) => `${brand ?? "Cartão"} final ${last4}`,
   otherCard: "Outro cartão",
   buyer: {
     cpf: "CPF",

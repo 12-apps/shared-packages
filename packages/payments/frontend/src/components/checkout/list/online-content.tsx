@@ -7,6 +7,7 @@ import { UNRESOLVED_CODE } from "../failure-codes";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 
 import { BuyerInline } from "./buyer-inline";
+import { cardName } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import type { PaymentListCopy } from "./types";
 import type { ListCard } from "./use-list-state";
@@ -28,7 +29,8 @@ function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): 
         clickable
         color={on ? "primary" : "default"}
         variant="filled"
-        aria-pressed={on}
+        role="radio"
+        aria-checked={on}
         onClick={() => card.setSelection(id)}
         data-testid={id === NEW_CARD ? "list-card-new" : `list-card-${id}`}
         sx={{ fontWeight: on ? 600 : 400 }}
@@ -36,8 +38,8 @@ function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): 
     );
   };
   return (
-    <Box role="group" sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-      {card.saved.map((saved) => chip(saved.id, copy.savedCard(saved.brand, saved.last4)))}
+    <Box role="radiogroup" aria-label={copy.card.label} sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+      {card.saved.map((saved) => chip(saved.id, cardName(copy, saved)))}
       {chip(NEW_CARD, copy.otherCard)}
     </Box>
   );

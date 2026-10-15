@@ -111,7 +111,7 @@ function isReadyToPayRequest(): Record<string, unknown> {
 /** Step 4's request: the same card method, now carrying gateway + price. */
 export function paymentDataRequest(
   params: GooglePayGatewayParams,
-  order: CheckoutOrder,
+  order: Pick<CheckoutOrder, "totalCents">,
 ): Record<string, unknown> {
   return {
     apiVersion: 2,

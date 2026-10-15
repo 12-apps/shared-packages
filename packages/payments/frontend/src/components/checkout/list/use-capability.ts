@@ -20,16 +20,23 @@ export interface ListCapability extends OnlineCapability {
  * `isReadyToPay` said yes — the same two gates the Google Pay button has
  * always had (FUT-471), so the list never offers a wallet that cannot work.
  *
+ * The sheet must open inside the tap, before any order exists, so it is priced
+ * with the host's `totalCents`; without one there is no row.
+ *
  * Apple Pay is not a row here: its sheet must open synchronously inside the
  * tap, before any order could be raised for it. The tabs layout keeps it.
  */
-export function useListCapability(config: CheckoutProviderConfig | null): ListCapability {
+export function useListCapability(
+  config: CheckoutProviderConfig | null,
+  /** The host's price for the sheet — no price, no Google Pay row. */
+  totalCents: number | undefined,
+): ListCapability {
   const declared = googlePayConfig(config) !== null;
   // `null` tells the client hook not to load pay.js at all.
   const client = useGooglePayClient(declared ? undefined : null, "TEST");
   return useMemo(() => {
     const params = googlePayConfig(config);
-    const googlePay = params && client ? { client, params } : null;
+    const googlePay = params && client && totalCents !== undefined ? { client, params } : null;
     return {
       handOff: methodChosenAtProvider(config?.chain?.[0]?.checkoutScreen, config),
       offered: offeredMethods(config),
@@ -37,5 +44,5 @@ export function useListCapability(config: CheckoutProviderConfig | null): ListCa
       googlePayReady: googlePay !== null,
       googlePay,
     };
-  }, [config, client]);
+  }, [config, client, totalCents]);
 }

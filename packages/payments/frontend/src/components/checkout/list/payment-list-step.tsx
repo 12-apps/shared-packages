@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
 
 import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
@@ -35,6 +35,8 @@ interface PaymentListStepProps {
   /** What the buyer arrived with — the asked fields are decided against it. */
   defaultBuyer: BuyerInfo | undefined;
   saveBuyerContact?: (contact: BuyerContact) => void;
+  /** The Dados step's consent sentence — the list asks it beside the details it asks. */
+  consentLabel: string;
   pollIntervalMs?: number;
 }
 
@@ -96,7 +98,7 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
       charge={charge}
       cap={cap}
       config={config}
-      total={c.order?.totalLabel ?? displayTotals(totalOverride, cart).label}
+      total={displayTotals(totalOverride, cart).label}
       provider={providerName(config)}
       taxIdOnFile={props.taxIdOnFile}
       tenantSlug={props.tenantSlug}
@@ -120,7 +122,7 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
 export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
-  const cap = useListCapability(config);
+  const cap = useListCapability(config, list.totalCents);
   const state = useListState({
     config,
     capability: cap,
@@ -130,10 +132,14 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     taxIdOnFile: props.taxIdOnFile,
     onChoiceChange: list.onChoiceChange,
   });
-  const charge = useListCharge(c);
+  const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label });
   const [handingOff, startHandOff] = useHandingOff(c.createError);
   const pixStage = usePaymentPixStage(cap, usePreferMethod(c, state.choose));
   const pix = c.order?.method === "PIX" ? c.order : null;
+  const consent = useMemo(
+    () => ({ label: props.consentLabel, checked: c.saveProfile, onChange: c.setSaveProfile }),
+    [props.consentLabel, c.saveProfile, c.setSaveProfile],
+  );
   const face = pix ? (
     <PixView order={pix} onResolved={c.handleResolved} pollIntervalMs={props.pollIntervalMs} />
   ) : handingOff ? (
@@ -142,7 +148,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} />
   );
   return (
-    <PaymentListProvider list={list} onLeavePix={c.dropOrder}>
+    <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
       <PixStageProvider stage={pixStage}>
         <CartChangedBoundary
           order={c.order}
@@ -150,6 +156,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
           onGenerate={(method) => void c.startPayment(method)}
           refresh={c.refresh}
           basket={props.totalOverride ? undefined : props.cart.identity}
+          actionInBar={Boolean(pix)}
         >
           {face}
         </CartChangedBoundary>

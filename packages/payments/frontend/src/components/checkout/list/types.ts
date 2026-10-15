@@ -101,6 +101,13 @@ export interface CheckoutPaymentList {
   hold?: CheckoutListHold | null;
   /** Told whenever the chosen option changes, including to nothing. */
   onChoiceChange?: (choice: CheckoutListChoice | null) => void;
+  /**
+   * The amount the buyer is about to pay, in integer cents — what Google Pay's
+   * sheet is priced with, since that sheet must open INSIDE the tap, before any
+   * order exists to read a price from. Absent ⇒ no Google Pay row. The charge
+   * is refused if the order raised after the sheet does not cost the same.
+   */
+  totalCents?: number;
 }
 
 /** The list's words — a pack per locale ships at `@12-apps/payments-frontend/locales`. */
@@ -125,8 +132,8 @@ export interface PaymentListCopy {
     /** "Você paga na página da InfinitePay e volta" — `null` when the store published no name. */
     hint: (provider: string | null) => string;
   };
-  /** "Visa final 4242". */
-  savedCard: (brand: string, last4: string) => string;
+  /** "Visa final 4242"; `brand` is `null` when the network is unknown ("Cartão final 4242"). */
+  savedCard: (brand: string | null, last4: string) => string;
   /** "Outro cartão". */
   otherCard: string;
   /** The buyer's own details asked inside the option, when the store needs one the buyer has not given. */

@@ -123,6 +123,11 @@ interface ListHost {
   buyer?: BuyerInfo;
   navigate?: (url: string) => void;
   orderNote?: ReactNode;
+  saveBuyerContact?: (contact: { name?: string; phone?: string; taxId?: string }) => void;
+  /** The cart's total as the host shows it; defaults to "R$ 27,00". */
+  cartTotal?: string;
+  /** The basket signature, so a suite can change the cart under a raised order. */
+  basket?: string;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -133,7 +138,14 @@ export function listFlow(host: ListHost): JSX.Element {
       <CheckoutNavigateProvider navigate={host.navigate ?? vi.fn()}>
         <CheckoutFlow
           copy={PT_BR_CHECKOUT_VIEW_COPY}
-          cart={{ empty: false, totalLabel: "R$ 27,00", totalItems: 2, orderNote: host.orderNote }}
+          cart={{
+            empty: false,
+            totalLabel: host.cartTotal ?? "R$ 27,00",
+            totalItems: 2,
+            orderNote: host.orderNote,
+            ...(host.basket ? { identity: { signature: host.basket, ready: true } } : {}),
+          }}
+          saveBuyerContact={host.saveBuyerContact}
           createOrder={createOrder}
           onExitToMenu={vi.fn()}
           providerConfig={host.config}

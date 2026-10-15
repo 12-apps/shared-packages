@@ -15,7 +15,7 @@ export interface ListCard {
   saved: SavedCard[];
   /** A saved card's id, `NEW_CARD` for the fields, or `null` when none is chosen. */
   selection: string | null;
-  setSelection: (selection: string) => void;
+  setSelection: (selection: string | null) => void;
   card: CardDetails;
   setCard: Dispatch<SetStateAction<CardDetails>>;
   fieldErrors: CardFieldErrors;
@@ -72,6 +72,17 @@ function usePreselect(
 }
 
 /**
+ * The card chosen again: the head of the saved list — or, for a buyer back from
+ * a refused card (FUT-1145), no saved card at all (the head may be the one that
+ * failed), or the fields when nothing is saved.
+ */
+function reopenedSelection(cards: readonly SavedCard[], fresh: boolean): string | null {
+  const head = cards[0];
+  if (!head) return NEW_CARD;
+  return fresh ? null : head.id;
+}
+
+/**
  * The one list's state (FUT-3591). Picking an option changes THIS and nothing
  * else: no order, no charge, no request — the bar's button is the only thing
  * that raises (M7). The host hears about every change through
@@ -110,12 +121,17 @@ export function useListState(input: {
         // the saved list again (FN:420), or on the fields when there is none;
         // what was typed in them is kept.
         const reopensCard = next.kind === "online" && next.method === "CARD" && !(previous?.kind === "online" && previous.method === "CARD");
-        if (reopensCard) setSelection(cards[0]?.id ?? NEW_CARD);
+        if (reopensCard) setSelection(reopenedSelection(cards, input.fresh));
         return next;
       });
     },
-    [cards, setSelection],
+    [cards, setSelection, input.fresh],
   );
+  // A choice the chain no longer offers (a config that resolved to a hand-off
+  // store after the card was preselected) is no choice at all.
+  useEffect(() => {
+    if (choice?.kind === "online" && !rows.some((row) => row.method === choice.method && !row.disabled)) setChoice(null);
+  }, [choice, rows]);
   const { onChoiceChange } = input;
   useEffect(() => {
     onChoiceChange?.(choice);

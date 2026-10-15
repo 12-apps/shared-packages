@@ -17,7 +17,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     hint: (provider) =>
       provider ? `You pay on ${provider}'s page and come back` : "You pay on the payment page and come back",
   },
-  savedCard: (brand, last4) => `${brand} ending ${last4}`,
+  savedCard: (brand, last4) => `${brand ?? "Card"} ending ${last4}`,
   otherCard: "Another card",
   buyer: {
     cpf: "CPF",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { NEW_CARD, tokenizerFor, type CardTokenizationConfig, type SavedCard } from "../../card";
 
@@ -23,9 +23,14 @@ export function useSavedCardList(tenantSlug: string | undefined): { cards: Saved
   const client = useCheckoutClientApi();
   useEffect(() => {
     let active = true;
-    void client.listInstruments(tenantSlug).then((cards) => {
-      if (active) setState({ cards, loaded: true });
-    });
+    // A list that cannot be read is an empty one that HAS answered: the
+    // buyer types a card, rather than waiting on a list that never comes.
+    void client
+      .listInstruments(tenantSlug)
+      .catch((): SavedCard[] => [])
+      .then((cards) => {
+        if (active) setState({ cards, loaded: true });
+      });
     return () => {
       active = false;
     };
@@ -53,13 +58,27 @@ export function useSavedCards(
   selection: string;
   setSelection: (id: string) => void;
 } {
-  const { cards } = useSavedCardList(tenantSlug);
-  const [selection, setSelection] = useState<string>(NEW_CARD);
+  // The cards and the selection land in ONE update, as they always did: a
+  // render holding the cards with nothing selected would flash the new-card
+  // form at a buyer whose saved card is about to be chosen for them.
+  const [state, setState] = useState<{ savedCards: SavedCard[]; selection: string }>({ savedCards: [], selection: NEW_CARD });
+  const client = useCheckoutClientApi();
   useEffect(() => {
-    const first = cards[0];
-    if (first && !freshInstrument) setSelection(first.id);
-  }, [cards, freshInstrument]);
-  return { savedCards: cards, selection, setSelection };
+    let active = true;
+    void client
+      .listInstruments(tenantSlug)
+      .catch((): SavedCard[] => [])
+      .then((cards) => {
+        if (!active) return;
+        const first = cards[0];
+        setState((prev) => ({ savedCards: cards, selection: first && !freshInstrument ? first.id : prev.selection }));
+      });
+    return () => {
+      active = false;
+    };
+  }, [tenantSlug, client, freshInstrument]);
+  const setSelection = useCallback((id: string) => setState((prev) => ({ ...prev, selection: id })), []);
+  return { savedCards: state.savedCards, selection: state.selection, setSelection };
 }
 
 /**
@@ -91,11 +110,18 @@ export function useCardPublicKey(
   useEffect(() => {
     if (!asks) return undefined;
     let active = true;
-    void client.refreshBrowserKey({ orderId }).then((result) => {
-      if (!active) return;
-      setAnswered(true);
-      if (result.ok && result.data.publicKey) setPublicKey(result.data.publicKey);
-    });
+    void client
+      .refreshBrowserKey({ orderId })
+      .then((result) => {
+        if (!active) return;
+        setAnswered(true);
+        if (result.ok && result.data.publicKey) setPublicKey(result.data.publicKey);
+      })
+      // A refresh that failed has answered too: the charge goes on and the
+      // tokenizer says why, rather than the bar waiting forever.
+      .catch(() => {
+        if (active) setAnswered(true);
+      });
     return () => {
       active = false;
     };

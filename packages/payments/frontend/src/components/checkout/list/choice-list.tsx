@@ -1,11 +1,11 @@
 import { Box } from "@mui/material";
-import { useId, type JSX } from "react";
+import { useId, type JSX, type ReactNode } from "react";
 
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo } from "../types";
 import { useCheckoutComponents } from "../ui";
 
-import type { OnlineRow } from "./choice";
+import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import { OnlineContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
@@ -25,7 +25,7 @@ function onlineWords(
   const head = state.card.saved[0];
   return {
     label: copy.card.label,
-    hint: head ? copy.card.hintSaved(copy.savedCard(head.brand, head.last4)) : copy.card.hintNew,
+    hint: head ? copy.card.hintSaved(cardName(copy, head)) : copy.card.hintNew,
   };
 }
 
@@ -95,10 +95,24 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
   );
 }
 
+/** One heading and the rows under it, as a group named by the heading. */
+function Group({ id, heading, children }: { id: string; heading: string; children: ReactNode }): JSX.Element {
+  return (
+    <Box role="group" aria-labelledby={id} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+      <GroupHeading id={id}>{heading}</GroupHeading>
+      {children}
+    </Box>
+  );
+}
+
 /**
  * "Como você quer pagar?" — every way to pay as ONE radio group under two
  * headings (FUT-3591, M6): the store's online options, then the host's door
  * options. Choosing a row only chooses it; the bar's button acts.
+ *
+ * One radio `name` across both groups keeps them one choice for the keyboard;
+ * each heading names its own `role="group"`, and what opens inside a row sits
+ * beside its radio's label, never inside it.
  */
 export function ChoiceList({
   door,
@@ -106,18 +120,17 @@ export function ChoiceList({
   ...rest
 }: Omit<RowProps, "name"> & {
   door: readonly CheckoutDoorOption[];
-  /** The card's 5-second bar is running: the list is inert, only Cancelar acts. */
+  /** A charge or a send is under way: the list is inert. */
   locked: boolean;
 }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const props: RowProps = { ...rest, name: useId() };
+  const base = useId();
+  const props: RowProps = { ...rest, name: `${base}-choice` };
   const { copy, state } = props;
   return (
     <Box
       data-testid="payment-list"
       data-locked={locked ? "true" : "false"}
-      role="radiogroup"
-      aria-label={copy.title}
       aria-disabled={locked || undefined}
       inert={locked || undefined}
       sx={{ display: "flex", flexDirection: "column", gap: 1.5, opacity: locked ? 0.6 : 1 }}
@@ -126,14 +139,16 @@ export function ChoiceList({
         {copy.title}
       </Text>
       {/* Each heading only over a group that has rows (a door-only store shows the door one alone). */}
-      {state.rows.length > 0 ? <GroupHeading>{copy.onlineHeading}</GroupHeading> : null}
-      {state.rows.map((row) => <OnlineOptionRow key={row.method} row={row} props={props} />)}
-      {door.length > 0 ? (
-        <Box sx={{ mt: state.rows.length > 0 ? 0.75 : 0 }}>
-          <GroupHeading>{copy.doorHeading}</GroupHeading>
-        </Box>
+      {state.rows.length > 0 ? (
+        <Group id={`${base}-online`} heading={copy.onlineHeading}>
+          {state.rows.map((row) => <OnlineOptionRow key={row.method} row={row} props={props} />)}
+        </Group>
       ) : null}
-      {door.map((option) => <DoorOptionRow key={option.id} option={option} props={props} />)}
+      {door.length > 0 ? (
+        <Group id={`${base}-door`} heading={copy.doorHeading}>
+          {door.map((option) => <DoorOptionRow key={option.id} option={option} props={props} />)}
+        </Group>
+      ) : null}
     </Box>
   );
 }

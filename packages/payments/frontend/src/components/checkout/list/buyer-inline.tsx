@@ -7,6 +7,7 @@ import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 import { useCheckoutComponents } from "../ui";
 
+import { usePaymentListMode } from "./context";
 import type { PaymentListCopy } from "./types";
 
 /**
@@ -61,7 +62,8 @@ export function BuyerInline({
   provider: string | null;
   onComplete?: () => void;
 }): JSX.Element | null {
-  const { Input, Text } = useCheckoutComponents();
+  const { Checkbox, Input, Text } = useCheckoutComponents();
+  const consent = usePaymentListMode()?.consent;
   const cardCopy = useCheckoutCopy().card;
   const complete = asked.every((field) => fieldSatisfied(field, buyer[field.key]));
   const was = useRef(complete);
@@ -110,6 +112,14 @@ export function BuyerInline({
           </Box>
         );
       })}
+      {consent ? (
+        <Checkbox
+          label={consent.label}
+          checked={consent.checked}
+          onChange={(_event, checked) => consent.onChange(checked)}
+          data-testid="list-save-profile"
+        />
+      ) : null}
     </Box>
   );
 }
