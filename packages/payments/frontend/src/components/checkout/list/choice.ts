@@ -64,9 +64,27 @@ export function raisedMethod(choice: CheckoutOnlineChoice, offered: PaymentMetho
 }
 
 /**
+ * The saved card to choose for the buyer: the one used LAST (owner,
+ * 2026-10-15), or the list's head — the host's own order, newest first — when
+ * no card says when it was used. A card never used loses to any used one.
+ */
+export function lastUsedCard(saved: readonly SavedCard[]): SavedCard | undefined {
+  let pick: SavedCard | undefined;
+  let pickAt = -Infinity;
+  for (const card of saved) {
+    const at = card.lastUsedAt ? Date.parse(card.lastUsedAt) : Number.NaN;
+    if (!Number.isNaN(at) && at > pickAt) {
+      pick = card;
+      pickAt = at;
+    }
+  }
+  return pick ?? saved[0];
+}
+
+/**
  * What is chosen before the buyer touches anything (M7, owner 2026-10-15): a
  * saved card makes "Cartão de crédito" the choice with that card selected —
- * the list's head, which the host orders last-used first. Nothing else is ever
+ * the one used last ({@link lastUsedCard}). Nothing else is ever
  * preselected: never Pix, never a door tender (FUT-1478), and not a store's
  * only method either (that pick used to raise an order with no tap at all).
  *
@@ -82,7 +100,7 @@ export function preselection(
   const card = rows.find((row) => row.method === "CARD" && !row.disabled);
   if (!card) return null;
   if (fresh) return { choice: { kind: "online", method: "CARD" }, selection: saved.length > 0 ? null : NEW_CARD };
-  const head = saved[0];
+  const head = lastUsedCard(saved);
   if (!head) return null;
   return { choice: { kind: "online", method: "CARD" }, selection: head.id };
 }
@@ -157,6 +175,8 @@ export function blockedReason(input: {
   buyer: BuyerInfo;
   selection: string | null;
   cardIsComplete: boolean;
+  /** The host's balance pays the whole amount: no card needs choosing. */
+  covered?: boolean;
 }): string | null {
   const { copy, choice } = input;
   if (input.hold) return input.hold;
@@ -164,7 +184,7 @@ export function blockedReason(input: {
   if (choice.kind === "door") return input.door ? input.door.blocked : copy.reasons.choose;
   const buyer = buyerReason(input.asked, input.buyer, copy.reasons);
   if (buyer) return buyer;
-  if (choice.method !== "CARD") return null;
+  if (choice.method !== "CARD" || input.covered) return null;
   return cardReason(input.selection, input.cardIsComplete, copy.reasons);
 }
 

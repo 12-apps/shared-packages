@@ -66,11 +66,19 @@ function saveAsked(props: ListFaceProps): void {
   saveBuyerContact?.({ name: c.buyer.name, phone: c.buyer.phone, taxId: c.buyer.taxId });
 }
 
+/**
+ * What an online payment asks for: the host's amount due when a balance it
+ * holds pays part of the cart, else the cart's total (P3).
+ */
+function onlineTotal(props: ListFaceProps): string {
+  return props.list.amountDueLabel ?? props.total;
+}
+
 /** An online choice's press: the card goes through the bar, Pix and the hand-off raise at once. */
 function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice): void {
   const { c, charge, cap } = props;
   saveAsked(props);
-  if (method === "CARD") return charge.start("CARD", props.total);
+  if (method === "CARD") return charge.start("CARD", onlineTotal(props));
   const raised = method === "PIX" ? "PIX" : handOffMethod(cap.offered);
   if (method === "HAND_OFF") props.onHandOff();
   c.setMethod(raised);
@@ -94,7 +102,7 @@ function useAct(props: ListFaceProps, clearFailure: () => void): () => void {
 
 /**
  * Google Pay's press, from Google's own button: the sheet opens HERE, inside
- * the tap, priced with the host's total — then the order is raised behind it.
+ * the tap, priced with the host's amount due — then the order is raised behind it.
  */
 function useGooglePayPress(props: ListFaceProps, clearFailure: () => void, sheet: { current: OpenSheet | null }): () => void {
   return () => {
@@ -113,7 +121,7 @@ function useGooglePayPress(props: ListFaceProps, clearFailure: () => void, sheet
         },
       );
     sheet.current = { answer, cents };
-    charge.start("GOOGLE_PAY", props.total);
+    charge.start("GOOGLE_PAY", onlineTotal(props));
   };
 }
 
@@ -151,26 +159,35 @@ function cardCharging(charge: ListCharge): boolean {
   return charge.phase === "counting" || (charge.phase === "sending" && charge.kind === "CARD");
 }
 
-/** The bar's sentence: the amount frozen at the press, and the card it goes on. */
+/**
+ * The bar's sentence: the amount frozen at the press, and the card it goes on
+ * — or, when the host's balance pays everything, no card at all.
+ */
 function chargingText(props: ListFaceProps): string {
-  const { charge, list, state, total } = props;
+  const { charge, list, state } = props;
+  if (coveredByHost(list) && list.copy.chargingCovered) return list.copy.chargingCovered;
   const selected = state.card.saved.find((card) => card.id === state.card.selection);
-  return list.copy.charging(charge.pressedTotal ?? total, selected ? cardName(list.copy, selected) : null);
+  return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
 }
 
 /** The verb, the amount and the busy state of the button, for what is chosen. */
 function buttonFacts(props: ListFaceProps): { label: string; total: string; busy: boolean } {
   const { list, state } = props;
   const door = chosenDoor(props);
+  const online = state.choice?.kind === "online";
   return {
     label: list.hold ? list.hold.action : actionLabel(list.copy, state.choice, door, props.provider),
-    total: door?.totalLabel ?? props.total,
+    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : props.total,
     busy: inFlight(props),
   };
 }
 
-/** Google Pay chosen while the host re-prices: the row stays, its button waits for the price. */
-function googlePayRepricing(props: ListFaceProps): boolean {
+/**
+ * Google Pay chosen while the host re-prices (or for the one render before the
+ * list drops a choice nobody prices any more): a plain disabled button, never
+ * a spinner, with `copy.reasons.repricing` under it.
+ */
+function googlePayUnpriced(props: ListFaceProps): boolean {
   const { choice } = props.state;
   return choice?.kind === "online" && choice.method === "GOOGLE_PAY" && !props.cap.googlePay;
 }
@@ -199,7 +216,7 @@ function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnF
   // all under "não pague de novo" (FUT-563), as the card pane does today.
   if (failure?.code === UNRESOLVED_CODE) return null;
   const { label, total, busy } = buttonFacts(props);
-  if (googlePayRepricing(props)) return <ActionButton label={label} total={total} disabled loading onClick={act} />;
+  if (googlePayUnpriced(props)) return <ActionButton label={label} total={total} disabled loading={false} onClick={act} />;
   if (googlePayLive(props, reason, busy) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
   return <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={act} focusOnMount={returnFocus} />;
 }
@@ -230,13 +247,19 @@ function RaiseError({ c, onRetry }: { c: Controller; onRetry: () => void }): JSX
   return <PaymentErrorPanel message={c.createError} emailFlagged={c.errorField === "email"} code={c.errorCode} onUseEmail={c.payWithEmail} onRetry={onRetry} />;
 }
 
+/** The host's balance pays the whole amount (`totalCents: 0`): no card is asked for or charged. */
+function coveredByHost(list: CheckoutPaymentList): boolean {
+  return list.totalCents === 0;
+}
+
 /** Why the button is held: the host's hold, then the list's own reasons, in the prototype's order. */
 function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined): string | null {
   const { c, list, state } = props;
-  return blockedReason({
+  const reason = blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door, asked: state.asked,
-    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete,
+    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
   });
+  return reason ?? (googlePayUnpriced(props) ? (list.copy.reasons.repricing ?? null) : null);
 }
 
 /**
@@ -262,8 +285,8 @@ function barFacts(props: ListFaceProps, door: CheckoutDoorOption | undefined, re
  * appears or a total that moves mid-bar stops it, and `send` checks again.
  */
 function useChargeGuard(props: ListFaceProps, reason: string | null): void {
-  const { charge, total } = props;
-  const allowed = reason === null && (charge.pressedTotal === null || charge.pressedTotal === total);
+  const { charge } = props;
+  const allowed = reason === null && (charge.pressedTotal === null || charge.pressedTotal === onlineTotal(props));
   const { setAllowed } = charge;
   useEffect(() => setAllowed(allowed), [allowed, setAllowed]);
 }
@@ -301,7 +324,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   return (
     <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
-        <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} />
+        <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} />
       ) : null}
       <Runners props={props} sheet={sheet.current} onFailed={onFailed} />
       <RaiseError c={c} onRetry={act} />

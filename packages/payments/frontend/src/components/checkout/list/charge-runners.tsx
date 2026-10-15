@@ -107,10 +107,26 @@ export function CardRun({
 }
 
 /**
+ * A refusal a host can fix: its order answers no `amountDueCents`, and its
+ * total is not what the sheet showed — the shape of a balance taken off the
+ * charge that the order view does not report. Said once in development; the
+ * buyer still gets the refusal.
+ */
+function warnMissingAmountDue(order: CheckoutOrder, sheetCents: number): void {
+  const development = typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
+  if (order.amountDueCents !== undefined || !development) return;
+  console.warn(
+    `[payments-frontend] Google Pay refused: the order costs ${order.totalCents} cents and the sheet showed ${sheetCents}. ` +
+      "A host that takes a balance off the charge must answer CheckoutOrder.amountDueCents.",
+  );
+}
+
+/**
  * Google Pay: the sheet was opened INSIDE the buyer's tap (`sheet`, priced at
  * `sheetCents`) while the order was raised; its key is charged against that
- * order only if the order costs what the sheet showed. A closed sheet sends
- * nothing more.
+ * order only if the order asks the provider for what the sheet showed — its
+ * amount due, which a balance the host holds may have made less than its
+ * total. A closed sheet sends nothing more.
  */
 export function WalletRun({
   order,
@@ -140,7 +156,10 @@ export function WalletRun({
       .then((key) => {
         if (key === null) return onFailed(null);
         // The sheet showed one amount; never charge another under it.
-        if (order.totalCents !== sheetCents) return onFailed(refused);
+        if ((order.amountDueCents ?? order.totalCents) !== sheetCents) {
+          warnMissingAmountDue(order, sheetCents);
+          return onFailed(refused);
+        }
         return void wallet.payWithKey("GOOGLE_PAY", key);
       })
       .catch(() => onFailed(refused));

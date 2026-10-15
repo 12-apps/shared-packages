@@ -51,6 +51,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     details: "Preencha seus dados para pagar pelo app.",
     chooseCard: "Escolha o cartão.",
     cardDetails: "Preencha os dados do cartão.",
+    repricing: "Atualizando o valor…",
   },
   actions: {
     choose: "Escolha como pagar",
@@ -62,6 +63,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
   payer: (name) => `Pagando como ${name} · CPF ✓`,
   payerChange: "Alterar",
   charging: (total, card) => `Pagando ${total} no ${card ?? "cartão informado"}…`,
+  chargingCovered: "Confirmando o pedido, pago com o seu saldo…",
   cancel: "Cancelar",
   pixFace: {
     title: (total) => `Pague ${total} com Pix`,

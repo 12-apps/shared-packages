@@ -32,6 +32,8 @@ interface RaisePorts {
   startPayment: (method: PaymentMethod) => Promise<void>;
   /** The amount the buyer is shown now (the cart's, or the balance's). */
   cartTotal: string;
+  /** What an online payment asks the provider for now, when the host prices it (`paymentList.totalCents`). */
+  dueCents?: number;
 }
 
 export interface ListCharge {
@@ -57,9 +59,23 @@ export interface ListCharge {
   chargeable: CheckoutOrder | null;
 }
 
-/** A held CARD order still awaiting payment AND priced as the buyer now sees — reusable for the charge. */
-function reusable(order: CheckoutOrder | null, cartTotal: string): boolean {
-  return order?.method === "CARD" && order.status === "AWAITING_PAYMENT" && order.totalLabel === cartTotal;
+/**
+ * A held CARD order still awaiting payment AND priced as the buyer now sees —
+ * reusable for the charge. A balance ticked or unticked moves what the charge
+ * asks for and not the order's total, so the amount due is compared too.
+ */
+function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined): boolean {
+  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || order.totalLabel !== cartTotal) return false;
+  return dueCents === undefined || (order.amountDueCents ?? order.totalCents) === dueCents;
+}
+
+/**
+ * An awaiting CARD order that asks the provider for nothing: a balance the host
+ * holds covers it, and the host should have settled it (see `amountDueLabel`).
+ * It is never charged.
+ */
+function owesNothing(order: CheckoutOrder | null): boolean {
+  return order?.method === "CARD" && order.status === "AWAITING_PAYMENT" && order.amountDueCents === 0;
 }
 
 /** The order `send` meant: the one it reused, or the CARD order raised to replace a stale one. */
@@ -67,9 +83,22 @@ function chargeTarget(
   order: CheckoutOrder | null,
   target: { reuse: CheckoutOrder } | { replace: CheckoutOrder | null } | null,
 ): CheckoutOrder | null {
-  if (!order || !target || order.method !== "CARD" || order.status !== "AWAITING_PAYMENT") return null;
+  if (!order || !target || order.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || owesNothing(order)) return null;
   if ("reuse" in target) return target.reuse === order ? order : null;
   return order !== target.replace ? order : null;
+}
+
+/**
+ * Back to the list when the press left nothing to charge: a raise that failed
+ * (the step's error panel says why), or a held order that owes the provider
+ * nothing — never charged, rather than waited on forever.
+ */
+function useSettleWhenNothingToCharge(phase: ListChargePhase, kind: ListChargeKind | null, ports: RaisePorts, settle: () => void): void {
+  const { order, creating, createError } = ports;
+  useEffect(() => {
+    if (phase !== "sending" || creating) return;
+    if ((!order && createError) || (kind === "CARD" && owesNothing(order))) settle();
+  }, [phase, kind, creating, order, createError, settle]);
 }
 
 /**
@@ -108,8 +137,8 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     // must not let the bar's own timer charge past it.
     if (!allowed.current) return cancel();
     setPhase("sending");
-    const { order, cartTotal } = latest.current;
-    if (reusable(order, cartTotal) && order) {
+    const { order, cartTotal, dueCents } = latest.current;
+    if (reusable(order, cartTotal, dueCents) && order) {
       target.current = { reuse: order };
       return;
     }
@@ -148,12 +177,8 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  // A raise that failed leaves nothing to charge: back to the list, where the
-  // step's error panel says why.
-  const { order, creating, createError } = ports;
-  useEffect(() => {
-    if (phase === "sending" && !creating && !order && createError) settle();
-  }, [phase, creating, order, createError, settle]);
+  const { order, creating } = ports;
+  useSettleWhenNothingToCharge(phase, kind, ports, settle);
 
   const sending = phase === "sending" || phase === "waiting";
   const chargeable = sending && !creating ? chargeTarget(order, target.current) : null;

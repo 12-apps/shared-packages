@@ -308,7 +308,9 @@ export function createCheckoutClient(transport: CheckoutTransport): CheckoutClie
       // offered for a Stone charge it would fail (or misroute).
       const query = tenantSlug ? `?tenantSlug=${encodeURIComponent(tenantSlug)}` : "";
       const result = await call<SavedCard[]>(`/cards${query}`, { method: "GET" });
-      return result.ok ? result.data : [];
+      // A route that answers `null` (or no list at all) has no saved card —
+      // every screen that reads this maps over it.
+      return result.ok && Array.isArray(result.data) ? result.data : [];
     },
 
     beginVault: () => call<BuyerVaultSession>("/cards/begin", { method: "POST" }),

@@ -70,8 +70,10 @@ export function OptionRow({
         borderRadius: 2.5,
         px: 1.5,
         opacity: disabled ? 0.6 : 1,
-        // The keyboard's place in the group, drawn on the whole row (5.1 item 6).
-        "&:has(input:focus-visible)": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
+        // The keyboard's place in the group, drawn on the whole row (5.1 item 6)
+        // — for the row's own radio only: a field opened inside draws its own
+        // ring, and a second one around the row doubled it.
+        "&:has(> label input[type='radio']:focus-visible)": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
       }}
     >
       <Box

@@ -5,7 +5,8 @@
  *  - the saved-card chips are ONE Tab stop; the arrows, Home and End move and
  *    select, as a radio group's do;
  *  - a Google Pay choice survives a moment without a price (the host
- *    re-pricing after the credit toggles): the row stays, its button waits.
+ *    re-pricing after the credit toggles): the row stays, its button is held
+ *    PLAINLY — disabled, no spinner, "Atualizando o valor…" under it.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -92,7 +93,7 @@ function installGoogle(): void {
 }
 
 describe("Google Pay while the host re-prices", () => {
-  it("keeps the choice and holds the button until the price returns", async () => {
+  it("keeps the choice and holds the button plainly until the price returns", async () => {
     installGoogle();
     const host = { config: walletStore(), client: stubClient() };
     const { rerender } = renderList({ ...host, list: { totalCents: 2700 } });
@@ -101,7 +102,12 @@ describe("Google Pay while the host re-prices", () => {
     await screen.findByTestId("google-pay-native");
 
     rerender(listFlow({ ...host, list: {} }));
-    await waitFor(() => expect((screen.getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() => {
+      const pay = screen.getByTestId("list-pay") as HTMLButtonElement;
+      expect(pay.disabled).toBe(true);
+      expect(pay.querySelector('[role="progressbar"]')).toBeNull();
+      expect(screen.getByText("Atualizando o valor…")).toBeTruthy();
+    });
     expect(radio("list-option-GOOGLE_PAY").checked).toBe(true);
 
     rerender(listFlow({ ...host, list: { totalCents: 2500 } }));

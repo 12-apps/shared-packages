@@ -40,6 +40,12 @@ export interface SavedCard {
   expMonth: number;
   expYear: number;
   holder: string;
+  /**
+   * When the buyer last paid with it (ISO-8601), or `null`/absent when the
+   * host does not say. The one list preselects the card used LAST (FUT-3591);
+   * every other screen keeps the host's own order.
+   */
+  lastUsedAt?: string | null;
 }
 
 /** Per-field validation messages; `undefined` means the field is fine. */

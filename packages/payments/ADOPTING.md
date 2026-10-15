@@ -787,7 +787,8 @@ import { PAYMENT_LIST_COPY } from "@12-apps/payments-frontend/locales";
     onlineExtras: <StoreCreditCheckbox />,     // in the bar while an ONLINE option is chosen
     door: useDoorOptions(),                    // CheckoutDoorOption[] — see below
     hold: addressOpen ? { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } : null,
-    totalCents: 2200,                          // integer cents, AFTER credit: what the order will cost
+    totalCents: 2200,                          // integer cents: the AMOUNT DUE online, after a balance you hold
+    amountDueLabel: "R$ 22,00",                // the same, formatted — only when it is not the cart's total
     onChoiceChange: (choice) => setChoice(choice),
   }}
 />
@@ -797,8 +798,10 @@ What changes for the buyer:
 
 - **Picking creates nothing.** No order is raised on a pick, and a store's only
   method is no longer chosen for them. A saved card is the one thing that comes
-  chosen — "Cartão de crédito" with the head of the saved list selected, so list
-  your cards last-used first.
+  chosen — "Cartão de crédito" with the card used LAST selected: the one whose
+  `SavedCard.lastUsedAt` is latest, or the head of your list when no card says.
+  Answer `lastUsedAt` on `/cards` (stamp it when a charge with the card goes
+  through); the tabs layout ignores it and keeps your list's head.
 - **The missing CPF (or mobile) is asked inside the chosen option**, above the
   card fields, instead of on a Dados step first; a complete CPF moves the focus
   to the card number. A buyer with one on file is never asked.
@@ -821,7 +824,8 @@ What changes for the buyer:
 | `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
 | `door?` | your pay-at-the-door options — the slot below |
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
-| `totalCents?` | integer cents, after credit — the amount the order will cost; Google Pay's sheet is priced with it. **A host without it gets no Google Pay row.** Once given, a moment without it (you are re-pricing) keeps a chosen Google Pay and holds its button until it returns |
+| `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Google Pay's sheet is priced with it, and its key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no Google Pay row** (a chosen one is dropped). Once given, a moment without it (you are re-pricing) keeps a chosen Google Pay and holds its button plainly — disabled, `copy.reasons.repricing` under it — until it returns |
+| `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar, Google Pay's press and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
 | `onChoiceChange?` | every change of choice, door ids included |
 
 **The door slot.** Paying at the door raises no charge, so it is the host's:
@@ -838,12 +842,24 @@ What changes for the buyer:
 | `onSend()` | the press — place the order yourself |
 
 Rebuild the array whenever any field changes: the list draws what it is
-handed on every render. `usePaymentList` on `createPaymentFlows` is the same
+handed on every render.
+
+**A balance you hold (store credit).** The list does no money arithmetic; you
+tell it the amount due, and your server tells it what each raised order owes:
+
+| what | your part |
+| --- | --- |
+| `CheckoutOrder.amountDueCents` | answer it on every raised order when a balance pays part of `totalCents`: the cents the provider is asked for. **A credit host that leaves it out has every Google Pay key refused** (its total is not the sheet's); in development the list says so with a `console.warn`. |
+| the wallet charge | your `/charge` route must check the wallet amount against the order's CURRENT amount due, not its total — the sheet was priced with the amount due |
+| everything covered (`totalCents: 0`) | the card option asks for no card, and the bar says `copy.chargingCovered`. The order the button raises must come back SETTLED — paid from the balance with no provider call, status not `AWAITING_PAYMENT` — so the list goes to its paid screen. An order that comes back awaiting with `amountDueCents: 0` is never charged; the list gives its rows back |
+| `copy.chargingCovered?`, `copy.reasons.repricing?` | the bar's sentence for a covered order; the reason under a Google Pay held while you re-price. Both packs carry them | `usePaymentList` on `createPaymentFlows` is the same
 thing for the mounted flow, read as a hook.
 
 **Known limitation.** The rows' radios are MUI's own `Radio`, not a checkout
 slot, so a host on another component kit gets MUI's radio dressed by its
-theme; the keyboard ring is drawn on the whole row (`:has(input:focus-visible)`).
+theme; the keyboard ring is drawn on the whole row for its own radio only
+(`:has(> label input[type='radio']:focus-visible)`), so a field opened inside the row
+draws its own ring and no second one.
 
 ## 4. Migrating the existing PagBank integration
 
