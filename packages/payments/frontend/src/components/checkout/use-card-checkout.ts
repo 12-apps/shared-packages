@@ -4,7 +4,6 @@ import {
   NEW_CARD,
   detectBrand,
   onlyDigits,
-  tokenizerFor,
   validateCardNumber,
   validateCvv,
   validateExpiry,
@@ -23,6 +22,7 @@ import {
   type RefreshBrowserKey,
 } from "./card-instruments";
 import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card-outcome";
+import { useCardPublicKey, useSavedCards } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
@@ -34,80 +34,6 @@ import { useCheckoutCopy } from "./copy-context";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
 
-/**
- * Saved-card list + current selection, loaded once on mount — scoped to the
- * current store (FUT-697), so only cards the store's active provider can
- * actually charge are offered. The slug arrives as an argument (the host's
- * routing owns it); absent, the list is unscoped, exactly as before FUT-697.
- */
-function useSavedCards(
-  tenantSlug: string | undefined,
-  /**
-   * The buyer is here because a card was REFUSED (FUT-1145), so the saved card
-   * this would otherwise preselect is the one that just failed. The list is
-   * still offered — another saved card may well work — but nothing is chosen
-   * for them, which puts the form in front of a buyer whose only untried
-   * instrument is a new one.
-   */
-  freshInstrument: boolean,
-): {
-  savedCards: SavedCard[];
-  selection: string;
-  setSelection: (id: string) => void;
-} {
-  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
-  const [selection, setSelection] = useState<string>(NEW_CARD);
-  const client = useCheckoutClientApi();
-
-  useEffect(() => {
-    let active = true;
-    void client.listInstruments(tenantSlug).then((cards) => {
-      if (!active) return;
-      setSavedCards(cards);
-      const first = cards[0];
-      if (first && !freshInstrument) setSelection(first.id);
-    });
-    return () => {
-      active = false;
-    };
-  }, [tenantSlug, client, freshInstrument]);
-
-  return { savedCards, selection, setSelection };
-}
-
-/**
- * The store's card public key for this order. The checkout config resolved the
- * initial key server-side (`GET /api/checkout/config`, FUT-697); the SPA
- * fetches through the order-scoped refresh route only when the ACTIVE provider
- * is PagBank — the sole provider that can mint a key on demand — and the
- * config arrived without one. A `null` key never means "mock": stub permission
- * travels separately as `mockTokenization`.
- */
-function useCardPublicKey(
-  orderId: string,
-  config: CardTokenizationConfig,
-): {
-  publicKey: string | null;
-  setPublicKey: (key: string) => void;
-} {
-  const [publicKey, setPublicKey] = useState<string | null>(config.publicKey);
-  const client = useCheckoutClientApi();
-  const refreshable =
-    config.provider !== null && tokenizerFor(config.provider) === "pagbank-sdk";
-
-  useEffect(() => {
-    if (config.publicKey !== null || !refreshable) return undefined;
-    let active = true;
-    void client.refreshBrowserKey({ orderId }).then((result) => {
-      if (active && result.ok && result.data.publicKey) setPublicKey(result.data.publicKey);
-    });
-    return () => {
-      active = false;
-    };
-  }, [orderId, config.publicKey, refreshable, client]);
-
-  return { publicKey, setPublicKey };
-}
 
 /** Everything the card view renders — all checkout state + the submit handler. */
 export interface CardCheckout {
@@ -137,6 +63,12 @@ export interface CardCheckout {
   pollTimedOut: boolean;
   /** Ask now and restart the wait — the buyer's "verificar de novo". */
   pollCheckAgain: () => void;
+  /**
+   * The order-scoped key refresh has not answered yet (`./card-sources.ts`): a
+   * charge started now would tokenize a new card with no key. A screen that
+   * starts the charge itself waits for this to clear.
+   */
+  keyPending: boolean;
   handlePay: () => Promise<void>;
 }
 
@@ -160,6 +92,7 @@ type CardSubmit = Pick<
   | "pollError"
   | "pollTimedOut"
   | "pollCheckAgain"
+  | "keyPending"
   | "handlePay"
 >;
 
@@ -246,7 +179,7 @@ function useCardWait(
  * poll for the async confirmation, bubbling the terminal status up via
  * {@link onResolved}.
  */
-function useCardSubmit(
+export function useCardSubmit(
   order: CheckoutOrder,
   buyer: BuyerInfo,
   providerConfig: CardTokenizationConfig,
@@ -264,7 +197,7 @@ function useCardSubmit(
   const [errorCode, setErrorCode] = useState<string | null>(null);
   // The active key: resolved by the checkout config, overridden by the
   // rotated-key self-heal for the rest of the session.
-  const { publicKey, setPublicKey } = useCardPublicKey(order.orderId, providerConfig);
+  const { publicKey, setPublicKey, keyPending } = useCardPublicKey(order.orderId, providerConfig);
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
   const cardCopy = useCheckoutCopy().card;
@@ -323,7 +256,7 @@ function useCardSubmit(
     else setSubmitted(true);
   };
 
-  return { submitting, submitted, error, errorCode, ...wait, handlePay };
+  return { submitting, submitted, error, errorCode, ...wait, keyPending, handlePay };
 }
 
 /**

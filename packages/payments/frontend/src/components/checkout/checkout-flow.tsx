@@ -2,18 +2,20 @@ import { useMemo, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
 import { buyerFieldsFor } from "./buyer-fields";
-import { EmptyCart, PaymentStep } from "./checkout-steps";
+import { EmptyCart } from "./checkout-steps";
 import { DadosStep } from "./dados-step";
 import { PaymentStatus } from "./payment-status";
 import type { BackActionEmphasis } from "./payment-status-parts";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutCopyProvider } from "./copy-context";
-import { OneClickProvider, useOneClick } from "./one-click";
+import { useOneClick } from "./one-click";
 import { CheckoutComponentsProvider, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
 import { CheckoutFrame, FlowHeader } from "./checkout-frame";
 import type { CheckoutDeliverySummary, CheckoutSummaryLine } from "./payment-summary";
 import { useCheckoutController, type CheckoutHostPorts } from "./use-checkout-controller";
+import type { CheckoutPaymentList } from "./list/types";
+import { PaymentPhase, settlementTotalOverride } from "./payment-phase";
 
 
 /** What the flow reads off the host's cart — display facts, never money math. */
@@ -111,6 +113,16 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   backActionEmphasis?: BackActionEmphasis;
   /** Design-system slots; unfilled slots render the raw-MUI defaults. */
   components?: Partial<CheckoutComponents>;
+  /**
+   * Opt-in: the Pagamento step as ONE list (FUT-3591) — the store's online
+   * options and the host's door options in one radio group, nothing raised on
+   * a pick, the bar's button the only way an order is made, and the card
+   * charged after a 5-second bar the buyer can cancel (FUT-3592). The buyer's
+   * missing CPF is asked inside the option instead of on a Dados step first.
+   * Absent: the method tabs, the order summary and raise-on-pick, unchanged.
+   * See `./list/types.ts`.
+   */
+  paymentList?: CheckoutPaymentList;
 }
 
 /**
@@ -121,13 +133,6 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
  */
 function cartLoaded(cart: CheckoutCartView): boolean {
   return cart.identity?.ready !== false;
-}
-
-/** The pay-bar total override when settling a settlement (else the cart's own totals). */
-function settlementTotalOverride(
-  settlement: SettlementCheckout | null | undefined,
-): { label: string; items: number } | undefined {
-  return settlement ? { label: settlement.totalLabel, items: settlement.totalItems } : undefined;
 }
 
 /**
@@ -244,67 +249,17 @@ function nothingToPayFor(
   return !c.order && !c.creating && c.step !== "status";
 }
 
-/** Step 2, with the controller's facts and the host's money mapped onto it. */
-function PagamentoStep({
-  c,
-  cart,
-  settlement,
-  providerConfig,
-  tenantSlug,
-  validateApplePayMerchant,
-}: {
-  c: ReturnType<typeof useCheckoutController>;
-  cart: CheckoutCartView;
-  settlement: SettlementCheckout | null | undefined;
-  providerConfig: CheckoutProviderConfig | null | undefined;
-  tenantSlug: string | undefined;
-  validateApplePayMerchant: ((validationURL: string) => Promise<unknown>) | undefined;
-}): JSX.Element {
-  return (
-    <PaymentStep
-      method={c.method}
-      onMethodChange={c.setMethod}
-      order={c.order}
-      buyer={c.buyer}
-      creating={c.creating}
-      createError={c.createError}
-      errorField={c.errorField}
-      errorCode={c.errorCode}
-      onGenerate={(chosen) => void c.startPayment(chosen)}
-      refresh={c.refresh}
-      onUseEmail={c.payWithEmail}
-      // Set only for a skipped-Dados flow (the controller decides); the payer
-      // block hides itself when it is absent.
-      onEditBuyer={c.editBuyer}
-      providerConfig={providerConfig}
-      tenantSlug={tenantSlug}
-      // The amount, on the step that asks for it (FUT-1179).
-      cartTotals={cart}
-      totalOverride={settlementTotalOverride(settlement)}
-      discountLines={cart.discountLines}
-      // The order around the payment, for the summary (FUT-3525).
-      lines={cart.lines}
-      delivery={cart.delivery}
-      orderNote={cart.orderNote}
-      // Retrying a refused card: the failed saved card is not chosen again (FUT-1145).
-      freshInstrument={c.freshInstrument}
-      // The card path parks an order of its own for a 3-D Secure challenge, so
-      // it needs the same basket the flow was mounted for (FUT-1213).
-      basket={cart.identity}
-      validateApplePayMerchant={validateApplePayMerchant}
-      onResolved={c.handleResolved}
-    />
-  );
-}
-
 function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Element {
-  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, confirmationHero, confirmationFooter, backActionEmphasis, validateApplePayMerchant, oneClick = false, ...ports } = props;
+  const { copy, cart, defaultBuyer, settlement, taxIdOnFile = false, providerConfig, tenantSlug, confirmationExtra, confirmationHero, confirmationFooter, backActionEmphasis, oneClick = false, paymentList } = props;
+  const ports = { createOrder: props.createOrder, saveBuyerContact: props.saveBuyerContact, onExitToMenu: props.onExitToMenu, onPaid: props.onPaid };
   // Resolved for NO method on purpose (FUT-595): the Dados step opens before
   // the picker, and the form is filled once — so it asks for the union of what
   // any chain member may need rather than re-opening after the choice. A chain
   // that declares nothing degrades to CPF-required, never to "ask nothing".
   const buyerFields = useMemo(() => buyerFieldsFor(providerConfig?.chain, null), [providerConfig]);
-  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile, buyerFields, tenantSlug, cart.identity);
+  // The list asks a missing CPF inside the option (M11), so it opens on
+  // Pagamento as a buyer with one on file always has (FUT-465).
+  const c = useCheckoutController(ports, defaultBuyer, taxIdOnFile || Boolean(paymentList), buyerFields, tenantSlug, cart.identity);
   const armed = useOneClick({ requested: oneClick, config: providerConfig, taxIdOnFile, step: c.step, method: c.method, setMethod: c.setMethod });
 
   // A settlement settlement pays already-sent kitchen items — the cart is
@@ -320,7 +275,10 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
 
   return (
     <CheckoutFrame payment={c.step === "payment"}>
-      <FlowHeader copy={copy} step={c.step} completed={c.completed} onBack={c.back} />
+      {/* In the list, the host's own stepper is the chrome around Pagamento. */}
+      {paymentList && c.step === "payment" ? null : (
+        <FlowHeader copy={copy} step={c.step} completed={c.completed} onBack={c.back} />
+      )}
 
           {c.step === "dados" ? (
             <DadosStep
@@ -339,18 +297,7 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
             />
           ) : null}
 
-          {c.step === "payment" ? (
-            <OneClickProvider armed={armed}>
-              <PagamentoStep
-                c={c}
-                cart={cart}
-                settlement={settlement}
-                providerConfig={providerConfig}
-                tenantSlug={tenantSlug}
-                validateApplePayMerchant={validateApplePayMerchant}
-              />
-            </OneClickProvider>
-          ) : null}
+          {c.step === "payment" ? <PaymentPhase props={props} c={c} armed={armed} /> : null}
 
           {c.step === "status" ? (
             <StatusStep

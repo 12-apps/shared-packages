@@ -28,6 +28,7 @@ const PUBLISHED_KEYS = [
   "awaitingCheckAgain",
   "awaitingError",
   "awaitingTimedOut",
+  "dropOrder",
   "resumeCheckAgain",
   "resumeError",
   "resumeRelease",

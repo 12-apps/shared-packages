@@ -2,6 +2,8 @@ import { Box } from "@mui/material";
 import { useEffect, useMemo, useRef, type JSX } from "react";
 
 import { useCheckoutCopy } from "./copy-context";
+import { usePaymentListMode } from "./list/context";
+import { ListPixFace } from "./list/list-pix";
 import { PixAfterCopy } from "./pix-after-copy";
 import { PixPane } from "./pix-pane";
 import { useCheckoutLayout } from "./payment-step-layout";
@@ -221,15 +223,19 @@ function PixTitle(): JSX.Element | null {
   );
 }
 
-function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; poll: ReturnType<typeof usePixPolling> }): JSX.Element {
-  const copy = useCheckoutCopy().screens.pix;
-  const stage = usePixStage();
-  const { copy: writeClipboard, justCopied } = useClipboardCopy(pix.copyPaste);
-  // Leaving the payment step (a method switch, a terminal status) ends the
-  // after-copy face with it: the next pane starts on the code.
-  const { setAfterCopy } = stage;
-  // A clipboard write that settles after the pane is gone must not reopen the
-  // after-copy face over whatever replaced it (it would hide the picker).
+/**
+ * The clipboard, and the copy that moves the pane on to its after-copy face.
+ *
+ * Leaving the payment step (a method switch, a terminal status) ends the
+ * after-copy face with it: the next pane starts on the code. And a clipboard
+ * write that settles after the pane is gone must not reopen the after-copy
+ * face over whatever replaced it (it would hide the picker).
+ */
+function useCopyThenWait(
+  payload: string,
+  setAfterCopy: (afterCopy: boolean) => void,
+): { writeClipboard: () => Promise<boolean>; justCopied: boolean; copyThenWait: () => void } {
+  const { copy: writeClipboard, justCopied } = useClipboardCopy(payload);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -238,6 +244,22 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
       setAfterCopy(false);
     };
   }, [setAfterCopy]);
+  // Only a copy the clipboard TOOK moves on: the next face opens on "Código
+  // Pix copiado", and a failed write leaves the code on screen to select by hand.
+  const copyThenWait = (): void => {
+    void writeClipboard().then((ok) => {
+      if (ok && mounted.current) setAfterCopy(true);
+    });
+  };
+  return { writeClipboard, justCopied, copyThenWait };
+}
+
+function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; poll: ReturnType<typeof usePixPolling> }): JSX.Element {
+  const copy = useCheckoutCopy().screens.pix;
+  const stage = usePixStage();
+  const listMode = usePaymentListMode();
+  const { writeClipboard, justCopied, copyThenWait } = useCopyThenWait(pix.copyPaste, stage.setAfterCopy);
+  const { setAfterCopy } = stage;
 
   // The locale is the HOST's (FUT-760): it decides what a buyer reads off the
   // clock, so it travels with the sentence it feeds rather than being frozen
@@ -247,6 +269,27 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   const footerLine = (awaiting: string): JSX.Element => (
     <PixPollFooter error={poll.error} timedOut={poll.timedOut} onCheckAgain={poll.checkAgain} awaiting={awaiting} />
   );
+  // Inside the one list (FUT-3592), the code itself is the pane and the bar
+  // carries the copy; the wait is said by the bar, so only a STALLED poll
+  // draws here.
+  if (listMode) {
+    return (
+      <ListPixFace
+        mode={listMode}
+        order={order}
+        pix={pix}
+        time={time}
+        afterCopy={stage.afterCopy}
+        words={sentences.afterCopy}
+        justCopied={justCopied}
+        onCopy={copyThenWait}
+        onCopyAgain={() => void writeClipboard()}
+        onShowQr={() => setAfterCopy(false)}
+        onPreferCard={stage.preferCard}
+        footer={poll.error || poll.timedOut ? footerLine(copy.verifying) : null}
+      />
+    );
+  }
 
   if (stage.afterCopy) {
     return (
@@ -267,17 +310,7 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
   return (
     <>
       <PixTitle />
-      <PixPane
-        pix={pix}
-        onCopy={() => {
-          // Only a copy the clipboard TOOK moves on: the next face opens on
-          // "Código Pix copiado", and a failed write leaves the code on screen
-          // to select by hand.
-          void writeClipboard().then((ok) => {
-            if (ok && mounted.current) setAfterCopy(true);
-          });
-        }}
-      />
+      <PixPane pix={pix} onCopy={copyThenWait} />
       <PixFooter deadline={sentences.validUntil(time)}>{footerLine(sentences.awaiting)}</PixFooter>
     </>
   );

@@ -116,6 +116,8 @@ export interface StoryHost {
    * Only `/config` is affected; everything else still reaches the real mount.
    */
   configRead?: "ok" | "pending" | "failing";
+  /** The one-list Pagamento (FUT-3591), as the host's hook — door options and all. */
+  usePaymentList?: PaymentFlowsConfig["usePaymentList"];
 }
 
 /**
@@ -168,6 +170,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useCart: () => cartOf(amountCents, host.cart),
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useSettlement: () => host.settlement ?? null,
+    usePaymentList: host.usePaymentList,
     components: host.components,
     copy: { ...STORY_CHECKOUT_COPY, ...host.copy },
     confirmation:

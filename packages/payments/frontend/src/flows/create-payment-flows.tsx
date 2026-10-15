@@ -68,6 +68,11 @@ function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
   };
 }
 
+/** The host's one-list Pagamento (FUT-3591), when it opted in — a hook, read every render. */
+function useHostPaymentList(runtime: FlowsRuntime) {
+  return runtime.config.usePaymentList?.();
+}
+
 /** The whole three-step flow, with the config fetched and availability decided. */
 function buildCheckout(
   runtime: FlowsRuntime,
@@ -80,6 +85,7 @@ function buildCheckout(
     const cart = runtime.config.useCart();
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
     const hostSettlement = runtime.config.useSettlement?.() ?? null;
+    const paymentList = useHostPaymentList(runtime);
     const { config, pending } = useResolvedConfig(runtime);
     const availability = runtime.useAvailability();
     const tenantSlug = runtime.useTenantSlug();
@@ -108,6 +114,7 @@ function buildCheckout(
         confirmationExtra={runtime.config.confirmation?.extra}
         confirmationHero={runtime.config.confirmation?.hero}
         validateApplePayMerchant={ports.validateApplePayMerchant}
+        paymentList={paymentList}
       />
     );
   }

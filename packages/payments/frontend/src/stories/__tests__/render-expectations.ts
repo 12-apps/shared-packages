@@ -668,4 +668,26 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["tender-split-option-CASH", "tender-split-confirm"],
     text: ["Left $82.00", "Pick a method"],
   },
+  // ------------------------------------------------- PaymentList (FUT-3591)
+  // The one list at rest: the saved card comes chosen and Pagar is live; a new
+  // buyer has nothing chosen; a hand-off store offers its one row; no door
+  // options means no door heading.
+  "PaymentList/SavedCard": {
+    testIds: ["payment-list", "list-card-vault_1", "list-door-cash", "list-pay"],
+    text: ["Pagar agora, pelo app", "Pagar na entrega", "Visa final 4242 ou outro cartão"],
+  },
+  "PaymentList/NewBuyer": {
+    testIds: ["payment-list", "list-option-PIX", "list-option-CARD"],
+    text: ["Escolha como pagar."],
+  },
+  "PaymentList/HandOffStore": {
+    testIds: ["payment-list", "list-option-HAND_OFF"],
+    text: ["Pix ou cartão"],
+    absentTestIds: ["list-option-PIX"],
+  },
+  "PaymentList/OnlineOnly": {
+    testIds: ["payment-list", "list-card-vault_1"],
+    text: ["Pagar agora, pelo app"],
+    absentTestIds: ["list-door-cash"],
+  },
 };

@@ -20,6 +20,9 @@ import {
 import { EN_US_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-en-US';
 import type { CheckoutScreensCopy } from './components/checkout/screens-copy';
 import { PT_BR_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-pt-BR';
+import { EN_US_PAYMENT_LIST_COPY } from './components/checkout/list/en-US';
+import { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
+import type { PaymentListCopy } from './components/checkout/list/types';
 import type { CheckoutViewCopy, PaymentStatusCopy } from './components/checkout/view-copy';
 import type { PlatformHomologacaoCopy } from './components/platform/copy';
 import { EN_US_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/en-US';
@@ -76,6 +79,15 @@ export const CHECKOUT_SCREENS_COPY = {
   'en-US': EN_US_CHECKOUT_SCREENS_COPY,
 } as const satisfies LocalePack<CheckoutScreensCopy>;
 
+/**
+ * The one-list Pagamento step's words (FUT-3591) — `CheckoutFlowProps.paymentList.copy`.
+ * Read by the SHOPPER, like every checkout pack.
+ */
+export const PAYMENT_LIST_COPY = {
+  'pt-BR': PT_BR_PAYMENT_LIST_COPY,
+  'en-US': EN_US_PAYMENT_LIST_COPY,
+} as const satisfies LocalePack<PaymentListCopy>;
+
 export const CHECKOUT_COPY = {
   'pt-BR': PT_BR_CHECKOUT_COPY,
   'en-US': EN_US_CHECKOUT_COPY,
@@ -123,6 +135,7 @@ export {
   EN_US_PAYMENT_STATUS_COPY,
 } from './components/checkout/en-US';
 export { EN_US_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-en-US';
+export { EN_US_PAYMENT_LIST_COPY } from './components/checkout/list/en-US';
 export { EN_US_PAYMENTS_SETTINGS_COPY } from './components/settings-en-US';
 export { EN_US_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/en-US';
 export { EN_US_TENDER_SPLIT_COPY } from './tender-split/en-US';
