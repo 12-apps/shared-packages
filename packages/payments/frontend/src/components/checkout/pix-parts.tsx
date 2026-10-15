@@ -105,6 +105,9 @@ export function StaleVeil({ stale, children }: { stale: boolean; children: React
         >
           <Box
             component="p"
+            // An opaque overlay over the blurred code (ADR 0121): it covers
+            // what is under it on purpose, so the review probe reads it so.
+            data-ui-overlay=""
             sx={{
               m: 0,
               px: 1.5,

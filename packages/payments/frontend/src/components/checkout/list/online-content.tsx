@@ -60,7 +60,11 @@ function SavedChips({ card, copy }: { card: ListCard; copy: PaymentListCopy }): 
             tabIndex={index === stop ? 0 : -1}
             onClick={() => card.setSelection(option.id)}
             data-testid={option.id === NEW_CARD ? "list-card-new" : `list-card-${option.id}`}
-            sx={{ fontWeight: on ? 600 : 400 }}
+            sx={{
+              fontWeight: on ? 600 : 400,
+              // The keyboard's place among the chips: the rows' own 2px ring (5.1 item 6).
+              "&.Mui-focusVisible, &:focus-visible": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
+            }}
           />
         );
       })}

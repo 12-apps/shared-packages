@@ -20,6 +20,27 @@ import { useCheckoutComponents } from "../ui";
  */
 const chosenTint = (theme: Theme): string => alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity);
 
+/**
+ * The fields opened inside a chosen row stand on the surface, not on its tint
+ * (the prototype's `.inp`, `background: var(--surface)`), and so does a
+ * floating label over the field's top edge: a focused label is drawn in the
+ * primary colour, and the primary over its own tint reads weaker than over the
+ * surface (#6366F1: 4.47:1 on white, 4.04:1 on the 8% tint). The surface
+ * around the label is a shadow, so the label does not move off the notch.
+ */
+const FIELDS_ON_SURFACE = {
+  "& .MuiOutlinedInput-root": { bgcolor: "background.paper" },
+  "& .MuiInputLabel-shrink": {
+    bgcolor: "background.paper",
+    boxShadow: (t: Theme) => `0 0 0 ${t.spacing(0.5)} ${t.palette.background.paper}`,
+  },
+  // A field's complaint stays on the tint, under the field: at night the error
+  // role's lighter tone (MUI dark #f44336 is 4.05:1 on the 16% tint).
+  "& .MuiFormHelperText-root.Mui-error": {
+    color: (t: Theme) => (t.palette.mode === "dark" ? t.palette.error.light : t.palette.error.main),
+  },
+} as const;
+
 export function OptionRow({
   name,
   value,
@@ -87,7 +108,7 @@ export function OptionRow({
       </Box>
       {/* Only a row with something to open draws the box for it — no empty band. */}
       {chosen && children ? (
-        <Box data-testid={`${testId}-content`} sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5 }}>
+        <Box data-testid={`${testId}-content`} sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5, ...FIELDS_ON_SURFACE }}>
           {children}
         </Box>
       ) : null}

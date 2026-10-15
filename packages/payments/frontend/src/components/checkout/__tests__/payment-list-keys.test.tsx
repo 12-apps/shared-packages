@@ -56,6 +56,18 @@ describe("the saved-card chips", () => {
     await press("End", "list-card-new");
     await press("ArrowUp", "list-card-vault-2");
   });
+
+  it("draw the rows' 2px primary ring on the chip the keyboard is on", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA, SAVED_MASTER]) });
+    const first = await screen.findByTestId("list-card-vault-1");
+    await waitFor(() => expect(first.getAttribute("aria-checked")).toBe("true"));
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    const second = screen.getByTestId("list-card-vault-2");
+    await waitFor(() => expect(second.classList.contains("Mui-focusVisible")).toBe(true));
+    const style = getComputedStyle(second);
+    expect(style.outlineStyle || style.outline).toContain("solid");
+    expect(getComputedStyle(first).outlineStyle || "").not.toContain("solid");
+  });
 });
 
 function walletStore(): CheckoutProviderConfig {

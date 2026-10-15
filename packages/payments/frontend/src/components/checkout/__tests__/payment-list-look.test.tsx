@@ -40,6 +40,25 @@ describe("a chosen row", () => {
   });
 });
 
+describe("the fields a chosen row opens", () => {
+  it("stand on the surface, label included, not on the row's tint", async () => {
+    renderList({ config: onPageStore(), client: stubClient() });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-CARD"));
+    const content = await screen.findByTestId("list-option-CARD-content");
+    const number = within(content).getByTestId("card-number");
+    // Typed into, the label floats over the field's top edge, as focused.
+    fireEvent.change(number, { target: { value: "4111" } });
+    const root = number.closest(".MuiOutlinedInput-root") as HTMLElement;
+    const paper = "rgb(255, 255, 255)";
+    expect(getComputedStyle(root).backgroundColor).toBe(paper);
+    const label = await waitFor(() => content.querySelector<HTMLElement>(".MuiInputLabel-shrink") ?? Promise.reject(new Error("no floating label")));
+    expect(getComputedStyle(label).backgroundColor).toBe(paper);
+    // The row itself keeps its tint.
+    expect(getComputedStyle(screen.getByTestId("list-option-CARD")).backgroundColor).not.toBe(paper);
+  });
+});
+
 describe("the bar's button", () => {
   it("keeps the amount on one line, beside a label that may wrap", async () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });

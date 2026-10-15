@@ -28,6 +28,7 @@ const raising = () => vi.fn(async (input: CreateOrderRequest): Promise<CreateOrd
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   cleanup();
 });
 
@@ -196,6 +197,36 @@ describe("a stale Pix in the list", () => {
     await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed-refresh")).toBeNull());
     fireEvent.click(payButton());
     await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
+  });
+
+  it("takes the veiled code out of the controls, and marks the veil's sentence an overlay (ADR 0121)", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const host = { config: onPageStore(), client: stubClient(), createOrder: raising(), basket: "l1x1" };
+    const { rerender } = renderList(host);
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(payButton());
+    const code = await screen.findByTestId("list-pix-code");
+    // In the clear, the code is the bar's copy button.
+    await waitFor(() => {
+      expect(code.getAttribute("role")).toBe("button");
+      expect(code.getAttribute("tabindex")).toBe("0");
+    });
+
+    rerender(listFlow({ ...host, basket: "l1x3" }));
+    await waitFor(() => expect(payButton().textContent).toBe("Atualizar pagamento"));
+    const veiled = screen.getByTestId("list-pix-code");
+    await waitFor(() => {
+      expect(veiled.getAttribute("role")).toBeNull();
+      expect(veiled.getAttribute("tabindex")).toBeNull();
+      expect(veiled.getAttribute("aria-label")).toBeNull();
+    });
+    fireEvent.click(veiled);
+    fireEvent.keyDown(veiled, { key: "Enter" });
+    expect(writeText).not.toHaveBeenCalled();
+    const sentence = within(veiled.closest("[data-testid=pix-stale-veil]") as HTMLElement).getByText("Atualize para gerar um novo Pix");
+    expect(sentence.hasAttribute("data-ui-overlay")).toBe(true);
   });
 });
 

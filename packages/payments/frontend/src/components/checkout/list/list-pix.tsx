@@ -43,25 +43,31 @@ function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; o
   const stale = usePaymentStale();
   const { Text } = useCheckoutComponents();
   const press = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
-    if (stale) return;
     selectAll(event.currentTarget);
     onCopy();
   };
-  return (
-    <StaleVeil stale={stale}>
-      <Box
-        role="button"
-        tabIndex={stale ? -1 : 0}
-        aria-label={label}
-        data-testid="list-pix-code"
-        onClick={press}
-        onKeyDown={(event) => {
+  // Under the veil the code is not a control at all — no role, no Tab stop,
+  // nothing a tap does (ADR 0121: the veil covers it, so it may not be one).
+  const control = stale
+    ? {}
+    : {
+        role: "button",
+        tabIndex: 0,
+        "aria-label": label,
+        onClick: press,
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             press(event);
           }
-        }}
-        sx={{ cursor: "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, wordBreak: "break-all" }}
+        },
+      };
+  return (
+    <StaleVeil stale={stale}>
+      <Box
+        {...control}
+        data-testid="list-pix-code"
+        sx={{ cursor: stale ? "default" : "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, wordBreak: "break-all" }}
       >
         <Text variant="code" size="xs" as="span">
           {pix.copyPaste}
