@@ -54,11 +54,22 @@ function SideCard({ side, testId }: { side: RestoreConflictSide; testId: string 
         border: (theme) => `1px solid ${theme.palette.divider}`,
       }}
     >
-      {/* Small capitals, as the approved mock draws the heading; Text has no transform of its own. */}
-      <Box sx={{ textTransform: 'uppercase' }}>
-        <Text variant="caption" as="p" color="secondary" weight="semibold">
-          {side.heading}
-        </Text>
+      {/*
+        Small capitals, as the approved mock draws the heading. A Box because
+        Text has no transform, and `text.secondary` because Text's own
+        "secondary" measured 3.24:1 on the card (WCAG AA wants 4.5:1).
+      */}
+      <Box
+        component="p"
+        sx={{
+          m: 0,
+          typography: 'caption',
+          fontWeight: 'fontWeightMedium',
+          color: 'text.secondary',
+          textTransform: 'uppercase',
+        }}
+      >
+        {side.heading}
       </Box>
       <Text variant="body" as="p" weight="semibold">
         {side.label}
