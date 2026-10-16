@@ -21,6 +21,7 @@ import {
 } from '../providers/pt-BR';
 import { stoneProvider } from '../providers/stone';
 import { stripeProvider } from '../providers/stripe';
+import { stubChargesFor } from '../providers/stub-charge-log';
 import { STUB_CHARGE_FAULT_FIELD, isStubDeclinedToken } from '../providers/stub-fault';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
 
@@ -156,5 +157,48 @@ describe('the `unresolved` stub fault', () => {
     await expect(adapter.findChargeByReference!('order-none', scripted)).rejects.toMatchObject({
       name: 'ProviderRequestError',
     });
+  });
+});
+
+describe('the stub charge log', () => {
+  it('given a card charge, then the provider is recorded with the tax id and the instrument it received', async () => {
+    await stoneProvider(PT_BR_STONE_COPY).createCharge(
+      { ...cardInput('order-log-card', 'tok_lx2k9b1'), customer: { name: 'Ana', taxId: '52998224725' } },
+      STUB_CREDS,
+    );
+
+    expect(stubChargesFor(new Set(['order-log-card']))).toEqual([
+      { provider: 'stone', reference: 'order-log-card', method: 'CARD', taxId: '52998224725', instrument: 'tok:tok_lx2k9b1' },
+    ]);
+  });
+
+  it('given a head scripted to refuse, then the refused charge is recorded too, before the tail', async () => {
+    const chain = scriptedPagbankChain('not-charged');
+
+    await chain.gateway.charge(TENANT, pixInput('order-log-chain'));
+
+    expect(stubChargesFor(new Set(['order-log-chain'])).map((record) => record.provider)).toEqual([
+      'pagbank',
+      'stone',
+    ]);
+  });
+
+  it('given a wallet charge, then the wallet is what the provider received', async () => {
+    const wallet = cardInput('order-log-wallet');
+    await stoneProvider(PT_BR_STONE_COPY).createCharge(
+      { ...wallet, card: { wallet: { type: 'GOOGLE_PAY', key: 'gp_token' } } },
+      STUB_CREDS,
+    );
+
+    expect(stubChargesFor(new Set(['order-log-wallet']))[0]?.instrument).toBe('wallet:GOOGLE_PAY');
+  });
+
+  it('given a chain map, then each provider is recorded with ITS OWN instrument', async () => {
+    await stoneProvider(PT_BR_STONE_COPY).createCharge(
+      { ...cardInput('order-log-map'), card: { token: 'tok_head', tokensByProvider: { pagbank: 'tok_head', stone: 'tok_tail' } } },
+      STUB_CREDS,
+    );
+
+    expect(stubChargesFor(new Set(['order-log-map']))[0]?.instrument).toBe('tok:tok_tail');
   });
 });

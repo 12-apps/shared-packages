@@ -16,6 +16,7 @@ import type {
 } from '../core/types';
 
 import { staticBrCode } from './pix-manual/br-code';
+import { recordStubCharge } from './stub-charge-log';
 import { applyStubChargeFault, isStubDeclinedToken } from './stub-fault';
 
 /**
@@ -100,6 +101,8 @@ export function stubCharge(
   input: ChargeInput,
   credentials?: ResolvedCredentials,
 ): ChargeSnapshot {
+  // Recorded FIRST, so a head scripted to refuse still received the charge.
+  recordStubCharge(provider, input);
   applyStubChargeFault(provider, credentials);
   const providerChargeId = stubChargeId(provider, input.reference);
   const base: ChargeSnapshot = {
