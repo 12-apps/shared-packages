@@ -73,7 +73,7 @@ export function usePixBankState(
 function OtherLink({ label, onClick, testId }: { label: string; onClick: () => void; testId: string }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
-    <Box sx={{ ml: "auto", flex: "none", "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5), px: 0.5 } }}>
+    <Box sx={{ ml: "auto", flex: "none", "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5.5), px: 0.5 } }}>
       <Button variant="text" color="primary" size="sm" onClick={onClick} dataTestId={testId}>
         {label}
       </Button>
@@ -88,11 +88,13 @@ function Opening({ bank, state, chosen }: { bank: CheckoutPixBank; state: PixBan
   const failed = state.status === "failed";
   return (
     <Box data-testid="pix-bank-opening" data-status={state.status ?? "opening"} sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-      <Text variant="body" size="sm" as="span" style={{ minWidth: 0 }}>
-        {failed ? bank.copy.notOpened(name) : <Emphasized text={bank.copy.opening(name)} />}
-      </Text>
+      <Box component="span" role={failed ? "alert" : "status"} sx={{ minWidth: 0 }}>
+        <Text variant="body" size="sm" as="span">
+          {failed ? bank.copy.notOpened(name) : <Emphasized text={bank.copy.opening(name)} />}
+        </Text>
+      </Box>
       {failed ? (
-        <Box sx={{ "& button": { minHeight: (t) => t.spacing(5) } }}>
+        <Box sx={{ "& button": { minHeight: (t) => t.spacing(5.5) } }}>
           <Button variant="outline" color="primary" size="sm" onClick={() => state.open(chosen, false)} dataTestId="pix-bank-retry">
             {bank.copy.retry}
           </Button>

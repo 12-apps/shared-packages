@@ -193,7 +193,7 @@ function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
 export function OtherBankLink({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5) } }}>
+    <Box sx={{ display: "flex", justifyContent: "center", "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5.5) } }}>
       <Button variant="text" color="primary" size="sm" onClick={onClick} dataTestId="pix-open-other-bank">
         {label}
       </Button>

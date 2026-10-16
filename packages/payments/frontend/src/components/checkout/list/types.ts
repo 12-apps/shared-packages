@@ -141,10 +141,18 @@ export interface CheckoutPaymentList {
   /**
    * "Pedir em 1 toque" opened this checkout (FUT-3611): the tap on the
    * cardápio was the buyer's consent, so the card's 5-second bar starts by
-   * itself once the saved card is chosen and nothing holds the button — at
-   * most once per mount. Without a saved card it does nothing.
+   * itself once the saved card is chosen and nothing holds the button — ONCE
+   * per step, and only within {@link ARMED_WINDOW_MS} of the step opening: a
+   * checkout that lands held (a field to fill) never charges by itself minutes
+   * later. Without a saved card it does nothing.
    */
   armedCharge?: boolean;
+  /**
+   * The saved card the host's consent named (the 1-tap offer's). Given, the
+   * armed charge fires only on THAT card; a different selection never charges
+   * by itself.
+   */
+  armedCardId?: string;
   /**
    * Host content under the 5-second bar's Cancelar while it counts — the
    * storefront's "Cancelar e desativar a compra em 1 toque". It is handed the

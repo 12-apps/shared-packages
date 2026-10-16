@@ -38,6 +38,13 @@ export interface PaymentListMode {
   consent: ListConsent;
   /** The Pix press's intent, waiting for its code — see {@link PixIntent}. */
   pixIntent: MutableRefObject<PixIntent | null>;
+  /**
+   * The armed charge (`armedCharge`) for this step: when it was armed and
+   * whether it was spent. Held HERE, above the faces, so a list face that
+   * remounts (after a Pix, "Prefere pagar com cartão?") can never fire it
+   * again — the 1-tap tap consented to ONE charge, right away.
+   */
+  armed: MutableRefObject<{ since: number; spent: boolean }>;
 }
 
 export interface ListConsent {
@@ -61,7 +68,8 @@ export function PaymentListProvider({
 }): JSX.Element {
   const [qrOpen, setQrOpen] = useState(false);
   const pixIntent = useRef<PixIntent | null>(null);
-  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix, consent, pixIntent }), [list, qrOpen, onLeavePix, consent]);
+  const armed = useRef({ since: Date.now(), spent: false });
+  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix, consent, pixIntent, armed }), [list, qrOpen, onLeavePix, consent]);
   return <PaymentListContext.Provider value={value}>{children}</PaymentListContext.Provider>;
 }
 

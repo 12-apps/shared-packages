@@ -128,22 +128,30 @@ function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean
   };
 }
 
+/** How long after the step opens an armed charge may still start by itself. */
+export const ARMED_WINDOW_MS = 15_000;
+
 /**
  * "Pedir em 1 toque" opened this checkout (FUT-3611): start the card's bar by
- * itself, ONCE — as soon as the saved card is chosen and nothing holds the
- * button. A choice that is not a saved card (none on file, the fields) never
- * charges by itself.
+ * itself, ONCE per step — as soon as the saved card the consent named is chosen
+ * and nothing holds the button, within {@link ARMED_WINDOW_MS}. A choice that is
+ * not that saved card (none on file, the fields, another card) never charges
+ * by itself, and neither does anything after Cancelar.
  */
 function useArmedCharge(props: ListFaceProps, reason: string | null, act: () => void): void {
-  const fired = useRef(false);
+  const mode = usePaymentListMode();
   const { choice, card } = props.state;
+  const { armedCharge, armedCardId } = props.list;
   const savedChosen = choice?.kind === "online" && choice.method === "CARD" && card.selection !== null && card.selection !== NEW_CARD;
-  const ready = Boolean(props.list.armedCharge) && savedChosen && reason === null && props.charge.phase === "idle" && !props.c.creating;
+  const theNamedCard = armedCardId === undefined || card.selection === armedCardId;
+  const ready = Boolean(armedCharge) && savedChosen && theNamedCard && reason === null && props.charge.phase === "idle" && !props.c.creating;
   useEffect(() => {
-    if (!ready || fired.current) return;
-    fired.current = true;
-    act();
-  }, [ready, act]);
+    const armed = mode?.armed.current;
+    if (!ready || !armed || armed.spent) return;
+    // Spent either way: fired now, or too late to be the tap's own charge.
+    armed.spent = true;
+    if (Date.now() - armed.since <= ARMED_WINDOW_MS) act();
+  }, [ready, act, mode]);
 }
 
 /** A Pix press whose code never came (the raise was refused) gives the clipboard up. */

@@ -14,9 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { preselection } from "../list/choice";
+import { ARMED_WINDOW_MS } from "../list/list-face";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
-import { SAVED_VISA, handOffStore, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, handOffStore, listFlow, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
 const radio = (testId: string): HTMLInputElement => screen.getByTestId(`${testId}-radio`) as HTMLInputElement;
 
@@ -94,6 +95,39 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     renderList({ config: handOffStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true } });
     await waitFor(() => expect(screen.getByTestId("list-pay")).toBeTruthy());
     expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+  });
+
+  it("never fires on a card other than the one the consent named", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true, armedCardId: "another-card" } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
+    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+  });
+
+  it("never fires once the step has been open longer than the armed window — a held checkout pays by a tap", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Held by the host until well past the window, then released.
+    const { rerender } = renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true, hold: { action: "Pagar", reason: "Escolha o horário." } } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await vi.advanceTimersByTimeAsync(ARMED_WINDOW_MS + 1_000);
+    rerender(listFlow({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true } }));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    expect(screen.getByTestId("list-pay").textContent).toContain("Pagar");
+  });
+
+  it("does not fire again after Cancelar, however the buyer comes back to the card", async () => {
+    const createOrder = recordingCreateOrder();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), createOrder, list: { armedCharge: true } });
+    await waitFor(() => expect(screen.getByTestId("list-charge-cancel")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("list-charge-cancel"));
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(radio("list-option-CARD"));
+    await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS * 2);
+    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    expect(createOrder).not.toHaveBeenCalled();
   });
 
   it("draws the host's footer under Cancelar while the bar counts, handing it the bar's cancel", async () => {
