@@ -59,6 +59,7 @@ function usePreselect(
   rows: readonly OnlineRow[],
   saved: readonly SavedCard[],
   fresh: boolean,
+  lastMethod: "PIX" | "CARD" | null,
   apply: (choice: CheckoutListChoice, selection: string | null) => void,
   touched: { current: boolean },
 ): void {
@@ -66,9 +67,9 @@ function usePreselect(
   useEffect(() => {
     if (done.current || touched.current || !loaded) return;
     done.current = true;
-    const pick = preselection(rows, saved, fresh);
+    const pick = preselection(rows, saved, fresh, lastMethod);
     if (pick) apply(pick.choice, pick.selection);
-  }, [loaded, rows, saved, fresh, apply, touched]);
+  }, [loaded, rows, saved, fresh, lastMethod, apply, touched]);
 }
 
 /**
@@ -96,6 +97,8 @@ export function useListState(input: {
   fresh: boolean;
   arrivedWith: BuyerInfo | undefined;
   taxIdOnFile: boolean;
+  /** The buyer's last online method, from the host (FUT-3611). */
+  lastMethod?: "PIX" | "CARD" | null;
   onChoiceChange?: (choice: CheckoutListChoice | null) => void;
 }): ListState {
   const { capability } = input;
@@ -112,7 +115,7 @@ export function useListState(input: {
     },
     [setSelection],
   );
-  usePreselect(loaded, rows, cards, input.fresh, apply, touched);
+  usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, apply, touched);
   const choose = useCallback(
     (next: CheckoutListChoice) => {
       touched.current = true;

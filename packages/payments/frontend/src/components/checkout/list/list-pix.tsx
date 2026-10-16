@@ -1,5 +1,5 @@
 import { Box, useTheme } from "@mui/material";
-import type { JSX, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { useEffect, useRef, useState, type JSX, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
 import { usePaymentRefresh, usePaymentStale } from "../cart-changed";
 import { useCheckoutCopy } from "../copy-context";
@@ -9,8 +9,11 @@ import type { PixAfterCopyCopy } from "../screens-copy";
 import type { CheckoutOrder, PixCharge } from "../types";
 import { useCheckoutComponents } from "../ui";
 
+import { bankFlowOs, type PhoneOs } from "./bank-apps";
 import type { PaymentListMode } from "./context";
 import { ListBar, ActionButton, WaitingLine } from "./list-bar";
+import { PixBanks, usePixBankState, type PixBankState } from "./pix-banks";
+import type { CheckoutPixBank, PixBankId } from "./types";
 
 /**
  * The Pix, in the one list (FUT-3592 #3): "Gerar Pix" already created the
@@ -146,6 +149,9 @@ interface ListPixFaceProps {
   onPreferCard?: () => void;
   /** The poll's stalled panel, when it has one. */
   footer: ReactNode;
+  /** The clipboard alone, saying whether it took the code — the bank flow's copy. */
+  writeClipboard: () => Promise<boolean>;
+  setAfterCopy: (afterCopy: boolean) => void;
 }
 
 /**
@@ -153,23 +159,117 @@ interface ListPixFaceProps {
  * code the cart has outgrown — "Atualizar pagamento" (FUT-3535, E20), then
  * the copy before it and the wait after it.
  */
-function ListPixBar({ mode, afterCopy, onCopy }: { mode: PaymentListMode; afterCopy: boolean; onCopy: () => void }): JSX.Element {
+function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
+  mode: PaymentListMode;
+  afterCopy: boolean;
+  onCopy: () => void;
+  bankFlow: BankFlow | null;
+  onOtherBank: () => void;
+}): JSX.Element {
   const copy = mode.list.copy.pixFace;
   const stale = usePaymentStale();
   const refresh = usePaymentRefresh();
   const refreshLabel = useCheckoutCopy().screens.cartChanged.refreshAction;
   const { hold } = mode.list;
+  // A phone with a bank remembered copies AND opens it, and keeps the way to another (FUT-3612).
+  const remembered = bankFlow?.os ? bankFlow.state.chosen : null;
+  const copyLabel = remembered && bankFlow ? bankFlow.bank.copy.copyAndOpen(bankFlow.bank.copy.names[remembered]) : copy.copyCode;
   const action = (): JSX.Element => {
     if (hold) return <ActionButton label={hold.action} total={null} disabled onClick={() => undefined} />;
     if (stale && refresh) return <ActionButton label={refreshLabel} total={null} disabled={false} onClick={refresh} />;
     if (afterCopy) return <WaitingLine text={copy.waiting} />;
-    return <ActionButton label={copy.copyCode} total={null} disabled={stale} onClick={onCopy} />;
+    return <ActionButton label={copyLabel} total={null} disabled={stale} onClick={onCopy} />;
   };
+  const other = remembered && bankFlow && !hold && !stale && !afterCopy;
   return (
     <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} live={afterCopy && !hold && !stale ? copy.waiting : null}>
       {action()}
+      {other ? <OtherBankLink label={bankFlow.bank.copy.openOther} onClick={onOtherBank} /> : null}
     </ListBar>
   );
+}
+
+/** "Abrir outro banco" — a centred text link under the bar's button (FUT-3612). */
+export function OtherBankLink({ label, onClick }: { label: string; onClick: () => void }): JSX.Element {
+  const { Button } = useCheckoutComponents();
+  return (
+    <Box sx={{ display: "flex", justifyContent: "center", "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5) } }}>
+      <Button variant="text" color="primary" size="sm" onClick={onClick} dataTestId="pix-open-other-bank">
+        {label}
+      </Button>
+    </Box>
+  );
+}
+
+/** The Pix-to-bank flow, when the host offers it (FUT-3612). */
+interface BankFlow {
+  bank: CheckoutPixBank;
+  /** `null` on a computer: copy-and-say, no banks. */
+  os: PhoneOs | null;
+  state: PixBankState;
+}
+
+/** The toast after a copy: which bank opens, or that one is to be chosen. */
+function copiedSentence(flow: BankFlow, opening: PixBankId | null): string {
+  const { copy } = flow.bank;
+  if (!flow.os) return copy.copied;
+  return opening ? copy.copiedOpening(copy.names[opening]) : copy.copiedPick;
+}
+
+/**
+ * Every copy on the bank flow ends the same way: the after-copy face, the
+ * toast, and the bank opened — the one chosen, or none when the grid is asked
+ * for. A copy the clipboard refused does none of it (the code stays to copy by
+ * hand).
+ */
+function useBankCopies(mode: PaymentListMode, flow: BankFlow | null, pix: PixCharge, ports: CopyPorts) {
+  const stale = usePaymentStale();
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  const land = (ok: boolean, grid: boolean, target: PixBankId | null): void => {
+    if (!ok || !live.current || !flow) return;
+    ports.setAfterCopy(true);
+    if (grid) flow.state.showGrid();
+    const opening = grid ? null : target;
+    mode.list.notify?.(copiedSentence(flow, flow.os ? opening : null));
+    if (opening && flow.os && !stale) flow.state.open(opening, false);
+  };
+  // The bar's press already opened the clipboard, waiting for this code.
+  useEffect(() => {
+    const intent = mode.pixIntent.current;
+    if (!intent) return;
+    mode.pixIntent.current = null;
+    intent.copy.resolve(pix.copyPaste);
+    void intent.copy.done.then((ok) => land(ok, intent.pick, intent.pick ? null : intent.bank));
+    // Once, as the code arrives.
+  }, []);
+  const copyThen = (grid: boolean) => () =>
+    void ports.writeClipboard().then((ok) => land(ok, grid, flow?.state.chosen ?? null));
+  return { copy: copyThen(false), other: copyThen(true) };
+}
+
+interface CopyPorts {
+  writeClipboard: () => Promise<boolean>;
+  setAfterCopy: (afterCopy: boolean) => void;
+}
+
+/** The bank flow's state, or `null` when the host does not offer it. */
+function useBankFlow(mode: PaymentListMode): BankFlow | null {
+  const bank = mode.list.pixBank;
+  const [os] = useState(() => bankFlowOs(bank?.phone));
+  const stale = usePaymentStale();
+  const startOnGrid = mode.pixIntent.current?.pick ?? false;
+  const state = usePixBankState(bank?.remembered ?? null, bank?.onPick ?? noPick, os, stale, startOnGrid);
+  return bank ? { bank, os, state } : null;
+}
+
+function noPick(): void {
+  // No bank flow: nothing to remember.
 }
 
 /** Both faces of the list's Pix, and the bar under them. */
@@ -177,6 +277,13 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   const { Text } = useCheckoutComponents();
   const { mode, order, pix, afterCopy } = props;
   const copy = mode.list.copy.pixFace;
+  const flow = useBankFlow(mode);
+  const copies = useBankCopies(mode, flow, pix, props);
+  const stale = usePaymentStale();
+  // On a phone the bank flow takes the copy: "Copiar e abrir o Nubank", the
+  // toast, the app. Without it — or on a computer — the copy is today's.
+  const onCopy = flow ? copies.copy : props.onCopy;
+  const banks = flow?.os ? { node: <PixBanks bank={flow.bank} state={flow.state} stale={stale} />, replacesChecklist: flow.state.chosen === null } : undefined;
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
@@ -189,18 +296,19 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
           totalLabel={mode.list.amountDueLabel ?? order.totalLabel}
           deadline={props.time}
           justCopied={props.justCopied}
-          onCopyAgain={props.onCopyAgain}
+          onCopyAgain={flow ? copies.copy : props.onCopyAgain}
           onShowQr={() => {
             mode.setQrOpen(true);
             props.onShowQr();
           }}
           onPreferCard={props.onPreferCard}
           footer={props.footer}
+          banks={banks}
         />
       ) : (
-        <BeforeCopy mode={mode} pix={pix} time={props.time} onCopy={props.onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
+        <BeforeCopy mode={mode} pix={pix} time={props.time} onCopy={onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
       )}
-      <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={props.onCopy} />
+      <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={onCopy} bankFlow={flow} onOtherBank={copies.other} />
     </Box>
   );
 }

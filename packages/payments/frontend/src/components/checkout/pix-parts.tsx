@@ -82,6 +82,62 @@ export function useClipboardCopy(text: string): { copy: () => Promise<boolean>; 
   return { copy, justCopied };
 }
 
+/** A copy opened inside a tap whose text arrives later (FUT-3612) — see {@link deferredCopy}. */
+export interface DeferredCopy {
+  /** The text has arrived: write it. */
+  resolve: (text: string) => void;
+  /** There will be no text (the raise was refused): give the clipboard up. */
+  fail: () => void;
+  /** `true` once the clipboard holds the text; `false` when it refused or there was none. */
+  done: Promise<boolean>;
+}
+
+/**
+ * Open the clipboard NOW, inside the buyer's tap, for a text the server has
+ * not answered yet. Safari lets a page write to the clipboard only inside the
+ * gesture, so the write is started here with a promise of the text
+ * (`ClipboardItem`); where that is missing or refused, the plain write is
+ * tried once the text arrives — Chrome takes it from a focused page.
+ */
+export function deferredCopy(): DeferredCopy {
+  let give: (text: string | null) => void = () => undefined;
+  const text = new Promise<string | null>((resolve) => {
+    give = resolve;
+  });
+  const plain = async (): Promise<boolean> => {
+    const value = await text;
+    if (value === null || !navigator.clipboard) return false;
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const Item = typeof window === "undefined" ? undefined : (window as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+  let done: Promise<boolean> = Promise.resolve(false);
+  let opened = false;
+  if (Item && navigator.clipboard && typeof navigator.clipboard.write === "function") {
+    const blob = text.then((value) => {
+      if (value === null) throw new Error("no text");
+      return new Blob([value], { type: "text/plain" });
+    });
+    // An unanswered blob must not surface as an unhandled rejection.
+    blob.catch(() => undefined);
+    try {
+      done = navigator.clipboard.write([new Item({ "text/plain": blob })]).then(
+        () => true,
+        async () => (await text) !== null && plain(),
+      );
+      opened = true;
+    } catch {
+      // A browser whose ClipboardItem takes no promise throws here, in the tap.
+    }
+  }
+  if (!opened) done = plain();
+  return { resolve: (value) => give(value), fail: () => give(null), done };
+}
+
 /**
  * A PIX's QR or code, veiled while the cart has changed under it (FUT-3535):
  * blurred past reading, out of reach of a pointer, a selection and a screen

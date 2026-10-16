@@ -130,6 +130,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     fresh: c.freshInstrument,
     arrivedWith: props.defaultBuyer,
     taxIdOnFile: props.taxIdOnFile,
+    lastMethod: list.lastMethod,
     onChoiceChange: list.onChoiceChange,
   });
   const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });

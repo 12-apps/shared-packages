@@ -84,9 +84,11 @@ export function lastUsedCard(saved: readonly SavedCard[]): SavedCard | undefined
 /**
  * What is chosen before the buyer touches anything (M7, owner 2026-10-15): a
  * saved card makes "Cartão de crédito" the choice with that card selected —
- * the one used last ({@link lastUsedCard}). Nothing else is ever
- * preselected: never Pix, never a door tender (FUT-1478), and not a store's
- * only method either (that pick used to raise an order with no tap at all).
+ * the one used last ({@link lastUsedCard}). The buyer's LAST online method
+ * (`lastMethod`, FUT-3611) wins when the store offers it: Pix as Pix, since
+ * choosing creates nothing any more. Never a door tender (FUT-1478), and not
+ * a store's only method by itself either (that pick used to raise an order
+ * with no tap at all).
  *
  * A buyer back here because a card was REFUSED (`fresh`) keeps the card
  * chosen, with no saved card selected for them — the one this would pick is
@@ -96,7 +98,10 @@ export function preselection(
   rows: readonly OnlineRow[],
   saved: readonly SavedCard[],
   fresh: boolean,
+  lastMethod: "PIX" | "CARD" | null = null,
 ): { choice: CheckoutListChoice; selection: string | null } | null {
+  const pixOffered = rows.some((row) => row.method === "PIX" && !row.disabled);
+  if (lastMethod === "PIX" && pixOffered && !fresh) return { choice: { kind: "online", method: "PIX" }, selection: null };
   const card = rows.find((row) => row.method === "CARD" && !row.disabled);
   if (!card) return null;
   if (fresh) return { choice: { kind: "online", method: "CARD" }, selection: saved.length > 0 ? null : NEW_CARD };
