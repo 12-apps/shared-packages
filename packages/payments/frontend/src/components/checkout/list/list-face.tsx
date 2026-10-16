@@ -10,7 +10,11 @@ import type { BuyerContact, CheckoutProviderConfig } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 import { useCheckoutComponents } from "../ui";
 
+
 import { actionLabel, blockedReason, cardName } from "./choice";
+import { usePaymentListMode, type PaymentListMode } from "./context";
+import { armPixCopy, armedReady, otherBankShown, pixBankLabel, useArmedCharge, useDropRefusedCopy } from "./list-memory";
+import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { CardRun, WalletRun, type ListChargeFailure } from "./charge-runners";
 import { ActionButton, ChargeBar, GooglePayAction, ListBar } from "./list-bar";
@@ -75,9 +79,10 @@ function onlineTotal(props: ListFaceProps): string {
 }
 
 /** An online choice's press: the card goes through the bar, Pix and the hand-off raise at once. */
-function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice): void {
+function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: PaymentListMode | null, pick = false): void {
   const { c, charge, cap } = props;
   saveAsked(props);
+  if (method === "PIX" && mode) armPixCopy(props.list, mode, pick);
   if (method === "CARD") return charge.start("CARD", onlineTotal(props));
   const raised = method === "PIX" ? "PIX" : handOffMethod(cap.offered);
   if (method === "HAND_OFF") props.onHandOff();
@@ -90,13 +95,14 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice): void {
  * or a charge. A door option hands the press to the host; the card counts five
  * seconds first; everything else raises at once.
  */
-function useAct(props: ListFaceProps, clearFailure: () => void): () => void {
-  return () => {
+function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean) => void {
+  const mode = usePaymentListMode();
+  return (pick = false) => {
     const { choice } = props.state;
     if (!choice || inFlight(props)) return;
     if (choice.kind === "door") return chosenDoor(props)?.onSend();
     clearFailure();
-    actOnline(props, choice.method);
+    actOnline(props, choice.method, mode, pick);
   };
 }
 
@@ -176,7 +182,7 @@ function buttonFacts(props: ListFaceProps): { label: string; total: string; busy
   const door = chosenDoor(props);
   const online = state.choice?.kind === "online";
   return {
-    label: list.hold ? list.hold.action : actionLabel(list.copy, state.choice, door, props.provider),
+    label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider),
     total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : props.total,
     busy: inFlight(props),
   };
@@ -198,27 +204,58 @@ function googlePayLive(props: ListFaceProps, reason: string | null, busy: boolea
   return choice?.kind === "online" && choice.method === "GOOGLE_PAY" && props.cap.googlePay !== null && reason === null && !busy;
 }
 
+/** The 5-second bar (or the charge going out), and the host's footer while it counts. */
+function ChargingBar({ props, onCancel }: { props: ListFaceProps; onCancel: () => void }): JSX.Element {
+  const { charge, list } = props;
+  const counting = charge.phase === "counting";
+  const footer = counting ? list.chargeFooter?.(charge.cancel) : null;
+  return (
+    <>
+      <ChargeBar text={chargingText(props)} full={!counting} cancelLabel={list.copy.cancel} onCancel={onCancel} />
+      {footer ? <Box data-testid="list-charge-footer">{footer}</Box> : null}
+    </>
+  );
+}
+
+/** The button, and "Abrir outro banco" under it when a remembered bank would open. */
+function PressButton({ props, act, reason, returnFocus }: {
+  props: ListFaceProps;
+  act: (pick?: boolean) => void;
+  reason: string | null;
+  returnFocus: boolean;
+}): JSX.Element {
+  const { list, state } = props;
+  const { label, total, busy } = buttonFacts(props);
+  const other = list.pixBank && otherBankShown(list, state, reason === null && !busy) ? list.pixBank.copy.openOther : null;
+  return (
+    <>
+      <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={() => act()} focusOnMount={returnFocus} />
+      {other ? <OtherBankLink label={other} onClick={() => act(true)} /> : null}
+    </>
+  );
+}
+
 /** The button, the 5-second bar, Google's own button, or nothing for a charge nobody can confirm yet. */
 function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnFocus }: {
   props: ListFaceProps;
   failure: ListChargeFailure | null;
-  act: () => void;
+  act: (pick?: boolean) => void;
   onGooglePay: () => void;
   onCancel: () => void;
   reason: string | null;
   returnFocus: boolean;
 }): JSX.Element | null {
-  const { charge, list, cap } = props;
-  if (cardCharging(charge)) {
-    return <ChargeBar text={chargingText(props)} full={charge.phase !== "counting"} cancelLabel={list.copy.cancel} onCancel={onCancel} />;
-  }
+  const { charge, cap } = props;
+  if (cardCharging(charge)) return <ChargingBar props={props} onCancel={onCancel} />;
   // An UNRESOLVED charge may be holding the buyer's money: no pay control at
   // all under "não pague de novo" (FUT-563), as the card pane does today.
   if (failure?.code === UNRESOLVED_CODE) return null;
-  const { label, total, busy } = buttonFacts(props);
-  if (googlePayUnpriced(props)) return <ActionButton label={label} total={total} disabled loading={false} onClick={act} />;
-  if (googlePayLive(props, reason, busy) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
-  return <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={act} focusOnMount={returnFocus} />;
+  if (googlePayUnpriced(props)) {
+    const { label, total } = buttonFacts(props);
+    return <ActionButton label={label} total={total} disabled loading={false} onClick={() => act()} />;
+  }
+  if (googlePayLive(props, reason, inFlight(props)) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
+  return <PressButton props={props} act={act} reason={reason} returnFocus={returnFocus} />;
 }
 
 /** The charge under way, once there is an order to run it against. */
@@ -318,6 +355,9 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const door = chosenDoor(props);
   const reason = reasonOf(props, door);
   useChargeGuard(props, reason);
+  const free = reason === null && props.charge.phase === "idle" && !c.creating;
+  useArmedCharge(armedReady(list, state, free), act);
+  useDropRefusedCopy(c.createError);
   const { returnFocus, onCancel } = useCancelWithFocus(charge);
   const shown = charge.phase !== "waiting";
   const facts = barFacts(props, door, reason);
@@ -327,7 +367,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
         <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} />
       ) : null}
       <Runners props={props} sheet={sheet.current} onFailed={onFailed} />
-      <RaiseError c={c} onRetry={act} />
+      <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
         <ListBar summary={list.summary} extras={facts.extras} payer={facts.charging ? null : <PayerLine props={props} />} reason={facts.underButton} live={facts.live}>
           <BarAction props={props} failure={failure} act={act} onGooglePay={onGooglePay} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />

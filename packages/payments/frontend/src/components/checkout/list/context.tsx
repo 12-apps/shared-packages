@@ -1,6 +1,19 @@
-import { createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useRef, useState, type JSX, type MutableRefObject, type ReactNode } from "react";
 
-import type { CheckoutPaymentList } from "./types";
+import type { DeferredCopy } from "../pix-parts";
+
+import type { CheckoutPaymentList, PixBankId } from "./types";
+
+/**
+ * What the bar's Pix press asked of the code it is raising (FUT-3612): copy it
+ * the moment it arrives (the clipboard was opened inside the tap), then open
+ * `bank` — or show the six banks when `pick`. Consumed once by the Pix face.
+ */
+export interface PixIntent {
+  copy: DeferredCopy;
+  bank: PixBankId | null;
+  pick: boolean;
+}
 
 /**
  * What the one list shares with the panes it mounts (FUT-3591/3592): its
@@ -23,6 +36,15 @@ export interface PaymentListMode {
    * default — because the list skips that step.
    */
   consent: ListConsent;
+  /** The Pix press's intent, waiting for its code — see {@link PixIntent}. */
+  pixIntent: MutableRefObject<PixIntent | null>;
+  /**
+   * The armed charge (`armedCharge`) for this step: when it was armed and
+   * whether it was spent. Held HERE, above the faces, so a list face that
+   * remounts (after a Pix, "Prefere pagar com cartão?") can never fire it
+   * again — the 1-tap tap consented to ONE charge, right away.
+   */
+  armed: MutableRefObject<{ since: number; spent: boolean }>;
 }
 
 export interface ListConsent {
@@ -45,7 +67,9 @@ export function PaymentListProvider({
   children: ReactNode;
 }): JSX.Element {
   const [qrOpen, setQrOpen] = useState(false);
-  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix, consent }), [list, qrOpen, onLeavePix, consent]);
+  const pixIntent = useRef<PixIntent | null>(null);
+  const armed = useRef({ since: Date.now(), spent: false });
+  const value = useMemo(() => ({ list, qrOpen, setQrOpen, onLeavePix, consent, pixIntent, armed }), [list, qrOpen, onLeavePix, consent]);
   return <PaymentListContext.Provider value={value}>{children}</PaymentListContext.Provider>;
 }
 

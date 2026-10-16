@@ -131,6 +131,97 @@ export interface CheckoutPaymentList {
    * the list returns to its rows.
    */
   amountDueLabel?: string;
+  /**
+   * The buyer's last ONLINE way to pay, as the host remembers it (FUT-3611) —
+   * chosen for them before they touch anything, when the store offers it: Pix
+   * as Pix; a card as the saved card used last. Absent or `null` ⇒ the saved
+   * card rule alone. A door tender is never chosen for the buyer.
+   */
+  lastMethod?: "PIX" | "CARD" | null;
+  /**
+   * "Pedir em 1 toque" opened this checkout (FUT-3611): the tap on the
+   * cardápio was the buyer's consent, so the card's 5-second bar starts by
+   * itself once the saved card is chosen and nothing holds the button — ONCE
+   * per step, and only within {@link ARMED_WINDOW_MS} of the step opening: a
+   * checkout that lands held (a field to fill) never charges by itself minutes
+   * later. Without a saved card it does nothing.
+   */
+  armedCharge?: boolean;
+  /**
+   * The saved card the host's consent named (the 1-tap offer's). Given, the
+   * armed charge fires only on THAT card; a different selection never charges
+   * by itself.
+   */
+  armedCardId?: string;
+  /**
+   * Host content under the 5-second bar's Cancelar while it counts — the
+   * storefront's "Cancelar e desativar a compra em 1 toque". It is handed the
+   * bar's own cancel, so a link there stops the charge before doing its own.
+   */
+  chargeFooter?: (cancel: () => void) => ReactNode;
+  /**
+   * Pix straight to the buyer's bank app (FUT-3612) — on a phone only: the
+   * button generates AND copies the code, a short message says so through
+   * `notify`, and the after-copy face offers the six banks (or opens the one
+   * remembered). Absent ⇒ today's Pix: "Gerar Pix", then a tap to copy.
+   */
+  pixBank?: CheckoutPixBank;
+  /** Says a short sentence in the host's own toast — "Código Pix copiado". */
+  notify?: (message: string) => void;
+}
+
+/** The six banks the Pix face offers to open, in the prototype's order. */
+export type PixBankId = "nubank" | "itau" | "bradesco" | "bb" | "caixa" | "santander";
+
+/** `CheckoutPaymentList.pixBank`. */
+export interface CheckoutPixBank {
+  /** The bank the buyer picked last time, as the host stored it — or `null`. */
+  remembered: PixBankId | null;
+  /** A bank was picked: the host remembers it for next time (a new pick replaces it). */
+  onPick: (bank: PixBankId) => void;
+  /** The words; ship with the list's pack (`PIX_BANK_COPY`). */
+  copy: PixBankCopy;
+  /**
+   * Whether this device can open a bank app — a phone. Absent ⇒ read from the
+   * browser (Android or iOS). A computer keeps today's face and gets only the
+   * generate-and-copy.
+   */
+  phone?: boolean;
+}
+
+/** A bank's name and the article pt-BR puts before it ("o Nubank", "a Caixa"). */
+export interface PixBankName {
+  name: string;
+  /** "Abrir o Nubank" / "Abrir a Caixa" — the article with its trailing space, or "" for none. */
+  the: string;
+}
+
+export interface PixBankCopy {
+  names: Record<PixBankId, PixBankName>;
+  /** The bar's button with no bank remembered — "Gerar e copiar o Pix". */
+  generateAndCopy: string;
+  /** With one remembered — "Gerar, copiar e abrir o Nubank". */
+  generateCopyAndOpen: (bank: PixBankName) => string;
+  /** The before-copy face's button with one remembered — "Copiar e abrir o Nubank". */
+  copyAndOpen: (bank: PixBankName) => string;
+  /** The link under the button — "Abrir outro banco". */
+  openOther: string;
+  /** Over the grid — "Abra seu banco e cole em Pix copia e cola". */
+  listTitle: string;
+  /** A bank button's accessible name — "Abrir Nubank". */
+  open: (bank: PixBankName) => string;
+  /** "Abrindo o **Nubank**…" — `**` marks the bold span. */
+  opening: (bank: PixBankName) => string;
+  /** "Outro banco". */
+  other: string;
+  /** "Não conseguimos abrir o Nubank. O app está instalado neste celular?" */
+  notOpened: (bank: PixBankName) => string;
+  /** "Tentar de novo". */
+  retry: string;
+  /** The toasts. */
+  copied: string;
+  copiedPick: string;
+  copiedOpening: (bank: PixBankName) => string;
 }
 
 /** The list's words — a pack per locale ships at `@12-apps/payments-frontend/locales`. */

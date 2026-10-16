@@ -123,6 +123,12 @@ interface PixAfterCopyProps {
   onPreferCard?: () => void;
   /** The poll's line ("Verificando…", or the stalled panel that replaces it). */
   footer: ReactNode;
+  /**
+   * The way to the bank app, on a phone (FUT-3612): drawn where the heading
+   * was — the toast already said the code was copied and the bar says what it
+   * waits for — and, while it is the six banks, in place of the checklist.
+   */
+  banks?: { node: ReactNode; replacesChecklist: boolean };
 }
 
 /** The narrow layout's two secondaries side by side; wide, the card link joins the row. */
@@ -164,8 +170,8 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
   return (
     <Box data-testid="pix-after-copy" sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
       <Box sx={{ flex: "999 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: 2.5 }}>
-        <Heading words={words} totalLabel={totalLabel} />
-        <Checklist words={words} deadline={deadline} />
+        {props.banks ? props.banks.node : <Heading words={words} totalLabel={totalLabel} />}
+        {props.banks?.replacesChecklist ? null : <Checklist words={words} deadline={deadline} />}
         <Actions {...props} />
         {footer}
         {onPreferCard ? (

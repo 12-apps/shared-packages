@@ -287,6 +287,8 @@ function PixBody({ order, pix, poll }: { order: CheckoutOrder; pix: PixCharge; p
         onShowQr={() => setAfterCopy(false)}
         onPreferCard={stage.preferCard}
         footer={poll.error || poll.timedOut ? footerLine(copy.verifying) : null}
+        writeClipboard={writeClipboard}
+        setAfterCopy={setAfterCopy}
       />
     );
   }

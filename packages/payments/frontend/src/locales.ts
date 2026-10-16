@@ -22,7 +22,9 @@ import type { CheckoutScreensCopy } from './components/checkout/screens-copy';
 import { PT_BR_CHECKOUT_SCREENS_COPY } from './components/checkout/screens-pt-BR';
 import { EN_US_PAYMENT_LIST_COPY } from './components/checkout/list/en-US';
 import { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
-import type { PaymentListCopy } from './components/checkout/list/types';
+import { EN_US_PIX_BANK_COPY } from './components/checkout/list/bank-en-US';
+import { PT_BR_PIX_BANK_COPY } from './components/checkout/list/bank-pt-BR';
+import type { PaymentListCopy, PixBankCopy } from './components/checkout/list/types';
 import type { CheckoutViewCopy, PaymentStatusCopy } from './components/checkout/view-copy';
 import type { PlatformHomologacaoCopy } from './components/platform/copy';
 import { EN_US_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/en-US';
@@ -87,6 +89,15 @@ export const PAYMENT_LIST_COPY = {
   'pt-BR': PT_BR_PAYMENT_LIST_COPY,
   'en-US': EN_US_PAYMENT_LIST_COPY,
 } as const satisfies LocalePack<PaymentListCopy>;
+
+/**
+ * The Pix-to-bank flow's words (FUT-3612) — `CheckoutFlowProps.paymentList.pixBank.copy`.
+ * Read by the SHOPPER.
+ */
+export const PIX_BANK_COPY = {
+  'pt-BR': PT_BR_PIX_BANK_COPY,
+  'en-US': EN_US_PIX_BANK_COPY,
+} as const satisfies LocalePack<PixBankCopy>;
 
 export const CHECKOUT_COPY = {
   'pt-BR': PT_BR_CHECKOUT_COPY,
