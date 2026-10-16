@@ -179,7 +179,9 @@ function ConflictFields({
           onChange={(event) => setValue(field.key, event.target.value)}
           error={field.error !== null}
           helperText={field.error ?? undefined}
-          required={!field.optional}
+          // Announced, not drawn: the approved mock shows no asterisk, and the
+          // dialog refuses an empty required value on its own (Restaurar off).
+          inputProps={{ 'aria-required': !field.optional }}
           autoFocus={index === 0}
           disabled={pending}
           dataTestId={`recycle-bin-conflict-field-${field.key}`}
@@ -208,6 +210,7 @@ function ConflictActions({
     <Button
       key="restore"
       variant="solid"
+      size="lg"
       fullWidth={sheet}
       loading={form.pending}
       disabled={form.blocked}
@@ -221,6 +224,7 @@ function ConflictActions({
     <Button
       key="cancel"
       variant="text"
+      size="lg"
       fullWidth={sheet}
       disabled={form.pending}
       onClick={onCancel}
