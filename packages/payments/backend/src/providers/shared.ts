@@ -142,7 +142,7 @@ function stubPixCode(input: ChargeInput): string {
   const amountCents = input.amount.amountCents;
   return staticBrCode({
     pixKey: STUB_PIX_KEY,
-    merchantName: 'LOJA STUB',
+    merchantName: 'STUB MERCHANT',
     merchantCity: 'SAO PAULO',
     amountCents: Number.isInteger(amountCents) && amountCents > 0 ? amountCents : undefined,
     txid: input.reference,

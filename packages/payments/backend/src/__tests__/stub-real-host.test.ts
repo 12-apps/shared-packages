@@ -10,8 +10,17 @@ import {
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import { pagbankProvider } from '../providers/pagbank';
 import { crc16Ccitt } from '../providers/pix-manual/br-code';
-import { PT_BR_PAGBANK_COPY, PT_BR_STONE_COPY } from '../providers/pt-BR';
+import { infinitePayProvider } from '../providers/infinitepay';
+import { itauProvider } from '../providers/itau';
+import {
+  PT_BR_INFINITEPAY_COPY,
+  PT_BR_ITAU_COPY,
+  PT_BR_PAGBANK_COPY,
+  PT_BR_STONE_COPY,
+  PT_BR_STRIPE_COPY,
+} from '../providers/pt-BR';
 import { stoneProvider } from '../providers/stone';
+import { stripeProvider } from '../providers/stripe';
 import { STUB_CHARGE_FAULT_FIELD, isStubDeclinedToken } from '../providers/stub-fault';
 import { STUB_CREDS, TENANT, cardInput, pixInput } from './fixtures';
 
@@ -111,26 +120,41 @@ function scriptedPagbankChain(fault: string) {
 
 describe('the `unresolved` stub fault', () => {
   it('given a head whose charge AND probe get no answer, when the buyer pays, then the walk stops unresolved', async () => {
-    const { gateway, attempts } = scriptedPagbankChain('unresolved');
+    const chain = scriptedPagbankChain('unresolved');
 
-    await expect(gateway.charge(TENANT, pixInput('order-unresolved'))).rejects.toMatchObject({
+    await expect(chain.gateway.charge(TENANT, pixInput('order-unresolved'))).rejects.toMatchObject({
       name: 'AmbiguousChargeError',
     });
     // Nobody can prove the money did not move, so nobody else is asked.
-    expect(attempts.all().map((attempt) => attempt.provider)).not.toContain('stone');
+    expect(chain.attempts.all().map((attempt) => attempt.provider)).not.toContain('stone');
   });
 
   it('given `ambiguous`, when the stub probe answers "no such charge", then the walk still advances', async () => {
-    const { gateway } = scriptedPagbankChain('ambiguous');
+    const chain = scriptedPagbankChain('ambiguous');
 
-    const stored = await gateway.charge(TENANT, pixInput('order-ambiguous'));
+    const stored = await chain.gateway.charge(TENANT, pixInput('order-ambiguous'));
 
     expect(stored.snapshot.provider).toBe('stone');
   });
 
-  it('given no fault, then the stub probe answers "no such charge"', async () => {
-    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+  /** Every adapter whose stub probe the walk can reach — each routes the script. */
+  const PROBING_STUBS = [
+    ['pagbank', pagbankProvider(PT_BR_PAGBANK_COPY)],
+    ['stone', stoneProvider(PT_BR_STONE_COPY)],
+    ['stripe', stripeProvider(PT_BR_STRIPE_COPY)],
+    ['itau', itauProvider(PT_BR_ITAU_COPY)],
+    ['infinitepay', infinitePayProvider(PT_BR_INFINITEPAY_COPY)],
+  ] as const;
 
+  it.each(PROBING_STUBS)('given no fault, then the %s stub probe answers "no such charge"', async (_name, adapter) => {
     await expect(adapter.findChargeByReference!('order-none', STUB_CREDS)).resolves.toBeNull();
+  });
+
+  it.each(PROBING_STUBS)('given `unresolved`, then the %s stub probe gets no answer', async (_name, adapter) => {
+    const scripted = { ...STUB_CREDS, fields: { [STUB_CHARGE_FAULT_FIELD]: 'unresolved' } };
+
+    await expect(adapter.findChargeByReference!('order-none', scripted)).rejects.toMatchObject({
+      name: 'ProviderRequestError',
+    });
   });
 });

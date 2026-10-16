@@ -252,7 +252,7 @@ export interface PaymentsWorld {
    * Called after the owner pressed the package's own "Reconectar": whatever
    * the host does to get a grant — a fake authorize page in a harness, a
    * stubbed exchange in an app — ends on the provider panel again, where the
-   * package's success notice is asserted. Declared here because the consent
+   * host's `payments-connect-success` notice is asserted. Declared here because the consent
    * screen is the PROVIDER's, which no package component renders.
    */
   authorizeOAuth(page: Page): Promise<void>;

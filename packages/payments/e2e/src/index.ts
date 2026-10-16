@@ -14,6 +14,7 @@
  *   raiseHostedPayable: async (page) => { ... },
  *   returnFromProvider: async (page) => { ... },
  *   hostedReturnStatus: (page) => page.getByTestId('...'),
+ *   authorizeOAuth: async (page) => { ... },
  *   fixtures: { ... },
  *   wire: { ... },
  * });

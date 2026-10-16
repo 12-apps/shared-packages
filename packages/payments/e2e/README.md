@@ -84,6 +84,15 @@ which is worse than a red one.
 - **Assert your journey count.** Whatever the mechanism, put a check somewhere
   that the number of scenarios you expect actually ran.
 
+### What `open` must leave on screen
+
+For a checkout shape, `open` returns with the buyer **on the Dados step**, the
+store's checkout config already resolved, and every field the chain requires
+filled in **except the CPF** — the packaged steps type the CPF when the form
+asks for one, and press Continuar. Which other fields a chain requires (a mobile
+phone, a name, an e-mail) is a fact about the store you built. A buyer with a
+CPF on file skips Dados entirely, so do not arrive with one.
+
 ## `PaymentsStore` — the shapes a scenario asks for
 
 A scenario names a kind of merchant; you decide how to produce one. A harness
@@ -100,7 +109,7 @@ files do not change either way.
 Adding a member is a breaking change for hosts, deliberately: a scenario needing
 a store nobody can build is a scenario that silently never runs.
 
-`wallet` (added for FUT-183/FUT-478) is one of two members that are **not a
+`wallet` (added for FUT-183/FUT-478) is one of the members that are **not a
 checkout**: `open(page, 'wallet')` must land the buyer on the package's
 manage-cards surface (`screens.ManageCards` from `createPaymentFlows`) at a
 store whose single provider can vault — the chain head declares the adapter

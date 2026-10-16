@@ -18,7 +18,7 @@ import { Given, Then, When } from './fixtures.js';
  *     renders;
  *   - the HOST's success notice after a connect, `payments-connect-success`:
  *     the settings page leaves that banner to its host, so a host that adopts
- *     this journey renders it under that id (as the harness and future-pay do);
+ *     this journey renders it under that id, as the harness does;
  *   - the host's PROBE of its own stored row — `wire.connectionStatus`,
  *     `wire.connectionEnabled`, `wire.rotation` — which is how a scenario
  *     asserts that `enabled` and the rotation genuinely disagree rather than

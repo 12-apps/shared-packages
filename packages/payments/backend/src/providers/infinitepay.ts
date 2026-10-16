@@ -37,6 +37,7 @@ export { STUB_OUTCOME_FIELD } from './infinitepay-stub';
 import { checkSnapshot, isPaidCheck } from './infinitepay-shared';
 import { infinitePayDeliveryReference, parseInfinitePayEvent, verifyInfinitePayWebhook } from './infinitepay-webhook';
 import { chargeDescription, stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
+import { stubFindChargeByReference } from './stub-fault';
 
 /**
  * InfinitePay adapter — live against the Checkout Integrado API.
@@ -178,7 +179,9 @@ function scriptedSnapshot(
     const answer = stubFindCharge(scripted, reference);
     if (answer !== undefined) return answer;
   }
-  return credentials.stub ? null : undefined;
+  // The plain stub finds nothing, unless the connection is scripted
+  // `unresolved` (FUT-3627): then the probe gets no answer either.
+  return credentials.stub ? stubFindChargeByReference(NAME, credentials) : undefined;
 }
 
 /**
