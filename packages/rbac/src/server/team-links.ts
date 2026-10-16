@@ -5,7 +5,7 @@ import type { RbacActorTier } from './roster-policy';
 import type { TeamStoreCtx } from './team-store';
 
 /**
- * The roster's writes to the membership ↔ role join: the base-role swap, and
+ * The roster's writes to the membership ↔ role join: the PATCH swap of the highest system role, and
  * granting or revoking one role. Out of `./team-store` for the size gate, and
  * because they are one family: each writes `membership_roles` and nothing else.
  */
@@ -86,6 +86,19 @@ export async function grantCustomRoleToMember(
   }
 }
 
+/**
+ * Whether revoking `roleName` takes ownership from `userId`: they hold that
+ * owner link, and no link to another live owner role that would keep them one.
+ */
+function takesOwnership(
+  linkHolders: ReadonlyMap<string, ReadonlySet<string>>,
+  roleName: string,
+  userId: string,
+): boolean {
+  if (!linkHolders.get(roleName)?.has(userId)) return false;
+  return ![...linkHolders].some(([name, holders]) => name !== roleName && holders.has(userId));
+}
+
 export async function revokeCustomRoleFromMember(
   ctx: TeamStoreCtx,
   tenantId: string,
@@ -104,7 +117,7 @@ export async function revokeCustomRoleFromMember(
     ? await db.$transaction(async (tx) => {
         const ownerRows = await lockTenantOwnership(tx, tenantId, ctx.ownerRoles);
         const ownership = await readOwnership(tx, tenantId, ctx.ownerRoles, ownerRows);
-        if (ownership.linkHolders.get(roleName)?.has(userId)) {
+        if (takesOwnership(ownership.linkHolders, roleName, userId)) {
           assertOwnershipMayMove(ownership, userId, actor, ctx.ownerRoles, {
             forbidden: ctx.messages.onlyOwnerRemovesOwner,
             lastOwner: ctx.messages.lastOwner,

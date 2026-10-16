@@ -128,7 +128,7 @@ async function membershipOf(db: RbacDbClient, tenantId: string, userId: string) 
 }
 
 /**
- * Whether moving a base role from `from` to `to` takes an owner role away.
+ * Whether moving the member's highest system role from `from` to `to` takes an owner role away.
  *
  * A move between two owner roles keeps ownership only when `to` has a live row
  * in the tenant to link: the swap unlinks `from` and links nothing otherwise
@@ -140,13 +140,14 @@ function demotesOwner(
   move: { from: string; to: string },
   ownerRows: readonly RoleRow[],
 ): boolean {
-  if (!ctx.ownerRoles.has(move.from)) return false;
+  // A PATCH to the role already held swaps nothing, so it takes nothing away.
+  if (move.from === move.to || !ctx.ownerRoles.has(move.from)) return false;
   if (!ctx.ownerRoles.has(move.to)) return true;
   return ownerRows.length > 0 && !ownerRows.some((row) => row.name === move.to);
 }
 
 /**
- * The membership a base-role write starts from, read AFTER the ownership lock.
+ * The membership a role swap (PATCH) starts from, read AFTER the ownership lock.
  *
  * Every PATCH locks, not only one whose target owns: a host may promote a
  * member under the same lock (ADOPTING.md, rule 10), and a PATCH that read

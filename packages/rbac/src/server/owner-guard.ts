@@ -13,7 +13,7 @@ import type { RbacActorTier } from './roster-policy';
  *
  * A member holds any number of roles, so an owner role is one role among
  * several, and three roster writes can take it away: revoking it, demoting the
- * member whose base role it is, and removing the member. Each of them used to
+ * member from their highest system role, and removing the member. Each of them used to
  * count owners in one statement and write in another. Two co-owners taking it
  * from each other at the same moment both saw a second owner, both wrote, and
  * the tenant ended with none (FUT-2435).

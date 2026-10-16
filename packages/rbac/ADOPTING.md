@@ -129,6 +129,11 @@ reusable across repositories, exposing standardized surfaces. A host repo only
     - A tenant with NO live owner-role row has nothing to lock: its writes run
       unserialised and the active column owners decide, as before this rule.
       Seed the owner roles per tenant (rule 8) to get the guarantee.
+    - Once a tenant has an owner-role row, an owner who holds only the column
+      (no link) counts as nobody: they cannot remove or demote an owner, and
+      they are not the owner who remains. Neither is a member who holds the
+      link under a column naming another role. Before adopting, backfill a link
+      to the owner-role row for every membership whose column names it.
     - Each of those writes updates the owner rows, so their `updated_at` moves
       and any host trigger on `roles` fires. Nothing in the package reads
       `updated_at`; a host trigger should skip a row whose values did not

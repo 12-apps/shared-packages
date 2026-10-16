@@ -610,6 +610,37 @@ describe('direct store calls', () => {
       'BRANCH_LEAD',
     );
   });
+
+  it('s6: a PATCH to the owner role already held takes nothing, even with no row for it', async () => {
+    // NETWORK_OPS has no tenant row, so a MOVE to it would unlink DIRECTOR
+    // (s4); a member already on it swaps nothing, and nothing is refused.
+    const h = await host({ 'owner-1': 'DIRECTOR', 'ops-1': 'NETWORK_OPS', 'admin-1': 'HEAD_LIBRARIAN' });
+    const admin = { role: 'HEAD_LIBRARIAN', isPlatformActor: false, userId: 'admin-1' };
+    await expect(
+      h.api.team.setMemberRole(TENANT, 'ops-1', 'NETWORK_OPS', undefined, admin),
+    ).resolves.toBe('NETWORK_OPS');
+  });
+
+  it('s7: revoking one owner role from a member who keeps another runs no owner rule', async () => {
+    const h = await host(ONE_OWNER);
+    seedRole(h.state, { clientId: TENANT, name: 'NETWORK_OPS', permissions: '*', kind: 'SYSTEM', locked: true });
+    addLink(h.state, 'owner-1', 'NETWORK_OPS');
+    const response = await call(h, REVOKE, {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'owner-1', role: 'DIRECTOR' },
+    });
+    expect(response.status).toBe(200);
+    expect(holdsLink(h.state, 'owner-1', 'DIRECTOR')).toBe(false);
+    expect(holdsLink(h.state, 'owner-1', 'NETWORK_OPS')).toBe(true);
+    // The last owner role is still guarded: dropping NETWORK_OPS too would
+    // leave the tenant with nobody holding one.
+    const last = await call(h, REVOKE, {
+      actor: memberActor(TENANT, 'owner-1'),
+      params: { userId: 'owner-1', role: 'NETWORK_OPS' },
+    });
+    expect(last.status).toBe(409);
+    expect(holdsLink(h.state, 'owner-1', 'NETWORK_OPS')).toBe(true);
+  });
 });
 
 /** The row ids the lock statements named, in the order they ran. */
