@@ -106,6 +106,9 @@ function Opening({ bank, state, chosen }: { bank: CheckoutPixBank; state: PixBan
 }
 
 /** One of the six: the bank's logo at 32px and its name, ≈56px tall. */
+/** The grid's own width, never the window's: under it, a cell is too narrow for logo and name side by side. */
+const NARROW_GRID = "@container pixbanks (max-width: 289.95px)";
+
 function BankButton({ bank, id, onPick, disabled }: { bank: CheckoutPixBank; id: PixBankId; onPick: () => void; disabled: boolean }): JSX.Element {
   const { Button } = useCheckoutComponents();
   const name = bank.copy.names[id];
@@ -125,9 +128,9 @@ function BankButton({ bank, id, onPick, disabled }: { bank: CheckoutPixBank; id:
           px: 1.5,
           color: "text.primary",
           borderColor: "divider",
-          // A 320px phone gives each half ~120px: logo beside "Santander" no
-          // longer fits, so the logo goes above the name.
-          "@media (max-width: 359.95px)": {
+          // A 320px phone gives the grid ~254px (each half ~123px): logo
+          // beside "Santander" no longer fits, so the logo goes above the name.
+          [NARROW_GRID]: {
             flexDirection: "column",
             justifyContent: "center",
             textAlign: "center",
@@ -158,10 +161,12 @@ function Grid({ bank, state, stale }: { bank: CheckoutPixBank; state: PixBankSta
       <Text variant="body" size="md" weight="semibold" as="p" style={{ margin: 0 }}>
         {bank.copy.listTitle}
       </Text>
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
-        {PIX_BANKS.map((id) => (
-          <BankButton key={id} bank={bank} id={id} disabled={stale} onPick={() => state.open(id, true)} />
-        ))}
+      <Box sx={{ containerType: "inline-size", containerName: "pixbanks" }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
+          {PIX_BANKS.map((id) => (
+            <BankButton key={id} bank={bank} id={id} disabled={stale} onPick={() => state.open(id, true)} />
+          ))}
+        </Box>
       </Box>
     </Box>
   );
