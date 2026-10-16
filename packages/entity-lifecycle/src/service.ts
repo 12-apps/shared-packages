@@ -20,6 +20,7 @@ import {
   type ApprovalMethods,
   type DraftMethods,
 } from './service-review';
+import type { RestoreOverrides } from './restore-conflict';
 import { listHistory, materializeVersion, type VersionSummary } from './versioning';
 import type {
   EntityLifecycleConfig,
@@ -58,7 +59,7 @@ export interface EntityLifecycle extends DraftMethods, NewItemDraftMethods, Appr
   // Recycle bin
   listRecycleBin(ctx: LifecycleContext, filter?: RecycleBinListFilter): Promise<RecycleBinEntry[]>;
   recycleBinTree(ctx: LifecycleContext, entryId: string): Promise<RecycleBinEntry[]>;
-  restoreDeleted(ctx: LifecycleContext, entryId: string): Promise<void>;
+  restoreDeleted(ctx: LifecycleContext, entryId: string, overrides?: RestoreOverrides): Promise<void>;
   purgeDeleted(ctx: LifecycleContext, entryId: string): Promise<void>;
 }
 
@@ -183,10 +184,17 @@ function createBinMethods(kernel: LifecycleKernel) {
       return tree;
     },
 
-    async restoreDeleted(ctx: LifecycleContext, entryId: string): Promise<void> {
+    async restoreDeleted(
+      ctx: LifecycleContext,
+      entryId: string,
+      overrides?: RestoreOverrides,
+    ): Promise<void> {
       const tree = await requireDeletedTree(ctx, entryId);
       const root = tree[0] as RecycleBinEntry;
-      const restored = await kernel.ops.unarchive(ctx.tenantId, root.entityId);
+      const restored = await kernel.ops.unarchive(ctx.tenantId, root.entityId, {
+        entry: root,
+        ...(overrides ? { overrides } : {}),
+      });
       if (!restored) {
         throw new LifecycleError(
           'ENTITY_NOT_FOUND',

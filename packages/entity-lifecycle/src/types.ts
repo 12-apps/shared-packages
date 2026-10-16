@@ -1,3 +1,4 @@
+import type { RestoreRequest } from './restore-conflict';
 /**
  * Shared contracts for the entity-lifecycle library. The core is storage- and
  * framework-agnostic: every persistence concern is an adapter interface the
@@ -352,8 +353,8 @@ export interface EntityOps {
   applySnapshot(tenantId: string, entityId: string | null, snapshot: Snapshot): Promise<string>;
   /** Soft-hide the record (e.g. stamp archivedAt). False when not found. */
   archive(tenantId: string, entityId: string): Promise<boolean>;
-  /** Undo `archive`. False when not found. */
-  unarchive(tenantId: string, entityId: string): Promise<boolean>;
+  /** Undo `archive`. False when not found. A bin restore passes {@link RestoreRequest}. */
+  unarchive(tenantId: string, entityId: string, request?: RestoreRequest): Promise<boolean>;
   /** Permanently delete the record (recycle-bin purge). */
   hardDelete(tenantId: string, entityId: string): Promise<void>;
   /**
@@ -395,3 +396,4 @@ export interface LifecycleContext {
    */
   canApprove?: boolean;
 }
+

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { LifecycleError, type LifecycleErrorCode } from '../../errors';
-import { LifecycleApiError, foldLifecycle } from '../context';
+import { LifecycleError, RestoreConflictError, type LifecycleErrorCode } from '../../errors';
+import { LifecycleApiError, foldApiError, foldLifecycle } from '../context';
 import { PT_BR_LIFECYCLE_MESSAGES as MESSAGES } from '../pt-BR';
 
 /**
@@ -28,6 +28,9 @@ const EVERY_CODE: Record<LifecycleErrorCode, number> = {
   // Not in ERROR_SURFACE — the deliberate fall-through, asserted so that
   // "unmapped" stays a decision rather than an omission nobody notices.
   INVALID_STATE: 422,
+  // Thrown bare it carries no clash to show, so it is the generic failure;
+  // the RestoreConflictError subclass is the 409 (asserted below).
+  RESTORE_CONFLICT: 422,
 };
 
 const throwing = (error: unknown) => () => Promise.reject(error);
@@ -52,6 +55,27 @@ describe('foldLifecycle', () => {
       expect(Object.values(MESSAGES)).toContain((thrown as LifecycleApiError).message);
     });
   }
+
+  it('answers a restore clash 409 with the host wording and the clash itself', async () => {
+    const conflict = {
+      title: 'Restaurar com outro nome',
+      message: 'O nome já está em uso.',
+      binned: { heading: 'Na lixeira', label: 'Grande', detail: 'Código 1' },
+      current: { heading: 'No produto agora', label: 'Grande', detail: 'Código 2' },
+      fields: [{ key: 'name', label: 'Novo nome', value: 'Grande (antiga)', error: null, optional: false }],
+    };
+    const thrown = await foldLifecycle(MESSAGES, throwing(new RestoreConflictError(conflict))).catch(
+      (error: unknown) => error,
+    );
+    expect(thrown).toBeInstanceOf(LifecycleApiError);
+    expect((thrown as LifecycleApiError).status).toBe(409);
+    expect((thrown as LifecycleApiError).message).toBe('O nome já está em uso.');
+    expect((thrown as LifecycleApiError).extra).toEqual({ conflict });
+    expect(foldApiError(thrown)).toEqual({
+      status: 409,
+      body: { conflict, error: 'O nome já está em uso.' },
+    });
+  });
 
   it('leaves a foreign error alone — it is not this package failing', async () => {
     const boom = new TypeError('a bug in the host');

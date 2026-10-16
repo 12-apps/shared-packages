@@ -1,3 +1,4 @@
+import type { RestoreOverrides } from '../restore-conflict';
 import type { Snapshot } from '../types';
 import type {
   DraftWire,
@@ -79,7 +80,8 @@ export interface LifecycleApiClient {
   publishDraft(slug: string, draftId: string): Promise<LifecycleResult<WriteOutcomeWire>>;
   discardDraft(slug: string, draftId: string): Promise<LifecycleResult<void>>;
   listRecycleBin(entityType?: string): Promise<{ entries: RecycleBinEntryWire[] }>;
-  restoreEntry(entryId: string): Promise<LifecycleResult<void>>;
+  /** `overrides`: the values typed after a restore clash (`RestoreConflict`). */
+  restoreEntry(entryId: string, overrides?: RestoreOverrides): Promise<LifecycleResult<void>>;
   purgeEntry(entryId: string): Promise<LifecycleResult<void>>;
   listApprovals(status: ApprovalStatusWire): Promise<{ requests: ApprovalRequestWire[] }>;
   approveRequest(requestId: string): Promise<LifecycleResult<WriteOutcomeWire>>;
@@ -125,8 +127,12 @@ export function createLifecycleApiClient(
           ? `${base}/recycle-bin?entityType=${encodeURIComponent(entityType)}`
           : `${base}/recycle-bin`,
       ),
-    restoreEntry: (entryId) =>
-      transport.send(`${base}/recycle-bin/${encodeURIComponent(entryId)}/restore`, 'POST'),
+    restoreEntry: (entryId, overrides) =>
+      transport.send(
+        `${base}/recycle-bin/${encodeURIComponent(entryId)}/restore`,
+        'POST',
+        overrides ? { overrides } : undefined,
+      ),
     purgeEntry: (entryId) =>
       transport.send(`${base}/recycle-bin/${encodeURIComponent(entryId)}`, 'DELETE'),
     listApprovals: (status) =>
