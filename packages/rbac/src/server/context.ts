@@ -163,6 +163,8 @@ export interface RbacMessages {
   reservedRoleName: string;
   lastOwner: string;
   onlyOwnerRemovesOwner: string;
+  /** A non-owner demoting an owner through PATCH; absent, `onlyOwnerRemovesOwner` answers. */
+  onlyOwnerDemotesOwner?: string;
   ownerNotDisableable: string;
   templateNotEditable: string;
   invalidEmail: string;

@@ -17,6 +17,7 @@ export const PT_BR_RBAC_MESSAGES: RbacMessages = {
     'Esse nome é reservado para um papel do sistema. Edite o papel do sistema.',
   lastOwner: 'É necessário manter ao menos um proprietário.',
   onlyOwnerRemovesOwner: 'Apenas o proprietário pode remover outro proprietário.',
+  onlyOwnerDemotesOwner: 'Apenas o proprietário pode mudar o papel de outro proprietário.',
   ownerNotDisableable: 'Não é possível desativar um proprietário.',
   templateNotEditable: 'Este papel do sistema não pode ser editado.',
   invalidEmail: 'Informe um e-mail válido.',
