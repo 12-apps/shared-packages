@@ -13,7 +13,7 @@
 import type { PixBankId } from "./types";
 
 /** How long a page may stay visible before the bank counts as not opened. */
-export const OPEN_WAIT_MS = 1500;
+const OPEN_WAIT_MS = 1500;
 
 interface BankApp {
   /** The Play Store package of the bank's personal app — each one checked on its Play listing (2026-10-16). */
