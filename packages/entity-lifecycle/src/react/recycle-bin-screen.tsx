@@ -14,7 +14,9 @@ import { Text } from '@12-apps/ui/typography/Text';
 import type { LifecycleApiClient, RecycleBinEntryWire } from './api';
 import type { RecycleBinCopy } from './copy';
 import { DATE_TIME, entityTypeLabel, type EntityTypeLabels } from './labels';
+import { RestoreConflictDialog } from './restore-conflict-dialog';
 import type { LifecycleResult } from './transport';
+import type { RestoreConflict } from '../restore-conflict';
 
 /**
  * Lixeira (12-17) — the soft-delete recycle bin of the entity-lifecycle
@@ -33,6 +35,42 @@ interface BinActions {
   restore: (entry: RecycleBinEntryWire) => Promise<void>;
   requestPurge: (entry: RecycleBinEntryWire) => void;
   purgeDialog: JSX.Element | null;
+  /** The rename dialog of a restore refused for a clash, while one is open. */
+  conflictDialog: JSX.Element | null;
+}
+
+/**
+ * The rename dialog of a restore refused for a clash: opened with the host's
+ * conflict, retried with what was typed, closed (and the list refetched) once
+ * a retry lands.
+ */
+function useRestoreClash(
+  api: LifecycleApiClient,
+  copy: RecycleBinCopy,
+  refetch: () => void,
+): { open: (entry: RecycleBinEntryWire, conflict: RestoreConflict) => void; dialog: JSX.Element | null } {
+  const [clashing, setClashing] = useState<{
+    entry: RecycleBinEntryWire;
+    conflict: RestoreConflict;
+  } | null>(null);
+  const dialog = clashing ? (
+    <RestoreConflictDialog
+      key={clashing.entry.id}
+      conflict={clashing.conflict}
+      restoreLabel={copy.restoreAction}
+      cancelLabel={copy.confirmAction.cancel}
+      onCancel={() => setClashing(null)}
+      onRestore={async (overrides) => {
+        const result = await api.restoreEntry(clashing.entry.id, overrides);
+        if (result.ok) {
+          setClashing(null);
+          refetch();
+        }
+        return result.ok ? { ok: true } : result;
+      }}
+    />
+  ) : null;
+  return { open: (entry, conflict) => setClashing({ entry, conflict }), dialog };
 }
 
 function useBinActions(
@@ -43,6 +81,7 @@ function useBinActions(
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [purging, setPurging] = useState<RecycleBinEntryWire | null>(null);
+  const clash = useRestoreClash(api, copy, refetch);
 
   async function run(
     entryId: string,
@@ -75,7 +114,23 @@ function useBinActions(
     busyId,
     error,
     clearError: () => setError(null),
-    restore: (entry) => run(entry.id, () => api.restoreEntry(entry.id)),
+    restore: async (entry) => {
+      // One restore at a time: two clashing at once would open one dialog over
+      // the other's, and the first clash would never be shown.
+      if (busyId !== null) return;
+      setBusyId(entry.id);
+      setError(null);
+      try {
+        const result = await api.restoreEntry(entry.id);
+        if (result.ok) refetch();
+        // A clash is not a failure to report: it is a question, asked in the
+        // rename dialog, and the entry stays in the bin until it is answered.
+        else if (result.conflict) clash.open(entry, result.conflict);
+        else setError(result.error);
+      } finally {
+        setBusyId(null);
+      }
+    },
     requestPurge: (entry) => {
       setPurging(entry);
       purgeState.request();
@@ -93,6 +148,7 @@ function useBinActions(
         dataTestId="recycle-bin-purge-confirm"
       />
     ) : null,
+    conflictDialog: clash.dialog,
   };
 }
 
@@ -102,6 +158,7 @@ function BinEntryCard({
   labels,
   copy,
   busy,
+  locked,
   onRestore,
   onPurge,
 }: {
@@ -109,6 +166,8 @@ function BinEntryCard({
   labels: EntityTypeLabels;
   copy: RecycleBinCopy;
   busy: boolean;
+  /** Another entry's restore is running: one at a time, said by a disabled button. */
+  locked: boolean;
   onRestore: () => void;
   onPurge: () => void;
 }): JSX.Element {
@@ -127,6 +186,7 @@ function BinEntryCard({
           variant="outline"
           size="sm"
           loading={busy}
+          disabled={locked}
           onClick={onRestore}
           dataTestId={`recycle-bin-restore-${entry.id}`}
         >
@@ -201,11 +261,13 @@ function BinBody({
           labels={labels}
           copy={copy}
           busy={actions.busyId === entry.id}
+          locked={actions.busyId !== null && actions.busyId !== entry.id}
           onRestore={() => void actions.restore(entry)}
           onPurge={() => actions.requestPurge(entry)}
         />
       ))}
       {actions.purgeDialog}
+      {actions.conflictDialog}
     </Stack>
   );
 }

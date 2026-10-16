@@ -5,8 +5,17 @@
  * global. The default is same-origin `fetch` riding the browser's cookies.
  */
 
+import type { RestoreConflict } from '../restore-conflict';
+
 /** A write outcome the screens branch on — never a thrown mutation. */
-export type LifecycleResult<T> = { ok: true; data: T } | { ok: false; error: string };
+export type LifecycleResult<T> =
+  | { ok: true; data: T }
+  | {
+      ok: false;
+      error: string;
+      /** Set when the server refused a restore for a clash (409). */
+      conflict?: RestoreConflict;
+    };
 
 /** A failed read, carrying the status the screens branch on (403 = feature off). */
 export class LifecycleHttpError extends Error {
@@ -41,6 +50,15 @@ async function readJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** A refused write: the server's sentence (or the host's), and a restore clash when it sent one. */
+function failureOf(
+  payload: { error?: string; conflict?: RestoreConflict } | null,
+  fallbackError: string,
+): LifecycleResult<never> {
+  const error = payload?.error ?? fallbackError;
+  return payload?.conflict ? { ok: false, error, conflict: payload.conflict } : { ok: false, error };
+}
+
 /**
  * @param fallbackError What a failed write says when the server sent no
  * sentence of its own — REQUIRED, the host's words. `createWebEntityLifecycle`
@@ -65,11 +83,9 @@ export function httpLifecycleTransport(fallbackError: string): LifecycleTranspor
         });
         if (response.status === 204) return { ok: true, data: undefined as T };
         const payload = (await response.json().catch(() => null)) as
-          | { data?: T; error?: string }
+          | { data?: T; error?: string; conflict?: RestoreConflict }
           | null;
-        if (!response.ok) {
-          return { ok: false, error: payload?.error ?? fallbackError };
-        }
+        if (!response.ok) return failureOf(payload, fallbackError);
         return { ok: true, data: (payload?.data ?? payload) as T };
       } catch {
         return { ok: false, error: fallbackError };

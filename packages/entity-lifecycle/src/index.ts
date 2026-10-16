@@ -19,7 +19,8 @@
  */
 
 export * from './types';
-export { LifecycleError, type LifecycleErrorCode } from './errors';
+export * from './restore-conflict';
+export { LifecycleError, RestoreConflictError, type LifecycleErrorCode } from './errors';
 export {
   diffSnapshots,
   jsonEquals,

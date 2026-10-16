@@ -4,7 +4,7 @@
  * shape — framework-neutral descriptors a forty-line adapter mounts.
  */
 
-import { LifecycleError } from '../errors';
+import { LifecycleError, RestoreConflictError } from '../errors';
 import type { DraftRecord, FeatureFlagMap, LifecycleContext, Snapshot, WriteResult } from '../types';
 import type { DraftWire, WriteOutcomeWire } from '../wire';
 
@@ -155,10 +155,16 @@ export function messagesOf(
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class LifecycleApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /**
+   * Fields answered beside `error` — the restore clash's `conflict`, which
+   * the bin screen needs whole to draw its dialog.
+   */
+  readonly extra: Readonly<Record<string, unknown>> | undefined;
+  constructor(status: number, message: string, extra?: Readonly<Record<string, unknown>>) {
     super(message);
     this.name = 'LifecycleApiError';
     this.status = status;
+    this.extra = extra;
     Object.setPrototypeOf(this, LifecycleApiError.prototype);
   }
 }
@@ -167,9 +173,13 @@ export const ok = (data: unknown, status = 200): LifecycleResponse => ({
   status,
   body: { data },
 });
-const fail = (status: number, error: string): LifecycleResponse => ({
+const fail = (
+  status: number,
+  error: string,
+  extra?: Readonly<Record<string, unknown>>,
+): LifecycleResponse => ({
   status,
-  body: { error },
+  body: { ...extra, error },
 });
 export const noContent = (): LifecycleResponse => ({ status: 204, body: undefined });
 
@@ -189,6 +199,11 @@ const ERROR_SURFACE: Record<string, [number, keyof LifecycleMessages]> = {
 function toApiError(error: unknown, messages: LifecycleMessages): LifecycleApiError | undefined {
   if (error instanceof LifecycleApiError) return error;
   if (!(error instanceof LifecycleError)) return undefined;
+  // The host worded this one itself, and the screen needs all of it: 409
+  // with the clash beside the sentence, never the generic 422.
+  if (error instanceof RestoreConflictError) {
+    return new LifecycleApiError(409, error.conflict.message, { conflict: error.conflict });
+  }
   const [status, key] = ERROR_SURFACE[error.code] ?? [422, 'operationFailed'];
   return new LifecycleApiError(status, messages[key]);
 }
@@ -218,7 +233,7 @@ export async function foldLifecycle<T>(
 
 /** Fold a thrown {@link LifecycleApiError} into a response; rethrow the rest. */
 export function foldApiError(error: unknown): LifecycleResponse {
-  if (error instanceof LifecycleApiError) return fail(error.status, error.message);
+  if (error instanceof LifecycleApiError) return fail(error.status, error.message, error.extra);
   throw error;
 }
 

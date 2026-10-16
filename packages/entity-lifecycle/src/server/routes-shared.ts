@@ -31,6 +31,7 @@ import {
   type LifecycleUserDirectory,
 } from './context';
 import type { LifecycleEntityRegistration } from './registration';
+import { parseRestoreBody } from './restore-body';
 
 export interface RegisteredEntity {
   registration: LifecycleEntityRegistration;
@@ -163,6 +164,8 @@ function binListRoute(config: SharedRouteConfig): LifecycleRoute {
  * `POST /recycle-bin/:entryId/restore` — bring a soft-deleted item back
  * (un-archive the live record, flip the entry tree to RESTORED), dispatched
  * to the entry's own collection so restore behaves identically everywhere.
+ * An optional `{ overrides }` body carries the values typed after a clash; a
+ * clash answers 409 `{ error, conflict }` (`RestoreConflictError`).
  *
  * `DELETE /recycle-bin/:entryId` — PERMANENTLY delete a binned item ("excluir
  * definitivamente"): the hard delete removes the record and its satellites;
@@ -181,10 +184,13 @@ function binItemRoutes(config: SharedRouteConfig): LifecycleRoute[] {
     return root;
   };
   return [
-    route(config, 'POST', '/recycle-bin/:entryId/restore', async ({ actor, params }, deps) => {
+    route(config, 'POST', '/recycle-bin/:entryId/restore', async ({ actor, params, body }, deps) => {
+      const overrides = parseRestoreBody(body, deps.messages);
       const root = await rootOf(deps, actor.tenantId, params.entryId);
       const { entity, ctx } = await dispatchContext(deps, root.entityType, actor);
-      await foldLifecycle(deps.messages, () => entity.lifecycle.restoreDeleted(ctx, root.id));
+      await foldLifecycle(deps.messages, () =>
+        entity.lifecycle.restoreDeleted(ctx, root.id, overrides),
+      );
       return noContent();
     }),
     route(config, 'DELETE', '/recycle-bin/:entryId', async ({ actor, params }, deps) => {

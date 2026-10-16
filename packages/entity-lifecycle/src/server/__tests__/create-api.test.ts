@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { EN_US_LIFECYCLE_MESSAGES } from '../en-US';
 import { PT_BR_LIFECYCLE_MESSAGES } from '../pt-BR';
 
+import { RestoreConflictError } from '../../errors';
 import type { EntityOps, Snapshot } from '../../types';
 import { createApiEntityLifecycle } from '../create-api-entity-lifecycle';
 import type { LifecycleActor, LifecycleRoute } from '../context';
@@ -89,7 +90,7 @@ function buildApi(
       getUsers: async (ids) => ids.map((id) => ({ id, name: `User ${id}` })),
     },
   });
-  return { api, rows };
+  return { api, rows, ops };
 }
 
 /** The seeded feature layers: everything entitled, approvals ON. */
@@ -497,6 +498,65 @@ describe('recycle bin', () => {
     });
     expect(purged.status).toBe(204);
     expect(rows.has(created.entityId)).toBe(false);
+  });
+
+  it('answers a clash 409 with the host conflict, and restores with the typed overrides', async () => {
+    const { api, rows, ops } = buildApi();
+    // The host's rule: two live rows may not share a name.
+    const unarchive = ops.unarchive.bind(ops);
+    ops.unarchive = async (tenantId, entityId, request) => {
+      const overrides = request?.overrides;
+      // The host is handed the entry it is restoring.
+      expect(request?.entry.entityId).toBe(entityId);
+      const row = rows.get(entityId);
+      const name = overrides?.name ?? String(row?.name);
+      const taken = [...rows.entries()].some(
+        ([id, other]) => id !== entityId && !other._archived && other.name === name,
+      );
+      if (taken) {
+        throw new RestoreConflictError({
+          title: 'Restaurar com outro nome',
+          message: 'O nome já está em uso.',
+          binned: { heading: 'Na lixeira', label: name, detail: '' },
+          current: { heading: 'Agora', label: name, detail: '' },
+          fields: [{ key: 'name', label: 'Novo nome', value: `${name} (antiga)`, error: null, optional: false }],
+        });
+      }
+      if (row && overrides?.name) row.name = overrides.name;
+      return unarchive(tenantId, entityId, request);
+    };
+    const handle = api.entity('product');
+    const ctx = handle.context(noApprovals);
+    const first = await handle.lifecycle.create(ctx, { name: 'Suco' });
+    if (first.status !== 'applied') throw new Error('expected applied');
+    await handle.lifecycle.softDelete(ctx, first.entityId);
+    await handle.lifecycle.create(ctx, { name: 'Suco' });
+
+    const listed = await call(routeOf(api.routes, 'GET', '/recycle-bin'), noApprovals);
+    const entryId = (listed.body as { data: { entries: { id: string }[] } }).data.entries[0]!.id;
+    const restore = routeOf(api.routes, 'POST', '/recycle-bin/:entryId/restore');
+
+    const refused = await call(restore, noApprovals, { entryId });
+    expect(refused.status).toBe(409);
+    const body = refused.body as { error: string; conflict: { fields: { value: string }[] } };
+    expect(body.error).toBe('O nome já está em uso.');
+    expect(body.conflict.fields[0]?.value).toBe('Suco (antiga)');
+    expect(rows.get(first.entityId)?._archived).toBe(true);
+
+    const renamed = await call(restore, noApprovals, { entryId }, { overrides: { name: ' Suco (antiga) ' } });
+    expect(renamed.status).toBe(204);
+    expect(rows.get(first.entityId)?._archived).toBeUndefined();
+    expect(rows.get(first.entityId)?.name).toBe('Suco (antiga)');
+  });
+
+  it('refuses a malformed restore body as invalid data', async () => {
+    const { api } = buildApi();
+    const restore = routeOf(api.routes, 'POST', '/recycle-bin/:entryId/restore');
+    for (const body of [[], { overrides: 'x' }, { overrides: { name: 1 } }, { overrides: { name: 'x'.repeat(501) } }]) {
+      const response = await call(restore, noApprovals, { entryId: 'any' }, body);
+      expect(response.status).toBe(400);
+      expect((response.body as { error: string }).error).toBe('Dados inválidos.');
+    }
   });
 
   it('rejects an EMPTY ?entityType= as the malformed filter it is', async () => {
