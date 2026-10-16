@@ -125,6 +125,17 @@ function BankButton({ bank, id, onPick, disabled }: { bank: CheckoutPixBank; id:
           px: 1.5,
           color: "text.primary",
           borderColor: "divider",
+          // A 320px phone gives each half ~120px: logo beside "Santander" no
+          // longer fits, so the logo goes above the name.
+          "@media (max-width: 359.95px)": {
+            flexDirection: "column",
+            justifyContent: "center",
+            textAlign: "center",
+            gap: 0.5,
+            px: 1,
+            py: 1,
+            "& .MuiButton-startIcon, & .MuiButton-start": { m: 0 },
+          },
         },
         "& button, & button *": { fontWeight: 600 },
       }}
