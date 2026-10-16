@@ -54,13 +54,16 @@ function SideCard({ side, testId }: { side: RestoreConflictSide; testId: string 
         border: (theme) => `1px solid ${theme.palette.divider}`,
       }}
     >
-      <Text variant="caption" as="p" color="secondary" weight="semibold">
+      <Box
+        component="p"
+        sx={{ m: 0, typography: 'caption', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase' }}
+      >
         {side.heading}
-      </Text>
+      </Box>
       <Text variant="body" as="p" weight="semibold">
         {side.label}
       </Text>
-      <Text variant="caption" as="p" color="secondary">
+      <Text variant="caption" as="p">
         {side.detail}
       </Text>
     </Box>
