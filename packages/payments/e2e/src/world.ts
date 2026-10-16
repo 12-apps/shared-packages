@@ -233,6 +233,11 @@ export interface PaymentsWorld {
    * Stripe's name and e-mail — is a fact about the store the host built, so
    * the host answers it. A buyer with a CPF on file skips Dados altogether;
    * the host must not arrive with one.
+   *
+   * And return only once the store's checkout CONFIG has resolved. Dados
+   * draws before it arrives, defaulting to a required CPF; a host that fetches
+   * its config (any real one) would otherwise hand `reachPayment` a CPF field
+   * that vanishes as the chain lands.
    */
   open(page: Page, store: PaymentsStore): Promise<void>;
   /** Raise a hosted payable and show the hand-off interstitial. */
