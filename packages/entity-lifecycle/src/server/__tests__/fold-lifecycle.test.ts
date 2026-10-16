@@ -28,9 +28,6 @@ const EVERY_CODE: Record<LifecycleErrorCode, number> = {
   // Not in ERROR_SURFACE — the deliberate fall-through, asserted so that
   // "unmapped" stays a decision rather than an omission nobody notices.
   INVALID_STATE: 422,
-  // Thrown bare it carries no clash to show, so it is the generic failure;
-  // the RestoreConflictError subclass is the 409 (asserted below).
-  RESTORE_CONFLICT: 422,
 };
 
 const throwing = (error: unknown) => () => Promise.reject(error);

@@ -11,8 +11,7 @@ export type LifecycleErrorCode =
   | 'REQUEST_ALREADY_DECIDED'
   | 'FEATURE_DISABLED'
   | 'NOT_AUTHORIZED'
-  | 'INVALID_STATE'
-  | 'RESTORE_CONFLICT';
+  | 'INVALID_STATE';
 
 export class LifecycleError extends Error {
   readonly code: LifecycleErrorCode;
@@ -33,7 +32,10 @@ export class RestoreConflictError extends LifecycleError {
   readonly conflict: RestoreConflict;
 
   constructor(conflict: RestoreConflict) {
-    super('RESTORE_CONFLICT', conflict.message);
+    // `INVALID_STATE` rather than a new code: a new member of
+    // `LifecycleErrorCode` breaks every adopter with an exhaustive map of it,
+    // and the class itself is what the HTTP surface tells apart (409).
+    super('INVALID_STATE', conflict.message);
     this.name = 'RestoreConflictError';
     this.conflict = conflict;
   }

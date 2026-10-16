@@ -115,6 +115,9 @@ function useBinActions(
     error,
     clearError: () => setError(null),
     restore: async (entry) => {
+      // One restore at a time: two clashing at once would open one dialog over
+      // the other's, and the first clash would never be shown.
+      if (busyId !== null) return;
       setBusyId(entry.id);
       setError(null);
       try {

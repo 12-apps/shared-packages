@@ -64,6 +64,29 @@ function scriptedTransport(results: LifecycleResult<unknown>[]): { transport: Li
   };
 }
 
+/** Clashes on the first send, then holds the retry until `release` is called. */
+function heldTransport(): {
+  transport: LifecycleTransport;
+  sends: unknown[];
+  release: (value: LifecycleResult<unknown>) => void;
+} {
+  const sends: unknown[] = [];
+  const waiting: ((value: LifecycleResult<unknown>) => void)[] = [];
+  const transport: LifecycleTransport = {
+    async get<T>(): Promise<T> {
+      return { data: { entries: [ENTRY] } } as T;
+    },
+    send<T>(_path: string, _method: string, body?: unknown): Promise<LifecycleResult<T>> {
+      sends.push(body);
+      if (sends.length === 1) return Promise.resolve(clash(null) as LifecycleResult<T>);
+      return new Promise((resolve) => {
+        waiting.push(resolve as (value: LifecycleResult<unknown>) => void);
+      });
+    },
+  };
+  return { transport, sends, release: (value) => waiting.shift()?.(value) };
+}
+
 function renderBin(transport: LifecycleTransport): void {
   const { page: Page } = createWebEntityLifecycle({
     apiBase: '/api/admin/loja',
@@ -158,5 +181,64 @@ describe('Lixeira restore clash', () => {
       expect(screen.getByTestId('recycle-bin-conflict-error').textContent).toContain('Não foi possível concluir.'),
     );
     expect(screen.getByTestId('recycle-bin-conflict')).toBeTruthy();
+  });
+
+  it('shows a first-try failure that is not a clash in the banner, with no dialog', async () => {
+    const { transport } = scriptedTransport([{ ok: false, error: 'O produto não existe mais.' }]);
+    renderBin(transport);
+    fireEvent.click(await screen.findByTestId('recycle-bin-restore-bin-1'));
+    await waitFor(() =>
+      expect(screen.getByTestId('recycle-bin-error').textContent).toContain('O produto não existe mais.'),
+    );
+    await waitFor(() => expect(screen.queryByTestId('recycle-bin-conflict')).toBeNull());
+  });
+
+  it('submits with Enter from a field', async () => {
+    const { transport, sends } = scriptedTransport([clash(null), { ok: true, data: undefined }]);
+    renderBin(transport);
+    fireEvent.click(await screen.findByTestId('recycle-bin-restore-bin-1'));
+    await screen.findByTestId('recycle-bin-conflict');
+    fireEvent.submit(screen.getByLabelText(/Novo nome/).closest('form') as HTMLFormElement);
+    await waitFor(() => expect(sends).toHaveLength(2));
+    expect(sends[1]?.body).toEqual({ overrides: { name: 'Grande (antiga)', sku: '0042' } });
+  });
+
+  it('opens a field the host adds on a retry with its prefill, and focuses the field in error', async () => {
+    const nameOnly: RestoreConflict = { ...conflict(null), fields: [conflict(null).fields[0]!] };
+    const addsCode: RestoreConflict = {
+      ...conflict('Já usado por Pizza Grande.'),
+      fields: [
+        { key: 'name', label: 'Novo nome', value: 'ignored', error: null, optional: false },
+        { key: 'sku', label: 'Novo código', value: '0042-b', error: 'Já usado por Pizza Grande.', optional: false },
+      ],
+    };
+    const { transport } = scriptedTransport([
+      { ok: false, error: 'x', conflict: nameOnly },
+      { ok: false, error: 'x', conflict: addsCode },
+    ]);
+    renderBin(transport);
+    fireEvent.click(await screen.findByTestId('recycle-bin-restore-bin-1'));
+    await screen.findByTestId('recycle-bin-conflict');
+    fireEvent.change(screen.getByLabelText(/Novo nome/), { target: { value: 'Grande B' } });
+    fireEvent.click(screen.getByTestId('recycle-bin-conflict-restore'));
+
+    const code = (await screen.findByLabelText(/Novo código/)) as HTMLInputElement;
+    expect(code.value).toBe('0042-b');
+    // What was typed survives; the host's value for an already-typed key does not override it.
+    expect((screen.getByLabelText(/Novo nome/) as HTMLInputElement).value).toBe('Grande B');
+    await waitFor(() => expect(document.activeElement).toBe(code));
+  });
+
+  it('cannot be dismissed with Escape while a retry is running', async () => {
+    const { transport, sends, release } = heldTransport();
+    renderBin(transport);
+    fireEvent.click(await screen.findByTestId('recycle-bin-restore-bin-1'));
+    const dialog = await screen.findByTestId('recycle-bin-conflict');
+    fireEvent.click(screen.getByTestId('recycle-bin-conflict-restore'));
+    await waitFor(() => expect(sends).toHaveLength(2));
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.getByTestId('recycle-bin-conflict')).toBeTruthy();
+    release({ ok: false, error: 'Não foi possível concluir.' });
+    await screen.findByTestId('recycle-bin-conflict-error');
   });
 });

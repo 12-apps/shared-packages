@@ -1,4 +1,3 @@
-import type { RestoreRequest } from './restore-conflict';
 /**
  * Shared contracts for the entity-lifecycle library. The core is storage- and
  * framework-agnostic: every persistence concern is an adapter interface the
@@ -7,6 +6,7 @@ import type { RestoreRequest } from './restore-conflict';
  */
 
 import type { NewItemDraftStore, NewItemDraftsOptions } from './new-item-drafts';
+import type { RestoreRequest } from './restore-conflict';
 
 /** JSON-compatible values — entity snapshots must be serializable. */
 export type JsonPrimitive = string | number | boolean | null;
@@ -396,4 +396,3 @@ export interface LifecycleContext {
    */
   canApprove?: boolean;
 }
-

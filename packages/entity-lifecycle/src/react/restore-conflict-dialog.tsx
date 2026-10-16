@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { Dialog, DialogActions, DialogContent } from '@12-apps/ui/feedback/Dialog';
@@ -28,7 +28,7 @@ import type { RestoreConflict, RestoreConflictSide, RestoreOverrides } from '../
  * dialog reflows on the dialog's own width.
  */
 
-export interface RestoreConflictDialogProps {
+interface RestoreConflictDialogProps {
   conflict: RestoreConflict;
   /** Retry with the typed values; resolves to the next clash, an error, or ok. */
   onRestore: (overrides: RestoreOverrides) => Promise<RestoreAttempt>;
@@ -38,7 +38,7 @@ export interface RestoreConflictDialogProps {
 }
 
 /** What one retry came back with. */
-export type RestoreAttempt =
+type RestoreAttempt =
   | { ok: true }
   | { ok: false; error: string; conflict?: RestoreConflict };
 
@@ -54,11 +54,11 @@ function SideCard({ side, testId }: { side: RestoreConflictSide; testId: string 
         border: (theme) => `1px solid ${theme.palette.divider}`,
       }}
     >
-      <Box
-        component="p"
-        sx={{ m: 0, typography: 'caption', fontWeight: 600, color: 'text.secondary', textTransform: 'uppercase' }}
-      >
-        {side.heading}
+      {/* Small capitals, as the approved mock draws the heading; Text has no transform of its own. */}
+      <Box sx={{ textTransform: 'uppercase' }}>
+        <Text variant="caption" as="p" color="secondary" weight="semibold">
+          {side.heading}
+        </Text>
       </Box>
       <Text variant="body" as="p" weight="semibold">
         {side.label}
@@ -72,6 +72,12 @@ function SideCard({ side, testId }: { side: RestoreConflictSide; testId: string 
 
 const initialValues = (conflict: RestoreConflict): Record<string, string> =>
   Object.fromEntries(conflict.fields.map((field) => [field.key, field.value]));
+
+/** The typed values for the fields `conflict` still asks about. */
+const pick = (typed: Record<string, string>, conflict: RestoreConflict): Record<string, string> =>
+  Object.fromEntries(
+    conflict.fields.filter((field) => field.key in typed).map((field) => [field.key, typed[field.key] ?? '']),
+  );
 
 /** The typed values, refused before sending when a required one is blank. */
 function missingRequired(conflict: RestoreConflict, values: Record<string, string>): boolean {
@@ -87,6 +93,15 @@ function useConflictForm(
   const [values, setValues] = useState(() => initialValues(opened));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // After a repeated clash, focus the first field in error: the inputs were
+  // disabled while the retry ran, so focus had dropped to the dialog.
+  const [focusError, setFocusError] = useState(false);
+  useEffect(() => {
+    if (!focusError || pending) return;
+    setFocusError(false);
+    const invalid = conflict.fields.find((field) => field.error !== null);
+    if (invalid) document.getElementById(`recycle-bin-conflict-${invalid.key}`)?.focus();
+  }, [focusError, pending, conflict]);
   const blocked = missingRequired(conflict, values);
 
   async function submit(): Promise<void> {
@@ -96,10 +111,15 @@ function useConflictForm(
     try {
       const result = await onRestore(values);
       if (result.ok) return;
-      // Still taken: the host's fresh wording replaces the old one, the typed
-      // values stay where they are.
-      if (result.conflict) setConflict(result.conflict);
-      else setError(result.error);
+      // Still taken: the host's fresh wording replaces the old one. What was
+      // typed stays; a field the host adds opens with its own prefill, and one
+      // it dropped is no longer sent.
+      if (result.conflict) {
+        const next = result.conflict;
+        setConflict(next);
+        setValues((typed) => ({ ...initialValues(next), ...pick(typed, next) }));
+        setFocusError(true);
+      } else setError(result.error);
     } finally {
       setPending(false);
     }
@@ -154,7 +174,7 @@ function ConflictFields({
           dataTestId={`recycle-bin-conflict-field-${field.key}`}
         />
       ))}
-      <button type="submit" hidden aria-hidden tabIndex={-1} />
+      <button type="submit" hidden tabIndex={-1} />
     </Box>
   );
 }
