@@ -15,16 +15,35 @@ import { Given, Then } from './fixtures.js';
  *
  * Neither step names a brand. The positive one asks the host what it calls
  * itself (`fixtures.platformBrand`) and requires exactly that to appear; the
- * negative one requires that no KNOWN adopter of this package appears at all.
+ * negative one requires that no OTHER known adopter of this package appears.
  * The second is the load-bearing one: a guide that interpolates the host once
  * and hardcodes somebody else two steps later satisfies the first and is still
  * the bug.
  */
 
-/** Products known to install this package. None may reach a host's screen. */
+/**
+ * Products known to install this package. None but the host's OWN may reach a
+ * host's screen.
+ */
 // Built from base64-decoded halves so this shipped step file spells no
 // adopter brand, whole or split — the brand gates sweep it like any source.
-const ADOPTER_NAMES = new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}|paladira`, 'i');
+const ADOPTER_NAMES: readonly RegExp[] = [
+  new RegExp(`${atob('ZnV0dXJl')}[\\s_-]?${atob('cGF5')}`, 'i'),
+  /paladira/i,
+];
+
+/**
+ * The adopters that are somebody ELSE from where this host stands (FUT-3627).
+ *
+ * The list used to be one pattern applied to every host, which made the
+ * scenario fail BY CONSTRUCTION in every adopter on it: a host whose brand is
+ * on the list renders its own name — correctly, it is what the positive step
+ * demands — and the negative step then calls that a stranger's. A name the
+ * host's own `platformBrand` matches is that host's to print.
+ */
+function strangers(platformBrand: string): RegExp[] {
+  return ADOPTER_NAMES.filter((name) => !name.test(platformBrand));
+}
 
 /** The packaged guide surface — the same test id in every host. */
 const GUIDE = 'payments-setup-guide';
@@ -40,5 +59,7 @@ Then('o passo a passo trata a plataforma pelo nome que o anfitrião deu', async 
 
 Then('a tela não cita nenhum outro produto que instale este pacote', async ({ page }) => {
   const rendered = await page.getByTestId(GUIDE).innerText();
-  expect(rendered).not.toMatch(ADOPTER_NAMES);
+  for (const name of strangers(paymentsWorld().fixtures.platformBrand)) {
+    expect(rendered).not.toMatch(name);
+  }
 });

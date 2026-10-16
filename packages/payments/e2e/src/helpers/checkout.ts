@@ -61,8 +61,22 @@ export async function payCard(page: Page): Promise<void> {
   await page.getByTestId('card-pay').click();
 }
 
-/** Walk the Dados step and land on Pagamento. */
+/**
+ * Walk the Dados step and land on Pagamento.
+ *
+ * The CPF is typed only when the form ASKS for it (FUT-3627). The Dados step
+ * renders the fields the store's chain declares, and a chain whose providers
+ * need no tax id — InfinitePay's hosted checkout is one — renders no
+ * `buyer-cpf` at all. Demanding it made every hand-off journey unreachable in
+ * a real host; only the harness, whose hosted store declared a CPF it did not
+ * need, could walk past it.
+ *
+ * Whatever ELSE the form asks for is the host's to have filled in `open`:
+ * which fields a provider requires is a fact about the store, not the buyer.
+ */
 export async function reachPayment(page: Page): Promise<void> {
-  await fillCpf(page);
-  await page.getByTestId('checkout-continue').click();
+  const proceed = page.getByTestId('checkout-continue');
+  await expect(proceed).toBeVisible();
+  if ((await page.getByTestId('buyer-cpf').count()) > 0) await fillCpf(page);
+  await proceed.click();
 }

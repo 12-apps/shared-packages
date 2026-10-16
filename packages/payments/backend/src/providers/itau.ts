@@ -38,6 +38,7 @@ import { parseItauWebhook, verifyItauWebhook } from './itau-webhook';
 import { itauStubWebhookCheck, itauWebhookCheck } from './itau-webhook-registration';
 import { unreachableOutcome } from './probe-shared';
 import { chargeDescription, stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { stubFindChargeByReference } from './stub-fault';
 
 export { itauTxId } from './itau-pix';
 export { NAME } from './itau-http';
@@ -290,7 +291,7 @@ async function verifyItauCredentials(credentials: ResolvedCredentials, copy: Ita
 async function findChargeByReference(reference: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot | null> {
   // Stub mode has no memory of what it raised, so it finds nothing — the same
   // answer Stone and PagBank give, and the one a scripted failover needs.
-  if (credentials.stub) return null;
+  if (credentials.stub) return stubFindChargeByReference(NAME, credentials);
   // The token is minted OUTSIDE the 404 catch: `null` is the walk's proof that
   // nothing was raised, and only the cob read may give it. A 404 from the
   // token endpoint (a routing blip, a deploy) says nothing about the cob, and

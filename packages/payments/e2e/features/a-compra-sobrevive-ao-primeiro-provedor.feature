@@ -15,6 +15,7 @@ Feature: A compra sobrevive ao primeiro provedor falhar
   Scenario: O primeiro provedor cai e o segundo cobra, sem redigitar nada
     Given a loja tem dois provedores que geram token no navegador
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     And ela paga com um cartão novo
     Then o pagamento é confirmado
     And um instrumento foi gerado para cada provedor da cadeia

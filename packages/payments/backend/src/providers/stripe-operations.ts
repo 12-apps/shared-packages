@@ -8,6 +8,7 @@ import type {
 } from '../core/types';
 import type { StripeCopy } from './copy';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { stubFindChargeByReference } from './stub-fault';
 import {
   declineReasonOf,
   declineRetriableOf,
@@ -252,7 +253,7 @@ async function probePage(
 export const findChargeByReference: NonNullable<
   PaymentProviderAdapter['findChargeByReference']
 > = async (reference, credentials) => {
-  if (credentials.stub) return null;
+  if (credentials.stub) return stubFindChargeByReference(NAME, credentials);
   const createdGte = Math.floor(Date.now() / 1000) - PROBE_WINDOW_SECONDS;
   let startingAfter: string | undefined;
 

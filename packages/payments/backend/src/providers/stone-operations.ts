@@ -4,6 +4,7 @@ import type { ResolvedCredentials } from '../core/types';
 import type { StoneCopy } from './copy';
 import { unreachableOutcome } from './probe-shared';
 import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { stubFindChargeByReference } from './stub-fault';
 import { NAME, stoneRequest } from './stone-http';
 import { methodOf, orderSnapshot, settledCharge, type StoneCharge, type StoneOrder } from './stone-orders';
 import { orderPayload } from './stone-payload';
@@ -110,7 +111,7 @@ export const getCharge: PaymentProviderAdapter['getCharge'] = async (
 export const findChargeByReference: NonNullable<
   PaymentProviderAdapter['findChargeByReference']
 > = async (reference, credentials) => {
-  if (credentials.stub) return null;
+  if (credentials.stub) return stubFindChargeByReference(NAME, credentials);
   const res = await stoneRequest<{ data?: StoneOrder[] }>(
     `/orders?code=${encodeURIComponent(reference)}`,
     credentials,

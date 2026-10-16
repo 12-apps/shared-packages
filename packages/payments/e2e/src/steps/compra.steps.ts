@@ -93,7 +93,9 @@ Then('ela vê o QR code do PIX', async ({ page }) => {
 });
 
 Then('o código copia-e-cola veio do provedor', async ({ page }) => {
-  await expect(page.getByTestId('pix-code')).toContainText('BR.GOV.BCB.PIX');
+  // The Banco Central GUI, in either case: the specification spells it in
+  // lowercase and many PSPs print it in capitals, and both are a real code.
+  await expect(page.getByTestId('pix-code')).toContainText(/br\.gov\.bcb\.pix/i);
 });
 
 Then('ela vê o formulário de cartão', async ({ page }) => {
@@ -224,9 +226,14 @@ Then('nenhum tokensByProvider é enviado', async ({ page }) => {
 
 Then('um instrumento foi gerado para cada provedor da cadeia', async ({ page }) => {
   const { fixtures, wire } = paymentsWorld();
-  await expect(wire.tokensByProvider(page)).toHaveText(
-    `${fixtures.headProvider},${fixtures.tailProvider}`,
-  );
+  // A SET of instruments, in whatever order the client minted them (FUT-3627):
+  // a real checkout mints the chain concurrently, so the map's key order is
+  // the order the mints finished in — `stone,pagbank` on one run, the reverse
+  // on the next — and no reader of the map depends on it.
+  const expected = [fixtures.headProvider, fixtures.tailProvider].sort().join(',');
+  await expect
+    .poll(async () => ((await wire.tokensByProvider(page).textContent()) ?? '').split(',').sort().join(','))
+    .toBe(expected);
 });
 
 Then('os dois provedores receberam a cobrança', async ({ page }) => {

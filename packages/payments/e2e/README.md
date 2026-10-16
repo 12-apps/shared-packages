@@ -4,11 +4,15 @@ The buyer journeys for the payments checkout, as Gherkin you run **against your
 own app**.
 
 Mounting `createPaymentFlows` gives you a checkout. This gives you its
-end-to-end coverage: twenty-seven scenarios across ten features — PIX, card,
+end-to-end coverage: thirty-six scenarios across thirteen features — PIX, card,
 digital wallets, hosted hand-off and return, provider failover, issuer
 declines, an unresolved charge, a store that cannot charge at all,
-per-provider screens, and saving a card outside checkout. You implement one
-port and add three lines of config. Nothing is copied, so a scenario added here
+per-provider screens, saving a card outside checkout, activating a provider
+with a verification charge, a dead OAuth grant and its reconnection, and a
+setup guide that speaks in the host platform's name. A further five scenarios
+in two features cover the platform-operations surface, behind their own
+opt-in port ([below](#the-platform-operations-journeys-opt-in)) — forty-one in
+all. You implement one port and add three lines of config. Nothing is copied, so a scenario added here
 later runs in your app on the next version bump.
 
 ## Why a port at all
@@ -35,8 +39,12 @@ definePaymentsWorld({
   raiseHostedPayable: async (page) => { /* …and wait for the interstitial */ },
   returnFromProvider: async (page) => { /* a real return trip */ },
   hostedReturnStatus: (page) => page.getByTestId('…'),
-  fixtures: { headProvider, tailProvider, hostedUrlFragment, payableRef, taxId },
-  wire: { paths, chargeKeys, chargeBody, tokensByProvider, providerCharges, providerChargeCount, navigated },
+  authorizeOAuth: async (page) => { /* play the provider's consent screen */ },
+  fixtures: { headProvider, tailProvider, hostedUrlFragment, payableRef, taxId, platformBrand, oauthProvider },
+  wire: {
+    paths, chargeKeys, chargeBody, tokensByProvider, providerCharges, providerChargeCount, navigated,
+    connectionStatus, connectionEnabled, rotation,
+  },
 });
 ```
 
@@ -76,6 +84,15 @@ which is worse than a red one.
 - **Assert your journey count.** Whatever the mechanism, put a check somewhere
   that the number of scenarios you expect actually ran.
 
+### What `open` must leave on screen
+
+For a checkout shape, `open` returns with the buyer **on the Dados step**, the
+store's checkout config already resolved, and every field the chain requires
+filled in **except the CPF** — the packaged steps type the CPF when the form
+asks for one, and press Continuar. Which other fields a chain requires (a mobile
+phone, a name, an e-mail) is a fact about the store you built. A buyer with a
+CPF on file skips Dados entirely, so do not arrive with one.
+
 ## `PaymentsStore` — the shapes a scenario asks for
 
 A scenario names a kind of merchant; you decide how to produce one. A harness
@@ -87,12 +104,12 @@ files do not change either way.
 `no-provider-remedy` · `payments-off` · `two-mintable` · `redirect-head` ·
 `google-pay` · `apple-pay` · `apple-pay-unsupported` · `wallet` ·
 `activation` · `screen-on-page` · `screen-handoff` · `screen-undeclared` ·
-`screen-unknown`
+`screen-unknown` · `setup-guide` · `reconnect-required`
 
 Adding a member is a breaking change for hosts, deliberately: a scenario needing
 a store nobody can build is a scenario that silently never runs.
 
-`wallet` (added for FUT-183/FUT-478) is one of two members that are **not a
+`wallet` (added for FUT-183/FUT-478) is one of the members that are **not a
 checkout**: `open(page, 'wallet')` must land the buyer on the package's
 manage-cards surface (`screens.ManageCards` from `createPaymentFlows`) at a
 store whose single provider can vault — the chain head declares the adapter

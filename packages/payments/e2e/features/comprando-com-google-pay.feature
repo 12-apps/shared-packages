@@ -10,6 +10,7 @@ Feature: Comprando com Google Pay
   Scenario: A compra inteira acontece pela carteira
     Given a compradora abre o checkout de uma loja com Google Pay
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     Then ela vê o botão do Google Pay
     And ela vê o formulário de cartão
     When ela paga com o Google Pay
@@ -19,5 +20,6 @@ Feature: Comprando com Google Pay
   Scenario: Uma loja sem carteira nunca mostra o botão
     Given a compradora abre o checkout da loja de cartão
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     Then nenhum botão do Google Pay é mostrado
     And ela vê o formulário de cartão

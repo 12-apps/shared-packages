@@ -11,6 +11,7 @@ Feature: Comprando com cartão
 
   Scenario: O cartão é cobrado e o CPF chega ao provedor
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     Then ela vê o formulário de cartão
     When ela paga com um cartão novo
     Then o pagamento é confirmado
@@ -19,6 +20,7 @@ Feature: Comprando com cartão
 
   Scenario: Uma loja com um provedor só não envia tokensByProvider
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     And ela paga com um cartão novo
     Then o pagamento é confirmado
     And nenhum tokensByProvider é enviado
