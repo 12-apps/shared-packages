@@ -112,6 +112,11 @@ definePaymentsWorld({
 
   hostedReturnStatus: (page) => page.getByTestId('hosted-return-status'),
 
+  async authorizeOAuth(page) {
+    // The connect page's fake provider consent screen: one button that grants.
+    await page.getByTestId('admin-oauth-authorize').click();
+  },
+
   fixtures: {
     headProvider: 'aurora',
     tailProvider: 'boreal',
@@ -136,5 +141,9 @@ definePaymentsWorld({
     providerCharges: (page) => page.getByTestId('provider-charges'),
     providerChargeCount: (page) => page.getByTestId('provider-charge-count'),
     navigated: (page) => page.getByTestId('panel-hosted-checkout').getByTestId('host-navigated'),
+    // The connect page's probe of the stored rows it seeded.
+    connectionStatus: (page, provider) => page.getByTestId(`admin-status-${provider}`),
+    connectionEnabled: (page, provider) => page.getByTestId(`admin-enabled-${provider}`),
+    rotation: (page) => page.getByTestId('admin-rotation'),
   },
 });

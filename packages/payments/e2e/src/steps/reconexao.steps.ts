@@ -14,12 +14,16 @@ import { Given, Then, When } from './fixtures.js';
  * These steps read two vocabularies, like the activation ones:
  *
  *   - the package's OWN screens, whose test ids mean the same in any host —
- *     `payments-expiry-warning`, `payments-connect-success`, and the reconnect
- *     banner the connection panel renders;
- *   - the host's PROBE of its own stored row — `admin-status-<provider>`,
- *     `admin-enabled-<provider>`, `admin-rotation` — which is how a scenario
+ *     `payments-expiry-warning` and the reconnect banner the connection panel
+ *     renders;
+ *   - the HOST's success notice after a connect, `payments-connect-success`:
+ *     the settings page leaves that banner to its host, so a host that adopts
+ *     this journey renders it under that id (as the harness and future-pay do);
+ *   - the host's PROBE of its own stored row — `wire.connectionStatus`,
+ *     `wire.connectionEnabled`, `wire.rotation` — which is how a scenario
  *     asserts that `enabled` and the rotation genuinely disagree rather than
- *     trusting a screen to say so.
+ *     trusting a screen to say so. Port members since FUT-3627; they were
+ *     harness test ids before, which no real host could know it owed.
  *
  * The provider is `fixtures.oauthProvider`, never a name written here: which
  * row is dead belongs to the host's invented cast.
@@ -30,8 +34,8 @@ Given('a autorização da loja com o provedor foi recusada', async ({ page }) =>
 });
 
 Then('a conexão aparece como precisando reconectar', async ({ page }) => {
-  const provider = paymentsWorld().fixtures.oauthProvider;
-  await expect(page.getByTestId(`admin-status-${provider}`)).toHaveText('RECONNECT_REQUIRED');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.connectionStatus(page, fixtures.oauthProvider)).toHaveText('RECONNECT_REQUIRED');
 });
 
 /**
@@ -40,9 +44,9 @@ Then('a conexão aparece como precisando reconectar', async ({ page }) => {
  * switch a live store back on.
  */
 Then('ela continua ligada, mas fora da rotação', async ({ page }) => {
-  const provider = paymentsWorld().fixtures.oauthProvider;
-  await expect(page.getByTestId(`admin-enabled-${provider}`)).toHaveText('true');
-  await expect(page.getByTestId('admin-rotation')).toHaveText('(none)');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.connectionEnabled(page, fixtures.oauthProvider)).toHaveText('true');
+  await expect(wire.rotation(page)).toHaveText('(none)');
 });
 
 When('o lojista abre a conexão do provedor', async ({ page }) => {
@@ -63,13 +67,13 @@ Then('ele vê desde quando', async ({ page }) => {
 
 When('ele reconecta e autoriza de novo', async ({ page }) => {
   await page.getByRole('button', { name: 'Reconectar' }).click();
-  await page.getByTestId('admin-oauth-authorize').click();
+  await paymentsWorld().authorizeOAuth(page);
   await expect(page.getByTestId('payments-connect-success')).toBeVisible();
 });
 
 Then('a conexão volta a estar verificada', async ({ page }) => {
-  const provider = paymentsWorld().fixtures.oauthProvider;
-  await expect(page.getByTestId(`admin-status-${provider}`)).toHaveText('VERIFIED');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.connectionStatus(page, fixtures.oauthProvider)).toHaveText('VERIFIED');
 });
 
 /**
@@ -78,9 +82,9 @@ Then('a conexão volta a estar verificada', async ({ page }) => {
  * silently not selling.
  */
 Then('a loja volta para a rotação sem ninguém ter mexido no botão', async ({ page }) => {
-  const provider = paymentsWorld().fixtures.oauthProvider;
-  await expect(page.getByTestId('admin-rotation')).toHaveText(provider);
-  await expect(page.getByTestId(`admin-enabled-${provider}`)).toHaveText('true');
+  const { fixtures, wire } = paymentsWorld();
+  await expect(wire.rotation(page)).toHaveText(fixtures.oauthProvider);
+  await expect(wire.connectionEnabled(page, fixtures.oauthProvider)).toHaveText('true');
 });
 
 Then('o aviso de autorização expirada some', async ({ page }) => {

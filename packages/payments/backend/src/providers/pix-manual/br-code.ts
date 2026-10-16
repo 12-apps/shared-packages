@@ -1,4 +1,4 @@
-import { sha256Hex } from '../shared';
+import { createHash } from 'node:crypto';
 
 /**
  * The STATIC Pix BR Code — the EMV "copia e cola" a payer's bank app reads —
@@ -66,7 +66,8 @@ export function sanitizeTxId(reference: string): string {
   const readable = reference.replace(/[^a-zA-Z0-9]/g, '');
   if (readable.length > 0 && readable.length <= TXID_MAX && readable === reference) return readable;
   const prefix = readable.slice(0, TXID_PREFIX);
-  return `${prefix}${sha256Hex(reference).slice(0, TXID_MAX - prefix.length)}`;
+  const digest = createHash('sha256').update(reference).digest('hex');
+  return `${prefix}${digest.slice(0, TXID_MAX - prefix.length)}`;
 }
 
 /** `12.50` from 1250 cents — the decimal point and two places the field requires. */

@@ -31,7 +31,11 @@ import type { Page } from '@playwright/test';
 export type PaymentsStore =
   /** One provider, PIX only — the simplest store there is. */
   | 'pix-only'
-  /** One provider that mints card instruments in the browser. */
+  /**
+   * One provider that mints card instruments in the browser. It may offer PIX
+   * too: the scenarios choose the card tile before typing (FUT-3627), since no
+   * shipped adapter is card-only and a sole-method picker still renders it.
+   */
   | 'card'
   /** One provider offering both methods. */
   | 'both-methods'
@@ -199,11 +203,37 @@ export interface PaymentsWireProbe {
   providerChargeCount(page: Page): ReturnType<Page['getByTestId']>;
   /** Where the host was asked to navigate, on a hand-off. */
   navigated(page: Page): ReturnType<Page['getByTestId']>;
+  /**
+   * The STORED status of one provider connection — `VERIFIED`,
+   * `RECONNECT_REQUIRED`… — as the host's own row has it, not as a screen
+   * words it (FUT-3627: these three were read by the reconnection journey
+   * from test ids only the harness rendered, and declared nowhere).
+   */
+  connectionStatus(page: Page, provider: string): ReturnType<Page['getByTestId']>;
+  /** That connection's stored `enabled` flag, as the text `true` or `false`. */
+  connectionEnabled(page: Page, provider: string): ReturnType<Page['getByTestId']>;
+  /**
+   * The providers a NEW checkout would route to, comma-separated in order, or
+   * `(none)` — the rotation the config read actually computes. Asserted next
+   * to {@link connectionEnabled} because a dead grant is exactly the state
+   * where the two disagree.
+   */
+  rotation(page: Page): ReturnType<Page['getByTestId']>;
 }
 
 /** Everything a host supplies to run the packaged journeys. */
 export interface PaymentsWorld {
-  /** Put the browser on a checkout for a store of this shape. */
+  /**
+   * Put the browser on a checkout for a store of this shape.
+   *
+   * For a checkout shape that means ON THE DADOS STEP, with every field the
+   * chain requires already filled EXCEPT the CPF (FUT-3627): `reachPayment`
+   * types the CPF when the form asks for one and presses Continuar, and
+   * nothing else. Which fields a chain requires — InfinitePay's mobile phone,
+   * Stripe's name and e-mail — is a fact about the store the host built, so
+   * the host answers it. A buyer with a CPF on file skips Dados altogether;
+   * the host must not arrive with one.
+   */
   open(page: Page, store: PaymentsStore): Promise<void>;
   /** Raise a hosted payable and show the hand-off interstitial. */
   raiseHostedPayable(page: Page): Promise<void>;
@@ -211,6 +241,16 @@ export interface PaymentsWorld {
   returnFromProvider(page: Page): Promise<void>;
   /** The terminal status the return leg settles to. */
   hostedReturnStatus(page: Page): ReturnType<Page['getByTestId']>;
+  /**
+   * Play the provider's OAuth consent screen and come back (FUT-3627).
+   *
+   * Called after the owner pressed the package's own "Reconectar": whatever
+   * the host does to get a grant — a fake authorize page in a harness, a
+   * stubbed exchange in an app — ends on the provider panel again, where the
+   * package's success notice is asserted. Declared here because the consent
+   * screen is the PROVIDER's, which no package component renders.
+   */
+  authorizeOAuth(page: Page): Promise<void>;
   fixtures: PaymentsFixtures;
   wire: PaymentsWireProbe;
 }

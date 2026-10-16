@@ -42,3 +42,6 @@ export {
 } from './en-US';
 export { PT_BR_PIX_MANUAL_COPY } from './pix-manual/pt-BR';
 export { EN_US_PIX_MANUAL_COPY } from './pix-manual/en-US';
+// The scripted stub charge faults (FUT-3627), so a host's e2e fixture names
+// the field and the fault instead of hand-typing strings.
+export { STUB_CHARGE_FAULT_FIELD, STUB_CHARGE_FAULTS, type StubChargeFault } from './stub-fault';

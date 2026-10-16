@@ -32,17 +32,35 @@ import type { ProviderName, ResolvedCredentials } from '../core/types';
 export const STUB_CHARGE_FAULT_FIELD = 'stubChargeFault';
 
 /**
- * The two failures worth scripting, named after the BUCKET they classify into
+ * The failures worth scripting, named after the BUCKET they classify into
  * rather than after a wire symptom — the bucket is the whole point.
  *
  *   not-charged  the provider answered before doing any work (HTTP 400). The
  *                one class that authorises advancing to the next provider.
- *   ambiguous    no usable answer at all. The walk must PROBE, never advance
- *                blind, and stop when the probe cannot settle it.
+ *   ambiguous    no usable answer to the CHARGE. The walk must probe, and the
+ *                stub's probe answers "no such charge" — so the walk advances,
+ *                which is the probe doing its job.
+ *   unresolved   no usable answer to the charge NOR to the probe (FUT-3627).
+ *                Nobody can prove whether the money moved, so the walk stops
+ *                and the buyer is told the payment is being confirmed. Without
+ *                this, every stub probe answered and that state — the one the
+ *                packaged `quando-o-pagamento-nao-vai` journey is about — could
+ *                not be reached against a real backend at all.
  */
-type StubChargeFault = 'not-charged' | 'ambiguous';
+export type StubChargeFault = 'not-charged' | 'ambiguous' | 'unresolved';
 
-const FAULTS: readonly StubChargeFault[] = ['not-charged', 'ambiguous'];
+/**
+ * Every scripted fault, exported so a host's fixture writes a NAMED value
+ * rather than a string it hopes this file still spells the same way.
+ */
+export const STUB_CHARGE_FAULTS: readonly StubChargeFault[] = ['not-charged', 'ambiguous', 'unresolved'];
+
+/** The scripted fault on this connection, or `null` for the plain stub. */
+function scriptedFault(credentials: ResolvedCredentials | undefined): StubChargeFault | null {
+  if (!credentials?.stub) return null;
+  const value = credentials.fields[STUB_CHARGE_FAULT_FIELD];
+  return STUB_CHARGE_FAULTS.find((candidate) => candidate === value) ?? null;
+}
 
 /**
  * Throw the failure this connection is scripted to produce, or return so the
@@ -56,9 +74,7 @@ export function applyStubChargeFault(
   provider: ProviderName,
   credentials: ResolvedCredentials | undefined,
 ): void {
-  if (!credentials?.stub) return;
-  const value = credentials.fields[STUB_CHARGE_FAULT_FIELD];
-  const fault = FAULTS.find((candidate) => candidate === value);
+  const fault = scriptedFault(credentials);
   if (!fault) return;
   if (fault === 'not-charged') {
     // A STATUS is what makes this safe: 400 means the provider answered and
@@ -73,4 +89,39 @@ export function applyStubChargeFault(
   throw new ProviderRequestError(provider, `${provider} did not answer (scripted stub)`, {
     retriable: true,
   });
+}
+
+/**
+ * The stub's answer to the reconciliation probe (`findChargeByReference`).
+ *
+ * A stub remembers nothing it raised, so it finds nothing — `null`, which the
+ * walk reads as proof that charging elsewhere is safe. Under the `unresolved`
+ * script the probe gets no answer either, and a thrown probe is exactly what
+ * the walk must never read as "no charge" (`core/charge-attempt.ts`, `probe`).
+ */
+export function stubFindChargeByReference(
+  provider: ProviderName,
+  credentials: ResolvedCredentials,
+): null {
+  if (scriptedFault(credentials) === 'unresolved') {
+    throw new ProviderRequestError(provider, `${provider} did not answer the probe (scripted stub)`, {
+      retriable: true,
+    });
+  }
+  return null;
+}
+
+/**
+ * Whether a card token is the stub's "this card is refused" marker.
+ *
+ * Two spellings, one meaning (FUT-3627). The backend's own convention is a
+ * `-declined` SUFFIX; the checkout's mock tokenizer
+ * (`@12-apps/payments-frontend`, `card/tokenize.ts`) mints the shared decline
+ * PAN as a `tok_declined` PREFIX. Reading only the suffix meant a buyer typing
+ * the decline card into a real host was charged PAID, and only the harness —
+ * whose in-page adapter honoured both — ever saw the refusal.
+ */
+export function isStubDeclinedToken(token: string | undefined): boolean {
+  if (!token) return false;
+  return token.endsWith('-declined') || token.startsWith('tok_declined');
 }

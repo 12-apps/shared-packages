@@ -15,7 +15,8 @@ import type {
   WebhookDelivery,
 } from '../core/types';
 
-import { applyStubChargeFault } from './stub-fault';
+import { staticBrCode } from './pix-manual/br-code';
+import { applyStubChargeFault, isStubDeclinedToken } from './stub-fault';
 
 /**
  * The charge description a provider is sent, capped at that provider's own
@@ -86,8 +87,8 @@ export function capturedAmountCents(
 
 /**
  * Deterministic stub charge. Card charges settle immediately as PAID unless
- * the token carries the magic suffix `-declined` (lets tests and demo flows
- * exercise the failure path); PIX/boleto start PENDING, awaiting a (stub)
+ * the token is the stub's decline marker (`isStubDeclinedToken` — lets tests
+ * and demo flows exercise the failure path); PIX/boleto start PENDING, awaiting a (stub)
  * webhook.
  *
  * `credentials` is optional and only ever read to run a SCRIPTED failure — see
@@ -109,7 +110,7 @@ export function stubCharge(
     method: input.method,
   };
   if (input.method === 'CARD') {
-    const declined = input.card?.token?.endsWith('-declined') ?? false;
+    const declined = isStubDeclinedToken(input.card?.token);
     return {
       ...base,
       status: declined ? 'DECLINED' : 'PAID',
@@ -118,9 +119,34 @@ export function stubCharge(
     };
   }
   if (input.method === 'PIX') {
-    return { ...base, pix: { qrText: `00020126:stub-pix:${providerChargeId}` } };
+    return { ...base, pix: { qrText: stubPixCode(input) } };
   }
   return { ...base, boleto: { barcode: `23790:stub-boleto:${providerChargeId}` } };
+}
+
+/** A key no bank resolves: `.invalid` is reserved (RFC 2606). */
+const STUB_PIX_KEY = 'stub-pix@example.invalid';
+
+/**
+ * The stub's PIX "copia e cola": a real static BR Code (FUT-3627).
+ *
+ * It used to be `00020126:stub-pix:<id>` — a string no bank app reads and no
+ * journey can tell from a broken provider, so the packaged
+ * `comprando-com-pix` journey, which asserts the code carries the Banco
+ * Central GUI, could not pass against a real backend. The key keeps the
+ * `stub-pix` marker, so a stub code is still recognisable as one at a glance
+ * and can never be mistaken for a store's own key. The order travels in the
+ * txid, as it does on a real static code.
+ */
+function stubPixCode(input: ChargeInput): string {
+  const amountCents = input.amount.amountCents;
+  return staticBrCode({
+    pixKey: STUB_PIX_KEY,
+    merchantName: 'LOJA STUB',
+    merchantCity: 'SAO PAULO',
+    amountCents: Number.isInteger(amountCents) && amountCents > 0 ? amountCents : undefined,
+    txid: input.reference,
+  });
 }
 
 /** Stub `getCharge` result: a PENDING snapshot for an id-only lookup. */

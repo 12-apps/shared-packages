@@ -2,6 +2,7 @@ import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { VaultedInstrument, VaultSession } from '../core/vault-types';
 import { NAME, pagbankRequest } from './pagbank-http';
+import { isStubDeclinedToken } from './stub-fault';
 
 /**
  * PagBank card vaulting (FUT-478 / FUT-183) — validating and storing a card
@@ -137,12 +138,12 @@ const complete: NonNullable<PaymentProviderAdapter['vault']>['complete'] = async
 
 /**
  * Deterministic stub vault, no network — the same contract every adapter
- * operation honours, and the same magic `-declined` suffix `stubCharge`
- * reads, so a host can exercise the validation-refusal path (a bad card
+ * operation honours, and the same decline marker `stubCharge`
+ * reads (`isStubDeclinedToken`), so a host can exercise the validation-refusal path (a bad card
  * caught at entry) without a live account.
  */
 function stubVaultedCard(reference: string, token: string): VaultedInstrument {
-  if (token.endsWith('-declined')) {
+  if (isStubDeclinedToken(token)) {
     throw new ProviderRequestError(NAME, `${NAME} refused to validate the card (stub).`, {
       retriable: false,
       httpStatus: 400,

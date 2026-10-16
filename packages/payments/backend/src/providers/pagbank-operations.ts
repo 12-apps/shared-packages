@@ -10,6 +10,7 @@ import {
   type PagBankOrderResponse,
 } from './pagbank-snapshots';
 import { stubPendingSnapshot, stubRefund } from './shared';
+import { stubFindChargeByReference } from './stub-fault';
 
 /**
  * The PagBank adapter's read/refund operations, split out of `pagbank.ts`
@@ -86,7 +87,7 @@ export const getCharge: PaymentProviderAdapter['getCharge'] = async (
 export const findChargeByReference: NonNullable<
   PaymentProviderAdapter['findChargeByReference']
 > = async (reference, credentials) => {
-  if (credentials.stub) return null;
+  if (credentials.stub) return stubFindChargeByReference(NAME, credentials);
   const res = await pagbankRequest<{ orders?: Array<PagBankOrderResponse & { id?: string }> }>(
     `/orders?reference_id=${encodeURIComponent(reference)}`,
     credentials,

@@ -10,6 +10,7 @@ Feature: Comprando com Apple Pay
   Scenario: A compra inteira acontece pela carteira
     Given a compradora abre o checkout de uma loja com Apple Pay
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     Then ela vê o botão do Apple Pay
     And ela vê o formulário de cartão
     When ela paga com o Apple Pay
@@ -19,6 +20,7 @@ Feature: Comprando com Apple Pay
   Scenario: Sem Apple Pay no aparelho, o cartão continua fazendo a venda
     Given a compradora abre o checkout da loja com Apple Pay num aparelho sem Apple Pay
     When ela informa o CPF e segue para o pagamento
+    And ela escolhe pagar com cartão
     Then nenhum botão do Apple Pay é mostrado
     And ela vê o formulário de cartão
     When ela paga com um cartão novo
