@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { preselection } from "../list/choice";
-import { ARMED_WINDOW_MS } from "../list/list-face";
+import { ARMED_WINDOW_MS } from "../list/list-memory";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
 import { SAVED_VISA, handOffStore, listFlow, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
@@ -81,7 +81,7 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     fireEvent.click(screen.getByTestId("list-charge-cancel"));
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS * 2);
     expect(createOrder).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
     expect(screen.getByTestId("list-pay").textContent).toContain("Pagar");
   });
 
@@ -90,11 +90,11 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     renderList({ config: onPageStore(), client: stubClient([]), list: { armedCharge: true } });
     await waitFor(() => expect(screen.getByTestId("list-pay")).toBeTruthy());
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
     cleanup();
     renderList({ config: handOffStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true } });
     await waitFor(() => expect(screen.getByTestId("list-pay")).toBeTruthy());
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
   });
 
   it("never fires on a card other than the one the consent named", async () => {
@@ -102,7 +102,7 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true, armedCardId: "another-card" } });
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
   });
 
   it("never fires once the step has been open longer than the armed window — a held checkout pays by a tap", async () => {
@@ -113,7 +113,7 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     await vi.advanceTimersByTimeAsync(ARMED_WINDOW_MS + 1_000);
     rerender(listFlow({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { armedCharge: true } }));
     await vi.advanceTimersByTimeAsync(500);
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
     expect(screen.getByTestId("list-pay").textContent).toContain("Pagar");
   });
 
@@ -126,7 +126,7 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     fireEvent.click(radio("list-option-PIX"));
     fireEvent.click(radio("list-option-CARD"));
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS * 2);
-    expect(screen.queryByTestId("list-charge-bar")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
     expect(createOrder).not.toHaveBeenCalled();
   });
 
@@ -152,6 +152,6 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     expect(optOut).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS * 2);
     expect(createOrder).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("list-charge-footer")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-charge-footer")).toBeNull());
   });
 });

@@ -154,6 +154,39 @@ interface ListPixFaceProps {
   setAfterCopy: (afterCopy: boolean) => void;
 }
 
+/** A phone with a bank remembered: the copy opens it too, and keeps the way to another (FUT-3612). */
+function rememberedOnPhone(flow: BankFlow | null): PixBankId | null {
+  return flow?.os ? flow.state.chosen : null;
+}
+
+/** "Copiar e abrir no Nubank" with a remembered bank on a phone, else the plain copy. */
+function copyLabel(plain: string, flow: BankFlow | null): string {
+  const remembered = rememberedOnPhone(flow);
+  return remembered && flow ? flow.bank.copy.copyAndOpen(flow.bank.copy.names[remembered]) : plain;
+}
+
+/** "Abrir outro banco", when a remembered bank on a phone is what the copy opens. */
+function otherBankLabel(flow: BankFlow | null): string | null {
+  return flow && rememberedOnPhone(flow) ? flow.bank.copy.openOther : null;
+}
+
+/** The bar's one control: held, "Atualizar pagamento", the wait after the copy, or the copy. */
+function PixBarAction({ mode, afterCopy, onCopy, copyLabel }: {
+  mode: PaymentListMode;
+  afterCopy: boolean;
+  onCopy: () => void;
+  copyLabel: string;
+}): JSX.Element {
+  const stale = usePaymentStale();
+  const refresh = usePaymentRefresh();
+  const refreshLabel = useCheckoutCopy().screens.cartChanged.refreshAction;
+  const { hold } = mode.list;
+  if (hold) return <ActionButton label={hold.action} total={null} disabled onClick={() => undefined} />;
+  if (stale && refresh) return <ActionButton label={refreshLabel} total={null} disabled={false} onClick={refresh} />;
+  if (afterCopy) return <WaitingLine text={mode.list.copy.pixFace.waiting} />;
+  return <ActionButton label={copyLabel} total={null} disabled={stale} onClick={onCopy} />;
+}
+
 /**
  * The Pix's bar: the host's hold first (a step reopened above), then — over a
  * code the cart has outgrown — "Atualizar pagamento" (FUT-3535, E20), then
@@ -168,23 +201,13 @@ function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
 }): JSX.Element {
   const copy = mode.list.copy.pixFace;
   const stale = usePaymentStale();
-  const refresh = usePaymentRefresh();
-  const refreshLabel = useCheckoutCopy().screens.cartChanged.refreshAction;
   const { hold } = mode.list;
-  // A phone with a bank remembered copies AND opens it, and keeps the way to another (FUT-3612).
-  const remembered = bankFlow?.os ? bankFlow.state.chosen : null;
-  const copyLabel = remembered && bankFlow ? bankFlow.bank.copy.copyAndOpen(bankFlow.bank.copy.names[remembered]) : copy.copyCode;
-  const action = (): JSX.Element => {
-    if (hold) return <ActionButton label={hold.action} total={null} disabled onClick={() => undefined} />;
-    if (stale && refresh) return <ActionButton label={refreshLabel} total={null} disabled={false} onClick={refresh} />;
-    if (afterCopy) return <WaitingLine text={copy.waiting} />;
-    return <ActionButton label={copyLabel} total={null} disabled={stale} onClick={onCopy} />;
-  };
-  const other = remembered && bankFlow && !hold && !stale && !afterCopy;
+  const settled = !hold && !stale;
+  const other = settled && !afterCopy ? otherBankLabel(bankFlow) : null;
   return (
-    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} live={afterCopy && !hold && !stale ? copy.waiting : null}>
-      {action()}
-      {other ? <OtherBankLink label={bankFlow.bank.copy.openOther} onClick={onOtherBank} /> : null}
+    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} live={afterCopy && settled ? copy.waiting : null}>
+      <PixBarAction mode={mode} afterCopy={afterCopy} onCopy={onCopy} copyLabel={copyLabel(copy.copyCode, bankFlow)} />
+      {other ? <OtherBankLink label={other} onClick={onOtherBank} /> : null}
     </ListBar>
   );
 }
@@ -216,6 +239,16 @@ function copiedSentence(flow: BankFlow, opening: PixBankId | null): string {
   return opening ? copy.copiedOpening(copy.names[opening]) : copy.copiedPick;
 }
 
+/** A copy the clipboard took: the after-copy face, the grid when asked for, the toast, and the bank opened. */
+function landCopy(at: { mode: PaymentListMode; flow: BankFlow; ports: CopyPorts; stale: boolean }, opening: PixBankId | null, grid: boolean): void {
+  const { mode, flow, ports } = at;
+  ports.setAfterCopy(true);
+  if (grid) flow.state.showGrid();
+  const target = flow.os ? opening : null;
+  mode.list.notify?.(copiedSentence(flow, target));
+  if (target && !at.stale) flow.state.open(target, false);
+}
+
 /**
  * Every copy on the bank flow ends the same way: the after-copy face, the
  * toast, and the bank opened — the one chosen, or none when the grid is asked
@@ -232,12 +265,7 @@ function useBankCopies(mode: PaymentListMode, flow: BankFlow | null, pix: PixCha
     };
   }, []);
   const land = (ok: boolean, grid: boolean, target: PixBankId | null): void => {
-    if (!ok || !live.current || !flow) return;
-    ports.setAfterCopy(true);
-    if (grid) flow.state.showGrid();
-    const opening = grid ? null : target;
-    mode.list.notify?.(copiedSentence(flow, flow.os ? opening : null));
-    if (opening && flow.os && !stale) flow.state.open(opening, false);
+    if (ok && live.current && flow) landCopy({ mode, flow, ports, stale }, grid ? null : target, grid);
   };
   // The bar's press already opened the clipboard, waiting for this code.
   useEffect(() => {

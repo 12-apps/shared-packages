@@ -45,6 +45,18 @@ afterEach(() => {
   cleanup();
 });
 
+/** This test's bank app does not open (reset before each test). */
+function appWillNotOpen(): void {
+  opened.result = false;
+}
+
+/** The clipboard refuses the next write — the one after it takes the code. */
+function clipboardRefusesOnce(): void {
+  writeText.mockImplementationOnce(async () => {
+    throw new Error("denied");
+  });
+}
+
 function bankFlow(remembered: PixBankId | null, phone = true) {
   const onPick = vi.fn();
   const notify = vi.fn();
@@ -59,7 +71,7 @@ describe("no bank remembered, on a phone", () => {
   it("generates and copies in one tap, toasts, and offers the six banks in place of the checklist", async () => {
     const { notify } = bankFlow(null);
     await waitFor(() => expect(pay().textContent).toContain("Gerar e copiar o Pix"));
-    expect(screen.queryByTestId("pix-open-other-bank")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("pix-open-other-bank")).toBeNull());
     fireEvent.click(pay());
     await waitFor(() => expect(screen.getByTestId("pix-bank-grid")).toBeTruthy());
     expect(writeText).toHaveBeenCalledWith("00020126BR.GOV.BCB.PIX.o-pix");
@@ -67,8 +79,8 @@ describe("no bank remembered, on a phone", () => {
     expect(screen.getByText("Abra seu banco e cole em Pix copia e cola")).toBeTruthy();
     const names = ["Nubank", "Itaú", "Bradesco", "Banco do Brasil", "Caixa", "Santander"];
     for (const name of names) expect(screen.getByRole("button", { name: `Abrir ${name}` })).toBeTruthy();
-    expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull();
-    expect(screen.queryByTestId("pix-after-copy-title")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-title")).toBeNull());
   });
 
   it("a pick opens that app and is remembered; 'Outro banco' brings the six back", async () => {
@@ -85,7 +97,7 @@ describe("no bank remembered, on a phone", () => {
   });
 
   it("says so when the app did not open, and 'Tentar de novo' opens it again", async () => {
-    opened.result = false;
+    appWillNotOpen();
     bankFlow(null);
     await waitFor(() => expect(pay().textContent).toContain("Gerar e copiar o Pix"));
     fireEvent.click(pay());
@@ -137,9 +149,7 @@ describe("a bank remembered, on a phone", () => {
   });
 
   it("a refused copy stays on the code, with 'Copiar e abrir o Nubank' to try by hand — no toast, no app", async () => {
-    writeText.mockImplementation(async () => {
-      throw new Error("denied");
-    });
+    clipboardRefusesOnce();
     const { notify } = bankFlow("nubank");
     await waitFor(() => expect(pay().textContent).toContain("Gerar, copiar e abrir o Nubank"));
     fireEvent.click(pay());
@@ -148,7 +158,6 @@ describe("a bank remembered, on a phone", () => {
     expect(screen.getByTestId("pix-open-other-bank")).toBeTruthy();
     expect(notify).not.toHaveBeenCalled();
     expect(opened.calls).toEqual([]);
-    writeText.mockImplementation(async () => undefined);
     fireEvent.click(pay());
     await waitFor(() => expect(opened.calls).toEqual(["nubank"]));
   });
@@ -158,12 +167,12 @@ describe("on a computer", () => {
   it("generates and copies in one tap and toasts, but keeps today's after-copy face — no banks", async () => {
     const { notify } = bankFlow("nubank", false);
     await waitFor(() => expect(pay().textContent).toContain("Gerar e copiar o Pix"));
-    expect(screen.queryByTestId("pix-open-other-bank")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("pix-open-other-bank")).toBeNull());
     fireEvent.click(pay());
     await waitFor(() => expect(screen.getByTestId("pix-after-copy")).toBeTruthy());
     expect(notify).toHaveBeenCalledWith("Código Pix copiado");
-    expect(screen.queryByTestId("pix-bank-grid")).toBeNull();
-    expect(screen.queryByTestId("pix-bank-opening")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("pix-bank-grid")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("pix-bank-opening")).toBeNull());
     expect(screen.getByTestId("pix-after-copy-step-1")).toBeTruthy();
     expect(opened.calls).toEqual([]);
   });

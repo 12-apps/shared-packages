@@ -42,17 +42,19 @@ function fakePage(hideOnOpen: boolean) {
   const off = (type: string, fn: () => void) => listeners.get(type)?.delete(fn);
   const fire = (type: string) => listeners.get(type)?.forEach((fn) => fn());
   const doc = { visibilityState: "visible", addEventListener: on, removeEventListener: off };
-  let href = "";
+  const nav = { href: "" };
+  const due: Array<() => void> = [];
   const win = {
     addEventListener: on,
     removeEventListener: off,
-    setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+    // The wait, run by hand: `elapse()` is the moment it ends.
+    setTimeout: (fn: () => void) => due.push(fn),
     location: {
       get href() {
-        return href;
+        return nav.href;
       },
       set href(next: string) {
-        href = next;
+        nav.href = next;
         if (hideOnOpen) {
           doc.visibilityState = "hidden";
           fire("visibilitychange");
@@ -60,19 +62,24 @@ function fakePage(hideOnOpen: boolean) {
       },
     },
   };
-  return { win: win as unknown as Window, doc: doc as unknown as Document, href: () => href, listeners };
+  const elapse = (): void => due.splice(0).forEach((fn) => fn());
+  return { win: win as unknown as Window, doc: doc as unknown as Document, href: () => nav.href, listeners, elapse };
 }
 
 describe("openBankApp", () => {
   it("says opened when the page lost the screen, and navigated to the bank's URL", async () => {
     const page = fakePage(true);
-    await expect(openBankApp("itau", "android", { win: page.win, doc: page.doc, waitMs: 5 })).resolves.toBe(true);
+    const opening = openBankApp("itau", "android", { win: page.win, doc: page.doc });
+    page.elapse();
+    await expect(opening).resolves.toBe(true);
     expect(page.href()).toBe(bankAppUrl("itau", "android"));
   });
 
   it("says NOT opened when the page is still on screen after the wait, and leaves no listener behind", async () => {
     const page = fakePage(false);
-    await expect(openBankApp("caixa", "ios", { win: page.win, doc: page.doc, waitMs: 5 })).resolves.toBe(false);
+    const opening = openBankApp("caixa", "ios", { win: page.win, doc: page.doc });
+    page.elapse();
+    await expect(opening).resolves.toBe(false);
     for (const set of page.listeners.values()) expect(set.size).toBe(0);
   });
 });

@@ -10,12 +10,10 @@ import type { BuyerContact, CheckoutProviderConfig } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 import { useCheckoutComponents } from "../ui";
 
-import { NEW_CARD } from "../../../card";
-import { deferredCopy } from "../pix-parts";
 
-import { bankFlowOs } from "./bank-apps";
 import { actionLabel, blockedReason, cardName } from "./choice";
 import { usePaymentListMode, type PaymentListMode } from "./context";
+import { armPixCopy, armedReady, otherBankShown, pixBankLabel, useArmedCharge, useDropRefusedCopy } from "./list-memory";
 import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { CardRun, WalletRun, type ListChargeFailure } from "./charge-runners";
@@ -23,7 +21,7 @@ import { ActionButton, ChargeBar, GooglePayAction, ListBar } from "./list-bar";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
 import type { ListState } from "./use-list-state";
-import type { CheckoutDoorOption, CheckoutOnlineChoice, CheckoutPaymentList, PixBankId } from "./types";
+import type { CheckoutDoorOption, CheckoutOnlineChoice, CheckoutPaymentList } from "./types";
 
 type Controller = ReturnType<typeof useCheckoutController>;
 
@@ -93,26 +91,6 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: Pay
 }
 
 /**
- * Pix with the host's bank flow (FUT-3612): the clipboard is opened HERE,
- * inside the tap, for a code the server has not answered yet — the Pix face
- * writes it the moment it arrives, then opens the remembered bank (or, for
- * "Abrir outro banco", shows the six).
- */
-function armPixCopy(list: CheckoutPaymentList, mode: PaymentListMode, pick: boolean): void {
-  if (!list.pixBank) return;
-  mode.pixIntent.current?.copy.fail();
-  const os = bankFlowOs(list.pixBank.phone);
-  mode.pixIntent.current = { copy: deferredCopy(), bank: os && !pick ? list.pixBank.remembered : null, pick };
-}
-
-/** The bank flow's remembered bank, on a phone — what the Pix button opens. */
-function rememberedBank(list: CheckoutPaymentList): PixBankId | null {
-  const bank = list.pixBank;
-  if (!bank?.remembered || !bankFlowOs(bank.phone)) return null;
-  return bank.remembered;
-}
-
-/**
  * The bar's ONE action (M7): the only thing in the list that raises an order
  * or a charge. A door option hands the press to the host; the card counts five
  * seconds first; everything else raises at once.
@@ -126,42 +104,6 @@ function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean
     clearFailure();
     actOnline(props, choice.method, mode, pick);
   };
-}
-
-/** How long after the step opens an armed charge may still start by itself. */
-export const ARMED_WINDOW_MS = 15_000;
-
-/**
- * "Pedir em 1 toque" opened this checkout (FUT-3611): start the card's bar by
- * itself, ONCE per step — as soon as the saved card the consent named is chosen
- * and nothing holds the button, within {@link ARMED_WINDOW_MS}. A choice that is
- * not that saved card (none on file, the fields, another card) never charges
- * by itself, and neither does anything after Cancelar.
- */
-function useArmedCharge(props: ListFaceProps, reason: string | null, act: () => void): void {
-  const mode = usePaymentListMode();
-  const { choice, card } = props.state;
-  const { armedCharge, armedCardId } = props.list;
-  const savedChosen = choice?.kind === "online" && choice.method === "CARD" && card.selection !== null && card.selection !== NEW_CARD;
-  const theNamedCard = armedCardId === undefined || card.selection === armedCardId;
-  const ready = Boolean(armedCharge) && savedChosen && theNamedCard && reason === null && props.charge.phase === "idle" && !props.c.creating;
-  useEffect(() => {
-    const armed = mode?.armed.current;
-    if (!ready || !armed || armed.spent) return;
-    // Spent either way: fired now, or too late to be the tap's own charge.
-    armed.spent = true;
-    if (Date.now() - armed.since <= ARMED_WINDOW_MS) act();
-  }, [ready, act, mode]);
-}
-
-/** A Pix press whose code never came (the raise was refused) gives the clipboard up. */
-function useDropRefusedCopy(c: Controller): void {
-  const mode = usePaymentListMode();
-  useEffect(() => {
-    if (!c.createError || !mode?.pixIntent.current) return;
-    mode.pixIntent.current.copy.fail();
-    mode.pixIntent.current = null;
-  }, [c.createError, mode]);
 }
 
 /**
@@ -234,20 +176,6 @@ function chargingText(props: ListFaceProps): string {
   return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
 }
 
-/** Pix with the bank flow: "Gerar e copiar o Pix", or "Gerar, copiar e abrir o Nubank". */
-function pixBankLabel(list: CheckoutPaymentList, state: ListState): string | null {
-  const bank = list.pixBank;
-  if (!bank || state.choice?.kind !== "online" || state.choice.method !== "PIX") return null;
-  const remembered = rememberedBank(list);
-  return remembered ? bank.copy.generateCopyAndOpen(bank.copy.names[remembered]) : bank.copy.generateAndCopy;
-}
-
-/** "Abrir outro banco" under the button: Pix chosen, a bank remembered, a phone, and the button free to act. */
-function otherBankShown(props: ListFaceProps, reason: string | null): boolean {
-  const { choice } = props.state;
-  return choice?.kind === "online" && choice.method === "PIX" && rememberedBank(props.list) !== null && reason === null && !inFlight(props);
-}
-
 /** The verb, the amount and the busy state of the button, for what is chosen. */
 function buttonFacts(props: ListFaceProps): { label: string; total: string; busy: boolean } {
   const { list, state } = props;
@@ -276,6 +204,37 @@ function googlePayLive(props: ListFaceProps, reason: string | null, busy: boolea
   return choice?.kind === "online" && choice.method === "GOOGLE_PAY" && props.cap.googlePay !== null && reason === null && !busy;
 }
 
+/** The 5-second bar (or the charge going out), and the host's footer while it counts. */
+function ChargingBar({ props, onCancel }: { props: ListFaceProps; onCancel: () => void }): JSX.Element {
+  const { charge, list } = props;
+  const counting = charge.phase === "counting";
+  const footer = counting ? list.chargeFooter?.(charge.cancel) : null;
+  return (
+    <>
+      <ChargeBar text={chargingText(props)} full={!counting} cancelLabel={list.copy.cancel} onCancel={onCancel} />
+      {footer ? <Box data-testid="list-charge-footer">{footer}</Box> : null}
+    </>
+  );
+}
+
+/** The button, and "Abrir outro banco" under it when a remembered bank would open. */
+function PressButton({ props, act, reason, returnFocus }: {
+  props: ListFaceProps;
+  act: (pick?: boolean) => void;
+  reason: string | null;
+  returnFocus: boolean;
+}): JSX.Element {
+  const { list, state } = props;
+  const { label, total, busy } = buttonFacts(props);
+  const other = list.pixBank && otherBankShown(list, state, reason === null && !busy) ? list.pixBank.copy.openOther : null;
+  return (
+    <>
+      <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={() => act()} focusOnMount={returnFocus} />
+      {other ? <OtherBankLink label={other} onClick={() => act(true)} /> : null}
+    </>
+  );
+}
+
 /** The button, the 5-second bar, Google's own button, or nothing for a charge nobody can confirm yet. */
 function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnFocus }: {
   props: ListFaceProps;
@@ -286,28 +245,17 @@ function BarAction({ props, failure, act, onGooglePay, onCancel, reason, returnF
   reason: string | null;
   returnFocus: boolean;
 }): JSX.Element | null {
-  const { charge, list, cap } = props;
-  if (cardCharging(charge)) {
-    const counting = charge.phase === "counting";
-    return (
-      <>
-        <ChargeBar text={chargingText(props)} full={!counting} cancelLabel={list.copy.cancel} onCancel={onCancel} />
-        {counting && list.chargeFooter ? <Box data-testid="list-charge-footer">{list.chargeFooter(charge.cancel)}</Box> : null}
-      </>
-    );
-  }
+  const { charge, cap } = props;
+  if (cardCharging(charge)) return <ChargingBar props={props} onCancel={onCancel} />;
   // An UNRESOLVED charge may be holding the buyer's money: no pay control at
   // all under "não pague de novo" (FUT-563), as the card pane does today.
   if (failure?.code === UNRESOLVED_CODE) return null;
-  const { label, total, busy } = buttonFacts(props);
-  if (googlePayUnpriced(props)) return <ActionButton label={label} total={total} disabled loading={false} onClick={() => act()} />;
-  if (googlePayLive(props, reason, busy) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
-  return (
-    <>
-      <ActionButton label={label} total={total} disabled={reason !== null || busy} loading={busy} onClick={() => act()} focusOnMount={returnFocus} />
-      {otherBankShown(props, reason) && list.pixBank ? <OtherBankLink label={list.pixBank.copy.openOther} onClick={() => act(true)} /> : null}
-    </>
-  );
+  if (googlePayUnpriced(props)) {
+    const { label, total } = buttonFacts(props);
+    return <ActionButton label={label} total={total} disabled loading={false} onClick={() => act()} />;
+  }
+  if (googlePayLive(props, reason, inFlight(props)) && cap.googlePay) return <GooglePayAction client={cap.googlePay.client} onPress={onGooglePay} />;
+  return <PressButton props={props} act={act} reason={reason} returnFocus={returnFocus} />;
 }
 
 /** The charge under way, once there is an order to run it against. */
@@ -407,8 +355,9 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const door = chosenDoor(props);
   const reason = reasonOf(props, door);
   useChargeGuard(props, reason);
-  useArmedCharge(props, reason, act);
-  useDropRefusedCopy(c);
+  const free = reason === null && props.charge.phase === "idle" && !c.creating;
+  useArmedCharge(armedReady(list, state, free), act);
+  useDropRefusedCopy(c.createError);
   const { returnFocus, onCancel } = useCancelWithFocus(charge);
   const shown = charge.phase !== "waiting";
   const facts = barFacts(props, door, reason);
