@@ -15,14 +15,14 @@ import type { LifecycleResult, LifecycleTransport } from '../transport';
 
 afterEach(cleanup);
 
-const conflict = (codeError: string | null): RestoreConflict => ({
+const conflict = (codeError: string | null, code = '0042'): RestoreConflict => ({
   title: 'Restaurar com outro nome',
   message: 'A variação que está na lixeira usa o mesmo nome e o mesmo código de uma que está em Pizza agora.',
   binned: { heading: 'Na lixeira', label: 'Grande', detail: 'Código 0042 · 22 em estoque' },
   current: { heading: 'No produto agora', label: 'Grande', detail: 'Código 0042 · 4 em estoque' },
   fields: [
     { key: 'name', label: 'Novo nome', value: 'Grande (antiga)', error: null, optional: false },
-    { key: 'sku', label: 'Novo código', value: '0042', error: codeError, optional: false },
+    { key: 'sku', label: 'Novo código', value: code, error: codeError, optional: false },
   ],
 });
 
@@ -97,10 +97,11 @@ function renderBin(transport: LifecycleTransport): void {
   render(<Page />);
 }
 
-const clash = (codeError: string | null): LifecycleResult<unknown> => ({
+/** A refused restore, as the host answers it: the field holds the value it refused. */
+const clash = (codeError: string | null, code?: string): LifecycleResult<unknown> => ({
   ok: false,
   error: 'A variação que está na lixeira usa o mesmo nome',
-  conflict: conflict(codeError),
+  conflict: conflict(codeError, code),
 });
 
 describe('Lixeira restore clash', () => {
@@ -130,7 +131,7 @@ describe('Lixeira restore clash', () => {
   it('retries with the typed values, stays open on a repeated clash and closes on success', async () => {
     const { transport, sends } = scriptedTransport([
       clash('Já usado por Pizza Grande.'),
-      clash('Já usado por Pizza Média.'),
+      clash('Já usado por Pizza Média.', '0043'),
       { ok: true, data: undefined },
     ]);
     renderBin(transport);
@@ -148,6 +149,19 @@ describe('Lixeira restore clash', () => {
     await waitFor(() => expect(screen.queryByTestId('recycle-bin-conflict')).toBeNull());
     expect(sends[2]?.body).toEqual({ overrides: { name: 'Grande (antiga)', sku: '0099' } });
     await screen.findByTestId('recycle-bin-empty');
+  });
+
+  it('drops a field error once the person types a new value', async () => {
+    const { transport } = scriptedTransport([clash('Já usado por Pizza Grande.')]);
+    renderBin(transport);
+    fireEvent.click(await screen.findByTestId('recycle-bin-restore-bin-1'));
+    const code = (await screen.findByLabelText(/Novo código/)) as HTMLInputElement;
+    expect(code.getAttribute('aria-invalid')).toBe('true');
+    fireEvent.change(code, { target: { value: '0043' } });
+    await waitFor(() => expect(code.getAttribute('aria-invalid')).toBe('false'));
+    await waitFor(() => expect(screen.queryByText('Já usado por Pizza Grande.')).toBeNull());
+    fireEvent.change(code, { target: { value: '0042' } });
+    await screen.findByText('Já usado por Pizza Grande.');
   });
 
   it('Cancelar closes the dialog and leaves the entry in the bin', async () => {

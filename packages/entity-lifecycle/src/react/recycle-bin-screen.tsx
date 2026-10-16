@@ -158,6 +158,7 @@ function BinEntryCard({
   labels,
   copy,
   busy,
+  locked,
   onRestore,
   onPurge,
 }: {
@@ -165,6 +166,8 @@ function BinEntryCard({
   labels: EntityTypeLabels;
   copy: RecycleBinCopy;
   busy: boolean;
+  /** Another entry's restore is running: one at a time, said by a disabled button. */
+  locked: boolean;
   onRestore: () => void;
   onPurge: () => void;
 }): JSX.Element {
@@ -183,6 +186,7 @@ function BinEntryCard({
           variant="outline"
           size="sm"
           loading={busy}
+          disabled={locked}
           onClick={onRestore}
           dataTestId={`recycle-bin-restore-${entry.id}`}
         >
@@ -257,6 +261,7 @@ function BinBody({
           labels={labels}
           copy={copy}
           busy={actions.busyId === entry.id}
+          locked={actions.busyId !== null && actions.busyId !== entry.id}
           onRestore={() => void actions.restore(entry)}
           onPurge={() => actions.requestPurge(entry)}
         />

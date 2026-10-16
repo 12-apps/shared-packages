@@ -10,7 +10,12 @@ import { useTheme } from '@12-apps/ui/mui/styles';
 import useMediaQuery from '@12-apps/ui/mui/useMediaQuery';
 import { Text } from '@12-apps/ui/typography/Text';
 
-import type { RestoreConflict, RestoreConflictSide, RestoreOverrides } from '../restore-conflict';
+import type {
+  RestoreConflict,
+  RestoreConflictField,
+  RestoreConflictSide,
+  RestoreOverrides,
+} from '../restore-conflict';
 
 /**
  * The bin's answer to a restore the host refused for a clash (FUT-1342): the
@@ -89,6 +94,13 @@ const pick = (typed: Record<string, string>, conflict: RestoreConflict): Record<
   Object.fromEntries(
     conflict.fields.filter((field) => field.key in typed).map((field) => [field.key, typed[field.key] ?? '']),
   );
+
+/**
+ * A field's error stands only while it holds the value the clash was about:
+ * typed over, it is a new value nobody has refused yet.
+ */
+const stillTaken = (field: RestoreConflictField, values: Record<string, string>): boolean =>
+  field.error !== null && (values[field.key] ?? '') === field.value;
 
 /** The typed values, refused before sending when a required one is blank. */
 function missingRequired(conflict: RestoreConflict, values: Record<string, string>): boolean {
@@ -177,8 +189,8 @@ function ConflictFields({
           label={field.label}
           value={values[field.key] ?? ''}
           onChange={(event) => setValue(field.key, event.target.value)}
-          error={field.error !== null}
-          helperText={field.error ?? undefined}
+          error={stillTaken(field, values)}
+          helperText={stillTaken(field, values) ? (field.error ?? undefined) : undefined}
           // Announced, not drawn: the approved mock shows no asterisk, and the
           // dialog refuses an empty required value on its own (Restaurar off).
           inputProps={{ 'aria-required': !field.optional }}
