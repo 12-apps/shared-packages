@@ -1,8 +1,10 @@
 import { Box } from "@mui/material";
-import { createContext, useContext, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { useCheckoutCopy } from "../copy-context";
 import { SummaryLines, SummaryTotal, type CheckoutSummaryLine } from "../payment-summary";
+import { useCheckoutLayout } from "../payment-step-layout";
 import { useCheckoutComponents } from "../ui";
 
 /**
@@ -13,7 +15,7 @@ import { useCheckoutComponents } from "../ui";
  */
 const ColumnTarget = createContext<{ element: HTMLElement | null } | null>(null);
 
-export const SummaryColumnTarget = ColumnTarget.Provider;
+const SummaryColumnTarget = ColumnTarget.Provider;
 
 /**
  * `null` for the bar (a phone); otherwise the column's element to portal the
@@ -34,7 +36,7 @@ const COLUMN_WIDTH = 45;
  * fees, "Total", the host's context line and the pay button — so no bar sits
  * at the bottom of the screen.
  */
-export function TwoColumns({ steps, column }: { steps: ReactNode; column: ReactNode }): JSX.Element {
+function TwoColumns({ steps, column }: { steps: ReactNode; column: ReactNode }): JSX.Element {
   return (
     <Box data-testid="list-columns" sx={{ display: "flex", gap: 4, alignItems: "flex-start", justifyContent: "center", width: "100%" }}>
       <Box sx={{ flex: 1, minWidth: 0, maxWidth: (t) => t.spacing(STEPS_MAX) }}>{steps}</Box>
@@ -48,7 +50,7 @@ export function TwoColumns({ steps, column }: { steps: ReactNode; column: ReactN
  * discounts) as the host words them, a hairline, "Total" and the amount — and
  * under them `slot`, the element the bar's content is portalled into.
  */
-export function SummaryColumn({ lines, moneyLines, totalLabel, slot }: {
+function SummaryColumn({ lines, moneyLines, totalLabel, slot }: {
   lines?: CheckoutSummaryLine[];
   /** The host's fee and discount rows (`CheckoutCartView.discountLines`). */
   moneyLines?: ReactNode;
@@ -74,5 +76,45 @@ export function SummaryColumn({ lines, moneyLines, totalLabel, slot }: {
       <SummaryTotal totalLabel={totalLabel} />
       <Box ref={slot} data-testid="list-summary-action" sx={{ display: "flex", flexDirection: "column" }} />
     </Box>
+  );
+}
+
+/**
+ * The list face's layout (FUT-3685, L4), in one of three shapes:
+ *
+ *  - the HOST lays out the page (`hostTarget` given — `paymentList.summaryTarget`):
+ *    the "Resumo do pedido" column is portalled into the host's element, beside
+ *    the host's own step cards, and the bar's action lands in it. While the
+ *    element is `null` (not mounted yet) the bar draws nothing rather than flash;
+ *  - a computer, the host silent: the step and the column side by side, here;
+ *  - a phone: the step alone, over the host's bar (L2).
+ *
+ * Only the list face is laid out this way: the Pix screen and the hand-off keep
+ * their bar (K9).
+ */
+export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, children }: {
+  hostTarget: HTMLElement | null | undefined;
+  lines?: CheckoutSummaryLine[];
+  moneyLines?: ReactNode;
+  totalLabel: string;
+  children: ReactNode;
+}): JSX.Element {
+  const wide = useCheckoutLayout()?.wide ?? false;
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const target = useMemo(() => ({ element: slot }), [slot]);
+  const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} slot={setSlot} />;
+  if (hostTarget !== undefined) {
+    return (
+      <SummaryColumnTarget value={target}>
+        {children}
+        {hostTarget ? createPortal(column, hostTarget) : null}
+      </SummaryColumnTarget>
+    );
+  }
+  if (!wide) return <>{children}</>;
+  return (
+    <SummaryColumnTarget value={target}>
+      <TwoColumns steps={children} column={column} />
+    </SummaryColumnTarget>
   );
 }

@@ -30,6 +30,11 @@ export interface WalletPressInput {
   before: () => void;
   /** A sheet that could not open, in the wallet's own words. */
   onFailed: (failure: ListChargeFailure) => void;
+  /**
+   * Set synchronously by a press, cleared when the charge is back to idle: a
+   * second tap before React re-renders (a double tap) opens no second sheet.
+   */
+  pressed: MutableRefObject<boolean>;
 }
 
 /** Google Pay's press: `loadPaymentData` inside the tap, then the charge. */
@@ -37,7 +42,8 @@ export function useGooglePayPress(input: WalletPressInput, sheet: MutableRefObje
   return () => {
     const google = input.cap.googlePay;
     const cents = input.cents;
-    if (!google || cents === undefined || input.blocked) return;
+    if (!google || cents === undefined || input.blocked || input.pressed.current) return;
+    input.pressed.current = true;
     input.before();
     const answer = google.client
       .loadPaymentData(paymentDataRequest(google.params, { totalCents: cents }))
@@ -63,7 +69,8 @@ export function useApplePayPress(input: WalletPressInput, sheet: MutableRefObjec
   return () => {
     const apple = input.cap.applePay;
     const cents = input.cents;
-    if (!apple || cents === undefined || input.blocked) return;
+    if (!apple || cents === undefined || input.blocked || input.pressed.current) return;
+    input.pressed.current = true;
     input.before();
     const started = startApplePaySession({
       Session: apple.Session,
@@ -82,14 +89,16 @@ export function useApplePayPress(input: WalletPressInput, sheet: MutableRefObjec
  * and the list is back to its rows. Apple's sheet waits for an outcome, so it
  * is told this one failed; nothing is charged.
  */
-export function useCloseOrphanSheet(phase: ListCharge["phase"], sheet: MutableRefObject<WalletSheet | null>): void {
+export function useCloseOrphanSheet(phase: ListCharge["phase"], sheet: MutableRefObject<WalletSheet | null>, pressed: MutableRefObject<boolean>): void {
   useEffect(() => {
     if (phase !== "idle") return;
+    // Back to idle: a new press may open a sheet again.
+    pressed.current = false;
     const open = sheet.current;
     sheet.current = null;
     if (!open || open.claimed) return;
     void open.answer.then((key) => {
       if (key !== null) open.complete?.(false);
     }, () => undefined);
-  }, [phase, sheet]);
+  }, [phase, sheet, pressed]);
 }

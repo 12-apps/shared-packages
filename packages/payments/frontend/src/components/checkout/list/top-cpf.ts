@@ -39,9 +39,10 @@ function requiredTaxId(
  *  - Decided against what the buyer ARRIVED with, never what they are typing,
  *    so the field does not vanish under their thumb as it completes.
  *  - A buyer with a CPF on file sees no field — until they press "Alterar" on
- *    the payer line (`revealed`, E2 → E1). That field is optional: the store
- *    already holds a CPF, so an empty one blocks nothing, and only a CPF typed
- *    there must be valid (K6).
+ *    the payer line (`revealed`, E2 → E1). That field opens holding the CPF
+ *    the host passed (masked, editable) and is REQUIRED like any other: a
+ *    buyer who clears it holds the online ways to pay with the reason (E3,
+ *    K6) — an empty field over a live "Gerar Pix" said nothing true.
  */
 export function topCpfField(input: {
   chain: readonly CheckoutChainLink[] | undefined;
@@ -53,7 +54,7 @@ export function topCpfField(input: {
 }): CheckoutCustomerField | null {
   const field = requiredTaxId(input.chain, input.methods);
   if (!field) return null;
-  if (input.taxIdOnFile) return input.revealed ? { ...field, required: false } : null;
+  if (input.taxIdOnFile) return input.revealed ? field : null;
   if (fieldSatisfied(field, input.arrivedWith?.taxId)) return null;
   return field;
 }

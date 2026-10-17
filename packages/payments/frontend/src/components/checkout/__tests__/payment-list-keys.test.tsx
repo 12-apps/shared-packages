@@ -102,7 +102,7 @@ describe("a wallet while the host re-prices", () => {
     rerender(listFlow({ ...host, list: {} }));
     await waitFor(() => {
       expect(screen.getByTestId("list-wallet-held")).toBeTruthy();
-      expect(screen.getByTestId("list-wallet-buttons").getAttribute("aria-disabled")).toBe("true");
+      expect((screen.getByTestId("list-wallet-held") as HTMLButtonElement).disabled).toBe(true);
       expect(screen.getByText("Atualizando o valor…")).toBeTruthy();
     });
     await waitFor(() => expect(screen.queryByTestId("google-pay-native")).toBeNull());

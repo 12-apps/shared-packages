@@ -172,6 +172,17 @@ export interface CheckoutPaymentList {
   pixBank?: CheckoutPixBank;
   /** Says a short sentence in the host's own toast — "Código Pix copiado". */
   notify?: (message: string) => void;
+  /**
+   * The host lays out the computer's two columns itself (FUT-3685, L4): its
+   * step cards on the left, and this element on the right — the list portals
+   * the "Resumo do pedido" column into it (the lines, the money rows, "Total",
+   * `summary`, the extras and the pay button), so no bar is drawn at the
+   * bottom. `null` while the element is not mounted yet: the bar waits rather
+   * than flash. Leave it OUT (undefined) on a phone, or to keep the list's own
+   * layout — the step and the column side by side once the flow's frame is
+   * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
+   */
+  summaryTarget?: HTMLElement | null;
 }
 
 /** The six banks the Pix face offers to open, in the prototype's order. */

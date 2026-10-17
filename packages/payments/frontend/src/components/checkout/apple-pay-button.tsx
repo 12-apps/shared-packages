@@ -103,19 +103,21 @@ function paymentRequest(cents: number, copy: ApplePayCopy): ApplePayPaymentReque
   };
 }
 
-export interface ApplePayButtonProps {
-  /**
-   * The raised order the sheet is priced from (`order.totalCents`) — the tabs
-   * layout's case. Give `totalCents` instead where no order exists yet.
-   */
-  order?: CheckoutOrder;
-  /**
-   * The amount the sheet shows, in integer cents, when no order exists yet —
-   * the one list's case (FUT-3685): the session must start INSIDE the tap, so
-   * it is priced with the host's amount due and the order is raised in
-   * parallel. Wins over `order`.
-   */
-  totalCents?: number;
+/**
+ * What the sheet is priced from — exactly one of the two:
+ *
+ *  - `order`: the raised order (`order.totalCents`) — the tabs layout's case;
+ *  - `totalCents`: the amount, in integer cents, when no order exists yet — the
+ *    one list's case (FUT-3685): the session must start INSIDE the tap, so it
+ *    is priced with the host's amount due and the order is raised in parallel.
+ */
+type ApplePayButtonPrice = { order: CheckoutOrder; totalCents?: never } | { totalCents: number; order?: never };
+
+/** {@link ApplePayButton}'s props: its price, and the handlers below. */
+export type ApplePayButtonProps = ApplePayButtonPrice & ApplePayButtonHandlers;
+
+/** The handlers every Apple Pay button takes, however it is priced. */
+interface ApplePayButtonHandlers {
   /**
    * The payment authorized on the sheet — charge this key. Resolves `true`
    * when the charge was accepted (paid, or confirming), `false` on a refusal,

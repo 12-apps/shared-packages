@@ -67,7 +67,7 @@ describe("the PAGAMENTO RÁPIDO block", () => {
     const block = await screen.findByTestId("list-wallets");
     expect(within(block).getByText("Pagamento rápido")).toBeTruthy();
     expect(within(block).getByText("ou escolha como pagar")).toBeTruthy();
-    expect(within(block).getByTestId("google-pay-native")).toBeTruthy();
+    expect(await within(block).findByTestId("google-pay-native")).toBeTruthy();
     await waitFor(() => expect(within(block).queryByTestId("list-apple-pay")).toBeNull());
     // Google is no longer a row (FUT-3685).
     await waitFor(() => expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull());
@@ -218,7 +218,8 @@ describe("Apple Pay's press", () => {
     await act(async () => sessions[0]?.onpaymentauthorized?.({ payment: { token: { paymentData: {} } } }));
     await waitFor(() => expect(sessions[0]?.completed).toEqual([1]));
     expect(client.chargeWallet).not.toHaveBeenCalled();
-    await screen.findByText(/^Não foi possível iniciar o Apple Pay/);
+    // After authorization it is the PAYMENT that failed, not the start (FUT-3685 review C4).
+    await screen.findByText(/^Não foi possível concluir o pagamento com o Apple Pay/);
   });
 
   it("fails the sheet when the provider refuses the charge", async () => {
@@ -287,5 +288,79 @@ describe("a card key minted per order", () => {
     expect(client.charge).not.toHaveBeenCalled();
     await act(async () => answers[0]?.({ ok: true, data: { publicKey: "pk_order" } }));
     await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("a press, whatever is chosen (FUT-3685 review)", () => {
+  it("raises a CARD order with a door row chosen, never the door's send, and leaves the door chosen (C10)", async () => {
+    installGoogle();
+    const client = stubClient();
+    client.chargeWallet.mockResolvedValue({ ok: true, data: { status: "PAID" } });
+    const raise = createOrder();
+    const cash = door();
+    renderList({ config: walletStore(), client, createOrder: raise, list: { totalCents: 2700, door: [cash] } });
+    await screen.findByTestId("google-pay-native");
+    fireEvent.click(radio("list-door-cash"));
+    fireEvent.click(screen.getByTestId("google-pay-native"));
+    await waitFor(() => expect(raise).toHaveBeenCalledWith(expect.objectContaining({ method: "CARD" })));
+    expect(cash.onSend).not.toHaveBeenCalled();
+    expect(radio("list-door-cash").checked).toBe(true);
+    await waitFor(() => expect(client.chargeWallet).toHaveBeenCalledTimes(1));
+  });
+
+  it("opens ONE Google sheet for a double tap (C5)", async () => {
+    const { loadPaymentData } = installGoogle(() => new Promise(() => undefined));
+    renderList({ config: walletStore(), client: stubClient(), createOrder: vi.fn(() => new Promise<CreateOrderResult>(() => undefined)), list: { totalCents: 2700 } });
+    const google = await screen.findByTestId("google-pay-native");
+    // Two taps in the same tick: the second lands before React re-renders.
+    act(() => {
+      google.click();
+      google.click();
+    });
+    expect(loadPaymentData).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts ONE Apple session for a double tap (C5)", async () => {
+    const { sessions } = installApple();
+    renderList({ config: walletStore(["APPLE_PAY"]), client: stubClient(), createOrder: vi.fn(() => new Promise<CreateOrderResult>(() => undefined)), list: { totalCents: 2700 }, validateApplePayMerchant: validate() });
+    const apple = await screen.findByRole("button", { name: "Pagar com Apple Pay" });
+    act(() => {
+      apple.click();
+      apple.click();
+    });
+    expect(sessions).toHaveLength(1);
+  });
+
+  it("keeps held buttons in the accessibility tree: disabled, described by the reason (C8)", async () => {
+    installApple();
+    renderList({ config: walletStore(["APPLE_PAY"]), client: stubClient(), taxIdOnFile: false, list: { totalCents: 2700 }, validateApplePayMerchant: validate() });
+    const apple = (await screen.findByRole("button", { name: "Pagar com Apple Pay" })) as HTMLButtonElement;
+    expect(apple.disabled).toBe(true);
+    const reasonId = apple.getAttribute("aria-describedby");
+    expect(reasonId && document.getElementById(reasonId)?.textContent).toBe("Digite seu CPF para pagar pelo app.");
+    expect(screen.getByTestId("list-wallet-buttons").closest("[inert]")).toBeNull();
+  });
+});
+
+describe("the store credit for a wallet (FUT-3685 review C1)", () => {
+  const credit = <label data-testid="host-credit">Usar meus R$ 5,00 de crédito na loja</label>;
+
+  it("shows the credit line with nothing chosen, and prices the sheet at the amount due", async () => {
+    const { loadPaymentData } = installGoogle();
+    renderList({ config: walletStore(), client: stubClient(), createOrder: createOrder(), list: { totalCents: 2200, amountDueLabel: "R$ 22,00", onlineExtras: credit } });
+    await screen.findByTestId("google-pay-native");
+    expect(screen.getByTestId("host-credit")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("google-pay-native"));
+    expect((loadPaymentData.mock.calls as unknown as [Record<string, unknown>][])[0]?.[0]).toMatchObject({ transactionInfo: { totalPrice: "22.00" } });
+  });
+
+  it("hides it while a door row is chosen, and brings it back off the door", async () => {
+    installGoogle();
+    renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 2200, onlineExtras: credit, door: [door()] } });
+    await screen.findByTestId("host-credit");
+    fireEvent.click(radio("list-door-cash"));
+    await waitFor(() => expect(screen.queryByTestId("host-credit")).toBeNull());
+    fireEvent.click(radio("list-option-PIX"));
+    await screen.findByTestId("host-credit");
   });
 });

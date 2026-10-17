@@ -113,6 +113,8 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
       cannotStart: 'Não foi possível iniciar o Apple Pay nesta loja. Pague com cartão.',
       cannotComplete:
         'Não foi possível iniciar o Apple Pay. Tente novamente ou pague com cartão.',
+      paymentFailed:
+        'Não foi possível concluir o pagamento com o Apple Pay. Tente novamente ou pague com cartão.',
       payAction: 'Pagar com Apple Pay',
     },
     googlePay: {

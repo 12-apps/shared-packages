@@ -64,20 +64,22 @@ When('ela paga com um cartão novo pela lista', async ({ page }) => {
 
 Then('a carteira espera o CPF', async ({ page }) => {
   // Held, with the bar's own reason under the buttons — the sheet cannot ask for it.
-  await expect(page.getByTestId('list-wallet-buttons')).toHaveAttribute('aria-disabled', 'true');
+  // Each button stays reachable, disabled and described by that reason.
   await expect(page.getByTestId('list-wallets-held')).toBeVisible();
+  for (const button of await page.getByTestId('list-wallet-buttons').getByRole('button').all()) {
+    await expect(button).toBeDisabled();
+  }
 });
 
 Then('ela vê o botão do Google Pay em pagamento rápido', async ({ page }) => {
   await expect(page.getByTestId('list-wallets')).toBeVisible();
   await expect(page.getByTestId('list-google-pay')).toBeVisible();
-  await expect(page.getByTestId('list-wallet-buttons')).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('list-google-pay').getByRole('button')).toBeEnabled();
 });
 
 Then('ela vê o botão do Apple Pay em pagamento rápido', async ({ page }) => {
   await expect(page.getByTestId('list-wallets')).toBeVisible();
-  await expect(page.getByTestId('list-apple-pay')).toBeVisible();
-  await expect(page.getByTestId('list-wallet-buttons')).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('list-apple-pay')).toBeEnabled();
 });
 
 Then('as formas de pagar continuam abaixo da carteira', async ({ page }) => {

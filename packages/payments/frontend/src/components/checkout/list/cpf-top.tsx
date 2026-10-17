@@ -39,7 +39,8 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   const consent = usePaymentListMode()?.consent;
   const fieldCopy = useCheckoutCopy().card.fields;
   const wide = useCheckoutLayout()?.wide ?? false;
-  const value = buyer.taxId ?? "";
+  // The CPF the store already holds, when the host passed it, shown masked and editable.
+  const value = formatCpf(buyer.taxId ?? "");
   useOnComplete(value.trim() !== "" && fieldSatisfied(field, value), onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -51,7 +52,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
       {/* A native <label> around the words and the field names the input with both. */}
       <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
         <Box component="span" sx={{ display: "flex", flexDirection: "column" }}>
-          <Text variant="body" size="md" as="span">
+          <Text variant="body" size="sm" as="span">
             {copy.cpf}
           </Text>
           <Text variant="body" size="sm" color="secondary" as="span">

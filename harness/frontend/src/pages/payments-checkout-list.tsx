@@ -43,7 +43,8 @@ function store(wallets: ('GOOGLE_PAY' | 'APPLE_PAY')[]): HarnessStoreSpec {
 }
 
 const NEW_BUYER: HarnessHost = { storefront: true, validateApplePayMerchant: validateHarnessApplePayMerchant };
-const RETURNING: HarnessHost = { ...NEW_BUYER, taxIdOnFile: true, buyer: { name: 'Ana Teste' } };
+// The CPF on file travels with the buyer, as the origin host passes it, so "Alterar" opens it filled.
+const RETURNING: HarnessHost = { ...NEW_BUYER, taxIdOnFile: true, buyer: { name: 'Ana Teste', taxId: '52998224725' } };
 
 /** The wallets' APIs, installed during render — before any child can feature-detect. */
 function WithWallets({ children }: { children: ReactNode }): ReactNode {

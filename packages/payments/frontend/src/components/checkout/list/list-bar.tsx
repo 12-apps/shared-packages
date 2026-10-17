@@ -138,7 +138,9 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
             animation: full ? "none" : `${fill} ${CHARGE_WINDOW_MS}ms linear forwards`,
           }}
         />
-        <Box component="span" sx={{ position: "relative", color: "common.white", typography: "body1", fontWeight: 600 }}>
+        {/* One line, whatever the column's width: a sentence that wrapped inside the
+            52px bar ran over its edges (FUT-3685 review). The live region reads it whole. */}
+        <Box component="span" sx={{ position: "relative", minWidth: 0, color: "common.white", typography: "body1", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {text}
         </Box>
       </Box>

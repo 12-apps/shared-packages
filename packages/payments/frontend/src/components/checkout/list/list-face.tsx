@@ -107,8 +107,15 @@ function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean
 }
 
 /** The press facts both wallets share — see `./wallet-press.ts`. */
-function walletInput(props: ListFaceProps, held: string | null, clearFailures: () => void, onFailed: (failure: ListChargeFailure) => void): WalletPressInput {
+function walletInput(
+  props: ListFaceProps,
+  held: string | null,
+  clearFailures: () => void,
+  onFailed: (failure: ListChargeFailure) => void,
+  pressed: WalletPressInput["pressed"],
+): WalletPressInput {
   return {
+    pressed,
     cap: props.cap,
     charge: props.charge,
     cents: props.list.totalCents,
@@ -122,11 +129,23 @@ function walletInput(props: ListFaceProps, held: string | null, clearFailures: (
   };
 }
 
-/** "Pagando como … · CPF ✓ Alterar" — while an online option is chosen and the CPF is not open. */
+/**
+ * A payment made HERE is still possible: the list offers an online way to pay
+ * (a row or a ready wallet) and no door row is chosen — nothing chosen counts,
+ * since a wallet pays with no row chosen at all (FUT-3685 review). What the
+ * host offers for a payment made here (store credit) and who is paying are
+ * shown while this holds.
+ */
+function payingHere(props: ListFaceProps): boolean {
+  const offersOnline = props.state.rows.length > 0 || props.cap.wallets.length > 0;
+  return offersOnline && props.state.choice?.kind !== "door";
+}
+
+/** "Pagando como … · CPF ✓ Alterar" — while a payment here is possible and the CPF is not open. */
 function Payer({ props }: { props: ListFaceProps }): JSX.Element | null {
-  const { c, list, taxIdOnFile, state } = props;
+  const { c, list, taxIdOnFile } = props;
   const name = c.buyer.name?.trim();
-  if (!taxIdOnFile || !name || props.revealed || state.choice?.kind !== "online") return null;
+  if (!taxIdOnFile || !name || props.revealed || !payingHere(props)) return null;
   return <PayerLine copy={list.copy} name={name} onChange={props.onRevealCpf} />;
 }
 
@@ -265,11 +284,10 @@ function raisedOf(props: ListFaceProps): PaymentMethod | null {
  */
 function barFacts(props: ListFaceProps, door: CheckoutDoorOption | undefined, reason: string | null) {
   const charging = props.charge.phase !== "idle";
-  const online = props.state.choice?.kind === "online";
   return {
     charging,
     locked: inFlight(props),
-    extras: online && !charging ? props.list.onlineExtras : undefined,
+    extras: payingHere(props) && !charging ? props.list.onlineExtras : undefined,
     underButton: charging ? null : (door?.error ?? reason),
     live: cardCharging(props.charge) ? chargingText(props) : null,
   };
@@ -316,10 +334,11 @@ function useWallets(props: ListFaceProps, clearFailure: () => void) {
     setFailure(null);
     clearFailure();
   };
-  const input = walletInput(props, held, before, onFailed);
+  const pressed = useRef(false);
+  const input = walletInput(props, held, before, onFailed, pressed);
   const onGoogle = useGooglePayPress(input, sheet);
   const onApple = useApplePayPress(input, sheet);
-  useCloseOrphanSheet(props.charge.phase, sheet);
+  useCloseOrphanSheet(props.charge.phase, sheet, pressed);
   return { sheet, held, failure, onFailed, clearWalletFailure: () => setFailure(null), onGoogle, onApple };
 }
 

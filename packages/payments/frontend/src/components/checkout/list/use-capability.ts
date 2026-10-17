@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { applePaySessionClass, applePaySupported, type ApplePaySessionClass } from "../apple-pay-button";
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
@@ -119,8 +119,18 @@ export function useListCapability(
   // `null` tells the client hook not to load pay.js at all.
   const client = useGooglePayClient(declared ? undefined : null, "TEST");
   const { priced, repricing } = useRepricing(totalCents);
+  // The port is read at the press, through a ref: a host passing a new
+  // function each render must not rebuild the capability (and the wallets'
+  // buttons) every time. Only whether there IS one changes what is offered.
+  const port = useRef(validateApplePayMerchant);
+  port.current = validateApplePayMerchant;
+  const hasPort = validateApplePayMerchant !== undefined;
+  const stablePort = useCallback((validationURL: string): Promise<unknown> => {
+    const current = port.current;
+    return current ? current(validationURL) : Promise.reject(new Error("no merchant validation port"));
+  }, []);
   return useMemo(
-    () => capabilityOf(config, client, { priced, repricing }, validateApplePayMerchant),
-    [config, client, priced, repricing, validateApplePayMerchant],
+    () => capabilityOf(config, client, { priced, repricing }, hasPort ? stablePort : undefined),
+    [config, client, priced, repricing, hasPort, stablePort],
   );
 }

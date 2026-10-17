@@ -78,8 +78,11 @@ export function OptionRow({
     >
       <Box
         component="label"
-        // 48 + the border = the prototype's 50px row, with or without a hint (L3).
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(6), py: 0, cursor: disabled ? "default" : "pointer" }}
+        // The prototype's `.opt` padding, 12px above and below the label and its
+        // hint (FUT-3685 review): a row with a hint is ~62px, and the hint never
+        // touches — or is clipped by — the row's border. 48px is the floor, for
+        // a row with no hint.
+        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(6), py: 1.5, cursor: disabled ? "default" : "pointer" }}
       >
         <Radio
           name={name}

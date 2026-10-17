@@ -909,6 +909,9 @@ What changes for the buyer:
 | --- | --- |
 | `CheckoutFlowProps.validateApplePayMerchant` | the Apple Pay merchant-validation port (server-side). The list offers no Apple Pay without it — its session could only abort. `ports.validateApplePayMerchant` on `createPaymentFlows` |
 | `cart.lines`, `cart.discountLines` | the "Resumo do pedido" column on a computer: your lines, then your fee/discount rows above "Total" |
+| `paymentList.summaryTarget` | lay out the computer's two columns YOURSELF: your step cards on the left (≤ 680px), and an element of yours on the right — pass it here and the list portals the whole "Resumo do pedido" column into it (lines, money rows, Total, `summary`, extras and the pay button), with no bar at the bottom. `null` while your element is not mounted yet (the bar waits rather than flash). Leave it out on a phone, or to keep the list's own layout (the step and the column side by side once the flow's frame is ≥ 900px). The Pix screen and the hand-off always keep their bar |
+| `defaultBuyer.taxId` with `taxIdOnFile` | the CPF on file, plain or masked digits: "Alterar" on the payer line opens it at the top, filled and editable. Without it the field opens empty, and the online ways to pay wait for a valid CPF |
+| `onlineExtras` | drawn whenever a payment here is possible — the list offers an online row or a wallet, and no door row is chosen (nothing chosen counts: a wallet pays with no row). The payer line follows the same rule |
 | `copy.wallets`, `copy.buyer.cpfHint` | new in the packs: "Pagamento rápido", "Pagar com Google Pay", "Pagar com Apple Pay", "ou escolha como pagar"; "o PagBank pede para pagar pelo app". A host building its own `PaymentListCopy` adds them. `copy.googlePay` is no longer drawn |
 | `CheckoutOnlineChoice` | never `"GOOGLE_PAY"` any more: the wallets are not rows, so `onChoiceChange` does not report one |
 

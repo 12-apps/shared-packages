@@ -137,7 +137,7 @@ export interface WalletSheet {
 /** The sentence for a wallet charge that could not go out. */
 function useRefusedWords(type: CheckoutWalletType): string {
   const words = useCheckoutCopy().screens.wallet;
-  return type === "APPLE_PAY" ? words.applePay.cannotComplete : words.googlePay.cannotComplete;
+  return type === "APPLE_PAY" ? (words.applePay.paymentFailed ?? words.applePay.cannotComplete) : words.googlePay.cannotComplete;
 }
 
 /**

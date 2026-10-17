@@ -119,11 +119,11 @@ describe("the CPF at the top (FUT-3685)", () => {
     expect(topCpfField({ ...input, chain: [link("Stone", [])], methods: ["PIX", "CARD"] })).toBeNull();
   });
 
-  it("is not asked of a buyer who arrived with a valid one, nor one on file — until revealed, and then optional", () => {
+  it("is not asked of a buyer who arrived with a valid one, nor one on file — until revealed, and then required", () => {
     const chain = [link("PagBank", [CPF])];
     expect(topCpfField({ ...input, chain, methods: ["CARD"], arrivedWith: { taxId: "529.982.247-25" } })).toBeNull();
     expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true })).toBeNull();
-    expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true, revealed: true })).toMatchObject({ required: false });
+    expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true, revealed: true })).toMatchObject({ required: true });
   });
 
   it("holds only a method whose chain needs it, unless a typed CPF is not valid (E3)", () => {

@@ -122,11 +122,11 @@ describe("the CPF at the top of Pagamento (E1)", () => {
   it("holds the wallet buttons with the bar's reason until the CPF is good (E3)", async () => {
     installGoogle();
     renderList({ config: walletStore(), client: stubClient([]), taxIdOnFile: false, list: { totalCents: 2700 } });
-    const buttons = await screen.findByTestId("list-wallet-buttons");
-    expect(buttons.getAttribute("aria-disabled")).toBe("true");
+    const native = await screen.findByTestId("google-pay-native");
+    await waitFor(() => expect(native.getAttribute("aria-disabled")).toBe("true"));
     expect(screen.getByTestId("list-wallets-held").textContent).toBe("Digite seu CPF para pagar pelo app.");
     type("list-buyer-taxId", "529.982.247-25");
-    await waitFor(() => expect(screen.getByTestId("list-wallet-buttons").getAttribute("aria-disabled")).toBeNull());
+    await waitFor(() => expect(screen.getByTestId("google-pay-native").getAttribute("aria-disabled")).toBeNull());
     await waitFor(() => expect(screen.queryByTestId("list-wallets-held")).toBeNull());
   });
 });
@@ -148,22 +148,34 @@ describe("a CPF on file (E2)", () => {
     await waitFor(() => expect(screen.queryByTestId("buyer-cpf")).toBeNull());
   });
 
-  it("left empty holds nothing — the store keeps the CPF it has; a new one must be valid (K6)", async () => {
-    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" } });
+  it("opens holding the CPF the host passed, masked; cleared, it holds the online ways with the reason (K6, U3)", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste", taxId: "52998224725" } });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));
     fireEvent.click(screen.getByTestId("list-payer-change"));
-    await screen.findByTestId("list-buyer-taxId");
+    const field = (await screen.findByTestId("list-buyer-taxId")) as HTMLInputElement;
+    const input = field.tagName === "INPUT" ? field : (field.querySelector("input") as HTMLInputElement);
+    expect(input.value).toBe("529.982.247-25");
     expect(payButton().disabled).toBe(false);
+    type("list-buyer-taxId", "");
+    await waitFor(() => expect(payButton().disabled).toBe(true));
+    expect(reason()).toBe("Digite seu CPF para pagar pelo app.");
     type("list-buyer-taxId", "111.111.111-1");
     await waitFor(() => expect(payButton().disabled).toBe(true));
     type("list-buyer-taxId", "529.982.247-25");
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
+
+  it("shows the payer line with nothing chosen, and hides it for a door row (C3)", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" }, list: { door: [door()] } });
+    await screen.findByTestId("list-payer");
+    fireEvent.click(radio("list-door-cash"));
+    await waitFor(() => expect(screen.queryByTestId("list-payer")).toBeNull());
+  });
 });
 
 describe("remembering the CPF", () => {
-  it("saves a CPF typed at the top, with the consent — and nothing for a revealed field left empty", async () => {
+  it("saves a CPF typed at the top, with the consent — and nothing for a CPF on file left alone", async () => {
     const save = vi.fn();
     const first = renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, saveBuyerContact: save });
     await screen.findByTestId("list-cpf");
@@ -180,10 +192,10 @@ describe("remembering the CPF", () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" }, saveBuyerContact: again });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));
-    fireEvent.click(screen.getByTestId("list-payer-change"));
-    await screen.findByTestId("list-buyer-taxId");
+    await waitFor(() => expect(payButton().disabled).toBe(false));
     fireEvent.click(payButton());
     await screen.findByTestId("list-pix");
+    // A CPF on file nobody touched: nothing new to remember.
     expect(again).not.toHaveBeenCalled();
   });
 });

@@ -73,3 +73,38 @@ describe("on a phone (L2)", () => {
     expect(within(bar).getByTestId("list-pay")).toBeTruthy();
   });
 });
+
+describe("the host's own two columns (FUT-3685 review C2)", () => {
+  it("portals the column — lines, Total and the pay button — into the host's element, and draws no columns of its own", async () => {
+    frameWidth(1280);
+    const aside = document.createElement("aside");
+    aside.setAttribute("data-testid", "host-aside");
+    document.body.appendChild(aside);
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { summaryTarget: aside, summary: "1 item" } });
+    await screen.findByTestId("payment-list");
+    const column = await within(aside).findByTestId("list-summary-column");
+    expect(within(column).getByText("1× Combo")).toBeTruthy();
+    expect(within(column).getByTestId("list-pay")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("list-columns")).toBeNull());
+    expect(screen.getAllByTestId("list-pay")).toHaveLength(1);
+    aside.remove();
+  });
+
+  it("waits, drawing no bar, while the host's element is not mounted yet", async () => {
+    frameWidth(1280);
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { summaryTarget: null } });
+    await screen.findByTestId("payment-list");
+    await waitFor(() => expect(screen.queryByTestId("list-pay")).toBeNull());
+  });
+
+  it("keeps the Pix screen's own bar on a computer: the column is the list's alone (K9)", async () => {
+    frameWidth(1280);
+    renderList({ config: onPageStore(), client: stubClient([]), list: {} });
+    fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
+    await waitFor(() => expect((screen.getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await screen.findByTestId("list-pix");
+    await waitFor(() => expect(screen.queryByTestId("list-summary-column")).toBeNull());
+    expect(screen.getByTestId("list-pay-bar")).toBeTruthy();
+  });
+});

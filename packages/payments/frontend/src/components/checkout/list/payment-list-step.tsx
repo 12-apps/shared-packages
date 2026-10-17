@@ -4,7 +4,7 @@ import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
 import { displayTotals } from "../checkout-totals";
 import type { CheckoutSummaryLine } from "../payment-summary";
-import { useCheckoutLayout, usePaymentPixStage } from "../payment-step-layout";
+import { usePaymentPixStage } from "../payment-step-layout";
 import { PixStageProvider } from "../pix-stage";
 import { PixView } from "../pix-view";
 import { HostedLinkScreen } from "../providers/hosted-link";
@@ -14,7 +14,7 @@ import type { useCheckoutController } from "../use-checkout-controller";
 import { PaymentListProvider } from "./context";
 import { ListBar, WaitingLine } from "./list-bar";
 import { ListFace } from "./list-face";
-import { SummaryColumn, SummaryColumnTarget, TwoColumns } from "./summary-column";
+import { ListLayout } from "./summary-column";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
 import type { ListState } from "./use-list-state";
@@ -129,32 +129,6 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
 }
 
 /**
- * On a computer (FUT-3685, L4): the step beside the "Resumo do pedido"
- * column, into which the bar's content goes. On a phone: the step alone, over
- * the host's bar (L2).
- */
-function Layout({ props, children }: { props: PaymentListStepProps; children: ReactNode }): JSX.Element {
-  const wide = useCheckoutLayout()?.wide ?? false;
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  const target = useMemo(() => ({ element: slot }), [slot]);
-  if (!wide) return <>{children}</>;
-  const { cart, totalOverride } = props;
-  const column = (
-    <SummaryColumn
-      lines={totalOverride ? undefined : cart.lines}
-      moneyLines={cart.discountLines}
-      totalLabel={displayTotals(totalOverride, cart).label}
-      slot={setSlot}
-    />
-  );
-  return (
-    <SummaryColumnTarget value={target}>
-      <TwoColumns steps={children} column={column} />
-    </SummaryColumnTarget>
-  );
-}
-
-/**
  * The Pagamento step as ONE list (FUT-3591, FUT-3592) — see `./types.ts`.
  *
  * Three faces, chosen from what the controller holds: the raised PIX (its code
@@ -194,7 +168,14 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   ) : handingOff ? (
     <HandOffFace props={props} method={c.method ?? "PIX"} />
   ) : (
-    <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
+    <ListLayout
+      hostTarget={list.summaryTarget}
+      lines={props.totalOverride ? undefined : props.cart.lines}
+      moneyLines={props.cart.discountLines}
+      totalLabel={displayTotals(props.totalOverride, props.cart).label}
+    >
+      <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
+    </ListLayout>
   );
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
@@ -207,7 +188,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
           basket={props.totalOverride ? undefined : props.cart.identity}
           actionInBar={Boolean(pix)}
         >
-          <Layout props={props}>{face}</Layout>
+          {face}
         </CartChangedBoundary>
       </PixStageProvider>
     </PaymentListProvider>
