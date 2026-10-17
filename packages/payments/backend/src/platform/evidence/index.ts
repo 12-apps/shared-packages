@@ -32,5 +32,6 @@ export {
 } from './service';
 export { recordTraffic, type RecordedOutcome } from './record';
 export { PT_BR_HOMOLOGACAO_EVIDENCE_COPY } from './pt-BR';
+export { EN_US_HOMOLOGACAO_EVIDENCE_COPY } from './en-US';
 export * from './types';
 export type { RecordedHttpCall } from '../../core/traffic-recorder';

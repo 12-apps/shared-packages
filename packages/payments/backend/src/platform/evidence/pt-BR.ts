@@ -4,10 +4,9 @@ import type { HomologacaoEvidenceCopy } from './types';
  * The pt-BR pack for the homologação evidence file (FUT-3696) — a NAMED
  * constant the host passes by hand, never a default.
  *
- * There is no en-US twin on purpose: the file's only reader is PagBank's
- * homologação reviewer, whose form is Portuguese, and an English evidence file
- * is one they would send back. The screen that offers the download is
- * translated with the rest of the platform copy.
+ * This is the pack a host submits with: the file's reader is PagBank's
+ * homologação reviewer, whose form is Portuguese. `EN_US_HOMOLOGACAO_EVIDENCE_COPY`
+ * is its translation, for an operator who reads English.
  */
 export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   title: 'EVIDÊNCIAS DE HOMOLOGAÇÃO — PAGBANK (API CONNECT E API DE PEDIDOS/ORDERS, PIX E CARTÃO) — SANDBOX',
