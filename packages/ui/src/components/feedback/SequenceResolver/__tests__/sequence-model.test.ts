@@ -217,6 +217,20 @@ describe("a queue that changes under the run", () => {
     expect(run.held).toEqual([]);
   });
 
+  it("Back releases the write pin of the step it leaves (a failed write on X, Back to W, refetch drops X)", () => {
+    const W = item("w");
+    const X = item("x");
+    const Y = item("y");
+    let run = startRun<Item, string>([W, X, Y]);
+    run = skipRun(run, "w");
+    run = pinRun(run, "x"); // resolve(promise) began on X; it rejected, the server had applied it
+    run = backRun(run, "w");
+    expect(run.pinned).toBeUndefined();
+    run = syncRun(run, [W, Y]);
+    run = skipRun(run, "w");
+    expect(keysAhead(run)).toEqual(["y"]);
+  });
+
   it("ignores a Back begun from a step already returned to (a double call)", () => {
     let run = startRun<Item, string>([A, B, C]);
     run = skipRun(run);

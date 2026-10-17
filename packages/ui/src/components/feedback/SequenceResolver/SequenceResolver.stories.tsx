@@ -122,10 +122,12 @@ interface DemoProps {
   writeMs?: number;
   /** Lines of form under each step — a purchase step taller than the viewport. */
   extraLines?: number;
+  /** Replaces every step's primary label — a host word longer than a phone row. */
+  primaryLabel?: string;
 }
 
 /** A host: the intro's picks set the queue; Back calls the host's (fake) inverse. */
-function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 0, extraLines = 0 }: DemoProps) {
+function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 0, extraLines = 0, primaryLabel }: DemoProps) {
   const [open, setOpen] = useState(true);
   const [showIntro, setShowIntro] = useState(withIntro);
   const [queue, setQueue] = useState<Problem[]>(initial);
@@ -155,6 +157,7 @@ function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 
         setTimeout(() => done(result), writeMs);
       });
     const step = writeMs === 0 ? stepOf(item, api) : stepOf(item, { ...api, resolve: (result) => api.resolve(slow(String(result))) });
+    if (primaryLabel && step.primary) step.primary = { ...step.primary, label: primaryLabel };
     if (extraLines === 0) return step;
     const form = Array.from({ length: extraLines }, (_, line) => (
       <Typography key={line} variant="body2" sx={{ py: 1, borderBottom: 1, borderColor: 'divider' }}>
@@ -291,3 +294,9 @@ export const PhoneDone: Story = { ...Done, globals: PHONE };
 
 /** The phone sheet with a step taller than the screen: 95% high, the body scrolls under fixed chrome. */
 export const PhoneLongStep: Story = { ...LongStep, globals: PHONE };
+
+/** A host word wider than a 320px row: the button takes the row and wraps inside it, nothing overflows. */
+export const PhoneLongLabel: Story = {
+  args: { primaryLabel: 'Registrar a compra e levar tudo para a exposição agora' },
+  globals: { viewport: { value: 'xxs', isRotated: false } },
+};

@@ -139,8 +139,13 @@ export function backRun<I extends SequenceItem, R>(state: RunState<I, R>, key?: 
   const last = previousOf(state);
   if (!last || (key !== undefined && last.item.key !== key)) return state;
   const ahead = state.ahead.filter((item) => item.key !== last.item.key);
+  // The step being left keeps no write pin: `pinned` is for a write in flight
+  // on the step ON SCREEN, and a failed one must not hold an entry the
+  // host's refetch has since dropped (it was applied server-side).
+  const leftKey = state.ahead[0]?.key;
   return {
     ...state,
+    pinned: state.pinned === leftKey ? undefined : state.pinned,
     visits: state.visits.slice(0, -1),
     ahead: [last.item, ...ahead],
     held: [...state.held.filter((held) => held !== last.item.key), last.item.key],

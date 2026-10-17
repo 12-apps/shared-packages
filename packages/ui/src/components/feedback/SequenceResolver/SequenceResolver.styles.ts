@@ -66,9 +66,13 @@ export function doneConfirmSx(touch: boolean): SxProps<Theme> {
 
 /** A button at the touch-target height below the sheet breakpoint; its own size above it. */
 export function actionSx(touch: boolean): SxProps<Theme> {
-  // On a phone the footer's actions share the row equally while each label
-  // fits on one line; one that does not takes a full row instead of wrapping.
-  return touch ? { minHeight: sxRem(SEQUENCE_METRICS.touchTarget), flex: '1 1 0', minWidth: 'max-content' } : {};
+  // On a phone the footer's actions share the row while both labels fit on
+  // one line each; one that does not takes a full row instead of wrapping
+  // word by word, and a label wider than the row itself wraps inside it
+  // rather than pushing the sheet sideways.
+  return touch
+    ? { minHeight: sxRem(SEQUENCE_METRICS.touchTarget), flex: '1 1 max-content', minWidth: 0, maxWidth: '100%' }
+    : {};
 }
 
 export const handleSx: SxProps<Theme> = {
