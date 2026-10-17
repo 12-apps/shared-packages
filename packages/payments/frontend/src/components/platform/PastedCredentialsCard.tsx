@@ -54,7 +54,12 @@ function CredentialInputs({
       value={values[key]}
       autoComplete={secret ? 'new-password' : 'off'}
       onChange={(event) => onChange({ ...values, [key]: event.target.value })}
-      slotProps={{ htmlInput: { 'data-testid': `connect-pasted-${key}` } }}
+      // Shrunk for good: the names share a long prefix, so an empty field's
+      // placeholder-sized label is cut to the same "PAGBANK_OAUTH_CLIENT…" twice.
+      slotProps={{
+        inputLabel: { shrink: true },
+        htmlInput: { 'data-testid': `connect-pasted-${key}` },
+      }}
     />
   ));
 }
