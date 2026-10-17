@@ -143,9 +143,10 @@ interface ActivationCallbacks {
  * provider's page and gives up at `pollTimeoutMs` (ten minutes by default).
  *
  * Where it is recorded: the origin host's realtime doc ("Allowed exceptions")
- * and the decision record that superseded its 0071 with it. If activation
- * ever becomes webhook-only, this relaxes to the channel exactly as the
- * checkout's waits did (FUT-649) and the exception goes away.
+ * and a decision record that amends ADR 0071 with it. This bounded third-party
+ * wait is an amendment to that ADR, not a supersession: 0071 still stands for
+ * every other wait. If activation ever becomes webhook-only, this relaxes to
+ * the channel exactly as the checkout's waits did and the exception goes away.
  *
  * The give-up is a `failed` state carrying the host's own sentence, because the
  * wording is load-bearing: the charge is STILL valid, and an owner who has

@@ -113,6 +113,21 @@ describe('the settings screen on the host channel', () => {
     await waitFor(() => expect(reads()).toBe(2));
   });
 
+  it('adds no read when the channel is already live at mount', async () => {
+    const { client, reads } = fakeClient(view('UNVERIFIED'));
+    const channel = fakeChannel();
+    render(screenFor(client, channel.signal(true)));
+    await waitFor(() => expect(reads()).toBe(1));
+    await screen.findByTestId('payments-status');
+
+    // Let any effect-driven re-read land before asserting there was none.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(reads()).toBe(1);
+  });
+
   it('re-reads again when the channel comes back after a drop, and not on the drop', async () => {
     const { client, reads } = fakeClient(view('UNVERIFIED'));
     const channel = fakeChannel();
