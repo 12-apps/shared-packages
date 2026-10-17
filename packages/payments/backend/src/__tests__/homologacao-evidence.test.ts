@@ -301,6 +301,10 @@ describe('homologação evidence', () => {
     const byKey = Object.fromEntries(result.record.steps.map((step) => [step.key, step.status]));
     expect(byKey).toMatchObject({ 'connect.authorize': 'FAILED', 'connect.exchange': 'PENDING' });
     expect(w.pagbank.seen.some((call) => call.path === 'POST /oauth2/token')).toBe(false);
+    // The callback line says what actually arrived: an error, never a code.
+    const callback = result.record.steps.find((step) => step.key === 'connect.callback');
+    expect(callback?.observed).toContain('sem code (error=access_denied)');
+    expect(callback?.observed).not.toContain('code (removido)');
   });
 
   it('given a state mismatch, then the code is never exchanged', async () => {

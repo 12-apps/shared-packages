@@ -129,7 +129,11 @@ function authorizeStep(copy: EvidenceOutcomeCopy, callback: SellerCallback, now:
 function callbackStep(copy: EvidenceOutcomeCopy, callback: SellerCallback, now: Date): EvidenceStep {
   return stepOf('connect.callback', callback.code && callback.stateMatched ? 'EXECUTED' : 'FAILED', now, {
     notes: [`GET ${redactUrl(callback.callbackUrl)}`],
-    observed: callback.stateMatched ? copy.callbackReceived(true) : copy.callbackStateMismatch,
+    observed: !callback.stateMatched
+      ? copy.callbackStateMismatch
+      : callback.code
+        ? copy.callbackReceived(true)
+        : copy.callbackWithoutCode(callback.error),
   });
 }
 
