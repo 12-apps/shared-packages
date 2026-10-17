@@ -272,6 +272,14 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/NotificationStatusNotice`
 **Docs**: `src/components/feedback/NotificationStatusNotice/NotificationStatusNotice.md`
 
+### SequenceResolver
+**Purpose**: Resolve a queue of problems one at a time, in one dialog whose body is replaced step by step
+**Use Cases**: A screen's "N problems to solve" (stock limits, purchases, restock, unexplained write-offs), a product's subproducts to restock — any data-sized list of decisions taken in order, where Back must undo the previous answer (not `StackedModal`: no layers; not `Stepper`: the queue is data-sized and shrinks)
+**Features**: Centred `Dialog` from 600px, inset `bottom-sheet` variant below (95% max height, scrolls inside, decorative handle, 44px+ targets); header with Back (awaits the host's `onBack` inverse over a resolved step), the host's step label and close; `Progress` bar; optional intro listing kinds with counts + "all in sequence"; host-rendered step with `primary` / `secondary` (skip by default) / one `tertiary`; end screen from the run's summary; `resolve(promise)` keeps the step busy until the write returns, a rejection shows its message; a live queue that shrinks mid-run never runs past the end; focus to the title on every advance, Esc closes; all copy from the caller
+**Types**: `SequenceResolverProps`, `SequenceItem`, `SequenceStep`, `SequenceStepApi`, `SequenceIntro`, `SequenceDone`, `SequenceSummary`, `SequenceResolverLabels`
+**Location**: `src/components/feedback/SequenceResolver`
+**Docs**: `src/components/feedback/SequenceResolver/SequenceResolver.md`
+
 ### Sonner
 **Purpose**: Display toast notifications with Sonner library
 **Use Cases**: Success messages, error notifications, quick feedback
