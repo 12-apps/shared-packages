@@ -18,10 +18,11 @@
  * settings page behind.
  *
  * **`prepareConnect`, `selectedProvider` / `onProviderChange`,
- * `initialProvider`, `onChanged`.** The OAuth CSRF state is minted against
+ * `initialProvider`, `onChanged`, `live`.** The OAuth CSRF state is minted against
  * the host's admin session; which provider is open may live in the host's
  * URL. Both are the host's, per render, and a factory that froze them would
- * make the page uncontrollable.
+ * make the page uncontrollable. `live` is the host's realtime channel, whose
+ * status changes from render to render (FUT-648).
  */
 
 import type { ComponentType, JSX } from "react";
@@ -31,6 +32,9 @@ import {
   type PaymentProviderSettingsProps,
 } from "../components/PaymentProviderSettings";
 import type { PaymentsSettingsClient } from "../client";
+
+/** The `live` prop's shape — the host's channel, see `../components/settings-live`. */
+export type { PaymentsSettingsLiveSignal } from "../components/settings-live";
 
 /** What a host binds ONCE: the settings port. */
 export interface PaymentsSettingsWebConfig {

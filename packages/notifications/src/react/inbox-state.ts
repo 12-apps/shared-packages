@@ -25,14 +25,13 @@ export const PAGE_SIZE = 20;
 export const BADGE_POLL_MS = 60_000;
 
 /**
- * The badge's interval while a realtime connection is live.
+ * The badge's interval beside a factory-time `subscribe` whose status nobody
+ * states (`BadgeSyncOptions.live` left undefined).
  *
- * Five minutes, not "never": this is the reconcile that catches an event the bus
- * dropped, and it costs one COUNT per open tab per five minutes. Deliberately
- * far slower than an operational screen's — a bell badge is ambient, and the
- * arrival that matters is pushed within milliseconds anyway. The poll does NOT
- * stop, which is the standing contract: a dropped event must cost latency and
- * never correctness.
+ * Five minutes: the reconcile that catches an event the bus dropped, for a host
+ * that cannot say whether its subscription is up. A host that DOES say — `live`
+ * — gets the fallback rule instead: no timer while live, a re-read on
+ * every (re)open of the channel, and the {@link BADGE_POLL_MS} poll while down.
  */
 export const BADGE_RECONCILE_MS = 300_000;
 

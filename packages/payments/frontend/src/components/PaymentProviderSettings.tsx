@@ -21,6 +21,7 @@ import {
   type ProviderChangeHandler,
 } from './settings-state';
 import { openSection, SetupGuideSection } from './SetupGuideSection';
+import { useSettingsLive, type PaymentsSettingsLiveSignal } from './settings-live';
 import type { PaymentsSettingsCopy } from './settings-copy';
 import { PaymentsSettingsCopyProvider } from './settings-copy-context';
 
@@ -102,6 +103,16 @@ export interface PaymentProviderSettingsProps {
    * its history ({@link ProviderChangeHandler}).
    */
   onProviderChange?: ProviderChangeHandler;
+  /**
+   * The host's realtime channel for this store's payment settings (FUT-648).
+   *
+   * A hint re-reads the view, and so does every (re)connect: an OAuth grant
+   * completed in another tab, a colleague's save, a webhook settling the
+   * activation charge all reach this screen without a reload. Omit it and the
+   * screen reads on mount and after its own actions, exactly as before — it
+   * keeps no timer either way. See {@link PaymentsSettingsLiveSignal}.
+   */
+  live?: PaymentsSettingsLiveSignal;
   /**
    * The activation step, rendered under the connection card.
    *
@@ -299,8 +310,10 @@ export function PaymentProviderSettings({
   selectedProvider,
   onProviderChange,
   renderVerification,
+  live,
 }: PaymentProviderSettingsProps) {
   const { view, error, reload } = useSettingsState(client);
+  useSettingsLive(live, () => void reload());
   const { selected, setSelected } = useSelectedProvider(
     initialProvider,
     selectedProvider,
