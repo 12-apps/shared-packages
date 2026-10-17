@@ -74,6 +74,17 @@ function suffixOf(environment: PaymentEnvironment): string {
   return environment === 'PRODUCTION' ? '_PROD' : '';
 }
 
+/** What {@link envOAuthAppValues} found: the values, and which came from a fallback. */
+export interface OAuthAppValues {
+  values: Record<string, string>;
+  /**
+   * Fields read from the UNSUFFIXED name for a production lookup (extras fall
+   * back — see the module doc). An operator looking at `PAGBANK_TOKEN_PROD`
+   * must be told it is unset and the sandbox-or-shared value is standing in.
+   */
+  inherited: string[];
+}
+
 /**
  * Every value the naming convention finds for one provider and environment —
  * the same lookup as {@link envOAuthAppCredentials}, WITHOUT its strict refusal.
@@ -86,13 +97,14 @@ function suffixOf(environment: PaymentEnvironment): string {
 export function envOAuthAppValues(
   env: Readonly<Record<string, string | undefined>>,
   options: EnvOAuthAppOptions = {},
-): (provider: string, environment: PaymentEnvironment) => Record<string, string> {
+): (provider: string, environment: PaymentEnvironment) => OAuthAppValues {
   const extras = options.extras ?? DEFAULT_OAUTH_APP_EXTRAS;
 
   return (provider, environment) => {
     const prefix = provider.toUpperCase();
     const suffix = suffixOf(environment);
     const fields: Record<string, string> = {};
+    const inherited: string[] = [];
     // STRICT — no unsuffixed fallback. See the module doc for what a fallback
     // would authorize.
     const clientId = env[`${prefix}_OAUTH_CLIENT_ID${suffix}`];
@@ -100,10 +112,13 @@ export function envOAuthAppValues(
     if (clientId) fields.clientId = clientId;
     if (clientSecret) fields.clientSecret = clientSecret;
     for (const [name, field] of Object.entries(extras)) {
-      const value = env[`${prefix}_${name}${suffix}`] ?? env[`${prefix}_${name}`];
-      if (value) fields[field] = value;
+      const own = env[`${prefix}_${name}${suffix}`];
+      const value = own ?? env[`${prefix}_${name}`];
+      if (!value) continue;
+      fields[field] = value;
+      if (own === undefined && suffix !== '') inherited.push(field);
     }
-    return fields;
+    return { values: fields, inherited };
   };
 }
 
@@ -121,7 +136,7 @@ export function envOAuthAppCredentials(
   const valuesOf = envOAuthAppValues(env, options);
 
   return (provider, environment): ResolvedCredentials | null => {
-    const fields = valuesOf(provider, environment);
+    const fields = valuesOf(provider, environment).values;
     // The pair is required; extras are not.
     if (!fields.clientId || !fields.clientSecret) return null;
     return { environment, fields };

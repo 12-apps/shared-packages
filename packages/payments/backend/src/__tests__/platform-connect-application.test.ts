@@ -7,6 +7,7 @@ import {
 } from '../platform/connect-application';
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
 import { PT_BR_CONNECT_APPLICATION_COPY } from '../platform/pt-BR';
+import type { OAuthAppValues } from '../config/oauth-env';
 
 /**
  * The Connect-application consult (FUT-479, packaged by FUT-573). Pinned:
@@ -252,11 +253,13 @@ describe('credential previews — the first five characters, never the value', (
       clientId: 'sandb',
       clientSecret: 'sandb',
       accountToken: 'accou',
+      inherited: [],
     });
     expect(production?.credentialPreview).toEqual({
       clientId: null,
       clientSecret: null,
       accountToken: null,
+      inherited: [],
     });
     expect(JSON.stringify(report)).not.toMatch(/sandbox-secret-value|account-token-value/);
   });
@@ -266,8 +269,10 @@ describe('credential previews — the first five characters, never the value', (
 
     const report = await consultConnectApplications({
       appCredentials: () => null,
-      previewValues: (_provider, env): Record<string, string> =>
-        env === 'PRODUCTION' ? { clientSecret: 'prod-secret-only' } : {},
+      previewValues: (_provider, env): OAuthAppValues =>
+        env === 'PRODUCTION'
+          ? { values: { clientSecret: 'prod-secret-only', accountToken: 'shared-tok' }, inherited: ['accountToken'] }
+          : { values: {}, inherited: [] },
       expectedRedirectUri: EXPECTED,
       copy: PT_BR_CONNECT_APPLICATION_COPY,
     });
@@ -277,7 +282,9 @@ describe('credential previews — the first five characters, never the value', (
     expect(production?.credentialPreview).toEqual({
       clientId: null,
       clientSecret: 'prod-',
-      accountToken: null,
+      accountToken: 'share',
+      // A fallback value is flagged so a screen does not show it as _PROD's own.
+      inherited: ['accountToken'],
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -314,7 +321,38 @@ describe('consultPastedConnectApplication', () => {
       clientId: 'app-p',
       clientSecret: 'paste',
       accountToken: 'paste',
+      inherited: [],
     });
     expect(JSON.stringify(result)).not.toMatch(/pasted-secret|pasted-token/);
+  });
+
+  it('answers a refused pasted consult with the reason, previews intact and no value echoed', async () => {
+    stubFetch(jsonResponse({ error: 'invalid_token' }, 401));
+
+    const result = await consultPastedConnectApplication(depsFor('both', {}), {
+      environment: 'SANDBOX',
+      clientId: 'app-sbx-1',
+      clientSecret: 'pasted-secret',
+      accountToken: 'pasted-token',
+    });
+
+    expect(result.status.application).toBeNull();
+    expect(result.status.error).toContain('401');
+    expect(result.status.credentialPreview.accountToken).toBe('paste');
+    expect(JSON.stringify(result)).not.toMatch(/pasted-secret|pasted-token/);
+  });
+
+  it('answers an unreachable PagBank without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('fetch failed'))));
+
+    const result = await consultPastedConnectApplication(depsFor('both', {}), {
+      environment: 'PRODUCTION',
+      clientId: 'app-prod-1',
+      clientSecret: 'pasted-secret',
+      accountToken: 'pasted-token',
+    });
+
+    expect(result.status.error).toBe(PT_BR_CONNECT_APPLICATION_COPY.unreachable);
+    expect(result.status.configured).toBe(true);
   });
 });

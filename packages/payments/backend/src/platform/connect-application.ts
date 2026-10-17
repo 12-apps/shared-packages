@@ -1,4 +1,5 @@
 import type { OAuthAppCredentialsResolver } from '../config/oauth';
+import type { OAuthAppValues } from '../config/oauth-env';
 import type { PaymentEnvironment } from '../core/types';
 import { pagbankApiBase } from '../providers/pagbank-api-base';
 
@@ -64,6 +65,12 @@ export interface ConnectCredentialPreview {
   clientId: string | null;
   clientSecret: string | null;
   accountToken: string | null;
+  /**
+   * Fields whose preview is a FALLBACK value — e.g. production's account token
+   * read from the unsuffixed name because its own is unset. A screen must not
+   * show it under the production variable's name as if that were set.
+   */
+  inherited?: ('clientId' | 'clientSecret' | 'accountToken')[];
 }
 
 /** One environment's application, as the deployment can see it. */
@@ -109,9 +116,11 @@ export interface ConsultConnectApplicationsDeps {
    * Every value the host holds per environment, for the PREVIEW only — so a
    * half-set id/secret pair, which `appCredentials` rightly resolves to `null`,
    * still shows the half that is set. Env-var hosts pass `envOAuthAppValues`.
-   * Omitted, the preview reads `appCredentials`' own fields.
+   * It must read the SAME source as `appCredentials`, or the preview describes
+   * credentials other than the ones consulted. Omitted, the preview reads
+   * `appCredentials`' own fields.
    */
-  previewValues?: (provider: string, environment: PaymentEnvironment) => Record<string, string>;
+  previewValues?: (provider: string, environment: PaymentEnvironment) => OAuthAppValues;
   /** The OAuth callback this deployment answers on — what must be registered. */
   expectedRedirectUri: string;
   /** Override the consult origin per environment. Defaults to PagBank's hosts. */
@@ -214,14 +223,18 @@ function previewOf(value: string | undefined): string | null {
   return value ? value.slice(0, PREVIEW_LENGTH) : null;
 }
 
-/** The preview of whatever fields an environment holds. */
+const PREVIEWED = ['clientId', 'clientSecret', 'accountToken'] as const;
+
+/** The preview of whatever fields an environment holds, and which of them are inherited. */
 function previewCredentials(
   fields: Readonly<Record<string, string | undefined>> | undefined,
+  inherited: readonly string[] = [],
 ): ConnectCredentialPreview {
   return {
     clientId: previewOf(fields?.clientId),
     clientSecret: previewOf(fields?.clientSecret),
     accountToken: previewOf(fields?.accountToken),
+    inherited: PREVIEWED.filter((field) => inherited.includes(field) && fields?.[field]),
   };
 }
 
@@ -263,7 +276,8 @@ function previewFor(
   environment: PaymentEnvironment,
   resolved: Readonly<Record<string, string>> | undefined,
 ): ConnectCredentialPreview {
-  return previewCredentials(deps.previewValues?.(PROVIDER, environment) ?? resolved);
+  const own = deps.previewValues?.(PROVIDER, environment);
+  return own ? previewCredentials(own.values, own.inherited) : previewCredentials(resolved);
 }
 
 /**

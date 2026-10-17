@@ -153,13 +153,26 @@ describe('envOAuthAppValues — what is set, for showing an operator', () => {
 
     expect(envOAuthAppCredentials(bag)('pagbank', 'PRODUCTION')).toBeNull();
     expect(envOAuthAppValues(bag)('pagbank', 'PRODUCTION')).toEqual({
-      clientSecret: 'prod-secret',
-      // Extras fall back exactly as the resolver reads them.
-      accountToken: 'shared-token',
+      values: {
+        clientSecret: 'prod-secret',
+        // Extras fall back exactly as the resolver reads them…
+        accountToken: 'shared-token',
+      },
+      // …and say so, so nobody reads it as PAGBANK_TOKEN_PROD being set.
+      inherited: ['accountToken'],
     });
   });
 
   it('keeps the pair strict: no sandbox id under a production lookup', () => {
-    expect(envOAuthAppValues(SANDBOX_ONLY)('pagbank', 'PRODUCTION')).toEqual({});
+    expect(envOAuthAppValues(SANDBOX_ONLY)('pagbank', 'PRODUCTION')).toEqual({
+      values: {},
+      inherited: [],
+    });
+  });
+
+  it('never marks a sandbox value as inherited: the unsuffixed name IS its own', () => {
+    const bag = { ...SANDBOX_ONLY, PAGBANK_TOKEN: 'sandbox-token' };
+
+    expect(envOAuthAppValues(bag)('pagbank', 'SANDBOX').inherited).toEqual([]);
   });
 });
