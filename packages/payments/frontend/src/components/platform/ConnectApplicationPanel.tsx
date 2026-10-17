@@ -3,11 +3,17 @@
 import { Box, Button, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
-import type { ConnectApplicationReport, PaymentEnvironment } from '@12-apps/payments-backend';
+import type {
+  ConnectApplicationReport,
+  ConnectApplicationStatus,
+  PastedConnectCredentials,
+  PaymentEnvironment,
+} from '@12-apps/payments-backend';
 
-import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
+import { CARD_SX, ConnectEnvironmentCard, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
+import { PastedCredentialsCard } from './PastedCredentialsCard';
 
 /**
  * The platform's PagBank Connect application, per environment (FUT-479,
@@ -41,9 +47,17 @@ export interface ConnectApplicationPanelProps {
   /**
    * Which host-side variables feed one environment's application — the host's
    * own configuration surface, rendered as a collapsible per-environment help
-   * when provided.
+   * when provided. ORDER MATTERS: the first three name the client id, the
+   * client secret and the account token, in that order — the credential
+   * preview and the paste fields are labelled by position.
    */
   configVarsFor?: (environment: PaymentEnvironment) => string[];
+  /**
+   * Consult with PASTED credentials — the host's mounted call to the backend's
+   * `consultPastedConnectApplication`, resolving to the status it answered.
+   * Omitted, the paste block is not rendered.
+   */
+  onConsultPasted?: (pasted: PastedConnectCredentials) => Promise<ConnectApplicationStatus>;
   /** Every word this panel and its environment cards render. REQUIRED. */
   copy: PlatformHomologacaoCopy;
 }
@@ -57,12 +71,12 @@ export function ConnectApplicationPanel(props: ConnectApplicationPanelProps): Re
 }
 
 function ConnectApplicationBody(props: ConnectApplicationPanelProps): ReactNode {
-  const { report, onRefresh, configVarsFor } = props;
+  const { report, onRefresh, configVarsFor, onConsultPasted } = props;
   const copy = usePlatformCopy().connect;
   return (
     <Stack spacing={2} data-testid="connect-application-panel">
       <Stack spacing={0.5} data-testid="connect-expected-redirect" sx={CARD_SX}>
-        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+        <Typography variant="caption" fontWeight={600}>
           {copy.expectedRedirectHeading}
         </Typography>
         <Box
@@ -79,6 +93,9 @@ function ConnectApplicationBody(props: ConnectApplicationPanelProps): ReactNode 
           configVars={configVarsFor?.(status.environment)}
         />
       ))}
+      {onConsultPasted ? (
+        <PastedCredentialsCard onConsult={onConsultPasted} configVarsFor={configVarsFor} />
+      ) : null}
       {onRefresh ? (
         <Box>
           <Button
@@ -86,6 +103,7 @@ function ConnectApplicationBody(props: ConnectApplicationPanelProps): ReactNode 
             size="small"
             onClick={() => onRefresh()}
             data-testid="connect-refresh"
+            sx={TAP_SX}
           >
             {copy.consultAgain}
           </Button>

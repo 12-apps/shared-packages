@@ -74,6 +74,54 @@ function suffixOf(environment: PaymentEnvironment): string {
   return environment === 'PRODUCTION' ? '_PROD' : '';
 }
 
+/** What {@link envOAuthAppValues} found: the values, and which came from a fallback. */
+export interface OAuthAppValues {
+  values: Record<string, string>;
+  /**
+   * Fields read from the UNSUFFIXED name for a production lookup (extras fall
+   * back — see the module doc). An operator looking at `PAGBANK_TOKEN_PROD`
+   * must be told it is unset and the sandbox-or-shared value is standing in.
+   */
+  inherited: string[];
+}
+
+/**
+ * Every value the naming convention finds for one provider and environment —
+ * the same lookup as {@link envOAuthAppCredentials}, WITHOUT its strict refusal.
+ *
+ * Only for showing an operator what is set: a half-set pair (an id with no
+ * secret) resolves to `null` above, which is right for authorizing and useless
+ * for diagnosing — this reports the half that is there. Never hand its result
+ * to anything that authorizes.
+ */
+export function envOAuthAppValues(
+  env: Readonly<Record<string, string | undefined>>,
+  options: EnvOAuthAppOptions = {},
+): (provider: string, environment: PaymentEnvironment) => OAuthAppValues {
+  const extras = options.extras ?? DEFAULT_OAUTH_APP_EXTRAS;
+
+  return (provider, environment) => {
+    const prefix = provider.toUpperCase();
+    const suffix = suffixOf(environment);
+    const fields: Record<string, string> = {};
+    const inherited: string[] = [];
+    // STRICT — no unsuffixed fallback. See the module doc for what a fallback
+    // would authorize.
+    const clientId = env[`${prefix}_OAUTH_CLIENT_ID${suffix}`];
+    const clientSecret = env[`${prefix}_OAUTH_CLIENT_SECRET${suffix}`];
+    if (clientId) fields.clientId = clientId;
+    if (clientSecret) fields.clientSecret = clientSecret;
+    for (const [name, field] of Object.entries(extras)) {
+      const own = env[`${prefix}_${name}${suffix}`];
+      const value = own ?? env[`${prefix}_${name}`];
+      if (!value) continue;
+      fields[field] = value;
+      if (own === undefined && suffix !== '') inherited.push(field);
+    }
+    return { values: fields, inherited };
+  };
+}
+
 /**
  * Build the resolver over an environment bag.
  *
@@ -85,23 +133,12 @@ export function envOAuthAppCredentials(
   env: Readonly<Record<string, string | undefined>>,
   options: EnvOAuthAppOptions = {},
 ): OAuthAppCredentialsResolver {
-  const extras = options.extras ?? DEFAULT_OAUTH_APP_EXTRAS;
+  const valuesOf = envOAuthAppValues(env, options);
 
   return (provider, environment): ResolvedCredentials | null => {
-    const prefix = provider.toUpperCase();
-    const suffix = suffixOf(environment);
-
-    // STRICT — no unsuffixed fallback. See the module doc for what a fallback
-    // would authorize.
-    const clientId = env[`${prefix}_OAUTH_CLIENT_ID${suffix}`];
-    const clientSecret = env[`${prefix}_OAUTH_CLIENT_SECRET${suffix}`];
-    if (!clientId || !clientSecret) return null;
-
-    const fields: Record<string, string> = { clientId, clientSecret };
-    for (const [name, field] of Object.entries(extras)) {
-      const value = env[`${prefix}_${name}${suffix}`] ?? env[`${prefix}_${name}`];
-      if (value) fields[field] = value;
-    }
+    const fields = valuesOf(provider, environment).values;
+    // The pair is required; extras are not.
+    if (!fields.clientId || !fields.clientSecret) return null;
     return { environment, fields };
   };
 }

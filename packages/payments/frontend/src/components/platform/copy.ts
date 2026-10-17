@@ -102,6 +102,32 @@ export interface ConnectApplicationCopy {
   hideConfig: string;
   /** The heading above whatever extra keys PagBank's response carried. */
   extraKeys: string;
+  /** Each card's heading — the environment, in the operator's words. */
+  environmentLabels: Readonly<Record<'SANDBOX' | 'PRODUCTION', string>>;
+  /**
+   * The preview of the values an application was consulted with: a heading,
+   * what an unset value reads as, and each value's name when the host names no
+   * configuration variables of its own (`configVarsFor`).
+   */
+  previewHeading: string;
+  previewUnset: string;
+  /** A value read from a fallback variable (production's token from the unsuffixed name). */
+  previewInherited: string;
+  credentialNames: { clientId: string; clientSecret: string; accountToken: string };
+  /** The block that consults with PASTED credentials — rendered only when the host wires it. */
+  pasted: {
+    heading: string;
+    /** Must say the values are not stored: the operator is pasting secrets. */
+    lede: string;
+    environment: string;
+    submit: string;
+    failed: string;
+    /**
+     * The consult authenticates with the account token and looks up the client
+     * id; the secret is never sent. The answer must not read as "all three are good".
+     */
+    secretNotChecked: string;
+  };
 }
 
 /** The whole platform surface, in one object a host passes at the mount. */

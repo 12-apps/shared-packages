@@ -72,7 +72,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     // operator compares the two strings character by character.
     redirectMatches: 'The registered redirect_uri matches the callback this deploy uses.',
     redirectDiffers:
-      'The redirect_uri registered with PagBank differs from the callback this deploy uses.',
+      'The redirect_uri registered with PagBank differs from the callback this deploy uses. The OAuth authorization flow fails silently until the registration is fixed at PagBank.',
     redirectUnreported:
       "PagBank's response carried no redirect_uri, so it could not be compared with the callback.",
     fields: {
@@ -85,9 +85,25 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     fieldEmpty: '—',
     redirectNotReported: 'not reported',
     resolvedFrom:
-      "This environment's application is resolved strictly from these variables, with no fallback between environments:",
+      "This environment's application is resolved from these variables. The client_id and client_secret are strict, with no fallback between environments; the others, such as the token, fall back to the unsuffixed variable when this environment's own is unset:",
     showConfig: 'Show environment variables',
     hideConfig: 'Hide environment variables',
-    extraKeys: 'Other fields returned',
+    extraKeys: 'Other fields returned (undocumented schema)',
+    environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Production' },
+    previewHeading: 'First 5 characters of each variable',
+    previewUnset: 'not set',
+    previewInherited: 'not set — uses the unsuffixed variable:',
+    // `client_id` / `client_secret` are PagBank's own parameter names.
+    credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'account token' },
+    pasted: {
+      heading: 'Test other credentials',
+      lede:
+        "Paste an application's credentials to look it up at PagBank before changing the environment variables. The values are used for this lookup only and are not saved.",
+      environment: 'Environment',
+      submit: 'Look up with these credentials',
+      failed: 'The pasted credentials could not be looked up.',
+      secretNotChecked:
+        'PagBank does not check the client_secret in this lookup — only the client_id and the token. A wrong client_secret only shows at the first store authorization.',
+    },
   },
 };
