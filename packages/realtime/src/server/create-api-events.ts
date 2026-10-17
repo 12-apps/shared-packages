@@ -1,14 +1,10 @@
 import {
-  MAX_TICKET_TOPICS,
-  mintRealtimeTicket,
-  TICKET_TTL_SECONDS,
-} from "../core/ticket";
-import {
-  configureRealtime,
-  getRealtimeDriver,
-  stopRealtime,
-} from "../core/runtime";
-import type { RealtimeDriver, RealtimeLogger } from "../core/types";
+  PresenceTracker,
+  subscribePresence,
+  type PresenceChange,
+} from "../core/presence";
+import { configureRealtime, stopRealtime } from "../core/runtime";
+import type { RealtimeDriver, RealtimeLogger, Unsubscribe } from "../core/types";
 
 import { ConnectionLedger } from "./connections";
 import {
@@ -16,22 +12,14 @@ import {
   type RealtimeOutbox,
   type RealtimeOutboxOptions,
 } from "./outbox";
-import { DEFAULT_MAX_TOPICS_PER_CONNECTION, parseTopicList } from "./registry";
 import { resolveRealtimeDriver } from "./resolve-driver";
-import { createEventStreamResponse } from "./sse";
+import { streamRoute, ticketRoute, type RouteDeps } from "./routes";
 import { createTicketSecretResolver, type TicketSecretSource } from "./ticket-secret";
-import {
-  EventsDenial,
-  isEventsDenial,
-  resolveEventsCopy,
-  type EventsCopySource,
-  type EventsAuthorization,
-  type EventsMessages,
-  type EventsRequestContext,
-  type EventsRoute,
-  type EventsRouteResult,
-  type EventsSurfaceConfig,
-  type EventsTopicSpec,
+import type {
+  EventsCopySource,
+  EventsMessages,
+  EventsRoute,
+  EventsSurfaceConfig,
 } from "./types";
 
 /**
@@ -113,6 +101,23 @@ export interface EventsServerConfig {
    * off and calls `closeAllStreams()` + `stop()` itself.
    */
   installSignalHooks?: boolean;
+  /**
+   * Hear presence changes (`../core/presence.ts`): a key a surface's `authorize`
+   * handed a connection is `held` while any connection holding it is open —
+   * announced on open and renewed from the server while it stays open — and
+   * `released` when the last one closes. Every holder reports here, the gateway
+   * processes and this process's own SSE streams alike, through the bus.
+   *
+   * Give it in every API process that should WRITE presence; leave it out where
+   * none should (the listener is the only thing it turns on — connections hold
+   * their keys either way). Handlers must be idempotent: a renewal repeats a
+   * `held`, and every listening process hears every change.
+   */
+  presence?: {
+    onChange: (change: PresenceChange) => void | Promise<void>;
+    /** Renewal cadence for THIS process's SSE streams; default `PRESENCE_RENEW_MS`. */
+    renewMs?: number;
+  };
 }
 
 export interface EventsApi {
@@ -132,184 +137,56 @@ export interface EventsApi {
   connections: ConnectionLedger;
   /** The outbox drain — present exactly when `config.outbox` was given. */
   outbox: RealtimeOutbox | null;
-}
-
-function denialResult(error: unknown): EventsRouteResult {
-  if (isEventsDenial(error)) {
-    return { status: error.status, body: { error: error.message } };
-  }
-  throw error;
-}
-
-/** Parse the surface's topic list out of the query, per its own rules. */
-function specsFor(
-  surface: EventsSurfaceConfig,
-  query: Record<string, string | undefined>,
-  messages: EventsMessages,
-): EventsTopicSpec[] {
-  if (surface.topicsQuery === false) return [];
-  const raw = query.topics;
-  if (!raw) throw new EventsDenial(400, messages.invalidTopics);
-  return parseTopicList(
-    raw,
-    { domains: surface.domains, qualifiedDomains: surface.qualifiedDomains },
-    surface.maxTopicsPerConnection ?? DEFAULT_MAX_TOPICS_PER_CONNECTION,
-    messages,
-  );
-}
-
-/**
- * Everything the two route builders need, resolved once per factory. Passed rather than
- * closed over so each builder is a module-scope function the size gate can measure on its
- * own — and so the surfaces cannot accidentally share mutable state.
- */
-interface RouteDeps {
-  logger: RealtimeLogger;
-  connections: ConnectionLedger;
-  ticketSecret: () => string | null;
-  /**
-   * The SOURCE, unresolved. Holding a value here is what would re-freeze the
-   * language into the factory — `deps` is built once, per process.
-   */
-  messages: EventsCopySource<EventsMessages>;
-}
-
-/**
- * Authorize one request. EVERY topic is authorized before anything streams or is signed;
- * the seam throws `EventsDenial` for a refusal, and anything else is a host bug that
- * propagates as a 500 through the adapter.
- */
-async function authorizeRequest(
-  surface: EventsSurfaceConfig,
-  context: EventsRequestContext,
-  messages: EventsMessages,
-): Promise<EventsAuthorization> {
-  const specs = specsFor(surface, context.query, messages);
-  return surface.authorize({ params: context.params, specs, request: context.request });
-}
-
-function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute {
-  return {
-    method: "GET",
-    path: surface.path,
-    surface: surface.name,
-    kind: "stream",
-    handle: async (context): Promise<EventsRouteResult> => {
-      // Resolved here, per request, from the tag the adapter put on the
-      // context — never in the factory, which ran once at boot.
-      const messages = resolveEventsCopy(deps.messages, context.locale);
-      let granted: EventsAuthorization;
-      try {
-        granted = await authorizeRequest(surface, context, messages);
-      } catch (error) {
-        return denialResult(error);
-      }
-
-      // After auth, deliberately: "realtime is off" is not information an unauthorized
-      // caller should be able to collect.
-      if (!getRealtimeDriver()) return { status: 503, body: { error: messages.unavailable } };
-
-      // A stream subscribed to nothing is the LYING channel FUT-657 exists to prevent: it
-      // opens, reports `connected`, heartbeats an empty topic list and the consumer
-      // relaxes its poll on the strength of it. Refusing is the honest answer, and the
-      // client's own heartbeat check would reach the same conclusion a beat later anyway.
-      if (granted.topics.length === 0) {
-        deps.logger.error(`surface "${surface.name}" authorized zero topics; refusing the stream.`);
-        return { status: 503, body: { error: messages.unavailable } };
-      }
-
-      const release = deps.connections.acquire(granted.subjectId);
-      if (!release) {
-        return {
-          status: 429,
-          body: { error: surface.tooManyMessage ?? messages.tooMany },
-        };
-      }
-
-      try {
-        const response = await createEventStreamResponse({
-          topics: granted.topics,
-          onClose: release,
-          streams: deps.connections,
-        });
-        return { response };
-      } catch (error) {
-        release();
-        throw error;
-      }
-    },
-  };
-}
-
-function ticketRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute {
-  return {
-    // POST because it MINTS a credential: it must never be cached, prefetched or
-    // replayed out of a browser history entry.
-    method: "POST",
-    path: `${surface.path}/ticket`,
-    surface: surface.name,
-    kind: "json",
-    handle: async (context): Promise<EventsRouteResult> => {
-      // Per request, exactly as the stream route does: the two transports must
-      // not disagree about the language any more than about the authorization.
-      const messages = resolveEventsCopy(deps.messages, context.locale);
-      let granted: EventsAuthorization;
-      try {
-        // The identical authorization the stream route performs, so the two transports
-        // can never disagree about who may watch what.
-        granted = await authorizeRequest(surface, context, messages);
-      } catch (error) {
-        return denialResult(error);
-      }
-
-      const secret = deps.ticketSecret();
-      if (!secret) return { status: 503, body: { error: messages.unavailable } };
-
-      // A ticket travels in a query string, so the signed payload caps its topic list
-      // (`MAX_TICKET_TOPICS`). `maxTopicsPerConnection` bounds the SPECS, not the resolved
-      // names — a host whose `authorize` fans one spec out into several topics can exceed
-      // it — and `mintRealtimeTicket` throws on that. Answered here rather than allowed to
-      // become a 500 out of a crypto helper, and answered as `unavailable`: the honest
-      // thing to tell a client is "no socket for you", which is exactly the state its SSE
-      // fallback handles.
-      if (granted.topics.length === 0 || granted.topics.length > MAX_TICKET_TOPICS) {
-        deps.logger.error(
-          `surface "${surface.name}" authorized ${granted.topics.length} topics; a ticket ` +
-            `carries 1..${MAX_TICKET_TOPICS}. The WebSocket transport is unavailable for ` +
-            `this connection; the client falls back to SSE.`,
-        );
-        return { status: 503, body: { error: messages.unavailable } };
-      }
-
-      return {
-        status: 200,
-        body: {
-          data: {
-            ticket: mintRealtimeTicket(granted.topics, secret),
-            expiresInSeconds: TICKET_TTL_SECONDS,
-          },
-        },
-      };
-    },
-  };
+  /** The presence keys this process's streams hold — for tests and health readouts. */
+  presence: PresenceTracker;
 }
 
 /**
  * End open streams cleanly on a deploy: clients see EOF and reconnect to the new process;
  * the bus connections are released after.
  */
-function installShutdownHooks(connections: ConnectionLedger, logger: RealtimeLogger): void {
+function installShutdownHooks(
+  connections: ConnectionLedger,
+  presence: PresenceTracker,
+  logger: RealtimeLogger,
+): void {
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
     process.once(signal, () => {
       connections.closeAllStreams();
-      void stopRealtime().catch((error) => logger.error("shutdown failed:", error));
+      // The streams' own releases have already been sent; this waits for them,
+      // so a deploy tells every host the people it dropped instead of leaving
+      // them to lapse at the end of their lease.
+      void presence
+        .releaseAll()
+        .then(() => stopRealtime())
+        .catch((error) => logger.error("shutdown failed:", error));
     });
+  }
+}
+
+/**
+ * Install the host's presence listener once the driver is up — and only where the
+ * host asked for one. Answered with its unsubscribe, or `null`.
+ */
+async function listenForPresence(
+  config: EventsServerConfig,
+  logger: RealtimeLogger,
+): Promise<Unsubscribe | null> {
+  if (!config.presence) return null;
+  try {
+    return await subscribePresence(config.presence.onChange, logger);
+  } catch (error) {
+    // Never fatal: presence is a latency optimisation like every hint, and a
+    // listener that could not subscribe leaves the host on its own lease.
+    logger.error("could not listen for presence changes:", error);
+    return null;
   }
 }
 
 export function createApiEvents(config: EventsServerConfig): EventsApi {
   const logger = config.logger ?? console;
   const connections = new ConnectionLedger({ logger, cap: config.connectionCap });
+  const presence = new PresenceTracker({ renewMs: config.presence?.renewMs, logger });
   const deps: RouteDeps = {
     logger,
     connections,
@@ -317,9 +194,13 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     // Carried unresolved. Each handler resolves against its own request's
     // locale, which is the whole reason the field takes a resolver at all.
     messages: config.messages,
+    presence,
   };
   const outbox = config.outbox ? createRealtimeOutbox({ ...config.outbox, logger }) : null;
-  const state = { started: false };
+  const state: { started: boolean; unlisten: Unsubscribe | null } = {
+    started: false,
+    unlisten: null,
+  };
 
   return {
     routes: config.surfaces.flatMap((surface) => [
@@ -328,6 +209,7 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     ]),
     connections,
     outbox,
+    presence,
 
     async start(): Promise<void> {
       if (state.started) return;
@@ -336,12 +218,17 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
       const driver = config.driver ?? (await resolveRealtimeDriver(logger));
       if (!driver) return;
       configureRealtime({ driver, logger });
+      state.unlisten = await listenForPresence(config, logger);
 
-      if (config.installSignalHooks !== false) installShutdownHooks(connections, logger);
+      if (config.installSignalHooks !== false) installShutdownHooks(connections, presence, logger);
     },
 
     async stop(): Promise<void> {
       connections.closeAllStreams();
+      // Released and PUBLISHED before the bus goes, for the gateway's reason.
+      await presence.releaseAll();
+      await state.unlisten?.().catch(() => undefined);
+      state.unlisten = null;
       await stopRealtime();
       state.started = false;
     },

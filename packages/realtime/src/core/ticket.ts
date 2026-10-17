@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
+import { isValidPresenceList } from "./presence-keys";
 import { isValidTopic } from "./topics";
 
 /**
@@ -77,6 +78,18 @@ interface TicketPayload {
    * signature as the identity, which is exactly as unique as the payload was.
    */
   n?: string;
+  /**
+   * The presence keys the connection holds while it is open (`./presence.ts`),
+   * chosen by the minting host's `authorize` — never by the browser. Absent on a
+   * connection that holds none, and on a ticket minted before presence existed.
+   */
+  p?: string[];
+}
+
+/** What a mint may add beside the topics. */
+export interface MintTicketOptions {
+  /** Presence keys to hold for as long as the connection is open (`./presence.ts`). */
+  presence?: readonly string[];
 }
 
 /** A verified ticket's contents. */
@@ -89,6 +102,12 @@ export interface RealtimeTicket {
    * CALLER: the ticket carries none, by design.
    */
   id: string;
+  /**
+   * The presence keys this connection holds while open — empty when it holds
+   * none. Bound to the HANDSHAKE ticket only: a mid-connection `subscribe`
+   * widens topics and never changes what the connection holds.
+   */
+  presence: string[];
 }
 
 function base64url(input: Buffer | string): string {
@@ -123,15 +142,24 @@ export function mintRealtimeTicket(
   topics: readonly string[],
   secret: string,
   nowSeconds: number = Math.floor(Date.now() / 1000),
+  options: MintTicketOptions = {},
 ): string {
   if (!secret) throw new Error("a realtime ticket secret is required");
   if (topics.length === 0 || topics.length > MAX_TICKET_TOPICS) {
     throw new Error("a realtime ticket must carry between 1 and 16 topics");
   }
+  if (topics.some(isReservedTopic)) {
+    throw new Error("a realtime ticket cannot carry a reserved ($) topic");
+  }
+  const presence = options.presence ?? [];
+  if (!isValidPresenceList(presence)) {
+    throw new Error("a realtime ticket's presence keys are malformed or too many");
+  }
   const payload: TicketPayload = {
     t: [...topics],
     e: nowSeconds + TICKET_TTL_SECONDS,
     n: randomBytes(12).toString("base64url"),
+    ...(presence.length > 0 ? { p: [...presence] } : {}),
   };
   const body = base64url(JSON.stringify(payload));
   return `${body}.${sign(body, secret)}`;
@@ -168,7 +196,20 @@ function isUsablePayload(payload: TicketPayload, nowSeconds: number): boolean {
   if (!Array.isArray(payload.t) || typeof payload.e !== "number") return false;
   if (payload.e <= nowSeconds) return false;
   if (payload.t.length === 0 || payload.t.length > MAX_TICKET_TOPICS) return false;
-  return payload.t.every((topic) => typeof topic === "string" && isValidTopic(topic));
+  if (payload.p !== undefined && !isValidPresenceList(payload.p)) return false;
+  return payload.t.every(
+    (topic) => typeof topic === "string" && isValidTopic(topic) && !isReservedTopic(topic),
+  );
+}
+
+/**
+ * A `$…` name is the PACKAGE's own channel — `$gateway` control frames, the
+ * `$presence` bus — and never a subscription. A ticket naming one would hand a
+ * browser every presence change in the deployment, so it is refused at the mint
+ * and again at the verify, whatever the signature says.
+ */
+function isReservedTopic(topic: string): boolean {
+  return topic.startsWith("$");
 }
 
 /**
@@ -202,7 +243,13 @@ export function verifyRealtimeTicket(
     // exactly as unique as its payload was — so single-use enforcement is no
     // WEAKER for it, only coarser.
     id: typeof payload.n === "string" && payload.n ? payload.n : parts.signature,
+    presence: presenceOf(payload),
   };
+}
+
+/** The keys a verified payload holds — none for a ticket that named none. */
+function presenceOf(payload: TicketPayload): string[] {
+  return payload.p ? [...payload.p] : [];
 }
 
 /**

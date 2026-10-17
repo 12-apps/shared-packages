@@ -105,6 +105,18 @@ export interface EventsAuthorization {
   subjectId: string;
   /** Fully-qualified topic names, e.g. `tenant:<id>:kitchen:<station>`. */
   topics: readonly string[];
+  /**
+   * Presence keys this connection HOLDS for as long as it is open
+   * (`../core/presence.ts`) — at most `MAX_PRESENCE_KEYS`, printable, no
+   * whitespace, not starting with `$`. Built by the host from ids it resolved,
+   * exactly like `topics`: the browser never names one, so nobody can hold a key
+   * that is not theirs. Omit it (the default) and the connection holds none.
+   *
+   * Signed into the ticket for the WebSocket wire and held by the stream itself
+   * on SSE, so a host hears the same `held`/`released` whichever wire the
+   * browser lands on (`EventsServerConfig.presence`).
+   */
+  presence?: readonly string[];
 }
 
 /** One subscribe surface: a pair of routes (stream + ticket) under one path. */

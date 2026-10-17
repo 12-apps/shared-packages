@@ -45,6 +45,11 @@ useQuery({ /* … */ refetchInterval: reconcileRefetchInterval(status, POLL_MS, 
   never handed over is never subscribed to, so a gateway bug can break the socket but cannot
   leak another tenant's events.
 
+**Presence follows the connection.** A surface's `authorize` may name presence keys; the process
+holding the connection announces them `held` while it is open (renewed from the server) and
+`released` when it closes, and the API's `presence.onChange` hears every holder — no heartbeat
+poll in any browser. See ADOPTING.md, "Presence".
+
 The outbox is the one durable exception to "best-effort", and its guarantee is stated plainly:
 exactly-once persistence, **at-least-once publish with idempotent consumers**, no total order.
 See ADOPTING.md — it is not exactly-once and does not pretend to be.

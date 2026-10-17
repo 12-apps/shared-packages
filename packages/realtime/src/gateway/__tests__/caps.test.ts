@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PresenceTracker } from "../../core/presence";
 import { configureRealtime, resetRealtimeRuntime } from "../../core/runtime";
 import { mintRealtimeTicket, TicketReplayGuard } from "../../core/ticket";
 import { createInlineRealtimeDriver } from "../../drivers/inline";
@@ -172,6 +173,7 @@ function gateway(max: number, options: { defer?: boolean; caps?: CapLedger<Gatew
     wss: fakeWss(connections, options.defer),
     logger: silentLogger,
     caps: options.caps ?? new CapLedger<GatewaySocket>(),
+    presence: new PresenceTracker({ logger: silentLogger }),
   };
   const upgrade = (topics: string[], ticket = mintRealtimeTicket(topics, SECRET)) => {
     const raw = rawSocket();
@@ -269,6 +271,7 @@ describe("the upgrade respects the class bound", () => {
         wss: fakeWss(connections),
         logger: silentLogger,
         caps: new CapLedger<GatewaySocket>(),
+        presence: new PresenceTracker({ logger: silentLogger }),
       },
       {
         url: `/ws?ticket=${encodeURIComponent(mintRealtimeTicket(["tenant:c1:catalog"], SECRET))}`,

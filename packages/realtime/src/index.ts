@@ -58,3 +58,18 @@ export type {
   InlinePublishRecord,
   InlineRealtimeDriver,
 } from "./drivers/inline";
+
+// Presence that lasts as long as a connection (`./core/presence.ts`): a surface's
+// `authorize` names the keys, whichever process holds the socket announces them,
+// and the API's `presence.onChange` hears every holder.
+export {
+  isValidPresenceKey,
+  isValidPresenceList,
+  MAX_PRESENCE_KEYS,
+  PRESENCE_RENEW_MS,
+  PRESENCE_TOPIC,
+  PresenceTracker,
+  presenceChangesOf,
+  subscribePresence,
+} from "./core/presence";
+export type { PresenceChange, PresenceTrackerOptions } from "./core/presence";
