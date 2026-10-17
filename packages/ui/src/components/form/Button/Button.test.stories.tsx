@@ -98,10 +98,13 @@ export const LoadingStateTest: Story = {
       await expect(spinner).toBeInTheDocument();
     });
 
-    await step('Verify text is replaced by spinner', async () => {
+    await step('Verify the spinner covers the label without taking its name', async () => {
       const button = canvas.getByTestId('loading-button');
-      // Text should not be visible when loading
-      await expect(button).not.toHaveTextContent('Loading Button');
+      // FUT-3646: the label stays in the accessibility tree, only transparent,
+      // so the button keeps its name and its width while it loads.
+      await expect(canvas.getByRole('button', { name: 'Loading Button' })).toBe(button);
+      await expect(button).toHaveAttribute('aria-busy', 'true');
+      await expect(canvas.getByText('Loading Button')).toHaveStyle({ opacity: '0' });
     });
   },
 };

@@ -101,6 +101,26 @@ const muiColorFor = (color: NonNullable<ButtonProps['color']>): MuiButtonColor =
 const iconGlyphStyle = (theme: Theme) => ({ fontSize: rem(theme, BUTTON_ICON_GLYPH_SIZE) });
 
 /**
+ * The label while the button loads (FUT-3646): still in the DOM and in the
+ * accessibility tree, only transparent. The spinner used to REPLACE it, which
+ * left the button with no accessible name — a screen reader on it heard just
+ * "button, dimmed" — and let it shrink to the spinner's width mid-press.
+ *
+ * `opacity`, never `visibility: hidden` or `display: none`: those two take the
+ * text out of the accessibility tree, which is the bug again.
+ */
+const LOADING_LABEL_STYLE: React.CSSProperties = { opacity: 0 };
+
+/** The spinner, centred over the label it stands in for. */
+const LOADING_SPINNER_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+/**
  * An icon and nothing else — the shape that should render square.
  *
  * A separate predicate rather than three clauses inline: the component function
@@ -188,6 +208,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         pulse={pulse}
         ripple={ripple}
         disabled={disabled || loading}
+        aria-busy={loading ? true : undefined}
         disableRipple={!ripple}
         startIcon={iconPosition === 'left' ? iconWithTestId : undefined}
         endIcon={iconPosition === 'right' ? iconWithTestId : undefined}
@@ -200,7 +221,12 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={mergedClassName}
       >
         {loading ? (
-          <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
+          <>
+            <span style={LOADING_LABEL_STYLE}>{children}</span>
+            <span style={LOADING_SPINNER_STYLE}>
+              <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
+            </span>
+          </>
         ) : (
           children
         )}
