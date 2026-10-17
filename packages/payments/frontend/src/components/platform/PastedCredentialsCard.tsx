@@ -9,7 +9,7 @@ import type {
   PaymentEnvironment,
 } from '@12-apps/payments-backend';
 
-import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
+import { CARD_SX, ConnectEnvironmentCard, TAP_SX } from './ConnectEnvironmentCard';
 import { usePlatformCopy } from './copy-context';
 
 /**
@@ -147,6 +147,7 @@ export function PastedCredentialsCard({
             disabled={!complete || consult.pending}
             onClick={() => consult.run(trimmed)}
             data-testid="connect-pasted-submit"
+            sx={TAP_SX}
           >
             {copy.pasted.submit}
           </Button>

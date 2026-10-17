@@ -28,6 +28,9 @@ export const CARD_SX = {
   p: 2,
 } as const;
 
+/** A small button that is still a 40px tap target on a phone. */
+export const TAP_SX = { minHeight: { xs: 40, sm: 'auto' } } as const;
+
 function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <Box
@@ -166,6 +169,7 @@ function ConfigHelp({
         size="small"
         onClick={() => setOpen((value) => !value)}
         data-testid={`connect-config-toggle-${environment}`}
+        sx={TAP_SX}
       >
         {open ? copy.hideConfig : copy.showConfig}
       </Button>

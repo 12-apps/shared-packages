@@ -10,7 +10,7 @@ import type {
   PaymentEnvironment,
 } from '@12-apps/payments-backend';
 
-import { CARD_SX, ConnectEnvironmentCard } from './ConnectEnvironmentCard';
+import { CARD_SX, ConnectEnvironmentCard, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
 import { PastedCredentialsCard } from './PastedCredentialsCard';
@@ -101,6 +101,7 @@ function ConnectApplicationBody(props: ConnectApplicationPanelProps): ReactNode 
             size="small"
             onClick={() => onRefresh()}
             data-testid="connect-refresh"
+            sx={TAP_SX}
           >
             {copy.consultAgain}
           </Button>
