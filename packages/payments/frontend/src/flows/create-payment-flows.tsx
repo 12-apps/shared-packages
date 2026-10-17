@@ -68,6 +68,16 @@ function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
   };
 }
 
+/** The host's confirmation slots, as `CheckoutFlow` takes them. */
+function confirmationProps(confirmation: PaymentFlowsConfig["confirmation"]) {
+  return {
+    confirmationExtra: confirmation?.extra,
+    confirmationHero: confirmation?.hero,
+    confirmationFooter: confirmation?.footer,
+    backActionEmphasis: confirmation?.backActionEmphasis,
+  };
+}
+
 /** The host's one-list Pagamento (FUT-3591), when it opted in — a hook, read every render. */
 function useHostPaymentList(runtime: FlowsRuntime) {
   return runtime.config.usePaymentList?.();
@@ -111,8 +121,7 @@ function buildCheckout(
         settlement={settlement ?? hostSettlement}
         providerConfig={config}
         tenantSlug={tenantSlug}
-        confirmationExtra={runtime.config.confirmation?.extra}
-        confirmationHero={runtime.config.confirmation?.hero}
+        {...confirmationProps(runtime.config.confirmation)}
         validateApplePayMerchant={ports.validateApplePayMerchant}
         paymentList={paymentList}
       />

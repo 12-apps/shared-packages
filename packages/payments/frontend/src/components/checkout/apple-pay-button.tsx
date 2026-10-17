@@ -68,7 +68,7 @@ export interface ApplePaySessionClass {
 }
 
 /** The native constructor, where Safari (or a harness) provides one. */
-function applePaySessionClass(): ApplePaySessionClass | null {
+export function applePaySessionClass(): ApplePaySessionClass | null {
   if (typeof window === "undefined") return null;
   const scope = window as unknown as { ApplePaySession?: ApplePaySessionClass };
   return scope.ApplePaySession ?? null;
@@ -89,8 +89,8 @@ export function applePaySupported(): boolean {
   }
 }
 
-/** The sheet's payment request, from the server-authoritative order total. */
-function paymentRequest(order: CheckoutOrder, copy: ApplePayCopy): ApplePayPaymentRequest {
+/** The sheet's payment request, priced at `cents` — the amount the charge will ask for. */
+function paymentRequest(cents: number, copy: ApplePayCopy): ApplePayPaymentRequest {
   return {
     countryCode: "BR",
     currencyCode: "BRL",
@@ -99,12 +99,23 @@ function paymentRequest(order: CheckoutOrder, copy: ApplePayCopy): ApplePayPayme
     // The one line Apple's own sheet renders from us, so it is the host's
     // (FUT-760) — the rest of that sheet is Apple's, in the buyer's own
     // system language.
-    total: { label: copy.orderTotal, amount: (order.totalCents / 100).toFixed(2) },
+    total: { label: copy.orderTotal, amount: (cents / 100).toFixed(2) },
   };
 }
 
 export interface ApplePayButtonProps {
-  order: CheckoutOrder;
+  /**
+   * The raised order the sheet is priced from (`order.totalCents`) — the tabs
+   * layout's case. Give `totalCents` instead where no order exists yet.
+   */
+  order?: CheckoutOrder;
+  /**
+   * The amount the sheet shows, in integer cents, when no order exists yet —
+   * the one list's case (FUT-3685): the session must start INSIDE the tap, so
+   * it is priced with the host's amount due and the order is raised in
+   * parallel. Wins over `order`.
+   */
+  totalCents?: number;
   /**
    * The payment authorized on the sheet — charge this key. Resolves `true`
    * when the charge was accepted (paid, or confirming), `false` on a refusal,
@@ -123,40 +134,65 @@ export interface ApplePayButtonProps {
   validateMerchant?: (validationURL: string) => Promise<unknown>;
 }
 
-/** Wire one session run. Split from the component for the size gate. */
-function runSession(
-  Session: ApplePaySessionClass,
-  order: CheckoutOrder,
-  handlers: ApplePayButtonProps,
-  copy: ApplePayCopy,
-): void {
-  const session = new Session(APPLE_PAY_VERSION, paymentRequest(order, copy));
+/** What one started session hands back: the wallet key, and the way to close the sheet. */
+interface ApplePaySheet {
+  /** Apple's `token.paymentData`, serialized verbatim — or `null` when the buyer closed the sheet. */
+  answer: Promise<string | null>;
+  /** Close the sheet with the charge's honest outcome. */
+  complete: (accepted: boolean) => void;
+}
+
+/**
+ * Start ONE Apple Pay session, SYNCHRONOUSLY — call it from inside the buyer's
+ * tap, which Safari requires for `new ApplePaySession(…).begin()`. Priced at
+ * `cents`; the merchant is validated through the host's port, server-side.
+ * A validation that cannot run aborts the session and reports why through
+ * `onError` (the answer then resolves `null`).
+ */
+export function startApplePaySession(input: {
+  Session: ApplePaySessionClass;
+  cents: number;
+  copy: ApplePayCopy;
+  validateMerchant: ((validationURL: string) => Promise<unknown>) | undefined;
+  onError: (message: string) => void;
+}): ApplePaySheet {
+  const { Session, copy } = input;
+  const session = new Session(APPLE_PAY_VERSION, paymentRequest(input.cents, copy));
+  let settle: (key: string | null) => void = () => undefined;
+  const answer = new Promise<string | null>((resolve) => {
+    settle = resolve;
+  });
+  const fail = (message: string): void => {
+    session.abort();
+    settle(null);
+    input.onError(message);
+  };
   session.onvalidatemerchant = (event) => {
-    const validate = handlers.validateMerchant;
-    if (!validate) {
-      session.abort();
-      handlers.onError(copy.cannotStart);
-      return;
-    }
+    const validate = input.validateMerchant;
+    if (!validate) return fail(copy.cannotStart);
     validate(event.validationURL)
       .then((merchantSession) => session.completeMerchantValidation(merchantSession))
-      .catch(() => {
-        session.abort();
-        handlers.onError(copy.cannotComplete);
-      });
+      .catch(() => fail(copy.cannotComplete));
   };
-  session.onpaymentauthorized = (event) => {
-    // Apple's `token.paymentData`, serialized VERBATIM — PagBank's `key`.
-    const key = JSON.stringify(event.payment.token.paymentData);
-    void handlers.onAuthorized(key).then((accepted) => {
-      session.completePayment({
-        status: accepted ? Session.STATUS_SUCCESS : Session.STATUS_FAILURE,
-      });
-    });
-  };
+  // Apple's `token.paymentData`, serialized VERBATIM — PagBank's `key`.
+  session.onpaymentauthorized = (event) => settle(JSON.stringify(event.payment.token.paymentData));
   // Closing the sheet is a choice, not a failure to report.
-  session.oncancel = () => undefined;
+  session.oncancel = () => settle(null);
   session.begin();
+  const complete = (accepted: boolean): void =>
+    session.completePayment({ status: accepted ? Session.STATUS_SUCCESS : Session.STATUS_FAILURE });
+  return { answer, complete };
+}
+
+/** One session run for the button: charge the authorized key, then close the sheet honestly. */
+function runSession(Session: ApplePaySessionClass, handlers: ApplePayButtonProps, copy: ApplePayCopy): void {
+  const cents = handlers.totalCents ?? handlers.order?.totalCents;
+  if (cents === undefined) return;
+  const sheet = startApplePaySession({ Session, cents, copy, validateMerchant: handlers.validateMerchant, onError: handlers.onError });
+  void sheet.answer.then(async (key) => {
+    if (key === null) return;
+    sheet.complete(await handlers.onAuthorized(key));
+  });
 }
 
 /**
@@ -180,7 +216,7 @@ export function ApplePayButton(props: ApplePayButtonProps): JSX.Element | null {
       type="button"
       aria-label={copy.payAction}
       data-testid="apple-pay-button"
-      onClick={() => runSession(Session, current.current.order, current.current, copy)}
+      onClick={() => runSession(Session, current.current, copy)}
       sx={{
         WebkitAppearance: "-apple-pay-button",
         // Apple draws the button; these only give it room. The fallback

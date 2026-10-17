@@ -12,6 +12,12 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     hintNew: "Enter your card details",
   },
   googlePay: { label: "Google Pay", hint: "With the card saved in your Google account" },
+  wallets: {
+    heading: "Quick payment",
+    googlePay: "Pay with Google Pay",
+    applePay: "Pay with Apple Pay",
+    or: "or choose how to pay",
+  },
   handOff: {
     label: "Pix or card",
     hint: (provider) =>
@@ -25,6 +31,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     name: "Name",
     email: "Email",
     why: (provider) => (provider ? `(${provider} asks for it to pay in the app)` : "(needed to pay in the app)"),
+    cpfHint: (provider) => (provider ? `${provider} asks for it to pay in the app` : "needed to pay in the app"),
     cpfIncomplete: "A CPF has 11 digits.",
     phoneIncomplete: "The mobile number needs the area code and 9 digits.",
   },

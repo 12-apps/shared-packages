@@ -26,6 +26,12 @@ export interface GooglePaymentsClient {
     onClick: () => void;
     buttonSizeMode?: string;
     buttonLocale?: string;
+    /** "black" | "white" | "default" — Google's own palette for its button. */
+    buttonColor?: string;
+    /** "pay", "buy", "plain"… — which of Google's labels it draws. */
+    buttonType?: string;
+    /** The corner radius Google draws, in CSS pixels (Google's own parameter). */
+    buttonRadius?: number;
   }): HTMLElement;
   loadPaymentData(request: Record<string, unknown>): Promise<GooglePaymentData>;
 }

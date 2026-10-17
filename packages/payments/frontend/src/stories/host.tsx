@@ -104,6 +104,9 @@ export interface StoryHost {
   onNavigate?: (url: string) => void;
   confirmationExtra?: ReactNode;
   confirmationHero?: ReactNode;
+  /** Content after the paid screen's actions, and whether the way out leads it. */
+  confirmationFooter?: ReactNode;
+  backActionEmphasis?: "primary" | "secondary";
   tenantSlug?: string;
   /**
    * What the `/config` read does, for the two states a live mount cannot be
@@ -122,6 +125,8 @@ export interface StoryHost {
   useCart?: () => Partial<CheckoutCartView>;
   /** The host refuses to raise the payable at all — the screen's own error panel. */
   refuseRaise?: { code: string; message: string };
+  /** Apple Pay merchant validation, answered like a real server would (FUT-472). */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }
 
 const noCart = (): Partial<CheckoutCartView> => ({});
@@ -182,8 +187,8 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     components: host.components,
     copy: { ...STORY_CHECKOUT_COPY, ...host.copy },
     confirmation:
-      host.confirmationExtra || host.confirmationHero
-        ? { extra: host.confirmationExtra, hero: host.confirmationHero }
+      host.confirmationExtra || host.confirmationHero || host.confirmationFooter || host.backActionEmphasis
+        ? { extra: host.confirmationExtra, hero: host.confirmationHero, footer: host.confirmationFooter, backActionEmphasis: host.backActionEmphasis }
         : undefined,
     ports: {
       createPayable: (input) =>
@@ -194,6 +199,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
       // leave Storybook, and the point of `HostedHandoff` is that the departure
       // is observable at all.
       navigate: (url) => host.onNavigate?.(url),
+      validateApplePayMerchant: host.validateApplePayMerchant,
       useAvailability: () => host.availability ?? { payable: true },
     },
   });

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
 import { displayTotals } from "../checkout-totals";
-import { usePaymentPixStage } from "../payment-step-layout";
+import type { CheckoutSummaryLine } from "../payment-summary";
+import { useCheckoutLayout, usePaymentPixStage } from "../payment-step-layout";
 import { PixStageProvider } from "../pix-stage";
 import { PixView } from "../pix-view";
 import { HostedLinkScreen } from "../providers/hosted-link";
@@ -13,6 +14,7 @@ import type { useCheckoutController } from "../use-checkout-controller";
 import { PaymentListProvider } from "./context";
 import { ListBar, WaitingLine } from "./list-bar";
 import { ListFace } from "./list-face";
+import { SummaryColumn, SummaryColumnTarget, TwoColumns } from "./summary-column";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
 import type { ListState } from "./use-list-state";
@@ -26,7 +28,15 @@ type Controller = ReturnType<typeof useCheckoutController>;
 interface PaymentListStepProps {
   c: Controller;
   list: CheckoutPaymentList;
-  cart: { totalLabel: string; totalItems: number; identity?: CheckoutBasketIdentity };
+  cart: {
+    totalLabel: string;
+    totalItems: number;
+    identity?: CheckoutBasketIdentity;
+    /** The cart's lines, for the "Resumo do pedido" column on a computer (L4). */
+    lines?: CheckoutSummaryLine[];
+    /** The host's fee and discount rows, for the same column. */
+    discountLines?: ReactNode;
+  };
   /** Settling a balance: its totals win, and its basket is no signal. */
   totalOverride?: { label: string; items: number };
   providerConfig: CheckoutProviderConfig | null | undefined;
@@ -38,6 +48,11 @@ interface PaymentListStepProps {
   /** The Dados step's consent sentence — the list asks it beside the details it asks. */
   consentLabel: string;
   pollIntervalMs?: number;
+  /**
+   * The host's Apple Pay merchant-validation port (FUT-472), server-side.
+   * Without it the list offers no Apple Pay: its session could only abort.
+   */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }
 
 /** The store's provider name, as its chain head published it — `null` when it did not. */
@@ -81,12 +96,13 @@ function usePreferMethod(c: Controller, choose: ListState["choose"]): (method: P
 }
 
 /** The list face, with what the step gathered for it. */
-function ListFaceFor({ props, state, charge, cap, onHandOff }: {
+function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
   props: PaymentListStepProps;
   state: ListState;
   charge: ListCharge;
   cap: ListCapability;
   onHandOff: () => void;
+  reveal: { revealed: boolean; onRevealCpf: () => void };
 }): JSX.Element {
   const { c, cart, totalOverride } = props;
   const config = props.providerConfig ?? null;
@@ -106,7 +122,35 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
       pollIntervalMs={props.pollIntervalMs ?? 2500}
       saveBuyerContact={props.saveBuyerContact}
       onHandOff={onHandOff}
+      revealed={reveal.revealed}
+      onRevealCpf={reveal.onRevealCpf}
     />
+  );
+}
+
+/**
+ * On a computer (FUT-3685, L4): the step beside the "Resumo do pedido"
+ * column, into which the bar's content goes. On a phone: the step alone, over
+ * the host's bar (L2).
+ */
+function Layout({ props, children }: { props: PaymentListStepProps; children: ReactNode }): JSX.Element {
+  const wide = useCheckoutLayout()?.wide ?? false;
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const target = useMemo(() => ({ element: slot }), [slot]);
+  if (!wide) return <>{children}</>;
+  const { cart, totalOverride } = props;
+  const column = (
+    <SummaryColumn
+      lines={totalOverride ? undefined : cart.lines}
+      moneyLines={cart.discountLines}
+      totalLabel={displayTotals(totalOverride, cart).label}
+      slot={setSlot}
+    />
+  );
+  return (
+    <SummaryColumnTarget value={target}>
+      <TwoColumns steps={children} column={column} />
+    </SummaryColumnTarget>
   );
 }
 
@@ -122,7 +166,9 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
 export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
-  const cap = useListCapability(config, list.totalCents);
+  const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant);
+  const [revealed, setRevealed] = useState(false);
+  const reveal = useMemo(() => ({ revealed, onRevealCpf: () => setRevealed(true) }), [revealed]);
   const state = useListState({
     config,
     capability: cap,
@@ -132,6 +178,8 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     taxIdOnFile: props.taxIdOnFile,
     lastMethod: list.lastMethod,
     onChoiceChange: list.onChoiceChange,
+    wallets: cap.wallets,
+    revealed,
   });
   const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });
   const [handingOff, startHandOff] = useHandingOff(c.createError);
@@ -146,7 +194,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   ) : handingOff ? (
     <HandOffFace props={props} method={c.method ?? "PIX"} />
   ) : (
-    <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} />
+    <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
   );
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
@@ -159,7 +207,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
           basket={props.totalOverride ? undefined : props.cart.identity}
           actionInBar={Boolean(pix)}
         >
-          {face}
+          <Layout props={props}>{face}</Layout>
         </CartChangedBoundary>
       </PixStageProvider>
     </PaymentListProvider>

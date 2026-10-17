@@ -6,11 +6,15 @@
  * fail-closed) and the DEVICE feature-detect (`ApplePaySession` exists and
  * `canMakePayments()`), which is the half Google Pay does not have.
  *
+ * The store opens on the ONE list (FUT-3685), dressed as the origin host's
+ * storefront: the button is in "PAGAMENTO RÁPIDO", the session is created
+ * inside the tap, priced at the amount due, and the order is raised behind it.
+ *
  * Two cases, and the device gate is why they are cases of one page:
  *
  *   - `no-device` (the DEFAULT, deliberately first): no `ApplePaySession`
  *     anywhere — every non-Safari browser, this harness's own included. The
- *     fallback rule is the subject: no button, and the card form still sells.
+ *     fallback rule is the subject: no button, and the card row still sells.
  *   - `device`: a deterministic `ApplePaySession` stub installed DURING the
  *     case's render, before any button can feature-detect. Render-scoped, not
  *     module-scoped like the Google stub, because here the global's absence
@@ -24,76 +28,27 @@
 import type { JSX, ReactNode } from 'react';
 
 import { checkoutCase, mintable, MountedCheckout } from '../payments/cases';
+import type { HarnessHost } from '../payments/host';
 import { CaseTabs, PageIntro } from '../payments/panel';
 import type { HarnessStoreSpec } from '../payments/store';
+import { STOREFRONT_CART_CENTS } from '../payments/storefront-look';
+import { installApplePayStub, validateHarnessApplePayMerchant } from '../payments/wallet-stubs';
 
 /** One chain entry declaring CARD plus the Apple Pay wallet. */
 const STORE: HarnessStoreSpec = {
+  amountCents: STOREFRONT_CART_CENTS,
   chain: [mintable('aurora', ['CARD'], { wallets: ['APPLE_PAY'] })],
 };
 
-/** The host half: merchant validation answered like a real server would. */
-const HOST = {
-  validateApplePayMerchant: async (): Promise<unknown> => ({ merchantSession: 'harness' }),
+/** The host half: merchant validation answered like a real server would, on the one list. */
+const HOST: HarnessHost = {
+  storefront: true,
+  validateApplePayMerchant: validateHarnessApplePayMerchant,
 };
-
-/** The payment-request slice the stub inspects. */
-interface StubPaymentRequest {
-  supportedNetworks?: readonly string[];
-}
-
-/**
- * A deterministic `ApplePaySession`: validates the merchant as soon as the
- * sheet opens, then authorizes with a fixed `token.paymentData` — the same
- * order Safari drives, synchronously so no scenario ever waits on a timer.
- */
-class StubApplePaySession {
-  static readonly STATUS_SUCCESS = 0;
-  static readonly STATUS_FAILURE = 1;
-  static canMakePayments(): boolean {
-    return true;
-  }
-
-  onvalidatemerchant: ((event: { validationURL: string }) => void) | null = null;
-  onpaymentauthorized:
-    | ((event: { payment: { token: { paymentData: unknown } } }) => void)
-    | null = null;
-  oncancel: (() => void) | null = null;
-
-  private readonly request: StubPaymentRequest;
-
-  constructor(_version: number, request: StubPaymentRequest) {
-    this.request = request;
-  }
-
-  begin(): void {
-    this.onvalidatemerchant?.({ validationURL: 'https://apple.example/validate' });
-  }
-
-  abort(): void {
-    // Nothing to tear down — the stub keeps no timers.
-  }
-
-  completeMerchantValidation(): void {
-    this.onpaymentauthorized?.({
-      payment: {
-        token: {
-          // The networks the sheet was asked for, echoed into the opaque
-          // payload so a spec could pin the Visa/Mastercard-only constraint.
-          paymentData: { stub: true, networks: this.request.supportedNetworks ?? [] },
-        },
-      },
-    });
-  }
-
-  completePayment(): void {
-    // The pane's own polling reports the outcome; nothing to record here.
-  }
-}
 
 /** Install the stub during render — before any child can feature-detect. */
 function WithApplePayDevice({ children }: { children: ReactNode }): ReactNode {
-  (window as { ApplePaySession?: unknown }).ApplePaySession = StubApplePaySession;
+  installApplePayStub();
   return children;
 }
 
@@ -116,10 +71,11 @@ export function PaymentsCheckoutApplePayPage(): JSX.Element {
   return (
     <>
       <PageIntro title="Checkout · Apple Pay (wallet)">
-        One provider declaring CARD plus the <code>APPLE_PAY</code> wallet. The stubbed
-        session&apos;s <code>token.paymentData</code> crosses the flat <code>/charge</code> wire as{' '}
-        <code>wallet: {'{ type, key }'}</code>; without <code>ApplePaySession</code> the button never
-        renders and the card form still sells.
+        One provider declaring CARD plus the <code>APPLE_PAY</code> wallet, on the ONE list. The
+        session starts inside the tap; its stubbed <code>token.paymentData</code> crosses the flat{' '}
+        <code>/charge</code> wire as <code>wallet: {'{ type, key }'}</code>; without{' '}
+        <code>ApplePaySession</code> there is no &quot;Pagamento rápido&quot; and the card row
+        still sells.
       </PageIntro>
       <CaseTabs cases={CASES} />
     </>

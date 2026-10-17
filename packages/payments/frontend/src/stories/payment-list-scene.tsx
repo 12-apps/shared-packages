@@ -82,7 +82,7 @@ function useDemoDoor(): CheckoutDoorOption[] {
 /** The cart's two prices — the second after "Adicionar um item". */
 export const CART_CENTS = { before: 2700, after: 3400 };
 
-function useDemoList(withDoor: boolean, totalCents: number | undefined): CheckoutPaymentList {
+function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDueLabel: string | undefined): CheckoutPaymentList {
   const door = useDemoDoor();
   const { held, bumped } = useContext(Controls);
   return useMemo(
@@ -97,8 +97,9 @@ function useDemoList(withDoor: boolean, totalCents: number | undefined): Checkou
       door: withDoor ? door : [],
       hold: held ? { action: "Loja pausada", reason: "A loja pausou os pedidos por alguns minutos." } : null,
       ...(totalCents === undefined ? {} : { totalCents: bumped ? CART_CENTS.after : totalCents }),
+      ...(amountDueLabel ? { amountDueLabel } : {}),
     }),
-    [door, withDoor, held, bumped, totalCents],
+    [door, withDoor, held, bumped, totalCents, amountDueLabel],
   );
 }
 
@@ -109,11 +110,11 @@ function useDemoCart(): Partial<CheckoutCartView> {
   return { totalLabel: brlLabel(cents), totalItems: bumped ? 3 : 2, identity: { signature: bumped ? "x1|3" : "x1|2", ready: true } };
 }
 
-/** The host's chrome around the step: page, 512px column, the step card. */
-function HostFrame({ controls, children }: { controls: ReactNode; children: ReactNode }): JSX.Element {
+/** The host's chrome around the step: page, 512px column (or the computer's whole width), the step card. */
+function HostFrame({ controls, desktop = false, children }: { controls: ReactNode; desktop?: boolean; children: ReactNode }): JSX.Element {
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", px: 2, pt: 2 }}>
-      <Box sx={{ maxWidth: 512, mx: "auto", display: "flex", flexDirection: "column", gap: 1.5 }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", px: desktop ? 8 : 2, pt: desktop ? 4 : 2 }}>
+      <Box sx={{ maxWidth: desktop ? 1152 : 512, mx: "auto", display: "flex", flexDirection: "column", gap: 1.5 }}>
         {controls}
         <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 3, boxShadow: 1, p: 1.75, display: "flex", flexDirection: "column", gap: 1.25 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, typography: "subtitle1", fontWeight: 700 }}>
@@ -146,30 +147,100 @@ interface SceneOptions {
   controls?: boolean;
   /** Install a faked `google.payments.api` for the scene. */
   googlePay?: boolean;
+  /** Install a faked `ApplePaySession` for the scene, and answer the host's merchant validation. */
+  applePay?: boolean;
+  /** A balance the host holds pays part of the cart: what is left, formatted (store credit, E11). */
+  amountDueLabel?: string;
+  /** The computer's layout: the whole width, the "Resumo do pedido" column beside the step (L4). */
+  desktop?: boolean;
 }
 
 export function scene(spec: StorySpec, host: StoryHost, options: SceneOptions = {}): StoryObj {
-  const { withDoor = true, totalCents, controls = false } = options;
+  const { withDoor = true, totalCents, controls = false, desktop = false } = options;
   // The list is the host's HOOK, called inside the checkout on every render —
   // so the door options' own state (the troco answer) reaches the bar.
-  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents);
-  const full: StoryHost = { ...host, usePaymentList, ...(controls ? { useCart: useDemoCart } : {}) };
+  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents, options.amountDueLabel);
+  const full: StoryHost = {
+    ...host,
+    usePaymentList,
+    ...(controls ? { useCart: useDemoCart } : {}),
+    ...(options.applePay ? { validateApplePayMerchant: async () => ({ merchantSession: "story" }) } : {}),
+    cart: { lines: DEMO_LINES, discountLines: DEMO_FEE, ...host.cart },
+  };
   function Scene(): JSX.Element {
     const [state, set] = useState<HostControls>({ bumped: false, held: false });
     const body = (
       <Controls.Provider value={state}>
         <StoryFlow spec={spec} host={full}>
           {(flows) => (
-            <HostFrame controls={controls ? <ControlChips state={state} set={set} /> : null}>
+            <HostFrame controls={controls ? <ControlChips state={state} set={set} /> : null} desktop={desktop}>
               <flows.Checkout />
             </HostFrame>
           )}
         </StoryFlow>
       </Controls.Provider>
     );
-    return options.googlePay ? <WithGooglePay>{body}</WithGooglePay> : body;
+    const withApple = options.applePay ? <WithApplePay>{body}</WithApplePay> : body;
+    return options.googlePay ? <WithGooglePay>{withApple}</WithGooglePay> : withApple;
   }
-  return { render: () => <Scene /> };
+  return { render: () => <Scene />, ...(desktop ? { parameters: { layout: "fullscreen", wide: true } } : {}) };
+}
+
+/** The cart's lines and the delivery fee, as a host words them — what the computer's summary column lists. */
+const DEMO_LINES = [
+  { key: "combo", quantity: 1, name: "Combo", totalLabel: "R$ 15,00" },
+  { key: "suco", quantity: 1, name: "Suco de laranja", totalLabel: "R$ 7,00" },
+];
+const DEMO_FEE = (
+  <Box sx={{ display: "flex", justifyContent: "space-between", typography: "body2" }}>
+    <span>Taxa de entrega</span>
+    <span>R$ 5,00</span>
+  </Box>
+);
+
+/**
+ * Safari's `ApplePaySession`, faked for one scene: the device can pay, the
+ * merchant validates, and the sheet authorises as soon as it opens — so the
+ * story plays the whole run in a browser that has no Apple Pay.
+ */
+class StoryApplePaySession {
+  static readonly STATUS_SUCCESS = 0;
+  static readonly STATUS_FAILURE = 1;
+  static canMakePayments(): boolean {
+    return true;
+  }
+  onvalidatemerchant: ((event: { validationURL: string }) => void) | null = null;
+  onpaymentauthorized: ((event: { payment: { token: { paymentData: unknown } } }) => void) | null = null;
+  oncancel: (() => void) | null = null;
+  private readonly amount: string;
+  constructor(_version: number, request: { total: { amount: string } }) {
+    this.amount = request.total.amount;
+  }
+  begin(): void {
+    this.onvalidatemerchant?.({ validationURL: "https://apple-pay-gateway.apple.com/story" });
+  }
+  abort(): void {}
+  completeMerchantValidation(): void {
+    this.onpaymentauthorized?.({ payment: { token: { paymentData: { story: true, amount: this.amount } } } });
+  }
+  completePayment(): void {}
+}
+
+interface AppleWindow {
+  ApplePaySession?: unknown;
+}
+
+/** Installed during render — before the list's feature-detect — and removed on unmount. */
+function WithApplePay({ children }: { children: ReactNode }): JSX.Element {
+  const scope = window as unknown as AppleWindow;
+  scope.ApplePaySession = StoryApplePaySession;
+  useEffect(() => {
+    scope.ApplePaySession = StoryApplePaySession;
+    return () => {
+      delete scope.ApplePaySession;
+    };
+  }, [scope]);
+  return <>{children}</>;
 }
 
 /**
@@ -182,11 +253,12 @@ class StoryPaymentsClient implements GooglePaymentsClient {
     return Promise.resolve({ result: true });
   }
 
-  createButton(options: { onClick: () => void }): HTMLElement {
+  createButton(options: { onClick: () => void; buttonRadius?: number }): HTMLElement {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "Pagar com Google Pay";
-    button.style.cssText = "width:100%;min-height:52px;border-radius:8px;border:0;background:#000;color:#fff;font:600 16px system-ui";
+    // Google draws its own button; this stand-in only mimics its black pill.
+    button.style.cssText = `width:100%;height:100%;min-height:44px;border-radius:${options.buttonRadius ?? 22}px;border:0;background:#000;color:#fff;font:600 15px system-ui`;
     button.addEventListener("click", options.onClick);
     return button;
   }

@@ -697,8 +697,9 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // ------------------------------------------- PaymentListStates (FUT-3591/3592)
   // The starting points of the harder runs; the visual gate plays the clicks.
   "PaymentListStates/GooglePay": {
-    testIds: ["payment-list", "list-option-GOOGLE_PAY"],
-    text: ["Google Pay"],
+    testIds: ["payment-list", "list-wallets", "list-google-pay"],
+    text: ["Pagamento rápido", "ou escolha como pagar"],
+    absentTestIds: ["list-option-GOOGLE_PAY"],
   },
   "PaymentListStates/StalePix": {
     testIds: ["payment-list", "host-bump-cart", "host-hold"],
@@ -719,5 +720,38 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "PaymentListStates/LongPayerName": {
     testIds: ["payment-list", "list-payer", "list-payer-change"],
     text: ["Maria Aparecida dos Santos"],
+  },
+  // ------------------------------------------- PaymentListWallets (FUT-3685)
+  // The wallet block and the CPF at the top; the visual gate plays the presses.
+  "PaymentListWallets/NoWallet": {
+    testIds: ["payment-list", "list-card-vault_1"],
+    absentTestIds: ["list-wallets", "list-cpf"],
+    absentText: ["Pagamento rápido", "ou escolha como pagar"],
+  },
+  "PaymentListWallets/GoogleOnly": {
+    testIds: ["list-wallets", "list-google-pay"],
+    text: ["Pagamento rápido", "ou escolha como pagar"],
+    absentTestIds: ["list-apple-pay", "list-option-GOOGLE_PAY"],
+  },
+  "PaymentListWallets/BothWallets": {
+    testIds: ["list-wallets", "list-google-pay", "list-apple-pay"],
+  },
+  "PaymentListWallets/CpfMissing": {
+    testIds: ["list-cpf", "list-buyer-taxId", "list-save-profile", "list-wallets", "list-wallets-held"],
+    text: ["CPF", "a aurora pede para pagar pelo app", "Digite seu CPF para pagar pelo app."],
+  },
+  "PaymentListWallets/CpfOnFile": {
+    testIds: ["list-wallets", "list-payer", "list-payer-change"],
+    absentTestIds: ["list-cpf", "list-wallets-held"],
+  },
+  "PaymentListWallets/StoreCredit": {
+    testIds: ["list-wallets", "list-pay"],
+    text: ["R$ 22,00"],
+  },
+  "PaymentListWallets/Desktop": {
+    testIds: ["list-cpf", "list-wallets"],
+  },
+  "PaymentListWallets/DesktopReturning": {
+    testIds: ["list-wallets", "list-card-vault_1"],
   },
 };

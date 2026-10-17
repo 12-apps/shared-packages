@@ -8,6 +8,7 @@ import { PaymentsCheckoutChainFailoverPage } from './payments-checkout-chain-fai
 import { PaymentsCheckoutFailuresPage } from './payments-checkout-failures';
 import { PaymentsCheckoutGooglePayPage } from './payments-checkout-google-pay';
 import { PaymentsCheckoutHeadlessPage } from './payments-checkout-headless';
+import { PaymentsCheckoutListPage } from './payments-checkout-list';
 import { PaymentsCheckoutMethodGatePage } from './payments-checkout-method-gate';
 import { PaymentsCheckoutNoProviderPage } from './payments-checkout-no-provider';
 import { PaymentsCheckoutPixPage } from './payments-checkout-pix';
@@ -75,6 +76,7 @@ export const PAYMENTS_STOREFRONT_PAGES: readonly HarnessPage[] = [
     Component: PaymentsCheckoutGooglePayPage,
   },
   { ...CHECKOUT_FLOW, slug: 'payments-checkout-both', title: 'Both methods', Component: PaymentsCheckoutBothPage },
+  { ...CHECKOUT_FLOW, slug: 'payments-checkout-list', title: 'One list', Component: PaymentsCheckoutListPage },
   {
     ...CHECKOUT_FLOW,
     slug: 'payments-checkout-apple-pay',

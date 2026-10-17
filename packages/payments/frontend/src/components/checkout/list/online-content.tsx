@@ -102,6 +102,7 @@ export function OnlineContent({
   provider,
   failure,
   covered = false,
+  withConsent = true,
 }: {
   method: "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
   asked: readonly CheckoutCustomerField[];
@@ -113,6 +114,8 @@ export function OnlineContent({
   failure: ListChargeFailure | null;
   /** The host's balance pays the whole amount — no chips, no card fields. */
   covered?: boolean;
+  /** Offer "Salvar meus dados…" beside the asked fields — not when the top of Pagamento does. */
+  withConsent?: boolean;
 }): JSX.Element {
   const scope = useRef<HTMLDivElement | null>(null);
   const isCard = method === "CARD" && !covered;
@@ -125,6 +128,7 @@ export function OnlineContent({
         copy={copy.buyer}
         provider={provider}
         onComplete={isCard ? () => focusCardNumber(scope.current) : undefined}
+        withConsent={withConsent}
       />
       {isCard ? <SavedChips card={card} copy={copy} /> : null}
       {isCard && card.selection === NEW_CARD ? (

@@ -24,6 +24,7 @@ import { useMemo, type JSX, type ReactNode } from 'react';
 
 import { brlLabel } from './adapter';
 import { HARNESS_CHECKOUT_COPY } from './checkout-copy';
+import { STOREFRONT_CART, STOREFRONT_SLOTS, useStorefrontPaymentList } from './storefront-look';
 import { createHarnessStore, type HarnessStoreSpec, type HarnessWorld } from './store';
 
 /** The envelope every checkout route answers with. */
@@ -111,6 +112,12 @@ export interface HarnessHost {
    * exercises the abort path.
    */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /**
+   * Dress the checkout as the origin host's storefront does (FUT-3685 child 3):
+   * its `@12-apps/ui` slots and sticky bar, the cart's lines and fee row, and
+   * the ONE list with the door group — see `./storefront-look`.
+   */
+  storefront?: boolean;
 }
 
 /** Wrap the mount's fetch so `/config` can stall or refuse. */
@@ -151,10 +158,13 @@ export function harnessFlowsConfig(
     // answers. A page that re-prefixed it would stop testing that.
     transport: { fetchImpl: withConfigRead(world.fetchImpl, host.configRead) },
     useScope: () => ({ tenantSlug: host.tenantSlug ?? 'loja-harness' }),
-    useCart: () => cartOf(amountCents, host.cart),
+    useCart: () => cartOf(amountCents, host.storefront ? { ...STOREFRONT_CART, ...host.cart } : host.cart),
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useComanda: () => host.comanda ?? null,
-    components: host.components,
+    components: host.components ?? (host.storefront ? STOREFRONT_SLOTS : undefined),
+    // The one list, read as a hook every render, as the origin host's entrega mounts it.
+    // A door send places nothing here: the harness has no pedido to raise at the door.
+    ...(host.storefront ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined) } : {}),
     // Required now, and stated by THIS host in its own words. It used to be
     // omitted, which meant rendering the package's pt-BR default — another
     // product's restaurant vocabulary — while claiming to be an independent

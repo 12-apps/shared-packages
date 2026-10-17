@@ -15,7 +15,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { err, ok } from "../../../result";
-import type { ApplePayPaymentRequest } from "../apple-pay-button";
+import { ApplePayButton, type ApplePayPaymentRequest } from "../apple-pay-button";
 import { CheckoutClientProvider } from "../client-context";
 import type { CheckoutClient } from "../transport";
 import type {
@@ -293,5 +293,30 @@ describe("ApplePayButton — the session", () => {
     await waitFor(() => expect(world.sessions[0]?.aborted).toBe(true));
     await screen.findByTestId("wallet-sheet-error");
     expect(walletCharges).toHaveLength(0);
+  });
+});
+
+describe("ApplePayButton — with no order yet (FUT-3685)", () => {
+  it("is priced from `totalCents` and starts the session inside the click, before any order exists", async () => {
+    const world = installApplePay(true);
+    const keys: string[] = [];
+    render(
+      <ApplePayButton
+        totalCents={2200}
+        onAuthorized={async (key) => {
+          keys.push(key);
+          return true;
+        }}
+        onError={() => undefined}
+        validateMerchant={async () => ({ merchant: "session" })}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("apple-pay-button"));
+    // Synchronous: no await stands between the click and the session.
+    expect(world.sessions).toHaveLength(1);
+    expect(world.sessions[0]?.begun).toBe(true);
+    expect(world.requests[0]?.total.amount).toBe("22.00");
+    await waitFor(() => expect(world.sessions[0]?.completions).toEqual([{ status: 0 }]));
+    expect(keys).toEqual([JSON.stringify({ data: "opaque", signature: "sig" })]);
   });
 });

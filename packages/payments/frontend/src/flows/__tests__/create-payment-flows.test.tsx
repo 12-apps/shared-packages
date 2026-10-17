@@ -296,3 +296,19 @@ describe("the buyer's CPF reaches the provider", () => {
     expect(world.seen[0]?.customer?.email).toBe("ana@exemplo.com");
   });
 });
+
+describe("the confirmation the host composes at the factory (FUT-3685)", () => {
+  it("reaches the paid screen: the footer after its actions, and the emphasis of the way out", async () => {
+    const { flows } = storyFlows(
+      { chain: [{ name: "aurora", methods: ["CARD"], stub: true, publicKey: null }] },
+      { confirmationFooter: <p data-testid="host-footer">Volte sempre</p>, backActionEmphasis: "primary" },
+    );
+    render(<flows.Checkout />);
+    await reachPayment();
+    await waitFor(() => expect(screen.getByTestId("card-view")).toBeTruthy());
+    fillCard();
+    fireEvent.click(screen.getByTestId("card-pay"));
+    await waitFor(() => expect(screen.getByTestId("payment-paid")).toBeTruthy());
+    expect(screen.getByTestId("host-footer").textContent).toBe("Volte sempre");
+  });
+});

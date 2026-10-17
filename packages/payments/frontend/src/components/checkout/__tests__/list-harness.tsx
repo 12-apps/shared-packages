@@ -98,6 +98,87 @@ export function handOffStore(): CheckoutProviderConfig {
   };
 }
 
+/**
+ * {@link onPageStore} whose chain head declares the wallets (FUT-3685):
+ * Google Pay with its gateway parameters, Apple Pay, or both.
+ */
+export function walletStore(wallets: ("GOOGLE_PAY" | "APPLE_PAY")[] = ["GOOGLE_PAY"], options: Parameters<typeof onPageStore>[0] = {}): CheckoutProviderConfig {
+  const base = onPageStore(options);
+  const head = base.chain?.[0];
+  if (!head) throw new Error("the store has a chain head");
+  const google = wallets.includes("GOOGLE_PAY") ? { googlePay: { gateway: "pagbank", gatewayMerchantId: "MID_1" } } : {};
+  return { ...base, chain: [{ ...head, wallets, ...google }] };
+}
+
+/** Google's `google.payments.api`, installed the way pay.js would; its button calls the press it was built with. */
+export function installGoogle(load: () => Promise<unknown> = async () => ({ paymentMethodData: { tokenizationData: { token: "gpay-key" } } })) {
+  const loadPaymentData = vi.fn(load);
+  const createButton = vi.fn(({ onClick }: { onClick: () => void }) => {
+    const button = document.createElement("button");
+    button.setAttribute("data-testid", "google-pay-native");
+    button.textContent = "Pagar com Google Pay";
+    button.addEventListener("click", onClick);
+    return button;
+  });
+  class PaymentsClient {
+    isReadyToPay = async () => ({ result: true });
+    createButton = createButton;
+    loadPaymentData = loadPaymentData;
+  }
+  (window as { google?: unknown }).google = { payments: { api: { PaymentsClient } } };
+  return { loadPaymentData, createButton };
+}
+
+/** One `ApplePaySession` the button started, as the test drives it. */
+interface StubAppleSession {
+  request: { total: { amount: string } };
+  begun: boolean;
+  aborted: boolean;
+  completed: number[];
+  onvalidatemerchant: ((event: { validationURL: string }) => void) | null;
+  onpaymentauthorized: ((event: { payment: { token: { paymentData: unknown } } }) => void) | null;
+  oncancel: (() => void) | null;
+}
+
+/** Safari's `ApplePaySession`, installed on `window`; every session it makes is recorded in order. */
+export function installApple(canPay = true): { sessions: StubAppleSession[] } {
+  const sessions: StubAppleSession[] = [];
+  class ApplePaySession {
+    static STATUS_SUCCESS = 0;
+    static STATUS_FAILURE = 1;
+    static canMakePayments = () => canPay;
+    request: { total: { amount: string } };
+    begun = false;
+    aborted = false;
+    completed: number[] = [];
+    onvalidatemerchant: StubAppleSession["onvalidatemerchant"] = null;
+    onpaymentauthorized: StubAppleSession["onpaymentauthorized"] = null;
+    oncancel: StubAppleSession["oncancel"] = null;
+    constructor(_version: number, request: { total: { amount: string } }) {
+      this.request = request;
+      sessions.push(this);
+    }
+    begin() {
+      this.begun = true;
+    }
+    abort() {
+      this.aborted = true;
+    }
+    completeMerchantValidation() {}
+    completePayment(result: { status: number }) {
+      this.completed.push(result.status);
+    }
+  }
+  (window as { ApplePaySession?: unknown }).ApplePaySession = ApplePaySession;
+  return { sessions };
+}
+
+/** Take both wallets' globals away again. */
+export function uninstallWallets(): void {
+  delete (window as { google?: unknown }).google;
+  delete (window as { ApplePaySession?: unknown }).ApplePaySession;
+}
+
 /** The wire, stubbed: every call recorded, every answer settable per test. */
 export function stubClient(saved: (typeof SAVED_VISA)[] = []) {
   const client = {
@@ -128,6 +209,11 @@ interface ListHost {
   cartTotal?: string;
   /** The basket signature, so a suite can change the cart under a raised order. */
   basket?: string;
+  /** The host's Apple Pay merchant-validation port. */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** The cart's lines and money rows, for the computer's summary column. */
+  lines?: { key: string; quantity: number; name: string; totalLabel: string }[];
+  discountLines?: ReactNode;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -143,6 +229,8 @@ export function listFlow(host: ListHost): JSX.Element {
             totalLabel: host.cartTotal ?? "R$ 27,00",
             totalItems: 2,
             orderNote: host.orderNote,
+            lines: host.lines,
+            discountLines: host.discountLines,
             ...(host.basket ? { identity: { signature: host.basket, ready: true } } : {}),
           }}
           saveBuyerContact={host.saveBuyerContact}
@@ -151,6 +239,7 @@ export function listFlow(host: ListHost): JSX.Element {
           providerConfig={host.config}
           tenantSlug="loja-1"
           taxIdOnFile={host.taxIdOnFile ?? true}
+          validateApplePayMerchant={host.validateApplePayMerchant}
           defaultBuyer={host.buyer ?? { name: "Ana Teste" }}
           paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY, ...host.list }}
         />

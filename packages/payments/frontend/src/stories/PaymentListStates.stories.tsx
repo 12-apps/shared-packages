@@ -6,7 +6,7 @@ import { CART_CENTS, ON_FILE, ON_PAGE, SAVED, scene } from "./payment-list-scene
  * THE ONE LIST'S HARDER STATES (FUT-3591/3592) — each the start of a run the
  * buyer plays from here; the visual gate drives them with the same clicks.
  *
- *  - the Google Pay row, and its charge on Google's own button;
+ *  - Google Pay in the "PAGAMENTO RÁPIDO" block, and its charge on Google's own button;
  *  - a Pix the cart moved under ("Adicionar um item"), before and after the
  *    copy — "Atualizar pagamento" takes the bar;
  *  - the host holding the button ("Pausar a loja") over the list or the Pix;
@@ -21,7 +21,7 @@ export default meta;
 
 const WALLET = { ...ON_PAGE, wallets: ["GOOGLE_PAY" as const], googlePayMerchantId: "MID_LOJA_1" };
 
-/** Google Pay as its own row; chosen, Google's own button takes the bar's place. */
+/** Google Pay in the block above the rows (FUT-3685): its press opens the sheet, the chosen row stays. */
 export const GooglePay: StoryObj = scene(
   { chain: [WALLET], amountCents: CART_CENTS.before },
   { taxIdOnFile: true, buyer: ON_FILE },
