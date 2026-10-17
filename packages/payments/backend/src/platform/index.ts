@@ -8,10 +8,14 @@ export { PT_BR_CONNECT_APPLICATION_COPY, PT_BR_HOMOLOGACAO_ANSWERS } from './pt-
 export { EN_US_CONNECT_APPLICATION_COPY } from './en-US';
 export {
   consultConnectApplications,
+  consultPastedConnectApplication,
   type ConnectApplicationCopy,
+  type ConnectCredentialPreview,
   type ConnectApplicationReport,
   type ConnectApplicationStatus,
   type ConsultConnectApplicationsDeps,
+  type PastedConnectApplicationResult,
+  type PastedConnectCredentials,
   type RegisteredConnectApplication,
 } from './connect-application';
 export {

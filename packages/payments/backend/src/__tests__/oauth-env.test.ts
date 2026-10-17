@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_OAUTH_APP_EXTRAS, envOAuthAppCredentials } from '../config/oauth-env';
+import {
+  DEFAULT_OAUTH_APP_EXTRAS,
+  envOAuthAppCredentials,
+  envOAuthAppValues,
+} from '../config/oauth-env';
 
 /**
  * READING THE PLATFORM'S OAUTH APPLICATION CREDENTIALS FROM THE ENVIRONMENT.
@@ -140,5 +144,22 @@ describe('the extras fall back', () => {
       clientId: 'sandbox-id',
       clientSecret: 'sandbox-secret',
     });
+  });
+});
+
+describe('envOAuthAppValues — what is set, for showing an operator', () => {
+  it('reports the half of a pair that IS set, where the resolver answers null', () => {
+    const bag = { PAGBANK_OAUTH_CLIENT_SECRET_PROD: 'prod-secret', PAGBANK_TOKEN: 'shared-token' };
+
+    expect(envOAuthAppCredentials(bag)('pagbank', 'PRODUCTION')).toBeNull();
+    expect(envOAuthAppValues(bag)('pagbank', 'PRODUCTION')).toEqual({
+      clientSecret: 'prod-secret',
+      // Extras fall back exactly as the resolver reads them.
+      accountToken: 'shared-token',
+    });
+  });
+
+  it('keeps the pair strict: no sandbox id under a production lookup', () => {
+    expect(envOAuthAppValues(SANDBOX_ONLY)('pagbank', 'PRODUCTION')).toEqual({});
   });
 });

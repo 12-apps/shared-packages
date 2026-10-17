@@ -75,6 +75,39 @@ function suffixOf(environment: PaymentEnvironment): string {
 }
 
 /**
+ * Every value the naming convention finds for one provider and environment —
+ * the same lookup as {@link envOAuthAppCredentials}, WITHOUT its strict refusal.
+ *
+ * Only for showing an operator what is set: a half-set pair (an id with no
+ * secret) resolves to `null` above, which is right for authorizing and useless
+ * for diagnosing — this reports the half that is there. Never hand its result
+ * to anything that authorizes.
+ */
+export function envOAuthAppValues(
+  env: Readonly<Record<string, string | undefined>>,
+  options: EnvOAuthAppOptions = {},
+): (provider: string, environment: PaymentEnvironment) => Record<string, string> {
+  const extras = options.extras ?? DEFAULT_OAUTH_APP_EXTRAS;
+
+  return (provider, environment) => {
+    const prefix = provider.toUpperCase();
+    const suffix = suffixOf(environment);
+    const fields: Record<string, string> = {};
+    // STRICT — no unsuffixed fallback. See the module doc for what a fallback
+    // would authorize.
+    const clientId = env[`${prefix}_OAUTH_CLIENT_ID${suffix}`];
+    const clientSecret = env[`${prefix}_OAUTH_CLIENT_SECRET${suffix}`];
+    if (clientId) fields.clientId = clientId;
+    if (clientSecret) fields.clientSecret = clientSecret;
+    for (const [name, field] of Object.entries(extras)) {
+      const value = env[`${prefix}_${name}${suffix}`] ?? env[`${prefix}_${name}`];
+      if (value) fields[field] = value;
+    }
+    return fields;
+  };
+}
+
+/**
  * Build the resolver over an environment bag.
  *
  * The bag is passed in rather than read off `process.env` here: this package
@@ -85,23 +118,12 @@ export function envOAuthAppCredentials(
   env: Readonly<Record<string, string | undefined>>,
   options: EnvOAuthAppOptions = {},
 ): OAuthAppCredentialsResolver {
-  const extras = options.extras ?? DEFAULT_OAUTH_APP_EXTRAS;
+  const valuesOf = envOAuthAppValues(env, options);
 
   return (provider, environment): ResolvedCredentials | null => {
-    const prefix = provider.toUpperCase();
-    const suffix = suffixOf(environment);
-
-    // STRICT — no unsuffixed fallback. See the module doc for what a fallback
-    // would authorize.
-    const clientId = env[`${prefix}_OAUTH_CLIENT_ID${suffix}`];
-    const clientSecret = env[`${prefix}_OAUTH_CLIENT_SECRET${suffix}`];
-    if (!clientId || !clientSecret) return null;
-
-    const fields: Record<string, string> = { clientId, clientSecret };
-    for (const [name, field] of Object.entries(extras)) {
-      const value = env[`${prefix}_${name}${suffix}`] ?? env[`${prefix}_${name}`];
-      if (value) fields[field] = value;
-    }
+    const fields = valuesOf(provider, environment);
+    // The pair is required; extras are not.
+    if (!fields.clientId || !fields.clientSecret) return null;
     return { environment, fields };
   };
 }

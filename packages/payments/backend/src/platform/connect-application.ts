@@ -39,6 +39,9 @@ const SECRET_KEY_RE = /secret|token|password|credential/i;
 /** The one provider with this consult surface today. */
 const PROVIDER = 'pagbank';
 
+/** How much of each value a preview shows — enough to tell two apart, never to use one. */
+const PREVIEW_LENGTH = 5;
+
 /** What PagBank reports about a registered application — parsed defensively. */
 export interface RegisteredConnectApplication {
   name: string | null;
@@ -49,6 +52,18 @@ export interface RegisteredConnectApplication {
   logo: string | null;
   /** Every other key the undocumented response carried, secret-looking ones removed. */
   extra: Record<string, unknown>;
+}
+
+/**
+ * The first {@link PREVIEW_LENGTH} characters of each value an application was
+ * consulted with — `null` where it is not set. Lets an operator see WHICH id,
+ * secret and account token are in play (a rotated secret, a sandbox token under
+ * a production name) without the screen becoming a way to read them.
+ */
+export interface ConnectCredentialPreview {
+  clientId: string | null;
+  clientSecret: string | null;
+  accountToken: string | null;
 }
 
 /** One environment's application, as the deployment can see it. */
@@ -68,6 +83,8 @@ export interface ConnectApplicationStatus {
   redirectUriMismatch: boolean | null;
   /** pt-BR reason the consult could not answer, for the operator. */
   error: string | null;
+  /** Which values it was consulted with — their first characters only. */
+  credentialPreview: ConnectCredentialPreview;
 }
 
 /** The whole screen's payload: both environments plus the expected callback. */
@@ -88,6 +105,13 @@ export interface ConsultConnectApplicationsDeps {
    * reported as such without a network call.
    */
   appCredentials: OAuthAppCredentialsResolver;
+  /**
+   * Every value the host holds per environment, for the PREVIEW only — so a
+   * half-set id/secret pair, which `appCredentials` rightly resolves to `null`,
+   * still shows the half that is set. Env-var hosts pass `envOAuthAppValues`.
+   * Omitted, the preview reads `appCredentials`' own fields.
+   */
+  previewValues?: (provider: string, environment: PaymentEnvironment) => Record<string, string>;
   /** The OAuth callback this deployment answers on — what must be registered. */
   expectedRedirectUri: string;
   /** Override the consult origin per environment. Defaults to PagBank's hosts. */
@@ -173,6 +197,7 @@ function unanswered(
   configured: boolean,
   clientId: string | null,
   error: string | null,
+  credentialPreview: ConnectCredentialPreview,
 ): ConnectApplicationStatus {
   return {
     environment,
@@ -181,6 +206,22 @@ function unanswered(
     application: null,
     redirectUriMismatch: null,
     error,
+    credentialPreview,
+  };
+}
+
+function previewOf(value: string | undefined): string | null {
+  return value ? value.slice(0, PREVIEW_LENGTH) : null;
+}
+
+/** The preview of whatever fields an environment holds. */
+function previewCredentials(
+  fields: Readonly<Record<string, string | undefined>> | undefined,
+): ConnectCredentialPreview {
+  return {
+    clientId: previewOf(fields?.clientId),
+    clientSecret: previewOf(fields?.clientSecret),
+    accountToken: previewOf(fields?.accountToken),
   };
 }
 
@@ -216,6 +257,15 @@ function mismatchOf(
   return application.redirectUri !== expectedRedirectUri;
 }
 
+/** The host's own values when it supplies them, else what the consult resolved. */
+function previewFor(
+  deps: ConsultConnectApplicationsDeps,
+  environment: PaymentEnvironment,
+  resolved: Readonly<Record<string, string>> | undefined,
+): ConnectCredentialPreview {
+  return previewCredentials(deps.previewValues?.(PROVIDER, environment) ?? resolved);
+}
+
 /**
  * Consult ONE environment's application. Never throws: an environment that
  * cannot answer (unconfigured, missing account token, network failure, non-2xx)
@@ -227,7 +277,8 @@ async function consultEnvironment(
   environment: PaymentEnvironment,
 ): Promise<ConnectApplicationStatus> {
   const credentials = deps.appCredentials(PROVIDER, environment);
-  if (!credentials) return unanswered(environment, false, null, null);
+  const preview = previewFor(deps, environment, credentials?.fields);
+  if (!credentials) return unanswered(environment, false, null, null, preview);
 
   const clientId = credentials.fields.clientId ?? null;
   // Same auth as every Connect call: the PARTNER's account token in a Bearer
@@ -235,7 +286,7 @@ async function consultEnvironment(
   // sent, so fail with the cause named instead of relaying that riddle.
   const accountToken = credentials.fields.accountToken;
   if (!accountToken) {
-    return unanswered(environment, true, clientId, deps.copy.missingAccountToken);
+    return unanswered(environment, true, clientId, deps.copy.missingAccountToken, preview);
   }
 
   // Still overridable per call for tests and proxies; the default is now the
@@ -243,7 +294,7 @@ async function consultEnvironment(
   const apiBase = deps.apiBaseFor?.(environment) ?? pagbankApiBase(environment);
   try {
     const result = await fetchApplication(apiBase, clientId, accountToken, deps.copy);
-    if ('error' in result) return unanswered(environment, true, clientId, result.error);
+    if ('error' in result) return unanswered(environment, true, clientId, result.error, preview);
     return {
       environment,
       configured: true,
@@ -251,9 +302,10 @@ async function consultEnvironment(
       application: result.application,
       redirectUriMismatch: mismatchOf(result.application, deps.expectedRedirectUri),
       error: null,
+      credentialPreview: preview,
     };
   } catch {
-    return unanswered(environment, true, clientId, deps.copy.unreachable);
+    return unanswered(environment, true, clientId, deps.copy.unreachable, preview);
   }
 }
 
@@ -270,4 +322,47 @@ export async function consultConnectApplications(
     ),
   );
   return { provider: PROVIDER, expectedRedirectUri: deps.expectedRedirectUri, environments };
+}
+
+/** Credentials an operator pasted to consult with, instead of the host's own. */
+export interface PastedConnectCredentials {
+  environment: PaymentEnvironment;
+  clientId: string;
+  clientSecret: string;
+  accountToken: string;
+}
+
+/** What a pasted consult answers: the one environment, previewed. */
+export interface PastedConnectApplicationResult {
+  expectedRedirectUri: string;
+  status: ConnectApplicationStatus;
+}
+
+/**
+ * Consult ONE environment with PASTED credentials — the same consult and the
+ * same callback comparison, against values the host does not hold (yet). It
+ * answers "is this the application I am about to configure, and is its
+ * redirect_uri ours?" before anyone edits a secret and redeploys.
+ *
+ * The host's own `appCredentials` and `previewValues` are never read: pasted
+ * means pasted. Nothing is stored, and the status carries the values' previews
+ * only. The secret is not sent to PagBank either — the consult authenticates
+ * with the account token — but it is previewed, so the operator can confirm
+ * which secret they pasted.
+ */
+export async function consultPastedConnectApplication(
+  deps: ConsultConnectApplicationsDeps,
+  pasted: PastedConnectCredentials,
+): Promise<PastedConnectApplicationResult> {
+  const { environment, clientId, clientSecret, accountToken } = pasted;
+  const fields = { clientId, clientSecret, accountToken };
+  const status = await consultEnvironment(
+    {
+      ...deps,
+      appCredentials: (_provider, env) => (env === environment ? { environment, fields } : null),
+      previewValues: undefined,
+    },
+    environment,
+  );
+  return { expectedRedirectUri: deps.expectedRedirectUri, status };
 }

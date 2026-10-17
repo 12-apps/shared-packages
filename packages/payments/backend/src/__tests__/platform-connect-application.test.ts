@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   consultConnectApplications,
+  consultPastedConnectApplication,
   type ConsultConnectApplicationsDeps,
 } from '../platform/connect-application';
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
@@ -231,5 +232,89 @@ describe('consultConnectApplications', () => {
       'https://proxy.example.com/oauth2/application/app-123',
       expect.anything(),
     );
+  });
+});
+
+describe('credential previews — the first five characters, never the value', () => {
+  it("previews each environment's resolved fields, and nothing for an unconfigured one", async () => {
+    stubFetch(() => jsonResponse({ redirect_uri: EXPECTED }));
+
+    const report = await consultConnectApplications(
+      depsFor('SANDBOX', {
+        clientId: 'sandbox-client-id',
+        clientSecret: 'sandbox-secret-value',
+        accountToken: 'account-token-value',
+      }),
+    );
+    const [sandbox, production] = report.environments;
+
+    expect(sandbox?.credentialPreview).toEqual({
+      clientId: 'sandb',
+      clientSecret: 'sandb',
+      accountToken: 'accou',
+    });
+    expect(production?.credentialPreview).toEqual({
+      clientId: null,
+      clientSecret: null,
+      accountToken: null,
+    });
+    expect(JSON.stringify(report)).not.toMatch(/sandbox-secret-value|account-token-value/);
+  });
+
+  it('previews a half-set pair from previewValues, while the consult still refuses it', async () => {
+    const fetchMock = stubFetch(jsonResponse({}));
+
+    const report = await consultConnectApplications({
+      appCredentials: () => null,
+      previewValues: (_provider, env): Record<string, string> =>
+        env === 'PRODUCTION' ? { clientSecret: 'prod-secret-only' } : {},
+      expectedRedirectUri: EXPECTED,
+      copy: PT_BR_CONNECT_APPLICATION_COPY,
+    });
+    const production = report.environments[1];
+
+    expect(production?.configured).toBe(false);
+    expect(production?.credentialPreview).toEqual({
+      clientId: null,
+      clientSecret: 'prod-',
+      accountToken: null,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('consultPastedConnectApplication', () => {
+  it("consults the chosen environment with the pasted values, never the host's", async () => {
+    const fetchMock = stubFetch(jsonResponse({ name: 'Nova', redirect_uri: EXPECTED }));
+    const hostCredentials = vi.fn(() => null);
+
+    const result = await consultPastedConnectApplication(
+      { ...depsFor('both', {}), appCredentials: hostCredentials },
+      {
+        environment: 'PRODUCTION',
+        clientId: 'app-prod-999',
+        clientSecret: 'pasted-secret',
+        accountToken: 'pasted-token',
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.pagseguro.com/oauth2/application/app-prod-999',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer pasted-token' }),
+      }),
+    );
+    expect(hostCredentials).not.toHaveBeenCalled();
+    expect(result.expectedRedirectUri).toBe(EXPECTED);
+    expect(result.status.environment).toBe('PRODUCTION');
+    expect(result.status.application?.name).toBe('Nova');
+    expect(result.status.redirectUriMismatch).toBe(false);
+    expect(result.status.credentialPreview).toEqual({
+      clientId: 'app-p',
+      clientSecret: 'paste',
+      accountToken: 'paste',
+    });
+    expect(JSON.stringify(result)).not.toMatch(/pasted-secret|pasted-token/);
   });
 });
