@@ -112,7 +112,7 @@ export interface ConnectApplicationCopy {
   previewHeading: string;
   previewUnset: string;
   /** A value read from a fallback variable (production's token from the unsuffixed name). */
-  previewInherited(preview: string): string;
+  previewInherited: string;
   credentialNames: { clientId: string; clientSecret: string; accountToken: string };
   /** The block that consults with PASTED credentials — rendered only when the host wires it. */
   pasted: {

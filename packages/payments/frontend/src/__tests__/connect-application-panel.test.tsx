@@ -355,9 +355,10 @@ describe('ConnectApplicationPanel — review round 1', () => {
       />,
     );
 
-    expect(screen.getByTestId('connect-preview-PRODUCTION').textContent).toContain(
-      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.previewInherited('abcde'),
-    );
+    const preview = screen.getByTestId('connect-preview-PRODUCTION');
+    expect(preview.textContent).toContain(PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.previewInherited);
+    // The inherited value itself still reads as code, like every other preview.
+    expect(preview.querySelector('code')?.textContent).toBe('abcde…');
   });
 
   it('renders a payload without previews as unset rather than crashing', () => {

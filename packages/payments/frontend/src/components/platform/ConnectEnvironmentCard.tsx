@@ -132,11 +132,16 @@ const EMPTY_PREVIEW: ConnectCredentialPreview = {
 function PreviewValue({ value, inherited }: { value: string | null; inherited: boolean }): ReactNode {
   const copy = usePlatformCopy().connect;
   if (value === null) return copy.previewUnset;
-  if (inherited) return copy.previewInherited(value);
-  return (
+  const code = (
     <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
       {`${value}…`}
     </Box>
+  );
+  if (!inherited) return code;
+  return (
+    <>
+      {copy.previewInherited} {code}
+    </>
   );
 }
 

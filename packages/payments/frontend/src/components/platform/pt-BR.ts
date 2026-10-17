@@ -65,14 +65,14 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     fieldEmpty: '—',
     redirectNotReported: 'não informado',
     resolvedFrom:
-      'A aplicação deste ambiente é resolvida estritamente a partir destas variáveis, sem fallback entre ambientes:',
+      'A aplicação deste ambiente é resolvida a partir destas variáveis. O client_id e o client_secret são estritos, sem fallback entre ambientes; as demais, como o token, caem para a variável sem sufixo quando a deste ambiente não existe:',
     showConfig: 'Mostrar variáveis de ambiente',
     hideConfig: 'Ocultar variáveis de ambiente',
     extraKeys: 'Outros campos retornados (schema não documentado)',
     environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Produção' },
     previewHeading: 'Primeiros 5 caracteres de cada variável',
     previewUnset: 'não definida',
-    previewInherited: (preview) => `não definida — usa ${preview}… da variável sem sufixo`,
+    previewInherited: 'não definida — usa o valor da variável sem sufixo:',
     credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'token da conta' },
     pasted: {
       heading: 'Testar outras credenciais',

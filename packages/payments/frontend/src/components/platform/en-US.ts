@@ -85,14 +85,14 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     fieldEmpty: '—',
     redirectNotReported: 'not reported',
     resolvedFrom:
-      "This environment's application is resolved strictly from these variables, with no fallback between environments:",
+      "This environment's application is resolved from these variables. The client_id and client_secret are strict, with no fallback between environments; the others, such as the token, fall back to the unsuffixed variable when this environment's own is unset:",
     showConfig: 'Show environment variables',
     hideConfig: 'Hide environment variables',
     extraKeys: 'Other fields returned (undocumented schema)',
     environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Production' },
     previewHeading: 'First 5 characters of each variable',
     previewUnset: 'not set',
-    previewInherited: (preview) => `not set — uses ${preview}… from the unsuffixed variable`,
+    previewInherited: 'not set — uses the unsuffixed variable:',
     // `client_id` / `client_secret` are PagBank's own parameter names.
     credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'account token' },
     pasted: {
