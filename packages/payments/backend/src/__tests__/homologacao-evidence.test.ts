@@ -227,7 +227,7 @@ describe('homologação evidence', () => {
     expect(file.content).toContain('"capture": true');
     expect(file.content).toContain('"notification_urls": [\n    "https://example.test/api/webhooks/platform-homologacao/pagbank"');
     expect(file.content).toContain('"code": "10002"');
-    expect(file.content).toContain('ARQUIVO INCOMPLETO: 2 cenário(s) pendente(s) e 0 com falha');
+    expect(file.content).toContain('ARQUIVO INCOMPLETO: 2 cenários pendentes e 0 com falha');
     expect(file.content).toContain('não garante a aprovação');
     expect(file.content).toMatch(/\(GMT-03:00, America\/Sao_Paulo\)/);
   });
@@ -277,10 +277,10 @@ describe('homologação evidence', () => {
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
     expect(file.summary).toEqual({ executed: 0, failed: 0, pending: 17 });
-    expect(file.content).toContain('ARQUIVO INCOMPLETO: 17 cenário(s) pendente(s)');
-    expect(file.content).toContain('Situação: INCOMPLETO — 0 executado(s) · 0 com falha · 17 pendente(s)');
+    expect(file.content).toContain('ARQUIVO INCOMPLETO: 17 cenários pendentes');
+    expect(file.content).toContain('Situação: INCOMPLETO — 0 executados · 0 com falha · 17 pendentes');
     // Nothing ran, so no test time is claimed for either group.
-    expect(file.content).toContain('Data e hora dos testes: Connect: não executado; Pix e cartão: não executado');
+    expect(file.content).toContain('Data e hora dos testes — Connect: não executado · Pix e cartão: não executado');
     expect(file.content).not.toMatch(/Horário: \d/);
   });
 

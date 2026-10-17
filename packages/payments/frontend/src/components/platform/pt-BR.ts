@@ -103,9 +103,9 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     returnedConnected:
       'Lojista de teste conectado. O callback e a troca do código foram registrados nas evidências.',
     returnedFailed:
-      'A conexão do lojista de teste não foi concluída. O motivo foi registrado no arquivo de evidências.',
+      'A conexão do lojista de teste não foi concluída. Tente conectar de novo.',
     generate: 'Gerar arquivo de evidências\u00a0(TXT)',
-    downloadLatest: 'Baixar de novo (sem executar)',
+    downloadLatest: 'Baixar o último registrado',
     phases: {
       preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública…',
       encrypting: 'Criptografando os cartões de teste no navegador…',
@@ -113,11 +113,12 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       downloading: 'Montando o arquivo…',
     },
     summary: ({ executed, failed, pending }) =>
-      `✓ ${executed} ${executed === 1 ? 'executado' : 'executados'} · ` +
-      `✗ ${failed} ${failed === 1 ? 'falhou' : 'falharam'} · ` +
-      `⧗ ${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`,
+      // Non-breaking inside each count, so only the separators may wrap.
+      `✓\u00a0${executed}\u00a0${executed === 1 ? 'executado' : 'executados'} · ` +
+      `✗\u00a0${failed}\u00a0${failed === 1 ? 'falhou' : 'falharam'} · ` +
+      `⧗\u00a0${pending}\u00a0${pending === 1 ? 'pendente' : 'pendentes'}`,
     incomplete:
-      'O arquivo lista o que falta na seção Pendências. Não o envie como completo. Notificações que chegarem depois aparecem ao baixar de novo.',
+      'O arquivo lista o que falta na seção Pendências. Não o envie como completo. Notificações que chegarem depois aparecem ao baixar o último registrado.',
     generateFailed: (phase) =>
       `${
         {
@@ -126,6 +127,6 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
           running: 'Falhou ao criar os pedidos no sandbox.',
           downloading: 'Falhou ao montar o arquivo.',
         }[phase]
-      } Tente de novo; "Baixar de novo" ainda traz o que já foi registrado.`,
+      } Tente de novo; "Baixar o último registrado" ainda traz o que já foi registrado.`,
   },
 };
