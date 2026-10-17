@@ -56,18 +56,22 @@ export interface BadgeSyncOptions {
   /**
    * The host's own word that its realtime channel is up RIGHT NOW.
    *
-   * `subscribe` relaxes the poll because a live subscription is implied by its
-   * presence. `useSignal` cannot say the same — a hook handed a callback knows
-   * nothing about whether its connection opened — and neither can a host that
-   * wires the invalidate itself, outside this package, because its connection
-   * is session-scoped and must stay behind `enabled` (which `useSignal` is
-   * called in front of). Such a host had no way to relax the badge at all, and
-   * every signed-in reader polled once a minute on top of a working stream.
+   * `useSignal` cannot say this — a hook handed a callback knows nothing about
+   * whether its connection opened — and neither can a host that wires the
+   * invalidate itself, outside this package, because its connection is
+   * session-scoped and must stay behind `enabled` (which `useSignal` is called
+   * in front of).
    *
-   * `true` relaxes the poll to {@link BADGE_RECONCILE_MS}, exactly as a
-   * `subscribe` does; anything else keeps {@link BADGE_POLL_MS}. It is a STATUS,
-   * so pass it live — a stream that drops takes the badge straight back to the
-   * fast poll on the next render.
+   * `true` STOPS the poll: while the channel is live the badge re-reads
+   * on a hint, on focus, and each time the channel (re)opens — the fallback rule,
+   * a badge hears live data and polls only while the channel is down. `false`
+   * polls every {@link BADGE_POLL_MS}. It is a STATUS, so pass it live: a stream
+   * that drops takes the badge straight back to the poll on the next render.
+   *
+   * Left undefined beside a factory-time `subscribe`, the badge cannot know
+   * whether that subscription is up, so it keeps the slow
+   * {@link BADGE_RECONCILE_MS} it always had there. Pass `live` to get the
+   * fallback rule.
    */
   live?: boolean;
 }
@@ -117,9 +121,7 @@ const NOTHING_TO_SHOW: InboxState = {
 export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {}): InboxState {
   const enabled = options.enabled ?? true;
   const subscribe = options.subscribe;
-  // Pushed to by a subscription this package holds, or by one the host holds
-  // and says is up — see `BadgeSyncOptions.live`.
-  const relaxed = subscribe !== undefined || options.live === true;
+  const cadence = badgeCadence(subscribe !== undefined, options.live);
   const live = useInboxState(store);
   const state = enabled ? live : NOTHING_TO_SHOW;
 
@@ -130,9 +132,9 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
   });
 
   // Two effects, split on purpose. This first one makes the mount read and owns
-  // the subscription and the focus re-read. It must NOT be keyed on `relaxed`:
-  // when it was, the host's channel coming up re-ran it and read the count a
-  // second time on every cold page load.
+  // the subscription and the focus re-read. It must NOT be keyed on the
+  // cadence: when it was, the host's channel coming up re-ran it — a read the
+  // relive effect below now makes on purpose, and must not make twice.
   useEffect(() => {
     if (!enabled) return;
     store.refreshBadge();
@@ -145,17 +147,14 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
     };
   }, [store, enabled, subscribe]);
 
-  // The cadence. A live channel relaxes the poll to the reconcile interval;
-  // without one it stays the 60 s poll. Keyed on `store` and `enabled` too, since
-  // it reads both and a disabled bell must not tick.
+  // The fallback poll: none while the host says its channel is live, the 60 s
+  // poll while it is down (see `badgeCadence`). Keyed on `store` and `enabled`
+  // too, since it reads both and a disabled bell must not tick.
   useEffect(() => {
-    if (!enabled) return;
-    const interval = setInterval(
-      () => store.refreshBadge(),
-      relaxed ? BADGE_RECONCILE_MS : BADGE_POLL_MS,
-    );
+    if (!enabled || cadence === null) return;
+    const interval = setInterval(() => store.refreshBadge(), cadence);
     return () => clearInterval(interval);
-  }, [store, enabled, relaxed]);
+  }, [store, enabled, cadence]);
 
   useReadOnRelive(store, enabled, options.live === true);
 
@@ -163,39 +162,52 @@ export function useBadgeState(store: InboxStore, options: BadgeSyncOptions = {})
 }
 
 /**
- * Read once more when the host's channel comes BACK after a drop.
+ * How often the badge polls, or `null` for not at all.
  *
- * Whatever was pushed while the stream was down is lost by contract, so a return
- * to live is worth one read. The first live after mount is not a return: the
- * mount effect has just read, and reading again there was the duplicate. This
- * mirrors the consent dialog's re-ask in `@12-apps/app-shell`.
+ * - `live === true` — the host says its channel is up: no poll. The badge hears
+ *   its hint, re-reads on focus and on every (re)open of the channel
+ *   ({@link useReadOnRelive}); a timer here would be a poll on top of a working
+ *   stream.
+ * - `live === false` — the host says it is down: the {@link BADGE_POLL_MS} poll,
+ *   the only news the badge has.
+ * - `live` unstated beside a factory-time `subscribe` — nothing says whether that
+ *   subscription is up, so the {@link BADGE_RECONCILE_MS} it always had there.
+ * - nothing at all — the {@link BADGE_POLL_MS} poll.
+ */
+function badgeCadence(subscribed: boolean, live: boolean | undefined): number | null {
+  if (live === true) return null;
+  if (live === undefined && subscribed) return BADGE_RECONCILE_MS;
+  return BADGE_POLL_MS;
+}
+
+/**
+ * Read once more every time the host's channel goes LIVE — the first time after
+ * mount included.
  *
- * The cost, accepted: an event published between the mount read and the first
- * live (about a second on a slow link) is not heard, so the badge catches up at
- * the next reconcile, a focus, or a later event. That is the reconcile interval
- * at worst, and a hint is best-effort by contract anyway.
+ * While the channel is live the badge keeps no timer, so nothing else bounds an
+ * event the stream never delivered. Whatever was pushed while it was down is
+ * lost by contract, and an event published between the mount read and the
+ * subscription opening (about a second on a slow link) is lost the same way —
+ * which, with no reconcile left behind it, would leave the badge wrong until a
+ * focus or the next event. So each transition to live is one read. A channel
+ * that is ALREADY live at mount adds nothing: the mount read is that read.
+ *
+ * The cost, accepted: one extra count read per cold page load, where the
+ * channel comes up a moment after the mount read. A count is the cheapest read
+ * the surface has, and it is what the badge needs to be right without a poll.
  */
 function useReadOnRelive(store: InboxStore, enabled: boolean, live: boolean): void {
-  // A container, mutated in place: live since mount, and dropped since then.
-  const seen = useRef({ live: false, dropped: false });
+  // A container, mutated in place: whether the channel was live at the last look.
+  const seen = useRef({ live, enabled });
   useEffect(() => {
     const memory = seen.current;
-    // A disabled bell (nobody signed in) forgets the channel's history: signing
-    // back in makes its own mount read, and the channel coming up after it is a
-    // first live, not a return.
-    if (!enabled) {
-      memory.live = false;
-      memory.dropped = false;
-      return;
-    }
-    if (!live) {
-      if (memory.live) memory.dropped = true;
-      return;
-    }
-    const back = memory.dropped;
-    memory.live = true;
-    memory.dropped = false;
-    if (back) store.refreshBadge();
+    const opened = enabled && live && !(memory.live && memory.enabled);
+    // A bell that has just been ENABLED (signing in) makes its own mount read,
+    // so a channel already live at that moment is that read, not a second one.
+    const justEnabled = enabled && !memory.enabled;
+    memory.live = live;
+    memory.enabled = enabled;
+    if (opened && !justEnabled) store.refreshBadge();
   }, [store, enabled, live]);
 }
 

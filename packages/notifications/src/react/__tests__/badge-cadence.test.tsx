@@ -8,15 +8,14 @@ import { useUnreadCount } from '../hooks';
 import { BADGE_POLL_MS, BADGE_RECONCILE_MS, createInboxStore } from '../inbox-state';
 
 /**
- * How often the badge asks for its count, and what relaxes it.
+ * How often the badge asks for its count, and what stops it.
  *
- * A live channel relaxes the poll to the reconcile interval — five minutes,
- * never "stop" — and without one the badge asks every minute. `subscribe`
- * always implied a live channel. `live` is the host's own word for a channel
- * this package does not hold: a host that wires the invalidate itself, because
- * its connection is session-scoped and must stay behind `enabled`, had no way
- * to say it was listening, and every reader polled once a minute on top of a
- * working stream.
+ * The fallback rule (FUT-437): while the host says its channel is live the
+ * badge keeps NO timer — it hears its hint, re-reads on focus and on every
+ * (re)open of the channel — and while the channel is down it asks every
+ * minute. `live` is the host's own word for a channel this package does not
+ * hold. A factory-time `subscribe` with no `live` beside it cannot say whether
+ * it is up, so it keeps the five-minute reconcile it always had.
  */
 
 const UNREAD_PATH = '/api/account/notifications/unread-count';
@@ -81,15 +80,30 @@ describe('the badge cadence', () => {
     expect(reads()).toBe(first + 1);
   });
 
-  it('relaxes to the reconcile while the host says its channel is live', async () => {
+  it('keeps no timer at all while the host says its channel is live', async () => {
     const { reads } = mountBadge({ live: true });
+    await elapse(0);
+    const first = reads();
+
+    // Not the minute, and not the old five-minute reconcile either: a live
+    // badge hears its news, and a timer here would be a poll on a working stream.
+    await elapse(BADGE_RECONCILE_MS * 3);
+
+    expect(reads()).toBe(first);
+  });
+
+  it('keeps the reconcile for a factory subscription that cannot say whether it is up', async () => {
+    const { transport, get } = recordingTransport();
+    const store = createInboxStore(createNotificationsApiClient(API_BASE, transport));
+    // Stable, as a factory-time subscription is: a new one per render re-subscribes.
+    const options = { subscribe: () => () => undefined };
+    renderHook(() => useUnreadCount(store, options));
+    const reads = (): number => get.mock.calls.filter(([path]) => path === UNREAD_PATH).length;
     await elapse(0);
     const first = reads();
 
     await elapse(BADGE_POLL_MS);
     expect(reads()).toBe(first);
-
-    // Relaxed, never stopped: a dropped event must still expire on something.
     await elapse(BADGE_RECONCILE_MS - BADGE_POLL_MS);
     expect(reads()).toBe(first + 1);
   });
@@ -111,17 +125,25 @@ describe('the badge cadence', () => {
 /**
  * The host's channel coming up, going down, and coming back.
  *
- * The first `live` after mount is not news: the mount has just read, and a
- * second read there happened on every cold page load. A return after a drop is
- * news, because whatever was pushed while the stream was down is lost.
+ * Every transition to live is one read — the first one after mount included.
+ * With no timer while live, nothing else bounds an event published between the
+ * mount read and the subscription opening, or one pushed while the stream was
+ * down. A channel ALREADY live at mount adds nothing: the mount read is that read.
  */
 describe('the badge and the channel coming back', () => {
-  it('does not read again when the channel first comes up', async () => {
+  it('reads once more when the channel first comes up after mount', async () => {
     const badge = mountBadge({ live: false });
     await elapse(0);
     expect(badge.reads()).toBe(1);
 
     badge.setLive(true);
+    await elapse(0);
+
+    expect(badge.reads()).toBe(2);
+  });
+
+  it('adds no read when the channel is already live at mount', async () => {
+    const badge = mountBadge({ live: true });
     await elapse(0);
 
     expect(badge.reads()).toBe(1);
@@ -140,7 +162,7 @@ describe('the badge and the channel coming back', () => {
     expect(badge.reads()).toBe(2);
   });
 
-  it('treats the channel after a sign-out and sign-in as a first live, not a return', async () => {
+  it('reads on the channel coming up after a sign-in, as on any first live', async () => {
     const badge = mountBadge({ live: true, enabled: true });
     await elapse(0);
 
@@ -153,6 +175,20 @@ describe('the badge and the channel coming back', () => {
     badge.setSession({ live: true, enabled: true });
     await elapse(0);
 
+    // The first mount, the sign-in's own mount read, and the channel opening.
+    expect(badge.reads()).toBe(3);
+  });
+
+  it('adds no read when the channel is live in the same render that signs in', async () => {
+    const badge = mountBadge({ live: true, enabled: true });
+    await elapse(0);
+    badge.setSession({ live: false, enabled: false });
+    await elapse(0);
+
+    badge.setSession({ live: true, enabled: true });
+    await elapse(0);
+
+    // The sign-in's mount read IS the read for a channel already up.
     expect(badge.reads()).toBe(2);
   });
 });
