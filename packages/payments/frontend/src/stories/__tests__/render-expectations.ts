@@ -288,6 +288,10 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["connect-application-panel", "connect-mismatch-SANDBOX", "connect-match-PRODUCTION"],
     text: [PLATFORM.connect.expectedRedirectHeading],
   },
+  "PlatformOps/ConnectApplicationPreviewAndPaste": {
+    testIds: ["connect-preview-SANDBOX", "connect-preview-PRODUCTION", "connect-pasted"],
+    text: [PLATFORM.connect.previewHeading, PLATFORM.connect.pasted.heading],
+  },
   "PlatformOps/ConnectApplicationUnconfigured": {
     testIds: ["connect-application-panel"],
     text: [PLATFORM.connect.noApplication],

@@ -69,5 +69,17 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     showConfig: 'Mostrar variáveis de ambiente',
     hideConfig: 'Ocultar variáveis de ambiente',
     extraKeys: 'Outros campos retornados',
+    environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Produção' },
+    previewHeading: 'Primeiros 5 caracteres de cada variável',
+    previewUnset: 'não definida',
+    credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'token da conta' },
+    pasted: {
+      heading: 'Testar outras credenciais',
+      lede:
+        'Cole as credenciais de uma aplicação para consultá-la no PagBank antes de alterar as variáveis de ambiente. Os valores são usados só nesta consulta e não são salvos.',
+      environment: 'Ambiente',
+      submit: 'Consultar com estas credenciais',
+      failed: 'Não foi possível consultar com as credenciais coladas.',
+    },
   },
 };

@@ -89,5 +89,18 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     showConfig: 'Show environment variables',
     hideConfig: 'Hide environment variables',
     extraKeys: 'Other fields returned',
+    environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Production' },
+    previewHeading: 'First 5 characters of each variable',
+    previewUnset: 'not set',
+    // `client_id` / `client_secret` are PagBank's own parameter names.
+    credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'account token' },
+    pasted: {
+      heading: 'Test other credentials',
+      lede:
+        "Paste an application's credentials to look it up at PagBank before changing the environment variables. The values are used for this lookup only and are not saved.",
+      environment: 'Environment',
+      submit: 'Look up with these credentials',
+      failed: 'The pasted credentials could not be looked up.',
+    },
   },
 };

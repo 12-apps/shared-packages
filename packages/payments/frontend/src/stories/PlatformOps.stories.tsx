@@ -43,6 +43,7 @@ function envStatus(over: Partial<ConnectApplicationStatus>): ConnectApplicationS
     application: null,
     redirectUriMismatch: null,
     error: null,
+    credentialPreview: { clientId: null, clientSecret: null, accountToken: null },
     ...over,
   };
 }
@@ -84,6 +85,43 @@ export const ConnectApplicationAllVerdicts: StoryObj = {
       ])}
       onRefresh={() => undefined}
       configVarsFor={() => CONFIG_VARS}
+    />
+  ),
+};
+
+export const ConnectApplicationPreviewAndPaste: StoryObj = {
+  name: "Aplicação Connect — prévia das credenciais e consulta colada",
+  render: () => (
+    <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+      configVarsFor={() => CONFIG_VARS}
+      onConsultPasted={async (pasted) =>
+        envStatus({
+          environment: pasted.environment,
+          configured: true,
+          clientId: pasted.clientId,
+          application: REGISTERED,
+          redirectUriMismatch: false,
+          credentialPreview: {
+            clientId: pasted.clientId.slice(0, 5),
+            clientSecret: pasted.clientSecret.slice(0, 5),
+            accountToken: pasted.accountToken.slice(0, 5),
+          },
+        })
+      }
+      report={connectReport([
+        envStatus({
+          environment: "SANDBOX",
+          configured: true,
+          clientId: "app-sandbox-123",
+          application: REGISTERED,
+          redirectUriMismatch: false,
+          credentialPreview: { clientId: "app-s", clientSecret: "Xk9pQ", accountToken: "a1b2c" },
+        }),
+        envStatus({
+          environment: "PRODUCTION",
+          credentialPreview: { clientId: null, clientSecret: "prod-", accountToken: "a1b2c" },
+        }),
+      ])}
     />
   ),
 };

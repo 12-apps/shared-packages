@@ -30,6 +30,7 @@ function status(over: Partial<ConnectApplicationStatus>): ConnectApplicationStat
     application: null,
     redirectUriMismatch: null,
     error: null,
+    credentialPreview: { clientId: null, clientSecret: null, accountToken: null },
     ...over,
   };
 }
@@ -232,6 +233,104 @@ describe('ConnectApplicationPanel', () => {
     rerender(<ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY} report={report([status({ environment: 'SANDBOX' })])} />);
     await waitFor(() => {
       expect(screen.queryByTestId('connect-refresh')).toBeNull();
+    });
+  });
+});
+
+describe('ConnectApplicationPanel — credential previews and the paste block', () => {
+  const VARS = ['APP_CLIENT_ID', 'APP_CLIENT_SECRET', 'APP_TOKEN'];
+
+  it("previews each value's first characters under the host's variable names", () => {
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        configVarsFor={() => VARS}
+        report={report([
+          status({
+            environment: 'PRODUCTION',
+            credentialPreview: { clientId: 'app-p', clientSecret: null, accountToken: 'tok-1' },
+          }),
+        ])}
+      />,
+    );
+
+    const preview = screen.getByTestId('connect-preview-PRODUCTION').textContent ?? '';
+    expect(preview).toContain('APP_CLIENT_ID');
+    expect(preview).toContain('app-p…');
+    expect(preview).toContain(PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.previewUnset);
+    expect(preview).toContain('tok-1…');
+    expect(screen.getByTestId('connect-env-PRODUCTION').textContent).toContain('Produção');
+  });
+
+  it('renders no paste block unless the host wires one', () => {
+    render(<ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY} report={report([])} />);
+
+    const panel = screen.getByTestId('connect-application-panel');
+    const rendered = Array.from(panel.querySelectorAll('[data-testid]'), (el) =>
+      el.getAttribute('data-testid'),
+    );
+    expect(rendered).toContain('connect-expected-redirect');
+    expect(rendered).not.toContain('connect-pasted');
+  });
+
+  it('consults the pasted values and renders the answer in its own card', async () => {
+    const calls: unknown[] = [];
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([status({ environment: 'SANDBOX' })])}
+        onConsultPasted={async (pasted) => {
+          calls.push(pasted);
+          return status({
+            environment: pasted.environment,
+            configured: true,
+            clientId: pasted.clientId,
+            application: { ...APPLICATION, redirectUri: EXPECTED },
+            redirectUriMismatch: false,
+            credentialPreview: { clientId: 'app-n', clientSecret: 'paste', accountToken: 'token' },
+          });
+        }}
+      />,
+    );
+
+    const submit = screen.getByTestId('connect-pasted-submit') as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId('connect-pasted-environment'), {
+      target: { value: 'PRODUCTION' },
+    });
+    fireEvent.change(screen.getByTestId('connect-pasted-clientId'), { target: { value: ' app-new ' } });
+    fireEvent.change(screen.getByTestId('connect-pasted-clientSecret'), { target: { value: 'pasted-secret' } });
+    fireEvent.change(screen.getByTestId('connect-pasted-accountToken'), { target: { value: 'token-xyz' } });
+    fireEvent.click(submit);
+
+    const answer = await screen.findByTestId('connect-env-PASTED');
+    expect(answer.textContent).toContain('Produção');
+    expect(screen.getByTestId('connect-match-PASTED')).toBeTruthy();
+    expect(screen.getByTestId('connect-preview-PASTED').textContent).toContain('paste…');
+    expect(calls).toEqual([
+      {
+        environment: 'PRODUCTION',
+        clientId: 'app-new',
+        clientSecret: 'pasted-secret',
+        accountToken: 'token-xyz',
+      },
+    ]);
+  });
+
+  it('says so when the pasted consult fails, without a result card', async () => {
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([])}
+        onConsultPasted={() => Promise.reject(new Error('boom'))}
+      />,
+    );
+
+    for (const id of ['clientId', 'clientSecret', 'accountToken']) {
+      fireEvent.change(screen.getByTestId(`connect-pasted-${id}`), { target: { value: 'x' } });
+    }
+    fireEvent.click(screen.getByTestId('connect-pasted-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('connect-pasted-failed')).toBeTruthy();
+      expect(screen.queryByTestId('connect-env-PASTED')).toBeNull();
     });
   });
 });

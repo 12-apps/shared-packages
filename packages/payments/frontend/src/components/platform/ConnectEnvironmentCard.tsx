@@ -11,16 +11,14 @@ import { usePlatformCopy } from './copy-context';
  * Sandbox and production are SEPARATE applications with separate id/secret
  * pairs, so each card stands on its own: configured or not, what PagBank says
  * is registered, and whether the registered redirect URI matches the
- * deployment's callback.
+ * deployment's callback — plus the first characters of each value it was
+ * consulted with, so an operator can tell WHICH id, secret and token are in play.
  *
- * English, like the rest of this platform surface (FUT-760) — see
- * `ConnectApplicationPanel` for why.
+ * The same card renders the answer to a PASTED consult, so its test ids key on
+ * a `slot` — the environment for the host's two cards, `PASTED` for that one —
+ * rather than on the environment, which the pasted answer shares with one of
+ * them.
  */
-
-const ENV_LABEL: Record<PaymentEnvironment, string> = {
-  SANDBOX: 'Sandbox',
-  PRODUCTION: 'Production',
-};
 
 /** The bordered-card look every block of these screens shares. */
 export const CARD_SX = {
@@ -33,9 +31,10 @@ export const CARD_SX = {
 function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <Box
-      sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 180, wordBreak: 'break-all' }}
+      // Whole words stay whole; only an unbroken id or URL breaks mid-run.
+      sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 180, overflowWrap: 'anywhere' }}
     >
-      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+      <Typography variant="caption" fontWeight={600}>
         {label}
       </Typography>
       <Typography component="span" variant="body2">
@@ -46,32 +45,32 @@ function Field({ label, children }: { label: string; children: ReactNode }): Rea
 }
 
 /** The verdict the screen exists for: does the registered callback match ours? */
-function MismatchAlert({ status }: { status: ConnectApplicationStatus }): ReactNode {
+function MismatchAlert({ status, slot }: { status: ConnectApplicationStatus; slot: string }): ReactNode {
   const copy = usePlatformCopy().connect;
   if (status.application === null) return null;
   if (status.redirectUriMismatch === true) {
     return (
-      <Alert severity="error" data-testid={`connect-mismatch-${status.environment}`}>
+      <Alert severity="error" data-testid={`connect-mismatch-${slot}`}>
         {copy.redirectDiffers}
       </Alert>
     );
   }
   if (status.redirectUriMismatch === false) {
     return (
-      <Alert severity="success" data-testid={`connect-match-${status.environment}`}>
+      <Alert severity="success" data-testid={`connect-match-${slot}`}>
         {copy.redirectMatches}
       </Alert>
     );
   }
   return (
-    <Alert severity="warning" data-testid={`connect-unknown-${status.environment}`}>
+    <Alert severity="warning" data-testid={`connect-unknown-${slot}`}>
       {copy.redirectUnreported}
     </Alert>
   );
 }
 
 /** What PagBank reports as registered, plus whatever extra keys came back. */
-function ApplicationFields({ status }: { status: ConnectApplicationStatus }): ReactNode {
+function ApplicationFields({ status, slot }: { status: ConnectApplicationStatus; slot: string }): ReactNode {
   const copy = usePlatformCopy().connect;
   const app = status.application;
   if (app === null) return null;
@@ -88,8 +87,8 @@ function ApplicationFields({ status }: { status: ConnectApplicationStatus }): Re
         </Field>
       </Box>
       {extraKeys.length > 0 ? (
-        <Box data-testid={`connect-extra-${status.environment}`}>
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+        <Box data-testid={`connect-extra-${slot}`}>
+          <Typography variant="caption" fontWeight={600}>
             {copy.extraKeys}
           </Typography>
           <Box component="pre" sx={{ m: 0, fontSize: 12, overflowX: 'auto' }}>
@@ -97,6 +96,50 @@ function ApplicationFields({ status }: { status: ConnectApplicationStatus }): Re
           </Box>
         </Box>
       ) : null}
+    </Stack>
+  );
+}
+
+/**
+ * The first characters of each value the application was consulted with —
+ * never the value. Each is named by the host's own variable when it supplies
+ * them (`configVars`, in id / secret / token order), by the copy's names when not.
+ */
+function CredentialPreview({
+  status,
+  slot,
+  configVars,
+}: {
+  status: ConnectApplicationStatus;
+  slot: string;
+  configVars?: string[];
+}): ReactNode {
+  const copy = usePlatformCopy().connect;
+  const { clientId, clientSecret, accountToken } = status.credentialPreview;
+  const names = copy.credentialNames;
+  const rows: [string, string | null][] = [
+    [configVars?.[0] ?? names.clientId, clientId],
+    [configVars?.[1] ?? names.clientSecret, clientSecret],
+    [configVars?.[2] ?? names.accountToken, accountToken],
+  ];
+  return (
+    <Stack spacing={1} data-testid={`connect-preview-${slot}`}>
+      <Typography variant="caption" fontWeight={600}>
+        {copy.previewHeading}
+      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5 }}>
+        {rows.map(([name, preview]) => (
+          <Field key={name} label={name}>
+            {preview === null ? (
+              copy.previewUnset
+            ) : (
+              <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
+                {`${preview}…`}
+              </Box>
+            )}
+          </Field>
+        ))}
+      </Box>
     </Stack>
   );
 }
@@ -149,18 +192,30 @@ function ConfigHelp({
 export function ConnectEnvironmentCard({
   status,
   configVars,
+  slot = status.environment,
+  showConfigHelp = true,
 }: {
   status: ConnectApplicationStatus;
   configVars?: string[];
+  /** What the test ids key on — see the module doc. */
+  slot?: string;
+  /** The variable help belongs to a host-configured environment, not a pasted answer. */
+  showConfigHelp?: boolean;
 }): ReactNode {
   const copy = usePlatformCopy().connect;
   return (
-    <Stack spacing={1.5} data-testid={`connect-env-${status.environment}`} sx={CARD_SX}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, wordBreak: 'break-all' }}>
-        <Typography variant="body2" fontWeight={600}>
-          {ENV_LABEL[status.environment]}
+    <Stack spacing={1.5} data-testid={`connect-env-${slot}`} sx={CARD_SX}>
+      {/* The label never yields to a long client_id: the id wraps beneath it. */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 1.5 }}>
+        <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+          {copy.environmentLabels[status.environment]}
         </Typography>
-        <Typography component="span" variant="caption" color="text.secondary">
+        <Typography
+          component="span"
+          variant="caption"
+          color="text.secondary"
+          sx={{ wordBreak: 'break-all', minWidth: 0 }}
+        >
           {status.clientId !== null ? `client_id: ${status.clientId}` : ''}
         </Typography>
       </Box>
@@ -168,13 +223,14 @@ export function ConnectEnvironmentCard({
         <Typography variant="body2" color="text.secondary">{copy.noApplication}</Typography>
       ) : null}
       {status.error !== null ? (
-        <Alert severity="warning" data-testid={`connect-error-${status.environment}`}>
+        <Alert severity="warning" data-testid={`connect-error-${slot}`}>
           {status.error}
         </Alert>
       ) : null}
-      <MismatchAlert status={status} />
-      <ApplicationFields status={status} />
-      <ConfigHelp environment={status.environment} configVars={configVars} />
+      <MismatchAlert status={status} slot={slot} />
+      <ApplicationFields status={status} slot={slot} />
+      <CredentialPreview status={status} slot={slot} configVars={configVars} />
+      {showConfigHelp ? <ConfigHelp environment={status.environment} configVars={configVars} /> : null}
     </Stack>
   );
 }
