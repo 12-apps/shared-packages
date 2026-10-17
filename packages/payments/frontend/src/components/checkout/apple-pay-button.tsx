@@ -180,7 +180,17 @@ export function startApplePaySession(input: {
   session.onpaymentauthorized = (event) => settle(JSON.stringify(event.payment.token.paymentData));
   // Closing the sheet is a choice, not a failure to report.
   session.oncancel = () => settle(null);
-  session.begin();
+  try {
+    session.begin();
+  } catch (error) {
+    // A session Safari would not begin must not stay open behind the next one.
+    try {
+      session.abort();
+    } catch {
+      // Nothing more to close.
+    }
+    throw error;
+  }
   const complete = (accepted: boolean): void =>
     session.completePayment({ status: accepted ? Session.STATUS_SUCCESS : Session.STATUS_FAILURE });
   return { answer, complete };

@@ -48,6 +48,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     email: "E-mail",
     why: (provider) => (provider ? `(${the(provider)} pede para pagar pelo app)` : "(pedido para pagar pelo app)"),
     cpfHint: (provider) => (provider ? `${the(provider)} pede para pagar pelo app` : "pedido para pagar pelo app"),
+    keepSavedCpf: "Manter o CPF salvo",
     cpfIncomplete: "O CPF tem 11 dígitos.",
     phoneIncomplete: "O celular precisa de DDD e 9 dígitos.",
   },

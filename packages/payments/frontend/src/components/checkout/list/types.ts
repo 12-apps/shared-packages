@@ -297,6 +297,12 @@ export interface PaymentListCopy {
      * pede para pagar pelo app"; `null` when no name was published.
      */
     cpfHint: (provider: string | null) => string;
+    /**
+     * The link under the CPF opened by "Alterar" over a CPF on file, closing it
+     * again — "Manter o CPF salvo" (FUT-3685). Both packs carry it; absent ⇒ no
+     * link (an empty field keeps the saved CPF either way).
+     */
+    keepSavedCpf?: string;
     cpfIncomplete: string;
     phoneIncomplete: string;
   };

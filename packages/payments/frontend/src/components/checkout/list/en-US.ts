@@ -32,6 +32,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     email: "Email",
     why: (provider) => (provider ? `(${provider} asks for it to pay in the app)` : "(needed to pay in the app)"),
     cpfHint: (provider) => (provider ? `${provider} asks for it to pay in the app` : "needed to pay in the app"),
+    keepSavedCpf: "Keep the saved CPF",
     cpfIncomplete: "A CPF has 11 digits.",
     phoneIncomplete: "The mobile number needs the area code and 9 digits.",
   },

@@ -148,7 +148,7 @@ describe("a CPF on file (E2)", () => {
     await waitFor(() => expect(screen.queryByTestId("buyer-cpf")).toBeNull());
   });
 
-  it("opens holding the CPF the host passed, masked; cleared, it holds the online ways with the reason (K6, U3)", async () => {
+  it("opens holding the CPF the host passed, masked; a new one must be valid (K6, U3)", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste", taxId: "52998224725" } });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));
@@ -157,12 +157,36 @@ describe("a CPF on file (E2)", () => {
     const input = field.tagName === "INPUT" ? field : (field.querySelector("input") as HTMLInputElement);
     expect(input.value).toBe("529.982.247-25");
     expect(payButton().disabled).toBe(false);
-    type("list-buyer-taxId", "");
-    await waitFor(() => expect(payButton().disabled).toBe(true));
-    expect(reason()).toBe("Digite seu CPF para pagar pelo app.");
     type("list-buyer-taxId", "111.111.111-1");
     await waitFor(() => expect(payButton().disabled).toBe(true));
+    expect(reason()).toBe("Digite seu CPF para pagar pelo app.");
     type("list-buyer-taxId", "529.982.247-25");
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+  });
+
+  it("left empty keeps the saved CPF: pay stays live — the host passed none (review round 2)", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" } });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(screen.getByTestId("list-payer-change"));
+    await screen.findByTestId("list-buyer-taxId");
+    expect(payButton().disabled).toBe(false);
+    type("list-buyer-taxId", "529.982.247-25");
+    type("list-buyer-taxId", "");
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+  });
+
+  it("'Manter o CPF salvo' closes the field, drops what was typed and brings the payer line back", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" } });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(screen.getByTestId("list-payer-change"));
+    await screen.findByTestId("list-buyer-taxId");
+    type("list-buyer-taxId", "123");
+    await waitFor(() => expect(payButton().disabled).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: "Manter o CPF salvo" }));
+    await screen.findByTestId("list-payer");
+    await waitFor(() => expect(screen.queryByTestId("list-cpf")).toBeNull());
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
 

@@ -32,12 +32,18 @@ const pillEdge = (held: boolean) => (t: Theme): string => {
   return t.palette.mode === "dark" ? `1px solid ${t.palette.divider}` : "1px solid transparent";
 };
 
-/** The look every wallet pill shares — the prototype's 44px black pill (L3). */
+/**
+ * The look every wallet pill shares — the prototype's 44px black pill (L3).
+ * The edge is an OUTLINE drawn just inside the pill: it paints over Google's
+ * own element and moves nothing, so both pills keep one size and their labels
+ * one baseline.
+ */
 const pill = (held: boolean) => ({
   height: (t: Theme) => t.spacing(WALLET_HEIGHT),
   width: "100%",
-  boxSizing: "border-box",
-  border: pillEdge(held),
+  border: 0,
+  outline: pillEdge(held),
+  outlineOffset: "-1px",
   borderRadius: (t: Theme) => t.spacing(WALLET_HEIGHT / 2),
   overflow: "hidden",
 } as const);

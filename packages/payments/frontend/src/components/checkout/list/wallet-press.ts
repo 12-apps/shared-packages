@@ -37,23 +37,42 @@ export interface WalletPressInput {
   pressed: MutableRefObject<boolean>;
 }
 
+/**
+ * Open a wallet's sheet, synchronously. A sheet that throws instead — Safari's
+ * `InvalidAccessError` for a session it will not begin, a pay.js that throws
+ * outright — starts no charge, so nothing would ever clear the press guard:
+ * both buttons would be dead (FUT-3685 review). So the guard is released, and
+ * the buyer is told the wallet could not start; the next press tries again.
+ */
+function openSheet<T>(input: WalletPressInput, open: () => T, cannotStart: string): T | null {
+  try {
+    return open();
+  } catch {
+    input.pressed.current = false;
+    input.onFailed({ message: cannotStart, code: null });
+    return null;
+  }
+}
+
 /** Google Pay's press: `loadPaymentData` inside the tap, then the charge. */
 export function useGooglePayPress(input: WalletPressInput, sheet: MutableRefObject<WalletSheet | null>): () => void {
+  const cannotStart = useCheckoutCopy().screens.wallet.googlePay.cannotComplete;
   return () => {
     const google = input.cap.googlePay;
     const cents = input.cents;
     if (!google || cents === undefined || input.blocked || input.pressed.current) return;
     input.pressed.current = true;
     input.before();
-    const answer = google.client
-      .loadPaymentData(paymentDataRequest(google.params, { totalCents: cents }))
-      .then(
-        (data) => data.paymentMethodData.tokenizationData.token,
-        (error: unknown) => {
-          if (sheetDismissed(error)) return null;
-          throw error;
-        },
-      );
+    const loading = openSheet(input, () => google.client.loadPaymentData(paymentDataRequest(google.params, { totalCents: cents })), cannotStart);
+    if (!loading) return;
+    // A sheet that rejects later reaches the runner, which says so and settles the charge.
+    const answer = loading.then(
+      (data) => data.paymentMethodData.tokenizationData.token,
+      (error: unknown) => {
+        if (sheetDismissed(error)) return null;
+        throw error;
+      },
+    );
     sheet.current = { type: "GOOGLE_PAY", answer, cents };
     input.charge.start("GOOGLE_PAY", input.total);
   };
@@ -72,13 +91,19 @@ export function useApplePayPress(input: WalletPressInput, sheet: MutableRefObjec
     if (!apple || cents === undefined || input.blocked || input.pressed.current) return;
     input.pressed.current = true;
     input.before();
-    const started = startApplePaySession({
-      Session: apple.Session,
-      cents,
-      copy,
-      validateMerchant: apple.validateMerchant,
-      onError: (message) => input.onFailed({ message, code: null }),
-    });
+    const started = openSheet(
+      input,
+      () =>
+        startApplePaySession({
+          Session: apple.Session,
+          cents,
+          copy,
+          validateMerchant: apple.validateMerchant,
+          onError: (message) => input.onFailed({ message, code: null }),
+        }),
+      copy.cannotComplete,
+    );
+    if (!started) return;
     sheet.current = { type: "APPLE_PAY", answer: started.answer, cents, complete: started.complete };
     input.charge.start("APPLE_PAY", input.total);
   };

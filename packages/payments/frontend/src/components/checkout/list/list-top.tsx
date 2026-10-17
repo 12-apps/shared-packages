@@ -59,6 +59,8 @@ interface ListTopFacts {
   config: CheckoutProviderConfig | null;
   c: { buyer: BuyerInfo; setBuyer: (buyer: BuyerInfo) => void };
   revealed: boolean;
+  /** Close a CPF opened over the one on file, keeping that one. */
+  onKeepSavedCpf: () => void;
 }
 
 /**
@@ -88,6 +90,7 @@ export function ListTop({ props, held, failure, onGoogle, onApple }: {
           provider={cpfProvider(config?.chain, state.methods)}
           onComplete={typingCard ? () => focusCardNumber(scope.current) : undefined}
           focusOnMount={props.revealed}
+          onKeepSaved={props.revealed ? props.onKeepSavedCpf : undefined}
         />
       ) : null}
       <WalletBlock cap={cap} copy={list.copy} held={held} failure={failure} onGoogle={onGoogle} onApple={onApple} />

@@ -25,7 +25,7 @@ const FIELD_WIDE_MAX = 35;
  * When the CPF is complete, `onComplete` fires once — the list moves the focus
  * to "Número do cartão" when a card typed now is chosen.
  */
-export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete, focusOnMount = false }: {
+export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete, focusOnMount = false, onKeepSaved }: {
   field: CheckoutCustomerField;
   buyer: BuyerInfo;
   onBuyerChange: (buyer: BuyerInfo) => void;
@@ -34,8 +34,10 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   onComplete?: () => void;
   /** Opened by "Alterar" on the payer line: the field takes the focus as it appears. */
   focusOnMount?: boolean;
+  /** Opened over a CPF on file: "Manter o CPF salvo" closes it and keeps that CPF. */
+  onKeepSaved?: () => void;
 }): JSX.Element {
-  const { Checkbox, Input, Text } = useCheckoutComponents();
+  const { Button, Checkbox, Input, Text } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
   const fieldCopy = useCheckoutCopy().card.fields;
   const wide = useCheckoutLayout()?.wide ?? false;
@@ -76,6 +78,13 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
           />
         </Box>
       </Box>
+      {onKeepSaved && copy.keepSavedCpf ? (
+        <Box sx={{ alignSelf: "flex-start", ml: -1 }}>
+          <Button variant="text" color="primary" size="sm" onClick={onKeepSaved} dataTestId="list-cpf-keep">
+            {copy.keepSavedCpf}
+          </Button>
+        </Box>
+      ) : null}
       {consent ? (
         <Checkbox
           label={consent.label}

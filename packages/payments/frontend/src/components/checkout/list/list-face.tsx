@@ -46,6 +46,8 @@ interface ListFaceProps {
   /** "Alterar" on the payer line opened the CPF at the top (E2 → E1). */
   revealed: boolean;
   onRevealCpf: () => void;
+  /** "Manter o CPF salvo": close the revealed CPF, keeping the one on file. */
+  onKeepSavedCpf: () => void;
 }
 
 function chosenDoor(props: ListFaceProps): CheckoutDoorOption | undefined {

@@ -119,11 +119,11 @@ describe("the CPF at the top (FUT-3685)", () => {
     expect(topCpfField({ ...input, chain: [link("Stone", [])], methods: ["PIX", "CARD"] })).toBeNull();
   });
 
-  it("is not asked of a buyer who arrived with a valid one, nor one on file — until revealed, and then required", () => {
+  it("is not asked of a buyer who arrived with a valid one, nor one on file — until revealed, and then optional", () => {
     const chain = [link("PagBank", [CPF])];
     expect(topCpfField({ ...input, chain, methods: ["CARD"], arrivedWith: { taxId: "529.982.247-25" } })).toBeNull();
     expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true })).toBeNull();
-    expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true, revealed: true })).toMatchObject({ required: true });
+    expect(topCpfField({ ...input, chain, methods: ["CARD"], taxIdOnFile: true, revealed: true })).toMatchObject({ required: false });
   });
 
   it("holds only a method whose chain needs it, unless a typed CPF is not valid (E3)", () => {
@@ -159,6 +159,7 @@ describe("the list's words (FUT-3685, T5–T8)", () => {
     expect(COPY.card.label).toBe("Cartão de crédito");
     expect(COPY.card.hintNew).toBe("Digite os dados do cartão");
     expect(COPY.buyer.cpf).toBe("CPF");
+    expect(COPY.buyer.keepSavedCpf).toBe("Manter o CPF salvo");
     expect(COPY.actions.card).toBe("Pagar");
     expect(COPY.actions.pix).toBe("Gerar Pix");
   });

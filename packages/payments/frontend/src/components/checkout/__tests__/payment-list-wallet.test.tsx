@@ -364,3 +364,43 @@ describe("the store credit for a wallet (FUT-3685 review C1)", () => {
     await screen.findByTestId("host-credit");
   });
 });
+
+describe("a sheet that will not open (FUT-3685 review round 2)", () => {
+  it("Apple: a session that throws in the tap says it could not start, and the next press opens one", async () => {
+    const { sessions } = installApple();
+    const Real = (window as unknown as { ApplePaySession: new (v: number, r: unknown) => unknown }).ApplePaySession;
+    const attempts: number[] = [];
+    class Refusing extends (Real as new (v: number, r: unknown) => object) {
+      constructor(version: number, request: unknown) {
+        attempts.push(version);
+        if (attempts.length === 1) throw new Error("InvalidAccessError");
+        super(version, request);
+      }
+    }
+    (window as unknown as { ApplePaySession: unknown }).ApplePaySession = Refusing;
+    renderList({ config: walletStore(["APPLE_PAY"]), client: stubClient(), createOrder: vi.fn(() => new Promise<CreateOrderResult>(() => undefined)), list: { totalCents: 2700 }, validateApplePayMerchant: validate() });
+    const apple = await screen.findByRole("button", { name: "Pagar com Apple Pay" });
+    fireEvent.click(apple);
+    await screen.findByText(/^Não foi possível iniciar o Apple Pay/);
+    expect(sessions).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Pagar com Apple Pay" }));
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.begun).toBe(true);
+  });
+
+  it("Google: a sheet that throws in the tap says so, and the next press opens one", async () => {
+    const load = vi
+      .fn<() => Promise<unknown>>()
+      .mockImplementationOnce(() => {
+        throw new Error("pay.js threw");
+      })
+      .mockImplementation(() => new Promise(() => undefined));
+    const { loadPaymentData } = installGoogle(load);
+    renderList({ config: walletStore(), client: stubClient(), createOrder: vi.fn(() => new Promise<CreateOrderResult>(() => undefined)), list: { totalCents: 2700 } });
+    fireEvent.click(await screen.findByTestId("google-pay-native"));
+    await screen.findByText(/^Não foi possível concluir o pagamento com o Google Pay/);
+    fireEvent.click(screen.getByTestId("google-pay-native"));
+    expect(loadPaymentData).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.getByTestId("payment-list").getAttribute("data-locked")).toBe("true"));
+  });
+});

@@ -95,6 +95,21 @@ function usePreferMethod(c: Controller, choose: ListState["choose"]): (method: P
   );
 }
 
+/**
+ * "Alterar" on the payer line opens the CPF at the top (E2 → E1); "Manter o
+ * CPF salvo" closes it, putting back the CPF the buyer arrived with — a CPF
+ * typed in between is dropped, never sent.
+ */
+function useReveal(c: Controller, arrivedWith: BuyerInfo | undefined) {
+  const [revealed, setRevealed] = useState(false);
+  const { buyer, setBuyer } = c;
+  const onKeepSavedCpf = useCallback(() => {
+    setBuyer({ ...buyer, taxId: arrivedWith?.taxId });
+    setRevealed(false);
+  }, [buyer, setBuyer, arrivedWith]);
+  return useMemo(() => ({ revealed, onRevealCpf: () => setRevealed(true), onKeepSavedCpf }), [revealed, onKeepSavedCpf]);
+}
+
 /** The list face, with what the step gathered for it. */
 function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
   props: PaymentListStepProps;
@@ -102,7 +117,7 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
   charge: ListCharge;
   cap: ListCapability;
   onHandOff: () => void;
-  reveal: { revealed: boolean; onRevealCpf: () => void };
+  reveal: { revealed: boolean; onRevealCpf: () => void; onKeepSavedCpf: () => void };
 }): JSX.Element {
   const { c, cart, totalOverride } = props;
   const config = props.providerConfig ?? null;
@@ -124,6 +139,7 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
       onHandOff={onHandOff}
       revealed={reveal.revealed}
       onRevealCpf={reveal.onRevealCpf}
+      onKeepSavedCpf={reveal.onKeepSavedCpf}
     />
   );
 }
@@ -141,8 +157,8 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
   const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant);
-  const [revealed, setRevealed] = useState(false);
-  const reveal = useMemo(() => ({ revealed, onRevealCpf: () => setRevealed(true) }), [revealed]);
+  const reveal = useReveal(c, props.defaultBuyer);
+  const { revealed } = reveal;
   const state = useListState({
     config,
     capability: cap,
