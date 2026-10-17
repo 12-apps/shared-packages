@@ -122,18 +122,19 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     reconnect: 'Reconnect test seller',
     connectFailed: 'Could not start the test seller connection.',
     returnedConnected: 'Test seller connected. The callback and the code exchange were recorded in the evidence.',
-    returnedFailed: 'The test seller connection did not complete. The reason was recorded in the evidence file.',
+    returnedFailed: 'The test seller connection did not complete. Try connecting again.',
     generate: 'Generate evidence file\u00a0(TXT)',
-    downloadLatest: 'Download again (no run)',
+    downloadLatest: 'Download the latest recorded',
     phases: {
       preparing: 'Consulting the application, renewing the token and minting the public key…',
       encrypting: 'Encrypting the test cards in the browser…',
       running: 'Creating the Pix and card orders in the sandbox — this can take up to a minute…',
       downloading: 'Building the file…',
     },
-    summary: ({ executed, failed, pending }) => `✓ ${executed} executed · ✗ ${failed} failed · ⧗ ${pending} pending`,
+    summary: ({ executed, failed, pending }) =>
+      `✓\u00a0${executed}\u00a0executed · ✗\u00a0${failed}\u00a0failed · ⧗\u00a0${pending}\u00a0pending`,
     incomplete:
-      'The file lists what is missing under Pendências. Do not submit it as complete. Notifications that arrive later show up when you download again.',
+      'The file lists what is missing under Pendências. Do not submit it as complete. Notifications that arrive later show up when you download the latest recorded.',
     generateFailed: (phase) =>
       `${
         {
@@ -142,6 +143,6 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
           running: 'Creating the orders in the sandbox failed.',
           downloading: 'Building the file failed.',
         }[phase]
-      } Try again; "Download again" still returns what was recorded.`,
+      } Try again; "Download the latest recorded" still returns what was recorded.`,
   },
 };
