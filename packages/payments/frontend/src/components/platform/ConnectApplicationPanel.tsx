@@ -47,7 +47,9 @@ export interface ConnectApplicationPanelProps {
   /**
    * Which host-side variables feed one environment's application — the host's
    * own configuration surface, rendered as a collapsible per-environment help
-   * when provided.
+   * when provided. ORDER MATTERS: the first three name the client id, the
+   * client secret and the account token, in that order — the credential
+   * preview and the paste fields are labelled by position.
    */
   configVarsFor?: (environment: PaymentEnvironment) => string[];
   /**

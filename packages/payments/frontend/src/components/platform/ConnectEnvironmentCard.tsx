@@ -3,7 +3,11 @@
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { Fragment, useState, type ReactNode } from 'react';
 
-import type { ConnectApplicationStatus, PaymentEnvironment } from '@12-apps/payments-backend';
+import type {
+  ConnectApplicationStatus,
+  ConnectCredentialPreview,
+  PaymentEnvironment,
+} from '@12-apps/payments-backend';
 import { usePlatformCopy } from './copy-context';
 
 /**
@@ -118,6 +122,24 @@ function ApplicationFields({ status, slot }: { status: ConnectApplicationStatus;
   );
 }
 
+const EMPTY_PREVIEW: ConnectCredentialPreview = {
+  clientId: null,
+  clientSecret: null,
+  accountToken: null,
+};
+
+/** One previewed value: unset, inherited from a fallback variable, or its own. */
+function PreviewValue({ value, inherited }: { value: string | null; inherited: boolean }): ReactNode {
+  const copy = usePlatformCopy().connect;
+  if (value === null) return copy.previewUnset;
+  if (inherited) return copy.previewInherited(value);
+  return (
+    <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
+      {`${value}…`}
+    </Box>
+  );
+}
+
 /**
  * The first characters of each value the application was consulted with —
  * never the value. Each is named by the host's own variable when it supplies
@@ -133,28 +155,24 @@ function CredentialPreview({
   configVars?: string[];
 }): ReactNode {
   const copy = usePlatformCopy().connect;
-  const { clientId, clientSecret, accountToken } = status.credentialPreview;
+  // A payload from a backend older than the preview carries none — render it unset, never crash.
+  const preview = status.credentialPreview ?? EMPTY_PREVIEW;
   const names = copy.credentialNames;
-  const rows: [string, string | null][] = [
-    [configVars?.[0] ?? names.clientId, clientId],
-    [configVars?.[1] ?? names.clientSecret, clientSecret],
-    [configVars?.[2] ?? names.accountToken, accountToken],
-  ];
+  const fields = ['clientId', 'clientSecret', 'accountToken'] as const;
+  const rows = fields.map((field, index) => ({
+    name: configVars?.[index] ?? names[field],
+    value: preview[field],
+    inherited: preview.inherited?.includes(field) ?? false,
+  }));
   return (
     <Stack spacing={1} data-testid={`connect-preview-${slot}`}>
       <Typography variant="caption" fontWeight={600}>
         {copy.previewHeading}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2.5 }}>
-        {rows.map(([name, preview]) => (
+        {rows.map(({ name, value, inherited }) => (
           <Field key={name} label={name}>
-            {preview === null ? (
-              copy.previewUnset
-            ) : (
-              <Box component="code" sx={{ fontFamily: 'monospace', fontSize: 13 }}>
-                {`${preview}…`}
-              </Box>
-            )}
+            <PreviewValue value={value} inherited={inherited} />
           </Field>
         ))}
       </Box>

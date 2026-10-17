@@ -111,6 +111,8 @@ export interface ConnectApplicationCopy {
    */
   previewHeading: string;
   previewUnset: string;
+  /** A value read from a fallback variable (production's token from the unsuffixed name). */
+  previewInherited(preview: string): string;
   credentialNames: { clientId: string; clientSecret: string; accountToken: string };
   /** The block that consults with PASTED credentials — rendered only when the host wires it. */
   pasted: {
@@ -120,6 +122,11 @@ export interface ConnectApplicationCopy {
     environment: string;
     submit: string;
     failed: string;
+    /**
+     * The consult authenticates with the account token and looks up the client
+     * id; the secret is never sent. The answer must not read as "all three are good".
+     */
+    secretNotChecked: string;
   };
 }
 

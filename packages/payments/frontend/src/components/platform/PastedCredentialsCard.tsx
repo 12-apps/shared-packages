@@ -52,13 +52,20 @@ function CredentialInputs({
       type={secret ? 'password' : 'text'}
       label={label}
       value={values[key]}
-      autoComplete={secret ? 'new-password' : 'off'}
+      // "off", never "new-password": that value is the hint password managers use to
+      // offer saving what was typed, and these values are never to be stored.
+      autoComplete="off"
       onChange={(event) => onChange({ ...values, [key]: event.target.value })}
       // Shrunk for good: the names share a long prefix, so an empty field's
       // placeholder-sized label is cut to the same "PAGBANK_OAUTH_CLIENT…" twice.
       slotProps={{
         inputLabel: { shrink: true },
-        htmlInput: { 'data-testid': `connect-pasted-${key}` },
+        htmlInput: {
+          'data-testid': `connect-pasted-${key}`,
+          // Password managers that ignore autocomplete honour these.
+          'data-1p-ignore': true,
+          'data-lpignore': 'true',
+        },
       }}
     />
   ));
@@ -83,6 +90,7 @@ function usePastedConsult(
   onConsult: (pasted: PastedConnectCredentials) => Promise<ConnectApplicationStatus>,
 ): {
   run: (pasted: PastedConnectCredentials) => void;
+  reset: () => void;
   pending: boolean;
   failed: boolean;
   result: ConnectApplicationStatus | null;
@@ -98,7 +106,12 @@ function usePastedConsult(
       .catch(() => setFailed(true))
       .finally(() => setPending(false));
   };
-  return { run, pending, failed, result };
+  // An answer belongs to the values it was given: editing any of them retires it.
+  const reset = (): void => {
+    setFailed(false);
+    setResult(null);
+  };
+  return { run, reset, pending, failed, result };
 }
 
 export function PastedCredentialsCard({
@@ -135,7 +148,10 @@ export function PastedCredentialsCard({
           size="small"
           label={copy.pasted.environment}
           value={environment}
-          onChange={(event) => setEnvironment(event.target.value as PaymentEnvironment)}
+          onChange={(event) => {
+            setEnvironment(event.target.value as PaymentEnvironment);
+            consult.reset();
+          }}
           slotProps={{
             select: { native: true },
             htmlInput: { 'data-testid': 'connect-pasted-environment' },
@@ -144,7 +160,14 @@ export function PastedCredentialsCard({
           <option value="SANDBOX">{copy.environmentLabels.SANDBOX}</option>
           <option value="PRODUCTION">{copy.environmentLabels.PRODUCTION}</option>
         </TextField>
-        <CredentialInputs names={names} values={values} onChange={setValues} />
+        <CredentialInputs
+          names={names}
+          values={values}
+          onChange={(next) => {
+            setValues(next);
+            consult.reset();
+          }}
+        />
         <Box>
           <Button
             variant="contained"
@@ -181,11 +204,16 @@ function PastedAnswer({
   }
   if (!consult.result) return null;
   return (
-    <ConnectEnvironmentCard
-      status={consult.result}
-      slot="PASTED"
-      configVars={configVarsFor?.(consult.result.environment)}
-      showConfigHelp={false}
-    />
+    <Stack spacing={1}>
+      <Alert severity="info" data-testid="connect-pasted-secret-not-checked">
+        {copy.pasted.secretNotChecked}
+      </Alert>
+      <ConnectEnvironmentCard
+        status={consult.result}
+        slot="PASTED"
+        configVars={configVarsFor?.(consult.result.environment)}
+        showConfigHelp={false}
+      />
+    </Stack>
   );
 }

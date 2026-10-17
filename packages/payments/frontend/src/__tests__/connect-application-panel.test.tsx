@@ -334,3 +334,82 @@ describe('ConnectApplicationPanel — credential previews and the paste block', 
     });
   });
 });
+
+describe('ConnectApplicationPanel — review round 1', () => {
+
+  it("says a fallback value is inherited instead of showing it as _PROD's own", () => {
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        configVarsFor={() => ['ID_PROD', 'SECRET_PROD', 'TOKEN_PROD']}
+        report={report([
+          status({
+            environment: 'PRODUCTION',
+            credentialPreview: {
+              clientId: null,
+              clientSecret: null,
+              accountToken: 'abcde',
+              inherited: ['accountToken'],
+            },
+          }),
+        ])}
+      />,
+    );
+
+    expect(screen.getByTestId('connect-preview-PRODUCTION').textContent).toContain(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.previewInherited('abcde'),
+    );
+  });
+
+  it('renders a payload without previews as unset rather than crashing', () => {
+    const legacy = status({ environment: 'SANDBOX' }) as Partial<ConnectApplicationStatus>;
+    delete legacy.credentialPreview;
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([legacy as ConnectApplicationStatus])}
+      />,
+    );
+
+    expect(screen.getByTestId('connect-preview-SANDBOX').textContent).toContain(PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.previewUnset);
+  });
+
+  it('warns the secret is not checked, and retires the answer when a value changes', async () => {
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([])}
+        onConsultPasted={async (pasted) =>
+          status({ environment: pasted.environment, configured: true, clientId: pasted.clientId })
+        }
+      />,
+    );
+
+    for (const id of ['clientId', 'clientSecret', 'accountToken']) {
+      fireEvent.change(screen.getByTestId(`connect-pasted-${id}`), { target: { value: 'x' } });
+    }
+    fireEvent.click(screen.getByTestId('connect-pasted-submit'));
+
+    expect((await screen.findByTestId('connect-pasted-secret-not-checked')).textContent).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.connect.pasted.secretNotChecked,
+    );
+    expect(screen.getByTestId('connect-env-PASTED')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('connect-pasted-clientSecret'), { target: { value: 'y' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('connect-pasted-submit')).toBeTruthy();
+      expect(screen.queryByTestId('connect-env-PASTED')).toBeNull();
+    });
+  });
+
+  it('asks password managers not to offer saving the pasted values', () => {
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([])}
+        onConsultPasted={async () => status({})}
+      />,
+    );
+
+    const secret = screen.getByTestId('connect-pasted-clientSecret');
+    expect(secret.getAttribute('autocomplete')).toBe('off');
+    expect(secret.getAttribute('data-1p-ignore')).toBe('true');
+  });
+});

@@ -52,7 +52,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     noApplication: 'Nenhuma aplicação configurada neste ambiente.',
     redirectMatches: 'O redirect_uri registrado confere com o callback que este deploy usa.',
     redirectDiffers:
-      'O redirect_uri registrado no PagBank é diferente do callback que este deploy usa.',
+      'O redirect_uri registrado no PagBank é diferente do callback que este deploy usa. O fluxo de autorização OAuth falha silenciosamente até o cadastro ser corrigido no PagBank.',
     redirectUnreported:
       'A resposta do PagBank não trouxe redirect_uri, então não foi possível comparar com o callback.',
     fields: {
@@ -68,10 +68,11 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       'A aplicação deste ambiente é resolvida estritamente a partir destas variáveis, sem fallback entre ambientes:',
     showConfig: 'Mostrar variáveis de ambiente',
     hideConfig: 'Ocultar variáveis de ambiente',
-    extraKeys: 'Outros campos retornados',
+    extraKeys: 'Outros campos retornados (schema não documentado)',
     environmentLabels: { SANDBOX: 'Sandbox', PRODUCTION: 'Produção' },
     previewHeading: 'Primeiros 5 caracteres de cada variável',
     previewUnset: 'não definida',
+    previewInherited: (preview) => `não definida — usa ${preview}… da variável sem sufixo`,
     credentialNames: { clientId: 'client_id', clientSecret: 'client_secret', accountToken: 'token da conta' },
     pasted: {
       heading: 'Testar outras credenciais',
@@ -80,6 +81,8 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       environment: 'Ambiente',
       submit: 'Consultar com estas credenciais',
       failed: 'Não foi possível consultar com as credenciais coladas.',
+      secretNotChecked:
+        'O PagBank não verifica o client_secret nesta consulta — só o client_id e o token. Um client_secret errado só aparece na primeira autorização de loja.',
     },
   },
 };
