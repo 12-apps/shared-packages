@@ -101,19 +101,43 @@ const muiColorFor = (color: NonNullable<ButtonProps['color']>): MuiButtonColor =
 const iconGlyphStyle = (theme: Theme) => ({ fontSize: rem(theme, BUTTON_ICON_GLYPH_SIZE) });
 
 /**
+ * The label while the button loads (FUT-3646): still in the DOM and in the
+ * accessibility tree, only transparent. The spinner used to REPLACE it, which
+ * left the button with no accessible name — a screen reader on it heard just
+ * "button, dimmed" — and let it shrink to the spinner's width mid-press.
+ *
+ * `opacity`, never `visibility: hidden` or `display: none`: those two take the
+ * text out of the accessibility tree, which is the bug again.
+ */
+const LOADING_LABEL_STYLE: React.CSSProperties = { opacity: 0 };
+
+/** The spinner, centred over the label it stands in for. */
+const LOADING_SPINNER_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+/**
+ * The icon slot while loading keeps its glyph, transparent like the label
+ * (FUT-3646): dropping it made an icon-and-label button jump 28px narrower the
+ * moment it started loading, and a square icon button turn into a 64px slab.
+ */
+const iconSlotStyle = (theme: Theme, loading: boolean | undefined): React.CSSProperties =>
+  loading ? { ...iconGlyphStyle(theme), ...LOADING_LABEL_STYLE } : iconGlyphStyle(theme);
+
+/**
  * An icon and nothing else — the shape that should render square.
  *
  * A separate predicate rather than three clauses inline: the component function
  * is already at the complexity ceiling, and "what counts as an icon button" is
- * a rule worth naming anyway. `loading` disqualifies, because a spinner
- * replaces the children and would otherwise make every loading button square.
+ * a rule worth naming anyway. Loading does not change it: the icon stays,
+ * transparent under the spinner, so the button keeps its square.
  */
-function isIconOnly({
-  loading,
-  icon,
-  children,
-}: Pick<ButtonProps, 'loading' | 'icon' | 'children'>): boolean {
-  return !loading && icon != null && children == null;
+function isIconOnly({ icon, children }: Pick<ButtonProps, 'icon' | 'children'>): boolean {
+  return icon != null && children == null;
 }
 
 /**
@@ -163,15 +187,14 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const theme = useTheme();
 
     // Wrap icon with testId if provided
-    const iconWithTestId =
-      !loading && icon ? (
-        <span data-testid={testId('icon')} style={iconGlyphStyle(theme)}>
-          {icon}
-        </span>
-      ) : undefined;
+    const iconWithTestId = icon ? (
+      <span data-testid={testId('icon')} style={iconSlotStyle(theme, loading)}>
+        {icon}
+      </span>
+    ) : undefined;
 
     // Only an icon, so the button is a square rather than a 64px slab.
-    const iconOnly = isIconOnly({ loading, icon, children });
+    const iconOnly = isIconOnly({ icon, children });
 
     const mergedClassName =
       [active ? 'active' : '', props.className].filter(Boolean).join(' ') || undefined;
@@ -188,6 +211,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         pulse={pulse}
         ripple={ripple}
         disabled={disabled || loading}
+        aria-busy={loading ? true : undefined}
         disableRipple={!ripple}
         startIcon={iconPosition === 'left' ? iconWithTestId : undefined}
         endIcon={iconPosition === 'right' ? iconWithTestId : undefined}
@@ -200,7 +224,14 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={mergedClassName}
       >
         {loading ? (
-          <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
+          <>
+            <span style={LOADING_LABEL_STYLE} data-testid={testId('busy-label')}>
+              {children}
+            </span>
+            <span style={LOADING_SPINNER_STYLE}>
+              <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
+            </span>
+          </>
         ) : (
           children
         )}

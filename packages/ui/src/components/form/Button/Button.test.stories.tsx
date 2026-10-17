@@ -98,10 +98,16 @@ export const LoadingStateTest: Story = {
       await expect(spinner).toBeInTheDocument();
     });
 
-    await step('Verify text is replaced by spinner', async () => {
+    await step('Verify the spinner covers the label without taking its name', async () => {
       const button = canvas.getByTestId('loading-button');
-      // Text should not be visible when loading
-      await expect(button).not.toHaveTextContent('Loading Button');
+      // FUT-3646: the label stays in the accessibility tree, only transparent,
+      // so the button keeps its name and its width while it loads.
+      await expect(canvas.getByRole('button', { name: 'Loading Button' })).toBe(button);
+      await expect(button).toHaveAttribute('aria-busy', 'true');
+      // Unseen (opacity 0), yet still its name; the same test id on web and native.
+      const label = canvas.getByTestId('loading-button-busy-label');
+      await expect(label).toHaveTextContent('Loading Button');
+      await expect(label).toHaveStyle({ opacity: '0' });
     });
   },
 };
@@ -527,18 +533,19 @@ export const LoadingWithIcon: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Verify icon is hidden during loading', async () => {
+    await step('Verify the icon stays, transparent, under the spinner', async () => {
       const button = canvas.getByTestId('loading-icon-button');
       await expect(button).toBeInTheDocument();
 
       // Assert the positive condition first: the spinner being present is what
-      // establishes that the loading state actually rendered. Without it the
-      // absence check below would also pass on a button that rendered nothing.
+      // establishes that the loading state actually rendered.
       const spinner = canvas.getByRole('progressbar');
       await expect(spinner).toBeInTheDocument();
 
-      // Icon should not be visible when loading
-      await waitFor(() => expect(canvas.queryByTestId('delete-icon')).not.toBeInTheDocument());
+      // FUT-3646: the icon is kept, transparent, so the button keeps its width
+      // (dropping it made the button jump 28px narrower when loading began).
+      await expect(canvas.getByTestId('loading-icon-button-icon')).toHaveStyle({ opacity: '0' });
+      await expect(canvas.getByRole('button', { name: 'Processing...' })).toBe(button);
     });
   },
 };

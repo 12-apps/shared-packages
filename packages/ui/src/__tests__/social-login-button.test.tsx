@@ -174,6 +174,12 @@ describe("SocialLoginButton's logo, pressable or not (FUT-2393)", () => {
     return slot;
   };
 
+  /** The elements strictly between `from` and its ancestor `to`, nearest first. */
+  const between = (from: Element, to: Element): Element[] => {
+    const parent = from.parentElement;
+    return parent && parent !== to ? [parent, ...between(parent, to)] : [];
+  };
+
   /** Nothing from `root` down is faded or filtered, however it is spelled. */
   const expectUnfaded = (root: Element): void => {
     for (const drawn of [root, ...root.querySelectorAll("*")]) {
@@ -239,14 +245,19 @@ describe("SocialLoginButton's logo, pressable or not (FUT-2393)", () => {
   });
 
   it("does not fade the spinner of a provider handing off", () => {
-    // Loading disables the button too, but the spinner replaces the logo and
-    // is the one sign that something is happening: nothing in the button is
-    // faded further than MUI's disabled colour already draws it.
+    // Loading disables the button too, but the spinner is the one sign that
+    // something is happening: nothing on its way to the screen is faded further
+    // than MUI's disabled colour already draws it. The logo stays under it,
+    // unseen, so the button keeps its shape and its name (FUT-3646).
     render(<SocialLoginButton provider="google" copy={PT_BR_SOCIAL_LOGIN_COPY} iconOnly loading />);
 
     const handingOff = screen.getByRole("button", { name: PT_BR_SOCIAL_LOGIN_COPY.google });
-    expect(within(handingOff).getByRole("progressbar")).toBeInTheDocument();
-    expectUnfaded(handingOff);
+    const spinner = within(handingOff).getByRole("progressbar");
+    expectUnfaded(spinner);
+    for (const drawn of between(spinner, handingOff)) {
+      expect(["", "1"]).toContain(getComputedStyle(drawn).opacity);
+    }
+    expect(["", "1"]).toContain(getComputedStyle(handingOff).opacity);
   });
 });
 

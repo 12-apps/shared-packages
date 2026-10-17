@@ -10,11 +10,11 @@ The Button component is a versatile and highly customizable interactive element 
 - **Color Themes**: primary, secondary, success, warning, info, danger, neutral
 - **Size Options**: xs, sm, md, lg, xl
 - **Special Effects**: glow, pulse animations
-- **Loading States**: Built-in loading spinner
+- **Loading States**: Built-in loading spinner over the label, which stays as the button's accessible name
 - **Icon Support**: Leading icons with automatic loading state handling
 - **Renders As Anything**: `component` swaps the element, carrying that
   component's own props through the types (a router link, an `<a>`, a label)
-- **Accessibility**: Full ARIA support, keyboard navigation
+- **Accessibility**: Native `<button>` semantics, keyboard navigation; a loading button keeps its name and sets `aria-busy`
 - **Responsive Design**: Adapts to different screen sizes
 
 ## Usage
@@ -56,7 +56,7 @@ import { Button } from '@procurement/ui';
 | `variant`    | `'solid' \| 'outline' \| 'ghost' \| 'text' \| 'glass' \| 'gradient'`                | `'solid'`   | Visual style variant                      |
 | `color`      | `'primary' \| 'secondary' \| 'success' \| 'warning' \| 'info' \| 'danger' \| 'neutral'`      | `'primary'` | Color theme                               |
 | `size`       | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'`                                        | `'md'`      | Button size                               |
-| `loading`    | `boolean`                                                                     | `false`     | Shows loading spinner and disables button |
+| `loading`    | `boolean`                                                                     | `false`     | Shows loading spinner over the label, sets `aria-busy`, disables button |
 | `disabled`   | `boolean`                                                                     | `false`     | Disables button interaction               |
 | `icon`       | `ReactNode`                                                                   | -           | Icon element to display before text       |
 | `glow`       | `boolean`                                                                     | `false`     | Adds glow visual effect                   |
@@ -274,6 +274,7 @@ The Button component includes comprehensive test IDs for reliable automated test
 | Button          | `{dataTestId}` or `'button'`       | Main button element                  |
 | Icon            | `{dataTestId}-icon` or `'button-icon'` | Icon wrapper when icon prop provided |
 | Loading Spinner | `{dataTestId}-loading` or `'button-loading'` | Circular progress during loading state |
+| Loading Label | `{dataTestId}-busy-label` or `'button-busy-label'` | The label kept, transparent, under the spinner while loading |
 
 ### Testing Best Practices
 
