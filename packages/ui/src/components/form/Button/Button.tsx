@@ -121,19 +121,23 @@ const LOADING_SPINNER_STYLE: React.CSSProperties = {
 };
 
 /**
+ * The icon slot while loading keeps its glyph, transparent like the label
+ * (FUT-3646): dropping it made an icon-and-label button jump 28px narrower the
+ * moment it started loading, and a square icon button turn into a 64px slab.
+ */
+const iconSlotStyle = (theme: Theme, loading: boolean | undefined): React.CSSProperties =>
+  loading ? { ...iconGlyphStyle(theme), ...LOADING_LABEL_STYLE } : iconGlyphStyle(theme);
+
+/**
  * An icon and nothing else — the shape that should render square.
  *
  * A separate predicate rather than three clauses inline: the component function
  * is already at the complexity ceiling, and "what counts as an icon button" is
- * a rule worth naming anyway. `loading` disqualifies, because a spinner
- * replaces the children and would otherwise make every loading button square.
+ * a rule worth naming anyway. Loading does not change it: the icon stays,
+ * transparent under the spinner, so the button keeps its square.
  */
-function isIconOnly({
-  loading,
-  icon,
-  children,
-}: Pick<ButtonProps, 'loading' | 'icon' | 'children'>): boolean {
-  return !loading && icon != null && children == null;
+function isIconOnly({ icon, children }: Pick<ButtonProps, 'icon' | 'children'>): boolean {
+  return icon != null && children == null;
 }
 
 /**
@@ -183,15 +187,14 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const theme = useTheme();
 
     // Wrap icon with testId if provided
-    const iconWithTestId =
-      !loading && icon ? (
-        <span data-testid={testId('icon')} style={iconGlyphStyle(theme)}>
-          {icon}
-        </span>
-      ) : undefined;
+    const iconWithTestId = icon ? (
+      <span data-testid={testId('icon')} style={iconSlotStyle(theme, loading)}>
+        {icon}
+      </span>
+    ) : undefined;
 
     // Only an icon, so the button is a square rather than a 64px slab.
-    const iconOnly = isIconOnly({ loading, icon, children });
+    const iconOnly = isIconOnly({ icon, children });
 
     const mergedClassName =
       [active ? 'active' : '', props.className].filter(Boolean).join(' ') || undefined;

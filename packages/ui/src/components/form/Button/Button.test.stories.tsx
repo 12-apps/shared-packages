@@ -530,18 +530,19 @@ export const LoadingWithIcon: Story = {
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
 
-    await step('Verify icon is hidden during loading', async () => {
+    await step('Verify the icon stays, transparent, under the spinner', async () => {
       const button = canvas.getByTestId('loading-icon-button');
       await expect(button).toBeInTheDocument();
 
       // Assert the positive condition first: the spinner being present is what
-      // establishes that the loading state actually rendered. Without it the
-      // absence check below would also pass on a button that rendered nothing.
+      // establishes that the loading state actually rendered.
       const spinner = canvas.getByRole('progressbar');
       await expect(spinner).toBeInTheDocument();
 
-      // Icon should not be visible when loading
-      await waitFor(() => expect(canvas.queryByTestId('delete-icon')).not.toBeInTheDocument());
+      // FUT-3646: the icon is kept, transparent, so the button keeps its width
+      // (dropping it made the button jump 28px narrower when loading began).
+      await expect(canvas.getByTestId('loading-icon-button-icon')).toHaveStyle({ opacity: '0' });
+      await expect(canvas.getByRole('button', { name: 'Processing...' })).toBe(button);
     });
   },
 };

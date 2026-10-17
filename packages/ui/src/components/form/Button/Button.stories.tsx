@@ -207,7 +207,7 @@ export const WithIcons: Story = {
 
 export const LoadingStates: Story = {
   render: () => (
-    <Stack spacing={2} direction="row">
+    <Stack spacing={2} direction="row" useFlexGap sx={{ flexWrap: 'wrap' }}>
       <Button loading>Loading</Button>
       <Button variant="outline" loading color="secondary">
         Processing

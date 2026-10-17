@@ -33,4 +33,26 @@ describe('Button (web) — loading keeps the name (FUT-3646)', () => {
     );
     expect(screen.getByRole('button', { name: 'Salvando pedido' })).toHaveAttribute('aria-busy', 'true');
   });
+
+  // The icon is kept too: dropping it made an icon-and-label button jump 28px
+  // narrower when loading began, and a square icon button turn into a slab.
+  it('keeps its icon, transparent, while loading', () => {
+    render(
+      <Button dataTestId="b" icon={<span>+</span>} loading>
+        Salvar
+      </Button>,
+    );
+    expect(screen.getByTestId('b-icon')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByRole('button', { name: '+ Salvar' })).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps an icon-only button square while loading', () => {
+    const { rerender } = render(<Button dataTestId="b" icon={<span>+</span>} aria-label="Adicionar" />);
+    const idle = getComputedStyle(screen.getByTestId('b'));
+    const idleShape = { minWidth: idle.minWidth, width: idle.width, padding: idle.padding };
+    rerender(<Button dataTestId="b" icon={<span>+</span>} aria-label="Adicionar" loading />);
+    const busy = getComputedStyle(screen.getByTestId('b'));
+    expect({ minWidth: busy.minWidth, width: busy.width, padding: busy.padding }).toEqual(idleShape);
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toHaveAttribute('aria-busy', 'true');
+  });
 });
