@@ -1,6 +1,7 @@
 import type { OAuthAppCredentialsResolver } from '../config/oauth';
 import type { OAuthAppValues } from '../config/oauth-env';
 import type { PaymentEnvironment } from '../core/types';
+import { recordedFetch } from '../core/traffic-recorder';
 import { pagbankApiBase } from '../providers/pagbank-api-base';
 
 /**
@@ -245,7 +246,7 @@ async function fetchApplication(
   accountToken: string,
   copy: ConnectApplicationCopy,
 ): Promise<{ application: RegisteredConnectApplication } | { error: string }> {
-  const res = await fetch(`${apiBase}/oauth2/application/${encodeURIComponent(clientId ?? '')}`, {
+  const res = await recordedFetch(`${apiBase}/oauth2/application/${encodeURIComponent(clientId ?? '')}`, {
     headers: { Accept: 'application/json', Authorization: `Bearer ${accountToken}` },
     signal: AbortSignal.timeout(CONSULT_TIMEOUT_MS),
   });
@@ -321,6 +322,17 @@ async function consultEnvironment(
   } catch {
     return unanswered(environment, true, clientId, deps.copy.unreachable, preview);
   }
+}
+
+/**
+ * ONE environment's application — what the homologação evidence records
+ * (FUT-3696), which must consult the sandbox and nothing else.
+ */
+export async function consultConnectApplication(
+  deps: ConsultConnectApplicationsDeps,
+  environment: PaymentEnvironment,
+): Promise<ConnectApplicationStatus> {
+  return consultEnvironment(deps, environment);
 }
 
 /**

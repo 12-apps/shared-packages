@@ -21,6 +21,8 @@
  * `./providers/*` is contractually adapter modules only.
  */
 
+import { recordedFetch } from '../core/traffic-recorder';
+
 interface PagBankPublicKeyResponse {
   public_key?: unknown;
 }
@@ -49,7 +51,7 @@ export async function fetchPagbankCardPublicKey(
 
   for (let attempt = 0; ; attempt += 1) {
     try {
-      const res = await fetch(url, {
+      const res = await recordedFetch(url, {
         method: 'POST',
         headers: {
           Accept: 'application/json',

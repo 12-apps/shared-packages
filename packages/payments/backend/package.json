@@ -17,6 +17,7 @@
     "./providers/itau": "./src/providers/itau.ts",
     "./providers/pixmanual": "./src/providers/pixmanual.ts",
     "./pagbank-public-key": "./src/providers/pagbank-public-key.ts",
+    "./homologacao-evidence": "./src/platform/evidence/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/server": "./src/manifest/server.ts",
     "./locales": "./src/locales.ts",

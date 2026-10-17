@@ -23,7 +23,13 @@
  * - A wait given {@link LiveCadence.liveIntervalMs} keeps that floor. The hook
  *   gives it one only on a hosted-checkout return carrying the settlement pair
  *   (`carriesSettlementPair`), where the buyer's own read is what confirms the
- *   payment and no server sweep can stand in for it.
+ *   payment and no server sweep can stand in for it. That floor is a timed
+ *   read on a live channel — a bounded wait on a THIRD PARTY, the provider the
+ *   buyer just paid — and it is recorded as one: the origin host's realtime
+ *   doc lists it under "Allowed exceptions", beside the redirect activation's
+ *   verify (`../../activation/use-redirect-activation.ts`), with the decision
+ *   that admits the class. If the provider's webhook ever settles every
+ *   return, the floor goes and the return waits on the channel like the rest.
  *
  * Split out of `poll-loop.ts` so the loop stays one question: WHEN to ask. This
  * file answers only how being live changes that answer.
