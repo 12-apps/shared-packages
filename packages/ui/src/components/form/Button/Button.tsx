@@ -225,7 +225,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <>
-            <span style={LOADING_LABEL_STYLE} data-testid={testId('label')}>
+            <span style={LOADING_LABEL_STYLE} data-testid={testId('busy-label')}>
               {children}
             </span>
             <span style={LOADING_SPINNER_STYLE}>

@@ -65,10 +65,20 @@ describe('Button (native)', () => {
     );
     expect(screen.getByRole('button', { name: 'Salvar' })).toHaveAttribute('aria-busy', 'true');
     // Laid out (the width holds) but unseen: the view around the text is transparent.
-    expect(screen.getByTestId('save-label')).toHaveStyle({ opacity: '0' });
-    expect(screen.getByTestId('save-label')).toHaveTextContent('Salvar');
+    expect(screen.getByTestId('save-busy-label')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByTestId('save-busy-label')).toHaveTextContent('Salvar');
     expect(screen.getByTestId('save-loading')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('names itself from a label built of text and numbers while loading', () => {
+    const count = 3;
+    render(
+      <Button dataTestId="pay" loading>
+        Pagar {count}
+      </Button>,
+    );
+    expect(screen.getByRole('button', { name: 'Pagar 3' })).toHaveAttribute('aria-label', 'Pagar 3');
   });
 
   it('keeps its icon, unseen, while loading, and lets an aria-label name it', () => {

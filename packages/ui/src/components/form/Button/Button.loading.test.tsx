@@ -20,7 +20,7 @@ describe('Button (web) — loading keeps the name (FUT-3646)', () => {
     expect(button).toBeDisabled();
     expect(screen.getByTestId('b-loading')).toBeInTheDocument();
     // Transparent, not hidden: `visibility` or `display` would drop the name again.
-    const label = screen.getByTestId('b-label');
+    const label = screen.getByTestId('b-busy-label');
     expect(label).toHaveTextContent('Salvar');
     expect(label).toHaveStyle({ opacity: '0' });
     expect(label).not.toHaveStyle({ visibility: 'hidden' });

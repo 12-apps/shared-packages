@@ -274,7 +274,7 @@ The Button component includes comprehensive test IDs for reliable automated test
 | Button          | `{dataTestId}` or `'button'`       | Main button element                  |
 | Icon            | `{dataTestId}-icon` or `'button-icon'` | Icon wrapper when icon prop provided |
 | Loading Spinner | `{dataTestId}-loading` or `'button-loading'` | Circular progress during loading state |
-| Loading Label | `{dataTestId}-label` or `'button-label'` | The label kept, transparent, under the spinner while loading |
+| Loading Label | `{dataTestId}-busy-label` or `'button-busy-label'` | The label kept, transparent, under the spinner while loading |
 
 ### Testing Best Practices
 

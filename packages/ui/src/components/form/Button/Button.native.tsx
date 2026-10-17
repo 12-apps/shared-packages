@@ -315,7 +315,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
     >
       {pulse && !look.inactive ? <Pulse color={look.palette.main} radius={look.radius} testID={idFor('pulse')} /> : null}
       {iconPosition === 'left' ? iconNode : null}
-      <Label loading={loading} label={look.label} testID={idFor('label')}>
+      <Label loading={loading} label={look.label} testID={idFor('busy-label')}>
         {children}
       </Label>
       {iconPosition === 'right' ? iconNode : null}

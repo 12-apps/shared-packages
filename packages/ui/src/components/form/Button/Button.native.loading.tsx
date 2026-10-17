@@ -37,7 +37,18 @@ export function Spinner({ color, testID }: { color: string; testID: string }): R
  * A caller's own `aria-label` still wins, being spread after this.
  */
 export const loadingName = (loading: boolean | undefined, children: React.ReactNode): string | undefined =>
-  loading && typeof children === 'string' ? children : undefined;
+  loading ? textOf(children) : undefined;
+
+/**
+ * The text of a label made only of strings and numbers — `Salvar`, or
+ * `Salvar {n}`, which React hands over as an array. Anything else (an element)
+ * has no text to say here, so the name is left to the label itself.
+ */
+function textOf(children: React.ReactNode): string | undefined {
+  const parts = React.Children.toArray(children);
+  const textual = parts.every((part) => typeof part === 'string' || typeof part === 'number');
+  return textual && parts.length > 0 ? parts.join('') : undefined;
+}
 
 /** Laid out but unseen under the spinner while loading, so the width holds. */
 export const hiddenWhile = (loading: boolean | undefined) => (loading ? styles.hidden : null);
