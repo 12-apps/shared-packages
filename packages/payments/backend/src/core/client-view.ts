@@ -174,3 +174,22 @@ export function toClientProviderConfig(
     confirmation: adapter.capabilities.confirmation ?? 'AUTOMATIC',
   };
 }
+
+/**
+ * The wallets an entry may DECLARE to a buyer (FUT-3686, contract R5).
+ *
+ * The capability table says what the adapter's charge can carry; it cannot
+ * say whether Apple Pay can run, because Apple Pay on the web needs a merchant
+ * identity to validate every session with, and that is a per-deployment fact
+ * the adapter never sees. Declaring it anyway is how every PagBank store
+ * published `APPLE_PAY` and drew a button whose sheet could never open. So
+ * `APPLE_PAY` survives only when the caller has established the identity (or a
+ * stub connection, which never reaches Apple); Google Pay is untouched — its
+ * per-store gate is `googlePay`.
+ */
+export function declaredWallets(
+  wallets: readonly WalletType[],
+  applePayConfigured: boolean,
+): WalletType[] {
+  return applePayConfigured ? [...wallets] : wallets.filter((wallet) => wallet !== 'APPLE_PAY');
+}

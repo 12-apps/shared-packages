@@ -1,3 +1,4 @@
+import type { ApplePayIdentityPort } from '../apple-pay/types';
 import type { ProviderConfigStore } from '../config/types';
 import { providerCorrelationId } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
@@ -85,6 +86,8 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
    */
   vault?: BuyerVaultPort<Caller>;
   browserKey?: BrowserKeyPort;
+  /** The Apple Pay merchant identity; without one `/config` declares no Apple Pay (FUT-3686). */
+  applePay?: ApplePayIdentityPort;
 
   /**
    * Every sentence a buyer can be refused with — REQUIRED, no default.
