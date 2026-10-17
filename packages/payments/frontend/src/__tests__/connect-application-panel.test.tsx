@@ -414,3 +414,34 @@ describe('ConnectApplicationPanel — review round 1', () => {
     expect(secret.getAttribute('data-1p-ignore')).toBe('true');
   });
 });
+
+describe('ConnectApplicationPanel — review round 2', () => {
+  it('drops an answer that settles after the pasted values changed', async () => {
+    const pending: ((answer: ConnectApplicationStatus) => void)[] = [];
+    render(
+      <ConnectApplicationPanel copy={PT_BR_PLATFORM_HOMOLOGACAO_COPY}
+        report={report([])}
+        onConsultPasted={() =>
+          new Promise<ConnectApplicationStatus>((resolve) => {
+            pending.push(resolve);
+          })
+        }
+      />,
+    );
+
+    for (const id of ['clientId', 'clientSecret', 'accountToken']) {
+      fireEvent.change(screen.getByTestId(`connect-pasted-${id}`), { target: { value: 'x' } });
+    }
+    fireEvent.click(screen.getByTestId('connect-pasted-submit'));
+    // Edited while the consult is still in flight…
+    fireEvent.change(screen.getByTestId('connect-pasted-clientId'), { target: { value: 'other' } });
+    // …so its answer, arriving now, belongs to values no longer on screen.
+    expect(pending).toHaveLength(1);
+    pending[0]?.(status({ environment: 'SANDBOX', configured: true, clientId: 'x' }));
+
+    await waitFor(() => {
+      expect((screen.getByTestId('connect-pasted-submit') as HTMLButtonElement).disabled).toBe(false);
+      expect(screen.queryByTestId('connect-env-PASTED')).toBeNull();
+    });
+  });
+});

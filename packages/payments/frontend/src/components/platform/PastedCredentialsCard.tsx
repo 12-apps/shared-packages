@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 
 import type {
   ConnectApplicationStatus,
@@ -98,16 +98,24 @@ function usePastedConsult(
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [result, setResult] = useState<ConnectApplicationStatus | null>(null);
+  // Which call the screen still wants an answer to. `reset` and every new `run`
+  // move it on, so a consult that settles after the values changed is dropped
+  // instead of landing beside values it was not given.
+  const current = useRef(0);
   const run = (pasted: PastedConnectCredentials): void => {
+    const id = ++current.current;
+    const live = (): boolean => id === current.current;
     setPending(true);
     setFailed(false);
     onConsult(pasted)
-      .then(setResult)
-      .catch(() => setFailed(true))
-      .finally(() => setPending(false));
+      .then((status) => live() && setResult(status))
+      .catch(() => live() && setFailed(true))
+      .finally(() => live() && setPending(false));
   };
   // An answer belongs to the values it was given: editing any of them retires it.
   const reset = (): void => {
+    current.current += 1;
+    setPending(false);
     setFailed(false);
     setResult(null);
   };
