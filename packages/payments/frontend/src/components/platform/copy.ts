@@ -130,10 +130,35 @@ export interface ConnectApplicationCopy {
   };
 }
 
+/** The homologação evidence card (FUT-3696) — the sandbox test seller and the TXT. */
+export interface HomologacaoEvidenceCardCopy {
+  heading: string;
+  lede: string;
+  sellerHeading: string;
+  /** `connectedAt` is ISO-8601; the pack formats it in its own locale. */
+  sellerConnected: (connectedAt: string | null, accountId: string | null) => string;
+  sellerNotConnected: string;
+  sellerReconnect: string;
+  connectHint: string;
+  connect: string;
+  reconnect: string;
+  connectFailed: string;
+  returnedConnected: string;
+  returnedFailed: string;
+  generate: string;
+  downloadLatest: string;
+  phases: { preparing: string; encrypting: string; running: string; downloading: string };
+  summary: (counts: { executed: number; failed: number; pending: number }) => string;
+  incomplete: string;
+  /** Which phase failed — and that the latest recorded file can still be downloaded. */
+  generateFailed: (phase: 'preparing' | 'encrypting' | 'running' | 'downloading') => string;
+}
+
 /** The whole platform surface, in one object a host passes at the mount. */
 export interface PlatformHomologacaoCopy {
   outcome: HomologacaoOutcomeCopy;
   guide: HomologacaoGuideCopy;
   anexo: HomologacaoAnexoCopy;
   connect: ConnectApplicationCopy;
+  evidence: HomologacaoEvidenceCardCopy;
 }

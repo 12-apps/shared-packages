@@ -337,6 +337,7 @@ export {
   type ConnectApplicationPanelProps,
 } from './components/platform/ConnectApplicationPanel';
 export { PlatformHomologacao, type PlatformHomologacaoProps } from './components/platform/PlatformHomologacao';
+export * from './components/platform/HomologacaoEvidenceCard';
 export {
   type HomologacaoSaveInput,
   type HomologacaoSaveState,

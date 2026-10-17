@@ -85,4 +85,47 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         'O PagBank não verifica o client_secret nesta consulta — só o client_id e o token. Um client_secret errado só aparece na primeira autorização de loja.',
     },
   },
+  evidence: {
+    heading: 'Evidências para homologação (sandbox)',
+    lede: 'Executa os cenários reais no sandbox do PagBank e gera o TXT para o formulário. Nada é cobrado.',
+    sellerHeading: 'Lojista de teste',
+    sellerConnected: (connectedAt, accountId) =>
+      `Conectado${connectedAt ? ` em ${new Date(connectedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` : ''}` +
+      (accountId ? ` · conta ${accountId}` : ''),
+    sellerNotConnected:
+      'Nenhum lojista de teste conectado. Sem ele, os cenários de Connect, Pix e cartão ficam pendentes no arquivo.',
+    sellerReconnect: 'A conexão do lojista de teste precisa ser autorizada de novo.',
+    connectHint:
+      'Você fará login no sandbox do PagBank com uma conta de vendedor de teste e aprovará o consentimento. Somente sandbox.',
+    connect: 'Conectar lojista de teste',
+    reconnect: 'Reconectar lojista de teste',
+    connectFailed: 'Não foi possível iniciar a conexão do lojista de teste.',
+    returnedConnected:
+      'Lojista de teste conectado. O callback e a troca do código foram registrados nas evidências.',
+    returnedFailed:
+      'A conexão do lojista de teste não foi concluída. O motivo foi registrado no arquivo de evidências.',
+    generate: 'Gerar arquivo de evidências\u00a0(TXT)',
+    downloadLatest: 'Baixar de novo (sem executar)',
+    phases: {
+      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública…',
+      encrypting: 'Criptografando os cartões de teste no navegador…',
+      running: 'Criando os pedidos Pix e cartão no sandbox — pode levar até um minuto…',
+      downloading: 'Montando o arquivo…',
+    },
+    summary: ({ executed, failed, pending }) =>
+      `✓ ${executed} ${executed === 1 ? 'executado' : 'executados'} · ` +
+      `✗ ${failed} ${failed === 1 ? 'falhou' : 'falharam'} · ` +
+      `⧗ ${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`,
+    incomplete:
+      'O arquivo lista o que falta na seção Pendências. Não o envie como completo. Notificações que chegarem depois aparecem ao baixar de novo.',
+    generateFailed: (phase) =>
+      `${
+        {
+          preparing: 'Falhou ao consultar a aplicação e preparar o lojista de teste.',
+          encrypting: 'Falhou ao criptografar os cartões de teste no navegador.',
+          running: 'Falhou ao criar os pedidos no sandbox.',
+          downloading: 'Falhou ao montar o arquivo.',
+        }[phase]
+      } Tente de novo; "Baixar de novo" ainda traz o que já foi registrado.`,
+  },
 };

@@ -1,5 +1,6 @@
 import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
+import { recordedFetch } from '../core/traffic-recorder';
 import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/types';
 
 import { pagbankApiBase } from './pagbank-api-base';
@@ -198,7 +199,7 @@ export async function pagbankRequest<T>(
 ): Promise<T> {
   const url = `${apiBaseFor(credentials)}${path}`;
   return withNetworkRetry(async () => {
-    const res = await fetch(url, {
+    const res = await recordedFetch(url, {
       method: init.method,
       headers: {
         Accept: 'application/json',

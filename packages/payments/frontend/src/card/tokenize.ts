@@ -335,3 +335,29 @@ function mintToken(prefix: string): string {
   tokenCounter += 1;
   return `${prefix}_${Date.now().toString(36)}${tokenCounter.toString(36)}`;
 }
+
+/** Why {@link encryptPagBankCard} produced no blob. */
+type PagBankEncryptFailure = "SDK_UNAVAILABLE" | "NOT_PROCESSED";
+
+/**
+ * Encrypt a card with PagBank's own browser SDK — the same script and the same
+ * `PagSeguro.encryptCard` call the checkout's {@link tokenizeCard} makes, minus
+ * the buyer-form validation and copy. For the homologação evidence (FUT-3696),
+ * which encrypts PagBank's official TEST cards and must prove the flow the
+ * checkout really uses: the PAN never leaves the browser, only the blob does.
+ */
+export async function encryptPagBankCard(params: {
+  publicKey: string;
+  holder: string;
+  number: string;
+  expMonth: string;
+  expYear: string;
+  securityCode: string;
+}): Promise<{ encrypted: string } | { failure: PagBankEncryptFailure }> {
+  if (!(await ensurePagBankSdk()) || !window.PagSeguro?.encryptCard) {
+    return { failure: "SDK_UNAVAILABLE" };
+  }
+  const result = window.PagSeguro.encryptCard(params);
+  if (result.hasErrors || !result.encryptedCard) return { failure: "NOT_PROCESSED" };
+  return { encrypted: result.encryptedCard };
+}
