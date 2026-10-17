@@ -28,6 +28,12 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     hintNew: "Digite os dados do cartão",
   },
   googlePay: { label: "Google Pay", hint: "Com o cartão salvo no seu Google" },
+  wallets: {
+    heading: "Pagamento rápido",
+    googlePay: "Pagar com Google Pay",
+    applePay: "Pagar com Apple Pay",
+    or: "ou escolha como pagar",
+  },
   handOff: {
     label: "Pix ou cartão",
     hint: (provider) =>
@@ -41,6 +47,8 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     name: "Nome",
     email: "E-mail",
     why: (provider) => (provider ? `(${the(provider)} pede para pagar pelo app)` : "(pedido para pagar pelo app)"),
+    cpfHint: (provider) => (provider ? `${the(provider)} pede para pagar pelo app` : "pedido para pagar pelo app"),
+    keepSavedCpf: "Manter o CPF salvo",
     cpfIncomplete: "O CPF tem 11 dígitos.",
     phoneIncomplete: "O celular precisa de DDD e 9 dígitos.",
   },

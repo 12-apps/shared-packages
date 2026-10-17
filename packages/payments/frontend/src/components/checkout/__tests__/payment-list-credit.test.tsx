@@ -7,8 +7,7 @@
  *  - Google Pay's sheet is priced with the amount DUE — the host's price after
  *    a balance it holds — and the key is charged only when the raised order
  *    asks the provider for that same amount; a host that gives no price, or a
- *    price of zero, has no Google Pay row, and a choice of it is dropped rather
- *    than left on a spinning, disabled button (P2);
+ *    price of zero, has no wallet button (P2, FUT-3685 E11);
  *  - `amountDueLabel` is what the card button and the 5-second bar name while an
  *    online option is chosen; a door option and an empty choice keep the
  *    cart's amount; a balance that covers everything names no card (P3);
@@ -98,8 +97,6 @@ describe("Google Pay priced with the amount due", () => {
       data: orderFor(input.method, { amountDueCents: 2200 }),
     }));
     renderList({ config: walletStore(), client, createOrder: raise, list: { totalCents: 2200, amountDueLabel: "R$ 22,00" } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     fireEvent.click(await screen.findByTestId("google-pay-native"));
     expect((load.mock.calls as unknown as [Record<string, unknown>][])[0]?.[0]).toMatchObject({ transactionInfo: { totalPrice: "22.00" } });
     await waitFor(() => expect(client.chargeWallet).toHaveBeenCalledTimes(1));
@@ -114,8 +111,6 @@ describe("Google Pay priced with the amount due", () => {
       data: orderFor(input.method, { amountDueCents: 2500 }),
     }));
     renderList({ config: walletStore(), client, createOrder: raise, list: { totalCents: 2200, amountDueLabel: "R$ 22,00" } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     fireEvent.click(await screen.findByTestId("google-pay-native"));
     await screen.findByText(/^Não foi possível concluir o pagamento com o Google Pay/);
     expect(client.chargeWallet).not.toHaveBeenCalled();
@@ -125,45 +120,35 @@ describe("Google Pay priced with the amount due", () => {
     installGoogle();
     const client = stubClient();
     renderList({ config: walletStore(), client, list: { totalCents: 2200, amountDueLabel: "R$ 22,00" } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     fireEvent.click(await screen.findByTestId("google-pay-native"));
     await screen.findByText(/^Não foi possível concluir o pagamento com o Google Pay/);
     expect(client.chargeWallet).not.toHaveBeenCalled();
   });
 
-  it("has no row when the whole amount is covered (a sheet of zero)", async () => {
+  it("offers no wallet when the whole amount is covered (a sheet of zero)", async () => {
     installGoogle();
     renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 0, amountDueLabel: "R$ 0,00" } });
     await screen.findByTestId("list-option-CARD");
-    await waitFor(() => expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("list-wallets")).toBeNull());
   });
 
-  it("withdraws the row, and a choice of it, when the host prices the sheet at zero", async () => {
+  it("withdraws the wallet when the host prices the sheet at zero, and offers it again at a new price", async () => {
     installGoogle();
     const host = { config: walletStore(), client: stubClient() };
     const { rerender } = renderList({ ...host, list: { totalCents: 2700 } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     await screen.findByTestId("google-pay-native");
 
     rerender(listFlow({ ...host, list: { totalCents: 0 } }));
-    await waitFor(() => {
-      expect(screen.queryByTestId("list-option-GOOGLE_PAY")).toBeNull();
-      expect(payButton().querySelector('[role="progressbar"]')).toBeNull();
-      expect(screen.getByText("Escolha como pagar.")).toBeTruthy();
-    });
+    await waitFor(() => expect(screen.queryByTestId("list-wallets")).toBeNull());
 
     rerender(listFlow({ ...host, list: { totalCents: 2500 } }));
-    await screen.findByTestId("list-option-GOOGLE_PAY");
+    await screen.findByTestId("google-pay-native");
   });
 
   it("warns a developer whose order view answers no amount due", async () => {
     installGoogle();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 2200 } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     fireEvent.click(await screen.findByTestId("google-pay-native"));
     await waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining("CheckoutOrder.amountDueCents")));
     warn.mockRestore();

@@ -278,6 +278,58 @@ If your router needs a literal file per URL — an MCP or RBAC scanner that
 resolves an advertised path to a real route file cannot follow a catch-all —
 mount `routes.handlers.<kind>` per file instead. Each is still a one-line mount.
 
+### Apple Pay merchant validation (`@12-apps/payments-backend/apple-pay`, FUT-3686)
+
+Apple Pay on the web needs a server step before the sheet opens: the page
+receives Apple's `validationURL`, the server calls it over mutual TLS with the
+merchant identity certificate, and the page completes with the opaque session
+that comes back. It is one route, and the route carries no host logic:
+
+```ts
+// e.g. app/api/checkout/apple-pay/merchant-session/route.ts
+import { createApplePayMerchantValidation } from '@12-apps/payments-backend/apple-pay';
+
+export const { POST } = createApplePayMerchantValidation({
+  identity: applePayIdentities, // ApplePayIdentityPort — see below
+  resolveMerchant: (request) => storeMerchantOf(request), // or a Response to refuse
+});
+```
+
+The page posts `{ validationURL }`. The URL's host must be one of the gateway
+hosts Apple publishes, matched exactly (`APPLE_PAY_GATEWAY_HOSTS`), over
+`https`, with no userinfo or port: anything else is refused before the
+certificate is loaded. The domain Apple is asked about is the browser-set
+`Origin`. Success answers `{ data: <session> }`, and every refusal answers
+`{ error, code }`: 400 for a bad body (including one over 4 KB), URL or
+domain, 409 `APPLE_PAY_NOT_CONFIGURED`, 503 `IDENTITY_UNAVAILABLE` (the port
+failed) or `IDENTITY_UNUSABLE` (the certificate is bad), 502 when Apple
+refused or could not be reached, and 504 `TIMEOUT`, which also aborts the
+call. The subpath is server-only (`node:https`). The types are also exported
+from the root, as types only.
+
+Two things stay the host's:
+
+- **Set `identity.domains`.** Without it, a caller that sends no `Origin`
+  header (anything but a browser) may name any domain in the body, and only
+  Apple's own registration check stands between it and a session for that
+  domain.
+- **Rate-limit the route.** It is public by design (the buyer may not be
+  signed in yet), and every request that passes the URL check costs one
+  mutual-TLS call to Apple.
+
+**The identity is a port**, `ApplePayIdentityPort.merchantIdentity(merchant)`,
+which answers `{ merchantIdentifier, displayName, certificate, privateKey,
+domains? }` or `null`. Whether that is one platform identity or one per seller
+is the host's decision (FUT-773). Pass the same port to `buyerCheckoutConfig`
+(`applePay`) or to `createPaymentFlowsBE` (`applePay`): **without a merchant
+identity the buyer config no longer declares `APPLE_PAY`**, even for a provider
+whose capabilities list it. A stub connection still declares it, but only so
+an e2e suite can render the button: validation on a stub store with no
+identity still answers 409. Only `buyerCheckoutConfig` and the
+`createPaymentFlowsBE` `/config` row are gated. The older library `config`
+route on `mountPayments` (`getClientConfig`) still publishes the raw
+capability table, so a host should not draw an Apple Pay button from it.
+
 ## 3. Frontend wiring
 
 - Settings page: render `<PaymentProviderSettings client={...} />` where the
@@ -802,19 +854,37 @@ What changes for the buyer:
   `SavedCard.lastUsedAt` is latest, or the head of your list when no card says.
   Answer `lastUsedAt` on `/cards` (stamp it when a charge with the card goes
   through); the tabs layout ignores it and keeps your list's head.
-- **The missing CPF (or mobile) is asked inside the chosen option**, above the
-  card fields, instead of on a Dados step first; a complete CPF moves the focus
-  to the card number. A buyer with one on file is never asked.
+- **The CPF is asked once, at the top of Pagamento** (FUT-3685), above the
+  wallets, instead of on a Dados step: it shows when ANY online method or
+  wallet the list offers needs it under the chain rule (the union, never the
+  chosen row), with "o PagBank pede para pagar pelo app" under it — the
+  provider named is the chain member that asks. Until it is valid, the wallet
+  buttons and the online rows' button are held with `copy.reasons.cpf`; a door
+  row never is. A buyer with one on file sees no field but the payer line, and
+  its "Alterar" reveals the field at the top — the list never opens a Dados
+  step. The hand-off provider's mobile is still asked inside its own row.
 - **No confirmation dialog.** The card's "Pagar" becomes a bar that fills in
   five seconds (`CHARGE_WINDOW_MS`) with "Cancelar" under it; nothing is sent
   before it fills. "Gerar Pix" raises the order and the code at once, and the
-  code copies on a tap. Google Pay is a row of its own, offered only where the
-  head declares it and `isReadyToPay` agrees; its button raises the order and
-  opens Google's sheet. A hand-off store's single "Pix ou cartão" row goes
-  straight to the provider's page. Apple Pay is not a row (its sheet must open
-  inside the tap, before an order could exist) — the tabs layout keeps it.
-- No method tabs, no order summary, no `orderNote`, and no step header on
-  Pagamento: the host's own stepper is the chrome around it.
+  code copies on a tap. A hand-off store's single "Pix ou cartão" row goes
+  straight to the provider's page.
+- **The wallets are a block above the rows** (FUT-3685): "PAGAMENTO RÁPIDO",
+  the ready wallets' buttons (Google's drawn by `createButton`, Apple's by
+  Safari's `-apple-pay-button`), then "ou escolha como pagar". A wallet is
+  ready when the chain head declares it AND the device can pay AND the card is
+  offered here (so a Pix-only store shows no block); Apple also needs your
+  `validateApplePayMerchant` port. None ready ⇒ nothing at all; two ⇒ side by
+  side from the theme's `sm`. A press opens the wallet's sheet INSIDE the tap,
+  priced at `totalCents` (the amount due), raises a CARD order in parallel and
+  charges the key only when that order's `amountDueCents ?? totalCents` is the
+  sheet's amount. Pressing a wallet never changes the chosen row.
+- **On a computer** (the flow's frame ≥ 900px, the `md` breakpoint), the step
+  sits beside a "Resumo do pedido" column: `cart.lines`, `cart.discountLines`
+  (your fee and discount rows), "Total", then `summary`, the extras and the pay
+  button — no bar at the bottom. On a phone the bar stays.
+- No method tabs, no `orderNote`, and no step header on Pagamento: the host's
+  own stepper is the chrome around it. The list's `copy.title` names the list
+  for a screen reader only.
 
 **The list's own fields.**
 
@@ -824,14 +894,26 @@ What changes for the buyer:
 | `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
 | `door?` | your pay-at-the-door options — the slot below |
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
-| `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Google Pay's sheet is priced with it, and its key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no Google Pay row** (a chosen one is dropped). Once given, a moment without it (you are re-pricing) keeps a chosen Google Pay and holds its button plainly — disabled, `copy.reasons.repricing` under it — until it returns |
-| `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar, Google Pay's press and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
+| `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
+| `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
 | `lastMethod?` | `"PIX"` or `"CARD"` — the buyer's last ONLINE way to pay, as the host remembers it (FUT-3611). Chosen before the buyer touches anything when the store offers it: Pix as Pix, a card as the saved card used last. Never a door tender. Absent ⇒ the saved-card rule alone |
 | `armedCharge?` | the host's own consent screen already took the tap ("Pedir em 1 toque", FUT-3611): the card's 5-second bar starts by itself, once, as soon as a SAVED card is chosen and nothing holds the button. Without a saved card it does nothing; Cancelar still sends nothing |
 | `chargeFooter?` | `(cancel) => ReactNode` — host content under the 5-second bar's Cancelar while it counts (the storefront's opt-out link). Handed the bar's own cancel, so it stops the charge first |
 | `pixBank?` | `{ remembered, onPick, copy, phone? }` — Pix straight to the bank app (FUT-3612). The button reads "Gerar e copiar o Pix" (or "Gerar, copiar e abrir o Nubank" with a bank remembered) and copies in the same tap; on a phone the after-copy face shows six banks (2×3, logos) in place of the checklist, or opens the remembered one with "Outro banco"; "Abrir outro banco" sits under the button. A bank that does not open (the page still visible ~1.5 s later) says so, with "Tentar de novo". `onPick` is the host's to persist; `copy` is `PIX_BANK_COPY[locale]` from `./locales`. `phone` overrides the browser's own answer (tests). A computer gets the one-tap copy and the toast only |
 | `notify?` | `(message) => void` — the host's toast, for "Código Pix copiado" (+ ". Escolha o banco." / ". Abrindo o Nubank…") |
 | `onChoiceChange?` | every change of choice, door ids included |
+
+**What else the list reads (FUT-3685).**
+
+| what | your part |
+| --- | --- |
+| `CheckoutFlowProps.validateApplePayMerchant` | the Apple Pay merchant-validation port (server-side). The list offers no Apple Pay without it — its session could only abort. `ports.validateApplePayMerchant` on `createPaymentFlows` |
+| `cart.lines`, `cart.discountLines` | the "Resumo do pedido" column on a computer: your lines, then your fee/discount rows above "Total" |
+| `paymentList.summaryTarget` | lay out the computer's two columns YOURSELF: your step cards on the left (≤ 680px), and an element of yours on the right — pass it here and the list portals the whole "Resumo do pedido" column into it (lines, money rows, Total, `summary`, extras and the pay button), with no bar at the bottom. `null` while your element is not mounted yet (the bar waits rather than flash). Leave it out on a phone, or to keep the list's own layout (the step and the column side by side once the flow's frame is ≥ 900px). The Pix screen and the hand-off always keep their bar |
+| `defaultBuyer.taxId` with `taxIdOnFile` | the CPF on file, plain digits: "Alterar" on the payer line opens it at the top, filled and editable. Without it the field opens empty. Either way the field is optional while a CPF is on file — empty keeps the saved one, only a typed CPF that is not valid holds the online ways to pay — and "Manter o CPF salvo" (`copy.buyer.keepSavedCpf`) closes it again, dropping what was typed |
+| `onlineExtras` | drawn whenever a payment here is possible — the list offers an online row or a wallet, and no door row is chosen (nothing chosen counts: a wallet pays with no row). The payer line follows the same rule |
+| `copy.wallets`, `copy.buyer.cpfHint` | new in the packs: "Pagamento rápido", "Pagar com Google Pay", "Pagar com Apple Pay", "ou escolha como pagar"; "o PagBank pede para pagar pelo app". A host building its own `PaymentListCopy` adds them. `copy.googlePay` is no longer drawn |
+| `CheckoutOnlineChoice` | never `"GOOGLE_PAY"` any more: the wallets are not rows, so `onChoiceChange` does not report one |
 
 **The door slot.** Paying at the door raises no charge, so it is the host's:
 
@@ -854,10 +936,10 @@ tell it the amount due, and your server tells it what each raised order owes:
 
 | what | your part |
 | --- | --- |
-| `CheckoutOrder.amountDueCents` | answer it on every raised order when a balance pays part of `totalCents`: the cents the provider is asked for. **A credit host that leaves it out has every Google Pay key refused** (its total is not the sheet's); in development the list says so with a `console.warn`. |
+| `CheckoutOrder.amountDueCents` | answer it on every raised order when a balance pays part of `totalCents`: the cents the provider is asked for. **A credit host that leaves it out has every wallet key refused** (its total is not the sheet's); in development the list says so with a `console.warn`. |
 | the wallet charge | your `/charge` route must check the wallet amount against the order's CURRENT amount due, not its total — the sheet was priced with the amount due |
 | everything covered (`totalCents: 0`) | the card option asks for no card, and the bar says `copy.chargingCovered`. The order the button raises must come back SETTLED — paid from the balance with no provider call, status not `AWAITING_PAYMENT` — so the list goes to its paid screen. An order that comes back awaiting with `amountDueCents: 0` is never charged; the list gives its rows back |
-| `copy.chargingCovered?`, `copy.reasons.repricing?` | the bar's sentence for a covered order; the reason under a Google Pay held while you re-price. Both packs carry them | `usePaymentList` on `createPaymentFlows` is the same
+| `copy.chargingCovered?`, `copy.reasons.repricing?` | the bar's sentence for a covered order; the reason under the wallets held while you re-price. Both packs carry them | `usePaymentList` on `createPaymentFlows` is the same
 thing for the mounted flow, read as a hook.
 
 **Known limitation.** The rows' radios are MUI's own `Radio`, not a checkout

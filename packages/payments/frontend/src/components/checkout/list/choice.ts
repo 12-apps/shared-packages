@@ -37,14 +37,13 @@ export interface OnlineCapability {
   /** The methods the chain declares, or `null` while unknown (fails OPEN). */
   offered: PaymentMethod[] | null;
   cardUnavailable: boolean;
-  /** Google Pay is declared AND this browser's `isReadyToPay` said yes. */
-  googlePayReady: boolean;
 }
 
 /**
- * The "PAGAR AGORA, PELO APP" rows, in the prototype's order: Pix, card,
- * Google Pay — or the single hand-off row for a store that takes the method
- * on its own page (N18).
+ * The "PAGAR AGORA, PELO APP" rows, in the prototype's order: Pix, then the
+ * card — or the single hand-off row for a store that takes the method on its
+ * own page (N18). The wallets are not rows: they are buttons in the block
+ * above the list (FUT-3685, R1), and pressing one never changes the choice.
  */
 export function onlineRows(cap: OnlineCapability): OnlineRow[] {
   if (cap.handOff) return [{ method: "HAND_OFF", disabled: false }];
@@ -52,7 +51,6 @@ export function onlineRows(cap: OnlineCapability): OnlineRow[] {
   const rows: OnlineRow[] = [];
   if (offers("PIX")) rows.push({ method: "PIX", disabled: false });
   if (offers("CARD")) rows.push({ method: "CARD", disabled: cap.cardUnavailable });
-  if (offers("CARD") && !cap.cardUnavailable && cap.googlePayReady) rows.push({ method: "GOOGLE_PAY", disabled: false });
   return rows;
 }
 

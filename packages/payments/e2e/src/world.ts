@@ -66,20 +66,25 @@ export type PaymentsStore =
    * capability, the PAYMENT_GATEWAY parameters, a merchant id — and a page
    * where `google.payments.api` answers, which the host provides by
    * installing a stub of it before the checkout loads (the shipped button
-   * uses an installed global without touching the network).
+   * uses an installed global without touching the network). Its checkout is
+   * the ONE list (`paymentList`, with `totalCents`), the buyer arrives with no
+   * CPF on file, and the order raised behind the sheet costs what the sheet
+   * showed (FUT-3685).
    */
   | 'google-pay'
   /**
    * A store whose chain head declares Apple Pay (FUT-472), opened on a device
    * that HAS it: the host provides a page where `window.ApplePaySession`
    * exists and `canMakePayments()` answers true (a stub, outside Safari),
-   * plus a merchant-validation port that answers a session.
+   * plus a merchant-validation port that answers a session. Its checkout is
+   * the ONE list, as for `google-pay` (FUT-3685).
    */
   | 'apple-pay'
   /**
    * The SAME Apple Pay store on a device WITHOUT Apple Pay (every non-Safari
    * browser): no `ApplePaySession` global. The scenario this hosts is the
-   * fallback rule — no button, and the card form stays the way to pay.
+   * fallback rule — no wallet block, and the list's card row stays the way to
+   * pay.
    */
   | 'apple-pay-unsupported'
   /**

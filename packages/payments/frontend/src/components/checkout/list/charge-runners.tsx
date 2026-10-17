@@ -1,7 +1,7 @@
 /**
- * The two charges the one list's button starts once an order is held
- * (FUT-3592): the CARD — the buyer's saved card or the one they typed — and
- * GOOGLE PAY's sheet. Each is the existing money path (`useCardSubmit`,
+ * The charges the one list starts once an order is held (FUT-3592,
+ * FUT-3685): the CARD — the buyer's saved card or the one they typed — and a
+ * wallet's sheet, Google Pay's or Apple Pay's. Each is the existing money path (`useCardSubmit`,
  * `useWalletCharge`), run with no button of its own: the list's bar already
  * was the button, and its 5-second window the buyer's chance to stop it.
  *
@@ -17,7 +17,7 @@ import { useRefreshOnCartChanged } from "../cart-changed";
 import { SubmittedState } from "../card-view";
 import type { ChallengeScope } from "../card-outcome";
 import { useCheckoutCopy } from "../copy-context";
-import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved } from "../types";
+import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OnCheckoutResolved } from "../types";
 import { useCardSubmit } from "../use-card-checkout";
 import { useWalletCharge } from "../use-wallet-charge";
 
@@ -112,27 +112,45 @@ export function CardRun({
  * charge that the order view does not report. Said once in development; the
  * buyer still gets the refusal.
  */
-function warnMissingAmountDue(order: CheckoutOrder, sheetCents: number): void {
+function warnMissingAmountDue(order: CheckoutOrder, sheetCents: number, type: CheckoutWalletType): void {
   const development = typeof process !== "undefined" && process.env?.NODE_ENV !== "production";
   if (order.amountDueCents !== undefined || !development) return;
+  const wallet = type === "APPLE_PAY" ? "Apple Pay" : "Google Pay";
   console.warn(
-    `[payments-frontend] Google Pay refused: the order costs ${order.totalCents} cents and the sheet showed ${sheetCents}. ` +
+    `[payments-frontend] ${wallet} refused: the order costs ${order.totalCents} cents and the sheet showed ${sheetCents}. ` +
       "A host that takes a balance off the charge must answer CheckoutOrder.amountDueCents.",
   );
 }
 
+/** A wallet's sheet, opened inside the tap: its answer, the amount it showed, and how to close it. */
+export interface WalletSheet {
+  type: CheckoutWalletType;
+  /** The sheet's answer: the wallet key, or `null` when the buyer closed it. */
+  answer: Promise<string | null>;
+  cents: number;
+  /** Close the sheet with the charge's outcome — Apple's sheet waits for it; Google's closes itself. */
+  complete?: (accepted: boolean) => void;
+  /** A runner took the sheet: it, not the list, closes it. */
+  claimed?: boolean;
+}
+
+/** The sentence for a wallet charge that could not go out. */
+function useRefusedWords(type: CheckoutWalletType): string {
+  const words = useCheckoutCopy().screens.wallet;
+  return type === "APPLE_PAY" ? (words.applePay.paymentFailed ?? words.applePay.cannotComplete) : words.googlePay.cannotComplete;
+}
+
 /**
- * Google Pay: the sheet was opened INSIDE the buyer's tap (`sheet`, priced at
- * `sheetCents`) while the order was raised; its key is charged against that
- * order only if the order asks the provider for what the sheet showed — its
- * amount due, which a balance the host holds may have made less than its
- * total. A closed sheet sends nothing more.
+ * A wallet — Google Pay or Apple Pay (FUT-3685): the sheet was opened INSIDE
+ * the buyer's tap, priced at `sheet.cents`, while the order was raised; its
+ * key is charged against that order only if the order asks the provider for
+ * what the sheet showed — its amount due, which a balance the host holds may
+ * have made less than its total (R4). A closed sheet sends nothing more.
  */
 export function WalletRun({
   order,
   buyer,
   sheet,
-  sheetCents,
   scope,
   onResolved,
   pollIntervalMs,
@@ -141,28 +159,34 @@ export function WalletRun({
 }: RunnerCallbacks & {
   order: CheckoutOrder;
   buyer: BuyerInfo;
-  /** The sheet's answer: the wallet key, or `null` when the buyer closed it. */
-  sheet: Promise<string | null>;
-  sheetCents: number;
+  sheet: WalletSheet;
   scope: ChallengeScope;
   onResolved: OnCheckoutResolved;
   pollIntervalMs: number;
 }): JSX.Element | null {
-  const words = useCheckoutCopy().screens.wallet.googlePay;
+  const refusedWords = useRefusedWords(sheet.type);
   const wallet = useWalletCharge(order, buyer, onResolved, pollIntervalMs, scope);
   useFireOnce(true, () => {
-    const refused = { message: words.cannotComplete, code: null };
-    sheet
-      .then((key) => {
+    sheet.claimed = true;
+    const refused = { message: refusedWords, code: null };
+    sheet.answer
+      .then(async (key) => {
         if (key === null) return onFailed(null);
         // The sheet showed one amount; never charge another under it.
-        if ((order.amountDueCents ?? order.totalCents) !== sheetCents) {
-          warnMissingAmountDue(order, sheetCents);
+        if ((order.amountDueCents ?? order.totalCents) !== sheet.cents) {
+          warnMissingAmountDue(order, sheet.cents, sheet.type);
+          sheet.complete?.(false);
           return onFailed(refused);
         }
-        return void wallet.payWithKey("GOOGLE_PAY", key);
+        // Charged FIRST, then the sheet told: `complete?.(await …)` would skip
+        // the charge itself for a sheet with nothing to complete (Google's).
+        const accepted = await wallet.payWithKey(sheet.type, key);
+        sheet.complete?.(accepted);
       })
-      .catch(() => onFailed(refused));
+      .catch(() => {
+        sheet.complete?.(false);
+        onFailed(refused);
+      });
   });
   const { error, errorCode, phase } = wallet;
   useEffect(() => {

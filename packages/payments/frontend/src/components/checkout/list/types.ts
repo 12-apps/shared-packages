@@ -62,7 +62,12 @@ export interface CheckoutDoorOption {
   onSend: () => void;
 }
 
-/** The online ways to pay the list may offer, as the host is told about them. */
+/**
+ * The online ways to pay the list may offer, as the host is told about them.
+ * `"GOOGLE_PAY"` is never reported any more: the wallets are buttons above the
+ * list, not rows (FUT-3685). It stays in the union so a host's exhaustive
+ * switch still compiles.
+ */
 export type CheckoutOnlineChoice = "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
 
 /** What the buyer has chosen in the list. */
@@ -104,15 +109,14 @@ export interface CheckoutPaymentList {
   /**
    * The amount an ONLINE payment will ask the provider for, in integer cents —
    * the cart's total, or what is left of it after a balance the host holds
-   * (store credit). It is what Google Pay's sheet is priced with, since that
-   * sheet must open INSIDE the tap, before any order exists to read a price
-   * from. Never given, or zero (a balance covers everything) ⇒ no Google Pay
-   * row, and a Google Pay choice is dropped. Once given, a moment without it
-   * (the host re-pricing) keeps a chosen Google Pay with its button held —
-   * plainly, with `copy.reasons.repricing` — until it returns. The key is
-   * refused if the order raised behind the sheet asks the provider for another
-   * amount (`CheckoutOrder.amountDueCents`, else its total) — so a host that
-   * takes a balance off the charge MUST answer `amountDueCents`.
+   * (store credit). It is what the wallets' sheets are priced with (FUT-3685),
+   * since a sheet must open INSIDE the tap, before any order exists to read a
+   * price from. Never given, or zero (a balance covers everything) ⇒ no wallet
+   * buttons. Once given, a moment without it (the host re-pricing) keeps their
+   * place, held — plainly, with `copy.reasons.repricing` — until it returns. A
+   * key is refused if the order raised behind the sheet asks the provider for
+   * another amount (`CheckoutOrder.amountDueCents`, else its total) — so a host
+   * that takes a balance off the charge MUST answer `amountDueCents`.
    */
   totalCents?: number;
   /**
@@ -168,6 +172,17 @@ export interface CheckoutPaymentList {
   pixBank?: CheckoutPixBank;
   /** Says a short sentence in the host's own toast — "Código Pix copiado". */
   notify?: (message: string) => void;
+  /**
+   * The host lays out the computer's two columns itself (FUT-3685, L4): its
+   * step cards on the left, and this element on the right — the list portals
+   * the "Resumo do pedido" column into it (the lines, the money rows, "Total",
+   * `summary`, the extras and the pay button), so no bar is drawn at the
+   * bottom. `null` while the element is not mounted yet: the bar waits rather
+   * than flash. Leave it OUT (undefined) on a phone, or to keep the list's own
+   * layout — the step and the column side by side once the flow's frame is
+   * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
+   */
+  summaryTarget?: HTMLElement | null;
 }
 
 /** The six banks the Pix face offers to open, in the prototype's order. */
@@ -240,7 +255,26 @@ export interface PaymentListCopy {
     /** "Digite os dados do cartão". */
     hintNew: string;
   };
+  /**
+   * @deprecated Google Pay is no longer a row (FUT-3685): it is a button in
+   * the "PAGAMENTO RÁPIDO" block — see {@link PaymentListCopy.wallets}. Kept so
+   * a host's own pack still type-checks; nothing draws it.
+   */
   googlePay: { label: string; hint: string };
+  /**
+   * The "PAGAMENTO RÁPIDO" block above the list (FUT-3685, T5–T8): the wallet
+   * buttons' accessible names and the words around them.
+   */
+  wallets: {
+    /** "Pagamento rápido" — drawn in capitals by CSS. */
+    heading: string;
+    /** "Pagar com Google Pay". */
+    googlePay: string;
+    /** "Pagar com Apple Pay". */
+    applePay: string;
+    /** "ou escolha como pagar" — the divider between the wallets and the rows. */
+    or: string;
+  };
   handOff: {
     label: string;
     /** "Você paga na página da InfinitePay e volta" — `null` when the store published no name. */
@@ -258,6 +292,17 @@ export interface PaymentListCopy {
     email: string;
     /** "(o PagBank pede para pagar pelo app)" — `null` when no name was published. */
     why: (provider: string | null) => string;
+    /**
+     * The line under "CPF" at the top of Pagamento (FUT-3685, T3) — "o PagBank
+     * pede para pagar pelo app"; `null` when no name was published.
+     */
+    cpfHint: (provider: string | null) => string;
+    /**
+     * The link under the CPF opened by "Alterar" over a CPF on file, closing it
+     * again — "Manter o CPF salvo" (FUT-3685). Both packs carry it; absent ⇒ no
+     * link (an empty field keeps the saved CPF either way).
+     */
+    keepSavedCpf?: string;
     cpfIncomplete: string;
     phoneIncomplete: string;
   };

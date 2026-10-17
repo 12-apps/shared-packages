@@ -20,6 +20,7 @@
  * a `tokensByProvider` key. A host never types one.
  */
 import type { CheckoutPaymentList } from "../components/checkout/list/types";
+import type { BackActionEmphasis } from "../components/checkout/payment-status-parts";
 import type { ComponentType, ReactNode } from "react";
 
 import type { SavedCard } from "../card";
@@ -153,9 +154,13 @@ export interface PaymentFlowsConfig extends CheckoutPipelineConfig {
   copy: CheckoutCopyFE;
   /**
    * Host content under the paid receipt (the storefront's PWA install invite),
-   * and the host's own illustration in place of the paid icon (`hero`).
+   * the host's own illustration in place of the paid icon (`hero`), content
+   * AFTER the confirmation's actions (`footer`), and whether the way out leads
+   * the paid screen (`backActionEmphasis`) — `CheckoutFlowProps`'
+   * `confirmationExtra`/`Hero`/`Footer` and `backActionEmphasis`, so a host on
+   * the factory composes the same confirmation as one mounting the flow.
    */
-  confirmation?: { extra?: ReactNode; hero?: ReactNode };
+  confirmation?: { extra?: ReactNode; hero?: ReactNode; footer?: ReactNode; backActionEmphasis?: BackActionEmphasis };
   /**
    * Warnings the host reports (Sentry). Default SILENT — never `console`: a
    * library that writes to a buyer's console tells them nothing and tells the

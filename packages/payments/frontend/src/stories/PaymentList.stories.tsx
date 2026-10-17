@@ -21,7 +21,7 @@ export default meta;
 /** A returning buyer: CPF on file, a saved Visa — the card comes chosen and Pagar is live. */
 export const SavedCard: StoryObj = scene({ chain: [ON_PAGE], instruments: SAVED, amountCents: 2700 }, { taxIdOnFile: true, buyer: ON_FILE });
 
-/** A new buyer: no CPF, no card — nothing chosen; the CPF is asked inside the option, above the card fields. */
+/** A new buyer: no CPF, no card — nothing chosen; the CPF is asked once, at the top of the step (FUT-3685). */
 export const NewBuyer: StoryObj = scene({ chain: [ON_PAGE], amountCents: 2700 }, { taxIdOnFile: false, buyer: { name: "Ana Teste" } });
 
 /** A store that finishes on its own page: one "Pix ou cartão" row, and the buyer's mobile asked inside it. */

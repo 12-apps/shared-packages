@@ -153,7 +153,7 @@ describe("a send in flight locks the list", () => {
   });
 });
 
-describe("the LGPD consent beside the asked details", () => {
+describe("the LGPD consent beside the CPF at the top", () => {
   async function newBuyerPix(saveBuyerContact: ReturnType<typeof vi.fn>, createOrder: ReturnType<typeof raising>) {
     renderList({ config: onPageStore(), client: stubClient(), taxIdOnFile: false, createOrder, saveBuyerContact });
     await screen.findByTestId("payment-list");
@@ -165,7 +165,7 @@ describe("the LGPD consent beside the asked details", () => {
     const save = vi.fn();
     const createOrder = raising();
     await newBuyerPix(save, createOrder);
-    const consent = within(screen.getByTestId("list-option-PIX")).getByLabelText("Salvar meus dados para a próxima compra") as HTMLInputElement;
+    const consent = within(screen.getByTestId("list-cpf")).getByLabelText("Salvar meus dados para a próxima compra") as HTMLInputElement;
     expect(consent.checked).toBe(true);
     fireEvent.click(payButton());
     await waitFor(() => expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ saveProfile: true })));

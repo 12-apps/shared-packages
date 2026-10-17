@@ -12,9 +12,10 @@ import type { PaymentListCopy } from "./types";
 
 /**
  * The buyer's own details the chosen option needs, asked INSIDE it and ABOVE
- * the card fields (M11, the owner's "maybe.. we should ask cpf first"): only
- * the ones the store's chain requires for this method and the buyer arrived
- * without. A buyer with a CPF on file never sees the field.
+ * the card fields (M11): only the ones the store's chain requires for this
+ * method and the buyer arrived without — the hand-off provider's mobile (K4).
+ * The CPF is no longer one of them: it is asked once, at the top of Pagamento
+ * (`./cpf-top.tsx`, FUT-3685).
  *
  * When the last of them is complete, `onComplete` fires once — the card
  * option moves the focus to "Número do cartão" with it, so the buyer's next
@@ -34,17 +35,28 @@ function nameOf(field: CheckoutCustomerField, copy: Copy): string {
 }
 
 /** The sentence under a field the buyer has started and not finished. */
-function complaintOf(field: CheckoutCustomerField, value: string, copy: Copy, cpfInvalid: (v: string) => string | undefined): string | undefined {
+export function complaintOf(field: CheckoutCustomerField, value: string, copy: Copy, cpfInvalid: (v: string) => string | undefined): string | undefined {
   if (!value.trim() || fieldSatisfied(field, value)) return undefined;
   if (field.key === "taxId") return onlyDigits(value).length < 11 ? copy.cpfIncomplete : cpfInvalid(value);
   if (field.key === "phone") return copy.phoneIncomplete;
   return undefined;
 }
 
-const PLACEHOLDERS: Partial<Record<CheckoutCustomerField["key"], string>> = {
+export const PLACEHOLDERS: Partial<Record<CheckoutCustomerField["key"], string>> = {
   taxId: "000.000.000-00",
   phone: "(00) 00000-0000",
 };
+
+/** Call `onComplete` once each time `complete` turns true — the focus moves on to what is next. */
+export function useOnComplete(complete: boolean, onComplete: (() => void) | undefined): void {
+  const was = useRef(complete);
+  const latest = useRef(onComplete);
+  latest.current = onComplete;
+  useEffect(() => {
+    if (complete && !was.current) latest.current?.();
+    was.current = complete;
+  }, [complete]);
+}
 
 export function BuyerInline({
   asked,
@@ -53,6 +65,7 @@ export function BuyerInline({
   copy,
   provider,
   onComplete,
+  withConsent = true,
 }: {
   asked: readonly CheckoutCustomerField[];
   buyer: BuyerInfo;
@@ -61,18 +74,13 @@ export function BuyerInline({
   /** The store's provider, named in the "why" — `null` when it published no name. */
   provider: string | null;
   onComplete?: () => void;
+  /** Offer "Salvar meus dados…" here — not when the top of Pagamento already does (FUT-3685). */
+  withConsent?: boolean;
 }): JSX.Element | null {
   const { Checkbox, Input, Text } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
   const cardCopy = useCheckoutCopy().card;
-  const complete = asked.every((field) => fieldSatisfied(field, buyer[field.key]));
-  const was = useRef(complete);
-  const latest = useRef(onComplete);
-  latest.current = onComplete;
-  useEffect(() => {
-    if (complete && !was.current) latest.current?.();
-    was.current = complete;
-  }, [complete]);
+  useOnComplete(asked.every((field) => fieldSatisfied(field, buyer[field.key])), onComplete);
   if (asked.length === 0) return null;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
@@ -112,7 +120,7 @@ export function BuyerInline({
           </Box>
         );
       })}
-      {consent ? (
+      {consent && withConsent ? (
         <Checkbox
           label={consent.label}
           checked={consent.checked}

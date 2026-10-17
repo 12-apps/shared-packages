@@ -94,6 +94,36 @@ describe('mtlsTransport', () => {
   });
 });
 
+describe('mtlsTransport — abort', () => {
+  it('destroys the socket when the signal fires', async () => {
+    // A slow that accepts the request and never answers it.
+    const slow = createServer({ cert: SERVER.cert, key: SERVER.key, ca: MERCHANT.cert, requestCert: true, rejectUnauthorized: true });
+    const held = new Promise<TLSSocket>((resolve) => slow.once('request', (req) => resolve(req.socket as TLSSocket)));
+    await new Promise<void>((resolve) => slow.listen(0, resolve));
+    const { port } = slow.address() as AddressInfo;
+    try {
+      const controller = new AbortController();
+      const pending = mtlsTransport(MERCHANT, { ca: SERVER.cert })(`https://localhost:${port}/slow`, {
+        method: 'POST',
+        headers: {},
+        body: '{}',
+        signal: controller.signal,
+      }).then(
+        () => null,
+        (error: unknown) => error as { name?: string },
+      );
+      const socket = await held;
+      const closed = new Promise<void>((resolve) => socket.once('close', () => resolve()));
+      controller.abort();
+      expect((await pending)?.name).toBe('AbortError');
+      // The slow sees the connection go — nothing is left holding it.
+      await closed;
+    } finally {
+      await close(slow);
+    }
+  });
+});
+
 describe('identityProblem', () => {
   it('accepts a certificate with its own key', () => {
     expect(identityProblem(MERCHANT)).toBeNull();

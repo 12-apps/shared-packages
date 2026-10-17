@@ -272,6 +272,7 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
             orderTotal: 'Total a pagar',
             cannotStart: 'Esta loja não consegue abrir o Apple Pay. Pague com cartão.',
             cannotComplete: 'O Apple Pay não abriu. Tente de novo ou pague com cartão.',
+            paymentFailed: 'O pagamento pelo Apple Pay não foi concluído. Tente de novo ou pague com cartão.',
             payAction: 'Pagar pelo Apple Pay',
           },
           googlePay: {

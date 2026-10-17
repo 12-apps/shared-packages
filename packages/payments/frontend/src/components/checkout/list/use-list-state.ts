@@ -3,10 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { NEW_CARD, type CardDetails, type CardFieldErrors, type SavedCard } from "../../../card";
 import { useSavedCardList } from "../card-sources";
 import { useCheckoutCopy } from "../copy-context";
-import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig } from "../types";
+import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
 import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, type OnlineCapability, type OnlineRow } from "./choice";
+import { isTaxId, topCpfField } from "./top-cpf";
 import type { CheckoutListChoice } from "./types";
+import type { ListWallet } from "./use-capability";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
 
@@ -31,8 +33,15 @@ export interface ListState {
   choice: CheckoutListChoice | null;
   choose: (next: CheckoutListChoice) => void;
   card: ListCard;
-  /** The buyer's own details the chosen online option must ask for (M11). */
+  /**
+   * The buyer's own details the chosen online option asks for INSIDE its row
+   * (M11) — the hand-off provider's mobile (K4). Never the CPF: that is `top`.
+   */
   asked: CheckoutCustomerField[];
+  /** The CPF asked at the top of Pagamento, or `null` (FUT-3685, E1/E2). */
+  top: CheckoutCustomerField | null;
+  /** Every online method the list offers, wallets included — what the top CPF is decided over (R2). */
+  methods: PaymentMethod[];
 }
 
 /**
@@ -100,6 +109,10 @@ export function useListState(input: {
   /** The buyer's last online method, from the host (FUT-3611). */
   lastMethod?: "PIX" | "CARD" | null;
   onChoiceChange?: (choice: CheckoutListChoice | null) => void;
+  /** The wallets the block above the list draws — each raises a CARD order. */
+  wallets?: readonly ListWallet[];
+  /** "Alterar" on the payer line revealed the CPF at the top (E2 → E1). */
+  revealed?: boolean;
 }): ListState {
   const { capability } = input;
   const rows = useMemo(() => onlineRows(capability), [capability]);
@@ -147,9 +160,29 @@ export function useListState(input: {
             method: raisedMethod(choice.method, capability.offered),
             arrivedWith: input.arrivedWith,
             taxIdOnFile: input.taxIdOnFile,
-          })
+          }).filter((field) => !isTaxId(field))
         : [],
     [choice, input.config, capability.offered, input.arrivedWith, input.taxIdOnFile],
   );
-  return { rows, choice, choose, card, asked };
+  const methods = useMemo(() => offeredOnline(rows, capability.offered, input.wallets ?? []), [rows, capability.offered, input.wallets]);
+  const top = useMemo(
+    () =>
+      topCpfField({
+        chain: input.config?.chain,
+        methods,
+        arrivedWith: input.arrivedWith,
+        taxIdOnFile: input.taxIdOnFile,
+        revealed: input.revealed ?? false,
+      }),
+    [input.config, methods, input.arrivedWith, input.taxIdOnFile, input.revealed],
+  );
+  return { rows, choice, choose, card, asked, top, methods };
+}
+
+/** The chain methods the list's rows and wallets would raise, each once. */
+function offeredOnline(rows: readonly OnlineRow[], offered: PaymentMethod[] | null, wallets: readonly ListWallet[]): PaymentMethod[] {
+  const methods = new Set<PaymentMethod>();
+  for (const row of rows) if (!row.disabled) methods.add(raisedMethod(row.method, offered));
+  if (wallets.length > 0) methods.add("CARD");
+  return [...methods];
 }

@@ -1,11 +1,11 @@
 import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import { useEffect, useRef, type JSX, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-import { useCheckoutCopy } from "../copy-context";
-import type { GooglePaymentsClient } from "../google-pay-button";
 import { useCheckoutComponents } from "../ui";
 
+import { useSummaryColumnTarget } from "./summary-column";
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
 
 /** The prototype's 52px action and 44px secondary, on the theme's spacing scale. */
@@ -23,7 +23,9 @@ function focusButtonIn(scope: HTMLElement | null): void {
  * is paying, the ONE action — or what replaced it — and why it is held.
  *
  * Drawn through the host's `ActionBar` slot, which is what pins it to the
- * bottom of the screen: the storefront passes its sticky action bar.
+ * bottom of the screen: the storefront passes its sticky action bar. On a
+ * computer (FUT-3685, L4) the same content goes into the "Resumo do pedido"
+ * column instead, and there is no bar at the bottom.
  *
  * ONE live region, always mounted, says what changes under the button — the
  * reason it is held, the charge under way, the wait — because a region that
@@ -39,29 +41,30 @@ export function ListBar({ summary, extras, payer, reason, live, children }: {
   live?: string | null;
   /** The action, or the charge bar, or the wait. */
   children: ReactNode;
-}): JSX.Element {
+}): JSX.Element | null {
   const { ActionBar, Text } = useCheckoutComponents();
-  return (
-    <ActionBar dataTestId="list-pay-bar">
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
-        {summary ? <Box data-testid="list-bar-summary">{summary}</Box> : null}
-        {extras ? <Box data-testid="list-bar-extras">{extras}</Box> : null}
-        {payer}
-        {children}
-        <Box role="status" aria-live="polite" data-testid="list-bar-live">
-          {reason ? (
-            <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
-              {reason}
-            </Text>
-          ) : (
-            <Box component="span" sx={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
-              {live ?? ""}
-            </Box>
-          )}
-        </Box>
+  const column = useSummaryColumnTarget();
+  const content = (
+    <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
+      {summary ? <Box data-testid="list-bar-summary">{summary}</Box> : null}
+      {extras ? <Box data-testid="list-bar-extras">{extras}</Box> : null}
+      {payer}
+      {children}
+      <Box role="status" aria-live="polite" data-testid="list-bar-live">
+        {reason ? (
+          <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+            {reason}
+          </Text>
+        ) : (
+          <Box component="span" sx={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
+            {live ?? ""}
+          </Box>
+        )}
       </Box>
-    </ActionBar>
+    </Box>
   );
+  if (column) return column.element ? createPortal(content, column.element) : null;
+  return <ActionBar dataTestId="list-pay-bar">{content}</ActionBar>;
 }
 
 /** "Pagar" on the left, "R$ 22,00" on the right — the prototype's 52px bar of a button. */
@@ -135,7 +138,9 @@ export function ChargeBar({ text, full, cancelLabel, onCancel }: {
             animation: full ? "none" : `${fill} ${CHARGE_WINDOW_MS}ms linear forwards`,
           }}
         />
-        <Box component="span" sx={{ position: "relative", color: "common.white", typography: "body1", fontWeight: 600 }}>
+        {/* One line, whatever the column's width: a sentence that wrapped inside the
+            52px bar ran over its edges (FUT-3685 review). The live region reads it whole. */}
+        <Box component="span" sx={{ position: "relative", minWidth: 0, color: "common.white", typography: "body1", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {text}
         </Box>
       </Box>
@@ -163,24 +168,4 @@ export function WaitingLine({ text }: { text: string }): JSX.Element {
       </Text>
     </Box>
   );
-}
-
-/**
- * Google Pay's own button in the action's place (FUT-471's brand rule: the
- * buyer presses Google's button, drawn by `createButton`, never a look-alike).
- * Its press opens the sheet SYNCHRONOUSLY — inside the tap, as the browser
- * requires — through `onPress`.
- */
-export function GooglePayAction({ client, onPress }: { client: GooglePaymentsClient; onPress: () => void }): JSX.Element {
-  const mount = useRef<HTMLDivElement | null>(null);
-  const latest = useRef(onPress);
-  latest.current = onPress;
-  const locale = useCheckoutCopy().screens.wallet.googlePay.buttonLocale;
-  useEffect(() => {
-    const element = mount.current;
-    if (!element) return undefined;
-    element.replaceChildren(client.createButton({ onClick: () => latest.current(), buttonSizeMode: "fill", buttonLocale: locale }));
-    return () => element.replaceChildren();
-  }, [client, locale]);
-  return <Box ref={mount} data-testid="list-google-pay" sx={{ minHeight: (t) => t.spacing(ACTION_HEIGHT), "& > *": { width: "100%" } }} />;
 }

@@ -101,6 +101,7 @@ export function PaymentPhase({
         defaultBuyer={props.defaultBuyer}
         saveBuyerContact={props.saveBuyerContact}
         consentLabel={props.copy.dados.saveProfile}
+        validateApplePayMerchant={validateApplePayMerchant}
       />
     );
   }

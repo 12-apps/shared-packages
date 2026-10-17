@@ -3,7 +3,6 @@ import { useId, type JSX, type ReactNode } from "react";
 
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo } from "../types";
-import { useCheckoutComponents } from "../ui";
 
 import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
@@ -66,6 +65,7 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
     >
       {opensContent(row.method, state.asked, props.failure, props.covered) ? (
         <OnlineContent
+        withConsent={!state.top}
         method={row.method}
         asked={state.asked}
         buyer={props.buyer}
@@ -100,6 +100,9 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
   );
 }
 
+/** Read by a screen reader, not drawn. */
+const VISUALLY_HIDDEN = { position: "absolute", width: "1px", height: "1px", m: 0, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" } as const;
+
 /** One heading and the rows under it, as a group named by the heading. */
 function Group({ id, heading, children }: { id: string; heading: string; children: ReactNode }): JSX.Element {
   return (
@@ -113,7 +116,9 @@ function Group({ id, heading, children }: { id: string; heading: string; childre
 /**
  * "Como você quer pagar?" — every way to pay as ONE radio group under two
  * headings (FUT-3591, M6): the store's online options, then the host's door
- * options. Choosing a row only chooses it; the bar's button acts.
+ * options. Choosing a row only chooses it; the bar's button acts. Above them,
+ * `top`: the CPF and the wallet block (FUT-3685), which are not part of the
+ * group (R1).
  *
  * One radio `name` across both groups keeps them one choice for the keyboard;
  * each heading names its own `role="group"`, and what opens inside a row sits
@@ -122,13 +127,15 @@ function Group({ id, heading, children }: { id: string; heading: string; childre
 export function ChoiceList({
   door,
   locked,
+  top,
   ...rest
 }: Omit<RowProps, "name"> & {
   door: readonly CheckoutDoorOption[];
   /** A charge or a send is under way: the list is inert. */
   locked: boolean;
+  /** The CPF and the wallets, above the rows (FUT-3685) — inert with them. */
+  top?: ReactNode;
 }): JSX.Element {
-  const { Text } = useCheckoutComponents();
   const base = useId();
   const props: RowProps = { ...rest, name: `${base}-choice` };
   const { copy, state } = props;
@@ -138,11 +145,15 @@ export function ChoiceList({
       data-locked={locked ? "true" : "false"}
       aria-disabled={locked || undefined}
       inert={locked || undefined}
+      aria-labelledby={`${base}-title`}
       sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
     >
-      <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }}>
+      {/* The list's name, for a screen reader: the step's own heading is what a
+          sighted buyer reads (the host's "Pagamento" card, T1). */}
+      <Box component="p" id={`${base}-title`} sx={VISUALLY_HIDDEN}>
         {copy.title}
-      </Text>
+      </Box>
+      {top}
       {/* Each heading only over a group that has rows (a door-only store shows the door one alone). */}
       {state.rows.length > 0 ? (
         <Group id={`${base}-online`} heading={copy.onlineHeading}>

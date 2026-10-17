@@ -20,8 +20,8 @@ export const CHARGE_WINDOW_MS = 5_000;
  */
 export type ListChargePhase = "idle" | "counting" | "sending" | "waiting";
 
-/** What a charge runs against: the card the buyer chose, or Google Pay's sheet. */
-export type ListChargeKind = "CARD" | "GOOGLE_PAY";
+/** What a charge runs against: the card the buyer chose, or a wallet's sheet. */
+export type ListChargeKind = "CARD" | "GOOGLE_PAY" | "APPLE_PAY";
 
 /** The controller's slice this needs. */
 interface RaisePorts {
@@ -41,7 +41,7 @@ export interface ListCharge {
   kind: ListChargeKind | null;
   /** The amount named when the button was pressed — the bar shows THIS, never a later one. */
   pressedTotal: string | null;
-  /** Start a card charge (with its 5-second bar) or a Google Pay one (straight away). Only from idle. */
+  /** Start a card charge (with its 5-second bar) or a wallet one (straight away: its sheet is the confirmation). Only from idle. */
   start: (kind: ListChargeKind, total: string) => void;
   /** Cancelar, during the bar: nothing has been sent, and nothing will be. */
   cancel: () => void;
@@ -131,11 +131,12 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     setPressedTotal(null);
   }, []);
 
-  const send = useCallback(() => {
+  const send = useCallback((wallet: boolean) => {
     timer.current = null;
     // Checked again at the last moment: a hold raised between two renders
-    // must not let the bar's own timer charge past it.
-    if (!allowed.current) return cancel();
+    // must not let the bar's own timer charge past it. A wallet's press is not
+    // the bar's: its sheet is already open, and the block held it itself.
+    if (!wallet && !allowed.current) return cancel();
     setPhase("sending");
     const { order, cartTotal, dueCents } = latest.current;
     if (reusable(order, cartTotal, dueCents) && order) {
@@ -152,12 +153,13 @@ export function useListCharge(ports: RaisePorts): ListCharge {
   const start = useCallback(
     (next: ListChargeKind, total: string) => {
       if (phaseRef.current !== "idle") return;
-      phaseRef.current = next === "GOOGLE_PAY" ? "sending" : "counting";
+      const wallet = next !== "CARD";
+      phaseRef.current = wallet ? "sending" : "counting";
       setKind(next);
       setPressedTotal(total);
-      if (next === "GOOGLE_PAY") return send();
+      if (wallet) return send(true);
       setPhase("counting");
-      timer.current = setTimeout(send, CHARGE_WINDOW_MS);
+      timer.current = setTimeout(() => send(false), CHARGE_WINDOW_MS);
     },
     [send],
   );

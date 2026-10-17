@@ -97,7 +97,7 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
    * The host's Apple Pay merchant-validation port (FUT-472): exchange the
    * session's `validationURL` for an Apple merchant session, SERVER-SIDE.
    * Optional — without it the Apple Pay sheet cannot start, and the card form
-   * remains the way to pay.
+   * remains the way to pay (the one list then offers no Apple Pay at all).
  */
   validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   /** Host content shown on the paid confirmation (the storefront's install invite). */
@@ -118,7 +118,8 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
    * options and the host's door options in one radio group, nothing raised on
    * a pick, the bar's button the only way an order is made, and the card
    * charged after a 5-second bar the buyer can cancel (FUT-3592). The buyer's
-   * missing CPF is asked inside the option instead of on a Dados step first.
+   * missing CPF is asked once at the top of the step, above the wallet buttons
+   * (FUT-3685), instead of on a Dados step first.
    * Absent: the method tabs, the order summary and raise-on-pick, unchanged.
    * See `./list/types.ts`.
    */

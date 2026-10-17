@@ -4,9 +4,10 @@
  *
  *  - the saved-card chips are ONE Tab stop; the arrows, Home and End move and
  *    select, as a radio group's do;
- *  - a Google Pay choice survives a moment without a price (the host
- *    re-pricing after the credit toggles): the row stays, its button is held
- *    PLAINLY — disabled, no spinner, "Atualizando o valor…" under it.
+ *  - a wallet survives a moment without a price (the host re-pricing after
+ *    the credit toggles): its place stays, held PLAINLY — disabled, no
+ *    spinner, "Atualizando o valor…" under it (FUT-3685: a button in the
+ *    block above the list, no longer a row).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +16,6 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { CheckoutProviderConfig } from "../types";
 import { SAVED_MASTER, SAVED_VISA, listFlow, onPageStore, renderList, stubClient } from "./list-harness";
 
-const radio = (testId: string): HTMLInputElement => screen.getByTestId(`${testId}-radio`) as HTMLInputElement;
 
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
@@ -92,26 +92,23 @@ function installGoogle(): void {
   (window as { google?: unknown }).google = { payments: { api: { PaymentsClient } } };
 }
 
-describe("Google Pay while the host re-prices", () => {
-  it("keeps the choice and holds the button plainly until the price returns", async () => {
+describe("a wallet while the host re-prices", () => {
+  it("keeps its place, held plainly with 'Atualizando o valor…', until the price returns", async () => {
     installGoogle();
     const host = { config: walletStore(), client: stubClient() };
     const { rerender } = renderList({ ...host, list: { totalCents: 2700 } });
-    await screen.findByTestId("list-option-GOOGLE_PAY");
-    fireEvent.click(radio("list-option-GOOGLE_PAY"));
     await screen.findByTestId("google-pay-native");
 
     rerender(listFlow({ ...host, list: {} }));
     await waitFor(() => {
-      const pay = screen.getByTestId("list-pay") as HTMLButtonElement;
-      expect(pay.disabled).toBe(true);
-      expect(pay.querySelector('[role="progressbar"]')).toBeNull();
+      expect(screen.getByTestId("list-wallet-held")).toBeTruthy();
+      expect((screen.getByTestId("list-wallet-held") as HTMLButtonElement).disabled).toBe(true);
       expect(screen.getByText("Atualizando o valor…")).toBeTruthy();
     });
-    expect(radio("list-option-GOOGLE_PAY").checked).toBe(true);
+    await waitFor(() => expect(screen.queryByTestId("google-pay-native")).toBeNull());
 
     rerender(listFlow({ ...host, list: { totalCents: 2500 } }));
     await screen.findByTestId("google-pay-native");
-    expect(radio("list-option-GOOGLE_PAY").checked).toBe(true);
+    await waitFor(() => expect(screen.queryByText("Atualizando o valor…")).toBeNull());
   });
 });

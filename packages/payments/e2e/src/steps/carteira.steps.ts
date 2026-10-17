@@ -1,16 +1,19 @@
 import { expect } from '@playwright/test';
 
+import { VALID_CPF, fillCard } from '../helpers/checkout.js';
 import { paymentsWorld } from '../world.js';
 
 import { Given, Then, When } from './fixtures.js';
 
 /**
- * PAYING WITH A DIGITAL WALLET (FUT-471) — the CARD pane's fast lane.
+ * PAYING WITH A DIGITAL WALLET (FUT-471, FUT-472, FUT-3685).
  *
- * The wallet is not a fourth method: the buyer still walks Dados and still
- * lands on the CARD pane; what changes is that the instrument comes from the
- * wallet sheet instead of typed digits. So these steps sit beside the buyer's
- * card gestures, and the Givens name store shapes exactly like `loja.steps.ts`.
+ * A wallet store opens on the ONE list (`paymentList`): the CPF asked once at
+ * the top, then "PAGAMENTO RÁPIDO" — the wallet buttons — above the rows. The
+ * wallet is not a fourth method: its press opens the sheet and raises a CARD
+ * order behind it, and never changes the chosen row. A store that does NOT
+ * declare a wallet may still be a tabs checkout, so the steps that assert an
+ * absence look for both shapes of the button.
  *
  * The button element itself is rendered by the wallet's own script (brand
  * rules), inside the package's `google-pay-button` container — a host
@@ -35,28 +38,68 @@ Given(
   },
 );
 
-When('ela paga com o Google Pay', async ({ page }) => {
-  await page.getByTestId('google-pay-button').click();
+When('ela informa o CPF no topo do pagamento', async ({ page }) => {
+  // Asked once, above the wallets — never a Dados step first (FUT-3685).
+  await expect(page.getByTestId('payment-list')).toBeVisible();
+  const cpf = page.getByTestId('list-buyer-taxId');
+  if ((await cpf.count()) > 0) await cpf.fill(VALID_CPF);
 });
 
-When('ela paga com o Apple Pay', async ({ page }) => {
-  await page.getByTestId('apple-pay-button').click();
+When('ela paga com o Google Pay em pagamento rápido', async ({ page }) => {
+  // Google's own button, drawn inside the package's mount point.
+  await page.getByTestId('list-google-pay').getByRole('button').click();
 });
 
-Then('ela vê o botão do Google Pay', async ({ page }) => {
-  await expect(page.getByTestId('google-pay-button')).toBeVisible();
+When('ela paga com o Apple Pay em pagamento rápido', async ({ page }) => {
+  await page.getByTestId('list-apple-pay').click();
+});
+
+When('ela paga com um cartão novo pela lista', async ({ page }) => {
+  await page.getByTestId('list-option-CARD-radio').check();
+  await fillCard(page);
+  // "Pagar" turns into the five-second bar; nothing is sent until it fills.
+  await page.getByTestId('list-pay').click();
+  await expect(page.getByTestId('list-charge-bar')).toBeVisible();
+});
+
+Then('a carteira espera o CPF', async ({ page }) => {
+  // Held, with the bar's own reason under the buttons — the sheet cannot ask for it.
+  // Each button stays reachable, disabled and described by that reason.
+  await expect(page.getByTestId('list-wallets-held')).toBeVisible();
+  for (const button of await page.getByTestId('list-wallet-buttons').getByRole('button').all()) {
+    await expect(button).toBeDisabled();
+  }
+});
+
+Then('ela vê o botão do Google Pay em pagamento rápido', async ({ page }) => {
+  await expect(page.getByTestId('list-wallets')).toBeVisible();
+  await expect(page.getByTestId('list-google-pay')).toBeVisible();
+  await expect(page.getByTestId('list-google-pay').getByRole('button')).toBeEnabled();
+});
+
+Then('ela vê o botão do Apple Pay em pagamento rápido', async ({ page }) => {
+  await expect(page.getByTestId('list-wallets')).toBeVisible();
+  await expect(page.getByTestId('list-apple-pay')).toBeEnabled();
+});
+
+Then('as formas de pagar continuam abaixo da carteira', async ({ page }) => {
+  // The wallet is a shortcut above the rows, not a replacement for them.
+  await expect(page.getByTestId('list-option-CARD')).toBeVisible();
+});
+
+Then('não há pagamento rápido na tela', async ({ page }) => {
+  // No heading, no buttons, no divider — not an empty block.
+  await expect(page.getByTestId('list-wallets')).toHaveCount(0);
 });
 
 Then('nenhum botão do Google Pay é mostrado', async ({ page }) => {
   await expect(page.getByTestId('google-pay-button')).toHaveCount(0);
-});
-
-Then('ela vê o botão do Apple Pay', async ({ page }) => {
-  await expect(page.getByTestId('apple-pay-button')).toBeVisible();
+  await expect(page.getByTestId('list-google-pay')).toHaveCount(0);
 });
 
 Then('nenhum botão do Apple Pay é mostrado', async ({ page }) => {
   await expect(page.getByTestId('apple-pay-button')).toHaveCount(0);
+  await expect(page.getByTestId('list-apple-pay')).toHaveCount(0);
 });
 
 Then('a cobrança enviada ao provedor carrega a carteira do Google', async ({ page }) => {

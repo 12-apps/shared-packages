@@ -234,6 +234,12 @@ export interface WalletCopy {
     cannotStart: string;
     /** It started and failed. */
     cannotComplete: string;
+    /**
+     * The sheet was authorized and the payment did not go through — the
+     * amount moved, or the charge was refused (FUT-3685). Absent ⇒
+     * `cannotComplete`. Both packs carry it.
+     */
+    paymentFailed?: string;
     payAction: string;
   };
   googlePay: {

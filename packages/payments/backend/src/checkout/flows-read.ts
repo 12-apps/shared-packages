@@ -35,6 +35,7 @@ export async function getCheckoutConfig<C, V extends object, D>(
       connections: runtime.config.connections,
       ...(runtime.config.providers ? { providers: runtime.config.providers } : {}),
       browserKey: runtime.config.browserKey,
+      applePay: runtime.config.applePay,
     },
     merchant,
   );

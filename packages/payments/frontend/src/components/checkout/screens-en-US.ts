@@ -124,6 +124,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
       orderTotal: 'Order total',
       cannotStart: 'Could not start Apple Pay in this store. Pay by card instead.',
       cannotComplete: 'Could not start Apple Pay. Try again, or pay by card.',
+      paymentFailed: 'Could not complete the payment with Apple Pay. Try again, or pay by card.',
       payAction: 'Pay with Apple Pay',
     },
     googlePay: {

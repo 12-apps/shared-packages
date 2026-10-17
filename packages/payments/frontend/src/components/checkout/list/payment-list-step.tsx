@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
 
 import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
 import { displayTotals } from "../checkout-totals";
+import type { CheckoutSummaryLine } from "../payment-summary";
 import { usePaymentPixStage } from "../payment-step-layout";
 import { PixStageProvider } from "../pix-stage";
 import { PixView } from "../pix-view";
@@ -13,6 +14,7 @@ import type { useCheckoutController } from "../use-checkout-controller";
 import { PaymentListProvider } from "./context";
 import { ListBar, WaitingLine } from "./list-bar";
 import { ListFace } from "./list-face";
+import { ListLayout } from "./summary-column";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
 import type { ListState } from "./use-list-state";
@@ -26,7 +28,15 @@ type Controller = ReturnType<typeof useCheckoutController>;
 interface PaymentListStepProps {
   c: Controller;
   list: CheckoutPaymentList;
-  cart: { totalLabel: string; totalItems: number; identity?: CheckoutBasketIdentity };
+  cart: {
+    totalLabel: string;
+    totalItems: number;
+    identity?: CheckoutBasketIdentity;
+    /** The cart's lines, for the "Resumo do pedido" column on a computer (L4). */
+    lines?: CheckoutSummaryLine[];
+    /** The host's fee and discount rows, for the same column. */
+    discountLines?: ReactNode;
+  };
   /** Settling a balance: its totals win, and its basket is no signal. */
   totalOverride?: { label: string; items: number };
   providerConfig: CheckoutProviderConfig | null | undefined;
@@ -38,6 +48,11 @@ interface PaymentListStepProps {
   /** The Dados step's consent sentence — the list asks it beside the details it asks. */
   consentLabel: string;
   pollIntervalMs?: number;
+  /**
+   * The host's Apple Pay merchant-validation port (FUT-472), server-side.
+   * Without it the list offers no Apple Pay: its session could only abort.
+   */
+  validateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
 }
 
 /** The store's provider name, as its chain head published it — `null` when it did not. */
@@ -80,13 +95,29 @@ function usePreferMethod(c: Controller, choose: ListState["choose"]): (method: P
   );
 }
 
+/**
+ * "Alterar" on the payer line opens the CPF at the top (E2 → E1); "Manter o
+ * CPF salvo" closes it, putting back the CPF the buyer arrived with — a CPF
+ * typed in between is dropped, never sent.
+ */
+function useReveal(c: Controller, arrivedWith: BuyerInfo | undefined) {
+  const [revealed, setRevealed] = useState(false);
+  const { buyer, setBuyer } = c;
+  const onKeepSavedCpf = useCallback(() => {
+    setBuyer({ ...buyer, taxId: arrivedWith?.taxId });
+    setRevealed(false);
+  }, [buyer, setBuyer, arrivedWith]);
+  return useMemo(() => ({ revealed, onRevealCpf: () => setRevealed(true), onKeepSavedCpf }), [revealed, onKeepSavedCpf]);
+}
+
 /** The list face, with what the step gathered for it. */
-function ListFaceFor({ props, state, charge, cap, onHandOff }: {
+function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
   props: PaymentListStepProps;
   state: ListState;
   charge: ListCharge;
   cap: ListCapability;
   onHandOff: () => void;
+  reveal: { revealed: boolean; onRevealCpf: () => void; onKeepSavedCpf: () => void };
 }): JSX.Element {
   const { c, cart, totalOverride } = props;
   const config = props.providerConfig ?? null;
@@ -106,6 +137,9 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
       pollIntervalMs={props.pollIntervalMs ?? 2500}
       saveBuyerContact={props.saveBuyerContact}
       onHandOff={onHandOff}
+      revealed={reveal.revealed}
+      onRevealCpf={reveal.onRevealCpf}
+      onKeepSavedCpf={reveal.onKeepSavedCpf}
     />
   );
 }
@@ -122,7 +156,9 @@ function ListFaceFor({ props, state, charge, cap, onHandOff }: {
 export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
-  const cap = useListCapability(config, list.totalCents);
+  const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant);
+  const reveal = useReveal(c, props.defaultBuyer);
+  const { revealed } = reveal;
   const state = useListState({
     config,
     capability: cap,
@@ -132,6 +168,8 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     taxIdOnFile: props.taxIdOnFile,
     lastMethod: list.lastMethod,
     onChoiceChange: list.onChoiceChange,
+    wallets: cap.wallets,
+    revealed,
   });
   const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });
   const [handingOff, startHandOff] = useHandingOff(c.createError);
@@ -146,7 +184,14 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   ) : handingOff ? (
     <HandOffFace props={props} method={c.method ?? "PIX"} />
   ) : (
-    <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} />
+    <ListLayout
+      hostTarget={list.summaryTarget}
+      lines={props.totalOverride ? undefined : props.cart.lines}
+      moneyLines={props.cart.discountLines}
+      totalLabel={displayTotals(props.totalOverride, props.cart).label}
+    >
+      <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
+    </ListLayout>
   );
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>

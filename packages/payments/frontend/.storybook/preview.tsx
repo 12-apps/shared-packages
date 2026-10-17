@@ -48,7 +48,8 @@ const preview: Preview = {
       return (
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <div style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+          {/* A computer-layout story (`parameters.wide`) takes the whole canvas. */}
+          <div style={{ maxWidth: context.parameters.wide ? 'none' : 720, margin: '0 auto', padding: context.parameters.wide ? 0 : 16 }}>
             <Story />
           </div>
         </ThemeProvider>

@@ -212,7 +212,7 @@ function AddressRow({
 const DIVIDER = <Box sx={{ height: "1px", bgcolor: "divider" }} />;
 
 /** The cart's lines, "2× X-Burger … R$ 36,00", when the host passed them. */
-function SummaryLines({ lines }: { lines: CheckoutSummaryLine[] }): JSX.Element {
+export function SummaryLines({ lines }: { lines: CheckoutSummaryLine[] }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.layout;
   return (
@@ -232,7 +232,7 @@ function SummaryLines({ lines }: { lines: CheckoutSummaryLine[] }): JSX.Element 
 }
 
 /** "Total" and the amount on one line, the host's money rows under it. */
-function SummaryTotal({ totalLabel, discountLines }: { totalLabel: string; discountLines?: ReactNode }): JSX.Element {
+export function SummaryTotal({ totalLabel, discountLines }: { totalLabel: string; discountLines?: ReactNode }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.layout;
   return (
