@@ -209,14 +209,19 @@ type Story = StoryObj<typeof meta>;
 
 const resolverIn = (canvasElement: HTMLElement) => within(canvasElement.ownerDocument.body);
 
+/** The prototype's two frames: the computer stories at `lg` (1200), the phone ones at `xs` (400). */
+const DESKTOP = { viewport: { value: 'lg', isRotated: false } };
+const PHONE = { viewport: { value: 'xs', isRotated: false } };
+
 /** The intro: each kind with its count, or all of them in one run. */
-export const Intro: Story = { args: { withIntro: true } };
+export const Intro: Story = { args: { withIntro: true }, globals: DESKTOP };
 
 /** The first step of a mixed run: no Back yet. */
-export const Step: Story = { args: {} };
+export const Step: Story = { args: {}, globals: DESKTOP };
 
 /** One step skipped: Back returns to it. */
 export const StepWithBack: Story = {
+  globals: DESKTOP,
   args: {},
   play: async ({ canvasElement }) => {
     const body = resolverIn(canvasElement);
@@ -227,6 +232,7 @@ export const StepWithBack: Story = {
 
 /** The end screen after the last step: one answered, one skipped. */
 export const Done: Story = {
+  globals: DESKTOP,
   args: { queue: PROBLEMS.slice(0, 2) },
   play: async ({ canvasElement }) => {
     const body = resolverIn(canvasElement);
@@ -239,6 +245,7 @@ export const Done: Story = {
 
 /** A step whose answer is being written: every action disabled until it returns. */
 export const Busy: Story = {
+  globals: DESKTOP,
   args: { writeMs: 600_000 },
   play: async ({ canvasElement }) => {
     const body = resolverIn(canvasElement);
@@ -249,6 +256,7 @@ export const Busy: Story = {
 
 /** Back's inverse failed: the step stays and the host's message shows. */
 export const BackFailed: Story = {
+  globals: DESKTOP,
   args: {
     onBack: () => Promise.reject(new Error('Não deu para desfazer a resposta. Tente de novo.')),
   },
@@ -261,16 +269,25 @@ export const BackFailed: Story = {
 };
 
 /** A step taller than the viewport: the paper scrolls inside it, nothing is cut off. */
-export const LongStep: Story = { args: { queue: PROBLEMS.slice(2, 3), extraLines: 24 } };
+export const LongStep: Story = { args: { queue: PROBLEMS.slice(2, 3), extraLines: 24 }, globals: DESKTOP };
 
 /** Below 600px: the inset bottom sheet, its decorative handle, 44px+ targets. */
 export const PhoneSheet: Story = {
   args: { withIntro: true },
-  globals: { viewport: { value: 'xs', isRotated: false } },
+  globals: PHONE,
 };
 
 /** The phone sheet on a step, after one skip. */
 export const PhoneStepWithBack: Story = {
   ...StepWithBack,
-  globals: { viewport: { value: 'xs', isRotated: false } },
+  globals: PHONE,
 };
+
+/** The phone sheet on the first step. */
+export const PhoneStep: Story = { ...Step, globals: PHONE };
+
+/** The phone sheet's end screen: the button full width. */
+export const PhoneDone: Story = { ...Done, globals: PHONE };
+
+/** The phone sheet with a step taller than the screen: 95% high, the body scrolls under fixed chrome. */
+export const PhoneLongStep: Story = { ...LongStep, globals: PHONE };

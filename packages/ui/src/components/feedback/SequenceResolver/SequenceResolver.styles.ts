@@ -5,16 +5,59 @@ import { softSignal } from '../../../tokens/surfaces';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
 
 /**
- * The paper's column: header, progress, body — one gap, as the prototype draws
- * it. A title focused by script (`tabIndex={-1}`, the host's included) is not
- * a control and draws no focus ring.
+ * The paper's column: chrome (handle, header, progress) on top, the screen's
+ * body below — one gap, as the prototype draws it. The body is the ONLY scroll
+ * region, so Back, the step label, close and the progress never scroll away
+ * with a long step. A title focused by script (`tabIndex={-1}`, the host's
+ * included) is not a control and draws no focus ring.
  */
 export const columnSx: SxProps<Theme> = {
   display: 'flex',
   flexDirection: 'column',
+  flex: '1 1 auto',
+  minHeight: 0,
   gap: 2.25,
   '& [tabindex="-1"]:focus': { outline: 0 },
 };
+
+/** The chrome above the body: never shrinks, never scrolls. */
+export const chromeSx: SxProps<Theme> = { display: 'flex', flexDirection: 'column', gap: 2.25, flex: 'none' };
+
+/** The screen's body: takes what the paper has left and scrolls inside it. */
+export const scrollBodySx: SxProps<Theme> = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2.25,
+  flex: '1 1 auto',
+  minHeight: 0,
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  // Room inside the scroll edge for focus rings and the primary's shadow,
+  // which an `overflow` box would otherwise clip; the negative margin keeps
+  // the content where the prototype puts it.
+  px: 0.5,
+  mx: -0.5,
+  pb: 0.5,
+};
+
+/**
+ * The paper stops scrolling itself and lets its one child (the Dialog's padded
+ * body box around `columnSx`) shrink, so the height cap reaches the body.
+ * Below the sheet breakpoint the paper is also capped at 95% of the viewport.
+ */
+export function paperSx(touch: boolean): SxProps<Theme> {
+  const share = SEQUENCE_METRICS.sheetMaxHeightPercent;
+  const column = {
+    overflowY: 'hidden',
+    '& > *': { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 },
+  } as const;
+  if (!touch) return column;
+  return {
+    ...column,
+    maxHeight: `${share}vh`,
+    '@supports (height: 100dvh)': { maxHeight: `${share}dvh` },
+  };
+}
 
 /** The end screen's button: a step down from the sentence, at the touch-target height on a phone. */
 export function doneConfirmSx(touch: boolean): SxProps<Theme> {
@@ -23,15 +66,9 @@ export function doneConfirmSx(touch: boolean): SxProps<Theme> {
 
 /** A button at the touch-target height below the sheet breakpoint; its own size above it. */
 export function actionSx(touch: boolean): SxProps<Theme> {
-  return touch ? { minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : {};
-}
-
-export function sheetPaperSx(): SxProps<Theme> {
-  const share = SEQUENCE_METRICS.sheetMaxHeightPercent;
-  return {
-    maxHeight: `${share}vh`,
-    '@supports (height: 100dvh)': { maxHeight: `${share}dvh` },
-  };
+  // On a phone the footer's actions share the row equally while each label
+  // fits on one line; one that does not takes a full row instead of wrapping.
+  return touch ? { minHeight: sxRem(SEQUENCE_METRICS.touchTarget), flex: '1 1 0', minWidth: 'max-content' } : {};
 }
 
 export const handleSx: SxProps<Theme> = {
@@ -145,7 +182,11 @@ export const categoryDescriptionSx: SxProps<Theme> = {
  */
 export function footerSx(touch: boolean): SxProps<Theme> {
   const edge = { gap: 1.25, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' } as const;
-  if (touch) return { ...edge, display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(0, 1fr)' };
+  if (touch) {
+    // Equal columns while both labels fit on one line each; a label that
+    // does not fit takes a full row rather than wrapping word by word.
+    return { ...edge, display: 'flex', flexWrap: 'wrap' };
+  }
   return { ...edge, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' };
 }
 

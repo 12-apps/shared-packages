@@ -185,6 +185,47 @@ describe("a queue that changes under the run", () => {
     expect(keysAhead(run)).toEqual(["a", "b", "c"]);
   });
 
+  it("holds BOTH steps after two Backs before one refetch (a, b, x, c)", () => {
+    const X = item("x");
+    let run = startRun<Item, string>([A, B, X, C]);
+    run = resolveRun(run, "r-a");
+    run = resolveRun(run, "r-b");
+    run = syncRun(run, [X, C]);
+    run = backRun(run);
+    run = backRun(run);
+    run = syncRun(run, [X, C]);
+    expect(keysAhead(run)).toEqual(["a", "b", "x", "c"]);
+    expect(currentOf(run)).toBe(A);
+  });
+
+  it("releases a held step once the queue confirms it, so a later drop removes it", () => {
+    let run = startRun<Item, string>([A, B]);
+    run = resolveRun(run, "r-a");
+    run = backRun(run);
+    run = syncRun(run, [A, B]);
+    expect(run.held).toEqual([]);
+    run = syncRun(run, [B]);
+    expect(keysAhead(run)).toEqual(["b"]);
+  });
+
+  it("releases a held step when the run leaves it", () => {
+    let run = startRun<Item, string>([A, B]);
+    run = skipRun(run);
+    run = backRun(run);
+    expect(run.held).toEqual(["a"]);
+    run = skipRun(run, "a");
+    expect(run.held).toEqual([]);
+  });
+
+  it("ignores a Back begun from a step already returned to (a double call)", () => {
+    let run = startRun<Item, string>([A, B, C]);
+    run = skipRun(run);
+    run = skipRun(run);
+    run = backRun(run, "b");
+    expect(backRun(run, "b")).toBe(run);
+    expect(currentOf(run)).toBe(B);
+  });
+
   it("appends entries it has not seen, in queue order, after the ones ahead", () => {
     let run = startRun<Item, string>([A, B]);
     run = syncRun(run, [C, A, B, D]);

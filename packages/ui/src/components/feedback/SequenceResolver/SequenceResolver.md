@@ -27,8 +27,10 @@ data-sized and shrinks while you go.
 
 ## Surfaces
 
-- **≥ 600px (`sm`)**: a centred `Dialog` (`size="sm"`). The paper scrolls inside the
-  viewport, so a long step is never cut off.
+- **≥ 600px (`sm`)**: a centred `Dialog` (`size="sm"`), capped by the viewport.
+- **Either way the body is the only scroll region**: the handle, header and progress stay
+  put while a long step scrolls under them, so it is never cut off and Back/close never
+  scroll away.
 - **< 600px**: the `Dialog` inset `bottom-sheet` variant, at most 95% of the dynamic
   viewport, scrolling inside; a drag handle on top is decoration only (the sheet does not
   drag). Every header and footer target is at least 44px tall there.
@@ -37,7 +39,7 @@ data-sized and shrinks while you go.
 
 | Prop | Type | Description |
 |---|---|---|
-| `open` | `boolean` | Shows the resolver. Opening it (past the intro) starts a fresh run. |
+| `open` | `boolean` | Shows the resolver. Every opening — with an intro or without — starts a fresh run. |
 | `onClose` | `(summary) => void` | Close button, Esc and the end screen's button. Gets `{ resolved, skipped, total }` for the host's "N resolved · Undo" toast. The veil does nothing (as approved). |
 | `intro` | `SequenceIntro?` | While given, the intro shows instead of the run: `title`, `description`, `categories` (`label`, `description`, `count`, `onPick`), `startAllLabel`, `onStartAll`. The host drops it and sets `queue` in the same update as a pick. |
 | `queue` | `readonly I[]` (`I extends { key; kindLabel }`) | The problems, in order. Live data: it may shrink (siblings answered together) or grow mid-run. |
@@ -64,10 +66,19 @@ data-sized and shrinks while you go.
   the steps ahead in queue order. A new `queue` drops the steps ahead it no longer has
   (resolved elsewhere — "apply to every sibling") and appends entries it has not seen; the
   total follows. The run never goes past the end: with nothing ahead the end screen shows.
+- **An empty queue at the start shows the end screen.** Do not open the resolver (past the
+  intro) before the problems have loaded.
 - **Back** pops the last visited step. Over a resolved step it awaits `onBack(item, result)`
   first; over a skipped one it returns at once. A rejected `onBack` keeps the current step
-  and shows the message (`labels.failed` when the rejection has none). The step Back
-  returned to stays on screen while the host's refetch has not put it back yet.
+  and shows the message (`labels.failed` when the rejection has none). Every step Back
+  returned to is held on screen while the host's refetch has not put it back yet — two Backs
+  before one refetch hold both — and is released once the queue has it again.
+- **`onBack` receives the item as it was when the step was answered** (with that answer's
+  result), not a fresher copy from a later queue.
+- **The close summary counts what has settled.** An answer whose write is still pending
+  when the reader closes is not in `resolved`.
+- **An error belongs to its step**: once the run moves to another step (an answer, a skip,
+  or a queue change), it is gone.
 - **Busy** blocks every verb: a second tap, or a skip during a pending write, is ignored.
 - **Focus** moves to the screen's title on open and on every advance or return; Tab is
   trapped in the dialog; Esc closes (a popup inside a step that handles its own Esc keeps it).

@@ -450,6 +450,117 @@ describe("closing", () => {
   });
 });
 
+describe("review round 1 regressions", () => {
+  it("reopening with an intro starts a fresh run: closing reports zeros, not the last run", async () => {
+    const onClose = vi.fn();
+    const intro: SequenceIntro = {
+      title: "3 problems to solve",
+      categories: [{ label: "No stock", count: 3, onPick: vi.fn() }],
+      startAllLabel: "Solve all",
+      onStartAll: vi.fn(),
+    };
+    const { rerender } = renderResolver({ onClose, intro });
+    rerender({ onClose, intro: undefined });
+    click("sr-primary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 2 of 3 · Purchase");
+    });
+    click("sr-primary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 3 of 3 · Purchase");
+    });
+    click("sr-close");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 2, skipped: 0, total: 3 });
+    });
+    rerender({ onClose, intro, open: false });
+    rerender({ onClose, intro, open: true });
+    click("sr-close");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 0, skipped: 0, total: 3 });
+    });
+  });
+
+  it("drops a failed-Back error once a queue change moves the run to another step", async () => {
+    const onBack = vi.fn(() => Promise.reject(new Error("Could not undo")));
+    const { rerender } = renderResolver({ onBack });
+    click("sr-primary");
+    click("sr-back");
+    await waitFor(() => {
+      expect(screen.getByTestId("sr-error")).toHaveTextContent("Could not undo");
+    });
+    rerender({ onBack, queue: [P("a"), P("c")] });
+    await waitFor(() => {
+      expect(dialog()).toHaveAccessibleName("Item c");
+    });
+    expect(screen.queryAllByTestId("sr-error")).toHaveLength(0);
+  });
+
+  it("a double synchronous Back over skipped steps returns one step, not two", async () => {
+    renderResolver({
+      renderStep: (item, api) => ({
+        ...basicStep(item, api),
+        tertiary: {
+          label: "Back twice",
+          onClick: () => {
+            api.back();
+            api.back();
+          },
+        },
+      }),
+    });
+    click("sr-secondary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 2 of 3 · Purchase");
+    });
+    click("sr-secondary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 3 of 3 · Purchase");
+    });
+    click("sr-tertiary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 2 of 3 · Purchase");
+    });
+  });
+
+  it("scrolls only the body: header and progress sit outside the scroll region", () => {
+    renderResolver();
+    const body = screen.getByTestId("sr-body");
+    expect(getComputedStyle(body).overflowY).toBe("auto");
+    expect(body).toContainElement(screen.getByTestId("sr-primary"));
+    expect(body).not.toContainElement(screen.getByTestId("sr-close"));
+    expect(body).not.toContainElement(screen.getByRole("progressbar"));
+    expect(getComputedStyle(dialog()).overflowY).toBe("hidden");
+  });
+
+  it("unmounting while a write is pending settles quietly", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { promise: write, open: finish } = latch<string>();
+    const { unmount } = render(
+      <SequenceResolver<Problem, string>
+        open
+        onClose={vi.fn()}
+        queue={QUEUE}
+        renderStep={(item, api) => ({
+          content: <h3 {...api.titleProps}>{item.name}</h3>,
+          primary: { label: "Save", onClick: () => api.resolve(write) },
+        })}
+        done={{ title: "Done", confirmLabel: "Finish" }}
+        labels={LABELS}
+        dataTestId="sr"
+      />,
+    );
+    click("sr-primary");
+    unmount();
+    await act(async () => {
+      finish("late");
+      await write;
+    });
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+});
+
 describe("on a phone", () => {
   it("draws the sheet's decorative handle and keeps the same dialog semantics", () => {
     stubPhoneViewport();

@@ -22,12 +22,18 @@ export interface RunState<I extends SequenceItem, R> {
   /** The steps still ahead; the first is on screen. Empty means the end screen. */
   ahead: I[];
   /**
-   * A key kept ahead even while the queue lacks it: the step whose answer is
-   * being written (the host's refetch may drop it before the write returns),
-   * or the step Back returned to (the host's inverse ran, its refetch has not
-   * put the entry back yet). Cleared once the run moves on.
+   * The step whose answer is being written, kept ahead even while the queue
+   * lacks it (the host's refetch may drop it before the write returns).
+   * Cleared when the run leaves it.
    */
   pinned?: string;
+  /**
+   * The steps Back returned to, kept ahead while the queue lacks them (the
+   * host's inverse ran, its refetch has not put the entry back yet). A SET:
+   * two Backs before one refetch hold both. A key leaves it when the queue
+   * confirms the entry or the run leaves the step.
+   */
+  held: readonly string[];
 }
 
 function dedupe<I extends SequenceItem>(items: readonly I[], skip: ReadonlySet<string>): I[] {
@@ -43,15 +49,16 @@ function dedupe<I extends SequenceItem>(items: readonly I[], skip: ReadonlySet<s
 
 /** A fresh run over `queue` (a repeated key counts once). */
 export function startRun<I extends SequenceItem, R>(queue: readonly I[]): RunState<I, R> {
-  return { visits: [], ahead: dedupe(queue, new Set()) };
+  return { visits: [], ahead: dedupe(queue, new Set()), held: [] };
 }
 
 /**
  * The run against a new queue.
  *
  * - A step ahead that the queue no longer has is dropped — it was resolved
- *   elsewhere (siblings answered together, another device) — unless it is the
- *   `pinned` one.
+ *   elsewhere (siblings answered together, another device) — unless it is
+ *   `pinned` or `held`.
+ * - A held key the queue has again is released: the host confirmed it.
  * - A queue entry the run has not seen is appended, in queue order.
  * - The entries kept are refreshed from the queue (same key, newer data).
  * - Visited steps are history and never change.
@@ -64,10 +71,11 @@ export function syncRun<I extends SequenceItem, R>(
   const kept = state.ahead.flatMap((item) => {
     const next = fresh.get(item.key);
     if (next) return [next];
-    return item.key === state.pinned ? [item] : [];
+    return item.key === state.pinned || state.held.includes(item.key) ? [item] : [];
   });
   const known = new Set([...state.visits.map((visit) => visit.item.key), ...kept.map((item) => item.key)]);
-  return { ...state, ahead: [...kept, ...dedupe(queue, known)] };
+  const held = state.held.filter((key) => !fresh.has(key));
+  return { ...state, ahead: [...kept, ...dedupe(queue, known)], held };
 }
 
 /** Keep `key` ahead whatever the queue says, until the run moves on (see {@link RunState.pinned}). */
@@ -78,6 +86,14 @@ export function pinRun<I extends SequenceItem, R>(state: RunState<I, R>, key: st
 /** The step on screen, or `undefined` at the end. */
 export function currentOf<I extends SequenceItem, R>(state: RunState<I, R>): I | undefined {
   return state.ahead[0];
+}
+
+/** The pins once the run leaves `key`: neither the write pin nor the held set keeps it. */
+function leaving<I extends SequenceItem, R>(state: RunState<I, R>, key: string): Pick<RunState<I, R>, 'pinned' | 'held'> {
+  return {
+    pinned: state.pinned === key ? undefined : state.pinned,
+    held: state.held.filter((held) => held !== key),
+  };
 }
 
 /**
@@ -94,6 +110,7 @@ export function resolveRun<I extends SequenceItem, R>(
   return {
     visits: [...state.visits, { item, outcome: 'resolved', result }],
     ahead: state.ahead.filter((entry) => entry.key !== item.key),
+    ...leaving(state, item.key),
   };
 }
 
@@ -105,7 +122,7 @@ export function resolveRun<I extends SequenceItem, R>(
 export function skipRun<I extends SequenceItem, R>(state: RunState<I, R>, key?: string): RunState<I, R> {
   const [item, ...rest] = state.ahead;
   if (!item || (key !== undefined && item.key !== key)) return state;
-  return { visits: [...state.visits, { item, outcome: 'skipped' }], ahead: rest };
+  return { visits: [...state.visits, { item, outcome: 'skipped' }], ahead: rest, ...leaving(state, item.key) };
 }
 
 /** The step Back would return to, or `undefined` on the first one. */
@@ -113,12 +130,21 @@ export function previousOf<I extends SequenceItem, R>(state: RunState<I, R>): Vi
   return state.visits[state.visits.length - 1];
 }
 
-/** Return to the previous step: it is on screen again, ahead of the rest. */
-export function backRun<I extends SequenceItem, R>(state: RunState<I, R>): RunState<I, R> {
+/**
+ * Return to the previous step: it is on screen again, ahead of the rest, and
+ * held until the queue confirms it. Given the `key` Back began from, a step
+ * already returned to (a double call) is left alone.
+ */
+export function backRun<I extends SequenceItem, R>(state: RunState<I, R>, key?: string): RunState<I, R> {
   const last = previousOf(state);
-  if (!last) return state;
+  if (!last || (key !== undefined && last.item.key !== key)) return state;
   const ahead = state.ahead.filter((item) => item.key !== last.item.key);
-  return { visits: state.visits.slice(0, -1), ahead: [last.item, ...ahead], pinned: last.item.key };
+  return {
+    ...state,
+    visits: state.visits.slice(0, -1),
+    ahead: [last.item, ...ahead],
+    held: [...state.held.filter((held) => held !== last.item.key), last.item.key],
+  };
 }
 
 /** Where the run stands. */

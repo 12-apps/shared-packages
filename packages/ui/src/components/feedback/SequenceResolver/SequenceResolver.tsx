@@ -9,7 +9,7 @@ import { Dialog } from '../Dialog';
 import { currentOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
 import { SequenceDoneBody, SequenceHeader, SequenceIntroBody, SequenceStepBody } from './SequenceResolver.parts';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
-import { columnSx, sheetPaperSx } from './SequenceResolver.styles';
+import { chromeSx, columnSx, paperSx, scrollBodySx } from './SequenceResolver.styles';
 import type { SequenceItem, SequenceResolverProps, SequenceStepApi } from './SequenceResolver.types';
 import { useSequenceRun, type SequenceRun } from './useSequenceRun';
 
@@ -118,6 +118,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
   }, []);
 
   const state = useSequenceRun<I, R>({
+    open,
     active: open && !intro,
     queue: props.queue,
     onBack: props.onBack,
@@ -143,11 +144,12 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
       size="sm"
       aria-labelledby={titleId}
       onKeyDown={escapeCloses(close)}
-      slotProps={{ paper: { sx: touch ? sheetPaperSx() : undefined } }}
+      slotProps={{ paper: { sx: paperSx(touch) } }}
       dataTestId={testId}
     >
       <Box sx={columnSx}>
-        <SequenceHeader
+        <Box sx={chromeSx}>
+          <SequenceHeader
           touch={touch}
           label={headerLabelOf(props, run, current)}
           back={backOf(props, state)}
@@ -156,8 +158,10 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
           progress={intro ? 0 : progressOf(run)}
           progressLabel={labels.progress}
           testId={testId}
-        />
-        <SequenceBody
+          />
+        </Box>
+        <Box sx={scrollBodySx} data-testid={`${testId}-body`}>
+          <SequenceBody
           props={props}
           state={state}
           current={current}
@@ -167,7 +171,8 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
           touch={touch}
           testId={testId}
           close={close}
-        />
+          />
+        </Box>
       </Box>
     </Dialog>
   );
