@@ -1,4 +1,5 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
+import type { RecordedOutcome } from './record';
 import type {
   EvidenceOutcomeCopy,
   EvidenceStatus,
@@ -59,4 +60,19 @@ export function summarize(steps: readonly EvidenceStep[]): EvidenceSummary {
 /** Replace (or add) one step of a record, keeping the canonical order stable. */
 export function withStep(steps: readonly EvidenceStep[], next: EvidenceStep): EvidenceStep[] {
   return [...steps.filter((step) => step.key !== next.key), next];
+}
+
+/** The step's clock — injectable for tests. */
+export const clockOf = (deps: { now?: () => Date }): (() => Date) => deps.now ?? (() => new Date());
+
+/** Whether PagBank actually answered 2xx to a call this step recorded. */
+export function answered(calls: readonly RecordedHttpCall[]): boolean {
+  return calls.some((call) => isSuccess(call.status));
+}
+
+/** A failed or unexpected answer, in the copy's words. */
+export function failureOf(copy: EvidenceOutcomeCopy, outcome: RecordedOutcome<unknown>): string {
+  if (!outcome.ok) return copy.callError(errorDetail(outcome.error));
+  const status = lastStatus(outcome.calls);
+  return status === undefined ? copy.notAsExpected : copy.httpAnswered(status);
 }

@@ -155,12 +155,16 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     httpAnswered: (status) => `O PagBank respondeu HTTP ${status}.`,
     exchangeStored: (accountId) =>
       `Tokens do lojista recebidos e armazenados cifrados${accountId ? ` (account_id ${accountId})` : ''}.`,
-    applicationConsulted: 'Aplicação consultada com sucesso.',
+    applicationConsulted: 'Aplicação consultada; o redirect_uri registrado confere com o callback.',
+    applicationRedirectMismatch: 'Aplicação consultada, mas o redirect_uri registrado difere do callback da integração.',
     refreshed: 'Token renovado; o novo par substituiu o anterior.',
     refreshRejected: 'O PagBank recusou a renovação; a conexão do lojista precisa ser autorizada de novo.',
-    usageSellerToken: (seller, platform) =>
-      `Os pedidos usaram o token do lojista (impressão digital SHA-256 ${seller})` +
+    usageSellerToken: (calls, seller, platform) =>
+      `As ${calls} chamada(s) de pedidos e chave pública foram autenticadas com o token do lojista ` +
+      `(impressão digital SHA-256 ${seller}, registrada em cada requisição acima)` +
       (platform ? `, diferente do token da plataforma (${platform}).` : '.'),
+    usageOtherToken:
+      'Alguma chamada foi autenticada com um token diferente do token atual do lojista — a autorização do lojista não foi comprovada.',
     usageSameAsPlatform: 'O token do lojista é igual ao da plataforma — a autorização do lojista não foi comprovada.',
     usageNotConnected: 'Nenhum lojista de teste conectado no sandbox; conecte-o antes de gerar as evidências.',
     notSandbox: 'A conexão do lojista de teste não é de sandbox; nada foi executado.',
@@ -185,5 +189,10 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       (chargeStatus ? `; a cobrança registrada pela integração está ${chargeStatus}.` : '.'),
     webhookNone: 'Nenhuma notificação recebida até a geração deste arquivo.',
     webhookFailed: 'Notificação recebida, mas o processamento falhou.',
+    webhookNotProcessed: (statuses, chargeStatus) =>
+      `Notificação recebida, mas ainda não processada (situação: ${statuses}` +
+      (chargeStatus ? `; cobrança ${chargeStatus})` : ')') + '.',
+    enableFailed: (detail) =>
+      `Tokens recebidos e armazenados, mas o lojista não pôde ser habilitado para os pedidos: ${detail}`,
   },
 };

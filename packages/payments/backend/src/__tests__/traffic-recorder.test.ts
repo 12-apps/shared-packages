@@ -42,8 +42,10 @@ describe('redactValue', () => {
 });
 
 describe('redactUrl', () => {
-  it('given a callback URL, then the code is removed and the state kept', () => {
-    expect(redactUrl('https://x.test/cb?code=abc&state=s1')).toBe('https://x.test/cb?code=***REDACTED***&state=s1');
+  it('given a callback URL, then the code and the live state are both removed', () => {
+    expect(redactUrl('https://x.test/cb?code=abc&state=s1')).toBe(
+      'https://x.test/cb?code=***REDACTED***&state=***REDACTED***',
+    );
   });
 });
 
@@ -60,7 +62,13 @@ describe('recordedFetch', () => {
     );
 
     expect(outcome.calls[0]).toMatchObject({
-      requestHeaders: { authorization: 'Bearer ***REDACTED***', x_client_secret: '***REDACTED***', x_client_id: 'cid', cookie: '***REDACTED***' },
+      requestHeaders: {
+        authorization: expect.stringMatching(/^Bearer \*\*\*REDACTED\*\*\* \(sha256:[0-9a-f]{12}\)$/),
+        x_client_secret: '***REDACTED***',
+        x_client_id: 'cid',
+        cookie: '***REDACTED***',
+      },
+      bearerFingerprint: expect.stringMatching(/^[0-9a-f]{12}$/),
       requestBody: { token: '***REDACTED***' },
       status: 200,
       responseBody: { ok: true },

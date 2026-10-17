@@ -34,6 +34,12 @@ export interface RecordedHttpCall {
   responseBody?: unknown;
   /** The network failure, when there was no response. */
   error?: string;
+  /**
+   * A short one-way fingerprint of the bearer token this call carried — never
+   * the token. It is what lets the evidence PROVE which credential authenticated
+   * an order (the seller's, not the platform's) without showing either.
+   */
+  bearerFingerprint?: string;
 }
 
 const REDACTED = '***REDACTED***';
@@ -42,6 +48,8 @@ const REDACTED = '***REDACTED***';
 interface TrafficContext {
   getStore(): RecordedHttpCall[] | undefined;
   run<T>(store: RecordedHttpCall[], fn: () => T): T;
+  /** A short one-way digest of a secret (the server half supplies SHA-256). */
+  fingerprint(secret: string): string;
 }
 
 let context: TrafficContext | null = null;
@@ -60,13 +68,7 @@ export function trafficContext(): TrafficContext | null {
 export async function recordedFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const log = context?.getStore();
   if (!log) return fetch(url, init);
-  const entry: RecordedHttpCall = {
-    at: new Date().toISOString(),
-    method: init.method ?? 'GET',
-    url: redactUrl(url),
-    requestHeaders: redactHeaders(init.headers),
-    ...(typeof init.body === 'string' ? { requestBody: redactValue(parseBody(init.body)) } : {}),
-  };
+  const entry = requestEntry(url, init, context?.fingerprint);
   try {
     const res = await fetch(url, init);
     const text = await res.clone().text().catch(() => '');
@@ -80,6 +82,18 @@ export async function recordedFetch(url: string, init: RequestInit = {}): Promis
     log.push(entry);
     throw error;
   }
+}
+
+/** The request half of a recorded call — redacted before it is held. */
+function requestEntry(url: string, init: RequestInit, fingerprint: Fingerprint): RecordedHttpCall {
+  return {
+    at: new Date().toISOString(),
+    method: init.method ?? 'GET',
+    url: redactUrl(url),
+    requestHeaders: redactHeaders(init.headers, fingerprint),
+    ...bearerOf(init.headers, fingerprint),
+    ...(typeof init.body === 'string' ? { requestBody: redactValue(parseBody(init.body)) } : {}),
+  };
 }
 
 /**
@@ -117,17 +131,37 @@ const SECRET_KEYS = new Set([
 const CARD_KEYS = new Set(['number', 'id']);
 
 /** URL query parameters that carry a credential or a one-time code. */
-const SECRET_PARAMS = ['code', 'access_token', 'refresh_token', 'token', 'client_secret'];
+/**
+ * `state` too: while a connect is open it is the one value that lets someone
+ * else complete it (a login-CSRF on the callback), and the file is downloadable
+ * by every operator who can read the platform's payments.
+ */
+const SECRET_PARAMS = ['code', 'state', 'access_token', 'refresh_token', 'token', 'client_secret'];
 
-function redactHeaders(headers: RequestInit['headers']): Record<string, string> {
+type Fingerprint = ((secret: string) => string) | undefined;
+
+function bearerToken(headers: RequestInit['headers']): string | null {
+  const match = /^bearer (.+)$/i.exec(new Headers(headers).get('authorization') ?? '');
+  return match?.[1] ?? null;
+}
+
+function bearerOf(headers: RequestInit['headers'], fingerprint: Fingerprint): { bearerFingerprint?: string } {
+  const token = bearerToken(headers);
+  return token && fingerprint ? { bearerFingerprint: fingerprint(token) } : {};
+}
+
+function redactHeaders(headers: RequestInit['headers'], fingerprint: Fingerprint): Record<string, string> {
   const out: Record<string, string> = {};
+  const token = bearerToken(headers);
   new Headers(headers).forEach((value, key) => {
     if (!SECRET_HEADERS.has(key)) {
       out[key] = value;
       return;
     }
-    // Keep the scheme so the reader can see a bearer token WAS sent.
-    out[key] = key === 'authorization' && /^bearer /i.test(value) ? `Bearer ${REDACTED}` : REDACTED;
+    // Keep the scheme so the reader can see a bearer token WAS sent, and its
+    // fingerprint so the reader can see WHICH one.
+    const print = token && fingerprint ? ` (sha256:${fingerprint(token)})` : '';
+    out[key] = key === 'authorization' && token ? `Bearer ${REDACTED}${print}` : REDACTED;
   });
   return out;
 }

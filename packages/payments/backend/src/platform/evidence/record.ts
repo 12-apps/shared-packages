@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
 
 import {
   installTrafficContext,
@@ -12,7 +13,19 @@ import {
  * entry reaches that module and must stay free of Node builtins. Loading this
  * module installs it; it ships only at the `./homologacao-evidence` subpath.
  */
-if (!trafficContext()) installTrafficContext(new AsyncLocalStorage<RecordedHttpCall[]>());
+if (!trafficContext()) {
+  const storage = new AsyncLocalStorage<RecordedHttpCall[]>();
+  installTrafficContext({
+    getStore: () => storage.getStore(),
+    run: (store, fn) => storage.run(store, fn),
+    fingerprint: tokenFingerprint,
+  });
+}
+
+/** 12 hex chars of SHA-256: enough to tell two tokens apart, nothing to use. */
+export function tokenFingerprint(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 12);
+}
 
 /** What {@link recordTraffic} hands back: the outcome, plus every call made. */
 export type RecordedOutcome<T> =

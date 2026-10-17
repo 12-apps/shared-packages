@@ -100,8 +100,7 @@ async function webhookStep(
   if (ids.length === 0) return pendingStep(key, outcome);
   const events = await deps.webhookEvents(ids);
   if (events.length === 0) return pendingStep(key, outcome, outcome.webhookNone);
-  const row = await deps.chargeRow(ids);
-  const failed = events.some((event) => event.status === 'FAILED');
+  const verdict = webhookVerdict(outcome, key, events, await deps.chargeRow(ids));
   const first = [...events].sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime())[0]!;
   const timeZone = deps.timeZone ?? DEFAULT_TIME_ZONE;
   const notes = events.flatMap((event) => [
@@ -109,13 +108,32 @@ async function webhookStep(
       (event.processedAt ? ` (${formatEvidenceTime(event.processedAt.toISOString(), timeZone)})` : ''),
     JSON.stringify(redactValue(event.payload), null, 2),
   ]);
-  return stepOf(key, failed ? 'FAILED' : 'EXECUTED', first.receivedAt, {
+  return stepOf(key, verdict.status, first.receivedAt, {
     notes,
     ids: Object.fromEntries(ids.map((id) => [id.startsWith('ORDE_') ? 'order_id' : 'charge_id', id])),
-    observed: failed
-      ? outcome.webhookFailed
-      : outcome.webhookReceived(events.length, [...new Set(events.map((event) => event.status))].join(', '), row?.status ?? null),
+    observed: verdict.observed,
   });
+}
+
+/**
+ * "Received AND processed": every delivery processed, and the charge row it
+ * moved in the state the scenario ends in (a Pix one PAID). A delivery still
+ * waiting in the inbox is PENDING — never counted as processed.
+ */
+function webhookVerdict(
+  outcome: HomologacaoEvidenceCopy['outcome'],
+  key: 'pix.webhook' | 'card.webhook',
+  events: readonly EvidenceWebhookEvent[],
+  row: EvidenceChargeRow | null,
+): { status: EvidenceStep['status']; observed: string } {
+  if (events.some((event) => event.status === 'FAILED')) return { status: 'FAILED', observed: outcome.webhookFailed };
+  const statuses = [...new Set(events.map((event) => event.status))].join(', ');
+  const rowStatus = row?.status ?? null;
+  const processed =
+    events.every((event) => event.status === 'PROCESSED') && row !== null && (key !== 'pix.webhook' || row.status === 'PAID');
+  return processed
+    ? { status: 'EXECUTED', observed: outcome.webhookReceived(events.length, statuses, rowStatus) }
+    : { status: 'PENDING', observed: outcome.webhookNotProcessed(statuses, rowStatus) };
 }
 
 /** Every scenario in canonical order — a missing one is PENDING, never dropped. */

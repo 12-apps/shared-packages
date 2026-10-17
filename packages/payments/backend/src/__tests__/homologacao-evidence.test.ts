@@ -201,6 +201,7 @@ async function connected(w: ReturnType<typeof world>) {
     code: 'auth-code-123',
     error: null,
     stateMatched: true,
+    state: 'st-1',
     redirectUri: 'https://example.test/cb',
   });
 }
@@ -292,6 +293,7 @@ describe('homologação evidence', () => {
       code: null,
       error: 'access_denied',
       stateMatched: true,
+      state: 'st-1',
       redirectUri: 'https://example.test/cb',
     });
 
@@ -309,6 +311,7 @@ describe('homologação evidence', () => {
       code: 'auth-code-123',
       error: null,
       stateMatched: false,
+      state: 'forged',
       redirectUri: 'https://example.test/cb',
     });
 
@@ -354,5 +357,94 @@ describe('homologação evidence', () => {
     expect(file.content).toContain('o SDK do PagBank não carregou no navegador');
     expect(w.pagbank.seen.some((call) => call.path === 'POST /orders' && call.authorization)).toBe(true);
     expect(file.content).toMatch(/Pedido com cartão de crédito aprovado .* — PENDENTE/);
+  });
+
+  it('given a second phase 2 on the same run, then it is refused and the first recording stands', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+
+    await expect(completeEvidenceRun(w.runDeps, prepared.runId, cards())).rejects.toMatchObject({
+      name: 'EvidenceRunNotFoundError',
+    });
+    expect((await buildHomologacaoEvidenceFile(w.fileDeps)).summary.executed).toBe(15);
+  });
+
+  it('given the orders, then usage is proven from the fingerprint each call carried, never the token', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(file.content).toMatch(/\[2\.6\] Uso da autorização do lojista nos pedidos — EXECUTADO/);
+    expect(file.content).toMatch(/authorization: Bearer \*\*\*REDACTED\*\*\* \(sha256:[0-9a-f]{12}\)/);
+    expect(file.content).not.toContain('seller-access-2');
+  });
+
+  it('given a seller whose token is the platform token, then no order is raised and the file says why', async () => {
+    const w = world();
+    await connected(w);
+    const runDeps = { ...w.runDeps, platformToken: async () => 'seller-access-2' };
+    const prepared = await prepareEvidenceRun(runDeps);
+    const before = w.pagbank.seen.filter((call) => call.path === 'POST /orders').length;
+
+    await completeEvidenceRun(runDeps, prepared.runId, cards());
+
+    expect(prepared.publicKey).toBeNull();
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /orders').length).toBe(before);
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+    expect(file.content).toMatch(/\[2\.6\] Uso da autorização do lojista nos pedidos — FALHOU/);
+    expect(file.content).toContain('igual ao da plataforma');
+  });
+
+  it('given a delivery the inbox has not processed, then the webhook step stays PENDING', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    w.events.push({
+      receivedAt: new Date('2026-10-17T15:00:00Z'),
+      processedAt: null,
+      status: 'PENDING',
+      payload: { id: 'ORDE_PIX' },
+    });
+
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(file.content).toContain('ainda não processada');
+    expect(file.summary.pending).toBe(2);
+  });
+
+  it('given the seller row cannot be enabled, then the exchange is recorded and the connect is not ok', async () => {
+    const w = world();
+    await beginSellerConnect(w.connectDeps, { state: 'st-1', redirectUri: 'https://example.test/cb' });
+    const failing = { ...w.connectDeps, config: { save: async () => Promise.reject(new Error('serialization failure')) } };
+
+    const result = await completeSellerConnect(failing, {
+      callbackUrl: 'https://example.test/cb?code=auth-code-123&state=st-1',
+      code: 'auth-code-123',
+      error: null,
+      stateMatched: true,
+      state: 'st-1',
+      redirectUri: 'https://example.test/cb',
+    });
+
+    expect(result.ok).toBe(false);
+    const exchange = result.record.steps.find((step) => step.key === 'connect.exchange');
+    expect(exchange?.status).toBe('EXECUTED');
+    expect(exchange?.notes.join(' ')).toContain('serialization failure');
+  });
+
+  it('given the open authorize URL, then its state is not in the record', async () => {
+    const w = world();
+
+    await beginSellerConnect(w.connectDeps, { state: 'live-state-123', redirectUri: 'https://example.test/cb' });
+
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+    expect(file.content).not.toContain('live-state-123');
+    expect(file.content).toContain('state=***REDACTED***');
   });
 });

@@ -203,7 +203,15 @@ async function captureFollowUps(
   return calls;
 }
 
-/** Run the real sandbox calls with the platform's token and assemble the file. */
+/**
+ * Run the real sandbox calls with the platform's token and assemble the file.
+ *
+ * @deprecated Since FUT-3696: three calls made with the PLATFORM's token prove
+ * neither a seller's authorization nor a payment. Use the
+ * `./homologacao-evidence` subpath (`createHomologacaoEvidence`), which records
+ * a sandbox test seller's Connect and real Pix and card orders made with its
+ * own token. Kept for adopters that have not moved; nothing here calls it.
+ */
 export async function buildPlatformHomologacaoAnexo(
   input: PlatformHomologacaoAnexoInput,
 ): Promise<HomologacaoAnexoResult> {

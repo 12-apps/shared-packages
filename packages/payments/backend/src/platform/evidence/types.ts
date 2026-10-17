@@ -197,9 +197,11 @@ export interface EvidenceOutcomeCopy {
   httpAnswered: (status: number) => string;
   exchangeStored: (accountId: string | null) => string;
   applicationConsulted: string;
+  applicationRedirectMismatch: string;
   refreshed: string;
   refreshRejected: string;
-  usageSellerToken: (seller: string, platform: string | null) => string;
+  usageSellerToken: (calls: number, seller: string, platform: string | null) => string;
+  usageOtherToken: string;
   usageSameAsPlatform: string;
   usageNotConnected: string;
   notSandbox: string;
@@ -218,4 +220,6 @@ export interface EvidenceOutcomeCopy {
   webhookReceived: (count: number, inboxStatuses: string, chargeStatus: string | null) => string;
   webhookNone: string;
   webhookFailed: string;
+  webhookNotProcessed: (inboxStatuses: string, chargeStatus: string | null) => string;
+  enableFailed: (detail: string) => string;
 }

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { OAuthConnectService } from '../../config/oauth';
 import type { ProviderConfigStore } from '../../config/types';
 import type { MerchantRef } from '../../core/types';
@@ -40,6 +42,15 @@ export interface SellerConnectDeps {
   now?: () => Date;
 }
 
+/**
+ * The CONNECT record a flow writes to, named by a one-way digest of its state:
+ * two operators (or two tabs) connecting at once each complete their OWN
+ * record, never whichever happens to be the latest.
+ */
+function recordIdOf(state: string): string {
+  return `connect-${createHash('sha256').update(state).digest('hex').slice(0, 32)}`;
+}
+
 /** Step 1: the authorize URL to send the operator to, and an open record. */
 export async function beginSellerConnect(
   deps: SellerConnectDeps,
@@ -52,7 +63,7 @@ export async function beginSellerConnect(
     environment: 'SANDBOX',
   });
   const record: EvidenceRecord = {
-    id: deps.newId(),
+    id: recordIdOf(ctx.state),
     provider: PROVIDER,
     kind: 'CONNECT',
     createdAt: now.toISOString(),
@@ -100,6 +111,8 @@ export interface SellerCallback {
   error: string | null;
   /** Whether the echoed `state` matched the one this flow minted. */
   stateMatched: boolean;
+  /** The echoed state — it names the record its `begin` opened. */
+  state: string | null;
   redirectUri: string;
 }
 
@@ -140,12 +153,19 @@ async function exchangeStep(
       }),
     };
   }
-  await enableSeller(deps, exchanged.value);
+  // The exchange happened at PagBank whatever happens next, so it is recorded
+  // as executed; a row that could not be enabled is the note beside it, and
+  // the seller is not usable until it reconnects.
+  const enabled = await enableSeller(deps, exchanged.value).then(
+    () => null,
+    (error: unknown) => deps.copy.enableFailed(errorDetail(error)),
+  );
   const accountId = exchanged.value.environments.SANDBOX?.accountId ?? null;
   return {
-    ok: true,
+    ok: enabled === null,
     step: stepOf('connect.exchange', 'EXECUTED', clock(), {
       calls: exchanged.calls,
+      notes: enabled ? [enabled] : [],
       ids: accountId ? { account_id: accountId } : {},
       observed: deps.copy.exchangeStored(accountId),
     }),
@@ -163,8 +183,10 @@ export async function completeSellerConnect(
 ): Promise<{ ok: boolean; record: EvidenceRecord }> {
   const clock = deps.now ?? (() => new Date());
   const now = clock();
-  const record: EvidenceRecord = (await deps.store.latest(PROVIDER, 'CONNECT')) ?? {
-    id: deps.newId(),
+  const id = callback.state ? recordIdOf(callback.state) : deps.newId();
+  const latest = await deps.store.latest(PROVIDER, 'CONNECT');
+  const record: EvidenceRecord = (latest?.id === id ? latest : null) ?? {
+    id,
     provider: PROVIDER,
     kind: 'CONNECT',
     createdAt: now.toISOString(),

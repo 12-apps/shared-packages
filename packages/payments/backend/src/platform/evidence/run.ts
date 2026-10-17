@@ -1,18 +1,17 @@
-import { createHash } from 'node:crypto';
-
 import type { OAuthConnectService } from '../../config/oauth';
 import type { PaymentsGateway } from '../../core/gateway';
-import type { StoredCharge } from '../../core/ports';
 import type { CustomerInfo, MerchantRef, PaymentEnvironment } from '../../core/types';
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
-import { recordTraffic, type RecordedOutcome } from './record';
-import { errorDetail, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
+import { pixSteps, cardSteps } from './orders';
+import { recordTraffic, tokenFingerprint } from './record';
+import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type {
   BrowserCardResult,
   EvidenceOutcomeCopy,
   EvidenceRecord,
   EvidenceStep,
+  EvidenceStepKey,
   HomologacaoEvidenceStore,
 } from './types';
 
@@ -38,11 +37,6 @@ import type {
 
 const PROVIDER = 'pagbank';
 
-/** ≤ R$ 100,00: the sandbox simulator pays a Pix order seconds after creation. */
-const PIX_CENTS = 1000;
-const CARD_CENTS = 1500;
-const PIX_POLLS = 8;
-const PIX_POLL_MS = 3000;
 
 export interface EvidenceRunDeps {
   /** The test seller — the merchant the Connect half authorized. */
@@ -57,7 +51,11 @@ export interface EvidenceRunDeps {
   /** The platform's own account token — read ONLY to show it was not used. */
   platformToken: () => Promise<string | null>;
   /** The sandbox application consult (`GET /oauth2/application/{client_id}`). */
-  consultApplication: () => Promise<unknown>;
+  consultApplication: () => Promise<{
+    application: unknown;
+    error: string | null;
+    redirectUriMismatch: boolean | null;
+  }>;
   /** The buyer on the test orders — official sandbox test data only. */
   customer: CustomerInfo;
   now?: () => Date;
@@ -67,12 +65,6 @@ export interface EvidenceRunDeps {
   pixPollMs?: number;
 }
 
-/** A short public fingerprint, so two tokens can be told apart without showing either. */
-function fingerprint(token: string): string {
-  return createHash('sha256').update(token).digest('hex').slice(0, 12);
-}
-
-const clockOf = (deps: EvidenceRunDeps): (() => Date) => deps.now ?? (() => new Date());
 
 /** The seller's connection, provided it is a sandbox one. */
 async function sandboxSeller(deps: EvidenceRunDeps): Promise<{ token: string } | 'NOT_CONNECTED' | 'NOT_SANDBOX'> {
@@ -82,12 +74,24 @@ async function sandboxSeller(deps: EvidenceRunDeps): Promise<{ token: string } |
   return { token: seller.token };
 }
 
+
+type ConsultStatus = Awaited<ReturnType<EvidenceRunDeps['consultApplication']>>;
+
+/** What a consult answer says, in the copy's words — or null when it passes. */
+function consultProblem(copy: EvidenceOutcomeCopy, status: ConsultStatus): string | null {
+  if (status.error) return copy.callError(status.error);
+  if (status.application === null) return copy.notAsExpected;
+  return status.redirectUriMismatch === false ? null : copy.applicationRedirectMismatch;
+}
+
+/** The consult passes only on an application that is there, parsed, and ours. */
 async function applicationStep(deps: EvidenceRunDeps): Promise<EvidenceStep> {
   const consulted = await recordTraffic(() => deps.consultApplication());
-  const ok = consulted.ok && isSuccess(lastStatus(consulted.calls));
+  const problem = consulted.ok ? consultProblem(deps.copy, consulted.value) : failureOf(deps.copy, consulted);
+  const ok = problem === null && answered(consulted.calls);
   return stepOf('connect.application', ok ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
     calls: consulted.calls,
-    observed: ok ? deps.copy.applicationConsulted : failureOf(deps.copy, consulted),
+    observed: ok ? deps.copy.applicationConsulted : (problem ?? failureOf(deps.copy, consulted)),
   });
 }
 
@@ -100,21 +104,51 @@ async function refreshStep(deps: EvidenceRunDeps): Promise<EvidenceStep> {
   });
 }
 
-async function usageStep(deps: EvidenceRunDeps, sellerToken: string): Promise<EvidenceStep> {
-  const platform = await deps.platformToken();
-  const same = platform !== null && platform === sellerToken;
-  return stepOf('connect.usage', same ? 'FAILED' : 'EXECUTED', clockOf(deps)(), {
-    observed: same
-      ? deps.copy.usageSameAsPlatform
-      : deps.copy.usageSellerToken(fingerprint(sellerToken), platform ? fingerprint(platform) : null),
+/** Every step whose calls must have been authenticated by the seller. */
+const SELLER_CALL_KEYS: ReadonlySet<EvidenceStepKey> = new Set([
+  'card.publicKey',
+  'pix.create',
+  'pix.consult',
+  'card.approved',
+  'card.approvedConsult',
+  'card.declined',
+  'card.cancel',
+]);
+
+/** The phase-2 scenarios — a run raises them once. */
+const ORDER_KEYS: readonly EvidenceStepKey[] = [
+  'pix.create',
+  'pix.consult',
+  'pix.paid',
+  'card.encrypt',
+  'card.approved',
+  'card.approvedConsult',
+  'card.declined',
+  'card.cancel',
+];
+
+/**
+ * `connect.usage`, PROVEN from what went over the wire: the fingerprint of the
+ * bearer token each order call carried (recorded beside the redaction). The
+ * orders must all carry the seller's current token, and nothing may carry the
+ * platform's — the claim is about the calls made, not about two stored strings.
+ */
+async function usageStep(deps: EvidenceRunDeps, steps: readonly EvidenceStep[], sellerToken: string): Promise<EvidenceStep> {
+  const calls = steps.filter((step) => SELLER_CALL_KEYS.has(step.key)).flatMap((step) => step.calls);
+  const prints = calls.map((call) => call.bearerFingerprint).filter((print): print is string => Boolean(print));
+  if (prints.length === 0) return pendingStep('connect.usage', deps.copy);
+  const seller = tokenFingerprint(sellerToken);
+  const platformToken = await deps.platformToken();
+  const platform = platformToken ? tokenFingerprint(platformToken) : null;
+  const orderPrints = steps
+    .filter((step) => step.key !== 'card.publicKey' && SELLER_CALL_KEYS.has(step.key))
+    .flatMap((step) => step.calls.map((call) => call.bearerFingerprint));
+  const proven = seller !== platform && !prints.includes(platform ?? '') && orderPrints.every((print) => print === seller);
+  return stepOf('connect.usage', proven ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
+    observed: proven ? deps.copy.usageSellerToken(prints.length, seller, platform) : deps.copy.usageOtherToken,
   });
 }
 
-function failureOf(copy: EvidenceOutcomeCopy, outcome: RecordedOutcome<unknown>): string {
-  if (!outcome.ok) return copy.callError(errorDetail(outcome.error));
-  const status = lastStatus(outcome.calls);
-  return status === undefined ? copy.notAsExpected : copy.httpAnswered(status);
-}
 
 /**
  * Phase 1. Returns the seller's public key for the browser to encrypt with —
@@ -146,7 +180,13 @@ export async function prepareEvidenceRun(
   // The token AFTER the renewal: a rotation replaced the one read above.
   const renewed = await sandboxSeller(deps);
   const token = typeof renewed === 'object' ? renewed.token : seller.token;
-  record.steps.push(await usageStep(deps, token));
+  // A seller "authorized" with the platform's own token proves nothing, and no
+  // order may be raised with it: the run stops here, saying so.
+  if (token === (await deps.platformToken())) {
+    record.steps.push(stepOf('connect.usage', 'FAILED', clockOf(deps)(), { observed: deps.copy.usageSameAsPlatform }));
+    await deps.store.save(record);
+    return { runId: record.id, publicKey: null };
+  }
 
   const minted = await recordTraffic(() =>
     fetchPagbankCardPublicKey({ apiBase: pagbankApiBase('SANDBOX'), token }),
@@ -163,218 +203,56 @@ export async function prepareEvidenceRun(
   return { runId: record.id, publicKey };
 }
 
-/** The ids a stored charge gives the reader: the order and, once it exists, the charge. */
-function idsOf(charge: StoredCharge | { providerChargeId: string }, reference?: string): Record<string, string> {
-  const id = charge.providerChargeId;
-  return {
-    ...(id.startsWith('ORDE_') ? { order_id: id } : { charge_id: id }),
-    ...(reference ? { reference_id: reference } : {}),
-  };
-}
-
-async function createPix(deps: EvidenceRunDeps, runId: string): Promise<{ step: EvidenceStep; orderId: string | null }> {
-  const reference = `homolog-${runId.slice(0, 8)}-pix`;
-  const created = await recordTraffic(() =>
-    deps.gateway.charge(
-      deps.merchant,
-      {
-        reference,
-        idempotencyKey: reference,
-        amount: { amountCents: PIX_CENTS, currency: 'BRL' },
-        method: 'PIX',
-        customer: deps.customer,
-      },
-      { provider: PROVIDER },
-    ),
-  );
-  if (!created.ok) {
-    return {
-      orderId: null,
-      step: stepOf('pix.create', 'FAILED', clockOf(deps)(), {
-        calls: created.calls,
-        ids: { reference_id: reference },
-        observed: failureOf(deps.copy, created),
-      }),
-    };
-  }
-  const orderId = created.value.providerChargeId;
-  const qr = Boolean(created.value.snapshot.pix?.qrText);
-  return {
-    orderId,
-    step: stepOf('pix.create', qr ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-      calls: created.calls,
-      ids: idsOf(created.value, reference),
-      observed: qr ? deps.copy.qrCreated(orderId) : deps.copy.qrMissing,
-    }),
-  };
-}
-
-interface PixPolls {
-  calls: EvidenceStep['calls'];
-  status: string | null;
-  chargeId: string;
-  lastError: unknown;
-  made: number;
-}
-
-/** Consult the order until the simulator has paid it, or the polls run out. */
-async function pollPix(deps: EvidenceRunDeps, orderId: string): Promise<PixPolls> {
-  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const result: PixPolls = { calls: [], status: null, chargeId: orderId, lastError: null, made: 0 };
-  while (result.made < (deps.pixPolls ?? PIX_POLLS) && result.status !== 'PAID') {
-    if (result.made > 0) await sleep(deps.pixPollMs ?? PIX_POLL_MS);
-    result.made += 1;
-    const polled = await recordTraffic(() => deps.gateway.refreshCharge(deps.merchant, PROVIDER, result.chargeId));
-    result.calls.push(...polled.calls);
-    if (!polled.ok) {
-      result.lastError = polled.error;
-      continue;
-    }
-    result.status = polled.value.status;
-    result.chargeId = polled.value.providerChargeId;
-  }
-  return result;
-}
-
-async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<EvidenceStep[]> {
-  const clock = clockOf(deps);
-  const created = await createPix(deps, runId);
-  const orderId = created.orderId;
-  if (!orderId) return [created.step, pendingStep('pix.consult', deps.copy), pendingStep('pix.paid', deps.copy)];
-
-  const polled = await pollPix(deps, orderId);
-  const ids = { order_id: orderId, ...(polled.chargeId !== orderId ? { charge_id: polled.chargeId } : {}) };
-  const consult = stepOf('pix.consult', polled.status !== null ? 'EXECUTED' : 'FAILED', clock(), {
-    // The first and the last poll: the move from "waiting" to "paid" is the
-    // evidence, and the polls in between are the same call again.
-    calls: polled.calls.length > 2 ? [polled.calls[0]!, polled.calls.at(-1)!] : polled.calls,
-    ids,
-    observed:
-      polled.status !== null
-        ? deps.copy.consultStatus(polled.status, polled.made)
-        : deps.copy.callError(errorDetail(polled.lastError)),
-  });
-  const waited = Math.round(((deps.pixPolls ?? PIX_POLLS) * (deps.pixPollMs ?? PIX_POLL_MS)) / 1000);
-  const paid =
-    polled.status === 'PAID'
-      ? stepOf('pix.paid', 'EXECUTED', clock(), { ids, observed: deps.copy.paid })
-      : pendingStep('pix.paid', deps.copy, deps.copy.notPaidYet(waited));
-  return [created.step, consult, paid];
-}
-
-async function cardCharge(
-  deps: EvidenceRunDeps,
-  runId: string,
-  card: BrowserCardResult,
-): Promise<{ step: EvidenceStep; charge: StoredCharge | null }> {
-  const key = card.scenario === 'approved' ? 'card.approved' : 'card.declined';
-  const expected = card.scenario === 'approved' ? 'PAID' : 'DECLINED';
-  const reference = `homolog-${runId.slice(0, 8)}-card-${card.scenario}`;
-  const notes = [`${card.brand} ${card.masked}`];
-  if (!card.encrypted) {
-    return { step: { ...pendingStep(key, deps.copy, deps.copy.encryptFailed(card.failure ? deps.copy.browserFailures[card.failure] : '')), notes }, charge: null };
-  }
-  const encrypted = card.encrypted;
-  const raised = await recordTraffic(() =>
-    deps.gateway.charge(
-      deps.merchant,
-      {
-        reference,
-        idempotencyKey: reference,
-        amount: { amountCents: CARD_CENTS, currency: 'BRL' },
-        method: 'CARD',
-        customer: deps.customer,
-        card: { token: encrypted, installments: 1 },
-      },
-      { provider: PROVIDER },
-    ),
-  );
-  const status = raised.ok ? raised.value.snapshot.status : null;
-  return {
-    step: stepOf(key, status === expected ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-      calls: raised.calls,
-      notes,
-      ids: raised.ok ? idsOf(raised.value, reference) : { reference_id: reference },
-      observed: status ? deps.copy.chargeStatus(status) : failureOf(deps.copy, raised),
-    }),
-    charge: raised.ok ? raised.value : null,
-  };
-}
-
-function encryptStep(deps: EvidenceRunDeps, cards: readonly BrowserCardResult[]): EvidenceStep {
-  const described = cards.map((card) => `${card.brand} ${card.masked}`).join('; ');
-  if (cards.length > 0 && cards.every((card) => card.encrypted)) {
-    return stepOf('card.encrypt', 'EXECUTED', clockOf(deps)(), {
-      observed: deps.copy.encrypted(described),
-      notes: [described],
-    });
-  }
-  const reasons = new Set(cards.flatMap((card) => (card.failure ? [deps.copy.browserFailures[card.failure]] : [])));
-  return pendingStep('card.encrypt', deps.copy, deps.copy.encryptFailed([...reasons].join('; ')));
-}
-
-async function consultApproved(deps: EvidenceRunDeps, chargeId: string): Promise<EvidenceStep> {
-  const consulted = await recordTraffic(() => deps.gateway.refreshCharge(deps.merchant, PROVIDER, chargeId));
-  const paid = consulted.ok && consulted.value.status === 'PAID';
-  return stepOf('card.approvedConsult', paid ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-    calls: consulted.calls,
-    ids: { charge_id: chargeId },
-    observed: consulted.ok ? deps.copy.chargeStatus(consulted.value.status) : failureOf(deps.copy, consulted),
-  });
-}
-
-async function cancelApproved(deps: EvidenceRunDeps, chargeId: string): Promise<EvidenceStep> {
-  const canceled = await recordTraffic(() => deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId }));
-  const done = canceled.ok && canceled.value.status === 'REFUNDED';
-  return stepOf('card.cancel', done ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-    calls: canceled.calls,
-    ids: { charge_id: chargeId },
-    observed: canceled.ok ? deps.copy.canceled(canceled.value.status) : failureOf(deps.copy, canceled),
-  });
-}
-
-async function cardSteps(deps: EvidenceRunDeps, runId: string, cards: readonly BrowserCardResult[]): Promise<EvidenceStep[]> {
-  const scenario = async (which: BrowserCardResult['scenario']) => {
-    const card = cards.find((candidate) => candidate.scenario === which);
-    return card ? cardCharge(deps, runId, card) : null;
-  };
-  const approved = await scenario('approved');
-  const approvedId = approved?.charge?.snapshot.status === 'PAID' ? approved.charge.providerChargeId : null;
-  const consult = approvedId ? await consultApproved(deps, approvedId) : pendingStep('card.approvedConsult', deps.copy);
-  const declined = await scenario('declined');
-  const cancel = approvedId ? await cancelApproved(deps, approvedId) : pendingStep('card.cancel', deps.copy);
-  return [
-    encryptStep(deps, cards),
-    approved?.step ?? pendingStep('card.approved', deps.copy),
-    consult,
-    declined?.step ?? pendingStep('card.declined', deps.copy),
-    cancel,
-  ];
-}
-
-/** Thrown when phase 2 names a run that is not the latest prepared one. */
+/**
+ * Thrown when phase 2 names a run that is not the latest prepared one, or one
+ * whose orders were already raised. A second phase 2 on the same run would
+ * replay idempotent creates that make no call, and overwrite the recording
+ * that did — so a run raises its orders exactly once.
+ */
 export class EvidenceRunNotFoundError extends Error {
   constructor(runId: string) {
-    super(`No open homologação evidence run ${runId}`);
+    super(`No open homologation evidence run ${runId}`);
     this.name = 'EvidenceRunNotFoundError';
   }
 }
 
-/** Phase 2: raise the Pix and card orders and record them into the run. */
+/** The latest run, provided it is this one and its orders were never raised. */
+function openRun(record: EvidenceRecord | null, runId: string): EvidenceRecord {
+  if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
+  if (record.steps.some((step) => ORDER_KEYS.includes(step.key))) throw new EvidenceRunNotFoundError(runId);
+  return record;
+}
+
+/** Why phase 2 may not raise orders for this run, or null when it may. */
+function blockedBecause(
+  deps: EvidenceRunDeps,
+  record: EvidenceRecord,
+  seller: Awaited<ReturnType<typeof sandboxSeller>>,
+): string | null {
+  if (seller === 'NOT_SANDBOX') return deps.copy.notSandbox;
+  if (seller === 'NOT_CONNECTED') return deps.copy.usageNotConnected;
+  return record.steps.find((step) => step.key === 'connect.usage' && step.status === 'FAILED')?.observed ?? null;
+}
+
+/** Phase 2: raise the Pix and card orders once, record them, then prove whose token they used. */
 export async function completeEvidenceRun(
   deps: EvidenceRunDeps,
   runId: string,
   cards: readonly BrowserCardResult[],
 ): Promise<EvidenceRecord> {
-  const record = await deps.store.latest(PROVIDER, 'RUN');
-  if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
+  const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
 
   let steps = record.steps;
   const seller = await sandboxSeller(deps);
-  if (typeof seller === 'object') {
+  const blocked = blockedBecause(deps, record, seller);
+  if (blocked !== null || typeof seller !== 'object') {
+    // Recorded with the reason, so the file says WHY nothing was raised.
+    for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
+  } else {
     for (const step of [...(await pixSteps(deps, runId)), ...(await cardSteps(deps, runId, cards))]) {
       steps = withStep(steps, step);
     }
+    steps = withStep(steps, await usageStep(deps, steps, seller.token));
   }
   return deps.store.save({ ...record, steps, updatedAt: clockOf(deps)().toISOString() });
 }

@@ -93,6 +93,33 @@ async function storedSeller(cfg: HomologacaoEvidenceConfig) {
   return { stored, fields: stored?.environments[stored.environment] };
 }
 
+/**
+ * The connection as a screen shows it. The problem is the latest connect's
+ * failed step, or the note an executed exchange carries when the row it
+ * stored could not be enabled.
+ */
+function connectProblem(connect: EvidenceRecord | null): string | null {
+  const steps = connect?.steps ?? [];
+  const failed = steps.find((step) => step.status === 'FAILED');
+  if (failed) return failed.observed;
+  return steps.find((step) => step.key === 'connect.exchange')?.notes[0] ?? null;
+}
+
+function sellerView(
+  { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
+  connect: EvidenceRecord | null,
+): HomologacaoSellerConnection {
+  const field = (key: string): string | null => fields?.[key] ?? null;
+  return {
+    connected: field('token') !== null,
+    environment: stored?.environment ?? null,
+    status: stored?.status ?? null,
+    connectedAt: field('connectedAt'),
+    accountId: field('accountId'),
+    lastConnectProblem: connectProblem(connect),
+  };
+}
+
 export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): HomologacaoEvidenceService {
   const store = createPrismaHomologacaoEvidenceStore(cfg.prisma.platformHomologationEvidence);
   const newId = cfg.newId ?? (() => crypto.randomUUID());
@@ -112,16 +139,7 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
   };
   return {
     async seller() {
-      const { stored, fields } = await storedSeller(cfg);
-      return {
-        connected: Boolean(fields?.['token']),
-        environment: stored?.environment ?? null,
-        status: stored?.status ?? null,
-        connectedAt: fields?.['connectedAt'] ?? null,
-        accountId: fields?.['accountId'] ?? null,
-        lastConnectProblem:
-          (await store.latest(PROVIDER, 'CONNECT'))?.steps.find((step) => step.status === 'FAILED')?.observed ?? null,
-      };
+      return sellerView(await storedSeller(cfg), await store.latest(PROVIDER, 'CONNECT'));
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
