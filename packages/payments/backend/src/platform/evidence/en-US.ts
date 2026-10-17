@@ -125,7 +125,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       `INCOMPLETE FILE: ${pending} scenario(s) pending and ${failed} failed. Do not submit this file as complete.`,
     allExecuted: 'Every scenario listed above was executed with the expected result.',
     notCovered: [
-      'Not tested: card brands other than the one used above (Mastercard, Amex, Elo, Hiper).',
+      'Not covered by any scenario: card brands other than VISA (Mastercard, Amex, Elo, Hiper).',
       'Not tested: installments (the orders use 1 installment).',
       'Not applicable: later capture (pre-authorization). The integration authorizes and captures in one call (capture: true).',
       'Not tested: boleto.',

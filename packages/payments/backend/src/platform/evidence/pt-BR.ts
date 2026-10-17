@@ -1,5 +1,8 @@
 import type { HomologacaoEvidenceCopy } from './types';
 
+/** `1 cenário pendente` / `2 cenários pendentes` — the count and its agreement. */
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
+
 /**
  * The pt-BR pack for the homologação evidence file (FUT-3696) — a NAMED
  * constant the host passes by hand, never a default.
@@ -97,7 +100,8 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     situation: ({ executed, failed, pending }) =>
       failed + pending === 0
         ? `todos os ${executed} cenários executados com o resultado esperado`
-        : `INCOMPLETO — ${executed} executado(s) · ${failed} com falha · ${pending} pendente(s) (ver Pendências)`,
+        : `INCOMPLETO — ${plural(executed, 'executado', 'executados')} · ${plural(failed, 'com falha', 'com falha')} · ` +
+          `${plural(pending, 'pendente', 'pendentes')} (ver Pendências)`,
     clientId: 'client_id da aplicação',
     callback: 'Callback (redirect_uri)',
     generatedAt: 'Arquivo gerado em',
@@ -129,10 +133,11 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   pendencies: {
     heading: '5. Pendências',
     incomplete: (failed, pending) =>
-      `ARQUIVO INCOMPLETO: ${pending} cenário(s) pendente(s) e ${failed} com falha. Não envie este arquivo como completo.`,
+      `ARQUIVO INCOMPLETO: ${plural(pending, 'cenário pendente', 'cenários pendentes')} e ` +
+      `${plural(failed, 'com falha', 'com falha')}. Não envie este arquivo como completo.`,
     allExecuted: 'Todos os cenários listados acima foram executados com o resultado esperado.',
     notCovered: [
-      'Não testado: outras bandeiras além da usada acima (Mastercard, Amex, Elo, Hiper).',
+      'Não coberto por nenhum cenário: bandeiras além de VISA (Mastercard, Amex, Elo, Hiper).',
       'Não testado: parcelamento (os pedidos usam 1 parcela).',
       'Não aplicável: captura posterior (pré-autorização). A integração autoriza e captura na mesma chamada (capture: true).',
       'Não testado: boleto.',

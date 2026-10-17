@@ -240,7 +240,7 @@ function renderIdentification(
     `${copy.identification.name}: ${id.name}`,
     `${copy.identification.site}: ${id.site}`,
     `${copy.identification.environment}: SANDBOX (${pagbankApiBase('SANDBOX')})`,
-    `${copy.identification.testsAt}: ${copy.identification.testsAtConnect}: ${when(connect)}; ` +
+    `${copy.identification.testsAt} — ${copy.identification.testsAtConnect}: ${when(connect)} · ` +
       `${copy.identification.testsAtRun}: ${when(run)}`,
     `${copy.identification.clientId}: ${id.clientId ?? '—'}`,
     `${copy.identification.callback}: ${id.callbackUrl}`,

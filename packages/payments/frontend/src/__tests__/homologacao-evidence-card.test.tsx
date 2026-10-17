@@ -59,7 +59,7 @@ describe('HomologacaoEvidenceCard', () => {
     fireEvent.click(screen.getByTestId('evidence-generate'));
 
     await waitFor(() => expect(screen.getByTestId('evidence-summary-counts').textContent).toBe(
-      '✓ 15 executados · ✗ 0 falharam · ⧗ 2 pendentes',
+      '✓\u00a015\u00a0executados · ✗\u00a00\u00a0falharam · ⧗\u00a02\u00a0pendentes',
     ));
     expect(props.onRun).toHaveBeenCalledWith('run-1', expect.any(Array));
     expect(ran[0]?.map((card) => [card.scenario, card.encrypted])).toEqual([
@@ -97,7 +97,7 @@ describe('HomologacaoEvidenceCard', () => {
 
     // The phase that failed is named, and the way back still works.
     await waitFor(() => expect(screen.getByTestId('evidence-generate-failed').textContent).toContain('Falhou ao consultar'));
-    expect(screen.getByTestId('evidence-generate-failed').textContent).toContain('Baixar de novo');
+    expect(screen.getByTestId('evidence-generate-failed').textContent).toContain('Baixar o último registrado');
     expect(document.querySelectorAll('[data-testid="evidence-summary"]')).toHaveLength(0);
   });
 
@@ -131,5 +131,13 @@ describe('HomologacaoEvidenceCard', () => {
 
     expect(screen.getByTestId('evidence-connect').className).toContain('MuiButton-contained');
     expect(screen.getByTestId('evidence-generate').className).toContain('MuiButton-outlined');
+  });
+
+  it('given a failed return with nothing recorded, then the fallback does not claim a recording', () => {
+    mount({ connectOutcome: 'failed', seller: { ...SELLER, lastConnectProblem: null } });
+
+    expect(screen.getByTestId('evidence-connect-outcome').textContent).toBe(
+      'A conexão do lojista de teste não foi concluída. Tente conectar de novo.',
+    );
   });
 });
