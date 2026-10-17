@@ -79,6 +79,9 @@ export function mtlsTransport(identity: ClientIdentity, trust?: { ca: string }):
           // root store. Set only to trust a private CA (a test server).
           ...(trust ? { ca: trust.ca } : {}),
           timeout: IDLE_TIMEOUT_MS,
+          // Node destroys the request (socket included) and rejects with an
+          // `AbortError` when it fires. Absent for every adapter call.
+          ...(init.signal ? { signal: init.signal } : {}),
         },
         (incoming) => {
           const chunks: Buffer[] = [];

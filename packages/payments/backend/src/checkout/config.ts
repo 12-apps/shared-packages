@@ -1,6 +1,7 @@
+import type { ApplePayIdentityPort } from '../apple-pay/types';
 import { mintBrowserKey } from '../config/browser-key';
 import type { ProviderConfigStore } from '../config/types';
-import type { ClientProviderConfig } from '../core/client-view';
+import { declaredWallets, type ClientProviderConfig } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
 import type { CredentialStore } from '../core/ports';
 import type { ProviderRegistry } from '../core/registry';
@@ -44,6 +45,12 @@ export interface CheckoutConfigDeps {
   providers?: ProviderRegistry;
   /** Override the capability — see {@link backfillKey}. */
   browserKey?: BrowserKeyPort;
+  /**
+   * Where the Apple Pay merchant identity comes from (FUT-3686). Without one —
+   * the port omitted, or answering `null` — no entry declares `APPLE_PAY`
+   * unless its connection is a stub. See {@link applePayConfigured}.
+   */
+  applePay?: ApplePayIdentityPort;
 }
 
 const NO_PROVIDER: BuyerCheckoutConfig = {
@@ -105,6 +112,43 @@ async function backfillKey(
 }
 
 /**
+ * Whether this entry may declare Apple Pay (contract R5): a merchant identity
+ * the port reports, or a STUB connection — the same short-circuit the
+ * enrolment takes (`providers/pagbank-wallets.ts`), so an e2e run renders the
+ * button without an Apple certificate. Stub is read off the RESOLVED
+ * credentials, which re-decide it against the deployment's stub mode, never
+ * off the stored column alone.
+ *
+ * Fails CLOSED: a port or credential read that throws declares nothing. A
+ * missing button is recoverable; a button whose sheet cannot validate is not.
+ */
+async function applePayConfigured(
+  deps: CheckoutConfigDeps,
+  merchant: MerchantRef,
+  entry: ClientProviderConfig,
+  identity: () => Promise<boolean>,
+): Promise<boolean> {
+  if (!entry.wallets.includes('APPLE_PAY')) return false;
+  if (await identity()) return true;
+  const credentials = await deps.credentials.getCredentials(merchant, entry.provider).catch(() => null);
+  return credentials?.stub === true;
+}
+
+/** Ask the identity port at most once per config read, however many entries declare Apple Pay. */
+function identityOnce(deps: CheckoutConfigDeps, merchant: MerchantRef): () => Promise<boolean> {
+  let answer: Promise<boolean> | undefined;
+  return () => {
+    const port = deps.applePay;
+    answer ??= port
+      ? Promise.resolve()
+          .then(() => port.merchantIdentity(merchant))
+          .then(Boolean, () => false)
+      : Promise.resolve(false);
+    return answer;
+  };
+}
+
+/**
  * One chain entry's buyer-safe view: what the adapter declares, plus the two
  * facts only the stored row knows — whether this connection runs the stub, and
  * the lazily-backfilled key for a provider that can mint one on demand.
@@ -113,6 +157,7 @@ async function toBuyerLink(
   deps: CheckoutConfigDeps,
   merchant: MerchantRef,
   entry: ClientProviderConfig,
+  identity: () => Promise<boolean>,
 ): Promise<BuyerProviderLink> {
   const stored = await deps.connections.get(merchant, entry.provider);
   const isStub = stored?.stub === true;
@@ -127,7 +172,7 @@ async function toBuyerLink(
     publicKey,
     mockTokenization: isStub && publicKey === null,
     methods: [...entry.methods],
-    wallets: [...entry.wallets],
+    wallets: declaredWallets(entry.wallets, await applePayConfigured(deps, merchant, entry, identity)),
     googlePay: entry.googlePay,
     customerSchema: [...entry.customerSchema],
     checkoutScreen: entry.checkoutScreen,
@@ -148,7 +193,8 @@ export async function buyerCheckoutConfig(
   // (`ChargeOptions.confirmation`): a lane nobody watches leaves out the
   // providers only a person can confirm, exactly as its charge walk will.
   const entries = options.confirmation === 'AUTOMATIC' ? all.filter((entry) => entry.confirmation !== 'MANUAL') : all;
-  const chain = await Promise.all(entries.map((entry) => toBuyerLink(deps, merchant, entry)));
+  const identity = identityOnce(deps, merchant);
+  const chain = await Promise.all(entries.map((entry) => toBuyerLink(deps, merchant, entry, identity)));
   const head = chain[0];
   if (!head) return NO_PROVIDER;
   return {

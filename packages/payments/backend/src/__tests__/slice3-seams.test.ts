@@ -189,6 +189,13 @@ describe('holdsInstrumentFor', () => {
     expect(holdsInstrumentFor({}, 'pagbank')).toBe(false);
     expect(holdsInstrumentFor(undefined, 'pagbank')).toBe(false);
   });
+
+  it('counts a wallet key as an instrument, under the same map rule as a token', () => {
+    const wallet = { type: 'GOOGLE_PAY' as const, key: 'gpay-token' };
+    expect(holdsInstrumentFor({ wallet }, 'pagbank')).toBe(true);
+    // A minted map is still the complete statement.
+    expect(holdsInstrumentFor({ wallet, tokensByProvider: { stripe: 'tok_s' } }, 'pagbank')).toBe(false);
+  });
 });
 
 describe('attributedCard', () => {

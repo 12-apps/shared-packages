@@ -45,6 +45,20 @@ export {
   usesHostedCheckout,
   type CheckoutConfigDeps,
 } from './config';
+/**
+ * The Apple Pay vocabulary (FUT-3686), TYPE-ONLY on the root: the port
+ * `buyerCheckoutConfig` gates the `APPLE_PAY` declaration on, and the wire
+ * shapes of the validation route. The route itself is server-only, at
+ * `@12-apps/payments-backend/apple-pay`.
+ */
+export type {
+  ApplePayIdentityPort,
+  ApplePayMerchantIdentity,
+  ApplePayMerchantSession,
+  ApplePayValidationFailureCode,
+  ApplePayValidationRefusalCode,
+  ApplePayValidationResult,
+} from '../apple-pay/types';
 export type {
   AttachedCharge,
   BrowserKeyPort,
