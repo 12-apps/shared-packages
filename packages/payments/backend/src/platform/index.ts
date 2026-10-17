@@ -7,6 +7,7 @@
 export { PT_BR_CONNECT_APPLICATION_COPY, PT_BR_HOMOLOGACAO_ANSWERS } from './pt-BR';
 export { EN_US_CONNECT_APPLICATION_COPY } from './en-US';
 export {
+  consultConnectApplication,
   consultConnectApplications,
   consultPastedConnectApplication,
   type ConnectApplicationCopy,
@@ -42,3 +43,17 @@ export {
   type HomologacaoAnexoResult,
   type PlatformHomologacaoAnexoInput,
 } from './homologacao-anexo';
+export {
+  BROWSER_CARD_FAILURES,
+  EVIDENCE_STEP_KEYS,
+  type BrowserCardFailure,
+  type BrowserCardResult,
+  type EvidenceRecord,
+  type EvidenceRecordKind,
+  type EvidenceStatus,
+  type EvidenceStep,
+  type EvidenceStepKey,
+  type EvidenceSummary,
+  type HomologacaoEvidenceCopy,
+  type HomologacaoEvidenceStore,
+} from './evidence/types';

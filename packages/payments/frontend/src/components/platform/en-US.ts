@@ -106,4 +106,42 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         'PagBank does not check the client_secret in this lookup — only the client_id and the token. A wrong client_secret only shows at the first store authorization.',
     },
   },
+  evidence: {
+    heading: 'Homologation evidence (sandbox)',
+    lede: "Runs the real scenarios in PagBank's sandbox and builds the TXT for the form. Nothing is charged.",
+    sellerHeading: 'Test seller',
+    sellerConnected: (connectedAt, accountId) =>
+      `Connected${connectedAt ? ` on ${new Date(connectedAt).toLocaleString('en-US')}` : ''}` +
+      (accountId ? ` · account ${accountId}` : ''),
+    sellerNotConnected:
+      'No test seller connected. Without one, the Connect, Pix and card scenarios stay pending in the file.',
+    sellerReconnect: "The test seller's connection must be authorized again.",
+    connectHint:
+      "You will sign in to PagBank's sandbox with a test seller account and approve the consent. Sandbox only.",
+    connect: 'Connect test seller',
+    reconnect: 'Reconnect test seller',
+    connectFailed: 'Could not start the test seller connection.',
+    returnedConnected: 'Test seller connected. The callback and the code exchange were recorded in the evidence.',
+    returnedFailed: 'The test seller connection did not complete. The reason was recorded in the evidence file.',
+    generate: 'Generate evidence file\u00a0(TXT)',
+    downloadLatest: 'Download again (no run)',
+    phases: {
+      preparing: 'Consulting the application, renewing the token and minting the public key…',
+      encrypting: 'Encrypting the test cards in the browser…',
+      running: 'Creating the Pix and card orders in the sandbox — this can take up to a minute…',
+      downloading: 'Building the file…',
+    },
+    summary: ({ executed, failed, pending }) => `✓ ${executed} executed · ✗ ${failed} failed · ⧗ ${pending} pending`,
+    incomplete:
+      'The file lists what is missing under Pendências. Do not submit it as complete. Notifications that arrive later show up when you download again.',
+    generateFailed: (phase) =>
+      `${
+        {
+          preparing: 'Consulting the application and preparing the test seller failed.',
+          encrypting: 'Encrypting the test cards in the browser failed.',
+          running: 'Creating the orders in the sandbox failed.',
+          downloading: 'Building the file failed.',
+        }[phase]
+      } Try again; "Download again" still returns what was recorded.`,
+  },
 };

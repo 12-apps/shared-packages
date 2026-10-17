@@ -1,5 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
+import { recordedFetch } from '../core/traffic-recorder';
 import type { ProviderName } from '../core/types';
 
 /**
@@ -64,7 +65,7 @@ export interface ProviderHttpInit {
 export type ProviderTransport = (url: string, init: ProviderHttpInit) => Promise<Response>;
 
 const globalFetch: ProviderTransport = (url, init) =>
-  fetch(url, { method: init.method, headers: init.headers, body: init.body });
+  recordedFetch(url, { method: init.method, headers: init.headers, body: init.body });
 
 /**
  * One authenticated call: retry-on-pre-send-only, non-2xx mapped to a
