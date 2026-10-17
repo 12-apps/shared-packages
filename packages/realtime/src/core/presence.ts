@@ -1,12 +1,6 @@
 import { isValidPresenceKey } from "./presence-keys";
-import { publishRealtimeEvent, subscribeRealtime } from "./runtime";
-import type {
-  PublishResult,
-  RealtimeEvent,
-  RealtimeEventInput,
-  RealtimeLogger,
-  Unsubscribe,
-} from "./types";
+import { publishRealtimeEvent } from "./runtime";
+import type { PublishResult, RealtimeEvent, RealtimeEventInput, RealtimeLogger } from "./types";
 
 /**
  * Presence that lasts exactly as long as a connection — the capability a host asks
@@ -61,10 +55,12 @@ import type {
  *    never by counting events.
  *
  * Refcounting is per holder PROCESS: two tabs on one gateway are one hold, and
- * the key is released when the second closes. Two holders in different processes
- * (an SSE stream and a socket for the same key) are not merged — the first to
- * close releases the key and the other's next renewal re-holds it, so the gap is
- * at most one renewal.
+ * the key is released when the second closes. Every event names its holder, so
+ * the listener (`./presence-listener.ts`) merges holders in DIFFERENT processes —
+ * an SSE stream on one API replica and a socket on the gateway — and reports a
+ * key released only when no holder still has it. The listener also waits a short
+ * grace before reporting a release, so a connection that closes and reopens (a
+ * page navigation, a deploy, an SSE stream's planned rotation) never flickers.
  */
 
 /**
@@ -76,9 +72,31 @@ export const PRESENCE_TOPIC = "$presence";
 /** How often a holder re-announces the keys it holds. A host's lease must outlive two of these. */
 export const PRESENCE_RENEW_MS = 10_000;
 
+/**
+ * The most keys one event carries. A renewal re-announces every key a process
+ * holds, and a gateway can hold thousands: one frame per this many keeps every
+ * bus message small, whatever the fleet's size.
+ */
+export const PRESENCE_EVENT_MAX_KEYS = 200;
+
 /** The wire-stable event names on {@link PRESENCE_TOPIC}. */
 const HELD = "presence.held";
 const RELEASED = "presence.released";
+
+/** What one {@link PRESENCE_TOPIC} event carries. `holder` is absent from older holders. */
+interface PresencePayload {
+  keys: string[];
+  holder: string;
+}
+
+/**
+ * A holder's identity on the bus: random per process, never a secret and never a
+ * person — only what lets a listener tell two holders of one key apart.
+ */
+function newHolderId(): string {
+  const uuid = (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.();
+  return uuid ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 export { isValidPresenceKey, isValidPresenceList, MAX_PRESENCE_KEYS } from "./presence-keys";
 
@@ -93,7 +111,7 @@ export interface PresenceChange {
 }
 
 /** The publish seam, so a test can watch the wire without a driver. */
-type Publish = (topic: string, input: RealtimeEventInput<{ keys: string[] }>) => Promise<PublishResult>;
+type Publish = (topic: string, input: RealtimeEventInput<PresencePayload>) => Promise<PublishResult>;
 
 export interface PresenceTrackerOptions {
   /** Renewal cadence; default {@link PRESENCE_RENEW_MS}. */
@@ -101,6 +119,8 @@ export interface PresenceTrackerOptions {
   logger?: RealtimeLogger;
   /** Defaults to the runtime's {@link publishRealtimeEvent}. */
   publish?: Publish;
+  /** This process's holder id on the bus; random by default. */
+  holder?: string;
 }
 
 /**
@@ -116,11 +136,14 @@ export class PresenceTracker {
   private readonly logger: RealtimeLogger;
   private readonly publish: Publish;
   private renewTimer: ReturnType<typeof setInterval> | null = null;
+  /** Named on every event, so a listener can merge holders across processes. */
+  readonly holder: string;
 
   constructor(options: PresenceTrackerOptions = {}) {
     this.renewMs = options.renewMs ?? PRESENCE_RENEW_MS;
     this.logger = options.logger ?? console;
     this.publish = options.publish ?? publishRealtimeEvent;
+    this.holder = options.holder ?? newHolderId();
   }
 
   /** How many distinct keys are held — for tests and health readouts. */
@@ -193,8 +216,15 @@ export class PresenceTracker {
     }
   }
 
+  /** Announce `keys`, at most {@link PRESENCE_EVENT_MAX_KEYS} per event. */
   private emit(type: string, keys: string[]): void {
-    const sent = this.publish(PRESENCE_TOPIC, { type, data: { keys } })
+    for (let start = 0; start < keys.length; start += PRESENCE_EVENT_MAX_KEYS) {
+      this.send(type, keys.slice(start, start + PRESENCE_EVENT_MAX_KEYS));
+    }
+  }
+
+  private send(type: string, keys: string[]): void {
+    const sent = this.publish(PRESENCE_TOPIC, { type, data: { keys, holder: this.holder } })
       .then((result) => {
         if (!result.published) {
           this.logger.warn(`presence "${type}" for ${keys.length} key(s) was not published.`);
@@ -216,29 +246,10 @@ export function presenceChangesOf(event: RealtimeEvent): PresenceChange[] {
 }
 
 /**
- * Listen to presence changes from every holder process.
- *
- * Changes to ONE key are delivered to `onChange` in order, each after the previous
- * one's promise settles: a `held` and a `released` arriving back to back must not
- * be written in the opposite order by an async handler, or a person who left would
- * read as present until the lease ran out. Different keys do not wait on each
- * other. A throwing handler is logged and never stops the listener.
+ * Which holder sent an event — `""` for a holder too old to name itself, which a
+ * listener then treats as one holder of its own.
  */
-export async function subscribePresence(
-  onChange: (change: PresenceChange) => void | Promise<void>,
-  logger: RealtimeLogger = console,
-): Promise<Unsubscribe> {
-  const chains = new Map<string, Promise<void>>();
-  return subscribeRealtime(PRESENCE_TOPIC, (_topic, event) => {
-    for (const change of presenceChangesOf(event)) {
-      const previous = chains.get(change.key) ?? Promise.resolve();
-      const next = previous
-        .then(() => onChange(change))
-        .catch((error: unknown) => logger.error(`presence handler failed for a "${change.state}":`, error));
-      chains.set(change.key, next);
-      void next.finally(() => {
-        if (chains.get(change.key) === next) chains.delete(change.key);
-      });
-    }
-  });
+export function presenceHolderOf(event: RealtimeEvent): string {
+  const holder = (event.data as { holder?: unknown } | null)?.holder;
+  return typeof holder === "string" ? holder : "";
 }

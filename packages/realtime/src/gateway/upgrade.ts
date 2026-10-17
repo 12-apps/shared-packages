@@ -100,7 +100,7 @@ export function handleUpgrade(
     // Held from admission, released by the same single-shot cleanup that frees
     // the slot — so a socket that dies without a close frame (the liveness
     // sweep in `./connection.ts` terminates it) releases its presence too.
-    const releasePresence = presence.hold(ticket.presence);
+    const releasePresence = presence.hold(ticket.presence ?? []);
     void attachConnection({
       ws,
       topics: ticket.topics,

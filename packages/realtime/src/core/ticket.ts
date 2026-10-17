@@ -107,7 +107,7 @@ export interface RealtimeTicket {
    * none. Bound to the HANDSHAKE ticket only: a mid-connection `subscribe`
    * widens topics and never changes what the connection holds.
    */
-  presence: string[];
+  presence?: string[];
 }
 
 function base64url(input: Buffer | string): string {

@@ -1,8 +1,5 @@
-import {
-  PresenceTracker,
-  subscribePresence,
-  type PresenceChange,
-} from "../core/presence";
+import { PresenceTracker, type PresenceChange } from "../core/presence";
+import { subscribePresence } from "../core/presence-listener";
 import { configureRealtime, stopRealtime } from "../core/runtime";
 import type { RealtimeDriver, RealtimeLogger, Unsubscribe } from "../core/types";
 
@@ -14,6 +11,7 @@ import {
 } from "./outbox";
 import { resolveRealtimeDriver } from "./resolve-driver";
 import { streamRoute, ticketRoute, type RouteDeps } from "./routes";
+import { PRESENCE_STREAM_MAX_AGE_MS } from "./sse";
 import { createTicketSecretResolver, type TicketSecretSource } from "./ticket-secret";
 import type {
   EventsCopySource,
@@ -117,6 +115,13 @@ export interface EventsServerConfig {
     onChange: (change: PresenceChange) => void | Promise<void>;
     /** Renewal cadence for THIS process's SSE streams; default `PRESENCE_RENEW_MS`. */
     renewMs?: number;
+    /**
+     * How long a release waits for a re-hold before `onChange` hears it; default
+     * `PRESENCE_RELEASE_GRACE_MS` (`../core/presence-listener.ts`).
+     */
+    releaseGraceMs?: number;
+    /** A presence-holding SSE stream's rotation age; default `PRESENCE_STREAM_MAX_AGE_MS`. */
+    streamMaxAgeMs?: number;
   };
 }
 
@@ -174,7 +179,10 @@ async function listenForPresence(
 ): Promise<Unsubscribe | null> {
   if (!config.presence) return null;
   try {
-    return await subscribePresence(config.presence.onChange, logger);
+    return await subscribePresence(config.presence.onChange, logger, {
+      renewMs: config.presence.renewMs,
+      releaseGraceMs: config.presence.releaseGraceMs,
+    });
   } catch (error) {
     // Never fatal: presence is a latency optimisation like every hint, and a
     // listener that could not subscribe leaves the host on its own lease.
@@ -195,6 +203,7 @@ export function createApiEvents(config: EventsServerConfig): EventsApi {
     // locale, which is the whole reason the field takes a resolver at all.
     messages: config.messages,
     presence,
+    presenceStreamMaxAgeMs: config.presence?.streamMaxAgeMs ?? PRESENCE_STREAM_MAX_AGE_MS,
   };
   const outbox = config.outbox ? createRealtimeOutbox({ ...config.outbox, logger }) : null;
   const state: { started: boolean; unlisten: Unsubscribe | null } = {

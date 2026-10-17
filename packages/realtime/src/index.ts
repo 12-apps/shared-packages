@@ -70,6 +70,11 @@ export {
   PRESENCE_TOPIC,
   PresenceTracker,
   presenceChangesOf,
-  subscribePresence,
+  PRESENCE_EVENT_MAX_KEYS,
 } from "./core/presence";
 export type { PresenceChange, PresenceTrackerOptions } from "./core/presence";
+export {
+  PRESENCE_RELEASE_GRACE_MS,
+  subscribePresence,
+} from "./core/presence-listener";
+export type { PresenceListenerOptions } from "./core/presence-listener";

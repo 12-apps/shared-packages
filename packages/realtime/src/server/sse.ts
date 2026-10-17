@@ -23,6 +23,23 @@ const HEARTBEAT_MS = 25_000;
 const RETRY_HINT_MS = 3_000;
 
 /**
+ * How long a stream that HOLDS PRESENCE may live before it asks its client to
+ * move to a fresh one (`../react/rotation.ts`).
+ *
+ * An SSE stream has no client→server half, so a phone that falls off the network
+ * leaves its stream — and the presence it holds — open on the server until TCP
+ * gives up, which can be a quarter of an hour. Rotating bounds that: a live
+ * client opens its next stream at once and nobody sees a change; a dead one never
+ * does, so its stream ends at {@link PRESENCE_STREAM_MAX_AGE_MS} +
+ * {@link ROTATE_GRACE_MS} and its presence lapses — within a minute, like a socket
+ * the gateway's ping finds dead. A stream holding no presence is never rotated.
+ */
+export const PRESENCE_STREAM_MAX_AGE_MS = 30_000;
+
+/** How long a rotated stream stays open for its client to move. */
+const ROTATE_GRACE_MS = 5_000;
+
+/**
  * The reserved topic control frames arrive on — the SAME name the WebSocket
  * gateway uses (`../gateway/connection.ts`), because the client must not need
  * to know which wire it is on to recognise one. `$` cannot appear in a real
@@ -55,6 +72,11 @@ function heartbeatFrame(topics: readonly string[], nowMs: number): string {
     id: `hb-${nowMs}`,
   });
   return `data: ${payload}\n\n`;
+}
+
+/** The control frame that asks a client to open its next stream now. */
+function rotateFrame(nowMs: number): string {
+  return `data: ${JSON.stringify({ topic: GATEWAY_TOPIC, type: "rotate", data: {}, ts: nowMs, id: `rot-${nowMs}` })}\n\n`;
 }
 
 function frameFor(topic: string, event: RealtimeEvent): string {
@@ -130,6 +152,11 @@ interface EventStreamOptions {
   onClose: () => void;
   /** The ledger that tracks open streams for the shutdown path. */
   streams: Pick<ConnectionLedger, "registerStreamCloser">;
+  /**
+   * Rotate the stream after this long (see {@link PRESENCE_STREAM_MAX_AGE_MS}).
+   * Absent for a stream that holds no presence: it lives until its client leaves.
+   */
+  maxAgeMs?: number;
 }
 
 /**
@@ -145,6 +172,7 @@ export async function createEventStreamResponse(
   const sink = new SseSink();
   const unsubscribes: Unsubscribe[] = [];
   let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let rotation: ReturnType<typeof setTimeout> | null = null;
   let deregister: (() => void) | null = null;
   let cleanedUp = false;
 
@@ -152,6 +180,7 @@ export async function createEventStreamResponse(
     if (cleanedUp) return;
     cleanedUp = true;
     if (heartbeat) clearInterval(heartbeat);
+    if (rotation) clearTimeout(rotation);
     deregister?.();
     for (const unsubscribe of unsubscribes.splice(0)) {
       void unsubscribe().catch(() => undefined);
@@ -160,6 +189,13 @@ export async function createEventStreamResponse(
     options.onClose();
   };
   sink.setOnAbort(cleanup);
+
+  /** Ask the client to move at `maxAgeMs`, then end the stream if it has not. */
+  const scheduleRotation = (maxAgeMs: number): ReturnType<typeof setTimeout> =>
+    setTimeout(() => {
+      sink.write(rotateFrame(Date.now()));
+      rotation = setTimeout(cleanup, ROTATE_GRACE_MS);
+    }, maxAgeMs);
 
   try {
     // Subscriptions are live BEFORE the response is returned, so an event
@@ -185,6 +221,7 @@ export async function createEventStreamResponse(
         HEARTBEAT_MS,
       );
       deregister = options.streams.registerStreamCloser(cleanup);
+      if (options.maxAgeMs !== undefined) rotation = scheduleRotation(options.maxAgeMs);
     },
     cancel() {
       cleanup();
@@ -206,4 +243,12 @@ export async function createEventStreamResponse(
 }
 
 /** Internals pinned by unit tests (wire format must stay stable). */
-export const __testables = { frameFor, heartbeatFrame, HEARTBEAT_MS, RETRY_HINT_MS, GATEWAY_TOPIC };
+export const __testables = {
+  frameFor,
+  heartbeatFrame,
+  rotateFrame,
+  HEARTBEAT_MS,
+  RETRY_HINT_MS,
+  ROTATE_GRACE_MS,
+  GATEWAY_TOPIC,
+};

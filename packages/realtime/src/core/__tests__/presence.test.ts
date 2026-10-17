@@ -9,9 +9,10 @@ import {
   isValidPresenceKey,
   isValidPresenceList,
   presenceChangesOf,
-  subscribePresence,
+  PRESENCE_EVENT_MAX_KEYS,
   type PresenceChange,
 } from "../presence";
+import { subscribePresence } from "../presence-listener";
 import { configureRealtime, resetRealtimeRuntime } from "../runtime";
 import { mintRealtimeTicket, verifyRealtimeTicket } from "../ticket";
 
@@ -183,6 +184,25 @@ describe("PresenceTracker — held for the connections' lifetime, refcounted", (
     expect(announced(driver).filter((change) => change.state === "released")).toHaveLength(2);
   });
 
+  it("names its holder on every event, so listeners can merge processes", async () => {
+    const { driver, tracker } = trackerOnBus();
+    tracker.hold(["seat:k"]);
+    await settle();
+    const data = driver.published.find((record) => record.topic === PRESENCE_TOPIC)?.event.data;
+    expect(data).toEqual({ keys: ["seat:k"], holder: tracker.holder });
+  });
+
+  it("chunks a large renewal so no bus event carries more than the cap", async () => {
+    vi.useFakeTimers();
+    const { driver, tracker } = trackerOnBus(1_000);
+    for (let seat = 0; seat < 450; seat += 1) tracker.hold([`seat:${seat}`]);
+    await settle();
+    forget(driver);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const sizes = driver.published.map((record) => (record.event.data as { keys: string[] }).keys.length);
+    expect(sizes).toEqual([PRESENCE_EVENT_MAX_KEYS, PRESENCE_EVENT_MAX_KEYS, 50]);
+  });
+
   it("never throws into the connection when the bus is gone", async () => {
     resetRealtimeRuntime();
     const tracker = new PresenceTracker({ logger: silentLogger });
@@ -205,6 +225,7 @@ describe("subscribePresence — the host's listener", () => {
           });
         }),
       silentLogger,
+      { releaseGraceMs: 0 },
     );
 
     tracker.hold(["seat:k"])();
@@ -228,6 +249,7 @@ describe("subscribePresence — the host's listener", () => {
         if (change.state === "held") throw new Error("host write failed");
       },
       { ...silentLogger, error: (_message: string, error?: unknown) => errors.push(error) },
+      { releaseGraceMs: 0 },
     );
     tracker.hold(["seat:k"])();
     await settle();

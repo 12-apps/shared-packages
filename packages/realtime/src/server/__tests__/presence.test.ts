@@ -43,7 +43,7 @@ async function harness(options: HarnessOptions = {}) {
     driver,
     ticketSecret: SECRET,
     installSignalHooks: false,
-    ...(options.listen === false ? {} : { presence: { onChange: (change) => void heard.push(change) } }),
+    ...(options.listen === false ? {} : { presence: { onChange: (change) => void heard.push(change), releaseGraceMs: 0 } }),
     surfaces: [
       {
         name: "seat",

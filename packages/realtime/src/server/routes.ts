@@ -68,6 +68,8 @@ export interface RouteDeps {
   messages: EventsCopySource<EventsMessages>;
   /** What this process's SSE streams hold (`../core/presence.ts`). */
   presence: PresenceTracker;
+  /** How long a presence-holding stream lives before it rotates (`./sse.ts`). */
+  presenceStreamMaxAgeMs: number;
 }
 
 /**
@@ -100,6 +102,28 @@ async function authorizeRequest(
   return surface.authorize({ params: context.params, specs, request: context.request });
 }
 
+/** A grant no stream may serve — a host bug, logged, answered as `unavailable`. */
+function unstreamable(
+  surface: EventsSurfaceConfig,
+  granted: EventsAuthorization,
+  logger: RealtimeLogger,
+): boolean {
+  // A stream subscribed to nothing is the LYING channel FUT-657 exists to prevent: it
+  // opens, reports `connected`, heartbeats an empty topic list and the consumer
+  // relaxes its poll on the strength of it. Refusing is the honest answer.
+  if (granted.topics.length === 0) {
+    logger.error(`surface "${surface.name}" authorized zero topics; refusing the stream.`);
+    return true;
+  }
+  // The ticket refuses a reserved `$…` name at the mint; a stream has no ticket, so
+  // it refuses here — a host bug must not hand a browser the presence bus.
+  if (granted.topics.some((topic) => topic.startsWith("$"))) {
+    logger.error(`surface "${surface.name}" authorized a reserved topic; refusing the stream.`);
+    return true;
+  }
+  return invalidPresence(surface, granted, logger);
+}
+
 export function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): EventsRoute {
   return {
     method: "GET",
@@ -121,15 +145,7 @@ export function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): Even
       // caller should be able to collect.
       if (!getRealtimeDriver()) return { status: 503, body: { error: messages.unavailable } };
 
-      // A stream subscribed to nothing is the LYING channel FUT-657 exists to prevent: it
-      // opens, reports `connected`, heartbeats an empty topic list and the consumer
-      // relaxes its poll on the strength of it. Refusing is the honest answer, and the
-      // client's own heartbeat check would reach the same conclusion a beat later anyway.
-      if (granted.topics.length === 0) {
-        deps.logger.error(`surface "${surface.name}" authorized zero topics; refusing the stream.`);
-        return { status: 503, body: { error: messages.unavailable } };
-      }
-      if (invalidPresence(surface, granted, deps.logger)) {
+      if (unstreamable(surface, granted, deps.logger)) {
         return { status: 503, body: { error: messages.unavailable } };
       }
 
@@ -143,7 +159,8 @@ export function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): Even
       // Held for exactly the stream's life: the stream's single-shot cleanup runs
       // `onClose` on every exit path (client gone, shutdown, a write that finds the
       // client gone), so presence cannot outlive the connection that holds it.
-      const releasePresence = deps.presence.hold(granted.presence ?? []);
+      const held = granted.presence ?? [];
+      const releasePresence = deps.presence.hold(held);
       const release = (): void => {
         releaseSlot();
         releasePresence();
@@ -154,6 +171,7 @@ export function streamRoute(surface: EventsSurfaceConfig, deps: RouteDeps): Even
           topics: granted.topics,
           onClose: release,
           streams: deps.connections,
+          ...(held.length > 0 ? { maxAgeMs: deps.presenceStreamMaxAgeMs } : {}),
         });
         return { response };
       } catch (error) {
