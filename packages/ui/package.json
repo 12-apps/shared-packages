@@ -320,6 +320,10 @@
       "types": "./dist/types/components/feedback/Sonner/index.d.ts",
       "default": "./dist/feedback/Sonner.js"
     },
+    "./feedback/SequenceResolver": {
+      "types": "./dist/types/components/feedback/SequenceResolver/index.d.ts",
+      "default": "./dist/feedback/SequenceResolver.js"
+    },
     "./feedback/StackedModal": {
       "types": "./dist/types/components/feedback/StackedModal/index.d.ts",
       "default": "./dist/feedback/StackedModal.js"

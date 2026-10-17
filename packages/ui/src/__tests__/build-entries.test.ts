@@ -92,8 +92,9 @@ describe("the build emits one module per component", () => {
     // `navigation/SectionNav`; 145 → 146 added `form/MenuSelect` (FUT-2930);
     // 146 → 147 adds the cross-platform `layout/Screen` viewport; 147 → 148
     // adds `form/PickerSheet` (FUT-3239); 148 → 149 adds the pinned
-    // `form/Input/outlined` (FUT-1054).
-    expect(Object.keys(entries).length - internal.length).toBe(149);
+    // `form/Input/outlined` (FUT-1054); 149 → 150 adds
+    // `feedback/SequenceResolver` (FUT-3671).
+    expect(Object.keys(entries).length - internal.length).toBe(150);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {
