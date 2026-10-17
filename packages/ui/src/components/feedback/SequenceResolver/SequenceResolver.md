@@ -40,10 +40,10 @@ data-sized and shrinks while you go.
 | Prop | Type | Description |
 |---|---|---|
 | `open` | `boolean` | Shows the resolver. Every opening — with an intro or without — starts a fresh run. |
-| `onClose` | `(summary) => void` | Close button, Esc and the end screen's button. Gets `{ resolved, skipped, total }` for the host's "N resolved · Undo" toast. The veil does nothing (as approved). |
+| `onClose` | `(summary) => void` | Close button, Esc and the end screen's button. Gets `{ resolved, skipped, total, alsoResolved }`; a close toast counts `resolved + alsoResolved` (and shows only when that is above 0). Clicking the veil does nothing (as approved). |
 | `intro` | `SequenceIntro?` | While given, the intro shows instead of the run: `title`, `description`, `categories` (`label`, `description`, `count`, `onPick`), `startAllLabel`, `onStartAll`. The host drops it and sets `queue` in the same update as a pick. |
 | `queue` | `readonly I[]` (`I extends { key; kindLabel }`) | The problems, in order. Live data: it may shrink (siblings answered together) or grow mid-run. |
-| `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`. |
+| `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`, `footer?` (`'end'` default — right-aligned over a hairline; `'split'` — two equal columns, no hairline; on a phone the actions always share the row without a hairline). |
 | `onBack` | `(item, result) => Promise<void> \| void` | The host's server inverse, awaited before Back shows the previous step again. Called only when that step was RESOLVED. |
 | `canGoBack` | `boolean` (default `true`) | Offer Back at all. It shows only once a previous step exists — on steps and on the end screen, never on the intro. |
 | `done` | `SequenceDone \| (summary) => SequenceDone` | The end screen: `title`, `description?`, `confirmLabel`. |
@@ -54,7 +54,7 @@ data-sized and shrinks while you go.
 
 | `api.` | |
 |---|---|
-| `resolve(result \| promise)` | Answer and move on. Given the PROMISE of the host's write, the step stays on screen and `busy` until it settles (even if the host's refetch drops the entry first); a rejection keeps it and shows the rejection's message. |
+| `resolve(result \| promise, { alsoResolved? })` | Answer and move on. `alsoResolved` counts OTHER problems this answer resolved too ("apply to every sibling") for the close summary; Back over the step takes them off again. Given the PROMISE of the host's write, the step stays on screen and `busy` until it settles (even if the host's refetch drops the entry first); a rejection keeps it and shows the rejection's message. |
 | `skip()` | Leave it unanswered and move on. |
 | `back()` | Same as the header's Back. |
 | `busy` | True while a `resolve` promise or an `onBack` is pending. The footer, tertiary and Back are disabled by the component; disable the step's own answers with it. |
@@ -112,11 +112,11 @@ button above the footer.
 
 ### Four step kinds, as a stock screen plugs them in
 
-| Kind (`kindLabel`) | `content` | `primary` | `secondary` | `tertiary` |
+| Kind (`kindLabel`) | `content` | `primary` | `secondary` | `tertiary` / `footer` |
 |---|---|---|---|---|
-| **Limits** — no minimum/maximum | name; "How much stays on display?"; facts; min/max steppers (`NumberField`); "Apply to every subproduct of X (N)" checkbox | "Save limits" → `api.resolve(saveLimits(...))`; with the checkbox the host's refetch drops the siblings' steps | skip | — |
-| **Purchase** — out of stock | name; "Register purchase"; last purchase; quantity / total paid (`NumberField`), supplier (`CreatableSelect`), destination; "Also put N on display" | "Register and display N" → `api.resolve(registerPurchase(...))` | `{ label: 'Not bought yet', onClick: api.skip }` | — |
-| **Restock** — display below its rule | name; "How many to take?"; total / displayed / stored; the 0→max bar; − / + | "Take N" → `api.resolve(restock(...))` | skip | — |
+| **Limits** — no minimum/maximum | name; "How much stays on display?"; facts; min/max steppers (`NumberField`); "Apply to every subproduct of X (N)" checkbox | "Save limits" → `api.resolve(saveLimits(...))`; with the checkbox the host's refetch drops the siblings' steps, and `{ alsoResolved: N }` counts them | skip | `footer: 'split'` |
+| **Purchase** — out of stock | name; "Register purchase"; last purchase; quantity / total paid (`NumberField`), supplier (`CreatableSelect`), destination; "Also put N on display" | "Register and display N" → `api.resolve(registerPurchase(...))` | `{ label: 'Not bought yet', onClick: api.skip }` | `footer: 'split'` |
+| **Restock** — display below its rule | name; "How many to take?"; total / displayed / stored; the 0→max bar; − / + | "Take N" → `api.resolve(restock(...))` | skip | `footer: 'end'` |
 | **Unexplained loss** — a write-off with no reason | name; "Why did these N leave?"; quick reasons + "Other reason" (each answers with `api.resolve`, disabled while `api.busy`); "Different reasons? Split the N" | — (the reason buttons answer); while splitting: "Save N reasons" | skip; while splitting: `{ label: 'One reason only', ... }` | "It was a stock count, not a loss" |
 
 Each `resolve` returns what `onBack` needs to undo it (an undo id from the server), so Back

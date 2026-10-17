@@ -11,7 +11,7 @@ import {
   syncRun,
   type RunState,
 } from './sequence-model';
-import type { SequenceItem } from './SequenceResolver.types';
+import type { SequenceItem, SequenceResolveOptions } from './SequenceResolver.types';
 
 interface RunInputs<I extends SequenceItem, R> {
   /** The resolver is open. Opening it, intro or not, starts a fresh run. */
@@ -28,7 +28,7 @@ export interface SequenceRun<I extends SequenceItem, R> {
   run: RunState<I, R>;
   busy: boolean;
   error: string | null;
-  resolve: (result: R | PromiseLike<R>) => void;
+  resolve: (result: R | PromiseLike<R>, options?: SequenceResolveOptions) => void;
   skip: () => void;
   back: () => void;
 }
@@ -61,14 +61,18 @@ function messageOf(reason: unknown, fallback: string): string {
   return fallback;
 }
 
+/** What the pending work is: an answer being written, or Back's inverse. */
+type Work = 'resolve' | 'back';
+
 interface AsyncGate {
-  busy: boolean;
+  /** The pending work, or `null` when idle. */
+  busy: Work | null;
   error: GateError | null;
   /** True from the moment work starts — read before React re-renders with `busy`. */
   isPending: () => boolean;
   clearError: () => void;
   /** Run `work`; on success apply `onDone`, on failure keep the screen and show why. */
-  settle: <T>(work: PromiseLike<T>, screen: string, onDone: (value: T) => void) => void;
+  settle: <T>(work: PromiseLike<T>, kind: Work, screen: string, onDone: (value: T) => void) => void;
   /** Forget pending work (a restart): whatever settles later touches nothing. */
   reset: () => void;
 }
@@ -80,21 +84,21 @@ interface AsyncGate {
  * promise settling after a restart must not touch the new run.
  */
 function useAsyncGate(failed: string): AsyncGate {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Work | null>(null);
   const [error, setError] = useState<GateError | null>(null);
   const pending = useRef(false);
   const generation = useRef(0);
 
   const settle = useCallback(
-    <T,>(work: PromiseLike<T>, screen: string, onDone: (value: T) => void) => {
+    <T,>(work: PromiseLike<T>, kind: Work, screen: string, onDone: (value: T) => void) => {
       const mine = generation.current;
       pending.current = true;
-      setBusy(true);
+      setBusy(kind);
       setError(null);
       const finish = (): boolean => {
         if (mine !== generation.current) return false;
         pending.current = false;
-        setBusy(false);
+        setBusy(null);
         return true;
       };
       work.then(
@@ -112,7 +116,7 @@ function useAsyncGate(failed: string): AsyncGate {
   const reset = (): void => {
     generation.current += 1;
     pending.current = false;
-    if (busy) setBusy(false);
+    if (busy) setBusy(null);
     if (error) setError(null);
   };
 
@@ -160,17 +164,18 @@ export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R
   const { settle, isPending, clearError } = gate;
 
   const onScreen = currentOf(run);
-  const resolve = (result: R | PromiseLike<R>): void => {
+  const resolve = (result: R | PromiseLike<R>, options?: SequenceResolveOptions): void => {
+    const also = options?.alsoResolved ?? 0;
     if (isPending() || !onScreen) return;
     if (isThenable(result)) {
       // The host's refetch may drop the entry before its write returns: keep
       // it on screen meanwhile, and answer THIS entry when it does.
       update((prev) => pinRun(prev, onScreen.key));
-      settle(result, onScreen.key, (value) => update((prev) => resolveRun(prev, value, onScreen)));
+      settle(result, 'resolve', onScreen.key, (value) => update((prev) => resolveRun(prev, value, onScreen, also)));
       return;
     }
     clearError();
-    update((prev) => resolveRun(prev, result, onScreen));
+    update((prev) => resolveRun(prev, result, onScreen, also));
   };
 
   const skip = (): void => {
@@ -186,7 +191,7 @@ export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R
       // `new Promise` so a handler that throws synchronously lands in the same
       // rejection path as one that rejects.
       const undo = new Promise<void>((done) => done(onBack(last.item, last.result)));
-      settle(undo, screenOf(onScreen), () => update((prev) => backRun(prev, last.item.key)));
+      settle(undo, 'back', screenOf(onScreen), () => update((prev) => backRun(prev, last.item.key)));
       return;
     }
     clearError();
@@ -196,5 +201,5 @@ export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R
   // An error belongs to the screen it was raised on: once a queue change (or
   // anything else) moves the run to another step, it no longer shows.
   const error = gate.error && gate.error.screen === screenOf(onScreen) ? gate.error.message : null;
-  return { run, busy: gate.busy, error, resolve, skip, back };
+  return { run, busy: gate.busy !== null, error, resolve, skip, back };
 }

@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { useState } from 'react';
 
+import { sxRem } from '../../../tokens/relative';
 import { Button } from '../../form/Button';
 import { SequenceResolver } from './SequenceResolver';
 import type {
@@ -62,21 +63,40 @@ const LABELS: SequenceResolverLabels = {
   failed: 'Não deu certo. Tente de novo.',
 };
 
-const doneOf = (summary: SequenceSummary) => ({
-  title: summary.resolved === summary.total ? 'Tudo resolvido' : `${summary.resolved} de ${summary.total} resolvidas`,
-  description:
-    summary.resolved === summary.total
-      ? 'O estoque está em dia.'
-      : 'Os que você pulou continuam em “problemas a resolver”.',
-  confirmLabel: 'Concluir',
-});
+/** One kind's own word in the header ("Baixa 2 de 5") and its own end sentence — host copy. */
+const SINGLE_WORD: Record<Kind, string> = { limits: 'Limites', purchase: 'Compra', restock: 'Reposição', loss: 'Baixa' };
+const SINGLE_DONE: Record<Kind, string> = {
+  limits: 'Esses produtos agora entram em “para repor”.',
+  purchase: 'As compras entraram no estoque guardado.',
+  restock: 'A exposição foi abastecida.',
+  loss: 'As perdas já contam com elas.',
+};
 
-const VERB: Record<Kind, string> = {
+/** The host's labels for a run: a mixed run says "Problema 3 de 13 · Compra", one kind "Compra 1 de 2". */
+const labelsFor = (single: Kind | null): SequenceResolverLabels =>
+  single ? { ...LABELS, step: (position, total) => `${SINGLE_WORD[single]} ${position} de ${total}` } : LABELS;
+
+const doneFor = (single: Kind | null) => (summary: SequenceSummary) => {
+  const all = summary.resolved === summary.total;
+  const allSentence = single ? SINGLE_DONE[single] : 'O estoque está em dia.';
+  const skipped = single
+    ? 'As que você pulou continuam no chip do topo.'
+    : 'Os que você pulou continuam em “problemas a resolver”.';
+  return {
+    title: all ? 'Tudo resolvido' : `${summary.resolved} de ${summary.total} resolvidas`,
+    description: all ? allSentence : skipped,
+    confirmLabel: 'Concluir',
+  };
+};
+
+const VERB: Record<Exclude<Kind, 'loss'>, string> = {
   limits: 'Salvar limites',
   purchase: 'Registrar e expor 12',
   restock: 'Levar 16',
-  loss: 'Quebra',
 };
+
+/** A baixa is answered from its body: the store's quick reasons. */
+const QUICK_REASONS = ['Quebra', 'Vencido', 'Consumo interno'];
 
 const QUESTION: Record<Kind, string> = {
   limits: 'Quanto deve ficar na exposição?',
@@ -100,18 +120,40 @@ function stepOf(item: Problem, api: SequenceStepApi<string>): SequenceStep {
       </Typography>
     </Box>
   );
-  const answer = { label: VERB[item.kind], onClick: () => api.resolve(`${item.key}:answered`), disabled: api.busy };
   if (item.kind === 'loss') {
+    // No primary: each reason answers the step; the tertiary and Pular are the footer.
+    const reasons = (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, mt: 2 }}>
+        {QUICK_REASONS.map((reason) => (
+          <Button
+            key={reason}
+            variant="outline"
+            color="neutral"
+            disabled={api.busy}
+            sx={{ minHeight: sxRem(44) }}
+            onClick={() => api.resolve(`${item.key}:${reason}`)}
+          >
+            {reason}
+          </Button>
+        ))}
+      </Box>
+    );
     return {
-      content,
-      primary: answer,
+      content: (
+        <>
+          {content}
+          {reasons}
+        </>
+      ),
       tertiary: { label: 'Não foi perda: foi contagem de estoque', onClick: () => api.resolve(`${item.key}:count`) },
     };
   }
+  const answer = { label: VERB[item.kind], onClick: () => api.resolve(`${item.key}:answered`), disabled: api.busy };
   if (item.kind === 'purchase') {
-    return { content, primary: answer, secondary: { label: 'Ainda não comprei', onClick: api.skip } };
+    return { content, primary: answer, secondary: { label: 'Ainda não comprei', onClick: api.skip }, footer: 'split' };
   }
-  return { content, primary: answer };
+  // Restock keeps its actions right-aligned over a hairline; limits is a two-column form footer.
+  return { content, primary: answer, footer: item.kind === 'limits' ? 'split' : 'end' };
 }
 
 interface DemoProps {
@@ -131,6 +173,8 @@ function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 
   const [open, setOpen] = useState(true);
   const [showIntro, setShowIntro] = useState(withIntro);
   const [queue, setQueue] = useState<Problem[]>(initial);
+  const kinds = new Set(queue.map((item) => item.kind));
+  const single = !showIntro && kinds.size === 1 ? ([...kinds][0] ?? null) : null;
   const count = (kind: Kind): number => initial.filter((item) => item.kind === kind).length;
   const pick = (kind: Kind) => () => {
     setQueue(initial.filter((item) => item.kind === kind));
@@ -184,8 +228,8 @@ function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 
         queue={queue}
         renderStep={renderStep}
         onBack={onBack}
-        done={doneOf}
-        labels={LABELS}
+        done={doneFor(single)}
+        labels={labelsFor(single)}
         dataTestId="resolver"
       />
     </Box>
@@ -240,7 +284,7 @@ export const Done: Story = {
   play: async ({ canvasElement }) => {
     const body = resolverIn(canvasElement);
     await userEvent.click(await body.findByTestId('resolver-primary'));
-    await waitFor(() => expect(body.getByTestId('resolver-step-label')).toHaveTextContent('Problema 2 de 2'));
+    await waitFor(() => expect(body.getByTestId('resolver-step-label')).toHaveTextContent('2 de 2'));
     await userEvent.click(body.getByTestId('resolver-secondary'));
     await waitFor(() => expect(body.getByTestId('resolver-done')).toBeInTheDocument());
   },
@@ -299,4 +343,35 @@ export const PhoneLongStep: Story = { ...LongStep, globals: PHONE };
 export const PhoneLongLabel: Story = {
   args: { primaryLabel: 'Registrar a compra e levar tudo para a exposição agora' },
   globals: { viewport: { value: 'xxs', isRotated: false } },
+};
+
+/** A restock step: auto-width actions right-aligned over a hairline (`footer: 'end'`). */
+export const RestockStep: Story = { args: { queue: PROBLEMS.slice(3, 4) }, globals: DESKTOP };
+
+/** A baixa answered from its body: no primary — the reasons, the tertiary above the footer, and Pular. */
+export const LossStep: Story = { args: { queue: PROBLEMS.slice(4) }, globals: DESKTOP };
+
+/** The baixa step on the phone sheet. */
+export const PhoneLossStep: Story = { ...LossStep, globals: PHONE };
+
+/** Opened straight into one kind (a row shortcut): step 1, no Back, the kind's own label ("Limites 1 de 2"). */
+export const SingleKind: Story = { args: { queue: PROBLEMS.slice(0, 2) }, globals: DESKTOP };
+
+/** A 1-of-1 run (one product's shortcut): "Compra 1 de 1". */
+export const OneOfOne: Story = { args: { queue: PROBLEMS.slice(2, 3) }, globals: DESKTOP };
+
+/** The end screen after a failed Back: the run stays on the end screen and the host's message shows. */
+export const DoneBackFailed: Story = {
+  globals: DESKTOP,
+  args: {
+    queue: PROBLEMS.slice(0, 1),
+    onBack: () => Promise.reject(new Error('Não deu para desfazer a resposta. Tente de novo.')),
+  },
+  play: async ({ canvasElement }) => {
+    const body = resolverIn(canvasElement);
+    await userEvent.click(await body.findByTestId('resolver-primary'));
+    await waitFor(() => expect(body.getByTestId('resolver-done')).toBeInTheDocument());
+    await userEvent.click(body.getByTestId('resolver-back'));
+    await waitFor(() => expect(body.getByTestId('resolver-error')).toBeInTheDocument());
+  },
 };

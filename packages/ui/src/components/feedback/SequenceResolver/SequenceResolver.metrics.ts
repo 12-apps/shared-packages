@@ -7,8 +7,10 @@ export const SEQUENCE_METRICS = {
   sheetBreakpoint: 'sm',
   /** The sheet never grows past this share of the viewport; the paper scrolls inside it. */
   sheetMaxHeightPercent: 95,
-  /** The smallest a control may be below the sheet breakpoint. */
+  /** The smallest a control may be below the sheet breakpoint, and the end screen's button everywhere. */
   touchTarget: 44,
+  /** The intro's "all in sequence" button, at least. */
+  startAllHeight: 48,
   /** Header icon button: 40px on a pointer, 44px on a phone. */
   closeSize: { pointer: 40, touch: 44 },
   /** The drag handle — decoration only, the sheet does not drag. */

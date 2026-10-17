@@ -400,7 +400,7 @@ describe("the end screen", () => {
     expect(screen.getByTestId("sr-back")).toBeInTheDocument();
     click("sr-done-confirm");
     await waitFor(() => {
-      expect(onClose).toHaveBeenCalledWith({ resolved: 1, skipped: 1, total: 2 });
+      expect(onClose).toHaveBeenCalledWith({ resolved: 1, skipped: 1, total: 2, alsoResolved: 0 });
     });
   });
 
@@ -430,7 +430,7 @@ describe("closing", () => {
     click("sr-primary");
     click("sr-close");
     await waitFor(() => {
-      expect(onClose).toHaveBeenLastCalledWith({ resolved: 1, skipped: 0, total: 3 });
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 1, skipped: 0, total: 3, alsoResolved: 0 });
     });
     fireEvent.keyDown(dialog(), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(2);
@@ -471,13 +471,13 @@ describe("review round 1 regressions", () => {
     });
     click("sr-close");
     await waitFor(() => {
-      expect(onClose).toHaveBeenLastCalledWith({ resolved: 2, skipped: 0, total: 3 });
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 2, skipped: 0, total: 3, alsoResolved: 0 });
     });
     rerender({ onClose, intro, open: false });
     rerender({ onClose, intro, open: true });
     click("sr-close");
     await waitFor(() => {
-      expect(onClose).toHaveBeenLastCalledWith({ resolved: 0, skipped: 0, total: 3 });
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 0, skipped: 0, total: 3, alsoResolved: 0 });
     });
   });
 
@@ -533,6 +533,60 @@ describe("review round 1 regressions", () => {
     expect(getComputedStyle(dialog()).overflowY).toBe("hidden");
   });
 
+  it("reports problems resolved together with a step in the close summary", async () => {
+    const onClose = vi.fn();
+    renderResolver({
+      onClose,
+      renderStep: (item, api) => ({
+        content: <h3 {...api.titleProps}>{item.name}</h3>,
+        primary: { label: "Save for all", onClick: () => api.resolve("all", { alsoResolved: 2 }) },
+      }),
+    });
+    click("sr-primary");
+    await waitFor(() => {
+      expect(stepLabel()).toBe("Problem 2 of 3 · Purchase");
+    });
+    click("sr-close");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenLastCalledWith({ resolved: 1, skipped: 0, total: 3, alsoResolved: 2 });
+    });
+  });
+
+  it("keeps the body's children at their own height so the body scrolls instead of crushing them", () => {
+    renderResolver();
+    for (const child of Array.from(screen.getByTestId("sr-body").children)) {
+      expect(getComputedStyle(child).flexShrink).toBe("0");
+    }
+  });
+
+  it("lays the footer out per step: 'end' over a hairline, 'split' in equal columns without one", () => {
+    const { rerender } = renderResolver();
+    const footer = (): CSSStyleDeclaration => getComputedStyle(screen.getByTestId("sr-footer"));
+    expect(footer().display).toBe("flex");
+    expect(footer().justifyContent).toBe("flex-end");
+    expect(footer().borderTopStyle).toBe("solid");
+    rerender({ renderStep: (item, api) => ({ ...basicStep(item, api), footer: "split" }) });
+    expect(footer().display).toBe("grid");
+    expect(footer().borderTopStyle).not.toBe("solid");
+  });
+
+  it("answers from the body: no primary, the tertiary and Skip only", () => {
+    renderResolver({
+      renderStep: (item, api) => ({
+        content: (
+          <div>
+            <h3 {...api.titleProps}>{item.name}</h3>
+            <button type="button" onClick={() => api.resolve("broken")}>Broken</button>
+          </div>
+        ),
+        tertiary: { label: "It was a stock count", onClick: () => api.resolve("count") },
+      }),
+    });
+    expect(screen.queryAllByTestId("sr-primary")).toHaveLength(0);
+    expect(screen.getByTestId("sr-secondary")).toHaveTextContent("Skip for now");
+    expect(screen.getByTestId("sr-tertiary")).toHaveTextContent("It was a stock count");
+  });
+
   it("unmounting while a write is pending settles quietly", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { promise: write, open: finish } = latch<string>();
@@ -567,5 +621,11 @@ describe("on a phone", () => {
     renderResolver();
     expect(screen.getByTestId("sr-handle")).toHaveAttribute("aria-hidden", "true");
     expect(dialog()).toHaveAccessibleName("Item a");
+  });
+
+  it("draws no hairline over the footer, whatever the step's layout", () => {
+    stubPhoneViewport();
+    renderResolver();
+    expect(getComputedStyle(screen.getByTestId("sr-footer")).borderTopStyle).not.toBe("solid");
   });
 });

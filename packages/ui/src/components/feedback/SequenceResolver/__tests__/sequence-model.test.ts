@@ -37,7 +37,7 @@ describe("a fresh run", () => {
     const run = startRun<Item, string>([A, B, C]);
     expect(currentOf(run)).toBe(A);
     expect(positionOf(run)).toBe(1);
-    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 0, total: 3 });
+    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 0, total: 3, alsoResolved: 0 });
     expect(progressOf(run)).toBe(0);
     expect(previousOf(run)).toBeUndefined();
   });
@@ -61,7 +61,7 @@ describe("resolve and skip", () => {
     expect(currentOf(run)).toBe(B);
     expect(positionOf(run)).toBe(2);
     expect(previousOf(run)).toEqual({ item: A, outcome: "resolved", result: "r-a" });
-    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 3 });
+    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 3, alsoResolved: 0 });
     expect(progressOf(run)).toBe(33);
     expect(run.pinned).toBeUndefined();
   });
@@ -70,7 +70,7 @@ describe("resolve and skip", () => {
     const run = skipRun(startRun<Item, string>([A, B]));
     expect(currentOf(run)).toBe(B);
     expect(previousOf(run)).toEqual({ item: A, outcome: "skipped" });
-    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 1, total: 2 });
+    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 1, total: 2, alsoResolved: 0 });
   });
 
   it("reaches the end after the last step, and never runs past it", () => {
@@ -82,7 +82,17 @@ describe("resolve and skip", () => {
     expect(progressOf(run)).toBe(100);
     expect(resolveRun(run, "extra")).toBe(run);
     expect(skipRun(run)).toBe(run);
-    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 1, total: 2 });
+    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 1, total: 2, alsoResolved: 0 });
+  });
+});
+
+describe("problems resolved together with a step", () => {
+  it("counts them in the summary apart from the steps, and Back takes them away again", () => {
+    let run = startRun<Item, string>([A, B]);
+    run = resolveRun(run, "limits for a and 2 siblings", A, 2);
+    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 2, alsoResolved: 2 });
+    run = backRun(run);
+    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 0, total: 2, alsoResolved: 0 });
   });
 });
 
@@ -93,7 +103,7 @@ describe("back", () => {
     run = backRun(run);
     expect(currentOf(run)).toBe(A);
     expect(positionOf(run)).toBe(1);
-    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 0, total: 3 });
+    expect(summaryOf(run)).toEqual({ resolved: 0, skipped: 0, total: 3, alsoResolved: 0 });
     expect(keysAhead(run)).toEqual(["a", "b", "c"]);
   });
 
@@ -127,7 +137,7 @@ describe("a queue that changes under the run", () => {
     run = resolveRun(run, "limits for a and its siblings");
     run = syncRun(run, [A, D]);
     expect(currentOf(run)).toBe(D);
-    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 2 });
+    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 2, alsoResolved: 0 });
     expect(positionOf(run)).toBe(2);
   });
 
@@ -268,6 +278,6 @@ describe("a queue that changes under the run", () => {
     run = syncRun(run, []);
     expect(currentOf(run)).toBeUndefined();
     expect(progressOf(run)).toBe(100);
-    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 1 });
+    expect(summaryOf(run)).toEqual({ resolved: 1, skipped: 0, total: 1, alsoResolved: 0 });
   });
 });

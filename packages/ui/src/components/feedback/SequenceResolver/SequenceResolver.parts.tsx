@@ -29,6 +29,7 @@ import {
   headerSx,
   introListSx,
   stepLabelSx,
+  startAllSx,
   tertiarySx,
   titleSx,
 } from './SequenceResolver.styles';
@@ -181,6 +182,7 @@ export function SequenceIntroBody({ intro, titleId, testId, screenKey }: IntroPr
         fullWidth
         onClick={intro.onStartAll}
         dataTestId={`${testId}-start-all`}
+        sx={startAllSx}
       >
         {intro.startAllLabel}
       </Button>
@@ -248,7 +250,7 @@ export function SequenceStepBody(props: StepProps): React.JSX.Element {
         <ActionButton action={step.tertiary} busy={busy} touch={touch} variant="text" testId={`${testId}-tertiary`} />
       ) : null}
       {hasFooter ? (
-        <Box sx={footerSx(touch)} data-testid={`${testId}-footer`}>
+        <Box sx={footerSx(touch, step.footer ?? 'end')} data-testid={`${testId}-footer`}>
           {secondary ? (
             <ActionButton action={secondary} busy={busy} touch={touch} variant="outline" testId={`${testId}-secondary`} />
           ) : null}
@@ -296,7 +298,7 @@ export function SequenceDoneBody({ done, titleId, error, touch, onConfirm, testI
         fullWidth={touch}
         onClick={onConfirm}
         dataTestId={`${testId}-done-confirm`}
-        sx={doneConfirmSx(touch)}
+        sx={doneConfirmSx()}
       >
         {done.confirmLabel}
       </Button>

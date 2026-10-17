@@ -6,6 +6,7 @@ export type {
   SequenceIntro,
   SequenceItem,
   SequenceResolverLabels,
+  SequenceResolveOptions,
   SequenceResolverProps,
   SequenceStep,
   SequenceStepApi,

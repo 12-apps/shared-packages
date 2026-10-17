@@ -22,6 +22,19 @@ export interface SequenceSummary {
   skipped: number;
   /** Every step of the run so far: answered + skipped + still ahead. */
   total: number;
+  /**
+   * Problems the host reported as resolved TOGETHER with an answered step
+   * (`api.resolve(result, { alsoResolved })` — "apply to every sibling"),
+   * which never became steps. `resolved + alsoResolved` is what a close toast
+   * counts; the end screen's "N of M" counts steps.
+   */
+  alsoResolved: number;
+}
+
+/** What an answer can say besides its result. */
+export interface SequenceResolveOptions {
+  /** How many OTHER problems this answer resolved too (siblings that never became steps). */
+  alsoResolved?: number;
 }
 
 /** A button a step puts in the resolver's footer. */
@@ -40,7 +53,7 @@ export interface SequenceStepApi<R> {
    * `busy` until it settles; a rejection keeps it and shows the rejection's
    * message. The result is what `onBack` receives if the reader returns.
    */
-  resolve: (result: R | PromiseLike<R>) => void;
+  resolve: (result: R | PromiseLike<R>, options?: SequenceResolveOptions) => void;
   /** Leave this step unanswered and move on. */
   skip: () => void;
   /** Return to the previous step (the header's back button does the same). */
@@ -72,6 +85,13 @@ export interface SequenceStep {
   secondary?: SequenceAction | false;
   /** One text button above the footer ("It was a stock count, not a loss"). */
   tertiary?: SequenceAction;
+  /**
+   * How the footer lays its actions out on a pointer: `'end'` (default) —
+   * auto-width, right-aligned, over a hairline; `'split'` — two equal
+   * full-width columns, no hairline (a form step: limits, a purchase). On a
+   * phone the actions always share the row, with no hairline.
+   */
+  footer?: 'end' | 'split';
 }
 
 /** One kind on the intro screen. */

@@ -13,7 +13,7 @@ import type { SequenceItem, SequenceSummary } from './SequenceResolver.types';
 
 /** How a visited step was left. */
 export type Visit<I extends SequenceItem, R> =
-  | { item: I; outcome: 'resolved'; result: R }
+  | { item: I; outcome: 'resolved'; result: R; alsoResolved?: number }
   | { item: I; outcome: 'skipped' };
 
 export interface RunState<I extends SequenceItem, R> {
@@ -105,10 +105,12 @@ export function resolveRun<I extends SequenceItem, R>(
   state: RunState<I, R>,
   result: R,
   item: I | undefined = state.ahead[0],
+  alsoResolved = 0,
 ): RunState<I, R> {
   if (!item || !state.ahead.some((entry) => entry.key === item.key)) return state;
+  const visit: Visit<I, R> = alsoResolved > 0 ? { item, outcome: 'resolved', result, alsoResolved } : { item, outcome: 'resolved', result };
   return {
-    visits: [...state.visits, { item, outcome: 'resolved', result }],
+    visits: [...state.visits, visit],
     ahead: state.ahead.filter((entry) => entry.key !== item.key),
     ...leaving(state, item.key),
   };
@@ -155,7 +157,12 @@ export function backRun<I extends SequenceItem, R>(state: RunState<I, R>, key?: 
 /** Where the run stands. */
 export function summaryOf<I extends SequenceItem, R>(state: RunState<I, R>): SequenceSummary {
   const resolved = state.visits.filter((visit) => visit.outcome === 'resolved').length;
+  const alsoResolved = state.visits.reduce(
+    (sum, visit) => sum + (visit.outcome === 'resolved' ? Math.max(0, visit.alsoResolved ?? 0) : 0),
+    0,
+  );
   return {
+    alsoResolved,
     resolved,
     skipped: state.visits.length - resolved,
     total: state.visits.length + state.ahead.length,

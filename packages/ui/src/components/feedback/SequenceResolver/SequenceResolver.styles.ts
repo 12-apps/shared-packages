@@ -32,6 +32,10 @@ export const scrollBodySx: SxProps<Theme> = {
   minHeight: 0,
   overflowY: 'auto',
   overscrollBehavior: 'contain',
+  // The body's children keep their own height and the BODY scrolls: a
+  // shrinking child (the intro's clipped list, a host's step) would
+  // otherwise be crushed instead (320×568, 700×420).
+  '& > *': { flexShrink: 0 },
   // Room inside the scroll edge for focus rings and the primary's shadow,
   // which an `overflow` box would otherwise clip; the negative margin keeps
   // the content where the prototype puts it.
@@ -60,9 +64,12 @@ export function paperSx(touch: boolean): SxProps<Theme> {
 }
 
 /** The end screen's button: a step down from the sentence, at the touch-target height on a phone. */
-export function doneConfirmSx(touch: boolean): SxProps<Theme> {
-  return touch ? { mt: 1, minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : { mt: 1 };
+export function doneConfirmSx(): SxProps<Theme> {
+  return { mt: 1, minHeight: sxRem(SEQUENCE_METRICS.touchTarget) };
 }
+
+/** "All in sequence": the prototype's 48px, and taller when a long label wraps. */
+export const startAllSx: SxProps<Theme> = { height: 'auto', minHeight: sxRem(SEQUENCE_METRICS.startAllHeight) };
 
 /** A button at the touch-target height below the sheet breakpoint; its own size above it. */
 export function actionSx(touch: boolean): SxProps<Theme> {
@@ -91,10 +98,12 @@ export const headerSx: SxProps<Theme> = {
   gap: 1.5,
 };
 
+/** Back and the label; on a narrow sheet the label takes its own row rather than squeeze. */
 export const headerStartSx: SxProps<Theme> = {
   display: 'inline-flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
-  gap: 0.75,
+  columnGap: 0.75,
   minWidth: 0,
 };
 
@@ -181,17 +190,27 @@ export const categoryDescriptionSx: SxProps<Theme> = {
 };
 
 /**
- * The step's footer: a hairline over right-aligned actions on a pointer; on a
- * phone the actions share the row in equal columns, as the prototype draws them.
+ * The step's footer, as the prototype draws each kind:
+ * - phone: the actions share the row (a label that does not fit takes a full
+ *   row), no hairline;
+ * - pointer, `'split'`: two equal full-width columns, no hairline (limits, a purchase);
+ * - pointer, `'end'`: auto-width actions, right-aligned, over a hairline (restock).
  */
-export function footerSx(touch: boolean): SxProps<Theme> {
-  const edge = { gap: 1.25, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' } as const;
-  if (touch) {
-    // Equal columns while both labels fit on one line each; a label that
-    // does not fit takes a full row rather than wrapping word by word.
-    return { ...edge, display: 'flex', flexWrap: 'wrap' };
+export function footerSx(touch: boolean, layout: 'end' | 'split'): SxProps<Theme> {
+  if (touch) return { display: 'flex', flexWrap: 'wrap', gap: 1.25 };
+  if (layout === 'split') {
+    return { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(0, 1fr)', gap: 1.25 };
   }
-  return { ...edge, display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' };
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 1.25,
+    pt: 1.5,
+    borderTop: '1px solid',
+    borderColor: 'divider',
+  };
 }
 
 export function tertiarySx(touch: boolean): SxProps<Theme> {
