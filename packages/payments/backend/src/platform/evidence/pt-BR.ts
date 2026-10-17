@@ -154,6 +154,8 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     consentGiven: 'O lojista aprovou o consentimento e o PagBank redirecionou ao callback com o código.',
     consentRefused: (error) => `O PagBank retornou ao callback com error=${error}; o consentimento não foi concedido.`,
     callbackReceived: () => 'Callback recebido com code (removido) e state; o state confere com o emitido.',
+    callbackWithoutCode: (error) =>
+      `Callback recebido sem code${error ? ` (error=${error})` : ''}; o state confere com o emitido, mas não há código para trocar.`,
     callbackStateMismatch: 'Callback recebido, mas o state não confere com o emitido; a troca do código não foi feita.',
     callError: (detail) => `A chamada falhou: ${detail}`,
     httpAnswered: (status) => `O PagBank respondeu HTTP ${status}.`,

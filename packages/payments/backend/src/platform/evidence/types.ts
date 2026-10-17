@@ -192,6 +192,8 @@ export interface EvidenceOutcomeCopy {
   consentGiven: string;
   consentRefused: (error: string) => string;
   callbackReceived: (stateMatched: boolean) => string;
+  /** The callback came back without a code: the provider's error, if it named one. */
+  callbackWithoutCode: (error: string | null) => string;
   callbackStateMismatch: string;
   callError: (detail: string) => string;
   httpAnswered: (status: number) => string;
