@@ -300,10 +300,22 @@ hosts Apple publishes, matched exactly (`APPLE_PAY_GATEWAY_HOSTS`), over
 `https`, with no userinfo or port: anything else is refused before the
 certificate is loaded. The domain Apple is asked about is the browser-set
 `Origin`. Success answers `{ data: <session> }`, and every refusal answers
-`{ error, code }`: 400 for a bad body, URL or domain, 409
-`APPLE_PAY_NOT_CONFIGURED`, 503 `IDENTITY_UNUSABLE`, 502 when Apple refused or
-could not be reached, and 504 `TIMEOUT`. The subpath is server-only
-(`node:https`). The types are also exported from the root, as types only.
+`{ error, code }`: 400 for a bad body (including one over 4 KB), URL or
+domain, 409 `APPLE_PAY_NOT_CONFIGURED`, 503 `IDENTITY_UNAVAILABLE` (the port
+failed) or `IDENTITY_UNUSABLE` (the certificate is bad), 502 when Apple
+refused or could not be reached, and 504 `TIMEOUT`, which also aborts the
+call. The subpath is server-only (`node:https`). The types are also exported
+from the root, as types only.
+
+Two things stay the host's:
+
+- **Set `identity.domains`.** Without it, a caller that sends no `Origin`
+  header (anything but a browser) may name any domain in the body, and only
+  Apple's own registration check stands between it and a session for that
+  domain.
+- **Rate-limit the route.** It is public by design (the buyer may not be
+  signed in yet), and every request that passes the URL check costs one
+  mutual-TLS call to Apple.
 
 **The identity is a port**, `ApplePayIdentityPort.merchantIdentity(merchant)`,
 which answers `{ merchantIdentifier, displayName, certificate, privateKey,
@@ -311,8 +323,12 @@ domains? }` or `null`. Whether that is one platform identity or one per seller
 is the host's decision (FUT-773). Pass the same port to `buyerCheckoutConfig`
 (`applePay`) or to `createPaymentFlowsBE` (`applePay`): **without a merchant
 identity the buyer config no longer declares `APPLE_PAY`**, even for a provider
-whose capabilities list it. A stub connection still declares it, so an e2e
-suite can render the button.
+whose capabilities list it. A stub connection still declares it, but only so
+an e2e suite can render the button: validation on a stub store with no
+identity still answers 409. Only `buyerCheckoutConfig` and the
+`createPaymentFlowsBE` `/config` row are gated. The older library `config`
+route on `mountPayments` (`getClientConfig`) still publishes the raw
+capability table, so a host should not draw an Apple Pay button from it.
 
 ## 3. Frontend wiring
 

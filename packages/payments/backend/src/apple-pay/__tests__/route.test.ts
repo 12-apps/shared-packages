@@ -83,6 +83,39 @@ describe('createApplePayMerchantValidation', () => {
     expect(await malformed.json()).toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it('refuses a body over 4 KB with 400, before the identity is read', async () => {
+    const merchantIdentity = vi.fn(async () => IDENTITY);
+    const { route } = mount({ identity: { merchantIdentity } });
+    const oversized = await route.POST(post({ validationURL: URL_OK, padding: 'x'.repeat(5000) }));
+    expect(oversized.status).toBe(400);
+    expect(await oversized.json()).toMatchObject({ code: 'BAD_REQUEST' });
+    expect(merchantIdentity).not.toHaveBeenCalled();
+  });
+
+  it('refuses a declared content-length over 4 KB without reading the body', async () => {
+    const { route } = mount();
+    const request = new Request('https://api.example.com/x', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': '100000', origin: 'https://loja.example.com' },
+      body: JSON.stringify({ validationURL: URL_OK }),
+    });
+    const declared = await route.POST(request);
+    expect(declared.status).toBe(400);
+  });
+
+  it('answers 503 IDENTITY_UNAVAILABLE when the identity port fails', async () => {
+    const { route } = mount({
+      identity: {
+        merchantIdentity: async () => {
+          throw new Error('vault down');
+        },
+      },
+    });
+    const unavailable = await route.POST(post({ validationURL: URL_OK }));
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: 'IDENTITY_UNAVAILABLE', code: 'IDENTITY_UNAVAILABLE' });
+  });
+
   it('answers 409 APPLE_PAY_NOT_CONFIGURED when there is no merchant identity', async () => {
     const { route } = mount({ identity: { merchantIdentity: async () => null } });
     const response = await route.POST(post({ validationURL: URL_OK }));

@@ -144,16 +144,68 @@ describe('validateApplePayMerchant', () => {
     expect(world.sent).toHaveLength(0);
   });
 
-  it('surfaces a deadline as TIMEOUT', async () => {
+  it('surfaces a deadline as TIMEOUT, and aborts the request it gave up on', async () => {
     vi.useFakeTimers();
     try {
       const world = deps(() => new Promise<Response>(() => undefined), identity(), { timeoutMs: 50 });
+      const pending = codeOf(validateApplePayMerchant({ validationURL: URL_OK, domain: 'loja.example.com', merchant: MERCHANT }, world.deps));
+      await vi.advanceTimersByTimeAsync(10);
+      expect(world.sent[0]?.init.signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(await pending).toBe('TIMEOUT');
+      expect(world.sent[0]?.init.signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads a transport that honours the abort as TIMEOUT too', async () => {
+    vi.useFakeTimers();
+    try {
+      const world = deps(
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+          }),
+        identity(),
+        { timeoutMs: 50 },
+      );
       const pending = codeOf(validateApplePayMerchant({ validationURL: URL_OK, domain: 'loja.example.com', merchant: MERCHANT }, world.deps));
       await vi.advanceTimersByTimeAsync(60);
       expect(await pending).toBe('TIMEOUT');
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it.each([
+    ['throws', () => {
+      throw new Error('vault at /secrets/apple down');
+    }],
+    ['rejects', () => Promise.reject(new Error('vault at /secrets/apple down'))],
+  ])('types an identity port that %s as IDENTITY_UNAVAILABLE, naming nothing of it', async (_case, lookup) => {
+    const failing: ApplePayValidationDeps = {
+      identity: { merchantIdentity: lookup as () => Promise<null> },
+      transport: () => async () => Response.json(SESSION),
+    };
+    const caught = await validateApplePayMerchant({ validationURL: URL_OK, domain: 'loja.example.com', merchant: MERCHANT }, failing).catch(
+      (error: unknown) => error as ApplePayValidationError,
+    );
+    expect(caught).toBeInstanceOf(ApplePayValidationError);
+    expect((caught as ApplePayValidationError).code).toBe('IDENTITY_UNAVAILABLE');
+    expect((caught as ApplePayValidationError).message).not.toContain('/secrets');
+  });
+
+  it('names only the parsed host of a refused URL, never its path or query', async () => {
+    const world = deps(ok);
+    const caught = await validateApplePayMerchant(
+      { validationURL: 'https://evil.example.com/steal?token=abc123', domain: 'loja.example.com', merchant: MERCHANT },
+      world.deps,
+    ).catch((error: unknown) => error as ApplePayValidationError);
+    expect((caught as ApplePayValidationError).code).toBe('INVALID_VALIDATION_URL');
+    expect((caught as ApplePayValidationError).message).toContain('evil.example.com');
+    expect((caught as ApplePayValidationError).message).not.toContain('steal');
+    expect((caught as ApplePayValidationError).message).not.toContain('abc123');
   });
 
   it("surfaces the transport's own idle timeout as TIMEOUT", async () => {

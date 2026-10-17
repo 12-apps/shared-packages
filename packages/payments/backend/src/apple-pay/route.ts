@@ -27,9 +27,9 @@ import {
  * | outcome | status | body |
  * | --- | --- | --- |
  * | validated | 200 | `{ data: <merchant session> }` — opaque, pass it to `completeMerchantValidation` |
- * | `BAD_REQUEST` / `INVALID_VALIDATION_URL` / `INVALID_DOMAIN` | 400 | `{ error, code }` |
+ * | `BAD_REQUEST` (incl. a body over 4 KB) / `INVALID_VALIDATION_URL` / `INVALID_DOMAIN` | 400 | `{ error, code }` |
  * | `APPLE_PAY_NOT_CONFIGURED` | 409 | `{ error, code }` |
- * | `IDENTITY_UNUSABLE` | 503 | `{ error, code }` |
+ * | `IDENTITY_UNAVAILABLE` / `IDENTITY_UNUSABLE` | 503 | `{ error, code }` |
  * | `UNREACHABLE` / `UPSTREAM_REFUSED` / `INVALID_RESPONSE` | 502 | `{ error, code }` |
  * | `TIMEOUT` | 504 | `{ error, code }` |
  *
@@ -62,6 +62,7 @@ const STATUS: Record<ApplePayValidationRefusalCode, number> = {
   INVALID_VALIDATION_URL: 400,
   INVALID_DOMAIN: 400,
   APPLE_PAY_NOT_CONFIGURED: 409,
+  IDENTITY_UNAVAILABLE: 503,
   IDENTITY_UNUSABLE: 503,
   UNREACHABLE: 502,
   UPSTREAM_REFUSED: 502,
@@ -79,8 +80,41 @@ interface ValidationBody {
   domain: unknown;
 }
 
+/**
+ * The body's ceiling. `{ validationURL, domain }` is a few hundred bytes; the
+ * route is public, so nothing larger is ever read into memory, let alone parsed.
+ */
+const MAX_BODY_BYTES = 4096;
+
+/** The body as text, or `null` once it passes {@link MAX_BODY_BYTES} — read no further than that. */
+async function cappedText(request: Request): Promise<string | null> {
+  if (Number(request.headers.get('content-length') ?? '0') > MAX_BODY_BYTES) return null;
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 async function bodyOf(request: Request): Promise<ValidationBody | null> {
-  const parsed: unknown = await request.json().catch(() => null);
+  const text = await cappedText(request);
+  if (text === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
   const record = parsed as Record<string, unknown>;
   return { validationURL: record.validationURL, domain: record.domain };

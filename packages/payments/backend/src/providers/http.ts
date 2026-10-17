@@ -54,6 +54,14 @@ export interface ProviderHttpInit {
   headers: Record<string, string>;
   /** Already-serialized body (JSON string or form encoding). */
   body?: string;
+  /**
+   * Abort the request — and DESTROY its socket — when this fires. Optional and
+   * unset by every adapter call (`providerFetch` never sets it), so nothing on
+   * the charge paths changes; a caller with its own deadline (Apple Pay
+   * merchant validation, FUT-3686) sets it so a timed-out call stops holding a
+   * connection open.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -64,7 +72,7 @@ export interface ProviderHttpInit {
 export type ProviderTransport = (url: string, init: ProviderHttpInit) => Promise<Response>;
 
 const globalFetch: ProviderTransport = (url, init) =>
-  fetch(url, { method: init.method, headers: init.headers, body: init.body });
+  fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: init.signal });
 
 /**
  * One authenticated call: retry-on-pre-send-only, non-2xx mapped to a

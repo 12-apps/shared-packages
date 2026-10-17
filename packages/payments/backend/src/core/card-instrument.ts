@@ -224,7 +224,12 @@ export function holdsInstrumentFor(
   // instrument here, whatever else the block carries.
   const minted = card.tokensByProvider;
   if (minted && Object.keys(minted).length > 0) return Boolean(minted[provider]);
-  return Boolean(card.token ?? card.savedCardToken);
+  // A wallet key counts (FUT-471, FUT-3686), exactly as a bare token does and
+  // under the same attribution rule — the map above, when there is one, still
+  // decides alone. The buyer just authorized THIS payment on the wallet sheet;
+  // answering with a parked hosted link would discard that authorization the
+  // way ignoring a typed card would. `checkout/reuse.ts` already asked it so.
+  return Boolean(card.token ?? card.savedCardToken ?? card.wallet);
 }
 
 /**

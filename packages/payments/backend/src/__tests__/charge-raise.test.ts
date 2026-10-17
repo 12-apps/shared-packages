@@ -122,6 +122,22 @@ describe('rule 2 — hosted is checked first, and for either method', () => {
     // Silently reusing here would ignore the card the buyer just typed.
     expect(d.gateway.charge).toHaveBeenCalled();
   });
+
+  it('raises a wallet charge on an order still holding a live hosted link', async () => {
+    const link = snapshot({ providerChargeId: 'LINK', hostedCheckoutUrl: 'https://pay/x' });
+    const { d } = deps({ payable: [{ snapshot: link }] });
+
+    const got = await createChargeRaiser(d)({
+      ...REQUEST,
+      method: 'CARD',
+      card: { wallet: { type: 'APPLE_PAY', key: '{"paymentData":"x"}' } },
+    });
+
+    // The buyer authorized THIS payment on the sheet; the parked link is not it.
+    expect(got).not.toBe(link);
+    expect(got.providerChargeId).toBe('NEW');
+    expect(d.gateway.charge).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('rule 3 — the returned row is not taken on trust', () => {

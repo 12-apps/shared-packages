@@ -76,6 +76,33 @@ export function applePayDomain(raw: unknown): string | null {
   return FQDN.test(domain) ? domain : null;
 }
 
+/**
+ * The parsed hostname of a refused URL, for the operator's log — never the
+ * whole URL: its path and query are the caller's, and nothing of them is
+ * worth writing down.
+ */
+function hostOf(raw: unknown): string {
+  if (typeof raw !== 'string') return 'not a string';
+  try {
+    return new URL(raw).hostname.slice(0, 253) || 'no host';
+  } catch {
+    return 'unparseable';
+  }
+}
+
+/**
+ * The identity, with the port's own failure TYPED — fail closed, as the
+ * declaration gate does. The port's error is not chained: it is the host's,
+ * and may say anything about where its keys live.
+ */
+async function identityFor(port: ApplePayIdentityPort, merchant: MerchantRef): Promise<ApplePayMerchantIdentity | null> {
+  try {
+    return await port.merchantIdentity(merchant);
+  } catch {
+    return fail('IDENTITY_UNAVAILABLE', 'The merchant identity could not be read');
+  }
+}
+
 function fail(code: ApplePayValidationFailureCode, message: string, httpStatus?: number): never {
   throw new ApplePayValidationError(code, message, httpStatus);
 }
@@ -102,25 +129,33 @@ function isTimeout(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === 'ETIMEDOUT';
 }
 
-/** Send, under one deadline. Every rejection becomes a typed error; nothing of the identity rides on it. */
+/**
+ * Send, under one deadline. On the deadline the request is ABORTED — the
+ * transport destroys the socket — rather than merely abandoned, so a slow
+ * Apple cannot pin one connection per tap for the transport's idle timeout.
+ * The race stays as the backstop for a transport that ignores the signal.
+ * Every rejection becomes a typed error; nothing of the identity rides on it.
+ */
 async function send(
   transport: ProviderTransport,
   url: URL,
   body: string,
   timeoutMs: number,
 ): Promise<Response> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new ApplePayValidationError('TIMEOUT', `No answer from ${url.hostname} in ${timeoutMs} ms`)), timeoutMs);
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new ApplePayValidationError('TIMEOUT', `No answer from ${url.hostname} in ${timeoutMs} ms`));
+    }, timeoutMs);
   });
+  const init = { method: 'POST' as const, headers: { 'content-type': 'application/json' }, body, signal: controller.signal };
   try {
-    return await Promise.race([
-      transport(url.href, { method: 'POST', headers: { 'content-type': 'application/json' }, body }),
-      deadline,
-    ]);
+    return await Promise.race([transport(url.href, init), deadline]);
   } catch (error) {
     if (error instanceof ApplePayValidationError) throw error;
-    if (isTimeout(error)) fail('TIMEOUT', `No answer from ${url.hostname} in time`);
+    if (isTimeout(error) || controller.signal.aborted) fail('TIMEOUT', `No answer from ${url.hostname} in time`);
     return fail('UNREACHABLE', `Merchant validation could not reach ${url.hostname}`);
   } finally {
     clearTimeout(timer);
@@ -160,11 +195,11 @@ export async function validateApplePayMerchant(
   deps: ApplePayValidationDeps,
 ): Promise<ApplePayValidationResult> {
   const url = applePayValidationUrl(input.validationURL);
-  if (!url) fail('INVALID_VALIDATION_URL', 'The validation URL is not on an Apple Pay gateway host');
+  if (!url) fail('INVALID_VALIDATION_URL', `The validation URL's host (${hostOf(input.validationURL)}) is not an Apple Pay gateway host`);
   const domain = applePayDomain(input.domain);
   if (!domain) fail('INVALID_DOMAIN', 'The domain is not a fully qualified domain name');
 
-  const identity = await deps.identity.merchantIdentity(input.merchant);
+  const identity = await identityFor(deps.identity, input.merchant);
   if (!identity) return { status: 'NOT_CONFIGURED' };
   assertRegistered(identity, domain);
 

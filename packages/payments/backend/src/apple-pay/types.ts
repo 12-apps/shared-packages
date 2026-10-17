@@ -61,6 +61,7 @@ export type ApplePayValidationResult =
  *
  * - `INVALID_VALIDATION_URL` — not an `https` URL on one of Apple's gateway hosts
  * - `INVALID_DOMAIN`         — no usable domain, or one the identity is not registered for
+ * - `IDENTITY_UNAVAILABLE`   — the identity port itself failed (threw or rejected)
  * - `IDENTITY_UNUSABLE`      — certificate/key unreadable, mismatched, expired or not yet valid
  * - `TIMEOUT`                — Apple did not answer in time
  * - `UNREACHABLE`            — the call failed before any answer (DNS, TLS, reset)
@@ -70,6 +71,7 @@ export type ApplePayValidationResult =
 export type ApplePayValidationFailureCode =
   | 'INVALID_VALIDATION_URL'
   | 'INVALID_DOMAIN'
+  | 'IDENTITY_UNAVAILABLE'
   | 'IDENTITY_UNUSABLE'
   | 'TIMEOUT'
   | 'UNREACHABLE'
