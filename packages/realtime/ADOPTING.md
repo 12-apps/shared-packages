@@ -89,6 +89,7 @@ const web    = createWebEvents({ apiBase: "/api" });    // frontend
 | `messages` | no | pt-BR (today's strings) | override the 400/429/503 bodies; per field, so changing one keeps the rest |
 | `outbox` | no | off | `{ db }` — enabling it is saying where the rows live |
 | `installSignalHooks` | no | `true` | SIGTERM/SIGINT end open streams cleanly; turn off if the host owns shutdown |
+| `presence` | no | off | `{ onChange, renewMs?, releaseGraceMs?, streamMaxAgeMs? }` — hear connection-lifetime presence; see [Presence](#presence-for-as-long-as-a-connection-is-open) |
 
 **`connectionCap` covers the SSE path only, and SSE is not the wire a working deployment
 uses.** The stream route takes a ledger slot; the ticket route cannot, because a ticket
@@ -297,6 +298,59 @@ of the seam.
 
 A host that would rather not run a second process passes its own `server`, and the gateway
 attaches to it instead of listening.
+
+## Presence: for as long as a connection is open
+
+"Who else is here right now?" used to cost a heartbeat poll: every browser re-announcing
+itself every few seconds, and a TTL deciding that silence meant gone. The honest signal was
+open the whole time — the person's realtime connection — so presence is that connection's
+LIFETIME.
+
+```ts
+// authorize: name the keys this connection holds, from ids YOU resolved
+authorize: async ({ request }) => {
+  const seat = await seatFromCookie(request);
+  return {
+    subjectId: seat.id,
+    topics: [tenantTopic(seat.tenantId, "table", seat.tableId)],
+    presence: [`seat:${seat.tenantId}:${seat.id}`],
+  };
+},
+
+// createApiEvents: hear every holder
+createApiEvents({ surfaces, presence: { onChange: ({ key, state }) => writePresence(key, state) } });
+```
+
+| | |
+| --- | --- |
+| **Who names a key** | the host's `authorize`, exactly like topics — the browser never names one, so nobody can hold a key that is not theirs. Opaque to the package: printable, no whitespace, not `$…`, at most 200 characters, at most `MAX_PRESENCE_KEYS` (4) per connection |
+| **Who holds it** | whichever process holds the connection: the gateway for a socket (the keys are signed into the ticket beside the topics), the API itself for an SSE stream. A mid-connection `subscribe` widens topics and never changes what a connection holds |
+| **What the host hears** | `held` when the first connection for a key opens in a process, again every `PRESENCE_RENEW_MS` (10 s) while it stays open, and `released` when the last one closes — through the bus, on the reserved `$presence` topic no ticket can carry |
+| **Where it listens** | every API process given `presence.onChange`. Leave it out of processes that should not write (connections hold their keys either way) |
+| **A release waits** | `released` reaches `onChange` only after `PRESENCE_RELEASE_GRACE_MS` (4 s) with nobody taking the key back, in ANY process — so a page navigation that remounts its provider, a deploy, or an SSE stream moving to another replica never reads as "left, then arrived" |
+| **SSE is bounded** | a stream that holds presence asks its client to move after `PRESENCE_STREAM_MAX_AGE_MS` (30 s) and ends 5 s later. A live client opens its next stream first and retires the old one once it is open, so its status never leaves `connected`; a phone that fell off the network answers nothing, so its presence is released within about 40 s instead of whenever TCP gives up |
+| **What rotation costs** | a presence-holding SSE client re-authorizes (the surface's `authorize` runs again) every 30 s, on each rotation. A tab on a bundle older than the `rotate` frame ignores it, so its stream ends every 35 s and it reconnects — a `disconnected` → `connected` flicker and any catch-up read that hangs off it — until it reloads |
+| **Big holders** | one event carries at most `PRESENCE_EVENT_MAX_KEYS` (200) keys; a renewal of more is split |
+| **Shutdown** | the gateway's `close()` and the API's `stop()`/signal hooks release and PUBLISH every held key before the bus goes, so a deploy does not leave people drawn as present |
+
+Two rules the host owns, because the bus is best-effort:
+
+- **Treat `held` as a lease, not a flag.** Record "present until now + lease", with a lease
+  longer than two renewals. A holder that crashed never sends `released`; its lease runs out.
+  A lost `held` is repaired by the next renewal.
+- **Write state, never count events.** A renewal repeats a `held` you already have, and every
+  listening process hears every change. One key's changes reach `onChange` in order, each
+  after the previous one's promise settles; different keys do not wait on each other.
+
+Refcounting is per holder process: two tabs on one gateway are one hold, released when the
+second closes, and a `SharedWorker` sharing one connection across a person's tabs holds the key
+until the last tab leaves. Every event names its holder, and the listener MERGES holders: a key
+held in two processes (a socket on the gateway, an SSE stream on a replica) is released only when
+the last of them lets go, and a holder silent for 2.5 renewals no longer counts.
+A hidden tab whose connection is open is PRESENT: this answers "is the connection open", not
+"is somebody looking". A host that means "looking" drops the connection's keys while the page is
+hidden — for example by closing the endpoint that holds them — and the grace absorbs a quick
+tab switch.
 
 ## The SharedWorker (optional)
 

@@ -7,6 +7,7 @@ import {
   SILENCE_LIMIT_MS,
   SilenceWatch,
 } from "./liveness";
+import { isRotation, openReplacement } from "./rotation";
 import type {
   RealtimeMessage,
   RealtimeStatus,
@@ -15,7 +16,7 @@ import type {
   WireSource,
   WireSourceFactory,
 } from "./types";
-import { createWebSocketSource } from "./ws-source";
+import { decodeMessage, makeDefaultSourceFactory } from "./wire";
 
 /**
  * The browser side of the realtime channel (FUT-438): a long-lived subscription to a
@@ -52,36 +53,6 @@ const MAX_RETRY_MS = 30_000;
  * the deploy-restart case.
  */
 const MAX_INITIAL_ATTEMPTS = 4;
-
-/**
- * The browser transport for one attempt. `null` where neither is available (SSR, old
- * engines).
- *
- * WebSocket is not behind a build flag (FUT-643). It was, briefly, and the flag was a
- * mistake twice over: `import.meta.env` is inlined at build time, so the "rollback is
- * a config change" it promised would in fact have needed a rebuild — and defaulting
- * it off shipped the socket as dead code that no environment ever ran. The safety it
- * was reaching for belongs at runtime, where it can observe what actually happened,
- * and that is {@link RealtimeChannel}'s ws→sse demotion.
- *
- * The `null` fall-through from `createWebSocketSource` is the engine-capability case
- * (no `WebSocket` global) and is separate from that demotion: this one is knowable
- * before a connection is attempted, so it costs no failed attempt.
- */
-function makeDefaultSourceFactory(
-  transport: RealtimeTransportConfig | undefined,
-): WireSourceFactory {
-  return (url: string, wire: RealtimeTransport): WireSource | null => {
-    if (wire === "ws") {
-      const socket = createWebSocketSource(url, transport);
-      if (socket) return socket;
-    }
-    if (typeof EventSource === "undefined") return null;
-    // One contained cast: the DOM handler types carry event-object parameters this
-    // seam deliberately widens to `unknown`.
-    return new EventSource(url) as unknown as WireSource;
-  };
-}
 
 /**
  * What a client may push. Mirrors the gateway's closed verb set in
@@ -125,24 +96,6 @@ export interface RealtimeChannelOptions {
   random?: () => number;
 }
 
-/** Parse one wire payload, or `null` for anything malformed. */
-function decodeMessage(raw: string): RealtimeMessage | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      parsed !== null &&
-      typeof parsed === "object" &&
-      typeof (parsed as RealtimeMessage).topic === "string" &&
-      typeof (parsed as RealtimeMessage).type === "string"
-    ) {
-      return parsed as RealtimeMessage;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * One realtime subscription. Connects on construction, reconnects with exponential
  * backoff (1s → 2s → … → 30s cap, reset on a successful open), and reports
@@ -160,6 +113,8 @@ export class RealtimeChannel {
   /** Whether this channel has ever opened — see {@link MAX_INITIAL_ATTEMPTS}. */
   private everConnected = false;
   private failedAttempts = 0;
+  /** A planned SSE reconnect being opened beside the live stream (`./rotation.ts`). */
+  private pendingRotation: (() => void) | null = null;
   /**
    * The wire this channel is currently attempting. Starts on `options.wire` (`ws`
    * unless told otherwise) and demotes to `sse` once — permanently for this
@@ -231,6 +186,7 @@ export class RealtimeChannel {
     if (this.closed) return;
     this.closed = true;
     this.silence.stop();
+    this.cancelRotation();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.source?.close();
@@ -252,6 +208,59 @@ export class RealtimeChannel {
     // correct behaviour, not a broken channel.
     const beat = readHeartbeat(message);
     if (beat && heartbeatProvesBroken(beat)) this.handleDrop();
+    if (isRotation(message)) this.rotate();
+  }
+
+  /**
+   * The server asked for a planned reconnect: open the next stream now and retire
+   * this one once it is open, so the status never leaves `connected` and nothing
+   * re-reads (`./rotation.ts`). A failure leaves the old stream to end on its own.
+   */
+  private rotate(): void {
+    if (this.closed || this.pendingRotation) return;
+    this.pendingRotation = openReplacement(() => this.createSource(this.options.url, this.transport), {
+      onMessage: (raw) => this.receive(raw),
+      onReady: (next) => {
+        this.pendingRotation = null;
+        const old = this.source;
+        if (old) {
+          old.onopen = null;
+          old.onmessage = null;
+          old.onerror = null;
+          old.close();
+        }
+        this.source = next;
+        this.listen(next);
+        this.silence.start(Date.now());
+      },
+      onFail: () => {
+        this.pendingRotation = null;
+      },
+    });
+  }
+
+  private cancelRotation(): void {
+    this.pendingRotation?.();
+    this.pendingRotation = null;
+  }
+
+  /** One frame off the wire, from whichever stream is current. */
+  private receive(raw: string): void {
+    const message = decodeMessage(raw);
+    if (!message) return;
+    this.silence.note(Date.now());
+    // Control frames are not events: no consumer routes the topic anywhere.
+    if (message.topic === CONTROL_TOPIC) {
+      this.readControl(message);
+      return;
+    }
+    this.options.onMessage?.(message);
+  }
+
+  /** The handlers a stream needs once it is the current one. */
+  private listen(source: WireSource): void {
+    source.onmessage = (event) => this.receive(event.data);
+    source.onerror = () => this.handleDrop();
   }
 
   private setStatus(next: RealtimeStatus): void {
@@ -279,21 +288,7 @@ export class RealtimeChannel {
       this.silence.start(Date.now());
       this.setStatus("connected");
     };
-    source.onmessage = (event) => {
-      const message = decodeMessage(event.data);
-      if (!message) return;
-      this.silence.note(Date.now());
-      // Control frames are not events. Forwarding them would hand every consumer a
-      // message every 25 s that none of them route anywhere — the topic is unknown to
-      // all of them by construction, so it would be pure noise with a chance of being
-      // mistaken for a hint.
-      if (message.topic === CONTROL_TOPIC) {
-        this.readControl(message);
-        return;
-      }
-      this.options.onMessage?.(message);
-    };
-    source.onerror = () => this.handleDrop();
+    this.listen(source);
   }
 
   /**
@@ -323,6 +318,7 @@ export class RealtimeChannel {
     // retry): one owner for backoff means the status a consumer sees and the actual
     // connection attempts can never disagree.
     this.silence.stop();
+    this.cancelRotation();
     this.source?.close();
     this.source = null;
     this.setStatus("disconnected");

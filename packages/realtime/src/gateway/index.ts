@@ -1,14 +1,16 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
+import { PresenceTracker } from "../core/presence";
 import { configureRealtime, stopRealtime } from "../core/runtime";
-import { TicketReplayGuard, verifyRealtimeTicket } from "../core/ticket";
+import { TicketReplayGuard } from "../core/ticket";
 import type { RealtimeDriver, RealtimeLogger } from "../core/types";
 import { createInlineRealtimeDriver } from "../drivers/inline";
 
-import { CapLedger, capFor, warnOnUnsafeCaps } from "./caps";
+import { CapLedger, warnOnUnsafeCaps } from "./caps";
 import { readGatewayConfig, type GatewayConfig, type GatewayConfigInput } from "./config";
-import { attachConnection, type GatewaySocket } from "./connection";
+import type { GatewaySocket } from "./connection";
 import { MAX_INBOUND_BYTES } from "./inbound";
+import { handleUpgrade, type WebSocketServerLike } from "./upgrade";
 
 /**
  * `@12-apps/realtime/gateway` — the WebSocket gateway as a RUNNABLE ENTRY of the
@@ -54,17 +56,6 @@ import { MAX_INBOUND_BYTES } from "./inbound";
  * {@link GatewaySocket} rather than a `ws` type.
  */
 
-/** The `ws` surface this module uses — resolved dynamically, typed structurally. */
-interface WebSocketServerLike {
-  handleUpgrade(
-    request: IncomingMessage,
-    socket: { destroy(): void; write(chunk: string): void },
-    head: Buffer,
-    callback: (ws: GatewaySocket) => void,
-  ): void;
-  close(): void;
-}
-
 interface WsModule {
   WebSocketServer: new (options: { noServer: true; maxPayload: number }) => WebSocketServerLike;
 }
@@ -87,6 +78,11 @@ export interface StartGatewayOptions extends GatewayConfigInput {
    * REFUSES TO START — see {@link createDriver}.
    */
   driver?: RealtimeDriver;
+  /**
+   * How often the gateway re-announces the presence keys its sockets hold
+   * (`../core/presence.ts`). Default `PRESENCE_RENEW_MS`; a test shortens it.
+   */
+  presenceRenewMs?: number;
   /**
    * Attach to a server the HOST owns instead of creating and listening on one.
    * The gateway then adds an `upgrade` listener and leaves the lifecycle alone —
@@ -167,84 +163,33 @@ function healthHandler(
   };
 }
 
-/** Everything the upgrade handler needs. */
-interface UpgradeDeps {
-  config: GatewayConfig;
-  sockets: Set<GatewaySocket>;
-  replayGuard: TicketReplayGuard;
-  wss: WebSocketServerLike;
-  logger: RealtimeLogger;
-  caps: CapLedger<GatewaySocket>;
-}
-
-/** Answer an upgrade at the HTTP layer and drop it — it never becomes a socket. */
-function refuse(socket: { destroy(): void; write(chunk: string): void }, status: string): void {
-  socket.write(`HTTP/1.1 ${status}\r\n\r\n`);
-  socket.destroy();
-}
-
 /**
- * Verify the ticket and complete the handshake, or refuse at the HTTP layer.
+ * Close every socket, stop the bus — the body of `RealtimeGateway.close()`.
  *
- * The refusal happens BEFORE the upgrade, so an unauthorized client never becomes a
- * socket at all — no bus subscription, no connection slot, nothing to clean up.
+ * Clients see a clean close and reconnect to whichever instance survives; their
+ * polling fallback covers the gap either way. Every key this process holds is
+ * released AND published before the bus goes: the sockets' own close events land
+ * after `stopRealtime`, too late to say anything, and a host would otherwise wait
+ * out its lease for people a deploy dropped.
  */
-function handleUpgrade(
-  deps: UpgradeDeps,
-  request: IncomingMessage,
-  socket: { destroy(): void; write(chunk: string): void },
-  head: Buffer,
-): void {
-  const { config, sockets, replayGuard, wss, logger, caps } = deps;
-  const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
-  if (url.pathname !== config.socketPath) {
-    socket.destroy();
-    return;
+async function closeGateway(parts: {
+  sockets: Set<GatewaySocket>;
+  caps: CapLedger<GatewaySocket>;
+  wss: WebSocketServerLike;
+  presence: PresenceTracker;
+  /** The server to stop — only one the gateway started itself. */
+  server: Server | null;
+}): Promise<void> {
+  for (const ws of parts.sockets) {
+    ws.close(1001, "server shutting down");
+    parts.caps.release(ws);
   }
-
-  if (sockets.size >= config.maxConnections) return refuse(socket, "503 Service Unavailable");
-
-  // The ticket travels in the query string because the browser's WebSocket constructor
-  // cannot set headers — the one real constraint the client API imposes. It is safe here
-  // BECAUSE the ticket is single-purpose, expires in seconds and is single-USE: it
-  // authorizes one subscription to one fixed topic list and grants nothing else anywhere.
-  const ticket = verifyRealtimeTicket(url.searchParams.get("ticket") ?? "", config.ticketSecret);
-  // Burned on FIRST use, so a ticket captured out of a proxy log is worthless the moment
-  // its owner connects — which, the mint being one round trip away from the handshake, is
-  // immediately. A replay is refused with the SAME 401 as a bad signature: a prober
-  // learns nothing from being told which half failed.
-  if (!ticket) return refuse(socket, "401 Unauthorized");
-
-  // The class bound (see `./caps.ts`), checked only once the signature is real (an
-  // unverified upgrade must never count against the budget it is there to protect) and
-  // BEFORE the ticket is burned, so a refusal for capacity leaves it usable exactly
-  // like the global 503 above does. The same 503 — the client backs off either way.
-  const cap = capFor(config.topicCaps, ticket.topics);
-  if (!caps.hasRoom(cap)) return refuse(socket, "503 Service Unavailable");
-
-  if (!replayGuard.consume(ticket)) return refuse(socket, "401 Unauthorized");
-
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    // Admitted here, defensively: `ws` calls back synchronously today, but should the
-    // handshake ever become asynchronous two upgrades could pass `hasRoom` for the last
-    // slot. The loser is closed with 1013 (try again later) and holds nothing.
-    if (!caps.admit(cap, ws)) {
-      ws.close(1013, "class at capacity");
-      return;
-    }
-    sockets.add(ws);
-    void attachConnection({
-      ws,
-      topics: ticket.topics,
-      onClose: () => {
-        sockets.delete(ws);
-        caps.release(ws);
-      },
-      ticketSecret: config.ticketSecret,
-      replayGuard,
-      logger,
-    });
-  });
+  parts.sockets.clear();
+  parts.wss.close();
+  await parts.presence.releaseAll();
+  const server = parts.server;
+  if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
+  await stopRealtime();
 }
 
 /**
@@ -265,6 +210,7 @@ export async function startRealtimeGateway(
   // outage path.
   const replayGuard = new TicketReplayGuard();
   const caps = new CapLedger<GatewaySocket>();
+  const presence = new PresenceTracker({ renewMs: options.presenceRenewMs, logger });
   warnOnUnsafeCaps(config, logger);
 
   configureRealtime({
@@ -292,7 +238,12 @@ export async function startRealtimeGateway(
   });
 
   server.on("upgrade", (request, socket, head) => {
-    handleUpgrade({ config, sockets, replayGuard, wss, logger, caps }, request, socket, head);
+    handleUpgrade(
+      { config, sockets, replayGuard, wss, logger, caps, presence },
+      request,
+      socket,
+      head,
+    );
   });
 
   if (ownsServer) {
@@ -314,16 +265,7 @@ export async function startRealtimeGateway(
     async close(): Promise<void> {
       if (closed) return;
       closed = true;
-      // Clients see a clean close and reconnect to whichever instance survives;
-      // their polling fallback covers the gap either way.
-      for (const ws of sockets) {
-        ws.close(1001, "server shutting down");
-        caps.release(ws);
-      }
-      sockets.clear();
-      wss.close();
-      if (ownsServer) await new Promise<void>((resolve) => server.close(() => resolve()));
-      await stopRealtime();
+      await closeGateway({ sockets, caps, wss, presence, server: ownsServer ? server : null });
     },
   };
 }
