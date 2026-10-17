@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 
 import type { ConnectApplicationStatus, PaymentEnvironment } from '@12-apps/payments-backend';
 import { usePlatformCopy } from './copy-context';
@@ -31,6 +31,21 @@ export const CARD_SX = {
 /** A small button that is still a 40px tap target on a phone. */
 export const TAP_SX = { minHeight: { xs: 40, sm: 'auto' } } as const;
 
+/**
+ * A label like `PAGBANK_OAUTH_CLIENT_SECRET` is one token, so a narrow card
+ * would break it anywhere ("…SECRE / T"). A `<wbr>` after each underscore lets
+ * it wrap at the word joints instead.
+ */
+function breakAfterUnderscores(label: string): ReactNode {
+  return label.split(/(?<=_)/).map((part, index) => (
+    // The parts are positional by construction; the label never reorders.
+    <Fragment key={index}>
+      {part}
+      <wbr />
+    </Fragment>
+  ));
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <Box
@@ -38,7 +53,7 @@ function Field({ label, children }: { label: string; children: ReactNode }): Rea
       sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 180, overflowWrap: 'anywhere' }}
     >
       <Typography variant="caption" fontWeight={600}>
-        {label}
+        {breakAfterUnderscores(label)}
       </Typography>
       <Typography component="span" variant="body2">
         {children}
