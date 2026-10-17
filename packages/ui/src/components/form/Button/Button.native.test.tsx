@@ -55,15 +55,30 @@ describe('Button (native)', () => {
     expect(screen.getByTestId('busy')).toHaveAttribute('aria-busy', 'true');
   });
 
-  it('replaces the label with a spinner while loading', () => {
+  // FUT-3646: the spinner used to REPLACE the label, so a loading button had
+  // no accessible name. The label stays, unseen, and names the button.
+  it('keeps its name under the spinner while loading', () => {
     render(
       <Button dataTestId="save" loading>
         Salvar
       </Button>
     );
-    expect(screen.getByTestId('save')).not.toHaveTextContent('Salvar');
+    expect(screen.getByRole('button', { name: 'Salvar' })).toHaveAttribute('aria-busy', 'true');
+    // Laid out (the width holds) but unseen: the view around the text is transparent.
+    expect(screen.getByTestId('save-label')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByTestId('save-label')).toHaveTextContent('Salvar');
     expect(screen.getByTestId('save-loading')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('keeps its icon, unseen, while loading, and lets an aria-label name it', () => {
+    render(
+      <Button dataTestId="add" icon={<Icon name="Add" />} aria-label="Adicionando" loading>
+        Novo
+      </Button>,
+    );
+    expect(screen.getByTestId('add-icon')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByRole('button', { name: 'Adicionando' })).toHaveAttribute('aria-busy', 'true');
   });
 
   it('wraps the icon under a derived test id, on the side asked for', () => {

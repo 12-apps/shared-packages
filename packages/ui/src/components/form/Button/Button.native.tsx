@@ -1,6 +1,5 @@
 import * as React from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Platform,
@@ -20,7 +19,6 @@ import {
   BUTTON_ICON_GAP_UNITS,
   BUTTON_LINE_HEIGHT,
   BUTTON_SIZES,
-  BUTTON_SPINNER_SIZE,
   BUTTON_WASH_ALPHA,
   GLASS_BACKGROUND_ALPHA,
   GLASS_BACKGROUND_ALPHA_PRESSED,
@@ -35,7 +33,7 @@ import {
   quietInk,
 } from './Button.metrics';
 import type { ButtonProps, ButtonVariant } from './Button.types.native';
-import { renderTextChildren } from '../../../platform/text-children';
+import { hiddenWhile, Label, loadingName, Spinner } from './Button.native.loading';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
@@ -238,7 +236,8 @@ interface ButtonLook {
 function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   const { variant, color, size, loading, icon, children, glow, pulse, active, disabled, style } = props;
   const palette = buttonPalette(theme, color);
-  const iconOnly = !loading && icon != null && children == null;
+  // Loading keeps the icon (transparent), so it changes neither the shape nor the gap (FUT-3646).
+  const iconOnly = icon != null && children == null;
   const inactive = Boolean(disabled) || loading;
   const paint = inactive ? disabledPaint(theme, variant) : paintFor(theme, variant, color, palette, active);
   // The theme's one field radius, so a button and the input beside it agree.
@@ -248,7 +247,7 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   // ring turns it visible; on native the glow's shadow needs it visible too,
   // because a view's own shadow is clipped by its own overflow there.
   const overflow: ViewStyle['overflow'] = pulse || glow ? 'visible' : 'hidden';
-  const sized = sizeStyle(theme, size, iconOnly, icon != null && !loading);
+  const sized = sizeStyle(theme, size, iconOnly, icon != null);
   const glowing = glow && !inactive ? glowStyle(palette) : null;
 
   return {
@@ -275,18 +274,6 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   };
 }
 
-/** The spinner that replaces the label while loading; `role` comes from react-native's ActivityIndicator. */
-function Spinner({ color, testID }: { color: string; testID: string }): React.JSX.Element {
-  return (
-    <ActivityIndicator
-      size={Platform.OS === 'ios' ? 'small' : BUTTON_SPINNER_SIZE}
-      color={color}
-      testID={testID}
-      accessibilityLabel="loading"
-    />
-  );
-}
-
 export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
   const resolved = resolveButtonProps(rawProps);
   const { loading, icon, iconPosition, pulse, ripple, children, onClick, onPress, ...others } = resolved;
@@ -306,12 +293,11 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
     onPress?.(event);
   };
 
-  const iconNode =
-    !loading && icon ? (
-      <View style={styles.icon} testID={idFor('icon')}>
-        {icon}
-      </View>
-    ) : null;
+  const iconNode = icon ? (
+    <View style={[styles.icon, hiddenWhile(loading)]} testID={idFor('icon')}>
+      {icon}
+    </View>
+  ) : null;
 
   return (
     <Pressable
@@ -319,6 +305,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
       role="button"
       aria-disabled={look.inactive}
       aria-busy={loading}
+      aria-label={loadingName(loading, children)}
       disabled={look.inactive}
       onPress={handlePress}
       android_ripple={ripple && !look.inactive ? { color: alpha(look.palette.main, 0.2), borderless: false } : undefined}
@@ -328,8 +315,11 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
     >
       {pulse && !look.inactive ? <Pulse color={look.palette.main} radius={look.radius} testID={idFor('pulse')} /> : null}
       {iconPosition === 'left' ? iconNode : null}
-      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : renderTextChildren(children, look.label, 1)}
+      <Label loading={loading} label={look.label} testID={idFor('label')}>
+        {children}
+      </Label>
       {iconPosition === 'right' ? iconNode : null}
+      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : null}
     </Pressable>
   );
 });

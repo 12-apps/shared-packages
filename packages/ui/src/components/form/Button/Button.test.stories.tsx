@@ -104,7 +104,10 @@ export const LoadingStateTest: Story = {
       // so the button keeps its name and its width while it loads.
       await expect(canvas.getByRole('button', { name: 'Loading Button' })).toBe(button);
       await expect(button).toHaveAttribute('aria-busy', 'true');
-      await expect(canvas.getByText('Loading Button')).toHaveStyle({ opacity: '0' });
+      // Unseen (opacity 0), yet still its name; the same test id on web and native.
+      const label = canvas.getByTestId('loading-button-label');
+      await expect(label).toHaveTextContent('Loading Button');
+      await expect(label).toHaveStyle({ opacity: '0' });
     });
   },
 };

@@ -225,7 +225,9 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? (
           <>
-            <span style={LOADING_LABEL_STYLE}>{children}</span>
+            <span style={LOADING_LABEL_STYLE} data-testid={testId('label')}>
+              {children}
+            </span>
             <span style={LOADING_SPINNER_STYLE}>
               <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
             </span>
