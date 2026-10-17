@@ -53,7 +53,10 @@ import { clearReturnedSettlement, takeReturnedSettlement } from './returned-sett
  * things that clear it are settlement and an explicit "give up".
  */
 
-/** How often to ask the provider whether the payment landed. */
+/**
+ * How often to ask the provider whether the payment landed — the recorded
+ * third-party-wait exception, see {@link usePollTimer}.
+ */
 const DEFAULT_POLL_MS = 4000;
 
 /** Give up asking after this long, rather than polling a tab forever. */
@@ -125,6 +128,24 @@ interface ActivationCallbacks {
 
 /**
  * Ask the provider every few seconds, and stop asking eventually.
+ *
+ * ## A deliberate poll: the recorded exception to "hear, do not poll" (FUT-2433)
+ *
+ * Every other wait in this package hears the host's channel and keeps no timer
+ * while it is live. This one cannot, and it is the one exception class the
+ * origin host records: a timer-driven read of a THIRD PARTY's state that no
+ * webhook or publisher of the host's reaches yet, bounded in time, and named.
+ * Each tick is not a read of the host's own rows — `verify-charge` asks the
+ * PROVIDER whether the activation charge was paid, and while nobody has asked,
+ * nothing server-side has moved that a hint could carry. The activation webhook
+ * that would settle it is not guaranteed to arrive (a tunnel, a preview box), so
+ * the wait is the confirmation. It runs only while the owner is paying on the
+ * provider's page and gives up at `pollTimeoutMs` (ten minutes by default).
+ *
+ * Where it is recorded: the origin host's realtime doc ("Allowed exceptions")
+ * and the decision record that superseded its 0071 with it. If activation
+ * ever becomes webhook-only, this relaxes to the channel exactly as the
+ * checkout's waits did (FUT-649) and the exception goes away.
  *
  * The give-up is a `failed` state carrying the host's own sentence, because the
  * wording is load-bearing: the charge is STILL valid, and an owner who has
