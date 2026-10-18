@@ -260,6 +260,19 @@ describe('homologação evidence', () => {
     expect(cancel?.body).toEqual({ amount: { value: 1500 } });
   });
 
+  it('given the card orders, then each card step names the order PagBank created and encryption comes first (FUT-3722)', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(file.content).toContain('IDs para correlação: order_id=ORDE_C1, charge_id=CHAR_OK, reference_id=');
+    expect(file.content).toContain('IDs para correlação: order_id=ORDE_C2, charge_id=CHAR_NO, reference_id=');
+    expect(file.content).toMatch(/Pedido consultado \d+ vezes; status final PAID/);
+    expect(file.content).not.toMatch(/\((s|es|ões)\)/);
+  });
+
   it('given a completed connect, then the seller row is enabled and addressed to its own webhook route', async () => {
     const w = world();
     await connected(w);
@@ -296,7 +309,7 @@ describe('homologação evidence', () => {
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
     expect(file.summary.pending).toBe(1);
-    expect(file.content).toContain('1 notificação(ões) recebida(s) e armazenada(s) (situação: PROCESSED)');
+    expect(file.content).toContain('1 notificação recebida e armazenada (situação: PROCESSED)');
   });
 
   it('given nothing has run, then every scenario is PENDING and the file says so', async () => {

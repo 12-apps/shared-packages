@@ -38,7 +38,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     'connect.refresh': {
       scenario: 'Renovação do token do lojista — POST /oauth2/refresh',
-      expected: 'HTTP 200 com novo access_token; o novo par de tokens substitui o anterior.',
+      expected: 'HTTP 200 ou 201 com novo access_token; o novo par de tokens substitui o anterior.',
     },
     'connect.usage': {
       scenario: 'Uso da autorização do lojista nos pedidos',
@@ -166,7 +166,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     refreshed: 'Token renovado; o novo par substituiu o anterior.',
     refreshRejected: 'O PagBank recusou a renovação; a conexão do lojista precisa ser autorizada de novo.',
     usageSellerToken: (calls, seller, platform) =>
-      `As ${calls} chamada(s) de pedidos e chave pública foram autenticadas com o token do lojista ` +
+      `${calls === 1 ? 'A chamada' : `As ${calls} chamadas`} de pedidos e chave pública ${calls === 1 ? 'foi autenticada' : 'foram autenticadas'} com o token do lojista ` +
       `(impressão digital SHA-256 ${seller}, registrada em cada requisição acima)` +
       (platform ? `, diferente do token da plataforma (${platform}).` : '.'),
     usageOtherToken:
@@ -176,7 +176,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     notSandbox: 'A conexão do lojista de teste não é de sandbox; nada foi executado.',
     qrCreated: (orderId) => `QR Code criado no pedido ${orderId}. Isto ainda NÃO é pagamento confirmado.`,
     qrMissing: 'O pedido foi criado sem QR Code.',
-    consultStatus: (status, polls) => `Pedido consultado ${polls} vez(es); status final ${status}.`,
+    consultStatus: (status, polls) => `Pedido consultado ${plural(polls, 'vez', 'vezes')}; status final ${status}.`,
     paid: 'Pagamento confirmado: a cobrança Pix está PAID na consulta.',
     notPaidYet: (seconds) => `Pagamento não confirmado em ${seconds} s de consultas.`,
     publicKeyMinted: 'Chave pública gerada com o token do lojista.',
@@ -191,7 +191,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     chargeStatus: (status) => `Cobrança com status ${status}.`,
     canceled: (status) => `Cancelamento registrado com status ${status}.`,
     webhookReceived: (count, statuses, chargeStatus) =>
-      `${count} notificação(ões) recebida(s) e armazenada(s) (situação: ${statuses})` +
+      (count === 1 ? '1 notificação recebida e armazenada' : `${count} notificações recebidas e armazenadas`) + ` (situação: ${statuses})` +
       (chargeStatus ? `; a cobrança registrada pela integração está ${chargeStatus}.` : '.'),
     webhookNone: 'Nenhuma notificação recebida até a geração deste arquivo.',
     webhookFailed: 'Notificação recebida, mas o processamento falhou.',
