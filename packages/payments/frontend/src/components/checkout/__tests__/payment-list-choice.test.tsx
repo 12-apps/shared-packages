@@ -151,6 +151,73 @@ describe("the door slot", () => {
     expect(onSend).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a plain content closed while idle — today's behaviour, unchanged (FUT-3715)", async () => {
+    renderList({ config: onPageStore(), client: stubClient(), list: { door: [door({ content: <p>Troco?</p> })] } });
+    await screen.findByTestId("payment-list");
+    await waitFor(() => expect(screen.queryByText("Troco?")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("list-door-cash-content")).toBeNull());
+  });
+
+  it("draws the content while idle only when the host asks, on the row's unchosen frame (FUT-3715)", async () => {
+    renderList({ config: onPageStore(), client: stubClient(), list: { door: [door({ content: <p>Troco?</p>, showContentWhileIdle: true })] } });
+    await screen.findByTestId("payment-list");
+    const row = screen.getByTestId("list-door-cash");
+    expect(row.getAttribute("data-chosen")).toBe("false");
+    expect(within(row).getByText("Troco?")).toBeTruthy();
+    expect(radio("list-door-cash").checked).toBe(false);
+  });
+
+  it("lets a function content choose its row, and reports it like the radio (FUT-3715)", async () => {
+    const onChoiceChange = vi.fn();
+    const seen: boolean[] = [];
+    renderList({
+      config: onPageStore(),
+      client: stubClient(),
+      list: {
+        onChoiceChange,
+        door: [
+          door({
+            showContentWhileIdle: true,
+            content: ({ chosen, choose }) => {
+              seen.push(chosen);
+              return (
+                <button type="button" onClick={choose}>
+                  R$ 50
+                </button>
+              );
+            },
+          }),
+        ],
+      },
+    });
+    await screen.findByTestId("payment-list");
+    expect(seen.at(-1)).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "R$ 50" }));
+    await waitFor(() => expect(radio("list-door-cash").checked).toBe(true));
+    expect(seen.at(-1)).toBe(true);
+    await waitFor(() => expect(onChoiceChange).toHaveBeenLastCalledWith({ kind: "door", id: "cash" }));
+  });
+
+  it("changes nothing when content chooses a row that is already chosen (FUT-3715)", async () => {
+    const onChoiceChange = vi.fn();
+    renderList({
+      config: onPageStore(),
+      client: stubClient(),
+      list: {
+        onChoiceChange,
+        door: [door({ content: ({ choose }) => <button type="button" onClick={choose}>Sem troco</button> })],
+      },
+    });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-door-cash"));
+    await waitFor(() => expect(onChoiceChange).toHaveBeenLastCalledWith({ kind: "door", id: "cash" }));
+    const calls = onChoiceChange.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Sem troco" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sem troco" }));
+    await waitFor(() => expect(radio("list-door-cash").checked).toBe(true));
+    expect(onChoiceChange.mock.calls.length).toBe(calls);
+  });
+
   it("hides a door option's hint while it is chosen when the host asks", async () => {
     renderList({ config: onPageStore(), client: stubClient(), list: { door: [door({ id: "reader", label: "Maquininha", hint: "Crédito ou débito", hideHintWhileChosen: true })] } });
     await screen.findByTestId("payment-list");
