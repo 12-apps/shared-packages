@@ -1,11 +1,12 @@
 import { Box } from "@mui/material";
-import { createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
+import { Suspense, createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { useCheckoutCopy } from "../copy-context";
-import { SummaryLines, SummaryTotal, type CheckoutSummaryLine } from "../payment-summary";
+import type { CheckoutSummaryLine } from "../payment-summary";
 import { useCheckoutLayout } from "../payment-step-layout";
-import { useCheckoutComponents } from "../ui";
+
+import { deferredPart } from "./lazy-body";
+import type { ColumnProps } from "./summary-column-body";
 
 /**
  * Where the bar's content goes on a computer (FUT-3685, L4): into the
@@ -30,52 +31,28 @@ export function useSummaryColumnTarget(): { element: HTMLElement | null } | null
 const STEPS_MAX = 85;
 const COLUMN_WIDTH = 45;
 
+const useSummaryColumnBody = deferredPart(async () => ({ default: (await import("./summary-column-body")).SummaryColumn }));
+
 /**
- * The computer's two columns (L4): the steps on the left, at most ~680px, and
- * the "Resumo do pedido" column on the right, ~360px, holding the lines, the
- * fees, "Total", the host's context line and the pay button — so no bar sits
- * at the bottom of the screen.
+ * The column's action slot alone, while the column's chunk loads (FUT-3711):
+ * the bar's content — the pay button with it — is portalled in here at once,
+ * so the action never waits on the summary above it. The column drawn in
+ * full takes the slot over when it lands.
  */
-function TwoColumns({ steps, column }: { steps: ReactNode; column: ReactNode }): JSX.Element {
-  return (
-    <Box data-testid="list-columns" sx={{ display: "flex", gap: 4, alignItems: "flex-start", justifyContent: "center", width: "100%" }}>
-      <Box sx={{ flex: 1, minWidth: 0, maxWidth: (t) => t.spacing(STEPS_MAX) }}>{steps}</Box>
-      <Box sx={{ flex: "none", width: (t) => t.spacing(COLUMN_WIDTH), position: "sticky", top: (t) => t.spacing(3) }}>{column}</Box>
-    </Box>
-  );
+function ColumnWhileLoading({ slot }: { slot: (element: HTMLElement | null) => void }): JSX.Element {
+  return <Box ref={slot} data-testid="list-summary-action" data-loading="true" sx={{ display: "flex", flexDirection: "column" }} />;
 }
 
 /**
- * "Resumo do pedido" (T20): the cart's lines and the host's money rows (fees,
- * discounts) as the host words them, a hairline, "Total" and the amount — and
- * under them `slot`, the element the bar's content is portalled into.
+ * "Resumo do pedido" (T20), loaded as a chunk of its own (FUT-3711): a phone
+ * never draws it, so a phone never parses it.
  */
-function SummaryColumn({ lines, moneyLines, totalLabel, slot }: {
-  lines?: CheckoutSummaryLine[];
-  /** The host's fee and discount rows (`CheckoutCartView.discountLines`). */
-  moneyLines?: ReactNode;
-  totalLabel: string;
-  slot: (element: HTMLElement | null) => void;
-}): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  const copy = useCheckoutCopy().screens.layout;
-  const shown = lines ?? [];
+function SummaryColumn(props: ColumnProps): JSX.Element {
+  const Body = useSummaryColumnBody();
   return (
-    <Box
-      component="aside"
-      aria-label={copy.summaryTitle}
-      data-testid="list-summary-column"
-      sx={{ display: "flex", flexDirection: "column", gap: 1.75, p: 2.75, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 3.5 }}
-    >
-      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
-        {copy.summaryTitle}
-      </Text>
-      {shown.length > 0 ? <SummaryLines lines={shown} /> : null}
-      {moneyLines ? <Box data-testid="list-summary-money">{moneyLines}</Box> : null}
-      <Box sx={{ height: "1px", bgcolor: "divider" }} />
-      <SummaryTotal totalLabel={totalLabel} />
-      <Box ref={slot} data-testid="list-summary-action" sx={{ display: "flex", flexDirection: "column" }} />
-    </Box>
+    <Suspense fallback={<ColumnWhileLoading slot={props.slot} />}>
+      <Body {...props} />
+    </Suspense>
   );
 }
 
@@ -86,35 +63,61 @@ function SummaryColumn({ lines, moneyLines, totalLabel, slot }: {
  *    the "Resumo do pedido" column is portalled into the host's element, beside
  *    the host's own step cards, and the bar's action lands in it. While the
  *    element is `null` (not mounted yet) the bar draws nothing rather than flash;
- *  - a computer, the host silent: the step and the column side by side, here;
+ *  - a computer, the host silent: the step and the column side by side, here —
+ *    the steps at most ~680px, the column ~360px and sticky;
  *  - a phone: the step alone, over the host's bar (L2).
+ *
+ * The step sits at the SAME place in the tree in all three (FUT-3711): the
+ * same two wrappers, only their styles and the column beside them change. A
+ * host crossing its two-column threshold (an iPad rotated between 1366 and
+ * 1024) or the frame crossing `WIDE_CHECKOUT_MIN` re-lays the step out — it
+ * never remounts it, so a typed card and the chosen row survive.
  *
  * Only the list face is laid out this way: the Pix screen and the hand-off keep
  * their bar (K9).
  */
-export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, children }: {
+export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, children }: {
   hostTarget: HTMLElement | null | undefined;
   lines?: CheckoutSummaryLine[];
   moneyLines?: ReactNode;
   totalLabel: string;
+  credit?: ColumnProps["credit"];
   children: ReactNode;
 }): JSX.Element {
   const wide = useCheckoutLayout()?.wide ?? false;
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const target = useMemo(() => ({ element: slot }), [slot]);
-  const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} slot={setSlot} />;
-  if (hostTarget !== undefined) {
-    return (
-      <SummaryColumnTarget value={target}>
-        {children}
-        {hostTarget ? createPortal(column, hostTarget) : null}
-      </SummaryColumnTarget>
-    );
-  }
-  if (!wide) return <>{children}</>;
+  const hosted = hostTarget !== undefined;
+  const sideBySide = !hosted && wide;
+  const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} credit={credit} slot={setSlot} />;
   return (
-    <SummaryColumnTarget value={target}>
-      <TwoColumns steps={children} column={column} />
+    <SummaryColumnTarget value={hosted || sideBySide ? target : null}>
+      <Columns sideBySide={sideBySide} column={column}>
+        {children}
+      </Columns>
+      {hostTarget ? createPortal(column, hostTarget) : null}
     </SummaryColumnTarget>
+  );
+}
+
+/** Not laid out: the wrappers stay in the tree, drawing nothing. */
+const UNLAID = { display: "contents" } as const;
+
+/**
+ * The step, and beside it on a computer the column: the steps at most ~680px,
+ * the column ~360px and sticky. On a phone or beside the host's own columns
+ * the same two wrappers are kept, unlaid, so the step never changes place.
+ */
+function Columns({ sideBySide, column, children }: { sideBySide: boolean; column: ReactNode; children: ReactNode }): JSX.Element {
+  return (
+    <Box
+      data-testid={sideBySide ? "list-columns" : undefined}
+      sx={sideBySide ? { display: "flex", gap: 4, alignItems: "flex-start", justifyContent: "center", width: "100%" } : UNLAID}
+    >
+      <Box sx={sideBySide ? { flex: 1, minWidth: 0, maxWidth: (t) => t.spacing(STEPS_MAX) } : UNLAID}>{children}</Box>
+      {sideBySide ? (
+        <Box sx={{ flex: "none", width: (t) => t.spacing(COLUMN_WIDTH), position: "sticky", top: (t) => t.spacing(3) }}>{column}</Box>
+      ) : null}
+    </Box>
   );
 }

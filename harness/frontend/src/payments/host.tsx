@@ -118,6 +118,8 @@ export interface HarnessHost {
    * the ONE list with the door group — see `./storefront-look`.
    */
   storefront?: boolean;
+  /** With `storefront`: the buyer holds store credit, paying part of the cart (FUT-3711). */
+  storeCredit?: boolean;
 }
 
 /** Wrap the mount's fetch so `/config` can stall or refuse. */
@@ -164,7 +166,7 @@ export function harnessFlowsConfig(
     components: host.components ?? (host.storefront ? STOREFRONT_SLOTS : undefined),
     // The one list, read as a hook every render, as the origin host's entrega mounts it.
     // A door send places nothing here: the harness has no pedido to raise at the door.
-    ...(host.storefront ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined) } : {}),
+    ...(host.storefront ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit) } : {}),
     // Required now, and stated by THIS host in its own words. It used to be
     // omitted, which meant rendering the package's pt-BR default — another
     // product's restaurant vocabulary — while claiming to be an independent

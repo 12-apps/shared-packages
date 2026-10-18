@@ -136,6 +136,14 @@ export interface CheckoutPaymentList {
    */
   amountDueLabel?: string;
   /**
+   * The balance that pays part of the cart, as the host words and formats it
+   * — `{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }` (FUT-3711).
+   * With `amountDueLabel`, the computer's "Resumo do pedido" column draws it
+   * under "Total", then "A pagar" (`copy.amountDue`) and the amount due, so
+   * Total − credit reads as what the button charges. Absent ⇒ "Total" alone.
+   */
+  credit?: { label: string; amountLabel: string };
+  /**
    * The buyer's last ONLINE way to pay, as the host remembers it (FUT-3611) —
    * chosen for them before they touch anything, when the store offers it: Pix
    * as Pix; a card as the saved card used last. Absent or `null` ⇒ the saved
@@ -336,6 +344,12 @@ export interface PaymentListCopy {
    * o pedido, pago com o seu saldo…". Absent ⇒ `charging` as usual.
    */
   chargingCovered?: string;
+  /**
+   * "A pagar" — the row under "Total" in the computer's "Resumo do pedido"
+   * column, after the host's `credit` row, naming `amountDueLabel` (FUT-3711).
+   * Absent ⇒ neither row is drawn.
+   */
+  amountDue?: string;
   cancel: string;
   pixFace: {
     /** "Pague R$ 22,00 com Pix". */

@@ -26,7 +26,9 @@ export function PayerLine({ copy, name, onChange }: {
       </Text>
       <Box
         sx={{
-          "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5), minWidth: 0, px: 0.5, py: 0 },
+          // The 40px target reaches into the gaps above and below rather than making the
+          // line 40px tall: a row of text in the bar, not a row of button (FUT-3711).
+          "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5), height: (t) => t.spacing(5), minWidth: 0, px: 0.5, py: 0, my: -1 },
           "& button:focus-visible": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
         }}
       >

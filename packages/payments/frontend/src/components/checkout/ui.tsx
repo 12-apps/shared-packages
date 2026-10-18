@@ -15,7 +15,7 @@
  * mapping. The contract is documented for adopters in
  * `packages/payments/ADOPTING.md` §3.
  */
-import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type JSX, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type JSX, type lazy, type ReactNode } from 'react';
 
 import { defaultCheckoutComponents } from './mui-defaults';
 
@@ -127,6 +127,22 @@ export interface CheckoutActionBarProps {
   dataTestId?: string;
 }
 
+/**
+ * How the checkout defers a part of a screen to a chunk of its own
+ * (FUT-3711): React's `lazy` signature, `(factory) => Component`. The list
+ * loads the CPF/wallet block above its rows and the computer's "Resumo do
+ * pedido" column through it, so a checkout that never draws them never parses
+ * them.
+ *
+ * A host whose deploys replace hashed chunks passes its stale-chunk-safe
+ * loader here (one that reloads onto the current build when an old tab asks
+ * for a chunk that is gone). Pass the SAME function every render: each loader
+ * builds its deferred components once and keeps them, so a new function per
+ * render re-suspends those parts every time. Unfilled, the default is
+ * React's own `lazy`, which has no stale-chunk recovery.
+ */
+export type CheckoutLazy = typeof lazy;
+
 /** Every primitive the buyer checkout renders through. */
 export interface CheckoutComponents {
   Text: ComponentType<CheckoutTextProps>;
@@ -138,6 +154,8 @@ export interface CheckoutComponents {
   Stepper: ComponentType<CheckoutStepperProps>;
   RadioGroup: ComponentType<CheckoutRadioGroupProps>;
   ActionBar: ComponentType<CheckoutActionBarProps>;
+  /** Not a primitive but a loader — see `CheckoutLazy`. Absent ⇒ React's `lazy`. */
+  lazy?: CheckoutLazy;
 }
 
 const CheckoutComponentsContext = createContext<CheckoutComponents>(defaultCheckoutComponents);

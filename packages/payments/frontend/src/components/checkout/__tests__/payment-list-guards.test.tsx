@@ -158,7 +158,7 @@ describe("the LGPD consent beside the CPF at the top", () => {
     renderList({ config: onPageStore(), client: stubClient(), taxIdOnFile: false, createOrder, saveBuyerContact });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));
-    fireEvent.change(screen.getByTestId("list-buyer-taxId"), { target: { value: "529.982.247-25" } });
+    fireEvent.change(await screen.findByTestId("list-buyer-taxId"), { target: { value: "529.982.247-25" } });
   }
 
   it("offers 'Salvar meus dados para a próxima compra' ticked, as Dados does, and saves with it", async () => {

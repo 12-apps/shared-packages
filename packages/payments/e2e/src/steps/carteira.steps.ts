@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import { VALID_CPF, fillCard } from '../helpers/checkout.js';
 import { paymentsWorld } from '../world.js';
@@ -22,6 +22,15 @@ import { Given, Then, When } from './fixtures.js';
  * request.
  */
 
+/**
+ * The list's top (the CPF and "PAGAMENTO RÁPIDO") is a chunk of its own
+ * (FUT-3711): wait for it to land before asking what it shows — an absence
+ * read while it loads proves nothing, and a field looked for then is missed.
+ */
+async function topSettled(page: Page): Promise<void> {
+  await expect(page.getByTestId('list-top-loading')).toHaveCount(0);
+}
+
 Given('a compradora abre o checkout de uma loja com Google Pay', async ({ page }) => {
   await paymentsWorld().open(page, 'google-pay');
 });
@@ -41,6 +50,7 @@ Given(
 When('ela informa o CPF no topo do pagamento', async ({ page }) => {
   // Asked once, above the wallets — never a Dados step first (FUT-3685).
   await expect(page.getByTestId('payment-list')).toBeVisible();
+  await topSettled(page);
   const cpf = page.getByTestId('list-buyer-taxId');
   if ((await cpf.count()) > 0) await cpf.fill(VALID_CPF);
 });
@@ -88,16 +98,19 @@ Then('as formas de pagar continuam abaixo da carteira', async ({ page }) => {
 });
 
 Then('não há pagamento rápido na tela', async ({ page }) => {
+  await topSettled(page);
   // No heading, no buttons, no divider — not an empty block.
   await expect(page.getByTestId('list-wallets')).toHaveCount(0);
 });
 
 Then('nenhum botão do Google Pay é mostrado', async ({ page }) => {
+  await topSettled(page);
   await expect(page.getByTestId('google-pay-button')).toHaveCount(0);
   await expect(page.getByTestId('list-google-pay')).toHaveCount(0);
 });
 
 Then('nenhum botão do Apple Pay é mostrado', async ({ page }) => {
+  await topSettled(page);
   await expect(page.getByTestId('apple-pay-button')).toHaveCount(0);
   await expect(page.getByTestId('list-apple-pay')).toHaveCount(0);
 });

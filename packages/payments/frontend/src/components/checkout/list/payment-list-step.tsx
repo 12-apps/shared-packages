@@ -153,6 +153,12 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
  * the only way an order is made, and the card's 5-second bar is the buyer's
  * chance to stop it (no confirmation dialog: owner, 2026-10-14).
  */
+/** The column's credit and "A pagar" rows — only with all three of the host's credit, amount due and words. */
+function creditRows(list: CheckoutPaymentList): { label: string; amountLabel: string; dueTitle: string; dueLabel: string } | undefined {
+  if (!list.credit || !list.amountDueLabel || !list.copy.amountDue) return undefined;
+  return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: list.amountDueLabel };
+}
+
 export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
@@ -189,6 +195,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
       lines={props.totalOverride ? undefined : props.cart.lines}
       moneyLines={props.cart.discountLines}
       totalLabel={displayTotals(props.totalOverride, props.cart).label}
+      credit={creditRows(list)}
     >
       <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
     </ListLayout>
