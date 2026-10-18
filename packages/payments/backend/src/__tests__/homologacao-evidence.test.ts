@@ -59,7 +59,6 @@ function json(body: unknown, status = 200, statusText = 'OK'): Response {
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
 function fakePagbank(options: { refreshStatus?: number; consultOutages?: number } = {}) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
-  let outages = options.consultOutages ?? 0;
   const pixPolls: number[] = [];
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
@@ -110,8 +109,8 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number 
       );
     }
     if (route === 'GET /orders/ORDE_C1') {
-      if (outages > 0) {
-        outages -= 1;
+      // `seen` already holds this call: the first N consults are the outage.
+      if (seen.filter((call) => call.path === route).length <= (options.consultOutages ?? 0)) {
         return json({ error_messages: [{ code: 'SERVICE_UNAVAILABLE' }] }, 503, 'Service Unavailable');
       }
       return json({ id: 'ORDE_C1', charges: [{ id: 'CHAR_OK', status: 'PAID', amount: { value: 1500 } }] });
