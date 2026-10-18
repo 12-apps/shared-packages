@@ -183,11 +183,26 @@ function encryptStep(deps: EvidenceRunDeps, cards: readonly BrowserCardResult[])
   return pendingStep('card.encrypt', deps.copy, deps.copy.encryptFailed([...reasons].join('; ')));
 }
 
+/** A read PagBank answered 5xx: its own outage, worth one more try (FUT-3722). */
+function serverError(outcome: { ok: boolean; calls: readonly { status?: number }[] }): boolean {
+  const status = outcome.calls.at(-1)?.status;
+  return !outcome.ok && typeof status === 'number' && status >= 500;
+}
+
+/**
+ * Consult the approved charge — a read, so a PagBank 5xx is retried ONCE after
+ * a pause (the sandbox answered 503 on a run). Both attempts stay in the
+ * evidence; only the last one decides.
+ */
 async function consultApproved(deps: EvidenceRunDeps, chargeId: string): Promise<EvidenceStep> {
-  const consulted = await recordTraffic(() => deps.gateway.refreshCharge(deps.merchant, PROVIDER, chargeId));
+  const consult = () => recordTraffic(() => deps.gateway.refreshCharge(deps.merchant, PROVIDER, chargeId));
+  const first = await consult();
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const consulted = serverError(first) ? await sleep(deps.pixPollMs ?? PIX_POLL_MS).then(consult) : first;
+  const calls = consulted === first ? first.calls : [...first.calls, ...consulted.calls];
   const paid = consulted.ok && consulted.value.status === 'PAID' && answered(consulted.calls);
   return stepOf('card.approvedConsult', paid ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-    calls: consulted.calls,
+    calls,
     ids: { charge_id: chargeId },
     observed: consulted.ok ? deps.copy.chargeStatus(consulted.value.status) : failureOf(deps.copy, consulted),
   });

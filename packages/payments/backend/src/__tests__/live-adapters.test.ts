@@ -1209,21 +1209,36 @@ describe('pagbank refund honesty', () => {
       ['SOMETHING_NEW', 'PENDING'],
       [undefined, 'PENDING'],
     ] as const) {
-      stubFetch([{ body: { id: 'CHAR_1', status, amount: { value: 500 } } }]);
+      stubFetch([
+        { body: { id: 'CHAR_1', status: 'PAID', amount: { value: 500 } } },
+        { body: { id: 'CHAR_1', status, amount: { value: 500 } } },
+      ]);
       const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_1' }, creds);
       expect(snapshot.status, `pagbank cancel status "${status}"`).toBe(expected);
     }
   });
 
-  it('sends NO body for a full refund — never the {"amount":{}} shape', async () => {
-    const calls = stubFetch([{ body: { id: 'CHAR_2', status: 'CANCELED' } }]);
+  it('names the remaining amount on a full refund, read back from the charge (FUT-3722)', async () => {
+    // The sandbox answered a body-less cancel with 400 invalid_parameter
+    // (FUT-3722 evidence run), and PagBank's cancel reference sends
+    // `amount.value` in every example, the full refund included.
+    const calls = stubFetch([
+      { body: { id: 'CHAR_2', status: 'PAID', amount: { value: 1500, summary: { refunded: 500 } } } },
+      { body: { id: 'CHAR_2', status: 'CANCELED' } },
+    ]);
     await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_2' }, creds);
 
-    expect(calls[0]!.url).toBe('https://api.pagseguro.com/charges/CHAR_2/cancel');
-    expect(calls[0]!.init.method).toBe('POST');
-    // PagBank documents an omitted `amount` as "cancel the total"; an empty
-    // amount object asserts nothing and is the wire bug FUT-680 names.
-    expect(calls[0]!.init.body).toBeUndefined();
+    expect(calls[0]!.url).toBe('https://api.pagseguro.com/charges/CHAR_2');
+    expect(calls[0]!.init.method).toBe('GET');
+    expect(calls[1]!.url).toBe('https://api.pagseguro.com/charges/CHAR_2/cancel');
+    expect(calls[1]!.init.method).toBe('POST');
+    expect(jsonOf(calls[1]!.init)).toEqual({ amount: { value: 1000 } });
+  });
+
+  it('cancels without a body only when the charge names no amount', async () => {
+    const calls = stubFetch([{ body: { id: 'CHAR_5', status: 'PAID' } }, { body: { id: 'CHAR_5', status: 'CANCELED' } }]);
+    await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_5' }, creds);
+    expect(calls[1]!.init.body).toBeUndefined();
   });
 
   it('still sends the explicit amount when the caller has one', async () => {
@@ -1237,6 +1252,7 @@ describe('pagbank refund honesty', () => {
 
   it('reports the amount PagBank says went back, not a fabricated zero', async () => {
     stubFetch([
+      { body: { id: 'CHAR_4', status: 'PAID', amount: { value: 12_50 } } },
       {
         body: {
           id: 'CHAR_4',
