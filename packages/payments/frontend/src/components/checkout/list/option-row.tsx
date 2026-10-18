@@ -1,4 +1,4 @@
-import { Box, Radio } from "@mui/material";
+import { Box, Radio, type SxProps } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import type { JSX, ReactNode } from "react";
 
@@ -35,6 +35,48 @@ const FIELDS_ON_SURFACE = {
   },
 } as const;
 
+/** The row's label and its muted hint, beside the radio. */
+function RowWords({ label, hint }: { label: string; hint?: string }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+      <Text variant="body" size="md" as="span">
+        {label}
+      </Text>
+      {hint ? (
+        <Text variant="body" size="sm" color="secondary" as="span">
+          {hint}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
+/** What opens inside a row, its fields standing on the surface. */
+function RowContent({ testId, children }: { testId: string; children: ReactNode }): JSX.Element {
+  return (
+    <Box data-testid={`${testId}-content`} sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5, ...FIELDS_ON_SURFACE }}>
+      {children}
+    </Box>
+  );
+}
+
+/** The row's frame: tinted and outlined while chosen, dimmed while disabled. */
+function rowFrameSx(chosen: boolean, disabled: boolean): SxProps<Theme> {
+  return {
+    border: "1px solid",
+    borderColor: chosen ? "primary.main" : "divider",
+    bgcolor: chosen ? chosenTint : "background.paper",
+    borderRadius: 2.5,
+    px: 1.5,
+    opacity: disabled ? 0.6 : 1,
+    // The keyboard's place in the group, drawn on the whole row (5.1 item 6)
+    // — for the row's own radio only: a field opened inside draws its own
+    // ring, and a second one around the row doubled it.
+    "&:has(> label input[type='radio']:focus-visible)": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
+  };
+}
+
 export function OptionRow({
   name,
   value,
@@ -44,6 +86,7 @@ export function OptionRow({
   hint,
   onChoose,
   testId,
+  open = false,
   children,
 }: {
   /** The group's name, shared by every row. */
@@ -55,26 +98,16 @@ export function OptionRow({
   hint?: string;
   onChoose: () => void;
   testId: string;
-  /** Rendered only while chosen. */
+  /** Render `children` while NOT chosen too (a door option's `showContentWhileIdle`). */
+  open?: boolean;
+  /** Rendered only while chosen, unless `open`. */
   children?: ReactNode;
 }): JSX.Element {
-  const { Text } = useCheckoutComponents();
   return (
     <Box
       data-testid={testId}
       data-chosen={chosen ? "true" : "false"}
-      sx={{
-        border: "1px solid",
-        borderColor: chosen ? "primary.main" : "divider",
-        bgcolor: chosen ? chosenTint : "background.paper",
-        borderRadius: 2.5,
-        px: 1.5,
-        opacity: disabled ? 0.6 : 1,
-        // The keyboard's place in the group, drawn on the whole row (5.1 item 6)
-        // — for the row's own radio only: a field opened inside draws its own
-        // ring, and a second one around the row doubled it.
-        "&:has(> label input[type='radio']:focus-visible)": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
-      }}
+      sx={rowFrameSx(chosen, disabled)}
     >
       <Box
         component="label"
@@ -94,23 +127,10 @@ export function OptionRow({
           sx={{ p: 0, flex: "none" }}
           inputProps={{ "data-testid": `${testId}-radio` } as Record<string, string>}
         />
-        <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
-          <Text variant="body" size="md" as="span">
-            {label}
-          </Text>
-          {hint ? (
-            <Text variant="body" size="sm" color="secondary" as="span">
-              {hint}
-            </Text>
-          ) : null}
-        </Box>
+        <RowWords label={label} hint={hint} />
       </Box>
       {/* Only a row with something to open draws the box for it — no empty band. */}
-      {chosen && children ? (
-        <Box data-testid={`${testId}-content`} sx={{ display: "flex", flexDirection: "column", gap: 1.25, pb: 1.5, ...FIELDS_ON_SURFACE }}>
-          {children}
-        </Box>
-      ) : null}
+      {(chosen || open) && children ? <RowContent testId={testId}>{children}</RowContent> : null}
     </Box>
   );
 }

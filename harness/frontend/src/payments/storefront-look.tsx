@@ -134,15 +134,27 @@ function useDoorGroup(onSend: () => void): readonly CheckoutDoorOption[] {
     () => [
       {
         id: 'cash',
-        label: 'Dinheiro',
-        hint: 'Diga se precisa de troco',
+        // The troco answers ARE the way to choose cash (FUT-3715): they show on
+        // the idle row, and one tap chooses the row and answers it.
+        label: troco === null ? 'Dinheiro, troco para?' : troco === 'Sem troco' ? 'Dinheiro, sem troco' : `Dinheiro, troco para ${troco}`,
         action: 'Enviar pedido',
         blocked: troco === null ? 'Diga se precisa de troco.' : null,
         onSend,
-        content: (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {['Não preciso', 'R$ 50', 'R$ 100'].map((label) => (
-              <Button key={label} variant={troco === label ? 'solid' : 'outline'} color="primary" size="sm" onClick={() => setTroco(label)}>
+        showContentWhileIdle: true,
+        content: ({ choose }) => (
+          <Box role="group" aria-label="Troco" sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1 }}>
+            {['Sem troco', 'R$ 50', 'R$ 100'].map((label) => (
+              <Button
+                key={label}
+                variant={troco === label ? 'solid' : 'outline'}
+                color="primary"
+                size="sm"
+                aria-pressed={troco === label}
+                onClick={() => {
+                  setTroco(label);
+                  choose();
+                }}
+              >
                 {label}
               </Button>
             ))}

@@ -920,7 +920,8 @@ What changes for the buyer:
 | field | what it is |
 | --- | --- |
 | `id`, `label`, `hint?` | the row; `id` comes back through `onChoiceChange` |
-| `content?` | what opens INSIDE the row while chosen (troco, tender chips, brand lines) |
+| `content?` | what opens INSIDE the row while chosen (troco, tender chips, brand lines). Also a function `({ chosen, choose }) => ReactNode`: `choose()` is what the row's radio does (a no-op on the chosen row), so a control inside can choose the row in the tap that answers it (FUT-3715). The choice still reaches `onChoiceChange` from an effect, after the render, so keep an answer given in that tap across it. It is called during the row's render, not mounted: return a component of your own if the content needs hooks |
+| `showContentWhileIdle?` | draw `content` while the row is NOT chosen too, on the unchosen frame, in the same place it keeps once chosen — for answers that are themselves the way to choose the row (FUT-3715) |
 | `hideHintWhileChosen?` | drop the hint while the content says the same at length |
 | `action` | the bar button's verb while chosen — "Enviar pedido" |
 | `totalLabel?` | the amount beside it; absent ⇒ the cart's |

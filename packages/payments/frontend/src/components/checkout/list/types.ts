@@ -21,6 +21,22 @@
 import type { ReactNode } from "react";
 
 /**
+ * What a door option's `content` function is handed (FUT-3715).
+ *
+ * `choose` is exactly what the row's radio does; calling it on the chosen row
+ * changes nothing. The list reports the choice through `onChoiceChange` as it
+ * does for the radio — from an effect, after the render — so a host that
+ * answers in the same tap keeps its answer across that render. The list never
+ * moves keyboard focus here: where focus goes is the host's call.
+ */
+export interface CheckoutDoorRowControls {
+  /** This option is the list's current choice. */
+  chosen: boolean;
+  /** Choose this option, as its radio would. */
+  choose: () => void;
+}
+
+/**
  * One of the host's ways to pay at the door — "Dinheiro", "Maquininha".
  *
  * Every field is a fact the host already holds; the list never computes one.
@@ -41,10 +57,25 @@ export interface CheckoutDoorOption {
   hideHintWhileChosen?: boolean;
   /**
    * What opens INSIDE the row when it is chosen (the troco question, the
-   * tender chips, the brand lines). Rendered only while chosen, with no left
-   * indent: it starts where the row's own content starts.
+   * tender chips, the brand lines). Rendered only while chosen — unless
+   * `showContentWhileIdle` — with no left indent: it starts where the row's own
+   * content starts.
+   *
+   * As a function it is handed the row's own controls, so a control inside the
+   * content can choose the row in the same tap that answers it (the troco
+   * chips, FUT-3715). A plain node behaves exactly as before. The function is
+   * called during the row's render, not mounted as a component: keep it one
+   * shape for the option's life, and return a component of your own if the
+   * content needs hooks.
    */
-  content?: ReactNode;
+  content?: ReactNode | ((row: CheckoutDoorRowControls) => ReactNode);
+  /**
+   * Render `content` while the option is NOT chosen too — for an option whose
+   * answers are themselves the way to choose it (FUT-3715). The unchosen row
+   * keeps its unchosen frame; the content keeps its box and place in both
+   * states, so choosing the row moves nothing.
+   */
+  showContentWhileIdle?: boolean;
   /** The bar button's verb while this option is chosen — "Enviar pedido". */
   action: string;
   /** The amount beside the verb. Absent ⇒ the cart's own total. */

@@ -85,6 +85,12 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
 function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: RowProps }): JSX.Element {
   const { choice } = props.state;
   const chosen = choice?.kind === "door" && choice.id === option.id;
+  const choose = (): void => {
+    if (!chosen) props.state.choose({ kind: "door", id: option.id });
+  };
+  // A function content gets the row's own controls (FUT-3715): a chip inside
+  // it can choose the row in the tap that answers it.
+  const content = typeof option.content === "function" ? option.content({ chosen, choose }) : option.content;
   return (
     <OptionRow
       name={props.name}
@@ -92,10 +98,11 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
       chosen={chosen}
       label={option.label}
       hint={chosen && option.hideHintWhileChosen ? undefined : option.hint}
-      onChoose={() => props.state.choose({ kind: "door", id: option.id })}
+      onChoose={choose}
       testId={`list-door-${option.id}`}
+      open={option.showContentWhileIdle === true}
     >
-      {option.content}
+      {content}
     </OptionRow>
   );
 }
