@@ -149,6 +149,7 @@ function useDoorGroup(onSend: () => void): readonly CheckoutDoorOption[] {
                 variant={troco === label ? 'solid' : 'outline'}
                 color="primary"
                 size="sm"
+                aria-pressed={troco === label}
                 onClick={() => {
                   setTroco(label);
                   choose();

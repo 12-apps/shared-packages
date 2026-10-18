@@ -63,7 +63,10 @@ export interface CheckoutDoorOption {
    *
    * As a function it is handed the row's own controls, so a control inside the
    * content can choose the row in the same tap that answers it (the troco
-   * chips, FUT-3715). A plain node behaves exactly as before.
+   * chips, FUT-3715). A plain node behaves exactly as before. The function is
+   * called during the row's render, not mounted as a component: keep it one
+   * shape for the option's life, and return a component of your own if the
+   * content needs hooks.
    */
   content?: ReactNode | ((row: CheckoutDoorRowControls) => ReactNode);
   /**
