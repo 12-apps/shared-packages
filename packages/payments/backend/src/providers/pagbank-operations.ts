@@ -98,20 +98,37 @@ export const findChargeByReference: NonNullable<
   return orderSnapshot(order, order.id);
 };
 
+/** What is still refundable on a charge, in cents, or null when it names no amount. */
+function refundableCents(charge: PagBankOrderCharge): number | null {
+  const value = charge.amount?.value;
+  return typeof value === 'number' ? Math.max(0, value - refundedCents(charge)) : null;
+}
+
 /**
- * The charge a refund must name at `/charges/{id}/cancel`.
+ * The charge a refund must name at `/charges/{id}/cancel`, and what is still
+ * refundable on it.
  *
  * A refund handed an ORDER id — a PIX row created before the paid webhook
  * re-keyed it, or one written before FUT-681 — cannot be sent there verbatim:
  * the endpoint 404s on anything but a charge id. Resolve it through the order
  * instead, and refuse loudly when the order holds no settled charge, because
- * "refund an order nobody paid" has no honest charge to act on.
+ * "refund an order nobody paid" has no honest charge to act on. A charge id is
+ * read back too: the cancel needs its amount (see `refund`).
  */
-async function refundableChargeId(
+async function refundTarget(
   providerChargeId: string,
   credentials: ResolvedCredentials,
-): Promise<string> {
-  if (!ORDER_ID_PREFIX.test(providerChargeId)) return providerChargeId;
+): Promise<{ chargeId: string; cents: number | null }> {
+  if (!ORDER_ID_PREFIX.test(providerChargeId)) {
+    // A failed read must not block a refund the body-less cancel may still
+    // perform: fall back to it rather than throwing before the cancel.
+    const charge = await pagbankRequest<PagBankOrderCharge>(
+      `/charges/${encodeURIComponent(providerChargeId)}`,
+      credentials,
+      { method: 'GET' },
+    ).catch(() => null);
+    return { chargeId: providerChargeId, cents: charge ? refundableCents(charge) : null };
+  }
   const res = await pagbankRequest<PagBankOrderResponse>(
     `/orders/${encodeURIComponent(providerChargeId)}`,
     credentials,
@@ -125,7 +142,7 @@ async function refundableChargeId(
       { retriable: false },
     );
   }
-  return charge.id;
+  return { chargeId: charge.id, cents: refundableCents(charge) };
 }
 
 /**
@@ -167,18 +184,28 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   credentials,
 ) => {
   if (credentials.stub) return stubRefund(NAME, input);
-  const chargeId = await refundableChargeId(input.providerChargeId, credentials);
-  // NO body for a full refund: PagBank documents an omitted `amount` as
-  // "cancel the total". The old body was `{"amount":{}}` — `partialRefunds` is
-  // false, so the gateway never passes an amount and `value` was always
-  // undefined — an accidental shape asserting nothing. An explicit amount
-  // still travels for the caller that has one (partial, capability-gated).
+  // A caller naming its amount on a charge id needs no read-back.
+  const { chargeId, cents } =
+    input.amount && !ORDER_ID_PREFIX.test(input.providerChargeId)
+      ? { chargeId: input.providerChargeId, cents: null }
+      : await refundTarget(input.providerChargeId, credentials);
+  // A full refund names its amount too (FUT-3722): the sandbox answered a
+  // body-less cancel with 400 invalid_parameter, and every example in
+  // PagBank's cancel reference sends `amount.value`, the full-refund one
+  // included. The remaining amount comes from the charge itself; only a
+  // charge that names none is cancelled without a body.
+  const value = input.amount ? input.amount.amountCents : cents;
+  if (value === 0) {
+    throw new ProviderRequestError(NAME, `PagBank charge ${chargeId} has nothing left to refund.`, {
+      retriable: false,
+    });
+  }
   const res = await pagbankRequest<PagBankOrderCharge & { id?: string }>(
     `/charges/${encodeURIComponent(chargeId)}/cancel`,
     credentials,
     {
       method: 'POST',
-      ...(input.amount ? { body: { amount: { value: input.amount.amountCents } } } : {}),
+      ...(value !== null ? { body: { amount: { value } } } : {}),
     },
   );
   return {

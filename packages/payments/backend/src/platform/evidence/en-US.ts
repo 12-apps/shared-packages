@@ -29,7 +29,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     'connect.refresh': {
       scenario: "Seller token renewal — POST /oauth2/refresh",
-      expected: 'HTTP 200 with a new access_token; the new token pair replaces the previous one.',
+      expected: 'HTTP 200 or 201 with a new access_token; the new token pair replaces the previous one.',
     },
     'connect.usage': {
       scenario: "Use of the seller's authorization in the orders",
@@ -122,7 +122,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   pendencies: {
     heading: '5. Pending items',
     incomplete: (failed, pending) =>
-      `INCOMPLETE FILE: ${pending} scenario(s) pending and ${failed} failed. Do not submit this file as complete.`,
+      `INCOMPLETE FILE: ${pending} ${pending === 1 ? 'scenario' : 'scenarios'} pending and ${failed} failed. Do not submit this file as complete.`,
     allExecuted: 'Every scenario listed above was executed with the expected result.',
     notCovered: [
       'Not covered by any scenario: card brands other than VISA (Mastercard, Amex, Elo, Hiper).',
@@ -153,7 +153,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     refreshed: 'Token renewed; the new pair replaced the previous one.',
     refreshRejected: "PagBank refused the renewal; the seller's connection must be authorized again.",
     usageSellerToken: (calls, seller, platform) =>
-      `The ${calls} order and public-key call(s) were authenticated with the seller's token ` +
+      `${calls === 1 ? 'The order or public-key call was' : `The ${calls} order and public-key calls were`} authenticated with the seller's token ` +
       `(SHA-256 fingerprint ${seller}, recorded on every request above)` +
       (platform ? `, different from the platform's token (${platform}).` : '.'),
     usageOtherToken:
@@ -163,7 +163,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     notSandbox: "The test seller's connection is not a sandbox one; nothing was executed.",
     qrCreated: (orderId) => `QR Code created on order ${orderId}. This is NOT yet a confirmed payment.`,
     qrMissing: 'The order was created without a QR Code.',
-    consultStatus: (status, polls) => `Order consulted ${polls} time(s); final status ${status}.`,
+    consultStatus: (status, polls) => `Order consulted ${polls} ${polls === 1 ? 'time' : 'times'}; final status ${status}.`,
     paid: 'Payment confirmed: the Pix charge is PAID in the consult.',
     notPaidYet: (seconds) => `Payment not confirmed within ${seconds} s of consults.`,
     publicKeyMinted: "Public key minted with the seller's token.",
@@ -178,7 +178,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     chargeStatus: (status) => `Charge with status ${status}.`,
     canceled: (status) => `Cancellation recorded with status ${status}.`,
     webhookReceived: (count, statuses, chargeStatus) =>
-      `${count} notification(s) received and stored (status: ${statuses})` +
+      `${count} ${count === 1 ? 'notification' : 'notifications'} received and stored (status: ${statuses})` +
       (chargeStatus ? `; the charge the integration records is ${chargeStatus}.` : '.'),
     webhookNone: 'No notification received by the time this file was generated.',
     webhookFailed: 'Notification received, but processing failed.',
