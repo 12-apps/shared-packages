@@ -786,11 +786,15 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
       expect(refund.providerRefundId).toBe('CHAR_5');
     });
 
-    it('cancels a charge id directly, with no order read', async () => {
-      const calls = mockFetchQueue([{ id: 'CHAR_6', status: 'CANCELED' }]);
+    it('cancels a charge id with no order read, naming the amount it reads back (FUT-3722)', async () => {
+      const calls = mockFetchQueue([
+        { id: 'CHAR_6', status: 'PAID', amount: { value: 900 } },
+        { id: 'CHAR_6', status: 'CANCELED' },
+      ]);
       await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_6' }, CREDS);
-      expect(calls).toHaveLength(1);
-      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
+      expect(calls).toHaveLength(2);
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6');
+      expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
     });
 
     it('refuses to refund an order nobody paid instead of 404-ing blind', async () => {

@@ -57,14 +57,14 @@ function json(body: unknown, status = 200, statusText = 'OK'): Response {
 }
 
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
-function fakePagbank(options: { refreshStatus?: number } = {}) {
-  const seen: { path: string; authorization: string | null }[] = [];
+function fakePagbank(options: { refreshStatus?: number; consultOutages?: number } = {}) {
+  const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
-    seen.push({ path: `${method} ${url.pathname}`, authorization: new Headers(init?.headers).get('authorization') });
+    seen.push({ path: `${method} ${url.pathname}`, authorization: new Headers(init?.headers).get('authorization'), body });
     const route = `${method} ${url.pathname}`;
     if (route === 'POST /oauth2/token') {
       return json({ access_token: 'seller-access-1', refresh_token: 'seller-refresh-1', expires_in: 3600, account_id: 'ACCO_TEST' });
@@ -109,8 +109,13 @@ function fakePagbank(options: { refreshStatus?: number } = {}) {
       );
     }
     if (route === 'GET /orders/ORDE_C1') {
+      // `seen` already holds this call: the first N consults are the outage.
+      if (seen.filter((call) => call.path === route).length <= (options.consultOutages ?? 0)) {
+        return json({ error_messages: [{ code: 'SERVICE_UNAVAILABLE' }] }, 503, 'Service Unavailable');
+      }
       return json({ id: 'ORDE_C1', charges: [{ id: 'CHAR_OK', status: 'PAID', amount: { value: 1500 } }] });
     }
+    if (route === 'GET /charges/CHAR_OK') return json({ id: 'CHAR_OK', status: 'PAID', amount: { value: 1500 } });
     if (route === 'POST /charges/CHAR_OK/cancel') {
       return json({ id: 'CHAR_OK', status: 'CANCELED', amount: { value: 1500, summary: { refunded: 1500 } } }, 201, 'Created');
     }
@@ -119,7 +124,7 @@ function fakePagbank(options: { refreshStatus?: number } = {}) {
   return { handler, seen };
 }
 
-function world(options: { refreshStatus?: number; sellerEnvironment?: 'SANDBOX' | 'PRODUCTION' } = {}) {
+function world(options: { refreshStatus?: number; consultOutages?: number; sellerEnvironment?: 'SANDBOX' | 'PRODUCTION' } = {}) {
   const pagbank = fakePagbank(options);
   vi.stubGlobal('fetch', vi.fn(pagbank.handler));
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
@@ -232,6 +237,41 @@ describe('homologação evidence', () => {
     expect(file.content).toMatch(/\(GMT-03:00, America\/Sao_Paulo\)/);
   });
 
+  it('given PagBank answers the card consult 503 once, then it is retried and both calls are recorded (FUT-3722)', async () => {
+    const w = world({ consultOutages: 1 });
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(w.pagbank.seen.filter((call) => call.path === 'GET /orders/ORDE_C1')).toHaveLength(2);
+    expect(file.content).toContain('Status HTTP: 503 Service Unavailable');
+    expect(file.content).toMatch(/\[4\.4\][^\n]*— EXECUTADO/);
+  });
+
+  it('given a cancel, then it names the charge amount PagBank documents (FUT-3722)', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+
+    const cancel = w.pagbank.seen.find((call) => call.path === 'POST /charges/CHAR_OK/cancel');
+    expect(cancel?.body).toEqual({ amount: { value: 1500 } });
+  });
+
+  it('given the card orders, then each card step names the order PagBank created and encryption comes first (FUT-3722)', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(file.content).toContain('IDs para correlação: order_id=ORDE_C1, charge_id=CHAR_OK, reference_id=');
+    expect(file.content).toContain('IDs para correlação: order_id=ORDE_C2, charge_id=CHAR_NO, reference_id=');
+    expect(file.content).toMatch(/Pedido consultado \d+ vezes; status final PAID/);
+    expect(file.content).not.toMatch(/\((s|es|ões)\)/);
+  });
+
   it('given a completed connect, then the seller row is enabled and addressed to its own webhook route', async () => {
     const w = world();
     await connected(w);
@@ -268,7 +308,7 @@ describe('homologação evidence', () => {
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
     expect(file.summary.pending).toBe(1);
-    expect(file.content).toContain('1 notificação(ões) recebida(s) e armazenada(s) (situação: PROCESSED)');
+    expect(file.content).toContain('1 notificação recebida e armazenada (situação: PROCESSED)');
   });
 
   it('given nothing has run, then every scenario is PENDING and the file says so', async () => {
