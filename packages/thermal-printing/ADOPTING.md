@@ -9,7 +9,7 @@ surfaces; when the library updates, every host updates with no app changes.
 | Surface | Export | What the host does |
 |---|---|---|
 | **Core** | `@12-apps/thermal-printing` | Nothing to wire — the line model, the column table, the wrapper, the field/rule builders, and the sized vocabulary (`textLines`, `band`, `box`, `row`, `image`). Isomorphic: a browser composing a preview reads the same widths the server encodes. |
-| **ESC/POS** | `…/escpos` | `encodeTicket(lines)`. No configuration: the command set is the universally implemented core and the code page is CP850. |
+| **ESC/POS** | `…/escpos` | `encodeTicket(lines)`. No configuration: the command set is the universally implemented core and the code page is CP850. `encodeDrawerPulse({ pin?, onMs?, offMs? })` opens a cash drawer on the printer's DK port; the defaults (pin 2, 50 ms on, 500 ms off) open every drawer in this class. |
 | **HTML** | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang)`. Hand the string to a tab that prints it. `rasterToDataUri(raster)` for a 1-bit preview. |
 | **Raster** | `…/raster` | `rasterizeSvg(svg, { width })` then `toMonochrome(rgba)` → a `RasterImage` for `image(...)`. Pass your own artwork; the package ships none. |
 | **Socket** | `…/net` | `sendToNetworkPrinter(host, port, bytes)`. Node-only; behind its own subpath so a browser bundle never resolves `node:net`. |
