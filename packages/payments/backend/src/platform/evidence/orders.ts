@@ -228,8 +228,13 @@ async function consultApproved(deps: EvidenceRunDeps, chargeId: string, orderId:
   });
 }
 
-/** How many times the cancel is tried while PagBank says it cannot refund yet. */
-const CANCEL_ATTEMPTS = 4;
+/**
+ * The pauses before each retried cancel while PagBank says it cannot refund
+ * yet: exponential, capped, three minutes in all. The fourth evidence run
+ * (FUT-3722) got 40008 on four attempts spread over nine seconds, so the
+ * sandbox needs minutes, not seconds, after a capture.
+ */
+const CANCEL_BACKOFF_MS = [5_000, 10_000, 20_000, 40_000, 60_000, 45_000];
 
 /**
  * PagBank's "not yet": `40008 refund_temporarily_unavailable` ("Transaction is
@@ -243,7 +248,7 @@ function refundNotYet(outcome: { ok: boolean; calls: readonly { responseBody?: u
 }
 
 /**
- * Cancel the approved charge, retried after a pause while PagBank answers
+ * Cancel the approved charge, retried with backoff while PagBank answers
  * that it cannot refund it yet. Every attempt stays in the evidence; only the
  * last one decides.
  */
@@ -252,8 +257,9 @@ async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   let canceled = await cancel();
   const calls = [...canceled.calls];
-  for (let attempt = 1; attempt < CANCEL_ATTEMPTS && refundNotYet(canceled); attempt += 1) {
-    await sleep(deps.pixPollMs ?? PIX_POLL_MS);
+  for (const pause of CANCEL_BACKOFF_MS) {
+    if (!refundNotYet(canceled)) break;
+    await sleep(pause);
     canceled = await cancel();
     calls.push(...canceled.calls);
   }

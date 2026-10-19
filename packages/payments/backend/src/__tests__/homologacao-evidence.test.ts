@@ -267,6 +267,21 @@ describe('homologação evidence', () => {
     expect(file.content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
   });
 
+  it('given PagBank keeps answering the cancel 40008, then it backs off for about three minutes and reports the failure (FUT-3722)', async () => {
+    const w = world({ cancelNotYet: 100 });
+    const pauses: number[] = [];
+    await connected(w);
+    const prepared = await prepareEvidenceRun({ ...w.runDeps, sleep: async (ms) => void pauses.push(ms) });
+    await completeEvidenceRun({ ...w.runDeps, sleep: async (ms) => void pauses.push(ms) }, prepared.runId, cards());
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(7);
+    const backoff = pauses.filter((ms) => ms >= 5_000);
+    expect(backoff).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 45_000]);
+    expect(backoff.reduce((sum, ms) => sum + ms, 0)).toBe(180_000);
+    expect(file.content).toMatch(/\[4\.6\][^\n]*— FALHOU/);
+  });
+
   it('given a cancel, then it names the charge amount PagBank documents (FUT-3722)', async () => {
     const w = world();
     await connected(w);
