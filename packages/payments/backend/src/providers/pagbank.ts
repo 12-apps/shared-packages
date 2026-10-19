@@ -6,7 +6,7 @@ import {
 } from '../copy-source';
 import type { PagbankCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
-import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials, WebhookDelivery } from '../core/types';
+import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials } from '../core/types';
 import {
   customerPayload,
   customerSchema,
@@ -32,7 +32,15 @@ import {
   type PagBankPixResponse,
 } from './pagbank-snapshots';
 import { postTransactionEvents } from './pagbank-webhook';
-import { chargeDescription, secureEquals, sha256Hex, stubCharge } from './shared';
+import {
+  consultedOrder,
+  isConnectConnection,
+  requireConsultedOrder,
+  signerOf,
+  signerSecrets,
+  verifiedByConsult,
+} from './pagbank-webhook-auth';
+import { chargeDescription, sha256Hex, stubCharge } from './shared';
 
 /**
  * PagBank (PagSeguro) Orders API adapter — a port of the integration this
@@ -143,81 +151,38 @@ function createChargeWith(
   };
 }
 
-/**
- * PagBank signs deliveries with `x-authenticity-token` =
- * SHA-256(`${secret}-${rawBody}`), where the documented secret is the ACCOUNT
- * token ("token da conta") — and PagBank never says WHICH account under
- * Connect (FUT-678). So a delivery authenticates under any secret it could
- * honestly have been signed with:
- *
- * - `webhookToken` — the platform's explicit override, copied in at connect;
- * - `token` — the merchant's own account token (a connected store's OAuth
- *   token, or the one a store pasted);
- * - `platformWebhookSecret` — the PLATFORM account's token, and
- *   `platformClientSecret` — the application's client secret, both stamped at
- *   resolve time by `withPlatformWebhookSecret` and honoured only for an OAuth
- *   connection, the one case where the platform's account created the
- *   application the order was raised through. The third evidence run
- *   (FUT-3722) refused all three deliveries under the first three, so the
- *   client secret is the remaining candidate; `refusalDetail` names what was
- *   tried.
- *
- * It used to be `webhookToken ?? token`: one secret, so a configured override
- * hid the store's token entirely. The second sandbox evidence run (FUT-3722)
- * had all six of the test seller's notifications refused that way. `signer`
- * reports which field matched, so the first accepted delivery answers FUT-678.
- *
- * The URL itself carries no secret because `notification_urls` is capped at
- * 150 chars, so this header IS the authentication — hence fail-closed when it
- * is absent or no secret is configured at all (stub mode excepted).
- */
-function signerSecrets(credentials: ResolvedCredentials): Array<[string, string]> {
-  const { fields } = credentials;
-  const oauth = Boolean(fields['refreshToken']);
-  const named: Array<[string, string | undefined]> = [
-    ['webhookToken', fields['webhookToken']],
-    ['token', fields['token']],
-    ['platformWebhookSecret', oauth ? fields['platformWebhookSecret'] : undefined],
-    ['platformClientSecret', oauth ? fields['platformClientSecret'] : undefined],
-  ];
-  return named.filter((entry): entry is [string, string] => Boolean(entry[1]));
-}
-
-function signerOf(delivery: WebhookDelivery, credentials: ResolvedCredentials): string | null {
-  const presented = delivery.headers['x-authenticity-token'];
-  if (!presented) return null;
-  for (const [field, secret] of signerSecrets(credentials)) {
-    if (secureEquals(presented, sha256Hex(`${secret}-${delivery.rawBody}`))) return field;
-  }
-  return null;
-}
-
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
     if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
-    return signerOf(delivery, credentials) !== null;
+    if (signerOf(delivery, credentials) !== null) return true;
+    return (await consultedOrder(delivery, credentials)) !== null;
   },
 
-  signer: signerOf,
+  signer: (delivery, credentials) =>
+    signerOf(delivery, credentials) ?? (isConnectConnection(credentials) ? 'orderConsult' : null),
 
   refusalDetail(delivery, credentials) {
     const header = delivery.headers['x-authenticity-token'] ? 'present' : 'absent';
     const tried = signerSecrets(credentials).map(([field]) => field).join(', ') || 'none';
-    return `x-authenticity-token ${header}; tried ${tried}`;
+    const consult = isConnectConnection(credentials) ? '; order consult failed' : '';
+    return `x-authenticity-token ${header}; tried ${tried}${consult}`;
   },
 
   /**
-   * PagBank posts the ORDER object. The signature above is what makes the body
-   * trustworthy; `eventId` falls back to a body hash because PagBank sends no
+   * PagBank posts the ORDER object. The signature (`pagbank-webhook-auth.ts`)
+   * is what makes the body trustworthy — or, for an unsigned Connect delivery,
+   * the order PagBank answered replaces it outright; `eventId` falls back to a body hash because PagBank sends no
    * delivery id, which still makes redeliveries idempotent. Post-transaction
    * events reach this same URL form-encoded, which the `JSON.parse` below
    * throws on — see `pagbank-webhook.ts`.
    */
-  async parse(delivery) {
+  async parse(delivery, credentials) {
     const eventId = sha256Hex(delivery.rawBody);
     const postTransaction = postTransactionEvents(delivery.rawBody, eventId);
     if (postTransaction) return postTransaction;
-    const body = JSON.parse(delivery.rawBody) as PagBankOrderResponse & { id?: string };
+    const body = verifiedByConsult(delivery, credentials)
+      ? await requireConsultedOrder(delivery, credentials)
+      : (JSON.parse(delivery.rawBody) as PagBankOrderResponse & { id?: string });
     const paid = settledCharge(body);
     const providerChargeId =
       typeof paid?.id === 'string' ? paid.id : typeof body.id === 'string' ? body.id : null;

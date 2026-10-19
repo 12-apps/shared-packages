@@ -596,7 +596,7 @@ describe('pagbank adapter — webhooks', () => {
       expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformClientSecret');
       const unsigned = { ...delivery, headers: {} };
       const detail = adapter.webhook.refusalDetail?.(unsigned, connected);
-      expect(detail).toBe('x-authenticity-token absent; tried token, platformClientSecret');
+      expect(detail).toBe('x-authenticity-token absent; tried token, platformClientSecret; order consult failed');
       expect(detail).not.toContain('csecret');
     });
 
@@ -618,8 +618,65 @@ describe('pagbank adapter — webhooks', () => {
       await expect(adapter.webhook.verify(delivery, connected)).resolves.toBe(true);
       expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformWebhookSecret');
       const forged = { ...delivery, headers: { 'x-authenticity-token': 'f'.repeat(64) } };
+      // Unsigned under Connect, it is confirmed by consult — and PagBank does
+      // not know the order, so it is still refused.
+      mockFetch({ error_messages: [{ code: '40400' }] }, 404);
       await expect(adapter.webhook.verify(forged, connected)).resolves.toBe(false);
-      expect(adapter.webhook.signer?.(forged, connected)).toBeNull();
+    });
+
+    /**
+     * The fourth evidence run (FUT-3722) refused every Connect delivery under
+     * all four candidate secrets, header present: PagBank signs them with a
+     * secret it does not name. So an OAuth delivery matching none is confirmed
+     * by reading the order back with the SELLER's token, and only PagBank's
+     * answer is applied.
+     */
+    describe('an unsigned Connect delivery is confirmed by consult (FUT-3722)', () => {
+      const connected = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', refreshToken: 'rt', platformClientSecret: 'csecret' },
+      };
+      // The body claims more than PagBank will answer: only the answer counts.
+      const claimed = JSON.stringify({
+        id: 'ORDE_5',
+        charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 999_99 } }],
+      });
+      const unsigned = {
+        provider: 'pagbank' as const,
+        rawBody: claimed,
+        headers: { 'x-authenticity-token': 'f'.repeat(64) },
+      };
+
+      it('accepts it when PagBank answers the order, reads it with the seller token, and applies the answer', async () => {
+        const spy = mockFetch({ id: 'ORDE_5', charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 12_50 } }] });
+        const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(true);
+        expect(adapter.webhook.signer?.(unsigned, connected)).toBe('orderConsult');
+        const [event] = await adapter.webhook.parse(unsigned, connected);
+
+        expect(event?.charge?.amount.amountCents).toBe(12_50);
+        const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+        expect(url).toMatch(/\/orders\/ORDE_5$/);
+        expect(init.method).toBe('GET');
+        expect(new Headers(init.headers).get('authorization')).toBe('Bearer store_tok');
+      });
+
+      it('refuses it when PagBank answers another order or nothing', async () => {
+        const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+        mockFetch({ id: 'ORDE_OTHER', charges: [] });
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(false);
+        mockFetch({ error: 'boom' }, 500);
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(false);
+        await expect(adapter.webhook.parse(unsigned, connected)).rejects.toBeInstanceOf(ProviderRequestError);
+      });
+
+      it('never consults for a pasted (non-OAuth) connection', async () => {
+        const spy = mockFetch({ id: 'ORDE_5', charges: [] });
+        const pasted = { environment: 'SANDBOX' as const, fields: { token: 'store_tok' } };
+        await expect(pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(unsigned, pasted)).resolves.toBe(false);
+        expect(spy).not.toHaveBeenCalled();
+      });
     });
 
     it('verifies a legacy form-encoded notification body the same way', async () => {
