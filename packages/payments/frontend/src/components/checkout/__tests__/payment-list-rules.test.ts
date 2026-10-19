@@ -94,6 +94,7 @@ describe("the button's verb", () => {
     expect(actionLabel(COPY, { kind: "online", method: "CARD" }, undefined, null)).toBe("Pagar");
     expect(actionLabel(COPY, { kind: "online", method: "PIX" }, undefined, null)).toBe("Gerar Pix");
     expect(actionLabel(COPY, { kind: "online", method: "PIX" }, undefined, null, true)).toBe("Pagar com saldo");
+    expect(actionLabel(COPY, { kind: "online", method: "HAND_OFF" }, undefined, "InfinitePay", true)).toBe("Ir para a InfinitePay");
     expect(actionLabel(COPY, { kind: "online", method: "GOOGLE_PAY" }, undefined, null)).toBe("Pagar com Google Pay");
     expect(actionLabel(COPY, { kind: "online", method: "HAND_OFF" }, undefined, "InfinitePay")).toBe("Ir para a InfinitePay");
     expect(actionLabel(COPY, { kind: "online", method: "HAND_OFF" }, undefined, null)).toBe("Ir para o pagamento");
