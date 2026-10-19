@@ -61,8 +61,12 @@ export interface WebhookPipelineObserver {
    * trace. The thrown error still propagates unchanged.
    */
   refused?(provider: ProviderName, reason: string): void;
-  /** Verified, parsed and ingested; `events` counts what THIS call applied. */
-  accepted?(provider: ProviderName, events: number): void;
+  /**
+   * Verified, parsed and ingested; `events` counts what THIS call applied, and
+   * `signer` is the credential field that authenticated it when the adapter
+   * reports one (`webhook.signer`).
+   */
+  accepted?(provider: ProviderName, events: number, signer?: string | null): void;
 }
 
 /**
@@ -234,6 +238,23 @@ function refuseStaleAtIntake(adapter: PaymentProviderAdapter, delivery: WebhookD
 }
 
 /**
+ * Tell the observer a delivery was applied, naming the credential field that
+ * signed it when the adapter can tell (`webhook.signer`, FUT-3722) — and with
+ * the original two arguments when it cannot, so an observer written before the
+ * signer existed sees exactly what it always did.
+ */
+function reportAccepted(
+  observer: WebhookPipelineObserver | undefined,
+  delivery: WebhookDelivery,
+  verified: { adapter: PaymentProviderAdapter; creds: ResolvedCredentials },
+  events: number,
+): void {
+  const { signer } = verified.adapter.webhook;
+  if (signer) observer?.accepted?.(delivery.provider, events, signer(delivery, verified.creds));
+  else observer?.accepted?.(delivery.provider, events);
+}
+
+/**
  * The LIVE inbound path: verify the signature, parse, then hand off to the
  * shared post-verification ingest.
  *
@@ -287,6 +308,6 @@ export async function runWebhookPipeline(
   // turns it into a non-2xx so the provider redelivers, and the inbox row is
   // already FAILED with its attempt counted.
   if (outcome.failure) throw outcome.failure.error;
-  deps.webhookObserver?.accepted?.(delivery.provider, outcome.processed.length);
+  reportAccepted(deps.webhookObserver, delivery, verified, outcome.processed.length);
   return outcome.processed;
 }
