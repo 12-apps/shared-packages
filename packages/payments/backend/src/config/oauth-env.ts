@@ -2,7 +2,8 @@ import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
 
 import type { OAuthAppCredentialsResolver } from './oauth';
 import type { ProviderName } from '../core/types';
-import type { PlatformWebhookSecretResolver } from '../core/webhook-secret';
+import type { CredentialStore } from '../core/ports';
+import { withPlatformWebhookSecret, type PlatformWebhookSecretResolver } from '../core/webhook-secret';
 
 /**
  * The platform's OAuth APPLICATION credentials, read from the environment
@@ -180,4 +181,23 @@ export function oauthAppField(
     if (!providers.includes(provider)) return null;
     return (await appCredentials(provider, environment))?.fields?.[field] || null;
   };
+}
+
+/**
+ * Stamp every secret a Connect delivery may be signed with, read off the
+ * platform's OAuth application credentials per environment, for the providers
+ * named: `platformWebhookSecret` (`oauthAppWebhookSecret`) and
+ * `platformClientSecret` (the app's `clientSecret`). One call for a host, so
+ * the composition lives here rather than in every host (FUT-3722).
+ */
+export function withOAuthAppSigningSecrets(
+  inner: CredentialStore,
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+): CredentialStore {
+  return withPlatformWebhookSecret(
+    withPlatformWebhookSecret(inner, oauthAppWebhookSecret(appCredentials, providers)),
+    oauthAppField(appCredentials, providers, 'clientSecret'),
+    'platformClientSecret',
+  );
 }

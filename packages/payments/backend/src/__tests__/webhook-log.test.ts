@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OAuthAppCredentialsResolver } from '../config/oauth';
-import { oauthAppField, oauthAppWebhookSecret } from '../config/oauth-env';
+import { oauthAppField, oauthAppWebhookSecret, withOAuthAppSigningSecrets } from '../config/oauth-env';
+import type { CredentialStore } from '../core/ports';
 import { createWebhookLog } from '../core/webhook-log';
 
 const ARRIVAL = { tenantSlug: 'platform-homologacao', provider: 'pagbank', bytes: 15 };
@@ -91,5 +92,27 @@ describe('oauthAppField', () => {
     await expect(oauthAppField(app, ['pagbank'], 'clientSecret')(merchant, 'pagbank', 'SANDBOX')).resolves.toBe('cs-SANDBOX');
     await expect(oauthAppField(app, ['pagbank'], 'clientSecret')(merchant, 'stripe', 'SANDBOX')).resolves.toBeNull();
     await expect(oauthAppField(app, ['pagbank'], 'missing')(merchant, 'pagbank', 'SANDBOX')).resolves.toBeNull();
+  });
+});
+
+describe('withOAuthAppSigningSecrets', () => {
+  it('stamps the account token and the client secret per environment, for the providers named only (FUT-3722)', async () => {
+    const app: OAuthAppCredentialsResolver = (_provider, environment) => ({
+      environment,
+      fields: { clientId: 'c', clientSecret: `cs-${environment}`, accountToken: `acct-${environment}` },
+    });
+    const sets = [{ environment: 'SANDBOX' as const, fields: { token: 'store' } }];
+    const inner = {
+      getCredentials: async () => sets[0]!,
+      listListeningCredentials: async () => sets,
+    } as unknown as CredentialStore;
+    const merchant = { kind: 'TENANT', id: 't' } as const;
+    const store = withOAuthAppSigningSecrets(inner, app, ['pagbank']);
+
+    const [pagbank] = (await store.listListeningCredentials?.(merchant, 'pagbank')) ?? [];
+    const [stripe] = (await store.listListeningCredentials?.(merchant, 'stripe')) ?? [];
+
+    expect(pagbank?.fields).toEqual({ token: 'store', platformWebhookSecret: 'acct-SANDBOX', platformClientSecret: 'cs-SANDBOX' });
+    expect(stripe?.fields).toEqual({ token: 'store' });
   });
 });
