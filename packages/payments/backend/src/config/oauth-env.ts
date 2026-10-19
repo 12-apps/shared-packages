@@ -1,6 +1,8 @@
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
 
 import type { OAuthAppCredentialsResolver } from './oauth';
+import type { ProviderName } from '../core/types';
+import type { PlatformWebhookSecretResolver } from '../core/webhook-secret';
 
 /**
  * The platform's OAuth APPLICATION credentials, read from the environment
@@ -140,5 +142,25 @@ export function envOAuthAppCredentials(
     // The pair is required; extras are not.
     if (!fields.clientId || !fields.clientSecret) return null;
     return { environment, fields };
+  };
+}
+
+/**
+ * The platform webhook secret a host stamps through `withPlatformWebhookSecret`,
+ * read off the platform's OAuth application credentials for each candidate
+ * set's environment: the app's `webhookSecret` (Stripe's endpoint secret)
+ * where one is configured, else its `accountToken` — the platform ACCOUNT
+ * token PagBank's notification signature is documented over (FUT-678,
+ * FUT-3722). Limited to `providers`, so a host turns it on one provider at a
+ * time; every other provider resolves null and its credentials pass untouched.
+ */
+export function oauthAppWebhookSecret(
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+): PlatformWebhookSecretResolver {
+  return async (_merchant, provider, environment) => {
+    if (!providers.includes(provider)) return null;
+    const fields = (await appCredentials(provider, environment))?.fields;
+    return fields?.['webhookSecret'] || fields?.['accountToken'] || null;
   };
 }
