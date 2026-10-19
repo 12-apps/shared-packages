@@ -61,6 +61,10 @@ export function createWebhookLog(log: WebhookLogger) {
      * delivery.
      */
     observer: {
+      /** The pipeline's own refusal reason — the fields tried, never a value. */
+      refused(provider: string, reason: string) {
+        log.warn(`payments.webhook verify refused: ${provider} — ${reason}`);
+      },
       accepted(provider: string, _events: number, signer?: string | null) {
         if (!signer) return;
         const key = `${provider}:${signer}`;

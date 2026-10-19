@@ -53,6 +53,12 @@ export type PlatformWebhookSecretResolver = (
 export function withPlatformWebhookSecret(
   inner: CredentialStore,
   resolve: PlatformWebhookSecretResolver,
+  /**
+   * The field the secret is stamped under. A provider that may sign with more
+   * than one platform secret (PagBank under Connect, FUT-3722) gets one stamp
+   * per field, each read by its adapter beside the others.
+   */
+  field = 'platformWebhookSecret',
 ): CredentialStore {
   const stampAll = async (
     merchant: MerchantRef,
@@ -65,7 +71,7 @@ export function withPlatformWebhookSecret(
     return Promise.all(
       resolved.map(async (set) => {
         const secret = await resolve(merchant, provider, set.environment);
-        return secret ? { ...set, fields: { ...set.fields, platformWebhookSecret: secret } } : set;
+        return secret ? { ...set, fields: { ...set.fields, [field]: secret } } : set;
       }),
     );
   };

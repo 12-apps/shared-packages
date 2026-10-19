@@ -88,6 +88,22 @@ describe('withPlatformWebhookSecret', () => {
     expect(listening?.map((set) => set.fields['platformWebhookSecret'])).toEqual(['platform-prod', 'platform-sb']);
   });
 
+  it('given a field name, then the secret is stamped under it beside an earlier stamp (FUT-3722)', async () => {
+    const inner: CredentialStore = {
+      ...storeWith({}),
+      listListeningCredentials: vi.fn().mockResolvedValue([{ environment: 'SANDBOX', fields: { token: 'store' } }]),
+    };
+    const store = withPlatformWebhookSecret(
+      withPlatformWebhookSecret(inner, async () => 'account-token'),
+      async () => 'client-secret',
+      'platformClientSecret',
+    );
+
+    const [set] = (await store.listListeningCredentials?.(TENANT, 'pagbank')) ?? [];
+
+    expect(set?.fields).toEqual({ token: 'store', platformWebhookSecret: 'account-token', platformClientSecret: 'client-secret' });
+  });
+
   it('given an inner store without listening reads, then the wrapper does not invent them', () => {
     // Their PRESENCE switches the pipeline onto the multi-candidate path, so
     // a decorator that added them would change routing, not just fields.

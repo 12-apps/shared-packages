@@ -135,6 +135,37 @@ describe('WebhookPipelineObserver', () => {
     expect(refused).not.toHaveBeenCalled();
   });
 
+  it('puts the adapter refusal detail in the refusal reason (FUT-3722)', async () => {
+    const refused = vi.fn();
+    const describing = adapter(async () => false);
+    const gateway = createPaymentsGateway({
+      providers: {
+        get: () => ({ ...describing, webhook: { ...describing.webhook, refusalDetail: () => 'tried token' } }),
+      } as never,
+      credentials: CONNECTED,
+      charges: {
+        findByProviderChargeId: async () => null,
+        findByIdempotencyKey: async () => null,
+        create: async () => {
+          throw new Error('not used');
+        },
+        upsertByProviderChargeId: async () => null,
+      },
+      webhooks: {
+        record: async () => ({ id: 'row', duplicate: false, settled: false }),
+        markProcessed: async () => undefined,
+        markFailed: async () => undefined,
+        listRetryable: async () => [],
+      },
+      webhookObserver: { refused },
+    } as never);
+
+    await expect(gateway.handleWebhook(MERCHANT, DELIVERY)).rejects.toThrow();
+
+    const [, reason] = refused.mock.calls[0] as [string, string];
+    expect(reason).toMatch(/^Webhook verification failed \(\w+: tried token\)$/);
+  });
+
   it('reports which credential field signed, when the adapter can tell (FUT-3722)', async () => {
     const accepted = vi.fn();
     const signing = adapter(async () => true);

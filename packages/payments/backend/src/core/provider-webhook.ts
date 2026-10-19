@@ -16,6 +16,13 @@ export interface ProviderWebhookHandling {
    */
   signer?(delivery: WebhookDelivery, credentials: ResolvedCredentials): string | null;
   /**
+   * Why a delivery did NOT verify under one candidate set, in words safe to log
+   * — whether the signature header arrived and which credential FIELDS were
+   * tried, never a value or digest. Optional; the pipeline puts it in the
+   * refusal's reason so a mis-signed provider is diagnosable from one run.
+   */
+  refusalDetail?(delivery: WebhookDelivery, credentials: ResolvedCredentials): string;
+  /**
    * Replay-tolerance for the LIVE intake path ONLY (FUT-690) — is this
    * delivery's signed timestamp within the provider's documented skew
    * window right now?
