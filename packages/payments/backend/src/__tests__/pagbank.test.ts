@@ -548,7 +548,7 @@ describe('pagbank adapter — webhooks', () => {
       ).resolves.toBe(true);
     });
 
-    it('keeps an explicitly configured webhook token authoritative', async () => {
+    it('accepts the store token beside a configured webhook token, and names which one signed (FUT-3722)', async () => {
       const creds = {
         environment: 'PRODUCTION' as const,
         fields: { token: 'acct_tok', webhookToken: 'dedicated' },
@@ -566,18 +566,39 @@ describe('pagbank adapter — webhooks', () => {
           creds,
         ),
       ).resolves.toBe(true);
-      // The override REPLACES the default rather than widening it: two live
-      // secrets at once is a bigger surface than the configuration asked for.
-      await expect(
-        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
-          {
-            provider: 'pagbank',
-            rawBody: body,
-            headers: { 'x-authenticity-token': signedWithAccount },
-          },
-          creds,
-        ),
-      ).resolves.toBe(false);
+      // The override used to REPLACE the account token, and the second sandbox
+      // evidence run had all six Connect notifications refused that way:
+      // PagBank does not say which account signs under Connect (FUT-678).
+      const byAccount = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithAccount },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      await expect(adapter.webhook.verify(byAccount, creds)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(byAccount, creds)).toBe('token');
+    });
+
+    it('honours the platform secret only for an OAuth connection (FUT-3722)', async () => {
+      const signedWithPlatform = createHash('sha256').update(`platform_tok-${body}`).digest('hex');
+      const delivery = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithPlatform },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const pasted = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', platformWebhookSecret: 'platform_tok' },
+      };
+      const connected = { ...pasted, fields: { ...pasted.fields, refreshToken: 'rt' } };
+
+      await expect(adapter.webhook.verify(delivery, pasted)).resolves.toBe(false);
+      await expect(adapter.webhook.verify(delivery, connected)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformWebhookSecret');
+      const forged = { ...delivery, headers: { 'x-authenticity-token': 'f'.repeat(64) } };
+      await expect(adapter.webhook.verify(forged, connected)).resolves.toBe(false);
+      expect(adapter.webhook.signer?.(forged, connected)).toBeNull();
     });
 
     it('verifies a legacy form-encoded notification body the same way', async () => {
@@ -795,6 +816,20 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
       expect(calls).toHaveLength(2);
       expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6');
       expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
+    });
+
+    it('reads a charge id through its stored order, so a failing charge read cannot strip the amount (FUT-3722)', async () => {
+      // The second sandbox evidence run: `GET /charges/{id}` answered 406, the
+      // cancel went out with no body, and PagBank refused it 400.
+      const calls = mockFetchQueue([
+        { id: 'ORDE_7', charges: [{ id: 'CHAR_7', status: 'PAID', amount: { value: 1500 } }] },
+        { id: 'CHAR_7', status: 'CANCELED' },
+      ]);
+      await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_7' }, CREDS, { orderId: 'ORDE_7' });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/orders/ORDE_7');
+      expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_7/cancel');
+      expect(JSON.parse(String(calls[1]![1]?.body))).toEqual({ amount: { value: 1500 } });
     });
 
     it('refuses to refund an order nobody paid instead of 404-ing blind', async () => {

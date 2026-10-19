@@ -244,7 +244,9 @@ describe('homologação evidence', () => {
     await completeEvidenceRun(w.runDeps, prepared.runId, cards());
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
-    expect(w.pagbank.seen.filter((call) => call.path === 'GET /orders/ORDE_C1')).toHaveLength(2);
+    // Two consults (the 503, then the retry), then the cancel's own read of
+    // the order for the amount it names.
+    expect(w.pagbank.seen.filter((call) => call.path === 'GET /orders/ORDE_C1')).toHaveLength(3);
     expect(file.content).toContain('Status HTTP: 503 Service Unavailable');
     expect(file.content).toMatch(/\[4\.4\][^\n]*— EXECUTADO/);
   });
@@ -257,6 +259,9 @@ describe('homologação evidence', () => {
 
     const cancel = w.pagbank.seen.find((call) => call.path === 'POST /charges/CHAR_OK/cancel');
     expect(cancel?.body).toEqual({ amount: { value: 1500 } });
+    // The amount comes from the order, never `GET /charges/{id}`: the second
+    // sandbox run answered that read 406 and the body-less cancel then 400ed.
+    expect(w.pagbank.seen.some((call) => call.path === 'GET /charges/CHAR_OK')).toBe(false);
   });
 
   it('given the card orders, then each card step names the order PagBank created and encryption comes first (FUT-3722)', async () => {

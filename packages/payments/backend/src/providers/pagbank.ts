@@ -6,7 +6,7 @@ import {
 } from '../copy-source';
 import type { PagbankCopy } from './copy';
 import { stubDeliveryTrusted } from '../core/stub-mode';
-import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials } from '../core/types';
+import type { ChargeInput, NormalizedWebhookEvent, ResolvedCredentials, WebhookDelivery } from '../core/types';
 import {
   customerPayload,
   customerSchema,
@@ -146,31 +146,54 @@ function createChargeWith(
 /**
  * PagBank signs deliveries with `x-authenticity-token` =
  * SHA-256(`${secret}-${rawBody}`), where the documented secret is the ACCOUNT
- * token ("token da conta") — so the API `token` is the default and a stored
- * `webhookToken` is the platform's explicit override, not a requirement
- * (FUT-678). Requiring `webhookToken` alone is what killed Connect stores:
- * an OAuth connection only ever gets that field by env-var copy, and without
- * it every delivery died fail-closed BEFORE the durable inbox — no row, no
- * replay, no trace. The `??` order keeps an explicitly configured override
- * authoritative where one exists.
+ * token ("token da conta") — and PagBank never says WHICH account under
+ * Connect (FUT-678). So a delivery authenticates under any secret it could
+ * honestly have been signed with:
  *
- * Which account signs a CONNECT store's deliveries (the store's own token vs
- * the platform's) is still to be measured against a live sandbox Connect
- * store; both secrets reach this verify through the pipeline's candidate
- * sets, so either answer authenticates.
+ * - `webhookToken` — the platform's explicit override, copied in at connect;
+ * - `token` — the merchant's own account token (a connected store's OAuth
+ *   token, or the one a store pasted);
+ * - `platformWebhookSecret` — the PLATFORM account's token, stamped at resolve
+ *   time by `withPlatformWebhookSecret` and honoured only for an OAuth
+ *   connection, the one case where the platform's account created the
+ *   application the order was raised through.
+ *
+ * It used to be `webhookToken ?? token`: one secret, so a configured override
+ * hid the store's token entirely. The second sandbox evidence run (FUT-3722)
+ * had all six of the test seller's notifications refused that way. `signer`
+ * reports which field matched, so the first accepted delivery answers FUT-678.
  *
  * The URL itself carries no secret because `notification_urls` is capped at
  * 150 chars, so this header IS the authentication — hence fail-closed when it
  * is absent or no secret is configured at all (stub mode excepted).
  */
+function signerSecrets(credentials: ResolvedCredentials): Array<[string, string]> {
+  const { fields } = credentials;
+  const oauth = Boolean(fields['refreshToken']);
+  const named: Array<[string, string | undefined]> = [
+    ['webhookToken', fields['webhookToken']],
+    ['token', fields['token']],
+    ['platformWebhookSecret', oauth ? fields['platformWebhookSecret'] : undefined],
+  ];
+  return named.filter((entry): entry is [string, string] => Boolean(entry[1]));
+}
+
+function signerOf(delivery: WebhookDelivery, credentials: ResolvedCredentials): string | null {
+  const presented = delivery.headers['x-authenticity-token'];
+  if (!presented) return null;
+  for (const [field, secret] of signerSecrets(credentials)) {
+    if (secureEquals(presented, sha256Hex(`${secret}-${delivery.rawBody}`))) return field;
+  }
+  return null;
+}
+
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
-    const secret = credentials.fields['webhookToken'] ?? credentials.fields['token'];
-    if (!secret) return stubDeliveryTrusted(credentials);
-    const presented = delivery.headers['x-authenticity-token'];
-    if (!presented) return false;
-    return secureEquals(presented, sha256Hex(`${secret}-${delivery.rawBody}`));
+    if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
+    return signerOf(delivery, credentials) !== null;
   },
+
+  signer: signerOf,
 
   /**
    * PagBank posts the ORDER object. The signature above is what makes the body
