@@ -197,9 +197,11 @@ export function actionLabel(
   choice: CheckoutListChoice | null,
   door: CheckoutDoorOption | undefined,
   provider: string | null,
+  covered = false,
 ): string {
   if (!choice) return copy.actions.choose;
   if (choice.kind === "door") return door?.action ?? copy.actions.choose;
+  if (covered) return copy.actions.covered;
   const verbs: Record<CheckoutOnlineChoice, string> = {
     PIX: copy.actions.pix,
     CARD: copy.actions.card,

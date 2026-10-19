@@ -50,6 +50,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     card: "Pay",
     pix: "Create Pix",
     googlePay: "Pay with Google Pay",
+    covered: "Pay with balance",
     handOff: (provider) => (provider ? `Go to ${provider}` : "Go to payment"),
   },
   payer: (name) => `Paying as ${name} · CPF ✓`,

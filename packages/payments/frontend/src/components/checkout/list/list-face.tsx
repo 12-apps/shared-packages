@@ -173,7 +173,7 @@ function buttonFacts(props: ListFaceProps): { label: string; total: string; busy
   const door = chosenDoor(props);
   const online = state.choice?.kind === "online";
   return {
-    label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider),
+    label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider, coveredByHost(list)),
     total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : props.total,
     busy: inFlight(props),
   };
