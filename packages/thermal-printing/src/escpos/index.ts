@@ -241,3 +241,61 @@ export function encodeTicket(lines: readonly TicketLine[]): Uint8Array {
   bytes.push(GS, 0x56, 0x42, 0x00); // partial cut, feeding to the cutter
   return Uint8Array.from(bytes);
 }
+
+/** Which connector pin of the printer's drawer port to drive. */
+export type DrawerPin = 2 | 5;
+
+export interface DrawerPulseOptions {
+  /**
+   * Pin 2 (`m = 0`) is where every single-drawer cable is wired; pin 5
+   * (`m = 1`) is the second drawer a few printers can drive from the same port.
+   */
+  pin?: DrawerPin;
+  /** How long the solenoid is energised, in milliseconds. */
+  onMs?: number;
+  /** How long the printer waits before it accepts the next kick. */
+  offMs?: number;
+}
+
+/**
+ * The kick every drawer in this class opens on: 50 ms on pin 2, then 500 ms
+ * off. Long enough to release the latch of the heavy steel drawers, short
+ * enough that a solenoid held for a second kick never overheats.
+ */
+export const DRAWER_PULSE_DEFAULTS: Readonly<Required<DrawerPulseOptions>> = Object.freeze({
+  pin: 2,
+  onMs: 50,
+  offMs: 500,
+});
+
+/** Milliseconds as the command's 2 ms units, in the one byte it has. */
+function pulseUnits(ms: number, fallback: number): number {
+  const valid = Number.isFinite(ms) && ms >= 0 ? ms : fallback;
+  return Math.min(255, Math.round(valid / 2));
+}
+
+/**
+ * `ESC p m t1 t2` — open the cash drawer wired to the printer.
+ *
+ * A drawer has no interface of its own: it hangs off the printer's RJ-11 "DK"
+ * port and opens when the printer energises it, which the printer does when it
+ * reads this command. So opening a drawer is printing five bytes, over whatever
+ * already reaches the printer — the `:9100` socket of `../net` or a host's own
+ * USB path.
+ *
+ * Returns only the command: no initialise, no feed, no cut. Written alone it
+ * opens the drawer without wasting paper; appended to {@link encodeTicket}'s
+ * output it opens the drawer once the receipt is out, in one job.
+ *
+ * Never throws. A setting outside what the byte can hold is clamped, and a
+ * nonsensical one falls back to {@link DRAWER_PULSE_DEFAULTS}, because a sale
+ * that fails over a drawer setting is worse than a drawer kicked the usual way.
+ */
+export function encodeDrawerPulse(options: DrawerPulseOptions = {}): Uint8Array {
+  const pin = options.pin === 5 ? 1 : 0;
+  const on = pulseUnits(options.onMs ?? DRAWER_PULSE_DEFAULTS.onMs, DRAWER_PULSE_DEFAULTS.onMs);
+  const off = pulseUnits(options.offMs ?? DRAWER_PULSE_DEFAULTS.offMs, DRAWER_PULSE_DEFAULTS.offMs);
+  // The printers in this class read t2 < t1 as t2 = t1; sending it explicitly
+  // keeps one that does not from cutting the kick short.
+  return Uint8Array.of(ESC, 0x70, pin, on, Math.max(on, off));
+}

@@ -58,7 +58,7 @@ mount.
 | Export | What it is |
 |---|---|
 | `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`, `textWidth`. Pure, isomorphic. |
-| `…/escpos` | `encodeTicket(lines)` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. |
+| `…/escpos` | `encodeTicket(lines)` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. `encodeDrawerPulse(options?)` → the five-byte `ESC p m t1 t2` that opens the cash drawer wired to the printer, alone or appended to a ticket. |
 | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document exactly the roll's printable width (72 mm of 80, 48 mm of 58), pure black on white, with `@page { margin: 0 }`. `rasterToDataUri(raster)` → the 1-bit picture as a `data:` URI, for a preview. |
 | `…/raster` | `rasterizeSvg(svg, { width })` → RGBA at the printer's dot size; `toMonochrome(rgba, options?)` → a printable 1-bit `RasterImage`. Pure, isomorphic, no canvas and no native module. |
 | `…/net` | `sendToNetworkPrinter(host, port, bytes, options?)`. Node-only (`node:net`), never throws, structured failures. |
