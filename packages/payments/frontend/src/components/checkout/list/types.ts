@@ -354,6 +354,8 @@ export interface PaymentListCopy {
     card: string;
     pix: string;
     googlePay: string;
+    /** The bar's verb when the host's balance pays the whole amount. */
+    covered: string;
     handOff: (provider: string | null) => string;
   };
   /** "Pagando como Ana Teste · CPF ✓". */

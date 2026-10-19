@@ -197,9 +197,12 @@ export function actionLabel(
   choice: CheckoutListChoice | null,
   door: CheckoutDoorOption | undefined,
   provider: string | null,
+  covered = false,
 ): string {
   if (!choice) return copy.actions.choose;
   if (choice.kind === "door") return door?.action ?? copy.actions.choose;
+  // A handoff leaves the store for a provider even at zero: it keeps its own verb.
+  if (covered && choice.method !== "HAND_OFF") return copy.actions.covered;
   const verbs: Record<CheckoutOnlineChoice, string> = {
     PIX: copy.actions.pix,
     CARD: copy.actions.card,
