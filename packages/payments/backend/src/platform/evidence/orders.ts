@@ -228,14 +228,46 @@ async function consultApproved(deps: EvidenceRunDeps, chargeId: string, orderId:
   });
 }
 
+/** How many times the cancel is tried while PagBank says it cannot refund yet. */
+const CANCEL_ATTEMPTS = 4;
+
+/**
+ * PagBank's "not yet": `40008 refund_temporarily_unavailable` ("Transaction is
+ * not found"), answered by the sandbox to a cancel sent seconds after the
+ * charge was captured (the third evidence run, FUT-3722).
+ */
+function refundNotYet(outcome: { ok: boolean; calls: readonly { responseBody?: unknown }[] }): boolean {
+  if (outcome.ok) return false;
+  const body = outcome.calls.at(-1)?.responseBody as { error_messages?: { code?: unknown }[] } | undefined;
+  return body?.error_messages?.some((message) => String(message.code) === '40008') ?? false;
+}
+
+/**
+ * Cancel the approved charge, retried after a pause while PagBank answers
+ * that it cannot refund it yet. Every attempt stays in the evidence; only the
+ * last one decides.
+ */
+async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
+  const cancel = () => recordTraffic(() => deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId }));
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  let canceled = await cancel();
+  const calls = [...canceled.calls];
+  for (let attempt = 1; attempt < CANCEL_ATTEMPTS && refundNotYet(canceled); attempt += 1) {
+    await sleep(deps.pixPollMs ?? PIX_POLL_MS);
+    canceled = await cancel();
+    calls.push(...canceled.calls);
+  }
+  return { canceled, calls };
+}
+
 async function cancelApproved(deps: EvidenceRunDeps, chargeId: string, orderId: string | null): Promise<EvidenceStep> {
-  const canceled = await recordTraffic(() => deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId }));
+  const { canceled, calls } = await cancelUntilAnswered(deps, chargeId);
   const done = canceled.ok && canceled.value.status === 'REFUNDED' && answered(canceled.calls);
   // PagBank's own word for the charge (CANCELED), which is what the scenario
   // expects — not this package's normalized refund status.
   const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
   return stepOf('card.cancel', done ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-    calls: canceled.calls,
+    calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),
     observed: canceled.ok ? deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status) : failureOf(deps.copy, canceled),
   });

@@ -164,3 +164,20 @@ export function oauthAppWebhookSecret(
     return fields?.['webhookSecret'] || fields?.['accountToken'] || null;
   };
 }
+
+/**
+ * A {@link PlatformWebhookSecretResolver} answering one named field of the
+ * platform's OAuth application credentials, per environment — for a provider
+ * whose signing secret may be an app field other than its webhook secret
+ * (PagBank's `clientSecret`, FUT-3722). Limited to `providers`.
+ */
+export function oauthAppField(
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+  field: string,
+): PlatformWebhookSecretResolver {
+  return async (_merchant, provider, environment) => {
+    if (!providers.includes(provider)) return null;
+    return (await appCredentials(provider, environment))?.fields?.[field] || null;
+  };
+}

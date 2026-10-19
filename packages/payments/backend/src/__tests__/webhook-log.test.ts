@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OAuthAppCredentialsResolver } from '../config/oauth';
-import { oauthAppWebhookSecret } from '../config/oauth-env';
+import { oauthAppField, oauthAppWebhookSecret } from '../config/oauth-env';
 import { createWebhookLog } from '../core/webhook-log';
 
 const ARRIVAL = { tenantSlug: 'platform-homologacao', provider: 'pagbank', bytes: 15 };
@@ -47,6 +47,15 @@ describe('createWebhookLog', () => {
   });
 });
 
+describe('createWebhookLog observer refusals', () => {
+  it('writes the pipeline refusal reason at warn (FUT-3722)', () => {
+    const log = logger();
+    createWebhookLog(log).observer.refused('pagbank', 'Webhook verification failed (SANDBOX: tried token)');
+
+    expect(log.warn).toHaveBeenCalledWith('payments.webhook verify refused: pagbank — Webhook verification failed (SANDBOX: tried token)');
+  });
+});
+
 describe('oauthAppWebhookSecret', () => {
   const app: OAuthAppCredentialsResolver = (provider, environment) => {
     const fields: Record<string, string> =
@@ -68,5 +77,19 @@ describe('oauthAppWebhookSecret', () => {
   it('prefers an endpoint webhookSecret over the account token, and is null with no application', async () => {
     await expect(oauthAppWebhookSecret(app, ['stripe'])(merchant, 'stripe', 'PRODUCTION')).resolves.toBe('whsec');
     await expect(oauthAppWebhookSecret(() => null, ['pagbank'])(merchant, 'pagbank', 'SANDBOX')).resolves.toBeNull();
+  });
+});
+
+describe('oauthAppField', () => {
+  it('answers the named app field per environment, for the providers named only (FUT-3722)', async () => {
+    const app: OAuthAppCredentialsResolver = (_provider, environment) => ({
+      environment,
+      fields: { clientId: 'c', clientSecret: `cs-${environment}` },
+    });
+    const merchant = { kind: 'TENANT', id: 't' } as const;
+
+    await expect(oauthAppField(app, ['pagbank'], 'clientSecret')(merchant, 'pagbank', 'SANDBOX')).resolves.toBe('cs-SANDBOX');
+    await expect(oauthAppField(app, ['pagbank'], 'clientSecret')(merchant, 'stripe', 'SANDBOX')).resolves.toBeNull();
+    await expect(oauthAppField(app, ['pagbank'], 'missing')(merchant, 'pagbank', 'SANDBOX')).resolves.toBeNull();
   });
 });

@@ -579,6 +579,27 @@ describe('pagbank adapter — webhooks', () => {
       expect(adapter.webhook.signer?.(byAccount, creds)).toBe('token');
     });
 
+    it('honours the application client secret for an OAuth connection, and describes a refusal by field name only (FUT-3722)', async () => {
+      const signedWithClientSecret = createHash('sha256').update(`csecret-${body}`).digest('hex');
+      const delivery = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithClientSecret },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const connected = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', refreshToken: 'rt', platformClientSecret: 'csecret' },
+      };
+
+      await expect(adapter.webhook.verify(delivery, connected)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformClientSecret');
+      const unsigned = { ...delivery, headers: {} };
+      const detail = adapter.webhook.refusalDetail?.(unsigned, connected);
+      expect(detail).toBe('x-authenticity-token absent; tried token, platformClientSecret');
+      expect(detail).not.toContain('csecret');
+    });
+
     it('honours the platform secret only for an OAuth connection (FUT-3722)', async () => {
       const signedWithPlatform = createHash('sha256').update(`platform_tok-${body}`).digest('hex');
       const delivery = {

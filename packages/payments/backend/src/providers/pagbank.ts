@@ -153,10 +153,14 @@ function createChargeWith(
  * - `webhookToken` — the platform's explicit override, copied in at connect;
  * - `token` — the merchant's own account token (a connected store's OAuth
  *   token, or the one a store pasted);
- * - `platformWebhookSecret` — the PLATFORM account's token, stamped at resolve
- *   time by `withPlatformWebhookSecret` and honoured only for an OAuth
+ * - `platformWebhookSecret` — the PLATFORM account's token, and
+ *   `platformClientSecret` — the application's client secret, both stamped at
+ *   resolve time by `withPlatformWebhookSecret` and honoured only for an OAuth
  *   connection, the one case where the platform's account created the
- *   application the order was raised through.
+ *   application the order was raised through. The third evidence run
+ *   (FUT-3722) refused all three deliveries under the first three, so the
+ *   client secret is the remaining candidate; `refusalDetail` names what was
+ *   tried.
  *
  * It used to be `webhookToken ?? token`: one secret, so a configured override
  * hid the store's token entirely. The second sandbox evidence run (FUT-3722)
@@ -174,6 +178,7 @@ function signerSecrets(credentials: ResolvedCredentials): Array<[string, string]
     ['webhookToken', fields['webhookToken']],
     ['token', fields['token']],
     ['platformWebhookSecret', oauth ? fields['platformWebhookSecret'] : undefined],
+    ['platformClientSecret', oauth ? fields['platformClientSecret'] : undefined],
   ];
   return named.filter((entry): entry is [string, string] => Boolean(entry[1]));
 }
@@ -194,6 +199,12 @@ const webhook: PaymentProviderAdapter['webhook'] = {
   },
 
   signer: signerOf,
+
+  refusalDetail(delivery, credentials) {
+    const header = delivery.headers['x-authenticity-token'] ? 'present' : 'absent';
+    const tried = signerSecrets(credentials).map(([field]) => field).join(', ') || 'none';
+    return `x-authenticity-token ${header}; tried ${tried}`;
+  },
 
   /**
    * PagBank posts the ORDER object. The signature above is what makes the body

@@ -221,6 +221,21 @@ export async function verifiedCredentials(
 }
 
 /**
+ * The refusal's reason: the default message, plus what the adapter can say
+ * about each candidate set it tried (`webhook.refusalDetail`, FUT-3722).
+ */
+function refusalReason(
+  adapter: PaymentProviderAdapter,
+  delivery: WebhookDelivery,
+  candidates: readonly ResolvedCredentials[],
+): string | undefined {
+  const describe = adapter.webhook.refusalDetail;
+  if (!describe) return undefined;
+  const details = candidates.map((creds) => `${creds.environment}: ${describe(delivery, creds)}`);
+  return `Webhook verification failed (${details.join(' | ')})`;
+}
+
+/**
  * Refuse a delivery outside the adapter's declared intake tolerance —
  * LIVE PATH ONLY, by design (FUT-690). The replay sweep re-runs `verify` over
  * rows stored hours earlier and must keep succeeding, so the skew window
@@ -288,7 +303,7 @@ export async function runWebhookPipeline(
       delivery.provider,
     );
     const creds = await verifiedCredentials(adapter, delivery, candidates);
-    if (!creds) throw new WebhookVerificationError(adapter.name);
+    if (!creds) throw new WebhookVerificationError(adapter.name, refusalReason(adapter, delivery, candidates));
     refuseStaleAtIntake(adapter, delivery);
     verified = { adapter, creds };
   } catch (error) {

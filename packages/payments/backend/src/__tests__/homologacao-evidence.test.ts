@@ -57,7 +57,7 @@ function json(body: unknown, status = 200, statusText = 'OK'): Response {
 }
 
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
-function fakePagbank(options: { refreshStatus?: number; consultOutages?: number } = {}) {
+function fakePagbank(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number } = {}) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -117,6 +117,10 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number 
     }
     if (route === 'GET /charges/CHAR_OK') return json({ id: 'CHAR_OK', status: 'PAID', amount: { value: 1500 } });
     if (route === 'POST /charges/CHAR_OK/cancel') {
+      // `seen` already holds this call: the first N cancels are PagBank's "not yet".
+      if (seen.filter((call) => call.path === route).length <= (options.cancelNotYet ?? 0)) {
+        return json({ error_messages: [{ code: '40008', error: 'refund_temporarily_unavailable', description: 'Transaction is not found.' }] }, 400, 'Bad Request');
+      }
       return json({ id: 'CHAR_OK', status: 'CANCELED', amount: { value: 1500, summary: { refunded: 1500 } } }, 201, 'Created');
     }
     return json({ error: `unscripted ${route}` }, 404, 'Not Found');
@@ -124,7 +128,7 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number 
   return { handler, seen };
 }
 
-function world(options: { refreshStatus?: number; consultOutages?: number; sellerEnvironment?: 'SANDBOX' | 'PRODUCTION' } = {}) {
+function world(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number; sellerEnvironment?: 'SANDBOX' | 'PRODUCTION' } = {}) {
   const pagbank = fakePagbank(options);
   vi.stubGlobal('fetch', vi.fn(pagbank.handler));
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
@@ -249,6 +253,18 @@ describe('homologação evidence', () => {
     expect(w.pagbank.seen.filter((call) => call.path === 'GET /orders/ORDE_C1')).toHaveLength(3);
     expect(file.content).toContain('Status HTTP: 503 Service Unavailable');
     expect(file.content).toMatch(/\[4\.4\][^\n]*— EXECUTADO/);
+  });
+
+  it('given PagBank answers the cancel 40008 twice, then it is retried until it cancels and every attempt is recorded (FUT-3722)', async () => {
+    const w = world({ cancelNotYet: 2 });
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(3);
+    expect(file.content).toContain('refund_temporarily_unavailable');
+    expect(file.content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
   });
 
   it('given a cancel, then it names the charge amount PagBank documents (FUT-3722)', async () => {
