@@ -104,7 +104,7 @@ describe('HomologacaoEvidenceCard', () => {
       encryptedCard: `enc-${params.number.slice(-4)}`,
     }));
     const setUp = vi.fn();
-    const authenticate3DS = vi.fn(async (_request: unknown) => ({
+    const authenticate3DS = vi.fn<(request: unknown) => Promise<Record<string, string>>>(async () => ({
       status: 'AUTH_FLOW_COMPLETED',
       authenticationStatus: 'AUTHENTICATED',
       id: '3DS_AUTH_1',

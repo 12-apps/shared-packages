@@ -27,7 +27,7 @@ const PAGBANK_SANDBOX_3DS_CONTACT = {
     number: '1384',
     complement: 'apto 12',
     regionCode: 'SP',
-    city: 'São Paulo',
+    city: 'Sao Paulo',
     postalCode: '01452002',
   },
 } as const;

@@ -8,7 +8,7 @@ import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import { OnlineContent, opensContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
-import type { CheckoutDoorOption, CheckoutOnlineChoice, PaymentListCopy } from "./types";
+import type { CheckoutDoorOption, PaymentListCopy } from "./types";
 import type { ListState } from "./use-list-state";
 
 /** An online row's label and hint, worded for what the store and the buyer hold. */
