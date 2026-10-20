@@ -48,6 +48,8 @@ export interface SignupState {
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
   sent: boolean;
+  /** The webmail the server read off the domain's MX, by key, when it knew one. */
+  inboxHost: string | null;
   setName: (value: string) => void;
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
@@ -171,6 +173,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
+  const [inboxHost, setInboxHost] = useState<string | null>(null);
   const passwordCheck = usePasswordFailure(password, setPassword);
   const phone = usePhone(config.phone);
 
@@ -184,6 +187,9 @@ function useSignup(config: SignupConfig): SignupState {
       return;
     }
     if (result.data.status === "verification-sent") {
+      // A body from the wire: only a string is kept, and `inboxLink` ignores a
+      // key it does not know.
+      setInboxHost(typeof result.data.inbox === "string" ? result.data.inbox : null);
       setSent(true);
       return;
     }
@@ -229,6 +235,7 @@ function useSignup(config: SignupConfig): SignupState {
     reason,
     violations,
     sent,
+    inboxHost,
     setName,
     setEmail,
     setPassword: passwordCheck.change,
@@ -271,9 +278,9 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
  */
 const WHITE_BUTTON = { "& .MuiButton-root": { bgcolor: "background.paper" } } as const;
 
-function VerificationSent({ email }: { email: string }): JSX.Element {
+function VerificationSent({ email, host }: { email: string; host: string | null }): JSX.Element {
   const { copy, inboxSender } = useScreens();
-  const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
+  const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender, host) : null;
   // The button sits INSIDE the alert, under its sentence: it is the way to do
   // what the alert asks, so the two read as one card rather than a message and
   // an unrelated call to action below it.
@@ -314,7 +321,7 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
   const { copy } = useScreens();
   const form = useSignup(props);
 
-  if (form.sent) return <VerificationSent email={form.email} />;
+  if (form.sent) return <VerificationSent email={form.email} host={form.inboxHost} />;
 
   const submit = <SubmitButton form={form} gateClosed={props.disabled === true} />;
   const step: SignupStep = props.emailFirst && form.email === "" ? "email" : "details";
