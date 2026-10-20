@@ -20,7 +20,7 @@ import type { EmailAuthScreens, SignupStep } from "../screens";
  * when the form steps back: emptying the e-mail shows the providers anyway, and
  * typing again starts from them hidden, as the first time.
  */
-export function EmailFirstActions({
+function EmailFirstActions({
   step,
   gate,
   submit,
