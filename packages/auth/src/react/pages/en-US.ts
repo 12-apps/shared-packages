@@ -20,6 +20,7 @@ export const EN_US_PAGES: AuthPagesCopy = {
     title: "Create account",
     subtitle: "Create your account",
     providerDivider: "or",
+    otherWays: { show: "Other ways to sign up", hide: "Hide other ways" },
     loginPrompt: "Already have an account?",
     loginLink: "Sign in",
   },

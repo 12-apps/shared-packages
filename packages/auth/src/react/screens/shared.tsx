@@ -339,15 +339,19 @@ export function FailureBanner({
 export function LinkButton({
   onClick,
   dataTestId,
+  expanded,
   children,
 }: {
   onClick: () => void;
   dataTestId: string;
+  /** For a link that shows and hides something: whether it is shown now. */
+  expanded?: boolean;
   children: ReactNode;
 }): JSX.Element {
   return (
     <Button
       type="button"
+      {...(expanded === undefined ? {} : { "aria-expanded": expanded })}
       variant="text"
       color="primary"
       size="sm"
