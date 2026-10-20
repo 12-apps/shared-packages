@@ -3,6 +3,8 @@ import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
 import type { WalletType } from './wallet-types';
 
+export type { DebitCapability, ThreeDSecureSession } from './card-funding';
+
 export type { SettlementHints };
 /** The probe verdict types, re-exported so `core/types` stays the one door. */
 export type { ProbeCheck, ProbeFault, ProbeOutcome } from './probe';
@@ -279,6 +281,8 @@ export interface ProviderCapabilities {
    * `card.wallet` of that type.
    */
   wallets?: readonly WalletType[];
+  /** Debit charges, 3-D Secure authenticated (FUT-3754). See `card-funding.ts`. */
+  debit?: boolean;
   savedCards: boolean;
   refunds: boolean;
   partialRefunds: boolean;

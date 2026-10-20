@@ -81,7 +81,10 @@ export interface Payable {
  */
 export interface CheckoutChargeDraft {
   /** A fresh instrument, a saved-instrument id, per-provider instruments, or a wallet key. */
-  card?: Pick<CardDetails, 'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet'>;
+  card?: Pick<
+    CardDetails,
+    'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet' | 'funding' | 'authenticationId'
+  >;
   /**
    * `card.token` may ALSO be a saved instrument's id.
    *
@@ -127,6 +130,11 @@ export interface BuyerProviderLink {
    * id and the merchant's id at that gateway.
    */
   googlePay: GooglePayClientConfig | null;
+  /**
+   * Whether this entry charges a card as DEBIT (FUT-3754). The browser must run
+   * the provider's 3-D Secure first, with a session from the `3ds-session` row.
+   */
+  debit?: boolean;
   /**
    * The buyer fields THIS provider asks for (FUT-595), per entry rather than
    * once for the merchant: requiredness is a per-provider fact, so a chain the
@@ -323,6 +331,7 @@ export type CheckoutIntentKind =
   | 'getStatus'
   | 'releaseCheckout'
   | 'refreshBrowserKey'
+  | 'threeDSecureSession'
   | 'beginVault'
   | 'completeVault';
 

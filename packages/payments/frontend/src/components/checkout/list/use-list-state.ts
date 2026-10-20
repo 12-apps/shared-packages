@@ -93,6 +93,25 @@ function reopenedSelection(cards: readonly SavedCard[], fresh: boolean): string 
 }
 
 /**
+ * The card selection a choice opens on, or `undefined` when it opens no card.
+ * Coming back to the card from another option starts on the head of the saved
+ * list again (FN:420), or on the fields when there is none; what was typed in
+ * them is kept. The debit row always types one: a saved card is charged as
+ * credit (FUT-3754).
+ */
+function cardOpenedBy(
+  previous: CheckoutListChoice | null,
+  next: CheckoutListChoice,
+  cards: readonly SavedCard[],
+  fresh: boolean,
+): string | null | undefined {
+  if (next.kind !== "online" || next.method !== "CARD") return undefined;
+  const sameRow = previous?.kind === "online" && previous.method === "CARD" && previous.funding === next.funding;
+  if (sameRow) return undefined;
+  return next.funding === "DEBIT" ? NEW_CARD : reopenedSelection(cards, fresh);
+}
+
+/**
  * The one list's state (FUT-3591). Picking an option changes THIS and nothing
  * else: no order, no charge, no request — the bar's button is the only thing
  * that raises (M7). The host hears about every change through
@@ -133,11 +152,8 @@ export function useListState(input: {
     (next: CheckoutListChoice) => {
       touched.current = true;
       setChoice((previous) => {
-        // Coming back to the card from another option starts on the head of
-        // the saved list again (FN:420), or on the fields when there is none;
-        // what was typed in them is kept.
-        const reopensCard = next.kind === "online" && next.method === "CARD" && !(previous?.kind === "online" && previous.method === "CARD");
-        if (reopensCard) setSelection(reopenedSelection(cards, input.fresh));
+        const selection = cardOpenedBy(previous, next, cards, input.fresh);
+        if (selection !== undefined) setSelection(selection);
         return next;
       });
     },

@@ -5,6 +5,7 @@ import type { MerchantRef, PaymentEnvironment } from '../../core/types';
 import { consultConnectApplication, type ConsultConnectApplicationsDeps } from '../connect-application';
 import { beginSellerConnect, completeSellerConnect, type SellerCallback } from './connect';
 import { buildHomologacaoEvidenceFile, type EvidenceFile } from './file';
+import { buildHomologacaoEvidenceJson } from './json';
 import {
   createPrismaHomologacaoEvidenceStore,
   prismaEvidenceCharge,
@@ -13,8 +14,12 @@ import {
   type EvidenceDelegate,
   type EvidenceWebhookDelegate,
 } from './prisma';
-import { completeEvidenceRun, prepareEvidenceRun, type EvidenceRunDeps } from './run';
+import { completeEvidenceRun, prepareEvidenceRun, type EvidenceRunDeps, type PreparedEvidenceRun } from './run';
+import { PAGBANK_SANDBOX_TEST_BUYER } from './sandbox-buyer';
 import type { BrowserCardResult, EvidenceRecord, HomologacaoEvidenceCopy } from './types';
+
+/** Which rendering of the evidence a download asks for. */
+export type EvidenceFileFormat = 'TXT' | 'JSON';
 
 /**
  * The homologação evidence as ONE service (FUT-3696) — what a host mounts.
@@ -28,15 +33,8 @@ import type { BrowserCardResult, EvidenceRecord, HomologacaoEvidenceCopy } from 
 
 const PROVIDER = 'pagbank';
 
-/**
- * PagBank's own sandbox example buyer. Test data only, and the file says so:
- * the evidence may never carry a real person.
- */
-export const PAGBANK_SANDBOX_TEST_BUYER = {
-  name: 'Jose da Silva',
-  email: 'cliente@sandbox.pagseguro.com.br',
-  taxId: '12345678909',
-} as const;
+/** PagBank's sandbox example buyer — browser-safe, so it lives beside the 3DS contact. */
+export { PAGBANK_SANDBOX_TEST_BUYER };
 
 export interface HomologacaoEvidenceConfig {
   gateway: Pick<PaymentsGateway, 'charge' | 'refreshCharge' | 'refund'>;
@@ -83,9 +81,11 @@ export interface HomologacaoEvidenceService {
   seller(): Promise<HomologacaoSellerConnection>;
   beginConnect(ctx: { state: string; redirectUri: string }): Promise<{ url: string }>;
   completeConnect(callback: SellerCallback): Promise<{ ok: boolean; record: EvidenceRecord }>;
-  prepare(): Promise<{ runId: string; publicKey: string | null }>;
+  /** Phase 1: the seller's public key and the debit card's 3DS session, each null when not minted. */
+  prepare(): Promise<PreparedEvidenceRun>;
   run(runId: string, cards: readonly BrowserCardResult[]): Promise<EvidenceRecord>;
-  file(): Promise<EvidenceFile>;
+  /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
+  file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
 }
 
 async function storedSeller(cfg: HomologacaoEvidenceConfig) {
@@ -145,8 +145,8 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
     prepare: () => prepareEvidenceRun(runDeps),
     run: (runId, cards) => completeEvidenceRun(runDeps, runId, cards),
-    file: () =>
-      buildHomologacaoEvidenceFile({
+    file: (format = 'TXT') =>
+      (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,
         copy: cfg.copy,
         identification: {

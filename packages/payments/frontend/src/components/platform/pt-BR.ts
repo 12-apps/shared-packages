@@ -107,9 +107,9 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     generate: 'Gerar arquivo de evidências\u00a0(TXT)',
     downloadLatest: 'Baixar o último registrado',
     phases: {
-      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública…',
-      encrypting: 'Criptografando os cartões de teste no navegador…',
-      running: 'Criando os pedidos Pix e cartão no sandbox — pode levar até um minuto…',
+      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública e a sessão 3DS…',
+      encrypting: 'Criptografando os cartões de teste e autenticando o cartão de débito (3DS) no navegador…',
+      running: 'Criando os pedidos Pix, crédito e débito no sandbox — pode levar alguns minutos…',
       downloading: 'Montando o arquivo…',
     },
     summary: ({ executed, failed, pending }) =>
@@ -123,7 +123,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       `${
         {
           preparing: 'Falhou ao consultar a aplicação e preparar o lojista de teste.',
-          encrypting: 'Falhou ao criptografar os cartões de teste no navegador.',
+          encrypting: 'Falhou ao criptografar os cartões de teste ou autenticar o cartão de débito no navegador.',
           running: 'Falhou ao criar os pedidos no sandbox.',
           downloading: 'Falhou ao montar o arquivo.',
         }[phase]

@@ -7,7 +7,7 @@
  * this folder. The host-side halves — the cart, the catalog, order CREATION — stay in the
  * host app and reach the flow through the ports declared on `CheckoutFlowProps`.
  */
-
+import type { DebitChargeFields, DebitDeclaration } from "./debit-types";
 import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
 
 /** Payment methods offered at checkout. Mirrors `Payment.method` (FUT-42). */
@@ -215,7 +215,7 @@ export interface SavedCardMeta {
 }
 
 /** Input to charge a tokenized card against an order. */
-export interface ChargeCardInput {
+export interface ChargeCardInput extends DebitChargeFields {
   orderId: string;
   /** A fresh token, or a saved card's id for reuse. */
   token: string;
@@ -271,7 +271,7 @@ export interface CheckoutCustomerField {
  * answers it. The same protocol facts as the head, stated per provider —
  * which is what lets the card path mint an instrument for each of them.
  */
-export interface CheckoutChainLink {
+export interface CheckoutChainLink extends DebitDeclaration {
   provider: string;
   /**
    * The provider's own name as a BUYER should read it ("InfinitePay"), which

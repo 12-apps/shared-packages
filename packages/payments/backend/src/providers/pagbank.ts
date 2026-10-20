@@ -1,5 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
-import type { CredentialFieldSpec } from '../core/types';
+import type { CredentialFieldSpec, ProviderCapabilities } from '../core/types';
 import {
   resolvePaymentsCopy,
   type PaymentsCopySource,
@@ -14,6 +14,7 @@ import {
   notificationUrls,
   pagbankRequest,
 } from './pagbank-http';
+import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
@@ -85,7 +86,26 @@ function pixPayload(input: ChargeInput, credentials: ResolvedCredentials, expire
 function cardInstrument(card: NonNullable<ChargeInput['card']> | undefined) {
   if (card?.wallet) return { wallet: { type: card.wallet.type, key: card.wallet.key } };
   if (card?.savedCardToken) return { id: card.savedCardToken };
+  // A debit card is not stored: the vault charges a saved card as CREDIT, so
+  // keeping it would offer the buyer a card that later pays the wrong way.
+  if (card?.funding === 'DEBIT') return { encrypted: card.token ?? '' };
   return { encrypted: card?.token ?? '', store: true };
+}
+
+/**
+ * `payment_method`'s type and, for a debit charge, the 3-D Secure proof
+ * PagBank requires on it (FUT-3754): `authentication_method` is mandatory on
+ * `DEBIT_CARD`, and a debit is always a single installment.
+ */
+function fundingOf(card: NonNullable<ChargeInput['card']> | undefined) {
+  if (card?.funding !== 'DEBIT') {
+    return { type: 'CREDIT_CARD', installments: card?.installments ?? 1 };
+  }
+  return {
+    type: 'DEBIT_CARD',
+    installments: 1,
+    authentication_method: { type: 'THREEDS', id: card.authenticationId ?? '' },
+  };
 }
 
 /** The single `charges[]` entry of a card order. */
@@ -95,8 +115,7 @@ function cardCharge(input: ChargeInput) {
     description: chargeDescription(input, 64),
     amount: { value: input.amount.amountCents, currency: input.amount.currency },
     payment_method: {
-      type: 'CREDIT_CARD',
-      installments: input.card?.installments ?? 1,
+      ...fundingOf(input.card),
       capture: true,
       card: cardInstrument(input.card),
     },
@@ -273,6 +292,28 @@ const browserKey = {
     }),
 };
 
+/** What PagBank can do. Hoisted for the size gate, like `browserKey` above. */
+const capabilities: ProviderCapabilities = {
+  methods: ['PIX', 'CARD'],
+  // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
+  // Declared here — the single capability source — so the gateway skips a
+  // wallet charge on any provider that never made this claim, and the
+  // checkout gates its buttons on the same fact. Apple Pay additionally
+  // needs the certificate round-trip (`applePay` below) completed for the
+  // merchant account before a charge can authorize.
+  wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
+  // DEBIT_CARD with PagBank's own 3-D Secure (FUT-3754); `debit` below
+  // mints the browser's session.
+  debit: true,
+  savedCards: true,
+  refunds: true,
+  partialRefunds: false,
+  splits: false,
+  webhooks: true,
+  tokenization: 'PUBLIC_KEY',
+  activationCharge: true,
+};
+
 // `copy` is resolved at each BOUNDARY below, never once here — `src/copy-source.ts`.
 export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): PaymentProviderAdapter {
   const copy = (locale?: string): PagbankCopy => resolvePaymentsCopy(source, locale);
@@ -285,23 +326,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
     authMode: 'oauth',
-    capabilities: {
-      methods: ['PIX', 'CARD'],
-      // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
-      // Declared here — the single capability source — so the gateway skips a
-      // wallet charge on any provider that never made this claim, and the
-      // checkout gates its buttons on the same fact. Apple Pay additionally
-      // needs the certificate round-trip (`applePay` below) completed for the
-      // merchant account before a charge can authorize.
-      wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
-      savedCards: true,
-      refunds: true,
-      partialRefunds: false,
-      splits: false,
-      webhooks: true,
-      tokenization: 'PUBLIC_KEY',
-      activationCharge: true,
-    },
+    capabilities,
     credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
@@ -320,6 +345,8 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     vault: pagbankVault,
 
     browserKey,
+
+    debit: { createSession: createPagbankThreeDSecureSession },
 
     // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
     applePay: {

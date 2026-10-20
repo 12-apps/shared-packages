@@ -13,8 +13,10 @@ export {
   EvidenceRunNotFoundError,
   prepareEvidenceRun,
   type EvidenceRunDeps,
+  type PreparedEvidenceRun,
 } from './run';
 export { buildHomologacaoEvidenceFile, formatEvidenceTime, type EvidenceFile, type EvidenceFileDeps } from './file';
+export { buildHomologacaoEvidenceJson } from './json';
 export { createMemoryHomologacaoEvidenceStore } from './memory';
 export {
   createPrismaHomologacaoEvidenceStore,
@@ -25,6 +27,7 @@ export {
 export {
   createHomologacaoEvidence,
   PAGBANK_SANDBOX_TEST_BUYER,
+  type EvidenceFileFormat,
   type HomologacaoEvidenceConfig,
   type HomologacaoEvidencePrisma,
   type HomologacaoEvidenceService,

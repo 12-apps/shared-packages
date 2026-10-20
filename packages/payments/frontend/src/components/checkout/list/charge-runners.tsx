@@ -19,6 +19,7 @@ import type { ChallengeScope } from "../card-outcome";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OnCheckoutResolved } from "../types";
 import { useCardSubmit } from "../use-card-checkout";
+import type { DebitAuthentication } from "../debit-charge";
 import { useWalletCharge } from "../use-wallet-charge";
 
 import type { ListCard } from "./use-list-state";
@@ -60,10 +61,13 @@ export function CardRun({
   pollIntervalMs,
   onAccepted,
   onFailed,
+  debit,
 }: RunnerCallbacks & {
   order: CheckoutOrder;
   buyer: BuyerInfo;
   card: ListCard;
+  /** The debit row is the choice: authenticate, then charge as debit (FUT-3754). */
+  debit?: DebitAuthentication;
   config: CardTokenizationConfig;
   chain: readonly CardChainLink[];
   scope: ChallengeScope;
@@ -89,6 +93,7 @@ export function CardRun({
         number: card.complete ? undefined : fieldCopy.numberInvalid,
       }),
       setFieldErrors: card.setFieldErrors,
+      debit,
     },
     chain,
     scope,

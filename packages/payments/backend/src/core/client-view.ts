@@ -133,6 +133,8 @@ export interface ClientProviderConfig {
    * Normalized: an adapter that declares nothing publishes `[]`.
    */
   wallets: readonly WalletType[];
+  /** Whether a card may be charged as DEBIT here (FUT-3754), from `capabilities.debit`. Absent ⇒ no. */
+  debit?: boolean;
   /**
    * Google Pay's PAYMENT_GATEWAY parameters, or `null` when this provider
    * cannot run it (FUT-471). Unlike `wallets` this IS a per-credential fact —
@@ -169,6 +171,7 @@ export function toClientProviderConfig(
     customerSchema: adapter.customerSchema ?? [],
     methods: adapter.capabilities.methods,
     wallets: adapter.capabilities.wallets ?? [],
+    debit: adapter.capabilities.debit === true && adapter.debit !== undefined,
     googlePay: config.googlePay ?? null,
     checkoutScreen: adapter.checkoutScreen ?? null,
     confirmation: adapter.capabilities.confirmation ?? 'AUTOMATIC',

@@ -7,7 +7,7 @@
  * encrypts them and only the encrypted blob leaves it.
  */
 interface PagBankTestCard {
-  scenario: "approved" | "declined";
+  scenario: "approved" | "declined" | "debit";
   brand: string;
   number: string;
   holder: string;
@@ -43,6 +43,22 @@ export const PAGBANK_TEST_CARDS: readonly PagBankTestCard[] = [
     securityCode: "123",
   },
 ];
+
+/**
+ * PagBank's 3-D Secure sandbox test card (FUT-3755), charged as DEBIT. The
+ * sandbox answers it by AMOUNT: authenticated for R$ 27,01
+ * (`PAGBANK_SANDBOX_DEBIT_CENTS`) it is AUTHENTICATED with no challenge and
+ * then PAID, so the evidence run needs no one to type a code.
+ */
+export const PAGBANK_3DS_TEST_CARD: PagBankTestCard = {
+  scenario: "debit",
+  brand: "VISA",
+  number: "4000000000002701",
+  holder: "Jose da Silva",
+  expMonth: "12",
+  expYear: TEST_EXPIRY_YEAR,
+  securityCode: "123",
+};
 
 /** `4539 62** **** 2097` — the first six and last four, as a receipt prints them. */
 export function maskTestCard(number: string): string {

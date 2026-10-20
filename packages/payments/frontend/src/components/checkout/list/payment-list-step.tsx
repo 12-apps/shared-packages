@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } f
 
 import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
+import { useCheckoutClientApi } from "../client-context";
 import { displayTotals } from "../checkout-totals";
 import type { CheckoutSummaryLine } from "../payment-summary";
 import { usePaymentPixStage } from "../payment-step-layout";
@@ -145,6 +146,16 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
 }
 
 /**
+ * Everything a debit row needs besides the provider's claim (FUT-3754): the
+ * host's billing address, its words for the row, and a client that can ask for
+ * the 3-D Secure session. Missing any one, there is no row.
+ */
+function useDebitReady(list: CheckoutPaymentList): boolean {
+  const client = useCheckoutClientApi();
+  return Boolean(list.billingAddress) && list.copy.debit !== undefined && client.threeDSecureSession !== undefined;
+}
+
+/**
  * The Pagamento step as ONE list (FUT-3591, FUT-3592) — see `./types.ts`.
  *
  * Three faces, chosen from what the controller holds: the raised PIX (its code
@@ -156,7 +167,8 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
 export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
-  const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant);
+  const debitReady = useDebitReady(list);
+  const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant, debitReady);
   const reveal = useReveal(c, props.defaultBuyer);
   const { revealed } = reveal;
   const state = useListState({

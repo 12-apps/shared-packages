@@ -94,6 +94,14 @@ export const CHECKOUT_ROUTES: readonly CheckoutRouteSpec[] = [
     principal: 'BUYER',
     payableScoped: true,
   },
+  // A debit card's 3-D Secure session (FUT-3754), scoped like `/refresh-key`.
+  {
+    kind: 'threeDSecureSession',
+    method: 'POST',
+    pattern: ['3ds-session'],
+    principal: 'BUYER',
+    payableScoped: true,
+  },
   {
     kind: 'refreshBrowserKey',
     method: 'POST',

@@ -28,6 +28,8 @@ export interface OnlineRow {
   method: CheckoutOnlineChoice;
   /** A card the store declares but this browser cannot mint for — drawn, not choosable. */
   disabled: boolean;
+  /** The DEBIT card row (FUT-3754): the card again, authenticated by 3-D Secure. */
+  funding?: "DEBIT";
 }
 
 /** What the chain lets this browser offer, as the list needs it. */
@@ -37,6 +39,8 @@ export interface OnlineCapability {
   /** The methods the chain declares, or `null` while unknown (fails OPEN). */
   offered: PaymentMethod[] | null;
   cardUnavailable: boolean;
+  /** The debit row is offered: the head declares debit and the host gave an address (FUT-3754). */
+  debit?: boolean;
 }
 
 /**
@@ -51,6 +55,8 @@ export function onlineRows(cap: OnlineCapability): OnlineRow[] {
   const rows: OnlineRow[] = [];
   if (offers("PIX")) rows.push({ method: "PIX", disabled: false });
   if (offers("CARD")) rows.push({ method: "CARD", disabled: cap.cardUnavailable });
+  // Right under the credit card, and only where the store has debit on.
+  if (offers("CARD") && cap.debit) rows.push({ method: "CARD", funding: "DEBIT", disabled: cap.cardUnavailable });
   return rows;
 }
 

@@ -1,9 +1,11 @@
 import type { OAuthConnectService } from '../../config/oauth';
 import type { PaymentsGateway } from '../../core/gateway';
-import type { CustomerInfo, MerchantRef, PaymentEnvironment } from '../../core/types';
+import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession } from '../../core/types';
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
+import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
+import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type {
@@ -28,8 +30,10 @@ import type {
  *
  * Two calls, because the card has to be encrypted in the browser between
  * them: {@link prepareEvidenceRun} consults the application, renews the
- * seller's token and mints the seller's public key; the browser encrypts the
- * official test cards with it; {@link completeEvidenceRun} raises the orders.
+ * seller's token and mints the seller's public key and the debit card's 3DS
+ * session; the browser encrypts the official test cards with the key and
+ * authenticates the 3DS test card with the session; {@link completeEvidenceRun}
+ * raises the orders.
  *
  * Sandbox only: both calls refuse unless the seller's stored connection is a
  * SANDBOX one, and refusing is recorded as such rather than skipped silently.
@@ -105,15 +109,22 @@ async function refreshStep(deps: EvidenceRunDeps): Promise<EvidenceStep> {
 }
 
 /** Every step whose calls must have been authenticated by the seller. */
-const SELLER_CALL_KEYS: ReadonlySet<EvidenceStepKey> = new Set([
+const SELLER_CALL_KEYS: ReadonlySet<EvidenceStepKey> = new Set<EvidenceStepKey>([
   'card.publicKey',
+  'debit.session',
   'pix.create',
   'pix.consult',
   'card.approved',
   'card.approvedConsult',
   'card.declined',
   'card.cancel',
+  'debit.approved',
+  'debit.consult',
+  'debit.cancel',
 ]);
+
+/** The seller calls phase 1 made — minted before the orders, so not order calls. */
+const PREPARE_KEYS: ReadonlySet<EvidenceStepKey> = new Set<EvidenceStepKey>(['card.publicKey', 'debit.session']);
 
 /** The phase-2 scenarios — a run raises them once. */
 const ORDER_KEYS: readonly EvidenceStepKey[] = [
@@ -125,6 +136,7 @@ const ORDER_KEYS: readonly EvidenceStepKey[] = [
   'card.approvedConsult',
   'card.declined',
   'card.cancel',
+  ...DEBIT_ORDER_KEYS,
 ];
 
 /**
@@ -141,7 +153,7 @@ async function usageStep(deps: EvidenceRunDeps, steps: readonly EvidenceStep[], 
   const platformToken = await deps.platformToken();
   const platform = platformToken ? tokenFingerprint(platformToken) : null;
   const orderPrints = steps
-    .filter((step) => step.key !== 'card.publicKey' && SELLER_CALL_KEYS.has(step.key))
+    .filter((step) => !PREPARE_KEYS.has(step.key) && SELLER_CALL_KEYS.has(step.key))
     .flatMap((step) => step.calls.map((call) => call.bearerFingerprint));
   const proven = seller !== platform && !prints.includes(platform ?? '') && orderPrints.every((print) => print === seller);
   return stepOf('connect.usage', proven ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
@@ -150,14 +162,24 @@ async function usageStep(deps: EvidenceRunDeps, steps: readonly EvidenceStep[], 
 }
 
 
+/** What phase 1 hands the browser. */
+export interface PreparedEvidenceRun {
+  runId: string;
+  /** The seller's public key the test cards are encrypted with. */
+  publicKey: string | null;
+  /** The session PagBank's 3DS SDK is set up with to authenticate the debit card. */
+  threeDSSession: ThreeDSecureSession | null;
+  /** The buyer, address and amount the debit card is authenticated with. */
+  debitTest: DebitTestData;
+}
+
 /**
- * Phase 1. Returns the seller's public key for the browser to encrypt with —
- * null when it could not be minted, in which case the card steps will record
- * why instead of running.
+ * Phase 1. Returns the seller's public key for the browser to encrypt with and
+ * the 3DS session it authenticates the debit card with — each null when it
+ * could not be minted, in which case the card and debit steps will record why
+ * instead of running.
  */
-export async function prepareEvidenceRun(
-  deps: EvidenceRunDeps,
-): Promise<{ runId: string; publicKey: string | null }> {
+export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<PreparedEvidenceRun> {
   const now = clockOf(deps)();
   const record: EvidenceRecord = {
     id: deps.newId(),
@@ -172,7 +194,7 @@ export async function prepareEvidenceRun(
     const why = seller === 'NOT_SANDBOX' ? deps.copy.notSandbox : deps.copy.usageNotConnected;
     record.steps = [stepOf('connect.usage', seller === 'NOT_SANDBOX' ? 'FAILED' : 'PENDING', now, { observed: why })];
     await deps.store.save(record);
-    return { runId: record.id, publicKey: null };
+    return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
   }
 
   record.steps.push(await applicationStep(deps));
@@ -185,7 +207,7 @@ export async function prepareEvidenceRun(
   if (token === (await deps.platformToken())) {
     record.steps.push(stepOf('connect.usage', 'FAILED', clockOf(deps)(), { observed: deps.copy.usageSameAsPlatform }));
     await deps.store.save(record);
-    return { runId: record.id, publicKey: null };
+    return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
   }
 
   const minted = await recordTraffic(() =>
@@ -198,9 +220,11 @@ export async function prepareEvidenceRun(
       observed: publicKey ? deps.copy.publicKeyMinted : deps.copy.publicKeyMissing,
     }),
   );
+  const threeDS = await threeDSSessionStep(deps, token);
+  record.steps.push(threeDS.step);
   record.updatedAt = clockOf(deps)().toISOString();
   await deps.store.save(record);
-  return { runId: record.id, publicKey };
+  return { runId: record.id, publicKey, threeDSSession: threeDS.session, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
 }
 
 /**
@@ -234,7 +258,7 @@ function blockedBecause(
   return record.steps.find((step) => step.key === 'connect.usage' && step.status === 'FAILED')?.observed ?? null;
 }
 
-/** Phase 2: raise the Pix and card orders once, record them, then prove whose token they used. */
+/** Phase 2: raise the Pix, card and debit orders once, record them, then prove whose token they used. */
 export async function completeEvidenceRun(
   deps: EvidenceRunDeps,
   runId: string,
@@ -249,7 +273,12 @@ export async function completeEvidenceRun(
     // Recorded with the reason, so the file says WHY nothing was raised.
     for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
   } else {
-    for (const step of [...(await pixSteps(deps, runId)), ...(await cardSteps(deps, runId, cards))]) {
+    const raised = [
+      ...(await pixSteps(deps, runId)),
+      ...(await cardSteps(deps, runId, cards)),
+      ...(await debitSteps(deps, runId, cards)),
+    ];
+    for (const step of raised) {
       steps = withStep(steps, step);
     }
     steps = withStep(steps, await usageStep(deps, steps, seller.token));

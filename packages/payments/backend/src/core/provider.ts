@@ -7,6 +7,7 @@ import type {
   ClientTokenization,
   CredentialFieldSpec,
   CustomerSchema,
+  DebitCapability,
   GooglePayClientConfig,
   ProviderCapabilities,
   OAuthAuthorizeRequest,
@@ -294,6 +295,9 @@ export interface PaymentProviderAdapterBase {
       credentials: ResolvedCredentials,
     ): Promise<ApplePayActivation>;
   };
+
+  /** The 3-D Secure session a debit charge needs (FUT-3754); pairs with `capabilities.debit`. */
+  debit?: DebitCapability;
 
   /** Mint this provider's public browser key on demand — most cannot. */
   browserKey?: BrowserKeyCapability;

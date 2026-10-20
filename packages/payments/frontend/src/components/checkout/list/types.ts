@@ -20,6 +20,10 @@
  */
 import type { ReactNode } from "react";
 
+import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
+
+export type { CheckoutBillingAddress, PaymentListDebitCopy };
+
 /**
  * What a door option's `content` function is handed (FUT-3715).
  *
@@ -103,7 +107,7 @@ export type CheckoutOnlineChoice = "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
 
 /** What the buyer has chosen in the list. */
 export type CheckoutListChoice =
-  | { kind: "online"; method: CheckoutOnlineChoice }
+  | { kind: "online"; method: CheckoutOnlineChoice; funding?: "DEBIT" }
   | { kind: "door"; id: string };
 
 /**
@@ -214,6 +218,8 @@ export interface CheckoutPaymentList {
    * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
    */
   summaryTarget?: HTMLElement | null;
+  /** The billing address a DEBIT card's 3-D Secure needs (FUT-3754); none ⇒ no debit row. */
+  billingAddress?: CheckoutBillingAddress | null;
 }
 
 /** The six banks the Pix face offers to open, in the prototype's order. */
@@ -286,6 +292,8 @@ export interface PaymentListCopy {
     /** "Digite os dados do cartão". */
     hintNew: string;
   };
+  /** The DEBIT card row's words (FUT-3754). A pack without them offers no debit row. */
+  debit?: PaymentListDebitCopy;
   /**
    * @deprecated Google Pay is no longer a row (FUT-3685): it is a button in
    * the "PAGAMENTO RÁPIDO" block — see {@link PaymentListCopy.wallets}. Kept so

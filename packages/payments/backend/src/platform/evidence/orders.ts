@@ -1,14 +1,16 @@
+import type { CardDetails } from '../../core/card-details';
 import type { StoredCharge } from '../../core/ports';
 import { recordTraffic } from './record';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf } from './steps';
-import type { BrowserCardResult, EvidenceStep } from './types';
+import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
 import type { EvidenceRunDeps } from './run';
 
 /**
  * The orders of an evidence run (FUT-3696): the Pix and card scenarios, raised
  * through the host's gateway for the test seller and recorded call by call.
  * Split from `run.ts`, which owns the phases; this owns what each order step
- * counts as evidence — a recorded 2xx answer is always part of the bar.
+ * counts as evidence — a recorded 2xx answer is always part of the bar. The
+ * debit section (`orders-debit.ts`) raises its order through the same helpers.
  */
 
 const PROVIDER = 'pagbank';
@@ -137,30 +139,57 @@ export async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<Ev
   return [created.step, consult, paid];
 }
 
-async function cardCharge(
-  deps: EvidenceRunDeps,
-  runId: string,
-  card: BrowserCardResult,
-): Promise<{ step: EvidenceStep; charge: StoredCharge | null; orderId: string | null }> {
+/** One card order a scenario raises: which step it is, and what PagBank must answer. */
+interface CardOrder {
+  key: EvidenceStepKey;
+  /** The charge status the scenario expects (PAID, DECLINED). */
+  expected: string;
+  reference: string;
+  amountCents: number;
+  card: CardDetails;
+  notes: string[];
+}
+
+interface RaisedCardOrder {
+  step: EvidenceStep;
+  charge: StoredCharge | null;
+  orderId: string | null;
+}
+
+/** Why the browser sent no card blob, in the copy's words. */
+export function encryptFailure(deps: EvidenceRunDeps, card: BrowserCardResult): string {
+  return deps.copy.encryptFailed(card.failure ? deps.copy.browserFailures[card.failure] : '');
+}
+
+async function cardCharge(deps: EvidenceRunDeps, runId: string, card: BrowserCardResult): Promise<RaisedCardOrder> {
   const key = card.scenario === 'approved' ? 'card.approved' : 'card.declined';
-  const expected = card.scenario === 'approved' ? 'PAID' : 'DECLINED';
-  const reference = `homolog-${runId.slice(0, 8)}-card-${card.scenario}`;
   const notes = [`${card.brand} ${card.masked}`];
   if (!card.encrypted) {
-    const why = deps.copy.encryptFailed(card.failure ? deps.copy.browserFailures[card.failure] : '');
-    return { step: { ...pendingStep(key, deps.copy, why), notes }, charge: null, orderId: null };
+    return { step: { ...pendingStep(key, deps.copy, encryptFailure(deps, card)), notes }, charge: null, orderId: null };
   }
-  const encrypted = card.encrypted;
+  return raiseCardOrder(deps, {
+    key,
+    expected: card.scenario === 'approved' ? 'PAID' : 'DECLINED',
+    reference: `homolog-${runId.slice(0, 8)}-card-${card.scenario}`,
+    amountCents: CARD_CENTS,
+    card: { token: card.encrypted, installments: 1 },
+    notes,
+  });
+}
+
+/** Raise one card order through the gateway, recorded; EXECUTED only on the expected status. */
+export async function raiseCardOrder(deps: EvidenceRunDeps, order: CardOrder): Promise<RaisedCardOrder> {
+  const { key, expected, reference, notes } = order;
   const raised = await recordTraffic(() =>
     deps.gateway.charge(
       deps.merchant,
       {
         reference,
         idempotencyKey: reference,
-        amount: { amountCents: CARD_CENTS, currency: 'BRL' },
+        amount: { amountCents: order.amountCents, currency: 'BRL' },
         method: 'CARD',
         customer: deps.customer,
-        card: { token: encrypted, installments: 1 },
+        card: order.card,
       },
       { provider: PROVIDER },
     ),
@@ -214,14 +243,19 @@ function serverError(outcome: { ok: boolean; calls: readonly { status?: number }
  * a pause (the sandbox answered 503 on a run). Both attempts stay in the
  * evidence; only the last one decides.
  */
-async function consultApproved(deps: EvidenceRunDeps, chargeId: string, orderId: string | null): Promise<EvidenceStep> {
+export async function consultCharge(
+  deps: EvidenceRunDeps,
+  key: 'card.approvedConsult' | 'debit.consult',
+  chargeId: string,
+  orderId: string | null,
+): Promise<EvidenceStep> {
   const consult = () => recordTraffic(() => deps.gateway.refreshCharge(deps.merchant, PROVIDER, chargeId));
   const first = await consult();
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const consulted = serverError(first) ? await sleep(deps.pixPollMs ?? PIX_POLL_MS).then(consult) : first;
   const calls = consulted === first ? first.calls : [...first.calls, ...consulted.calls];
   const paid = consulted.ok && consulted.value.status === 'PAID' && answered(consulted.calls);
-  return stepOf('card.approvedConsult', paid ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
+  return stepOf(key, paid ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
     calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),
     observed: consulted.ok ? deps.copy.chargeStatus(consulted.value.status) : failureOf(deps.copy, consulted),
@@ -266,37 +300,46 @@ async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
   return { canceled, calls };
 }
 
-async function cancelApproved(deps: EvidenceRunDeps, chargeId: string, orderId: string | null): Promise<EvidenceStep> {
+export async function cancelCharge(
+  deps: EvidenceRunDeps,
+  key: 'card.cancel' | 'debit.cancel',
+  chargeId: string,
+  orderId: string | null,
+): Promise<EvidenceStep> {
   const { canceled, calls } = await cancelUntilAnswered(deps, chargeId);
   const done = canceled.ok && canceled.value.status === 'REFUNDED' && answered(canceled.calls);
   // PagBank's own word for the charge (CANCELED), which is what the scenario
   // expects — not this package's normalized refund status.
   const said = (canceled.calls.at(-1)?.responseBody as { status?: unknown } | undefined)?.status;
-  return stepOf('card.cancel', done ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
+  return stepOf(key, done ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
     calls,
     ids: idsOf({ providerChargeId: chargeId }, undefined, orderId),
     observed: canceled.ok ? deps.copy.canceled(typeof said === 'string' ? said : canceled.value.status) : failureOf(deps.copy, canceled),
   });
 }
 
-/** The PAID approved charge's id and its order, or nulls when it was not approved. */
-function approvedRefs(approved: Awaited<ReturnType<typeof cardCharge>> | null): { chargeId: string | null; orderId: string | null } {
+/** The PAID charge's id and its order, or nulls when it was not paid. */
+export function paidRefs(approved: RaisedCardOrder | null): { chargeId: string | null; orderId: string | null } {
   const paid = approved?.charge?.snapshot.status === 'PAID';
   return { chargeId: paid ? approved!.charge!.providerChargeId : null, orderId: approved?.orderId ?? null };
 }
 
 export async function cardSteps(deps: EvidenceRunDeps, runId: string, cards: readonly BrowserCardResult[]): Promise<EvidenceStep[]> {
-  const scenario = async (which: BrowserCardResult['scenario']) => {
+  const scenario = async (which: 'approved' | 'declined') => {
     const card = cards.find((candidate) => candidate.scenario === which);
     return card ? cardCharge(deps, runId, card) : null;
   };
   // The encryption happened in the browser BEFORE any order: stamp it first.
-  const encrypt = encryptStep(deps, cards);
+  // The debit card has its own section (and its own 3DS step), so 4.2 is
+  // about the two credit cards only.
+  const encrypt = encryptStep(deps, cards.filter((card) => card.scenario !== 'debit'));
   const approved = await scenario('approved');
-  const { chargeId, orderId } = approvedRefs(approved);
-  const consult = chargeId ? await consultApproved(deps, chargeId, orderId) : pendingStep('card.approvedConsult', deps.copy);
+  const { chargeId, orderId } = paidRefs(approved);
+  const consult = chargeId
+    ? await consultCharge(deps, 'card.approvedConsult', chargeId, orderId)
+    : pendingStep('card.approvedConsult', deps.copy);
   const declined = await scenario('declined');
-  const cancel = chargeId ? await cancelApproved(deps, chargeId, orderId) : pendingStep('card.cancel', deps.copy);
+  const cancel = chargeId ? await cancelCharge(deps, 'card.cancel', chargeId, orderId) : pendingStep('card.cancel', deps.copy);
   return [
     encrypt,
     approved?.step ?? pendingStep('card.approved', deps.copy),

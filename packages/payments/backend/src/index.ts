@@ -334,7 +334,7 @@ export { isValidCpf } from './core/cpf';
 // FAN-IN deciding the order the reactions run in. See `./core/webhook-public`.
 export * from './core/webhook-public';
 export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
-export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
+export * from './core/card-public';
 // What a host may need to know about PagBank — its published Orders API hosts
 // (FUT-760) and the variables that carry its credentials (FUT-764). Both are
 // the adapter's facts, and the first adopting host wrote each out a sixth time
