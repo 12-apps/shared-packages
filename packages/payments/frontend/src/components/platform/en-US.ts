@@ -123,7 +123,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     connectFailed: 'Could not start the test seller connection.',
     returnedConnected: 'Test seller connected. The callback and the code exchange were recorded in the evidence.',
     returnedFailed: 'The test seller connection did not complete. Try connecting again.',
-    generate: 'Generate evidence file\u00a0(TXT)',
+    generate: 'Generate evidence file\u00a0(TXT and JSON)',
     downloadLatest: 'Download the latest recorded',
     phases: {
       preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',

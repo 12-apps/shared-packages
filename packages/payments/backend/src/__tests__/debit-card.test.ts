@@ -66,6 +66,20 @@ describe('the PagBank debit charge', () => {
     });
   });
 
+  it('says on the snapshot how PagBank charged the card, so nothing downstream calls a debit credit', async () => {
+    const charged = (type: string) => ({
+      id: 'ORDE_F',
+      charges: [{ id: 'CHAR_F', status: 'PAID', payment_method: { type, card: { brand: 'visa', last_digits: '2701' } } }],
+    });
+    mockFetch(charged('DEBIT_CARD'));
+    const debit = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(debitInput(), LIVE);
+    mockFetch(charged('CREDIT_CARD'));
+    const credit = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-c', 'enc_c'), LIVE);
+
+    expect(debit.card).toMatchObject({ brand: 'visa', last4: '2701', funding: 'DEBIT' });
+    expect(credit.card?.funding).toBe('CREDIT');
+  });
+
   it('keeps an ordinary card charge exactly as it was: CREDIT_CARD, stored', async () => {
     const spy = mockFetch({ id: 'ORDE_C', charges: [{ id: 'CHAR_C', status: 'PAID' }] });
     await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(cardInput('order-c', 'enc_c'), LIVE);

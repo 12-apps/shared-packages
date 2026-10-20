@@ -188,9 +188,10 @@ export interface ChargeSnapshot {
    * Present for card charges. `vaultToken` is the REUSABLE token for a card the
    * provider agreed to store — never the one-time blob, which providers reject
    * on a second charge — normalized by the ADAPTER (FUT-740) so no host digs one
-   * vendor's payload out of `raw`. Absent when nothing was vaulted.
+   * vendor's payload out of `raw`. Absent when nothing was vaulted. `funding`
+   * is how the card was charged, when the provider says (FUT-3754).
    */
-  card?: { brand?: string; last4?: string; authorizationCode?: string; vaultToken?: string };
+  card?: { brand?: string; last4?: string; authorizationCode?: string; vaultToken?: string; funding?: CardDetails['funding'] };
   /**
    * Present when the provider runs a redirect/hosted checkout (e.g.
    * InfinitePay checkout links): send the buyer here instead of rendering a

@@ -104,7 +104,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       'Lojista de teste conectado. O callback e a troca do código foram registrados nas evidências.',
     returnedFailed:
       'A conexão do lojista de teste não foi concluída. Tente conectar de novo.',
-    generate: 'Gerar arquivo de evidências\u00a0(TXT)',
+    generate: 'Gerar arquivo de evidências\u00a0(TXT e JSON)',
     downloadLatest: 'Baixar o último registrado',
     phases: {
       preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública e a sessão 3DS…',
