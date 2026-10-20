@@ -137,6 +137,13 @@ interface PixAfterCopyProps {
  * fits a 390px phone's card (two of 180px did not, and stacked) and stacks only
  * at 320 — wide, the card link joins the row.
  */
+/**
+ * The buttons' leading icons. Narrow, the pair goes without them, as in the
+ * prototype: in a 159px column the icon pushed "Copiar de novo" onto two lines
+ * ("novo" alone). Wide, the row has room and keeps them.
+ */
+const ICON_SLOT = "& .MuiButton-startIcon, & .MuiButton-start";
+
 function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAfterCopyProps, "justCopied" | "onCopyAgain" | "onShowQr" | "onPreferCard">): JSX.Element {
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
@@ -144,7 +151,7 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
   // (FUT-3535): copying it again would only hand the buyer the wrong amount.
   const stale = usePaymentStale();
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, [ICON_SLOT]: { display: "none" }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" }, [ICON_SLOT]: { display: "inherit" } } }}>
       {/* Narrow, a grid cell; wide, its own width beside the link (the prototype's row). */}
       <Box sx={{ minWidth: 0, [PIX_WIDE]: { flex: "none", "& > *": { width: "auto" } } }}>
         <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} disabled={stale} dataTestId="pix-copy-again">
