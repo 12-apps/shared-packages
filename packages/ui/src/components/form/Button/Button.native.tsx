@@ -301,6 +301,12 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
 
   return (
     <Pressable
+      // A NEW native view when the button turns enabled or disabled (FUT-3775).
+      // On Android a disabled button that turned enabled painted its new fill
+      // and no label at all — the label's own colour, a remount of the label
+      // and a ripple kept constant did not bring it back. A button that mounts
+      // enabled draws its label, so the flip mounts it again.
+      key={look.inactive ? 'inactive' : 'active'}
       ref={ref}
       role="button"
       aria-disabled={look.inactive}
