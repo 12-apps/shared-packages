@@ -187,6 +187,16 @@ describe("a Pix the store confirms (MANUAL), a bank remembered", () => {
   });
 });
 
+describe("a Pix the store confirms (MANUAL), no bank remembered", () => {
+  it("keeps the checklist under the six banks, so the buyer still reads who confirms and by when", async () => {
+    bankFlow(null, true, "MANUAL");
+    await waitFor(() => expect(pay().textContent).toContain("Gerar e copiar o Pix"));
+    fireEvent.click(pay());
+    await waitFor(() => expect(screen.getByTestId("pix-bank-grid")).toBeTruthy());
+    expect(screen.getByTestId("pix-after-copy-step-3").textContent).toMatch(/A loja confirma o pagamento — até \d{2}:\d{2}/);
+  });
+});
+
 describe("on a computer", () => {
   it("generates and copies in one tap and toasts, but keeps today's after-copy face — no banks", async () => {
     const { notify } = bankFlow("nubank", false);
