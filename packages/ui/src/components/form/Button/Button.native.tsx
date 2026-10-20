@@ -233,6 +233,25 @@ interface ButtonLook {
  * props and the theme. Kept out of the component so the component reads as
  * structure — what renders where — and this reads as arithmetic.
  */
+/**
+ * Whether the button clips what it draws.
+ *
+ * The web button is `overflow: hidden` (its ripple needs it) unless the pulse
+ * ring turns it visible; on native the glow's shadow needs it visible too,
+ * because a view's own shadow is clipped by its own overflow there.
+ *
+ * An Android button never clips (FUT-3775). There, a clipped solid button that
+ * turned enabled — after a disable or a loading — painted its new fill and no
+ * label: the courier app's cancel, help and delivery sheets showed a red block
+ * with no text. The same button unclipped draws its label in every state
+ * (measured on the future-pay Maestro emulator lane), and nothing else needs
+ * the clip there: the label sits inside the padding, and the ripple's
+ * square-cornered mask shows only for the instant of a press.
+ */
+export function overflowOf(visible: boolean, os: string = Platform.OS): ViewStyle['overflow'] {
+  return visible || os === 'android' ? 'visible' : 'hidden';
+}
+
 function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   const { variant, color, size, loading, icon, children, glow, pulse, active, disabled, style } = props;
   const palette = buttonPalette(theme, color);
@@ -243,10 +262,7 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   // The theme's one field radius, so a button and the input beside it agree.
   const radius = theme.radius.field;
   const metrics = BUTTON_SIZES[size];
-  // The web button is `overflow: hidden` (its ripple needs it) unless the pulse
-  // ring turns it visible; on native the glow's shadow needs it visible too,
-  // because a view's own shadow is clipped by its own overflow there.
-  const overflow: ViewStyle['overflow'] = pulse || glow ? 'visible' : 'hidden';
+  const overflow = overflowOf(Boolean(pulse || glow));
   const sized = sizeStyle(theme, size, iconOnly, icon != null);
   const glowing = glow && !inactive ? glowStyle(palette) : null;
 
@@ -272,26 +288,6 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
       style,
     ],
   };
-}
-
-/**
- * A NEW native view when an Android button turns enabled or disabled
- * (FUT-3775). There, a disabled solid button that turned enabled painted its
- * new fill and no label at all — the courier app's cancel, join and finish
- * sheets showed a red block with no text. A remount of the label alone (keyed
- * on its colour) and a ripple kept constant did not bring it back; a button
- * that mounts enabled draws its label, so the flip mounts it again (measured on
- * the future-pay Maestro emulator lane).
- *
- * Only on Android, and only on a disable that is not a loading one: a
- * remounted view loses screen-reader focus, so iOS (never affected) and a
- * button the user just pressed keep their view — callers write
- * `disabled={busy} loading={busy}`, and that press must not remount it. A ref
- * to the button gets the new view; a node stored before the flip is detached.
- */
-export function enableFlipKey(disabled: boolean | undefined, os: string = Platform.OS): string | undefined {
-  if (os !== 'android') return undefined;
-  return disabled ? 'disabled' : 'enabled';
 }
 
 export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
@@ -321,7 +317,6 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
 
   return (
     <Pressable
-      key={enableFlipKey(resolved.disabled && !resolved.loading)}
       ref={ref}
       role="button"
       aria-disabled={look.inactive}
