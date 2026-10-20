@@ -311,7 +311,18 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   // On a phone the bank flow takes the copy: "Copiar e abrir o Nubank", the
   // toast, the app. Without it — or on a computer — the copy is today's.
   const onCopy = flow ? copies.copy : props.onCopy;
-  const banks = flow?.os ? { node: <PixBanks bank={flow.bank} state={flow.state} stale={stale} />, replacesChecklist: true } : undefined;
+  // With a bank chosen, one line says what to do there, in place of the
+  // checklist (FUT-3612) — unless the STORE confirms this Pix: its checklist's
+  // "A loja confirma o pagamento — até 14:32" is then the only place that says
+  // who confirms and by when, so it stays. No line in the host's copy: the
+  // checklist stays too. The six banks always replace it.
+  const oneLine = Boolean(flow?.bank.copy.appHint) && pix.confirmation !== "MANUAL";
+  const banks = flow?.os
+    ? {
+        node: <PixBanks bank={flow.bank} state={flow.state} stale={stale} hint={oneLine} />,
+        replacesChecklist: flow.state.chosen === null || oneLine,
+      }
+    : undefined;
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
