@@ -3,6 +3,7 @@ import type { EmailAuthRefusal } from "../email-credentials/types";
 import type { PasswordPolicyViolation } from "../password";
 
 import { SIGNUP_BINDING_COOKIE } from "./auth-cookies";
+import { createInboxLookup, type InboxLookup, type InboxLookupConfig } from "./inbox-host";
 
 import {
   EMAIL_AUTH_STATUS,
@@ -117,6 +118,13 @@ export interface EmailAuthRoutesConfig {
    * up", which every guard then bounced — the bug FUT-873 found the hard way.
    */
   onSignedUp?: (input: { email: string; name?: string }) => Promise<void> | void;
+  /**
+   * Read the webmail a sign-up's confirmation lands in off the domain's MX
+   * records, so "Confira seu e-mail" can offer a button that opens it for a
+   * company domain too (`./inbox-host`). On by default; `false` switches the
+   * lookup off and the screen names only the public domains, as before.
+   */
+  inboxLookup?: InboxLookupConfig | false;
 }
 
 /**
@@ -219,6 +227,7 @@ function signupRoute(
   credentials: EmailCredentials,
   refuse: Refuser,
   onSignedUp: EmailAuthRoutesConfig["onSignedUp"],
+  lookupInbox: InboxLookup | null,
 ): EmailAuthRoute {
   return {
     method: "POST",
@@ -226,6 +235,9 @@ function signupRoute(
     handle: async ({ body, locale }) => {
       const email = str(body, "email");
       const name = optionalStr(body, "name");
+      // Asked alongside the sign-up, not after it, so it adds at most its own
+      // cap. It reads the domain only, so both branches below get the same.
+      const inbox = lookupInbox ? lookupInbox(email) : Promise.resolve(null);
       const result = await credentials.signUp({
         email,
         password: str(body, "password"),
@@ -235,7 +247,11 @@ function signupRoute(
       });
       if (!result.ok) return refuse(result, locale);
       await onSignedUp?.({ email, name });
-      return { ...ok({ status: result.status }), cookies: bindingCookie(result.binding) };
+      const host = await inbox;
+      return {
+        ...ok({ status: result.status, ...(host ? { inbox: host } : {}) }),
+        cookies: bindingCookie(result.binding),
+      };
     },
   };
 }
@@ -269,9 +285,10 @@ function verifyRoute(credentials: EmailCredentials, refuse: Refuser): EmailAuthR
 export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[] {
   const { credentials, onSignedUp } = config;
   const refuse = refuserFor(config.messages);
+  const lookupInbox = config.inboxLookup === false ? null : createInboxLookup(config.inboxLookup);
 
   return [
-    signupRoute(credentials, refuse, onSignedUp),
+    signupRoute(credentials, refuse, onSignedUp, lookupInbox),
     verifyRoute(credentials, refuse),
     {
       method: "POST",
