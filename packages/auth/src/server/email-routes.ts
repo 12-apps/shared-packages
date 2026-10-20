@@ -121,10 +121,12 @@ export interface EmailAuthRoutesConfig {
   /**
    * Read the webmail a sign-up's confirmation lands in off the domain's MX
    * records, so "Confira seu e-mail" can offer a button that opens it for a
-   * company domain too (`./inbox-host`). On by default; `false` switches the
-   * lookup off and the screen names only the public domains, as before.
+   * company domain too (`./inbox-host`). OFF unless the host passes it: the
+   * lookup reaches the network, which is the host's call to make. `{}` asks the
+   * system resolver; `{ dohUrl }` adds a DNS-over-HTTPS fallback. Without it
+   * the screen names only the public domains, as before.
    */
-  inboxLookup?: InboxLookupConfig | false;
+  inboxLookup?: InboxLookupConfig;
 }
 
 /**
@@ -285,7 +287,7 @@ function verifyRoute(credentials: EmailCredentials, refuse: Refuser): EmailAuthR
 export function emailAuthRoutes(config: EmailAuthRoutesConfig): EmailAuthRoute[] {
   const { credentials, onSignedUp } = config;
   const refuse = refuserFor(config.messages);
-  const lookupInbox = config.inboxLookup === false ? null : createInboxLookup(config.inboxLookup);
+  const lookupInbox = config.inboxLookup ? createInboxLookup(config.inboxLookup) : null;
 
   return [
     signupRoute(credentials, refuse, onSignedUp, lookupInbox),

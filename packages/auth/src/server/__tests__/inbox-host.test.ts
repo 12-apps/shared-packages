@@ -12,11 +12,14 @@ import { PT_BR_MESSAGES } from "../pt-BR";
 
 // No case reaches the network: the system resolver answers every MX query the
 // way the cloud containers' egress does — an empty ENODATA.
+// `systemCode` lets a case play a resolver that could not ask at all.
+const systemAnswer = vi.hoisted(() => ({ code: "ENODATA" }));
 vi.mock("node:dns", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:dns")>();
   class Resolver {
     resolveMx(): Promise<never> {
-      return Promise.reject(Object.assign(new Error("queryMx ENODATA"), { code: "ENODATA" }));
+      const { code } = systemAnswer;
+      return Promise.reject(Object.assign(new Error(`queryMx ${code}`), { code }));
     }
   }
   const promises = { ...actual.promises, Resolver };
@@ -30,6 +33,7 @@ vi.mock("node:dns", async (importOriginal) => {
  */
 
 afterEach(() => {
+  systemAnswer.code = "ENODATA";
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -44,13 +48,14 @@ describe("inboxHostOfMx", () => {
     [["mta5.am0.yahoodns.net"], "yahoo"],
     [["mx01.mail.icloud.com"], "icloud"],
     [["mail.protonmail.ch"], "proton"],
+    [["mx.core.locaweb.com.br."], "locaweb"],
     [["MX1.TITAN.EMAIL"], "titan"],
   ])("names %j as %s", (hosts, expected) => {
     expect(inboxHostOfMx(hosts)).toBe(expected);
   });
 
   it("knows nobody else, and never a look-alike", () => {
-    expect(inboxHostOfMx(["mx.a.locaweb.com.br"])).toBeNull();
+    expect(inboxHostOfMx(["mx.kinghost.net"])).toBeNull();
     expect(inboxHostOfMx(["mx.zoho.eu"])).toBeNull();
     expect(inboxHostOfMx(["evilgoogle.com"])).toBeNull();
     expect(inboxHostOfMx(["google.com.attacker.net"])).toBeNull();
@@ -110,6 +115,7 @@ describe("createInboxLookup", () => {
       expect(resolveMx).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
       void lookup("caio@slow.com.br");
+      await vi.advanceTimersByTimeAsync(0);
       expect(resolveMx).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
@@ -119,6 +125,32 @@ describe("createInboxLookup", () => {
   it("answers null when the resolver throws", async () => {
     const lookup = createInboxLookup({ resolveMx: async () => Promise.reject(new Error("ENOTFOUND")) });
     expect(await lookup("ana@nowhere.com.br")).toBeNull();
+  });
+
+  it("asks once for sign-ups at one domain in the same instant", async () => {
+    // The answer is held until both sign-ups have asked.
+    const gate: { release?: (hosts: string[]) => void } = {};
+    const resolveMx = vi.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          gate.release = resolve;
+        }),
+    );
+    const lookup = createInboxLookup({ resolveMx });
+    const both = Promise.all([lookup("a@paladira.com"), lookup("b@paladira.com")]);
+    await vi.waitFor(() => expect(gate.release).toBeDefined());
+    gate.release?.(["mx1.titan.email"]);
+    expect(await both).toEqual(["titan", "titan"]);
+    expect(resolveMx).toHaveBeenCalledTimes(1);
+  });
+
+  it("never rejects, even when the resolver throws before it returns a promise", async () => {
+    const lookup = createInboxLookup({
+      resolveMx: () => {
+        throw new Error("boom");
+      },
+    });
+    expect(await lookup("ana@paladira.com")).toBeNull();
   });
 
   it("drops the oldest domain past the cache's size", async () => {
@@ -166,7 +198,7 @@ describe("the sign-up answer", () => {
     expect(taken.body).toEqual({ data: { status: "verification-sent", inbox: "titan" } });
   });
 
-  it("carries nothing when the lookup is switched off", async () => {
+  it("carries nothing when the host has not switched the lookup on", async () => {
     const host = new FakeHost();
     const credentials = createEmailCredentials({
       store: host,
@@ -179,7 +211,6 @@ describe("the sign-up answer", () => {
       credentials,
       messages: PT_BR_MESSAGES,
       resolveUserId: () => null,
-      inboxLookup: false,
     });
     const response = await POST(
       new Request("http://host/api/auth/email/signup", {
@@ -209,6 +240,38 @@ describe("the default resolver's DNS-over-HTTPS fallback", () => {
     const url = String(fetchMock.mock.calls[0]?.[0]);
     expect(url).toBe("https://doh.example.net/resolve?name=paladira.com&type=MX");
     expect(url).not.toContain("thom");
+  });
+
+  it("keeps a failed fallback only briefly, not as an hour of no webmail", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response("busy", { status: 503 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const lookup = createInboxLookup({ dohUrl: "https://doh.example.net/resolve" });
+      expect(await lookup("a@paladira.com")).toBeNull();
+      expect(await lookup("b@paladira.com")).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+      fetchMock.mockImplementation(async () => Response.json({ Answer: [{ type: 15, data: "10 mx1.titan.email." }] }));
+      expect(await lookup("c@paladira.com")).toBe("titan");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a system resolver that could not answer only briefly", async () => {
+    vi.useFakeTimers();
+    try {
+      systemAnswer.code = "ETIMEOUT";
+      const lookup = createInboxLookup({});
+      expect(await lookup("a@paladira.com")).toBeNull();
+      systemAnswer.code = "ENODATA";
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+      // The real "no MX" now: kept, and asked no more for the hour.
+      expect(await lookup("b@paladira.com")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not ask any endpoint unless the host names one", async () => {

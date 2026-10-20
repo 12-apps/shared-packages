@@ -81,7 +81,15 @@ const TLD = String.raw`\.(com|com\.[a-z]{2}|co\.[a-z]{2}|[a-z]{2})$`;
  * by key, so the wire carries a word rather than a link it would have to be
  * trusted for.
  */
-export type InboxHost = "google" | "microsoft" | "titan" | "zoho" | "yahoo" | "icloud" | "proton";
+export type InboxHost =
+  | "google"
+  | "microsoft"
+  | "titan"
+  | "zoho"
+  | "yahoo"
+  | "icloud"
+  | "proton"
+  | "locaweb";
 
 const GMAIL: Omit<Provider, "domain"> = { name: "Gmail", link: gmail };
 const YAHOO: Omit<Provider, "domain"> = { name: "Yahoo", link: yahoo };
@@ -111,6 +119,9 @@ const BY_HOST: Readonly<Record<InboxHost, Omit<Provider, "domain">>> = {
   yahoo: YAHOO,
   icloud: ICLOUD,
   proton: PROTON,
+  // "Abrir o webmail da Locaweb": the copy reads "Abrir o <name>", and the
+  // company is feminine, so the name carries its own article.
+  locaweb: { name: "webmail da Locaweb", link: inbox("https://webmail-seguro.com.br/") },
 };
 
 /**

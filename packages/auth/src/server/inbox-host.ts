@@ -40,6 +40,8 @@ const MX_HOSTS: readonly { suffix: string; host: InboxHost }[] = [
   { suffix: "yahoodns.net", host: "yahoo" },
   { suffix: "mail.icloud.com", host: "icloud" },
   { suffix: "protonmail.ch", host: "proton" },
+  // Locaweb's shared webmail serves every domain it hosts.
+  { suffix: "locaweb.com.br", host: "locaweb" },
 ];
 
 /**
@@ -109,11 +111,15 @@ function reserved(domain: string): boolean {
   );
 }
 
+/** The system's MX hosts; `[]` for "no MX", a rejection for a resolver that could not answer. */
 async function systemMx(domain: string, timeoutMs: number): Promise<string[]> {
   // Its own resolver, one try at the budget: the system default is
   // `timeout:2 attempts:3`, which alone can outlast the whole sign-up wait.
   const resolver = new dns.Resolver({ timeout: timeoutMs, tries: 1 });
-  const records = await resolver.resolveMx(domain);
+  const records = await resolver.resolveMx(domain).catch((error: unknown) => {
+    if (NO_MX.has((error as { code?: string }).code ?? "")) return [];
+    throw error;
+  });
   return records.sort((a, b) => a.priority - b.priority).map((record) => record.exchange);
 }
 
@@ -126,7 +132,8 @@ async function dohMx(url: string, domain: string, timeoutMs: number): Promise<st
     headers: { accept: "application/dns-json" },
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!response.ok) return [];
+  // A refusal or an outage is not "no MX": it throws, and is kept only briefly.
+  if (!response.ok) throw new Error(`DNS-over-HTTPS answered ${response.status}`);
   const body = (await response.json()) as DohAnswer;
   return (body.Answer ?? [])
     .filter((answer) => answer.type === 15 && typeof answer.data === "string")
@@ -136,21 +143,28 @@ async function dohMx(url: string, domain: string, timeoutMs: number): Promise<st
     .map((fields) => fields[1] ?? "");
 }
 
+/** The system resolver's codes for "this domain has no MX", as opposed to "I could not ask". */
+const NO_MX = new Set(["ENODATA", "ENOTFOUND"]);
+
 /**
  * The system resolver, then DNS-over-HTTPS when one is configured.
  *
- * "No answer" from the system — no MX, `ENODATA`, `ENOTFOUND`, a timeout —
- * all fall through alike, because some hosting egress answers every MX query
+ * "No MX" from the system (`ENODATA`, `ENOTFOUND`, an empty list) falls
+ * through to the fallback, because some hosting egress answers every MX query
  * with an empty `ENODATA` (measured in the cloud containers this is built in),
- * which reads exactly like a domain that has no mail. The system gets half the
- * budget so the fallback still has time; the caller caps the whole.
+ * which reads exactly like a domain that has no mail. A resolver that could
+ * not answer at all falls through too. Only an answer is returned as one; a
+ * fallback that fails rejects, so the caller keeps it as a short-lived miss
+ * rather than an hour-long "no webmail". The system gets half the budget when
+ * there is a fallback to leave time for.
  */
 function defaultResolver(dohUrl: string | undefined, timeoutMs: number): (domain: string) => Promise<string[]> {
   const systemBudget = dohUrl ? Math.floor(timeoutMs / 2) : timeoutMs;
   return async (domain) => {
+    if (!dohUrl) return systemMx(domain, systemBudget);
     const fromSystem = await systemMx(domain, systemBudget).catch(() => []);
-    if (fromSystem.length > 0 || !dohUrl) return fromSystem;
-    return dohMx(dohUrl, domain, timeoutMs - systemBudget).catch(() => []);
+    if (fromSystem.length > 0) return fromSystem;
+    return dohMx(dohUrl, domain, timeoutMs - systemBudget);
   };
 }
 
@@ -184,16 +198,16 @@ export function createInboxLookup(config: InboxLookupConfig = {}): InboxLookup {
   const maxEntries = config.maxEntries ?? 1000;
   const resolveMx = config.resolveMx ?? defaultResolver(config.dohUrl, timeoutMs);
   const cache = new Map<string, { host: InboxHost | null; until: number }>();
+  // Sign-ups at one uncached domain in the same instant share one lookup.
+  const pending = new Map<string, Promise<InboxHost | null>>();
 
-  return async (email) => {
-    const domain = lookupDomain(email);
-    if (!domain || reserved(domain) || inboxProviderOfDomain(domain)) return null;
-    const cached = cache.get(domain);
-    if (cached && cached.until > Date.now()) return cached.host;
-    const hosts = await withinTimeout(resolveMx(domain), timeoutMs);
+  async function ask(domain: string): Promise<InboxHost | null> {
+    // `then`, so a resolver that throws synchronously still lands in the race.
+    const hosts = await withinTimeout(Promise.resolve().then(() => resolveMx(domain)), timeoutMs);
     const host = hosts ? inboxHostOfMx(hosts) : null;
-    // A timeout is kept for a few minutes only: long enough that a slow domain
-    // does not cost every sign-up there a full wait, short enough to try again.
+    // A miss that was not an answer — a timeout, a resolver that could not
+    // ask — is kept for a few minutes only: long enough that a slow domain does
+    // not cost every sign-up there a full wait, short enough to try again.
     const keepFor = hosts === null ? Math.min(ttlMs, TIMEOUT_TTL_MS) : ttlMs;
     cache.delete(domain);
     cache.set(domain, { host, until: Date.now() + keepFor });
@@ -203,5 +217,15 @@ export function createInboxLookup(config: InboxLookupConfig = {}): InboxLookup {
       cache.delete(oldest);
     }
     return host;
+  }
+
+  return async (email) => {
+    const domain = lookupDomain(email);
+    if (!domain || reserved(domain) || inboxProviderOfDomain(domain)) return null;
+    const cached = cache.get(domain);
+    if (cached && cached.until > Date.now()) return cached.host;
+    const inFlight = pending.get(domain) ?? ask(domain).finally(() => pending.delete(domain));
+    pending.set(domain, inFlight);
+    return inFlight;
   };
 }

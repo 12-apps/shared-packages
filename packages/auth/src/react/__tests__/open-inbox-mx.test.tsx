@@ -19,6 +19,7 @@ describe("inboxLink with the server's MX reading", () => {
     ["zoho", "Zoho", "https://mail.zoho.com/"],
     ["icloud", "iCloud", "https://www.icloud.com/mail/"],
     ["proton", "Proton", "https://mail.proton.me/"],
+    ["locaweb", "webmail da Locaweb", "https://webmail-seguro.com.br/"],
   ])("opens %s's webmail for a company domain", (host, provider, href) => {
     expect(inboxLink("thom@paladira.com", "Paladira", host)).toEqual({ provider, href });
   });
