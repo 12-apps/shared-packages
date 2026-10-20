@@ -9,6 +9,9 @@ import type { AuthErrorCopy } from "./errors";
  * this. What this saves is a host with nothing to say about the phrasing having
  * to invent eight sentences anyway.
  */
+/** The sign-up's "other ways" link (FUT-3806); also the stand-in for a pack that predates it. */
+export const PT_BR_OTHER_WAYS = { show: "Outras formas de cadastro", hide: "Ocultar outras formas" };
+
 export const PT_BR_PAGES: AuthPagesCopy = {
   login: {
     title: "Entrar",
@@ -23,7 +26,7 @@ export const PT_BR_PAGES: AuthPagesCopy = {
     title: "Criar conta",
     subtitle: "Crie sua conta",
     providerDivider: "ou",
-    otherWays: { show: "Outras formas de cadastro", hide: "Ocultar outras formas" },
+    otherWays: PT_BR_OTHER_WAYS,
     loginPrompt: "Já tem uma conta?",
     loginLink: "Entrar",
   },

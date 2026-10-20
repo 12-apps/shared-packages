@@ -1,13 +1,10 @@
 import { useState, type JSX, type ReactNode } from "react";
 
 import type { AuthPagesCopy, SignupPageProps } from "./index";
-import { PT_BR_PAGES } from "./pt-BR";
+import { PT_BR_OTHER_WAYS } from "./pt-BR";
 import { ProviderBlock } from "./card";
 import { SignupActions } from "./signup-actions";
 import type { EmailAuthScreens, SignupStep } from "../screens";
-
-/** The Portuguese words for the "other ways" link, for a pack that predates it. */
-const PT_BR_OTHER_WAYS = PT_BR_PAGES.signup.otherWays ?? { show: "", hide: "" };
 
 /**
  * The action block of an `emailFirst` sign-up, step by step (FUT-3806).
@@ -113,7 +110,8 @@ export function signupActions({
   copy: AuthPagesCopy;
   screens: EmailAuthScreens;
 }): JSX.Element {
-  const block = present(providers) ? (
+  // `ProviderBlock`'s own test for "nothing", so the link and the block agree.
+  const block = providers ? (
     <ProviderBlock label={copy.signup.providerDivider} dividerFirst>
       {providers}
     </ProviderBlock>
