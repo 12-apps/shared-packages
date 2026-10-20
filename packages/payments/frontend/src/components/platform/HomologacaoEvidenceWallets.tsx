@@ -25,7 +25,7 @@ import {
   type GooglePaymentData,
   type GooglePaymentsClient,
 } from '../checkout/google-pay-button';
-import type { HomologacaoEvidenceWalletsCopy } from './copy';
+import type { AppleAbsence, HomologacaoEvidenceWalletsCopy } from './copy';
 import { usePlatformCopy } from './copy-context';
 
 /**
@@ -171,9 +171,10 @@ function notOffered(wallet: EvidenceWallet, input: EvidenceWalletsInput, googleR
 }
 
 /** Why Apple Pay has no button on a screen whose host carries wallets — null when it has one, or no wallets at all. */
-function appleAbsence(input: EvidenceWalletsInput, offered: boolean): BrowserWalletFailure | null {
+function appleAbsence(input: EvidenceWalletsInput, offered: boolean): AppleAbsence | null {
   if (offered || !input.config) return null;
-  return notOffered('APPLE_PAY', input, false)?.failure ?? null;
+  const failure = notOffered('APPLE_PAY', input, false)?.failure;
+  return failure === 'NOT_CONFIGURED' || failure === 'NOT_AVAILABLE' || failure === 'MERCHANT_VALIDATION_FAILED' ? failure : null;
 }
 
 /** The wallet step's state: the sheets' answers, the presses that open them, and what phase 2 gets. */
@@ -216,7 +217,7 @@ function GooglePayMount({ client, onPress, locale }: { client: GooglePaymentsCli
     element.replaceChildren(client.createButton({ onClick: () => latest.current(), buttonSizeMode: 'fill', buttonLocale: locale }));
     return () => element.replaceChildren();
   }, [client, locale]);
-  return <Box ref={mount} data-testid="evidence-google-pay" sx={{ minHeight: 40, width: 240, '& > *': { width: '100%' } }} />;
+  return <Box ref={mount} data-testid="evidence-google-pay" sx={{ minHeight: 40, width: { xs: '100%', sm: 240 }, '& > *': { width: '100%' } }} />;
 }
 
 /** Apple's button: Safari draws it (`-apple-pay-button`); elsewhere the name on a black pill. */
@@ -231,7 +232,7 @@ function ApplePayPress({ label, onPress }: { label: string; onPress: () => void 
       sx={{
         WebkitAppearance: '-apple-pay-button',
         height: 40,
-        width: 240,
+        width: { xs: '100%', sm: 240 },
         border: 0,
         borderRadius: 1,
         cursor: 'pointer',
@@ -270,20 +271,22 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
     return result ? [result] : [];
   });
   return (
-    <Stack spacing={1} data-testid="evidence-wallets">
+    <Stack spacing={1} data-testid="evidence-wallets" sx={{ maxWidth: '72ch' }}>
       <Typography variant="body2" fontWeight={600}>
         {copy.heading}
       </Typography>
-      <Typography variant="caption" component="p" color="text.secondary">
-        {copy.hint}
-      </Typography>
+      {wallets.google || wallets.apple ? (
+        <Typography variant="caption" component="p" color="text.secondary">
+          {copy.hint}
+        </Typography>
+      ) : null}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
         {wallets.google ? (
           <GooglePayMount client={wallets.google.client} onPress={wallets.google.press} locale={copy.googlePayButtonLocale} />
         ) : null}
         {wallets.apple ? <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} /> : null}
       </Stack>
-      {wallets.appleAbsent === 'NOT_CONFIGURED' || wallets.appleAbsent === 'NOT_AVAILABLE' ? (
+      {wallets.appleAbsent ? (
         <Typography variant="caption" component="p" color="text.secondary" data-testid="evidence-apple-pay-absent">
           {copy.applePayAbsent[wallets.appleAbsent]}
         </Typography>

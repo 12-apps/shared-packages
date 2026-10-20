@@ -156,6 +156,9 @@ export interface HomologacaoEvidenceCardCopy {
   wallets: HomologacaoEvidenceWalletsCopy;
 }
 
+/** Why Apple Pay has no button on the evidence card (FUT-3755). */
+export type AppleAbsence = 'NOT_CONFIGURED' | 'NOT_AVAILABLE' | 'MERCHANT_VALIDATION_FAILED';
+
 /** The Google Pay / Apple Pay step of the evidence card (FUT-3755). */
 export interface HomologacaoEvidenceWalletsCopy {
   heading: string;
@@ -174,7 +177,7 @@ export interface HomologacaoEvidenceWalletsCopy {
   /** Apple Pay started and failed. */
   applePayCannotComplete: string;
   /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
-  applePayAbsent: { NOT_CONFIGURED: string; NOT_AVAILABLE: string };
+  applePayAbsent: Record<AppleAbsence, string>;
   /** A wallet holds its token: `card` is the network and last four the wallet showed — never the token. */
   ready: (wallet: string, card: string) => string;
   /** The sheet answered no token; pressing again retries. */

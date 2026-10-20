@@ -257,6 +257,15 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
     expect(ran[0]?.wallets[0]).toMatchObject({ type: 'APPLE_PAY', failure: 'MERCHANT_VALIDATION_FAILED' });
   });
 
+  it('given no wallet has a button, then the card says why Apple Pay is absent and drops the tap hint', () => {
+    installApplePay();
+    mount({ seller: appleSeller(true) });
+
+    const copy = PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets;
+    expect(screen.getByTestId('evidence-apple-pay-absent').textContent).toBe(copy.applePayAbsent.MERCHANT_VALIDATION_FAILED);
+    expect(screen.getByTestId('evidence-wallets').textContent).not.toContain(copy.hint);
+  });
+
   it("given Apple Pay configured, when pressed, then the host validates the merchant and the authorized token is kept and sent", async () => {
     const apple = installApplePay();
     const validate = vi.fn<(validationURL: string) => Promise<unknown>>(async () => ({ merchantSessionIdentifier: 'ms-1' }));

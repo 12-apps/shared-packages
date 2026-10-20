@@ -131,9 +131,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     wallets: {
       heading: 'Carteiras digitais (antes de gerar)',
       names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
-      hint:
-        'O Google Pay e o Apple Pay abrem a própria folha e só com o seu toque. Toque em cada um antes de gerar o arquivo; ' +
-        'sem isso, as seções das carteiras ficam pendentes. Somente teste: nada é cobrado.',
+      hint: 'Toque em cada carteira antes de gerar; sem isso, a seção dela fica pendente.',
       googlePayButtonLocale: 'pt',
       applePayButton: 'Pagar com Apple Pay',
       applePaySheetTotal: 'Teste de homologação',
@@ -142,6 +140,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       applePayAbsent: {
         NOT_CONFIGURED: 'Apple Pay: aguardando a conta Apple Developer. A seção fica pendente.',
         NOT_AVAILABLE: 'Apple Pay: abra esta tela no Safari de um iPhone ou Mac para testar.',
+        MERCHANT_VALIDATION_FAILED: 'Apple Pay: a validação do comerciante não está configurada. A seção fica pendente.',
       },
       ready: (wallet, card) => `${wallet} pronto${card ? ` — ${card}` : ''}. Será usado ao gerar o arquivo.`,
       failed: (wallet) => `O ${wallet} não devolveu o token. Toque de novo para tentar.`,
