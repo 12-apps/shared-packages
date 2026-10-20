@@ -88,15 +88,17 @@ describe('Button (native, Android) — the enable flip', () => {
     expect(screen.getByTestId('send')).toBe(idle);
   });
 
-  it('still mounts a new view when it turns enabled while it was disabled and busy — the ready flip', () => {
+  it('mounts once on the ready flip, then keeps that view through a busy press and its settle', () => {
     asAndroid();
     const { rerender } = render(<Confirm ready={false} />);
     const disabled = screen.getByTestId('confirm');
 
     rerender(<Confirm ready busy />);
+    const ready = screen.getByTestId('confirm');
     rerender(<Confirm ready />);
 
-    expect(screen.getByTestId('confirm')).not.toBe(disabled);
+    expect(ready).not.toBe(disabled);
+    expect(screen.getByTestId('confirm')).toBe(ready);
   });
 
   it('keeps its view across a render that does not flip it', () => {
