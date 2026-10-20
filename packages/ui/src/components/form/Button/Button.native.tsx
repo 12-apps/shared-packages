@@ -237,9 +237,9 @@ interface ButtonLook {
  *
  * An Android button never clips (FUT-3775). There, a clipped solid button that
  * turned enabled — after a disable or a loading — painted its new fill and no
- * label: the courier app's cancel, help and delivery sheets showed a red block
+ * label: an adopter's cancel, help and delivery sheets showed a red block
  * with no text. The same button unclipped draws its label in every state
- * (measured on the future-pay Maestro emulator lane). Nothing else needs the
+ * (measured on an Android emulator with a pixel check). Nothing else needs the
  * clip there: the label, icon and spinner sit inside the padding. The ripple
  * did, since its mask is a square, so a native press shows the variant's
  * pressed paint alone, as on iOS, and `ripple` only matters on the web.
