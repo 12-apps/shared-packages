@@ -36,9 +36,16 @@ export interface GooglePaymentsClient {
   loadPaymentData(request: Record<string, unknown>): Promise<GooglePaymentData>;
 }
 
-/** The one path of the payment data this checkout reads. */
+/** The paths of the payment data this package reads. */
 export interface GooglePaymentData {
-  paymentMethodData: { tokenizationData: { token: string } };
+  paymentMethodData: {
+    tokenizationData: { token: string };
+    /**
+     * The card the buyer picked, as Google describes it: its network (`VISA`)
+     * and its last four digits — what a screen may show of it (FUT-3755).
+     */
+    info?: { cardNetwork?: string; cardDetails?: string };
+  };
 }
 
 /** The `google.payments.api` namespace, as far as this button needs it. */

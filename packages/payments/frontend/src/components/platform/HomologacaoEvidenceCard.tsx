@@ -6,8 +6,10 @@ import { useState, type ReactNode } from 'react';
 import type {
   BrowserCardFailure,
   BrowserCardResult,
+  BrowserWalletResult,
   DebitTestData,
   EvidenceSummary,
+  EvidenceWalletsConfig,
   PaymentEnvironment,
   ThreeDSecureSession,
 } from '@12-apps/payments-backend';
@@ -15,9 +17,11 @@ import type {
 import { maskTestCard, PAGBANK_3DS_TEST_CARD, PAGBANK_TEST_CARDS } from '../../card/pagbank-test-cards';
 import { authenticatePagBankDebit, type ThreeDSFailure } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
+import type { GooglePayApi } from '../checkout/google-pay-button';
 import { CARD_SX, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
+import { EvidenceWalletBlock, useEvidenceWallets, type EvidenceWallets } from './HomologacaoEvidenceWallets';
 
 /**
  * The homologação EVIDENCE card (FUT-3696): connect a sandbox test seller,
@@ -26,7 +30,9 @@ import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
  * The one thing this card does itself is the part that has to happen in a
  * browser: encrypting PagBank's official TEST cards with the seller's public
  * key, through the same SDK call the checkout makes, and authenticating the
- * 3DS test card with PagBank's SDK for the debit scenario (FUT-3755). Everything else is the
+ * 3DS test card with PagBank's SDK for the debit scenario (FUT-3755), and
+ * opening Google Pay's and Apple Pay's sheets on the operator's tap for the
+ * wallet scenarios (`HomologacaoEvidenceWallets.tsx`). Everything else is the
  * host's — each callback is a call to its own mounted routes — and what the
  * file says is decided by the server, from what was recorded. This card shows
  * the counts it answered and never infers a result of its own.
@@ -42,6 +48,12 @@ export interface HomologacaoSellerView {
   accountId: string | null;
   /** Why the latest authorization did not complete, as the evidence recorded it. */
   lastConnectProblem?: string | null;
+  /**
+   * What each wallet's sheet needs (FUT-3755) — the package's seller view
+   * carries it. Absent, no wallet button is drawn and both wallet sections
+   * stay pending.
+   */
+  wallets?: EvidenceWalletsConfig;
 }
 
 export interface HomologacaoEvidenceCardProps {
@@ -64,8 +76,19 @@ export interface HomologacaoEvidenceCardProps {
     /** What the debit card is authenticated with — the server's, so the amount matches what it charges. */
     debitTest?: DebitTestData;
   }>;
-  /** Phase 2 — raise the orders with the encrypted cards. */
-  onRun: (runId: string, cards: BrowserCardResult[]) => Promise<void>;
+  /**
+   * Phase 2 — raise the orders with the encrypted cards and, for each wallet,
+   * the token its sheet gave (or the code saying why there is none).
+   */
+  onRun: (runId: string, cards: BrowserCardResult[], wallets: BrowserWalletResult[]) => Promise<void>;
+  /**
+   * The host's Apple Pay merchant validation (FUT-3755): exchange Apple's
+   * `validationURL` for a merchant session, server-side. Absent, the Apple Pay
+   * button is not drawn and its section stays pending.
+   */
+  onValidateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** Injectable `google.payments.api` for tests and harnesses; omit to load pay.js. */
+  googlePayApi?: GooglePayApi | null;
   /** Build and deliver the file; resolves to the counts it holds. */
   onDownload: () => Promise<EvidenceSummary>;
 }
@@ -206,7 +229,10 @@ function SellerBlock({
 }
 
 /** One run at a time: which phase it is in, what it answered, where it failed. */
-function useEvidenceRun({ onPrepare, onRun, onDownload }: Pick<HomologacaoEvidenceCardProps, 'onPrepare' | 'onRun' | 'onDownload'>) {
+function useEvidenceRun(
+  { onPrepare, onRun, onDownload }: Pick<HomologacaoEvidenceCardProps, 'onPrepare' | 'onRun' | 'onDownload'>,
+  wallets: Pick<EvidenceWallets, 'collect' | 'reset'>,
+) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const [failed, setFailed] = useState<ActivePhase | null>(null);
@@ -222,11 +248,14 @@ function useEvidenceRun({ onPrepare, onRun, onDownload }: Pick<HomologacaoEviden
     try {
       if (full) {
         enter('preparing');
+        // The sheets ran before this chain: what they answered, taken once.
+        const walletResults = wallets.collect();
+        wallets.reset();
         const prepared = await onPrepare();
         enter('encrypting');
         const cards = await prepareTestCards(prepared);
         enter('running');
-        await onRun(prepared.runId, cards);
+        await onRun(prepared.runId, cards, walletResults);
       }
       enter('downloading');
       setSummary(await onDownload());
@@ -256,7 +285,12 @@ function ConnectOutcome({ seller, connectOutcome }: Pick<HomologacaoEvidenceCard
 function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
   const { seller, onConnect } = props;
   const copy = usePlatformCopy().evidence;
-  const { phase, busy, summary, failed, run } = useEvidenceRun(props);
+  const wallets = useEvidenceWallets({
+    config: seller?.connected ? (seller.wallets ?? null) : null,
+    validateApplePayMerchant: props.onValidateApplePayMerchant,
+    googlePayApi: props.googlePayApi,
+  });
+  const { phase, busy, summary, failed, run } = useEvidenceRun(props, wallets);
   return (
     <Stack spacing={1.5} data-testid="homologacao-evidence-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
@@ -267,6 +301,7 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
       </Typography>
       <ConnectOutcome seller={seller} connectOutcome={props.connectOutcome} />
       <SellerBlock seller={seller} onConnect={onConnect} />
+      <EvidenceWalletBlock wallets={wallets} />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
         <Button
           variant={seller?.connected ? 'contained' : 'outlined'}

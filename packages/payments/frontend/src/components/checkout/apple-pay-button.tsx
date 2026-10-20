@@ -48,10 +48,18 @@ export interface ApplePayPaymentRequest {
   total: { label: string; amount: string };
 }
 
+/** The card an authorized payment names, as Apple describes it — e.g. `{ network: 'Visa', displayName: 'Visa 1234' }`. */
+export interface ApplePayPaymentMethod {
+  network?: string;
+  displayName?: string;
+}
+
 /** The session events/methods this button drives. */
 export interface ApplePaySessionLike {
   onvalidatemerchant: ((event: { validationURL: string }) => void) | null;
-  onpaymentauthorized: ((event: { payment: { token: { paymentData: unknown } } }) => void) | null;
+  onpaymentauthorized:
+    | ((event: { payment: { token: { paymentData: unknown; paymentMethod?: ApplePayPaymentMethod } } }) => void)
+    | null;
   oncancel: (() => void) | null;
   begin(): void;
   abort(): void;
@@ -157,6 +165,8 @@ export function startApplePaySession(input: {
   copy: ApplePayCopy;
   validateMerchant: ((validationURL: string) => Promise<unknown>) | undefined;
   onError: (message: string) => void;
+  /** The card the authorized payment names — told before the answer settles (FUT-3755). */
+  onPaymentMethod?: (method: ApplePayPaymentMethod | null) => void;
 }): ApplePaySheet {
   const { Session, copy } = input;
   const session = new Session(APPLE_PAY_VERSION, paymentRequest(input.cents, copy));
@@ -177,7 +187,10 @@ export function startApplePaySession(input: {
       .catch(() => fail(copy.cannotComplete));
   };
   // Apple's `token.paymentData`, serialized VERBATIM — PagBank's `key`.
-  session.onpaymentauthorized = (event) => settle(JSON.stringify(event.payment.token.paymentData));
+  session.onpaymentauthorized = (event) => {
+    input.onPaymentMethod?.(event.payment.token.paymentMethod ?? null);
+    settle(JSON.stringify(event.payment.token.paymentData));
+  };
   // Closing the sheet is a choice, not a failure to report.
   session.oncancel = () => settle(null);
   try {
