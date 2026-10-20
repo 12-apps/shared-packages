@@ -32,7 +32,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     hint: "O banco pode pedir confirmação no app",
     notSupported: "Esse cartão não pode ser usado no débito aqui. Tente no crédito ou no Pix.",
     refused: "O banco não confirmou o pagamento no débito. Tente outro cartão ou o Pix.",
-    failed: "Não foi possível confirmar o débito com o banco. Tente de novo.",
+    failed: "O banco não confirmou o débito agora. Tente de novo.",
   },
   googlePay: { label: "Google Pay", hint: "Com o cartão salvo no seu Google" },
   wallets: {
