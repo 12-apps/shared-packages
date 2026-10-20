@@ -147,9 +147,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     wallets: {
       heading: 'Digital wallets (before generating)',
       names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
-      hint:
-        'Google Pay and Apple Pay open their own sheet, and only on your tap. Tap each one before generating the file; ' +
-        "without it, the wallets' sections stay pending. Test only: nothing is charged.",
+      hint: "Tap each wallet before generating; without it, that wallet's section stays pending.",
       googlePayButtonLocale: 'en',
       applePayButton: 'Pay with Apple Pay',
       applePaySheetTotal: 'Homologation test',
@@ -158,6 +156,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       applePayAbsent: {
         NOT_CONFIGURED: 'Apple Pay: waiting for the Apple Developer account. Its section stays pending.',
         NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
+        MERCHANT_VALIDATION_FAILED: "Apple Pay: the merchant validation is not set up. Its section stays pending.",
       },
       ready: (wallet, card) => `${wallet} ready${card ? ` — ${card}` : ''}. It will be used when the file is generated.`,
       failed: (wallet) => `${wallet} returned no token. Tap again to retry.`,
