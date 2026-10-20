@@ -20,6 +20,7 @@ export const EN_US_PIX_BANK_COPY: PixBankCopy = {
   other: "Another bank",
   notOpened: (bank) => `We couldn't open ${bank.name}. Is the app installed on this phone?`,
   retry: "Try again",
+  appHint: "Open your bank's app and paste the code in Pix copy and paste.",
   copied: "Pix code copied",
   copiedPick: "Pix code copied. Choose your bank.",
   copiedOpening: (bank) => `Pix code copied. Opening ${bank.name}…`,

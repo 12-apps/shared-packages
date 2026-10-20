@@ -270,6 +270,11 @@ export interface PixBankCopy {
   notOpened: (bank: PixBankName) => string;
   /** "Tentar de novo". */
   retry: string;
+  /**
+   * The one line under the bank being opened, in place of the checklist —
+   * "Abra o app do seu banco e cole em Pix copia e cola." Absent ⇒ no line.
+   */
+  appHint?: string;
   /** The toasts. */
   copied: string;
   copiedPick: string;
