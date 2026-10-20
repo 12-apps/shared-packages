@@ -43,6 +43,20 @@ describe('redactValue', () => {
     });
   });
 
+  it("given a wallet charge, then the wallet's key is removed and its type survives (FUT-3755)", () => {
+    const wallet = { type: 'GOOGLE_PAY', key: '{"signature":"MEU…","signedMessage":"…"}' };
+
+    expect(redactValue({ charges: [{ payment_method: { type: 'CREDIT_CARD', card: { wallet } } }] })).toEqual({
+      charges: [{ payment_method: { type: 'CREDIT_CARD', card: { wallet: { type: 'GOOGLE_PAY', key: '***REDACTED***' } } } }],
+    });
+  });
+
+  it('given a key outside a card wallet, then it is kept — the rule is that narrow (FUT-3755)', () => {
+    const body = { key: 'idem-1', wallet: { key: 'not-a-card' }, card: { key: 'k', holder: { wallet: { key: 'deep' } } } };
+
+    expect(redactValue(body)).toEqual(body);
+  });
+
   it('given a phone number outside a card, then it is kept', () => {
     expect(redactValue({ phones: [{ number: '999999999' }] })).toEqual({ phones: [{ number: '999999999' }] });
   });

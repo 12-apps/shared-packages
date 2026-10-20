@@ -14,6 +14,8 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     PIX: 'Pix evidence',
     CARD: 'Card evidence',
     DEBIT: "Debit card (PagBank's 3DS)",
+    GOOGLE_PAY: 'Google Pay (digital wallet)',
+    APPLE_PAY: 'Apple Pay (digital wallet)',
   },
   steps: {
     'connect.authorize': {
@@ -104,6 +106,48 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Debit payment canceled — POST /charges/{charge_id}/cancel',
       expected: 'HTTP 201 with the debit charge canceled (status CANCELED).',
     },
+    'gpay.token': {
+      scenario: "Google Pay token obtained in the browser (Google's TEST environment, gateway pagbank)",
+      expected:
+        "The operator opens Google Pay's sheet (PaymentsClient in TEST; PAYMENT_GATEWAY tokenizationSpecification with gateway pagbank and " +
+        "gatewayMerchantId = the test seller's PagBank account), for R$ 12.00, and picks one of Google's test cards; the browser receives " +
+        'paymentMethodData.tokenizationData.token. No request from the integration to PagBank in this step.',
+    },
+    'gpay.approved': {
+      scenario: 'Approved Google Pay order (card.wallet GOOGLE_PAY) — POST /orders',
+      expected:
+        'HTTP 201 with charges[0].status PAID: payment_method CREDIT_CARD with card.wallet { type: GOOGLE_PAY, key } (the Google Pay token), ' +
+        'authorized and captured in one call (capture: true).',
+    },
+    'gpay.consult': {
+      scenario: 'Google Pay order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the Google Pay charge in status PAID.',
+    },
+    'gpay.cancel': {
+      scenario: 'Google Pay payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the Google Pay charge canceled (status CANCELED).',
+    },
+    'apay.token': {
+      scenario: 'Apple Pay token obtained in the browser (ApplePaySession with merchant validation)',
+      expected:
+        "The operator opens Apple Pay's sheet in Safari (ApplePaySession version 3, Visa and Mastercard), for R$ 12.00; the integration " +
+        "validates the merchant server-side with the platform's Apple Pay identity and the browser receives token.paymentData. No " +
+        'request from the integration to PagBank in this step.',
+    },
+    'apay.approved': {
+      scenario: 'Approved Apple Pay order (card.wallet APPLE_PAY) — POST /orders',
+      expected:
+        "HTTP 201 with charges[0].status PAID: payment_method CREDIT_CARD with card.wallet { type: APPLE_PAY, key } (Apple Pay's " +
+        'token.paymentData), authorized and captured in one call (capture: true).',
+    },
+    'apay.consult': {
+      scenario: 'Apple Pay order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the Apple Pay charge in status PAID.',
+    },
+    'apay.cancel': {
+      scenario: 'Apple Pay payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the Apple Pay charge canceled (status CANCELED).',
+    },
   },
   identification: {
     heading: 'Identification',
@@ -141,11 +185,12 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   },
   redactionNote:
     'Security: Authorization, access_token, refresh_token, client_secret, OAuth codes, cookies, ' +
-    'CVV, the full card number and the encrypted card data were removed and show as ***REDACTED***. ' +
+    "CVV, the full card number, the encrypted card data and the digital wallets' token (Google Pay and Apple Pay, " +
+    'card.wallet.key) were removed and show as ***REDACTED***. ' +
     "Every call below was recorded by the integration's own code as it was made; no response was " +
     "written by hand. Data and cards are PagBank's official test ones.",
   pendencies: {
-    heading: '6. Pending items',
+    heading: '8. Pending items',
     incomplete: (failed, pending) =>
       `INCOMPLETE FILE: ${pending} ${pending === 1 ? 'scenario' : 'scenarios'} pending and ${failed} failed. Do not submit this file as complete.`,
     allExecuted: 'Every scenario listed above was executed with the expected result.',
@@ -154,6 +199,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       'Not tested: installments (the orders use 1 installment).',
       'Not applicable: later capture (pre-authorization). The integration authorizes and captures in one call (capture: true).',
       'Not tested: boleto.',
+      'Google Pay and Apple Pay: the approved payment, its consult and its cancellation are covered; a wallet decline is not tested.',
       'Notifications refused at signature verification are not stored. A missing notification may not have been sent, or may have been refused.',
     ],
     noGuarantee: "This file records only what was executed and does not guarantee PagBank's approval of the homologation.",
@@ -214,6 +260,23 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
         : '3DS authentication completed in the browser, but the cardholder was not authenticated (NOT_AUTHENTICATED).',
     threeDSFailed: (detail) => `3DS authentication of the debit card did not complete${detail ? `: ${detail}` : ''}; no debit was charged.`,
     debitNotReported: 'The browser reported no debit card; no debit was charged.',
+    walletNames: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
+    walletTokenReceived: (wallet, card) =>
+      `${wallet} token received in the browser${card ? ` (${card})` : ''}; it went to the server only and shows as ***REDACTED***.`,
+    walletNotRun: (wallet) =>
+      `Not executed: the ${wallet} button was not pressed before generating the file; no ${wallet} order was created.`,
+    walletFailed: (wallet, detail) =>
+      `${wallet} token not obtained in the browser${detail ? `: ${detail}` : ''}; no ${wallet} order was created.`,
+    walletFailures: {
+      NOT_AVAILABLE: 'the wallet is not offered on this browser/device',
+      DISMISSED: 'the operator closed the payment sheet',
+      NOT_CONFIGURED: 'waiting for the Apple Developer account — Apple Pay identity not configured',
+      MERCHANT_VALIDATION_FAILED: "Apple Pay's merchant validation did not complete",
+      TOKEN_ERROR: 'the payment sheet failed or returned no token',
+    },
+    applePayNotConfigured:
+      'Pending: waiting for the Apple Developer account — Apple Pay identity not configured (Merchant ID and certificate). ' +
+      'No Apple Pay order was created.',
     webhookReceived: (count, statuses, chargeStatus) =>
       `${count} ${count === 1 ? 'notification' : 'notifications'} received and stored (status: ${statuses})` +
       (chargeStatus ? `; the charge the integration records is ${chargeStatus}.` : '.'),

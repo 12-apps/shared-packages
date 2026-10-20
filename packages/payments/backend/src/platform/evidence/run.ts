@@ -5,15 +5,18 @@ import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
+import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type {
   BrowserCardResult,
+  BrowserWalletResult,
   EvidenceOutcomeCopy,
   EvidenceRecord,
   EvidenceStep,
   EvidenceStepKey,
+  EvidenceWalletsConfig,
   HomologacaoEvidenceStore,
 } from './types';
 
@@ -50,8 +53,11 @@ export interface EvidenceRunDeps {
   newId: () => string;
   gateway: Pick<PaymentsGateway, 'charge' | 'refreshCharge' | 'refund'>;
   oauth: Pick<OAuthConnectService, 'refresh'>;
-  /** The seller's stored connection, or null when it never connected. */
-  seller: () => Promise<{ environment: PaymentEnvironment; token: string | null } | null>;
+  /**
+   * The seller's stored connection, or null when it never connected. Its
+   * PagBank `accountId` is what Google Pay's sheet mints the token against.
+   */
+  seller: () => Promise<{ environment: PaymentEnvironment; token: string | null; accountId?: string | null } | null>;
   /** The platform's own account token — read ONLY to show it was not used. */
   platformToken: () => Promise<string | null>;
   /** The sandbox application consult (`GET /oauth2/application/{client_id}`). */
@@ -62,6 +68,13 @@ export interface EvidenceRunDeps {
   }>;
   /** The buyer on the test orders — official sandbox test data only. */
   customer: CustomerInfo;
+  /**
+   * Whether the host has an Apple Pay identity (FUT-3755) — for the platform
+   * identity, whether `platformApplePayIdentity(process.env)` is non-null.
+   * Absent means not configured: the Apple Pay section then stays PENDING,
+   * waiting for the Apple Developer account.
+   */
+  applePayConfigured?: () => boolean | Promise<boolean>;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
   /** Overrides for tests. */
@@ -71,11 +84,13 @@ export interface EvidenceRunDeps {
 
 
 /** The seller's connection, provided it is a sandbox one. */
-async function sandboxSeller(deps: EvidenceRunDeps): Promise<{ token: string } | 'NOT_CONNECTED' | 'NOT_SANDBOX'> {
+async function sandboxSeller(
+  deps: EvidenceRunDeps,
+): Promise<{ token: string; accountId: string | null } | 'NOT_CONNECTED' | 'NOT_SANDBOX'> {
   const seller = await deps.seller();
   if (!seller?.token) return 'NOT_CONNECTED';
   if (seller.environment !== 'SANDBOX') return 'NOT_SANDBOX';
-  return { token: seller.token };
+  return { token: seller.token, accountId: seller.accountId ?? null };
 }
 
 
@@ -121,6 +136,7 @@ const SELLER_CALL_KEYS: ReadonlySet<EvidenceStepKey> = new Set<EvidenceStepKey>(
   'debit.approved',
   'debit.consult',
   'debit.cancel',
+  ...WALLET_ORDER_KEYS.filter((key) => !key.endsWith('.token')),
 ]);
 
 /** The seller calls phase 1 made — minted before the orders, so not order calls. */
@@ -137,6 +153,7 @@ const ORDER_KEYS: readonly EvidenceStepKey[] = [
   'card.declined',
   'card.cancel',
   ...DEBIT_ORDER_KEYS,
+  ...WALLET_ORDER_KEYS,
 ];
 
 /**
@@ -171,6 +188,13 @@ export interface PreparedEvidenceRun {
   threeDSSession: ThreeDSecureSession | null;
   /** The buyer, address and amount the debit card is authenticated with. */
   debitTest: DebitTestData;
+  /** What each wallet's sheet needs (FUT-3755) — Google Pay null without a sandbox seller account. */
+  wallets: EvidenceWalletsConfig;
+}
+
+/** A phase 1 that stopped before minting anything for the browser. */
+function unminted(record: EvidenceRecord): Omit<PreparedEvidenceRun, 'wallets'> {
+  return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
 }
 
 /**
@@ -194,7 +218,7 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
     const why = seller === 'NOT_SANDBOX' ? deps.copy.notSandbox : deps.copy.usageNotConnected;
     record.steps = [stepOf('connect.usage', seller === 'NOT_SANDBOX' ? 'FAILED' : 'PENDING', now, { observed: why })];
     await deps.store.save(record);
-    return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
+    return { ...unminted(record), wallets: await walletsConfig(deps, null) };
   }
 
   record.steps.push(await applicationStep(deps));
@@ -207,7 +231,7 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
   if (token === (await deps.platformToken())) {
     record.steps.push(stepOf('connect.usage', 'FAILED', clockOf(deps)(), { observed: deps.copy.usageSameAsPlatform }));
     await deps.store.save(record);
-    return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
+    return { ...unminted(record), wallets: await walletsConfig(deps, seller.accountId) };
   }
 
   const minted = await recordTraffic(() =>
@@ -224,7 +248,13 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
   record.steps.push(threeDS.step);
   record.updatedAt = clockOf(deps)().toISOString();
   await deps.store.save(record);
-  return { runId: record.id, publicKey, threeDSSession: threeDS.session, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
+  return {
+    runId: record.id,
+    publicKey,
+    threeDSSession: threeDS.session,
+    debitTest: PAGBANK_SANDBOX_DEBIT_TEST,
+    wallets: await walletsConfig(deps, seller.accountId),
+  };
 }
 
 /**
@@ -258,11 +288,16 @@ function blockedBecause(
   return record.steps.find((step) => step.key === 'connect.usage' && step.status === 'FAILED')?.observed ?? null;
 }
 
-/** Phase 2: raise the Pix, card and debit orders once, record them, then prove whose token they used. */
+/**
+ * Phase 2: raise the Pix, card, debit and wallet orders once, record them,
+ * then prove whose token they used. `wallets` is what each wallet's sheet gave
+ * the browser (FUT-3755); absent, both wallet sections stay PENDING.
+ */
 export async function completeEvidenceRun(
   deps: EvidenceRunDeps,
   runId: string,
   cards: readonly BrowserCardResult[],
+  wallets: readonly BrowserWalletResult[] = [],
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
 
@@ -277,6 +312,7 @@ export async function completeEvidenceRun(
       ...(await pixSteps(deps, runId)),
       ...(await cardSteps(deps, runId, cards)),
       ...(await debitSteps(deps, runId, cards)),
+      ...(await walletSectionSteps(deps, runId, wallets)),
     ];
     for (const step of raised) {
       steps = withStep(steps, step);

@@ -1,4 +1,5 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
+import type { WalletType } from '../../core/wallet-types';
 
 /**
  * The homologação EVIDENCE model (FUT-3696) — what was really executed against
@@ -19,9 +20,10 @@ export type EvidenceStatus = 'EXECUTED' | 'FAILED' | 'PENDING';
 /**
  * The file's sections, in the order (and so with the numbers, from 2) it
  * prints them. DEBIT came last (FUT-3755) so the card steps PagBank already
- * cites — 4.6 among them — keep their numbers.
+ * cites — 4.6 among them — keep their numbers; the two wallets came after it
+ * for the same reason.
  */
-export const EVIDENCE_SECTIONS = ['CONNECT', 'PIX', 'CARD', 'DEBIT'] as const;
+export const EVIDENCE_SECTIONS = ['CONNECT', 'PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY'] as const;
 
 export type EvidenceSection = (typeof EVIDENCE_SECTIONS)[number];
 
@@ -49,6 +51,14 @@ export const EVIDENCE_STEP_KEYS = [
   'debit.approved',
   'debit.consult',
   'debit.cancel',
+  'gpay.token',
+  'gpay.approved',
+  'gpay.consult',
+  'gpay.cancel',
+  'apay.token',
+  'apay.approved',
+  'apay.consult',
+  'apay.cancel',
 ] as const;
 
 export type EvidenceStepKey = (typeof EVIDENCE_STEP_KEYS)[number];
@@ -59,6 +69,8 @@ const SECTION_BY_PREFIX: Readonly<Record<string, EvidenceSection>> = {
   pix: 'PIX',
   card: 'CARD',
   debit: 'DEBIT',
+  gpay: 'GOOGLE_PAY',
+  apay: 'APPLE_PAY',
 };
 
 export const SECTION_OF: Readonly<Record<EvidenceStepKey, EvidenceSection>> = Object.fromEntries(
@@ -157,6 +169,59 @@ export const BROWSER_CARD_FAILURES = [
   'THREEDS_FAILED',
 ] as const;
 export type BrowserCardFailure = (typeof BROWSER_CARD_FAILURES)[number];
+
+/** The wallets the evidence runs, in the order the file prints them (FUT-3755). */
+export const EVIDENCE_WALLETS = ['GOOGLE_PAY', 'APPLE_PAY'] as const satisfies readonly WalletType[];
+export type EvidenceWallet = (typeof EVIDENCE_WALLETS)[number];
+
+/**
+ * Why the browser has no wallet token — a CODE, worded by the evidence copy:
+ *
+ * - `NOT_AVAILABLE`              this browser/device cannot show the wallet's sheet
+ * - `DISMISSED`                  the operator closed the sheet
+ * - `NOT_CONFIGURED`             the host has no Apple Pay identity (no Apple Developer account yet)
+ * - `MERCHANT_VALIDATION_FAILED` Apple Pay's merchant validation did not complete
+ * - `TOKEN_ERROR`                the sheet failed, or answered without a token
+ */
+export const BROWSER_WALLET_FAILURES = [
+  'NOT_AVAILABLE',
+  'DISMISSED',
+  'NOT_CONFIGURED',
+  'MERCHANT_VALIDATION_FAILED',
+  'TOKEN_ERROR',
+] as const;
+export type BrowserWalletFailure = (typeof BROWSER_WALLET_FAILURES)[number];
+
+/**
+ * One wallet's sheet, as the browser reports it to phase 2 (FUT-3755). The
+ * token is the wallet's one-time payment credential, sent verbatim as
+ * `card.wallet.key` and redacted wherever it is recorded; `brand` and `last4`
+ * are what the wallet itself showed (never a PAN).
+ */
+export interface BrowserWalletResult {
+  type: EvidenceWallet;
+  /** Google's `tokenizationData.token`, or Apple's `token.paymentData` serialized; null when there is none. */
+  token: string | null;
+  /** The card network the wallet named, e.g. `VISA`; null when it named none. */
+  brand: string | null;
+  /** The card's last four digits as the wallet showed them; null when it showed none. */
+  last4: string | null;
+  /** Why there is no token. */
+  failure?: BrowserWalletFailure;
+}
+
+/**
+ * What the browser needs to open each wallet's sheet for the evidence —
+ * computed server-side (FUT-3755). Google Pay is always `TEST` (the evidence is
+ * sandbox-only) and is minted against the test seller's PagBank account id;
+ * Apple Pay only says whether the host has an Apple Pay identity at all.
+ */
+export interface EvidenceWalletsConfig {
+  /** The amount the sheets show — the amount the wallet orders are raised for. */
+  amountCents: number;
+  googlePay: { gateway: string; gatewayMerchantId: string; environment: 'TEST' } | null;
+  applePay: { configured: boolean };
+}
 
 /** The ✓/✗/⧗ counts the screen shows beside the button. */
 export interface EvidenceSummary {
@@ -264,6 +329,17 @@ export interface EvidenceOutcomeCopy {
   threeDSFailed: (detail: string) => string;
   /** The browser reported no debit card at all. */
   debitNotReported: string;
+  /** Each wallet's name as the file prints it (FUT-3755). */
+  walletNames: Readonly<Record<EvidenceWallet, string>>;
+  /** The browser obtained the wallet's token; `card` is its network and last four. */
+  walletTokenReceived: (wallet: string, card: string) => string;
+  /** The wallet's button was not pressed before generating. */
+  walletNotRun: (wallet: string) => string;
+  /** The browser has no token; `detail` is a worded {@link BrowserWalletFailure}. */
+  walletFailed: (wallet: string, detail: string) => string;
+  walletFailures: Readonly<Record<BrowserWalletFailure, string>>;
+  /** The host has no Apple Pay identity: waiting for the Apple Developer account. */
+  applePayNotConfigured: string;
   webhookReceived: (count: number, inboxStatuses: string, chargeStatus: string | null) => string;
   webhookNone: string;
   webhookFailed: string;
