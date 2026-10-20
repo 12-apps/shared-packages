@@ -1,6 +1,7 @@
 /* eslint-disable test-flakiness/no-test-isolation --
    each case builds its own lookup (and its own cache) through
    `createInboxLookup`; nothing is shared between cases. */
+import { promises as dnsPromises } from "node:dns";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createEmailCredentials } from "../../email-credentials";
@@ -262,13 +263,20 @@ describe("the default resolver's DNS-over-HTTPS fallback", () => {
   it("keeps a system resolver that could not answer only briefly", async () => {
     vi.useFakeTimers();
     try {
+      const resolveMxSpy = vi.spyOn(dnsPromises.Resolver.prototype, "resolveMx");
       systemAnswer.code = "ETIMEOUT";
       const lookup = createInboxLookup({});
       expect(await lookup("a@paladira.com")).toBeNull();
+      expect(await lookup("b@paladira.com")).toBeNull();
+      expect(resolveMxSpy).toHaveBeenCalledTimes(1);
+      // Past five minutes it asks again; a real "no MX" is then kept for the hour.
       systemAnswer.code = "ENODATA";
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
-      // The real "no MX" now: kept, and asked no more for the hour.
-      expect(await lookup("b@paladira.com")).toBeNull();
+      expect(await lookup("c@paladira.com")).toBeNull();
+      expect(resolveMxSpy).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+      expect(await lookup("d@paladira.com")).toBeNull();
+      expect(resolveMxSpy).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }
