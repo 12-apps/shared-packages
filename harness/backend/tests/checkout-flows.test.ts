@@ -205,7 +205,7 @@ async function call(
 }
 
 describe('@12-apps/payments-backend — the published buyer-checkout mount', () => {
-  it('publishes the nine-row table, and 404s anything outside it', async () => {
+  it('publishes the ten-row table, and 404s anything outside it', async () => {
     expect(CHECKOUT_ROUTES.map((row) => row.kind)).toEqual([
       'getCheckoutConfig',
       'listInstruments',
@@ -215,6 +215,8 @@ describe('@12-apps/payments-backend — the published buyer-checkout mount', () 
       'chargeInstrument',
       'getStatus',
       'releaseCheckout',
+      // A debit card's 3-D Secure session (FUT-3754).
+      'threeDSecureSession',
       'refreshBrowserKey',
     ]);
     const { routes } = setup([harnessAdapter('alpha')]);
