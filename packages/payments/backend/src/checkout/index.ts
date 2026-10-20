@@ -88,6 +88,8 @@ export type {
   BuyerVaultSession,
   VaultedCardDisplay,
 } from './vault-port';
+/** What a buyer's charge may carry of a card (FUT-3754: debit's funding and 3DS id included). */
+export type { CheckoutCard } from './reuse';
 /**
  * The charge-body normalizer, exported so a host can assert what its OWN
  * client's request turns into. Which two wire shapes it accepts, and which of

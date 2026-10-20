@@ -23,6 +23,8 @@ export {
   type ApplePayValidationDeps,
   type ApplePayValidationInput,
 } from './validate';
+export { applePayEnrolmentFor, type ApplePayEnrolment } from './enrolment';
+export { platformApplePayIdentities, platformApplePayIdentity } from './platform-identity';
 export { APPLE_PAY_GATEWAY_HOSTS, applePayValidationUrl } from './gateway-hosts';
 export type {
   ApplePayIdentityPort,
