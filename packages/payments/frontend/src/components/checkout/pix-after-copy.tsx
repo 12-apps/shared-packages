@@ -133,17 +133,21 @@ interface PixAfterCopyProps {
 }
 
 /**
+ * The pair's leading icons. On a phone's card (the pair under 360px) they go,
+ * as in the prototype: beside the icon, "Copiar de novo" took two lines in its
+ * 159px column ("novo" alone). A computer's column is wider and keeps them.
+ * `button` in the selector outranks the library Button's own icon rule, which
+ * otherwise wins or loses on style insertion order.
+ */
+const ICON_SLOT = "& button .MuiButton-startIcon, & button .MuiButton-start";
+/** The pair's own width, never the pane's. */
+const ACTIONS_NARROW = "@container pixactions (max-width: 359.95px)";
+
+/**
  * The narrow layout's two secondaries side by side — 140px columns, so the pair
  * fits a 390px phone's card (two of 180px did not, and stacked) and stacks only
  * at 320 — wide, the card link joins the row.
  */
-/**
- * The buttons' leading icons. Narrow, the pair goes without them, as in the
- * prototype: in a 159px column the icon pushed "Copiar de novo" onto two lines
- * ("novo" alone). Wide, the row has room and keeps them.
- */
-const ICON_SLOT = "& .MuiButton-startIcon, & .MuiButton-start";
-
 function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAfterCopyProps, "justCopied" | "onCopyAgain" | "onShowQr" | "onPreferCard">): JSX.Element {
   const { Button } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
@@ -151,7 +155,7 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
   // (FUT-3535): copying it again would only hand the buyer the wrong amount.
   const stale = usePaymentStale();
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, [ICON_SLOT]: { display: "none" }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" }, [ICON_SLOT]: { display: "inherit" } } }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 1.25, "& button": { minHeight: 48, height: "100%" }, "& button, & button *": { fontWeight: 700 }, containerType: "inline-size", containerName: "pixactions", [ACTIONS_NARROW]: { [ICON_SLOT]: { display: "none" } }, [PIX_WIDE]: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.5, "& button": { height: "auto" } } }}>
       {/* Narrow, a grid cell; wide, its own width beside the link (the prototype's row). */}
       <Box sx={{ minWidth: 0, [PIX_WIDE]: { flex: "none", "& > *": { width: "auto" } } }}>
         <Button variant="outline" color="neutral" size="md" fullWidth icon={<ContentCopyIcon fontSize="small" />} onClick={onCopyAgain} disabled={stale} dataTestId="pix-copy-again">
