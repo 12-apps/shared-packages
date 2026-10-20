@@ -112,6 +112,16 @@ describe('the walk gates debit charges', () => {
     expect(!hasInstrument(result) && result.reason).toContain('3-D Secure');
   });
 
+  it('refuses a debit charge on a saved card, rather than charge the vaulted card as DEBIT', () => {
+    const result = chargeInputFor(
+      debitInput({ token: undefined, savedCardToken: 'vault-1' }),
+      'pagbank',
+      'pagbank',
+      { tokenization: 'PUBLIC_KEY', debit: true },
+    );
+    expect(!hasInstrument(result) && result.reason).toContain('saved card');
+  });
+
   it('refuses a pinned debit charge before reaching createCharge', async () => {
     const world = setupGatewayWorld();
     await expect(world.gateway.charge(TENANT, debitInput(), { provider: 'stone' })).rejects.toThrow(

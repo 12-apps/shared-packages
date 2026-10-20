@@ -16,8 +16,10 @@ import type { CheckoutRouteIntent } from './types';
  * Payable-scoped for the reason `/refresh-key` is: the merchant comes from the
  * caller's OWN payable, never from a client-supplied handle, so a signed-in
  * buyer cannot make the platform call a provider with an arbitrary store's
- * token. The answer carries the session only — it authorizes nothing but an
- * authentication attempt, and expires in 30 minutes.
+ * token. The answer carries the session — it authorizes nothing but an
+ * authentication attempt, and expires in 30 minutes — and the amount the charge
+ * will take (`payable.amount`), so the bank authenticates exactly what is then
+ * charged and the browser never decides a figure of its own.
  */
 export async function threeDSecureSession<C, V extends object, D>(
   runtime: CheckoutRuntime<C, V, D>,
@@ -42,7 +44,11 @@ export async function threeDSecureSession<C, V extends object, D>(
       loaded.payable.merchant,
     );
     if (!minted) return notConfigured(runtime);
-    return runtime.respond.ok({ provider: minted.provider, ...minted.session });
+    return runtime.respond.ok({
+      provider: minted.provider,
+      ...minted.session,
+      amountCents: loaded.payable.amount.amountCents,
+    });
   } catch (error) {
     // The MESSAGE only: a provider error retains the provider's parsed body.
     runtime.log.error(

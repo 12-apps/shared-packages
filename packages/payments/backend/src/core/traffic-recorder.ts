@@ -125,6 +125,9 @@ const SECRET_KEYS = new Set([
   'security_code',
   'securitycode',
   'encrypted',
+  // The 3-D Secure session (FUT-3754): it authorizes an authentication against
+  // the seller's account for 30 minutes, so the evidence file never carries it.
+  'session',
 ]);
 
 /** Inside a `card` object these identify the instrument: PAN and vault id. */

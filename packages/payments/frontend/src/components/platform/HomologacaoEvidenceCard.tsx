@@ -121,6 +121,9 @@ async function authenticateDebitTestCard(
     amountCents: test.amountCents,
     customer: test.customer,
     billingAddress: test.billingAddress,
+    // The test card never challenges; a hung SDK must not hold the Pix and
+    // credit scenarios back with it.
+    timeoutMs: 60_000,
   });
   return outcome.ok
     ? { ...encrypted, authenticationId: outcome.authenticationId, authenticated: outcome.authenticated }

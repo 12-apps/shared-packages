@@ -97,6 +97,9 @@ function debitRefusal(
 ): NoInstrument | null {
   if (card.funding !== 'DEBIT') return null;
   if (!card.authenticationId) return { reason: 'a debit charge needs a 3-D Secure authentication' };
+  // A vaulted card is charged as credit: the authentication was run on the
+  // card the buyer typed, and a stored one may not even be a debit card.
+  if (card.savedCardToken) return { reason: 'a debit charge cannot use a saved card' };
   if (!capabilities || capabilities.debit) return null;
   return { reason: `provider ${provider} does not support debit` };
 }

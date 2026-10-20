@@ -160,9 +160,12 @@ export function useListState(input: {
     [cards, setSelection, input.fresh],
   );
   // A choice the chain no longer offers (a config that resolved to a hand-off
-  // store after the card was preselected) is no choice at all.
+  // store after the card was preselected) is no choice at all. Matched on the
+  // funding too: a debit row that went away (its billing address with it) must
+  // not leave a choice the card charge would run as CREDIT (FUT-3754).
   useEffect(() => {
-    if (choice?.kind === "online" && !rows.some((row) => row.method === choice.method && !row.disabled)) setChoice(null);
+    if (choice?.kind !== "online") return;
+    if (!rows.some((row) => row.method === choice.method && row.funding === choice.funding && !row.disabled)) setChoice(null);
   }, [choice, rows]);
   const { onChoiceChange } = input;
   useEffect(() => {

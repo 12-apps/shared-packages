@@ -16,7 +16,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CheckoutBillingAddress } from "../list/types";
 import type { CheckoutProviderConfig } from "../types";
-import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, listFlow, onPageStore, renderList, stubClient } from "./list-harness";
 
 const ADDRESS: CheckoutBillingAddress = {
   street: "Av. Brigadeiro Faria Lima",
@@ -133,6 +133,26 @@ describe("paying by debit", () => {
         }),
       }),
     );
+    expect(client.charge).not.toHaveBeenCalled();
+  });
+
+  it("drops a debit choice whose row went away, rather than pay it as credit", async () => {
+    const client = debitClient();
+    const host = { config: debitStore(), client, buyer: BUYER, list: { billingAddress: ADDRESS } };
+    const { rerender } = renderList(host);
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    fireEvent.click(radio("list-option-CARD-DEBIT"));
+    await waitFor(() => expect(radio("list-option-CARD-DEBIT").checked).toBe(true));
+    fireEvent.change(screen.getByTestId("card-number"), { target: { value: "4000 0000 0000 2701" } });
+    fireEvent.change(screen.getByTestId("card-holder"), { target: { value: "ANA TESTE" } });
+    fireEvent.change(screen.getByTestId("card-expiry"), { target: { value: "12/40" } });
+    fireEvent.change(screen.getByTestId("card-cvv"), { target: { value: "123" } });
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+
+    rerender(listFlow({ ...host, list: {} }));
+    await waitFor(() => expect(screen.queryByTestId("list-option-CARD-DEBIT")).toBeNull());
+    expect(radio("list-option-CARD").checked).toBe(false);
+    await waitFor(() => expect(payButton().disabled).toBe(true));
     expect(client.charge).not.toHaveBeenCalled();
   });
 

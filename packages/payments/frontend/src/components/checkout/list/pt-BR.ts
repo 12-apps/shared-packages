@@ -29,7 +29,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
   },
   debit: {
     label: "Cartão de débito",
-    hint: "O banco pode pedir uma confirmação no app",
+    hint: "O banco pode pedir confirmação no app",
     notSupported: "Esse cartão não pode ser usado no débito aqui. Tente no crédito ou no Pix.",
     refused: "O banco não confirmou o pagamento no débito. Tente outro cartão ou o Pix.",
     failed: "Não foi possível confirmar o débito com o banco. Tente de novo.",

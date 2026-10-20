@@ -48,7 +48,7 @@ export async function authenticateDebit(input: {
     session: minted.data.session,
     environment: minted.data.environment,
     encryptedCard: input.encryptedCard,
-    amountCents: input.order.amountDueCents ?? input.order.totalCents,
+    amountCents: minted.data.amountCents,
     customer: {
       name: input.buyer.name ?? "",
       email: input.buyer.email ?? "",

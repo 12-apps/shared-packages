@@ -87,12 +87,6 @@ function focusCardNumber(scope: HTMLElement | null): void {
 }
 
 /**
- * What opens inside a chosen ONLINE option, top to bottom (M11, FN:180-202):
- * the buyer's missing details, then — for the card — the saved-card chips and
- * the card fields, then a refusal of the last charge. No left indent: it all
- * starts where the row's own content starts.
- */
-/**
  * The card's own fields: the saved cards, then the form for a new one. A debit
  * card (FUT-3754) is always typed — a saved card is charged as credit — and is
  * never offered for saving.
@@ -116,6 +110,12 @@ function CardFields({ card, copy, debit }: { card: ListCard; copy: PaymentListCo
   );
 }
 
+/**
+ * What opens inside a chosen ONLINE option, top to bottom (M11, FN:180-202):
+ * the buyer's missing details, then — for the card — the saved-card chips and
+ * the card fields, then a refusal of the last charge. No left indent: it all
+ * starts where the row's own content starts.
+ */
 export function OnlineContent({
   method,
   asked,

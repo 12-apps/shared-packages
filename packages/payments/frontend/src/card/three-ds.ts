@@ -65,6 +65,12 @@ export interface ThreeDSInput {
   amountCents: number;
   customer: { name: string; email: string; phone: string };
   billingAddress: Omit<PagBankThreeDSAddress, "country">;
+  /**
+   * Give up after this long, answering `ERROR`. Only for a run nobody types
+   * into (the homologation's no-challenge test card): a buyer's challenge may
+   * honestly take minutes, so the checkout passes none.
+   */
+  timeoutMs?: number;
 }
 
 /** Why a debit card could not be authenticated — a CODE; the caller words it. */
@@ -123,6 +129,24 @@ export function threeDSOutcomeOf(result: PagBankThreeDSResult): ThreeDSOutcome {
   return { ok: false, failure: "ERROR" };
 }
 
+/** The SDK's answer, or a rejection once `ms` have passed (never, without `ms`). */
+function withTimeout<T>(pending: Promise<T>, ms: number | undefined): Promise<T> {
+  if (ms === undefined) return pending;
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("3-D Secure timed out")), ms);
+    pending.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 /** Authenticate a debit card with PagBank's SDK. Never throws. */
 export async function authenticatePagBankDebit(input: ThreeDSInput): Promise<ThreeDSOutcome> {
   const request = threeDSRequestOf(input);
@@ -132,7 +156,7 @@ export async function authenticatePagBankDebit(input: ThreeDSInput): Promise<Thr
   if (!sdk?.setUp || !sdk.authenticate3DS) return { ok: false, failure: "SDK_UNAVAILABLE" };
   try {
     sdk.setUp({ session: input.session, env: input.environment === "PRODUCTION" ? "PROD" : "SANDBOX" });
-    return threeDSOutcomeOf(await sdk.authenticate3DS(request));
+    return threeDSOutcomeOf(await withTimeout(sdk.authenticate3DS(request), input.timeoutMs));
   } catch {
     // The SDK rejects with `{ detail: { httpStatus, traceId, errorMessages } }`
     // — a bad field or an expired session. Neither can be fixed by the buyer

@@ -22,4 +22,10 @@ export interface ThreeDSecureSessionView {
   session: string;
   expiresAt: number;
   environment: "SANDBOX" | "PRODUCTION";
+  /**
+   * What the charge will take, in cents — the figure the bank authenticates.
+   * The server's, never the browser's: an authentication for any other amount
+   * is refused or, worse, approves a debit the buyer never confirmed.
+   */
+  amountCents: number;
 }

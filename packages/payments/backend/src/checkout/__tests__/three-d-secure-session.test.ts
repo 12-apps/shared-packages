@@ -23,6 +23,8 @@ describe('POST /3ds-session', () => {
       provider: 'pagbank',
       session: 'stub-3ds-session',
       environment: 'SANDBOX',
+      // The payable's own figure: the bank authenticates what the charge takes.
+      amountCents: 7500,
     });
   });
 
