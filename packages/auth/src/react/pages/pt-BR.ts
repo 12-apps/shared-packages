@@ -23,6 +23,7 @@ export const PT_BR_PAGES: AuthPagesCopy = {
     title: "Criar conta",
     subtitle: "Crie sua conta",
     providerDivider: "ou",
+    otherWays: { show: "Outras formas de cadastro", hide: "Ocultar outras formas" },
     loginPrompt: "Já tem uma conta?",
     loginLink: "Entrar",
   },

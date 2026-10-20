@@ -90,6 +90,8 @@ export interface EmailAuthScreens {
   LinkButton: ComponentType<{
     onClick: () => void;
     dataTestId: string;
+    /** For a link that shows and hides something: whether it is shown now. */
+    expanded?: boolean;
     children: ReactNode;
   }>;
 }
@@ -134,5 +136,5 @@ export type { EmailAuthCopy, EmailAuthScreenReason } from "./copy";
 export { PT_BR } from "./pt-BR";
 export { EN_US } from "./en-US";
 export { failureMessage } from "./copy";
-export type { SignupConfig, SignupPhoneField } from "./email-signup-form";
+export type { SignupConfig, SignupPhoneField, SignupStep } from "./email-signup-form";
 export type { VerifiedOutcome } from "./verify-email";
