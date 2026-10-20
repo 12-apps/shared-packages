@@ -10,7 +10,8 @@ import type { EvidenceRunDeps } from './run';
  * through the host's gateway for the test seller and recorded call by call.
  * Split from `run.ts`, which owns the phases; this owns what each order step
  * counts as evidence — a recorded 2xx answer is always part of the bar. The
- * debit section (`orders-debit.ts`) raises its order through the same helpers.
+ * debit section (`orders-debit.ts`) and the wallet sections (`orders-wallet.ts`)
+ * raise their orders through the same helpers.
  */
 
 const PROVIDER = 'pagbank';
@@ -245,7 +246,7 @@ function serverError(outcome: { ok: boolean; calls: readonly { status?: number }
  */
 export async function consultCharge(
   deps: EvidenceRunDeps,
-  key: 'card.approvedConsult' | 'debit.consult',
+  key: 'card.approvedConsult' | 'debit.consult' | 'gpay.consult' | 'apay.consult',
   chargeId: string,
   orderId: string | null,
 ): Promise<EvidenceStep> {
@@ -302,7 +303,7 @@ async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
 
 export async function cancelCharge(
   deps: EvidenceRunDeps,
-  key: 'card.cancel' | 'debit.cancel',
+  key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel',
   chargeId: string,
   orderId: string | null,
 ): Promise<EvidenceStep> {

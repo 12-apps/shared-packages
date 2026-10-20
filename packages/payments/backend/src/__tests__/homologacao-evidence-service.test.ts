@@ -36,7 +36,7 @@ function delegates() {
   return { evidence, webhookEvents, charges };
 }
 
-function service(config = createMemoryProviderConfigStore()) {
+function service(config = createMemoryProviderConfigStore(), extra: { applePayConfigured?: () => boolean } = {}) {
   const d = delegates();
   const appCredentials = () => ({ environment: 'SANDBOX' as const, fields: { clientId: 'cid', accountToken: 'platform-token' } });
   return {
@@ -53,28 +53,32 @@ function service(config = createMemoryProviderConfigStore()) {
       identification: { name: 'Brand', site: 'https://x.test' },
       copy: PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
       newId: () => 'run-0000-0000',
+      ...extra,
     }),
   };
 }
 
+async function connectedConfig() {
+  const config = createMemoryProviderConfigStore();
+  await config.save(SELLER, {
+    provider: 'pagbank',
+    enabled: true,
+    priority: 0,
+    environment: 'SANDBOX',
+    status: 'VERIFIED',
+    lastVerifiedAt: null,
+    chargeVerifiedAt: null,
+    pendingVerification: null,
+    expiresAt: null,
+    stub: false,
+    environments: { SANDBOX: { token: 'seller-secret', accountId: 'ACCO_1', connectedAt: '2026-10-17T15:00:00Z' }, PRODUCTION: {} },
+  });
+  return config;
+}
+
 describe('createHomologacaoEvidence', () => {
   it('given a connected seller, then the view says so and never carries its token', async () => {
-    const config = createMemoryProviderConfigStore();
-    await config.save(SELLER, {
-      provider: 'pagbank',
-      enabled: true,
-      priority: 0,
-      environment: 'SANDBOX',
-      status: 'VERIFIED',
-      lastVerifiedAt: null,
-      chargeVerifiedAt: null,
-      pendingVerification: null,
-      expiresAt: null,
-      stub: false,
-      environments: { SANDBOX: { token: 'seller-secret', accountId: 'ACCO_1', connectedAt: '2026-10-17T15:00:00Z' }, PRODUCTION: {} },
-    });
-
-    const view = await service(config).svc.seller();
+    const view = await service(await connectedConfig()).svc.seller();
 
     expect(view).toEqual({
       connected: true,
@@ -83,8 +87,26 @@ describe('createHomologacaoEvidence', () => {
       connectedAt: '2026-10-17T15:00:00Z',
       accountId: 'ACCO_1',
       lastConnectProblem: null,
+      // Google Pay's sheet mints against the sandbox seller's account; no Apple Pay identity was given.
+      wallets: {
+        amountCents: 1200,
+        googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'TEST' },
+        applePay: { configured: false },
+      },
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
+  });
+
+  it('given the host says Apple Pay is configured, then the view says so (FUT-3755)', async () => {
+    const view = await service(await connectedConfig(), { applePayConfigured: () => true }).svc.seller();
+
+    expect(view.wallets.applePay).toEqual({ configured: true });
+  });
+
+  it('given no seller, then Google Pay has no account to mint against (FUT-3755)', async () => {
+    const view = await service().svc.seller();
+
+    expect(view.wallets).toEqual({ amountCents: 1200, googlePay: null, applePay: { configured: false } });
   });
 
   it('when connecting, then the record lands in the evidence table and the file reads it back', async () => {

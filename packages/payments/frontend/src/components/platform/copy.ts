@@ -152,6 +152,33 @@ export interface HomologacaoEvidenceCardCopy {
   incomplete: string;
   /** Which phase failed — and that the latest recorded file can still be downloaded. */
   generateFailed: (phase: 'preparing' | 'encrypting' | 'running' | 'downloading') => string;
+  /** The wallet step before generating (FUT-3755): each sheet opens on the operator's tap. */
+  wallets: HomologacaoEvidenceWalletsCopy;
+}
+
+/** The Google Pay / Apple Pay step of the evidence card (FUT-3755). */
+export interface HomologacaoEvidenceWalletsCopy {
+  heading: string;
+  /** Each wallet's name, as the ready and failed lines say it. */
+  names: { GOOGLE_PAY: string; APPLE_PAY: string };
+  /** Why the buttons come before "generate", and that skipping them leaves the sections pending. */
+  hint: string;
+  /** The language Google draws its own button's label in. */
+  googlePayButtonLocale: string;
+  /** The Apple Pay button's accessible name. */
+  applePayButton: string;
+  /** The line Apple's sheet shows above the test amount. */
+  applePaySheetTotal: string;
+  /** Apple Pay could not start (no merchant validation). */
+  applePayCannotStart: string;
+  /** Apple Pay started and failed. */
+  applePayCannotComplete: string;
+  /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
+  applePayAbsent: { NOT_CONFIGURED: string; NOT_AVAILABLE: string };
+  /** A wallet holds its token: `card` is the network and last four the wallet showed — never the token. */
+  ready: (wallet: string, card: string) => string;
+  /** The sheet answered no token; pressing again retries. */
+  failed: (wallet: string) => string;
 }
 
 /** The whole platform surface, in one object a host passes at the mount. */

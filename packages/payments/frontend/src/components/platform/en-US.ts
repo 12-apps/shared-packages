@@ -128,7 +128,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     phases: {
       preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',
       encrypting: 'Encrypting the test cards and authenticating the debit card (3DS) in the browser…',
-      running: 'Creating the Pix, credit and debit orders in the sandbox — this can take a few minutes…',
+      running: 'Creating the Pix, credit, debit and wallet orders in the sandbox — this can take a few minutes…',
       downloading: 'Building the file…',
     },
     summary: ({ executed, failed, pending }) =>
@@ -144,5 +144,23 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
           downloading: 'Building the file failed.',
         }[phase]
       } Try again; "Download the latest recorded" still returns what was recorded.`,
+    wallets: {
+      heading: 'Digital wallets (before generating)',
+      names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
+      hint:
+        'Google Pay and Apple Pay open their own sheet, and only on your tap. Tap each one before generating the file; ' +
+        "without it, the wallets' sections stay pending. Test only: nothing is charged.",
+      googlePayButtonLocale: 'en',
+      applePayButton: 'Pay with Apple Pay',
+      applePaySheetTotal: 'Homologation test',
+      applePayCannotStart: 'Apple Pay is not configured.',
+      applePayCannotComplete: 'Apple Pay could not be completed.',
+      applePayAbsent: {
+        NOT_CONFIGURED: 'Apple Pay: waiting for the Apple Developer account. Its section stays pending.',
+        NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
+      },
+      ready: (wallet, card) => `${wallet} ready${card ? ` — ${card}` : ''}. It will be used when the file is generated.`,
+      failed: (wallet) => `${wallet} returned no token. Tap again to retry.`,
+    },
   },
 };

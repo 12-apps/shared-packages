@@ -75,7 +75,7 @@ describe('HomologacaoEvidenceCard', () => {
     await waitFor(() => expect(screen.getByTestId('evidence-summary-counts').textContent).toBe(
       '✓\u00a015\u00a0executados · ✗\u00a00\u00a0falharam · ⧗\u00a02\u00a0pendentes',
     ));
-    expect(props.onRun).toHaveBeenCalledWith('run-1', expect.any(Array));
+    expect(props.onRun).toHaveBeenCalledWith('run-1', expect.any(Array), expect.any(Array));
     expect(ran[0]?.map((card) => [card.scenario, card.encrypted])).toEqual([
       ['approved', 'enc-2097'],
       ['declined', 'enc-0766'],

@@ -40,6 +40,13 @@ const PAGBANK_SANDBOX_3DS_CONTACT = {
 export const PAGBANK_SANDBOX_DEBIT_CENTS = 2701;
 
 /**
+ * The wallet orders' amount, in cents (FUT-3755): Google Pay's and Apple Pay's
+ * sheets show it and the server raises the wallet orders for it, so the
+ * browser is handed it rather than restating it.
+ */
+export const PAGBANK_SANDBOX_WALLET_CENTS = 1200;
+
+/**
  * What the browser authenticates the debit test card with — handed over by
  * phase 1 rather than restated in the frontend, so the amount the browser
  * authenticates is, by construction, the amount the server charges.
