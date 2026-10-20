@@ -274,6 +274,24 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   };
 }
 
+/**
+ * A NEW native view when an Android button turns enabled or disabled
+ * (FUT-3775). There, a disabled solid button that turned enabled painted its
+ * new fill and no label at all — the courier app's cancel, join and finish
+ * sheets showed a red block with no text. A remount of the label alone (keyed
+ * on its colour) and a ripple kept constant did not bring it back; a button
+ * that mounts enabled draws its label, so the flip mounts it again (measured on
+ * the future-pay Maestro emulator lane).
+ *
+ * Only on Android, and only on `disabled`: a remounted view loses screen-reader
+ * focus, so iOS (never affected) and the loading flip (a button the user just
+ * pressed) keep their view.
+ */
+export function enableFlipKey(disabled: boolean | undefined, os: string = Platform.OS): string | undefined {
+  if (os !== 'android') return undefined;
+  return disabled ? 'disabled' : 'enabled';
+}
+
 export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
   const resolved = resolveButtonProps(rawProps);
   const { loading, icon, iconPosition, pulse, ripple, children, onClick, onPress, ...others } = resolved;
@@ -301,12 +319,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
 
   return (
     <Pressable
-      // A NEW native view when the button turns enabled or disabled (FUT-3775).
-      // On Android a disabled button that turned enabled painted its new fill
-      // and no label at all — the label's own colour, a remount of the label
-      // and a ripple kept constant did not bring it back. A button that mounts
-      // enabled draws its label, so the flip mounts it again.
-      key={look.inactive ? 'inactive' : 'active'}
+      key={enableFlipKey(resolved.disabled)}
       ref={ref}
       role="button"
       aria-disabled={look.inactive}

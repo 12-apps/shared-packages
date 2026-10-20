@@ -1,27 +1,53 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
-import { describe, expect, it } from 'vitest';
+import { Platform } from 'react-native';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { Button } from './Button.native';
+import { Button, enableFlipKey } from './Button.native';
 
 /**
- * A native Button is a NEW view when it turns enabled or disabled (FUT-3775).
- * On Android, a disabled solid Button that turned enabled painted its new
- * fill and no label — the courier app's cancel, join and finish sheets showed
- * a red block with no text. A Button that mounts enabled draws its label, so
- * the flip mounts it again. Measured on the Maestro emulator lane: the label
- * key alone did not bring the label back; this did.
+ * An Android Button is a NEW view when it turns enabled or disabled
+ * (FUT-3775). There, a disabled solid Button that turned enabled painted its
+ * fill and no label — the courier app's cancel, join and finish sheets showed a
+ * red block with no text. Measured on the future-pay Maestro emulator lane: a
+ * remount of the label alone did not bring it back; remounting the button did.
+ * Only Android, and only the disabled flip: a remount loses screen-reader focus.
  */
-function Confirm({ ready, label = 'Confirmar' }: { ready: boolean; label?: string }): React.JSX.Element {
+const realOs = Platform.OS;
+
+/** Run the render as Android: the remount is Android's alone. */
+function asAndroid(): void {
+  Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
+}
+
+afterEach(() => {
+  Object.defineProperty(Platform, 'OS', { value: realOs, configurable: true });
+});
+
+function Confirm({ ready, busy = false, label = 'Confirmar' }: { ready: boolean; busy?: boolean; label?: string }): React.JSX.Element {
   return (
-    <Button variant="solid" color="danger" disabled={!ready} dataTestId="confirm">
+    <Button variant="solid" color="danger" disabled={!ready} loading={busy} dataTestId="confirm">
       {label}
     </Button>
   );
 }
 
-describe('Button (native) — the enable flip', () => {
+describe('enableFlipKey', () => {
+  it('keys an Android button on whether it is disabled', () => {
+    expect(enableFlipKey(true, 'android')).toBe('disabled');
+    expect(enableFlipKey(false, 'android')).toBe('enabled');
+    expect(enableFlipKey(undefined, 'android')).toBe('enabled');
+  });
+
+  it('gives iOS and the web no key — they keep their view, and screen-reader focus', () => {
+    expect(enableFlipKey(true, 'ios')).toBeUndefined();
+    expect(enableFlipKey(false, 'web')).toBeUndefined();
+  });
+});
+
+describe('Button (native, Android) — the enable flip', () => {
   it('mounts a new view when the button turns enabled', () => {
+    asAndroid();
     const { rerender } = render(<Confirm ready={false} />);
     const disabled = screen.getByTestId('confirm');
 
@@ -31,28 +57,25 @@ describe('Button (native) — the enable flip', () => {
     expect(screen.getByTestId('confirm')).toHaveTextContent('Confirmar');
   });
 
+  it('keeps its view while loading starts and settles — the user just pressed it', () => {
+    asAndroid();
+    const { rerender } = render(<Confirm ready />);
+    const idle = screen.getByTestId('confirm');
+
+    rerender(<Confirm ready busy />);
+    expect(screen.getByTestId('confirm')).toBe(idle);
+    rerender(<Confirm ready />);
+
+    expect(screen.getByTestId('confirm')).toBe(idle);
+  });
+
   it('keeps its view across a render that does not flip it', () => {
+    asAndroid();
     const { rerender } = render(<Confirm ready />);
     const enabled = screen.getByTestId('confirm');
 
     rerender(<Confirm ready label="Confirmar cancelamento" />);
 
     expect(screen.getByTestId('confirm')).toBe(enabled);
-  });
-
-  it('mounts a new view when a loading button settles, as loading is inactive too', () => {
-    function Busy({ busy }: { busy: boolean }): React.JSX.Element {
-      return (
-        <Button variant="solid" color="danger" loading={busy} dataTestId="busy">
-          Enviar
-        </Button>
-      );
-    }
-    const { rerender } = render(<Busy busy />);
-    const loading = screen.getByTestId('busy');
-
-    rerender(<Busy busy={false} />);
-
-    expect(screen.getByTestId('busy')).not.toBe(loading);
   });
 });
