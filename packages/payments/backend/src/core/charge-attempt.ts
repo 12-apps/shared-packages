@@ -313,7 +313,7 @@ async function instrumentFor(
   provider: ProviderName,
   pinned: boolean,
   chainHead: ProviderName | undefined,
-  capabilities: Pick<ProviderCapabilities, 'tokenization' | 'wallets'>,
+  capabilities: Pick<ProviderCapabilities, 'tokenization' | 'wallets' | 'debit'>,
 ): Promise<ChargeInput | WalkFailure> {
   const forProvider = chargeInputFor(ctx.input, provider, chainHead, capabilities);
   if (hasInstrument(forProvider)) return forProvider;

@@ -195,7 +195,8 @@ function snapshotOf(
 export async function pagbankRequest<T>(
   path: string,
   credentials: ResolvedCredentials,
-  init: { method: 'GET' | 'POST'; body?: unknown; idempotencyKey?: string },
+  /** `form` sends multipart instead of JSON — the one upload PagBank takes (Apple Pay's `.cer`). */
+  init: { method: 'GET' | 'POST'; body?: unknown; form?: FormData; idempotencyKey?: string },
 ): Promise<T> {
   const url = `${apiBaseFor(credentials)}${path}`;
   return withNetworkRetry(async () => {
@@ -203,11 +204,12 @@ export async function pagbankRequest<T>(
       method: init.method,
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        // A multipart body names its own boundary in the Content-Type fetch sets.
+        ...(init.form ? {} : { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${credentials.fields['token'] ?? ''}`,
         ...(init.idempotencyKey ? { 'x-idempotency-key': init.idempotencyKey } : {}),
       },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      body: init.form ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');

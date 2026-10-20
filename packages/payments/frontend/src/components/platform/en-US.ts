@@ -123,12 +123,12 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     connectFailed: 'Could not start the test seller connection.',
     returnedConnected: 'Test seller connected. The callback and the code exchange were recorded in the evidence.',
     returnedFailed: 'The test seller connection did not complete. Try connecting again.',
-    generate: 'Generate evidence file\u00a0(TXT)',
+    generate: 'Generate evidence file\u00a0(TXT and JSON)',
     downloadLatest: 'Download the latest recorded',
     phases: {
-      preparing: 'Consulting the application, renewing the token and minting the public key…',
-      encrypting: 'Encrypting the test cards in the browser…',
-      running: 'Creating the Pix and card orders in the sandbox — this can take up to a minute…',
+      preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',
+      encrypting: 'Encrypting the test cards and authenticating the debit card (3DS) in the browser…',
+      running: 'Creating the Pix, credit and debit orders in the sandbox — this can take a few minutes…',
       downloading: 'Building the file…',
     },
     summary: ({ executed, failed, pending }) =>
@@ -139,7 +139,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       `${
         {
           preparing: 'Consulting the application and preparing the test seller failed.',
-          encrypting: 'Encrypting the test cards in the browser failed.',
+          encrypting: 'Encrypting the test cards or authenticating the debit card in the browser failed.',
           running: 'Creating the orders in the sandbox failed.',
           downloading: 'Building the file failed.',
         }[phase]

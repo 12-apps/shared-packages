@@ -14,7 +14,7 @@ import {
   type CardTokenizationConfig,
   type SavedCard,
 } from "../../card";
-import { ok, type Result } from "../../result";
+import { err, ok, type Result } from "../../result";
 
 import {
   resolveNewCardToken,
@@ -27,7 +27,9 @@ import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
 import { useOneClickArmed, useOneClickPay } from "./one-click";
-import type { BuyerInfo, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
+import type { BuyerInfo, ChargeCardInput, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
+import { authenticateDebit, type DebitAuthentication } from "./debit-charge";
+import type { CheckoutClient } from "./transport";
 import { usePaymentPolling } from "./use-payment-polling";
 import type { CardCopy } from "../../card/copy";
 import { useCheckoutCopy } from "./copy-context";
@@ -80,6 +82,32 @@ interface CardFormState {
   saveCard: boolean;
   validate: () => CardFieldErrors;
   setFieldErrors: React.Dispatch<React.SetStateAction<CardFieldErrors>>;
+  /** Charge the card as DEBIT, after its 3-D Secure (FUT-3754). */
+  debit?: DebitAuthentication;
+}
+
+/**
+ * The charge's body. A DEBIT card (FUT-3754) is 3-D Secure authenticated first
+ * and charged with the head's own instrument only — the authentication is that
+ * provider's — so no per-provider map, and nothing saved.
+ */
+async function chargeBodyOf(
+  form: CardFormState,
+  instruments: CardInstruments,
+  ctx: { client: CheckoutClient; order: CheckoutOrder; buyer: BuyerInfo },
+): Promise<Result<ChargeCardInput>> {
+  const body: ChargeCardInput = {
+    orderId: ctx.order.orderId,
+    token: instruments.token,
+    tokensByProvider: instruments.tokensByProvider,
+    saveCard: form.usingNewCard && form.saveCard,
+    cardMeta: instruments.cardMeta,
+    taxId: ctx.buyer.taxId,
+  };
+  if (!form.debit) return ok(body);
+  const authenticated = await authenticateDebit({ ...ctx, encryptedCard: instruments.token, debit: form.debit });
+  if (!authenticated.ok) return authenticated;
+  return ok({ ...body, tokensByProvider: undefined, saveCard: false, funding: "DEBIT", authenticationId: authenticated.data });
 }
 
 /** The submit slice of {@link useCardCheckout}. */
@@ -223,20 +251,13 @@ export function useCardSubmit(
       refreshKey: client.refreshBrowserKey,
       copy: cardCopy,
     });
-    if (!resolved.ok) {
-      setError(resolved.error);
+    const body = resolved.ok ? await chargeBodyOf(form, resolved.data, { client, order, buyer }) : err<ChargeCardInput>(resolved.error);
+    if (!body.ok) {
+      setError(body.error);
       setSubmitting(false);
       return;
     }
-
-    const charged = await client.charge({
-      orderId: order.orderId,
-      token: resolved.data.token,
-      tokensByProvider: resolved.data.tokensByProvider,
-      saveCard: form.usingNewCard && form.saveCard,
-      cardMeta: resolved.data.cardMeta,
-      taxId: buyer.taxId,
-    });
+    const charged = await client.charge(body.data);
     if (!charged.ok) {
       setError(charged.error); // transport/validation problem — stay on the form
       // An UNRESOLVED charge is not a decline: some provider may be holding the

@@ -1,3 +1,4 @@
+import type { CardFunding } from './card-funding';
 import type { ProviderName } from './types';
 import type { WalletInstrument } from './wallet-types';
 
@@ -41,6 +42,10 @@ export interface CardDetails {
    *   PagBank  `recurring: { type: 'SUBSEQUENT' }`
    */
   merchantInitiated?: boolean;
+  /** Absent means `CREDIT` (FUT-3754); `DEBIT` needs {@link authenticationId}. */
+  funding?: CardFunding;
+  /** The 3-D Secure authentication the buyer completed for this debit charge. */
+  authenticationId?: string;
   /** 1..12 installments; adapters clamp to what the provider supports. */
   installments?: number;
   /** Cardholder name as typed at checkout (some providers require it). */

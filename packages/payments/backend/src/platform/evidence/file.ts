@@ -2,11 +2,11 @@ import { redactValue, type RecordedHttpCall } from '../../core/traffic-recorder'
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { pendingStep, stepOf, summarize as summary } from './steps';
 import {
+  EVIDENCE_SECTIONS,
   EVIDENCE_STEP_KEYS,
   SECTION_OF,
   type EvidenceChargeRow,
   type EvidenceRecord,
-  type EvidenceSection,
   type EvidenceStep,
   type EvidenceStepKey,
   type EvidenceSummary,
@@ -154,9 +154,8 @@ async function allSteps(
 }
 
 function numbering(steps: readonly EvidenceStep[]): Map<EvidenceStepKey, string> {
-  const sections: EvidenceSection[] = ['CONNECT', 'PIX', 'CARD'];
   const numbers = new Map<EvidenceStepKey, string>();
-  sections.forEach((section, s) => {
+  EVIDENCE_SECTIONS.forEach((section, s) => {
     steps
       .filter((step) => SECTION_OF[step.key] === section)
       .forEach((step, i) => numbers.set(step.key, `${s + 2}.${i + 1}`));
@@ -277,16 +276,35 @@ function renderPendencies(copy: HomologacaoEvidenceCopy, steps: readonly Evidenc
   ];
 }
 
-/** Build the file from what is stored and what has arrived since. */
-export async function buildHomologacaoEvidenceFile(deps: EvidenceFileDeps): Promise<EvidenceFile> {
+/** Everything both renderings read: the records, every step in order, and its number. */
+interface LoadedEvidence {
+  generatedAt: Date;
+  connect: EvidenceRecord | null;
+  run: EvidenceRecord | null;
+  steps: EvidenceStep[];
+  numbers: Map<EvidenceStepKey, string>;
+}
+
+/** What is stored and what has arrived since — the one read behind the TXT and the JSON. */
+export async function loadEvidence(deps: EvidenceFileDeps): Promise<LoadedEvidence> {
   const generatedAt = (deps.now ?? (() => new Date()))();
-  const timeZone = deps.timeZone ?? DEFAULT_TIME_ZONE;
   const [connect, run] = await Promise.all([
     deps.store.latest(PROVIDER, 'CONNECT'),
     deps.store.latest(PROVIDER, 'RUN'),
   ]);
   const steps = await allSteps(deps, connect, run);
-  const numbers = numbering(steps);
+  return { generatedAt, connect, run, steps, numbers: numbering(steps) };
+}
+
+/** The file name's timestamp — shared so a TXT and a JSON of one moment pair up. */
+export function evidenceStamp(generatedAt: Date): string {
+  return generatedAt.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+}
+
+/** Build the file from what is stored and what has arrived since. */
+export async function buildHomologacaoEvidenceFile(deps: EvidenceFileDeps): Promise<EvidenceFile> {
+  const timeZone = deps.timeZone ?? DEFAULT_TIME_ZONE;
+  const { generatedAt, connect, run, steps, numbers } = await loadEvidence(deps);
   const { copy } = deps;
 
   const index = [
@@ -298,7 +316,7 @@ export async function buildHomologacaoEvidenceFile(deps: EvidenceFileDeps): Prom
     ),
     '',
   ];
-  const sections = (['CONNECT', 'PIX', 'CARD'] as const).flatMap((section, s) => [
+  const sections = EVIDENCE_SECTIONS.flatMap((section, s) => [
     RULE,
     `${s + 2}. ${copy.sectionTitles[section]}`,
     RULE,
@@ -316,6 +334,9 @@ export async function buildHomologacaoEvidenceFile(deps: EvidenceFileDeps): Prom
     ...sections,
     ...renderPendencies(copy, steps, numbers),
   ].join('\n');
-  const stamp = generatedAt.toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  return { filename: `pagbank-homologacao-evidencias-${stamp}.txt`, content, summary: summary(steps) };
+  return {
+    filename: `pagbank-homologacao-evidencias-${evidenceStamp(generatedAt)}.txt`,
+    content,
+    summary: summary(steps),
+  };
 }

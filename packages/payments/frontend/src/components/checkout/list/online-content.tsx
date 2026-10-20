@@ -87,6 +87,30 @@ function focusCardNumber(scope: HTMLElement | null): void {
 }
 
 /**
+ * The card's own fields: the saved cards, then the form for a new one. A debit
+ * card (FUT-3754) is always typed — a saved card is charged as credit — and is
+ * never offered for saving.
+ */
+function CardFields({ card, copy, debit }: { card: ListCard; copy: PaymentListCopy; debit: boolean }): JSX.Element {
+  return (
+    <>
+      {debit ? null : <SavedChips card={card} copy={copy} />}
+      {card.selection === NEW_CARD ? (
+        <NewCardForm
+          card={card.card}
+          fieldErrors={card.fieldErrors}
+          brand={detectBrand(onlyDigits(card.card.number))}
+          saveCard={card.saveCard}
+          setCard={card.setCard}
+          setFieldErrors={card.setFieldErrors}
+          onSaveCardChange={debit ? undefined : card.setSaveCard}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
  * What opens inside a chosen ONLINE option, top to bottom (M11, FN:180-202):
  * the buyer's missing details, then — for the card — the saved-card chips and
  * the card fields, then a refusal of the last charge. No left indent: it all
@@ -103,8 +127,11 @@ export function OnlineContent({
   failure,
   covered = false,
   withConsent = true,
+  debit = false,
 }: {
   method: "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
+  /** The debit card row (FUT-3754): no saved cards, and nothing to save. */
+  debit?: boolean;
   asked: readonly CheckoutCustomerField[];
   buyer: BuyerInfo;
   onBuyerChange: (buyer: BuyerInfo) => void;
@@ -130,18 +157,7 @@ export function OnlineContent({
         onComplete={isCard ? () => focusCardNumber(scope.current) : undefined}
         withConsent={withConsent}
       />
-      {isCard ? <SavedChips card={card} copy={copy} /> : null}
-      {isCard && card.selection === NEW_CARD ? (
-        <NewCardForm
-          card={card.card}
-          fieldErrors={card.fieldErrors}
-          brand={detectBrand(onlyDigits(card.card.number))}
-          saveCard={card.saveCard}
-          setCard={card.setCard}
-          setFieldErrors={card.setFieldErrors}
-          onSaveCardChange={card.setSaveCard}
-        />
-      ) : null}
+      {isCard ? <CardFields card={card} copy={copy} debit={debit} /> : null}
       {failure ? <ChargeFailure message={failure.message} unresolved={failure.code === UNRESOLVED_CODE} /> : null}
     </Box>
   );

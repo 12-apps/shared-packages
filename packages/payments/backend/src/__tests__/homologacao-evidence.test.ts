@@ -16,11 +16,13 @@ import { PT_BR_CONNECT_APPLICATION_COPY } from '../platform/pt-BR';
 import {
   beginSellerConnect,
   buildHomologacaoEvidenceFile,
+  buildHomologacaoEvidenceJson,
   completeEvidenceRun,
   completeSellerConnect,
   createMemoryHomologacaoEvidenceStore,
   PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
   prepareEvidenceRun,
+  type BrowserCardResult,
   type EvidenceWebhookEvent,
 } from '../platform/evidence/index';
 import { pagbankProvider } from '../providers/pagbank';
@@ -50,14 +52,37 @@ const SECRETS = [
   'seller-refresh-2',
   'enc-approved-blob',
   'enc-declined-blob',
+  'enc-debit-blob',
 ];
 
 function json(body: unknown, status = 200, statusText = 'OK'): Response {
   return new Response(JSON.stringify(body), { status, statusText, headers: { 'Content-Type': 'application/json' } });
 }
 
+/** The debit card's order, consult and cancel (FUT-3755), or null for any other route. */
+function debitAnswer(route: string, body: Record<string, unknown>): Response | null {
+  const charges = body['charges'] as { payment_method?: { type?: string } }[] | undefined;
+  if (route === 'POST /orders' && charges?.[0]?.payment_method?.type === 'DEBIT_CARD') {
+    const charge = {
+      id: 'CHAR_DEB',
+      status: 'PAID',
+      amount: { value: 2701, currency: 'BRL' },
+      payment_response: { code: '20000', message: 'SUCESSO' },
+      payment_method: { type: 'DEBIT_CARD', card: { brand: 'visa', first_digits: '400000', last_digits: '2701' } },
+    };
+    return json({ id: 'ORDE_D1', charges: [charge] }, 201, 'Created');
+  }
+  if (route === 'GET /orders/ORDE_D1') {
+    return json({ id: 'ORDE_D1', charges: [{ id: 'CHAR_DEB', status: 'PAID', amount: { value: 2701 } }] });
+  }
+  if (route === 'POST /charges/CHAR_DEB/cancel') {
+    return json({ id: 'CHAR_DEB', status: 'CANCELED', amount: { value: 2701, summary: { refunded: 2701 } } }, 201, 'Created');
+  }
+  return null;
+}
+
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
-function fakePagbank(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number } = {}) {
+function fakePagbank(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number; sessionStatus?: number } = {}) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -77,6 +102,12 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
       return json({ client_id: 'cid', name: 'Paladira', redirect_uri: 'https://example.test/cb', client_secret: 'csecret-value' });
     }
     if (route === 'POST /public-keys') return json({ public_key: 'PUBKEY', created_at: 1 });
+    if (route === 'POST /checkout-sdk/sessions') {
+      if (options.sessionStatus) return json({ error_messages: [{ code: 'UNAUTHORIZED' }] }, options.sessionStatus, 'Unauthorized');
+      return json({ session: '3ds-session-1', expires_at: 1_800_000_000_000 });
+    }
+    const debitOrder = debitAnswer(route, body);
+    if (debitOrder) return debitOrder;
     if (route === 'POST /orders' && Array.isArray(body['qr_codes'])) {
       return json({ id: 'ORDE_PIX', reference_id: body['reference_id'], qr_codes: [{ id: 'QRCO_1', text: '00020101pix', expiration_date: '2026-10-17T12:15:00-03:00' }] }, 201, 'Created');
     }
@@ -128,7 +159,15 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
   return { handler, seen };
 }
 
-function world(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number; sellerEnvironment?: 'SANDBOX' | 'PRODUCTION' } = {}) {
+function world(
+  options: {
+    refreshStatus?: number;
+    consultOutages?: number;
+    cancelNotYet?: number;
+    sessionStatus?: number;
+    sellerEnvironment?: 'SANDBOX' | 'PRODUCTION';
+  } = {},
+) {
   const pagbank = fakePagbank(options);
   vi.stubGlobal('fetch', vi.fn(pagbank.handler));
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
@@ -196,10 +235,18 @@ function world(options: { refreshStatus?: number; consultOutages?: number; cance
   return { pagbank, configs, connectDeps, runDeps, fileDeps, events };
 }
 
-function cards() {
+function cards(): BrowserCardResult[] {
   return [
-    { scenario: 'approved' as const, brand: 'VISA', masked: '4539 62** **** 2097', encrypted: 'enc-approved-blob' },
-    { scenario: 'declined' as const, brand: 'VISA', masked: '4929 29** **** 0766', encrypted: 'enc-declined-blob' },
+    { scenario: 'approved', brand: 'VISA', masked: '4539 62** **** 2097', encrypted: 'enc-approved-blob' },
+    { scenario: 'declined', brand: 'VISA', masked: '4929 29** **** 0766', encrypted: 'enc-declined-blob' },
+    {
+      scenario: 'debit',
+      brand: 'VISA',
+      masked: '4000 00** **** 2701',
+      encrypted: 'enc-debit-blob',
+      authenticationId: '3DS_AUTH_1',
+      authenticated: true,
+    },
   ];
 }
 
@@ -229,7 +276,9 @@ describe('homologação evidence', () => {
     await completeEvidenceRun(w.runDeps, prepared.runId, cards());
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
-    expect(file.summary).toEqual({ executed: 15, failed: 0, pending: 2 });
+    // 15 Connect, Pix and credit-card steps plus the five debit ones (FUT-3755);
+    // the two webhook steps stay pending until a delivery arrives.
+    expect(file.summary).toEqual({ executed: 20, failed: 0, pending: 2 });
     for (const secret of SECRETS) expect(file.content).not.toContain(secret);
     expect(file.content).toContain('POST https://sandbox.api.pagseguro.com/oauth2/token');
     expect(file.content).toContain('code=***REDACTED***');
@@ -352,9 +401,10 @@ describe('homologação evidence', () => {
 
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
-    expect(file.summary).toEqual({ executed: 0, failed: 0, pending: 17 });
-    expect(file.content).toContain('ARQUIVO INCOMPLETO: 17 cenários pendentes');
-    expect(file.content).toContain('Situação: INCOMPLETO — 0 executados · 0 com falha · 17 pendentes');
+    // 17 Connect, Pix and credit-card scenarios plus the five debit ones (FUT-3755).
+    expect(file.summary).toEqual({ executed: 0, failed: 0, pending: 22 });
+    expect(file.content).toContain('ARQUIVO INCOMPLETO: 22 cenários pendentes');
+    expect(file.content).toContain('Situação: INCOMPLETO — 0 executados · 0 com falha · 22 pendentes');
     // Nothing ran, so no test time is claimed for either group.
     expect(file.content).toContain('Data e hora dos testes — Connect: não executado · Pix e cartão: não executado');
     expect(file.content).not.toMatch(/Horário: \d/);
@@ -448,7 +498,7 @@ describe('homologação evidence', () => {
     await expect(completeEvidenceRun(w.runDeps, prepared.runId, cards())).rejects.toMatchObject({
       name: 'EvidenceRunNotFoundError',
     });
-    expect((await buildHomologacaoEvidenceFile(w.fileDeps)).summary.executed).toBe(15);
+    expect((await buildHomologacaoEvidenceFile(w.fileDeps)).summary.executed).toBe(20);
   });
 
   it('given the orders, then usage is proven from the fingerprint each call carried, never the token', async () => {
@@ -526,5 +576,190 @@ describe('homologação evidence', () => {
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
     expect(file.content).not.toContain('live-state-123');
     expect(file.content).toContain('state=***REDACTED***');
+  });
+});
+
+/**
+ * FUT-3755 — the JSON download: the same stored records as the TXT, one entry
+ * per scenario with each call as `{ request, response }`, the redaction the
+ * TXT carries, and a PENDING scenario listed with no calls rather than dropped.
+ */
+describe('homologação evidence — the JSON file', () => {
+  it('given a full run, then every scenario is listed with its calls as request and response, and no secret is in it', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const txt = await buildHomologacaoEvidenceFile(w.fileDeps);
+    const file = await buildHomologacaoEvidenceJson(w.fileDeps);
+
+    expect(file.filename).toMatch(/^pagbank-homologacao-evidencias-.*\.json$/);
+    expect(file.summary).toEqual(txt.summary);
+    for (const secret of SECRETS) expect(file.content).not.toContain(secret);
+
+    const parsed = JSON.parse(file.content) as {
+      environment: { name: string };
+      scenarios: Array<{
+        number: string;
+        key: string;
+        status: string;
+        calls: Array<{ request: { method: string; url: string; body: unknown }; response: { status: number } | null }>;
+      }>;
+    };
+    expect(parsed.environment.name).toBe('SANDBOX');
+    expect(parsed.scenarios.map((scenario) => scenario.number)).toContain('4.6');
+    const cancel = parsed.scenarios.find((scenario) => scenario.key === 'card.cancel');
+    expect(cancel?.status).toBe('EXECUTED');
+    expect(cancel?.calls.some((call) => call.request.method === 'POST' && call.request.url.endsWith('/cancel'))).toBe(true);
+    expect(cancel?.calls.every((call) => call.response !== null)).toBe(true);
+  });
+
+  it('given nothing ran, then every scenario is PENDING with no calls', async () => {
+    const w = world();
+    const parsed = JSON.parse((await buildHomologacaoEvidenceJson(w.fileDeps)).content) as {
+      scenarios: Array<{ status: string; at: string | null; calls: unknown[] }>;
+    };
+    expect(parsed.scenarios.length).toBeGreaterThan(0);
+    for (const scenario of parsed.scenarios) {
+      expect(scenario).toMatchObject({ status: 'PENDING', at: null, calls: [] });
+    }
+  });
+});
+
+/**
+ * FUT-3755 — the DEBIT section: PagBank's 3DS session minted in phase 1 with
+ * the seller's token, the browser's authentication reported as a note, and a
+ * DEBIT_CARD order carrying that authentication raised, consulted and
+ * canceled. Numbered 5.x so the credit-card steps PagBank already cites keep
+ * theirs; without an authentication nothing is charged and every debit step
+ * stays PENDING with the reason.
+ */
+describe('homologação evidence — the debit section', () => {
+  type JsonScenario = {
+    number: string;
+    key: string;
+    status: string;
+    observed: string;
+    ids: Record<string, string>;
+    calls: Array<{ request: { method: string; url: string; headers: Record<string, string>; body: unknown } }>;
+  };
+  async function scenarios(w: ReturnType<typeof world>): Promise<JsonScenario[]> {
+    return (JSON.parse((await buildHomologacaoEvidenceJson(w.fileDeps)).content) as { scenarios: JsonScenario[] }).scenarios;
+  }
+  const debitOrders = (w: ReturnType<typeof world>) =>
+    w.pagbank.seen.filter(
+      (call) =>
+        call.path === 'POST /orders' &&
+        (call.body?.['charges'] as { payment_method: { type: string } }[] | undefined)?.[0]?.payment_method.type === 'DEBIT_CARD',
+    );
+
+  it('given an authenticated debit card, then the session, order, consult and cancel are EXECUTED with the 3DS proof on the order', async () => {
+    const w = world();
+    await connected(w);
+
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+
+    expect(prepared.threeDSSession).toMatchObject({ session: '3ds-session-1', environment: 'SANDBOX' });
+    const session = w.pagbank.seen.find((call) => call.path === 'POST /checkout-sdk/sessions');
+    expect(session?.authorization).toBe('Bearer seller-access-2');
+    const debit = (await scenarios(w)).filter((scenario) => scenario.key.startsWith('debit.'));
+    expect(debit.map((scenario) => [scenario.key, scenario.status])).toEqual([
+      ['debit.session', 'EXECUTED'],
+      ['debit.authenticate', 'EXECUTED'],
+      ['debit.approved', 'EXECUTED'],
+      ['debit.consult', 'EXECUTED'],
+      ['debit.cancel', 'EXECUTED'],
+    ]);
+    const order = debit.find((scenario) => scenario.key === 'debit.approved')!;
+    expect(order.calls[0]?.request.body).toMatchObject({
+      charges: [
+        {
+          amount: { value: 2701 },
+          payment_method: {
+            type: 'DEBIT_CARD',
+            installments: 1,
+            authentication_method: { type: 'THREEDS', id: '3DS_AUTH_1' },
+          },
+        },
+      ],
+    });
+    // A debit card is never stored in PagBank's vault.
+    expect(JSON.stringify(debitOrders(w)[0]?.body)).not.toContain('"store"');
+    expect(order.ids).toMatchObject({ order_id: 'ORDE_D1', charge_id: 'CHAR_DEB' });
+    expect(debit.find((scenario) => scenario.key === 'debit.authenticate')?.ids).toEqual({ authentication_id: '3DS_AUTH_1' });
+  });
+
+  it('given the browser could not authenticate the debit card, then no debit is charged and every debit order step is PENDING with why', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+
+    const refused = cards().map((card) =>
+      card.scenario === 'debit' ? { ...card, authenticationId: undefined, authenticated: undefined, failure: 'THREEDS_REFUSED' as const } : card,
+    );
+    await completeEvidenceRun(w.runDeps, prepared.runId, refused);
+
+    expect(debitOrders(w)).toHaveLength(0);
+    const debit = (await scenarios(w)).filter((scenario) => scenario.key.startsWith('debit.') && scenario.key !== 'debit.session');
+    expect(debit.map((scenario) => scenario.status)).toEqual(['PENDING', 'PENDING', 'PENDING', 'PENDING']);
+    for (const scenario of debit) {
+      expect(scenario.observed).toBe(
+        'Autenticação 3DS do cartão de débito não concluída: o PagBank recusou a autenticação 3DS (CHANGE_PAYMENT_METHOD); nenhum débito foi cobrado.',
+      );
+      expect(scenario.calls).toEqual([]);
+    }
+    // The credit-card section is untouched by the debit card's failure.
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+    expect(file.content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
+  });
+
+  it('given the browser reported no debit card, then the debit steps say so and nothing is charged', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards().filter((card) => card.scenario !== 'debit'));
+
+    expect(debitOrders(w)).toHaveLength(0);
+    const order = (await scenarios(w)).find((scenario) => scenario.key === 'debit.approved');
+    expect(order).toMatchObject({ status: 'PENDING', observed: 'O navegador não informou o cartão de débito; nenhum débito foi cobrado.' });
+  });
+
+  it('given PagBank refuses the 3DS session, then the session step is FAILED and none is handed to the browser', async () => {
+    const w = world({ sessionStatus: 401 });
+    await connected(w);
+
+    const prepared = await prepareEvidenceRun(w.runDeps);
+
+    expect(prepared.publicKey).toBe('PUBKEY');
+    expect(prepared.threeDSSession).toBeNull();
+    const session = (await scenarios(w)).find((scenario) => scenario.key === 'debit.session');
+    expect(session?.status).toBe('FAILED');
+    expect(session?.calls).toHaveLength(1);
+  });
+
+  it('given the full run, then the credit steps keep their numbers (4.6 is still the cancel) and debit is section 5', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+
+    const numbers = Object.fromEntries((await scenarios(w)).map((scenario) => [scenario.key, scenario.number]));
+    expect(numbers).toMatchObject({
+      'connect.usage': '2.6',
+      'pix.webhook': '3.4',
+      'card.cancel': '4.6',
+      'card.webhook': '4.7',
+      'debit.session': '5.1',
+      'debit.authenticate': '5.2',
+      'debit.approved': '5.3',
+      'debit.consult': '5.4',
+      'debit.cancel': '5.5',
+    });
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+    expect(file.content).toContain('5. Cartão de débito (3DS PagBank)');
+    expect(file.content).toContain('6. Pendências');
+    expect(file.content).toMatch(/\[5\.3\] Pedido com cartão de débito autenticado \(DEBIT_CARD\)[^\n]*— EXECUTADO/);
   });
 });

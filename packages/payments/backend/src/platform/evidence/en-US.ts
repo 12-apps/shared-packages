@@ -9,7 +9,12 @@ import type { HomologacaoEvidenceCopy } from './types';
 export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   title: 'HOMOLOGATION EVIDENCE — PAGBANK (CONNECT API AND ORDERS API, PIX AND CARD) — SANDBOX',
   statusLabels: { EXECUTED: 'EXECUTED', FAILED: 'FAILED', PENDING: 'PENDING' },
-  sectionTitles: { CONNECT: 'Connect evidence', PIX: 'Pix evidence', CARD: 'Card evidence' },
+  sectionTitles: {
+    CONNECT: 'Connect evidence',
+    PIX: 'Pix evidence',
+    CARD: 'Card evidence',
+    DEBIT: "Debit card (PagBank's 3DS)",
+  },
   steps: {
     'connect.authorize': {
       scenario: "Test seller account authorization (login and consent at PagBank)",
@@ -79,6 +84,26 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Card notifications received and processed by the integration',
       expected: "PagBank POSTs to the card orders' notification_url; the integration stores the events and updates the charges' status.",
     },
+    'debit.session': {
+      scenario: '3DS authentication session — POST /checkout-sdk/sessions',
+      expected: "HTTP 200/201 with session and expires_at, minted server-side with the seller's token; the browser sets up the SDK (PagSeguro.setUp) with it.",
+    },
+    'debit.authenticate': {
+      scenario: '3DS authentication of the debit card (Visa test card 4000 0000 0000 2701, no challenge)',
+      expected: "PagBank's SDK (PagSeguro.authenticate3DS) authenticates the encrypted test card in the browser for R$ 27.01: status AUTH_FLOW_COMPLETED, AUTHENTICATED, with the authentication id.",
+    },
+    'debit.approved': {
+      scenario: 'Order with an authenticated debit card (DEBIT_CARD) — POST /orders',
+      expected: 'HTTP 201 with charges[0].status PAID: payment_method DEBIT_CARD carrying authentication_method { type: THREEDS, id } from the authentication above.',
+    },
+    'debit.consult': {
+      scenario: 'Debit order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the debit charge in status PAID.',
+    },
+    'debit.cancel': {
+      scenario: 'Debit payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the debit charge canceled (status CANCELED).',
+    },
   },
   identification: {
     heading: 'Identification',
@@ -120,7 +145,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     "Every call below was recorded by the integration's own code as it was made; no response was " +
     "written by hand. Data and cards are PagBank's official test ones.",
   pendencies: {
-    heading: '5. Pending items',
+    heading: '6. Pending items',
     incomplete: (failed, pending) =>
       `INCOMPLETE FILE: ${pending} ${pending === 1 ? 'scenario' : 'scenarios'} pending and ${failed} failed. Do not submit this file as complete.`,
     allExecuted: 'Every scenario listed above was executed with the expected result.',
@@ -153,7 +178,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     refreshed: 'Token renewed; the new pair replaced the previous one.',
     refreshRejected: "PagBank refused the renewal; the seller's connection must be authorized again.",
     usageSellerToken: (calls, seller, platform) =>
-      `${calls === 1 ? 'The order or public-key call was' : `The ${calls} order and public-key calls were`} authenticated with the seller's token ` +
+      `${calls === 1 ? 'The order, public-key or 3DS-session call was' : `The ${calls} order, public-key and 3DS-session calls were`} authenticated with the seller's token ` +
       `(SHA-256 fingerprint ${seller}, recorded on every request above)` +
       (platform ? `, different from the platform's token (${platform}).` : '.'),
     usageOtherToken:
@@ -174,9 +199,21 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       SDK_UNAVAILABLE: "PagBank's SDK did not load in the browser",
       NOT_PROCESSED: "PagBank's SDK did not encrypt the card",
       NO_PUBLIC_KEY: 'no public key for the seller',
+      NO_THREEDS_SESSION: 'no 3DS session for the seller',
+      THREEDS_NOT_SUPPORTED: 'PagBank said the card does not support 3DS authentication (AUTH_NOT_SUPPORTED)',
+      THREEDS_REFUSED: 'PagBank refused the 3DS authentication (CHANGE_PAYMENT_METHOD)',
+      THREEDS_FAILED: 'the 3DS authentication in the browser did not complete',
     },
     chargeStatus: (status) => `Charge with status ${status}.`,
     canceled: (status) => `Cancellation recorded with status ${status}.`,
+    threeDSSessionMinted: "3DS session minted with the seller's token.",
+    threeDSSessionMissing: 'The 3DS session was not minted.',
+    threeDSAuthenticated: (authenticated) =>
+      authenticated
+        ? '3DS authentication completed in the browser: AUTHENTICATED, no challenge.'
+        : '3DS authentication completed in the browser, but the cardholder was not authenticated (NOT_AUTHENTICATED).',
+    threeDSFailed: (detail) => `3DS authentication of the debit card did not complete${detail ? `: ${detail}` : ''}; no debit was charged.`,
+    debitNotReported: 'The browser reported no debit card; no debit was charged.',
     webhookReceived: (count, statuses, chargeStatus) =>
       `${count} ${count === 1 ? 'notification' : 'notifications'} received and stored (status: ${statuses})` +
       (chargeStatus ? `; the charge the integration records is ${chargeStatus}.` : '.'),

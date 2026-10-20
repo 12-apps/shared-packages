@@ -20,6 +20,7 @@ import type { BuyerVaultSession, VaultedCardDisplay } from "@12-apps/payments-ba
 import type { SavedCard } from "../../card";
 import { err, ok, type Result } from "../../result";
 
+import type { ThreeDSecureSessionView } from "./debit-types";
 import type { CheckoutTransportCopy } from "./screens-copy";
 
 import type {
@@ -127,6 +128,11 @@ export interface CheckoutClient {
    */
   completeVault(input: CompleteVaultInput): Promise<Result<VaultedCardDisplay>>;
   refreshBrowserKey(input: { orderId: string }): Promise<Result<{ publicKey: string | null }>>;
+  /**
+   * `POST /3ds-session` (FUT-3754): the 3-D Secure session a debit card is
+   * authenticated on. Optional — a host without the row offers no debit.
+   */
+  threeDSecureSession?(input: { orderId: string }): Promise<Result<ThreeDSecureSessionView>>;
 }
 
 /** Envelope the API routes return: `{ data }` on success, `{ error }` on failure. */
@@ -192,6 +198,11 @@ function returnedSettlement(): Record<string, string> {
   };
 }
 
+/** A POST naming the payable — the body every payable-scoped row takes. */
+function orderBody(input: { orderId: string }): RequestInit {
+  return { method: "POST", body: JSON.stringify({ orderId: input.orderId }) };
+}
+
 /** The ambient `fetch`, wrapped so it is never invoked detached from its global. */
 function ambientFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   return globalThis.fetch(input, init);
@@ -211,6 +222,8 @@ function flatChargeBody(input: ChargeCardInput): string {
     saveCard: input.saveCard,
     cardMeta: input.cardMeta,
     taxId: input.taxId,
+    ...(input.funding ? { funding: input.funding } : {}),
+    ...(input.authenticationId ? { authenticationId: input.authenticationId } : {}),
   });
 }
 
@@ -321,10 +334,8 @@ export function createCheckoutClient(transport: CheckoutTransport): CheckoutClie
         body: completeVaultBody(input),
       }),
 
-    refreshBrowserKey: (input) =>
-      call<{ publicKey: string | null }>("/refresh-key", {
-        method: "POST",
-        body: JSON.stringify({ orderId: input.orderId }),
-      }),
+    refreshBrowserKey: (input) => call<{ publicKey: string | null }>("/refresh-key", orderBody(input)),
+
+    threeDSecureSession: (input) => call<ThreeDSecureSessionView>("/3ds-session", orderBody(input)),
   };
 }

@@ -174,6 +174,7 @@ async function toBuyerLink(
     methods: [...entry.methods],
     wallets: declaredWallets(entry.wallets, await applePayConfigured(deps, merchant, entry, identity)),
     googlePay: entry.googlePay,
+    debit: entry.debit,
     customerSchema: [...entry.customerSchema],
     checkoutScreen: entry.checkoutScreen,
     confirmation: entry.confirmation,

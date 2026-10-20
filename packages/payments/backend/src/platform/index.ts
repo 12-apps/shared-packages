@@ -45,9 +45,13 @@ export {
 } from './homologacao-anexo';
 export {
   BROWSER_CARD_FAILURES,
+  BROWSER_CARD_SCENARIOS,
+  EVIDENCE_SECTIONS,
   EVIDENCE_STEP_KEYS,
   type BrowserCardFailure,
   type BrowserCardResult,
+  type BrowserCardScenario,
+  type EvidenceSection,
   type EvidenceRecord,
   type EvidenceRecordKind,
   type EvidenceStatus,
@@ -57,3 +61,4 @@ export {
   type HomologacaoEvidenceCopy,
   type HomologacaoEvidenceStore,
 } from './evidence/types';
+export type { DebitTestData } from './evidence/sandbox-buyer';

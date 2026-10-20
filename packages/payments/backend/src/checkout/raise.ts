@@ -93,7 +93,9 @@ function chargeInstrument(card: CheckoutCard | undefined): CheckoutCard | undefi
   const minted = card?.tokensByProvider;
   if (!card || !minted || Object.keys(minted).length === 0) return card;
   if (card.savedCardToken) return card;
-  return { tokensByProvider: minted };
+  // A debit charge keeps its funding and its 3-D Secure proof (FUT-3754).
+  const { funding, authenticationId } = card;
+  return { tokensByProvider: minted, ...(funding ? { funding } : {}), ...(authenticationId ? { authenticationId } : {}) };
 }
 
 /**

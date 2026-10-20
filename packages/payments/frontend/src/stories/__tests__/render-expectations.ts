@@ -599,7 +599,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // Computed verdicts, printed — each row pins one clause's answer.
   "Wallets/CapabilityGates": {
     text: [
-      'cabeça com CARD + GOOGLE_PAY + parâmetros → {"gateway":"aurora","gatewayMerchantId":"MID_LOJA_1"}',
+      'cabeça com CARD + GOOGLE_PAY + parâmetros → {"gateway":"aurora","gatewayMerchantId":"MID_LOJA_1","environment":"TEST"}',
       "config sem chain (host antigo) → null",
       "cabeça anterior ao campo wallets (host antigo) → false",
       "canMakePayments() lança (tratado como não) → false",

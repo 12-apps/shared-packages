@@ -146,7 +146,16 @@ describe("googlePayConfig — the wallet gate fails CLOSED (FUT-471)", () => {
     expect(googlePayConfig(chained(head))).toEqual({
       gateway: "pagbank",
       gatewayMerchantId: "MID_1",
+      environment: "TEST",
     });
+  });
+
+  it("carries the connection's Google Pay environment, so a production store mints real tokens (FUT-3756)", () => {
+    const head = {
+      wallets: ["GOOGLE_PAY" as const],
+      googlePay: { gateway: "pagbank", gatewayMerchantId: "MID_1", environment: "PRODUCTION" as const },
+    };
+    expect(googlePayConfig(chained(head))?.environment).toBe("PRODUCTION");
   });
 
   it("answers null while the config is loading — the opposite of the picker's fail-open", () => {

@@ -128,6 +128,7 @@ function WalletButtons({
         <GooglePayButton
           order={props.order}
           params={googlePay}
+          environment={googlePay.environment}
           onKey={(key) => void wallet.payWithKey("GOOGLE_PAY", key)}
           onError={onSheetError}
           onReady={() => setGoogleReady(true)}

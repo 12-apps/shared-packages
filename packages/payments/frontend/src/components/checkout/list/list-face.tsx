@@ -5,6 +5,7 @@ import { cardChain, cardTokenization, handOffMethod } from "../method-capability
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
 import type { CheckoutBasketIdentity } from "../basket";
+import type { DebitAuthentication } from "../debit-charge";
 import type { BuyerContact, CheckoutProviderConfig, PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
@@ -226,6 +227,14 @@ function BarAction({ props, failure, act, onCancel, reason, returnFocus }: {
   return <PressButton props={props} act={act} reason={reason} returnFocus={returnFocus} />;
 }
 
+/** The debit card's 3-D Secure inputs when the debit row is the choice (FUT-3754), else none. */
+function debitOf(props: ListFaceProps): DebitAuthentication | undefined {
+  const { choice } = props.state;
+  const { billingAddress, copy } = props.list;
+  if (choice?.kind !== "online" || choice.funding !== "DEBIT" || !billingAddress || !copy.debit) return undefined;
+  return { billingAddress, copy: copy.debit };
+}
+
 /** The charge under way, once there is an order to run it against. */
 function Runners({ props, sheet, onFailed, onWalletFailed }: {
   props: ListFaceProps;
@@ -242,7 +251,7 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
-    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} />;
+    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debitOf(props)} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
   return null;

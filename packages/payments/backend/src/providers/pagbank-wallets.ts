@@ -57,20 +57,27 @@ export async function requestApplePayCsr(
   return { csr: findCsr(raw), raw };
 }
 
+/**
+ * The `.cer`'s bytes. Apple hands out DER, which reaches us base64-encoded;
+ * a PEM (`-----BEGIN CERTIFICATE-----`) is already text and goes as it is.
+ */
+function certificateBytes(certificate: string): Uint8Array<ArrayBuffer> | string {
+  if (certificate.includes('-----BEGIN')) return certificate;
+  const binary = atob(certificate.replace(/\s+/g, ''));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
 /** Step 3: hand Apple's `.cer` back to PagBank; activates the integration. */
 export async function activateApplePayCertificate(
   certificate: string,
   credentials: ResolvedCredentials,
 ): Promise<ApplePayActivation> {
   if (credentials.stub) return { activated: true, raw: { stub: true } };
-  // The request schema is as unpublished as the response's; `certificate` is
-  // the endpoint's own noun (`…/apple-pay/cer`). To be confirmed against the
-  // sandbox once the platform holds a real `.cer` — an external prerequisite
-  // (Apple Developer account, Merchant ID, domain verification).
-  const raw = await pagbankRequest<unknown>('/wallets/apple-pay/cer', credentials, {
-    method: 'POST',
-    body: { certificate },
-  });
+  // "Criar e pagar um pedido com Apple Pay" uploads the FILE, as the form
+  // field `cer` (`--form 'cer=@"arquivo.cer"'`), not a JSON body (FUT-3757).
+  const form = new FormData();
+  form.append('cer', new Blob([certificateBytes(certificate)]), 'apple_pay.cer');
+  const raw = await pagbankRequest<unknown>('/wallets/apple-pay/cer', credentials, { method: 'POST', form });
   // `pagbankRequest` throws on every non-2xx, so reaching here IS activation
   // as far as the wire can say.
   return { activated: true, raw };

@@ -30,6 +30,13 @@ describe('redactValue', () => {
     });
   });
 
+  it('given a 3-D Secure session answer, then the session is removed and its expiry survives', () => {
+    expect(redactValue({ session: 'S-1', expires_at: 1_800_000_000 })).toEqual({
+      session: '***REDACTED***',
+      expires_at: 1_800_000_000,
+    });
+  });
+
   it("given a decline, then PagBank's payment_response.code survives", () => {
     expect(redactValue({ payment_response: { code: '10002', message: 'NAO AUTORIZADO' } })).toEqual({
       payment_response: { code: '10002', message: 'NAO AUTORIZADO' },

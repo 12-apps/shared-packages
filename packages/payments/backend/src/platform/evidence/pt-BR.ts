@@ -18,6 +18,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     CONNECT: 'Evidências do Connect',
     PIX: 'Evidências de Pix',
     CARD: 'Evidências de cartão',
+    DEBIT: 'Cartão de débito (3DS PagBank)',
   },
   steps: {
     'connect.authorize': {
@@ -88,6 +89,26 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Notificações de cartão recebidas e processadas pela integração',
       expected: 'O PagBank envia POST para a notification_url dos pedidos de cartão; a integração armazena os eventos e atualiza o status das cobranças.',
     },
+    'debit.session': {
+      scenario: 'Sessão de autenticação 3DS — POST /checkout-sdk/sessions',
+      expected: 'HTTP 200/201 com session e expires_at, gerada no servidor com o token do lojista; o navegador configura o SDK (PagSeguro.setUp) com ela.',
+    },
+    'debit.authenticate': {
+      scenario: 'Autenticação 3DS do cartão de débito (cartão de teste Visa 4000 0000 0000 2701, sem desafio)',
+      expected: 'O SDK do PagBank (PagSeguro.authenticate3DS) autentica no navegador o cartão de teste criptografado, no valor de R$ 27,01: status AUTH_FLOW_COMPLETED, AUTHENTICATED, com o id da autenticação.',
+    },
+    'debit.approved': {
+      scenario: 'Pedido com cartão de débito autenticado (DEBIT_CARD) — POST /orders',
+      expected: 'HTTP 201 com charges[0].status PAID: payment_method DEBIT_CARD com authentication_method { type: THREEDS, id } da autenticação acima.',
+    },
+    'debit.consult': {
+      scenario: 'Consulta do pedido de débito — GET /orders/{order_id}',
+      expected: 'HTTP 200 com o pedido e a cobrança de débito em status PAID.',
+    },
+    'debit.cancel': {
+      scenario: 'Cancelamento do pagamento com débito — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 com a cobrança de débito cancelada (status CANCELED).',
+    },
   },
   identification: {
     heading: 'Identificação',
@@ -131,7 +152,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     'momento em que foram feitas; nenhuma resposta foi escrita à mão. Dados e cartões usados são os ' +
     'de teste oficiais do PagBank.',
   pendencies: {
-    heading: '5. Pendências',
+    heading: '6. Pendências',
     incomplete: (failed, pending) =>
       `ARQUIVO INCOMPLETO: ${plural(pending, 'cenário pendente', 'cenários pendentes')} e ` +
       `${plural(failed, 'com falha', 'com falha')}. Não envie este arquivo como completo.`,
@@ -166,7 +187,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     refreshed: 'Token renovado; o novo par substituiu o anterior.',
     refreshRejected: 'O PagBank recusou a renovação; a conexão do lojista precisa ser autorizada de novo.',
     usageSellerToken: (calls, seller, platform) =>
-      `${calls === 1 ? 'A chamada' : `As ${calls} chamadas`} de pedidos e chave pública ${calls === 1 ? 'foi autenticada' : 'foram autenticadas'} com o token do lojista ` +
+      `${calls === 1 ? 'A chamada' : `As ${calls} chamadas`} de pedidos, chave pública e sessão 3DS ${calls === 1 ? 'foi autenticada' : 'foram autenticadas'} com o token do lojista ` +
       `(impressão digital SHA-256 ${seller}, registrada em cada requisição acima)` +
       (platform ? `, diferente do token da plataforma (${platform}).` : '.'),
     usageOtherToken:
@@ -187,9 +208,21 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       SDK_UNAVAILABLE: 'o SDK do PagBank não carregou no navegador',
       NOT_PROCESSED: 'o SDK do PagBank não criptografou o cartão',
       NO_PUBLIC_KEY: 'sem chave pública do lojista',
+      NO_THREEDS_SESSION: 'sem sessão 3DS do lojista',
+      THREEDS_NOT_SUPPORTED: 'o PagBank informou que o cartão não suporta autenticação 3DS (AUTH_NOT_SUPPORTED)',
+      THREEDS_REFUSED: 'o PagBank recusou a autenticação 3DS (CHANGE_PAYMENT_METHOD)',
+      THREEDS_FAILED: 'a autenticação 3DS no navegador não foi concluída',
     },
     chargeStatus: (status) => `Cobrança com status ${status}.`,
     canceled: (status) => `Cancelamento registrado com status ${status}.`,
+    threeDSSessionMinted: 'Sessão 3DS gerada com o token do lojista.',
+    threeDSSessionMissing: 'A sessão 3DS não foi gerada.',
+    threeDSAuthenticated: (authenticated) =>
+      authenticated
+        ? 'Autenticação 3DS concluída no navegador: AUTHENTICATED, sem desafio.'
+        : 'Autenticação 3DS concluída no navegador, mas o portador não foi autenticado (NOT_AUTHENTICATED).',
+    threeDSFailed: (detail) => `Autenticação 3DS do cartão de débito não concluída${detail ? `: ${detail}` : ''}; nenhum débito foi cobrado.`,
+    debitNotReported: 'O navegador não informou o cartão de débito; nenhum débito foi cobrado.',
     webhookReceived: (count, statuses, chargeStatus) =>
       (count === 1 ? '1 notificação recebida e armazenada' : `${count} notificações recebidas e armazenadas`) + ` (situação: ${statuses})` +
       (chargeStatus ? `; a cobrança registrada pela integração está ${chargeStatus}.` : '.'),

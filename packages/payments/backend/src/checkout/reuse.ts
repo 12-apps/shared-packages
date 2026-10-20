@@ -136,7 +136,7 @@ export function holdsInstrumentFor(
 /** The instrument fields a checkout request may carry. */
 export type CheckoutCard = Pick<
   CardDetails,
-  'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet'
+  'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet' | 'funding' | 'authenticationId'
 >;
 
 /** A still-payable charge left behind by a reprice. */

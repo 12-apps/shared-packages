@@ -89,14 +89,31 @@ describe('pagbank adapter — the Apple Pay certificate round-trip (FUT-472)', (
     expect(answer.raw).toEqual({ unexpected: 'shape' });
   });
 
-  it('activates by POSTing the .cer and reads activation off the HTTP outcome', async () => {
+  /**
+   * FUT-3757: PagBank's guide uploads the FILE as the form field `cer`
+   * (`--form 'cer=@"arquivo.cer"'`). The JSON `{ certificate }` body this sent
+   * before was a guess the docs contradict, made before any `.cer` existed.
+   */
+  it('activates by uploading the .cer as the form field cer, and reads activation off the HTTP outcome', async () => {
     const spy = mockFetch({});
-    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate('CER_B64', LIVE);
+    const der = btoa(String.fromCharCode(0x30, 0x82, 0x01));
+    const answer = await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate(der, LIVE);
 
     const [url, init] = spy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://sandbox.api.pagseguro.com/wallets/apple-pay/cer');
-    expect(JSON.parse(init.body as string)).toEqual({ certificate: 'CER_B64' });
+    expect(init.body).toBeInstanceOf(FormData);
+    const file = (init.body as FormData).get('cer') as Blob;
+    expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([0x30, 0x82, 0x01]);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
     expect(answer.activated).toBe(true);
+  });
+
+  it('uploads a PEM certificate as the text it already is', async () => {
+    const spy = mockFetch({});
+    const pem = '-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----';
+    await pagbankProvider(PT_BR_PAGBANK_COPY).applePay!.activateCertificate(pem, LIVE);
+    const file = ((spy.mock.calls[0] as [string, RequestInit])[1].body as FormData).get('cer') as Blob;
+    expect(await file.text()).toBe(pem);
   });
 
   it('a refused activation throws the typed provider error, never a silent false', async () => {
