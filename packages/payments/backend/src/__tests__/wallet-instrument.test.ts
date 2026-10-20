@@ -66,7 +66,7 @@ describe('the client view publishes the wallet capability (FUT-471)', () => {
       fields: { token: 't', publicKey: 'pk', googlePayMerchantId: 'MID_1' },
     });
     expect(published.wallets).toContain('GOOGLE_PAY');
-    expect(published.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_1' });
+    expect(published.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_1', environment: 'TEST' });
   });
 
   it('publishes [] and null for an adapter that declares no wallet', () => {

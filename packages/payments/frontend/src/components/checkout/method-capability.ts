@@ -158,13 +158,15 @@ function toCardLink(link: CheckoutChainLink): CardChainLink {
  */
 export function googlePayConfig(
   config: CheckoutProviderConfig | null,
-): { gateway: string; gatewayMerchantId: string } | null {
+): { gateway: string; gatewayMerchantId: string; environment: "TEST" | "PRODUCTION" } | null {
   const head = config?.chain?.[0];
   if (!head?.methods.includes("CARD")) return null;
   if (!head.wallets?.includes("GOOGLE_PAY")) return null;
   const params = head.googlePay;
   if (!params?.gatewayMerchantId) return null;
-  return { gateway: params.gateway, gatewayMerchantId: params.gatewayMerchantId };
+  // The connection's own environment (FUT-3756): a production store must never
+  // mint Google's test tokens. Absent ⇒ TEST, as before it was published.
+  return { gateway: params.gateway, gatewayMerchantId: params.gatewayMerchantId, environment: params.environment ?? "TEST" };
 }
 
 /**

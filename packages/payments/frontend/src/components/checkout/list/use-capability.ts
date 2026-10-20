@@ -127,9 +127,9 @@ export function useListCapability(
   /** The host gave the billing address a debit card's 3-D Secure needs. */
   hasBillingAddress = false,
 ): ListCapability {
-  const declared = googlePayConfig(config) !== null;
+  const declared = googlePayConfig(config);
   // `null` tells the client hook not to load pay.js at all.
-  const client = useGooglePayClient(declared ? undefined : null, "TEST");
+  const client = useGooglePayClient(declared ? undefined : null, declared?.environment ?? "TEST");
   const { priced, repricing } = useRepricing(totalCents);
   // The port is read at the press, through a ref: a host passing a new
   // function each render must not rebuild the capability (and the wallets'

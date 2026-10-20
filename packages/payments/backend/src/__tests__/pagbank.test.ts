@@ -1025,7 +1025,16 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
     });
     // `gateway` is PagBank's id in Google's processor registry — a provider
     // fact, spelled by the adapter so no frontend hardcodes a vendor name.
-    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_123' });
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_123', environment: 'TEST' });
+  });
+
+  it("publishes Google's PRODUCTION environment for a production connection (FUT-3756)", () => {
+    // A production store minting Google's TEST tokens would charge nobody.
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
+      environment: 'PRODUCTION',
+      fields: { token: 't', googlePayMerchantId: 'MID_123' },
+    });
+    expect(config.googlePay?.environment).toBe('PRODUCTION');
   });
 
   it('publishes a null merchant id for a connection that has none', () => {
@@ -1035,6 +1044,6 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
       environment: 'SANDBOX',
       fields: { token: 't', googlePayMerchantId: '' },
     });
-    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null });
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null, environment: 'TEST' });
   });
 });

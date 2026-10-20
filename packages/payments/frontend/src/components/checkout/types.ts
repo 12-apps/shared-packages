@@ -322,7 +322,7 @@ export interface CheckoutChainLink extends DebitDeclaration {
    * — the button must not render, because a token minted against a missing id
    * charges nobody.
    */
-  googlePay?: { gateway: string; gatewayMerchantId: string | null } | null;
+  googlePay?: { gateway: string; gatewayMerchantId: string | null; environment?: "TEST" | "PRODUCTION" } | null;
   /**
    * The buyer screen THIS provider's flow needs (FUT-596) — an opaque id the
    * adapter declares and `providers/registry.ts` resolves to a component.

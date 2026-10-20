@@ -376,7 +376,11 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
         // PagBank's id in Google's processor registry — a fact about PagBank,
         // spelled once here; the merchant id is per connection and `null`
         // until configured, which the button reads as "do not render".
-        googlePay: { gateway: 'pagbank', gatewayMerchantId: gatewayMerchantId || null },
+        googlePay: {
+          gateway: 'pagbank',
+          gatewayMerchantId: gatewayMerchantId || null,
+          environment: credentials.environment === 'PRODUCTION' ? 'PRODUCTION' : 'TEST',
+        },
       };
     },
   };
