@@ -283,9 +283,11 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
  * that mounts enabled draws its label, so the flip mounts it again (measured on
  * the future-pay Maestro emulator lane).
  *
- * Only on Android, and only on `disabled`: a remounted view loses screen-reader
- * focus, so iOS (never affected) and the loading flip (a button the user just
- * pressed) keep their view.
+ * Only on Android, and only on a disable that is not a loading one: a
+ * remounted view loses screen-reader focus, so iOS (never affected) and a
+ * button the user just pressed keep their view — callers write
+ * `disabled={busy} loading={busy}`, and that press must not remount it. A ref
+ * to the button gets the new view; a node stored before the flip is detached.
  */
 export function enableFlipKey(disabled: boolean | undefined, os: string = Platform.OS): string | undefined {
   if (os !== 'android') return undefined;
@@ -319,7 +321,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
 
   return (
     <Pressable
-      key={enableFlipKey(resolved.disabled)}
+      key={enableFlipKey(resolved.disabled && !resolved.loading)}
       ref={ref}
       role="button"
       aria-disabled={look.inactive}

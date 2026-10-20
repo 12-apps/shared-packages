@@ -69,6 +69,36 @@ describe('Button (native, Android) — the enable flip', () => {
     expect(screen.getByTestId('confirm')).toBe(idle);
   });
 
+  it('keeps its view when a press makes it busy — disabled and loading together, as callers write it', () => {
+    asAndroid();
+    function Send({ busy }: { busy: boolean }): React.JSX.Element {
+      return (
+        <Button variant="solid" color="danger" disabled={busy} loading={busy} dataTestId="send">
+          Enviar
+        </Button>
+      );
+    }
+    const { rerender } = render(<Send busy={false} />);
+    const idle = screen.getByTestId('send');
+
+    rerender(<Send busy />);
+    expect(screen.getByTestId('send')).toBe(idle);
+    rerender(<Send busy={false} />);
+
+    expect(screen.getByTestId('send')).toBe(idle);
+  });
+
+  it('still mounts a new view when it turns enabled while it was disabled and busy — the ready flip', () => {
+    asAndroid();
+    const { rerender } = render(<Confirm ready={false} />);
+    const disabled = screen.getByTestId('confirm');
+
+    rerender(<Confirm ready busy />);
+    rerender(<Confirm ready />);
+
+    expect(screen.getByTestId('confirm')).not.toBe(disabled);
+  });
+
   it('keeps its view across a render that does not flip it', () => {
     asAndroid();
     const { rerender } = render(<Confirm ready />);
