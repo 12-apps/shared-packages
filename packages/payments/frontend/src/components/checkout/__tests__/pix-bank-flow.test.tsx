@@ -91,7 +91,9 @@ describe("no bank remembered, on a phone", () => {
     expect(onPick).toHaveBeenCalledWith("caixa");
     await waitFor(() => expect(opened.calls).toEqual(["caixa"]));
     expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Abrindo a Caixa…");
-    expect(screen.getByTestId("pix-after-copy-step-1")).toBeTruthy();
+    // The bank picked: one line where the checklist was, as in the approved prototype.
+    expect(screen.getByTestId("pix-bank-hint").textContent).toBe("Abra o app do seu banco e cole em Pix copia e cola.");
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
     fireEvent.click(screen.getByTestId("pix-bank-other"));
     expect(screen.getByTestId("pix-bank-grid")).toBeTruthy();
   });
@@ -122,8 +124,9 @@ describe("a bank remembered, on a phone", () => {
     await waitFor(() => expect(opened.calls).toEqual(["nubank"]));
     expect(notify).toHaveBeenCalledWith("Código Pix copiado. Abrindo o Nubank…");
     expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Abrindo o Nubank…");
-    // The checklist stays while a bank is being opened.
-    expect(screen.getByTestId("pix-after-copy-step-1")).toBeTruthy();
+    // One line says what to do in the bank, where the checklist was (approved prototype).
+    expect(screen.getByTestId("pix-bank-hint").textContent).toBe("Abra o app do seu banco e cole em Pix copia e cola.");
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
     expect(onPick).not.toHaveBeenCalled();
   });
 
