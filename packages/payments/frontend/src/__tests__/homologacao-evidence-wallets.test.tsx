@@ -222,11 +222,39 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
     expect(ran[0]?.wallets).toEqual([{ type: 'APPLE_PAY', token: null, brand: null, last4: null, failure: 'NOT_AVAILABLE' }]);
   });
 
-  it('given a host with no merchant validation, then Apple Pay is not drawn', () => {
+  it('given Apple Pay is not configured, then the card says it waits for the Apple Developer account', () => {
+    mount({ seller: appleSeller(false), onValidateApplePayMerchant: vi.fn(async () => ({})) });
+
+    expect(screen.getByTestId('evidence-apple-pay-absent').textContent).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayAbsent.NOT_CONFIGURED,
+    );
+  });
+
+  it('given Apple Pay is configured but the browser has no ApplePaySession, then the card says to open it in Safari', () => {
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})) });
+
+    expect(screen.getByTestId('evidence-apple-pay-absent').textContent).toBe(
+      PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.wallets.applePayAbsent.NOT_AVAILABLE,
+    );
+  });
+
+  it('given Apple Pay drawn, then no absence line is shown', () => {
     installApplePay();
-    mount({ seller: appleSeller(true) });
+    mount({ seller: appleSeller(true), onValidateApplePayMerchant: vi.fn(async () => ({})) });
+
+    expect(screen.getByTestId('evidence-apple-pay')).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid="evidence-apple-pay-absent"]')).toHaveLength(0);
+  });
+
+  it('given a host with no merchant validation, then Apple Pay is not drawn and the run says the validation cannot run', async () => {
+    installApplePay();
+    const { ran } = mount({ seller: appleSeller(true) });
 
     expect(document.querySelectorAll('[data-testid="evidence-apple-pay"]')).toHaveLength(0);
+    fireEvent.click(screen.getByTestId('evidence-generate'));
+
+    await waitFor(() => expect(ran).toHaveLength(1));
+    expect(ran[0]?.wallets[0]).toMatchObject({ type: 'APPLE_PAY', failure: 'MERCHANT_VALIDATION_FAILED' });
   });
 
   it("given Apple Pay configured, when pressed, then the host validates the merchant and the authorized token is kept and sent", async () => {

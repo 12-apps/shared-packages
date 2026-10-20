@@ -164,8 +164,16 @@ function appleOffer(input: EvidenceWalletsInput): { Session: ApplePaySessionClas
 /** Why a wallet with no press cannot run here — or undefined when it simply was not pressed. */
 function notOffered(wallet: EvidenceWallet, input: EvidenceWalletsInput, googleReady: boolean): BrowserWalletResult | undefined {
   if (wallet === 'GOOGLE_PAY') return input.config?.googlePay && !googleReady ? failed(wallet, 'NOT_AVAILABLE') : undefined;
-  if (!input.config?.applePay.configured || !input.validateApplePayMerchant) return failed(wallet, 'NOT_CONFIGURED');
+  if (!input.config?.applePay.configured) return failed(wallet, 'NOT_CONFIGURED');
+  // An identity with no host validation: the sheet could never be validated.
+  if (!input.validateApplePayMerchant) return failed(wallet, 'MERCHANT_VALIDATION_FAILED');
   return applePaySupported() ? undefined : failed(wallet, 'NOT_AVAILABLE');
+}
+
+/** Why Apple Pay has no button on a screen whose host carries wallets — null when it has one, or no wallets at all. */
+function appleAbsence(input: EvidenceWalletsInput, offered: boolean): BrowserWalletFailure | null {
+  if (offered || !input.config) return null;
+  return notOffered('APPLE_PAY', input, false)?.failure ?? null;
 }
 
 /** The wallet step's state: the sheets' answers, the presses that open them, and what phase 2 gets. */
@@ -182,6 +190,8 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
     results,
     google: client && google ? { client, press: () => runGooglePay(client, google, cents, record) } : null,
     apple: apple ? { press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
+    /** Why Apple Pay has no button here, or null when it has one. */
+    appleAbsent: appleAbsence(input, apple !== null),
     /** What phase 2 gets: each wallet's answer, or why it could not be offered here. */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
@@ -220,8 +230,6 @@ function ApplePayPress({ label, onPress }: { label: string; onPress: () => void 
       data-testid="evidence-apple-pay"
       sx={{
         WebkitAppearance: '-apple-pay-button',
-        '-apple-pay-button-type': 'plain',
-        '-apple-pay-button-style': 'black',
         height: 40,
         width: 240,
         border: 0,
@@ -242,16 +250,21 @@ function WalletLine({ result, copy }: { result: BrowserWalletResult; copy: Homol
   const name = copy.names[result.type];
   const card = [result.brand, result.last4 ? `•••• ${result.last4}` : null].filter(Boolean).join(' ');
   return (
-    <Typography variant="body2" role="status" data-testid={`evidence-wallet-${result.token ? 'ready' : 'failed'}-${result.type}`}>
+    <Typography
+      variant="body2"
+      role="status"
+      color={result.token ? 'text.primary' : 'error.main'}
+      data-testid={`evidence-wallet-${result.token ? 'ready' : 'failed'}-${result.type}`}
+    >
       {result.token ? copy.ready(name, card) : copy.failed(name)}
     </Typography>
   );
 }
 
-/** The wallet step: nothing at all when neither wallet can be offered on this screen. */
+/** The wallet step: nothing at all when the host's seller view carries no wallets. */
 export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): ReactNode {
   const copy = usePlatformCopy().evidence.wallets;
-  if (!wallets.google && !wallets.apple) return null;
+  if (!wallets.google && !wallets.apple && !wallets.appleAbsent) return null;
   const lines = WALLETS.flatMap((wallet) => {
     const result = wallets.results[wallet];
     return result ? [result] : [];
@@ -270,6 +283,11 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
         ) : null}
         {wallets.apple ? <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} /> : null}
       </Stack>
+      {wallets.appleAbsent === 'NOT_CONFIGURED' || wallets.appleAbsent === 'NOT_AVAILABLE' ? (
+        <Typography variant="caption" component="p" color="text.secondary" data-testid="evidence-apple-pay-absent">
+          {copy.applePayAbsent[wallets.appleAbsent]}
+        </Typography>
+      ) : null}
       {lines.map((result) => (
         <WalletLine key={result.type} result={result} copy={copy} />
       ))}

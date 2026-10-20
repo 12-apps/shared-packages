@@ -173,6 +173,8 @@ export interface HomologacaoEvidenceWalletsCopy {
   applePayCannotStart: string;
   /** Apple Pay started and failed. */
   applePayCannotComplete: string;
+  /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
+  applePayAbsent: { NOT_CONFIGURED: string; NOT_AVAILABLE: string };
   /** A wallet holds its token: `card` is the network and last four the wallet showed — never the token. */
   ready: (wallet: string, card: string) => string;
   /** The sheet answered no token; pressing again retries. */

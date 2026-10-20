@@ -155,6 +155,10 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       applePaySheetTotal: 'Homologation test',
       applePayCannotStart: 'Apple Pay is not configured.',
       applePayCannotComplete: 'Apple Pay could not be completed.',
+      applePayAbsent: {
+        NOT_CONFIGURED: 'Apple Pay: waiting for the Apple Developer account. Its section stays pending.',
+        NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
+      },
       ready: (wallet, card) => `${wallet} ready${card ? ` — ${card}` : ''}. It will be used when the file is generated.`,
       failed: (wallet) => `${wallet} returned no token. Tap again to retry.`,
     },
