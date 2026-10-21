@@ -1,15 +1,14 @@
 import { Box } from "@mui/material";
-import { useRef, type JSX } from "react";
+import { Suspense, useEffect, useState, type JSX, type ReactNode } from "react";
 
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
 import type { ListChargeFailure } from "./charge-runners";
-import { CpfTop } from "./cpf-top";
-import { cpfHolds, cpfProvider } from "./top-cpf";
+import { PartBoundary, deferredPart } from "./lazy-body";
+import { cpfHolds } from "./top-cpf";
 import type { CheckoutPaymentList } from "./types";
 import type { ListCapability } from "./use-capability";
 import type { ListState } from "./use-list-state";
-import { WalletBlock } from "./wallet-block";
 
 /**
  * The fields that hold the bar's button for the chosen online option, in the
@@ -46,13 +45,8 @@ export function walletsHeld(input: {
   return priced ? null : (list.copy.reasons.repricing ?? list.copy.reasons.choose);
 }
 
-/** Move the focus to "Número do cartão" — the next thing to type once the CPF is complete. */
-function focusCardNumber(scope: HTMLElement | null): void {
-  scope?.closest('[data-testid="payment-list"]')?.querySelector<HTMLInputElement>('input[data-testid="card-number"]')?.focus();
-}
-
 /** What the top of the list reads, gathered by the face. */
-interface ListTopFacts {
+export interface ListTopFacts {
   list: CheckoutPaymentList;
   state: ListState;
   cap: ListCapability;
@@ -63,37 +57,97 @@ interface ListTopFacts {
   onKeepSavedCpf: () => void;
 }
 
-/**
- * The top of Pagamento (FUT-3685): the CPF, asked once (E1, L7), then the
- * "PAGAMENTO RÁPIDO" block (C5, C6) — both above the rows.
- */
-export function ListTop({ props, held, failure, onGoogle, onApple }: {
+/** What the top of the list is handed by the face. */
+export interface ListTopInput {
   props: ListTopFacts;
   held: string | null;
   /** The last wallet charge's refusal, said under the buttons. */
   failure: ListChargeFailure | null;
   onGoogle: () => void;
   onApple: () => void;
-}): JSX.Element | null {
-  const scope = useRef<HTMLDivElement | null>(null);
-  const { list, state, cap, config, c } = props;
+  /** Whether the rows under the top have been drawn yet — set by the face once they are. */
+  rowsShown?: { readonly current: boolean };
+}
+
+/** The top's chunk (FUT-3711): `ListTop` draws it; the step preloads it (`TopPart.Preload`). */
+export const TopPart = deferredPart<ListTopInput>(async () => (await import("./list-top-body")).ListTopBody);
+
+/**
+ * The top of Pagamento (FUT-3685): the CPF, asked once (E1, L7), then the
+ * "PAGAMENTO RÁPIDO" block (C5, C6) — both above the rows.
+ *
+ * Only the decision to draw it is here; what it draws is a chunk of its own
+ * (FUT-3711), so a checkout with neither a CPF to ask nor a wallet ready never
+ * parses it. The step starts that chunk as soon as it mounts
+ * (`TopPart.Preload`). A top drawn with the list's first rows SUSPENDS to the
+ * boundary the face puts around the top AND the rows (`ChoiceList`): the two
+ * land together, so no row is pushed down under a finger. A top that appears
+ * once the rows are drawn suspends on its own and never hides them. A chunk that
+ * fails is caught here — the rows stay, nothing is drawn in the top's place,
+ * and it is tried once more. What the CPF holds — the pay button, the wallets
+ * — is decided in this file (`gateFields`, `walletsHeld`), so the hold is in
+ * force whether or not the field is on screen.
+ */
+export function ListTop(input: ListTopInput): JSX.Element | null {
+  const { state, cap } = input.props;
   if (!state.top && cap.wallets.length === 0) return null;
-  const typingCard = state.choice?.kind === "online" && state.choice.method === "CARD";
+  return <TopWithRetry {...input} />;
+}
+
+/**
+ * The top behind its own boundary: a failed chunk draws nothing there, then is
+ * tried once more. A top that first appears AFTER the rows are on screen — a
+ * wallet that turned ready, a CPF opened by "Alterar" — also suspends on its
+ * own (nothing drawn while it loads), so it can never hide rows already drawn.
+ * Decided once, when the top mounts: a boundary that came and went would
+ * remount what is under it.
+ */
+function TopWithRetry(input: ListTopInput): JSX.Element {
+  const forget = TopPart.useForget();
+  const [late] = useState(() => input.rowsShown?.current === true);
+  const top = <DeferredTop {...input} />;
   return (
-    <Box ref={scope} data-testid="list-top" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      {state.top ? (
-        <CpfTop
-          field={state.top}
-          buyer={c.buyer}
-          onBuyerChange={c.setBuyer}
-          copy={list.copy.buyer}
-          provider={cpfProvider(config?.chain, state.methods)}
-          onComplete={typingCard ? () => focusCardNumber(scope.current) : undefined}
-          focusOnMount={props.revealed}
-          onKeepSaved={props.revealed ? props.onKeepSavedCpf : undefined}
-        />
-      ) : null}
-      <WalletBlock cap={cap} copy={list.copy} held={held} failure={failure} onGoogle={onGoogle} onApple={onApple} />
-    </Box>
+    <PartBoundary fallback={null} retry={forget}>
+      {late ? <Suspense fallback={<TopLoading />}>{top}</Suspense> : top}
+    </PartBoundary>
+  );
+}
+
+/** The top's chunk, asked of the host's loader only once there is a top to draw. */
+function DeferredTop(input: ListTopInput): JSX.Element {
+  const Body = TopPart.usePart();
+  return <Body {...input} />;
+}
+
+/**
+ * What the top and the rows show while the top's chunk is on its way: nothing
+ * — an undrawn `list-top-loading` marker a test can wait on (`display: none`
+ * takes no row and no gap). The bar under them is not inside the boundary, so
+ * its button keeps its place and its hold.
+ */
+function TopLoading(): JSX.Element {
+  return <Box data-testid="list-top-loading" sx={{ display: "none" }} />;
+}
+
+/** Marks the rows as drawn once they commit — a top appearing after that suspends on its own. */
+function RowsShown({ into }: { into: { current: boolean } }): null {
+  useEffect(() => {
+    into.current = true;
+  }, [into]);
+  return null;
+}
+
+/**
+ * The top and the rows under ONE boundary (FUT-3711): a top drawn with the
+ * first rows lands with them, so its chunk never pushes a row down. Once the
+ * rows have committed, `rowsShown` says so, and a top that appears later
+ * suspends on its own instead (`TopWithRetry`).
+ */
+export function TopAndRows({ rowsShown, children }: { rowsShown: { current: boolean }; children: ReactNode }): JSX.Element {
+  return (
+    <Suspense fallback={<TopLoading />}>
+      {children}
+      <RowsShown into={rowsShown} />
+    </Suspense>
   );
 }

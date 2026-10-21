@@ -13,7 +13,9 @@
  *   - `cpf-on-file`: a returning buyer — the payer line, whose "Alterar"
  *     opens the CPF at the top;
  *   - `google-only`: one wallet, full width;
- *   - `no-wallet`: a store that declares none — no block at all.
+ *   - `no-wallet`: a store that declares none — no block at all;
+ *   - `credit`: a returning buyer holding R$ 5,00 of store credit — the bar's
+ *     extras, and on a computer the column's credit and "A pagar" rows.
  *
  * The wallets' own APIs are stubbed (`../payments/wallet-stubs`); the money
  * path behind them is the real mount's.
@@ -82,6 +84,7 @@ const CASES = [
   listCase('cpf-on-file', 'CPF salvo', store(['GOOGLE_PAY', 'APPLE_PAY']), RETURNING),
   listCase('google-only', 'Só Google Pay', store(['GOOGLE_PAY']), RETURNING),
   listCase('no-wallet', 'Sem carteira', store([]), RETURNING),
+  listCase('credit', 'Com crédito', store([]), { ...RETURNING, storeCredit: true }),
 ];
 
 export function PaymentsCheckoutListPage(): JSX.Element {

@@ -33,6 +33,7 @@ describe("on a computer (L4)", () => {
     frameWidth(1280);
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, discountLines: FEE, list: { summary: "1 item · Taxa de entrega R$ 5,00" } });
     const column = await screen.findByTestId("list-summary-column");
+    await within(column).findByTestId("list-summary-body");
     expect(within(column).getByRole("heading", { name: "Resumo do pedido" })).toBeTruthy();
     expect(within(column).getByText("1× Combo")).toBeTruthy();
     expect(within(column).getByText("R$ 22,00")).toBeTruthy();
@@ -83,6 +84,7 @@ describe("the host's own two columns (FUT-3685 review C2)", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: LINES, list: { summaryTarget: aside, summary: "1 item" } });
     await screen.findByTestId("payment-list");
     const column = await within(aside).findByTestId("list-summary-column");
+    await within(column).findByTestId("list-summary-body");
     expect(within(column).getByText("1× Combo")).toBeTruthy();
     expect(within(column).getByTestId("list-pay")).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("list-columns")).toBeNull());

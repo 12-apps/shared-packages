@@ -15,6 +15,7 @@ import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import { CheckoutNavigateProvider } from "../navigate-context";
 import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import type { CheckoutClient } from "../transport";
+import type { CheckoutComponents } from "../ui";
 import type {
   BuyerInfo,
   CheckoutCustomerField,
@@ -214,6 +215,8 @@ interface ListHost {
   /** The cart's lines and money rows, for the computer's summary column. */
   lines?: { key: string; quantity: number; name: string; totalLabel: string }[];
   discountLines?: ReactNode;
+  /** The host's slots — a suite fills `lazy` to hold or watch the list's deferred parts. */
+  components?: Partial<CheckoutComponents>;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -242,6 +245,7 @@ export function listFlow(host: ListHost): JSX.Element {
           validateApplePayMerchant={host.validateApplePayMerchant}
           defaultBuyer={host.buyer ?? { name: "Ana Teste" }}
           paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY, ...host.list }}
+          components={host.components}
         />
       </CheckoutNavigateProvider>
     </CheckoutClientProvider>

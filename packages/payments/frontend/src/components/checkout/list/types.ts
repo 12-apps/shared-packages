@@ -5,8 +5,7 @@
  * the only thing that creates the order and the charge.
  *
  * Opt-in, through `CheckoutFlowProps.paymentList`. A host that passes nothing
- * keeps the method tabs, the order summary and the raise-on-pick it has today
- * — this is additive, not a replacement.
+ * keeps the method tabs, the order summary and the raise-on-pick it has today — this is additive.
  *
  * ## The door options are the HOST's
  *
@@ -20,6 +19,7 @@
  */
 import type { ReactNode } from "react";
 
+import type { PaymentListCredit, PaymentListCreditCopy } from "./credit-types";
 import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
 
 export type { CheckoutBillingAddress, PaymentListDebitCopy };
@@ -121,7 +121,7 @@ export interface CheckoutListHold {
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */
-export interface CheckoutPaymentList {
+export interface CheckoutPaymentList extends PaymentListCredit {
   /** Every sentence the list draws. REQUIRED, with no default (FUT-760). */
   copy: PaymentListCopy;
   /**
@@ -282,7 +282,7 @@ export interface PixBankCopy {
 }
 
 /** The list's words — a pack per locale ships at `@12-apps/payments-frontend/locales`. */
-export interface PaymentListCopy {
+export interface PaymentListCopy extends PaymentListCreditCopy {
   /** "Como você quer pagar?" */
   title: string;
   /** "Pagar agora, pelo app" — drawn in capitals by CSS. */

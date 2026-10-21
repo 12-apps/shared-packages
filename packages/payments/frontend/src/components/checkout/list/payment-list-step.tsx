@@ -15,11 +15,12 @@ import type { useCheckoutController } from "../use-checkout-controller";
 import { PaymentListProvider } from "./context";
 import { ListBar, WaitingLine } from "./list-bar";
 import { ListFace } from "./list-face";
+import { TopPart } from "./list-top";
 import { ListLayout } from "./summary-column";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
 import type { ListState } from "./use-list-state";
-import type { CheckoutPaymentList } from "./types";
+import type { CheckoutListChoice, CheckoutPaymentList } from "./types";
 import { useListCapability } from "./use-capability";
 import { useListCharge } from "./use-list-charge";
 import { useListState } from "./use-list-state";
@@ -156,6 +157,32 @@ function useDebitReady(list: CheckoutPaymentList): boolean {
 }
 
 /**
+ * Starts the top's chunk the moment the list knows it MAY draw a top
+ * (FUT-3711): a CPF to ask, a wallet the chain head DECLARES (readiness —
+ * pay.js, the device, the host's price — arrives only after the first
+ * render), or a CPF on file that "Alterar" can open. So the top is in hand
+ * when it is drawn.
+ */
+function PreloadTop({ state, cap, config, taxIdOnFile }: { state: ListState; cap: ListCapability; config: CheckoutProviderConfig | null; taxIdOnFile: boolean }): JSX.Element | null {
+  const declared = (config?.chain?.[0]?.wallets?.length ?? 0) > 0;
+  if (!state.top && cap.wallets.length === 0 && !declared && !taxIdOnFile) return null;
+  return <TopPart.Preload />;
+}
+
+/**
+ * The column's credit and "A pagar" rows (FUT-3711) — only with all three of
+ * the host's credit, amount due and words, and only while an ONLINE option is
+ * chosen: that is the only time the button charges the amount due. A door
+ * option or no choice charges the cart's total, so "Total" stands alone — a
+ * balance the host holds pays no door tender.
+ */
+function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null): { label: string; amountLabel: string; dueTitle: string; dueLabel: string } | undefined {
+  if (choice?.kind !== "online") return undefined;
+  if (!list.credit || !list.amountDueLabel || !list.copy.amountDue) return undefined;
+  return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: list.amountDueLabel };
+}
+
+/**
  * The Pagamento step as ONE list (FUT-3591, FUT-3592) — see `./types.ts`.
  *
  * Three faces, chosen from what the controller holds: the raised PIX (its code
@@ -201,6 +228,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
       lines={props.totalOverride ? undefined : props.cart.lines}
       moneyLines={props.cart.discountLines}
       totalLabel={displayTotals(props.totalOverride, props.cart).label}
+      credit={creditRows(list, state.choice)}
     >
       <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
     </ListLayout>
@@ -208,6 +236,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
       <PixStageProvider stage={pixStage}>
+        <PreloadTop state={state} cap={cap} config={config} taxIdOnFile={props.taxIdOnFile} />
         <CartChangedBoundary
           order={c.order}
           creating={c.creating}

@@ -174,14 +174,33 @@ function useDoorGroup(onSend: () => void): readonly CheckoutDoorOption[] {
   );
 }
 
+/** The store credit the `credit` case holds for the buyer (FUT-3711): R$ 5,00. */
+export const STOREFRONT_CREDIT_CENTS = 500;
+
+/** The host's online extra: its "use my balance" checkbox — the host owns the choice and re-prices with it. */
+function StoreCreditExtra({ use, onUse }: { use: boolean; onUse: (use: boolean) => void }): JSX.Element {
+  return (
+    <Box data-testid="harness-store-credit" sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: 'action.hover' }}>
+      <StorefrontCheckbox label={`Usar meu saldo de ${brlLabel(STOREFRONT_CREDIT_CENTS)}`} checked={use} onChange={(_event, checked) => onUse(checked)} />
+    </Box>
+  );
+}
+
 /**
  * The ONE list as the origin host's entrega mounts it: the package's own pt-BR
- * pack, the bar's first line, the door group, and the amount due.
+ * pack, the bar's first line, the door group, and the amount due. With
+ * `credit`, the buyer holds store credit: the extras checkbox, and — while it
+ * is ticked — the amount due less the credit, the column's credit and
+ * "A pagar" rows. Unticked, the cart's total is due again and neither row is
+ * drawn, as a host that re-prices does.
  */
-export function useStorefrontPaymentList(amountCents: number, onDoorSend: () => void): CheckoutPaymentList {
+export function useStorefrontPaymentList(amountCents: number, onDoorSend: () => void, credit = false): CheckoutPaymentList {
   const door = useDoorGroup(onDoorSend);
-  return useMemo(
-    () => ({
+  const [use, setUse] = useState(true);
+  return useMemo(() => {
+    const applied = credit && use;
+    const due = applied ? amountCents - STOREFRONT_CREDIT_CENTS : amountCents;
+    return {
       copy: { ...PAYMENT_LIST_COPY['pt-BR'], doorHeading: 'Pagar na entrega' },
       summary: (
         <Text variant="body" size="sm" as="span">
@@ -189,8 +208,14 @@ export function useStorefrontPaymentList(amountCents: number, onDoorSend: () => 
         </Text>
       ),
       door,
-      totalCents: amountCents,
-    }),
-    [door, amountCents],
-  );
+      totalCents: due,
+      ...(credit ? { onlineExtras: <StoreCreditExtra use={use} onUse={setUse} /> } : {}),
+      ...(applied
+        ? {
+            amountDueLabel: brlLabel(due),
+            credit: { label: 'Crédito da loja', amountLabel: `− ${brlLabel(STOREFRONT_CREDIT_CENTS)}` },
+          }
+        : {}),
+    };
+  }, [door, amountCents, credit, use]);
 }

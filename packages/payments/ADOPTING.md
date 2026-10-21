@@ -798,12 +798,13 @@ any design system satisfies them with a thin — often identity — mapping):
 | `Text` | semantic `variant`/`size`/`weight`/`color`, `as`, `data-testid` |
 | `Button` | `variant` solid/outline/text, `color`, `size`, `fullWidth`, `loading`, `icon`, `dataTestId` **on the button element** |
 | `Input` | `label`, `error`+`helperText`, `endAdornment`, `data-testid` **on the `<input>` itself** (e2e fills it) |
-| `Checkbox` | `checked`, `onChange(event, checked)`, `label` |
+| `Checkbox` | `checked`, `onChange(event, checked)`, `label`. The list's consent row under the CPF (FUT-3711) sits flush with the field by zeroing MUI's `.MuiFormControlLabel-root` inset and `.MuiCheckbox-root` padding inside it — a Checkbox built on MUI's (the default, `@12-apps/ui`'s) is flush; one built otherwise keeps its own inset |
 | `Alert` | `variant` info/warning/danger, `title`, `description`, `showIcon` |
 | `LoadingState` | spinner + `message` |
 | `Stepper` | `steps[{id,label}]`, `activeId`, `completed` |
 | `RadioGroup` | `options[{value,label,description}]` (the saved-cards list) |
 | `ActionBar` | the bottom CTA bar — host chrome (this repo's storefront passes its `StickyActionBar`) |
+| `lazy` | not a primitive: the loader for the parts of a screen deferred to a chunk of their own, React's `lazy` signature — see "Deferred parts" under the one list. Absent ⇒ React's `lazy` |
 
 Layout stays raw MUI `Box` INSIDE the package (MUI is already a peer), so
 slot implementations never receive layout responsibilities; test ids are
@@ -858,7 +859,9 @@ What changes for the buyer:
   wallets, instead of on a Dados step: it shows when ANY online method or
   wallet the list offers needs it under the chain rule (the union, never the
   chosen row), with "o PagBank pede para pagar pelo app" under it — the
-  provider named is the chain member that asks. Until it is valid, the wallet
+  provider named is the chain member that asks. The field is ~280px once the
+  list itself is at least 560px wide — read off the list's own container, so
+  it stops in your own ~680px left column too — and full width under that. Until it is valid, the wallet
   buttons and the online rows' button are held with `copy.reasons.cpf`; a door
   row never is. A buyer with one on file sees no field but the payer line, and
   its "Alterar" reveals the field at the top — the list never opens a Dados
@@ -896,6 +899,7 @@ What changes for the buyer:
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
 | `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
 | `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
+| `credit?` | `{ label, amountLabel }` — the balance paying part of the cart, worded and formatted by you (`{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }`, FUT-3711). With `amountDueLabel`, the computer's "Resumo do pedido" column draws it under "Total", then "A pagar" (`copy.amountDue`) and the amount due — Total − credit reads as what the button charges — while an ONLINE option is chosen. A door option or no choice charges the cart's total, so "Total" stands alone; without either field, "Total" alone |
 | `lastMethod?` | `"PIX"` or `"CARD"` — the buyer's last ONLINE way to pay, as the host remembers it (FUT-3611). Chosen before the buyer touches anything when the store offers it: Pix as Pix, a card as the saved card used last. Never a door tender. Absent ⇒ the saved-card rule alone |
 | `armedCharge?` | the host's own consent screen already took the tap ("Pedir em 1 toque", FUT-3611): the card's 5-second bar starts by itself, once, as soon as a SAVED card is chosen and nothing holds the button. Without a saved card it does nothing; Cancelar still sends nothing |
 | `chargeFooter?` | `(cancel) => ReactNode` — host content under the 5-second bar's Cancelar while it counts (the storefront's opt-out link). Handed the bar's own cancel, so it stops the charge first |
@@ -914,6 +918,51 @@ What changes for the buyer:
 | `onlineExtras` | drawn whenever a payment here is possible — the list offers an online row or a wallet, and no door row is chosen (nothing chosen counts: a wallet pays with no row). The payer line follows the same rule |
 | `copy.wallets`, `copy.buyer.cpfHint` | new in the packs: "Pagamento rápido", "Pagar com Google Pay", "Pagar com Apple Pay", "ou escolha como pagar"; "o PagBank pede para pagar pelo app". A host building its own `PaymentListCopy` adds them. `copy.googlePay` is no longer drawn |
 | `CheckoutOnlineChoice` | never `"GOOGLE_PAY"` any more: the wallets are not rows, so `onChoiceChange` does not report one |
+
+**Deferred parts — the `lazy` slot (FUT-3711).** Two parts of the list are
+chunks of their own, so a checkout that never draws them never parses them:
+the top (the CPF field and the "PAGAMENTO RÁPIDO" block, drawn only when a CPF
+is asked or a wallet is ready) and the computer's "Resumo do pedido" column
+(never drawn on a phone, nor by a checkout that does not mount the list). The
+list builds both through `components.lazy`, a function with React's `lazy`
+signature, `(factory) => Component`:
+
+```tsx
+import { lazyRoute } from "@12-apps/app-shell/react";
+
+<CheckoutFlow components={{ ...mySlots, lazy: lazyRoute }} ... />
+// or once, at the factory: createPaymentFlows({ components: { ...mySlots, lazy: lazyRoute } })
+```
+
+- **Pass your stale-chunk-safe loader.** A host whose deploys replace hashed
+  chunks must: a tab opened before a deploy asks for a chunk that is gone,
+  and React's `lazy` — the default when the slot is unfilled — throws that to
+  the nearest error boundary. `lazyRoute` reloads onto the current build
+  instead. Any function `typeof React.lazy` fits (`CheckoutLazy`, exported).
+  The list starts the top's chunk as soon as it mounts, so a loader that
+  reloads on a stale chunk does it then — before the buyer has typed anything —
+  not when "Alterar" is tapped.
+- **Pass the same function every render** — a module-level one, as above.
+  Each loader's components are built once and kept against it; a new arrow per
+  render re-suspends both parts on every render.
+- **The top and the rows land together.** The top's chunk starts when the
+  list mounts; until it lands neither the top nor the rows are drawn (the bar
+  is), so no row is drawn and then pushed down under a finger. A top opened
+  later ("Alterar") is already in hand and hides nothing. What the CPF holds is
+  decided outside the chunk: the online rows' button and the wallets are held
+  with `copy.reasons.cpf` before the field is on screen. A test can wait for
+  `list-top-loading` to be gone before asking what the top shows.
+- **The column's frame, heading and pay-button slot are drawn at once** (in
+  your `summaryTarget` when you pass one), with the bar's content in that one
+  slot from the first render: only the lines, the money rows, "Total" and the
+  credit rows load, and their landing moves nothing — the focus on "Pagar",
+  your extras' state and a 5-second bar counting all stay.
+- **A chunk that fails to load** is caught per part: the rows, the column's
+  frame and the pay button stay, nothing is drawn in the part's place, and the
+  part is imported once more a second later.
+- A bundler rule that merges small chunks may fold both back in; a host that
+  keeps chunks apart by module names `list/list-top-body` and
+  `list/summary-column-body`.
 
 **The door slot.** Paying at the door raises no charge, so it is the host's:
 
@@ -940,7 +989,7 @@ tell it the amount due, and your server tells it what each raised order owes:
 | `CheckoutOrder.amountDueCents` | answer it on every raised order when a balance pays part of `totalCents`: the cents the provider is asked for. **A credit host that leaves it out has every wallet key refused** (its total is not the sheet's); in development the list says so with a `console.warn`. |
 | the wallet charge | your `/charge` route must check the wallet amount against the order's CURRENT amount due, not its total — the sheet was priced with the amount due |
 | everything covered (`totalCents: 0`) | the card option asks for no card, and the bar says `copy.chargingCovered`. The order the button raises must come back SETTLED — paid from the balance with no provider call, status not `AWAITING_PAYMENT` — so the list goes to its paid screen. An order that comes back awaiting with `amountDueCents: 0` is never charged; the list gives its rows back |
-| `copy.chargingCovered?`, `copy.reasons.repricing?` | the bar's sentence for a covered order; the reason under the wallets held while you re-price. Both packs carry them | `usePaymentList` on `createPaymentFlows` is the same
+| `copy.chargingCovered?`, `copy.reasons.repricing?`, `copy.amountDue?` | the bar's sentence for a covered order; the reason under the wallets held while you re-price; "A pagar", the column's row under your `credit` (absent ⇒ neither row is drawn). The packs carry all three | `usePaymentList` on `createPaymentFlows` is the same
 thing for the mounted flow, read as a hook.
 
 **Known limitation.** The rows' radios are MUI's own `Radio`, not a checkout

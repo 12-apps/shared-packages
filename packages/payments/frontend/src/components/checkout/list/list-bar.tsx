@@ -12,6 +12,12 @@ import { CHARGE_WINDOW_MS } from "./use-list-charge";
 const ACTION_HEIGHT = 6.5;
 const SECONDARY_HEIGHT = 5.5;
 
+/** A block the host handed that draws nothing takes no row, and so no gap (FUT-3711). */
+const NO_EMPTY_ROW = { "&:empty": { display: "none" } } as const;
+
+/** Read by a screen reader, drawn nowhere. */
+const VISUALLY_HIDDEN = { position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" } as const;
+
 /** Focus the first button under `scope` — the slot owns the element, so it is found, not referenced. */
 function focusButtonIn(scope: HTMLElement | null): void {
   scope?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -46,19 +52,19 @@ export function ListBar({ summary, extras, payer, reason, live, children }: {
   const column = useSummaryColumnTarget();
   const content = (
     <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
-      {summary ? <Box data-testid="list-bar-summary">{summary}</Box> : null}
-      {extras ? <Box data-testid="list-bar-extras">{extras}</Box> : null}
+      {/* The context line in the secondary ink in the column, as in the bar — the column inherits whatever the host's element is inked in. */}
+      {summary ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, ...(column ? { color: "text.secondary" } : {}) }}>{summary}</Box> : null}
+      {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
       {children}
-      <Box role="status" aria-live="polite" data-testid="list-bar-live">
+      {/* Out of the flow while it has nothing to show: an empty row still took a gap under the button. */}
+      <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={reason ? undefined : VISUALLY_HIDDEN}>
         {reason ? (
           <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
             {reason}
           </Text>
         ) : (
-          <Box component="span" sx={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
-            {live ?? ""}
-          </Box>
+          <Box component="span">{live ?? ""}</Box>
         )}
       </Box>
     </Box>
