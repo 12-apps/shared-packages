@@ -21,6 +21,7 @@ import type {
   BrowserCardResult,
   BrowserWalletResult,
   EvidenceRecord,
+  EvidenceRunSection,
   EvidenceWalletsConfig,
   HomologacaoEvidenceCopy,
 } from './types';
@@ -103,7 +104,12 @@ export interface HomologacaoEvidenceService {
   /** Phase 1: the seller's public key and the debit card's 3DS session, each null when not minted. */
   prepare(): Promise<PreparedEvidenceRun>;
   /** Phase 2, with the browser's test cards and — when their buttons were pressed — wallet tokens. */
-  run(runId: string, cards: readonly BrowserCardResult[], wallets?: readonly BrowserWalletResult[]): Promise<EvidenceRecord>;
+  run(
+    runId: string,
+    cards: readonly BrowserCardResult[],
+    wallets?: readonly BrowserWalletResult[],
+    onSection?: (section: EvidenceRunSection) => void,
+  ): Promise<EvidenceRecord>;
   /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
   file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
 }
@@ -175,7 +181,7 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
     prepare: () => prepareEvidenceRun(runDeps),
-    run: (runId, cards, wallets) => completeEvidenceRun(runDeps, runId, cards, wallets),
+    run: (runId, cards, wallets, onSection) => completeEvidenceRun(runDeps, runId, cards, wallets, onSection),
     file: (format = 'TXT') =>
       (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,

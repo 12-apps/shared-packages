@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BrowserCardResult } from '@12-apps/payments-backend';
@@ -75,7 +75,7 @@ describe('HomologacaoEvidenceCard', () => {
     await waitFor(() => expect(screen.getByTestId('evidence-summary-counts').textContent).toBe(
       '✓\u00a015\u00a0executados · ✗\u00a00\u00a0falharam · ⧗\u00a02\u00a0pendentes',
     ));
-    expect(props.onRun).toHaveBeenCalledWith('run-1', expect.any(Array), expect.any(Array));
+    expect(props.onRun).toHaveBeenCalledWith('run-1', expect.any(Array), expect.any(Array), expect.any(Function));
     expect(ran[0]?.map((card) => [card.scenario, card.encrypted])).toEqual([
       ['approved', 'enc-2097'],
       ['declined', 'enc-0766'],
@@ -212,5 +212,59 @@ describe('HomologacaoEvidenceCard', () => {
     expect(screen.getByTestId('evidence-connect-outcome').textContent).toBe(
       'A conexão do lojista de teste não foi concluída. Tente conectar de novo.',
     );
+  });
+
+  it('given a run, then each step is marked done, current or pending as the host reports the sections (FUT-3755)', async () => {
+    let section: ((name: 'PIX' | 'CARD' | 'DEBIT' | 'GOOGLE_PAY' | 'APPLE_PAY') => void) | undefined;
+    let finish: (() => void) | undefined;
+    (window as { PagSeguro?: unknown }).PagSeguro = { encryptCard: () => ({ hasErrors: false, encryptedCard: 'enc' }) };
+    mount({
+      onRun: vi.fn(
+        (_runId: string, _cards: BrowserCardResult[], _wallets: unknown, onSection: typeof section) =>
+          new Promise<void>((resolve) => {
+            section = onSection;
+            finish = resolve;
+          }),
+      ),
+    });
+
+    fireEvent.click(screen.getByTestId('evidence-generate'));
+    await waitFor(() => expect(section).toBeDefined());
+    act(() => section?.('DEBIT'));
+
+    const states = () =>
+      Array.from(screen.getByTestId('evidence-steps').querySelectorAll('li')).map((li) => [
+        li.dataset['testid']?.replace('evidence-step-', ''),
+        li.dataset['state'],
+      ]);
+    expect(states()).toEqual([
+      ['prepare', 'done'],
+      ['encrypt', 'done'],
+      ['PIX', 'done'],
+      ['CARD', 'done'],
+      ['DEBIT', 'current'],
+      ['GOOGLE_PAY', 'pending'],
+      ['APPLE_PAY', 'pending'],
+      ['file', 'pending'],
+    ]);
+    expect(screen.getByTestId('evidence-run-wallets').textContent).toBe(
+      'Nenhuma carteira nesta geração. Google Pay e Apple Pay ficam pendentes.',
+    );
+
+    act(() => finish?.());
+    await waitFor(() => expect(screen.queryByTestId('evidence-steps')).toBeNull());
+  });
+
+  it('given a download-only press, then no step list is drawn', async () => {
+    let finish: ((summary: { executed: number; failed: number; pending: number }) => void) | undefined;
+    mount({ onDownload: vi.fn(() => new Promise((resolve) => (finish = resolve))) });
+
+    fireEvent.click(screen.getByTestId('evidence-download-latest'));
+
+    await waitFor(() => expect(screen.getByTestId('evidence-phase')).toBeDefined());
+    expect(screen.queryByTestId('evidence-steps')).toBeNull();
+    expect(screen.queryByTestId('evidence-run-wallets')).toBeNull();
+    act(() => finish?.({ executed: 1, failed: 0, pending: 0 }));
+    await waitFor(() => expect(screen.getByTestId('evidence-summary')).toBeDefined());
   });
 });

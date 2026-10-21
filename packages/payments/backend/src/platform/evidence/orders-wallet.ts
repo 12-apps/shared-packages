@@ -108,10 +108,13 @@ export async function walletSectionSteps(
   deps: EvidenceRunDeps,
   runId: string,
   results: readonly BrowserWalletResult[],
+  onSection: (section: EvidenceWallet) => void = () => undefined,
 ): Promise<EvidenceStep[]> {
   const configured = (await deps.applePayConfigured?.()) === true;
-  return [
-    ...(await walletSteps(deps, runId, 'GOOGLE_PAY', results, configured)),
-    ...(await walletSteps(deps, runId, 'APPLE_PAY', results, configured)),
-  ];
+  const steps: EvidenceStep[] = [];
+  for (const wallet of ['GOOGLE_PAY', 'APPLE_PAY'] as const) {
+    onSection(wallet);
+    steps.push(...(await walletSteps(deps, runId, wallet, results, configured)));
+  }
+  return steps;
 }

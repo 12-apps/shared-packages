@@ -14,6 +14,7 @@ import type {
   BrowserWalletResult,
   EvidenceOutcomeCopy,
   EvidenceRecord,
+  EvidenceRunSection,
   EvidenceStep,
   EvidenceStepKey,
   EvidenceWalletsConfig,
@@ -292,12 +293,15 @@ function blockedBecause(
  * Phase 2: raise the Pix, card, debit and wallet orders once, record them,
  * then prove whose token they used. `wallets` is what each wallet's sheet gave
  * the browser (FUT-3755); absent, both wallet sections stay PENDING.
+ * `onSection` is told each part as it starts, so a host can show the
+ * operator where a run of several minutes is.
  */
 export async function completeEvidenceRun(
   deps: EvidenceRunDeps,
   runId: string,
   cards: readonly BrowserCardResult[],
   wallets: readonly BrowserWalletResult[] = [],
+  onSection: (section: EvidenceRunSection) => void = () => undefined,
 ): Promise<EvidenceRecord> {
   const record = openRun(await deps.store.latest(PROVIDER, 'RUN'), runId);
 
@@ -308,12 +312,13 @@ export async function completeEvidenceRun(
     // Recorded with the reason, so the file says WHY nothing was raised.
     for (const key of ORDER_KEYS) steps = withStep(steps, pendingStep(key, deps.copy, blocked ?? deps.copy.notRun));
   } else {
-    const raised = [
-      ...(await pixSteps(deps, runId)),
-      ...(await cardSteps(deps, runId, cards)),
-      ...(await debitSteps(deps, runId, cards)),
-      ...(await walletSectionSteps(deps, runId, wallets)),
-    ];
+    onSection('PIX');
+    const pix = await pixSteps(deps, runId);
+    onSection('CARD');
+    const card = await cardSteps(deps, runId, cards);
+    onSection('DEBIT');
+    const debit = await debitSteps(deps, runId, cards);
+    const raised = [...pix, ...card, ...debit, ...(await walletSectionSteps(deps, runId, wallets, onSection))];
     for (const step of raised) {
       steps = withStep(steps, step);
     }

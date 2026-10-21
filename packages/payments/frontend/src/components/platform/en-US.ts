@@ -131,6 +131,26 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       running: 'Creating the Pix, credit, debit and wallet orders in the sandbox — this can take a few minutes…',
       downloading: 'Building the file…',
     },
+    steps: {
+      label: 'Generation progress',
+      names: {
+        prepare: 'Prepare (application, token, public key and 3DS session)',
+        encrypt: 'Encrypt the cards and authenticate the debit (3DS)',
+        PIX: 'Pix',
+        CARD: 'Credit card',
+        DEBIT: 'Debit with 3DS',
+        GOOGLE_PAY: 'Google Pay',
+        APPLE_PAY: 'Apple Pay',
+        file: 'Build the file',
+      },
+      walletsInRun: (included, pending) =>
+        [
+          included.length > 0 ? `In this generation: ${included.join(' and ')}.` : 'No wallet in this generation.',
+          pending.length > 0 ? `${pending.join(' and ')} ${pending.length === 1 ? 'stays' : 'stay'} pending.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+    },
     summary: ({ executed, failed, pending }) =>
       `✓\u00a0${executed}\u00a0executed · ✗\u00a0${failed}\u00a0failed · ⧗\u00a0${pending}\u00a0pending`,
     incomplete:

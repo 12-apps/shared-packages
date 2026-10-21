@@ -170,6 +170,13 @@ export const BROWSER_CARD_FAILURES = [
 ] as const;
 export type BrowserCardFailure = (typeof BROWSER_CARD_FAILURES)[number];
 
+/**
+ * The parts of phase 2, in the order it raises them — what a host shows the
+ * operator while the run goes on, minutes long (FUT-3755).
+ */
+export const EVIDENCE_RUN_SECTIONS = ['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY'] as const;
+export type EvidenceRunSection = (typeof EVIDENCE_RUN_SECTIONS)[number];
+
 /** The wallets the evidence runs, in the order the file prints them (FUT-3755). */
 export const EVIDENCE_WALLETS = ['GOOGLE_PAY', 'APPLE_PAY'] as const satisfies readonly WalletType[];
 export type EvidenceWallet = (typeof EVIDENCE_WALLETS)[number];
