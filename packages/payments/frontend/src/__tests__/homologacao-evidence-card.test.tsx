@@ -249,6 +249,11 @@ describe('HomologacaoEvidenceCard', () => {
     expect(screen.getByTestId('evidence-run-wallets').textContent).toBe(
       'Nenhuma carteira nesta geração. Google Pay e Apple Pay ficam pendentes.',
     );
+    // Progress takes the ink, never the primary: a red primary beside the green checks reads as a failure.
+    const phase = screen.getByTestId('evidence-phase');
+    expect(phase.querySelector('.MuiLinearProgress-colorInherit')).not.toBeNull();
+    expect(phase.querySelector('.MuiCircularProgress-colorInherit')).not.toBeNull();
+    expect(phase.querySelectorAll('.MuiLinearProgress-colorPrimary, .MuiCircularProgress-colorPrimary')).toHaveLength(0);
 
     act(() => host.finish?.());
     await waitFor(() => expect(screen.queryByTestId('evidence-steps')).toBeNull());

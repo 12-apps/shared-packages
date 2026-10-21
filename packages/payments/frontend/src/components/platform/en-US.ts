@@ -128,7 +128,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     phases: {
       preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',
       encrypting: 'Encrypting the test cards and authenticating the debit card (3DS) in the browser…',
-      running: 'Creating the Pix, credit, debit and wallet orders in the sandbox — this can take a few minutes…',
+      running: 'Creating the orders in the sandbox — this can take a few minutes…',
       downloading: 'Building the file…',
     },
     steps: {

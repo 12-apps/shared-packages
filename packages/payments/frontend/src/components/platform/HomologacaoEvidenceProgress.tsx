@@ -50,13 +50,22 @@ const DONE_PATH = 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 
 const PENDING_PATH =
   'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8';
 
-/** Shape, not only colour, tells the three states apart. */
+/**
+ * Shape, not only colour, tells the three states apart. The spinner and the
+ * bar take the ink, never the theme's primary: on a staff screen whose primary
+ * is red they would read as a failure beside the green checks.
+ */
 function StepMark({ state }: { state: 'done' | 'current' | 'pending' }): ReactNode {
-  if (state === 'current') return <CircularProgress size={18} thickness={5} />;
   return (
-    <SvgIcon fontSize="small" color={state === 'done' ? 'success' : 'disabled'}>
-      <path d={state === 'done' ? DONE_PATH : PENDING_PATH} />
-    </SvgIcon>
+    <Box sx={{ width: 20, height: 20, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+      {state === 'current' ? (
+        <CircularProgress size={18} thickness={5} color="inherit" sx={{ color: 'text.primary' }} />
+      ) : (
+        <SvgIcon fontSize="small" sx={{ color: state === 'done' ? 'success.main' : 'text.secondary' }}>
+          <path d={state === 'done' ? DONE_PATH : PENDING_PATH} />
+        </SvgIcon>
+      )}
+    </Box>
   );
 }
 
@@ -85,7 +94,13 @@ export function EvidenceProgress({ phase, section, full, walletResults }: Eviden
   return (
     <Stack spacing={1} role="status" aria-busy="true" data-testid="evidence-phase">
       <Typography variant="body2">{copy.phases[phase]}</Typography>
-      <LinearProgress variant="determinate" value={(at / steps.length) * 100} aria-label={copy.steps.label} />
+      <LinearProgress
+        variant="determinate"
+        value={(at / steps.length) * 100}
+        aria-label={copy.steps.label}
+        color="inherit"
+        sx={{ color: 'text.primary' }}
+      />
       {full ? (
         <Box component="ol" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 0.5 }} data-testid="evidence-steps">
           {steps.map((step, index) => {
