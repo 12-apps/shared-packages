@@ -157,9 +157,11 @@ export function DataCell<T extends Record<string, unknown>>({
       data-slot="cell"
       data-col-id={column.id}
       data-editing={isEditing}
+      onClick={column.onCellClick && !isEditing ? () => column.onCellClick?.(row) : undefined}
       sx={{
         ...columnBox(theme, column),
         height: rowHeight,
+        ...(column.onCellClick && { cursor: "pointer" }),
       }}
       role="gridcell"
       tabIndex={-1}

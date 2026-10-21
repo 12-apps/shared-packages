@@ -25,7 +25,7 @@ export function isActionsColumn<T extends Record<string, unknown>>(col: GridColu
 
 /**
  * Map the DataView columns to grid columns, applying visibility and — when a row
- * click handler is present — wrapping each non-actions cell so clicking opens the row.
+ * click handler is present — making each non-actions cell, padding included, open the row.
  */
 export function buildGridColumns<T extends Record<string, unknown>>(
   columns: DataViewColumn<T>[],
@@ -38,13 +38,12 @@ export function buildGridColumns<T extends Record<string, unknown>>(
     return {
       ...col,
       hidden,
+      // On the cell, not a wrapper inside it: its padding opens the row too.
+      onCellClick: onRowClick,
       cell: (ctx) => {
         const content = col.cell ? col.cell(ctx) : ctx.value == null ? "" : String(ctx.value);
         return (
-          <Box
-            onClick={() => onRowClick(ctx.row)}
-            sx={{ cursor: "pointer", width: "100%", height: "100%", display: "flex", alignItems: "center" }}
-          >
+          <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
             {content}
           </Box>
         );

@@ -40,6 +40,12 @@ export interface GridColumn<T = Record<string, unknown>> {
   enableEdit?: boolean;
   /** Custom renderers */
   cell?: (ctx: { value: unknown; row: T; rowIndex: number; col: GridColumn<T> }) => React.ReactNode;
+  /**
+   * Fired by a click anywhere in the cell, its padding included. Opening a row
+   * from a wrapper inside the content left the padding dead: a strip either
+   * side of every column that showed the hover and did nothing (FUT-3849).
+   */
+  onCellClick?: (row: T) => void;
   headerCell?: (col: GridColumn<T>) => React.ReactNode;
   /** Cell editor renderer (edit mode) */
   editor?: (ctx: {
