@@ -358,6 +358,7 @@ describe("the store credit for a wallet (FUT-3685 review C1)", () => {
     installGoogle();
     renderList({ config: walletStore(), client: stubClient(), list: { totalCents: 2200, onlineExtras: credit, door: [door()] } });
     await screen.findByTestId("host-credit");
+    await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-door-cash"));
     await waitFor(() => expect(screen.queryByTestId("host-credit")).toBeNull());
     fireEvent.click(radio("list-option-PIX"));

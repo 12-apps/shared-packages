@@ -30,6 +30,12 @@ export interface ListCard {
 /** Everything the one list holds, and nothing it raises. */
 export interface ListState {
   rows: OnlineRow[];
+  /**
+   * The saved cards answered and the one preselection ran (FUT-3849). Until
+   * then nothing may be offered to tap: the preselected card opens its chips
+   * when it lands and moves every row below it, under the buyer's finger.
+   */
+  settled: boolean;
   choice: CheckoutListChoice | null;
   choose: (next: CheckoutListChoice) => void;
   card: ListCard;
@@ -71,14 +77,19 @@ function usePreselect(
   lastMethod: "PIX" | "CARD" | null,
   apply: (choice: CheckoutListChoice, selection: string | null) => void,
   touched: { current: boolean },
-): void {
+): boolean {
   const done = useRef(false);
+  // Set in the same effect as the preselection, so the render that first
+  // draws the rows already holds the choice they will keep.
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
     if (done.current || touched.current || !loaded) return;
     done.current = true;
     const pick = preselection(rows, saved, fresh, lastMethod);
     if (pick) apply(pick.choice, pick.selection);
+    setSettled(true);
   }, [loaded, rows, saved, fresh, lastMethod, apply, touched]);
+  return settled;
 }
 
 /**
@@ -147,7 +158,7 @@ export function useListState(input: {
     },
     [setSelection],
   );
-  usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, apply, touched);
+  const settled = usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, apply, touched);
   const choose = useCallback(
     (next: CheckoutListChoice) => {
       touched.current = true;
@@ -195,7 +206,7 @@ export function useListState(input: {
       }),
     [input.config, methods, input.arrivedWith, input.taxIdOnFile, input.revealed],
   );
-  return { rows, choice, choose, card, asked, top, methods };
+  return { rows, settled, choice, choose, card, asked, top, methods };
 }
 
 /** The chain methods the list's rows and wallets would raise, each once. */
