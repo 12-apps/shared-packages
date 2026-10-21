@@ -19,7 +19,7 @@ import { usePlatformCopy } from './copy-context';
  */
 
 export type EvidencePhase = 'preparing' | 'encrypting' | 'running' | 'downloading';
-export type EvidenceRunStep = 'prepare' | 'encrypt' | EvidenceRunSection | 'file';
+type EvidenceRunStep = 'prepare' | 'encrypt' | EvidenceRunSection | 'file';
 
 // The server's section order (`EVIDENCE_RUN_SECTIONS`), spelled here: this
 // package may import only types from the backend (ADOPTING.md §6).
@@ -28,14 +28,14 @@ const FULL_RUN: readonly EvidenceRunStep[] = ['prepare', 'encrypt', ...SECTIONS,
 const DOWNLOAD_ONLY: readonly EvidenceRunStep[] = ['file'];
 
 /** The step a phase — and, while running, the server's section — is on. */
-export function currentEvidenceStep(phase: EvidencePhase, section: EvidenceRunSection | null): EvidenceRunStep {
+function currentEvidenceStep(phase: EvidencePhase, section: EvidenceRunSection | null): EvidenceRunStep {
   if (phase === 'preparing') return 'prepare';
   if (phase === 'encrypting') return 'encrypt';
   if (phase === 'running') return section ?? 'PIX';
   return 'file';
 }
 
-export interface EvidenceProgressProps {
+interface EvidenceProgressProps {
   phase: EvidencePhase;
   section: EvidenceRunSection | null;
   /** False for "download the latest recorded": nothing is run. */
