@@ -1,21 +1,26 @@
 // @vitest-environment jsdom
 /**
  * FUT-3711 — the list's CPF/wallet top and the computer's "Resumo do pedido"
- * column are chunks of their own, loaded through the host's `lazy` slot (its
+ * body are chunks of their own, loaded through the host's `lazy` slot (its
  * stale-chunk-safe loader), so a checkout that never draws them never parses
  * them.
  *
  *  - Both parts are built through the host's loader, once per loader.
  *  - What the CPF holds is decided outside the deferred part: the pay button
  *    is held before the field is on screen.
- *  - While the column's chunk loads, the pay button is already where the
- *    column will be — never missing, never a bar at the bottom.
+ *  - The top and the rows land TOGETHER: no row is drawn and then pushed down.
+ *    The top is started at list mount, so a later "Alterar" never suspends.
+ *  - The column's frame and pay-button slot are drawn at once and never
+ *    change element: the button keeps its node and its focus as the body lands.
+ *  - A chunk that fails is caught per part — the rows, the frame and the pay
+ *    button stay — and is tried once more, importing again.
  */
 import { lazy } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 
+import { PART_RETRY_MS } from "../list/lazy-body";
 import type { CheckoutLazy } from "../ui";
 import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
 
@@ -41,10 +46,25 @@ function watchedLoader(): { loader: CheckoutLazy; asked: unknown[] } {
   return { loader, asked };
 }
 
+/** A loader whose first `failures` imports reject — a chunk gone after a deploy. */
+function failingLoader(failures: number): { loader: CheckoutLazy; attempts: () => number } {
+  const tries = { count: 0 };
+  const loader: CheckoutLazy = (load) =>
+    lazy(async () => {
+      tries.count += 1;
+      if (tries.count <= failures) throw new Error("chunk gone");
+      return load();
+    });
+  return { loader, attempts: () => tries.count };
+}
+
 /** The flow's frame measures this wide. */
 function frameWidth(width: number): void {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width, height: 800, top: 0, left: 0, right: width, bottom: 800, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
 }
+
+/** A store asking no CPF, so neither part has anything to draw on a phone. */
+const noCpfStore = () => onPageStore({ customerSchema: [] });
 
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
@@ -64,56 +84,100 @@ describe("the host's loader (the `lazy` slot)", () => {
     expect(asked).toHaveLength(1);
   });
 
-  it("builds the summary column through it on a computer", async () => {
+  it("builds the summary column's body through it on a computer", async () => {
     frameWidth(1280);
     const { loader, asked } = watchedLoader();
-    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), components: { lazy: loader } });
+    renderList({ config: noCpfStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
     const column = await screen.findByTestId("list-summary-column");
+    await within(column).findByTestId("list-summary-body");
     expect(within(column).getByTestId("list-pay")).toBeTruthy();
     expect(asked).toHaveLength(1);
   });
 
-  it("is not asked for either part where neither is drawn: a phone, a CPF on file, no wallet", async () => {
+  it("is not asked for either part where neither can be drawn: a phone, no CPF asked or on file, no wallet", async () => {
     const { loader, asked } = watchedLoader();
-    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), components: { lazy: loader } });
+    renderList({ config: noCpfStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
     await screen.findByTestId("payment-list");
     await waitFor(() => expect(payButton().disabled).toBe(false));
     expect(asked).toHaveLength(0);
   });
 });
 
-describe("while the CPF's chunk loads", () => {
-  it("holds the pay button for the CPF before the field is on screen, and the field arrives empty", async () => {
+describe("while the top's chunk loads", () => {
+  it("draws neither the top nor the rows — they land together — and the CPF already holds the button", async () => {
     const { loader, open } = gatedLoader();
-    renderList({ config: onPageStore(), client: stubClient(), taxIdOnFile: false, components: { lazy: loader } });
-    await screen.findByTestId("payment-list");
-    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
+    await screen.findByTestId("list-top-loading");
     await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF para pagar pelo app."));
     expect(payButton().disabled).toBe(true);
-    await waitFor(() => expect(screen.queryByTestId("list-cpf")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("list-option-CARD")).toBeNull());
     await act(async () => open());
     const field = (await screen.findByTestId("list-buyer-taxId")) as HTMLInputElement;
+    expect(screen.getByTestId("list-option-CARD")).toBeTruthy();
     expect(field.value).toBe("");
     fireEvent.change(field, { target: { value: "529.982.247-25" } });
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
+
+  it("starts the top at list mount, so 'Alterar' opens the CPF without hiding the rows", async () => {
+    const { loader, open } = gatedLoader();
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" }, components: { lazy: loader } });
+    // No top to draw yet (a CPF on file), so the rows are there — and the top's chunk is already asked for.
+    const pix = await screen.findByTestId("list-option-PIX");
+    await act(async () => open());
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(await screen.findByTestId("list-payer-change"));
+    expect(await screen.findByTestId("list-buyer-taxId")).toBeTruthy();
+    expect(screen.getByTestId("list-option-PIX")).toBe(pix);
+    expect(pix.style.display).not.toBe("none");
+  });
 });
 
-describe("while the summary column's chunk loads (a computer)", () => {
-  it("keeps the pay button reachable where the column goes, then hands it to the column", async () => {
+describe("while the summary column's body loads (a computer)", () => {
+  it("draws the frame and the pay button at once, and the button keeps its node and focus as the body lands", async () => {
     frameWidth(1280);
     const { loader, open } = gatedLoader();
-    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), components: { lazy: loader } });
-    await screen.findByTestId("payment-list");
-    const waiting = await screen.findByTestId("list-summary-action");
-    expect(waiting.getAttribute("data-loading")).toBe("true");
-    await waitFor(() => expect((within(waiting).getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
-    await waitFor(() => expect(screen.queryByTestId("list-summary-column")).toBeNull());
+    renderList({ config: noCpfStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
+    const column = await screen.findByTestId("list-summary-column");
+    expect(within(column).getByTestId("list-summary-loading")).toBeTruthy();
+    const pay = (await within(column).findByTestId("list-pay")) as HTMLButtonElement;
+    await waitFor(() => expect(pay.disabled).toBe(false));
+    // The buyer on "Pagar" — the focus the body's landing must not take away.
+    // Called through the prototype: the flakiness rule's fixer loops on a bare `.focus()` in an act().
+    await act(async () => HTMLElement.prototype.focus.call(pay));
+    await waitFor(() => expect(document.activeElement).toBe(pay));
     expect(screen.getAllByTestId("list-pay")).toHaveLength(1);
     await act(async () => open());
-    const column = await screen.findByTestId("list-summary-column");
-    await waitFor(() => expect(within(column).getByTestId("list-pay")).toBeTruthy());
-    expect(screen.getAllByTestId("list-pay")).toHaveLength(1);
+    await within(column).findByTestId("list-summary-body");
+    expect(within(column).getByTestId("list-pay")).toBe(pay);
+    await waitFor(() => expect(document.activeElement).toBe(pay));
     expect(screen.getAllByTestId("list-summary-action")).toHaveLength(1);
+  });
+});
+
+describe("a part whose chunk fails to load", () => {
+  it("leaves the column's frame and a working pay button, then imports the body again", async () => {
+    frameWidth(1280);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { loader, attempts } = failingLoader(1);
+    renderList({ config: noCpfStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
+    const column = await screen.findByTestId("list-summary-column");
+    await waitFor(() => expect(attempts()).toBe(1));
+    await waitFor(() => expect((within(column).getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.getByTestId("payment-list")).toBeTruthy();
+    await within(column).findByTestId("list-summary-body", {}, { timeout: PART_RETRY_MS * 5 });
+    expect(attempts()).toBe(2);
+  });
+
+  it("keeps the rows and the CPF's hold without the top, then imports the top again", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { loader, attempts } = failingLoader(1);
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
+    // The preload and the top share one build: one failed import fails both.
+    await screen.findByTestId("list-option-CARD");
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF para pagar pelo app."));
+    expect(payButton().disabled).toBe(true);
+    expect(await screen.findByTestId("list-buyer-taxId", {}, { timeout: PART_RETRY_MS * 5 })).toBeTruthy();
+    expect(attempts()).toBe(2);
   });
 });

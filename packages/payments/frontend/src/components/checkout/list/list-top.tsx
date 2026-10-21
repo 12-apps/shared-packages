@@ -1,10 +1,10 @@
 import { Box } from "@mui/material";
-import { Suspense, type JSX } from "react";
+import type { JSX } from "react";
 
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
 import type { ListChargeFailure } from "./charge-runners";
-import { deferredPart } from "./lazy-body";
+import { PartBoundary, deferredPart } from "./lazy-body";
 import { cpfHolds } from "./top-cpf";
 import type { CheckoutPaymentList } from "./types";
 import type { ListCapability } from "./use-capability";
@@ -67,7 +67,8 @@ export interface ListTopInput {
   onApple: () => void;
 }
 
-const useListTopBody = deferredPart(async () => ({ default: (await import("./list-top-body")).ListTopBody }));
+/** The top's chunk (FUT-3711): `ListTop` draws it; the step preloads it (`TopPart.Preload`). */
+export const TopPart = deferredPart<ListTopInput>(async () => (await import("./list-top-body")).ListTopBody);
 
 /**
  * The top of Pagamento (FUT-3685): the CPF, asked once (E1, L7), then the
@@ -75,24 +76,43 @@ const useListTopBody = deferredPart(async () => ({ default: (await import("./lis
  *
  * Only the decision to draw it is here; what it draws is a chunk of its own
  * (FUT-3711), so a checkout with neither a CPF to ask nor a wallet ready never
- * parses it. Nothing is drawn while that chunk loads — only an undrawn
- * `list-top-loading` marker, so a test can wait for the top to land before
- * asking what it shows (`display: none` takes no row and no gap). What the CPF holds — the
- * pay button, the wallets — is decided in this file (`gateFields`,
- * `walletsHeld`), so the hold is in force before the field is on screen.
+ * parses it. The step starts that chunk as soon as it mounts
+ * (`TopPart.Preload`), and while it is still on its way the top SUSPENDS to
+ * the boundary the face puts around the top AND the rows (`ChoiceList`): the
+ * two land together, so no row is pushed down under a finger. A chunk that
+ * fails is caught here — the rows stay, nothing is drawn in the top's place,
+ * and it is tried once more. What the CPF holds — the pay button, the wallets
+ * — is decided in this file (`gateFields`, `walletsHeld`), so the hold is in
+ * force whether or not the field is on screen.
  */
 export function ListTop(input: ListTopInput): JSX.Element | null {
   const { state, cap } = input.props;
   if (!state.top && cap.wallets.length === 0) return null;
-  return <DeferredTop {...input} />;
+  return <TopWithRetry {...input} />;
+}
+
+/** The top behind its own boundary: a failed chunk draws nothing there, then is tried once more. */
+function TopWithRetry(input: ListTopInput): JSX.Element {
+  const forget = TopPart.useForget();
+  return (
+    <PartBoundary fallback={null} retry={forget}>
+      <DeferredTop {...input} />
+    </PartBoundary>
+  );
 }
 
 /** The top's chunk, asked of the host's loader only once there is a top to draw. */
 function DeferredTop(input: ListTopInput): JSX.Element {
-  const Body = useListTopBody();
-  return (
-    <Suspense fallback={<Box data-testid="list-top-loading" sx={{ display: "none" }} />}>
-      <Body {...input} />
-    </Suspense>
-  );
+  const Body = TopPart.usePart();
+  return <Body {...input} />;
+}
+
+/**
+ * What the top and the rows show while the top's chunk is on its way: nothing
+ * — an undrawn `list-top-loading` marker a test can wait on (`display: none`
+ * takes no row and no gap). The bar under them is not inside the boundary, so
+ * its button keeps its place and its hold.
+ */
+export function TopLoading(): JSX.Element {
+  return <Box data-testid="list-top-loading" sx={{ display: "none" }} />;
 }

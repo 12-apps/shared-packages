@@ -190,6 +190,7 @@ export {
   type CheckoutCheckboxProps,
   type CheckoutComponents,
   type CheckoutInputProps,
+  type CheckoutLazy,
   type CheckoutLoadingStateProps,
   type CheckoutRadioGroupProps,
   type CheckoutRadioOption,
@@ -206,11 +207,7 @@ export {
  * host owns the cart and therefore has to build it — see `basket.ts` for why
  * the identity is the lines and never the cart's id.
  */
-export {
-  basketSignature,
-  type CheckoutBasketIdentity,
-  type CheckoutBasketLine,
-} from './components/checkout/basket';
+export { basketSignature, type CheckoutBasketIdentity, type CheckoutBasketLine } from './components/checkout/basket';
 /**
  * WHY a card was refused, and whether another attempt could work (FUT-1145).
  * A host wiring the confirmation screen's per-reason copy names these.

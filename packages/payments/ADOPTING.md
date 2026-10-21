@@ -798,7 +798,7 @@ any design system satisfies them with a thin — often identity — mapping):
 | `Text` | semantic `variant`/`size`/`weight`/`color`, `as`, `data-testid` |
 | `Button` | `variant` solid/outline/text, `color`, `size`, `fullWidth`, `loading`, `icon`, `dataTestId` **on the button element** |
 | `Input` | `label`, `error`+`helperText`, `endAdornment`, `data-testid` **on the `<input>` itself** (e2e fills it) |
-| `Checkbox` | `checked`, `onChange(event, checked)`, `label` |
+| `Checkbox` | `checked`, `onChange(event, checked)`, `label`. The list's consent row under the CPF (FUT-3711) sits flush with the field by zeroing MUI's `.MuiFormControlLabel-root` inset and `.MuiCheckbox-root` padding inside it — a Checkbox built on MUI's (the default, `@12-apps/ui`'s) is flush; one built otherwise keeps its own inset |
 | `Alert` | `variant` info/warning/danger, `title`, `description`, `showIcon` |
 | `LoadingState` | spinner + `message` |
 | `Stepper` | `steps[{id,label}]`, `activeId`, `completed` |
@@ -899,7 +899,7 @@ What changes for the buyer:
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
 | `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
 | `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
-| `credit?` | `{ label, amountLabel }` — the balance paying part of the cart, worded and formatted by you (`{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }`, FUT-3711). With `amountDueLabel`, the computer's "Resumo do pedido" column draws it under "Total", then "A pagar" (`copy.amountDue`) and the amount due — Total − credit reads as what the button charges. Without either, "Total" alone |
+| `credit?` | `{ label, amountLabel }` — the balance paying part of the cart, worded and formatted by you (`{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }`, FUT-3711). With `amountDueLabel`, the computer's "Resumo do pedido" column draws it under "Total", then "A pagar" (`copy.amountDue`) and the amount due — Total − credit reads as what the button charges — while an ONLINE option is chosen. A door option or no choice charges the cart's total, so "Total" stands alone; without either field, "Total" alone |
 | `lastMethod?` | `"PIX"` or `"CARD"` — the buyer's last ONLINE way to pay, as the host remembers it (FUT-3611). Chosen before the buyer touches anything when the store offers it: Pix as Pix, a card as the saved card used last. Never a door tender. Absent ⇒ the saved-card rule alone |
 | `armedCharge?` | the host's own consent screen already took the tap ("Pedir em 1 toque", FUT-3611): the card's 5-second bar starts by itself, once, as soon as a SAVED card is chosen and nothing holds the button. Without a saved card it does nothing; Cancelar still sends nothing |
 | `chargeFooter?` | `(cancel) => ReactNode` — host content under the 5-second bar's Cancelar while it counts (the storefront's opt-out link). Handed the bar's own cancel, so it stops the charge first |
@@ -938,18 +938,28 @@ import { lazyRoute } from "@12-apps/app-shell/react";
   chunks must: a tab opened before a deploy asks for a chunk that is gone,
   and React's `lazy` — the default when the slot is unfilled — throws that to
   the nearest error boundary. `lazyRoute` reloads onto the current build
-  instead. Any function `typeof React.lazy` fits (`CheckoutComponents["lazy"]`).
+  instead. Any function `typeof React.lazy` fits (`CheckoutLazy`, exported).
+  The list starts the top's chunk as soon as it mounts, so a loader that
+  reloads on a stale chunk does it then — before the buyer has typed anything —
+  not when "Alterar" is tapped.
 - **Pass the same function every render** — a module-level one, as above.
   Each loader's components are built once and kept against it; a new arrow per
   render re-suspends both parts on every render.
-- **While the top loads, nothing is drawn there** and the rows sit where they
-  will be pushed down from. What the CPF holds is decided outside the chunk:
-  the online rows' button and the wallets are held with `copy.reasons.cpf`
-  before the field is on screen.
-- **While the column loads,** its pay-button slot is already drawn where the
-  column goes (in your `summaryTarget` when you pass one), with the bar's
-  content in it — the button is never missing and never flashes as a bar at
-  the bottom. The column's lines and "Total" join above it when they land.
+- **The top and the rows land together.** The top's chunk starts when the
+  list mounts; until it lands neither the top nor the rows are drawn (the bar
+  is), so no row is drawn and then pushed down under a finger. A top opened
+  later ("Alterar") is already in hand and hides nothing. What the CPF holds is
+  decided outside the chunk: the online rows' button and the wallets are held
+  with `copy.reasons.cpf` before the field is on screen. A test can wait for
+  `list-top-loading` to be gone before asking what the top shows.
+- **The column's frame, heading and pay-button slot are drawn at once** (in
+  your `summaryTarget` when you pass one), with the bar's content in that one
+  slot from the first render: only the lines, the money rows, "Total" and the
+  credit rows load, and their landing moves nothing — the focus on "Pagar",
+  your extras' state and a 5-second bar counting all stay.
+- **A chunk that fails to load** is caught per part: the rows, the column's
+  frame and the pay button stay, nothing is drawn in the part's place, and the
+  part is imported once more a second later.
 - A bundler rule that merges small chunks may fold both back in; a host that
   keeps chunks apart by module names `list/list-top-body` and
   `list/summary-column-body`.

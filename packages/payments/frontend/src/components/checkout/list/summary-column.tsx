@@ -2,11 +2,13 @@ import { Box } from "@mui/material";
 import { Suspense, createContext, useContext, useMemo, useState, type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useCheckoutCopy } from "../copy-context";
 import type { CheckoutSummaryLine } from "../payment-summary";
 import { useCheckoutLayout } from "../payment-step-layout";
+import { useCheckoutComponents } from "../ui";
 
-import { deferredPart } from "./lazy-body";
-import type { ColumnProps } from "./summary-column-body";
+import { PartBoundary, deferredPart } from "./lazy-body";
+import type { ColumnBodyProps } from "./summary-column-body";
 
 /**
  * Where the bar's content goes on a computer (FUT-3685, L4): into the
@@ -31,28 +33,45 @@ export function useSummaryColumnTarget(): { element: HTMLElement | null } | null
 const STEPS_MAX = 85;
 const COLUMN_WIDTH = 45;
 
-const useSummaryColumnBody = deferredPart(async () => ({ default: (await import("./summary-column-body")).SummaryColumn }));
+/** The column's loaded half (FUT-3711): lines, money rows, "Total", the credit rows. */
+const ColumnPart = deferredPart<ColumnBodyProps>(async () => (await import("./summary-column-body")).SummaryBody);
 
-/**
- * The column's action slot alone, while the column's chunk loads (FUT-3711):
- * the bar's content — the pay button with it — is portalled in here at once,
- * so the action never waits on the summary above it. The column drawn in
- * full takes the slot over when it lands.
- */
-function ColumnWhileLoading({ slot }: { slot: (element: HTMLElement | null) => void }): JSX.Element {
-  return <Box ref={slot} data-testid="list-summary-action" data-loading="true" sx={{ display: "flex", flexDirection: "column" }} />;
+/** The loaded half, drawn through the host's loader. */
+function DeferredBody(props: ColumnBodyProps): JSX.Element {
+  const Body = ColumnPart.usePart();
+  return <Body {...props} />;
 }
 
 /**
- * "Resumo do pedido" (T20), loaded as a chunk of its own (FUT-3711): a phone
- * never draws it, so a phone never parses it.
+ * "Resumo do pedido" (T20). The frame, the heading and the pay-button slot are
+ * drawn at once and never change element (FUT-3711): the bar's content is
+ * portalled into that ONE slot from the first render, so the body landing —
+ * lines, money rows, "Total" — moves nothing out from under it (the focus on
+ * "Pagar", the host's extras, a 5-second bar counting). Only the body is a
+ * chunk of its own, which a phone never draws and so never parses; a body that
+ * fails to load leaves the frame and the button, and is tried once more.
  */
-function SummaryColumn(props: ColumnProps): JSX.Element {
-  const Body = useSummaryColumnBody();
+function SummaryColumn({ slot, ...body }: ColumnBodyProps & { slot: (element: HTMLElement | null) => void }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.layout;
+  const forget = ColumnPart.useForget();
   return (
-    <Suspense fallback={<ColumnWhileLoading slot={props.slot} />}>
-      <Body {...props} />
-    </Suspense>
+    <Box
+      component="aside"
+      aria-label={copy.summaryTitle}
+      data-testid="list-summary-column"
+      sx={{ display: "flex", flexDirection: "column", gap: 1.75, p: 2.75, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 3.5 }}
+    >
+      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
+        {copy.summaryTitle}
+      </Text>
+      <PartBoundary fallback={null} retry={forget}>
+        <Suspense fallback={<Box data-testid="list-summary-loading" sx={{ display: "none" }} />}>
+          <DeferredBody {...body} />
+        </Suspense>
+      </PartBoundary>
+      <Box ref={slot} data-testid="list-summary-action" sx={{ display: "flex", flexDirection: "column" }} />
+    </Box>
   );
 }
 
@@ -81,7 +100,7 @@ export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, 
   lines?: CheckoutSummaryLine[];
   moneyLines?: ReactNode;
   totalLabel: string;
-  credit?: ColumnProps["credit"];
+  credit?: ColumnBodyProps["credit"];
   children: ReactNode;
 }): JSX.Element {
   const wide = useCheckoutLayout()?.wide ?? false;

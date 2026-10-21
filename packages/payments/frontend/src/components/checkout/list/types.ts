@@ -5,8 +5,7 @@
  * the only thing that creates the order and the charge.
  *
  * Opt-in, through `CheckoutFlowProps.paymentList`. A host that passes nothing
- * keeps the method tabs, the order summary and the raise-on-pick it has today
- * — this is additive, not a replacement.
+ * keeps the method tabs, the order summary and the raise-on-pick it has today — this is additive.
  *
  * ## The door options are the HOST's
  *
@@ -20,6 +19,7 @@
  */
 import type { ReactNode } from "react";
 
+import type { PaymentListCredit, PaymentListCreditCopy } from "./credit-types";
 import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
 
 export type { CheckoutBillingAddress, PaymentListDebitCopy };
@@ -121,7 +121,7 @@ export interface CheckoutListHold {
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */
-export interface CheckoutPaymentList {
+export interface CheckoutPaymentList extends PaymentListCredit {
   /** Every sentence the list draws. REQUIRED, with no default (FUT-760). */
   copy: PaymentListCopy;
   /**
@@ -170,14 +170,6 @@ export interface CheckoutPaymentList {
    * the list returns to its rows.
    */
   amountDueLabel?: string;
-  /**
-   * The balance that pays part of the cart, as the host words and formats it
-   * — `{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }` (FUT-3711).
-   * With `amountDueLabel`, the computer's "Resumo do pedido" column draws it
-   * under "Total", then "A pagar" (`copy.amountDue`) and the amount due, so
-   * Total − credit reads as what the button charges. Absent ⇒ "Total" alone.
-   */
-  credit?: { label: string; amountLabel: string };
   /**
    * The buyer's last ONLINE way to pay, as the host remembers it (FUT-3611) —
    * chosen for them before they touch anything, when the store offers it: Pix
@@ -290,7 +282,7 @@ export interface PixBankCopy {
 }
 
 /** The list's words — a pack per locale ships at `@12-apps/payments-frontend/locales`. */
-export interface PaymentListCopy {
+export interface PaymentListCopy extends PaymentListCreditCopy {
   /** "Como você quer pagar?" */
   title: string;
   /** "Pagar agora, pelo app" — drawn in capitals by CSS. */
@@ -390,12 +382,6 @@ export interface PaymentListCopy {
    * o pedido, pago com o seu saldo…". Absent ⇒ `charging` as usual.
    */
   chargingCovered?: string;
-  /**
-   * "A pagar" — the row under "Total" in the computer's "Resumo do pedido"
-   * column, after the host's `credit` row, naming `amountDueLabel` (FUT-3711).
-   * Absent ⇒ neither row is drawn.
-   */
-  amountDue?: string;
   cancel: string;
   pixFace: {
     /** "Pague R$ 22,00 com Pix". */

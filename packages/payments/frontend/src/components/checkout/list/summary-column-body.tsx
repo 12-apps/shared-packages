@@ -1,12 +1,11 @@
 import { Box } from "@mui/material";
 import type { JSX, ReactNode } from "react";
 
-import { useCheckoutCopy } from "../copy-context";
 import { SummaryLines, SummaryTotal, type CheckoutSummaryLine } from "../payment-summary";
 import { useCheckoutComponents } from "../ui";
 
-/** What the "Resumo do pedido" column is handed by the layout. */
-export interface ColumnProps {
+/** What the loaded half of "Resumo do pedido" is handed by the layout. */
+export interface ColumnBodyProps {
   lines?: CheckoutSummaryLine[];
   /** The host's fee and discount rows (`CheckoutCartView.discountLines`). */
   moneyLines?: ReactNode;
@@ -16,7 +15,6 @@ export interface ColumnProps {
    * drawn under "Total" so Total − credit reads as what the button charges.
    */
   credit?: { label: string; amountLabel: string; dueTitle: string; dueLabel: string };
-  slot: (element: HTMLElement | null) => void;
 }
 
 /** One label/amount row under "Total". */
@@ -38,24 +36,16 @@ function AmountRow({ label, amount, strong = false, testId }: { label: string; a
 }
 
 /**
- * "Resumo do pedido" (T20): the cart's lines and the host's money rows (fees,
- * discounts) as the host words them, a hairline, "Total" and the amount — and
- * under them `slot`, the element the bar's content is portalled into.
+ * What "Resumo do pedido" loads (T20, FUT-3711): the cart's lines and the
+ * host's money rows (fees, discounts) as the host words them, a hairline,
+ * "Total" and the amount, and the credit and "A pagar" rows. The frame, the
+ * heading and the pay-button slot under them are the layout's own — eager —
+ * so the bar's content never changes element when this lands.
  */
-export function SummaryColumn({ lines, moneyLines, totalLabel, credit, slot }: ColumnProps): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  const copy = useCheckoutCopy().screens.layout;
+export function SummaryBody({ lines, moneyLines, totalLabel, credit }: ColumnBodyProps): JSX.Element {
   const shown = lines ?? [];
   return (
-    <Box
-      component="aside"
-      aria-label={copy.summaryTitle}
-      data-testid="list-summary-column"
-      sx={{ display: "flex", flexDirection: "column", gap: 1.75, p: 2.75, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 3.5 }}
-    >
-      <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
-        {copy.summaryTitle}
-      </Text>
+    <Box data-testid="list-summary-body" sx={{ display: "flex", flexDirection: "column", gap: 1.75 }}>
       {shown.length > 0 ? <SummaryLines lines={shown} /> : null}
       {moneyLines ? <Box data-testid="list-summary-money">{moneyLines}</Box> : null}
       <Box sx={{ height: "1px", bgcolor: "divider" }} />
@@ -66,7 +56,6 @@ export function SummaryColumn({ lines, moneyLines, totalLabel, credit, slot }: C
           <AmountRow label={credit.dueTitle} amount={credit.dueLabel} strong testId="list-summary-due-row" />
         </Box>
       ) : null}
-      <Box ref={slot} data-testid="list-summary-action" sx={{ display: "flex", flexDirection: "column" }} />
     </Box>
   );
 }
