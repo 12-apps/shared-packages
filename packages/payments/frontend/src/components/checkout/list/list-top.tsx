@@ -141,13 +141,23 @@ function RowsShown({ into }: { into: { current: boolean } }): null {
  * The top and the rows under ONE boundary (FUT-3711): a top drawn with the
  * first rows lands with them, so its chunk never pushes a row down. Once the
  * rows have committed, `rowsShown` says so, and a top that appears later
- * suspends on its own instead (`TopWithRetry`).
+ * suspends on its own instead (`TopWithRetry`). `drawn` is false while the
+ * list holds its rows back for the saved cards (FUT-3849): the placeholder
+ * committing is not the rows committing.
  */
-export function TopAndRows({ rowsShown, children }: { rowsShown: { current: boolean }; children: ReactNode }): JSX.Element {
+export function TopAndRows({
+  rowsShown,
+  drawn,
+  children,
+}: {
+  rowsShown: { current: boolean };
+  drawn: boolean;
+  children: ReactNode;
+}): JSX.Element {
   return (
     <Suspense fallback={<TopLoading />}>
       {children}
-      <RowsShown into={rowsShown} />
+      {drawn ? <RowsShown into={rowsShown} /> : null}
     </Suspense>
   );
 }
