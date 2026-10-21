@@ -109,7 +109,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     phases: {
       preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública e a sessão 3DS…',
       encrypting: 'Criptografando os cartões de teste e autenticando o cartão de débito (3DS) no navegador…',
-      running: 'Criando os pedidos Pix, crédito, débito e carteiras no sandbox — pode levar alguns minutos…',
+      running: 'Criando os pedidos no sandbox — pode levar alguns minutos…',
       downloading: 'Montando o arquivo…',
     },
     steps: {
