@@ -229,6 +229,26 @@ interface ButtonLook {
 }
 
 /**
+ * Whether the button clips what it draws.
+ *
+ * The web button is `overflow: hidden` (its ripple needs it) unless the pulse
+ * ring turns it visible; on native the glow's shadow needs it visible too,
+ * because a view's own shadow is clipped by its own overflow there.
+ *
+ * An Android button never clips (FUT-3775). There, a clipped solid button that
+ * turned enabled — after a disable or a loading — painted its new fill and no
+ * label: an adopter's cancel, help and delivery sheets showed a red block
+ * with no text. The same button unclipped draws its label in every state
+ * (measured on an Android emulator with a pixel check). Nothing else needs the
+ * clip there: the label, icon and spinner sit inside the padding. The ripple
+ * did, since its mask is a square, so a native press shows the variant's
+ * pressed paint alone, as on iOS, and `ripple` only matters on the web.
+ */
+export function overflowOf(visible: boolean, os: typeof Platform.OS = Platform.OS): ViewStyle['overflow'] {
+  return visible || os === 'android' ? 'visible' : 'hidden';
+}
+
+/**
  * Everything the button paints, decided once per render from the resolved
  * props and the theme. Kept out of the component so the component reads as
  * structure — what renders where — and this reads as arithmetic.
@@ -243,10 +263,7 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
   // The theme's one field radius, so a button and the input beside it agree.
   const radius = theme.radius.field;
   const metrics = BUTTON_SIZES[size];
-  // The web button is `overflow: hidden` (its ripple needs it) unless the pulse
-  // ring turns it visible; on native the glow's shadow needs it visible too,
-  // because a view's own shadow is clipped by its own overflow there.
-  const overflow: ViewStyle['overflow'] = pulse || glow ? 'visible' : 'hidden';
+  const overflow = overflowOf(Boolean(pulse || glow));
   const sized = sizeStyle(theme, size, iconOnly, icon != null);
   const glowing = glow && !inactive ? glowStyle(palette) : null;
 
@@ -276,7 +293,8 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
 
 export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
   const resolved = resolveButtonProps(rawProps);
-  const { loading, icon, iconPosition, pulse, ripple, children, onClick, onPress, ...others } = resolved;
+  // `ripple` is web-only: kept out of `others` so it never reaches the Pressable (see overflowOf).
+  const { loading, icon, iconPosition, pulse, ripple: _ripple, children, onClick, onPress, ...others } = resolved;
   const theme = useUiTheme();
   const look = buttonLook(theme, resolved);
 
@@ -308,7 +326,6 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
       aria-label={loadingName(loading, children)}
       disabled={look.inactive}
       onPress={handlePress}
-      android_ripple={ripple && !look.inactive ? { color: alpha(look.palette.main, 0.2), borderless: false } : undefined}
       style={look.container}
       testID={testId}
       {...pressable}

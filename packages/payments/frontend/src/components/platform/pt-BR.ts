@@ -104,13 +104,33 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       'Lojista de teste conectado. O callback e a troca do código foram registrados nas evidências.',
     returnedFailed:
       'A conexão do lojista de teste não foi concluída. Tente conectar de novo.',
-    generate: 'Gerar arquivo de evidências\u00a0(TXT)',
+    generate: 'Gerar arquivo de evidências\u00a0(TXT e JSON)',
     downloadLatest: 'Baixar o último registrado',
     phases: {
-      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública…',
-      encrypting: 'Criptografando os cartões de teste no navegador…',
-      running: 'Criando os pedidos Pix e cartão no sandbox — pode levar até um minuto…',
+      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública e a sessão 3DS…',
+      encrypting: 'Criptografando os cartões de teste e autenticando o cartão de débito (3DS) no navegador…',
+      running: 'Criando os pedidos Pix, crédito, débito e carteiras no sandbox — pode levar alguns minutos…',
       downloading: 'Montando o arquivo…',
+    },
+    steps: {
+      label: 'Progresso da geração',
+      names: {
+        prepare: 'Preparar (aplicação, token, chave pública e sessão 3DS)',
+        encrypt: 'Criptografar os cartões e autenticar o débito (3DS)',
+        PIX: 'Pix',
+        CARD: 'Cartão de crédito',
+        DEBIT: 'Débito com 3DS',
+        GOOGLE_PAY: 'Google Pay',
+        APPLE_PAY: 'Apple Pay',
+        file: 'Montar o arquivo',
+      },
+      walletsInRun: (included, pending) =>
+        [
+          included.length > 0 ? `Nesta geração: ${included.join(' e ')}.` : 'Nenhuma carteira nesta geração.',
+          pending.length > 0 ? `${pending.join(' e ')} ${pending.length === 1 ? 'fica pendente' : 'ficam pendentes'}.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
     },
     summary: ({ executed, failed, pending }) =>
       // Non-breaking inside each count, so only the separators may wrap.
@@ -123,10 +143,27 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       `${
         {
           preparing: 'Falhou ao consultar a aplicação e preparar o lojista de teste.',
-          encrypting: 'Falhou ao criptografar os cartões de teste no navegador.',
+          encrypting: 'Falhou ao criptografar os cartões de teste ou autenticar o cartão de débito no navegador.',
           running: 'Falhou ao criar os pedidos no sandbox.',
           downloading: 'Falhou ao montar o arquivo.',
         }[phase]
       } Tente de novo; "Baixar o último registrado" ainda traz o que já foi registrado.`,
+    wallets: {
+      heading: 'Carteiras digitais (antes de gerar)',
+      names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
+      hint: 'Toque em cada carteira antes de gerar; sem isso, a seção dela fica pendente.',
+      googlePayButtonLocale: 'pt',
+      applePayButton: 'Pagar com Apple Pay',
+      applePaySheetTotal: 'Teste de homologação',
+      applePayCannotStart: 'O Apple Pay não está configurado.',
+      applePayCannotComplete: 'Não foi possível concluir o Apple Pay.',
+      applePayAbsent: {
+        NOT_CONFIGURED: 'Apple Pay: aguardando a conta Apple Developer. A seção fica pendente.',
+        NOT_AVAILABLE: 'Apple Pay: abra esta tela no Safari de um iPhone ou Mac para testar.',
+        MERCHANT_VALIDATION_FAILED: 'Apple Pay: a validação do comerciante não está configurada. A seção fica pendente.',
+      },
+      ready: (wallet, card) => `${wallet} pronto${card ? ` — ${card}` : ''}. Será usado ao gerar o arquivo.`,
+      failed: (wallet) => `O ${wallet} não devolveu o token. Toque de novo para tentar.`,
+    },
   },
 };

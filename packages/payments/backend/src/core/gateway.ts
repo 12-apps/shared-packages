@@ -354,7 +354,8 @@ export function createPaymentsGateway<P extends string>(
       if (input.amount && !adapter.capabilities.partialRefunds) {
         throw new UnsupportedOperationError(adapter.name, 'partial refunds');
       }
-      return adapter.refund(input, creds);
+      const stored = await config.charges.findByProviderChargeId(provider, input.providerChargeId);
+      return adapter.refund(input, creds, stored?.snapshot.settlementHints);
     },
 
     async verifyCredentials(merchant, provider) {

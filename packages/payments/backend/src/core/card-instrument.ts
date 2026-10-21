@@ -65,7 +65,7 @@ function ownerOf(
 const NEEDS_INSTRUMENT: ReadonlySet<ClientTokenization> = new Set(['PUBLIC_KEY', 'SDK']);
 
 /** What the resolved adapter declares — the slice the ownership rules read. */
-type DeclaredCapabilities = Pick<ProviderCapabilities, 'tokenization' | 'wallets'>;
+type DeclaredCapabilities = Pick<ProviderCapabilities, 'tokenization' | 'wallets' | 'debit'>;
 
 /**
  * A wallet charge on a provider that never declared that wallet (FUT-471), or
@@ -84,6 +84,35 @@ function walletRefusal(
   return { reason: `provider ${provider} does not support the ${wallet.type} wallet` };
 }
 
+/**
+ * A debit charge on a provider that never declared debit (FUT-3754), or one
+ * carrying no authentication. Refused rather than attempted: an adapter that
+ * ignores `funding` would charge the card as CREDIT, which is not what the
+ * buyer chose, and a debit without its 3-D Secure id is a certain rejection.
+ */
+function debitRefusal(
+  card: NonNullable<ChargeInput['card']>,
+  provider: ProviderName,
+  capabilities: DeclaredCapabilities | undefined,
+): NoInstrument | null {
+  if (card.funding !== 'DEBIT') return null;
+  if (!card.authenticationId) return { reason: 'a debit charge needs a 3-D Secure authentication' };
+  // A vaulted card is charged as credit: the authentication was run on the
+  // card the buyer typed, and a stored one may not even be a debit card.
+  if (card.savedCardToken) return { reason: 'a debit charge cannot use a saved card' };
+  if (!capabilities || capabilities.debit) return null;
+  return { reason: `provider ${provider} does not support debit` };
+}
+
+/** What the capability table refuses before ownership is asked: a wallet, then a debit. */
+function refusalOf(
+  card: NonNullable<ChargeInput['card']>,
+  provider: ProviderName,
+  capabilities: DeclaredCapabilities | undefined,
+): NoInstrument | null {
+  return walletRefusal(card, provider, capabilities) ?? debitRefusal(card, provider, capabilities);
+}
+
 export function chargeInputFor(
   input: ChargeInput,
   provider: ProviderName,
@@ -98,7 +127,7 @@ export function chargeInputFor(
 ): ChargeInput | NoInstrument {
   const card = input.method === 'CARD' ? input.card : undefined;
   if (!card) return input;
-  const refused = walletRefusal(card, provider, capabilities);
+  const refused = refusalOf(card, provider, capabilities);
   if (refused) return refused;
   const tokenization = capabilities?.tokenization;
 

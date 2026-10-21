@@ -20,6 +20,26 @@
  */
 import type { ReactNode } from "react";
 
+import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
+
+export type { CheckoutBillingAddress, PaymentListDebitCopy };
+
+/**
+ * What a door option's `content` function is handed (FUT-3715).
+ *
+ * `choose` is exactly what the row's radio does; calling it on the chosen row
+ * changes nothing. The list reports the choice through `onChoiceChange` as it
+ * does for the radio — from an effect, after the render — so a host that
+ * answers in the same tap keeps its answer across that render. The list never
+ * moves keyboard focus here: where focus goes is the host's call.
+ */
+export interface CheckoutDoorRowControls {
+  /** This option is the list's current choice. */
+  chosen: boolean;
+  /** Choose this option, as its radio would. */
+  choose: () => void;
+}
+
 /**
  * One of the host's ways to pay at the door — "Dinheiro", "Maquininha".
  *
@@ -41,10 +61,25 @@ export interface CheckoutDoorOption {
   hideHintWhileChosen?: boolean;
   /**
    * What opens INSIDE the row when it is chosen (the troco question, the
-   * tender chips, the brand lines). Rendered only while chosen, with no left
-   * indent: it starts where the row's own content starts.
+   * tender chips, the brand lines). Rendered only while chosen — unless
+   * `showContentWhileIdle` — with no left indent: it starts where the row's own
+   * content starts.
+   *
+   * As a function it is handed the row's own controls, so a control inside the
+   * content can choose the row in the same tap that answers it (the troco
+   * chips, FUT-3715). A plain node behaves exactly as before. The function is
+   * called during the row's render, not mounted as a component: keep it one
+   * shape for the option's life, and return a component of your own if the
+   * content needs hooks.
    */
-  content?: ReactNode;
+  content?: ReactNode | ((row: CheckoutDoorRowControls) => ReactNode);
+  /**
+   * Render `content` while the option is NOT chosen too — for an option whose
+   * answers are themselves the way to choose it (FUT-3715). The unchosen row
+   * keeps its unchosen frame; the content keeps its box and place in both
+   * states, so choosing the row moves nothing.
+   */
+  showContentWhileIdle?: boolean;
   /** The bar button's verb while this option is chosen — "Enviar pedido". */
   action: string;
   /** The amount beside the verb. Absent ⇒ the cart's own total. */
@@ -72,7 +107,7 @@ export type CheckoutOnlineChoice = "PIX" | "CARD" | "GOOGLE_PAY" | "HAND_OFF";
 
 /** What the buyer has chosen in the list. */
 export type CheckoutListChoice =
-  | { kind: "online"; method: CheckoutOnlineChoice }
+  | { kind: "online"; method: CheckoutOnlineChoice; funding?: "DEBIT" }
   | { kind: "door"; id: string };
 
 /**
@@ -191,6 +226,8 @@ export interface CheckoutPaymentList {
    * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
    */
   summaryTarget?: HTMLElement | null;
+  /** The billing address a DEBIT card's 3-D Secure needs (FUT-3754); none ⇒ no debit row. */
+  billingAddress?: CheckoutBillingAddress | null;
 }
 
 /** The six banks the Pix face offers to open, in the prototype's order. */
@@ -241,6 +278,11 @@ export interface PixBankCopy {
   notOpened: (bank: PixBankName) => string;
   /** "Tentar de novo". */
   retry: string;
+  /**
+   * The one line under the bank being opened, in place of the checklist —
+   * "Abra o app do seu banco e cole em Pix copia e cola." Absent ⇒ no line.
+   */
+  appHint?: string;
   /** The toasts. */
   copied: string;
   copiedPick: string;
@@ -263,6 +305,8 @@ export interface PaymentListCopy {
     /** "Digite os dados do cartão". */
     hintNew: string;
   };
+  /** The DEBIT card row's words (FUT-3754). A pack without them offers no debit row. */
+  debit?: PaymentListDebitCopy;
   /**
    * @deprecated Google Pay is no longer a row (FUT-3685): it is a button in
    * the "PAGAMENTO RÁPIDO" block — see {@link PaymentListCopy.wallets}. Kept so
@@ -331,6 +375,8 @@ export interface PaymentListCopy {
     card: string;
     pix: string;
     googlePay: string;
+    /** The bar's verb when the host's balance pays the whole amount. */
+    covered: string;
     handOff: (provider: string | null) => string;
   };
   /** "Pagando como Ana Teste · CPF ✓". */

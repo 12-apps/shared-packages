@@ -300,6 +300,24 @@ function noPick(): void {
   // No bank flow: nothing to remember.
 }
 
+/**
+ * The way to the bank app on the after-copy face, or `undefined` off a phone.
+ * With a bank chosen, one line says what to do there, in place of the
+ * checklist (FUT-3612) — unless the STORE confirms this Pix: its checklist's
+ * "A loja confirma o pagamento — até 14:32" is then the only place that says
+ * who confirms and by when, so it stays — under the six banks too. No line in
+ * the host's copy: the checklist stays too. Otherwise the six banks replace it.
+ */
+function bankFace(flow: BankFlow | null, pix: PixCharge, stale: boolean): { node: JSX.Element; replacesChecklist: boolean } | undefined {
+  if (!flow?.os) return undefined;
+  const storeConfirms = pix.confirmation === "MANUAL";
+  const oneLine = Boolean(flow.bank.copy.appHint) && !storeConfirms;
+  return {
+    node: <PixBanks bank={flow.bank} state={flow.state} stale={stale} hint={oneLine} />,
+    replacesChecklist: oneLine || (flow.state.chosen === null && !storeConfirms),
+  };
+}
+
 /** Both faces of the list's Pix, and the bar under them. */
 export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode }): JSX.Element {
   const { Text } = useCheckoutComponents();
@@ -311,7 +329,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   // On a phone the bank flow takes the copy: "Copiar e abrir o Nubank", the
   // toast, the app. Without it — or on a computer — the copy is today's.
   const onCopy = flow ? copies.copy : props.onCopy;
-  const banks = flow?.os ? { node: <PixBanks bank={flow.bank} state={flow.state} stale={stale} />, replacesChecklist: flow.state.chosen === null } : undefined;
+  const banks = bankFace(flow, pix, stale);
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
       <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">

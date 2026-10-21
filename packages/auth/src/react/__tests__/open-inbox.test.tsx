@@ -58,7 +58,7 @@ describe("inboxLink", () => {
     );
   });
 
-  it.each(["ana@empresa.com.br", "ana@uol.com.br", "not-an-address", "ana@hotmail", "ana@outlook.example.com", "x@gmail.com@evil.com"])("offers nothing for %s", (email) => {
+  it.each(["ana@empresa.com.br", "ana@terra.com.br", "not-an-address", "ana@hotmail", "ana@outlook.example.com", "x@gmail.com@evil.com"])("offers nothing for %s", (email) => {
     expect(inboxLink(email, "Paladira")).toBeNull();
   });
 });

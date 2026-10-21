@@ -96,8 +96,8 @@ export type { MerchantWebhookUrlResolver } from './core/webhook-url';
  * (FUT-690) — what keeps Connect stores verifying deliveries after the
  * platform rolls its endpoint secret, without every store reconnecting.
  */
-export { withPlatformWebhookSecret } from './core/webhook-secret';
-export type { PlatformWebhookSecretResolver } from './core/webhook-secret';
+export { withPlatformWebhookSecret, type PlatformWebhookSecretResolver } from './core/webhook-secret';
+export { createWebhookLog, type WebhookArrival, type WebhookLogger } from './core/webhook-log';
 export {
   toClientChargeView,
   isSettled,
@@ -242,7 +242,7 @@ export { createCycleCollector } from './core/cycle-collection';
 export { merchantWebhookUrl, type MerchantWebhookUrlOptions } from './config/webhook-url';
 export { classifyFirstCharge } from './checkout/first-charge';
 export type { FirstChargeSettlement, FirstChargeExpectation, FirstChargeOptions } from './checkout/first-charge';
-export { envOAuthAppCredentials, envOAuthAppValues, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions, type OAuthAppValues } from './config/oauth-env';
+export { envOAuthAppCredentials, envOAuthAppValues, oauthAppField, oauthAppWebhookSecret, withOAuthAppSigningSecrets, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions, type OAuthAppValues } from './config/oauth-env';
 export type { BillingInstrument, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup } from './core/cycle-collection';
 // Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
 export { downgradeOnAccountError } from './config/account-downgrade';
@@ -334,7 +334,7 @@ export { isValidCpf } from './core/cpf';
 // FAN-IN deciding the order the reactions run in. See `./core/webhook-public`.
 export * from './core/webhook-public';
 export { chargeDeadlinePassed, hostedChargePayable, pixChargePayable } from './core/charge-reuse';
-export { attributedCard, chainTokenizesInBrowser, holdsInstrumentFor } from './core/card-instrument';
+export * from './core/card-public';
 // What a host may need to know about PagBank — its published Orders API hosts
 // (FUT-760) and the variables that carry its credentials (FUT-764). Both are
 // the adapter's facts, and the first adopting host wrote each out a sixth time

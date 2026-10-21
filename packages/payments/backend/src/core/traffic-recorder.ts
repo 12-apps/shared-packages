@@ -125,10 +125,29 @@ const SECRET_KEYS = new Set([
   'security_code',
   'securitycode',
   'encrypted',
+  // The 3-D Secure session (FUT-3754): it authorizes an authentication against
+  // the seller's account for 30 minutes, so the evidence file never carries it.
+  'session',
 ]);
 
 /** Inside a `card` object these identify the instrument: PAN and vault id. */
 const CARD_KEYS = new Set(['number', 'id']);
+
+/**
+ * Inside a card's `wallet` (FUT-3755), `key` IS the instrument: Google Pay's
+ * token or Apple Pay's `paymentData`, a one-time payment credential. Only
+ * there — a `key` anywhere else (an idempotency key, a public key's name) is
+ * not a secret, and hiding it would hide evidence.
+ */
+const WALLET_KEYS = new Set(['key']);
+
+/** Where a value sits, as far as the redaction rules care: a card, a card's wallet, or elsewhere. */
+type Within = 'NONE' | 'CARD' | 'CARD_WALLET';
+
+function childWithin(within: Within, lower: string): Within {
+  if (lower === 'card') return 'CARD';
+  return within === 'CARD' && lower === 'wallet' ? 'CARD_WALLET' : 'NONE';
+}
 
 /** URL query parameters that carry a credential or a one-time code. */
 /**
@@ -186,20 +205,25 @@ export function redactUrl(url: string): string {
  * `payment_response.code` is the decline code, and hiding it would hide the
  * one thing a declined-card evidence exists to show.
  */
-export function redactValue(value: unknown, insideCard = false): unknown {
-  if (Array.isArray(value)) return value.map((item) => redactValue(item, insideCard));
+export function redactValue(value: unknown, within: Within = 'NONE'): unknown {
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, within));
   if (value === null || typeof value !== 'object') return value;
   const record = value as Record<string, unknown>;
   const oauthBody = 'grant_type' in record;
   return Object.fromEntries(
     Object.entries(record).map(([key, child]) => {
       const lower = key.toLowerCase();
-      if (SECRET_KEYS.has(lower) || (oauthBody && lower === 'code') || (insideCard && CARD_KEYS.has(lower))) {
+      if (SECRET_KEYS.has(lower) || (oauthBody && lower === 'code') || instrumentKey(within, lower)) {
         return [key, REDACTED];
       }
-      return [key, redactValue(child, lower === 'card')];
+      return [key, redactValue(child, childWithin(within, lower))];
     }),
   );
+}
+
+/** A key that names the card itself where it sits: the PAN or vault id in a card, the token in its wallet. */
+function instrumentKey(within: Within, lower: string): boolean {
+  return (within === 'CARD' && CARD_KEYS.has(lower)) || (within === 'CARD_WALLET' && WALLET_KEYS.has(lower));
 }
 
 function parseBody(text: string): unknown {

@@ -52,6 +52,12 @@ export interface WalletInstrument {
 export interface GooglePayClientConfig {
   gateway: string;
   gatewayMerchantId: string | null;
+  /**
+   * Google's `PaymentsClient` environment for THIS connection (FUT-3756): a
+   * sandbox one mints test tokens, a production one real ones. Absent (an
+   * older adapter) means `TEST`, the browser's default before this existed.
+   */
+  environment?: 'TEST' | 'PRODUCTION';
 }
 
 /**

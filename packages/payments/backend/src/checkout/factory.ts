@@ -3,6 +3,7 @@ import { createMount, type MountedHandler, type PaymentsRouteContext } from '../
 import type { PaymentsRouteParams } from '../http/route-table';
 
 import { chargeInstrument, createCheckout } from './flows-charge';
+import { threeDSecureSession } from './flows-debit';
 import { getCheckoutConfig, getStatus, listInstruments, refreshBrowserKey } from './flows-read';
 import { releaseCheckout } from './flows-release';
 import { beginVault, completeVault } from './flows-vault';
@@ -181,6 +182,8 @@ async function runFlow<Caller, View extends object, Display>(
       return getStatus(runtime, request, caller, intent);
     case 'releaseCheckout':
       return releaseCheckout(runtime, request, caller, intent);
+    case 'threeDSecureSession':
+      return threeDSecureSession(runtime, request, caller, intent);
     default:
       return refreshBrowserKey(runtime, request, caller, intent);
   }

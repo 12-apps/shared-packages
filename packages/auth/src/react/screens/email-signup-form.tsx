@@ -3,18 +3,16 @@ import { useState, type FormEvent, type JSX, type ReactNode } from "react";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Button } from "@12-apps/ui/form/Button";
-import { Input } from "@12-apps/ui/form/Input";
 import { Spacer } from "@12-apps/ui/layout/Spacer";
-import { Text } from "@12-apps/ui/typography/Text";
 
 import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { inboxLink } from "./inbox-link";
 import { inboxLogo } from "./inbox-logos";
 import type { EmailAuth } from "../create-email-auth";
-import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
-import { PhoneField, usePhone, type PhoneState, type SignupPhoneField } from "./signup-phone";
+import { EmailInput, NameInput, SignupDetails } from "./signup-fields";
+import { usePhone, type PhoneState, type SignupPhoneField } from "./signup-phone";
 
 export type { SignupPhoneField } from "./signup-phone";
 
@@ -38,7 +36,7 @@ export type { SignupPhoneField } from "./signup-phone";
  * this form too.
  */
 
-interface SignupState {
+export interface SignupState {
   name: string;
   email: string;
   password: string;
@@ -50,6 +48,8 @@ interface SignupState {
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
   sent: boolean;
+  /** The webmail the server read off the domain's MX, by key, when it knew one. */
+  inboxHost: string | null;
   setName: (value: string) => void;
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
@@ -71,10 +71,29 @@ export interface SignupConfig {
    * `SignupActions` in `pages/signup-actions.tsx`). Omitted, the button renders
    * on its own, as it always has.
    */
-  renderActions?: (submit: ReactNode) => ReactNode;
+  renderActions?: (submit: ReactNode, step: SignupStep) => ReactNode;
   /** Ask for a phone too. See {@link SignupPhoneField}. */
   phone?: SignupPhoneField;
+  /**
+   * Ask for the e-mail alone first, and the rest once it has something in it
+   * (FUT-3806).
+   *
+   * The e-mail moves to the top, and nome, the phone, the password and the
+   * submit stay unmounted until the field has a value — typed, pasted or filled
+   * by the browser, since all three are a change of its value. There is no
+   * "next" button: the first character is the step. Emptying the field steps
+   * back, and whatever was typed in the other fields is still there when they
+   * come back, because their values live in this form, not in the inputs.
+   */
+  emailFirst?: boolean;
 }
+
+/**
+ * Where an `emailFirst` form is. `email` is its first step, only the e-mail on
+ * screen; `details` the rest of it. A form that is not `emailFirst` is always
+ * at `details`.
+ */
+export type SignupStep = "email" | "details";
 
 /**
  * The rule the sign-up hint states: at least 8 characters, a letter and a number.
@@ -154,6 +173,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
+  const [inboxHost, setInboxHost] = useState<string | null>(null);
   const passwordCheck = usePasswordFailure(password, setPassword);
   const phone = usePhone(config.phone);
 
@@ -167,6 +187,9 @@ function useSignup(config: SignupConfig): SignupState {
       return;
     }
     if (result.data.status === "verification-sent") {
+      // A body from the wire: only a string is kept, and `inboxLink` ignores a
+      // key it does not know.
+      setInboxHost(typeof result.data.inbox === "string" ? result.data.inbox : null);
       setSent(true);
       return;
     }
@@ -212,6 +235,7 @@ function useSignup(config: SignupConfig): SignupState {
     reason,
     violations,
     sent,
+    inboxHost,
     setName,
     setEmail,
     setPassword: passwordCheck.change,
@@ -254,9 +278,9 @@ function SubmitButton({ form, gateClosed }: { form: SignupState; gateClosed: boo
  */
 const WHITE_BUTTON = { "& .MuiButton-root": { bgcolor: "background.paper" } } as const;
 
-function VerificationSent({ email }: { email: string }): JSX.Element {
+function VerificationSent({ email, host }: { email: string; host: string | null }): JSX.Element {
   const { copy, inboxSender } = useScreens();
-  const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender) : null;
+  const inbox = copy.signUp.openInbox ? inboxLink(email, inboxSender, host) : null;
   // The button sits INSIDE the alert, under its sentence: it is the way to do
   // what the alert asks, so the two read as one card rather than a message and
   // an unrelated call to action below it.
@@ -297,9 +321,10 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
   const { copy } = useScreens();
   const form = useSignup(props);
 
-  if (form.sent) return <VerificationSent email={form.email} />;
+  if (form.sent) return <VerificationSent email={form.email} host={form.inboxHost} />;
 
   const submit = <SubmitButton form={form} gateClosed={props.disabled === true} />;
+  const step: SignupStep = props.emailFirst && form.email === "" ? "email" : "details";
 
   return (
     <form onSubmit={(event) => void form.submit(event)} data-testid="email-signup-form">
@@ -309,57 +334,24 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         violations={form.violations}
         onDismiss={form.dismiss}
       />
-
-      <Input
-        id="signup-name"
-        name="name"
-        label={copy.signUp.nameLabel}
-        value={form.name}
-        onChange={(event) => form.setName(event.target.value)}
-        autoComplete="name"
-        fullWidth
-        data-testid="signup-name"
-      />
-      <Spacer size="sm" />
-      <Input
-        id="signup-email"
-        name="email"
-        label={copy.signUp.emailLabel}
-        type="email"
-        value={form.email}
-        onChange={(event) => form.setEmail(event.target.value)}
-        autoComplete="email"
-        fullWidth
-        required
-        data-testid="signup-email"
-      />
-      <Spacer size="sm" />
-      {props.phone ? <PhoneField field={props.phone} phone={form.phone} /> : null}
-      <PasswordField
-        id="signup-password"
-        label={copy.signUp.passwordLabel}
-        value={form.password}
-        onChange={form.setPassword}
-        autoComplete="new-password"
-        dataTestId="signup-password"
-        error={form.passwordFailed}
-        onBlur={form.leavePassword}
-      />
-      <Spacer size="xs" />
-      <Text
-        color={form.passwordFailed ? "danger" : "secondary"}
-        size="sm"
-        data-testid="signup-password-hint"
-      >
-        {copy.signUp.passwordHint}
-      </Text>
-      {props.renderActions ? (
-        props.renderActions(submit)
+      {props.emailFirst ? (
+        <EmailInput form={form} last={step === "email"} />
       ) : (
         <>
-          <Spacer size="md" />
-          {submit}
+          <NameInput form={form} />
+          <EmailInput form={form} last={false} />
         </>
+      )}
+      {step === "details" ? <SignupDetails form={form} config={props} /> : null}
+      {props.renderActions ? (
+        props.renderActions(submit, step)
+      ) : (
+        step === "details" && (
+          <>
+            <Spacer size="md" />
+            {submit}
+          </>
+        )
       )}
     </form>
   );

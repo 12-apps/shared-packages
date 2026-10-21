@@ -71,12 +71,21 @@ function googleSheet(config: CheckoutProviderConfig | null, client: GooglePaymen
   return params && client ? { client, params } : null;
 }
 
+/**
+ * The debit row (FUT-3754): the card is here, the head declares debit, and the
+ * host gave the address PagBank's 3-D Secure refuses to run without.
+ */
+function debitOffered(config: CheckoutProviderConfig | null, card: boolean, hasBillingAddress: boolean): boolean {
+  return card && hasBillingAddress && config?.chain?.[0]?.debit === true;
+}
+
 /** {@link useListCapability}'s answer, from what it read. */
 function capabilityOf(
   config: CheckoutProviderConfig | null,
   client: GooglePaymentsClient | null,
   price: { priced: boolean; repricing: boolean },
   port: ListApplePay["validateMerchant"] | undefined,
+  hasBillingAddress: boolean,
 ): ListCapability {
   const offered = offeredMethods(config);
   const cardUnavailable = !cardPathAvailable(config);
@@ -89,6 +98,7 @@ function capabilityOf(
     handOff,
     offered,
     cardUnavailable,
+    debit: debitOffered(config, card, hasBillingAddress),
     wallets: walletsShown(card && (price.priced || price.repricing), google, apple),
     googlePay: live ? google : null,
     applePay: live ? apple : null,
@@ -114,10 +124,12 @@ export function useListCapability(
   /** The host's price for the sheets — no price (or zero), no wallet. */
   totalCents: number | undefined,
   validateApplePayMerchant?: ListApplePay["validateMerchant"],
+  /** The host gave the billing address a debit card's 3-D Secure needs. */
+  hasBillingAddress = false,
 ): ListCapability {
-  const declared = googlePayConfig(config) !== null;
+  const declared = googlePayConfig(config);
   // `null` tells the client hook not to load pay.js at all.
-  const client = useGooglePayClient(declared ? undefined : null, "TEST");
+  const client = useGooglePayClient(declared ? undefined : null, declared?.environment ?? "TEST");
   const { priced, repricing } = useRepricing(totalCents);
   // The port is read at the press, through a ref: a host passing a new
   // function each render must not rebuild the capability (and the wallets'
@@ -130,7 +142,7 @@ export function useListCapability(
     return current ? current(validationURL) : Promise.reject(new Error("no merchant validation port"));
   }, []);
   return useMemo(
-    () => capabilityOf(config, client, { priced, repricing }, hasPort ? stablePort : undefined),
-    [config, client, priced, repricing, hasPort, stablePort],
+    () => capabilityOf(config, client, { priced, repricing }, hasPort ? stablePort : undefined, hasBillingAddress),
+    [config, client, priced, repricing, hasPort, stablePort, hasBillingAddress],
   );
 }

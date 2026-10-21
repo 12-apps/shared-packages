@@ -148,10 +148,48 @@ export interface HomologacaoEvidenceCardCopy {
   generate: string;
   downloadLatest: string;
   phases: { preparing: string; encrypting: string; running: string; downloading: string };
+  /** The run's step list (FUT-3755): which step is done, which one is going. */
+  steps: {
+    /** The bar's accessible name. */
+    label: string;
+    names: Record<'prepare' | 'encrypt' | 'PIX' | 'CARD' | 'DEBIT' | 'GOOGLE_PAY' | 'APPLE_PAY' | 'file', string>;
+    /** Which wallets this generation carries a token for, and which stay pending. */
+    walletsInRun: (included: string[], pending: string[]) => string;
+  };
   summary: (counts: { executed: number; failed: number; pending: number }) => string;
   incomplete: string;
   /** Which phase failed — and that the latest recorded file can still be downloaded. */
   generateFailed: (phase: 'preparing' | 'encrypting' | 'running' | 'downloading') => string;
+  /** The wallet step before generating (FUT-3755): each sheet opens on the operator's tap. */
+  wallets: HomologacaoEvidenceWalletsCopy;
+}
+
+/** Why Apple Pay has no button on the evidence card (FUT-3755). */
+export type AppleAbsence = 'NOT_CONFIGURED' | 'NOT_AVAILABLE' | 'MERCHANT_VALIDATION_FAILED';
+
+/** The Google Pay / Apple Pay step of the evidence card (FUT-3755). */
+export interface HomologacaoEvidenceWalletsCopy {
+  heading: string;
+  /** Each wallet's name, as the ready and failed lines say it. */
+  names: { GOOGLE_PAY: string; APPLE_PAY: string };
+  /** Why the buttons come before "generate", and that skipping them leaves the sections pending. */
+  hint: string;
+  /** The language Google draws its own button's label in. */
+  googlePayButtonLocale: string;
+  /** The Apple Pay button's accessible name. */
+  applePayButton: string;
+  /** The line Apple's sheet shows above the test amount. */
+  applePaySheetTotal: string;
+  /** Apple Pay could not start (no merchant validation). */
+  applePayCannotStart: string;
+  /** Apple Pay started and failed. */
+  applePayCannotComplete: string;
+  /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
+  applePayAbsent: Record<AppleAbsence, string>;
+  /** A wallet holds its token: `card` is the network and last four the wallet showed — never the token. */
+  ready: (wallet: string, card: string) => string;
+  /** The sheet answered no token; pressing again retries. */
+  failed: (wallet: string) => string;
 }
 
 /** The whole platform surface, in one object a host passes at the mount. */

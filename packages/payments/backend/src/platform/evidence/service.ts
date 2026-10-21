@@ -5,6 +5,7 @@ import type { MerchantRef, PaymentEnvironment } from '../../core/types';
 import { consultConnectApplication, type ConsultConnectApplicationsDeps } from '../connect-application';
 import { beginSellerConnect, completeSellerConnect, type SellerCallback } from './connect';
 import { buildHomologacaoEvidenceFile, type EvidenceFile } from './file';
+import { buildHomologacaoEvidenceJson } from './json';
 import {
   createPrismaHomologacaoEvidenceStore,
   prismaEvidenceCharge,
@@ -13,8 +14,20 @@ import {
   type EvidenceDelegate,
   type EvidenceWebhookDelegate,
 } from './prisma';
-import { completeEvidenceRun, prepareEvidenceRun, type EvidenceRunDeps } from './run';
-import type { BrowserCardResult, EvidenceRecord, HomologacaoEvidenceCopy } from './types';
+import { walletsConfig } from './orders-wallet';
+import { completeEvidenceRun, prepareEvidenceRun, type EvidenceRunDeps, type PreparedEvidenceRun } from './run';
+import { PAGBANK_SANDBOX_TEST_BUYER } from './sandbox-buyer';
+import type {
+  BrowserCardResult,
+  BrowserWalletResult,
+  EvidenceRecord,
+  EvidenceRunSection,
+  EvidenceWalletsConfig,
+  HomologacaoEvidenceCopy,
+} from './types';
+
+/** Which rendering of the evidence a download asks for. */
+export type EvidenceFileFormat = 'TXT' | 'JSON';
 
 /**
  * The homologação evidence as ONE service (FUT-3696) — what a host mounts.
@@ -28,15 +41,8 @@ import type { BrowserCardResult, EvidenceRecord, HomologacaoEvidenceCopy } from 
 
 const PROVIDER = 'pagbank';
 
-/**
- * PagBank's own sandbox example buyer. Test data only, and the file says so:
- * the evidence may never carry a real person.
- */
-export const PAGBANK_SANDBOX_TEST_BUYER = {
-  name: 'Jose da Silva',
-  email: 'cliente@sandbox.pagseguro.com.br',
-  taxId: '12345678909',
-} as const;
+/** PagBank's sandbox example buyer — browser-safe, so it lives beside the 3DS contact. */
+export { PAGBANK_SANDBOX_TEST_BUYER };
 
 export interface HomologacaoEvidenceConfig {
   gateway: Pick<PaymentsGateway, 'charge' | 'refreshCharge' | 'refund'>;
@@ -54,6 +60,13 @@ export interface HomologacaoEvidenceConfig {
   /** The file header's name and site; the callback is the consult's `expectedRedirectUri`. */
   identification: { name: string; site: string };
   copy: HomologacaoEvidenceCopy;
+  /**
+   * Whether the host has an Apple Pay identity (FUT-3755), e.g.
+   * `() => platformApplePayIdentity(process.env) !== null`. Optional: absent,
+   * Apple Pay is not configured and its evidence section stays PENDING,
+   * waiting for the Apple Developer account.
+   */
+  applePayConfigured?: () => boolean | Promise<boolean>;
   newId?: () => string;
 }
 
@@ -77,15 +90,28 @@ export interface HomologacaoSellerConnection {
    * Null when it completed, or never started.
    */
   lastConnectProblem: string | null;
+  /**
+   * What each wallet's sheet needs before a run (FUT-3755): the sheet must open
+   * inside the operator's tap, so the screen reads it here, not from phase 1.
+   */
+  wallets: EvidenceWalletsConfig;
 }
 
 export interface HomologacaoEvidenceService {
   seller(): Promise<HomologacaoSellerConnection>;
   beginConnect(ctx: { state: string; redirectUri: string }): Promise<{ url: string }>;
   completeConnect(callback: SellerCallback): Promise<{ ok: boolean; record: EvidenceRecord }>;
-  prepare(): Promise<{ runId: string; publicKey: string | null }>;
-  run(runId: string, cards: readonly BrowserCardResult[]): Promise<EvidenceRecord>;
-  file(): Promise<EvidenceFile>;
+  /** Phase 1: the seller's public key and the debit card's 3DS session, each null when not minted. */
+  prepare(): Promise<PreparedEvidenceRun>;
+  /** Phase 2, with the browser's test cards and — when their buttons were pressed — wallet tokens. */
+  run(
+    runId: string,
+    cards: readonly BrowserCardResult[],
+    wallets?: readonly BrowserWalletResult[],
+    onSection?: (section: EvidenceRunSection) => void,
+  ): Promise<EvidenceRecord>;
+  /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
+  file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
 }
 
 async function storedSeller(cfg: HomologacaoEvidenceConfig) {
@@ -108,6 +134,7 @@ function connectProblem(connect: EvidenceRecord | null): string | null {
 function sellerView(
   { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
   connect: EvidenceRecord | null,
+  wallets: EvidenceWalletsConfig,
 ): HomologacaoSellerConnection {
   const field = (key: string): string | null => fields?.[key] ?? null;
   return {
@@ -117,7 +144,13 @@ function sellerView(
     connectedAt: field('connectedAt'),
     accountId: field('accountId'),
     lastConnectProblem: connectProblem(connect),
+    wallets,
   };
+}
+
+/** Google Pay mints against a SANDBOX seller's PagBank account only — the evidence is sandbox-only. */
+function sandboxAccountId({ stored, fields }: Awaited<ReturnType<typeof storedSeller>>): string | null {
+  return stored?.environment === 'SANDBOX' && fields?.['token'] ? (fields['accountId'] ?? null) : null;
 }
 
 export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): HomologacaoEvidenceService {
@@ -131,22 +164,26 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     oauth: cfg.oauth,
     seller: async () => {
       const { stored, fields } = await storedSeller(cfg);
-      return stored ? { environment: stored.environment, token: fields?.['token'] ?? null } : null;
+      return stored
+        ? { environment: stored.environment, token: fields?.['token'] ?? null, accountId: fields?.['accountId'] ?? null }
+        : null;
     },
     platformToken: async () => cfg.appCredentials(PROVIDER, 'SANDBOX')?.fields['accountToken'] ?? null,
     consultApplication: () => consultConnectApplication(cfg.consult, 'SANDBOX'),
     customer: { ...PAGBANK_SANDBOX_TEST_BUYER },
+    ...(cfg.applePayConfigured ? { applePayConfigured: cfg.applePayConfigured } : {}),
   };
   return {
     async seller() {
-      return sellerView(await storedSeller(cfg), await store.latest(PROVIDER, 'CONNECT'));
+      const seller = await storedSeller(cfg);
+      return sellerView(seller, await store.latest(PROVIDER, 'CONNECT'), await walletsConfig(runDeps, sandboxAccountId(seller)));
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
     prepare: () => prepareEvidenceRun(runDeps),
-    run: (runId, cards) => completeEvidenceRun(runDeps, runId, cards),
-    file: () =>
-      buildHomologacaoEvidenceFile({
+    run: (runId, cards, wallets, onSection) => completeEvidenceRun(runDeps, runId, cards, wallets, onSection),
+    file: (format = 'TXT') =>
+      (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,
         copy: cfg.copy,
         identification: {

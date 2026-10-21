@@ -16,6 +16,7 @@
  *     half-mapped snapshot is worse than a loud failure.
  */
 import { ProviderRequestError } from '../core/errors';
+import type { CardFunding } from '../core/card-funding';
 import type { ChargeInput, ChargeSnapshot } from '../core/types';
 
 import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
@@ -34,7 +35,14 @@ export interface PagBankCardCharge {
   /** The ABECS outcome — `code` is the refusal, `raw_data` says which of its
    *  issuer reasons, the only thing telling an expired card from a typo. */
   payment_response?: { code?: string; message?: string; raw_data?: PagBankPaymentRawData };
-  payment_method?: { card?: { id?: string; brand?: string; last_digits?: string } };
+  payment_method?: { type?: string; card?: { id?: string; brand?: string; last_digits?: string } };
+}
+
+/** `payment_method.type` as the core's `CardFunding`; nothing for another type. */
+function fundingOfMethod(type: string | undefined): { funding?: CardFunding } {
+  if (type === 'DEBIT_CARD') return { funding: 'DEBIT' };
+  if (type === 'CREDIT_CARD') return { funding: 'CREDIT' };
+  return {};
 }
 
 export interface PagBankCardResponse {
@@ -244,7 +252,14 @@ export function mapCard(res: PagBankCardResponse, input: ChargeInput): ChargeSna
     method: 'CARD',
     // `vaultToken` is the id PagBank mints when it agreed to STORE the card —
     // normalized here so no host has to read this vendor payload itself.
-    card: { brand: card?.brand, last4: card?.last_digits, vaultToken: card?.id },
+    card: {
+      brand: card?.brand,
+      last4: card?.last_digits,
+      vaultToken: card?.id,
+      // DEBIT_CARD / CREDIT_CARD, as PagBank charged it (FUT-3754): a receipt
+      // or a reconciliation must not call a debit card credit.
+      ...fundingOfMethod(charge.payment_method?.type),
+    },
     // The container the charge lives under — what `getCharge` polls, since
     // PagBank's read API is keyed by order, not by charge (FUT-681).
     settlementHints: { orderId: res.id },

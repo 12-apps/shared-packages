@@ -1,7 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from "react";
 
 import { AuthCard, AuthFooter, ProviderBlock, type AuthLink } from "./card";
-import { SignupActions } from "./signup-actions";
+import { present, signupActions, TermsGateBlock } from "./signup-action-block";
 import type { EmailAuthScreens, SignupPhoneField } from "../screens";
 import { RevealOnAppear } from "../screens/shared";
 
@@ -32,6 +32,7 @@ import { RevealOnAppear } from "../screens/shared";
  */
 
 export type { AuthLink } from "./card";
+export { TERMS_GATE_TEST_ID } from "./signup-action-block";
 
 /**
  * The route paths the footers link to.
@@ -73,6 +74,14 @@ export interface AuthPagesCopy {
     title: string;
     subtitle?: string;
     providerDivider: string;
+    /**
+     * The link that brings the provider buttons back once an `emailFirst`
+     * sign-up has moved on to the rest of the form (FUT-3806): `show` while they
+     * are hidden, `hide` while they are shown. Optional so that a pack written
+     * before it still type-checks; an `emailFirst` page without it falls back to
+     * the Portuguese pack's words.
+     */
+    otherWays?: { show: string; hide: string };
     /** "Already have an account?" */
     loginPrompt: string;
     /** "Sign in" */
@@ -188,6 +197,23 @@ export interface SignupPageProps {
    * those accounts later. See `SignupPhoneField`.
    */
   phone?: SignupPhoneField;
+  /**
+   * The e-mail first, alone with the providers; the rest of the form once it
+   * has something in it, with a link (`copy.signup.otherWays`) under the
+   * submit that shows the providers again (FUT-3806). Emptying the e-mail
+   * steps back. Off by default, and only with `emailEnabled`.
+   */
+  emailFirst?: boolean;
+  /**
+   * The host's terms notice, at the foot of the action block in EVERY step.
+   *
+   * A slot of its own rather than part of `providers`, because `emailFirst`
+   * hides the providers: a notice riding with them would leave the submit that
+   * records the consent with nothing on screen saying so. Handed whether the
+   * provider buttons are on screen, so the sentence can name only the ways in
+   * the page is offering at that moment.
+   */
+  terms?: (shown: { providers: boolean }) => ReactNode;
 }
 
 export interface AuthPages {
@@ -245,22 +271,6 @@ function LoginView({
   );
 }
 
-/** The terms gate's test hook, on the one block it is rendered as. */
-export const TERMS_GATE_TEST_ID = "signup-terms-gate";
-
-/**
- * The host's terms gate as ONE block of whichever column it lands in.
- *
- * Both columns it can land in space their children with a `gap` (see
- * `./card`), and a gate handed over as a fragment — a checkbox, a hint, a
- * spacer — would take that gap between each of its own parts. Wrapped, it takes
- * the gap once. An absent gate renders nothing, so it leaves no gap either.
- */
-function TermsGateBlock({ gate }: { gate: ReactNode }): JSX.Element | null {
-  if (!present(gate)) return null;
-  return <div data-testid={TERMS_GATE_TEST_ID}>{gate}</div>;
-}
-
 /**
  * A route to the other auth page that keeps where the person is going.
  *
@@ -275,11 +285,6 @@ function keepingCallback(route: string, callbackUrl: string): string {
   return `${route}${joiner}callbackUrl=${encodeURIComponent(callbackUrl)}`;
 }
 
-/** Whether a host slot has anything in it to render. */
-function present(node: ReactNode): boolean {
-  return node !== undefined && node !== null && node !== false;
-}
-
 function SignupView({
   cfg,
   callbackUrl,
@@ -292,6 +297,8 @@ function SignupView({
   notice,
   termsGate,
   phone,
+  emailFirst = false,
+  terms,
 }: SignupPageProps & { cfg: ResolvedPagesConfig }): JSX.Element {
   const { screens, copy, routes, Link, maxWidth } = cfg;
   const { EmailSignupForm } = screens;
@@ -323,20 +330,16 @@ function SignupView({
           onSignedIn={onSignedIn}
           disabled={disabled}
           {...(phone === undefined ? {} : { phone })}
-          renderActions={(submit) => (
-            <SignupActions>
-              {gate}
-              {submit}
-              <ProviderBlock label={copy.signup.providerDivider} dividerFirst>
-                {providers}
-              </ProviderBlock>
-            </SignupActions>
-          )}
+          emailFirst={emailFirst}
+          renderActions={(submit, step) =>
+            signupActions({ emailFirst, step, gate, submit, providers, terms, ...cfg })
+          }
         />
       ) : (
         <>
           {gate}
           <ProviderBlock>{providers}</ProviderBlock>
+          {terms?.({ providers: true })}
         </>
       )}
       {Link !== undefined && (

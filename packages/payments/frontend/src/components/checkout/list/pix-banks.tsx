@@ -172,7 +172,26 @@ function Grid({ bank, state, stale }: { bank: CheckoutPixBank; state: PixBankSta
   );
 }
 
-/** The grid, or the bank being opened. */
-export function PixBanks({ bank, state, stale }: { bank: CheckoutPixBank; state: PixBankState; stale: boolean }): JSX.Element {
-  return state.chosen ? <Opening bank={bank} state={state} chosen={state.chosen} /> : <Grid bank={bank} state={state} stale={stale} />;
+/** The one line under the bank being opened, where the checklist was (FUT-3612). */
+function AppHint({ text }: { text: string }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  return (
+    <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0 }} data-testid="pix-bank-hint">
+      {text}
+    </Text>
+  );
+}
+
+/**
+ * The grid, or the bank being opened — with, when `hint`, the line that says
+ * what to do there (the face then drops its checklist; see `ListPixFace`).
+ */
+export function PixBanks({ bank, state, stale, hint }: { bank: CheckoutPixBank; state: PixBankState; stale: boolean; hint: boolean }): JSX.Element {
+  if (!state.chosen) return <Grid bank={bank} state={state} stale={stale} />;
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <Opening bank={bank} state={state} chosen={state.chosen} />
+      {hint && bank.copy.appHint ? <AppHint text={bank.copy.appHint} /> : null}
+    </Box>
+  );
 }

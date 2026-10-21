@@ -11,6 +11,13 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     hintSaved: (card) => `${card} or another card`,
     hintNew: "Enter your card details",
   },
+  debit: {
+    label: "Debit card",
+    hint: "Your bank may ask you to confirm in its app",
+    notSupported: "This card can't be used as debit here. Try credit or Pix.",
+    refused: "Your bank didn't confirm the debit payment. Try another card or Pix.",
+    failed: "We couldn't confirm the debit with your bank. Try again.",
+  },
   googlePay: { label: "Google Pay", hint: "With the card saved in your Google account" },
   wallets: {
     heading: "Quick payment",
@@ -50,6 +57,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     card: "Pay",
     pix: "Create Pix",
     googlePay: "Pay with Google Pay",
+    covered: "Pay with balance",
     handOff: (provider) => (provider ? `Go to ${provider}` : "Go to payment"),
   },
   payer: (name) => `Paying as ${name} · CPF ✓`,

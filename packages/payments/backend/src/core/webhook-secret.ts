@@ -1,5 +1,5 @@
 import type { CredentialStore } from './ports';
-import type { MerchantRef, ProviderName, ResolvedCredentials } from './types';
+import type { MerchantRef, PaymentEnvironment, ProviderName, ResolvedCredentials } from './types';
 
 /**
  * Stamp the platform's CURRENT webhook signing secret onto resolved
@@ -42,27 +42,38 @@ import type { MerchantRef, ProviderName, ResolvedCredentials } from './types';
 export type PlatformWebhookSecretResolver = (
   merchant: MerchantRef,
   provider: ProviderName,
+  /**
+   * The environment of the credential set being stamped. A provider whose
+   * platform secret differs per environment (PagBank's account token, FUT-3722)
+   * answers per set; one with a single secret ignores it.
+   */
+  environment: PaymentEnvironment,
 ) => Promise<string | null>;
 
 export function withPlatformWebhookSecret(
   inner: CredentialStore,
   resolve: PlatformWebhookSecretResolver,
+  /**
+   * The field the secret is stamped under. A provider that may sign with more
+   * than one platform secret (PagBank under Connect, FUT-3722) gets one stamp
+   * per field, each read by its adapter beside the others.
+   */
+  field = 'platformWebhookSecret',
 ): CredentialStore {
   const stampAll = async (
     merchant: MerchantRef,
     provider: ProviderName,
     resolved: ResolvedCredentials[],
   ): Promise<ResolvedCredentials[]> => {
-    if (resolved.length === 0) return resolved;
-    const secret = await resolve(merchant, provider);
-    // A null answer leaves the credentials untouched (any stored copy stays
-    // the fallback), same degradation rule as an unaddressable merchant in
+    // A null answer leaves the set untouched (any stored copy stays the
+    // fallback), same degradation rule as an unaddressable merchant in
     // `withMerchantWebhookUrl`.
-    if (!secret) return resolved;
-    return resolved.map((set) => ({
-      ...set,
-      fields: { ...set.fields, platformWebhookSecret: secret },
-    }));
+    return Promise.all(
+      resolved.map(async (set) => {
+        const secret = await resolve(merchant, provider, set.environment);
+        return secret ? { ...set, fields: { ...set.fields, [field]: secret } } : set;
+      }),
+    );
   };
   const stampOne = async (
     merchant: MerchantRef,

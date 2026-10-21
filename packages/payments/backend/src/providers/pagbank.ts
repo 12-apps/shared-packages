@@ -1,5 +1,5 @@
 import type { PaymentProviderAdapter } from '../core/provider';
-import type { CredentialFieldSpec } from '../core/types';
+import type { CredentialFieldSpec, ProviderCapabilities } from '../core/types';
 import {
   resolvePaymentsCopy,
   type PaymentsCopySource,
@@ -14,6 +14,7 @@ import {
   notificationUrls,
   pagbankRequest,
 } from './pagbank-http';
+import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
@@ -32,7 +33,15 @@ import {
   type PagBankPixResponse,
 } from './pagbank-snapshots';
 import { postTransactionEvents } from './pagbank-webhook';
-import { chargeDescription, secureEquals, sha256Hex, stubCharge } from './shared';
+import {
+  consultedOrder,
+  isConnectConnection,
+  requireConsultedOrder,
+  signerOf,
+  signerSecrets,
+  verifiedByConsult,
+} from './pagbank-webhook-auth';
+import { chargeDescription, sha256Hex, stubCharge } from './shared';
 
 /**
  * PagBank (PagSeguro) Orders API adapter — a port of the integration this
@@ -77,7 +86,26 @@ function pixPayload(input: ChargeInput, credentials: ResolvedCredentials, expire
 function cardInstrument(card: NonNullable<ChargeInput['card']> | undefined) {
   if (card?.wallet) return { wallet: { type: card.wallet.type, key: card.wallet.key } };
   if (card?.savedCardToken) return { id: card.savedCardToken };
+  // A debit card is not stored: the vault charges a saved card as CREDIT, so
+  // keeping it would offer the buyer a card that later pays the wrong way.
+  if (card?.funding === 'DEBIT') return { encrypted: card.token ?? '' };
   return { encrypted: card?.token ?? '', store: true };
+}
+
+/**
+ * `payment_method`'s type and, for a debit charge, the 3-D Secure proof
+ * PagBank requires on it (FUT-3754): `authentication_method` is mandatory on
+ * `DEBIT_CARD`, and a debit is always a single installment.
+ */
+function fundingOf(card: NonNullable<ChargeInput['card']> | undefined) {
+  if (card?.funding !== 'DEBIT') {
+    return { type: 'CREDIT_CARD', installments: card?.installments ?? 1 };
+  }
+  return {
+    type: 'DEBIT_CARD',
+    installments: 1,
+    authentication_method: { type: 'THREEDS', id: card.authenticationId ?? '' },
+  };
 }
 
 /** The single `charges[]` entry of a card order. */
@@ -87,8 +115,7 @@ function cardCharge(input: ChargeInput) {
     description: chargeDescription(input, 64),
     amount: { value: input.amount.amountCents, currency: input.amount.currency },
     payment_method: {
-      type: 'CREDIT_CARD',
-      installments: input.card?.installments ?? 1,
+      ...fundingOf(input.card),
       capture: true,
       card: cardInstrument(input.card),
     },
@@ -143,47 +170,38 @@ function createChargeWith(
   };
 }
 
-/**
- * PagBank signs deliveries with `x-authenticity-token` =
- * SHA-256(`${secret}-${rawBody}`), where the documented secret is the ACCOUNT
- * token ("token da conta") — so the API `token` is the default and a stored
- * `webhookToken` is the platform's explicit override, not a requirement
- * (FUT-678). Requiring `webhookToken` alone is what killed Connect stores:
- * an OAuth connection only ever gets that field by env-var copy, and without
- * it every delivery died fail-closed BEFORE the durable inbox — no row, no
- * replay, no trace. The `??` order keeps an explicitly configured override
- * authoritative where one exists.
- *
- * Which account signs a CONNECT store's deliveries (the store's own token vs
- * the platform's) is still to be measured against a live sandbox Connect
- * store; both secrets reach this verify through the pipeline's candidate
- * sets, so either answer authenticates.
- *
- * The URL itself carries no secret because `notification_urls` is capped at
- * 150 chars, so this header IS the authentication — hence fail-closed when it
- * is absent or no secret is configured at all (stub mode excepted).
- */
 const webhook: PaymentProviderAdapter['webhook'] = {
   async verify(delivery, credentials) {
-    const secret = credentials.fields['webhookToken'] ?? credentials.fields['token'];
-    if (!secret) return stubDeliveryTrusted(credentials);
-    const presented = delivery.headers['x-authenticity-token'];
-    if (!presented) return false;
-    return secureEquals(presented, sha256Hex(`${secret}-${delivery.rawBody}`));
+    if (signerSecrets(credentials).length === 0) return stubDeliveryTrusted(credentials);
+    if (signerOf(delivery, credentials) !== null) return true;
+    return (await consultedOrder(delivery, credentials)) !== null;
+  },
+
+  signer: (delivery, credentials) =>
+    signerOf(delivery, credentials) ?? (isConnectConnection(credentials) ? 'orderConsult' : null),
+
+  refusalDetail(delivery, credentials) {
+    const header = delivery.headers['x-authenticity-token'] ? 'present' : 'absent';
+    const tried = signerSecrets(credentials).map(([field]) => field).join(', ') || 'none';
+    const consult = isConnectConnection(credentials) ? '; order consult failed' : '';
+    return `x-authenticity-token ${header}; tried ${tried}${consult}`;
   },
 
   /**
-   * PagBank posts the ORDER object. The signature above is what makes the body
-   * trustworthy; `eventId` falls back to a body hash because PagBank sends no
+   * PagBank posts the ORDER object. The signature (`pagbank-webhook-auth.ts`)
+   * is what makes the body trustworthy — or, for an unsigned Connect delivery,
+   * the order PagBank answered replaces it outright; `eventId` falls back to a body hash because PagBank sends no
    * delivery id, which still makes redeliveries idempotent. Post-transaction
    * events reach this same URL form-encoded, which the `JSON.parse` below
    * throws on — see `pagbank-webhook.ts`.
    */
-  async parse(delivery) {
+  async parse(delivery, credentials) {
     const eventId = sha256Hex(delivery.rawBody);
     const postTransaction = postTransactionEvents(delivery.rawBody, eventId);
     if (postTransaction) return postTransaction;
-    const body = JSON.parse(delivery.rawBody) as PagBankOrderResponse & { id?: string };
+    const body = verifiedByConsult(delivery, credentials)
+      ? await requireConsultedOrder(delivery, credentials)
+      : (JSON.parse(delivery.rawBody) as PagBankOrderResponse & { id?: string });
     const paid = settledCharge(body);
     const providerChargeId =
       typeof paid?.id === 'string' ? paid.id : typeof body.id === 'string' ? body.id : null;
@@ -274,6 +292,28 @@ const browserKey = {
     }),
 };
 
+/** What PagBank can do. Hoisted for the size gate, like `browserKey` above. */
+const capabilities: ProviderCapabilities = {
+  methods: ['PIX', 'CARD'],
+  // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
+  // Declared here — the single capability source — so the gateway skips a
+  // wallet charge on any provider that never made this claim, and the
+  // checkout gates its buttons on the same fact. Apple Pay additionally
+  // needs the certificate round-trip (`applePay` below) completed for the
+  // merchant account before a charge can authorize.
+  wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
+  // DEBIT_CARD with PagBank's own 3-D Secure (FUT-3754); `debit` below
+  // mints the browser's session.
+  debit: true,
+  savedCards: true,
+  refunds: true,
+  partialRefunds: false,
+  splits: false,
+  webhooks: true,
+  tokenization: 'PUBLIC_KEY',
+  activationCharge: true,
+};
+
 // `copy` is resolved at each BOUNDARY below, never once here — `src/copy-source.ts`.
 export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): PaymentProviderAdapter {
   const copy = (locale?: string): PagbankCopy => resolvePaymentsCopy(source, locale);
@@ -286,23 +326,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
     authMode: 'oauth',
-    capabilities: {
-      methods: ['PIX', 'CARD'],
-      // Both wallets ride the card charge as `card.wallet` (FUT-471/472).
-      // Declared here — the single capability source — so the gateway skips a
-      // wallet charge on any provider that never made this claim, and the
-      // checkout gates its buttons on the same fact. Apple Pay additionally
-      // needs the certificate round-trip (`applePay` below) completed for the
-      // merchant account before a charge can authorize.
-      wallets: ['GOOGLE_PAY', 'APPLE_PAY'],
-      savedCards: true,
-      refunds: true,
-      partialRefunds: false,
-      splits: false,
-      webhooks: true,
-      tokenization: 'PUBLIC_KEY',
-      activationCharge: true,
-    },
+    capabilities,
     credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,
@@ -321,6 +345,8 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     vault: pagbankVault,
 
     browserKey,
+
+    debit: { createSession: createPagbankThreeDSecureSession },
 
     // Apple Pay's certificate round-trip (FUT-472) — see `pagbank-wallets.ts`.
     applePay: {
@@ -350,7 +376,11 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
         // PagBank's id in Google's processor registry — a fact about PagBank,
         // spelled once here; the merchant id is per connection and `null`
         // until configured, which the button reads as "do not render".
-        googlePay: { gateway: 'pagbank', gatewayMerchantId: gatewayMerchantId || null },
+        googlePay: {
+          gateway: 'pagbank',
+          gatewayMerchantId: gatewayMerchantId || null,
+          environment: credentials.environment === 'PRODUCTION' ? 'PRODUCTION' : 'TEST',
+        },
       };
     },
   };

@@ -16,7 +16,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { PT_BR_PIX_BANK_COPY } from "../list/bank-pt-BR";
 import type { CheckoutPixBank, PixBankId } from "../list/types";
-import { onPageStore, renderList, stubClient } from "./list-harness";
+import { onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
 const opened = vi.hoisted(() => ({ result: true, calls: [] as string[] }));
 vi.mock("../list/bank-apps", async (importOriginal) => {
@@ -57,11 +57,17 @@ function clipboardRefusesOnce(): void {
   });
 }
 
-function bankFlow(remembered: PixBankId | null, phone = true) {
+function bankFlow(remembered: PixBankId | null, phone = true, confirmation?: "MANUAL") {
   const onPick = vi.fn();
   const notify = vi.fn();
   const pixBank: CheckoutPixBank = { remembered, onPick, copy: PT_BR_PIX_BANK_COPY, phone };
-  renderList({ config: onPageStore(), client: stubClient([]), list: { lastMethod: "PIX", pixBank, notify } });
+  const createOrder = confirmation
+    ? async () => {
+        const order = orderFor("PIX");
+        return { ok: true as const, data: { ...order, pix: { ...order.pix!, confirmation } } };
+      }
+    : undefined;
+  renderList({ config: onPageStore(), client: stubClient([]), createOrder, list: { lastMethod: "PIX", pixBank, notify } });
   return { onPick, notify };
 }
 
@@ -91,7 +97,9 @@ describe("no bank remembered, on a phone", () => {
     expect(onPick).toHaveBeenCalledWith("caixa");
     await waitFor(() => expect(opened.calls).toEqual(["caixa"]));
     expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Abrindo a Caixa…");
-    expect(screen.getByTestId("pix-after-copy-step-1")).toBeTruthy();
+    // The bank picked: one line where the checklist was, as in the approved prototype.
+    expect(screen.getByTestId("pix-bank-hint").textContent).toBe("Abra o app do seu banco e cole em Pix copia e cola.");
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
     fireEvent.click(screen.getByTestId("pix-bank-other"));
     expect(screen.getByTestId("pix-bank-grid")).toBeTruthy();
   });
@@ -105,6 +113,9 @@ describe("no bank remembered, on a phone", () => {
     await waitFor(() =>
       expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Não conseguimos abrir o Nubank. O app está instalado neste celular?"),
     );
+    // The app did not open: the one line still says what to do, still no checklist.
+    expect(screen.getByTestId("pix-bank-hint").textContent).toBe("Abra o app do seu banco e cole em Pix copia e cola.");
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
     fireEvent.click(screen.getByTestId("pix-bank-retry"));
     await waitFor(() => expect(opened.calls).toEqual(["nubank", "nubank"]));
     await waitFor(() => expect(screen.getByTestId("pix-bank-opening").getAttribute("data-status")).toBe("failed"));
@@ -122,8 +133,9 @@ describe("a bank remembered, on a phone", () => {
     await waitFor(() => expect(opened.calls).toEqual(["nubank"]));
     expect(notify).toHaveBeenCalledWith("Código Pix copiado. Abrindo o Nubank…");
     expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Abrindo o Nubank…");
-    // The checklist stays while a bank is being opened.
-    expect(screen.getByTestId("pix-after-copy-step-1")).toBeTruthy();
+    // One line says what to do in the bank, where the checklist was (approved prototype).
+    expect(screen.getByTestId("pix-bank-hint").textContent).toBe("Abra o app do seu banco e cole em Pix copia e cola.");
+    await waitFor(() => expect(screen.queryByTestId("pix-after-copy-step-1")).toBeNull());
     expect(onPick).not.toHaveBeenCalled();
   });
 
@@ -160,6 +172,28 @@ describe("a bank remembered, on a phone", () => {
     expect(opened.calls).toEqual([]);
     fireEvent.click(pay());
     await waitFor(() => expect(opened.calls).toEqual(["nubank"]));
+  });
+});
+
+describe("a Pix the store confirms (MANUAL), a bank remembered", () => {
+  it("keeps the checklist that says the store confirms and by when, and no one-line hint", async () => {
+    bankFlow("nubank", true, "MANUAL");
+    await waitFor(() => expect(pay().textContent).toContain("Gerar, copiar e abrir o Nubank"));
+    fireEvent.click(pay());
+    await waitFor(() => expect(opened.calls).toEqual(["nubank"]));
+    expect(screen.getByTestId("pix-bank-opening").textContent).toContain("Abrindo o Nubank…");
+    expect(screen.getByTestId("pix-after-copy-step-3").textContent).toMatch(/A loja confirma o pagamento — até \d{2}:\d{2}/);
+    await waitFor(() => expect(screen.queryByTestId("pix-bank-hint")).toBeNull());
+  });
+});
+
+describe("a Pix the store confirms (MANUAL), no bank remembered", () => {
+  it("keeps the checklist under the six banks, so the buyer still reads who confirms and by when", async () => {
+    bankFlow(null, true, "MANUAL");
+    await waitFor(() => expect(pay().textContent).toContain("Gerar e copiar o Pix"));
+    fireEvent.click(pay());
+    await waitFor(() => expect(screen.getByTestId("pix-bank-grid")).toBeTruthy());
+    expect(screen.getByTestId("pix-after-copy-step-3").textContent).toMatch(/A loja confirma o pagamento — até \d{2}:\d{2}/);
   });
 });
 

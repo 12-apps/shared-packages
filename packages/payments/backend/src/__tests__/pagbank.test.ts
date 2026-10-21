@@ -548,7 +548,7 @@ describe('pagbank adapter — webhooks', () => {
       ).resolves.toBe(true);
     });
 
-    it('keeps an explicitly configured webhook token authoritative', async () => {
+    it('accepts the store token beside a configured webhook token, and names which one signed (FUT-3722)', async () => {
       const creds = {
         environment: 'PRODUCTION' as const,
         fields: { token: 'acct_tok', webhookToken: 'dedicated' },
@@ -566,18 +566,117 @@ describe('pagbank adapter — webhooks', () => {
           creds,
         ),
       ).resolves.toBe(true);
-      // The override REPLACES the default rather than widening it: two live
-      // secrets at once is a bigger surface than the configuration asked for.
-      await expect(
-        pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(
-          {
-            provider: 'pagbank',
-            rawBody: body,
-            headers: { 'x-authenticity-token': signedWithAccount },
-          },
-          creds,
-        ),
-      ).resolves.toBe(false);
+      // The override used to REPLACE the account token, and the second sandbox
+      // evidence run had all six Connect notifications refused that way:
+      // PagBank does not say which account signs under Connect (FUT-678).
+      const byAccount = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithAccount },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      await expect(adapter.webhook.verify(byAccount, creds)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(byAccount, creds)).toBe('token');
+    });
+
+    it('honours the application client secret for an OAuth connection, and describes a refusal by field name only (FUT-3722)', async () => {
+      const signedWithClientSecret = createHash('sha256').update(`csecret-${body}`).digest('hex');
+      const delivery = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithClientSecret },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const connected = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', refreshToken: 'rt', platformClientSecret: 'csecret' },
+      };
+
+      await expect(adapter.webhook.verify(delivery, connected)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformClientSecret');
+      const unsigned = { ...delivery, headers: {} };
+      const detail = adapter.webhook.refusalDetail?.(unsigned, connected);
+      expect(detail).toBe('x-authenticity-token absent; tried token, platformClientSecret; order consult failed');
+      expect(detail).not.toContain('csecret');
+    });
+
+    it('honours the platform secret only for an OAuth connection (FUT-3722)', async () => {
+      const signedWithPlatform = createHash('sha256').update(`platform_tok-${body}`).digest('hex');
+      const delivery = {
+        provider: 'pagbank' as const,
+        rawBody: body,
+        headers: { 'x-authenticity-token': signedWithPlatform },
+      };
+      const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+      const pasted = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', platformWebhookSecret: 'platform_tok' },
+      };
+      const connected = { ...pasted, fields: { ...pasted.fields, refreshToken: 'rt' } };
+
+      await expect(adapter.webhook.verify(delivery, pasted)).resolves.toBe(false);
+      await expect(adapter.webhook.verify(delivery, connected)).resolves.toBe(true);
+      expect(adapter.webhook.signer?.(delivery, connected)).toBe('platformWebhookSecret');
+      const forged = { ...delivery, headers: { 'x-authenticity-token': 'f'.repeat(64) } };
+      // Unsigned under Connect, it is confirmed by consult — and PagBank does
+      // not know the order, so it is still refused.
+      mockFetch({ error_messages: [{ code: '40400' }] }, 404);
+      await expect(adapter.webhook.verify(forged, connected)).resolves.toBe(false);
+    });
+
+    /**
+     * The fourth evidence run (FUT-3722) refused every Connect delivery under
+     * all four candidate secrets, header present: PagBank signs them with a
+     * secret it does not name. So an OAuth delivery matching none is confirmed
+     * by reading the order back with the SELLER's token, and only PagBank's
+     * answer is applied.
+     */
+    describe('an unsigned Connect delivery is confirmed by consult (FUT-3722)', () => {
+      const connected = {
+        environment: 'SANDBOX' as const,
+        fields: { token: 'store_tok', refreshToken: 'rt', platformClientSecret: 'csecret' },
+      };
+      // The body claims more than PagBank will answer: only the answer counts.
+      const claimed = JSON.stringify({
+        id: 'ORDE_5',
+        charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 999_99 } }],
+      });
+      const unsigned = {
+        provider: 'pagbank' as const,
+        rawBody: claimed,
+        headers: { 'x-authenticity-token': 'f'.repeat(64) },
+      };
+
+      it('accepts it when PagBank answers the order, reads it with the seller token, and applies the answer', async () => {
+        const spy = mockFetch({ id: 'ORDE_5', charges: [{ id: 'CHAR_5', status: 'PAID', amount: { value: 12_50 } }] });
+        const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(true);
+        expect(adapter.webhook.signer?.(unsigned, connected)).toBe('orderConsult');
+        const [event] = await adapter.webhook.parse(unsigned, connected);
+
+        expect(event?.charge?.amount.amountCents).toBe(12_50);
+        const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+        expect(url).toMatch(/\/orders\/ORDE_5$/);
+        expect(init.method).toBe('GET');
+        expect(new Headers(init.headers).get('authorization')).toBe('Bearer store_tok');
+      });
+
+      it('refuses it when PagBank answers another order or nothing', async () => {
+        const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+        mockFetch({ id: 'ORDE_OTHER', charges: [] });
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(false);
+        mockFetch({ error: 'boom' }, 500);
+        await expect(adapter.webhook.verify(unsigned, connected)).resolves.toBe(false);
+        await expect(adapter.webhook.parse(unsigned, connected)).rejects.toBeInstanceOf(ProviderRequestError);
+      });
+
+      it('never consults for a pasted (non-OAuth) connection', async () => {
+        const spy = mockFetch({ id: 'ORDE_5', charges: [] });
+        const pasted = { environment: 'SANDBOX' as const, fields: { token: 'store_tok' } };
+        await expect(pagbankProvider(PT_BR_PAGBANK_COPY).webhook.verify(unsigned, pasted)).resolves.toBe(false);
+        expect(spy).not.toHaveBeenCalled();
+      });
     });
 
     it('verifies a legacy form-encoded notification body the same way', async () => {
@@ -786,11 +885,29 @@ describe('pagbank adapter — charge identity (FUT-681)', () => {
       expect(refund.providerRefundId).toBe('CHAR_5');
     });
 
-    it('cancels a charge id directly, with no order read', async () => {
-      const calls = mockFetchQueue([{ id: 'CHAR_6', status: 'CANCELED' }]);
+    it('cancels a charge id with no order read, naming the amount it reads back (FUT-3722)', async () => {
+      const calls = mockFetchQueue([
+        { id: 'CHAR_6', status: 'PAID', amount: { value: 900 } },
+        { id: 'CHAR_6', status: 'CANCELED' },
+      ]);
       await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_6' }, CREDS);
-      expect(calls).toHaveLength(1);
-      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
+      expect(calls).toHaveLength(2);
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6');
+      expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_6/cancel');
+    });
+
+    it('reads a charge id through its stored order, so a failing charge read cannot strip the amount (FUT-3722)', async () => {
+      // The second sandbox evidence run: `GET /charges/{id}` answered 406, the
+      // cancel went out with no body, and PagBank refused it 400.
+      const calls = mockFetchQueue([
+        { id: 'ORDE_7', charges: [{ id: 'CHAR_7', status: 'PAID', amount: { value: 1500 } }] },
+        { id: 'CHAR_7', status: 'CANCELED' },
+      ]);
+      await pagbankProvider(PT_BR_PAGBANK_COPY).refund!({ providerChargeId: 'CHAR_7' }, CREDS, { orderId: 'ORDE_7' });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]![0]).toBe('https://sandbox.api.pagseguro.com/orders/ORDE_7');
+      expect(calls[1]![0]).toBe('https://sandbox.api.pagseguro.com/charges/CHAR_7/cancel');
+      expect(JSON.parse(String(calls[1]![1]?.body))).toEqual({ amount: { value: 1500 } });
     });
 
     it('refuses to refund an order nobody paid instead of 404-ing blind', async () => {
@@ -908,7 +1025,16 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
     });
     // `gateway` is PagBank's id in Google's processor registry — a provider
     // fact, spelled by the adapter so no frontend hardcodes a vendor name.
-    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_123' });
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: 'MID_123', environment: 'TEST' });
+  });
+
+  it("publishes Google's PRODUCTION environment for a production connection (FUT-3756)", () => {
+    // A production store minting Google's TEST tokens would charge nobody.
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
+      environment: 'PRODUCTION',
+      fields: { token: 't', googlePayMerchantId: 'MID_123' },
+    });
+    expect(config.googlePay?.environment).toBe('PRODUCTION');
   });
 
   it('publishes a null merchant id for a connection that has none', () => {
@@ -918,6 +1044,6 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
       environment: 'SANDBOX',
       fields: { token: 't', googlePayMerchantId: '' },
     });
-    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null });
+    expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null, environment: 'TEST' });
   });
 });

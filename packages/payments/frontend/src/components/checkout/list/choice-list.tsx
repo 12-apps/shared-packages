@@ -8,16 +8,19 @@ import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import { OnlineContent, opensContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
-import type { CheckoutDoorOption, CheckoutOnlineChoice, PaymentListCopy } from "./types";
+import type { CheckoutDoorOption, PaymentListCopy } from "./types";
 import type { ListState } from "./use-list-state";
 
 /** An online row's label and hint, worded for what the store and the buyer hold. */
 function onlineWords(
-  method: CheckoutOnlineChoice,
+  row: OnlineRow,
   copy: PaymentListCopy,
   state: ListState,
   provider: string | null,
 ): { label: string; hint: string } {
+  const { method } = row;
+  // A debit row exists only with these words (`useDebitReady`).
+  if (row.funding === "DEBIT" && copy.debit) return { label: copy.debit.label, hint: copy.debit.hint };
   if (method === "PIX") return copy.pix;
   if (method === "GOOGLE_PAY") return copy.googlePay;
   if (method === "HAND_OFF") return { label: copy.handOff.label, hint: copy.handOff.hint(provider) };
@@ -26,6 +29,11 @@ function onlineWords(
     label: copy.card.label,
     hint: head ? copy.card.hintSaved(cardName(copy, head)) : copy.card.hintNew,
   };
+}
+
+/** A row's identity — its method, and `-DEBIT` for the debit card (FUT-3754). */
+function rowKey(row: OnlineRow): string {
+  return row.funding ? `${row.method}-${row.funding}` : row.method;
 }
 
 /** The hint of a card the store declares and this browser cannot take — today's words (N9). */
@@ -50,23 +58,24 @@ interface RowProps {
 function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): JSX.Element {
   const { copy, state, provider } = props;
   const unavailable = useUnavailableHint();
-  const words = onlineWords(row.method, copy, state, provider);
-  const chosen = state.choice?.kind === "online" && state.choice.method === row.method;
+  const words = onlineWords(row, copy, state, provider);
+  const chosen = state.choice?.kind === "online" && state.choice.method === row.method && state.choice.funding === row.funding;
   return (
     <OptionRow
       name={props.name}
-      value={row.method}
+      value={rowKey(row)}
       chosen={chosen}
       disabled={row.disabled}
       label={words.label}
       hint={row.disabled ? unavailable : words.hint}
-      onChoose={() => state.choose({ kind: "online", method: row.method })}
-      testId={`list-option-${row.method}`}
+      onChoose={() => state.choose({ kind: "online", method: row.method, ...(row.funding ? { funding: row.funding } : {}) })}
+      testId={`list-option-${rowKey(row)}`}
     >
       {opensContent(row.method, state.asked, props.failure, props.covered) ? (
         <OnlineContent
         withConsent={!state.top}
         method={row.method}
+        debit={row.funding === "DEBIT"}
         asked={state.asked}
         buyer={props.buyer}
         onBuyerChange={props.onBuyerChange}
@@ -85,6 +94,12 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
 function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: RowProps }): JSX.Element {
   const { choice } = props.state;
   const chosen = choice?.kind === "door" && choice.id === option.id;
+  const choose = (): void => {
+    if (!chosen) props.state.choose({ kind: "door", id: option.id });
+  };
+  // A function content gets the row's own controls (FUT-3715): a chip inside
+  // it can choose the row in the tap that answers it.
+  const content = typeof option.content === "function" ? option.content({ chosen, choose }) : option.content;
   return (
     <OptionRow
       name={props.name}
@@ -92,10 +107,11 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
       chosen={chosen}
       label={option.label}
       hint={chosen && option.hideHintWhileChosen ? undefined : option.hint}
-      onChoose={() => props.state.choose({ kind: "door", id: option.id })}
+      onChoose={choose}
       testId={`list-door-${option.id}`}
+      open={option.showContentWhileIdle === true}
     >
-      {option.content}
+      {content}
     </OptionRow>
   );
 }
@@ -157,7 +173,7 @@ export function ChoiceList({
       {/* Each heading only over a group that has rows (a door-only store shows the door one alone). */}
       {state.rows.length > 0 ? (
         <Group id={`${base}-online`} heading={copy.onlineHeading}>
-          {state.rows.map((row) => <OnlineOptionRow key={row.method} row={row} props={props} />)}
+          {state.rows.map((row) => <OnlineOptionRow key={rowKey(row)} row={row} props={props} />)}
         </Group>
       ) : null}
       {door.length > 0 ? (

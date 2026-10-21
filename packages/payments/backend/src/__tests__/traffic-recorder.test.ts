@@ -30,10 +30,31 @@ describe('redactValue', () => {
     });
   });
 
+  it('given a 3-D Secure session answer, then the session is removed and its expiry survives', () => {
+    expect(redactValue({ session: 'S-1', expires_at: 1_800_000_000 })).toEqual({
+      session: '***REDACTED***',
+      expires_at: 1_800_000_000,
+    });
+  });
+
   it("given a decline, then PagBank's payment_response.code survives", () => {
     expect(redactValue({ payment_response: { code: '10002', message: 'NAO AUTORIZADO' } })).toEqual({
       payment_response: { code: '10002', message: 'NAO AUTORIZADO' },
     });
+  });
+
+  it("given a wallet charge, then the wallet's key is removed and its type survives (FUT-3755)", () => {
+    const wallet = { type: 'GOOGLE_PAY', key: '{"signature":"MEU…","signedMessage":"…"}' };
+
+    expect(redactValue({ charges: [{ payment_method: { type: 'CREDIT_CARD', card: { wallet } } }] })).toEqual({
+      charges: [{ payment_method: { type: 'CREDIT_CARD', card: { wallet: { type: 'GOOGLE_PAY', key: '***REDACTED***' } } } }],
+    });
+  });
+
+  it('given a key outside a card wallet, then it is kept — the rule is that narrow (FUT-3755)', () => {
+    const body = { key: 'idem-1', wallet: { key: 'not-a-card' }, card: { key: 'k', holder: { wallet: { key: 'deep' } } } };
+
+    expect(redactValue(body)).toEqual(body);
   });
 
   it('given a phone number outside a card, then it is kept', () => {

@@ -9,7 +9,14 @@ import type { HomologacaoEvidenceCopy } from './types';
 export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   title: 'HOMOLOGATION EVIDENCE — PAGBANK (CONNECT API AND ORDERS API, PIX AND CARD) — SANDBOX',
   statusLabels: { EXECUTED: 'EXECUTED', FAILED: 'FAILED', PENDING: 'PENDING' },
-  sectionTitles: { CONNECT: 'Connect evidence', PIX: 'Pix evidence', CARD: 'Card evidence' },
+  sectionTitles: {
+    CONNECT: 'Connect evidence',
+    PIX: 'Pix evidence',
+    CARD: 'Card evidence',
+    DEBIT: "Debit card (PagBank's 3DS)",
+    GOOGLE_PAY: 'Google Pay (digital wallet)',
+    APPLE_PAY: 'Apple Pay (digital wallet)',
+  },
   steps: {
     'connect.authorize': {
       scenario: "Test seller account authorization (login and consent at PagBank)",
@@ -29,7 +36,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     'connect.refresh': {
       scenario: "Seller token renewal — POST /oauth2/refresh",
-      expected: 'HTTP 200 with a new access_token; the new token pair replaces the previous one.',
+      expected: 'HTTP 200 or 201 with a new access_token; the new token pair replaces the previous one.',
     },
     'connect.usage': {
       scenario: "Use of the seller's authorization in the orders",
@@ -79,6 +86,68 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Card notifications received and processed by the integration',
       expected: "PagBank POSTs to the card orders' notification_url; the integration stores the events and updates the charges' status.",
     },
+    'debit.session': {
+      scenario: '3DS authentication session — POST /checkout-sdk/sessions',
+      expected: "HTTP 200/201 with session and expires_at, minted server-side with the seller's token; the browser sets up the SDK (PagSeguro.setUp) with it.",
+    },
+    'debit.authenticate': {
+      scenario: '3DS authentication of the debit card (Visa test card 4000 0000 0000 2701, no challenge)',
+      expected: "PagBank's SDK (PagSeguro.authenticate3DS) authenticates the encrypted test card in the browser for R$ 27.01: status AUTH_FLOW_COMPLETED, AUTHENTICATED, with the authentication id.",
+    },
+    'debit.approved': {
+      scenario: 'Order with an authenticated debit card (DEBIT_CARD) — POST /orders',
+      expected: 'HTTP 201 with charges[0].status PAID: payment_method DEBIT_CARD carrying authentication_method { type: THREEDS, id } from the authentication above.',
+    },
+    'debit.consult': {
+      scenario: 'Debit order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the debit charge in status PAID.',
+    },
+    'debit.cancel': {
+      scenario: 'Debit payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the debit charge canceled (status CANCELED).',
+    },
+    'gpay.token': {
+      scenario: "Google Pay token obtained in the browser (Google's TEST environment, gateway pagbank)",
+      expected:
+        "The operator opens Google Pay's sheet (PaymentsClient in TEST; PAYMENT_GATEWAY tokenizationSpecification with gateway pagbank and " +
+        "gatewayMerchantId = the test seller's PagBank account), for R$ 12.00, and picks one of Google's test cards; the browser receives " +
+        'paymentMethodData.tokenizationData.token. No request from the integration to PagBank in this step.',
+    },
+    'gpay.approved': {
+      scenario: 'Approved Google Pay order (card.wallet GOOGLE_PAY) — POST /orders',
+      expected:
+        'HTTP 201 with charges[0].status PAID: payment_method CREDIT_CARD with card.wallet { type: GOOGLE_PAY, key } (the Google Pay token), ' +
+        'authorized and captured in one call (capture: true).',
+    },
+    'gpay.consult': {
+      scenario: 'Google Pay order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the Google Pay charge in status PAID.',
+    },
+    'gpay.cancel': {
+      scenario: 'Google Pay payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the Google Pay charge canceled (status CANCELED).',
+    },
+    'apay.token': {
+      scenario: 'Apple Pay token obtained in the browser (ApplePaySession with merchant validation)',
+      expected:
+        "The operator opens Apple Pay's sheet in Safari (ApplePaySession version 3, Visa and Mastercard), for R$ 12.00; the integration " +
+        "validates the merchant server-side with the platform's Apple Pay identity and the browser receives token.paymentData. No " +
+        'request from the integration to PagBank in this step.',
+    },
+    'apay.approved': {
+      scenario: 'Approved Apple Pay order (card.wallet APPLE_PAY) — POST /orders',
+      expected:
+        "HTTP 201 with charges[0].status PAID: payment_method CREDIT_CARD with card.wallet { type: APPLE_PAY, key } (Apple Pay's " +
+        'token.paymentData), authorized and captured in one call (capture: true).',
+    },
+    'apay.consult': {
+      scenario: 'Apple Pay order consulted — GET /orders/{order_id}',
+      expected: 'HTTP 200 with the order and the Apple Pay charge in status PAID.',
+    },
+    'apay.cancel': {
+      scenario: 'Apple Pay payment canceled — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the Apple Pay charge canceled (status CANCELED).',
+    },
   },
   identification: {
     heading: 'Identification',
@@ -116,19 +185,21 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   },
   redactionNote:
     'Security: Authorization, access_token, refresh_token, client_secret, OAuth codes, cookies, ' +
-    'CVV, the full card number and the encrypted card data were removed and show as ***REDACTED***. ' +
+    "CVV, the full card number, the encrypted card data and the digital wallets' token (Google Pay and Apple Pay, " +
+    'card.wallet.key) were removed and show as ***REDACTED***. ' +
     "Every call below was recorded by the integration's own code as it was made; no response was " +
     "written by hand. Data and cards are PagBank's official test ones.",
   pendencies: {
-    heading: '5. Pending items',
+    heading: '8. Pending items',
     incomplete: (failed, pending) =>
-      `INCOMPLETE FILE: ${pending} scenario(s) pending and ${failed} failed. Do not submit this file as complete.`,
+      `INCOMPLETE FILE: ${pending} ${pending === 1 ? 'scenario' : 'scenarios'} pending and ${failed} failed. Do not submit this file as complete.`,
     allExecuted: 'Every scenario listed above was executed with the expected result.',
     notCovered: [
       'Not covered by any scenario: card brands other than VISA (Mastercard, Amex, Elo, Hiper).',
       'Not tested: installments (the orders use 1 installment).',
       'Not applicable: later capture (pre-authorization). The integration authorizes and captures in one call (capture: true).',
       'Not tested: boleto.',
+      'Google Pay and Apple Pay: the approved payment, its consult and its cancellation are covered; a wallet decline is not tested.',
       'Notifications refused at signature verification are not stored. A missing notification may not have been sent, or may have been refused.',
     ],
     noGuarantee: "This file records only what was executed and does not guarantee PagBank's approval of the homologation.",
@@ -153,7 +224,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     refreshed: 'Token renewed; the new pair replaced the previous one.',
     refreshRejected: "PagBank refused the renewal; the seller's connection must be authorized again.",
     usageSellerToken: (calls, seller, platform) =>
-      `The ${calls} order and public-key call(s) were authenticated with the seller's token ` +
+      `${calls === 1 ? 'The order, public-key or 3DS-session call was' : `The ${calls} order, public-key and 3DS-session calls were`} authenticated with the seller's token ` +
       `(SHA-256 fingerprint ${seller}, recorded on every request above)` +
       (platform ? `, different from the platform's token (${platform}).` : '.'),
     usageOtherToken:
@@ -163,7 +234,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     notSandbox: "The test seller's connection is not a sandbox one; nothing was executed.",
     qrCreated: (orderId) => `QR Code created on order ${orderId}. This is NOT yet a confirmed payment.`,
     qrMissing: 'The order was created without a QR Code.',
-    consultStatus: (status, polls) => `Order consulted ${polls} time(s); final status ${status}.`,
+    consultStatus: (status, polls) => `Order consulted ${polls} ${polls === 1 ? 'time' : 'times'}; final status ${status}.`,
     paid: 'Payment confirmed: the Pix charge is PAID in the consult.',
     notPaidYet: (seconds) => `Payment not confirmed within ${seconds} s of consults.`,
     publicKeyMinted: "Public key minted with the seller's token.",
@@ -174,11 +245,40 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       SDK_UNAVAILABLE: "PagBank's SDK did not load in the browser",
       NOT_PROCESSED: "PagBank's SDK did not encrypt the card",
       NO_PUBLIC_KEY: 'no public key for the seller',
+      NO_THREEDS_SESSION: 'no 3DS session for the seller',
+      THREEDS_NOT_SUPPORTED: 'PagBank said the card does not support 3DS authentication (AUTH_NOT_SUPPORTED)',
+      THREEDS_REFUSED: 'PagBank refused the 3DS authentication (CHANGE_PAYMENT_METHOD)',
+      THREEDS_FAILED: 'the 3DS authentication in the browser did not complete',
     },
     chargeStatus: (status) => `Charge with status ${status}.`,
     canceled: (status) => `Cancellation recorded with status ${status}.`,
+    threeDSSessionMinted: "3DS session minted with the seller's token.",
+    threeDSSessionMissing: 'The 3DS session was not minted.',
+    threeDSAuthenticated: (authenticated) =>
+      authenticated
+        ? '3DS authentication completed in the browser: AUTHENTICATED, no challenge.'
+        : '3DS authentication completed in the browser, but the cardholder was not authenticated (NOT_AUTHENTICATED).',
+    threeDSFailed: (detail) => `3DS authentication of the debit card did not complete${detail ? `: ${detail}` : ''}; no debit was charged.`,
+    debitNotReported: 'The browser reported no debit card; no debit was charged.',
+    walletNames: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
+    walletTokenReceived: (wallet, card) =>
+      `${wallet} token received in the browser${card ? ` (${card})` : ''}; it went to the server only and shows as ***REDACTED***.`,
+    walletNotRun: (wallet) =>
+      `Not executed: the ${wallet} button was not pressed before generating the file; no ${wallet} order was created.`,
+    walletFailed: (wallet, detail) =>
+      `${wallet} token not obtained in the browser${detail ? `: ${detail}` : ''}; no ${wallet} order was created.`,
+    walletFailures: {
+      NOT_AVAILABLE: 'the wallet is not offered on this browser/device',
+      DISMISSED: 'the operator closed the payment sheet',
+      NOT_CONFIGURED: 'waiting for the Apple Developer account — Apple Pay identity not configured',
+      MERCHANT_VALIDATION_FAILED: "Apple Pay's merchant validation did not complete",
+      TOKEN_ERROR: 'the payment sheet failed or returned no token',
+    },
+    applePayNotConfigured:
+      'Pending: waiting for the Apple Developer account — Apple Pay identity not configured (Merchant ID and certificate). ' +
+      'No Apple Pay order was created.',
     webhookReceived: (count, statuses, chargeStatus) =>
-      `${count} notification(s) received and stored (status: ${statuses})` +
+      `${count} ${count === 1 ? 'notification' : 'notifications'} received and stored (status: ${statuses})` +
       (chargeStatus ? `; the charge the integration records is ${chargeStatus}.` : '.'),
     webhookNone: 'No notification received by the time this file was generated.',
     webhookFailed: 'Notification received, but processing failed.',

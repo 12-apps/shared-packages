@@ -1,6 +1,9 @@
 import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
 
 import type { OAuthAppCredentialsResolver } from './oauth';
+import type { ProviderName } from '../core/types';
+import type { CredentialStore } from '../core/ports';
+import { withPlatformWebhookSecret, type PlatformWebhookSecretResolver } from '../core/webhook-secret';
 
 /**
  * The platform's OAuth APPLICATION credentials, read from the environment
@@ -141,4 +144,60 @@ export function envOAuthAppCredentials(
     if (!fields.clientId || !fields.clientSecret) return null;
     return { environment, fields };
   };
+}
+
+/**
+ * The platform webhook secret a host stamps through `withPlatformWebhookSecret`,
+ * read off the platform's OAuth application credentials for each candidate
+ * set's environment: the app's `webhookSecret` (Stripe's endpoint secret)
+ * where one is configured, else its `accountToken` — the platform ACCOUNT
+ * token PagBank's notification signature is documented over (FUT-678,
+ * FUT-3722). Limited to `providers`, so a host turns it on one provider at a
+ * time; every other provider resolves null and its credentials pass untouched.
+ */
+export function oauthAppWebhookSecret(
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+): PlatformWebhookSecretResolver {
+  return async (_merchant, provider, environment) => {
+    if (!providers.includes(provider)) return null;
+    const fields = (await appCredentials(provider, environment))?.fields;
+    return fields?.['webhookSecret'] || fields?.['accountToken'] || null;
+  };
+}
+
+/**
+ * A {@link PlatformWebhookSecretResolver} answering one named field of the
+ * platform's OAuth application credentials, per environment — for a provider
+ * whose signing secret may be an app field other than its webhook secret
+ * (PagBank's `clientSecret`, FUT-3722). Limited to `providers`.
+ */
+export function oauthAppField(
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+  field: string,
+): PlatformWebhookSecretResolver {
+  return async (_merchant, provider, environment) => {
+    if (!providers.includes(provider)) return null;
+    return (await appCredentials(provider, environment))?.fields?.[field] || null;
+  };
+}
+
+/**
+ * Stamp every secret a Connect delivery may be signed with, read off the
+ * platform's OAuth application credentials per environment, for the providers
+ * named: `platformWebhookSecret` (`oauthAppWebhookSecret`) and
+ * `platformClientSecret` (the app's `clientSecret`). One call for a host, so
+ * the composition lives here rather than in every host (FUT-3722).
+ */
+export function withOAuthAppSigningSecrets(
+  inner: CredentialStore,
+  appCredentials: OAuthAppCredentialsResolver,
+  providers: readonly ProviderName[],
+): CredentialStore {
+  return withPlatformWebhookSecret(
+    withPlatformWebhookSecret(inner, oauthAppWebhookSecret(appCredentials, providers)),
+    oauthAppField(appCredentials, providers, 'clientSecret'),
+    'platformClientSecret',
+  );
 }

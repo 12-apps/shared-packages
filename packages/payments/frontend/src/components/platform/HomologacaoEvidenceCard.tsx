@@ -1,19 +1,29 @@
 'use client';
 
-import { Alert, Box, Button, LinearProgress, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import type {
+  BrowserCardFailure,
   BrowserCardResult,
+  BrowserWalletResult,
+  DebitTestData,
+  EvidenceRunSection,
   EvidenceSummary,
+  EvidenceWalletsConfig,
   PaymentEnvironment,
+  ThreeDSecureSession,
 } from '@12-apps/payments-backend';
 
-import { maskTestCard, PAGBANK_TEST_CARDS } from '../../card/pagbank-test-cards';
+import { maskTestCard, PAGBANK_3DS_TEST_CARD, PAGBANK_TEST_CARDS } from '../../card/pagbank-test-cards';
+import { authenticatePagBankDebit, type ThreeDSFailure } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
+import type { GooglePayApi } from '../checkout/google-pay-button';
 import { CARD_SX, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
+import { EvidenceProgress, type EvidencePhase } from './HomologacaoEvidenceProgress';
+import { EvidenceWalletBlock, useEvidenceWallets, type EvidenceWallets } from './HomologacaoEvidenceWallets';
 
 /**
  * The homologação EVIDENCE card (FUT-3696): connect a sandbox test seller,
@@ -21,7 +31,10 @@ import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
  *
  * The one thing this card does itself is the part that has to happen in a
  * browser: encrypting PagBank's official TEST cards with the seller's public
- * key, through the same SDK call the checkout makes. Everything else is the
+ * key, through the same SDK call the checkout makes, and authenticating the
+ * 3DS test card with PagBank's SDK for the debit scenario (FUT-3755), and
+ * opening Google Pay's and Apple Pay's sheets on the operator's tap for the
+ * wallet scenarios (`HomologacaoEvidenceWallets.tsx`). Everything else is the
  * host's — each callback is a call to its own mounted routes — and what the
  * file says is decided by the server, from what was recorded. This card shows
  * the counts it answered and never infers a result of its own.
@@ -37,6 +50,12 @@ export interface HomologacaoSellerView {
   accountId: string | null;
   /** Why the latest authorization did not complete, as the evidence recorded it. */
   lastConnectProblem?: string | null;
+  /**
+   * What each wallet's sheet needs (FUT-3755) — the package's seller view
+   * carries it. Absent, no wallet button is drawn and both wallet sections
+   * stay pending.
+   */
+  wallets?: EvidenceWalletsConfig;
 }
 
 export interface HomologacaoEvidenceCardProps {
@@ -47,40 +66,107 @@ export interface HomologacaoEvidenceCardProps {
   connectOutcome?: 'connected' | 'failed' | null;
   /** Start the authorization: the host mints the state and navigates away. */
   onConnect: () => Promise<void>;
-  /** Phase 1 — the seller's public key, null when it could not be minted. */
-  onPrepare: () => Promise<{ runId: string; publicKey: string | null }>;
-  /** Phase 2 — raise the orders with the encrypted cards. */
-  onRun: (runId: string, cards: BrowserCardResult[]) => Promise<void>;
+  /**
+   * Phase 1 — the seller's public key and the debit card's 3DS session, each
+   * null when it could not be minted (the session absent on a host that does
+   * not mint one yet: the debit scenarios then stay pending, saying why).
+   */
+  onPrepare: () => Promise<{
+    runId: string;
+    publicKey: string | null;
+    threeDSSession?: ThreeDSecureSession | null;
+    /** What the debit card is authenticated with — the server's, so the amount matches what it charges. */
+    debitTest?: DebitTestData;
+  }>;
+  /**
+   * Phase 2 — raise the orders with the encrypted cards and, for each wallet,
+   * the token its sheet gave (or the code saying why there is none). The host
+   * calls `onSection` as the server starts each section, for the step list.
+   */
+  onRun: (
+    runId: string,
+    cards: BrowserCardResult[],
+    wallets: BrowserWalletResult[],
+    onSection: (section: EvidenceRunSection) => void,
+  ) => Promise<void>;
+  /**
+   * The host's Apple Pay merchant validation (FUT-3755): exchange Apple's
+   * `validationURL` for a merchant session, server-side. Absent, the Apple Pay
+   * button is not drawn and its section stays pending.
+   */
+  onValidateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
+  /** Injectable `google.payments.api` for tests and harnesses; omit to load pay.js. */
+  googlePayApi?: GooglePayApi | null;
   /** Build and deliver the file; resolves to the counts it holds. */
   onDownload: () => Promise<EvidenceSummary>;
 }
 
-type Phase = 'idle' | 'preparing' | 'encrypting' | 'running' | 'downloading';
-type ActivePhase = Exclude<Phase, 'idle'>;
+type Phase = 'idle' | EvidencePhase;
+type ActivePhase = EvidencePhase;
 
-/** Each official test card, encrypted — or the code saying why it is not. */
-async function encryptTestCards(publicKey: string | null): Promise<BrowserCardResult[]> {
+type TestCard = typeof PAGBANK_3DS_TEST_CARD;
+
+/** One official test card, encrypted — or the code saying why it is not. */
+async function encryptTestCard(card: TestCard, publicKey: string | null): Promise<BrowserCardResult> {
+  const base = { scenario: card.scenario, brand: card.brand, masked: maskTestCard(card.number) };
+  if (!publicKey) return { ...base, encrypted: null, failure: 'NO_PUBLIC_KEY' };
+  const encrypted = await encryptPagBankCard({
+    publicKey,
+    holder: card.holder,
+    number: card.number,
+    expMonth: card.expMonth,
+    expYear: card.expYear,
+    securityCode: card.securityCode,
+  });
+  return 'encrypted' in encrypted
+    ? { ...base, encrypted: encrypted.encrypted }
+    : { ...base, encrypted: null, failure: encrypted.failure };
+}
+
+/** The SDK's 3DS failure, as the code the evidence copy words. */
+const THREEDS_FAILURES: Readonly<Record<ThreeDSFailure, BrowserCardFailure>> = {
+  SDK_UNAVAILABLE: 'SDK_UNAVAILABLE',
+  NOT_SUPPORTED: 'THREEDS_NOT_SUPPORTED',
+  REFUSED: 'THREEDS_REFUSED',
+  INVALID_DATA: 'THREEDS_FAILED',
+  ERROR: 'THREEDS_FAILED',
+};
+
+/**
+ * The 3DS test card, encrypted and authenticated with PagBank's SDK for the
+ * amount the server will charge — or the code saying where it stopped. The
+ * server charges it as DEBIT only with the authentication id.
+ */
+async function authenticateDebitTestCard(
+  publicKey: string | null,
+  session: ThreeDSecureSession | null,
+  test: DebitTestData | undefined,
+): Promise<BrowserCardResult> {
+  const encrypted = await encryptTestCard(PAGBANK_3DS_TEST_CARD, publicKey);
+  if (!encrypted.encrypted) return encrypted;
+  if (!session || !test) return { ...encrypted, failure: 'NO_THREEDS_SESSION' };
+  const outcome = await authenticatePagBankDebit({
+    session: session.session,
+    environment: session.environment,
+    encryptedCard: encrypted.encrypted,
+    amountCents: test.amountCents,
+    customer: test.customer,
+    billingAddress: test.billingAddress,
+    // The test card never challenges; a hung SDK must not hold the Pix and
+    // credit scenarios back with it.
+    timeoutMs: 60_000,
+  });
+  return outcome.ok
+    ? { ...encrypted, authenticationId: outcome.authenticationId, authenticated: outcome.authenticated }
+    : { ...encrypted, failure: THREEDS_FAILURES[outcome.failure] };
+}
+
+/** Each official test card, encrypted, then the debit one authenticated (FUT-3755). */
+async function prepareTestCards(prepared: Awaited<ReturnType<HomologacaoEvidenceCardProps['onPrepare']>>): Promise<BrowserCardResult[]> {
+  const { publicKey } = prepared;
   const results: BrowserCardResult[] = [];
-  for (const card of PAGBANK_TEST_CARDS) {
-    const base = { scenario: card.scenario, brand: card.brand, masked: maskTestCard(card.number) };
-    if (!publicKey) {
-      results.push({ ...base, encrypted: null, failure: 'NO_PUBLIC_KEY' });
-      continue;
-    }
-    const encrypted = await encryptPagBankCard({
-      publicKey,
-      holder: card.holder,
-      number: card.number,
-      expMonth: card.expMonth,
-      expYear: card.expYear,
-      securityCode: card.securityCode,
-    });
-    results.push(
-      'encrypted' in encrypted
-        ? { ...base, encrypted: encrypted.encrypted }
-        : { ...base, encrypted: null, failure: encrypted.failure },
-    );
-  }
+  for (const card of PAGBANK_TEST_CARDS) results.push(await encryptTestCard(card, publicKey));
+  results.push(await authenticateDebitTestCard(publicKey, prepared.threeDSSession ?? null, prepared.debitTest));
   return results;
 }
 
@@ -151,13 +237,24 @@ function SellerBlock({
 }
 
 /** One run at a time: which phase it is in, what it answered, where it failed. */
-function useEvidenceRun({ onPrepare, onRun, onDownload }: Pick<HomologacaoEvidenceCardProps, 'onPrepare' | 'onRun' | 'onDownload'>) {
+function useEvidenceRun(
+  { onPrepare, onRun, onDownload }: Pick<HomologacaoEvidenceCardProps, 'onPrepare' | 'onRun' | 'onDownload'>,
+  wallets: Pick<EvidenceWallets, 'collect' | 'reset'>,
+) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const [failed, setFailed] = useState<ActivePhase | null>(null);
+  // What the step list draws: the server's section, and the tokens this run took.
+  const [section, setSection] = useState<EvidenceRunSection | null>(null);
+  const [scope, setScope] = useState<{ full: boolean; walletResults: BrowserWalletResult[] | null }>({
+    full: false,
+    walletResults: null,
+  });
   const run = async (full: boolean): Promise<void> => {
     setFailed(null);
     setSummary(null);
+    setSection(null);
+    setScope({ full, walletResults: null });
     // The phase that throws is the one the operator is told about.
     let current: ActivePhase = full ? 'preparing' : 'downloading';
     const enter = (next: ActivePhase): void => {
@@ -167,11 +264,15 @@ function useEvidenceRun({ onPrepare, onRun, onDownload }: Pick<HomologacaoEviden
     try {
       if (full) {
         enter('preparing');
+        // The sheets ran before this chain: what they answered, taken once.
+        const walletResults = wallets.collect();
+        wallets.reset();
+        setScope({ full, walletResults });
         const prepared = await onPrepare();
         enter('encrypting');
-        const cards = await encryptTestCards(prepared.publicKey);
+        const cards = await prepareTestCards(prepared);
         enter('running');
-        await onRun(prepared.runId, cards);
+        await onRun(prepared.runId, cards, walletResults, setSection);
       }
       enter('downloading');
       setSummary(await onDownload());
@@ -181,7 +282,7 @@ function useEvidenceRun({ onPrepare, onRun, onDownload }: Pick<HomologacaoEviden
       setPhase('idle');
     }
   };
-  return { phase, busy: phase !== 'idle', summary, failed, run };
+  return { phase, section, scope, busy: phase !== 'idle', summary, failed, run };
 }
 
 /** How the last return from PagBank ended — with the recorded reason when it failed. */
@@ -201,7 +302,12 @@ function ConnectOutcome({ seller, connectOutcome }: Pick<HomologacaoEvidenceCard
 function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
   const { seller, onConnect } = props;
   const copy = usePlatformCopy().evidence;
-  const { phase, busy, summary, failed, run } = useEvidenceRun(props);
+  const wallets = useEvidenceWallets({
+    config: seller?.connected ? (seller.wallets ?? null) : null,
+    validateApplePayMerchant: props.onValidateApplePayMerchant,
+    googlePayApi: props.googlePayApi,
+  });
+  const { phase, section, scope, busy, summary, failed, run } = useEvidenceRun(props, wallets);
   return (
     <Stack spacing={1.5} data-testid="homologacao-evidence-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
@@ -212,6 +318,7 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
       </Typography>
       <ConnectOutcome seller={seller} connectOutcome={props.connectOutcome} />
       <SellerBlock seller={seller} onConnect={onConnect} />
+      <EvidenceWalletBlock wallets={wallets} />
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
         <Button
           variant={seller?.connected ? 'contained' : 'outlined'}
@@ -234,11 +341,8 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
           {copy.downloadLatest}
         </Button>
       </Stack>
-      {busy ? (
-        <Stack spacing={0.5} role="status" aria-busy="true" data-testid="evidence-phase">
-          <Typography variant="body2">{copy.phases[phase as ActivePhase]}</Typography>
-          <LinearProgress />
-        </Stack>
+      {phase !== 'idle' ? (
+        <EvidenceProgress phase={phase} section={section} full={scope.full} walletResults={scope.walletResults} />
       ) : null}
       <EvidenceResult summary={summary} failed={failed} />
     </Stack>

@@ -61,7 +61,7 @@ import { Button } from '@procurement/ui';
 | `icon`       | `ReactNode`                                                                   | -           | Icon element to display before text       |
 | `glow`       | `boolean`                                                                     | `false`     | Adds glow visual effect                   |
 | `pulse`      | `boolean`                                                                     | `false`     | Adds pulse animation effect               |
-| `ripple`     | `boolean`                                                                     | `true`      | Enables/disables ripple effect on click   |
+| `ripple`     | `boolean`                                                                     | `true`      | Enables/disables ripple effect on click (web only; a native press shows the pressed paint) |
 | `active`     | `boolean`                                                                     | `false`     | Indicates active state (used with text) |
 | `fullWidth`  | `boolean`                                                                     | `false`     | Makes button take full width of container |
 | `dataTestId` | `string`                                                                      | -           | Test ID for testing purposes              |

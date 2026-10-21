@@ -123,13 +123,33 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     connectFailed: 'Could not start the test seller connection.',
     returnedConnected: 'Test seller connected. The callback and the code exchange were recorded in the evidence.',
     returnedFailed: 'The test seller connection did not complete. Try connecting again.',
-    generate: 'Generate evidence file\u00a0(TXT)',
+    generate: 'Generate evidence file\u00a0(TXT and JSON)',
     downloadLatest: 'Download the latest recorded',
     phases: {
-      preparing: 'Consulting the application, renewing the token and minting the public key…',
-      encrypting: 'Encrypting the test cards in the browser…',
-      running: 'Creating the Pix and card orders in the sandbox — this can take up to a minute…',
+      preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',
+      encrypting: 'Encrypting the test cards and authenticating the debit card (3DS) in the browser…',
+      running: 'Creating the Pix, credit, debit and wallet orders in the sandbox — this can take a few minutes…',
       downloading: 'Building the file…',
+    },
+    steps: {
+      label: 'Generation progress',
+      names: {
+        prepare: 'Prepare (application, token, public key and 3DS session)',
+        encrypt: 'Encrypt the cards and authenticate the debit (3DS)',
+        PIX: 'Pix',
+        CARD: 'Credit card',
+        DEBIT: 'Debit with 3DS',
+        GOOGLE_PAY: 'Google Pay',
+        APPLE_PAY: 'Apple Pay',
+        file: 'Build the file',
+      },
+      walletsInRun: (included, pending) =>
+        [
+          included.length > 0 ? `In this generation: ${included.join(' and ')}.` : 'No wallet in this generation.',
+          pending.length > 0 ? `${pending.join(' and ')} ${pending.length === 1 ? 'stays' : 'stay'} pending.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
     },
     summary: ({ executed, failed, pending }) =>
       `✓\u00a0${executed}\u00a0executed · ✗\u00a0${failed}\u00a0failed · ⧗\u00a0${pending}\u00a0pending`,
@@ -139,10 +159,27 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       `${
         {
           preparing: 'Consulting the application and preparing the test seller failed.',
-          encrypting: 'Encrypting the test cards in the browser failed.',
+          encrypting: 'Encrypting the test cards or authenticating the debit card in the browser failed.',
           running: 'Creating the orders in the sandbox failed.',
           downloading: 'Building the file failed.',
         }[phase]
       } Try again; "Download the latest recorded" still returns what was recorded.`,
+    wallets: {
+      heading: 'Digital wallets (before generating)',
+      names: { GOOGLE_PAY: 'Google Pay', APPLE_PAY: 'Apple Pay' },
+      hint: "Tap each wallet before generating; without it, that wallet's section stays pending.",
+      googlePayButtonLocale: 'en',
+      applePayButton: 'Pay with Apple Pay',
+      applePaySheetTotal: 'Homologation test',
+      applePayCannotStart: 'Apple Pay is not configured.',
+      applePayCannotComplete: 'Apple Pay could not be completed.',
+      applePayAbsent: {
+        NOT_CONFIGURED: 'Apple Pay: waiting for the Apple Developer account. Its section stays pending.',
+        NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
+        MERCHANT_VALIDATION_FAILED: "Apple Pay: the merchant validation is not set up. Its section stays pending.",
+      },
+      ready: (wallet, card) => `${wallet} ready${card ? ` — ${card}` : ''}. It will be used when the file is generated.`,
+      failed: (wallet) => `${wallet} returned no token. Tap again to retry.`,
+    },
   },
 };

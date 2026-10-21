@@ -37,6 +37,12 @@ export type EmailAuthClientResult<T> =
 /** What `signUp` reports back — see `SignUpResult` for what the two mean. */
 export interface SignUpClientData {
   status: "verification-sent" | "signed-up";
+  /**
+   * The webmail the server read off the address's MX records, by key
+   * (`InboxHost`), when it knows one. A word, never a link: the screen builds
+   * the link from its own table, and ignores a key it does not know.
+   */
+  inbox?: string;
 }
 
 /** What a spent confirmation link reports — see `VerifiedResult`. */

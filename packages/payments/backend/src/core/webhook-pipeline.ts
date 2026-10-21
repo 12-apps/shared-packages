@@ -61,8 +61,12 @@ export interface WebhookPipelineObserver {
    * trace. The thrown error still propagates unchanged.
    */
   refused?(provider: ProviderName, reason: string): void;
-  /** Verified, parsed and ingested; `events` counts what THIS call applied. */
-  accepted?(provider: ProviderName, events: number): void;
+  /**
+   * Verified, parsed and ingested; `events` counts what THIS call applied, and
+   * `signer` is the credential field that authenticated it when the adapter
+   * reports one (`webhook.signer`).
+   */
+  accepted?(provider: ProviderName, events: number, signer?: string | null): void;
 }
 
 /**
@@ -217,6 +221,21 @@ export async function verifiedCredentials(
 }
 
 /**
+ * The refusal's reason: the default message, plus what the adapter can say
+ * about each candidate set it tried (`webhook.refusalDetail`, FUT-3722).
+ */
+function refusalReason(
+  adapter: PaymentProviderAdapter,
+  delivery: WebhookDelivery,
+  candidates: readonly ResolvedCredentials[],
+): string | undefined {
+  const describe = adapter.webhook.refusalDetail;
+  if (!describe) return undefined;
+  const details = candidates.map((creds) => `${creds.environment}: ${describe(delivery, creds)}`);
+  return `Webhook verification failed (${details.join(' | ')})`;
+}
+
+/**
  * Refuse a delivery outside the adapter's declared intake tolerance —
  * LIVE PATH ONLY, by design (FUT-690). The replay sweep re-runs `verify` over
  * rows stored hours earlier and must keep succeeding, so the skew window
@@ -231,6 +250,23 @@ function refuseStaleAtIntake(adapter: PaymentProviderAdapter, delivery: WebhookD
   if (freshness && !freshness.fresh) {
     throw new WebhookVerificationError(adapter.name, freshness.reason);
   }
+}
+
+/**
+ * Tell the observer a delivery was applied, naming the credential field that
+ * signed it when the adapter can tell (`webhook.signer`, FUT-3722) — and with
+ * the original two arguments when it cannot, so an observer written before the
+ * signer existed sees exactly what it always did.
+ */
+function reportAccepted(
+  observer: WebhookPipelineObserver | undefined,
+  delivery: WebhookDelivery,
+  verified: { adapter: PaymentProviderAdapter; creds: ResolvedCredentials },
+  events: number,
+): void {
+  const { signer } = verified.adapter.webhook;
+  if (signer) observer?.accepted?.(delivery.provider, events, signer(delivery, verified.creds));
+  else observer?.accepted?.(delivery.provider, events);
 }
 
 /**
@@ -267,7 +303,7 @@ export async function runWebhookPipeline(
       delivery.provider,
     );
     const creds = await verifiedCredentials(adapter, delivery, candidates);
-    if (!creds) throw new WebhookVerificationError(adapter.name);
+    if (!creds) throw new WebhookVerificationError(adapter.name, refusalReason(adapter, delivery, candidates));
     refuseStaleAtIntake(adapter, delivery);
     verified = { adapter, creds };
   } catch (error) {
@@ -287,6 +323,6 @@ export async function runWebhookPipeline(
   // turns it into a non-2xx so the provider redelivers, and the inbox row is
   // already FAILED with its attempt counted.
   if (outcome.failure) throw outcome.failure.error;
-  deps.webhookObserver?.accepted?.(delivery.provider, outcome.processed.length);
+  reportAccepted(deps.webhookObserver, delivery, verified, outcome.processed.length);
   return outcome.processed;
 }

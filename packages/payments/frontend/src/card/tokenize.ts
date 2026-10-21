@@ -27,6 +27,7 @@ import { detectBrand, onlyDigits } from "./format";
 import { tokenizeWithStripe } from "./stripe-token";
 import type { CardDetails, CardToken } from "./types";
 import type { CardCopy } from "./copy";
+import type { PagBankThreeDSRequest, PagBankThreeDSResult } from "./three-ds";
 
 /** Test PAN that always declines (mirrors common sandbox decline cards). */
 const DECLINE_PAN = "4000000000000002";
@@ -56,6 +57,10 @@ declare global {
         expYear: string;
         securityCode: string;
       }): PagBankEncryptResult;
+      /** 3-D Secure (FUT-3754): point the SDK at a server-minted session. */
+      setUp?(params: { session: string; env: "SANDBOX" | "PROD" }): void;
+      /** 3-D Secure (FUT-3754): see `three-ds.ts` for the request and the answer. */
+      authenticate3DS?(request: PagBankThreeDSRequest): Promise<PagBankThreeDSResult>;
     };
   }
 }
@@ -66,7 +71,7 @@ declare global {
  * surfaces a friendly retry message.
  */
 let sdkLoad: Promise<boolean> | null = null;
-function ensurePagBankSdk(): Promise<boolean> {
+export function ensurePagBankSdk(): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (window.PagSeguro?.encryptCard) return Promise.resolve(true);
   sdkLoad ??= new Promise<boolean>((resolve) => {

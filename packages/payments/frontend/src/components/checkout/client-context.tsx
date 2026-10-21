@@ -53,6 +53,7 @@ function unboundClient(copy: CheckoutTransportCopy): CheckoutClient {
     beginVault: () => createCheckoutClient({ copy }).beginVault(),
     completeVault: (input) => createCheckoutClient({ copy }).completeVault(input),
     refreshBrowserKey: (input) => refreshCardPublicKey(input, copy),
+    threeDSecureSession: (input) => createCheckoutClient({ copy }).threeDSecureSession!(input),
   };
 }
 

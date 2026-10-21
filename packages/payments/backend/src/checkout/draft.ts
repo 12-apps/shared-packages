@@ -97,7 +97,19 @@ function cardOf(
     ...(savedCardToken ? { savedCardToken } : {}),
     ...(minted ? { tokensByProvider: minted } : {}),
     ...(wallet ? { wallet } : {}),
+    ...debitOf(nested ?? raw),
   };
+}
+
+/**
+ * A debit card's funding and 3-D Secure proof (FUT-3754). Both or neither: a
+ * `DEBIT` with no authentication still travels, so the walk can refuse it by
+ * name instead of charging the card as credit.
+ */
+function debitOf(source: Record<string, unknown>): Pick<CheckoutChargeDraft['card'] & object, 'funding' | 'authenticationId'> {
+  if (source.funding !== 'DEBIT') return {};
+  const authenticationId = text(source.authenticationId);
+  return { funding: 'DEBIT', ...(authenticationId ? { authenticationId } : {}) };
 }
 
 /** The instrument half of a draft, from whichever shape carried it. */
@@ -111,7 +123,9 @@ function instrumentOf(raw: Record<string, unknown>): Pick<
   // ONLY the flat shape conflates the two kinds. A nested `token` was sent by a
   // client that had a `savedCardToken` field available and chose not to use it,
   // so it means what it says.
-  return { card, ...(!nested && card.token ? { ambiguousInstrument: true } : {}) };
+  // A debit token is always a fresh card: a saved one is never charged as debit.
+  const ambiguous = !nested && card.token && card.funding !== 'DEBIT';
+  return { card, ...(ambiguous ? { ambiguousInstrument: true } : {}) };
 }
 
 const CUSTOMER_KEYS = ['name', 'email', 'taxId', 'phone'] as const;
