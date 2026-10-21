@@ -136,6 +136,17 @@ export interface DataCellProps<T extends Record<string, unknown>> {
   model: Pick<DataGridModel<T>, 'editingCell' | 'setEditingCell'>;
 }
 
+/** The cell's own click, padding included — never while the cell is being edited (FUT-3849). */
+function cellClick<T extends Record<string, unknown>>(
+  column: GridColumn<T>,
+  row: T,
+  isEditing: boolean,
+): (() => void) | undefined {
+  const onCellClick = column.onCellClick;
+  if (!onCellClick || isEditing) return undefined;
+  return () => onCellClick(row);
+}
+
 export function DataCell<T extends Record<string, unknown>>({
   row,
   rowIndex,
@@ -157,9 +168,11 @@ export function DataCell<T extends Record<string, unknown>>({
       data-slot="cell"
       data-col-id={column.id}
       data-editing={isEditing}
+      onClick={cellClick(column, row, isEditing)}
       sx={{
         ...columnBox(theme, column),
         height: rowHeight,
+        ...(column.onCellClick && { cursor: "pointer" }),
       }}
       role="gridcell"
       tabIndex={-1}
