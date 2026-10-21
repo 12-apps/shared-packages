@@ -69,6 +69,23 @@ function failingLoader(failures: number): { loader: CheckoutLazy; attempts: () =
   return { loader, attempts: () => tries.count };
 }
 
+/** A loader whose first import rejects and whose retry waits until `open()`. */
+function failThenGatedLoader(): { loader: CheckoutLazy; attempts: () => number; open: () => void } {
+  const tries = { count: 0 };
+  const latch: { open: () => void } = { open: () => undefined };
+  const gate = new Promise<void>((resolve) => {
+    latch.open = resolve;
+  });
+  const loader: CheckoutLazy = (load) =>
+    lazy(async () => {
+      tries.count += 1;
+      if (tries.count === 1) throw new Error("chunk gone");
+      await gate;
+      return load();
+    });
+  return { loader, attempts: () => tries.count, open: () => latch.open() };
+}
+
 /** The flow's frame measures this wide. */
 function frameWidth(width: number): void {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width, height: 800, top: 0, left: 0, right: width, bottom: 800, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
@@ -230,5 +247,19 @@ describe("a part whose chunk fails to load", () => {
     expect(payButton().disabled).toBe(true);
     expect(await screen.findByTestId("list-buyer-taxId", {}, { timeout: PART_RETRY_MS * 5 })).toBeTruthy();
     expect(attempts()).toBe(2);
+  });
+  it("keeps the rows drawn while the failed top imports again", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { loader, attempts, open } = failThenGatedLoader();
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
+    const row = await screen.findByTestId("list-option-CARD");
+    await waitFor(() => expect(attempts()).toBe(2), { timeout: PART_RETRY_MS * 5 });
+    // The retry is in flight: the rows the failure left on screen stay drawn.
+    expect(screen.getByTestId("list-option-CARD")).toBe(row);
+    expect(row.closest('[style*="display: none"]')).toBeNull();
+    expect(payButton().disabled).toBe(true);
+    await act(async () => open());
+    expect(await screen.findByTestId("list-buyer-taxId")).toBeTruthy();
+    expect(screen.getByTestId("list-option-CARD")).toBe(row);
   });
 });

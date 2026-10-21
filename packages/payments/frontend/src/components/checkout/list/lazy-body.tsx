@@ -14,7 +14,8 @@ export const PART_RETRY_MS = 1000;
  * Catches a part whose chunk failed to load (FUT-3711): draws `fallback` in
  * its place — the rest of the list stays — and, with `retry` (the part's
  * `useForget()`), forgets the failed load and tries ONCE more after
- * {@link PART_RETRY_MS}, importing again rather than replaying the error.
+ * {@link PART_RETRY_MS}, importing again rather than replaying the error. The
+ * retry suspends to a boundary of its own, never to one holding drawn rows.
  */
 export class PartBoundary extends Component<{ fallback: ReactNode; retry?: () => void; children: ReactNode }, { failed: boolean; tries: number }> {
   state = { failed: false, tries: 0 };
@@ -38,7 +39,12 @@ export class PartBoundary extends Component<{ fallback: ReactNode; retry?: () =>
   }
 
   render(): ReactNode {
-    return this.state.failed ? this.props.fallback : this.props.children;
+    const { fallback, children } = this.props;
+    if (this.state.failed) return fallback;
+    // A retry suspends here, on its own: the boundary above may hold what the
+    // first failure left on screen (the rows under the top), and hiding it
+    // while the part imports again would blink it out under a finger.
+    return this.state.tries > 0 ? <Suspense fallback={fallback}>{children}</Suspense> : children;
   }
 }
 
