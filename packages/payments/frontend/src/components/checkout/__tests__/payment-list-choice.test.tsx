@@ -246,6 +246,7 @@ describe("the bar", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: true, list: { door: [door()] } });
     await waitFor(() => expect(screen.getByTestId("list-payer").textContent).toContain("Pagando como Ana Teste · CPF ✓"));
     expect(screen.getByTestId("list-payer-change")).toBeTruthy();
+    await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-door-cash"));
     await waitFor(() => expect(screen.queryByTestId("list-payer")).toBeNull());
   });

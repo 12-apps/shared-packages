@@ -155,6 +155,9 @@ export function ChoiceList({
   const base = useId();
   const props: RowProps = { ...rest, name: `${base}-choice` };
   const { copy, state } = props;
+  // Nothing to tap before the saved cards answer: a row tapped now would move
+  // when the saved card is preselected and opens its chips (FUT-3849).
+  if (!state.settled) return <Box data-testid="payment-list-loading" aria-busy="true" sx={{ minHeight: (theme) => theme.spacing(30) }} />;
   return (
     <Box
       data-testid="payment-list"

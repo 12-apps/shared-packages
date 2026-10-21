@@ -193,6 +193,7 @@ describe("a CPF on file (E2)", () => {
   it("shows the payer line with nothing chosen, and hides it for a door row (C3)", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" }, list: { door: [door()] } });
     await screen.findByTestId("list-payer");
+    await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-door-cash"));
     await waitFor(() => expect(screen.queryByTestId("list-payer")).toBeNull());
   });
