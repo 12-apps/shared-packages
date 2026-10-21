@@ -380,7 +380,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   return (
     <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
-        <TopAndRows rowsShown={rowsShown}>
+        <TopAndRows rowsShown={rowsShown} drawn={state.settled}>
           <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} top={top} />
         </TopAndRows>
       ) : null}
