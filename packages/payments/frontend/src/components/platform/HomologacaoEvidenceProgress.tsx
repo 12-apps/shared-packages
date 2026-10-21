@@ -3,7 +3,7 @@
 import { Box, CircularProgress, LinearProgress, Stack, SvgIcon, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
-import { EVIDENCE_RUN_SECTIONS, type BrowserWalletResult, type EvidenceRunSection } from '@12-apps/payments-backend';
+import type { BrowserWalletResult, EvidenceRunSection } from '@12-apps/payments-backend';
 
 import { usePlatformCopy } from './copy-context';
 
@@ -21,7 +21,10 @@ import { usePlatformCopy } from './copy-context';
 export type EvidencePhase = 'preparing' | 'encrypting' | 'running' | 'downloading';
 export type EvidenceRunStep = 'prepare' | 'encrypt' | EvidenceRunSection | 'file';
 
-const FULL_RUN: readonly EvidenceRunStep[] = ['prepare', 'encrypt', ...EVIDENCE_RUN_SECTIONS, 'file'];
+// The server's section order (`EVIDENCE_RUN_SECTIONS`), spelled here: this
+// package may import only types from the backend (ADOPTING.md §6).
+const SECTIONS: readonly EvidenceRunSection[] = ['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY'];
+const FULL_RUN: readonly EvidenceRunStep[] = ['prepare', 'encrypt', ...SECTIONS, 'file'];
 const DOWNLOAD_ONLY: readonly EvidenceRunStep[] = ['file'];
 
 /** The step a phase — and, while running, the server's section — is on. */

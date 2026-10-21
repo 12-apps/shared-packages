@@ -215,22 +215,21 @@ describe('HomologacaoEvidenceCard', () => {
   });
 
   it('given a run, then each step is marked done, current or pending as the host reports the sections (FUT-3755)', async () => {
-    let section: ((name: 'PIX' | 'CARD' | 'DEBIT' | 'GOOGLE_PAY' | 'APPLE_PAY') => void) | undefined;
-    let finish: (() => void) | undefined;
+    type Section = 'PIX' | 'CARD' | 'DEBIT' | 'GOOGLE_PAY' | 'APPLE_PAY';
+    const host: { section?: (name: Section) => void; finish?: () => void } = {};
     (window as { PagSeguro?: unknown }).PagSeguro = { encryptCard: () => ({ hasErrors: false, encryptedCard: 'enc' }) };
     mount({
       onRun: vi.fn(
-        (_runId: string, _cards: BrowserCardResult[], _wallets: unknown, onSection: typeof section) =>
+        (_runId: string, _cards: BrowserCardResult[], _wallets: unknown, onSection: (name: Section) => void) =>
           new Promise<void>((resolve) => {
-            section = onSection;
-            finish = resolve;
+            Object.assign(host, { section: onSection, finish: resolve });
           }),
       ),
     });
 
     fireEvent.click(screen.getByTestId('evidence-generate'));
-    await waitFor(() => expect(section).toBeDefined());
-    act(() => section?.('DEBIT'));
+    await waitFor(() => expect(host.section).toBeDefined());
+    act(() => host.section?.('DEBIT'));
 
     const states = () =>
       Array.from(screen.getByTestId('evidence-steps').querySelectorAll('li')).map((li) => [
@@ -251,20 +250,28 @@ describe('HomologacaoEvidenceCard', () => {
       'Nenhuma carteira nesta geração. Google Pay e Apple Pay ficam pendentes.',
     );
 
-    act(() => finish?.());
+    act(() => host.finish?.());
     await waitFor(() => expect(screen.queryByTestId('evidence-steps')).toBeNull());
   });
 
-  it('given a download-only press, then no step list is drawn', async () => {
-    let finish: ((summary: { executed: number; failed: number; pending: number }) => void) | undefined;
-    mount({ onDownload: vi.fn(() => new Promise((resolve) => (finish = resolve))) });
+  it('given a download-only press, then the progress is the file line alone, with no step list', async () => {
+    type Summary = { executed: number; failed: number; pending: number };
+    const host: { finish?: (summary: Summary) => void } = {};
+    mount({
+      onDownload: vi.fn(
+        () =>
+          new Promise<Summary>((resolve) => {
+            Object.assign(host, { finish: resolve });
+          }),
+      ),
+    });
 
     fireEvent.click(screen.getByTestId('evidence-download-latest'));
 
-    await waitFor(() => expect(screen.getByTestId('evidence-phase')).toBeDefined());
-    expect(screen.queryByTestId('evidence-steps')).toBeNull();
-    expect(screen.queryByTestId('evidence-run-wallets')).toBeNull();
-    act(() => finish?.({ executed: 1, failed: 0, pending: 0 }));
+    await waitFor(() =>
+      expect(screen.getByTestId('evidence-phase').textContent).toBe(PT_BR_PLATFORM_HOMOLOGACAO_COPY.evidence.phases.downloading),
+    );
+    act(() => host.finish?.({ executed: 1, failed: 0, pending: 0 }));
     await waitFor(() => expect(screen.getByTestId('evidence-summary')).toBeDefined());
   });
 });
