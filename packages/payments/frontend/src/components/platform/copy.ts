@@ -148,6 +148,14 @@ export interface HomologacaoEvidenceCardCopy {
   generate: string;
   downloadLatest: string;
   phases: { preparing: string; encrypting: string; running: string; downloading: string };
+  /** The run's step list (FUT-3755): which step is done, which one is going. */
+  steps: {
+    /** The bar's accessible name. */
+    label: string;
+    names: Record<'prepare' | 'encrypt' | 'PIX' | 'CARD' | 'DEBIT' | 'GOOGLE_PAY' | 'APPLE_PAY' | 'file', string>;
+    /** Which wallets this generation carries a token for, and which stay pending. */
+    walletsInRun: (included: string[], pending: string[]) => string;
+  };
   summary: (counts: { executed: number; failed: number; pending: number }) => string;
   incomplete: string;
   /** Which phase failed — and that the latest recorded file can still be downloaded. */

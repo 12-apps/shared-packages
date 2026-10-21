@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Box, Button, LinearProgress, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import type {
@@ -8,6 +8,7 @@ import type {
   BrowserCardResult,
   BrowserWalletResult,
   DebitTestData,
+  EvidenceRunSection,
   EvidenceSummary,
   EvidenceWalletsConfig,
   PaymentEnvironment,
@@ -21,6 +22,7 @@ import type { GooglePayApi } from '../checkout/google-pay-button';
 import { CARD_SX, TAP_SX } from './ConnectEnvironmentCard';
 import type { PlatformHomologacaoCopy } from './copy';
 import { PlatformCopyProvider, usePlatformCopy } from './copy-context';
+import { EvidenceProgress, type EvidencePhase } from './HomologacaoEvidenceProgress';
 import { EvidenceWalletBlock, useEvidenceWallets, type EvidenceWallets } from './HomologacaoEvidenceWallets';
 
 /**
@@ -78,9 +80,15 @@ export interface HomologacaoEvidenceCardProps {
   }>;
   /**
    * Phase 2 — raise the orders with the encrypted cards and, for each wallet,
-   * the token its sheet gave (or the code saying why there is none).
+   * the token its sheet gave (or the code saying why there is none). The host
+   * calls `onSection` as the server starts each section, for the step list.
    */
-  onRun: (runId: string, cards: BrowserCardResult[], wallets: BrowserWalletResult[]) => Promise<void>;
+  onRun: (
+    runId: string,
+    cards: BrowserCardResult[],
+    wallets: BrowserWalletResult[],
+    onSection: (section: EvidenceRunSection) => void,
+  ) => Promise<void>;
   /**
    * The host's Apple Pay merchant validation (FUT-3755): exchange Apple's
    * `validationURL` for a merchant session, server-side. Absent, the Apple Pay
@@ -93,8 +101,8 @@ export interface HomologacaoEvidenceCardProps {
   onDownload: () => Promise<EvidenceSummary>;
 }
 
-type Phase = 'idle' | 'preparing' | 'encrypting' | 'running' | 'downloading';
-type ActivePhase = Exclude<Phase, 'idle'>;
+type Phase = 'idle' | EvidencePhase;
+type ActivePhase = EvidencePhase;
 
 type TestCard = typeof PAGBANK_3DS_TEST_CARD;
 
@@ -236,9 +244,17 @@ function useEvidenceRun(
   const [phase, setPhase] = useState<Phase>('idle');
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const [failed, setFailed] = useState<ActivePhase | null>(null);
+  // What the step list draws: the server's section, and the tokens this run took.
+  const [section, setSection] = useState<EvidenceRunSection | null>(null);
+  const [scope, setScope] = useState<{ full: boolean; walletResults: BrowserWalletResult[] | null }>({
+    full: false,
+    walletResults: null,
+  });
   const run = async (full: boolean): Promise<void> => {
     setFailed(null);
     setSummary(null);
+    setSection(null);
+    setScope({ full, walletResults: null });
     // The phase that throws is the one the operator is told about.
     let current: ActivePhase = full ? 'preparing' : 'downloading';
     const enter = (next: ActivePhase): void => {
@@ -251,11 +267,12 @@ function useEvidenceRun(
         // The sheets ran before this chain: what they answered, taken once.
         const walletResults = wallets.collect();
         wallets.reset();
+        setScope({ full, walletResults });
         const prepared = await onPrepare();
         enter('encrypting');
         const cards = await prepareTestCards(prepared);
         enter('running');
-        await onRun(prepared.runId, cards, walletResults);
+        await onRun(prepared.runId, cards, walletResults, setSection);
       }
       enter('downloading');
       setSummary(await onDownload());
@@ -265,7 +282,7 @@ function useEvidenceRun(
       setPhase('idle');
     }
   };
-  return { phase, busy: phase !== 'idle', summary, failed, run };
+  return { phase, section, scope, busy: phase !== 'idle', summary, failed, run };
 }
 
 /** How the last return from PagBank ended — with the recorded reason when it failed. */
@@ -290,7 +307,7 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
     validateApplePayMerchant: props.onValidateApplePayMerchant,
     googlePayApi: props.googlePayApi,
   });
-  const { phase, busy, summary, failed, run } = useEvidenceRun(props, wallets);
+  const { phase, section, scope, busy, summary, failed, run } = useEvidenceRun(props, wallets);
   return (
     <Stack spacing={1.5} data-testid="homologacao-evidence-card" sx={CARD_SX}>
       <Typography variant="body2" fontWeight={600}>
@@ -324,11 +341,8 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
           {copy.downloadLatest}
         </Button>
       </Stack>
-      {busy ? (
-        <Stack spacing={0.5} role="status" aria-busy="true" data-testid="evidence-phase">
-          <Typography variant="body2">{copy.phases[phase as ActivePhase]}</Typography>
-          <LinearProgress />
-        </Stack>
+      {phase !== 'idle' ? (
+        <EvidenceProgress phase={phase} section={section} full={scope.full} walletResults={scope.walletResults} />
       ) : null}
       <EvidenceResult summary={summary} failed={failed} />
     </Stack>

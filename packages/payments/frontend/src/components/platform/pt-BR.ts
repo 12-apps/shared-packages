@@ -112,6 +112,26 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       running: 'Criando os pedidos Pix, crédito, débito e carteiras no sandbox — pode levar alguns minutos…',
       downloading: 'Montando o arquivo…',
     },
+    steps: {
+      label: 'Progresso da geração',
+      names: {
+        prepare: 'Preparar (aplicação, token, chave pública e sessão 3DS)',
+        encrypt: 'Criptografar os cartões e autenticar o débito (3DS)',
+        PIX: 'Pix',
+        CARD: 'Cartão de crédito',
+        DEBIT: 'Débito com 3DS',
+        GOOGLE_PAY: 'Google Pay',
+        APPLE_PAY: 'Apple Pay',
+        file: 'Montar o arquivo',
+      },
+      walletsInRun: (included, pending) =>
+        [
+          included.length > 0 ? `Nesta geração: ${included.join(' e ')}.` : 'Nenhuma carteira nesta geração.',
+          pending.length > 0 ? `${pending.join(' e ')} ${pending.length === 1 ? 'fica pendente' : 'ficam pendentes'}.` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+    },
     summary: ({ executed, failed, pending }) =>
       // Non-breaking inside each count, so only the separators may wrap.
       `✓\u00a0${executed}\u00a0${executed === 1 ? 'executado' : 'executados'} · ` +

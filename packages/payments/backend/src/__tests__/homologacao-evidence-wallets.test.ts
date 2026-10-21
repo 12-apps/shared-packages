@@ -210,4 +210,12 @@ describe('homologação evidence — the wallet sections', () => {
     expect(prepared.wallets.googlePay).toBeNull();
     expect(walletOrders(w, 'GOOGLE_PAY')).toHaveLength(0);
   });
+  it('given a run, then it reports each section as it starts, in the order the file numbers them', async () => {
+    const w = world();
+    await connected(w);
+    const prepared = await prepareEvidenceRun(w.runDeps);
+    const sections: string[] = [];
+    await completeEvidenceRun(w.runDeps, prepared.runId, cards(), wallets(), (section) => sections.push(section));
+    expect(sections).toEqual(['PIX', 'CARD', 'DEBIT', 'GOOGLE_PAY', 'APPLE_PAY']);
+  });
 });
