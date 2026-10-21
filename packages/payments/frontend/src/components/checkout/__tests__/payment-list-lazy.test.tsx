@@ -22,7 +22,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 
 import { PART_RETRY_MS } from "../list/lazy-body";
 import type { CheckoutLazy } from "../ui";
-import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, installGoogle, onPageStore, renderList, stubClient, uninstallWallets, walletStore } from "./list-harness";
 
 const payButton = (): HTMLButtonElement => screen.getByTestId("list-pay") as HTMLButtonElement;
 
@@ -34,6 +34,17 @@ function gatedLoader(): { loader: CheckoutLazy; open: () => void } {
   });
   const loader: CheckoutLazy = (load) => lazy(() => gate.then(load));
   return { loader, open: () => latch.open() };
+}
+
+/** {@link gatedLoader}, keeping each part it is asked to build. */
+function watchedGatedLoader(): { loader: CheckoutLazy; asked: unknown[]; open: () => void } {
+  const asked: unknown[] = [];
+  const { loader: gated, open } = gatedLoader();
+  const loader: CheckoutLazy = (load) => {
+    asked.push(load);
+    return gated(load);
+  };
+  return { loader, asked, open };
 }
 
 /** React's own `lazy`, keeping each part it is asked to build. */
@@ -68,9 +79,28 @@ const noCpfStore = () => onPageStore({ customerSchema: [] });
 
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
+  uninstallWallets();
   vi.restoreAllMocks();
   cleanup();
 });
+
+/** Google Pay installed, its `isReadyToPay` answering only once `ready()` is called. */
+function installGoogleLate(): { ready: () => void } {
+  installGoogle();
+  const latch: { open: () => void } = { open: () => undefined };
+  const gate = new Promise<void>((resolve) => {
+    latch.open = resolve;
+  });
+  const api = (window as unknown as { google: { payments: { api: { PaymentsClient: new () => { isReadyToPay: () => Promise<{ result: boolean }> } } } } }).google.payments.api;
+  const Ready = api.PaymentsClient;
+  api.PaymentsClient = class extends Ready {
+    isReadyToPay = async () => {
+      await gate;
+      return { result: true };
+    };
+  };
+  return { ready: () => latch.open() };
+}
 
 describe("the host's loader (the `lazy` slot)", () => {
   it("builds the CPF/wallet top through it, once, however often the list renders", async () => {
@@ -130,6 +160,27 @@ describe("while the top's chunk loads", () => {
     expect(await screen.findByTestId("list-buyer-taxId")).toBeTruthy();
     expect(screen.getByTestId("list-option-PIX")).toBe(pix);
     expect(pix.style.display).not.toBe("none");
+  });
+});
+
+describe("a top that first appears once the rows are drawn (FUT-3711 review round 2)", () => {
+  it("never hides the rows: a declared wallet turning ready suspends the top on its own", async () => {
+    const { loader, asked, open } = watchedGatedLoader();
+    const google = installGoogleLate();
+    renderList({ config: walletStore(["GOOGLE_PAY"], { customerSchema: [] }), client: stubClient(), taxIdOnFile: false, list: { totalCents: 2700 }, components: { lazy: loader } });
+    // No CPF, none on file, the wallet not ready yet: the rows are drawn — and the declared wallet already started the top.
+    const row = await screen.findByTestId("list-option-CARD");
+    expect(asked).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    await act(async () => google.ready());
+    // The wallet is ready: the top mounts, suspended on its own, and the rows stay drawn.
+    await screen.findByTestId("list-top-loading");
+    expect(screen.getByTestId("list-option-CARD")).toBe(row);
+    expect(row.closest('[style*="display: none"]')).toBeNull();
+    expect(screen.getByTestId("list-option-PIX-radio")).toHaveProperty("checked", true);
+    await act(async () => open());
+    expect(await screen.findByTestId("list-wallets")).toBeTruthy();
+    expect(screen.getByTestId("list-option-CARD")).toBe(row);
   });
 });
 

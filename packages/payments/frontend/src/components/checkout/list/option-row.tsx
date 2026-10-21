@@ -35,6 +35,9 @@ const FIELDS_ON_SURFACE = {
   },
 } as const;
 
+/** The small radio (20px) centred on the title's 24px line. */
+const RADIO_ON_TITLE = 0.25;
+
 /** The row's label and its muted hint, beside the radio. */
 function RowWords({ label, hint }: { label: string; hint?: string }): JSX.Element {
   const { Text } = useCheckoutComponents();
@@ -114,8 +117,9 @@ export function OptionRow({
         // The prototype's `.opt` padding, 12px above and below the label and its
         // hint (FUT-3685 review): a row with a hint is ~62px, and the hint never
         // touches — or is clipped by — the row's border. 48px is the floor, for
-        // a row with no hint.
-        sx={{ display: "flex", alignItems: "center", gap: 1.5, minHeight: (t) => t.spacing(6), py: 1.5, cursor: disabled ? "default" : "pointer" }}
+        // a row with no hint. The radio sits on the TITLE's line, not centred on
+        // title and hint together — a wrapped hint no longer drags it down (FUT-3711).
+        sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, minHeight: (t) => t.spacing(6), py: 1.5, boxSizing: "border-box", cursor: disabled ? "default" : "pointer" }}
       >
         <Radio
           name={name}
@@ -124,7 +128,7 @@ export function OptionRow({
           disabled={disabled}
           onChange={onChoose}
           size="small"
-          sx={{ p: 0, flex: "none" }}
+          sx={{ p: 0, flex: "none", mt: RADIO_ON_TITLE }}
           inputProps={{ "data-testid": `${testId}-radio` } as Record<string, string>}
         />
         <RowWords label={label} hint={hint} />

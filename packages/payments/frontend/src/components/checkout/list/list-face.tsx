@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { Suspense, useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 
 import { cardChain, cardTokenization, handOffMethod } from "../method-capability";
 import { PaymentErrorPanel } from "../payment-error-panel";
@@ -16,7 +16,7 @@ import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
 import { ActionButton, ChargeBar, ListBar } from "./list-bar";
-import { ListTop, TopLoading, gateFields, walletsHeld } from "./list-top";
+import { ListTop, TopAndRows, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
@@ -375,14 +375,14 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const { returnFocus, onCancel } = useCancelWithFocus(charge);
   const shown = charge.phase !== "waiting";
   const facts = barFacts(props, door, reason);
-  const top = <ListTop props={props} held={wallets.held} failure={wallets.failure} onGoogle={wallets.onGoogle} onApple={wallets.onApple} />;
+  const rowsShown = useRef(false);
+  const top = <ListTop props={props} held={wallets.held} failure={wallets.failure} onGoogle={wallets.onGoogle} onApple={wallets.onApple} rowsShown={rowsShown} />;
   return (
     <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* The top and the rows land together (FUT-3711): one boundary, so the top's chunk never pushes a row down. */}
       {shown ? (
-        <Suspense fallback={<TopLoading />}>
+        <TopAndRows rowsShown={rowsShown}>
           <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} top={top} />
-        </Suspense>
+        </TopAndRows>
       ) : null}
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />

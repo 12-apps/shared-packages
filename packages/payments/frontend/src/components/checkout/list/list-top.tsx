@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import type { JSX } from "react";
+import { Suspense, useEffect, useState, type JSX, type ReactNode } from "react";
 
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
@@ -65,6 +65,8 @@ export interface ListTopInput {
   failure: ListChargeFailure | null;
   onGoogle: () => void;
   onApple: () => void;
+  /** Whether the rows under the top have been drawn yet — set by the face once they are. */
+  rowsShown?: { readonly current: boolean };
 }
 
 /** The top's chunk (FUT-3711): `ListTop` draws it; the step preloads it (`TopPart.Preload`). */
@@ -77,9 +79,10 @@ export const TopPart = deferredPart<ListTopInput>(async () => (await import("./l
  * Only the decision to draw it is here; what it draws is a chunk of its own
  * (FUT-3711), so a checkout with neither a CPF to ask nor a wallet ready never
  * parses it. The step starts that chunk as soon as it mounts
- * (`TopPart.Preload`), and while it is still on its way the top SUSPENDS to
- * the boundary the face puts around the top AND the rows (`ChoiceList`): the
- * two land together, so no row is pushed down under a finger. A chunk that
+ * (`TopPart.Preload`). A top drawn with the list's first rows SUSPENDS to the
+ * boundary the face puts around the top AND the rows (`ChoiceList`): the two
+ * land together, so no row is pushed down under a finger. A top that appears
+ * once the rows are drawn suspends on its own and never hides them. A chunk that
  * fails is caught here — the rows stay, nothing is drawn in the top's place,
  * and it is tried once more. What the CPF holds — the pay button, the wallets
  * — is decided in this file (`gateFields`, `walletsHeld`), so the hold is in
@@ -91,12 +94,21 @@ export function ListTop(input: ListTopInput): JSX.Element | null {
   return <TopWithRetry {...input} />;
 }
 
-/** The top behind its own boundary: a failed chunk draws nothing there, then is tried once more. */
+/**
+ * The top behind its own boundary: a failed chunk draws nothing there, then is
+ * tried once more. A top that first appears AFTER the rows are on screen — a
+ * wallet that turned ready, a CPF opened by "Alterar" — also suspends on its
+ * own (nothing drawn while it loads), so it can never hide rows already drawn.
+ * Decided once, when the top mounts: a boundary that came and went would
+ * remount what is under it.
+ */
 function TopWithRetry(input: ListTopInput): JSX.Element {
   const forget = TopPart.useForget();
+  const [late] = useState(() => input.rowsShown?.current === true);
+  const top = <DeferredTop {...input} />;
   return (
     <PartBoundary fallback={null} retry={forget}>
-      <DeferredTop {...input} />
+      {late ? <Suspense fallback={<TopLoading />}>{top}</Suspense> : top}
     </PartBoundary>
   );
 }
@@ -113,6 +125,29 @@ function DeferredTop(input: ListTopInput): JSX.Element {
  * takes no row and no gap). The bar under them is not inside the boundary, so
  * its button keeps its place and its hold.
  */
-export function TopLoading(): JSX.Element {
+function TopLoading(): JSX.Element {
   return <Box data-testid="list-top-loading" sx={{ display: "none" }} />;
+}
+
+/** Marks the rows as drawn once they commit — a top appearing after that suspends on its own. */
+function RowsShown({ into }: { into: { current: boolean } }): null {
+  useEffect(() => {
+    into.current = true;
+  }, [into]);
+  return null;
+}
+
+/**
+ * The top and the rows under ONE boundary (FUT-3711): a top drawn with the
+ * first rows lands with them, so its chunk never pushes a row down. Once the
+ * rows have committed, `rowsShown` says so, and a top that appears later
+ * suspends on its own instead (`TopWithRetry`).
+ */
+export function TopAndRows({ rowsShown, children }: { rowsShown: { current: boolean }; children: ReactNode }): JSX.Element {
+  return (
+    <Suspense fallback={<TopLoading />}>
+      {children}
+      <RowsShown into={rowsShown} />
+    </Suspense>
+  );
 }

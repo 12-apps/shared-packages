@@ -158,12 +158,14 @@ function useDebitReady(list: CheckoutPaymentList): boolean {
 
 /**
  * Starts the top's chunk the moment the list knows it MAY draw a top
- * (FUT-3711): a CPF to ask, a wallet ready, or a CPF on file that "Alterar"
- * can open — so the top is in hand when it is drawn, and never suspends where
- * it would hide or push the rows.
+ * (FUT-3711): a CPF to ask, a wallet the chain head DECLARES (readiness —
+ * pay.js, the device, the host's price — arrives only after the first
+ * render), or a CPF on file that "Alterar" can open. So the top is in hand
+ * when it is drawn.
  */
-function PreloadTop({ state, cap, taxIdOnFile }: { state: ListState; cap: ListCapability; taxIdOnFile: boolean }): JSX.Element | null {
-  if (!state.top && cap.wallets.length === 0 && !taxIdOnFile) return null;
+function PreloadTop({ state, cap, config, taxIdOnFile }: { state: ListState; cap: ListCapability; config: CheckoutProviderConfig | null; taxIdOnFile: boolean }): JSX.Element | null {
+  const declared = (config?.chain?.[0]?.wallets?.length ?? 0) > 0;
+  if (!state.top && cap.wallets.length === 0 && !declared && !taxIdOnFile) return null;
   return <TopPart.Preload />;
 }
 
@@ -234,7 +236,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
       <PixStageProvider stage={pixStage}>
-        <PreloadTop state={state} cap={cap} taxIdOnFile={props.taxIdOnFile} />
+        <PreloadTop state={state} cap={cap} config={config} taxIdOnFile={props.taxIdOnFile} />
         <CartChangedBoundary
           order={c.order}
           creating={c.creating}
