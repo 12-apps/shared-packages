@@ -73,6 +73,14 @@ describe("the paid receipt at a narrow width", () => {
     renderPaid();
     const label = screen.getByText(PT_BR_CHECKOUT_VIEW_COPY.status.receiptEmailLabel).parentElement as HTMLElement;
     expect(getComputedStyle(label).getPropertyValue("flex-shrink")).toBe("0");
+    // A short fact's label may still wrap before its value breaks, as before.
+    const amount = screen.getByText(PT_BR_CHECKOUT_VIEW_COPY.status.amountLabel).parentElement as HTMLElement;
+    expect(getComputedStyle(amount).getPropertyValue("flex-shrink")).not.toBe("0");
+  });
+
+  it("stacks only under a phone's receipt, never a desktop one (~450px of content)", () => {
+    expect(RECEIPT_STACK_BELOW_PX).toBeLessThan(450);
+    expect(RECEIPT_STACK_BELOW_PX).toBeGreaterThan(296);
   });
 
   it("keeps the amount and the order on one row: only the e-mail stacks", () => {
