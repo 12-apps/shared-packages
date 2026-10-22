@@ -199,16 +199,46 @@ export function OutcomeHero({
 }
 
 /** One label/value row of the paid receipt block. */
-function Fact({ label, value, testId }: { label: string; value: string; testId?: string }): JSX.Element {
+/**
+ * Under this many pixels of the receipt's OWN width, a fact whose value is a
+ * long unbroken word (the e-mail) stands under its label instead of beside it
+ * (FUT-3693): side by side at 390px the e-mail broke mid-word and squeezed
+ * "Comprovante enviado para" into three lines. The amount and the order
+ * reference are short and keep their row.
+ */
+export const RECEIPT_STACK_BELOW_PX = 480;
+const STACKED = `@container receipt (max-width: ${RECEIPT_STACK_BELOW_PX - 0.05}px)`;
+
+function Fact({ label, value, testId, long = false }: { label: string; value: string; testId?: string; long?: boolean }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
-    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
-      <Text variant="body" size="sm" as="span" style={{ opacity: 0.75 }}>
-        {label}
-      </Text>
+    <Box
+      data-testid={testId ? `${testId}-row` : undefined}
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        gap: 2,
+        ...(long ? { [STACKED]: { flexDirection: "column", alignItems: "flex-start", gap: 0.25 } } : {}),
+      }}
+    >
+      {/* The label never gives way to the value: it is the shorter, and the one read first. */}
+      <Box component="span" sx={{ flexShrink: 0 }}>
+        <Text variant="body" size="sm" as="span" style={{ opacity: 0.75 }}>
+          {label}
+        </Text>
+      </Box>
       {/* A long e-mail breaks rather than pushing the receipt off a 320px
           phone: an address has no spaces to wrap at. */}
-      <Box sx={{ minWidth: 0, textAlign: "right", overflowWrap: "anywhere" }}>
+      <Box
+        sx={{
+          minWidth: 0,
+          maxWidth: "100%",
+          textAlign: "right",
+          overflowWrap: "anywhere",
+          ...(long ? { [STACKED]: { textAlign: "left" } } : {}),
+        }}
+      >
         <Text
           variant="body"
           size="sm"
@@ -243,6 +273,8 @@ export function PaidFacts({
     <Box
       data-testid="payment-receipt"
       sx={{
+        containerType: "inline-size",
+        containerName: "receipt",
         display: "flex",
         flexDirection: "column",
         gap: 1,
@@ -255,7 +287,7 @@ export function PaidFacts({
       {orderId ? (
         <Fact label={copy.referenceLabel} value={`#${orderReference(orderId)}`} testId="payment-reference" />
       ) : null}
-      {buyerEmail ? <Fact label={copy.receiptEmailLabel} value={buyerEmail} /> : null}
+      {buyerEmail ? <Fact label={copy.receiptEmailLabel} value={buyerEmail} testId="payment-receipt-email" long /> : null}
     </Box>
   );
 }
