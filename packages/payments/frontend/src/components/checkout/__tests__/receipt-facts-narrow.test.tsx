@@ -39,7 +39,7 @@ function renderPaid(): void {
       status="PAID"
       totalLabel="R$ 6,00"
       orderId="0d623625-aaaa-bbbb-cccc-000000000000"
-      buyerEmail="e4card390-um-endereco-bem-comprido@futurepay.test"
+      buyerEmail="e4card390-um-endereco-bem-comprido@loja-exemplo.test"
       onBackToMenu={vi.fn()}
     />,
   );
@@ -60,7 +60,7 @@ describe("the paid receipt at a narrow width", () => {
     const value = screen.getByTestId("payment-receipt-email").parentElement as HTMLElement;
     const query = `@containerreceipt(max-width:${RECEIPT_STACK_BELOW_PX - 0.05}px)`;
     // Emotion prefixes the flex declarations; the unprefixed ones are read inside the rule.
-    const stacked = css.match(new RegExp(`${query.replace(/[().]/g, "\\$&")}\\{\\.${emotionClass(row)}\\{([^}]*)\\}`))?.[1] ?? "";
+    const stacked = css.match(new RegExp(`${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\{\\.${emotionClass(row)}\\{([^}]*)\\}`))?.[1] ?? "";
     expect(stacked).toMatch(/(^|;)flex-direction:column;/);
     expect(stacked).toMatch(/(^|;)align-items:flex-start;/);
     expect(css).toContain(`${query}{.${emotionClass(value)}{text-align:left;}}`);
