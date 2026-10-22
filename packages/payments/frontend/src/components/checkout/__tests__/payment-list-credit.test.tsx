@@ -174,10 +174,10 @@ describe("the amount due on the bar", () => {
     await waitFor(() => expect(payButton().textContent).toBe("Enviar pedidoR$ 27,00"));
   });
 
-  it("keeps the cart's amount while nothing is chosen", async () => {
+  it("names no amount while nothing is chosen: a held button charges nothing", async () => {
     renderList({ config: onPageStore(), client: stubClient(), list: { amountDueLabel: "R$ 22,00" } });
     await screen.findByTestId("list-option-CARD");
-    expect(payButton().textContent).toBe("Escolha como pagarR$ 27,00");
+    expect(payButton().textContent).toBe("Escolha como pagar");
   });
 
   it("names the amount due on the Pix face, not the order's total", async () => {

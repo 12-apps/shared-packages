@@ -82,7 +82,7 @@ describe("what comes chosen", () => {
     expect(radio("list-option-PIX").checked).toBe(false);
     expect(radio("list-option-CARD").checked).toBe(false);
     expect(payButton().disabled).toBe(true);
-    expect(payButton().textContent).toBe("Escolha como pagarR$ 27,00");
+    expect(payButton().textContent).toBe("Escolha como pagar");
     // The button already says it: the helper does not repeat it (U4), the live region still does.
     expect(reason()).toBeNull();
     expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");

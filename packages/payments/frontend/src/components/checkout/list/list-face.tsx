@@ -168,14 +168,15 @@ function chargingText(props: ListFaceProps): string {
   return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
 }
 
-/** The verb, the amount and the busy state of the button, for what is chosen. */
-function buttonFacts(props: ListFaceProps): { label: string; total: string; busy: boolean } {
+/** The verb, the amount (none while nothing is chosen) and the busy state of the button, for what is chosen. */
+function buttonFacts(props: ListFaceProps): { label: string; total: string | null; busy: boolean } {
   const { list, state } = props;
   const door = chosenDoor(props);
   const online = state.choice?.kind === "online";
   return {
     label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider, coveredByHost(list)),
-    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : props.total,
+    // A button held with nothing chosen charges nothing: no amount, so its words get the whole width.
+    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : state.choice ? props.total : null,
     busy: inFlight(props),
   };
 }

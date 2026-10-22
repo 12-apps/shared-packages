@@ -12,10 +12,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { repeatsLabel } from "../list/list-bar";
-import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, listFlow, onPageStore, renderList, stubClient } from "./list-harness";
 
 const payButton = (): HTMLButtonElement => screen.getByTestId("list-pay") as HTMLButtonElement;
 const helper = (): string | null => screen.queryByTestId("list-blocked-reason")?.textContent ?? null;
@@ -47,7 +47,7 @@ describe("a reason that repeats the button's label", () => {
     await screen.findByTestId("payment-list");
 
     expect(payButton().disabled).toBe(true);
-    expect(payButton().textContent).toBe("Escolha como pagarR$ 27,00");
+    expect(payButton().textContent).toBe("Escolha como pagar");
     expect(helper()).toBeNull();
     expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");
   });
@@ -63,7 +63,7 @@ describe("a reason that repeats the button's label", () => {
     expect(helper()).toBe("Escolha o horário no passo 2.");
   });
 
-  it("is dropped for a host hold whose reason is its action", async () => {
+  it("is dropped for a host hold whose reason is its action, while the label is whole", async () => {
     renderList({
       config: onPageStore(),
       client: stubClient([SAVED_VISA]),
@@ -73,6 +73,66 @@ describe("a reason that repeats the button's label", () => {
 
     expect(helper()).toBeNull();
     expect(screen.getByTestId("list-bar-live").textContent).toBe("Confirme o endereço.");
+  });
+});
+
+describe("a label too wide for the button", () => {
+  /** Lay the label's span out 200px wide in a 100px box, whatever jsdom says. */
+  function overflowLabels(): void {
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("title") ? 200 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("title") ? 100 : 0;
+    });
+  }
+
+  it("is completed under the button, even when the reason only repeats it", async () => {
+    overflowLabels();
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço." } },
+    });
+
+    await waitFor(() => expect(helper()).toBe("Confirme o endereço."));
+  });
+
+  it("is completed under the button with nothing chosen, if it is ever cut", async () => {
+    overflowLabels();
+    renderList({ config: onPageStore(), client: stubClient([]) });
+
+    await waitFor(() => expect(helper()).toBe("Escolha como pagar."));
+  });
+});
+
+describe("the Pix face", () => {
+  it("does not repeat a hold's action as its reason", async () => {
+    const host = { config: onPageStore(), client: stubClient([]) };
+    const view = renderList(host);
+    fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    fireEvent.click(payButton());
+    await screen.findByTestId("list-pix");
+    expect(helper()).toBeNull();
+
+    view.rerender(listFlow({ ...host, list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço." } } }));
+    await waitFor(() => expect(payButton().textContent).toBe("Confirme o endereço"));
+    expect(helper()).toBeNull();
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Confirme o endereço.");
+
+    view.rerender(listFlow({ ...host, list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } } }));
+    await waitFor(() => expect(helper()).toBe("Confirme o endereço no passo 3."));
+  });
+});
+
+describe("the button held with nothing chosen", () => {
+  it("names no amount: it charges nothing, and its words take the whole width", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    expect(payButton().disabled).toBe(true);
+    expect(payButton().textContent).toBe("Escolha como pagar");
   });
 });
 
