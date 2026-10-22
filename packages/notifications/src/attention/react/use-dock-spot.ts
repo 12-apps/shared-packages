@@ -12,7 +12,7 @@ const FOLDED_REST: AttentionDockPosition = TAB_REST;
 
 /**
  * Where the dock sits and what a drag does with it. Unfolded hosts keep the
- * device's remembered spot; a folded host remembers the TAB's spot instead —
+ * device's remembered spot; a folded host remembers the TAB's own spot —
  * the button opens there — and keeps a drag of the open button for THIS
  * opening only, so folding back always lands where the tab is.
  */
@@ -47,7 +47,7 @@ export function useDockSpot(
       onMoveTab: () => undefined,
     };
   }
-  const tab = preferences.dock ?? FOLDED_REST;
+  const tab = preferences.tab ?? FOLDED_REST;
   return {
     position: spot,
     onMove: setSpot,
@@ -57,6 +57,6 @@ export function useDockSpot(
     // Halfway down, the list opens below; the "−" goes with it.
     high: (spot ?? tab).y <= 0.5,
     tab,
-    onMoveTab: (dock) => store.write({ dock }),
+    onMoveTab: (moved) => store.write({ tab: moved }),
   };
 }

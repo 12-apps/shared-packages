@@ -2,9 +2,11 @@
  * The folded button's tab: a half disc flush with the screen's edge, halfway
  * down the right one until the reader drags it (`./attention-collapsible`).
  *
- * A press that travels is a drag: the tab follows the pointer as a whole pill,
- * and on release snaps flush with the nearer side at the height it was let go.
- * A press that does not is a tap, and opens the button.
+ * A press that travels is a drag: the tab follows the pointer as a round
+ * bubble, anywhere on the screen. Let go within {@link SNAP_PX} of a side, it
+ * goes flush with that side as a half disc again; let go anywhere else, it
+ * stays there, a bubble. A press that does not travel is a tap, and opens the
+ * button.
  */
 import type { JSX } from 'react';
 
@@ -15,7 +17,7 @@ import type { AttentionPulse, AttentionSeverity } from '../core';
 
 import { HALO_SX, halos, severityFill, severityInk } from './attention-button';
 import type { AttentionDockPosition } from './preferences';
-import { useDockDrag, type DockFit } from './use-dock-drag';
+import { useDockDrag, type DockDrop, type DockFit } from './use-dock-drag';
 
 /**
  * How far the half disc reaches into the page: half its height. Wide enough to
@@ -25,12 +27,38 @@ const TAB_WIDTH_PX = 28;
 const TAB_HEIGHT_PX = TAB_WIDTH_PX * 2;
 
 /** Flush with the edges it is dragged against; its `y` is a share of the screen less its own height. */
-const TAB_FIT: DockFit = { margin: 0, span: TAB_HEIGHT_PX };
+const TAB_FIT: DockFit = { margin: 0, span: TAB_HEIGHT_PX, captureOnPress: true };
+
+/** The tab away from an edge: a round bubble, big enough for two digits and a thumb. */
+const BUBBLE_PX = 44;
+
+/** Let go this close to a side, the tab goes flush with it rather than floating. */
+const SNAP_PX = 24;
 
 /** Where a tab nobody dragged rests: halfway down the right edge. */
 export const TAB_REST: AttentionDockPosition = { side: 'right', y: 0.5 };
 
 const STAY = (): void => undefined;
+
+const clampShare = (value: number): number => Math.min(1, Math.max(0, value));
+
+/**
+ * Where a drag let the tab go: flush with a side when it was dropped near one,
+ * else the bubble's spot, its top-left as a share of the screen less its size.
+ * Measured from the bubble's centre, which is what the pointer held.
+ */
+export function tabSpotFor(edge: AttentionDockPosition, drop: DockDrop): AttentionDockPosition {
+  const left = drop.left + drop.width / 2 - BUBBLE_PX / 2;
+  const top = drop.top + drop.height / 2 - BUBBLE_PX / 2;
+  if (left < SNAP_PX || left + BUBBLE_PX > window.innerWidth - SNAP_PX) {
+    return { side: edge.side, y: clampShare(top / Math.max(1, window.innerHeight - TAB_HEIGHT_PX)) };
+  }
+  return {
+    side: edge.side,
+    y: clampShare(top / Math.max(1, window.innerHeight - BUBBLE_PX)),
+    x: clampShare(left / Math.max(1, window.innerWidth - BUBBLE_PX)),
+  };
+}
 
 /** The most the tab prints: two digits; past it, "99+" (the label says the number). */
 const TAB_MAX = 99;
@@ -57,7 +85,10 @@ export interface AttentionTabProps {
   readonly pulse: AttentionPulse;
   readonly label: string;
   readonly zIndex: number;
-  /** Where it rests: a side, and a height as a share of the screen — halfway down the right edge by default. */
+  /**
+   * Where it rests: a side and a height as a share of the screen — halfway
+   * down the right edge by default — and, away from an edge, how far across.
+   */
   readonly spot?: AttentionDockPosition;
   /** The host's resting inset over its bottom bar (a CSS length): a spot never sits on that bar. */
   readonly bottom?: string;
@@ -72,9 +103,10 @@ function halfDisc(side: 'left' | 'right'): string {
 }
 
 /**
- * Its spot on the edge, `y` of the way down — in the DYNAMIC viewport, which a
- * drag measured (`innerHeight`), with `100vh` for engines without `dvh` — and
- * never lower than the host's inset, so it cannot sit on a bottom bar.
+ * Its spot, `y` of the way down (and `x` across, away from an edge) — in the
+ * DYNAMIC viewport, which a drag measured (`innerHeight`), with `100vh` for
+ * engines without `dvh` — and never lower than the host's inset, so it cannot
+ * sit on a bottom bar.
  */
 function tabPlacement(
   live: { readonly left: number; readonly top: number } | null,
@@ -82,22 +114,30 @@ function tabPlacement(
   bottom: string,
 ): Record<string, number | string | Record<string, string>> {
   if (live !== null) return { left: live.left, top: live.top };
+  const size = spot.x === undefined ? TAB_HEIGHT_PX : BUBBLE_PX;
   const top = (vh: string): string =>
-    `max(0px, min(calc((${vh} - ${TAB_HEIGHT_PX}px) * ${spot.y}), calc(${vh} - ${bottom} - ${TAB_HEIGHT_PX}px)))`;
-  return { [spot.side]: 0, top: top('100vh'), '@supports (height: 100dvh)': { top: top('100dvh') } };
+    `max(0px, min(calc((${vh} - ${size}px) * ${spot.y}), calc(${vh} - ${bottom} - ${size}px)))`;
+  const across: Record<string, number | string> =
+    spot.x === undefined ? { [spot.side]: 0 } : { left: `calc((100vw - ${BUBBLE_PX}px) * ${spot.x})` };
+  return { ...across, top: top('100vh'), '@supports (height: 100dvh)': { top: top('100dvh') } };
 }
 
-/** What its side and a drag change: its corners, the padding off its edge, its open side, its shadow. */
-function tabLook(side: 'left' | 'right', dragging: boolean, quiet: boolean): Record<string, unknown> {
-  if (dragging) {
+/** What its side, a drag and floating change: its size, corners, the padding off its edge, its shadow. */
+function tabLook(side: 'left' | 'right', round: boolean, dragging: boolean, quiet: boolean): Record<string, unknown> {
+  if (round) {
     return {
-      borderRadius: `${TAB_WIDTH_PX}px`,
-      boxShadow: (theme: Theme) => `0 12px 18px ${alpha(theme.palette.text.primary, 0.3)}`,
-      cursor: 'grabbing',
+      width: BUBBLE_PX,
+      height: BUBBLE_PX,
+      borderRadius: '50%',
+      boxShadow: (theme: Theme) =>
+        dragging ? `0 12px 18px ${alpha(theme.palette.text.primary, 0.3)}` : `0 2px 8px ${alpha(theme.palette.text.primary, 0.25)}`,
+      cursor: dragging ? 'grabbing' : 'pointer',
     };
   }
   const right = side === 'right';
   return {
+    width: TAB_WIDTH_PX,
+    height: TAB_HEIGHT_PX,
     borderRadius: halfDisc(side),
     // The count sits a little off the edge it is flush with.
     [right ? 'pl' : 'pr']: '3px',
@@ -108,17 +148,38 @@ function tabLook(side: 'left' | 'right', dragging: boolean, quiet: boolean): Rec
   };
 }
 
-/** The halos it pulses with, growing from the edge into the page as the disc's grow from its centre. */
+/** Its fill, ink and type: the worst severity's, or the quiet surface when nothing waits. */
+function tabPaint(worst: AttentionSeverity | null, count: number): Record<string, unknown> {
+  return {
+    // The quiet fill is a see-through token, so it is laid over the page's
+    // own paper: the same colour on that paper, and nothing under it shows.
+    bgcolor: 'background.default',
+    backgroundImage: (theme: Theme) => `linear-gradient(${tabFill(theme, worst)}, ${tabFill(theme, worst)})`,
+    // A bare tab is the quiet surface on the page's own paper: its edge is
+    // what finds it, so it keeps one even with nothing waiting.
+    border: (theme: Theme) => (worst === null ? `1px solid ${theme.palette.text.secondary}` : 0),
+    color: (theme: Theme) => tabInk(theme, worst),
+    font: 'inherit',
+    fontSize: count > TAB_MAX ? 10 : 13,
+    fontWeight: 700,
+    lineHeight: 1,
+    letterSpacing: '-0.04em',
+    whiteSpace: 'nowrap',
+  };
+}
+
+/** The halos it pulses with: from the edge into the page, or from a bubble's centre as the disc's do. */
 function TabHalos({
   pulse,
   worst,
   corners,
-  side,
+  origin,
 }: {
   readonly pulse: AttentionPulse;
   readonly worst: AttentionSeverity;
   readonly corners: string;
-  readonly side: 'left' | 'right';
+  /** Where they grow from: the edge it is flush with, or its centre as a bubble. */
+  readonly origin: string;
 }): JSX.Element {
   return (
     <>
@@ -130,7 +191,7 @@ function TabHalos({
           sx={{
             ...HALO_SX,
             borderRadius: corners,
-            transformOrigin: `${side} center`,
+            transformOrigin: origin,
             bgcolor: (theme: Theme) => severityFill(theme, worst),
             animation: halo.animation,
           }}
@@ -142,7 +203,7 @@ function TabHalos({
 
 /**
  * The folded button: flush with an edge, halfway down the right one until the
- * reader drags it. A press that travels is a drag and opens nothing.
+ * reader drags it — anywhere. A press that travels is a drag and opens nothing.
  */
 export function AttentionTab({
   count,
@@ -155,9 +216,13 @@ export function AttentionTab({
   onMove,
   onExpand,
 }: AttentionTabProps): JSX.Element {
-  const { live, handlers } = useDockDrag(onMove ?? STAY, TAB_FIT);
-  // Mid-drag it is off the edge, so it is a whole pill, not half of one.
-  const look = tabLook(spot.side, live !== null, worst === null);
+  const { live, handlers } = useDockDrag(
+    (edge, drop) => (onMove ?? STAY)(tabSpotFor(edge, drop)),
+    TAB_FIT,
+  );
+  // Mid-drag, or let go away from an edge, it is a whole bubble, not half of one.
+  const round = live !== null || spot.x !== undefined;
+  const look = tabLook(spot.side, round, live !== null, worst === null);
   return (
     <Box
       component="button"
@@ -169,6 +234,8 @@ export function AttentionTab({
       data-count={count}
       data-pulse={pulse}
       data-side={spot.side}
+      // Away from every edge: it takes no strip of either side.
+      data-free={spot.x === undefined ? undefined : ''}
       // It floats over the page by design, flush with an edge: an
       // overlay that takes no room (ADR "an overlay takes no room"), which a
       // screen's checks read through this attribute — so it is drawn OPAQUE.
@@ -179,25 +246,9 @@ export function AttentionTab({
         position: 'fixed',
         ...tabPlacement(live, spot, bottom),
         zIndex,
-        width: TAB_WIDTH_PX,
-        height: TAB_HEIGHT_PX,
         p: 0,
-        // The quiet fill is a see-through token, so it is laid over the page's
-        // own paper: the same colour on that paper, and nothing under it shows.
-        bgcolor: 'background.default',
-        backgroundImage: (theme: Theme) => `linear-gradient(${tabFill(theme, worst)}, ${tabFill(theme, worst)})`,
-        // A bare tab is the quiet surface on the page's own paper: its edge is
-        // what finds it, so it keeps one even with nothing waiting.
-        border: (theme: Theme) => (worst === null ? `1px solid ${theme.palette.text.secondary}` : 0),
-        color: (theme: Theme) => tabInk(theme, worst),
-        font: 'inherit',
-        fontSize: count > TAB_MAX ? 10 : 13,
-        fontWeight: 700,
-        lineHeight: 1,
-        letterSpacing: '-0.04em',
-        whiteSpace: 'nowrap',
-        touchAction: 'none',
-        userSelect: 'none',
+        ...tabPaint(worst, count),
+        ...(onMove === undefined ? {} : { touchAction: 'none', userSelect: 'none' }),
         ...look,
         '&:focus-visible': {
           outline: 2,
@@ -208,7 +259,12 @@ export function AttentionTab({
       }}
     >
       {worst !== null && (
-        <TabHalos pulse={pulse} worst={worst} corners={look.borderRadius as string} side={spot.side} />
+        <TabHalos
+          pulse={pulse}
+          worst={worst}
+          corners={look.borderRadius as string}
+          origin={round ? 'center' : `${spot.side} center`}
+        />
       )}
       <Box component="span" sx={{ position: 'relative' }}>
         {tabCount(count)}

@@ -18,6 +18,12 @@ export interface AttentionDockPosition {
   readonly side: 'left' | 'right';
   /** 0 = the top of the screen, 1 = the bottom. */
   readonly y: number;
+  /**
+   * Set only where the reader let the folded tab go AWAY from an edge: how far
+   * across, as a share of the screen (0 = the left edge, 1 = the right). Absent,
+   * it is flush with `side`.
+   */
+  readonly x?: number;
 }
 
 export interface AttentionPreferences {
@@ -26,6 +32,12 @@ export interface AttentionPreferences {
   readonly push: AttentionChannelLevel;
   /** `null` until the reader drags the button somewhere. */
   readonly dock: AttentionDockPosition | null;
+  /**
+   * Where the reader dragged the FOLDED tab — its own key, so a spot the open
+   * button was dragged to before the tab could move is never read as the tab's.
+   * Absent or `null` until the tab is dragged.
+   */
+  readonly tab?: AttentionDockPosition | null;
 }
 
 export interface AttentionPreferencesStore {
@@ -53,9 +65,15 @@ function levelOr(value: unknown, fallback: AttentionChannelLevel): AttentionChan
 
 function dockOr(value: unknown): AttentionDockPosition | null {
   if (typeof value !== 'object' || value === null) return null;
-  const { side, y } = value as { side?: unknown; y?: unknown };
+  const { side, y, x } = value as { side?: unknown; y?: unknown; x?: unknown };
   if ((side !== 'left' && side !== 'right') || typeof y !== 'number' || !Number.isFinite(y)) return null;
-  return { side, y: Math.min(1, Math.max(0, y)) };
+  const share = (n: number): number => Math.min(1, Math.max(0, n));
+  return typeof x === 'number' && Number.isFinite(x) ? { side, y: share(y), x: share(x) } : { side, y: share(y) };
+}
+
+function tabOr(value: unknown): { readonly tab?: AttentionDockPosition } {
+  const tab = dockOr(value);
+  return tab === null ? {} : { tab };
 }
 
 function parse(raw: string | null, defaults: AttentionPreferences): AttentionPreferences {
@@ -67,6 +85,8 @@ function parse(raw: string | null, defaults: AttentionPreferences): AttentionPre
       vibration: levelOr(value.vibration, defaults.vibration),
       push: levelOr(value.push, defaults.push),
       dock: dockOr(value.dock),
+      // Only once the tab was dragged: a device that never did reads what it always read.
+      ...tabOr(value.tab),
     };
   } catch {
     return defaults;
@@ -88,7 +108,7 @@ function storage(): Storage | null {
  */
 export function createAttentionPreferences(options: {
   readonly storageKey: string;
-  readonly defaults?: Partial<Omit<AttentionPreferences, 'dock'>>;
+  readonly defaults?: Partial<Omit<AttentionPreferences, 'dock' | 'tab'>>;
 }): AttentionPreferencesStore {
   const defaults: AttentionPreferences = {
     ...FALLBACK,

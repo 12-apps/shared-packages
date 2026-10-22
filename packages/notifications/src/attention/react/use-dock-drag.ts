@@ -51,6 +51,12 @@ interface DockDrag {
 export interface DockFit {
   readonly margin: number;
   readonly span: number;
+  /**
+   * Take the pointer on the press itself rather than once it travels: for a
+   * thing too thin to keep a mouse over it for six pixels (the folded tab). A
+   * box with buttons INSIDE it must not, or their taps land on the box.
+   */
+  readonly captureOnPress?: boolean;
 }
 
 /** The dock's own fit: 8px from any edge, its 80px resting span. */
@@ -86,6 +92,15 @@ function pressAt(event: PointerEvent<HTMLElement>): Drag {
   };
 }
 
+/** Every later move of this pointer comes to us, wherever it goes. */
+function capture(event: PointerEvent<HTMLElement>): void {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // Older engines: the move still tracks while the pointer stays over us.
+  }
+}
+
 /** Past the slop yet? On the first move that is, the drag takes the pointer. */
 function crossedThreshold(event: PointerEvent<HTMLElement>, current: Drag): boolean {
   if (current.moved) return true;
@@ -93,17 +108,21 @@ function crossedThreshold(event: PointerEvent<HTMLElement>, current: Drag): bool
     return false;
   }
   current.moved = true;
-  try {
-    event.currentTarget.setPointerCapture(event.pointerId);
-  } catch {
-    // Older engines: the move still tracks while the pointer stays over us.
-  }
+  capture(event);
   return true;
 }
 
+/** Where a drag let go of the box, in px: its top-left corner, and the size it was pressed at. */
+export interface DockDrop {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export function useDockDrag(
-  onMove: (position: AttentionDockPosition) => void,
-  { margin, span }: DockFit = DOCK_FIT,
+  onMove: (position: AttentionDockPosition, drop: DockDrop) => void,
+  { margin, span, captureOnPress = false }: DockFit = DOCK_FIT,
 ): DockDrag {
   const drag = useRef<Drag | null>(null);
   const swallowClick = useRef(false);
@@ -128,6 +147,7 @@ export function useDockDrag(
         if (event.isPrimary === false || event.button !== 0) return;
         latest.current = null;
         drag.current = pressAt(event);
+        if (captureOnPress) capture(event);
       },
       onPointerMove(event) {
         const current = drag.current;
@@ -148,15 +168,19 @@ export function useDockDrag(
           swallowClick.current = false;
         }, 0);
         const y = (at.top - margin) / Math.max(1, window.innerHeight - span);
-        onMove({
-          side: at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right',
-          y: clamp(y, 0, 1),
-        });
+        onMove(
+          {
+            side: at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right',
+            y: clamp(y, 0, 1),
+          },
+          { left: at.left, top: at.top, width: current.width, height: current.height },
+        );
       },
       onPointerCancel: reset,
       onPointerLeave() {
         // Let go outside before it became a drag: nothing is being held any more.
-        if (drag.current !== null && !drag.current.moved) drag.current = null;
+        // A press captured on the pointer is still held wherever the pointer is.
+        if (drag.current !== null && !drag.current.moved && !captureOnPress) drag.current = null;
       },
       onClickCapture(event) {
         if (!swallowClick.current) return;

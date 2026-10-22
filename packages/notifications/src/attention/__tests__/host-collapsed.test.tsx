@@ -250,9 +250,50 @@ describe('the drag of the tab itself', () => {
     // Dragged, not tapped: still folded.
     expect(screen.queryAllByTestId('attention-dock')).toHaveLength(0);
     expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('left');
-    const dock = mounted.preferences.read().dock;
-    expect(dock?.side).toBe('left');
-    expect(dock?.y).toBeLessThan(0.5);
+    const spot = mounted.preferences.read().tab;
+    expect(spot?.side).toBe('left');
+    expect(spot?.y).toBeLessThan(0.5);
+    expect(spot?.x).toBeUndefined();
+    // Its own key: the open button's remembered spot is left alone.
+    expect(mounted.preferences.read().dock).toBeNull();
+  });
+
+  it('stays where it is let go away from every edge, as a bubble', () => {
+    const mounted = host([bell('12', 2)]);
+    dragTab(200, 600);
+    expect(screen.getByTestId('attention-tab').hasAttribute('data-free')).toBe(true);
+    expect(screen.queryAllByTestId('attention-dock')).toHaveLength(0);
+    const spot = mounted.preferences.read().tab;
+    expect(spot?.x).toBeGreaterThan(0.3);
+    expect(spot?.x).toBeLessThan(0.7);
+    expect(spot?.y).toBeGreaterThan(0.5);
+  });
+
+  it('goes flush with a side again once dropped near it', () => {
+    host([bell('12', 2)]);
+    dragTab(200, 600);
+    dragTab(390, 300);
+    const flush = screen.getByTestId('attention-tab');
+    expect(flush.hasAttribute('data-free')).toBe(false);
+    expect(flush.getAttribute('data-side')).toBe('right');
+  });
+
+  it('folds back to the bubble it was opened from', () => {
+    host([bell('12', 2)]);
+    dragTab(200, 600);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    expect(screen.getByTestId('attention-button')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    expect(screen.getByTestId('attention-tab').hasAttribute('data-free')).toBe(true);
+  });
+
+  it('never reads a spot the open button was dragged to before the tab could move', () => {
+    window.localStorage.setItem(
+      `attention-folded:${expect.getState().currentTestName ?? ''}`,
+      JSON.stringify({ dock: { side: 'left', y: 1 } }),
+    );
+    host([bell('12', 2)]);
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('right');
   });
 
   it('drags while nothing waits too', () => {
