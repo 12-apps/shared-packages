@@ -139,7 +139,15 @@ function tabPlacement(
 }
 
 /** What its side, a drag and floating change: its size, corners, the padding off its edge, its shadow. */
-function tabLook(side: 'left' | 'right', round: boolean, dragging: boolean, quiet: boolean): Record<string, unknown> {
+function tabLook(
+  side: 'left' | 'right',
+  round: boolean,
+  dragging: boolean,
+  quiet: boolean,
+  movable: boolean,
+): Record<string, unknown> {
+  // It moves: the hand says so before the press (the approved prototype's cursor) — only when it can.
+  const rest = movable ? 'grab' : 'pointer';
   if (round) {
     return {
       width: BUBBLE_PX,
@@ -147,7 +155,7 @@ function tabLook(side: 'left' | 'right', round: boolean, dragging: boolean, quie
       borderRadius: '50%',
       boxShadow: (theme: Theme) =>
         dragging ? `0 12px 18px ${alpha(theme.palette.text.primary, 0.3)}` : `0 2px 8px ${alpha(theme.palette.text.primary, 0.25)}`,
-      cursor: dragging ? 'grabbing' : 'grab',
+      cursor: dragging ? 'grabbing' : rest,
     };
   }
   const right = side === 'right';
@@ -160,8 +168,7 @@ function tabLook(side: 'left' | 'right', round: boolean, dragging: boolean, quie
     // A bare tab's edge stops at the screen's edge it is flush with.
     ...(quiet ? { [right ? 'borderRight' : 'borderLeft']: 0 } : {}),
     boxShadow: (theme: Theme) => `${right ? -2 : 2}px 0 6px ${alpha(theme.palette.text.primary, 0.22)}`,
-    // It moves: the hand says so before the press (the approved prototype's cursor).
-    cursor: 'grab',
+    cursor: rest,
   };
 }
 
@@ -239,7 +246,7 @@ export function AttentionTab({
   );
   // Mid-drag, or let go away from an edge, it is a whole bubble, not half of one.
   const round = live !== null || spot.x !== undefined;
-  const look = tabLook(spot.side, round, live !== null, worst === null);
+  const look = tabLook(spot.side, round, live !== null, worst === null, onMove !== undefined);
   return (
     <Box
       component="button"

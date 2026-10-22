@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AttentionItem } from '../core';
-import { AttentionHost, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
+import { AttentionHost, AttentionTab, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
 import { EMPTY_NOTE_MS } from '../react/attention-collapsible';
 
 import { MESSAGES, NOW, bell, registry, sample, views } from './attention-fixture';
@@ -238,6 +238,15 @@ function dragTab(x: number, y: number): void {
 
 describe('the drag of the tab itself', () => {
   beforeEach(pointerScreen);
+
+  it('shows a grab hand only where the tab can move', () => {
+    host([bell('12', 2)]);
+    expect(getComputedStyle(screen.getByTestId('attention-tab')).cursor).toBe('grab');
+    cleanup();
+    // Mounted alone without onMove it cannot be dragged: a plain button's hand.
+    render(<AttentionTab count={0} worst={null} pulse="still" label="Open" zIndex={1} onExpand={() => undefined} />);
+    expect(getComputedStyle(screen.getByTestId('attention-tab')).cursor).toBe('pointer');
+  });
 
   it('rests on the right edge until it is dragged', () => {
     host([bell('12', 2)]);
