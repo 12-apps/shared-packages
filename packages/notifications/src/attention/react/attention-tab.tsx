@@ -103,6 +103,22 @@ function halfDisc(side: 'left' | 'right'): string {
 }
 
 /**
+ * Mid-drag it is a bubble centred where the pressed shape's centre is — the
+ * centre {@link tabSpotFor} measures — and kept on the screen.
+ */
+function liveBubble(
+  live: { readonly left: number; readonly top: number },
+  spot: AttentionDockPosition,
+): { readonly left: number; readonly top: number } {
+  const [width, height] = spot.x === undefined ? [TAB_WIDTH_PX, TAB_HEIGHT_PX] : [BUBBLE_PX, BUBBLE_PX];
+  const fit = (value: number, room: number): number => Math.min(Math.max(0, value), Math.max(0, room - BUBBLE_PX));
+  return {
+    left: fit(live.left + (width - BUBBLE_PX) / 2, window.innerWidth),
+    top: fit(live.top + (height - BUBBLE_PX) / 2, window.innerHeight),
+  };
+}
+
+/**
  * Its spot, `y` of the way down (and `x` across, away from an edge) — in the
  * DYNAMIC viewport, which a drag measured (`innerHeight`), with `100vh` for
  * engines without `dvh` — and never lower than the host's inset, so it cannot
@@ -113,7 +129,7 @@ function tabPlacement(
   spot: AttentionDockPosition,
   bottom: string,
 ): Record<string, number | string | Record<string, string>> {
-  if (live !== null) return { left: live.left, top: live.top };
+  if (live !== null) return liveBubble(live, spot);
   const size = spot.x === undefined ? TAB_HEIGHT_PX : BUBBLE_PX;
   const top = (vh: string): string =>
     `max(0px, min(calc((${vh} - ${size}px) * ${spot.y}), calc(${vh} - ${bottom} - ${size}px)))`;
