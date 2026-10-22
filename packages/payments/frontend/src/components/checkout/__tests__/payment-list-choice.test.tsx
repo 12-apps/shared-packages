@@ -74,7 +74,7 @@ describe("what comes chosen", () => {
     expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("false");
   });
 
-  it("chooses nothing for a buyer with no saved card, and says so under a held button", async () => {
+  it("chooses nothing for a buyer with no saved card, and says so once, on the held button", async () => {
     const client = stubClient([]);
     renderList({ config: onPageStore(), client });
     await waitFor(() => expect(client.listInstruments).toHaveBeenCalled());
@@ -82,8 +82,10 @@ describe("what comes chosen", () => {
     expect(radio("list-option-PIX").checked).toBe(false);
     expect(radio("list-option-CARD").checked).toBe(false);
     expect(payButton().disabled).toBe(true);
-    expect(payButton().textContent).toBe("Escolha como pagarR$ 27,00");
-    expect(reason()).toBe("Escolha como pagar.");
+    expect(payButton().textContent).toBe("Escolha como pagar");
+    // The button already says it: the helper does not repeat it (U4), the live region still does.
+    expect(reason()).toBeNull();
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");
   });
 
   it("never chooses a store's ONLY method for the buyer, and so raises nothing", async () => {

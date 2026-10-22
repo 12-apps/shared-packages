@@ -1,0 +1,185 @@
+// @vitest-environment jsdom
+/**
+ * FUT-3692 (the origin host's UI reviews of its mercado and mesa) — the bar's label.
+ *
+ *  - U4: with nothing chosen the button reads "Escolha como pagar" and the
+ *    helper under it said "Escolha como pagar." — the same words twice. A held
+ *    reason that is the button's own label is announced, not drawn again; one
+ *    that says something else is still drawn.
+ *  - U1: at 320px the label wrapped onto two lines. It never wraps (it is cut
+ *    with an ellipsis, its full text in the title) and carries no letter-spacing
+ *    of its own.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+
+import { repeatsLabel } from "../list/list-bar";
+import { SAVED_VISA, listFlow, onPageStore, renderList, stubClient } from "./list-harness";
+
+const payButton = (): HTMLButtonElement => screen.getByTestId("list-pay") as HTMLButtonElement;
+const helper = (): string | null => screen.queryByTestId("list-blocked-reason")?.textContent ?? null;
+
+/** The label's own span: the first child of the button's row. */
+function labelOf(button: HTMLElement): HTMLElement {
+  const label = button.querySelector<HTMLElement>("span[title]");
+  if (!label) throw new Error("the button has no label span");
+  return label;
+}
+
+/** The flow's frame measures this wide. */
+function frameWidth(width: number): void {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width, height: 800, top: 0, left: 0, right: width, bottom: 800, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+}
+
+beforeEach(() => window.sessionStorage.clear());
+afterEach(() => {
+  vi.restoreAllMocks();
+  cleanup();
+});
+
+describe("a reason that repeats the button's label", () => {
+  it("is recognised through case and closing punctuation, and only then", () => {
+    expect(repeatsLabel("Escolha como pagar.", "Escolha como pagar")).toBe(true);
+    expect(repeatsLabel("  escolha como pagar ", "Escolha como pagar")).toBe(true);
+    expect(repeatsLabel("Escolha o cartão.", "Escolha como pagar")).toBe(false);
+    expect(repeatsLabel(null, "Escolha como pagar")).toBe(false);
+    expect(repeatsLabel("Escolha como pagar.", undefined)).toBe(false);
+  });
+
+  it("is said once with nothing chosen: on the button, and to a screen reader", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    expect(payButton().disabled).toBe(true);
+    expect(payButton().textContent).toBe("Escolha como pagar");
+    expect(helper()).toBeNull();
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");
+  });
+
+  it("is still drawn when it says something the button does not", async () => {
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { hold: { action: "Escolha o horário", reason: "Escolha o horário no passo 2." } },
+    });
+    await waitFor(() => expect(payButton().textContent).toBe("Escolha o horárioR$ 27,00"));
+
+    expect(helper()).toBe("Escolha o horário no passo 2.");
+  });
+
+  it("is dropped for a host hold whose reason is its action, while the label is whole", async () => {
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço." } },
+    });
+    await waitFor(() => expect(payButton().textContent).toBe("Confirme o endereçoR$ 27,00"));
+
+    expect(helper()).toBeNull();
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Confirme o endereço.");
+  });
+});
+
+describe("a label too wide for the button", () => {
+  /** Lay the label's span out 200px wide in a 100px box, whatever jsdom says. */
+  function overflowLabels(): void {
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("title") ? 200 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("title") ? 100 : 0;
+    });
+  }
+
+  it("is completed under the button, even when the reason only repeats it", async () => {
+    overflowLabels();
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço." } },
+    });
+
+    await waitFor(() => expect(helper()).toBe("Confirme o endereço."));
+  });
+
+  it("is completed under the button with nothing chosen, if it is ever cut", async () => {
+    overflowLabels();
+    renderList({ config: onPageStore(), client: stubClient([]) });
+
+    await waitFor(() => expect(helper()).toBe("Escolha como pagar."));
+  });
+});
+
+describe("the Pix face", () => {
+  it("does not repeat a hold's action as its reason", async () => {
+    const host = { config: onPageStore(), client: stubClient([]) };
+    const view = renderList(host);
+    fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    fireEvent.click(payButton());
+    await screen.findByTestId("list-pix");
+    expect(helper()).toBeNull();
+
+    view.rerender(listFlow({ ...host, list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço." } } }));
+    await waitFor(() => expect(payButton().textContent).toBe("Confirme o endereço"));
+    expect(helper()).toBeNull();
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Confirme o endereço.");
+
+    view.rerender(listFlow({ ...host, list: { hold: { action: "Confirme o endereço", reason: "Confirme o endereço no passo 3." } } }));
+    await waitFor(() => expect(helper()).toBe("Confirme o endereço no passo 3."));
+  });
+});
+
+describe("the button held with nothing chosen", () => {
+  it("names no amount: it charges nothing, and its words take the whole width", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    expect(payButton().disabled).toBe(true);
+    expect(payButton().textContent).toBe("Escolha como pagar");
+  });
+
+  it("leaves the cart's total on screen, in the bar, on a phone", async () => {
+    frameWidth(390);
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    expect(screen.getByTestId("list-bar-total").textContent).toBe("TotalR$ 27,00");
+  });
+
+  it("draws it once on a computer: the column has the Total, the bar none", async () => {
+    frameWidth(1280);
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("list-summary-column");
+
+    await waitFor(() => expect(screen.getByTestId("pay-bar-total").textContent).toBe("R$ 27,00"));
+    await waitFor(() => expect(screen.queryByTestId("list-bar-total")).toBeNull());
+  });
+
+  it("draws it on the button once something is chosen, and not twice", async () => {
+    frameWidth(390);
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
+    await waitFor(() => expect(payButton().textContent).toContain("R$ 27,00"));
+
+    await waitFor(() => expect(screen.queryByTestId("list-bar-total")).toBeNull());
+  });
+});
+
+describe("the button's label", () => {
+  it("never wraps, is cut with an ellipsis, and is plain: no letter-spacing", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    const words = labelOf(payButton());
+    const style = getComputedStyle(words);
+    expect(style.whiteSpace).toBe("nowrap");
+    expect(style.overflow).toBe("hidden");
+    expect(style.textOverflow).toBe("ellipsis");
+    // A plain label, as the prototype draws it: no tracking on top of the button's.
+    expect(style.letterSpacing).toBe("normal");
+    // Cut, not lost: the full words stay on the element and in the accessible name.
+    expect(words.getAttribute("title")).toBe("Escolha como pagar");
+    expect(payButton().textContent).toContain("Escolha como pagar");
+  });
+});

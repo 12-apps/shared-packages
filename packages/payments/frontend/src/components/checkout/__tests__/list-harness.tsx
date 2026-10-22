@@ -24,6 +24,7 @@ import type {
   CreateOrderRequest,
   CreateOrderResult,
   PaymentMethod,
+  SettlementCheckout,
 } from "../types";
 
 export const SAVED_VISA = { id: "vault-1", brand: "Visa", last4: "4242", expMonth: 11, expYear: 2032, holder: "ANA TESTE" };
@@ -217,6 +218,8 @@ interface ListHost {
   discountLines?: ReactNode;
   /** The host's slots — a suite fills `lazy` to hold or watch the list's deferred parts. */
   components?: Partial<CheckoutComponents>;
+  /** A ready total the checkout settles instead of the cart's (a comanda's conta). */
+  settlement?: SettlementCheckout;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -246,6 +249,7 @@ export function listFlow(host: ListHost): JSX.Element {
           defaultBuyer={host.buyer ?? { name: "Ana Teste" }}
           paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY, ...host.list }}
           components={host.components}
+          settlement={host.settlement}
         />
       </CheckoutNavigateProvider>
     </CheckoutClientProvider>

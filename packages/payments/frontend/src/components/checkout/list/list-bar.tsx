@@ -1,8 +1,9 @@
 import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import { useEffect, useRef, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useCheckoutCopy } from "../copy-context";
 import { useCheckoutComponents } from "../ui";
 
 import { useSummaryColumnTarget } from "./summary-column";
@@ -18,9 +19,89 @@ const NO_EMPTY_ROW = { "&:empty": { display: "none" } } as const;
 /** Read by a screen reader, drawn nowhere. */
 const VISUALLY_HIDDEN = { position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" } as const;
 
+/** "Escolha como pagar." and "Escolha como pagar" are the same words. */
+function wordsOf(text: string): string {
+  return text.trim().replace(/[\s.!?…:;]+$/u, "").toLocaleLowerCase();
+}
+
+/**
+ * The reason the button is held already IS the button's own label (nothing
+ * chosen: "Escolha como pagar" on the button, "Escolha como pagar." under it).
+ * One message is enough: the helper is not drawn again, and the live region
+ * still says it.
+ */
+export function repeatsLabel(reason: string | null | undefined, label: string | null | undefined): boolean {
+  return Boolean(reason && label) && wordsOf(reason ?? "") === wordsOf(label ?? "");
+}
+
+/**
+ * Whether the button's label is cut by its ellipsis. The button reports it, the
+ * line under it reads it: a cut label always has its full words in that line,
+ * so the instruction is whole somewhere (there is no hover on a phone, and no
+ * tooltip on a disabled button in Firefox).
+ */
+const LabelCutContext = createContext<(cut: boolean) => void>(() => undefined);
+
+/** Reports whether `node`'s text overflows it, and again whenever it is resized. */
+function useLabelCut(node: React.RefObject<HTMLElement | null>, label: string): void {
+  const report = useContext(LabelCutContext);
+  // Before paint, so the line under the button is there on the frame the cut label is.
+  useLayoutEffect(() => {
+    const element = node.current;
+    if (!element) return undefined;
+    const measure = () => report(element.scrollWidth > element.clientWidth);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      report(false);
+    };
+  }, [node, label, report]);
+}
+
 /** Focus the first button under `scope` — the slot owns the element, so it is found, not referenced. */
 function focusButtonIn(scope: HTMLElement | null): void {
   scope?.querySelector<HTMLButtonElement>("button")?.focus();
+}
+
+/**
+ * "Total R$ 27,00" above a button held with nothing chosen. That button names
+ * no amount (its words need the width), so on a phone the bar says it here; the
+ * computer's column already draws "Total" and passes none.
+ */
+function HeldTotal({ total }: { total?: string | null }): JSX.Element | null {
+  const { Text } = useCheckoutComponents();
+  const label = useCheckoutCopy().screens.layout.total;
+  if (!total) return null;
+  return (
+    <Box data-testid="list-bar-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
+      <Text variant="body" size="sm" color="secondary" as="span">{label}</Text>
+      <Text variant="body" size="md" weight="semibold" as="span">{total}</Text>
+    </Box>
+  );
+}
+
+/**
+ * The bar's ONE live region, always mounted: the reason the action is held,
+ * drawn under it — unless it only repeats the button's own label, and that
+ * label is whole (not cut), when it is announced and not drawn — or else what is under way. Out of the flow while it
+ * has nothing to show: an empty row still took a gap under the button.
+ */
+function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string | null; actionLabel?: string | null; labelCut: boolean; live?: string | null }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const drawn = reason && (labelCut || !repeatsLabel(reason, actionLabel)) ? reason : null;
+  return (
+    <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={drawn ? undefined : VISUALLY_HIDDEN}>
+      {drawn ? (
+        <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+          {drawn}
+        </Text>
+      ) : (
+        <Box component="span">{live ?? reason ?? ""}</Box>
+      )}
+    </Box>
+  );
 }
 
 /**
@@ -37,37 +118,36 @@ function focusButtonIn(scope: HTMLElement | null): void {
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, live, children }: {
+export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal, live, children }: {
   summary?: ReactNode;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
   reason?: string | null;
+  /** The cart's total, drawn above the action while it is held with nothing chosen (a phone; the column has its own). */
+  heldTotal?: string | null;
+  /** The action's own label: a reason that says the same is announced, not drawn twice. */
+  actionLabel?: string | null;
   /** What the region announces when there is no reason: the bar's own sentence. */
   live?: string | null;
   /** The action, or the charge bar, or the wait. */
   children: ReactNode;
 }): JSX.Element | null {
-  const { ActionBar, Text } = useCheckoutComponents();
+  const { ActionBar } = useCheckoutComponents();
   const column = useSummaryColumnTarget();
+  const [labelCut, setLabelCut] = useState(false);
   const content = (
+    <LabelCutContext.Provider value={setLabelCut}>
     <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
       {/* The context line in the secondary ink in the column, as in the bar — the column inherits whatever the host's element is inked in. */}
       {summary ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, ...(column ? { color: "text.secondary" } : {}) }}>{summary}</Box> : null}
       {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
+      <HeldTotal total={column ? null : heldTotal} />
       {children}
-      {/* Out of the flow while it has nothing to show: an empty row still took a gap under the button. */}
-      <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={reason ? undefined : VISUALLY_HIDDEN}>
-        {reason ? (
-          <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
-            {reason}
-          </Text>
-        ) : (
-          <Box component="span">{live ?? ""}</Box>
-        )}
-      </Box>
+      <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} />
     </Box>
+    </LabelCutContext.Provider>
   );
   if (column) return column.element ? createPortal(content, column.element) : null;
   return <ActionBar dataTestId="list-pay-bar">{content}</ActionBar>;
@@ -85,16 +165,20 @@ export function ActionButton({ label, total, disabled, loading, onClick, focusOn
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
   const scope = useRef<HTMLDivElement | null>(null);
+  const words = useRef<HTMLSpanElement | null>(null);
+  useLabelCut(words, label);
   useEffect(() => {
     if (focusOnMount) focusButtonIn(scope.current);
   }, [focusOnMount]);
   return (
-    <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600 } }}>
+    <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600, letterSpacing: "normal" } }}>
       <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
-        {/* The amount never breaks ("R$ / 27,00"); the label may wrap, at the left. An action with
-            no amount ("Copiar código Pix") is centred (C20). */}
+        {/* Neither the amount ("R$ / 27,00") nor the label breaks: a label too wide for the bar at
+            320px is cut with an ellipsis rather than wrapped onto a second line, and is plain (the rule above
+            gives label and amount one tracking). An action with no amount ("Copiar
+            código Pix") is centred (C20). */}
         <Box component="span" sx={{ display: "flex", justifyContent: total ? "space-between" : "center", alignItems: "center", gap: 1, width: "100%" }}>
-          <Box component="span" sx={{ minWidth: 0, textAlign: total ? "left" : "center" }}>{label}</Box>
+          <Box component="span" ref={words} title={label} sx={{ minWidth: 0, textAlign: total ? "left" : "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</Box>
           {total ? <Box component="span" sx={{ flex: "none", whiteSpace: "nowrap" }}>{total}</Box> : null}
         </Box>
       </Button>

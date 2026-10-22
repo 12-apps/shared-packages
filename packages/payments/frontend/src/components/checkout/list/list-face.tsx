@@ -168,14 +168,15 @@ function chargingText(props: ListFaceProps): string {
   return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
 }
 
-/** The verb, the amount and the busy state of the button, for what is chosen. */
-function buttonFacts(props: ListFaceProps): { label: string; total: string; busy: boolean } {
+/** The verb, the amount (none while nothing is chosen) and the busy state of the button, for what is chosen. */
+function buttonFacts(props: ListFaceProps): { label: string; total: string | null; busy: boolean } {
   const { list, state } = props;
   const door = chosenDoor(props);
   const online = state.choice?.kind === "online";
   return {
     label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider, coveredByHost(list)),
-    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : props.total,
+    // A button held with nothing chosen charges nothing: no amount, so its words get the whole width.
+    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : state.choice ? props.total : null,
     busy: inFlight(props),
   };
 }
@@ -387,7 +388,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
-        <ListBar summary={list.summary} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} live={facts.live}>
+        <ListBar summary={list.summary} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live}>
           <BarAction props={props} failure={failure ?? wallets.failure} act={act} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />
         </ListBar>
       ) : null}

@@ -183,6 +183,15 @@ function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null
 }
 
 /**
+ * The column's lines. A cart checkout draws the cart's, whatever `list.lines`
+ * says; beside a READY total (a settlement) the cart is not what is being paid,
+ * so the host's own lines are drawn when it gives them (FUT-3692), else none.
+ */
+function summaryLines(list: CheckoutPaymentList, props: Pick<PaymentListStepProps, "cart" | "totalOverride">): CheckoutSummaryLine[] | undefined {
+  return props.totalOverride ? list.lines : props.cart.lines;
+}
+
+/**
  * The Pagamento step as ONE list (FUT-3591, FUT-3592) — see `./types.ts`.
  *
  * Three faces, chosen from what the controller holds: the raised PIX (its code
@@ -225,7 +234,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   ) : (
     <ListLayout
       hostTarget={list.summaryTarget}
-      lines={props.totalOverride ? undefined : props.cart.lines}
+      lines={summaryLines(list, props)}
       moneyLines={props.cart.discountLines}
       totalLabel={displayTotals(props.totalOverride, props.cart).label}
       credit={creditRows(list, state.choice)}
