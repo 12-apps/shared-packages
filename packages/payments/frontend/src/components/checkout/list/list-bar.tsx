@@ -1,8 +1,9 @@
 import { Box } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import { createContext, useContext, useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useCheckoutCopy } from "../copy-context";
 import { useCheckoutComponents } from "../ui";
 
 import { useSummaryColumnTarget } from "./summary-column";
@@ -44,7 +45,8 @@ const LabelCutContext = createContext<(cut: boolean) => void>(() => undefined);
 /** Reports whether `node`'s text overflows it, and again whenever it is resized. */
 function useLabelCut(node: React.RefObject<HTMLElement | null>, label: string): void {
   const report = useContext(LabelCutContext);
-  useEffect(() => {
+  // Before paint, so the line under the button is there on the frame the cut label is.
+  useLayoutEffect(() => {
     const element = node.current;
     if (!element) return undefined;
     const measure = () => report(element.scrollWidth > element.clientWidth);
@@ -61,6 +63,23 @@ function useLabelCut(node: React.RefObject<HTMLElement | null>, label: string): 
 /** Focus the first button under `scope` — the slot owns the element, so it is found, not referenced. */
 function focusButtonIn(scope: HTMLElement | null): void {
   scope?.querySelector<HTMLButtonElement>("button")?.focus();
+}
+
+/**
+ * "Total R$ 27,00" above a button held with nothing chosen. That button names
+ * no amount (its words need the width), so on a phone the bar says it here; the
+ * computer's column already draws "Total" and passes none.
+ */
+function HeldTotal({ total }: { total?: string | null }): JSX.Element | null {
+  const { Text } = useCheckoutComponents();
+  const label = useCheckoutCopy().screens.layout.total;
+  if (!total) return null;
+  return (
+    <Box data-testid="list-bar-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
+      <Text variant="body" size="sm" color="secondary" as="span">{label}</Text>
+      <Text variant="body" size="md" weight="semibold" as="span">{total}</Text>
+    </Box>
+  );
 }
 
 /**
@@ -99,12 +118,14 @@ function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string |
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, actionLabel, live, children }: {
+export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal, live, children }: {
   summary?: ReactNode;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
   reason?: string | null;
+  /** The cart's total, drawn above the action while it is held with nothing chosen (a phone; the column has its own). */
+  heldTotal?: string | null;
   /** The action's own label: a reason that says the same is announced, not drawn twice. */
   actionLabel?: string | null;
   /** What the region announces when there is no reason: the bar's own sentence. */
@@ -122,6 +143,7 @@ export function ListBar({ summary, extras, payer, reason, actionLabel, live, chi
       {summary ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, ...(column ? { color: "text.secondary" } : {}) }}>{summary}</Box> : null}
       {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
+      <HeldTotal total={column ? null : heldTotal} />
       {children}
       <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} />
     </Box>

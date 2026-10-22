@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * FUT-3692 (Future Pay UI reviews of the mercado and the mesa) — the bar's label.
+ * FUT-3692 (the origin host's UI reviews of its mercado and mesa) — the bar's label.
  *
  *  - U4: with nothing chosen the button reads "Escolha como pagar" and the
  *    helper under it said "Escolha como pagar." — the same words twice. A held
@@ -25,6 +25,11 @@ function labelOf(button: HTMLElement): HTMLElement {
   const label = button.querySelector<HTMLElement>("span[title]");
   if (!label) throw new Error("the button has no label span");
   return label;
+}
+
+/** The flow's frame measures this wide. */
+function frameWidth(width: number): void {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width, height: 800, top: 0, left: 0, right: width, bottom: 800, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
 }
 
 beforeEach(() => window.sessionStorage.clear());
@@ -133,6 +138,31 @@ describe("the button held with nothing chosen", () => {
 
     expect(payButton().disabled).toBe(true);
     expect(payButton().textContent).toBe("Escolha como pagar");
+  });
+
+  it("leaves the cart's total on screen, in the bar, on a phone", async () => {
+    frameWidth(390);
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("payment-list");
+
+    expect(screen.getByTestId("list-bar-total").textContent).toBe("TotalR$ 27,00");
+  });
+
+  it("draws it once on a computer: the column has the Total, the bar none", async () => {
+    frameWidth(1280);
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    await screen.findByTestId("list-summary-column");
+
+    await waitFor(() => expect(screen.getByTestId("pay-bar-total").textContent).toBe("R$ 27,00"));
+    await waitFor(() => expect(screen.queryByTestId("list-bar-total")).toBeNull());
+  });
+
+  it("draws it on the button once something is chosen, and not twice", async () => {
+    frameWidth(390);
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
+    await waitFor(() => expect(payButton().textContent).toContain("R$ 27,00"));
+
+    await waitFor(() => expect(screen.queryByTestId("list-bar-total")).toBeNull());
   });
 });
 
