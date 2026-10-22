@@ -198,7 +198,6 @@ export function OutcomeHero({
   );
 }
 
-/** One label/value row of the paid receipt block. */
 /**
  * Under this many pixels of the receipt's OWN width, a fact whose value is a
  * long unbroken word (the e-mail) stands under its label instead of beside it
@@ -209,18 +208,14 @@ export function OutcomeHero({
 export const RECEIPT_STACK_BELOW_PX = 480;
 const STACKED = `@container receipt (max-width: ${RECEIPT_STACK_BELOW_PX - 0.05}px)`;
 
+/** One label/value row of the paid receipt block; `long` lets it stack under {@link RECEIPT_STACK_BELOW_PX}. */
 function Fact({ label, value, testId, long = false }: { label: string; value: string; testId?: string; long?: boolean }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
     <Box
       data-testid={testId ? `${testId}-row` : undefined}
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "baseline",
-        gap: 2,
-        ...(long ? { [STACKED]: { flexDirection: "column", alignItems: "flex-start", gap: 0.25 } } : {}),
-      }}
+      sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2,
+        ...(long ? { [STACKED]: { flexDirection: "column", alignItems: "flex-start", gap: 0.25 } } : {}) }}
     >
       {/* The label never gives way to the value: it is the shorter, and the one read first. */}
       <Box component="span" sx={{ flexShrink: 0 }}>
@@ -230,15 +225,7 @@ function Fact({ label, value, testId, long = false }: { label: string; value: st
       </Box>
       {/* A long e-mail breaks rather than pushing the receipt off a 320px
           phone: an address has no spaces to wrap at. */}
-      <Box
-        sx={{
-          minWidth: 0,
-          maxWidth: "100%",
-          textAlign: "right",
-          overflowWrap: "anywhere",
-          ...(long ? { [STACKED]: { textAlign: "left" } } : {}),
-        }}
-      >
+      <Box sx={{ minWidth: 0, maxWidth: "100%", textAlign: "right", overflowWrap: "anywhere", ...(long ? { [STACKED]: { textAlign: "left" } } : {}) }}>
         <Text
           variant="body"
           size="sm"

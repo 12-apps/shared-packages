@@ -50,7 +50,7 @@ describe("the paid receipt at a narrow width", () => {
     renderPaid();
     const receipt = screen.getByTestId("payment-receipt");
     expect(getComputedStyle(receipt).getPropertyValue("container-type")).toBe("inline-size");
-    expect(styleText()).toContain(`.${emotionClass(receipt)}{container-type:inline-size;container-name:receipt;`);
+    expect(getComputedStyle(receipt).getPropertyValue("container-name")).toBe("receipt");
   });
 
   it("stacks the e-mail under its label, left-aligned, under the threshold", () => {
