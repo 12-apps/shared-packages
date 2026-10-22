@@ -9,20 +9,31 @@
  *
  *  - beside a ready total, the column draws the host's lines above "Total";
  *  - without them it draws "Total" alone, as before;
- *  - a cart checkout keeps the cart's lines when the host gives none;
+ *  - a cart checkout keeps the cart's lines, whatever `lines` says;
+ *  - the gap between lines and Total (a taxa de serviço) is the host's, through
+ *    `cart.discountLines`, drawn beside the ready total;
  *  - a phone draws no column, so nothing there changes.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import type { JSX } from "react";
 
 import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
 
-const CONTA = { scope: "MINE", totalLabel: "R$ 52,80", totalItems: 2 };
+// A conta of R$ 48,00 in items plus R$ 4,80 of taxa de serviço, which the host shows
+// through `cart.discountLines`: the lines add to 48,00, the Total is the READY 52,80.
+const CONTA = { scope: "MINE", totalLabel: "R$ 52,80", totalItems: 3 };
 const CONTA_LINES = [
-  { key: "l-pastel", quantity: 1, name: "Pastel na Chapa", totalLabel: "R$ 24,00" },
-  { key: "l-suco", quantity: 2, name: "Suco de laranja", totalLabel: "R$ 24,00" },
+  { key: "l-pastel", quantity: 1, name: "Pastel na Chapa", totalLabel: "R$ 19,20" },
+  { key: "l-suco", quantity: 2, name: "Suco de laranja", totalLabel: "R$ 28,80" },
 ];
+const SERVICE_FEE: JSX.Element = (
+  <div data-testid="service-fee">
+    <span>Taxa de serviço</span>
+    <span>R$ 4,80</span>
+  </div>
+);
 const CART_LINES = [{ key: "combo", quantity: 1, name: "Combo", totalLabel: "R$ 22,00" }];
 
 /** The flow's frame measures this wide. */
@@ -54,19 +65,26 @@ afterEach(() => {
 describe("the column beside a ready total", () => {
   beforeEach(() => frameWidth(1280));
 
-  it("draws the host's lines above Total", async () => {
-    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), settlement: CONTA, list: { lines: CONTA_LINES } });
+  it("draws the host's lines, then its service fee, then Total", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), settlement: CONTA, discountLines: SERVICE_FEE, list: { lines: CONTA_LINES } });
     const body = await columnBody();
 
     const lines = within(body).getByTestId("checkout-summary-lines");
-    expect(drawnLines(body)).toEqual([
-      expect.stringContaining("Pastel na Chapa"),
-      expect.stringContaining("Suco de laranja"),
-    ]);
-    expect(drawnLines(body)[1]).toContain("R$ 24,00");
+    expect(drawnLines(body)).toEqual(["1× Pastel na ChapaR$ 19,20", "2× Suco de laranjaR$ 28,80"]);
+    const fee = within(body).getByTestId("list-summary-money");
+    expect(fee.textContent).toBe("Taxa de serviçoR$ 4,80");
     const total = within(body).getByTestId("pay-bar-total");
     expect(total.textContent).toBe("R$ 52,80");
-    expect(lines.compareDocumentPosition(total) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(lines.compareDocumentPosition(fee) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(fee.compareDocumentPosition(total) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("never computes Total from the lines", async () => {
+    // The lines add to 48,00 and the fee to 4,80; the ready total is the host's word, 52,80.
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), settlement: CONTA, list: { lines: CONTA_LINES } });
+    const body = await columnBody();
+
+    expect(within(body).getByTestId("pay-bar-total").textContent).toBe("R$ 52,80");
   });
 
   it("draws Total alone when the host gives no lines, and never the cart's", async () => {
@@ -75,6 +93,13 @@ describe("the column beside a ready total", () => {
 
     expect(within(body).getByTestId("pay-bar-total").textContent).toBe("R$ 52,80");
     await waitFor(() => expect(within(body).queryByTestId("checkout-summary-lines")).toBeNull());
+  });
+
+  it("draws the host's lines, not the cart's, when both are given", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), settlement: CONTA, lines: CART_LINES, list: { lines: CONTA_LINES } });
+    const body = await columnBody();
+
+    expect(drawnLines(body)).toEqual(["1× Pastel na ChapaR$ 19,20", "2× Suco de laranjaR$ 28,80"]);
   });
 });
 
@@ -85,7 +110,14 @@ describe("the column of a cart checkout", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: CART_LINES });
     const body = await columnBody();
 
-    expect(drawnLines(body)).toEqual([expect.stringContaining("Combo")]);
+    expect(drawnLines(body)).toEqual(["1× ComboR$ 22,00"]);
+  });
+
+  it("keeps the cart's lines even when the host also gives list lines", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), lines: CART_LINES, list: { lines: CONTA_LINES } });
+    const body = await columnBody();
+
+    expect(drawnLines(body)).toEqual(["1× ComboR$ 22,00"]);
   });
 });
 

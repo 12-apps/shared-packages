@@ -23,13 +23,14 @@ export interface PaymentListCredit {
 export interface PaymentListSummary {
   /**
    * The host's lines for the "Resumo do pedido" column — quantity, name and
-   * the host's formatted total — drawn above "Total" in place of the cart's.
+   * the host's formatted total — drawn above "Total" in place of `cart.lines`.
    *
-   * For a checkout whose total is READY rather than the cart's (a settlement:
-   * a comanda's conta, a balance), where the cart is not what is being paid
-   * and its lines are not drawn: the host knows what the total is made of,
-   * and says it here. Absent ⇒ the cart's lines, or none beside a ready
-   * total, as before. The column only — the phone draws no lines either way.
+   * Read ONLY beside a READY total (`settlement`, a comanda's conta), where
+   * the cart is not what is being paid and its lines are not drawn; a cart
+   * checkout keeps `cart.lines` and ignores this. The computer's column only —
+   * the phone draws no lines. "Total" is never computed from them: it is the
+   * ready total. A gap between the two (a taxa de serviço) is the host's to
+   * show through `cart.discountLines`, which a ready total still draws.
    */
   lines?: CheckoutSummaryLine[];
 }

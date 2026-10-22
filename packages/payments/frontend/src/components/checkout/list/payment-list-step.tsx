@@ -182,9 +182,13 @@ function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null
   return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: list.amountDueLabel };
 }
 
-/** The column's lines: the host's when it gives them (FUT-3692), else the cart's — none beside a ready total. */
+/**
+ * The column's lines. A cart checkout draws the cart's, whatever `list.lines`
+ * says; beside a READY total (a settlement) the cart is not what is being paid,
+ * so the host's own lines are drawn when it gives them (FUT-3692), else none.
+ */
 function summaryLines(list: CheckoutPaymentList, props: Pick<PaymentListStepProps, "cart" | "totalOverride">): CheckoutSummaryLine[] | undefined {
-  return list.lines ?? (props.totalOverride ? undefined : props.cart.lines);
+  return props.totalOverride ? list.lines : props.cart.lines;
 }
 
 /**

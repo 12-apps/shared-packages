@@ -882,9 +882,10 @@ What changes for the buyer:
   charges the key only when that order's `amountDueCents ?? totalCents` is the
   sheet's amount. Pressing a wallet never changes the chosen row.
 - **On a computer** (the flow's frame ≥ 900px, the `md` breakpoint), the step
-  sits beside a "Resumo do pedido" column: `cart.lines`, `cart.discountLines`
-  (your fee and discount rows), "Total", then `summary`, the extras and the pay
-  button — no bar at the bottom. On a phone the bar stays.
+  sits beside a "Resumo do pedido" column: `cart.lines` (or, settling a ready
+  total, your `paymentList.lines`), `cart.discountLines` (your fee and discount
+  rows), "Total", then `summary`, the extras and the pay button — no bar at the
+  bottom. On a phone the bar stays, and draws no lines.
 - No method tabs, no `orderNote`, and no step header on Pagamento: the host's
   own stepper is the chrome around it. The list's `copy.title` names the list
   for a screen reader only.
@@ -899,6 +900,7 @@ What changes for the buyer:
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
 | `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
 | `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar and the Pix face name it while an online option is chosen; a door option and an empty choice keep the cart's total. Absent ⇒ the cart's total |
+| `lines?` | `{ key, quantity, name, totalLabel }[]` — your own lines for the computer's "Resumo do pedido" column, drawn above "Total" **in place of `cart.lines`**, for a checkout that settles a READY total (`settlement` / `totalOverride`: a comanda's conta), where the cart is not what is being paid (FUT-3692). Read only then: a cart checkout keeps `cart.lines` and ignores this. The computer's column only — a phone draws no lines. **"Total" is never computed from them**: it is the ready total, whatever the lines add to. A gap between the two (a taxa de serviço) is yours to show through `cart.discountLines`, which a ready total still draws beside "Total"; make those rows describe the conta, because nothing reconciles them with the lines. Absent ⇒ "Total" alone, as before |
 | `credit?` | `{ label, amountLabel }` — the balance paying part of the cart, worded and formatted by you (`{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }`, FUT-3711). With `amountDueLabel`, the computer's "Resumo do pedido" column draws it under "Total", then "A pagar" (`copy.amountDue`) and the amount due — Total − credit reads as what the button charges — while an ONLINE option is chosen. A door option or no choice charges the cart's total, so "Total" stands alone; without either field, "Total" alone |
 | `lastMethod?` | `"PIX"` or `"CARD"` — the buyer's last ONLINE way to pay, as the host remembers it (FUT-3611). Chosen before the buyer touches anything when the store offers it: Pix as Pix, a card as the saved card used last. Never a door tender. Absent ⇒ the saved-card rule alone |
 | `armedCharge?` | the host's own consent screen already took the tap ("Pedir em 1 toque", FUT-3611): the card's 5-second bar starts by itself, once, as soon as a SAVED card is chosen and nothing holds the button. Without a saved card it does nothing; Cancelar still sends nothing |
@@ -912,7 +914,7 @@ What changes for the buyer:
 | what | your part |
 | --- | --- |
 | `CheckoutFlowProps.validateApplePayMerchant` | the Apple Pay merchant-validation port (server-side). The list offers no Apple Pay without it — its session could only abort. `ports.validateApplePayMerchant` on `createPaymentFlows` |
-| `cart.lines`, `cart.discountLines` | the "Resumo do pedido" column on a computer: your lines, then your fee/discount rows above "Total" |
+| `cart.lines`, `cart.discountLines` | the "Resumo do pedido" column on a computer: your lines, then your fee/discount rows above "Total". `cart.lines` is the cart's: settling a ready total it is not drawn, and `paymentList.lines` takes its place; `cart.discountLines` is drawn either way |
 | `paymentList.summaryTarget` | lay out the computer's two columns YOURSELF: your step cards on the left (≤ 680px), and an element of yours on the right — pass it here and the list portals the whole "Resumo do pedido" column into it (lines, money rows, Total, `summary`, extras and the pay button), with no bar at the bottom. `null` while your element is not mounted yet (the bar waits rather than flash). Leave it out on a phone, or to keep the list's own layout (the step and the column side by side once the flow's frame is ≥ 900px). The Pix screen and the hand-off always keep their bar |
 | `defaultBuyer.taxId` with `taxIdOnFile` | the CPF on file, plain digits: "Alterar" on the payer line opens it at the top, filled and editable. Without it the field opens empty. Either way the field is optional while a CPF is on file — empty keeps the saved one, only a typed CPF that is not valid holds the online ways to pay — and "Manter o CPF salvo" (`copy.buyer.keepSavedCpf`) closes it again, dropping what was typed |
 | `onlineExtras` | drawn whenever a payment here is possible — the list offers an online row or a wallet, and no door row is chosen (nothing chosen counts: a wallet pays with no row). The payer line follows the same rule |
