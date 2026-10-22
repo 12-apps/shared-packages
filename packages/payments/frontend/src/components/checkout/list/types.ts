@@ -19,7 +19,7 @@
  */
 import type { ReactNode } from "react";
 
-import type { PaymentListCredit, PaymentListCreditCopy } from "./credit-types";
+import type { PaymentListCredit, PaymentListCreditCopy, PaymentListSummary } from "./credit-types";
 import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
 
 export type { CheckoutBillingAddress, PaymentListDebitCopy };
@@ -121,7 +121,7 @@ export interface CheckoutListHold {
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */
-export interface CheckoutPaymentList extends PaymentListCredit {
+export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSummary {
   /** Every sentence the list draws. REQUIRED, with no default (FUT-760). */
   copy: PaymentListCopy;
   /**

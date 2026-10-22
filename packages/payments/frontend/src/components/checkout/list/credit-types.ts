@@ -1,7 +1,10 @@
+import type { CheckoutSummaryLine } from "../payment-summary";
+
 /**
- * A balance the host holds paying part of the cart, as the "Resumo do pedido"
- * column draws it (FUT-3711). Kept apart from `./types` only for that file's
- * length; both are part of `CheckoutPaymentList` / `PaymentListCopy`.
+ * What the "Resumo do pedido" column draws beyond the cart: a balance the host
+ * holds paying part of it (FUT-3711), and the host's own lines (FUT-3692).
+ * Kept apart from `./types` only for that file's length; both are part of
+ * `CheckoutPaymentList` / `PaymentListCopy`.
  */
 export interface PaymentListCredit {
   /**
@@ -14,6 +17,21 @@ export interface PaymentListCredit {
    * stands alone. Absent ⇒ "Total" alone.
    */
   credit?: { label: string; amountLabel: string };
+}
+
+/** The lines the computer's "Resumo do pedido" column draws above "Total". */
+export interface PaymentListSummary {
+  /**
+   * The host's lines for the "Resumo do pedido" column — quantity, name and
+   * the host's formatted total — drawn above "Total" in place of the cart's.
+   *
+   * For a checkout whose total is READY rather than the cart's (a settlement:
+   * a comanda's conta, a balance), where the cart is not what is being paid
+   * and its lines are not drawn: the host knows what the total is made of,
+   * and says it here. Absent ⇒ the cart's lines, or none beside a ready
+   * total, as before. The column only — the phone draws no lines either way.
+   */
+  lines?: CheckoutSummaryLine[];
 }
 
 /** The words of the column's credit rows (FUT-3711). */

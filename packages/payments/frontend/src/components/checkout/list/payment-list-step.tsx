@@ -182,6 +182,11 @@ function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null
   return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: list.amountDueLabel };
 }
 
+/** The column's lines: the host's when it gives them (FUT-3692), else the cart's — none beside a ready total. */
+function summaryLines(list: CheckoutPaymentList, props: Pick<PaymentListStepProps, "cart" | "totalOverride">): CheckoutSummaryLine[] | undefined {
+  return list.lines ?? (props.totalOverride ? undefined : props.cart.lines);
+}
+
 /**
  * The Pagamento step as ONE list (FUT-3591, FUT-3592) — see `./types.ts`.
  *
@@ -225,7 +230,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   ) : (
     <ListLayout
       hostTarget={list.summaryTarget}
-      lines={props.totalOverride ? undefined : props.cart.lines}
+      lines={summaryLines(list, props)}
       moneyLines={props.cart.discountLines}
       totalLabel={displayTotals(props.totalOverride, props.cart).label}
       credit={creditRows(list, state.choice)}
