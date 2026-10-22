@@ -195,23 +195,140 @@ describe("focus follows the reader's own taps", () => {
   });
 });
 
-describe('the drag, while it is open', () => {
-  beforeEach(() => {
-    if (typeof window.PointerEvent === 'undefined') {
-      class PointerEventStandIn extends MouseEvent {
-        readonly pointerId: number;
-        constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
-          super(type, init);
-          this.pointerId = init.pointerId ?? 1;
-        }
+/** A 400×800 screen that takes pointer events — jsdom has none of its own. */
+function pointerScreen(): void {
+  if (typeof window.PointerEvent === 'undefined') {
+    class PointerEventStandIn extends MouseEvent {
+      readonly pointerId: number;
+      constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 1;
       }
-      Object.defineProperty(window, 'PointerEvent', { configurable: true, value: PointerEventStandIn });
     }
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'PointerEvent', { configurable: true, value: PointerEventStandIn });
+  }
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+}
+
+/** Where the tab rests halfway down the right edge of that screen. */
+function tabAtRest(tab: HTMLElement): void {
+  vi.spyOn(tab, 'getBoundingClientRect').mockReturnValue({
+    left: 372,
+    top: 372,
+    width: 28,
+    height: 56,
+    right: 400,
+    bottom: 428,
+    x: 372,
+    y: 372,
+    toJSON: () => ({}),
+  });
+}
+
+/** A press on the tab carried to (x, y) and let go there, with the click a mouse drag ends with. */
+function dragTab(x: number, y: number): void {
+  const tab = screen.getByTestId('attention-tab');
+  tabAtRest(tab);
+  fireEvent.pointerDown(tab, { clientX: 386, clientY: 400, pointerId: 1 });
+  fireEvent.pointerMove(tab, { clientX: x, clientY: y, pointerId: 1 });
+  fireEvent.pointerUp(tab, { clientX: x, clientY: y, pointerId: 1 });
+  fireEvent.click(tab);
+}
+
+describe('the drag of the tab itself', () => {
+  beforeEach(pointerScreen);
+
+  it('rests on the right edge until it is dragged', () => {
+    host([bell('12', 2)]);
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('right');
   });
 
-  it("moves it while open, never into the device, and folding back returns it to the tab's side", () => {
+  it('snaps to the nearer side, opens nothing, and the device remembers the spot', () => {
+    const mounted = host([bell('12', 2)]);
+    dragTab(40, 100);
+    // Dragged, not tapped: still folded.
+    expect(screen.queryAllByTestId('attention-dock')).toHaveLength(0);
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('left');
+    const spot = mounted.preferences.read().tab;
+    expect(spot?.side).toBe('left');
+    expect(spot?.y).toBeLessThan(0.5);
+    expect(spot?.x).toBeUndefined();
+    // Its own key: the open button's remembered spot is left alone.
+    expect(mounted.preferences.read().dock).toBeNull();
+  });
+
+  it('stays where it is let go away from every edge, as a bubble', () => {
+    const mounted = host([bell('12', 2)]);
+    dragTab(200, 600);
+    expect(screen.getByTestId('attention-tab').hasAttribute('data-free')).toBe(true);
+    expect(screen.queryAllByTestId('attention-dock')).toHaveLength(0);
+    const spot = mounted.preferences.read().tab;
+    expect(spot?.x).toBeGreaterThan(0.3);
+    expect(spot?.x).toBeLessThan(0.7);
+    expect(spot?.y).toBeGreaterThan(0.5);
+  });
+
+  it('goes flush with a side again once dropped near it', () => {
+    host([bell('12', 2)]);
+    dragTab(200, 600);
+    dragTab(390, 300);
+    const flush = screen.getByTestId('attention-tab');
+    expect(flush.hasAttribute('data-free')).toBe(false);
+    expect(flush.getAttribute('data-side')).toBe('right');
+  });
+
+  it('folds back to the bubble it was opened from', () => {
+    host([bell('12', 2)]);
+    dragTab(200, 600);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    expect(screen.getByTestId('attention-button')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    expect(screen.getByTestId('attention-tab').hasAttribute('data-free')).toBe(true);
+  });
+
+  it('never reads a spot the open button was dragged to before the tab could move', () => {
+    window.localStorage.setItem(
+      `attention-folded:${expect.getState().currentTestName ?? ''}`,
+      JSON.stringify({ dock: { side: 'left', y: 1 } }),
+    );
+    host([bell('12', 2)]);
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('right');
+  });
+
+  it('drags while nothing waits too', () => {
+    host([]);
+    dragTab(40, 100);
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('left');
+  });
+
+  it('opens where the tab is, and the minus folds it back to that same spot', () => {
+    host([bell('12', 2)]);
+    dragTab(40, 100);
+    fireEvent.click(screen.getByTestId('attention-tab'));
+    expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('left');
+    // Up in the top half: the minus goes under the button, never off the top.
+    expect(screen.getByTestId('attention-collapse-spot').getAttribute('data-place')).toBe('below');
+    fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('left');
+  });
+
+  it('is still a tap under the drag slop', () => {
+    host([bell('12', 2)]);
+    const tab = screen.getByTestId('attention-tab');
+    tabAtRest(tab);
+    fireEvent.pointerDown(tab, { clientX: 386, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(tab, { clientX: 388, clientY: 402, pointerId: 1 });
+    fireEvent.pointerUp(tab, { clientX: 388, clientY: 402, pointerId: 1 });
+    fireEvent.click(tab);
+    expect(screen.getByTestId('attention-button')).toBeTruthy();
+  });
+});
+
+describe('the drag, while it is open', () => {
+  beforeEach(pointerScreen);
+
+  it("moves it while open, never into the device, and folding back returns it to the tab's spot", () => {
     const mounted = host([bell('12', 2)]);
     fireEvent.click(screen.getByTestId('attention-tab'));
     const dock = screen.getByTestId('attention-dock');
@@ -235,6 +352,7 @@ describe('the drag, while it is open', () => {
     expect(mounted.preferences.read().dock).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Fold the button' }));
+    expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('right');
     fireEvent.click(screen.getByTestId('attention-tab'));
     expect(screen.getByTestId('attention-dock').getAttribute('data-side')).toBe('right');
   });
