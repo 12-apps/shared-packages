@@ -11,7 +11,8 @@
  *
  * It draws nothing while nothing waits — unless the host gives it the words of
  * the folded mode (`collapsed`, `./attention-collapsible`): then a half disc on
- * the right edge is always there, and a tap opens the button.
+ * the screen's edge is always there — the reader can drag it along either
+ * edge — and a tap opens the button where the tab is.
  */
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 
@@ -35,12 +36,12 @@ import {
 } from './attention-collapsible';
 import { AttentionDock, type AttentionDockRest } from './attention-dock';
 import { AttentionOthersList } from './attention-others-list';
+import { useDockSpot } from './use-dock-spot';
 import { iconOf, minutesOf, type AttentionKindView, type AttentionViews } from './views';
 import type { AttentionMessages } from './messages';
 import {
   useAttentionPreferences,
   type AttentionDockPosition,
-  type AttentionPreferences,
   type AttentionPreferencesStore,
 } from './preferences';
 
@@ -68,14 +69,13 @@ export interface AttentionHostProps {
   /**
    * The words of the folded mode. Given, the button rests folded into a half disc on
    * the right edge, halfway down, at every width — always drawn, even with
-   * nothing waiting — and a tap opens it (`./attention-collapsible`). Omitted,
-   * nothing changes.
+   * nothing waiting — and a tap opens it (`./attention-collapsible`). A drag
+   * of the tab moves it, and the device remembers where. Omitted, nothing
+   * changes.
    */
   readonly collapsed?: AttentionCollapsedMessages;
 }
 
-/** Where the folded mode opens the button, and where the tab sits: halfway down the right edge. */
-const FOLDED_REST: AttentionDockPosition = { side: 'right', y: 0.5 };
 
 /**
  * What a tap opens: the kind's own `onOpen`, or its sheet drawn here. The
@@ -161,48 +161,6 @@ function useListAnchor(
   return [anchor, setAnchor];
 }
 
-/**
- * Where the dock sits and what a drag does with it. Unfolded hosts keep the
- * device's remembered spot; a folded host keeps the drag for THIS opening only,
- * so folding back always lands where the tab is.
- */
-function useDockSpot(
-  store: AttentionPreferencesStore,
-  preferences: AttentionPreferences,
-  folding: boolean,
-): {
-  readonly position: AttentionDockPosition | null;
-  readonly onMove: (dock: AttentionDockPosition) => void;
-  readonly reset: () => void;
-  /** The side it rests on, for the list that hangs off it. */
-  readonly side: 'left' | 'right';
-  /** Where it rests until moved: the folded mode's spot, or the dock's own default. */
-  readonly rest: AttentionDockRest | undefined;
-  /** In the screen's top half: what hangs off it goes below, never off the top. */
-  readonly high: boolean;
-} {
-  const [spot, setSpot] = useState<AttentionDockPosition | null>(null);
-  if (!folding) {
-    return {
-      position: preferences.dock,
-      onMove: (dock) => store.write({ dock }),
-      reset: () => undefined,
-      side: preferences.dock?.side ?? 'right',
-      rest: undefined,
-      high: preferences.dock !== null && preferences.dock.y < 0.5,
-    };
-  }
-  return {
-    position: spot,
-    onMove: setSpot,
-    reset: () => setSpot(null),
-    side: (spot ?? FOLDED_REST).side,
-    rest: FOLDED_REST,
-    // The rest is halfway down, where the list opens below; the "−" goes with it.
-    high: (spot ?? FOLDED_REST).y <= 0.5,
-  };
-}
-
 export function AttentionHost({
   registry,
   views,
@@ -236,6 +194,9 @@ export function AttentionHost({
           entries={entries}
           words={collapsed}
           zIndex={zIndex}
+          spot={dock.tab}
+          bottom={bottom}
+          onMove={dock.onMoveTab}
           onExpand={() => {
             dock.reset();
             fold.expand();
@@ -278,11 +239,17 @@ function FoldedTab({
   entries,
   words,
   zIndex,
+  spot,
+  bottom,
+  onMove,
   onExpand,
 }: {
   readonly entries: readonly AttentionEntry[];
   readonly words: AttentionCollapsedMessages;
   readonly zIndex: number;
+  readonly spot: AttentionDockPosition;
+  readonly bottom: string | undefined;
+  readonly onMove: (spot: AttentionDockPosition) => void;
   readonly onExpand: () => void;
 }): JSX.Element {
   const worst = worstSeverity(entries.map((entry) => entry.severity));
@@ -294,6 +261,9 @@ function FoldedTab({
       pulse={head === undefined ? 'still' : pulseOf(head)}
       label={words.tab(entries.length, worst)}
       zIndex={zIndex}
+      spot={spot}
+      bottom={bottom}
+      onMove={onMove}
       onExpand={onExpand}
     />
   );

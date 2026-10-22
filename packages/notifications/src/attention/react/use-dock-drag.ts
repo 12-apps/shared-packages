@@ -43,9 +43,21 @@ interface DockDrag {
   };
 }
 
+/**
+ * How a dragged thing sits on the screen: how close to an edge it may come,
+ * and the share of the screen's height it cannot rest in (its own height plus
+ * those margins) — what a stored `y` is a fraction of the rest of.
+ */
+export interface DockFit {
+  readonly margin: number;
+  readonly span: number;
+}
+
+/** The dock's own fit: 8px from any edge, its 80px resting span. */
+const DOCK_FIT: DockFit = { margin: EDGE_GAP_PX / 2, span: RESTING_SPAN_PX };
+
 /** Where the pointer has taken the dock, kept inside the screen. */
-function positionFor(event: PointerEvent<HTMLElement>, current: Drag): Live {
-  const margin = EDGE_GAP_PX / 2;
+function positionFor(event: PointerEvent<HTMLElement>, current: Drag, margin: number): Live {
   return {
     left: clamp(
       current.left + event.clientX - current.pointerX,
@@ -89,7 +101,10 @@ function crossedThreshold(event: PointerEvent<HTMLElement>, current: Drag): bool
   return true;
 }
 
-export function useDockDrag(onMove: (position: AttentionDockPosition) => void): DockDrag {
+export function useDockDrag(
+  onMove: (position: AttentionDockPosition) => void,
+  { margin, span }: DockFit = DOCK_FIT,
+): DockDrag {
   const drag = useRef<Drag | null>(null);
   const swallowClick = useRef(false);
   const [live, setLive] = useState<Live | null>(null);
@@ -117,7 +132,7 @@ export function useDockDrag(onMove: (position: AttentionDockPosition) => void): 
       onPointerMove(event) {
         const current = drag.current;
         if (current === null || !crossedThreshold(event, current)) return;
-        latest.current = positionFor(event, current);
+        latest.current = positionFor(event, current, margin);
         setLive(latest.current);
       },
       onPointerUp() {
@@ -132,7 +147,7 @@ export function useDockDrag(onMove: (position: AttentionDockPosition) => void): 
         window.setTimeout(() => {
           swallowClick.current = false;
         }, 0);
-        const y = (at.top - EDGE_GAP_PX / 2) / Math.max(1, window.innerHeight - RESTING_SPAN_PX);
+        const y = (at.top - margin) / Math.max(1, window.innerHeight - span);
         onMove({
           side: at.left + current.width / 2 < window.innerWidth / 2 ? 'left' : 'right',
           y: clamp(y, 0, 1),
