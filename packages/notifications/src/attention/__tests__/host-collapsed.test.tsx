@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AttentionItem } from '../core';
-import { AttentionHost, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
+import { AttentionHost, AttentionTab, createAttentionPreferences, type AttentionCollapsedMessages } from '../react';
 import { EMPTY_NOTE_MS } from '../react/attention-collapsible';
 
 import { MESSAGES, NOW, bell, registry, sample, views } from './attention-fixture';
@@ -239,6 +239,15 @@ function dragTab(x: number, y: number): void {
 describe('the drag of the tab itself', () => {
   beforeEach(pointerScreen);
 
+  it('shows a grab hand only where the tab can move', () => {
+    host([bell('12', 2)]);
+    expect(getComputedStyle(screen.getByTestId('attention-tab')).cursor).toBe('grab');
+    cleanup();
+    // Mounted alone without onMove it cannot be dragged: a plain button's hand.
+    render(<AttentionTab count={0} worst={null} pulse="still" label="Open" zIndex={1} onExpand={() => undefined} />);
+    expect(getComputedStyle(screen.getByTestId('attention-tab')).cursor).toBe('pointer');
+  });
+
   it('rests on the right edge until it is dragged', () => {
     host([bell('12', 2)]);
     expect(screen.getByTestId('attention-tab').getAttribute('data-side')).toBe('right');
@@ -267,6 +276,25 @@ describe('the drag of the tab itself', () => {
     expect(spot?.x).toBeGreaterThan(0.3);
     expect(spot?.x).toBeLessThan(0.7);
     expect(spot?.y).toBeGreaterThan(0.5);
+  });
+
+  it('is drawn mid-drag as a bubble centred where the pointer carried it, on the screen, and free of every edge', () => {
+    host([bell('12', 2)]);
+    const tab = screen.getByTestId('attention-tab');
+    tabAtRest(tab);
+    fireEvent.pointerDown(tab, { clientX: 386, clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(tab, { clientX: 200, clientY: 300, pointerId: 1 });
+    const moving = screen.getByTestId('attention-tab');
+    // Pressed at the half disc's centre (386, 400), carried 186px left and 100px up: the
+    // bubble's centre is the half disc's centre moved the same way, (200, 300).
+    const style = getComputedStyle(moving);
+    expect(Number.parseFloat(style.left) + 22).toBe(200);
+    expect(Number.parseFloat(style.top) + 22).toBe(300);
+    expect(moving.hasAttribute('data-free')).toBe(true);
+    // Carried past the right edge, it stays on the screen.
+    fireEvent.pointerMove(tab, { clientX: 520, clientY: 300, pointerId: 1 });
+    expect(Number.parseFloat(getComputedStyle(screen.getByTestId('attention-tab')).left)).toBe(400 - 44);
+    fireEvent.pointerUp(tab, { clientX: 520, clientY: 300, pointerId: 1 });
   });
 
   it('goes flush with a side again once dropped near it', () => {
