@@ -387,7 +387,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
-        <ListBar summary={list.summary} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} live={facts.live}>
+        <ListBar summary={list.summary} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} actionLabel={buttonFacts(props).label} live={facts.live}>
           <BarAction props={props} failure={failure ?? wallets.failure} act={act} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />
         </ListBar>
       ) : null}

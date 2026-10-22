@@ -18,9 +18,46 @@ const NO_EMPTY_ROW = { "&:empty": { display: "none" } } as const;
 /** Read by a screen reader, drawn nowhere. */
 const VISUALLY_HIDDEN = { position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" } as const;
 
+/** "Escolha como pagar." and "Escolha como pagar" are the same words. */
+function wordsOf(text: string): string {
+  return text.trim().replace(/[\s.!?…:;]+$/u, "").toLocaleLowerCase();
+}
+
+/**
+ * The reason the button is held already IS the button's own label (nothing
+ * chosen: "Escolha como pagar" on the button, "Escolha como pagar." under it).
+ * One message is enough: the helper is not drawn again, and the live region
+ * still says it.
+ */
+export function repeatsLabel(reason: string | null | undefined, label: string | null | undefined): boolean {
+  return Boolean(reason && label) && wordsOf(reason ?? "") === wordsOf(label ?? "");
+}
+
 /** Focus the first button under `scope` — the slot owns the element, so it is found, not referenced. */
 function focusButtonIn(scope: HTMLElement | null): void {
   scope?.querySelector<HTMLButtonElement>("button")?.focus();
+}
+
+/**
+ * The bar's ONE live region, always mounted: the reason the action is held,
+ * drawn under it — unless it only repeats the button's own label, when it is
+ * announced and not drawn — or else what is under way. Out of the flow while it
+ * has nothing to show: an empty row still took a gap under the button.
+ */
+function HeldReason({ reason, actionLabel, live }: { reason?: string | null; actionLabel?: string | null; live?: string | null }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const drawn = reason && !repeatsLabel(reason, actionLabel) ? reason : null;
+  return (
+    <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={drawn ? undefined : VISUALLY_HIDDEN}>
+      {drawn ? (
+        <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+          {drawn}
+        </Text>
+      ) : (
+        <Box component="span">{live ?? reason ?? ""}</Box>
+      )}
+    </Box>
+  );
 }
 
 /**
@@ -37,18 +74,20 @@ function focusButtonIn(scope: HTMLElement | null): void {
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, live, children }: {
+export function ListBar({ summary, extras, payer, reason, actionLabel, live, children }: {
   summary?: ReactNode;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
   reason?: string | null;
+  /** The action's own label: a reason that says the same is announced, not drawn twice. */
+  actionLabel?: string | null;
   /** What the region announces when there is no reason: the bar's own sentence. */
   live?: string | null;
   /** The action, or the charge bar, or the wait. */
   children: ReactNode;
 }): JSX.Element | null {
-  const { ActionBar, Text } = useCheckoutComponents();
+  const { ActionBar } = useCheckoutComponents();
   const column = useSummaryColumnTarget();
   const content = (
     <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
@@ -57,16 +96,7 @@ export function ListBar({ summary, extras, payer, reason, live, children }: {
       {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
       {children}
-      {/* Out of the flow while it has nothing to show: an empty row still took a gap under the button. */}
-      <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={reason ? undefined : VISUALLY_HIDDEN}>
-        {reason ? (
-          <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
-            {reason}
-          </Text>
-        ) : (
-          <Box component="span">{live ?? ""}</Box>
-        )}
-      </Box>
+      <HeldReason reason={reason} actionLabel={actionLabel} live={live} />
     </Box>
   );
   if (column) return column.element ? createPortal(content, column.element) : null;
@@ -91,10 +121,12 @@ export function ActionButton({ label, total, disabled, loading, onClick, focusOn
   return (
     <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600 } }}>
       <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
-        {/* The amount never breaks ("R$ / 27,00"); the label may wrap, at the left. An action with
-            no amount ("Copiar código Pix") is centred (C20). */}
+        {/* Neither the amount ("R$ / 27,00") nor the label breaks: a label too wide for the bar at
+            320px is cut with an ellipsis rather than wrapped onto a second line, and is plain, as the
+            prototype draws it: no tracking on top of the button's. An action with no amount ("Copiar
+            código Pix") is centred (C20). */}
         <Box component="span" sx={{ display: "flex", justifyContent: total ? "space-between" : "center", alignItems: "center", gap: 1, width: "100%" }}>
-          <Box component="span" sx={{ minWidth: 0, textAlign: total ? "left" : "center" }}>{label}</Box>
+          <Box component="span" title={label} sx={{ minWidth: 0, textAlign: total ? "left" : "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "normal" }}>{label}</Box>
           {total ? <Box component="span" sx={{ flex: "none", whiteSpace: "nowrap" }}>{total}</Box> : null}
         </Box>
       </Button>

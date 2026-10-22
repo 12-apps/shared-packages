@@ -205,7 +205,7 @@ function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
   const settled = !hold && !stale;
   const other = settled && !afterCopy ? otherBankLabel(bankFlow) : null;
   return (
-    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} live={afterCopy && settled ? copy.waiting : null}>
+    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} actionLabel={hold?.action} live={afterCopy && settled ? copy.waiting : null}>
       <PixBarAction mode={mode} afterCopy={afterCopy} onCopy={onCopy} copyLabel={copyLabel(copy.copyCode, bankFlow)} />
       {other ? <OtherBankLink label={other} onClick={onOtherBank} /> : null}
     </ListBar>

@@ -270,7 +270,9 @@ describe("what the list says", () => {
     rerender(listFlow({ config: handOffStore(), client }));
     await screen.findByTestId("list-option-HAND_OFF");
     expect(radio("list-option-HAND_OFF").checked).toBe(false);
-    expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Escolha como pagar.");
+    expect(payButton().textContent).toContain("Escolha como pagar");
+    await waitFor(() => expect(screen.queryByTestId("list-blocked-reason")).toBeNull());
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");
   });
 });
 
