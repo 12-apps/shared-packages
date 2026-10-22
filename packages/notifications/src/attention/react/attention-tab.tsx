@@ -47,7 +47,7 @@ const clampShare = (value: number): number => Math.min(1, Math.max(0, value));
  * else the bubble's spot, its top-left as a share of the screen less its size.
  * Measured from the bubble's centre, which is what the pointer held.
  */
-export function tabSpotFor(edge: AttentionDockPosition, drop: DockDrop): AttentionDockPosition {
+function tabSpotFor(edge: AttentionDockPosition, drop: DockDrop): AttentionDockPosition {
   const left = drop.left + drop.width / 2 - BUBBLE_PX / 2;
   const top = drop.top + drop.height / 2 - BUBBLE_PX / 2;
   if (left < SNAP_PX || left + BUBBLE_PX > window.innerWidth - SNAP_PX) {

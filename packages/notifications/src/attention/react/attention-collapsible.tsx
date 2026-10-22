@@ -30,7 +30,7 @@ import { alpha, type Theme } from '@12-apps/ui/mui/styles';
 
 import type { AttentionSeverity } from '../core';
 
-export { AttentionTab, TAB_REST, type AttentionTabProps } from './attention-tab';
+export { AttentionTab, type AttentionTabProps } from './attention-tab';
 
 /** The words of the folded mode — the host's, like every other sentence. */
 export interface AttentionCollapsedMessages {
