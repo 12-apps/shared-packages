@@ -250,8 +250,10 @@ export function AttentionTab({
       data-count={count}
       data-pulse={pulse}
       data-side={spot.side}
-      // Away from every edge: it takes no strip of either side.
-      data-free={spot.x === undefined ? undefined : ''}
+      // Away from every edge — resting as a bubble, or carried by a drag — it
+      // takes no strip of either side, so a host measuring the edge it covers
+      // does not re-pad its page under the reader's finger.
+      data-free={round ? '' : undefined}
       // It floats over the page by design, flush with an edge: an
       // overlay that takes no room (ADR "an overlay takes no room"), which a
       // screen's checks read through this attribute — so it is drawn OPAQUE.
