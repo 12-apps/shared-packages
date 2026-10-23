@@ -66,7 +66,7 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     const createOrder = recordingCreateOrder();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), createOrder, list: { armedCharge: true } });
-    await waitFor(() => expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa final 4242…"));
+    await waitFor(() => expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa 4242…"));
     expect(createOrder).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
     await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(1));

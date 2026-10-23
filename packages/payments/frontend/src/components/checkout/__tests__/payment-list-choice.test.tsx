@@ -63,7 +63,7 @@ describe("what comes chosen", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
     expect(screen.getByTestId("list-card-vault-1").getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByTestId("list-option-CARD").textContent).toContain("Visa final 4242 ou outro cartão");
+    expect(screen.getByTestId("list-option-CARD").textContent).toContain("Visa 4242 ou outro cartão");
     expect(payButton().disabled).toBe(false);
     expect(payButton().textContent).toBe("PagarR$ 27,00");
   });

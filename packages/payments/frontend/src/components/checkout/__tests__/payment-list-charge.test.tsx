@@ -45,7 +45,7 @@ describe("the card's 5-second bar", () => {
     vi.useFakeTimers();
     fireEvent.click(payButton());
     const bar = screen.getByTestId("list-charge-bar");
-    expect(bar.textContent).toBe("Pagando R$ 27,00 no Visa final 4242…");
+    expect(bar.textContent).toBe("Pagando R$ 27,00 no Visa 4242…");
     expect(bar.getAttribute("data-full")).toBe("false");
     expect(screen.getByTestId("list-charge-cancel").textContent).toBe("Cancelar");
     vi.useRealTimers();

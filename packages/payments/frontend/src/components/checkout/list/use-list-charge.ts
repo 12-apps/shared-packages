@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CheckoutOrder, PaymentMethod } from "../types";
 
 /**
- * How long the card's "Pagando R$ X no Visa final 4242…" bar takes to fill —
+ * How long the card's "Pagando R$ X no Visa 4242…" bar takes to fill —
  * the window in which "Cancelar" still sends nothing (FUT-3592, M10). The
  * owner's own number: the bar replaces the confirmation dialog, so it is the
  * buyer's whole chance to change their mind.

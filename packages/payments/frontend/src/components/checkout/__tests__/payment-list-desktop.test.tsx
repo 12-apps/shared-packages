@@ -56,7 +56,7 @@ describe("on a computer (L4)", () => {
     await waitFor(() => expect((within(column).getByTestId("list-pay") as HTMLButtonElement).disabled).toBe(false));
     vi.useFakeTimers();
     fireEvent.click(within(column).getByTestId("list-pay"));
-    expect(within(column).getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa final 4242…");
+    expect(within(column).getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa 4242…");
     fireEvent.click(within(column).getByTestId("list-charge-cancel"));
     vi.advanceTimersByTime(CHARGE_WINDOW_MS);
     expect(within(column).getByTestId("list-pay")).toBeTruthy();
