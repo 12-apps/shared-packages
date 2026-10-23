@@ -51,10 +51,20 @@ function resolveInitialFocus(
 }
 
 /**
+ * Whether what was typed is the word asked for — trimmed, and in any case.
+ * The gate is a pause, not a spelling test: a phone's automatic capital C
+ * ("Confirmar") or a held Caps Lock must not lock the act (FUT-3905).
+ */
+export function typedMatches(typed: string, expected: string): boolean {
+  return typed.trim().toLocaleLowerCase('pt-BR') === expected.trim().toLocaleLowerCase('pt-BR');
+}
+
+/**
  * The type-to-confirm field. Rendered only when `typeToConfirm` is set, which
  * should be rare: it is the guard for actions with NO recovery path, where a
- * click is too cheap a gesture. Comparison is exact — trimmed of surrounding
- * whitespace only, so a trailing space from a paste does not read as a mismatch.
+ * click is too cheap a gesture. Comparison ignores case and surrounding
+ * whitespace ({@link typedMatches}): a phone capitalises the first letter, and
+ * "Confirmar" must unlock what "confirmar" does (FUT-3905).
  */
 function TypeToConfirmField({
   expected,
@@ -95,6 +105,10 @@ function TypeToConfirmField({
         inputProps={{
           'aria-label': label ?? copy.typeToConfirm(expected),
           'data-testid': `${dataTestId}-type-to-confirm`,
+          // A word to copy, not prose: the phone keeps its hands off it.
+          autoCapitalize: 'none',
+          autoCorrect: 'off',
+          spellCheck: false,
         }}
       />
     </Stack>
@@ -135,7 +149,7 @@ export function ConfirmActionDialog({
     if (state.open) setTyped('');
   }, [state.open]);
 
-  const gateUnmet = typeToConfirm !== undefined && typed.trim() !== typeToConfirm;
+  const gateUnmet = typeToConfirm !== undefined && !typedMatches(typed, typeToConfirm);
 
   return (
     <AlertDialog

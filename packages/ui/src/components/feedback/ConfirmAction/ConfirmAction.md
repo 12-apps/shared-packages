@@ -114,7 +114,8 @@ with `<ConfirmActionDialog state={…} />` or your own surface.
 - `description` should say whether the action can be undone. A soft delete goes
   to the recycle bin and comes back; a purge does not. Say which. Without one,
   the popup falls back to naming the affected row.
-- `typeToConfirm` requires the operator to type an exact string before the
+- `typeToConfirm` requires the operator to type a string (any case, trimmed — a
+  phone's automatic capital must not lock it, FUT-3905) before the
   confirm enables. Reserve it for actions with **no** recovery path — a
   permanent purge, suspending a live store. Everywhere else it is friction that
   buys nothing.
@@ -128,7 +129,7 @@ with `<ConfirmActionDialog state={…} />` or your own surface.
 | `description` | `ReactNode` | derived from `entityName` | The consequence. |
 | `entityName` | `string` | — | The row being acted on, echoed into the body. |
 | `cancelText` | `string` | `Cancelar` | |
-| `typeToConfirm` | `string` | — | Gates the confirm until typed exactly. |
+| `typeToConfirm` | `string` | — | Gates the confirm until typed (any case, trimmed). |
 | `typeToConfirmLabel` | `string` | derived | Label above the field. |
 | `tone` | `'destructive' \| 'default'` | `destructive` | Colour + default focus. |
 | `initialFocus` | `'confirm' \| 'cancel'` | `cancel` when destructive | |

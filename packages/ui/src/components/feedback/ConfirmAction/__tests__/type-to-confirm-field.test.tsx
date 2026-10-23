@@ -64,7 +64,14 @@ function textFieldReference(): Element {
         value=""
         disabled={false}
         onChange={() => undefined}
-        inputProps={{ 'aria-label': LABEL, 'data-testid': 'confirm-action-type-to-confirm' }}
+        // The props the popup passes, FUT-3905's keyboard hints included.
+        inputProps={{
+          'aria-label': LABEL,
+          'data-testid': 'confirm-action-type-to-confirm',
+          autoCapitalize: 'none',
+          autoCorrect: 'off',
+          spellCheck: false,
+        }}
       />
     </ThemeProvider>,
   );
