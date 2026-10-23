@@ -266,10 +266,22 @@ describe("what the list says", () => {
     const client = stubClient([SAVED_VISA]);
     const { rerender } = renderList({ config: onPageStore(), client });
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
-    const { handOffStore } = await import("./list-harness");
-    rerender(listFlow({ config: handOffStore(), client }));
-    await screen.findByTestId("list-option-HAND_OFF");
-    expect(radio("list-option-HAND_OFF").checked).toBe(false);
+    rerender(listFlow({ config: onPageStore({ methods: ["PIX"] }), client }));
+    await waitFor(() => expect(screen.queryByTestId("list-option-CARD")).toBeNull());
+    // Pix is now the store's only option, so it comes chosen in the card's place (FUT-3942).
+    await waitFor(() => expect(radio("list-option-PIX").checked).toBe(true));
+  });
+
+  it("leaves nothing chosen when the choice it cleared leaves two options", async () => {
+    const client = stubClient([SAVED_VISA]);
+    const door: CheckoutDoorOption = { id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: null, onSend: vi.fn() };
+    const reader: CheckoutDoorOption = { id: "reader", label: "Maquininha", action: "Enviar pedido", blocked: null, onSend: vi.fn() };
+    const { rerender } = renderList({ config: onPageStore(), client, list: { door: [door, reader] } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    rerender(listFlow({ config: onPageStore({ methods: [] }), client, list: { door: [door, reader] } }));
+    await waitFor(() => expect(screen.queryByTestId("list-option-CARD")).toBeNull());
+    expect(radio("list-door-cash").checked).toBe(false);
+    expect(radio("list-door-reader").checked).toBe(false);
     expect(payButton().textContent).toContain("Escolha como pagar");
     await waitFor(() => expect(screen.queryByTestId("list-blocked-reason")).toBeNull());
     expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");

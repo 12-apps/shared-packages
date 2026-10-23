@@ -90,9 +90,8 @@ export function lastUsedCard(saved: readonly SavedCard[]): SavedCard | undefined
  * saved card makes "Cartão de crédito" the choice with that card selected —
  * the one used last ({@link lastUsedCard}). The buyer's LAST online method
  * (`lastMethod`, FUT-3611) wins when the store offers it: Pix as Pix, since
- * choosing creates nothing any more. Never a door tender (FUT-1478), and not
- * a store's only method by itself either (that pick used to raise an order
- * with no tap at all).
+ * choosing creates nothing any more. Never a door tender by itself (FUT-1478):
+ * with nothing here to choose, {@link soleOption} has the last word.
  *
  * A buyer back here because a card was REFUSED (`fresh`) keeps the card
  * chosen, with no saved card selected for them — the one this would pick is
@@ -112,6 +111,35 @@ export function preselection(
   const head = lastUsedCard(saved);
   if (!head) return null;
   return { choice: { kind: "online", method: "CARD" }, selection: head.id };
+}
+
+/**
+ * The one option a list offers, chosen for the buyer (FUT-3942, owner
+ * 2026-10-23: "se só tem uma opção … já vir selecionada"). Asked only when
+ * {@link preselection} chose nothing.
+ *
+ * The ONLINE group decides first: one choosable row there — a hand-off
+ * store's "Pix ou cartão", a Pix-only store's Pix, a card with nothing saved
+ * (its fields open) — is chosen even with door rows beside it (owner, "sim,
+ * sempre"). With no online row drawn at all, a sole door row is chosen. Two or
+ * more of either, and nothing is. A disabled row is drawn, not offered: it is
+ * never the one chosen, but while it is drawn the door is not the only way to
+ * pay (a card that is only waiting on the chain must not hand the buyer a door
+ * tender).
+ */
+export function soleOption(
+  rows: readonly OnlineRow[],
+  doorIds: readonly string[],
+): { choice: CheckoutListChoice; selection: string | null } | null {
+  const offered = rows.filter((row) => !row.disabled);
+  const [row] = offered;
+  if (offered.length === 1 && row) {
+    const choice: CheckoutListChoice = row.funding ? { kind: "online", method: row.method, funding: row.funding } : { kind: "online", method: row.method };
+    return { choice, selection: row.method === "CARD" ? NEW_CARD : null };
+  }
+  const [door] = doorIds;
+  if (rows.length === 0 && doorIds.length === 1 && door !== undefined) return { choice: { kind: "door", id: door }, selection: null };
+  return null;
 }
 
 /**

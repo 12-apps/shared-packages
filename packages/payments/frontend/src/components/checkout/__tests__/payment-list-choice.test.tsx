@@ -88,11 +88,11 @@ describe("what comes chosen", () => {
     expect(screen.getByTestId("list-bar-live").textContent).toBe("Escolha como pagar.");
   });
 
-  it("never chooses a store's ONLY method for the buyer, and so raises nothing", async () => {
+  it("chooses a store's ONLY method for the buyer (FUT-3942), and still raises nothing", async () => {
     const createOrder = vi.fn();
     renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), createOrder });
     await screen.findByTestId("payment-list");
-    await waitFor(() => expect(radio("list-option-PIX").checked).toBe(false));
+    await waitFor(() => expect(radio("list-option-PIX").checked).toBe(true));
     expect(createOrder).not.toHaveBeenCalled();
   });
 });

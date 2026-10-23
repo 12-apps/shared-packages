@@ -5,7 +5,8 @@ import { useSavedCardList } from "../card-sources";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
-import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, type OnlineCapability, type OnlineRow } from "./choice";
+import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, soleOption, type OnlineCapability, type OnlineRow } from "./choice";
+import { useChoiceUpkeep, useStableIds } from "./choice-upkeep";
 import { isTaxId, topCpfField } from "./top-cpf";
 import type { CheckoutListChoice } from "./types";
 import type { ListWallet } from "./use-capability";
@@ -67,7 +68,8 @@ function useListCard(saved: SavedCard[]): ListCard {
 
 /**
  * Preselect ONCE, when the saved cards answer — never over a choice the buyer
- * already made, and never again after they made one (M7).
+ * already made, and never again after they made one (M7). With nothing the
+ * buyer's history picks, a list's only option is chosen ({@link soleOption}).
  */
 function usePreselect(
   loaded: boolean,
@@ -75,6 +77,7 @@ function usePreselect(
   saved: readonly SavedCard[],
   fresh: boolean,
   lastMethod: "PIX" | "CARD" | null,
+  doorIds: readonly string[],
   apply: (choice: CheckoutListChoice, selection: string | null) => void,
   touched: { current: boolean },
 ): boolean {
@@ -85,10 +88,10 @@ function usePreselect(
   useEffect(() => {
     if (done.current || touched.current || !loaded) return;
     done.current = true;
-    const pick = preselection(rows, saved, fresh, lastMethod);
+    const pick = preselection(rows, saved, fresh, lastMethod) ?? soleOption(rows, doorIds);
     if (pick) apply(pick.choice, pick.selection);
     setSettled(true);
-  }, [loaded, rows, saved, fresh, lastMethod, apply, touched]);
+  }, [loaded, rows, saved, fresh, lastMethod, doorIds, apply, touched]);
   return settled;
 }
 
@@ -143,6 +146,8 @@ export function useListState(input: {
   wallets?: readonly ListWallet[];
   /** "Alterar" on the payer line revealed the CPF at the top (E2 → E1). */
   revealed?: boolean;
+  /** The host's door rows' ids, in order — a sole option among them is chosen (FUT-3942). */
+  doorIds?: readonly string[];
 }): ListState {
   const { capability } = input;
   const rows = useMemo(() => onlineRows(capability), [capability]);
@@ -158,7 +163,8 @@ export function useListState(input: {
     },
     [setSelection],
   );
-  const settled = usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, apply, touched);
+  const doorIds = useStableIds(input.doorIds);
+  const settled = usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, doorIds, apply, touched);
   const choose = useCallback(
     (next: CheckoutListChoice) => {
       touched.current = true;
@@ -170,14 +176,8 @@ export function useListState(input: {
     },
     [cards, setSelection, input.fresh],
   );
-  // A choice the chain no longer offers (a config that resolved to a hand-off
-  // store after the card was preselected) is no choice at all. Matched on the
-  // funding too: a debit row that went away (its billing address with it) must
-  // not leave a choice the card charge would run as CREDIT (FUT-3754).
-  useEffect(() => {
-    if (choice?.kind !== "online") return;
-    if (!rows.some((row) => row.method === choice.method && row.funding === choice.funding && !row.disabled)) setChoice(null);
-  }, [choice, rows]);
+  const lastMethod = input.lastMethod ?? null;
+  useChoiceUpkeep({ settled, touched, choice, setChoice, apply, rows, doorIds, cards, fresh: input.fresh, lastMethod });
   const { onChoiceChange } = input;
   useEffect(() => {
     onChoiceChange?.(choice);
