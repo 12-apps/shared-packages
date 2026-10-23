@@ -49,7 +49,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     },
     'pix.create': {
       scenario: 'Criação de pedido com QR Code Pix — POST /orders',
-      expected: 'HTTP 201 com o pedido (ORDE_…) e qr_codes[] com o texto copia-e-cola e os links da imagem. Criar o QR NÃO significa pagamento.',
+      expected: 'HTTP 201 com o pedido (ORDE_…) e a cobrança Pix (charges[].qr_code) com o texto copia-e-cola e os links da imagem. Criar o QR NÃO significa pagamento.',
     },
     'pix.consult': {
       scenario: 'Consulta do pedido Pix — GET /orders/{order_id}',

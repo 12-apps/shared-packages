@@ -17,6 +17,7 @@ import {
 import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
+import { pixPayload, summaryItems } from './pagbank-payloads';
 import { findChargeByReference, getCharge, refund } from './pagbank-operations';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
@@ -62,15 +63,6 @@ import { chargeDescription, sha256Hex, stubCharge } from './shared';
 
 /** PIX charge window (matches the copy shown in the PIX view). */
 const PIX_TTL_MS = 15 * 60 * 1000;
-
-function pixPayload(input: ChargeInput, credentials: ResolvedCredentials, expiresAt: string) {
-  return {
-    reference_id: input.reference,
-    customer: customerPayload(input.customer),
-    qr_codes: [{ amount: { value: input.amount.amountCents }, expiration_date: expiresAt }],
-    notification_urls: notificationUrls(credentials),
-  };
-}
 
 /**
  * The `card` object of a card charge's `payment_method` — which of PagBank's
@@ -129,16 +121,7 @@ function cardPayload(input: ChargeInput, credentials: ResolvedCredentials, copy:
   return {
     reference_id: input.reference,
     customer: customerPayload(input.customer),
-    // The Orders API requires `items` on a card order; one summary line whose
-    // amount equals the total (line-item detail stays in the host's DB).
-    items: [
-      {
-        reference_id: input.reference,
-        name: copy.payer.lineItemName,
-        quantity: 1,
-        unit_amount: input.amount.amountCents,
-      },
-    ],
+    items: summaryItems(input, copy),
     charges: [cardCharge(input)],
     notification_urls: notificationUrls(credentials),
   };
@@ -156,7 +139,7 @@ function createChargeWith(
       const expiresAt = new Date(Date.now() + PIX_TTL_MS).toISOString();
       const res = await pagbankRequest<PagBankPixResponse>('/orders', credentials, {
         method: 'POST',
-        body: pixPayload(input, credentials, expiresAt),
+        body: pixPayload(input, credentials, copy, expiresAt),
         idempotencyKey,
       });
       return mapPix(res, input, expiresAt);

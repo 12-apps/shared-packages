@@ -125,16 +125,17 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
     }
     const debitOrder = debitAnswer(route, body) ?? walletAnswer(route, body);
     if (debitOrder) return debitOrder;
-    if (route === 'POST /orders' && Array.isArray(body['qr_codes'])) {
-      return json({ id: 'ORDE_PIX', reference_id: body['reference_id'], qr_codes: [{ id: 'QRCO_1', text: '00020101pix', expiration_date: '2026-10-17T12:15:00-03:00' }] }, 201, 'Created');
+    // The charge form (FUT-3928): the QR rides the WAITING charge.
+    const pixCharges = body['charges'] as { payment_method?: { type?: string } }[] | undefined;
+    if (route === 'POST /orders' && pixCharges?.[0]?.payment_method?.type === 'PIX') {
+      const pix = { type: 'PIX', pix: { expiration_date: '2026-10-17T12:15:00-03:00' } };
+      const waiting = { id: 'CHAR_PIX', status: 'WAITING', amount: { value: 1000, currency: 'BRL' }, payment_method: pix, qr_code: { id: 'QRCO_1', text: '00020101pix' } };
+      return json({ id: 'ORDE_PIX', reference_id: body['reference_id'], charges: [waiting] }, 201, 'Created');
     }
     if (route === 'GET /orders/ORDE_PIX') {
       pixPolls.push(1);
-      return json({
-        id: 'ORDE_PIX',
-        reference_id: 'r',
-        charges: pixPolls.length > 1 ? [{ id: 'CHAR_PIX', status: 'PAID', amount: { value: 1000 } }] : [],
-      });
+      const status = pixPolls.length > 1 ? 'PAID' : 'WAITING';
+      return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [{ id: 'CHAR_PIX', status, amount: { value: 1000 } }] });
     }
     if (route === 'POST /orders') {
       const charges = body['charges'] as { payment_method: { card: { encrypted: string } } }[];

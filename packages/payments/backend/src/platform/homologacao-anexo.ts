@@ -163,10 +163,17 @@ function pixOrderPayload(webhookUrl: string): Record<string, unknown> {
       email: 'cliente@sandbox.pagseguro.com.br',
       tax_id: '12345678909',
     },
-    qr_codes: [
+    items: [{ reference_id: 'homolog-platform', name: 'Homologation test', quantity: 1, unit_amount: 500 }],
+    // The charge form PagBank homologates (FUT-3928), as the adapter sends it.
+    charges: [
       {
-        amount: { value: 500 },
-        expiration_date: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        reference_id: 'homolog-platform',
+        description: 'Homologation test',
+        amount: { value: 500, currency: 'BRL' },
+        payment_method: {
+          type: 'PIX',
+          pix: { expiration_date: new Date(Date.now() + 15 * 60 * 1000).toISOString() },
+        },
       },
     ],
     notification_urls: [webhookUrl],

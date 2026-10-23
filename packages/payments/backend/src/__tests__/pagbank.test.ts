@@ -66,13 +66,18 @@ describe('pagbank adapter — charges', () => {
     ]);
   });
 
-  it('sends the proven PIX order shape and maps the QR back', async () => {
-    // The REAL create response for an unpaid PIX: no charges[] — the charge
-    // does not exist until the buyer pays (FUT-681). The old fixture invented
-    // a CHAR_1 entry, which is exactly what hid the identity bug.
+  it('sends the PIX order in the charge form PagBank homologates and maps the QR back (FUT-3928)', async () => {
+    // "Criar pedido com QR Code PIX v2": the QR rides the WAITING charge.
     const spy = mockFetch({
       id: 'ORDE_1',
-      qr_codes: [{ text: '00020126-emv', expiration_date: '2030-01-01T00:00:00Z' }],
+      charges: [
+        {
+          id: 'CHAR_1',
+          status: 'WAITING',
+          payment_method: { type: 'PIX', pix: { expiration_date: '2030-01-01T00:00:00Z' } },
+          qr_code: { id: 'QRCO_1', text: '00020126-emv' },
+        },
+      ],
     });
     const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
       { ...pixInput('order-1'), idempotencyKey: 'order-1:1' },
@@ -87,23 +92,65 @@ describe('pagbank adapter — charges', () => {
     const body = JSON.parse(init.body as string) as {
       reference_id: string;
       customer: { tax_id?: string };
-      qr_codes: Array<{ amount: { value: number } }>;
+      items: Array<{ unit_amount: number }>;
+      qr_codes?: unknown;
+      charges: Array<{
+        reference_id: string;
+        amount: { value: number; currency: string };
+        payment_method: { type: string; pix: { expiration_date: string } };
+      }>;
     };
     expect(body.reference_id).toBe('order-1');
     // CPF must go as bare digits — PagBank rejects punctuation.
     expect(body.customer.tax_id).toBe('12345678909');
-    expect(body.qr_codes[0]?.amount.value).toBe(12_50);
+    expect(body.qr_codes).toBeUndefined();
+    expect(body.items[0]?.unit_amount).toBe(12_50);
+    expect(body.charges[0]).toMatchObject({
+      reference_id: 'order-1',
+      amount: { value: 12_50, currency: 'BRL' },
+      payment_method: { type: 'PIX' },
+    });
+    expect(Date.parse(body.charges[0]!.payment_method.pix.expiration_date)).toBeGreaterThan(Date.now());
 
     expect(snapshot).toMatchObject({
       provider: 'pagbank',
-      // The order id is the only identity an unpaid PIX has; the hint labels
-      // it as an ORDER id so later reads can re-key the row (FUT-681).
-      providerChargeId: 'ORDE_1',
+      // The WAITING charge keys the row from the start; the hint names its order.
+      providerChargeId: 'CHAR_1',
       reference: 'order-1',
       status: 'PENDING',
-      pix: { qrText: '00020126-emv' },
+      pix: { qrText: '00020126-emv', expiresAt: '2030-01-01T00:00:00Z' },
       settlementHints: { orderId: 'ORDE_1' },
     });
+  });
+
+  it('still maps an order-level QR answer (orders created before FUT-3928)', async () => {
+    // The order-level form had no charge until the buyer paid (FUT-681).
+    mockFetch({ id: 'ORDE_1', qr_codes: [{ text: '00020126-emv', expiration_date: '2030-01-01T00:00:00Z' }] });
+    const snapshot = await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(pixInput('order-1'), LIVE);
+    expect(snapshot).toMatchObject({
+      providerChargeId: 'ORDE_1',
+      pix: { qrText: '00020126-emv', expiresAt: '2030-01-01T00:00:00Z' },
+      settlementHints: { orderId: 'ORDE_1' },
+    });
+  });
+
+  it('reads a PIX charge PagBank canceled at its QR deadline as EXPIRED, and one canceled before it as CANCELED (FUT-3928)', async () => {
+    const order = (deadline: string) => ({
+      id: 'ORDE_9',
+      charges: [
+        {
+          id: 'CHAR_9',
+          status: 'CANCELED',
+          amount: { value: 12_50, summary: { refunded: 0 } },
+          payment_method: { type: 'PIX', pix: { expiration_date: deadline } },
+        },
+      ],
+    });
+    const adapter = pagbankProvider(PT_BR_PAGBANK_COPY);
+    mockFetch(order('2020-01-01T00:00:00Z'));
+    expect((await adapter.getCharge('CHAR_9', LIVE, { orderId: 'ORDE_9' })).status).toBe('EXPIRED');
+    mockFetch(order('2099-01-01T00:00:00Z'));
+    expect((await adapter.getCharge('CHAR_9', LIVE, { orderId: 'ORDE_9' })).status).toBe('CANCELED');
   });
 
   it('routes PRODUCTION credentials at the live host, sandbox by default', async () => {

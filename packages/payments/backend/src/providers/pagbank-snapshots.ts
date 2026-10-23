@@ -23,9 +23,19 @@ import { pagbankDecline, type PagBankPaymentRawData } from './pagbank-declines';
 import { NAME } from './pagbank-http';
 import { capturedAmountCents } from './shared';
 
+/**
+ * A PIX create's answer. The charge form (FUT-3928) carries the QR on the
+ * charge — `charges[].qr_code` and `payment_method.pix.expiration_date`; the
+ * order-level `qr_codes[]` is the form orders created before it still answer.
+ */
 export interface PagBankPixResponse {
   id?: string;
-  charges?: Array<{ id?: string; qr_codes?: Array<{ text?: string }> }>;
+  charges?: Array<{
+    id?: string;
+    qr_code?: { text?: string };
+    qr_codes?: Array<{ text?: string }>;
+    payment_method?: { pix?: { expiration_date?: string } };
+  }>;
   qr_codes?: Array<{ text?: string; expiration_date?: string }>;
 }
 
@@ -55,6 +65,7 @@ export interface PagBankOrderCharge {
   id?: unknown;
   status?: unknown;
   amount?: { value?: unknown; summary?: { refunded?: unknown } };
+  payment_method?: { type?: unknown; pix?: { expiration_date?: unknown } };
 }
 
 export interface PagBankOrderResponse {
@@ -102,6 +113,19 @@ function qrExpired(res: PagBankOrderResponse, now: number): boolean {
 }
 
 /**
+ * True for a PIX charge PagBank canceled because its QR lapsed unpaid: the
+ * charge form (FUT-3928) cancels the charge itself at the deadline, where the
+ * order-level form left an order with no charge that this mapping called
+ * EXPIRED. Kept EXPIRED so the host still offers the buyer a new QR.
+ */
+function pixQrLapsed(charge: PagBankOrderCharge): boolean {
+  const deadline = charge.payment_method?.pix?.expiration_date;
+  if (charge.payment_method?.type !== 'PIX' || typeof deadline !== 'string') return false;
+  const expiresAt = Date.parse(deadline);
+  return Number.isFinite(expiresAt) && Date.now() >= expiresAt;
+}
+
+/**
  * A deciding charge's status in OUR vocabulary (FUT-681).
  *
  * PagBank's cancel operation both VOIDS an unpaid charge and REFUNDS a paid
@@ -120,7 +144,8 @@ function chargeStatus(charge: PagBankOrderCharge): ChargeSnapshot['status'] {
     case 'DECLINED':
       return 'DECLINED';
     case 'CANCELED':
-      return refundedCents(charge) > 0 ? 'REFUNDED' : 'CANCELED';
+      if (refundedCents(charge) > 0) return 'REFUNDED';
+      return pixQrLapsed(charge) ? 'EXPIRED' : 'CANCELED';
     case 'EXPIRED':
       return 'EXPIRED';
     default:
@@ -174,8 +199,18 @@ export function orderSnapshot(
   };
 }
 
+type PagBankPixCharge = NonNullable<PagBankPixResponse['charges']>[number];
+
+function chargeQrText(charge: PagBankPixCharge | undefined): string | undefined {
+  return charge?.qr_code?.text ?? charge?.qr_codes?.[0]?.text;
+}
+
 function pixQrText(res: PagBankPixResponse): string | undefined {
-  return res.qr_codes?.[0]?.text ?? res.charges?.[0]?.qr_codes?.[0]?.text;
+  return chargeQrText(res.charges?.[0]) ?? res.qr_codes?.[0]?.text;
+}
+
+function pixExpiry(res: PagBankPixResponse): string | undefined {
+  return res.charges?.[0]?.payment_method?.pix?.expiration_date ?? res.qr_codes?.[0]?.expiration_date;
 }
 
 export function mapPix(
@@ -188,12 +223,11 @@ export function mapPix(
   if (!providerOrderId || !qrText) {
     throw new ProviderRequestError(NAME, 'PagBank PIX response missing order/qr fields.');
   }
-  // An unpaid PIX order has NO charge — PagBank mints the charge only when the
-  // buyer pays, so the real create response carries no `charges[]` at all
-  // (FUT-681; the old fixtures inventing one is what hid this). The order id
-  // is the only provider-side identity in existence and keys the row until a
-  // webhook or poll names the real charge id; `settlementHints.orderId` labels
-  // it as an ORDER id so that later read can re-key the row (see
+  // The charge form (FUT-3928) answers with the WAITING charge, whose id keys
+  // the row from the start. An order-level create had NO charge until the
+  // buyer paid (FUT-681), so the order id keyed the row until a webhook or
+  // poll named the real charge; `settlementHints.orderId` labels it as an
+  // ORDER id so that later read can re-key the row (see
   // `upsertByProviderChargeId`) instead of never finding it.
   const providerChargeId = res.charges?.[0]?.id ?? providerOrderId;
   return {
@@ -205,7 +239,7 @@ export function mapPix(
     status: 'PENDING',
     amount: input.amount,
     method: 'PIX',
-    pix: { qrText, expiresAt: res.qr_codes?.[0]?.expiration_date ?? expiresAt },
+    pix: { qrText, expiresAt: pixExpiry(res) ?? expiresAt },
     settlementHints: { orderId: providerOrderId },
     raw: res,
   };
