@@ -74,6 +74,10 @@ describe("a list's only option (FUT-3942)", () => {
     expect(soleOption(onlineRows({ ...ALL, cardUnavailable: true }), ["cash"])?.choice).toEqual({ kind: "online", method: "PIX" });
   });
 
+  it("is never a door row while a card is drawn, even one this browser cannot take", () => {
+    expect(soleOption([{ method: "CARD", disabled: true }], ["cash"])).toBeNull();
+  });
+
   it("is the sole door row when nothing is paid online", () => {
     expect(soleOption([], ["cash"])).toEqual({ choice: { kind: "door", id: "cash" }, selection: null });
   });

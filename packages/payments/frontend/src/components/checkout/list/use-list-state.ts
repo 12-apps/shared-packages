@@ -181,17 +181,24 @@ export function useListState(input: {
   // funding too: a debit row that went away (its billing address with it) must
   // not leave a choice the card charge would run as CREDIT (FUT-3754).
   useEffect(() => {
+    if (choice?.kind === "door") {
+      // A door row the host stopped offering is no choice either (FUT-3942:
+      // a sole door row can now be chosen for the buyer).
+      if (!doorIds.includes(choice.id)) setChoice(null);
+      return;
+    }
     if (choice?.kind !== "online") return;
     if (!rows.some((row) => row.method === choice.method && row.funding === choice.funding && !row.disabled)) setChoice(null);
-  }, [choice, rows]);
+  }, [choice, rows, doorIds]);
   // The options can change after the one preselection — a chain that resolved
   // to a hand-off store late, a choice the chain stopped offering. While the
   // buyer has touched nothing and nothing is chosen, a sole option still is.
+  const lastMethod = input.lastMethod ?? null;
   useEffect(() => {
     if (!settled || touched.current || choice !== null) return;
-    const sole = soleOption(rows, doorIds);
-    if (sole) apply(sole.choice, sole.selection);
-  }, [settled, choice, rows, doorIds, apply]);
+    const pick = preselection(rows, cards, input.fresh, lastMethod) ?? soleOption(rows, doorIds);
+    if (pick) apply(pick.choice, pick.selection);
+  }, [settled, choice, rows, cards, input.fresh, lastMethod, doorIds, apply]);
   const { onChoiceChange } = input;
   useEffect(() => {
     onChoiceChange?.(choice);

@@ -121,9 +121,11 @@ export function preselection(
  * The ONLINE group decides first: one choosable row there — a hand-off
  * store's "Pix ou cartão", a Pix-only store's Pix, a card with nothing saved
  * (its fields open) — is chosen even with door rows beside it (owner, "sim,
- * sempre"). With no online row at all, a sole door row is chosen. Two or more
- * of either, and nothing is. A disabled row is drawn, not offered, so it never
- * counts.
+ * sempre"). With no online row drawn at all, a sole door row is chosen. Two or
+ * more of either, and nothing is. A disabled row is drawn, not offered: it is
+ * never the one chosen, but while it is drawn the door is not the only way to
+ * pay (a card that is only waiting on the chain must not hand the buyer a door
+ * tender).
  */
 export function soleOption(
   rows: readonly OnlineRow[],
@@ -136,7 +138,7 @@ export function soleOption(
     return { choice, selection: row.method === "CARD" ? NEW_CARD : null };
   }
   const [door] = doorIds;
-  if (offered.length === 0 && doorIds.length === 1 && door !== undefined) return { choice: { kind: "door", id: door }, selection: null };
+  if (rows.length === 0 && doorIds.length === 1 && door !== undefined) return { choice: { kind: "door", id: door }, selection: null };
   return null;
 }
 
