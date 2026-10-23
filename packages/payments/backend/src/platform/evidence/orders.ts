@@ -48,7 +48,13 @@ function idsOf(
   };
 }
 
-async function createPix(deps: EvidenceRunDeps, runId: string): Promise<{ step: EvidenceStep; orderId: string | null }> {
+/** The created Pix: its step, the stored row's id the polls read through, and the order PagBank named. */
+interface CreatedPix {
+  step: EvidenceStep;
+  ids: { chargeId: string; orderId: string } | null;
+}
+
+async function createPix(deps: EvidenceRunDeps, runId: string): Promise<CreatedPix> {
   const reference = `homolog-${runId.slice(0, 8)}-pix`;
   const created = await recordTraffic(() =>
     deps.gateway.charge(
@@ -65,7 +71,7 @@ async function createPix(deps: EvidenceRunDeps, runId: string): Promise<{ step: 
   );
   if (!created.ok) {
     return {
-      orderId: null,
+      ids: null,
       step: stepOf('pix.create', 'FAILED', clockOf(deps)(), {
         calls: created.calls,
         ids: { reference_id: reference },
@@ -73,15 +79,18 @@ async function createPix(deps: EvidenceRunDeps, runId: string): Promise<{ step: 
       }),
     };
   }
-  const orderId = created.value.providerChargeId;
+  // The charge form (FUT-3928) keys the row by the WAITING charge; the order
+  // is what PagBank's own logs name, so the evidence names it too.
+  const chargeId = created.value.providerChargeId;
+  const orderId = created.value.snapshot.settlementHints?.orderId ?? chargeId;
   // A stored charge handed back WITHOUT a call (an idempotent replay) proves
   // nothing about this run, so a recorded 2xx is part of the bar.
   const qr = Boolean(created.value.snapshot.pix?.qrText) && answered(created.calls);
   return {
-    orderId,
+    ids: { chargeId, orderId },
     step: stepOf('pix.create', qr ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
       calls: created.calls,
-      ids: idsOf(created.value, reference),
+      ids: idsOf(created.value, reference, orderId),
       observed: qr ? deps.copy.qrCreated(orderId) : deps.copy.qrMissing,
     }),
   };
@@ -96,9 +105,9 @@ interface PixPolls {
 }
 
 /** Consult the order until the simulator has paid it, or the polls run out. */
-async function pollPix(deps: EvidenceRunDeps, orderId: string): Promise<PixPolls> {
+async function pollPix(deps: EvidenceRunDeps, storedId: string): Promise<PixPolls> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const result: PixPolls = { calls: [], status: null, chargeId: orderId, lastError: null, made: 0 };
+  const result: PixPolls = { calls: [], status: null, chargeId: storedId, lastError: null, made: 0 };
   while (result.made < (deps.pixPolls ?? PIX_POLLS) && result.status !== 'PAID') {
     if (result.made > 0) await sleep(deps.pixPollMs ?? PIX_POLL_MS);
     result.made += 1;
@@ -117,10 +126,10 @@ async function pollPix(deps: EvidenceRunDeps, orderId: string): Promise<PixPolls
 export async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<EvidenceStep[]> {
   const clock = clockOf(deps);
   const created = await createPix(deps, runId);
-  const orderId = created.orderId;
-  if (!orderId) return [created.step, pendingStep('pix.consult', deps.copy), pendingStep('pix.paid', deps.copy)];
+  if (!created.ids) return [created.step, pendingStep('pix.consult', deps.copy), pendingStep('pix.paid', deps.copy)];
+  const { chargeId, orderId } = created.ids;
 
-  const polled = await pollPix(deps, orderId);
+  const polled = await pollPix(deps, chargeId);
   const ids = { order_id: orderId, ...(polled.chargeId !== orderId ? { charge_id: polled.chargeId } : {}) };
   const consult = stepOf('pix.consult', polled.status !== null && answered(polled.calls) ? 'EXECUTED' : 'FAILED', clock(), {
     // The first and the last poll: the move from "waiting" to "paid" is the
