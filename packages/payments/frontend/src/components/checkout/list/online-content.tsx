@@ -22,7 +22,7 @@ function nextChip(key: string, at: number, count: number): number | null {
 }
 
 /**
- * The saved cards as chips — "Visa final 4242", "Outro cartão" — the
+ * The saved cards as chips — "Visa 4242", "Outro cartão" — the
  * storefront's chip look (the owner's "use the chips system is using today"):
  * MUI's own `Chip`, which the host's theme already dresses, filled in the
  * primary colour when chosen.

@@ -218,7 +218,7 @@ export function actionLabel(
   return verbs[choice.method];
 }
 
-/** A saved card's name — "Visa final 4242", or "Cartão final 4242" when the network is unknown. */
+/** A saved card's name — "Visa 4242", or "Cartão 4242" when the network is unknown. */
 export function cardName(copy: PaymentListCopy, card: Pick<SavedCard, "brand" | "last4">): string {
   const brand = card.brand.trim();
   return copy.savedCard(brand && brand.toLowerCase() !== "unknown" ? brand : null, card.last4);

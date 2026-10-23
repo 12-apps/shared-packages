@@ -678,7 +678,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // options means no door heading.
   "PaymentList/SavedCard": {
     testIds: ["payment-list", "list-card-vault_1", "list-door-cash", "list-pay"],
-    text: ["Pagar agora, pelo app", "Pagar na entrega", "Visa final 4242 ou outro cartão"],
+    text: ["Pagar agora, pelo app", "Pagar na entrega", "Visa 4242 ou outro cartão"],
   },
   "PaymentList/NewBuyer": {
     testIds: ["payment-list", "list-option-PIX", "list-option-CARD"],

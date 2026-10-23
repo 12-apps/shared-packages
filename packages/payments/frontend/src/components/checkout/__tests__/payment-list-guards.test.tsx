@@ -63,7 +63,7 @@ describe("a bar that must stop", () => {
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
     vi.useFakeTimers();
     fireEvent.click(payButton());
-    expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa final 4242…");
+    expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 27,00 no Visa 4242…");
     rerender(listFlow({ ...host, cartTotal: "R$ 22,00" }));
     await advance(CHARGE_WINDOW_MS * 2);
     vi.useRealTimers();
@@ -259,7 +259,7 @@ describe("what the list says", () => {
 
   it("names a card of an unknown network 'Cartão final …'", async () => {
     renderList({ config: onPageStore(), client: stubClient([{ ...SAVED_VISA, brand: "Unknown", last4: "1234" }]) });
-    await waitFor(() => expect(screen.getByTestId("list-card-vault-1").textContent).toBe("Cartão final 1234"));
+    await waitFor(() => expect(screen.getByTestId("list-card-vault-1").textContent).toBe("Cartão 1234"));
   });
 
   it("clears a choice the store no longer offers once its config resolves", async () => {

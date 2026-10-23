@@ -162,7 +162,7 @@ describe("the amount due on the bar", () => {
     expect(payButton().textContent).toBe("PagarR$ 22,00");
     vi.useFakeTimers();
     fireEvent.click(payButton());
-    expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 22,00 no Visa final 4242…");
+    expect(screen.getByTestId("list-charge-bar").textContent).toBe("Pagando R$ 22,00 no Visa 4242…");
     vi.useRealTimers();
   });
 

@@ -292,7 +292,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
   pix: { label: string; hint: string };
   card: {
     label: string;
-    /** "Visa final 4242 ou outro cartão" — the preselected saved card named. */
+    /** "Visa 4242 ou outro cartão" — the preselected saved card named. */
     hintSaved: (card: string) => string;
     /** "Digite os dados do cartão". */
     hintNew: string;
@@ -324,7 +324,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     /** "Você paga na página da InfinitePay e volta" — `null` when the store published no name. */
     hint: (provider: string | null) => string;
   };
-  /** "Visa final 4242"; `brand` is `null` when the network is unknown ("Cartão final 4242"). */
+  /** "Visa 4242"; `brand` is `null` when the network is unknown ("Cartão 4242"). */
   savedCard: (brand: string | null, last4: string) => string;
   /** "Outro cartão". */
   otherCard: string;
@@ -374,7 +374,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
   /** "Pagando como Ana Teste · CPF ✓". */
   payer: (name: string) => string;
   payerChange: string;
-  /** The 5-second bar: "Pagando R$ 27,00 no Visa final 4242…"; `card` is `null` for a card typed now. */
+  /** The 5-second bar: "Pagando R$ 27,00 no Visa 4242…"; `card` is `null` for a card typed now. */
   charging: (total: string, card: string | null) => string;
   /**
    * The 5-second bar when the host's balance pays the WHOLE amount
