@@ -230,7 +230,7 @@ describe('ConfirmAction', () => {
     });
   });
 
-  it('holds the confirm disabled until the exact text is typed', async () => {
+  it('holds the confirm disabled until the text is typed', async () => {
     const onConfirm = vi.fn();
     renderConfirmAction(onConfirm, { typeToConfirm: 'Bebidas' });
 
