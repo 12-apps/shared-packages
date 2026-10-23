@@ -1072,6 +1072,16 @@ describe('infinitepay live mode', () => {
     expect(items[0]).not.toHaveProperty('name');
   });
 
+  it('sends the phone as +55 and its digits, whatever shape the buyer typed it in (FUT-3955)', async () => {
+    for (const phone of ['(31) 99449-4408', '+55 31 99449-4408', '031994494408', '5531994494408']) {
+      const calls = stubFetch([{ body: { url: 'https://checkout.infinitepay.io/abc' } }]);
+      const input = { ...pixInput(), customer: { ...pixInput().customer, phone } };
+      await infinitePayProvider(PT_BR_INFINITEPAY_COPY).createCharge(input, creds);
+      const customer = jsonOf(calls[0]!.init)['customer'] as Record<string, unknown>;
+      expect(customer['phone_number'], phone).toBe('+5531994494408');
+    }
+  });
+
   it('believes a webhook ONLY after payment_check confirms it', async () => {
     const calls = stubFetch([{ body: { success: true, paid: true, amount: 12_50 } }]);
     const delivery = {

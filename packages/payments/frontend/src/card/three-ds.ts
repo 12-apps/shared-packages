@@ -1,3 +1,4 @@
+import { brLocalNumber } from "../phone";
 import { ensurePagBankSdk } from "./tokenize";
 
 /**
@@ -90,9 +91,8 @@ type ThreeDSOutcome =
  * cannot be split. PagBank requires at least one MOBILE phone on the request.
  */
 function mobileOf(phone: string): PagBankThreeDSRequest["data"]["customer"]["phones"][number] | null {
-  const digits = phone.replace(/\D/g, "");
-  const local = digits.length >= 12 && digits.startsWith("55") ? digits.slice(2) : digits;
-  if (local.length < 10 || local.length > 11) return null;
+  const local = brLocalNumber(phone);
+  if (local === null || local.length < 10 || local.length > 11) return null;
   return { country: "55", area: local.slice(0, 2), number: local.slice(2), type: "MOBILE" };
 }
 

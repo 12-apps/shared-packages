@@ -1,3 +1,4 @@
+import { brLocalNumber } from '../core/customer-schema';
 import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
 import { recordedFetch } from '../core/traffic-recorder';
@@ -64,17 +65,14 @@ interface PagBankPhone {
  * rather than being eaten as a duplicate DDI.
  */
 function customerPhones(phone: string | null | undefined): PagBankPhone[] | undefined {
-  const trimmed = (phone ?? '').trim();
-  const digits = trimmed.replace(/\D/g, '');
   // A leading `+` is an EXPLICIT country code and has to be honoured, not
   // stripped: `+1 415 555 0100` is eleven digits, exactly like a Brazilian
-  // mobile, so dropping the `+` first turns a US number into DDD 14.
-  const prefixed = trimmed.startsWith('+') || digits.length === 12 || digits.length === 13;
-  if (prefixed && !digits.startsWith('55')) return undefined;
-  const local = prefixed ? digits.slice(2) : digits;
+  // mobile, so dropping the `+` first turns a US number into DDD 14. The
+  // gate's own reading (`brLocalNumber`), so the two can never disagree.
+  const local = brLocalNumber(phone ?? '');
   // 2-digit DDD + an 8-digit landline or 9-digit mobile. Anything else is not
   // a Brazilian phone we can split into all three parts, so nothing is sent.
-  if (local.length < 10 || local.length > 11) return undefined;
+  if (local === null || local.length < 10 || local.length > 11) return undefined;
   return [{ country: '55', area: local.slice(0, 2), number: local.slice(2) }];
 }
 

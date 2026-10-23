@@ -31,6 +31,7 @@
 import { isValidCpf } from "../../card";
 
 import type { CheckoutChainLink, CheckoutCustomerField, PaymentMethod } from "./types";
+import { brLocalNumber } from "../../phone";
 
 /** What a chain that declared nothing is assumed to need — today's behaviour. */
 const CPF_REQUIRED: CheckoutCustomerField = { key: "taxId", type: "CPF", required: true };
@@ -102,8 +103,8 @@ const RULES: Record<CheckoutCustomerField["type"], (value: string) => boolean> =
   NAME: (value) => value.trim().length >= 2,
   EMAIL: (value) => /^[^\s@]+@[^\s@]+$/.test(value) && /\.[^\s@.]+$/.test(value),
   // DDD + an 8-digit landline or a 9-digit mobile, mirroring the server's rule.
-  PHONE: (value) => /^\d{10,11}$/.test(value.replace(/\D/g, "")),
-  MOBILE: (value) => /^\d{2}9\d{8}$/.test(value.replace(/\D/g, "")),
+  PHONE: (value) => /^\d{10,11}$/.test(brLocalNumber(value) ?? ""),
+  MOBILE: (value) => /^\d{2}9\d{8}$/.test(brLocalNumber(value) ?? ""),
   // The real check-digit rule, not a length test: the same validator the CPF
   // input has always used, so the form and the gate cannot disagree. The
   // PREDICATE rather than the message — this is a gate, and it would only be

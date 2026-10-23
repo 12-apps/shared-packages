@@ -182,19 +182,36 @@ function isValidTaxId(value: string): boolean {
 }
 
 /**
- * The DDD + local part of a Brazilian number, or `null` when the value cannot
- * be one. The prefix logic mirrors the PagBank payload splitter
- * (`customerPhones`, pagbank-http.ts, FUT-488) LINE FOR LINE: a leading `+` is
- * an explicit country code and must be honoured, and 12–13 bare digits cannot
- * be a local number so they must carry one — which keeps DDD 55 (Santa
- * Maria/RS) from being eaten as a duplicate DDI.
+ * The DDD + local part of a Brazilian number, in whatever shape the buyer
+ * typed or their phone autofilled it (FUT-3955): `+55 31 99449-4408`,
+ * `5531994494408`, `0031…`, `(31) 99449-4408`, a trunk `0` (`031 99449-4408`).
+ * `null` when the value cannot be one. A leading `+` or `00` is an explicit
+ * country code and must be honoured (a `+1` number is not Brazilian), and
+ * 12–13 bare digits cannot be a local number so they must carry one, which
+ * keeps DDD 55 (Santa Maria/RS) from being eaten as a duplicate DDI. The one
+ * exception is a single trunk `0` before an 11- or 10-digit national number.
+ * The PagBank splitter and the InfinitePay payload read the number through
+ * this same function.
  */
-function brLocalNumber(value: string): string | null {
+export function brLocalNumber(value: string): string | null {
+  const { digits, international } = withoutPrefixes(value);
+  const prefixed = international || digits.length === 12 || digits.length === 13;
+  if (!prefixed) return digits;
+  return digits.startsWith('55') ? digits.slice(2) : null;
+}
+
+/**
+ * The digits after an international `00` or `+` (flagged, so the country code
+ * is then required), or the national digits once a single trunk `0` before a
+ * 10- or 11-digit number is dropped.
+ */
+function withoutPrefixes(value: string): { digits: string; international: boolean } {
   const trimmed = value.trim();
   const digits = trimmed.replace(/\D/g, '');
-  const prefixed = trimmed.startsWith('+') || digits.length === 12 || digits.length === 13;
-  if (prefixed && !digits.startsWith('55')) return null;
-  return prefixed ? digits.slice(2) : digits;
+  if (digits.startsWith('00')) return { digits: digits.slice(2), international: true };
+  if (trimmed.startsWith('+')) return { digits, international: true };
+  const trunk = digits.startsWith('0') && (digits.length === 11 || digits.length === 12);
+  return { digits: trunk ? digits.slice(1) : digits, international: false };
 }
 
 /**

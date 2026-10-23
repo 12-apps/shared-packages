@@ -207,6 +207,30 @@ describe('validation follows the field type', () => {
     }
   });
 
+  it('MOBILE takes the number in whatever shape the buyer typed or autofilled it (FUT-3955)', () => {
+    const infinitepay = infinitePayProvider(PT_BR_INFINITEPAY_COPY).customerSchema;
+    for (const phone of [
+      '+5531994494408',
+      '+55 31 99449-4408',
+      '5531994494408',
+      '005531994494408',
+      '031994494408',
+      '0 31 99449-4408',
+      '(31) 99449-4408',
+      '31.99449.4408',
+      '31994494408',
+    ]) {
+      expect(validateCustomer(infinitepay, 'PIX', { phone }), phone).toEqual([]);
+    }
+    // DDD 55 (Santa Maria) is a DDD, not a country code, at 11 digits.
+    expect(validateCustomer(infinitepay, 'PIX', { phone: '55991234567' })).toEqual([]);
+    for (const phone of ['+1 415 555 0100', '0044 20 7946 0958', '3199449440']) {
+      expect(validateCustomer(infinitepay, 'PIX', { phone }), phone).toEqual([
+        { field: 'phone', reason: 'INVALID', required: true },
+      ]);
+    }
+  });
+
   it('stripe BOLETO blocks on name, e-mail and tax id — and only for BOLETO', () => {
     const stripe = stripeProvider(PT_BR_STRIPE_COPY).customerSchema;
     expect(validateCustomer(stripe, 'BOLETO', {})).toEqual([
