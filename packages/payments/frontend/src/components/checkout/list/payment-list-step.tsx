@@ -218,6 +218,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     onChoiceChange: list.onChoiceChange,
     wallets: cap.wallets,
     revealed,
+    doorIds: list.door?.map((option) => option.id),
   });
   const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });
   const [handingOff, startHandOff] = useHandingOff(c.createError);

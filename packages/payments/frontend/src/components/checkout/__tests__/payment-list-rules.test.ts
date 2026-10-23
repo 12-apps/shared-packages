@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { NEW_CARD } from "../../../card";
-import { actionLabel, blockedReason, onlineRows, preselection } from "../list/choice";
+import { actionLabel, blockedReason, onlineRows, preselection, soleOption } from "../list/choice";
 import { cpfHolds, cpfProvider, topCpfField } from "../list/top-cpf";
 import { PT_BR_PAYMENT_LIST_COPY as COPY } from "../list/pt-BR";
 import type { CheckoutChainLink, CheckoutCustomerField } from "../types";
@@ -53,6 +53,36 @@ describe("what comes chosen", () => {
 
   it("is nothing at a store whose card this browser cannot take", () => {
     expect(preselection(onlineRows({ ...ALL, cardUnavailable: true }), [VISA], false)).toBeNull();
+  });
+});
+
+describe("a list's only option (FUT-3942)", () => {
+  it("is a hand-off store's single row", () => {
+    expect(soleOption(onlineRows({ ...ALL, handOff: true }), [])).toEqual({ choice: { kind: "online", method: "HAND_OFF" }, selection: null });
+  });
+
+  it("is the single online row even with door rows beside it", () => {
+    expect(soleOption(onlineRows({ ...ALL, handOff: true }), ["cash", "reader"])?.choice).toEqual({ kind: "online", method: "HAND_OFF" });
+    expect(soleOption(onlineRows({ ...ALL, offered: ["PIX"] }), ["cash"])?.choice).toEqual({ kind: "online", method: "PIX" });
+  });
+
+  it("opens the card fields when the card is the only row", () => {
+    expect(soleOption(onlineRows({ ...ALL, offered: ["CARD"] }), [])).toEqual({ choice: { kind: "online", method: "CARD" }, selection: NEW_CARD });
+  });
+
+  it("does not count a card this browser cannot take", () => {
+    expect(soleOption(onlineRows({ ...ALL, cardUnavailable: true }), ["cash"])?.choice).toEqual({ kind: "online", method: "PIX" });
+  });
+
+  it("is the sole door row when nothing is paid online", () => {
+    expect(soleOption([], ["cash"])).toEqual({ choice: { kind: "door", id: "cash" }, selection: null });
+  });
+
+  it("is nothing when there are two of either", () => {
+    expect(soleOption(onlineRows(ALL), [])).toBeNull();
+    expect(soleOption(onlineRows({ ...ALL, debit: true, offered: ["CARD"] }), [])).toBeNull();
+    expect(soleOption([], ["cash", "reader"])).toBeNull();
+    expect(soleOption([], [])).toBeNull();
   });
 });
 
