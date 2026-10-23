@@ -6,6 +6,7 @@ import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
 import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, soleOption, type OnlineCapability, type OnlineRow } from "./choice";
+import { useChoiceUpkeep, useStableIds } from "./choice-upkeep";
 import { isTaxId, topCpfField } from "./top-cpf";
 import type { CheckoutListChoice } from "./types";
 import type { ListWallet } from "./use-capability";
@@ -162,8 +163,7 @@ export function useListState(input: {
     },
     [setSelection],
   );
-  const doorKey = (input.doorIds ?? []).join("\u0000");
-  const doorIds = useMemo(() => (doorKey === "" ? [] : doorKey.split("\u0000")), [doorKey]);
+  const doorIds = useStableIds(input.doorIds);
   const settled = usePreselect(loaded, rows, cards, input.fresh, input.lastMethod ?? null, doorIds, apply, touched);
   const choose = useCallback(
     (next: CheckoutListChoice) => {
@@ -176,29 +176,8 @@ export function useListState(input: {
     },
     [cards, setSelection, input.fresh],
   );
-  // A choice the chain no longer offers (a config that resolved to a hand-off
-  // store after the card was preselected) is no choice at all. Matched on the
-  // funding too: a debit row that went away (its billing address with it) must
-  // not leave a choice the card charge would run as CREDIT (FUT-3754).
-  useEffect(() => {
-    if (choice?.kind === "door") {
-      // A door row the host stopped offering is no choice either (FUT-3942:
-      // a sole door row can now be chosen for the buyer).
-      if (!doorIds.includes(choice.id)) setChoice(null);
-      return;
-    }
-    if (choice?.kind !== "online") return;
-    if (!rows.some((row) => row.method === choice.method && row.funding === choice.funding && !row.disabled)) setChoice(null);
-  }, [choice, rows, doorIds]);
-  // The options can change after the one preselection — a chain that resolved
-  // to a hand-off store late, a choice the chain stopped offering. While the
-  // buyer has touched nothing and nothing is chosen, a sole option still is.
   const lastMethod = input.lastMethod ?? null;
-  useEffect(() => {
-    if (!settled || touched.current || choice !== null) return;
-    const pick = preselection(rows, cards, input.fresh, lastMethod) ?? soleOption(rows, doorIds);
-    if (pick) apply(pick.choice, pick.selection);
-  }, [settled, choice, rows, cards, input.fresh, lastMethod, doorIds, apply]);
+  useChoiceUpkeep({ settled, touched, choice, setChoice, apply, rows, doorIds, cards, fresh: input.fresh, lastMethod });
   const { onChoiceChange } = input;
   useEffect(() => {
     onChoiceChange?.(choice);
