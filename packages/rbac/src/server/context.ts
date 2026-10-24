@@ -3,6 +3,7 @@ import { resolveRbacCopy, type RbacCopySource } from '../core/copy';
 import type { AuthzContext, OwnershipPredicate } from '../core/types';
 
 import type { RbacDbProvider } from './db';
+import type { RbacGrantsOption } from './grants';
 import type { RbacInvitesPort } from './invites';
 import type { RbacNotifyPort } from './notifications';
 
@@ -210,7 +211,7 @@ export const GLOBAL_SCOPE = 'GLOBAL' as const;
 export interface RbacServerConfig<
   P extends string = string,
   E extends Record<string, unknown> = Record<string, unknown>,
-> {
+> extends RbacGrantsOption {
   /** Prisma-shaped client for the five owned models, through the seam. */
   db: RbacDbProvider;
   /**
@@ -284,10 +285,7 @@ export interface RbacServerConfig<
   notify?: RbacNotifyPort;
   /** Walk a scope to its parent (`org:` chains). Default: flat scopes. */
   scopeParent?: (scope: string) => string | null;
-  /**
-   * Awaited before a scoped decision so an async parent edge (a DB read) can
-   * be cached for the synchronous {@link RbacServerConfig.scopeParent} walk.
-   */
+  /** Awaited before a scoped decision, caching an async parent edge for `scopeParent`. */
   warmScope?: (scope: string) => Promise<void>;
   /** Entity-gate ownership map for INSTANCE permissions. Default: none. */
   ownership?: (subject: string, resourceType: string) => OwnershipPredicate | null;

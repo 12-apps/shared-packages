@@ -7,6 +7,7 @@ import type { DefaultSession, Session } from "@auth/core/types";
 import { z } from "zod";
 
 import { isAdminEmail } from "./admin";
+import { tokenClaims, type SignInClaims } from "./sign-in-claims";
 
 /**
  * The Auth.js config, as a pure builder.
@@ -40,6 +41,8 @@ declare module "@auth/core/types" {
   interface Session {
     /** Per-login nonce, stable across JWT renewal. Missing on legacy sessions. */
     loginSessionId?: string;
+    /** The host's sign-in claims (`./sign-in-claims`); `{}` on older sessions. */
+    claims?: Readonly<Record<string, string>>;
     user: {
       id: string;
       provider?: string;
@@ -249,6 +252,8 @@ interface BuildAuthConfigOptions {
   getSignInGate: () => SignInGate | null;
   /** The superadmin resolver, read at call time for the same reason. */
   getSessionAdmin: () => SessionAdminResolver | null;
+  /** The host's sign-in claims (`./sign-in-claims`), read at call time. */
+  getSignInClaims?: () => SignInClaims | null;
   /** OAuth providers. Defaults to whatever the environment configures. */
   providers?: Provider[];
   /** Comma-separated allowlist used when no admin resolver is installed. */
@@ -268,6 +273,7 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
   const {
     getSignInGate,
     getSessionAdmin,
+    getSignInClaims = () => null,
     getAdminEmails = () => getEnv().ADMIN_EMAILS,
   } = options;
 
@@ -296,6 +302,10 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
         const isSuperadmin = resolver
           ? await resolver(user.email)
           : isAdminEmail(user.email, getAdminEmails());
+        const signInClaims = getSignInClaims();
+        const claims = signInClaims && user.email
+          ? await signInClaims({ email: user.email, provider: account.provider ?? null })
+          : {};
         return {
           ...token,
           // Auth.js rotates encrypted bytes, iat and jti on ordinary session
@@ -304,6 +314,7 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
           id: user.id ?? token.sub ?? "",
           provider: account.provider,
           isSuperadmin,
+          claims,
         };
       }
       return token;
@@ -313,6 +324,7 @@ function buildCallbacks(options: BuildAuthConfigOptions): AuthConfig["callbacks"
       // nonce while reading a legacy cookie: auth() may not forward Set-Cookie.
       session.loginSessionId = typeof token.loginSessionId === "string"
         ? token.loginSessionId : undefined;
+      session.claims = tokenClaims(token.claims);
       if (session.user) {
         session.user.id = (token.id as string) ?? (token.sub as string) ?? "";
         session.user.provider = token.provider as string | undefined;

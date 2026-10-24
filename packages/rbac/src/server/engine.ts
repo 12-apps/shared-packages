@@ -2,7 +2,8 @@ import { createRbac, type Rbac } from '../core/engine';
 import type { AuthzContext, RoleAssignment } from '../core/types';
 
 import { GLOBAL_SCOPE, type RbacServerConfig } from './context';
-import type { RbacDbProvider } from './db';
+import { RESOURCE_ASSIGNMENT_GRANT_SELECT, type RbacDbProvider } from './db';
+import { activeResourceIds, type RbacSubjectGrants } from './grants';
 import { parseRolePermissions, tenantRoleKey } from './permissions-format';
 
 /**
@@ -173,24 +174,65 @@ async function activeAssignmentIds(
   return rows.map((row) => row.resourceId);
 }
 
+/**
+ * Load a subject's grants in one batch: the role assignments
+ * {@link resolveAssignments} reads, and every resource assignment not yet
+ * ended. What a host's {@link RbacServerConfig.grants} port keeps.
+ */
+export async function loadSubjectGrants(
+  config: Pick<RbacServerConfig, 'db'>,
+  subject: string,
+  now: Date = new Date(),
+): Promise<RbacSubjectGrants> {
+  const client = await config.db();
+  const [assignments, rows] = await Promise.all([
+    resolveAssignments(config, subject),
+    client.resourceAssignment.findMany({
+      where: { userId: subject, OR: [{ validTo: null }, { validTo: { gt: now } }] },
+      select: RESOURCE_ASSIGNMENT_GRANT_SELECT,
+    }),
+  ]);
+  return {
+    assignments,
+    resources: rows.map((row) => ({
+      resourceType: row.resourceType,
+      resourceId: row.resourceId,
+      clientId: row.clientId,
+      validFrom: row.validFrom.toISOString(),
+      validTo: row.validTo === null ? null : row.validTo.toISOString(),
+    })),
+  };
+}
+
+/** The direct resource ids, from the host's grants when it keeps them. */
+async function directResourceIds(
+  config: RbacServerConfig,
+  subject: string,
+  resourceType: string,
+  tenantFilter: { clientId?: string },
+): Promise<string[]> {
+  const now = new Date();
+  if (!config.grants) return activeAssignmentIds(config.db, subject, resourceType, tenantFilter, now);
+  const grants = await config.grants.get(subject, () => loadSubjectGrants(config, subject, now));
+  return activeResourceIds(grants, resourceType, tenantFilter, now);
+}
+
 /** Build the shared engine for a config — one per `createApiRbac` call. */
 export function createDbEngine<P extends string>(config: RbacServerConfig<P>): Rbac<P> {
+  const grants = config.grants;
   return createRbac<P>({
     permissions: config.catalog.permissions,
     roles: config.catalog.roleTemplates,
-    resolver: (actorId) => resolveAssignments(config, actorId),
+    resolver: grants
+      ? async (actorId) =>
+          [...(await grants.get(actorId, () => loadSubjectGrants(config, actorId))).assignments]
+      : (actorId) => resolveAssignments(config, actorId),
     globalScope: GLOBAL_SCOPE,
     ...(config.scopeParent ? { scopeParent: config.scopeParent } : {}),
     ...(config.ownership ? { ownership: config.ownership } : {}),
     assignmentResolver: async (subject, resourceType, context) => {
       const tenantFilter = assignmentTenantFilter(context.scope);
-      const direct = await activeAssignmentIds(
-        config.db,
-        subject,
-        resourceType,
-        tenantFilter,
-        new Date(),
-      );
+      const direct = await directResourceIds(config, subject, resourceType, tenantFilter);
       if (!config.expandAssignments) return direct;
       return config.expandAssignments(direct, resourceType, context);
     },

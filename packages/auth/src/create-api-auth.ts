@@ -15,6 +15,7 @@ import {
   credentialsProvider,
   type CredentialsProviderConfig,
 } from "./credentials-provider";
+import type { SignInClaims } from "./sign-in-claims";
 
 /**
  * The backend half of `@12-apps/auth`, as one factory taking one config object.
@@ -108,6 +109,11 @@ export interface ApiAuthConfig {
    * the gate can disagree.
    */
   sessionAdmin?: SessionAdminResolver;
+  /**
+   * Claims stamped into the token at sign-in and read back as
+   * `session.claims` on every request, with no database read (FUT-3906).
+   */
+  signInClaims?: SignInClaims;
   /** Where an unauthenticated visitor is sent. Defaults to `/login`. */
   signInPage?: string;
   /** Session lifetime in seconds. Defaults to 30 days. */
@@ -240,6 +246,7 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
   const config = buildAuthConfig({
     getSignInGate: () => options.signInGate ?? null,
     getSessionAdmin: () => options.sessionAdmin ?? null,
+    getSignInClaims: () => options.signInClaims ?? null,
     providers: resolveProviders(options),
     getAdminEmails,
     signInPage: options.signInPage,
