@@ -1,8 +1,17 @@
 import { err, ok, type Result } from './result';
 import { validateFields, type ValidatorSchema } from './validators';
 
-/** Generic, user-safe message returned when a handler throws. */
+/**
+ * Generic, user-safe message returned when a handler throws — the English
+ * fallback. A host passes its own through `options.genericError` (pt-BR:
+ * `PT_BR_FORMS_MESSAGES.genericError`).
+ */
 const GENERIC_ERROR = 'Something went wrong. Please try again.';
+
+export interface ServerActionOptions {
+  /** The sentence an unexpected failure shows the user, in the host's language. */
+  genericError?: string;
+}
 
 /**
  * An error whose `message` is safe to show to the end user.
@@ -54,11 +63,13 @@ export class ActionError extends Error {
  * @typeParam O - The handler's success payload type.
  * @param schema - Per-field validators applied before the handler runs.
  * @param handler - The business logic, run only when input is valid.
+ * @param options - `genericError`: the host's sentence for an unexpected failure.
  * @returns An async action that resolves to a {@link Result}.
  */
 export const createServerAction = <I extends Record<string, string>, O>(
   schema: ValidatorSchema<I>,
   handler: (input: I) => Promise<O> | O,
+  options: ServerActionOptions = {},
 ): ((input: I) => Promise<Result<O>>) => {
   return async (input: I): Promise<Result<O>> => {
     const errors = validateFields(input, schema);
@@ -84,7 +95,7 @@ export const createServerAction = <I extends Record<string, string>, O>(
       // Unexpected: log the real cause server-side (never sent to the client)
       // so prod failures are diagnosable, and return a safe generic message.
       console.error('[serverAction] handler threw an unexpected error:', error);
-      return err(GENERIC_ERROR);
+      return err(options.genericError ?? GENERIC_ERROR);
     }
   };
 };

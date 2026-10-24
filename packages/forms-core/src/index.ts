@@ -12,3 +12,4 @@ export * from './validators';
 export * from './result';
 export * from './serverAction';
 export * from './br';
+export * from './pt-BR';
