@@ -1,8 +1,12 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
+import type { StepperLabels } from '../../../copy/labels';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
@@ -19,6 +23,8 @@ import type { SizeValue } from '../../../tokens/scales';
  */
 const STEP_MIN_WIDTH: Record<SizeValue, number> = { xs: 44, sm: 56, md: 80, lg: 96, xl: 112 };
 const STEP_ICON_SIZE: Record<SizeValue, number> = { xs: 14, sm: 18, md: 24, lg: 30, xl: 36 };
+/** A horizontal connector's shortest dash; its 8px margins either side add 16. */
+const CONNECTOR_MIN = 8;
 
 
 const StepperRoot = styled(Box, {
@@ -41,6 +47,10 @@ const StepItem = styled(Box, {
   // For vertical: center to align connector with centered circle
   alignItems: orientation === 'horizontal' ? 'flex-start' : 'center',
   flex: orientation === 'horizontal' && !isLast ? 1 : 'none',
+  // Horizontal, the last step takes an equal share capped at its own width:
+  // on desktop that IS its own width, as `none` gave; on a phone it lets the
+  // last step give up room instead of pushing the row past the viewport.
+  ...(orientation === 'horizontal' && isLast && { flex: '1 1 0%', maxWidth: 'max-content' }),
   position: 'relative',
   // For vertical: ensure consistent width for proper centering
   ...(orientation === 'vertical' && {
@@ -106,7 +116,8 @@ const StepConnector = styled(Box, {
           marginTop: rem(theme, CIRCLE_SIZE[size] / 2 - 1),
           marginLeft: rem(theme, 8),
           marginRight: rem(theme, 8),
-          minWidth: rem(theme, 24),
+          // Only binds when the row is squeezed: a phone keeps a short dash.
+          minWidth: rem(theme, CONNECTOR_MIN),
         }
       : {
           width: rem(theme, 2),
@@ -125,6 +136,8 @@ const StepLabel = styled(Box, {
 })<{ orientation: 'horizontal' | 'vertical' }>(({ theme, orientation }) => ({
   textAlign: 'center',
   marginTop: orientation === 'horizontal' ? rem(theme, 8) : 0,
+  // Last resort only: a single word wider than the whole row may break.
+  overflowWrap: orientation === 'horizontal' ? 'break-word' : undefined,
 }));
 
 type StepSize = SizeValue;
@@ -141,14 +154,25 @@ function stepClasses(isActive: boolean, isCompleted: boolean, optional?: boolean
     .join(' ');
 }
 
-/** The circle content-column width per orientation/size. */
+/**
+ * The circle content-column width per orientation/size. On a phone the column
+ * may shrink to its longest word, never inside one ("pagame / nto"), and the
+ * connectors give up the rest; from `sm` up the floor is the size's stop, as
+ * it always was, so a desktop row is unchanged.
+ */
 function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
   return orientation === 'horizontal'
-    ? { minWidth: sxRem(STEP_MIN_WIDTH[size]), maxWidth: sxRem(150), flex: '0 1 auto' }
+    ? (theme: Theme) => ({
+        minWidth: 'min-content',
+        [theme.breakpoints.up('sm')]: { minWidth: rem(theme, STEP_MIN_WIDTH[size]) },
+        maxWidth: rem(theme, 150),
+        flex: '0 1 auto',
+      })
     : { flexShrink: 0 };
 }
 
 interface StepPartProps {
+  labels: StepperLabels;
   step: Step;
   index: number;
   isActive: boolean;
@@ -159,8 +183,8 @@ interface StepPartProps {
 /** The step circle: a check when completed, otherwise the 1-based index. */
 const StepCircle: React.FC<
   StepPartProps & { isCompleted: boolean; isClickable: boolean; onClick: () => void }
-> = ({ step, index, isActive, isCompleted, isClickable, size, labelVariant, onClick }) => {
-  const state = isCompleted ? ' (completed)' : isActive ? ' (current)' : '';
+> = ({ step, index, isActive, isCompleted, isClickable, size, labelVariant, onClick, labels }) => {
+  const state = isCompleted ? ` (${labels.completed})` : isActive ? ` (${labels.current})` : '';
   return (
     <StepButton
       isActive={isActive}
@@ -170,7 +194,7 @@ const StepCircle: React.FC<
       onClick={onClick}
       disabled={step.disabled}
       aria-current={isActive ? 'step' : undefined}
-      aria-label={`Step ${index + 1}: ${step.label}${step.optional ? ' (optional)' : ''}${state}`}
+      aria-label={`${labels.step(index + 1, step.label)}${step.optional ? ` (${labels.optional})` : ''}${state}`}
       data-testid={`stepper-step-icon-${index}`}
     >
       {isCompleted ? (
@@ -192,6 +216,7 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
   orientation,
   size,
   labelVariant,
+  labels,
 }) => (
   <StepLabel
     orientation={orientation}
@@ -204,9 +229,12 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
       color={isActive ? 'primary' : 'textPrimary'}
     >
       {step.label}
+      {/* A break opportunity with no width: a narrow column may put the marker
+          on its own line instead of welding it to the label's last word. */}
+      {step.optional && <wbr />}
       {step.optional && (
         <Typography component="span" variant="caption" color="textSecondary" sx={{ ml: 1 }}>
-          (optional)
+          ({labels.optional})
         </Typography>
       )}
     </Typography>
@@ -231,6 +259,7 @@ const StepperItem: React.FC<StepItemProps> = ({
   onStepClick,
   renderConnector,
   nextStep,
+  labels,
 }) => {
   const labelVariant: LabelVariant = size === 'sm' ? 'caption' : 'body2';
   const isClickable = Boolean(clickable) && !step.disabled && (variant === 'non-linear' || !isActive);
@@ -267,6 +296,7 @@ const StepperItem: React.FC<StepItemProps> = ({
           isClickable={isClickable}
           size={size}
           labelVariant={labelVariant}
+          labels={labels}
           onClick={handleStepClick}
         />
         <StepLabelBlock
@@ -276,6 +306,7 @@ const StepperItem: React.FC<StepItemProps> = ({
           orientation={orientation}
           size={size}
           labelVariant={labelVariant}
+          labels={labels}
         />
       </Box>
       {!isLast && connector}
@@ -293,9 +324,11 @@ export const Stepper: React.FC<StepperProps> = ({
   onStepChange,
   clickable,
   renderConnector,
+  labels: labelOverrides,
   className,
   'data-testid': dataTestId,
 }) => {
+  const labels = resolveLabels(EN_US_UI_LABELS.stepper, labelOverrides);
   // Determine clickable behavior
   const isClickable = clickable ?? variant === 'non-linear';
 
@@ -332,6 +365,7 @@ export const Stepper: React.FC<StepperProps> = ({
             onStepClick={onStepChange}
             renderConnector={renderConnector}
             nextStep={nextStep}
+            labels={labels}
           />
         );
       })}

@@ -87,6 +87,7 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
     title,
     description,
     showCloseButton,
+    closeLabel,
     backdrop: _backdrop,
     persistent,
     glass,
@@ -144,6 +145,7 @@ export function Dialog(rawProps: DialogProps): React.JSX.Element {
                 title={title}
                 subtitle={description}
                 showCloseButton={showCloseButton}
+                closeLabel={closeLabel}
                 onClose={onClose}
                 dataTestId={testID}
               />

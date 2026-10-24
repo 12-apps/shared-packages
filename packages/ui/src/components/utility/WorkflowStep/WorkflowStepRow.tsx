@@ -25,6 +25,7 @@ interface StepRowProps {
   animated: boolean;
   disabled: boolean;
   onClick: (index: number, step: WorkflowStepItem) => void;
+  labels?: WorkflowStepProps['labels'];
   dataTestId?: string;
 }
 
@@ -46,6 +47,7 @@ export const StepRow: React.FC<StepRowProps> = ({
   animated,
   disabled,
   onClick,
+  labels,
   dataTestId,
 }) => {
   const isCompleted = step.status === 'completed';
@@ -69,6 +71,7 @@ export const StepRow: React.FC<StepRowProps> = ({
         animated={animated}
         disabled={disabled}
         onClick={onClick}
+        labels={labels}
         data-testid={`${dataTestId}-indicator-${index}`}
       />
 

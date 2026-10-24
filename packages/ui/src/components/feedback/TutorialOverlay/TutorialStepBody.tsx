@@ -1,3 +1,4 @@
+import { EN_US_TUTORIAL_COPY } from '../../../en-US.feedback';
 import CompleteIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import PrevIcon from '@mui/icons-material/NavigateBefore';
@@ -43,6 +44,9 @@ const StepDot = styled(Box, {
 // Title, body copy, the step dots and the navigation row.
 
 // The step's controls: skip/restart on the left, previous/next on the right.
+// On a phone the row wraps rather than widening the card past the screen, and
+// the second group keeps to the right edge when it drops to its own line. From
+// `sm` up it stays one row, as it always was.
 const TutorialStepNav: React.FC<{
   copy: TutorialCopy;
   currentStep: number;
@@ -68,7 +72,9 @@ const TutorialStepNav: React.FC<{
         <Stack
           direction="row"
           spacing={1}
+          useFlexGap
           justifyContent="space-between"
+          sx={(theme) => ({ flexWrap: 'wrap', [theme.breakpoints.up('sm')]: { flexWrap: 'nowrap' } })}
           data-testid="tutorial-navigation"
         >
           <Stack direction="row" spacing={1}>
@@ -89,7 +95,7 @@ const TutorialStepNav: React.FC<{
             )}
           </Stack>
 
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
             {stepCount > 1 && currentStep > 0 && (
               <Button
                 size="small"
@@ -153,8 +159,9 @@ const TutorialStepHeader: React.FC<{
   title: React.ReactNode;
   currentStep: number;
   allowSkip: boolean;
+  closeLabel: string;
   onSkip: () => void;
-}> = ({ title, currentStep, allowSkip, onSkip }) => (
+}> = ({ title, currentStep, allowSkip, closeLabel, onSkip }) => (
         <Box
           sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
@@ -172,6 +179,7 @@ const TutorialStepHeader: React.FC<{
               size="small"
               onClick={onSkip}
               sx={{ ml: 1, mt: -1, mr: -1 }}
+              aria-label={closeLabel}
               data-testid="tutorial-close-button"
             >
               <CloseIcon fontSize="small" />
@@ -213,6 +221,7 @@ export const TutorialStepBody: React.FC<{
           title={step.title}
           currentStep={currentStep}
           allowSkip={allowSkip}
+          closeLabel={copy.close ?? EN_US_TUTORIAL_COPY.close}
           onSkip={onSkip}
         />
 
@@ -227,7 +236,7 @@ export const TutorialStepBody: React.FC<{
 
         {showProgress && (
           <Typography variant="caption" color="text.secondary" align="center">
-            {currentStep + 1} of {stepCount}
+            {(copy.progress ?? EN_US_TUTORIAL_COPY.progress)(currentStep + 1, stepCount)}
           </Typography>
         )}
 

@@ -1,3 +1,4 @@
+import type { RichTextEditorLabels } from '../../../copy/labels';
 import type { ReactNode } from 'react';
 
 export interface RichTextEditorProps {
@@ -5,8 +6,13 @@ export interface RichTextEditorProps {
   value?: string;
   /** Callback when the content changes */
   onChange?: (value: string) => void;
-  /** Placeholder text when empty */
+  /** Placeholder text when empty. Defaults to `labels.placeholder`. */
   placeholder?: string;
+  /**
+   * The toolbar's tooltips, prompts, default placeholder and accessible name;
+   * the English pack answers for any key left out.
+   */
+  labels?: Partial<RichTextEditorLabels>;
   /** Whether the editor is disabled */
   disabled?: boolean;
   /** Whether the editor is read-only */

@@ -177,6 +177,13 @@ describe('Switch (native)', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('names the busy spinner with the caller loadingLabel, else "loading"', () => {
+    const { rerender } = render(<Switch dataTestId="s" loading loadingLabel="Carregando" />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-label', 'Carregando');
+    rerender(<Switch dataTestId="s" loading />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-label', 'loading');
+  });
+
   it('prints the label wording inside the track for the label variant', () => {
     render(<Switch dataTestId="s" variant="label" onText="ON" offText="OFF" />);
     expect(screen.getByTestId('s')).toHaveTextContent('ON');

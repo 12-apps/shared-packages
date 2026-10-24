@@ -1,3 +1,4 @@
+import type { StepperLabels } from '../../../copy/labels';
 import type { SizeValue } from '../../../tokens/scales';
 import type { ReactNode } from 'react';
 
@@ -15,6 +16,8 @@ export interface ConnectorState {
 }
 
 export interface StepperProps {
+  /** The words the stepper adds to your step labels; the English pack answers for any key left out. */
+  labels?: Partial<StepperLabels>;
   /**
    * Array of step configurations defining the stepper flow
    */
@@ -95,4 +98,5 @@ export interface StepItemProps {
   onStepClick?: (id: string) => void;
   renderConnector?: StepperProps['renderConnector'];
   nextStep?: Step;
+  labels: StepperLabels;
 }

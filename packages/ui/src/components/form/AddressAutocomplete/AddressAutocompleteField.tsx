@@ -1,3 +1,5 @@
+import { EN_US_ADDRESS_AUTOCOMPLETE_COPY } from '../../../en-US.form';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import Alert from '@mui/material/Alert/index.js';
 import Autocomplete from '@mui/material/Autocomplete/index.js';
 import Box from '@mui/material/Box/index.js';
@@ -38,7 +40,9 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
   handleInputChange,
   handleSelect,
   handleGetCurrentLocation,
-}) => (
+}) => {
+  const text = resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, copy);
+  return (
   <Box data-testid="address-autocomplete-container">
     <Autocomplete
       freeSolo
@@ -47,13 +51,14 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       onInputChange={handleInputChange}
       onChange={handleSelect}
       loading={loading}
+      loadingText={text.loadingSuggestions}
       disabled={disabled}
       fullWidth={fullWidth}
       getOptionLabel={addressOptionLabel}
       isOptionEqualToValue={isSameAddressOption}
       PaperComponent={AddressSuggestionsPaper}
       noOptionsText={
-        inputValue.length <= MIN_QUERY_LENGTH ? 'Type at least 3 characters' : 'No addresses found'
+        inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound
       }
       renderOption={({ key, ...optionProps }, option, state) => (
         <AddressOption
@@ -87,4 +92,5 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       </Alert>
     )}
   </Box>
-);
+  );
+};

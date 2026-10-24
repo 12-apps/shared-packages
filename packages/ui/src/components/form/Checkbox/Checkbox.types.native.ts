@@ -21,5 +21,7 @@ export type CheckboxProps = CheckboxBaseProps &
     /** Both spellings fire, as `Button`'s do. */
     onClick?: (event: GestureResponderEvent) => void;
     onPress?: (event: GestureResponderEvent) => void;
+    /** The busy spinner's accessible name; defaults to the labels pack's `loading`. */
+    loadingLabel?: string;
     style?: StyleProp<ViewStyle>;
   };

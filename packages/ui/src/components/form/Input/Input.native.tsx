@@ -20,6 +20,7 @@ import { fieldLook, helperStyle, labelStyle, type FieldState } from './Input.loo
 import { ADORNMENT_GAP, INPUT_GLOW, INPUT_LOADING } from './Input.metrics';
 import type { InputProps } from './Input.types.native';
 import { webAria, webClick, webDisabled } from '../../../platform/aria';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { fieldHeightPx } from '../../../tokens/field-height.core';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
@@ -101,13 +102,21 @@ function Line({
 }
 
 /** MUI's 20px `CircularProgress` in the end slot; the platform's own arc on a device. */
-function Spinner({ color, testID }: { color: string; testID: string }): React.JSX.Element {
+function Spinner({
+  color,
+  testID,
+  label,
+}: {
+  color: string;
+  testID: string;
+  label: string;
+}): React.JSX.Element {
   return (
     <ActivityIndicator
       testID={testID}
       size={Platform.OS === 'ios' ? 'small' : INPUT_LOADING.spinnerSize}
       color={color}
-      accessibilityLabel="loading"
+      accessibilityLabel={label}
     />
   );
 }
@@ -153,7 +162,7 @@ function useFocusState(
 export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) => {
   const {
     variant, size, type, label, error, helperText, startAdornment, endAdornment,
-    fullWidth, floating: _floating, glow, pulse, loading, disabled, required,
+    fullWidth, floating: _floating, glow, pulse, loading, loadingLabel = EN_US_UI_LABELS.common.loading, disabled, required,
     style, inputStyle, onClick, onPress, onFocus, onBlur, ...others
   } = resolveInputProps(rawProps);
 
@@ -211,7 +220,7 @@ export const Input = React.forwardRef<RNTextInput, InputProps>((rawProps, ref) =
           {...withoutTestIdProps(others)}
         />
         <Slot side="end">
-          {loading ? <Spinner color={theme.palette.primary.main} testID={idFor('loading')} /> : endAdornment}
+          {loading ? <Spinner color={theme.palette.primary.main} testID={idFor('loading')} label={loadingLabel} /> : endAdornment}
         </Slot>
       </View>
       <Line text={helperText} style={helperStyle(theme, variant, size, state)} />

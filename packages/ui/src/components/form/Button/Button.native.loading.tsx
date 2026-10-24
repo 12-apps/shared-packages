@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import type { TextStyle } from 'react-native';
 
 import { BUTTON_SPINNER_SIZE } from './Button.metrics';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { renderTextChildren } from '../../../platform/text-children';
 
 /**
@@ -17,14 +18,22 @@ import { renderTextChildren } from '../../../platform/text-children';
  * comes from react-native's ActivityIndicator. It used to REPLACE the label, so
  * a loading button had no accessible name (FUT-3646).
  */
-export function Spinner({ color, testID }: { color: string; testID: string }): React.JSX.Element {
+export function Spinner({
+  color,
+  testID,
+  label = EN_US_UI_LABELS.common.loading,
+}: {
+  color: string;
+  testID: string;
+  label?: string;
+}): React.JSX.Element {
   return (
     <View style={styles.spinner}>
       <ActivityIndicator
         size={Platform.OS === 'ios' ? 'small' : BUTTON_SPINNER_SIZE}
         color={color}
         testID={testID}
-        accessibilityLabel="loading"
+        accessibilityLabel={label}
       />
     </View>
   );

@@ -4,7 +4,7 @@ import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
-import { glassStyles, resolveMapPreviewProps } from './MapPreview.helpers';
+import { glassStyles, resolveMapCopy, resolveMapPreviewProps } from './MapPreview.helpers';
 import type { MapPreviewProps } from './MapPreview.types';
 import { MapLayers } from './MapLayers';
 import { MapCoordinates, MapMarkers } from './MapMarkers';
@@ -49,7 +49,11 @@ export const MapPreview: FC<MapPreviewProps> = (componentProps) => {
       elevation={props.variant === 'glass' ? 0 : 2}
       data-testid="map-preview-container"
       role="img"
-      aria-label={`Map preview centered at ${view.markerPosition.lat.toFixed(4)}, ${view.markerPosition.lng.toFixed(4)} with zoom level ${view.zoom}`}
+      aria-label={resolveMapCopy(props.copy).viewDescription(
+        view.markerPosition.lat.toFixed(4),
+        view.markerPosition.lng.toFixed(4),
+        view.zoom,
+      )}
       tabIndex={0}
       aria-live="polite"
       aria-atomic="true"
@@ -87,7 +91,7 @@ export const MapPreview: FC<MapPreviewProps> = (componentProps) => {
           controls={controls}
         />
 
-        <MapCoordinates position={view.markerPosition} zoom={view.zoom} />
+        <MapCoordinates position={view.markerPosition} zoom={view.zoom} copy={props.copy} />
       </MapWrapper>
     </MapContainer>
   );

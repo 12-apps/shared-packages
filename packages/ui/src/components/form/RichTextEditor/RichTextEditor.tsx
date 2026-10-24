@@ -1,3 +1,5 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
@@ -27,7 +29,6 @@ const DEFAULT_TOOLBAR: Required<Omit<ToolbarConfig, 'customItems'>> & Pick<Toolb
 
 const RICH_TEXT_DEFAULTS: Partial<RichTextEditorProps> = {
   value: '',
-  placeholder: 'Start typing...',
   disabled: false,
   readOnly: false,
   toolbar: {} };
@@ -89,7 +90,8 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
     const {
       value,
       onChange,
-      placeholder,
+      placeholder: placeholderProp,
+      labels: labelOverrides,
       disabled,
       readOnly,
       toolbar,
@@ -105,6 +107,8 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
     } = { ...RICH_TEXT_DEFAULTS, ...definedProps(editorProps) } as RichTextEditorProps;
 
     const theme = useTheme();
+    const labels = resolveLabels(EN_US_UI_LABELS.richTextEditor, labelOverrides);
+    const placeholder = placeholderProp ?? labels.placeholder;
     const toolbarConfig = { ...DEFAULT_TOOLBAR, ...toolbar };
     const editor = useRichTextEditor({
       value,
@@ -113,7 +117,8 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
       onBlur,
       disabled,
       readOnly,
-      maxLength });
+      maxLength,
+      listItemText: labels.listItem });
 
     return (
       <Paper
@@ -132,6 +137,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
           characterCount={editor.characterCount}
           editorRef={editor.editorRef}
           onFormat={editor.applyFormat}
+          labels={labels}
         />
 
         <Box
@@ -141,7 +147,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(
           onFocus={editor.handleFocus}
           onBlur={editor.handleBlur}
           role="textbox"
-          aria-label={ariaLabel || 'Rich text editor'}
+          aria-label={ariaLabel || labels.ariaLabel}
           aria-describedby={ariaDescribedBy}
           aria-multiline="true"
           tabIndex={disabled ? -1 : 0}

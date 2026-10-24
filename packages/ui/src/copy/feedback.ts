@@ -27,6 +27,10 @@ export interface TutorialCopy {
   finish: string;
   /** The next/finish button's title while `requiresActionBeforeNext` blocks it. */
   requiresAction: string;
+  /** The "2 of 5" line under the step, when `showProgress` is on. Optional; the shipped packs carry it. */
+  progress?: (current: number, total: number) => string;
+  /** The close (×) button's accessible name, beside the title. Optional; the shipped packs carry it. */
+  close?: string;
 }
 
 /** Chrome that carries a glyph and no text, across several small surfaces. */

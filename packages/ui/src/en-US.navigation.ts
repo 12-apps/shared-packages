@@ -8,7 +8,7 @@ import type {
   SectionNavCopy,
 } from './copy';
 
-export const EN_US_COMMAND_PALETTE_COPY: CommandPaletteCopy = {
+export const EN_US_COMMAND_PALETTE_COPY: Required<CommandPaletteCopy> = {
   execute: "Run",
   // The arrow glyphs and the key name are part of the hint a reader looks at
   // while their hands are on the keyboard, so they survive translation intact.
@@ -16,6 +16,10 @@ export const EN_US_COMMAND_PALETTE_COPY: CommandPaletteCopy = {
   close: "ESC Close",
   recent: "Recent",
   tryAnotherTerm: "Try another term",
+  placeholder: "Type a command or search...",
+  commandCount: (count) => `${count} commands`,
+  noCommandsFound: (query) => `No commands found for "${query}"`,
+  general: "General",
 };
 
 export const EN_US_BREADCRUMB_COPY: BreadcrumbCopy = {

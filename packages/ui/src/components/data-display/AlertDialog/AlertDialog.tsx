@@ -11,6 +11,7 @@ import { alpha, keyframes, styled } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { neutralTones } from '../../../tokens/ink';
 
 import { AlertDialogFooter } from './AlertDialog.parts';
@@ -238,6 +239,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
     icon,
     cancelText,
     confirmText,
+    closeLabel = EN_US_UI_LABELS.common.close,
     onCancel,
     onConfirm,
     showCancel,
@@ -267,7 +269,7 @@ export const AlertDialog = React.forwardRef<HTMLDivElement, AlertDialogProps>(
         {...props}
       >
         <CloseButton
-          aria-label="close"
+          aria-label={closeLabel}
           onClick={handleCancel}
           size="small"
           data-testid={`${dataTestId}-close-button`}

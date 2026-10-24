@@ -1,3 +1,4 @@
+import type { AddressAutocompleteCopy } from '../../../copy/form';
 import { useCallback } from 'react';
 
 import { coordinatesOf, toAddressDetails } from './AddressAutocomplete.mapper';
@@ -14,6 +15,7 @@ const GEOLOCATION_OPTIONS: PositionOptions = {
 };
 
 interface LocationSink {
+  messages: Required<AddressAutocompleteCopy>;
   setLoading: (loading: boolean) => void;
   setApiError: (message: string | null) => void;
   applyAddress: (address: AddressDetails) => void;
@@ -27,13 +29,13 @@ const resolveMockLocation = (sink: LocationSink) => {
 
     const mockLocation = MOCK_ADDRESSES[0];
     if (!mockLocation) {
-      sink.setApiError('No mock location available');
+      sink.setApiError(sink.messages.noMockLocation);
       return;
     }
 
     const mockDetails = MOCK_PLACE_DETAILS[mockLocation.place_id];
     if (!mockDetails) {
-      sink.setApiError('Mock location details not found');
+      sink.setApiError(sink.messages.mockLocationNotFound);
       return;
     }
 
@@ -57,7 +59,7 @@ const geocodePosition =
 
       const place = status === 'OK' ? results?.[0] : undefined;
       if (!place) {
-        sink.setApiError('Unable to retrieve address for current location');
+        sink.setApiError(sink.messages.locationAddressFailed);
         return;
       }
 
@@ -78,7 +80,9 @@ export const useCurrentLocation = ({
   setLoading,
   setApiError,
   applyAddress,
+  messages,
 }: {
+  messages: Required<AddressAutocompleteCopy>;
   services: GoogleMapsService;
   useMockData: boolean;
   setLoading: (loading: boolean) => void;
@@ -87,11 +91,11 @@ export const useCurrentLocation = ({
 }) =>
   useCallback(() => {
     if (!navigator.geolocation) {
-      setApiError('Geolocation is not supported by this browser');
+      setApiError(messages.geolocationUnsupported);
       return;
     }
 
-    const sink: LocationSink = { setLoading, setApiError, applyAddress };
+    const sink: LocationSink = { setLoading, setApiError, applyAddress, messages };
 
     if (useMockData) {
       setLoading(true);
@@ -100,7 +104,7 @@ export const useCurrentLocation = ({
     }
 
     if (!services.geocoder) {
-      setApiError('Geocoding service not available');
+      setApiError(messages.geocoderUnavailable);
       return;
     }
 
@@ -109,8 +113,8 @@ export const useCurrentLocation = ({
       geocodePosition(services.geocoder, sink),
       () => {
         setLoading(false);
-        setApiError('Unable to retrieve your location');
+        setApiError(messages.locationFailed);
       },
       GEOLOCATION_OPTIONS,
     );
-  }, [services, useMockData, setLoading, setApiError, applyAddress]);
+  }, [services, useMockData, setLoading, setApiError, applyAddress, messages]);

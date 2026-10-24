@@ -1,3 +1,5 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import Checkbox from '@mui/material/Checkbox/index.js';
 import TableBody from '@mui/material/TableBody/index.js';
 import TableCell from '@mui/material/TableCell/index.js';
@@ -12,7 +14,13 @@ import { rem } from '../../../tokens/relative';
 
 import { tableRowHeight } from './Table.helpers';
 import { useTableRowRenderer } from './TableParts.hooks';
-import type { ColumnConfig, TableBodyProps, TableHeaderProps, VirtualWindow } from './Table.types';
+import type {
+  ColumnConfig,
+  TableBodyProps,
+  TableHeaderProps,
+  TableLabels,
+  VirtualWindow,
+} from './Table.types';
 
 // Mirrors the visible sort indicator for assistive technology; undefined when
 // the column is not sorted, which is what removes the attribute entirely.
@@ -33,11 +41,12 @@ const columnLength = (theme: Theme, value: number | string | undefined): string 
 // One header cell. Sorting is offered when the table is sortable and the column
 // has not opted out; aria-sort mirrors the visible indicator.
 const HeaderCell: React.FC<{
+  labels: TableLabels;
   column: ColumnConfig;
   sortable?: boolean;
   sortConfig?: { key: string; direction: 'asc' | 'desc' };
   onSort: (columnKey: string) => void;
-}> = ({ column, sortable, sortConfig, onSort }) => {
+}> = ({ column, sortable, sortConfig, onSort, labels }) => {
   const theme = useTheme();
   const canSort = Boolean(sortable) && column.sortable !== false;
   const isSorted = sortConfig?.key === column.key;
@@ -57,7 +66,7 @@ const HeaderCell: React.FC<{
           direction={isSorted ? sortConfig?.direction : 'asc'}
           onClick={() => onSort(column.key)}
           data-testid="sort-indicator"
-          aria-label={`Sort by ${column.label}`}
+          aria-label={labels.sortBy(column.label)}
         >
           {column.label}
         </TableSortLabel>
@@ -77,7 +86,9 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
   selectable,
   selectedRows = [],
   onSelectAll,
+  labels: labelOverrides,
   headRef }) => {
+  const labels = resolveLabels(EN_US_UI_LABELS.table, labelOverrides);
   const handleSort = useCallback(
     (columnKey: string) => {
       if (!sortable || !onSortChange) return;
@@ -106,13 +117,14 @@ export const EnhancedTableHeader: React.FC<TableHeaderProps> = React.memo(({
               indeterminate={selectedRows.length > 0 && selectedRows.length < data.length}
               checked={selectedRows.length === data.length && data.length > 0}
               onChange={handleSelectAll}
-              inputProps={{ 'aria-label': 'select all' }}
+              inputProps={{ 'aria-label': labels.selectAllRows }}
             />
           </TableCell>
         )}
         {columns.map((column) => (
           <HeaderCell
             key={column.key}
+            labels={labels}
             column={column}
             sortable={sortable}
             sortConfig={sortConfig}
@@ -194,6 +206,7 @@ export const TableDataRow: React.FC<{
   /** Whether the row is one of a virtual window's. */
   virtualised: boolean;
   renderCell?: TableBodyProps['renderCell'];
+  labels: TableLabels;
 }> = ({
   rowData,
   rowKey,
@@ -207,6 +220,7 @@ export const TableDataRow: React.FC<{
   onRowBlur,
   onSelect,
   virtualised,
+  labels,
   renderCell }) => {
   const theme = useTheme();
   const pitch = tableRowHeight(rowHeight);
@@ -237,7 +251,7 @@ export const TableDataRow: React.FC<{
                 checked={selected}
                 onChange={(event) => onSelect(event, rowKey)}
                 onClick={(event) => event.stopPropagation()}
-                inputProps={{ 'aria-label': `select row ${index + 1}` }}
+                inputProps={{ 'aria-label': labels.selectRow(index + 1) }}
               />,
             )}
           </TableCell>

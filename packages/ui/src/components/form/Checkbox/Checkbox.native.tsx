@@ -25,6 +25,7 @@ import {
   resolveCheckboxSize,
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types.native';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { Icon } from '../../../icons/Icon.native';
 import type { IconName } from '../../../icons/Icon.types';
 import { webKeyDown } from '../../../platform/aria';
@@ -83,6 +84,7 @@ interface BoxProps {
   indeterminate: boolean;
   inactive: boolean;
   loading: boolean;
+  loadingLabel: string;
   glow: boolean;
   ripple: boolean;
   variant: keyof typeof CHECKBOX_VARIANT;
@@ -127,7 +129,7 @@ function CheckboxBox(props: BoxProps): React.JSX.Element {
           style={styles.spinner}
           size={CHECKBOX_SPINNER.size}
           color={theme.palette.primary.main}
-          accessibilityLabel="loading"
+          accessibilityLabel={props.loadingLabel}
         />
       ) : null}
     </Pressable>
@@ -167,7 +169,7 @@ function helperStyle(theme: UiTheme, error: boolean): TextStyle {
  */
 export const Checkbox = React.forwardRef<View, CheckboxProps>((rawProps, ref) => {
   const {
-    variant, label, error, helperText, loading, ripple, glow, pulse: _pulse,
+    variant, label, error, helperText, loading, loadingLabel = EN_US_UI_LABELS.common.loading, ripple, glow, pulse: _pulse,
     indeterminate, disabled, size, checked, defaultChecked,
     onChange, onClick, onPress, style, ...others
   } = resolveCheckboxProps(rawProps);
@@ -197,6 +199,7 @@ export const Checkbox = React.forwardRef<View, CheckboxProps>((rawProps, ref) =>
       indeterminate={Boolean(indeterminate)}
       inactive={inactive}
       loading={Boolean(loading)}
+      loadingLabel={loadingLabel}
       glow={glow}
       ripple={ripple}
       variant={variant}

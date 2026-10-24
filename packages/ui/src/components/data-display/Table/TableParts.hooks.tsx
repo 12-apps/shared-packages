@@ -1,5 +1,7 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import type React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { TableDataRow } from './TableParts';
 import type { TableBodyProps } from './Table.types';
@@ -43,6 +45,7 @@ type RowRendererProps = Pick<
   | 'renderRow'
   | 'renderCell'
   | 'rowHeight'
+  | 'labels'
 > & {
   selectedRows: Array<string | number>;
   /** Whether the rows are a virtual window's, drawn at exactly `rowHeight`. */
@@ -62,7 +65,9 @@ export const useTableRowRenderer = ({
   renderCell,
   virtualised,
   rowHeight,
+  labels: labelOverrides,
 }: RowRendererProps) => {
+  const labels = useMemo(() => resolveLabels(EN_US_UI_LABELS.table, labelOverrides), [labelOverrides]);
   const getRowKey = useRowKey(rowKeyExtractor);
   const isRowSelected = useCallback(
     (rowKey: string | number) => selectedRows.includes(rowKey),
@@ -93,6 +98,7 @@ export const useTableRowRenderer = ({
           onSelect={handleRowSelection}
           virtualised={virtualised}
           renderCell={renderCell}
+          labels={labels}
         />
       );
     },
@@ -109,6 +115,7 @@ export const useTableRowRenderer = ({
       rowHeight,
       selectable,
       virtualised,
+      labels,
     ],
   );
 

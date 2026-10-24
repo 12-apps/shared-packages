@@ -135,6 +135,7 @@ type TableOwnKey = Exclude<keyof TableProps, keyof MuiTableProps>;
  * added to `Table.types.ts` does not compile until it is named here.
  */
 const TABLE_OWN_KEYS: Record<TableOwnKey, true> = {
+  labels: true,
   emptyText: true,
   variant: true,
   stripeColor: true,

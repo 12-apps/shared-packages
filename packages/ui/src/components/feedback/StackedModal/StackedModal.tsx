@@ -78,7 +78,7 @@ const useUnnamedDialogWarning = (unnamed: boolean): void => {
 
 const StackedModalPanel: FC<ResolvedProps> = (props) => {
   const {
-    open, onClose, glass, navigationTitle, backLabel, hideClose, hideHeader, children, actions, modalId,
+    open, onClose, glass, navigationTitle, backLabel, closeLabel, hideClose, hideHeader, children, actions, modalId,
     closeOnClickOutside, closeOnEsc, loading, loadingText, fullScreen, maxWidth, size, panelWidth, disableBackdrop,
     disableFocusTrap, keepMounted, rtl, dataTestId,
     'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...otherProps
@@ -128,6 +128,7 @@ const StackedModalPanel: FC<ResolvedProps> = (props) => {
     >
       <ModalPanelContents
         backLabel={backLabel}
+        closeLabel={closeLabel}
         showSkeleton={showSkeleton}
         loadingText={loadingText}
         titleId={titleId}

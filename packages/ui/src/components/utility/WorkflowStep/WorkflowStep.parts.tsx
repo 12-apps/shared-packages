@@ -4,7 +4,7 @@ import { styled } from '@mui/material/styles/index.js';
 import React, { forwardRef, useCallback } from 'react';
 
 import type { StepColors } from './WorkflowStep.helpers';
-import { indicatorSizeFor, stepColors, stepPalette } from './WorkflowStep.helpers';
+import { indicatorSizeFor, stepColors, stepPalette, workflowLabels } from './WorkflowStep.helpers';
 import type {
   StepConnectorProps,
   StepContentProps,
@@ -227,6 +227,7 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
   animated,
   disabled,
   onClick,
+  labels,
   'data-testid': dataTestId,
 }, ref) => {
   const isDisabled = Boolean(disabled || step.disabled);
@@ -278,7 +279,7 @@ const StepIndicatorComponent = forwardRef<HTMLDivElement, StepIndicatorProps>(({
       onKeyDown={handleKeyDown}
       role={interactive ? 'button' : undefined}
       tabIndex={!interactive ? undefined : isDisabled ? -1 : 0}
-      aria-label={`Step ${index + 1}: ${step.title}`}
+      aria-label={workflowLabels(labels).step(index + 1, step.title)}
       aria-current={isActive ? 'step' : undefined}
       aria-disabled={interactive && isDisabled ? true : undefined}
       data-testid={dataTestId}

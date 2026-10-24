@@ -6,7 +6,11 @@ export interface GoogleMapsService {
   geocoder: google.maps.Geocoder | null;
 }
 
-export const useGoogleMapsAPI = (apiKey: string) => {
+export const useGoogleMapsAPI = (
+  apiKey: string,
+  messages: { loadFailed: string; initFailed: string },
+) => {
+  const { loadFailed, initFailed } = messages;
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
@@ -42,7 +46,7 @@ export const useGoogleMapsAPI = (apiKey: string) => {
     };
     
     script.onerror = () => {
-      setError('Failed to load Google Maps API');
+      setError(loadFailed);
     };
 
     document.head.appendChild(script);
@@ -53,7 +57,7 @@ export const useGoogleMapsAPI = (apiKey: string) => {
         document.head.removeChild(script);
       }
     };
-  }, [apiKey]);
+  }, [apiKey, loadFailed, initFailed]);
 
   const initializeServices = () => {
     try {
@@ -67,7 +71,7 @@ export const useGoogleMapsAPI = (apiKey: string) => {
         setError(null);
       }
     } catch {
-      setError('Failed to initialize Google Maps services');
+      setError(initFailed);
     }
   };
 

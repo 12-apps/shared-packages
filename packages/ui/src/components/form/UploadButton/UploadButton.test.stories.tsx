@@ -383,7 +383,7 @@ export const EdgeCases: Story = {
       await userEvent.upload(fileInput, largeFile);
 
       await waitFor(() => {
-        const errorTexts = canvas.queryAllByText(/file size must be less than/i);
+        const errorTexts = canvas.queryAllByText(PT_BR_UPLOAD_BUTTON_COPY.fileTooLarge(1));
         expect(errorTexts.length).toBeGreaterThan(0);
       });
 

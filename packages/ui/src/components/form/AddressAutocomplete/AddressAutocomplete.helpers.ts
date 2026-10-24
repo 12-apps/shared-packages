@@ -1,3 +1,5 @@
+import { EN_US_ADDRESS_AUTOCOMPLETE_COPY } from '../../../en-US.form';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import type { AddressAutocompleteProps, AddressOptionValue } from './AddressAutocomplete.types';
 
 // Below this the field clears its options rather than querying Places.
@@ -5,8 +7,6 @@ export const MIN_QUERY_LENGTH = 2;
 
 type DefaultedKeys =
   | 'variant'
-  | 'label'
-  | 'placeholder'
   | 'floating'
   | 'error'
   | 'disabled'
@@ -20,8 +20,6 @@ export type ResolvedAddressProps = AddressAutocompleteProps &
 
 const ADDRESS_AUTOCOMPLETE_DEFAULTS: Pick<AddressAutocompleteProps, DefaultedKeys> = {
   variant: 'outlined',
-  label: 'Address',
-  placeholder: 'Enter an address',
   floating: false,
   error: false,
   disabled: false,
@@ -40,8 +38,16 @@ const definedProps = (props: AddressAutocompleteProps): Partial<AddressAutocompl
 
 // Applied as a merge rather than destructuring defaults, which would otherwise
 // put ten branches into the component's own complexity budget.
-export const resolveAddressProps = (props: AddressAutocompleteProps): ResolvedAddressProps =>
-  ({ ...ADDRESS_AUTOCOMPLETE_DEFAULTS, ...definedProps(props) }) as ResolvedAddressProps;
+export const resolveAddressProps = (props: AddressAutocompleteProps): ResolvedAddressProps => {
+  // The label and placeholder come from the host's pack, then the English one.
+  const text = resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, props.copy);
+  return {
+    ...ADDRESS_AUTOCOMPLETE_DEFAULTS,
+    label: text.label,
+    placeholder: text.placeholder,
+    ...definedProps(props),
+  } as ResolvedAddressProps;
+};
 
 export const addressOptionLabel = (option: AddressOptionValue): string => {
   if (typeof option === 'string') return option;

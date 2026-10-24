@@ -1,6 +1,9 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import type { WorkflowStepItem, WorkflowStepProps } from './WorkflowStep.types';
+import type { WorkflowStepLabels } from '../../../copy/labels';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import { neutralTones } from '../../../tokens/ink';
 import { paletteKey } from '../../../tokens/scales';
 
@@ -158,6 +161,10 @@ export const resolveWorkflowStepProps = (
 ): ResolvedWorkflowStepProps =>
   ({ ...WORKFLOW_DEFAULTS, ...definedProps(props) }) as ResolvedWorkflowStepProps;
 
+/** The caller's labels over the English ones, key by key. */
+export const workflowLabels = (labels?: Partial<WorkflowStepLabels>): WorkflowStepLabels =>
+  resolveLabels(EN_US_UI_LABELS.workflowStep, labels);
+
 /**
  * The progressbar's `aria-valuetext`: `Step N of M: <title>` while `currentStep`
  * names a step, and `Step N of M` when it does not (past the end, below zero, or
@@ -167,8 +174,9 @@ export const resolveWorkflowStepProps = (
 export const progressValueText = (
   steps: readonly WorkflowStepItem[],
   currentStep: number,
+  labels?: Partial<WorkflowStepLabels>,
 ): string => {
-  const position = `Step ${currentStep + 1} of ${steps.length}`;
+  const position = workflowLabels(labels).progress(currentStep + 1, steps.length);
   const step = steps[currentStep];
   return step === undefined ? position : `${position}: ${step.title}`;
 };

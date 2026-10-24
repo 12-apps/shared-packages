@@ -68,6 +68,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
 
     {showIndicators && (
       <CarouselIndicators
+        copy={copy}
         count={items.length}
         activeIndex={activeIndex}
         onSelect={onSelect}

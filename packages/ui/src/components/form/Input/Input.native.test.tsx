@@ -141,6 +141,13 @@ describe('Input (native)', () => {
     expect(screen.getByTestId('q')).toHaveAttribute('aria-disabled', 'true');
   });
 
+  it('names the busy spinner with the caller loadingLabel, else "loading"', () => {
+    const { rerender } = render(<Input dataTestId="q" loading loadingLabel="Carregando" />);
+    expect(screen.getByTestId('q-loading')).toHaveAttribute('aria-label', 'Carregando');
+    rerender(<Input dataTestId="q" loading />);
+    expect(screen.getByTestId('q-loading')).toHaveAttribute('aria-label', 'loading');
+  });
+
   it('fades the whole control while loading, as the web fades the form control', () => {
     render(<Input dataTestId="q" loading label="Buscando" helperText="Aguarde" />);
     expect(rootOf('q')).toHaveStyle({ opacity: String(INPUT_LOADING.opacity) });

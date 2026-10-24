@@ -30,7 +30,14 @@ export interface InstallPromptCopy {
   shareLabel: string;
 }
 
-/** The account card's one action. */
+/** The account card's one action, and the words standing in for a missing name. */
 export interface UserAvatarCopy {
   signOut: string;
+  /**
+   * The avatar's `alt`, and the card's name line, when the user has no name.
+   * Optional so a host's existing pack keeps compiling; the shipped packs carry
+   * both and the components fall back to the English one.
+   */
+  avatarAlt?: string;
+  unnamedUser?: string;
 }

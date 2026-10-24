@@ -185,7 +185,7 @@ export const ScreenReader: Story = {
     });
 
     await step('Verify search input accessibility', async () => {
-      const searchInput = within(document.body).getByPlaceholderText('Type a command or search...');
+      const searchInput = within(document.body).getByPlaceholderText(PT_BR_COMMAND_PALETTE_COPY.placeholder!);
       await expect(searchInput).toBeVisible();
       await expect(searchInput).toHaveAttribute('autoComplete', 'off');
     });
@@ -232,7 +232,7 @@ export const FocusManagement: Story = {
       await waitFor(
         async () => {
           const searchInput = within(document.body).getByPlaceholderText(
-            'Type a command or search...',
+            PT_BR_COMMAND_PALETTE_COPY.placeholder!,
           );
           await expect(searchInput).toBeVisible();
           await expect(searchInput).toBeEnabled();
@@ -251,7 +251,7 @@ export const FocusManagement: Story = {
         await expect(openButton).toBeVisible();
         // Verify the command palette is closed by checking the search input is not in DOM
         await expect(() =>
-          within(document.body).getByPlaceholderText('Type a command or search...'),
+          within(document.body).getByPlaceholderText(PT_BR_COMMAND_PALETTE_COPY.placeholder!),
         ).toThrow();
       });
     });
@@ -351,11 +351,11 @@ export const VisualStates: Story = {
     });
 
     await step('Test empty state', async () => {
-      const searchInput = within(document.body).getByPlaceholderText('Type a command or search...');
+      const searchInput = within(document.body).getByPlaceholderText(PT_BR_COMMAND_PALETTE_COPY.placeholder!);
       await userEvent.type(searchInput, 'nonexistentcommand123');
 
       await waitFor(async () => {
-        const noResults = within(document.body).getByText(/No commands found/);
+        const noResults = within(document.body).getByText(/Nenhum comando encontrado/);
         await expect(noResults).toBeVisible();
       });
     });
@@ -425,7 +425,7 @@ export const EdgeCases: Story = {
     });
 
     await step('Test special characters', async () => {
-      const searchInput = within(document.body).getByPlaceholderText('Type a command or search...');
+      const searchInput = within(document.body).getByPlaceholderText(PT_BR_COMMAND_PALETTE_COPY.placeholder!);
       await userEvent.type(searchInput, '@#$');
 
       await waitFor(async () => {

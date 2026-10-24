@@ -8,7 +8,7 @@ import type {
   TutorialCopy,
 } from './copy';
 
-export const PT_BR_TUTORIAL_COPY: TutorialCopy = {
+export const PT_BR_TUTORIAL_COPY: Required<TutorialCopy> = {
   skip: "Pular",
   previous: "Anterior",
   next: "Próximo",
@@ -16,6 +16,8 @@ export const PT_BR_TUTORIAL_COPY: TutorialCopy = {
   complete: "Concluir",
   finish: "Finalizar",
   requiresAction: "Conclua a ação obrigatória primeiro",
+  progress: (current, total) => `${current} de ${total}`,
+  close: "Fechar",
 };
 
 export const PT_BR_CHROME_COPY: ChromeCopy = {

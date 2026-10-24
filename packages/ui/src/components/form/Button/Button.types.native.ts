@@ -23,5 +23,7 @@ export type ButtonProps = ButtonBaseProps &
     onPress?: (event: GestureResponderEvent) => void;
     onFocus?: (event: NativeSyntheticEvent<TargetedEvent>) => void;
     onBlur?: (event: NativeSyntheticEvent<TargetedEvent>) => void;
+    /** The busy spinner's accessible name; defaults to the labels pack's `loading`. */
+    loadingLabel?: string;
     style?: StyleProp<ViewStyle>;
   };

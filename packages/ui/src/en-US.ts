@@ -18,6 +18,7 @@
 export * from './en-US.data-display';
 export * from './en-US.feedback';
 export * from './en-US.form';
+export * from './en-US.labels';
 export * from './en-US.layout';
 export * from './en-US.navigation';
 export * from './en-US.shared';

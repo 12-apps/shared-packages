@@ -96,6 +96,7 @@ export const useRichTextEditor = ({
   disabled,
   readOnly,
   maxLength,
+  listItemText,
 }: {
   value?: string;
   onChange?: (value: string) => void;
@@ -104,6 +105,7 @@ export const useRichTextEditor = ({
   disabled?: boolean;
   readOnly?: boolean;
   maxLength?: number;
+  listItemText?: string;
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const { content, handleContentChange } = useEditorContent({
@@ -130,12 +132,13 @@ export const useRichTextEditor = ({
         value: formatValue,
         range: selection.getRangeAt(0),
         editor: editorRef.current,
+        listItemText,
       });
 
       handleContentChange();
       editorRef.current.focus();
     },
-    [disabled, readOnly, handleContentChange],
+    [disabled, readOnly, handleContentChange, listItemText],
   );
 
   const sanitizedContent = sanitize(content);

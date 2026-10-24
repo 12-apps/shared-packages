@@ -19,6 +19,8 @@ export const EN_US_INSTALL_PROMPT_COPY: InstallPromptCopy = {
   shareLabel: "Share",
 };
 
-export const EN_US_USER_AVATAR_COPY: UserAvatarCopy = {
+export const EN_US_USER_AVATAR_COPY: Required<UserAvatarCopy> = {
   signOut: "Sign out",
+  avatarAlt: "User avatar",
+  unnamedUser: "User",
 };

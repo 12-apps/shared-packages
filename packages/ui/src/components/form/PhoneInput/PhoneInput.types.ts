@@ -13,6 +13,7 @@ export interface PhoneInputProps {
   placeholder?: string;
   icon?: React.ReactNode;
   defaultValue?: string;
+  /** The country the picker starts on. @default 'BR' */
   countryCode?: CountryCode;
   floating?: boolean;
   onChange?: (value: string, isValid: boolean, countryCode?: CountryCode) => void;

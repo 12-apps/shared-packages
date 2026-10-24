@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { styled, useTheme } from '@mui/material/styles/index.js';
 import type { ElementType, FC, ReactNode } from 'react';
 import React from 'react';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { rem } from '../../../tokens/relative';
 import { safeAreaBottom } from '../../../utils/viewport';
 import {
@@ -126,6 +127,8 @@ interface ModalHeaderProps {
   onBack: () => void;
   /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
   backLabel: string;
+  /** The ✕'s accessible name; `close` when the host names none. */
+  closeLabel?: string;
   onClose: () => void;
   /** Renders the bar without its ✕ — the panel's content owns the dismiss. */
   hideClose?: boolean;
@@ -142,9 +145,25 @@ interface ModalHeaderProps {
 const HeaderLeadingButton: FC<
   Pick<
     ModalHeaderProps,
-    'canGoBack' | 'onBack' | 'backLabel' | 'onClose' | 'hideClose' | 'rtl' | 'dataTestId'
+    | 'canGoBack'
+    | 'onBack'
+    | 'backLabel'
+    | 'closeLabel'
+    | 'onClose'
+    | 'hideClose'
+    | 'rtl'
+    | 'dataTestId'
   >
-> = ({ canGoBack, onBack, backLabel, onClose, hideClose, rtl, dataTestId }) => {
+> = ({
+  canGoBack,
+  onBack,
+  backLabel,
+  closeLabel = EN_US_UI_LABELS.common.close,
+  onClose,
+  hideClose,
+  rtl,
+  dataTestId,
+}) => {
   if (canGoBack) {
     return (
       <IconButton
@@ -166,7 +185,7 @@ const HeaderLeadingButton: FC<
       edge="start"
       color="inherit"
       onClick={onClose}
-      aria-label="close"
+      aria-label={closeLabel}
       size="small"
       data-testid={testId(dataTestId, 'close-button')}
     >
@@ -183,6 +202,7 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
   onClose,
   hideClose,
   backLabel,
+  closeLabel,
   headerActions,
   rtl,
   dataTestId,
@@ -207,6 +227,7 @@ export const ModalHeader: FC<ModalHeaderProps> = ({
         canGoBack={canGoBack}
         onBack={onBack}
         backLabel={backLabel}
+        closeLabel={closeLabel}
         onClose={onClose}
         hideClose={hideClose}
         rtl={rtl}

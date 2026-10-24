@@ -11,6 +11,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { MAX_ZOOM, MIN_ZOOM } from './MapPreview.constants';
+import { resolveMapCopy } from './MapPreview.helpers';
 import type { MapType } from './MapPreview.types';
 import type { MapPreviewCopy } from '../../../copy';
 import { rem } from '../../../tokens/relative';
@@ -70,7 +71,9 @@ export const MapControlBar: FC<MapControlBarProps> = ({
   onCenter,
   onToggleMapType,
   onToggleFullscreen,
-}) => (
+}) => {
+  const text = resolveMapCopy(copy);
+  return (
   <MapControls data-testid="map-controls">
     <Tooltip title={copy.zoomIn} placement="left">
       <ControlButton
@@ -104,7 +107,7 @@ export const MapControlBar: FC<MapControlBarProps> = ({
         <CenterIcon fontSize="small" />
       </ControlButton>
     </Tooltip>
-    <Tooltip title={`Map type: ${mapType}`} placement="left">
+    <Tooltip title={text.mapTypeTitle(text.mapTypeNames[mapType])} placement="left">
       <ControlButton
         size="small"
         onClick={onToggleMapType}
@@ -125,4 +128,5 @@ export const MapControlBar: FC<MapControlBarProps> = ({
       </ControlButton>
     </Tooltip>
   </MapControls>
-);
+  );
+};

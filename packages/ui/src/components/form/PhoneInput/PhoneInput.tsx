@@ -10,9 +10,9 @@ import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
-import React, {  } from 'react';
+import React, { useMemo } from 'react';
 
-import { countries } from './countries';
+import { countriesByDisplayName, countryDisplayName } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
@@ -144,11 +144,10 @@ const PhoneField: React.FC<{
 
 const PHONE_INPUT_DEFAULTS = {
   variant: 'outlined',
-  label: 'Phone Number',
-  placeholder: 'Enter phone number',
   icon: <PhoneIcon />,
   defaultValue: '',
-  countryCode: 'US',
+  // The owner's market: a host that names no country starts at Brazil.
+  countryCode: 'BR',
   floating: false,
   error: false,
   disabled: false,
@@ -162,6 +161,12 @@ const definedProps = (props: PhoneInputProps): Partial<PhoneInputProps> =>
   Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
   ) as Partial<PhoneInputProps>;
+
+// The label and placeholder a host passes as props win; then the copy pack's;
+// then the English the field has always shown.
+const copyDefaults = (copy: PhoneInputCopy): Pick<PhoneInputProps, 'label' | 'placeholder'> => ({
+  label: copy.label ?? 'Phone Number',
+  placeholder: copy.placeholder ?? 'Enter phone number' });
 
 const CountryAdornment: React.FC<{
   country?: CountryData;
@@ -227,8 +232,10 @@ const CountryPicker: React.FC<{
   selectedCode?: CountryData['code'];
   onClose: () => void;
   onSelect: (country: CountryData) => void;
-}> = ({ anchorEl, selectedCode, onClose, onSelect }) => {
+  countryName?: PhoneInputCopy['countryName'];
+}> = ({ anchorEl, selectedCode, onClose, onSelect, countryName }) => {
   const theme = useTheme();
+  const listed = useMemo(() => countriesByDisplayName(countryName), [countryName]);
 
   return (
         <CountryMenu
@@ -243,7 +250,7 @@ const CountryPicker: React.FC<{
             horizontal: 'left' }}
           data-testid="country-menu"
         >
-          {countries.map((country) => (
+          {listed.map((country) => (
             <MenuItem
               key={country.code}
               onClick={() => onSelect(country)}
@@ -259,7 +266,7 @@ const CountryPicker: React.FC<{
                 </Typography>
               </ListItemIcon>
               <ListItemText
-                primary={country.name}
+                primary={country.displayName}
                 secondary={country.dial}
                 primaryTypographyProps={{ fontSize: rem(theme, 14.4) }}
                 secondaryTypographyProps={{ fontSize: rem(theme, 12.8) }}
@@ -315,7 +322,10 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     errorMessage,
     disabled,
     required,
-    fullWidth } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
+    fullWidth } = {
+    ...PHONE_INPUT_DEFAULTS,
+    ...copyDefaults(copy),
+    ...definedProps(props) };
   const {
     value,
     selectedCountry,
@@ -337,7 +347,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     value,
     isFocused,
     helper,
-    countryName: selectedCountry?.name,
+    countryName: selectedCountry && countryDisplayName(selectedCountry, copy.countryName),
     copy });
 
   const TextFieldComponent = variant === 'glass' ? GlassTextField : FieldTextField;
@@ -371,6 +381,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
         selectedCode={selectedCountry?.code}
         onClose={handleCountryClose}
         onSelect={handleCountrySelect}
+        countryName={copy.countryName}
       />
     </Box>
   );

@@ -46,6 +46,7 @@ export const WorkflowStep = forwardRef<HTMLDivElement, WorkflowStepProps>((rawPr
     errorIcon,
     onStepClick,
     disabled,
+    labels,
     className,
     style,
     'data-testid': dataTestId,
@@ -75,7 +76,7 @@ export const WorkflowStep = forwardRef<HTMLDivElement, WorkflowStepProps>((rawPr
       aria-valuemin={0}
       aria-valuemax={valueMax}
       aria-valuenow={valueNow}
-      aria-valuetext={progressValueText(steps, currentStep)}
+      aria-valuetext={progressValueText(steps, currentStep, labels)}
       data-testid={dataTestId}
       {...other}
     >
@@ -98,6 +99,7 @@ export const WorkflowStep = forwardRef<HTMLDivElement, WorkflowStepProps>((rawPr
           animated={animated}
           disabled={disabled}
           onClick={handleStepClick}
+          labels={labels}
           dataTestId={dataTestId}
         />
       ))}

@@ -17,11 +17,13 @@ const useCommandSearch = ({
   searchQuery,
   showRecent,
   recentCommandIds,
+  generalLabel,
 }: {
   commands: PaletteCommand[];
   searchQuery: string;
   showRecent?: boolean;
   recentCommandIds: string[];
+  generalLabel?: string;
 }) => {
   const fuse = useMemo(
     () =>
@@ -38,7 +40,10 @@ const useCommandSearch = ({
     [searchQuery, commands, fuse, showRecent, recentCommandIds],
   );
 
-  const groupedCommands = useMemo(() => groupByCategory(filteredCommands), [filteredCommands]);
+  const groupedCommands = useMemo(
+    () => groupByCategory(filteredCommands, generalLabel),
+    [filteredCommands, generalLabel],
+  );
 
   return { filteredCommands, groupedCommands };
 };
@@ -152,8 +157,10 @@ export const useCommandPalette = ({
   recentCommands,
   onCommandExecute,
   onClose,
+  generalLabel,
 }: {
   open: boolean;
+  generalLabel?: string;
   commands: PaletteCommand[];
   showRecent?: boolean;
   recentCommands: string[];
@@ -171,6 +178,7 @@ export const useCommandPalette = ({
     searchQuery,
     showRecent,
     recentCommandIds,
+    generalLabel,
   });
 
   const executeCommand = useExecuteCommand({ setRecentCommandIds, onCommandExecute, onClose });

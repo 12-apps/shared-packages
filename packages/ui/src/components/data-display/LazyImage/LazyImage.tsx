@@ -3,9 +3,9 @@ import CircularProgress from '@mui/material/CircularProgress/index.js';
 import { styled, useTheme, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 import { Skeleton } from '../../layout/Skeleton';
-import type { ResolvedLazyImageProps } from './LazyImage.hooks';
-import { imgPassThrough, resolveLazyImageProps, useLazyImage } from './LazyImage.hooks';
+import { imgPassThrough, resolveLazyImageProps, useLazyImage, type ResolvedLazyImageProps } from './LazyImage.hooks';
 import type { LazyImageProps } from './LazyImage.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { sheen } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 import { fieldHeight } from '../../../tokens/field-height';
@@ -238,7 +238,7 @@ const PlaceholderIndicator: React.FC<IndicatorProps & { onError: () => void }> =
   return (
     <StyledImage
       src={props.placeholder}
-      alt={`${props.alt} (loading)`}
+      alt={props.placeholderAlt ?? EN_US_UI_LABELS.lazyImage.loadingAlt(props.alt)}
       style={metrics}
       decoding={props.decoding}
       loading={props.lazy ? 'lazy' : props.loading}
@@ -286,7 +286,7 @@ const ErrorFallback: React.FC<IndicatorProps> = ({ props, metrics }) => {
     return (
       <StyledImage
         src={fallback}
-        alt={`${alt} (fallback)`}
+        alt={props.fallbackAlt ?? EN_US_UI_LABELS.lazyImage.fallbackAlt(alt)}
         style={metrics}
         fadeIn={false}
         isLoaded={true}

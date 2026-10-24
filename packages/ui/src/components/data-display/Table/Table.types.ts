@@ -1,3 +1,4 @@
+import type { TableLabels } from '../../../copy/labels';
 import type { ColorValue } from '../../../tokens/scales';
 import type { TableProps as MuiTableProps } from '@mui/material/Table/index.js';
 import type React from 'react';
@@ -63,7 +64,16 @@ export interface SelectionConfig {
 /** The full house vocabulary — a stripe can take any accent, or none. */
 export type TableStripeColor = ColorValue;
 
+/** The three accessible names the table adds: its sort button and its two kinds of checkbox. */
+export type { TableLabels };
+
 export interface TableProps extends Omit<MuiTableProps, 'variant'> {
+  /**
+   * The accessible names of the sort buttons and selection checkboxes. Any key
+   * left out keeps its English wording; a host passes `DATA_GRID_COPY[locale]`
+   * or `UI_LABELS[locale].table`.
+   */
+  labels?: Partial<TableLabels>;
   /**
    * What an empty result reads as. REQUIRED — the fallback was the English
    * "No data available", on the package every host renders.
@@ -307,6 +317,7 @@ export interface TableHeaderProps {
   selectable?: boolean;
   selectedRows?: (string | number)[];
   onSelectAll?: (selected: boolean) => void;
+  labels?: Partial<TableLabels>;
   density?: TableDensity;
   stickyHeader?: boolean;
   /** The `<thead>`, so the virtual window can subtract its height from the scroller's offset. */
@@ -347,6 +358,7 @@ export interface TableBodyProps {
   /** Set only when the body is virtualised: the rows in view and where they sit. */
   virtualWindow?: VirtualWindow;
   rowHeight?: number;
+  labels?: Partial<TableLabels>;
 }
 
 export interface VirtualTableBodyProps extends TableBodyProps {

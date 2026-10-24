@@ -68,7 +68,7 @@ const OWN_PROPS = new Set([
   'threshold', 'fadeIn', 'fadeInDuration', 'onLoad', 'onError', 'onLoadStart',
   'retryOnError', 'maxRetries', 'retryDelay', 'decoding', 'loading', 'fetchPriority',
   'skeletonProps', 'spinnerProps', 'sx', 'className', 'data-testid', 'aria-label',
-  'aria-describedby', 'role',
+  'aria-describedby', 'role', 'placeholderAlt', 'fallbackAlt',
 ]);
 
 export const imgPassThrough = (props: ResolvedLazyImageProps): Record<string, unknown> =>

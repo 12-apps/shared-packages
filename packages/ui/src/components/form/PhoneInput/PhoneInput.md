@@ -13,7 +13,7 @@ An international phone number input component with country selection, automatic 
 | placeholder  | string                            | 'Enter phone number' | Placeholder text                                |
 | icon         | React.ReactNode                   | PhoneIcon            | Custom end adornment icon                       |
 | defaultValue | string                            | ''                   | Initial phone number value                      |
-| countryCode  | CountryCode                       | 'US'                 | Default selected country                        |
+| countryCode  | CountryCode                       | 'BR'                 | Default selected country                        |
 | floating     | boolean                           | false                | Floating label style                            |
 | onChange     | function                          | undefined            | Callback with value, validity, and country code |
 | helper       | string                            | undefined            | Helper text below input                         |
@@ -349,7 +349,7 @@ play: async ({ canvasElement }) => {
 
 #### `countryCode`
 - **Type:** `CountryCode` (e.g., `'US'`, `'GB'`)
-- **Default:** `'US'`
+- **Default:** `'BR'`
 - **Impact:** Initial country selection
 
 #### `defaultValue`

@@ -43,18 +43,25 @@ export const PT_BR_DATA_GRID_COPY: DataGridCopy = {
   gridLabel: "Grade de dados",
 };
 
-export const PT_BR_MAP_PREVIEW_COPY: MapPreviewCopy = {
+export const PT_BR_MAP_PREVIEW_COPY: Required<MapPreviewCopy> = {
   zoomIn: "Aproximar",
   zoomOut: "Afastar",
   center: "Centralizar o mapa",
   mapType: "Trocar o tipo de mapa",
   fullscreen: "Tela cheia",
   search: "Buscar endereço",
+  searchPlaceholder: "Buscar local...",
+  viewDescription: (lat, lng, zoom) => `Mapa centralizado em ${lat}, ${lng}, zoom ${zoom}`,
+  mapTypeTitle: (name) => `Tipo de mapa: ${name}`,
+  mapTypeNames: { roadmap: "mapa", satellite: "satélite", hybrid: "híbrido", terrain: "relevo" },
+  coordinates: (lat, lng) => `Lat.: ${lat}, Long.: ${lng}`,
+  zoomLevel: (zoom) => `Zoom: ${zoom}`,
 };
 
-export const PT_BR_CAROUSEL_COPY: CarouselCopy = {
+export const PT_BR_CAROUSEL_COPY: Required<CarouselCopy> = {
   previous: "Anterior",
   next: "Próximo",
+  goToSlide: (position) => `Ir para o slide ${position}`,
 };
 
 export const PT_BR_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {

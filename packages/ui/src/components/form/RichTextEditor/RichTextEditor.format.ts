@@ -26,7 +26,9 @@ export const applyFormatToRange = ({
   value,
   range,
   editor,
+  listItemText,
 }: {
+  listItemText?: string;
   formatType: string;
   value?: string;
   range: globalThis.Range;
@@ -40,7 +42,7 @@ export const applyFormatToRange = ({
 
   const listTag = LIST_TAGS[formatType];
   if (listTag) {
-    toggleList(range, listTag, editor);
+    toggleList(range, listTag, editor, listItemText);
     return;
   }
 

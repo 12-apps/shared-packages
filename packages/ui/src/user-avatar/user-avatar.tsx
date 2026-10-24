@@ -8,6 +8,7 @@ import { Button } from '../components/form/Button';
 import { Text } from '../components/typography/Text';
 import { Card } from '../components/layout/Card';
 import type { UserAvatarCopy } from '../copy';
+import { EN_US_USER_AVATAR_COPY } from '../en-US.utility';
 
 /**
  * Generate initials from a name
@@ -28,6 +29,11 @@ export interface UserAvatarProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   onClick?: () => void;
   interactive?: boolean;
+  /**
+   * `avatarAlt` names the image when there is no `name`. Optional: English
+   * when omitted; a host passes `USER_AVATAR_COPY[locale]`.
+   */
+  copy?: Partial<UserAvatarCopy>;
 }
 
 /**
@@ -39,13 +45,15 @@ export function UserAvatar({
   size = 'md',
   onClick,
   interactive = false,
+  copy,
 }: UserAvatarProps): React.ReactElement {
   const fallbackText = name ? getInitials(name) : "?";
+  const avatarAlt = copy?.avatarAlt ?? EN_US_USER_AVATAR_COPY.avatarAlt;
 
   return (
     <Avatar
       src={src ?? undefined}
-      alt={name ?? "User avatar"}
+      alt={name ?? avatarAlt}
       fallback={fallbackText}
       size={size}
       variant="circle"
@@ -81,11 +89,12 @@ export function UserMenu({ user, onSignOut, copy }: UserMenuProps): React.ReactE
             src={user.image}
             name={user.name}
             size="md"
+            copy={copy}
           />
 
           <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
             <Text weight="semibold" size="sm">
-              {user.name ?? "User"}
+              {user.name ?? copy.unnamedUser ?? EN_US_USER_AVATAR_COPY.unnamedUser}
             </Text>
             {user.email && (
               <Text color="secondary" size="xs">

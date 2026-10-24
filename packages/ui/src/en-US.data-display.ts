@@ -43,18 +43,25 @@ export const EN_US_DATA_GRID_COPY: DataGridCopy = {
   gridLabel: "Data grid",
 };
 
-export const EN_US_MAP_PREVIEW_COPY: MapPreviewCopy = {
+export const EN_US_MAP_PREVIEW_COPY: Required<MapPreviewCopy> = {
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
   center: "Centre the map",
   mapType: "Change the map type",
   fullscreen: "Full screen",
   search: "Search for an address",
+  searchPlaceholder: "Search location...",
+  viewDescription: (lat, lng, zoom) => `Map preview centered at ${lat}, ${lng} with zoom level ${zoom}`,
+  mapTypeTitle: (name) => `Map type: ${name}`,
+  mapTypeNames: { roadmap: "roadmap", satellite: "satellite", hybrid: "hybrid", terrain: "terrain" },
+  coordinates: (lat, lng) => `Lat: ${lat}, Lng: ${lng}`,
+  zoomLevel: (zoom) => `Zoom: ${zoom}`,
 };
 
-export const EN_US_CAROUSEL_COPY: CarouselCopy = {
+export const EN_US_CAROUSEL_COPY: Required<CarouselCopy> = {
   previous: "Previous",
   next: "Next",
+  goToSlide: (position) => `Go to slide ${position}`,
 };
 
 export const EN_US_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {

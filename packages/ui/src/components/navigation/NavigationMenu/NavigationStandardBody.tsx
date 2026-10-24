@@ -13,6 +13,7 @@ import { CollapseToggle, LogoBar, MenuList } from './NavigationMenu.shell';
 import { slideIn } from './NavigationMenu.styles';
 import type { NavigationMenuItem } from './NavigationMenu.types';
 import { renderMenuItem } from './NavigationMenuItem';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { sxRem } from '../../../tokens/relative';
 
 const DividerRule: FC = () => (
@@ -38,15 +39,23 @@ const VerticalLogo: FC<{ logo: ReactNode; collapsed: boolean }> = ({ logo, colla
   </LogoBar>
 );
 
-const CollapseControl: FC<{ collapsed: boolean; onToggle: () => void }> = ({
+const CollapseControl: FC<{
+  collapsed: boolean;
+  label?: string;
+  expandLabel?: string;
+  onToggle: () => void;
+}> = ({
   collapsed,
+  label = EN_US_UI_LABELS.navigationMenu.collapse,
+  expandLabel = EN_US_UI_LABELS.navigationMenu.expand ?? 'Expand',
   onToggle,
 }) => (
-  <CollapseToggle onClick={onToggle}>
+  // Collapsed, the control is its icon alone, so the name has to be given.
+  <CollapseToggle onClick={onToggle} ariaLabel={collapsed ? expandLabel : undefined}>
     <ListItemIcon sx={{ minWidth: collapsed ? 0 : sxRem(40), justifyContent: 'center' }}>
       <MenuIcon />
     </ListItemIcon>
-    {!collapsed && <ListItemText primary="Collapse" />}
+    {!collapsed && <ListItemText primary={label} />}
   </CollapseToggle>
 );
 
@@ -103,6 +112,10 @@ export interface NavigationStandardBodyProps {
   items: NavigationMenuItem[];
   logo?: ReactNode;
   endContent?: ReactNode;
+  /** The collapse control's text; English when the host names none. */
+  collapseLabel?: string;
+  /** Its accessible name while collapsed; English when the host names none. */
+  expandLabel?: string;
   onCollapseToggle: () => void;
 }
 
@@ -118,6 +131,8 @@ export const NavigationStandardBody: FC<NavigationStandardBodyProps> = ({
   items,
   logo,
   endContent,
+  collapseLabel,
+  expandLabel,
   onCollapseToggle,
 }) => {
   const isVertical = variant === 'vertical';
@@ -137,7 +152,12 @@ export const NavigationStandardBody: FC<NavigationStandardBodyProps> = ({
       {logo && isVertical && <VerticalLogo logo={logo} collapsed={collapsed} />}
 
       {collapsible && isVertical && (
-        <CollapseControl collapsed={collapsed} onToggle={onCollapseToggle} />
+        <CollapseControl
+          collapsed={collapsed}
+          label={collapseLabel}
+          expandLabel={expandLabel}
+          onToggle={onCollapseToggle}
+        />
       )}
 
       <MenuItems
