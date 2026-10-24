@@ -18,6 +18,7 @@
  * Both speak the `{ data }` / `{ error, issues }` envelope every `createApi*`
  * package answers in, so a surface can mix them without a second adapter.
  */
+import { EN_US_REST_RESULT_FALLBACKS } from './en-US';
 
 /**
  * What a write answers with: the value, or the refusal and what to paint.
@@ -65,11 +66,6 @@ export interface RestResultFallbacks {
   network: string;
 }
 
-const DEFAULT_FALLBACKS: RestResultFallbacks = {
-  status: (status) => `HTTP ${status}`,
-  network: 'network error',
-};
-
 function foldError<T>(
   status: number,
   payload: ErrorEnvelope | null,
@@ -98,7 +94,7 @@ export async function restResult<T>(
   path: string,
   method = 'GET',
   body?: unknown,
-  fallbacks: RestResultFallbacks = DEFAULT_FALLBACKS,
+  fallbacks: RestResultFallbacks = EN_US_REST_RESULT_FALLBACKS,
 ): Promise<Result<T>> {
   const hasBody = body !== undefined;
   try {

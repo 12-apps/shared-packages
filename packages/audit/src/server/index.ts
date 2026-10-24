@@ -10,6 +10,8 @@
  * runtime.
  */
 export { createApiAudit, type ApiAudit } from './create-api-audit';
+export { EN_US_AUDIT_MESSAGES } from './en-US';
+export { AUDIT_MESSAGES } from './locales';
 export { PT_BR_AUDIT_MESSAGES } from './pt-BR';
 
 export {
