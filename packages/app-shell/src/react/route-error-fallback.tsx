@@ -35,8 +35,8 @@ import {
  * button loads the page again past every cache ({@link reloadOntoCurrentBuild}),
  * not the plain reload the recovery already tried and the stale document won.
  *
- * A host that has not written `routeUpdate` keeps the generic screen with the
- * raw message, as before — only the button's reload changes for it.
+ * A host that has not written `routeUpdate` keeps the generic screen — with its
+ * `routeErrorBody` when it wrote one, else the raw message, as before.
  */
 function errorStateFallback({
   error,
@@ -47,12 +47,14 @@ function errorStateFallback({
   reload: () => void;
   messages: AppShellMessages;
 }): JSX.Element {
+  // The host's sentence when it wrote one; the raw message otherwise.
+  const body = messages.routeErrorBody ?? error.message;
   if (isChunkLoadError(error)) {
     const update = messages.routeUpdate;
     return (
       <ErrorState
         title={update?.title ?? messages.routeErrorTitle}
-        message={update?.body ?? error.message}
+        message={update?.body ?? body}
         retryLabel={update?.retry ?? messages.routeErrorRetry}
         onRetry={reloadOntoCurrentBuild}
         // Not an error the reader caused or can fix beyond one tap — the amber
@@ -65,7 +67,7 @@ function errorStateFallback({
   return (
     <ErrorState
       title={messages.routeErrorTitle}
-      message={error.message}
+      message={body}
       retryLabel={messages.routeErrorRetry}
       onRetry={reload}
       dataTestId="route-error"

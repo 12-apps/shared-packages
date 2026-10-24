@@ -28,6 +28,13 @@ export interface AppShellMessages {
   routeErrorTitle: string;
   routeErrorRetry: string;
   /**
+   * The body of the generic crashed-page screen, in the host's words. OPTIONAL:
+   * without it the screen shows the error's own `message`, which is browser or
+   * JS English ("Cannot read properties of undefined …") on a page a shopper
+   * reads. The raw message still reaches error reporting either way.
+   */
+  routeErrorBody?: string;
+  /**
    * The crashed-page screen when the page is merely from an OLDER BUILD — a
    * chunk the last deploy removed, which the one recovery reload did not get
    * past. OPTIONAL, and whole when present: three sentences or none.
