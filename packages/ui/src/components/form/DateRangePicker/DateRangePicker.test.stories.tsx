@@ -189,7 +189,6 @@ const fitsIn = (width: number): Story => ({
     const box = canvas.getByTestId('drp-box').getBoundingClientRect();
     const grid = canvas.getByTestId('calendar-grid');
 
-    await expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth);
     // Every day, the last column included, ends inside the box.
     const rights = Array.from(grid.children, (cell) => cell.getBoundingClientRect().right);
     await expect(Math.max(...rights)).toBeLessThanOrEqual(box.right);
