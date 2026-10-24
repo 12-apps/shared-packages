@@ -110,10 +110,13 @@ test('a refused reorder rolls the list back to the server order', async ({ page 
   await page.getByRole('button', { name: 'Mover Boreal Pay para cima' }).click();
 
   // The host refused the intent before any handler ran; the component's own
-  // catch surfaces the refusal body and rolls the optimistic order back.
+  // catch words the refusal by its code (FUT-3860: never the server's own
+  // English) and rolls the optimistic order back. `HarnessRefusal` is no code
+  // the package knows, so the owner reads the generic sentence naming the status.
   await expectWireOrder(page, ['PUT /settings/priorities 409']);
   await expect(page.getByTestId('payments-priority-error')).toBeVisible();
-  await expect(page.getByTestId('payments-priority-error')).toContainText('HarnessRefusal');
+  await expect(page.getByTestId('payments-priority-error')).toContainText('(409)');
+  await expect(page.getByTestId('payments-priority-error')).not.toContainText('HarnessRefusal');
   await expect(page.locator('[data-testid^="payments-priority-item-"]')).toContainText([
     'Aurora Pagamentos',
     'Boreal Pay',

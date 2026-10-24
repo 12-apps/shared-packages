@@ -95,16 +95,17 @@ function ExpiryNote(props: { expiresAt: string }) {
  * and it is not a dead end either: the credentials path works, and it is right
  * there on the same screen. So it reads as a warning that names the way round.
  *
- * Anything else is passed through. The adapter's own sentence beats a generic
- * one, and inventing copy for a failure we have not seen is how a screen ends
- * up confidently misdescribing an outage.
+ * Anything else arrives already worded by its error code
+ * (`describeFailure`), never as the server's English.
  */
+const NO_PLATFORM_APP = /no platform oauth application credentials/i;
+
 function connectFailure(
   copy: OAuthConnectionCopy,
   message: string,
   displayName: string,
 ): { severity: 'error' | 'warning'; text: string } {
-  if (/no platform oauth application credentials/i.test(message)) {
+  if (NO_PLATFORM_APP.test(message)) {
     return { severity: 'warning', text: copy.notAvailableHere(displayName) };
   }
   return { severity: 'error', text: message };
@@ -303,7 +304,11 @@ function useConnectionAction(onChanged: () => void) {
       await action();
       onChanged();
     } catch (err) {
-      setError(describeFailure(err, failures));
+      // The missing-platform-app refusal keeps its raw message: `connectFailure`
+      // recognises it there and names the way round. Everything else reads as
+      // its code's sentence.
+      const raw = err instanceof Error ? err.message : '';
+      setError(NO_PLATFORM_APP.test(raw) ? raw : describeFailure(err, failures));
     } finally {
       setBusy(null);
     }
