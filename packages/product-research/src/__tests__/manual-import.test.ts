@@ -175,7 +175,8 @@ describe('createManualConnector', () => {
       source(),
       { logger: silentLogger, fetchJson: () => Promise.resolve(null), diagnostics: PT_BR_RESEARCH_DIAGNOSTICS },
     );
-    expect(result).toEqual({ ok: false, error: expect.stringContaining('db down') });
+    // The store owner reads the pack's sentence; the cause goes to the log.
+    expect(result).toEqual({ ok: false, error: PT_BR_RESEARCH_DIAGNOSTICS.connectors!.manualStoreUnavailable });
   });
 });
 

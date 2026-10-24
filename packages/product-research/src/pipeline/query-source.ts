@@ -5,7 +5,7 @@ import type { ResearchConfig, ResearchDeps } from '../ports';
 import { pacedContext } from './rate-limit';
 import { budgetedContext, hitCeiling, sourceCeilingError, sourceDeadlineAt } from './source-budget';
 import type { RawOffer, ResearchQuery, SourceRecord, SourceStat } from '../types';
-import { diagnosticsOf } from '../connectors/types';
+import { connectorFailuresOf, diagnosticsOf } from '../connectors/types';
 
 /**
  * Everything about asking ONE source: the cache envelope, the paid-budget
@@ -294,7 +294,7 @@ export const querySource = async (
 
   const connector = registry.get(source.type);
   if (!connector) {
-    return finish('SKIPPED', [], { error: `no connector registered for ${source.type}` });
+    return finish('SKIPPED', [], { error: connectorFailuresOf(ctx).noConnector(source.type) });
   }
 
   // Local-data connectors (MANUAL) opt out of the cache entirely: reading

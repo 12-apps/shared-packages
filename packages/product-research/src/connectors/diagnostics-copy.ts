@@ -135,6 +135,23 @@ export interface ManualImportCopy {
   unimportableRow(path: string, message: string): string;
 }
 
+/**
+ * A connector's own failures that are not transport or config.
+ * OPTIONAL on {@link ResearchDiagnosticsCopy} so a host's pack keeps compiling;
+ * absent, the connectors fall back to the English sentences of
+ * `EN_US_RESEARCH_DIAGNOSTICS`. Never carries a URL or a token: the reader is a
+ * store owner, and the request detail goes to the logger.
+ */
+export interface ConnectorFailureCopy {
+  mercadoLivreSearchUnreachable: string;
+  mercadoLivreCatalogUnreachable: string;
+  /** No access token for the source — the host's Mercado Livre credentials. */
+  mercadoLivreAuthFailed(sourceLabel: string): string;
+  manualStoreUnavailable: string;
+  /** No connector registered for the source's type. */
+  noConnector(sourceType: string): string;
+}
+
 export interface ResearchDiagnosticsCopy {
   manualImport: ManualImportCopy;
   fetch: FetchFailureCopy;
@@ -143,5 +160,6 @@ export interface ResearchDiagnosticsCopy {
   vtex: VtexCopy;
   vtexValidate: VtexValidateCopy;
   budget: SourceBudgetCopy;
+  connectors?: ConnectorFailureCopy;
 }
 

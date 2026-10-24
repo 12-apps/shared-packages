@@ -315,7 +315,7 @@ describe('mercadoLivreConnector', () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('unreachable');
+    if (!result.ok) expect(result.error).toBe(PT_BR_RESEARCH_DIAGNOSTICS.connectors!.mercadoLivreSearchUnreachable);
   });
 
   it('degrades on missing credentials without ever fetching', async () => {
@@ -326,7 +326,7 @@ describe('mercadoLivreConnector', () => {
       transport.ctx,
     );
 
-    expect(result).toEqual({ ok: false, error: expect.stringContaining('auth failed') });
+    expect(result).toEqual({ ok: false, error: expect.stringContaining('Falha de autenticação') });
     expect(transport.gets).toHaveLength(0);
   });
 
@@ -343,7 +343,7 @@ describe('mercadoLivreConnector', () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('auth failed');
+    if (!result.ok) expect(result.error).toContain('Falha de autenticação');
   });
 
   it('retries once with a fresh token when a mid-run 401 folds into null', async () => {
@@ -420,7 +420,7 @@ describe('mercadoLivreConnector', () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('invalid Mercado Livre config');
+    if (!result.ok) expect(result.error).toContain('Configuração da fonte');
   });
 
   it('tolerates unexpected payload shapes by returning no offers', () => {

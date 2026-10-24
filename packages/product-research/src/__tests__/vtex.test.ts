@@ -116,7 +116,7 @@ describe('vtexConnector', () => {
       ctxWith(() => GIGA_FIXTURE),
     );
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('invalid VTEX config');
+    if (!result.ok) expect(result.error).toContain('Configuração da fonte');
   });
 
   it('tolerates unexpected payload shapes by returning no offers', () => {

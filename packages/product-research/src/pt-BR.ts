@@ -170,4 +170,12 @@ export const PT_BR_RESEARCH_DIAGNOSTICS: ResearchDiagnosticsCopy = {
       'terminar. Nenhuma oferta chegou a tempo. Tente novamente; se repetir, a loja está ' +
       'respondendo devagar demais para esta pesquisa.',
   },
+  connectors: {
+    mercadoLivreSearchUnreachable: 'Busca do Mercado Livre indisponível',
+    mercadoLivreCatalogUnreachable: 'Catálogo do Mercado Livre indisponível',
+    mercadoLivreAuthFailed: (sourceLabel) =>
+      `Falha de autenticação no Mercado Livre para "${sourceLabel}": verifique as credenciais`,
+    manualStoreUnavailable: 'Tabela de preços manual indisponível',
+    noConnector: (sourceType) => `Nenhum conector disponível para ${sourceType}`,
+  },
 };

@@ -177,4 +177,12 @@ export const EN_US_RESEARCH_DIAGNOSTICS: ResearchDiagnosticsCopy = {
       'finished. No offers arrived in time. Try again; if it repeats, the store is ' +
       'answering too slowly for this search.',
   },
+  connectors: {
+    mercadoLivreSearchUnreachable: 'Mercado Livre search is unavailable',
+    mercadoLivreCatalogUnreachable: 'The Mercado Livre catalog is unavailable',
+    mercadoLivreAuthFailed: (sourceLabel) =>
+      `Mercado Livre authentication failed for "${sourceLabel}" — check the Mercado Livre credentials`,
+    manualStoreUnavailable: 'The manual price table is unavailable',
+    noConnector: (sourceType) => `No connector is available for ${sourceType}`,
+  },
 };
