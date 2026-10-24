@@ -355,7 +355,7 @@ export const VisualStates: Story = {
       await userEvent.type(searchInput, 'nonexistentcommand123');
 
       await waitFor(async () => {
-        const noResults = within(document.body).getByText(/No commands found/);
+        const noResults = within(document.body).getByText(/Nenhum comando encontrado/);
         await expect(noResults).toBeVisible();
       });
     });
