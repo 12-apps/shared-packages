@@ -196,4 +196,24 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     copyValue: (fieldLabel) => `Copy ${fieldLabel}`,
     copied: 'Copied',
   },
+  failures: {
+    generic: (status) =>
+      status === null
+        ? 'The request could not be sent. Check your connection and try again.'
+        : `The request could not be completed (${status}). Try again.`,
+    byCode: {
+      CredentialsError: 'The credentials for this provider are missing or no longer valid. Reconnect it.',
+      InvalidCredentialsInputError: 'Some credential fields are missing or invalid. Check them and save again.',
+      UnsupportedOperationError: 'This provider does not support that action.',
+      UnknownProviderError: 'This payment provider is not available.',
+      ProviderRequestError: 'The provider did not accept the request. Try again in a moment.',
+      ChargeDeclinedError: 'The charge was declined.',
+      CustomerRequirementsError: "The buyer's details are incomplete for this provider.",
+      UnprovenProviderError: 'Connect and verify this provider before turning sales on.',
+      IrreversibleChainRemovalError: 'This provider still has charges in progress and cannot be removed yet.',
+      WebhookVerificationError: 'The provider notification could not be verified.',
+      StubModeRefusedError: 'Test mode is off for this store.',
+      NoProviderSucceededError: 'No payment provider could complete the charge.',
+    },
+  },
 };

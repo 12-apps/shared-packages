@@ -24,6 +24,7 @@ import {
   foreignPatterns,
   HOST1,
   HOST2,
+  removedCopyPatterns,
   removedVocabularyPatterns,
   type ForeignPattern,
 } from './foreign-vocabulary';
@@ -90,12 +91,22 @@ function hitsFor(text: string, ban: ForeignPattern): string[] {
 }
 
 /**
- * Every ban a file's text trips. No exemptions: the migration table that once
- * needed to name the removed exports moved to the 2.x tags' git history, so
- * every packed entry — ADOPTING.md included — is swept with the full list.
+ * The named pt-BR packs — the ONLY packed entries allowed to carry the old
+ * sentences, because carrying them by name is their whole job. Exact paths,
+ * not a pattern: a new `pt-BR-ish.ts` gets no free pass. The same exemption
+ * `@12-apps/feature-flags` makes for its own packs.
+ */
+const NAMED_PACKS = new Set(['src/react/pt-BR.ts', 'src/server/pt-BR.ts']);
+
+/**
+ * Every ban a file's text trips. The migration table that once needed to name
+ * the removed exports moved to the 2.x tags' git history, so every packed entry
+ * — ADOPTING.md included — is swept with the full list; the named packs alone
+ * are excused from the removed-copy sentences, and nothing else.
  */
 export function offencesIn(entry: string, text: string): string[] {
-  const bans = [...foreignPatterns(), ...removedVocabularyPatterns()];
+  const copy = NAMED_PACKS.has(entry) ? [] : removedCopyPatterns();
+  const bans = [...foreignPatterns(), ...copy, ...removedVocabularyPatterns()];
   return bans.flatMap((ban) => hitsFor(text, ban).map((hit) => `${entry}: "${hit}"`));
 }
 
@@ -123,6 +134,10 @@ describe('the tarball npm would upload', () => {
     expect(files).toContain('scripts/sync-audit-schema.mjs');
     expect(files).toContain('prisma/audit.prisma');
     expect(files).toContain('prisma/migrations/20260813120000_add_audit_log/migration.sql');
+    // The named packs ARE published — the deliberate, reviewable way pt-BR
+    // ships. The sweep excuses exactly these two from the removed-copy list.
+    expect(files).toContain('src/react/pt-BR.ts');
+    expect(files).toContain('src/server/pt-BR.ts');
 
     // The module that used to ship one application's vocabulary. Named here
     // rather than left to the word sweep: the sweep would also pass if the file
@@ -181,6 +196,19 @@ describe('the tarball npm would upload', () => {
     expect(caught).toContain('src/planted.ts: "R$"');
     expect(caught).toContain('src/planted.ts: "Página"');
     expect(caught).toContain('src/planted.ts: "FUT-806"');
+  });
+
+  it('excuses the named packs from the removed-copy list alone, by path', () => {
+    // As wide as the two pack files and no wider: the same pt-BR sentence is an
+    // offence one directory over, and a pack still answers for the ticket
+    // namespace and the domain nouns.
+    const sentence = "systemActor: 'Sistema'";
+    expect(offencesIn('src/react/pt-BR.ts', sentence)).toEqual([]);
+    expect(offencesIn('src/react/labels.ts', sentence)).toEqual(['src/react/labels.ts: "Sistema"']);
+    expect(offencesIn('src/server/pt-BR.ts', 'Filtros da loja (FUT-901)')).toEqual([
+      'src/server/pt-BR.ts: "FUT-901"',
+      'src/server/pt-BR.ts: "loja"',
+    ]);
   });
 
   it('does not fire on the words this package needs to describe itself', () => {

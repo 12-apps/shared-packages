@@ -12,3 +12,7 @@ export * from './validators';
 export * from './result';
 export * from './serverAction';
 export * from './br';
+export * from './en-US';
+export * from './locales';
+export type { FormsMessages } from './messages';
+export * from './pt-BR';

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ResearchQuery, SourceRecord } from '../types';
 import { fetchJsonOutcome } from './fetch-reason';
 import type { ConnectorContext, ConnectorResult, FetchInit, PriceSourceConnector } from './types';
+import { invalidConfigMessage } from './config-errors';
 import { diagnosticsOf } from './types';
 import { vtexAuthInit } from './vtex-auth';
 import { type DeliverySku, deliverableSkus } from './vtex-delivery';
@@ -345,7 +346,7 @@ export const vtexConnector: PriceSourceConnector = {
   async search(query: ResearchQuery, source: SourceRecord, ctx: ConnectorContext): Promise<ConnectorResult> {
     const config = configSchema.safeParse(source.config);
     if (!config.success) {
-      return { ok: false, error: `invalid VTEX config for source "${source.name}": ${config.error.message}` };
+      return { ok: false, error: invalidConfigMessage(source.name, config.error, diagnosticsOf(ctx).sourceConfig) };
     }
 
     // Resolved once, shared by every tier — including the regions probe and the

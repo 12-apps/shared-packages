@@ -47,6 +47,8 @@ export class PaymentsClientError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The gateway's error name (`CredentialsError`, …), when it sent one. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'PaymentsClientError';
@@ -60,6 +62,20 @@ export interface PaymentsClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+/** The gateway's error name in the body, if any — what a screen translates. */
+function failureCode(body: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed !== null && typeof parsed === 'object' && 'error' in parsed) {
+      const { error } = parsed as { error?: unknown };
+      if (typeof error === 'string' && error.trim() !== '') return error;
+    }
+  } catch {
+    // Not JSON: no code to translate.
+  }
+  return undefined;
+}
+
 /**
  * The sentence a failed request carries, rather than the response body.
  *
@@ -70,9 +86,9 @@ export interface PaymentsClientOptions {
  * nothing. Unwrapping `message` is the floor: it is the only field written to
  * be read, and an error class name is never the owner's problem.
  *
- * That message may still be developer English — the surfaces that can do better
- * translate it (see `ProviderConnection`). This function's job is only to stop
- * shipping the envelope.
+ * That message may still be developer English: the settings screens word a
+ * failure by its code instead (`failureCode`, `describeFailure`). This
+ * function's job is only to stop shipping the envelope.
  */
 function failureMessage(body: string, status: number): string {
   const fallback = `Payments request failed (${status})`;
@@ -99,7 +115,7 @@ function makeRequest(options: PaymentsClientOptions) {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new PaymentsClientError(res.status, failureMessage(body, res.status));
+      throw new PaymentsClientError(res.status, failureMessage(body, res.status), failureCode(body));
     }
     return (await res.json()) as T;
   };

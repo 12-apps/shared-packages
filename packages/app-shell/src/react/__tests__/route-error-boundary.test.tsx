@@ -112,6 +112,25 @@ describe('createShellRouteErrorBoundary', () => {
     expect(screen.getByText(CLUB_MESSAGES.routeErrorTitle)).toBeDefined();
   });
 
+  it("shows the host's body instead of the raw message when it wrote one", () => {
+    const config = reporter();
+    const RouteErrorBoundary = createShellRouteErrorBoundary({
+      ...config,
+      messages: { ...config.messages, routeErrorBody: 'Algo deu errado ao abrir esta página.' },
+    });
+    render(
+      <RouteErrorBoundary resetKey="a">
+        <BadPage />
+      </RouteErrorBoundary>,
+    );
+    // The fallback is up and holds the host's body in the raw message's place.
+    const fallback = screen.getByTestId('route-error');
+    expect(fallback.textContent).toContain('Algo deu errado ao abrir esta página.');
+    expect(fallback.textContent).not.toContain('chunk exploded');
+    // The crash still reaches the reporter with its own message.
+    expect(String(config.seen[0])).toContain('chunk exploded');
+  });
+
   it('clears the error when the location changes', async () => {
     const RouteErrorBoundary = createShellRouteErrorBoundary(reporter());
     const view = render(

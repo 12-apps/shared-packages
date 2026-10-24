@@ -6,6 +6,9 @@
  * with `fixedFilters`), never because the surface needs assembling.
  */
 export { createWebAudit, type AuditWebConfig, type WebAudit } from './create-web-audit';
+export { EN_US_AUDIT_LABELS } from './en-US';
+export { AUDIT_LABELS } from './locales';
+export { PT_BR_AUDIT_LABELS } from './pt-BR';
 export { auditQueryString, createAuditApiClient, type AuditApiClient } from './api';
 export {
   createAuditLabels,

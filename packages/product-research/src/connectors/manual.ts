@@ -1,5 +1,6 @@
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
-import type { ConnectorResult, PriceSourceConnector } from './types';
+import type { ConnectorContext, ConnectorResult, PriceSourceConnector } from './types';
+import { connectorFailuresOf } from './types';
 
 /**
  * MANUAL source connector (FUT-415): serves the prices a tenant imported by
@@ -62,9 +63,9 @@ const toRawOffer = (entry: ManualPriceRecord, source: SourceRecord): RawOffer =>
 export const createManualConnector = (store: ManualPriceStore): PriceSourceConnector => ({
   type: 'MANUAL',
   cacheable: false,
-  // The trailing ConnectorContext param is omitted: this connector needs no
-  // network and no logger — the store either answers or errors visibly.
-  async search(_query: ResearchQuery, source: SourceRecord): Promise<ConnectorResult> {
+  // No network: the store either answers or errors visibly. The context is
+  // read only for the failure's sentence; its detail goes to the log.
+  async search(_query: ResearchQuery, source: SourceRecord, ctx: ConnectorContext): Promise<ConnectorResult> {
     try {
       const entries = await store.listLiveEntries({
         clientId: source.clientId,
@@ -73,10 +74,9 @@ export const createManualConnector = (store: ManualPriceStore): PriceSourceConne
       });
       return { ok: true, offers: entries.map((entry) => toRawOffer(entry, source)) };
     } catch (error) {
-      return {
-        ok: false,
-        error: `manual price store unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      };
+      const cause = error instanceof Error ? error.message : String(error);
+      ctx.logger.warn('manual price store unavailable', { error: cause });
+      return { ok: false, error: connectorFailuresOf(ctx).manualStoreUnavailable(cause) };
     }
   },
 });

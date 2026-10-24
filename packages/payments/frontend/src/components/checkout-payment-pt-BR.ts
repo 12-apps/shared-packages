@@ -46,5 +46,6 @@ export const PT_BR_CHECKOUT_PAYMENT_COPY: CheckoutPaymentCopy = {
     paymentsOff: 'Esta loja ainda não aceita pagamentos online.',
     cardUnavailable: 'Pagamento com cartão indisponível.',
     redirectNotice: 'Você será direcionado para concluir o pagamento com segurança.',
+    requestFailed: 'Não foi possível carregar as formas de pagamento. Tente novamente.',
   },
 };

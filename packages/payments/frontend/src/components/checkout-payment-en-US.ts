@@ -49,5 +49,6 @@ export const EN_US_CHECKOUT_PAYMENT_COPY: CheckoutPaymentCopy = {
     paymentsOff: 'This store does not accept online payments yet.',
     cardUnavailable: 'Card payment is unavailable.',
     redirectNotice: 'You will be taken somewhere secure to finish the payment.',
+    requestFailed: 'The payment options could not be loaded. Try again.',
   },
 };

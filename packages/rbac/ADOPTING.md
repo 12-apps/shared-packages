@@ -176,6 +176,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `scopeParent` / `warmScope` | no | flat scopes | `org:` chains (see rule 9) |
 | `ownership` | no | none | entity-gate owner map for INSTANCE permissions |
 | `expandAssignments` | no | identity | e.g. the origin host's sector → mesas expansion |
+| `grants` | no | every decision reads the database | a host-kept copy of each subject's grants (`loadSubjectGrants`); the host owns invalidation — see `src/server/grants.ts` |
 | `permissionsExtras` | no | `{}` | merged into `GET /permissions` (e.g. an entitlement snapshot) |
 | `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_RBAC_MESSAGES` from `/server`), or `localeCopy(RBAC_MESSAGES)` to answer each caller in their own |
 | `useLocale` (react) | no | none | your locale hook, so the permission and role LABELS follow the reader — see "If your readers do not share a language" |

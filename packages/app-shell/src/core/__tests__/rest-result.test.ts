@@ -113,3 +113,23 @@ describe('a call nothing answered', () => {
     expect(await restResult('/api/things')).not.toHaveProperty('status');
   });
 });
+
+describe("the host's fallback sentences", () => {
+  it('R-pt: a bodyless refusal and a dead network speak the language the host passed', async () => {
+    const { PT_BR_REST_RESULT_FALLBACKS } = await import('../pt-BR');
+    stubFetch({ ok: false, status: 503, json: async () => null });
+    expect(await restResult('/api/things', 'GET', undefined, PT_BR_REST_RESULT_FALLBACKS)).toEqual({
+      ok: false,
+      error: 'Erro 503',
+      status: 503,
+    });
+
+    vi.stubGlobal('fetch', async () => {
+      throw 'offline';
+    });
+    expect(await restResult('/api/things', 'GET', undefined, PT_BR_REST_RESULT_FALLBACKS)).toEqual({
+      ok: false,
+      error: 'Falha de conexão',
+    });
+  });
+});

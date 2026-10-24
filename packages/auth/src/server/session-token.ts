@@ -41,6 +41,8 @@ export interface SessionTokenIdentity {
   image: string | null;
   provider: string | null;
   isSuperadmin: boolean;
+  /** The host's sign-in claims, as an OAuth sign-in would have stamped them. */
+  claims?: Readonly<Record<string, string>>;
 }
 
 export interface SessionTokenConfig {
@@ -111,6 +113,7 @@ export function encodeSessionToken(
       picture: identity.image,
       provider: identity.provider,
       isSuperadmin: identity.isSuperadmin,
+      claims: identity.claims ?? {},
     },
   });
 }

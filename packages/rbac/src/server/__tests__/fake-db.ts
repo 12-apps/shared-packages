@@ -4,6 +4,7 @@ import type {
   MembershipWhere,
   RbacDb,
   RbacDbClient,
+  ResourceAssignmentGrantsWhere,
   ResourceAssignmentWhere,
   RoleAssignmentWhere,
   RoleRow,
@@ -459,7 +460,21 @@ export function createFakeRbacDb(options: FakeRbacDbOptions = {}): {
       },
     },
     resourceAssignment: {
-      async findMany({ where }: { where: ResourceAssignmentWhere; select: unknown }) {
+      // Two reads share the delegate: the reach question (one type, at an
+      // instant) and the grants load (every type, not yet ended).
+      findMany: (async ({ where }: { where: ResourceAssignmentWhere | ResourceAssignmentGrantsWhere }) => {
+        if (!('resourceType' in where)) {
+          const [, gt] = where.OR;
+          return state.resourceAssignments
+            .filter((row) => row.userId === where.userId && (row.validTo === null || row.validTo > gt.validTo.gt))
+            .map((row) => ({
+              resourceType: row.resourceType,
+              resourceId: row.resourceId,
+              clientId: row.clientId,
+              validFrom: row.validFrom,
+              validTo: row.validTo,
+            }));
+        }
         return state.resourceAssignments
           .filter((row) => {
             if (row.userId !== where.userId) return false;
@@ -471,7 +486,7 @@ export function createFakeRbacDb(options: FakeRbacDbOptions = {}): {
             return true;
           })
           .map((row) => ({ resourceId: row.resourceId }));
-      },
+      }) as unknown as RbacDbClient['resourceAssignment']['findMany'],
     },
   };
 

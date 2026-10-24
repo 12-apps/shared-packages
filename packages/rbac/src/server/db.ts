@@ -214,11 +214,37 @@ export interface ResourceAssignmentWhere {
   clientId?: string;
 }
 
+/** Every assignment of a subject not yet ended, for the grants port's load (`./grants`). */
+export interface ResourceAssignmentGrantsWhere {
+  userId: string;
+  OR: readonly [{ validTo: null }, { validTo: { gt: Date } }];
+}
+
+export const RESOURCE_ASSIGNMENT_GRANT_SELECT = {
+  resourceType: true,
+  resourceId: true,
+  clientId: true,
+  validFrom: true,
+  validTo: true,
+} as const;
+
+interface ResourceAssignmentGrantRow {
+  resourceType: string;
+  resourceId: string;
+  clientId: string | null;
+  validFrom: Date;
+  validTo: Date | null;
+}
+
 export interface ResourceAssignmentDelegate {
   findMany(args: {
     where: ResourceAssignmentWhere;
     select: { resourceId: true };
   }): Promise<{ resourceId: string }[]>;
+  findMany(args: {
+    where: ResourceAssignmentGrantsWhere;
+    select: typeof RESOURCE_ASSIGNMENT_GRANT_SELECT;
+  }): Promise<ResourceAssignmentGrantRow[]>;
 }
 
 /** The model delegates — what both a live client and a transaction expose. */

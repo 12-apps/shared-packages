@@ -65,10 +65,8 @@ function withSettingsRead(inner: typeof fetch, mode: SettingsRead | undefined): 
   const shim = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (String(input) !== `${SETTINGS_BASE_URL}/settings`) return inner(input, init);
     if (mode === "failing") {
-      // The same body shape `host.tsx`'s config shim refuses with. What the
-      // page then RENDERS is the client error's message — today the raw JSON
-      // envelope, a package-level presentation finding the failing story
-      // documents rather than papers over.
+      // The same body shape `host.tsx`'s config shim refuses with. The page
+      // renders the copy's sentence for it, not this envelope.
       return new Response(JSON.stringify({ error: "indisponível", code: "SERVER_ERROR" }), {
         status: 500,
         headers: { "content-type": "application/json" },

@@ -10,7 +10,10 @@ import {
   userSchema,
 } from './mercado-livre-schemas';
 import type { CatalogProduct, SearchItem, ShippingInfo } from './mercado-livre-schemas';
+import { invalidConfigMessage } from './config-errors';
+import type { ConnectorFailureCopy } from './diagnostics-copy';
 import type { ConnectorContext, ConnectorResult, PriceSourceConnector } from './types';
+import { connectorFailuresOf, diagnosticsOf } from './types';
 
 /**
  * Mercado Livre connector (FUT-417) — the one channel with an official,
@@ -139,6 +142,7 @@ const buildTextSearchUrl = (base: string, query: ResearchQuery, siteId: string):
 };
 
 const searchByText = async (
+  failures: ConnectorFailureCopy,
   client: MlClient,
   query: ResearchQuery,
   siteId: string,
@@ -147,7 +151,7 @@ const searchByText = async (
 ): Promise<MappedResult> => {
   const url = buildTextSearchUrl(client.base, query, siteId);
   const payload = await client.get(url);
-  if (payload === null) return { ok: false, error: `Mercado Livre search unreachable: ${url}` };
+  if (payload === null) return { ok: false, error: failures.mercadoLivreSearchUnreachable(url) };
   return { ok: true, mapped: mapSearchResults(payload, source, minReputationLevel) };
 };
 
@@ -209,6 +213,7 @@ const catalogProductToMapped = (
 };
 
 const searchCatalogByEan = async (
+  failures: ConnectorFailureCopy,
   client: MlClient,
   ean: string,
   siteId: string,
@@ -217,7 +222,7 @@ const searchCatalogByEan = async (
   const url = `${client.base}/products/search?status=active&site_id=${encodeURIComponent(siteId)}&product_identifier=${encodeURIComponent(ean)}`;
   const payload = await client.get(url);
   if (payload === null) {
-    return { ok: false, error: `Mercado Livre catalog lookup unreachable: ${url}` };
+    return { ok: false, error: failures.mercadoLivreCatalogUnreachable(url) };
   }
   const parsed = catalogSearchSchema.safeParse(payload);
   const ids = (parsed.success ? (parsed.data.results ?? []) : [])
@@ -337,7 +342,7 @@ export const createMercadoLivreConnector = (
       if (!config.success) {
         return {
           ok: false,
-          error: `invalid Mercado Livre config for source "${source.name}": ${config.error.message}`,
+          error: invalidConfigMessage(source.name, config.error, diagnosticsOf(ctx).sourceConfig),
         };
       }
       const { siteId, minReputationLevel } = config.data;
@@ -345,21 +350,21 @@ export const createMercadoLivreConnector = (
       if ((await auth.getAccessToken(ctx)) === null) {
         return {
           ok: false,
-          error: `Mercado Livre auth failed for source "${source.name}": no access token (check the host's Mercado Livre credentials)`,
+          error: connectorFailuresOf(ctx).mercadoLivreAuthFailed(source.name),
         };
       }
       const client: MlClient = { base, get: (url) => authedGet(auth, ctx, url) };
 
       let mapped: MappedOffer[] = [];
       if (query.ean) {
-        const viaCatalog = await searchCatalogByEan(client, query.ean, siteId, source);
+        const viaCatalog = await searchCatalogByEan(connectorFailuresOf(ctx), client, query.ean, siteId, source);
         if (!viaCatalog.ok) return viaCatalog;
         mapped = viaCatalog.mapped;
       }
       // Text search is both the no-EAN path and the once-only fallback for an
       // EAN the catalog doesn't know. A fallback outage is still an outage.
       if (mapped.length === 0) {
-        const viaText = await searchByText(client, query, siteId, minReputationLevel, source);
+        const viaText = await searchByText(connectorFailuresOf(ctx), client, query, siteId, minReputationLevel, source);
         if (!viaText.ok) return viaText;
         mapped = viaText.mapped;
       }

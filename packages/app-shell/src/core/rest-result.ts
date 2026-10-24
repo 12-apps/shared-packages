@@ -18,6 +18,7 @@
  * Both speak the `{ data }` / `{ error, issues }` envelope every `createApi*`
  * package answers in, so a surface can mix them without a second adapter.
  */
+import { EN_US_REST_RESULT_FALLBACKS } from './en-US';
 
 /**
  * What a write answers with: the value, or the refusal and what to paint.
@@ -53,14 +54,30 @@ interface ErrorEnvelope {
   issues?: Record<string, string>;
 }
 
-function foldError<T>(status: number, payload: ErrorEnvelope | null): Result<T> {
+/**
+ * The sentences a refusal with no body, or no answer at all, falls back to.
+ * English by default; a host passes its own (pt-BR:
+ * `PT_BR_REST_RESULT_FALLBACKS` from `./pt-BR`).
+ */
+export interface RestResultFallbacks {
+  /** No sentence in the body: name the status. */
+  status: (status: number) => string;
+  /** Nothing answered. */
+  network: string;
+}
+
+function foldError<T>(
+  status: number,
+  payload: ErrorEnvelope | null,
+  fallbacks: RestResultFallbacks,
+): Result<T> {
   return {
     ok: false,
     // A body that carried no sentence still has to say something, and the
     // status is the only fact there is. A caller that wants its own wording
     // branches on `status`; one that does not gets a line naming the code
     // rather than an empty string.
-    error: payload?.error ?? `HTTP ${status}`,
+    error: payload?.error ?? fallbacks.status(status),
     status,
     ...(payload?.issues ? { fieldErrors: payload.issues } : {}),
   };
@@ -77,6 +94,7 @@ export async function restResult<T>(
   path: string,
   method = 'GET',
   body?: unknown,
+  fallbacks: RestResultFallbacks = EN_US_REST_RESULT_FALLBACKS,
 ): Promise<Result<T>> {
   const hasBody = body !== undefined;
   try {
@@ -92,9 +110,9 @@ export async function restResult<T>(
     const payload = (await response.json().catch(() => null)) as
       | ({ data?: T } & ErrorEnvelope)
       | null;
-    if (!response.ok) return foldError(response.status, payload);
+    if (!response.ok) return foldError(response.status, payload, fallbacks);
     return { ok: true, data: (payload?.data ?? null) as T };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'network error' };
+    return { ok: false, error: error instanceof Error ? error.message : fallbacks.network };
   }
 }

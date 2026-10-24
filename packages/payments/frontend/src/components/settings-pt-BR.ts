@@ -182,4 +182,24 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     copyValue: (fieldLabel) => `Copiar ${fieldLabel}`,
     copied: 'Copiado',
   },
+  failures: {
+    generic: (status) =>
+      status === null
+        ? 'Não foi possível enviar a solicitação. Verifique sua conexão e tente novamente.'
+        : `Não foi possível concluir a operação (${status}). Tente novamente.`,
+    byCode: {
+      CredentialsError: 'As credenciais deste provedor estão faltando ou não valem mais. Reconecte-o.',
+      InvalidCredentialsInputError: 'Há campos de credenciais faltando ou inválidos. Confira e salve de novo.',
+      UnsupportedOperationError: 'Este provedor não permite essa ação.',
+      UnknownProviderError: 'Este provedor de pagamento não está disponível.',
+      ProviderRequestError: 'O provedor não aceitou a solicitação. Tente novamente em instantes.',
+      ChargeDeclinedError: 'A cobrança foi recusada.',
+      CustomerRequirementsError: 'Os dados do comprador estão incompletos para este provedor.',
+      UnprovenProviderError: 'Conecte e verifique este provedor antes de ativar as vendas.',
+      IrreversibleChainRemovalError: 'Este provedor ainda tem cobranças em andamento e não pode ser removido agora.',
+      WebhookVerificationError: 'Não foi possível verificar a notificação do provedor.',
+      StubModeRefusedError: 'O modo de teste está desligado para esta loja.',
+      NoProviderSucceededError: 'Nenhum provedor de pagamento conseguiu concluir a cobrança.',
+    },
+  },
 };

@@ -1,4 +1,5 @@
-import type { ResearchDiagnosticsCopy } from './diagnostics-copy';
+import type { ConnectorFailureCopy, ResearchDiagnosticsCopy } from './diagnostics-copy';
+import { EN_US_RESEARCH_DIAGNOSTICS } from '../en-US';
 import { resolveResearchCopy, type ResearchCopySource } from '../copy-source';
 import type { LoggerPort } from '../ports';
 import type { RawOffer, ResearchQuery, SourceRecord } from '../types';
@@ -271,3 +272,15 @@ export function diagnosticsOf(ctx: {
   return resolveResearchCopy(ctx.diagnostics, ctx.locale);
 }
 
+
+/**
+ * The connector failure sentences in force: the host's pack's when it
+ * states them, else the English pack's — never a URL or token in a store
+ * owner's row.
+ */
+export function connectorFailuresOf(ctx: {
+  readonly diagnostics: ResearchCopySource<ResearchDiagnosticsCopy>;
+  readonly locale?: string;
+}): ConnectorFailureCopy {
+  return diagnosticsOf(ctx).connectors ?? EN_US_RESEARCH_DIAGNOSTICS.connectors!;
+}

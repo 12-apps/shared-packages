@@ -71,12 +71,17 @@ function isFinalOnCreate(charge: ClientChargeView): boolean {
 /** Load the merchant's client-safe payment config once. */
 function useClientConfig(client: PaymentsClient) {
   const [config, setConfig] = useState<ClientPaymentsConfig | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<boolean>(false);
   useEffect(() => {
     client
       .getConfig()
       .then(setConfig)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+      // The gateway's message is developer English; the buyer reads the host's
+      // sentence instead. The cause still reaches the console.
+      .catch((err: unknown) => {
+        console.error('[payments] could not load the checkout config', err);
+        setError(true);
+      });
   }, [client]);
   return { config, error };
 }
@@ -189,7 +194,10 @@ export function CheckoutPayment(props: CheckoutPaymentProps) {
     [create, reference, customer],
   );
 
-  const errorMessage = firstError(configError, tokenizeError, createError && createError.message);
+  const configMessage = configError
+    ? (copy.refusal.requestFailed ?? 'The payment options could not be loaded. Try again.')
+    : null;
+  const errorMessage = firstError(configMessage, tokenizeError, createError && createError.message);
   const gate = checkoutGate({ errorMessage, config, copy: copy.refusal });
   if (gate || config === undefined || config === null) return gate;
 
