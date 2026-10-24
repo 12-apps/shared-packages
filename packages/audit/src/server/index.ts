@@ -10,6 +10,7 @@
  * runtime.
  */
 export { createApiAudit, type ApiAudit } from './create-api-audit';
+export { PT_BR_AUDIT_MESSAGES } from './pt-BR';
 
 export {
   actorContextKey,

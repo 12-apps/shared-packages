@@ -76,8 +76,21 @@ export function foreignPatterns(): ForeignPattern[] {
     { label: 'restaurant', pattern: /\brestaurants?\b/i },
     { label: 'storefront', pattern: /\bstorefront\b/i },
     { label: 'R$', pattern: /R\$/ },
-    // The pt-BR the viewer's own copy used to default to. These are the exact
-    // strings the screens rendered, and each is a sentence no adopter chose.
+  ];
+}
+
+/**
+ * The pt-BR the viewer's own copy used to default to. These are the exact
+ * strings the screens rendered, and each is a sentence no adopter chose.
+ *
+ * Kept apart from {@link foreignPatterns} for ONE reason: the named pt-BR packs
+ * (`src/react/pt-BR.ts`, `src/server/pt-BR.ts`) exist to carry exactly these
+ * sentences as an explicit import a host opts into, so `packed-artifact.test.ts`
+ * excuses those two files — by exact path — from this list alone. They still
+ * answer for the brand, the ticket namespace and the domain nouns.
+ */
+export function removedCopyPatterns(): ForeignPattern[] {
+  return [
     { label: 'Auditoria', pattern: /\bauditoria\b/i },
     { label: 'Sistema', pattern: /\bsistema\b/i },
     { label: 'em nome de', pattern: /em nome de/i },
