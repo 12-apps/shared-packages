@@ -1,3 +1,4 @@
+import { EN_US_COMMAND_PALETTE_COPY } from '../../../en-US.navigation';
 import type Fuse from 'fuse.js';
 import type React from 'react';
 
@@ -33,11 +34,14 @@ export const filterCommands = ({
   return [...recent, ...commands.filter((command) => !recentCommandIds.includes(command.id))];
 };
 
-export const groupByCategory = (commands: PaletteCommand[]): Record<string, PaletteCommand[]> => {
+export const groupByCategory = (
+  commands: PaletteCommand[],
+  generalLabel: string = EN_US_COMMAND_PALETTE_COPY.general,
+): Record<string, PaletteCommand[]> => {
   const groups: Record<string, PaletteCommand[]> = {};
 
   for (const command of commands) {
-    const category = command.category || 'General';
+    const category = command.category || generalLabel;
     groups[category] = groups[category] ?? [];
     groups[category].push(command);
   }

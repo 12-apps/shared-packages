@@ -2,7 +2,8 @@ import type { CountryCode } from 'libphonenumber-js';
 
 import type { CountryData } from './PhoneInput.types';
 
-// Dial codes and flags for the countries the input offers, sorted by name.
+// Dial codes and flags for the countries the input offers, sorted by name. The
+// `name` is the English one; the picker shows `copy.countryName` when a pack has it.
 export const countries: CountryData[] = [
   { code: 'US' as CountryCode, name: 'United States', dial: '+1', flag: '🇺🇸' },
   { code: 'GB' as CountryCode, name: 'United Kingdom', dial: '+44', flag: '🇬🇧' },
@@ -52,3 +53,19 @@ export const countries: CountryData[] = [
   { code: 'AE' as CountryCode, name: 'United Arab Emirates', dial: '+971', flag: '🇦🇪' },
   { code: 'SA' as CountryCode, name: 'Saudi Arabia', dial: '+966', flag: '🇸🇦' },
 ].sort((a, b) => a.name.localeCompare(b.name));
+
+/** A country's name as the host's pack spells it, else the English one above. */
+export const countryDisplayName = (
+  country: CountryData,
+  countryName?: (code: string, englishName: string) => string,
+): string => (countryName ? countryName(country.code, country.name) : country.name);
+
+/** The picker's list, sorted by the names it actually shows. */
+export const countriesByDisplayName = (
+  countryName?: (code: string, englishName: string) => string,
+): Array<CountryData & { displayName: string }> =>
+  countryName
+    ? countries
+        .map((country) => ({ ...country, displayName: countryDisplayName(country, countryName) }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    : countries.map((country) => ({ ...country, displayName: country.name }));

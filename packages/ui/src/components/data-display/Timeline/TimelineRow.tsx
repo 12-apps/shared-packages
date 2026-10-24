@@ -1,3 +1,4 @@
+import type { TimelineLabels } from '../../../copy/labels';
 import DotIcon from '@mui/icons-material/Circle';
 import ExpandIcon from '@mui/icons-material/ExpandMore';
 import Box from '@mui/material/Box/index.js';
@@ -196,7 +197,8 @@ const TimelineCardHeader: React.FC<{
   variant: NonNullable<TimelineProps['variant']>;
   isExpanded: boolean;
   onExpandClick: (itemId: string, event: React.MouseEvent) => void;
-}> = ({ item, variant, isExpanded, onExpandClick }) => (
+  labels: TimelineLabels;
+}> = ({ item, variant, isExpanded, onExpandClick, labels }) => (
   <Box
     sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
   >
@@ -216,7 +218,7 @@ const TimelineCardHeader: React.FC<{
       <IconButton
         size="small"
         onClick={(e) => onExpandClick(item.id, e)}
-        aria-label={isExpanded ? 'Collapse item details' : 'Expand item details'}
+        aria-label={isExpanded ? labels.collapseDetails : labels.expandDetails}
         sx={{
           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
           transition: 'transform 0.3s ease',
@@ -237,13 +239,14 @@ const TimelineRowCard: React.FC<{
   isExpanded: boolean;
   onItemClick?: (item: TimelineItem) => void;
   onExpandClick: (itemId: string, event: React.MouseEvent) => void;
-}> = ({ item, variant, isClickable, isExpanded, onItemClick, onExpandClick }) => (
+  labels: TimelineLabels;
+}> = ({ item, variant, isClickable, isExpanded, onItemClick, onExpandClick, labels }) => (
   <TimelineCard
     timelineVariant={variant}
     isClickable={isClickable}
     onClick={isClickable ? () => onItemClick?.(item) : undefined}
     role="article"
-    aria-label={`Timeline item: ${item.title}`}
+    aria-label={labels.item(item.title)}
     data-testid="timeline-card"
   >
     <CardContent>
@@ -253,6 +256,7 @@ const TimelineRowCard: React.FC<{
           variant={variant}
           isExpanded={isExpanded}
           onExpandClick={onExpandClick}
+          labels={labels}
         />
 
         {variant === 'compact' && item.description && (
@@ -282,6 +286,7 @@ export const TimelineRow: React.FC<{
   isExpanded: boolean;
   onItemClick?: (item: TimelineItem) => void;
   onExpandClick: (itemId: string, event: React.MouseEvent) => void;
+  labels: TimelineLabels;
 }> = ({
   item,
   index,
@@ -294,6 +299,7 @@ export const TimelineRow: React.FC<{
   isExpanded,
   onItemClick,
   onExpandClick,
+  labels,
 }) => {
 
     
@@ -341,6 +347,7 @@ export const TimelineRow: React.FC<{
         isExpanded={isExpanded}
         onItemClick={onItemClick}
         onExpandClick={onExpandClick}
+        labels={labels}
       />
     </TimelineItemContainer>
   );

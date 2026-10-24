@@ -18,13 +18,20 @@ import type SvgIcon from '@mui/material/SvgIcon/index.js';
 import React, { useState } from 'react';
 
 import type { ViewMode, ViewSelectorProps } from './ContentToolbar.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
 
-const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof SvgIcon }[] = [
-  { value: 'grid', label: 'Grid View', icon: GridIcon },
-  { value: 'list', label: 'List View', icon: ListIcon },
+interface ViewOption {
+  value: ViewMode;
+  label: string;
+  icon: typeof SvgIcon;
+}
+
+const viewOptions = (gridViewLabel: string, listViewLabel: string): ViewOption[] => [
+  { value: 'grid', label: gridViewLabel, icon: GridIcon },
+  { value: 'list', label: listViewLabel, icon: ListIcon },
 ];
 
 /**
@@ -37,10 +44,13 @@ export function ViewSelector({
   zoom,
   onZoomChange,
   cardSizeLabel,
+  gridViewLabel = EN_US_UI_LABELS.contentToolbar.gridView,
+  listViewLabel = EN_US_UI_LABELS.contentToolbar.listView,
 }: ViewSelectorProps): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
-  const activeOption = VIEW_OPTIONS.find((option) => option.value === viewMode) ?? VIEW_OPTIONS[0]!;
+  const options = viewOptions(gridViewLabel, listViewLabel);
+  const activeOption = options.find((option) => option.value === viewMode) ?? options[0]!;
   const ActiveIcon = activeOption.icon;
 
   return (
@@ -82,7 +92,7 @@ export function ViewSelector({
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         slotProps={{ paper: { sx: { minWidth: sxRem(180) } } }}
       >
-        {VIEW_OPTIONS.map((option) => {
+        {options.map((option) => {
           const OptionIcon = option.icon;
           const selected = viewMode === option.value;
           return (

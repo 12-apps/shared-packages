@@ -1,3 +1,4 @@
+import type { AddressAutocompleteCopy } from '../../../copy/form';
 import type React from 'react';
 import { useCallback } from 'react';
 
@@ -15,6 +16,7 @@ const MOCK_DETAILS_DELAY_MS = 50;
 const PLACE_DETAIL_FIELDS = ['formatted_address', 'address_components', 'geometry'];
 
 interface SelectionSink {
+  messages: Required<AddressAutocompleteCopy>;
   setLoading: (loading: boolean) => void;
   setApiError: (message: string | null) => void;
   applyAddress: (address: AddressDetails) => void;
@@ -26,7 +28,7 @@ const resolveMockPlace = (value: AddressPrediction, sink: SelectionSink) => {
 
     const place = MOCK_PLACE_DETAILS[value.place_id];
     if (!place) {
-      sink.setApiError('Address details not found');
+      sink.setApiError(sink.messages.addressDetailsNotFound);
       return;
     }
 
@@ -54,7 +56,7 @@ const resolveLivePlace = (
     sink.setLoading(false);
 
     if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
-      sink.setApiError('Failed to get address details');
+      sink.setApiError(sink.messages.addressDetailsFailed);
       return;
     }
 
@@ -75,7 +77,9 @@ export const useAddressSelection = ({
   setApiError,
   onSelect,
   applyAddress,
+  messages,
 }: {
+  messages: Required<AddressAutocompleteCopy>;
   services: GoogleMapsService;
   useMockData: boolean;
   setLoading: (loading: boolean) => void;
@@ -95,7 +99,7 @@ export const useAddressSelection = ({
       if (!value) return;
 
       setLoading(true);
-      const sink: SelectionSink = { setLoading, setApiError, applyAddress };
+      const sink: SelectionSink = { setLoading, setApiError, applyAddress, messages };
 
       if (useMockData && 'place_id' in value) {
         resolveMockPlace(value, sink);
@@ -109,5 +113,5 @@ export const useAddressSelection = ({
 
       resolveLivePlace(services.placesService, value, sink);
     },
-    [services, useMockData, setLoading, setApiError, onSelect, applyAddress],
+    [services, useMockData, setLoading, setApiError, onSelect, applyAddress, messages],
   );

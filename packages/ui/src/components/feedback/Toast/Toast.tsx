@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React, { createContext, useCallback,useContext, useState } from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { rem } from '../../../tokens/relative';
 
 import type { ToastContainerProps, ToastContextType, ToastItem,ToastProps } from './Toast.types';
@@ -166,6 +167,7 @@ export const Toast: React.FC<ToastProps> = ({
   message,
   variant = 'default',
   closable = true,
+  closeLabel = EN_US_UI_LABELS.common.close,
   action,
   glass = false,
   onClose,
@@ -200,7 +202,7 @@ export const Toast: React.FC<ToastProps> = ({
           {closable && (
             <IconButton
               data-testid={`${dataTestId}-close`}
-              aria-label="close"
+              aria-label={closeLabel}
               color="inherit"
               size="small"
               onClick={handleClose}
@@ -218,6 +220,7 @@ export const Toast: React.FC<ToastProps> = ({
 };
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({
+  closeLabel,
   position = 'top-right',
   maxToasts = 5,
   gap,
@@ -281,7 +284,7 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
             style={{ pointerEvents: 'auto' }}
           >
             <Box data-testid={`${dataTestId}-item-${index}`}>
-              <Toast {...toast} onClose={removeToast} dataTestId={toast.dataTestId || `toast-${index}`} />
+              <Toast closeLabel={closeLabel} {...toast} onClose={removeToast} dataTestId={toast.dataTestId || `toast-${index}`} />
             </Box>
           </Slide>
         ))}

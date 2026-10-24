@@ -1,3 +1,6 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
+import type { StepperLabels } from '../../../copy/labels';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
@@ -149,6 +152,7 @@ function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
 }
 
 interface StepPartProps {
+  labels: StepperLabels;
   step: Step;
   index: number;
   isActive: boolean;
@@ -159,8 +163,8 @@ interface StepPartProps {
 /** The step circle: a check when completed, otherwise the 1-based index. */
 const StepCircle: React.FC<
   StepPartProps & { isCompleted: boolean; isClickable: boolean; onClick: () => void }
-> = ({ step, index, isActive, isCompleted, isClickable, size, labelVariant, onClick }) => {
-  const state = isCompleted ? ' (completed)' : isActive ? ' (current)' : '';
+> = ({ step, index, isActive, isCompleted, isClickable, size, labelVariant, onClick, labels }) => {
+  const state = isCompleted ? ` (${labels.completed})` : isActive ? ` (${labels.current})` : '';
   return (
     <StepButton
       isActive={isActive}
@@ -170,7 +174,7 @@ const StepCircle: React.FC<
       onClick={onClick}
       disabled={step.disabled}
       aria-current={isActive ? 'step' : undefined}
-      aria-label={`Step ${index + 1}: ${step.label}${step.optional ? ' (optional)' : ''}${state}`}
+      aria-label={`${labels.step(index + 1, step.label)}${step.optional ? ` (${labels.optional})` : ''}${state}`}
       data-testid={`stepper-step-icon-${index}`}
     >
       {isCompleted ? (
@@ -192,6 +196,7 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
   orientation,
   size,
   labelVariant,
+  labels,
 }) => (
   <StepLabel
     orientation={orientation}
@@ -206,7 +211,7 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
       {step.label}
       {step.optional && (
         <Typography component="span" variant="caption" color="textSecondary" sx={{ ml: 1 }}>
-          (optional)
+          ({labels.optional})
         </Typography>
       )}
     </Typography>
@@ -231,6 +236,7 @@ const StepperItem: React.FC<StepItemProps> = ({
   onStepClick,
   renderConnector,
   nextStep,
+  labels,
 }) => {
   const labelVariant: LabelVariant = size === 'sm' ? 'caption' : 'body2';
   const isClickable = Boolean(clickable) && !step.disabled && (variant === 'non-linear' || !isActive);
@@ -267,6 +273,7 @@ const StepperItem: React.FC<StepItemProps> = ({
           isClickable={isClickable}
           size={size}
           labelVariant={labelVariant}
+          labels={labels}
           onClick={handleStepClick}
         />
         <StepLabelBlock
@@ -276,6 +283,7 @@ const StepperItem: React.FC<StepItemProps> = ({
           orientation={orientation}
           size={size}
           labelVariant={labelVariant}
+          labels={labels}
         />
       </Box>
       {!isLast && connector}
@@ -293,9 +301,11 @@ export const Stepper: React.FC<StepperProps> = ({
   onStepChange,
   clickable,
   renderConnector,
+  labels: labelOverrides,
   className,
   'data-testid': dataTestId,
 }) => {
+  const labels = resolveLabels(EN_US_UI_LABELS.stepper, labelOverrides);
   // Determine clickable behavior
   const isClickable = clickable ?? variant === 'non-linear';
 
@@ -332,6 +342,7 @@ export const Stepper: React.FC<StepperProps> = ({
             onStepClick={onStepChange}
             renderConnector={renderConnector}
             nextStep={nextStep}
+            labels={labels}
           />
         );
       })}

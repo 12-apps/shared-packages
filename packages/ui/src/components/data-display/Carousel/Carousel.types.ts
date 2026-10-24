@@ -59,6 +59,8 @@ export interface CarouselIndicatorsProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
   color?: ColorValue;
   variant?: 'dots' | 'lines' | 'numbers';
+  /** Names each indicator through `goToSlide`; the English pack's wording when omitted. */
+  copy?: CarouselCopy;
   className?: string;
   style?: CSSProperties;
 }

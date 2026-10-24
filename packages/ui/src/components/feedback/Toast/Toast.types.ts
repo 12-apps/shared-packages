@@ -16,6 +16,9 @@ export interface ToastProps {
   duration?: number;
   persistent?: boolean;
   closable?: boolean;
+  /** The close button's accessible name; defaults to `UI_LABELS['en-US'].common.close`;
+   *  a host passes `CHROME_COPY[locale].dismissToast`. */
+  closeLabel?: string;
   action?: {
     label: string;
     onClick: () => void;
@@ -31,6 +34,8 @@ export interface ToastProps {
 }
 
 export interface ToastContainerProps {
+  /** Applied to every toast that sets no `closeLabel` of its own. */
+  closeLabel?: string;
   position?: ToastPosition;
   maxToasts?: number;
   gap?: number;

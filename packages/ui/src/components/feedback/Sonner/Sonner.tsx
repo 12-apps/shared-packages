@@ -1,3 +1,4 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import Box from '@mui/material/Box/index.js';
 import Portal from '@mui/material/Portal/index.js';
 import React, { createContext, useCallback, useContext, useRef,useState, useMemo } from 'react';
@@ -81,7 +82,12 @@ export const SonnerProvider: React.FC<{
    * word cannot be a per-call argument without changing what they are for.
    */
   dismissLabel: string;
-}> = ({ children, dismissLabel }) => {
+  /**
+   * The "+N more" line when more toasts are queued than fit. Defaults to the
+   * labels pack's `sonner.hiddenCount`.
+   */
+  hiddenCountLabel?: (hiddenCount: number) => string;
+}> = ({ children, dismissLabel, hiddenCountLabel }) => {
   const [toasts, setToasts] = useState<SonnerItem[]>([]);
   const toastCounter = useRef(0);
 
@@ -152,7 +158,7 @@ export const SonnerProvider: React.FC<{
   return (
     <SonnerContext.Provider value={contextValue}>
       {children}
-      <SonnerToaster toasts={toasts} onDismiss={dismiss} />
+      <SonnerToaster toasts={toasts} onDismiss={dismiss} hiddenCountLabel={hiddenCountLabel} />
     </SonnerContext.Provider>
   );
 };
@@ -171,7 +177,8 @@ import { SonnerToast } from './SonnerToast';
 const SonnerToaster: React.FC<{
   toasts: SonnerItem[];
   onDismiss: (id: string) => void;
-}> = ({ toasts, onDismiss }) => {
+  hiddenCountLabel?: (hiddenCount: number) => string;
+}> = ({ toasts, onDismiss, hiddenCountLabel = EN_US_UI_LABELS.sonner.hiddenCount }) => {
   // Limit visible toasts to prevent overflow
   const MAX_VISIBLE_TOASTS = 5;
   const visibleToasts = toasts.slice(-MAX_VISIBLE_TOASTS);
@@ -202,7 +209,7 @@ const SonnerToaster: React.FC<{
               color: 'text.secondary',
               pointerEvents: 'none' }}
           >
-            +{hiddenCount} more
+            {hiddenCountLabel(hiddenCount)}
           </Box>
         )}
         {visibleToasts.map((toast) => (
@@ -317,6 +324,9 @@ export const Toaster: React.FC<{
   richColors?: boolean;
   closeButton?: boolean;
   dismissLabel: string;
-}> = ({ children, dismissLabel }) => (
-  <SonnerProvider dismissLabel={dismissLabel}>{children}</SonnerProvider>
+  hiddenCountLabel?: (hiddenCount: number) => string;
+}> = ({ children, dismissLabel, hiddenCountLabel }) => (
+  <SonnerProvider dismissLabel={dismissLabel} hiddenCountLabel={hiddenCountLabel}>
+    {children}
+  </SonnerProvider>
 );

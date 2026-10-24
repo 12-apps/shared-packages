@@ -10,9 +10,9 @@ import TextField from '@mui/material/TextField/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { alpha, styled, useTheme } from '@mui/material/styles/index.js';
 import type { FC} from 'react';
-import React, {  } from 'react';
+import React, { useMemo } from 'react';
 
-import { countries } from './countries';
+import { countriesByDisplayName, countryDisplayName } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
@@ -148,7 +148,8 @@ const PHONE_INPUT_DEFAULTS = {
   placeholder: 'Enter phone number',
   icon: <PhoneIcon />,
   defaultValue: '',
-  countryCode: 'US',
+  // The owner's market: a host that names no country starts at Brazil.
+  countryCode: 'BR',
   floating: false,
   error: false,
   disabled: false,
@@ -227,8 +228,10 @@ const CountryPicker: React.FC<{
   selectedCode?: CountryData['code'];
   onClose: () => void;
   onSelect: (country: CountryData) => void;
-}> = ({ anchorEl, selectedCode, onClose, onSelect }) => {
+  countryName?: PhoneInputCopy['countryName'];
+}> = ({ anchorEl, selectedCode, onClose, onSelect, countryName }) => {
   const theme = useTheme();
+  const listed = useMemo(() => countriesByDisplayName(countryName), [countryName]);
 
   return (
         <CountryMenu
@@ -243,7 +246,7 @@ const CountryPicker: React.FC<{
             horizontal: 'left' }}
           data-testid="country-menu"
         >
-          {countries.map((country) => (
+          {listed.map((country) => (
             <MenuItem
               key={country.code}
               onClick={() => onSelect(country)}
@@ -259,7 +262,7 @@ const CountryPicker: React.FC<{
                 </Typography>
               </ListItemIcon>
               <ListItemText
-                primary={country.name}
+                primary={country.displayName}
                 secondary={country.dial}
                 primaryTypographyProps={{ fontSize: rem(theme, 14.4) }}
                 secondaryTypographyProps={{ fontSize: rem(theme, 12.8) }}
@@ -337,7 +340,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     value,
     isFocused,
     helper,
-    countryName: selectedCountry?.name,
+    countryName: selectedCountry && countryDisplayName(selectedCountry, copy.countryName),
     copy });
 
   const TextFieldComponent = variant === 'glass' ? GlassTextField : FieldTextField;
@@ -371,6 +374,7 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
         selectedCode={selectedCountry?.code}
         onClose={handleCountryClose}
         onSelect={handleCountrySelect}
+        countryName={copy.countryName}
       />
     </Box>
   );

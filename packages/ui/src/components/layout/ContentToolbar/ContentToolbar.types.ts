@@ -103,6 +103,13 @@ export interface ViewSelectorProps {
   zoom: number[];
   /** Called when the zoom slider changes. */
   onZoomChange: (value: number[]) => void;
+  /**
+   * The grid option's name, in the menu and on the trigger while it is active.
+   * @default "Grid View" — a host passes `UI_LABELS[locale].contentToolbar.gridView`.
+   */
+  gridViewLabel?: string;
+  /** The list option's name. @default "List View" */
+  listViewLabel?: string;
 }
 
 /* ── SortByDropdown ──────────────────────────────────────────────────────── */
@@ -228,6 +235,13 @@ export interface FilterTriggerProps {
   activeCount?: number;
   /** Button label. @default "Filtros" */
   label?: string;
+  /**
+   * The button's accessible name while the panel is closed.
+   * @default "Open filters" — a host passes `UI_LABELS[locale].contentToolbar.openFilters`.
+   */
+  openFiltersLabel?: string;
+  /** The button's accessible name while the panel is open. @default "Close filters" */
+  closeFiltersLabel?: string;
   'data-testid'?: string;
 }
 

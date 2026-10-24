@@ -1,3 +1,4 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 // Selection surgery for the editor. Each of these mutates the DOM around a
 // Range and then rebuilds the selection, so the caret ends up where the user
 // expects rather than at the start of the document.
@@ -85,11 +86,11 @@ const removeFromList = (block: globalThis.Element) => {
   );
 };
 
-const wrapInList = (range: globalThis.Range, listType: 'ol' | 'ul') => {
+const wrapInList = (range: globalThis.Range, listType: 'ol' | 'ul', listItemText: string) => {
   const list = document.createElement(listType);
   const listItem = document.createElement('li');
 
-  listItem.appendChild(document.createTextNode(range.toString() || 'List item'));
+  listItem.appendChild(document.createTextNode(range.toString() || listItemText));
   list.appendChild(listItem);
 
   range.deleteContents();
@@ -109,6 +110,7 @@ export const toggleList = (
   range: globalThis.Range,
   listType: 'ol' | 'ul',
   editor: HTMLElement | null,
+  listItemText: string = EN_US_UI_LABELS.richTextEditor.listItem,
 ) => {
   if (!editor) return;
 
@@ -120,5 +122,5 @@ export const toggleList = (
     return;
   }
 
-  wrapInList(range, listType);
+  wrapInList(range, listType, listItemText);
 };

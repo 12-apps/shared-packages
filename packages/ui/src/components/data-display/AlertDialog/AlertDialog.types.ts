@@ -43,6 +43,12 @@ export interface AlertDialogProps extends Omit<MuiDialogProps, 'variant'> {
   confirmText?: string;
 
   /**
+   * The corner close button's accessible name. Defaults to `close`, as it
+   * always read; a host passes `CHROME_COPY[locale].closePanel`.
+   */
+  closeLabel?: string;
+
+  /**
    * Callback when cancel is clicked
    */
   onCancel?: () => void;

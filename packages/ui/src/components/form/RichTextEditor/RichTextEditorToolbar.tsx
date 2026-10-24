@@ -1,3 +1,4 @@
+import type { RichTextEditorLabels } from '../../../copy/labels';
 import Code from '@mui/icons-material/Code';
 import FormatBold from '@mui/icons-material/FormatBold';
 import FormatItalic from '@mui/icons-material/FormatItalic';
@@ -27,15 +28,15 @@ type ResolvedToolbar = Required<Omit<ToolbarConfig, 'customItems'>> &
 
 // The button groups, in render order. A separator is drawn between two groups
 // only when both actually have something switched on.
-const GROUPS: Array<Array<{ key: keyof ResolvedToolbar; icon: ReactElement; tooltip: string; command: string; commandValue?: string }>> = [
+const GROUPS: Array<Array<{ key: keyof ResolvedToolbar; icon: ReactElement; label: keyof RichTextEditorLabels; command: string; commandValue?: string }>> = [
   [
-    { key: 'bold', icon: <FormatBold />, tooltip: 'Bold', command: 'bold' },
-    { key: 'italic', icon: <FormatItalic />, tooltip: 'Italic', command: 'italic' },
-    { key: 'underline', icon: <FormatUnderlined />, tooltip: 'Underline', command: 'underline' },
+    { key: 'bold', icon: <FormatBold />, label: 'bold', command: 'bold' },
+    { key: 'italic', icon: <FormatItalic />, label: 'italic', command: 'italic' },
+    { key: 'underline', icon: <FormatUnderlined />, label: 'underline', command: 'underline' },
     {
       key: 'strikethrough',
       icon: <FormatStrikethrough />,
-      tooltip: 'Strikethrough',
+      label: 'strikethrough',
       command: 'strikethrough',
     },
   ],
@@ -43,30 +44,30 @@ const GROUPS: Array<Array<{ key: keyof ResolvedToolbar; icon: ReactElement; tool
     {
       key: 'orderedList',
       icon: <FormatListNumbered />,
-      tooltip: 'Numbered List',
+      label: 'numberedList',
       command: 'insertOrderedList',
     },
     {
       key: 'unorderedList',
       icon: <FormatListBulleted />,
-      tooltip: 'Bulleted List',
+      label: 'bulletedList',
       command: 'insertUnorderedList',
     },
   ],
   [
-    { key: 'link', icon: <Link />, tooltip: 'Insert Link', command: 'createLink' },
-    { key: 'image', icon: <Image />, tooltip: 'Insert Image', command: 'insertImage' },
+    { key: 'link', icon: <Link />, label: 'insertLink', command: 'createLink' },
+    { key: 'image', icon: <Image />, label: 'insertImage', command: 'insertImage' },
     {
       key: 'codeBlock',
       icon: <Code />,
-      tooltip: 'Code Block',
+      label: 'codeBlock',
       command: 'formatBlock',
       commandValue: 'pre',
     },
     {
       key: 'quote',
       icon: <FormatQuote />,
-      tooltip: 'Quote',
+      label: 'quote',
       command: 'formatBlock',
       commandValue: 'blockquote',
     },
@@ -74,9 +75,9 @@ const GROUPS: Array<Array<{ key: keyof ResolvedToolbar; icon: ReactElement; tool
 ];
 
 // Link and image need a target before they can run.
-const PROMPTS: Record<string, { message: string; initial?: string }> = {
-  createLink: { message: 'Enter URL:', initial: 'https://' },
-  insertImage: { message: 'Enter image URL:' },
+const PROMPTS: Record<string, { message: 'linkPrompt' | 'imagePrompt'; initial?: string }> = {
+  createLink: { message: 'linkPrompt', initial: 'https://' },
+  insertImage: { message: 'imagePrompt' },
 };
 
 const Separator: FC = () => <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />;
@@ -89,6 +90,7 @@ export interface RichTextEditorToolbarProps {
   characterCount: number;
   editorRef: React.RefObject<HTMLDivElement | null>;
   onFormat: (command: string, value?: string) => void;
+  labels: RichTextEditorLabels;
 }
 
 const ToolbarGroups: FC<{
@@ -96,7 +98,8 @@ const ToolbarGroups: FC<{
   disabled: boolean;
   readOnly: boolean;
   onRun: (command: string, commandValue?: string) => void;
-}> = ({ config, disabled, readOnly, onRun }) => {
+  labels: RichTextEditorLabels;
+}> = ({ config, disabled, readOnly, onRun, labels }) => {
   const groupIsActive = (group: (typeof GROUPS)[number]) => group.some((item) => config[item.key]);
 
   return (
@@ -107,12 +110,12 @@ const ToolbarGroups: FC<{
           {group
             .filter((item) => config[item.key])
             .map((item) => (
-              <Tooltip key={item.key} title={item.tooltip}>
+              <Tooltip key={item.key} title={labels[item.label]}>
                 <IconButton
                   size="small"
                   onClick={() => onRun(item.command, item.commandValue)}
                   disabled={disabled || readOnly}
-                  aria-label={item.tooltip}
+                  aria-label={labels[item.label]}
                   data-testid={`toolbar-${item.key}`}
                 >
                   {item.icon}
@@ -133,6 +136,7 @@ export const RichTextEditorToolbar: FC<RichTextEditorToolbarProps> = ({
   characterCount,
   editorRef,
   onFormat,
+  labels,
 }) => {
   const run = (command: string, commandValue?: string) => {
     const prompt = PROMPTS[command];
@@ -141,7 +145,7 @@ export const RichTextEditorToolbar: FC<RichTextEditorToolbarProps> = ({
       return;
     }
 
-    const answer = window.prompt(prompt.message, prompt.initial);
+    const answer = window.prompt(labels[prompt.message], prompt.initial);
     if (answer) onFormat(command, answer);
   };
 
@@ -156,7 +160,13 @@ export const RichTextEditorToolbar: FC<RichTextEditorToolbarProps> = ({
         backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
       }}
     >
-      <ToolbarGroups config={config} disabled={disabled} readOnly={readOnly} onRun={run} />
+      <ToolbarGroups
+        config={config}
+        disabled={disabled}
+        readOnly={readOnly}
+        onRun={run}
+        labels={labels}
+      />
 
       {config.customItems && config.customItems.length > 0 && (
         <>

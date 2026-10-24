@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { BadgeSize, BadgeVariant } from './Badge.base';
 import { badgeMetrics, badgeTextStyle } from './Badge.look.native';
 import { BADGE_CONTENT_GAP } from './Badge.metrics';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { Icon } from '../../../icons/Icon.native';
 import { renderTextChildren } from '../../../platform/text-children';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
@@ -18,6 +19,7 @@ export interface BadgeContentProps {
   content: React.ReactNode;
   idFor: (suffix: string) => string;
   onClose: () => void;
+  closeLabel?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function BadgeContent({
   content,
   idFor,
   onClose,
+  closeLabel = EN_US_UI_LABELS.common.close,
 }: BadgeContentProps): React.JSX.Element | null {
   const theme = useUiTheme();
   if (variant === 'dot') return null;
@@ -59,7 +62,7 @@ export function BadgeContent({
         <Pressable
           testID={idFor('close')}
           role="button"
-          aria-label="close"
+          aria-label={closeLabel}
           onPress={onClose}
           style={styles.close}
         >

@@ -118,6 +118,15 @@ describe("UserAvatar", () => {
     const img = container.querySelector('img.MuiAvatar-img');
     expect(img).toHaveAttribute("alt", "User avatar");
   });
+
+  it("names a nameless image with the caller's avatarAlt", () => {
+    const { container } = render(
+      <UserAvatar src="https://example.com/avatar.jpg" copy={{ avatarAlt: "Foto do usuário" }} />,
+    );
+
+    const img = container.querySelector('img.MuiAvatar-img');
+    expect(img).toHaveAttribute("alt", "Foto do usuário");
+  });
 });
 
 describe("UserMenu", () => {
@@ -166,6 +175,12 @@ describe("UserMenu", () => {
 
     render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={userWithoutName} onSignOut={vi.fn()} />);
 
+    expect(screen.getByText(PT_BR_USER_AVATAR_COPY.unnamedUser)).toBeInTheDocument();
+  });
+
+  it("falls back to the English name line for a pack without unnamedUser", () => {
+    render(<UserMenu copy={{ signOut: "Sair" }} user={{ ...mockUser, name: null }} onSignOut={vi.fn()} />);
+
     expect(screen.getByText("User")).toBeInTheDocument();
   });
 
@@ -190,7 +205,7 @@ describe("UserMenu", () => {
 
     render(<UserMenu copy={PT_BR_USER_AVATAR_COPY} user={emptyUser} onSignOut={vi.fn()} />);
 
-    expect(screen.getByText("User")).toBeInTheDocument();
+    expect(screen.getByText(PT_BR_USER_AVATAR_COPY.unnamedUser)).toBeInTheDocument();
     expect(screen.getByText("?")).toBeInTheDocument();
   });
 });

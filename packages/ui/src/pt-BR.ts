@@ -19,6 +19,7 @@
 export * from './pt-BR.data-display';
 export * from './pt-BR.feedback';
 export * from './pt-BR.form';
+export * from './pt-BR.labels';
 export * from './pt-BR.layout';
 export * from './pt-BR.navigation';
 export * from './pt-BR.shared';

@@ -10,6 +10,7 @@ import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
+import { EN_US_CAROUSEL_COPY } from '../../../en-US.data-display';
 import { neutralTones } from '../../../tokens/ink';
 import { accentFor, muiSize, rem } from '../../../tokens/scales';
 
@@ -51,26 +52,27 @@ const INDICATOR_POSITIONS = (theme: Theme): Record<IndicatorPosition, CSSObject>
 
 interface IndicatorProps {
   index: number;
+  label: string;
   isActive: boolean;
   color: Color;
   onSelect: () => void;
 }
 
 /** Attributes every indicator variant carries, whatever it draws. */
-const indicatorAttrs = (index: number, isActive: boolean) => ({
-  'aria-label': `Go to slide ${index + 1}`,
+const indicatorAttrs = (index: number, isActive: boolean, label: string) => ({
+  'aria-label': label,
   'data-testid': `carousel-indicator-${index}`,
   'data-active': isActive,
 });
 
-const LineIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSelect }) => {
+const LineIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color, onSelect }) => {
   const theme = useTheme();
 
   return (
     <Box
       role="button"
       tabIndex={0}
-      {...indicatorAttrs(index, isActive)}
+      {...indicatorAttrs(index, isActive, label)}
       sx={{
         width: rem(theme, isActive ? 30 : 20),
         height: rem(theme, 3),
@@ -87,14 +89,14 @@ const LineIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSel
   );
 };
 
-const NumberIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSelect }) => {
+const NumberIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color, onSelect }) => {
   const theme = useTheme();
 
   return (
     <Box
       role="button"
       tabIndex={0}
-      {...indicatorAttrs(index, isActive)}
+      {...indicatorAttrs(index, isActive, label)}
       sx={{
         width: rem(theme, 24),
         height: rem(theme, 24),
@@ -118,13 +120,13 @@ const NumberIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onS
   );
 };
 
-const DotIndicator: React.FC<IndicatorProps> = ({ index, isActive, color, onSelect }) => {
+const DotIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color, onSelect }) => {
   const theme = useTheme();
 
   return (
     <IconButton
       size="small"
-      {...indicatorAttrs(index, isActive)}
+      {...indicatorAttrs(index, isActive, label)}
       onClick={onSelect}
       sx={{
         p: 0.5,
@@ -151,13 +153,14 @@ const INDICATORS_DEFAULTS = {
 } satisfies Partial<CarouselIndicatorsProps>;
 
 export const CarouselIndicators: React.FC<CarouselIndicatorsProps> = (props) => {
-  const { count, activeIndex, onSelect, position, color, variant, className, style } = withDefaults(
+  const { count, activeIndex, onSelect, position, color, variant, className, style, copy } = withDefaults(
     props,
     INDICATORS_DEFAULTS,
   ) as CarouselIndicatorsProps & Required<Pick<CarouselIndicatorsProps, keyof typeof INDICATORS_DEFAULTS>>;
 
   const theme = useTheme();
   const Indicator = INDICATORS[variant] ?? DotIndicator;
+  const goToSlide = copy?.goToSlide ?? EN_US_CAROUSEL_COPY.goToSlide;
 
   return (
     <Box
@@ -176,6 +179,7 @@ export const CarouselIndicators: React.FC<CarouselIndicatorsProps> = (props) => 
         <Indicator
           key={index}
           index={index}
+          label={goToSlide(index + 1)}
           isActive={index === activeIndex}
           color={color}
           onSelect={() => onSelect(index)}

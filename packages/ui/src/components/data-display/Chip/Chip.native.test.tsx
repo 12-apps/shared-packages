@@ -148,6 +148,13 @@ describe('Chip (native)', () => {
     expect(screen.getByTestId('d').style.opacity).toBe('0.38');
   });
 
+  it('names the delete button with the caller deleteLabel, else "delete"', () => {
+    const { rerender } = render(<Chip label="x" deletable onDelete={vi.fn()} deleteLabel="Excluir" dataTestId="d" />);
+    expect(screen.getByTestId('d-delete')).toHaveAttribute('aria-label', 'Excluir');
+    rerender(<Chip label="x" deletable onDelete={vi.fn()} dataTestId="d" />);
+    expect(screen.getByTestId('d-delete')).toHaveAttribute('aria-label', 'delete');
+  });
+
   it('gives the delete button MUI\'s glyph size, tuck and ink', () => {
     const onDelete = vi.fn();
     render(<Chip label="x" deletable onDelete={onDelete} dataTestId="d" />);

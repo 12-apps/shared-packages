@@ -33,6 +33,11 @@ export interface DashboardBreadcrumbProps {
   items: DashboardBreadcrumbItem[];
   /** Render function for links, e.g. a Next.js `<Link>`. Defaults to `<a>`. */
   renderLink?: (item: DashboardBreadcrumbItem, children: ReactNode) => ReactNode;
+  /**
+   * The trail's landmark name. @default "breadcrumb" — a host passes
+   * `UI_LABELS[locale].dashboard.breadcrumb`.
+   */
+  ariaLabel?: string;
   className?: string;
 }
 

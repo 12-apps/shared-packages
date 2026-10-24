@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { focusDialogOnEntered } from './Dialog.focus';
 import { hasSpacingSlot, withDialogDefaults } from './Dialog.helpers';
 import {
@@ -180,6 +181,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
     title,
     description,
     showCloseButton,
+    closeLabel,
     backdrop,
     persistent,
     glass,
@@ -210,6 +212,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
       title={title}
       subtitle={description}
       showCloseButton={showCloseButton}
+      closeLabel={closeLabel}
       onClose={onClose}
       dataTestId={testId}
     />
@@ -247,6 +250,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
   title,
   subtitle,
   showCloseButton = true,
+  closeLabel = EN_US_UI_LABELS.common.close,
   onClose,
   ...others
 }) => {
@@ -296,7 +300,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({
       </Box>
       {showCloseButton && onClose && (
         <IconButton
-          aria-label="close"
+          aria-label={closeLabel}
           onClick={onClose}
           data-testid={childTestId(others, 'close', 'dialog')}
           sx={{

@@ -1,5 +1,8 @@
+import type { AddressAutocompleteCopy } from '../../../copy/form';
+import { EN_US_ADDRESS_AUTOCOMPLETE_COPY } from '../../../en-US.form';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import type React from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type {
   AddressAutocompleteProps,
@@ -31,7 +34,9 @@ export const useAddressAutocomplete = ({
   googleMapsApiKey,
   restrictions,
   onSelect,
+  copy,
 }: {
+  copy: AddressAutocompleteCopy;
   defaultValue: string;
   googleMapsApiKey: string;
   restrictions: AddressAutocompleteProps['restrictions'];
@@ -40,8 +45,13 @@ export const useAddressAutocomplete = ({
   const [inputValue, setInputValue] = useState(defaultValue);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  // Memoised so the selection and location callbacks keep their identity.
+  const messages = useMemo(() => resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, copy), [copy]);
 
-  const { isLoaded, error: mapsError, services, useMockData } = useGoogleMapsAPI(googleMapsApiKey);
+  const { isLoaded, error: mapsError, services, useMockData } = useGoogleMapsAPI(googleMapsApiKey, {
+    loadFailed: messages.mapsApiLoadFailed,
+    initFailed: messages.mapsServicesInitFailed,
+  });
 
   // A resolved address both notifies the caller and becomes the field's text.
   const applyAddress = useCallback(
@@ -60,6 +70,7 @@ export const useAddressAutocomplete = ({
     setInputValue,
     setLoading,
     setApiError,
+    fetchFailed: messages.fetchSuggestionsFailed,
   });
 
   const handleSelect = useAddressSelection({
@@ -69,6 +80,7 @@ export const useAddressAutocomplete = ({
     setApiError,
     onSelect,
     applyAddress,
+    messages,
   });
 
   const handleGetCurrentLocation = useCurrentLocation({
@@ -77,6 +89,7 @@ export const useAddressAutocomplete = ({
     setLoading,
     setApiError,
     applyAddress,
+    messages,
   });
 
   return {

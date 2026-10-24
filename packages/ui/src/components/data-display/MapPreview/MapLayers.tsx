@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { HEATMAP_VIEWBOX } from './MapPreview.constants';
-import type { ResolvedMapPreviewProps } from './MapPreview.helpers';
+import { resolveMapCopy, type ResolvedMapPreviewProps } from './MapPreview.helpers';
 import type { MapType } from './MapPreview.types';
 import { MapControlBar } from './MapControlBar';
 import { HeatmapOverlay, RouteOverlay } from './MapOverlays';
@@ -47,7 +47,7 @@ export const MapLayers: FC<MapLayersProps> = ({ settings, zoom, mapType, search,
         <MapSearchBar
           label={settings.copy.search}
           value={search.searchValue}
-          placeholder={settings.searchPlaceholder}
+          placeholder={settings.searchPlaceholder ?? resolveMapCopy(settings.copy).searchPlaceholder}
           isSearching={search.isSearching}
           onChange={search.setSearchValue}
           onSubmit={search.handleSearch}

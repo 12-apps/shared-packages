@@ -40,6 +40,7 @@ import {
 } from './Switch.metrics';
 import type { SwitchProps } from './Switch.types.native';
 import { webKeyDown } from '../../../platform/aria';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { childTestId, resolveTestId } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { UiTheme } from '../../../tokens/theme';
@@ -156,7 +157,7 @@ function SwitchIcon({
 }
 
 interface ControlProps {
-  props: ResolvedSwitchProps;
+  props: ResolvedSwitchProps<SwitchProps>;
   theme: UiTheme;
   checked: boolean;
   inactive: boolean;
@@ -233,7 +234,7 @@ function SwitchControl({ props, theme, checked, inactive, onToggle, rest, testID
           <ActivityIndicator
             size={geometry.thumbSize * SWITCH_SPINNER.sizeRatio}
             color={palette.main}
-            accessibilityLabel="loading"
+            accessibilityLabel={props.loadingLabel ?? EN_US_UI_LABELS.common.loading}
           />
         ) : null}
       </Animated.View>
@@ -290,7 +291,7 @@ function labelRowStyle(theme: UiTheme, position: string): ViewStyle {
 export const Switch = React.forwardRef<View, SwitchProps>((rawProps, ref) => {
   const props = resolveSwitchProps(rawProps);
   const {
-    label, description, labelPosition, error, helperText, loading, disabled,
+    label, description, labelPosition, error, helperText, loading, loadingLabel: _loadingLabel, disabled,
     checked, defaultChecked, onChange, onClick, onPress, style, ...others
   } = props;
 

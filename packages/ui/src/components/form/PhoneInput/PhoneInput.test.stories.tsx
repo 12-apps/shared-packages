@@ -4,7 +4,11 @@ import { expect, fn, Mock, userEvent, waitFor, within } from 'storybook/test';
 import { must } from '../../../test-utils/must';
 
 import { PhoneInput } from './PhoneInput';
-import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR';
+import { PT_BR_PHONE_INPUT_COPY as PT_BR_PACK } from '../../../pt-BR';
+
+// These stories pin interactions by the picker's English country names, so the
+// pack keeps its sentences and drops only its localized names.
+const PT_BR_PHONE_INPUT_COPY = { ...PT_BR_PACK, countryName: undefined };
 
 const meta: Meta<typeof PhoneInput> = {
   title: 'Form/PhoneInput/Tests',

@@ -18,6 +18,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { floatAnimation, getColorFromTheme } from './Textarea.styles';
 import type { RichEditorToolbarCopy } from '../../../copy';
+import { EN_US_RICH_EDITOR_TOOLBAR_COPY } from '../../../en-US.form';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
@@ -385,7 +386,7 @@ export const TextareaRichEditor: React.FC<{
         onMouseUp={updateActiveFormats}
         role="textbox"
         aria-multiline="true"
-        aria-label={placeholder || 'Rich text editor'}
+        aria-label={placeholder || (copy.editorLabel ?? EN_US_RICH_EDITOR_TOOLBAR_COPY.editorLabel)}
       />
 
       {characterLimit && (

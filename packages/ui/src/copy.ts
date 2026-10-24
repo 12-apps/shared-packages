@@ -22,6 +22,7 @@
 export type * from './copy/data-display';
 export type * from './copy/feedback';
 export type * from './copy/form';
+export type * from './copy/labels';
 export type * from './copy/layout';
 export type * from './copy/navigation';
 export type * from './copy/shared';

@@ -31,6 +31,11 @@ export interface PanelWidth {
 export interface StackedModalProps {
   /** The back arrow's accessible name — it carries a glyph only. REQUIRED. */
   backLabel: string;
+  /**
+   * The ✕'s accessible name — it carries a glyph only. Defaults to `close`, as
+   * it always read; a host passes `CHROME_COPY[locale].closePanel`.
+   */
+  closeLabel?: string;
   /** Controls the visibility of the modal */
   open: boolean;
   /** Callback fired when the component requests to be closed */

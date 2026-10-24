@@ -107,6 +107,12 @@ export interface NavigationMenuProps {
    * Callback when collapse state changes
    */
   onCollapseChange?: (collapsed: boolean) => void;
+
+  /**
+   * The collapse control's text (vertical, `collapsible` only).
+   * @default "Collapse" — a host passes `UI_LABELS[locale].navigationMenu.collapse`.
+   */
+  collapseLabel?: string;
   
   /**
    * Custom logo/brand element

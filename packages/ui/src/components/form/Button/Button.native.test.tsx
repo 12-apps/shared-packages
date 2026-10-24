@@ -71,6 +71,13 @@ describe('Button (native)', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
+  it('names the busy spinner with the caller loadingLabel, else "loading"', () => {
+    const { rerender } = render(<Button dataTestId="save" loading loadingLabel="Carregando">Salvar</Button>);
+    expect(screen.getByTestId('save-loading')).toHaveAttribute('aria-label', 'Carregando');
+    rerender(<Button dataTestId="save" loading>Salvar</Button>);
+    expect(screen.getByTestId('save-loading')).toHaveAttribute('aria-label', 'loading');
+  });
+
   it('names itself from a label built of text and numbers while loading', () => {
     const count = 3;
     render(

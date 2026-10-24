@@ -31,6 +31,7 @@ import type {
   DashboardMoreFiltersProps,
   DashboardProps,
 } from './Dashboard.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { sxRem } from '../../../tokens/relative';
 
 /**
@@ -160,6 +161,7 @@ Dashboard.displayName = 'Dashboard';
 const DashboardBreadcrumb = ({
   items,
   renderLink,
+  ariaLabel = EN_US_UI_LABELS.dashboard.breadcrumb,
   className,
 }: DashboardBreadcrumbProps): React.JSX.Element => {
   const { testIdPrefix } = useDashboardContext();
@@ -167,7 +169,7 @@ const DashboardBreadcrumb = ({
     <MuiBreadcrumbs
       separator={<NavigateNextIcon fontSize="small" />}
       className={className}
-      aria-label="breadcrumb"
+      aria-label={ariaLabel}
       data-testid={`${testIdPrefix}-breadcrumb`}
       sx={{ fontSize: sxRem(14), color: 'text.secondary' }}
     >

@@ -182,6 +182,13 @@ describe('Badge (native)', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
+  it('names the close button with the caller closeLabel, else "close"', () => {
+    const { rerender } = render(<Badge badgeContent="x" closable closeLabel="Remover" dataTestId="b" />);
+    expect(screen.getByTestId('b-close')).toHaveAttribute('aria-label', 'Remover');
+    rerender(<Badge badgeContent="x" closable dataTestId="b" />);
+    expect(screen.getByTestId('b-close')).toHaveAttribute('aria-label', 'close');
+  });
+
   it('has no close button until it is closable', () => {
     render(<Badge badgeContent="x" onClose={() => undefined} dataTestId="b" />);
     expect(screen.queryAllByTestId('b-close')).toHaveLength(0);

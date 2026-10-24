@@ -3,6 +3,8 @@ import { alpha } from '@mui/material/styles/index.js';
 
 import { DEFAULT_ZOOM } from './MapPreview.constants';
 import type { MapPreviewProps } from './MapPreview.types';
+import type { MapPreviewCopy } from '../../../copy/data-display';
+import { EN_US_MAP_PREVIEW_COPY } from '../../../en-US.data-display';
 import { rem } from '../../../tokens/relative';
 
 type MapDefaultedKeys =
@@ -14,7 +16,6 @@ type MapDefaultedKeys =
   | 'variant'
   | 'showControls'
   | 'showSearch'
-  | 'searchPlaceholder'
   | 'showRoute'
   | 'heatmapData'
   | 'showHeatmap'
@@ -32,12 +33,22 @@ const MAP_PREVIEW_DEFAULTS: Pick<MapPreviewProps, MapDefaultedKeys> = {
   variant: 'default',
   showControls: true,
   showSearch: false,
-  searchPlaceholder: 'Search location...',
   showRoute: false,
   heatmapData: [],
   showHeatmap: false,
   animated: true,
 };
+
+/**
+ * The copy the map renders: the host's pack over the English one, key by key,
+ * so a pack written before the optional keys existed still renders every word.
+ */
+export const resolveMapCopy = (copy: MapPreviewCopy): Required<MapPreviewCopy> => ({
+  ...EN_US_MAP_PREVIEW_COPY,
+  ...(Object.fromEntries(
+    Object.entries(copy).filter(([, value]) => value !== undefined),
+  ) as MapPreviewCopy),
+});
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
 // falls back to the default exactly as a destructuring default would.

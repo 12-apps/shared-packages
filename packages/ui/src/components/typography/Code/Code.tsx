@@ -4,6 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Tooltip from '@mui/material/Tooltip/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import React, { useState } from 'react';
 
 import type { CodeProps } from './Code.types';
@@ -188,7 +189,11 @@ const resolveCodeFlags = (
 // means the copied/not-copied branches do not count against the main render, and
 // the flash re-renders only the button. Non-string children are still a no-op on
 // click, exactly as before.
-const CodeCopyButton: React.FC<{ source: React.ReactNode }> = ({ source }) => {
+const CodeCopyButton: React.FC<{ source: React.ReactNode; copyLabel: string; copiedLabel: string }> = ({
+  source,
+  copyLabel,
+  copiedLabel,
+}) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -203,7 +208,7 @@ const CodeCopyButton: React.FC<{ source: React.ReactNode }> = ({ source }) => {
   };
 
   return (
-    <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
+    <Tooltip title={copied ? copiedLabel : copyLabel}>
       <CopyButton onClick={handleCopy} size="small" color={copied ? 'success' : 'default'}>
         {copied ? <Check /> : <ContentCopy />}
       </CopyButton>
@@ -217,6 +222,8 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
       variant = 'inline',
       language,
       copyable = false,
+      copyLabel = EN_US_UI_LABELS.code.copy,
+      copiedLabel = EN_US_UI_LABELS.code.copied,
       lineNumbers = false,
       size = 'md',
       children,
@@ -248,7 +255,7 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
 
         <StyledCode>{processedChildren}</StyledCode>
 
-        {showCopy && <CodeCopyButton source={children} />}
+        {showCopy && <CodeCopyButton source={children} copyLabel={copyLabel} copiedLabel={copiedLabel} />}
       </StyledCodeContainer>
     );
   },

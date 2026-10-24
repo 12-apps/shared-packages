@@ -1,3 +1,4 @@
+import { EN_US_TUTORIAL_COPY } from '../../../en-US.feedback';
 import CompleteIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import PrevIcon from '@mui/icons-material/NavigateBefore';
@@ -227,7 +228,7 @@ export const TutorialStepBody: React.FC<{
 
         {showProgress && (
           <Typography variant="caption" color="text.secondary" align="center">
-            {currentStep + 1} of {stepCount}
+            {(copy.progress ?? EN_US_TUTORIAL_COPY.progress)(currentStep + 1, stepCount)}
           </Typography>
         )}
 

@@ -46,6 +46,7 @@ import type {
   TableFilterCopy,
   TimingDiagramCopy,
   TutorialCopy,
+  UiLabels,
   UploadButtonCopy,
   UserAvatarCopy,
 } from "./copy";
@@ -171,3 +172,6 @@ export const USER_AVATAR_COPY = pack<UserAvatarCopy>(
   pt.PT_BR_USER_AVATAR_COPY,
   en.EN_US_USER_AVATAR_COPY,
 );
+
+// labels: the optional accessible names components fall back to English for
+export const UI_LABELS = pack<UiLabels>(pt.PT_BR_UI_LABELS, en.EN_US_UI_LABELS);

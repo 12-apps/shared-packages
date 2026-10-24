@@ -162,6 +162,13 @@ describe('Checkbox (native)', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('names the busy spinner with the caller loadingLabel, else "loading"', () => {
+    const { rerender } = render(<Checkbox dataTestId="c" loading loadingLabel="Carregando" />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-label', 'Carregando');
+    rerender(<Checkbox dataTestId="c" loading />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-label', 'loading');
+  });
+
   it('sets the label at MUI body2 and swaps both inks for the error hue', () => {
     const { rerender } = render(<Checkbox dataTestId="c" label="Aceito" helperText="Ajuda" />);
     const label = screen.getByText('Aceito');

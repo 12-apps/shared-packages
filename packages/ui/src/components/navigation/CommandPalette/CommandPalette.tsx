@@ -1,3 +1,5 @@
+import { EN_US_COMMAND_PALETTE_COPY } from '../../../en-US.navigation';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import CloseIcon from '@mui/icons-material/Close';
 import EnterIcon from '@mui/icons-material/KeyboardReturn';
 import SearchIcon from '@mui/icons-material/Search';
@@ -103,6 +105,7 @@ const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }
   copy,
 }) => {
   const theme = useTheme();
+  const text = resolveLabels(EN_US_COMMAND_PALETTE_COPY, copy);
 
   return (
     <Box
@@ -124,7 +127,7 @@ const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }
         <ShortcutChip label={copy.close} size="small" />
       </Box>
       <Typography variant="caption" color="text.secondary">
-        {commandCount} commands
+        {text.commandCount(commandCount)}
       </Typography>
     </Box>
   );
@@ -135,13 +138,14 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
   open,
   onClose,
   commands,
-  placeholder = 'Type a command or search...',
+  placeholder,
   width,
   maxHeight,
   showRecent = true,
   recentCommands = [],
   onCommandExecute,
   dataTestId = 'command-palette' }) => {
+  const text = resolveLabels(EN_US_COMMAND_PALETTE_COPY, copy);
   const {
     searchQuery,
     setSearchQuery,
@@ -158,7 +162,8 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
     showRecent,
     recentCommands,
     onCommandExecute,
-    onClose });
+    onClose,
+    generalLabel: text.general });
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -177,7 +182,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
         <PaletteContainer elevation={24} sx={{ width: width ?? sxRem(640), maxHeight: maxHeight ?? sxRem(400) }}>
           <PaletteSearch
             inputRef={searchInputRef}
-            placeholder={placeholder}
+            placeholder={placeholder ?? text.placeholder}
             value={searchQuery}
             dataTestId={dataTestId}
             onChange={handleSearchChange}

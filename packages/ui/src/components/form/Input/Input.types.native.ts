@@ -25,5 +25,7 @@ export type InputProps = InputBaseProps &
     onClick?: (event: GestureResponderEvent) => void;
     onPress?: (event: GestureResponderEvent) => void;
     style?: StyleProp<ViewStyle>;
+    /** The busy spinner's accessible name; defaults to the labels pack's `loading`. */
+    loadingLabel?: string;
     inputStyle?: StyleProp<TextStyle>;
   };

@@ -6,9 +6,16 @@ import Button from '@mui/material/Button/index.js';
 import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
+
+/** The toggle's accessible name for its state: the caller's, else the English one. */
+const toggleName = (open: boolean, openLabel?: string, closeLabel?: string): string =>
+  open
+    ? (closeLabel ?? EN_US_UI_LABELS.contentToolbar.closeFilters)
+    : (openLabel ?? EN_US_UI_LABELS.contentToolbar.openFilters);
 
 /**
  * Labeled filter toggle: a "Filtros" button (styled like the sibling toolbar
@@ -22,6 +29,8 @@ export function FilterTrigger({
   hasActiveFilters = false,
   activeCount = 0,
   label = 'Filtros',
+  openFiltersLabel,
+  closeFiltersLabel,
   'data-testid': testId = 'toggle-filters-btn',
 }: FilterTriggerProps): React.JSX.Element {
   const active = activeCount > 0 || hasActiveFilters;
@@ -32,7 +41,7 @@ export function FilterTrigger({
       color="inherit"
       data-testid={testId}
       aria-expanded={open}
-      aria-label={open ? 'Close filters' : 'Open filters'}
+      aria-label={toggleName(open, openFiltersLabel, closeFiltersLabel)}
       onClick={() => onOpenChange(!open)}
       startIcon={<FilterIcon sx={{ fontSize: sxRem(16) }} />}
       sx={{

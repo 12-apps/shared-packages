@@ -16,6 +16,18 @@ export interface CommandPaletteCopy {
   /** The recent-commands group, and the nudge under "nothing found". */
   recent: string;
   tryAnotherTerm: string;
+  /**
+   * The keys below are optional so a host's existing pack keeps compiling; the
+   * shipped packs carry all of them and the component falls back to English.
+   */
+  /** The search box's placeholder, unless the `placeholder` prop wins. */
+  placeholder?: string;
+  /** The footer's count. */
+  commandCount?: (count: number) => string;
+  /** The empty state, naming what was typed. */
+  noCommandsFound?: (query: string) => string;
+  /** The group header of a command that names no `category`. */
+  general?: string;
 }
 
 /**

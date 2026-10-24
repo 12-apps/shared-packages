@@ -23,6 +23,7 @@ import type {
   DialogContentProps,
   DialogHeaderProps,
 } from './Dialog.types.native';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { Icon } from '../../../icons/Icon.native';
 import { childTestId, slotTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { renderTextChildren } from '../../../platform/text-children';
@@ -67,12 +68,20 @@ export const dialogSubtitleStyle = (theme: UiTheme): TextStyle => ({
   marginTop: theme.spacing(DIALOG_TITLE.subtitleGapUnits),
 });
 
-function CloseButton({ onPress, testID }: { onPress: () => void; testID: string }): React.JSX.Element {
+function CloseButton({
+  onPress,
+  testID,
+  label,
+}: {
+  onPress: () => void;
+  testID: string;
+  label: string;
+}): React.JSX.Element {
   const theme = useUiTheme();
   return (
     <Pressable
       role="button"
-      aria-label="close"
+      aria-label={label}
       testID={testID}
       onPress={onPress}
       style={({ pressed }) => [
@@ -90,6 +99,7 @@ export function DialogHeader({
   title,
   subtitle,
   showCloseButton = true,
+  closeLabel = EN_US_UI_LABELS.common.close,
   onClose,
   ...others
 }: DialogHeaderProps): React.JSX.Element {
@@ -139,7 +149,11 @@ export function DialogHeader({
         {subtitle ? <RNText style={dialogSubtitleStyle(theme)}>{subtitle}</RNText> : null}
       </View>
       {showCloseButton && onClose ? (
-        <CloseButton onPress={onClose} testID={childTestId(others, 'close', 'dialog')} />
+        <CloseButton
+          onPress={onClose}
+          label={closeLabel}
+          testID={childTestId(others, 'close', 'dialog')}
+        />
       ) : null}
     </View>
   );

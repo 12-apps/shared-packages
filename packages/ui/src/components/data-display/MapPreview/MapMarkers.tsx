@@ -7,7 +7,9 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { MARKER_PIXELS_PER_DEGREE } from './MapPreview.constants';
+import { resolveMapCopy } from './MapPreview.helpers';
 import type { LatLng, MapMarker } from './MapPreview.types';
+import type { MapPreviewCopy } from '../../../copy';
 import { bounceKeyframes } from './mapSurface';
 import { shadowInk } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
@@ -75,15 +77,22 @@ export const MapMarkers: FC<MapMarkersProps> = ({ markers, centre, animated }) =
   );
 };
 
-export const MapCoordinates: FC<{ position: LatLng; zoom: number }> = ({ position, zoom }) => (
+export const MapCoordinates: FC<{ position: LatLng; zoom: number; copy: MapPreviewCopy }> = ({
+  position,
+  zoom,
+  copy,
+}) => {
+  const text = resolveMapCopy(copy);
+  return (
   <CoordinatesDisplay data-testid="coordinates-display">
     <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-      Lat: {position.lat.toFixed(6)}, Lng: {position.lng.toFixed(6)}
+      {text.coordinates(position.lat.toFixed(6), position.lng.toFixed(6))}
     </Typography>
     {zoom > 0 && (
       <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
-        Zoom: {zoom}
+        {text.zoomLevel(zoom)}
       </Typography>
     )}
   </CoordinatesDisplay>
-);
+  );
+};

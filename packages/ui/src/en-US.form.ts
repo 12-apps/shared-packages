@@ -13,11 +13,26 @@ import type {
   UploadButtonCopy,
 } from './copy';
 
-export const EN_US_ADDRESS_AUTOCOMPLETE_COPY: AddressAutocompleteCopy = {
+export const EN_US_ADDRESS_AUTOCOMPLETE_COPY: Required<AddressAutocompleteCopy> = {
   loadingMaps: "Loading Google Maps…",
   mapsLoadFailed:
     "Could not load the Google Maps API. Check the API key and the internet connection.",
   useCurrentLocation: "Use my current location",
+  label: "Address",
+  placeholder: "Enter an address",
+  typeToSearch: "Type at least 3 characters",
+  noAddressesFound: "No addresses found",
+  mapsApiLoadFailed: "Failed to load Google Maps API",
+  mapsServicesInitFailed: "Failed to initialize Google Maps services",
+  fetchSuggestionsFailed: "Failed to fetch address suggestions",
+  addressDetailsNotFound: "Address details not found",
+  addressDetailsFailed: "Failed to get address details",
+  noMockLocation: "No mock location available",
+  mockLocationNotFound: "Mock location details not found",
+  locationAddressFailed: "Unable to retrieve address for current location",
+  geolocationUnsupported: "Geolocation is not supported by this browser",
+  geocoderUnavailable: "Geocoding service not available",
+  locationFailed: "Unable to retrieve your location",
 };
 
 export const EN_US_AUTOCOMPLETE_COPY: AutocompleteCopy = {
@@ -70,7 +85,7 @@ export const EN_US_PASSWORD_STRENGTH_COPY: PasswordStrengthCopy = {
   },
 };
 
-export const EN_US_RICH_EDITOR_TOOLBAR_COPY: RichEditorToolbarCopy = {
+export const EN_US_RICH_EDITOR_TOOLBAR_COPY: Required<RichEditorToolbarCopy> = {
   bold: "Bold",
   italic: "Italic",
   underline: "Underline",
@@ -82,17 +97,19 @@ export const EN_US_RICH_EDITOR_TOOLBAR_COPY: RichEditorToolbarCopy = {
   textColor: "Text colour",
   backgroundColor: "Background colour",
   linkPrompt: "Enter the URL:",
+  editorLabel: "Rich text editor",
 };
 
-export const EN_US_PHONE_INPUT_COPY: PhoneInputCopy = {
+export const EN_US_PHONE_INPUT_COPY: Required<PhoneInputCopy> = {
   selectCountry: "Select country",
   invalidNumber: (countryName) => `Not a valid phone number for ${countryName}`,
   // Substituted into the sentence above when no country is chosen, so it has to
   // read as a noun phrase inside it rather than as a sentence of its own.
   unknownCountry: "the selected country",
+  countryName: (_code, englishName) => englishName,
 };
 
-export const EN_US_UPLOAD_BUTTON_COPY: UploadButtonCopy = {
+export const EN_US_UPLOAD_BUTTON_COPY: Required<UploadButtonCopy> = {
   buttonLabel: "Upload a file",
   dropzoneHint: "Drop the file here, or click to choose one",
   dropzoneRole: (label) => `File upload area. ${label}`,
@@ -101,6 +118,8 @@ export const EN_US_UPLOAD_BUTTON_COPY: UploadButtonCopy = {
   percentUploaded: (percent) => `${percent}% uploaded`,
   uploadInProgress: (percent) => `Upload in progress: ${percent}%`,
   errorAnnouncement: (message) => `Error: ${message}`,
+  fileTooLarge: (maxSizeMB) => `File size must be less than ${maxSizeMB}MB`,
+  uploadFailed: "Upload failed",
 };
 
 export const EN_US_SOCIAL_LOGIN_COPY: SocialLoginCopy = {

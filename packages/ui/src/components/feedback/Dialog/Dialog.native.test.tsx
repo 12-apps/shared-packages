@@ -92,6 +92,24 @@ describe('Dialog (native)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('names the close button with the caller label (FUT-3860)', () => {
+    render(
+      <Dialog open title="T" closeLabel="Fechar" onClose={vi.fn()} dataTestId="d">
+        <DialogContent>x</DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId('d-close')).toHaveAttribute('aria-label', 'Fechar');
+  });
+
+  it('falls back to "close" for the close button name, as it always read', () => {
+    render(
+      <Dialog open title="T" onClose={vi.fn()} dataTestId="d">
+        <DialogContent>x</DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByTestId('d-close')).toHaveAttribute('aria-label', 'close');
+  });
+
   it('hides the close button when asked, and when there is nothing to close to', () => {
     const { rerender } = render(
       <Dialog open title="T" showCloseButton={false} onClose={vi.fn()} dataTestId="d">

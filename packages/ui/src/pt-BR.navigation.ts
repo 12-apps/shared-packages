@@ -8,12 +8,16 @@ import type {
   SectionNavCopy,
 } from './copy';
 
-export const PT_BR_COMMAND_PALETTE_COPY: CommandPaletteCopy = {
+export const PT_BR_COMMAND_PALETTE_COPY: Required<CommandPaletteCopy> = {
   execute: "Executar",
   navigate: "↑↓ Navegar",
   close: "ESC Fechar",
   recent: "Recentes",
   tryAnotherTerm: "Tente outro termo",
+  placeholder: "Digite um comando ou pesquise...",
+  commandCount: (count) => `${count} comandos`,
+  noCommandsFound: (query) => `Nenhum comando encontrado para "${query}"`,
+  general: "Geral",
 };
 
 export const PT_BR_BREADCRUMB_COPY: BreadcrumbCopy = {

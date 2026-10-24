@@ -19,6 +19,7 @@ export const AddressAutocomplete: FC<AddressAutocompleteProps> = (componentProps
     googleMapsApiKey,
     restrictions,
     onSelect,
+    copy: resolved.copy,
   });
 
   // Until the API answers there is nothing to autocomplete against, so the field

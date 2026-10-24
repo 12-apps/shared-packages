@@ -22,6 +22,7 @@ import {
 } from './Chip.look.native';
 import { chipMuiSize, type ChipSizeMetrics } from './Chip.metrics';
 import type { ChipProps, ChipVariant } from './Chip.types.native';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { Icon } from '../../../icons/Icon.native';
 import { webKeyDown, type WebKeyHandler } from '../../../platform/web-keys';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
@@ -75,10 +76,12 @@ function DeleteSlot({
   variant,
   color,
   onDelete,
+  deleteLabel = EN_US_UI_LABELS.common.delete,
   disabled,
   testID,
 }: SlotArgs & {
   color: string;
+  deleteLabel?: string;
   onDelete?: () => void;
   disabled?: boolean;
   testID: string;
@@ -87,7 +90,7 @@ function DeleteSlot({
     <Pressable
       testID={testID}
       role="button"
-      aria-label="delete"
+      aria-label={deleteLabel}
       disabled={disabled}
       onPress={onDelete}
       style={chipDeleteSlotStyle(metrics, variant)}
@@ -106,6 +109,7 @@ interface ChipBodyProps extends SlotArgs {
   deletable?: boolean;
   disabled?: boolean;
   onDelete?: () => void;
+  deleteLabel?: string;
   idFor: (suffix: string) => string;
 }
 
@@ -121,6 +125,7 @@ function ChipBody({
   deletable,
   disabled,
   onDelete,
+  deleteLabel,
   idFor,
 }: ChipBodyProps): React.JSX.Element {
   const theme = useUiTheme();
@@ -147,6 +152,7 @@ function ChipBody({
           variant={variant}
           color={paint.deleteColor}
           onDelete={onDelete}
+          deleteLabel={deleteLabel}
           disabled={disabled}
           testID={idFor('delete')}
         />
@@ -208,6 +214,7 @@ export const Chip = React.forwardRef<View, ChipProps>((props, ref) => {
     onClick,
     onPress,
     onDelete,
+    deleteLabel,
     dataTestId,
     testID,
     style,
@@ -260,6 +267,7 @@ export const Chip = React.forwardRef<View, ChipProps>((props, ref) => {
         deletable={deletable}
         disabled={disabled}
         onDelete={onDelete}
+        deleteLabel={deleteLabel}
         idFor={makeTestId(chipId)}
       />
     </Pressable>

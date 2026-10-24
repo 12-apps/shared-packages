@@ -15,6 +15,18 @@ export interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement
   alt: string;
 
   /**
+   * The placeholder image's `alt` while the real one loads. Defaults to
+   * `UI_LABELS['en-US'].lazyImage.loadingAlt(alt)`, i.e. `<alt> (loading)`.
+   */
+  placeholderAlt?: string;
+
+  /**
+   * The string `fallback` image's `alt` after the real one failed. Defaults to
+   * `UI_LABELS['en-US'].lazyImage.fallbackAlt(alt)`, i.e. `<alt> (fallback)`.
+   */
+  fallbackAlt?: string;
+
+  /**
    * Width of the image. A number above 1 is design px, scaled with the theme's
    * type scale. A number above 0 and up to 1 is a fraction of the
    * container's parent, as in `sx`: `0.5` is `50%`. The container takes it and

@@ -1,3 +1,5 @@
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import Box from '@mui/material/Box/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
 import type { FC } from 'react';
@@ -42,7 +44,9 @@ export const Timeline: FC<TimelineProps> = ({
   showConnector = true,
   animated = true,
   alternating = false,
-  onItemClick }) => {
+  onItemClick,
+  labels: labelOverrides }) => {
+  const labels = resolveLabels(EN_US_UI_LABELS.timeline, labelOverrides);
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set());
 
   const handleExpandClick = (itemId: string, event: React.MouseEvent) => {
@@ -77,6 +81,7 @@ export const Timeline: FC<TimelineProps> = ({
           isExpanded={expandedItems.has(item.id)}
           onItemClick={onItemClick}
           onExpandClick={handleExpandClick}
+          labels={labels}
         />
       ))}
     </TimelineContainer>

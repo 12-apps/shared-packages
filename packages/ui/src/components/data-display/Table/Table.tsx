@@ -14,11 +14,7 @@ import TableRow from '@mui/material/TableRow/index.js';
 import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
-import type {
-  ColumnConfig,
-  TableDensity,
-  TableProps,
-  TableStripeColor} from './Table.types';
+import type { ColumnConfig, TableDensity, TableProps, TableStripeColor } from './Table.types';
 import {
   TABLE_DEFAULTS,
   containerStyle,
@@ -233,6 +229,7 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
             selectable={p.selectable}
             selectedRows={p.selectedRows}
             onSelectAll={selection.handleSelectAll}
+            labels={p.labels}
             density={p.density}
             stickyHeader={p.stickyHeader}
             headRef={headRef}
@@ -253,6 +250,7 @@ const AdvancedTable: React.FC<RendererProps> = ({ resolved: p, selection, innerR
             renderCell={p.renderCell}
             virtualWindow={windowHeight ? visibleItems : undefined}
             rowHeight={p.rowHeight}
+            labels={p.labels}
           />
         </StyledTable>
       </TableContainer>
@@ -296,6 +294,7 @@ const buildShell = ({
       selectable={resolved.selectable}
       selectedRows={resolved.selectedRows}
       onSelectAll={selection.handleSelectAll}
+      labels={resolved.labels}
       density={resolved.density}
       stickyHeader={resolved.stickyHeader}
     />

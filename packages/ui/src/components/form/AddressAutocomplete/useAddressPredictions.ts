@@ -16,6 +16,7 @@ interface PredictionSink {
   setOptions: (options: AddressOptionValue[]) => void;
   setLoading: (loading: boolean) => void;
   setApiError: (message: string | null) => void;
+  fetchFailed: string;
 }
 
 const predictionRequest = (
@@ -55,7 +56,7 @@ const fetchLivePredictions = (
     sink.setApiError(
       status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS
         ? null
-        : 'Failed to fetch address suggestions',
+        : sink.fetchFailed,
     );
   });
 };
@@ -68,7 +69,9 @@ export const useAddressPredictions = ({
   setInputValue,
   setLoading,
   setApiError,
+  fetchFailed,
 }: {
+  fetchFailed: string;
   isLoaded: boolean;
   services: GoogleMapsService;
   restrictions: Restrictions;
@@ -81,8 +84,8 @@ export const useAddressPredictions = ({
   const debounceTimeoutRef = useRef<number | undefined>(undefined);
 
   const sink = useMemo<PredictionSink>(
-    () => ({ setOptions, setLoading, setApiError }),
-    [setLoading, setApiError],
+    () => ({ setOptions, setLoading, setApiError, fetchFailed }),
+    [setLoading, setApiError, fetchFailed],
   );
 
   const debouncedAutocomplete = useCallback(

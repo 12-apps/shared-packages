@@ -27,6 +27,11 @@ export interface DialogBaseProps {
   title?: ReactNode;
   description?: string;
   showCloseButton?: boolean;
+  /**
+   * The close button's accessible name. Defaults to `close`, as it always read;
+   * a host passes `CHROME_COPY[locale].closePanel`.
+   */
+  closeLabel?: string;
   /** Ignored by BOTH renderers today; see `Dialog.metrics.ts`. */
   backdrop?: boolean;
   /** Refuses to close on a backdrop press or Escape. */
@@ -47,6 +52,11 @@ export interface DialogHeaderBaseProps {
   title?: ReactNode;
   subtitle?: ReactNode;
   showCloseButton?: boolean;
+  /**
+   * The close button's accessible name. Defaults to `close`, as it always read;
+   * a host passes `CHROME_COPY[locale].closePanel`.
+   */
+  closeLabel?: string;
   onClose?: () => void;
   dataTestId?: string;
   testID?: string;

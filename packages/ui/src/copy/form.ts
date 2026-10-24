@@ -21,6 +21,29 @@ export interface AddressAutocompleteCopy {
   mapsLoadFailed: string;
   /** The pin button's tooltip, which is also its accessible name. */
   useCurrentLocation: string;
+  /**
+   * Everything below is optional so a host's existing pack keeps compiling; the
+   * shipped packs carry all of it and the field falls back to the English pack.
+   */
+  /** The field's label and placeholder, unless the `label`/`placeholder` props win. */
+  label?: string;
+  placeholder?: string;
+  /** The empty list's text: nothing typed yet, then typed with no match. */
+  typeToSearch?: string;
+  noAddressesFound?: string;
+  /** Shown as the field's helper text when Google Maps or Places fails. */
+  mapsApiLoadFailed?: string;
+  mapsServicesInitFailed?: string;
+  fetchSuggestionsFailed?: string;
+  addressDetailsNotFound?: string;
+  addressDetailsFailed?: string;
+  /** The current-location button's failures. */
+  noMockLocation?: string;
+  mockLocationNotFound?: string;
+  locationAddressFailed?: string;
+  geolocationUnsupported?: string;
+  geocoderUnavailable?: string;
+  locationFailed?: string;
 }
 
 /** What an `Autocomplete` renders that is not one of the host's own options. */
@@ -107,6 +130,12 @@ export interface RichEditorToolbarCopy {
   backgroundColor: string;
   /** The browser prompt the link button opens, asking for the URL. */
   linkPrompt: string;
+  /**
+   * The editing area's accessible name when the field has no placeholder to
+   * lend it. Optional; the shipped packs carry it and the field falls back to
+   * the English one.
+   */
+  editorLabel?: string;
 }
 
 /**
@@ -124,6 +153,13 @@ export interface PhoneInputCopy {
   invalidNumber(countryName: string): string;
   /** Stands in for the country's name before one has been resolved. */
   unknownCountry: string;
+  /**
+   * A country's name in the picker and in `invalidNumber`, from its ISO 3166
+   * code and the English name the field ships. Optional: without it the
+   * English name is shown, as it always was. The pt-BR pack answers through
+   * `Intl.DisplayNames`, so every country the field lists is covered.
+   */
+  countryName?: (code: string, englishName: string) => string;
 }
 
 /**
@@ -151,6 +187,15 @@ export interface UploadButtonCopy {
   uploadInProgress(percent: number): string;
   /** The component's own error, announced. Takes the message it wraps. */
   errorAnnouncement(message: string): string;
+  /**
+   * The two errors the control raises itself. Optional so a host's existing
+   * pack keeps compiling; the shipped packs carry both and the control falls
+   * back to the English one.
+   */
+  /** A file over `maxSizeMB`. */
+  fileTooLarge?: (maxSizeMB: number) => string;
+  /** `onUpload` rejected with something that is not an `Error`. */
+  uploadFailed?: string;
 }
 
 /**

@@ -152,6 +152,7 @@ export const Badge = React.forwardRef<View, BadgeProps>((rawProps, ref) => {
     invisible,
     closable,
     onClose,
+    closeLabel,
     icon,
     children,
     style,
@@ -196,6 +197,7 @@ export const Badge = React.forwardRef<View, BadgeProps>((rawProps, ref) => {
               content={content}
               idFor={idFor}
               onClose={zoom.close}
+              closeLabel={closeLabel}
             />
           </Animated.View>
         </View>

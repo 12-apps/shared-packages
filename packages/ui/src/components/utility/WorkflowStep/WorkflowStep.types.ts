@@ -1,6 +1,8 @@
 import type { ColorValue, SizeValue } from '../../../tokens/scales';
 import type { ComponentProps } from 'react';
 
+import type { WorkflowStepLabels } from '../../../copy/labels';
+
 /**
  * Status of an individual workflow step
  */
@@ -78,6 +80,12 @@ export interface WorkflowStepProps extends Omit<ComponentProps<'div'>, 'onError'
   onStepClick?: (stepIndex: number, step: WorkflowStepItem) => void;
   /** Disable all interactions */
   disabled?: boolean;
+  /**
+   * The indicators' accessible names and the progressbar's value text. Any key
+   * left out keeps its English wording; a host passes
+   * `UI_LABELS[locale].workflowStep`.
+   */
+  labels?: Partial<WorkflowStepLabels>;
   /** Additional CSS class names */
   className?: string;
   /** Inline styles */
@@ -106,6 +114,8 @@ export interface StepIndicatorProps {
   animated: boolean;
   disabled: boolean;
   onClick?: (index: number, step: WorkflowStepItem) => void;
+  /** Names the indicator; English when omitted. */
+  labels?: Partial<WorkflowStepLabels>;
   'data-testid'?: string;
 }
 

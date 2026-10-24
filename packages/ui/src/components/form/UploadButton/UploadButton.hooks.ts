@@ -2,6 +2,7 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 
 import type { UploadButtonProps, UploadButtonState } from './UploadButton.types';
+import { EN_US_UPLOAD_BUTTON_COPY } from '../../../en-US.form';
 
 /** The props {@link useUploadButton} reads — the component's own props. */
 type UploadButtonHookProps = UploadButtonProps;
@@ -27,15 +28,16 @@ type SetState = React.Dispatch<React.SetStateAction<UploadButtonState>>;
 function useFileValidator(
   maxSizeMB: number | undefined,
   validate: ((file: globalThis.File) => string | null) | undefined,
+  fileTooLarge: (maxSizeMB: number) => string,
 ): (file: globalThis.File) => string | null {
   return useCallback(
     (file: globalThis.File): string | null => {
       if (maxSizeMB && file.size > maxSizeMB * BYTES_PER_MB) {
-        return `File size must be less than ${maxSizeMB}MB`;
+        return fileTooLarge(maxSizeMB);
       }
       return validate ? validate(file) : null;
     },
-    [maxSizeMB, validate],
+    [maxSizeMB, validate, fileTooLarge],
   );
 }
 
@@ -50,6 +52,7 @@ function useUploadRunner(
   onUpload: ((file: globalThis.File) => Promise<void>) | undefined,
   externalUploading: boolean,
   setState: SetState,
+  uploadFailed: string,
 ): (file: globalThis.File) => Promise<void> {
   return useCallback(
     async (file: globalThis.File) => {
@@ -80,11 +83,11 @@ function useUploadRunner(
           ...prev,
           isUploading: false,
           uploadProgress: 0,
-          error: error instanceof Error ? error.message : 'Upload failed',
+          error: error instanceof Error ? error.message : uploadFailed,
         }));
       }
     },
-    [onUpload, externalUploading, setState],
+    [onUpload, externalUploading, setState, uploadFailed],
   );
 }
 
@@ -106,6 +109,7 @@ interface UploadSelectionOptions {
   onUpload?: (file: globalThis.File) => Promise<void>;
   externalUploading: boolean;
   validateFile: (file: globalThis.File) => string | null;
+  uploadFailed: string;
 }
 
 /**
@@ -121,9 +125,10 @@ function useUploadSelection({
   onUpload,
   externalUploading,
   validateFile,
+  uploadFailed,
 }: UploadSelectionOptions): UploadSelection {
   const [state, setState] = useState<UploadButtonState>(INITIAL_STATE);
-  const runUpload = useUploadRunner(onUpload, externalUploading, setState);
+  const runUpload = useUploadRunner(onUpload, externalUploading, setState, uploadFailed);
 
   const selectOne = useCallback(
     (file: globalThis.File) => {
@@ -243,11 +248,15 @@ export function useUploadButton(props: UploadButtonHookProps): UploadButtonKit {
     helperText,
     errorText,
     disabled = false,
+    copy,
   } = props;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = `upload-button-${useId()}`;
-  const validateFile = useFileValidator(maxSizeMB, validate);
+  // The two errors the control raises itself: the host's pack, else English.
+  const fileTooLarge = copy.fileTooLarge ?? EN_US_UPLOAD_BUTTON_COPY.fileTooLarge;
+  const uploadFailed = copy.uploadFailed ?? EN_US_UPLOAD_BUTTON_COPY.uploadFailed;
+  const validateFile = useFileValidator(maxSizeMB, validate, fileTooLarge);
   const { state, setDragOver, handleFiles } = useUploadSelection({
     onSelect,
     multiple,
@@ -255,6 +264,7 @@ export function useUploadButton(props: UploadButtonHookProps): UploadButtonKit {
     onUpload,
     externalUploading,
     validateFile,
+    uploadFailed,
   });
   const drag = useDragHandlers(disabled, setDragOver, handleFiles);
   const derived = useDerivedUploadState({

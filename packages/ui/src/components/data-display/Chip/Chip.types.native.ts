@@ -24,5 +24,7 @@ export type { ChipBaseProps, ChipColor, ChipSize, ChipVariant } from './Chip.bas
 export type ChipProps = ChipBaseProps &
   Omit<PressableProps, keyof ChipBaseProps | 'style' | 'onPress'> & {
     onPress?: (event: GestureResponderEvent) => void;
+    /** The delete button's accessible name; defaults to `UI_LABELS['en-US'].common.delete`. */
+    deleteLabel?: string;
     style?: StyleProp<ViewStyle>;
   };

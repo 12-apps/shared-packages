@@ -44,12 +44,31 @@ export interface MapPreviewCopy {
   mapType: string;
   fullscreen: string;
   search: string;
+  /**
+   * Everything below is optional so a host's existing pack keeps compiling; the
+   * shipped packs always carry it and the component falls back to the English one.
+   */
+  /** The search field's placeholder, unless the `searchPlaceholder` prop wins. */
+  searchPlaceholder?: string;
+  /** The map's accessible name, read again whenever the view moves. */
+  viewDescription?: (lat: string, lng: string, zoom: number) => string;
+  /** The map-type button's tooltip, given the type's name from `mapTypeNames`. */
+  mapTypeTitle?: (name: string) => string;
+  mapTypeNames?: { roadmap: string; satellite: string; hybrid: string; terrain: string };
+  /** The marker caption under the map: coordinates, then the zoom level. */
+  coordinates?: (lat: string, lng: string) => string;
+  zoomLevel?: (zoom: number) => string;
 }
 
 /** The carousel's two arrows, which carry a glyph and nothing else. */
 export interface CarouselCopy {
   previous: string;
   next: string;
+  /**
+   * Each indicator's accessible name, from its 1-based position. Optional so a
+   * host's existing pack keeps compiling; the shipped packs always carry it.
+   */
+  goToSlide?: (position: number) => string;
 }
 
 /** The request-timing diagram's own words: its region, its phases, its totals. */

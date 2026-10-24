@@ -294,7 +294,7 @@ function buttonLook(theme: UiTheme, props: ResolvedProps): ButtonLook {
 export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
   const resolved = resolveButtonProps(rawProps);
   // `ripple` is web-only: kept out of `others` so it never reaches the Pressable (see overflowOf).
-  const { loading, icon, iconPosition, pulse, ripple: _ripple, children, onClick, onPress, ...others } = resolved;
+  const { loading, loadingLabel, icon, iconPosition, pulse, ripple: _ripple, children, onClick, onPress, ...others } = resolved;
   const theme = useUiTheme();
   const look = buttonLook(theme, resolved);
 
@@ -336,7 +336,7 @@ export const Button = React.forwardRef<View, ButtonProps>((rawProps, ref) => {
         {children}
       </Label>
       {iconPosition === 'right' ? iconNode : null}
-      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} /> : null}
+      {loading ? <Spinner color={look.label.color as string} testID={idFor('loading')} label={loadingLabel} /> : null}
     </Pressable>
   );
 });

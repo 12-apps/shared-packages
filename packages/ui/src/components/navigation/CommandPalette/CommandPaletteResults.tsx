@@ -1,3 +1,5 @@
+import { EN_US_COMMAND_PALETTE_COPY } from '../../../en-US.navigation';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import RecentIcon from '@mui/icons-material/History';
 import Box from '@mui/material/Box/index.js';
 import Divider from '@mui/material/Divider/index.js';
@@ -128,7 +130,7 @@ export const PaletteResults: React.FC<{
     return (
       <NoResults data-testid={`${dataTestId}-no-results`}>
         <Typography variant="body2" color="text.secondary">
-          No commands found for "{searchQuery}"
+          {resolveLabels(EN_US_COMMAND_PALETTE_COPY, copy).noCommandsFound(searchQuery)}
         </Typography>
         <Typography variant="caption" color="text.disabled" sx={{ mt: 1 }}>
           {copy.tryAnotherTerm}
