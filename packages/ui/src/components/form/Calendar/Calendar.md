@@ -119,7 +119,8 @@ export interface CalendarProps {
 ### Width
 
 - The day grid is fluid: seven `minmax(0, 1fr)` columns, each day a square that fills its column up to 40 design px.
-- A month takes the room it is given, up to 304 design px (7 × 40 + 6 × 4). Side by side, months keep a 280 basis and wrap.
+- A month takes the room it is given, up to 304 design px (7 × 40 + 6 × 4). Side by side, months wrap rather than squeeze, at the same width as before.
+- A custom `renderDay` element is the grid item, so it is held to its column: keep it within 40 design px or it overlaps the next day.
 - So a one-month calendar fits a 320 bottom sheet and a 390 `Dialog` with no consumer CSS (FUT-3861). Pinned by the `FitsA320Sheet` and `FitsA390Dialog` stories in `DateRangePicker.test.stories.tsx`.
 
 ### Navigation

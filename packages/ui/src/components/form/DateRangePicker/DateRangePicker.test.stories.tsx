@@ -187,11 +187,18 @@ const fitsIn = (width: number): Story => ({
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const box = canvas.getByTestId('drp-box').getBoundingClientRect();
+    const picker = canvas.getByTestId(TEST_ID);
     const grid = canvas.getByTestId('calendar-grid');
 
-    // Every day, the last column included, ends inside the box.
+    // The picker itself fits the box...
+    await expect(picker.getBoundingClientRect().right).toBeLessThanOrEqual(box.right);
+    // ...and every day, the last column included, ends inside its CONTENT
+    // edge. Against the box alone the 390 case passed on the old grid too: the
+    // 304px floor spilled only into the picker's own right padding.
+    const contentRight =
+      picker.getBoundingClientRect().right - parseFloat(getComputedStyle(picker).paddingRight);
     const rights = Array.from(grid.children, (cell) => cell.getBoundingClientRect().right);
-    await expect(Math.max(...rights)).toBeLessThanOrEqual(box.right);
+    await expect(Math.max(...rights)).toBeLessThanOrEqual(contentRight + 0.5);
     // ...and the days give way only as far as the box needs: they stay
     // readable, never collapsing to a sliver.
     const widths = Array.from(grid.children, (cell) => cell.getBoundingClientRect().width);
