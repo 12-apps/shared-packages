@@ -228,7 +228,7 @@ export const RESOURCE_ASSIGNMENT_GRANT_SELECT = {
   validTo: true,
 } as const;
 
-export interface ResourceAssignmentGrantRow {
+interface ResourceAssignmentGrantRow {
   resourceType: string;
   resourceId: string;
   clientId: string | null;
