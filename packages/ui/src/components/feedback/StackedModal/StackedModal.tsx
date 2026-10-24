@@ -9,6 +9,7 @@ import { modalAriaIds, ModalPanelContents, resolveModalContent } from './Stacked
 import type { PanelStyleProps } from './StackedModal.styles';
 import { dialogRootStyles, STYLE_ONLY_PROPS } from './StackedModal.styles';
 import type { StackedModalProps } from './StackedModal.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 const StyledDialog = styled(Dialog, {
   shouldForwardProp: (prop) => !STYLE_ONLY_PROPS.includes(prop as string),
@@ -32,7 +33,7 @@ const DEFAULTS: Partial<StackedModalProps> = {
   closeOnClickOutside: true,
   closeOnEsc: true,
   loading: false,
-  loadingText: 'Loading...',
+  loadingText: EN_US_UI_LABELS.stackedModal.loading,
   maxWidth: false,
   disableBackdrop: false,
   disableFocusTrap: false,

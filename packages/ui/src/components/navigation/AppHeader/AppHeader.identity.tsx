@@ -9,6 +9,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { rem, sxRem } from '../../../tokens/relative';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { accentFor, type SizeValue } from '../../../tokens/scales';
 
 import { AppHeaderBrand } from './AppHeader.brand';
@@ -215,7 +216,7 @@ const IdentityText: React.FC<
           onClick={onDisclose}
           aria-haspopup="dialog"
           aria-expanded={disclosed}
-          aria-label={discloseLabel ?? `Detalhes de ${title}`}
+          aria-label={discloseLabel ?? EN_US_UI_LABELS.appHeader.disclose(title)}
           sx={discloseSx}
         >
           {name}

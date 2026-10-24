@@ -13,6 +13,7 @@ import { GROUP_MAX, GROUP_OVERLAP, GROUP_HOVER, BORDER_WIDTH } from './Avatar.me
 import type { AvatarProps, ContentType } from './Avatar.types';
 import { rem } from '../../../tokens/relative';
 import { AvatarView, type AvatarViewProps } from './Avatar.view';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 /** The node behind the winning content slot; the pick itself is shared. */
 function resolveContent(args: {
@@ -141,7 +142,7 @@ function useAvatarModel(raw: AvatarProps, ref: React.Ref<HTMLDivElement>): Avata
     clickable: interactive || !!onClick,
     imgSrc: imageError ? undefined : src,
     alt,
-    ariaLabel: (rest['aria-label'] as string) || alt || 'Avatar',
+    ariaLabel: (rest['aria-label'] as string) || alt || EN_US_UI_LABELS.avatar.name,
     content,
     contentType,
     className,

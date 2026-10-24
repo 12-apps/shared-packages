@@ -8,6 +8,7 @@
  * {@link DateRangeStatus} and keeps its own confirm button shut.
  */
 import { isoToMasked } from '../../data-display/DataViews/data-views-day-input';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 import { dayCount, isAfterDay } from './DateRangePicker.dates';
 import type {
@@ -66,7 +67,7 @@ export function defaultMessages(): DateRangePickerMessages {
     reversed: 'The end date must be on or after the start date.',
     overMax: ({ maxRangeDays }) => `Choose a range of at most ${maxRangeDays} days.`,
     summary: ({ from, to }) => `${isoToMasked(from, dayMask)} – ${isoToMasked(to, dayMask)}`,
-    calendarLabel: 'Calendar',
+    calendarLabel: EN_US_UI_LABELS.dateRangePicker.calendar,
     dayMask,
   };
 }

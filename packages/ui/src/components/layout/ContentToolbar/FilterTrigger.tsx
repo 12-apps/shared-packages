@@ -28,7 +28,7 @@ export function FilterTrigger({
   onOpenChange,
   hasActiveFilters = false,
   activeCount = 0,
-  label = 'Filtros',
+  label = EN_US_UI_LABELS.contentToolbar.filters,
   openFiltersLabel,
   closeFiltersLabel,
   'data-testid': testId = 'toggle-filters-btn',

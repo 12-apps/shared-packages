@@ -25,6 +25,7 @@ import {
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
 import { resolveTestId } from '../../../platform/test-id';
 import { rem, sxRem } from '../../../tokens/relative';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -108,7 +109,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
     message,
     title,
     onRetry,
-    retryLabel = 'Retry',
+    retryLabel = EN_US_UI_LABELS.errorState.retry,
     severity = 'error',
     icon,
     className,

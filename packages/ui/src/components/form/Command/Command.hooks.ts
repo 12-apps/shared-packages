@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CommandItem, CommandProps } from './Command.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 type CommandDefaultedKeys =
   | 'open'
@@ -27,7 +28,7 @@ type ResolvedCommandProps = CommandProps &
 const COMMAND_DEFAULTS: Pick<CommandProps, CommandDefaultedKeys> = {
   open: false,
   items: [],
-  placeholder: 'Type a command or search...',
+  placeholder: EN_US_UI_LABELS.command.placeholder,
   value: '',
   variant: 'default',
   size: 'md',
@@ -36,7 +37,7 @@ const COMMAND_DEFAULTS: Pick<CommandProps, CommandDefaultedKeys> = {
   pulse: false,
   loading: false,
   disabled: false,
-  emptyMessage: 'No results found',
+  emptyMessage: EN_US_UI_LABELS.command.empty,
   showCategories: true,
   showShortcuts: true,
   showDescriptions: true,

@@ -28,6 +28,7 @@ import {
 import type { EmptyStateProps, EmptyStateVariant } from './EmptyState.types';
 import { resolveTestId } from '../../../platform/test-id';
 import { rem, sxRem } from '../../../tokens/relative';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 /** The shared action list names its glyph; the web draws it with MUI's icon. */
 const ACTION_ICONS: Record<ActionIconName, React.ReactNode> = {
@@ -165,8 +166,8 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo((props) => {
     description,
     illustration,
     helpLink,
-    refreshLabel = 'Refresh',
-    createLabel = 'Create New',
+    refreshLabel = EN_US_UI_LABELS.emptyState.refresh,
+    createLabel = EN_US_UI_LABELS.emptyState.create,
     className,
   } = props;
   const theme = useTheme();

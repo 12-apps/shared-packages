@@ -73,7 +73,7 @@ export const BasicInteraction: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    const disclosure = canvas.getByRole('button', { name: 'Future Drink details' });
     await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
 
     await userEvent.click(disclosure);
@@ -115,7 +115,7 @@ export const KeyboardNavigation: Story = {
   render: () => <Storefront presentation="dialog" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    const disclosure = canvas.getByRole('button', { name: 'Future Drink details' });
 
     // Tab rather than `.focus()`: this asserts the bar's real tab order, and the
     // identity is the first thing in it.
@@ -148,7 +148,7 @@ export const ScreenReader: Story = {
     await expect(canvas.getByRole('img', { name: 'Future Drink' })).toBeInTheDocument();
 
     // The disclosure announces what it is and what it does.
-    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    const disclosure = canvas.getByRole('button', { name: 'Future Drink details' });
     await expect(disclosure).toHaveAttribute('aria-haspopup', 'dialog');
 
     // The state line reads as a sentence: the separator is punctuation, and the
@@ -163,7 +163,7 @@ export const FocusManagement: Story = {
   render: () => <Storefront presentation="dialog" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const disclosure = canvas.getByRole('button', { name: 'Detalhes de Future Drink' });
+    const disclosure = canvas.getByRole('button', { name: 'Future Drink details' });
 
     await userEvent.click(disclosure);
 
@@ -186,7 +186,7 @@ export const ResponsiveDesign: Story = {
     // Both presentations render the same body, so a caller switching between
     // them never loses content.
     const canvas = within(canvasElement);
-    const [sheetDisclosure] = canvas.getAllByRole('button', { name: 'Detalhes de Future Drink' });
+    const [sheetDisclosure] = canvas.getAllByRole('button', { name: 'Future Drink details' });
     await userEvent.click(sheetDisclosure as HTMLElement);
     await waitFor(() => expect(document.querySelector('.MuiDrawer-root')).toBeInTheDocument());
   },
@@ -341,7 +341,7 @@ export const Integration: Story = {
     const canvas = within(canvasElement);
     const panel = within(document.body);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Detalhes de Future Drink' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Future Drink details' }));
 
     // Every row the caller passed reaches the panel, address newline included.
     await waitFor(() => expect(panel.getByText('Aberto até 22h')).toBeInTheDocument());

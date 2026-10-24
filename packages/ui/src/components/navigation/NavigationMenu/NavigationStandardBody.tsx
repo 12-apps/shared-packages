@@ -47,7 +47,7 @@ const CollapseControl: FC<{
 }> = ({
   collapsed,
   label = EN_US_UI_LABELS.navigationMenu.collapse,
-  expandLabel = EN_US_UI_LABELS.navigationMenu.expand ?? 'Expand',
+  expandLabel = EN_US_UI_LABELS.navigationMenu.expand,
   onToggle,
 }) => (
   // Collapsed, the control is its icon alone, so the name has to be given.

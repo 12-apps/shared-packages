@@ -87,7 +87,7 @@ export interface AppHeaderIdentityProps
   onDisclose?: () => void;
   /** Whether the panel `onDisclose` opens is currently open (`aria-expanded`). */
   disclosed?: boolean;
-  /** Accessible name of the disclosure. @default `Detalhes de {title}` */
+  /** Accessible name of the disclosure. @default `{title} details` (`UI_LABELS[locale].appHeader.disclose`) */
   discloseLabel?: string;
   /**
    * The identity is still being resolved — hold a skeleton the size of the real

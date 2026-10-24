@@ -1,3 +1,4 @@
+import type { LoadingStateLabels } from '../../../copy/labels';
 import type { SizeValue } from '../../../tokens/vocabulary';
 
 /**
@@ -21,6 +22,13 @@ export interface LoadingStateBaseProps {
    * Optional message to display below the loading indicator
    */
   message?: string;
+
+  /**
+   * The accessible name while no `message` is given, per variant. Optional: a
+   * host that names nothing hears "Loading content" / "Loading", as it always
+   * did; a pt-BR host passes `UI_LABELS['pt-BR'].loadingState`.
+   */
+  labels?: Partial<LoadingStateLabels>;
 
   /**
    * Size of the loading indicator

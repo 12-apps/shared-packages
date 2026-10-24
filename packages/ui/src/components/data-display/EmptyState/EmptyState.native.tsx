@@ -39,6 +39,7 @@ import { alpha } from '../../../tokens/color';
 import { MUI_FONT_WEIGHT_MEDIUM, MUI_TYPE, muiTypeStyle } from '../../../tokens/mui-type';
 import type { UiTheme } from '../../../tokens/theme';
 import { Button } from '../../form/Button/Button.native';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 /** MUI's `h6` as an `h3`, medium weight, in the body ink, wrapping at 400px. */
 export function titleStyle(theme: UiTheme): TextStyle {
@@ -207,8 +208,8 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(function EmptySt
     description,
     illustration,
     helpLink,
-    refreshLabel = 'Refresh',
-    createLabel = 'Create New',
+    refreshLabel = EN_US_UI_LABELS.emptyState.refresh,
+    createLabel = EN_US_UI_LABELS.emptyState.create,
     primaryAction: _primary,
     secondaryAction: _secondary,
     onCreate: _onCreate,

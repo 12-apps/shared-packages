@@ -61,9 +61,14 @@ export const EN_US_UI_LABELS: UiLabels = {
     listView: "List View",
     openFilters: "Open filters",
     closeFilters: "Close filters",
+    filters: "Filters",
+    all: "All",
+    search: "Search…",
+    noResults: "No results",
   },
   dashboard: {
     breadcrumb: "breadcrumb",
+    moreFilters: "More filters",
   },
   navigationMenu: {
     collapse: "Collapse",
@@ -72,5 +77,70 @@ export const EN_US_UI_LABELS: UiLabels = {
   workflowStep: {
     step: (position, title) => `Step ${position}: ${title}`,
     progress: (position, total) => `Step ${position} of ${total}`,
+  },
+  alertDialog: {
+    cancel: "Cancel",
+    confirm: "Confirm",
+  },
+  avatar: {
+    name: "Avatar",
+  },
+  emptyState: {
+    refresh: "Refresh",
+    create: "Create New",
+  },
+  errorState: {
+    retry: "Retry",
+  },
+  loadingState: {
+    skeleton: "Loading content",
+    spinner: "Loading",
+  },
+  stackedModal: {
+    loading: "Loading...",
+  },
+  command: {
+    placeholder: "Type a command or search...",
+    empty: "No results found",
+    loading: "Loading...",
+  },
+  formErrorSnackbar: {
+    message: "Please fix the highlighted fields and try again.",
+  },
+  columnsMenu: {
+    title: "Columns",
+    toggle: "Toggle columns",
+  },
+  drawer: {
+    close: "Close drawer",
+  },
+  settingsLayout: {
+    navigation: "Settings",
+    searchPlaceholder: "Search settings",
+    emptySearch: "No settings match your search.",
+    back: "Back",
+  },
+  tableFilter: {
+    filters: "Filters",
+    keywordPlaceholder: "Press Enter to filter",
+    keywordLabel: "Filter by keyword",
+  },
+  appHeader: {
+    disclose: (title) => `${title} details`,
+  },
+  breadcrumbs: {
+    navigation: "breadcrumb navigation",
+  },
+  animatedIcon: {
+    name: (variant) => `Animated ${variant} icon`,
+  },
+  infiniteScroll: {
+    loadFailed: "An error occurred while loading more items",
+  },
+  socialLogin: {
+    title: "Sign in to continue",
+  },
+  dateRangePicker: {
+    calendar: "Calendar",
   },
 };

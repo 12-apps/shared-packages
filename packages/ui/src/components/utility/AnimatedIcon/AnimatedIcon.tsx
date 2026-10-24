@@ -4,6 +4,7 @@ import type { FC } from 'react';
 import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 import { iconSx, sizeConfigs } from './AnimatedIcon.styles';
 import type { IconStyleFlags } from './AnimatedIcon.styles';
@@ -61,7 +62,7 @@ export const AnimatedIcon: FC<AnimatedIconProps> = (props) => {
       className={className}
       style={style}
       role="img"
-      aria-label={ariaLabel || `Animated ${variant} icon`}
+      aria-label={ariaLabel || EN_US_UI_LABELS.animatedIcon.name(variant)}
       onClick={onClick}
       tabIndex={tabIndex}
       onFocus={onFocus}

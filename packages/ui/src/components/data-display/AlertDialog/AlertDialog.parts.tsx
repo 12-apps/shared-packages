@@ -11,6 +11,7 @@ import { styled, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { rem } from '../../../tokens/relative';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 import type { AlertDialogProps } from './AlertDialog.types';
 
@@ -107,8 +108,8 @@ const inSlotOrder = (
  */
 export function AlertDialogFooter({
   variant,
-  cancelText = 'Cancel',
-  confirmText = 'Confirm',
+  cancelText = EN_US_UI_LABELS.alertDialog.cancel,
+  confirmText = EN_US_UI_LABELS.alertDialog.confirm,
   showCancel = true,
   loading = false,
   confirmDisabled = false,
