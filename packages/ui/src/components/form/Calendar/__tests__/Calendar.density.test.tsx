@@ -17,7 +17,8 @@ describe("Calendar under a non-default type scale", () => {
     );
     const day = screen.getByTestId("calendar-date-5");
     // A square that fills its column up to 40 design px (FUT-3861).
-    expect(getComputedStyle(day).maxWidth).toBe(r(40));
+    expect(getComputedStyle(day).width).toBe(r(40));
+    expect(getComputedStyle(day).maxWidth).toBe("100%");
     expect(getComputedStyle(day).aspectRatio.replace(/\s/g, "")).toBe("1/1");
 
     const weekday = screen.getByTestId("calendar-weekday-0");

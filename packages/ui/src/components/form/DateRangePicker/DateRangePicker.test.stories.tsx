@@ -193,6 +193,10 @@ const fitsIn = (width: number): Story => ({
     // Every day, the last column included, ends inside the box.
     const rights = Array.from(grid.children, (cell) => cell.getBoundingClientRect().right);
     await expect(Math.max(...rights)).toBeLessThanOrEqual(box.right);
+    // ...and the days give way only as far as the box needs: they stay
+    // readable, never collapsing to a sliver.
+    const widths = Array.from(grid.children, (cell) => cell.getBoundingClientRect().width);
+    await expect(Math.min(...widths)).toBeGreaterThanOrEqual(30);
   },
 });
 

@@ -66,8 +66,11 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: '100%',
-  maxWidth: CELL_SIZE,
+  // 40 is the size it ASKS for, so the month's intrinsic width stays 304 and a
+  // shrink-wrapping parent (the picker is inline-flex) still sizes to it; the
+  // column's `minmax(0, 1fr)` and this `maxWidth` let it give way below that.
+  width: CELL_SIZE,
+  maxWidth: '100%',
   aspectRatio: '1 / 1',
   justifySelf: 'center',
   boxSizing: 'border-box',
