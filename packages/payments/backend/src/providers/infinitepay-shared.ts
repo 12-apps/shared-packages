@@ -1,6 +1,7 @@
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 import { NAME, type InfinitePayPaymentCheck } from './infinitepay-http';
 import { capturedAmountCents } from './shared';
+import { brLocalNumber } from '../core/customer-schema';
 
 /** The delivery body InfinitePay POSTs when a payment is approved. */
 export interface InfinitePayWebhookBody {
@@ -89,4 +90,15 @@ export function checkSnapshot(
     ...(Object.keys(hints).length > 0 ? { settlementHints: hints } : {}),
     raw: check,
   };
+}
+
+/**
+ * The buyer's phone as InfinitePay's page takes it: `+55` and the national
+ * digits, whatever shape the buyer typed it in (FUT-3955). A value that is not
+ * a Brazilian number goes as typed, so InfinitePay's own page still asks.
+ */
+export function infinitePayPhone(phone: string | null | undefined): string | undefined {
+  if (!phone) return undefined;
+  const local = brLocalNumber(phone);
+  return local !== null && (local.length === 10 || local.length === 11) ? `+55${local}` : phone;
 }

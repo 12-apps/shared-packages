@@ -34,7 +34,7 @@ import {
  * `infinitepay-stub.ts` for why that makes it inert on a live connection.
  */
 export { STUB_OUTCOME_FIELD } from './infinitepay-stub';
-import { checkSnapshot, isPaidCheck } from './infinitepay-shared';
+import { checkSnapshot, infinitePayPhone, isPaidCheck } from './infinitepay-shared';
 import { infinitePayDeliveryReference, parseInfinitePayEvent, verifyInfinitePayWebhook } from './infinitepay-webhook';
 import { chargeDescription, stubCharge, stubChargeId, stubPendingSnapshot } from './shared';
 import { stubFindChargeByReference } from './stub-fault';
@@ -124,7 +124,7 @@ function linkPayload(
     customer: {
       name: input.customer.name || undefined,
       email: input.customer.email || undefined,
-      phone_number: input.customer.phone || undefined,
+      phone_number: infinitePayPhone(input.customer.phone),
     },
     redirect_url: credentials.fields['redirectUrl'] || undefined,
     webhook_url: credentials.fields['notificationUrl'] || undefined,

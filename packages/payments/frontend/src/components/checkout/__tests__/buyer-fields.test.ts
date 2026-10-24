@@ -125,3 +125,37 @@ describe("whether one field is satisfied", () => {
     expect(fieldSatisfied(mobile, "11987654321")).toBe(true);
   });
 });
+
+describe("a phone in the buyer's own format (FUT-3955)", () => {
+  const mobile = { key: "phone" as const, type: "MOBILE" as const, required: true };
+  const phone = { key: "phone" as const, type: "PHONE" as const, required: true };
+
+  it.each([
+    "+5531994494408",
+    "+55 31 99449-4408",
+    "5531994494408",
+    "005531994494408",
+    "031994494408",
+    "0 31 99449-4408",
+    "(31) 99449-4408",
+    "31.99449.4408",
+    "31994494408",
+  ])("takes %s as a mobile", (value) => {
+    expect(fieldSatisfied(mobile, value)).toBe(true);
+  });
+
+  it("takes a landline with the country code or a trunk 0 where any phone will do", () => {
+    expect(fieldSatisfied(phone, "+55 31 3222-1100")).toBe(true);
+    expect(fieldSatisfied(phone, "031 3222-1100")).toBe(true);
+  });
+
+  it("still refuses what is not a Brazilian mobile", () => {
+    for (const value of ["+1 415 555 0100", "3199449440", "123", "+55 31 3222-1100"]) {
+      expect(fieldSatisfied(mobile, value), value).toBe(false);
+    }
+  });
+
+  it("keeps DDD 55 a DDD, not a country code", () => {
+    expect(fieldSatisfied(mobile, "55991234567")).toBe(true);
+  });
+});
