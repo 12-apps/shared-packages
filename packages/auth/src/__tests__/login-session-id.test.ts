@@ -64,3 +64,44 @@ describe("stable per-login session binding", () => {
     expect(renewed?.loginSessionId).toBeUndefined();
   });
 });
+
+describe("sign-in claims (FUT-3906)", () => {
+  it("stamps the host's claims once at sign-in and reads them back on every request", async () => {
+    const seen: { email: string; provider: string | null }[] = [];
+    const api = createApiAuth({
+      secret: CONFIG.secret,
+      authUrl: ORIGIN,
+      trustHost: true,
+      providers: [],
+      signInClaims: async (params) => {
+        seen.push(params);
+        return { uid: "db-user-1" };
+      },
+    });
+    const signedIn = await api.config.callbacks?.jwt?.({
+      token: {}, user: IDENTITY, account: { provider: "google" },
+    } as never);
+    expect(signedIn?.claims).toEqual({ uid: "db-user-1" });
+    expect(seen).toEqual([{ email: IDENTITY.email, provider: "google" }]);
+
+    // A renewal keeps them without asking the host again.
+    const renewed = await api.config.callbacks?.jwt?.({ token: signedIn } as never);
+    expect(renewed?.claims).toEqual({ uid: "db-user-1" });
+    expect(seen).toHaveLength(1);
+
+    const cookie = await encodeSessionToken(CONFIG, { ...IDENTITY, claims: { uid: "db-user-1" } });
+    const session = await api.auth(request(cookie));
+    expect(session?.claims).toEqual({ uid: "db-user-1" });
+  });
+
+  it("reads no claims from a session minted before them, nor anything that is not a string map", async () => {
+    const api = createApiAuth({ secret: CONFIG.secret, authUrl: ORIGIN, trustHost: true, providers: [] });
+    const legacy = await encode({ secret: CONFIG.secret, salt: COOKIE_NAME, token: { sub: IDENTITY.id, email: IDENTITY.email } });
+    expect((await api.auth(request(legacy)))?.claims).toEqual({});
+    const odd = await encode({
+      secret: CONFIG.secret, salt: COOKIE_NAME,
+      token: { sub: IDENTITY.id, email: IDENTITY.email, claims: { uid: 7, ok: "yes" } },
+    });
+    expect((await api.auth(request(odd)))?.claims).toEqual({ ok: "yes" });
+  });
+});

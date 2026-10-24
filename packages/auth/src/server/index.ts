@@ -88,6 +88,7 @@ export type { SessionTokenConfig, SessionTokenIdentity } from "./session-token";
 
 export { createApiAuth } from "../create-api-auth";
 export type { ApiAuth, ApiAuthConfig } from "../create-api-auth";
+export type { SignInClaims } from "../sign-in-claims";
 
 export { credentialsProvider } from "../credentials-provider";
 export type { CredentialsProviderConfig } from "../credentials-provider";
