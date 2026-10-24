@@ -170,3 +170,31 @@ export const ZoneDecidesWhichDayIsToday: Story = {
     await expect(canvas.getByTestId(`${TEST_ID}-from`)).toHaveValue('10/08/2026');
   },
 };
+
+// 6. The width (FUT-3861)
+
+/**
+ * The narrowest boxes a one-month picker lands in: a 320 bottom sheet (296px of
+ * content after its gutters) and a 390 `Dialog size="sm"` (327px). The day grid
+ * used to hold a 304px floor and cut Saturday off at both.
+ */
+const fitsIn = (width: number): Story => ({
+  render: () => (
+    <div data-testid="drp-box" style={{ width, overflow: 'hidden' }}>
+      <Harness numberOfMonths={1} quickRanges={[]} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const box = canvas.getByTestId('drp-box').getBoundingClientRect();
+    const grid = canvas.getByTestId('calendar-grid');
+
+    await expect(grid.scrollWidth).toBeLessThanOrEqual(grid.clientWidth);
+    // Every day, the last column included, ends inside the box.
+    const rights = Array.from(grid.children, (cell) => cell.getBoundingClientRect().right);
+    await expect(Math.max(...rights)).toBeLessThanOrEqual(box.right);
+  },
+});
+
+export const FitsA320Sheet: Story = fitsIn(296);
+export const FitsA390Dialog: Story = fitsIn(327);

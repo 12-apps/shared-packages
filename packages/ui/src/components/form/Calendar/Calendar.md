@@ -116,6 +116,12 @@ export interface CalendarProps {
 - Enforce `minRangeLength`/`maxRangeLength`. If invalid, ignore or snap (configurable via your handler).
 - Fire `onIntermediateRangeChange` as user hovers. Fire `onRangeChange` once both ends are chosen.
 
+### Width
+
+- The day grid is fluid: seven `minmax(0, 1fr)` columns, each day a square that fills its column up to 40 design px.
+- A month takes the room it is given, up to 304 design px (7 × 40 + 6 × 4). Side by side, months keep a 280 basis and wrap.
+- So a one-month calendar fits a 320 bottom sheet and a 390 `Dialog` with no consumer CSS (FUT-3861). Pinned by the `FitsA320Sheet` and `FitsA390Dialog` stories in `DateRangePicker.test.stories.tsx`.
+
 ### Navigation
 
 - Header buttons move month (or year with modifier keys if desired).

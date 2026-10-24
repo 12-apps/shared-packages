@@ -7,7 +7,11 @@ import { rem, sxRem } from '../../../tokens/relative';
 
 import type { DayRenderArgs } from './Calendar.types';
 
-/** A day cell's edge, 40 design px through the theme's type scale. */
+/**
+ * A day cell's LARGEST edge, 40 design px through the theme's type scale. The
+ * cell is a square that fills its grid column up to this size, so the month
+ * shrinks with its container instead of holding a fixed 304px floor (FUT-3861).
+ */
 const CELL_SIZE = sxRem(40);
 
 interface DayState extends DayRenderArgs {
@@ -62,8 +66,12 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: CELL_SIZE,
-  height: CELL_SIZE,
+  width: '100%',
+  maxWidth: CELL_SIZE,
+  aspectRatio: '1 / 1',
+  justifySelf: 'center',
+  boxSizing: 'border-box',
+  padding: 0,
   border: 'none',
   borderRadius: 1,
   cursor: day.disabled ? 'not-allowed' : 'pointer',

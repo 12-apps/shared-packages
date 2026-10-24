@@ -16,7 +16,16 @@ import { CalendarDayCell } from './CalendarDayCell';
 /** The nav spacer's width and the weekday row's height, 32 design px through the type scale. */
 const SPACER_WIDTH = sxRem(32);
 
-const GRID_SX = { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 } as const;
+// `minmax(0, 1fr)`, not `1fr`: a bare `1fr` keeps each column at least its
+// content's width, which is what held the grid at 304px (FUT-3861).
+const GRID_SX = { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 0.5 } as const;
+
+/**
+ * A month takes the room it is given, from nothing up to seven full cells and
+ * their gaps (7 × 40 + 6 × 4 design px). Months side by side keep a 280 basis,
+ * so a multi-month calendar still wraps rather than squeezing every month.
+ */
+const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
 
 // Only the outermost months carry arrows; the ones between get a spacer so their
 // titles stay centred.
@@ -112,7 +121,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
        January's 5th and February's. Without a per-month hook a test can only
        reach a day positionally, which is exactly what the flakiness gate
        refuses. Additive: `calendar-grid` below is unchanged. */
-    <Box sx={{ minWidth: sxRem(280) }} data-testid={`calendar-month-${monthIndex}`}>
+    <Box sx={MONTH_SX} data-testid={`calendar-month-${monthIndex}`}>
       <MonthNavHeader
         title={title}
         showPrevious={monthIndex === 0}
