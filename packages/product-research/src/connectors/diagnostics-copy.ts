@@ -139,8 +139,10 @@ export interface ManualImportCopy {
  * A connector's own failures that are not transport or config.
  * OPTIONAL on {@link ResearchDiagnosticsCopy} so a host's pack keeps compiling;
  * absent, the connectors fall back to the English sentences of
- * `EN_US_RESEARCH_DIAGNOSTICS`. Never carries a URL or a token: the reader is a
- * store owner, and the request detail goes to the logger.
+ * `EN_US_RESEARCH_DIAGNOSTICS`, which are the sentences this package always
+ * recorded. The unreachable reasons carry the failing request's URL and the
+ * manual store's carries its cause, as they always did: the reason on the
+ * source row is the only diagnosis an admin gets. Never a token.
  */
 export interface ConnectorFailureCopy {
   /** The search answered nothing; `url` is the request that failed. */
