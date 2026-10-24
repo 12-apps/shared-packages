@@ -62,20 +62,6 @@ export interface PaymentsClientOptions {
   fetchImpl?: typeof fetch;
 }
 
-/**
- * The sentence a failed request carries, rather than the response body.
- *
- * The body is a JSON envelope, and throwing it verbatim put
- * `{"error":"CredentialsError","message":"No platform OAuth application
- * credentials configured for stripe/SANDBOX"}` on a store owner's settings
- * screen, inside a red alert, as the entire explanation of why a button did
- * nothing. Unwrapping `message` is the floor: it is the only field written to
- * be read, and an error class name is never the owner's problem.
- *
- * That message may still be developer English — the surfaces that can do better
- * translate it (see `ProviderConnection`). This function's job is only to stop
- * shipping the envelope.
- */
 /** The gateway's error name in the body, if any — what a screen translates. */
 function failureCode(body: string): string | undefined {
   try {
@@ -90,6 +76,20 @@ function failureCode(body: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The sentence a failed request carries, rather than the response body.
+ *
+ * The body is a JSON envelope, and throwing it verbatim put
+ * `{"error":"CredentialsError","message":"No platform OAuth application
+ * credentials configured for stripe/SANDBOX"}` on a store owner's settings
+ * screen, inside a red alert, as the entire explanation of why a button did
+ * nothing. Unwrapping `message` is the floor: it is the only field written to
+ * be read, and an error class name is never the owner's problem.
+ *
+ * That message may still be developer English: the settings screens word a
+ * failure by its code instead (`failureCode`, `describeFailure`). This
+ * function's job is only to stop shipping the envelope.
+ */
 function failureMessage(body: string, status: number): string {
   const fallback = `Payments request failed (${status})`;
   if (!body) return fallback;

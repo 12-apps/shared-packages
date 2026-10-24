@@ -151,7 +151,7 @@ const searchByText = async (
 ): Promise<MappedResult> => {
   const url = buildTextSearchUrl(client.base, query, siteId);
   const payload = await client.get(url);
-  if (payload === null) return { ok: false, error: failures.mercadoLivreSearchUnreachable };
+  if (payload === null) return { ok: false, error: failures.mercadoLivreSearchUnreachable(url) };
   return { ok: true, mapped: mapSearchResults(payload, source, minReputationLevel) };
 };
 
@@ -222,7 +222,7 @@ const searchCatalogByEan = async (
   const url = `${client.base}/products/search?status=active&site_id=${encodeURIComponent(siteId)}&product_identifier=${encodeURIComponent(ean)}`;
   const payload = await client.get(url);
   if (payload === null) {
-    return { ok: false, error: failures.mercadoLivreCatalogUnreachable };
+    return { ok: false, error: failures.mercadoLivreCatalogUnreachable(url) };
   }
   const parsed = catalogSearchSchema.safeParse(payload);
   const ids = (parsed.success ? (parsed.data.results ?? []) : [])

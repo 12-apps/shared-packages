@@ -195,7 +195,7 @@ export function useCanonicalProviderSegment(
 /**
  * The settings view, loaded once and on `reload`. `failures` is passed in, not
  * read from context: this hook runs ABOVE the copy provider, at the mount
- *.
+ * point, so the provider's words are not reachable from here.
  */
 export function useSettingsState(client: PaymentsSettingsClient, failures: PaymentsFailureCopy) {
   const [view, setView] = useState<MerchantSettingsView | null>(null);

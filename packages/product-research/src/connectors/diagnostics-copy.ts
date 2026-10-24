@@ -143,11 +143,14 @@ export interface ManualImportCopy {
  * store owner, and the request detail goes to the logger.
  */
 export interface ConnectorFailureCopy {
-  mercadoLivreSearchUnreachable: string;
-  mercadoLivreCatalogUnreachable: string;
+  /** The search answered nothing; `url` is the request that failed. */
+  mercadoLivreSearchUnreachable(url: string): string;
+  /** The catalog lookup answered nothing; `url` is the request that failed. */
+  mercadoLivreCatalogUnreachable(url: string): string;
   /** No access token for the source — the host's Mercado Livre credentials. */
   mercadoLivreAuthFailed(sourceLabel: string): string;
-  manualStoreUnavailable: string;
+  /** The manual price store threw; `cause` is its message. */
+  manualStoreUnavailable(cause: string): string;
   /** No connector registered for the source's type. */
   noConnector(sourceType: string): string;
 }

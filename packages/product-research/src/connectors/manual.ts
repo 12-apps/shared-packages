@@ -74,10 +74,9 @@ export const createManualConnector = (store: ManualPriceStore): PriceSourceConne
       });
       return { ok: true, offers: entries.map((entry) => toRawOffer(entry, source)) };
     } catch (error) {
-      ctx.logger.warn('manual price store unavailable', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return { ok: false, error: connectorFailuresOf(ctx).manualStoreUnavailable };
+      const cause = error instanceof Error ? error.message : String(error);
+      ctx.logger.warn('manual price store unavailable', { error: cause });
+      return { ok: false, error: connectorFailuresOf(ctx).manualStoreUnavailable(cause) };
     }
   },
 });

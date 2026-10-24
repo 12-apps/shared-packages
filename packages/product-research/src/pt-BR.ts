@@ -171,11 +171,13 @@ export const PT_BR_RESEARCH_DIAGNOSTICS: ResearchDiagnosticsCopy = {
       'respondendo devagar demais para esta pesquisa.',
   },
   connectors: {
-    mercadoLivreSearchUnreachable: 'Busca do Mercado Livre indisponível',
-    mercadoLivreCatalogUnreachable: 'Catálogo do Mercado Livre indisponível',
+    // The request or the cause rides along, as in English: the reason is the
+    // only diagnosis an admin gets on the source row.
+    mercadoLivreSearchUnreachable: (url) => `Busca do Mercado Livre indisponível: ${url}`,
+    mercadoLivreCatalogUnreachable: (url) => `Catálogo do Mercado Livre indisponível: ${url}`,
     mercadoLivreAuthFailed: (sourceLabel) =>
       `Falha de autenticação no Mercado Livre para "${sourceLabel}": verifique as credenciais`,
-    manualStoreUnavailable: 'Tabela de preços manual indisponível',
+    manualStoreUnavailable: (cause) => `Tabela de preços manual indisponível: ${cause}`,
     noConnector: (sourceType) => `Nenhum conector disponível para ${sourceType}`,
   },
 };

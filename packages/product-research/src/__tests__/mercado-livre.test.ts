@@ -315,7 +315,7 @@ describe('mercadoLivreConnector', () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe(PT_BR_RESEARCH_DIAGNOSTICS.connectors!.mercadoLivreSearchUnreachable);
+    if (!result.ok) expect(result.error).toMatch(/^Busca do Mercado Livre indisponível: https:/);
   });
 
   it('degrades on missing credentials without ever fetching', async () => {
