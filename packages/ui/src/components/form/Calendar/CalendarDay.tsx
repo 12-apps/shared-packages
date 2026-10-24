@@ -7,7 +7,11 @@ import { rem, sxRem } from '../../../tokens/relative';
 
 import type { DayRenderArgs } from './Calendar.types';
 
-/** A day cell's edge, 40 design px through the theme's type scale. */
+/**
+ * A day cell's LARGEST edge, 40 design px through the theme's type scale. The
+ * cell is a square that fills its grid column up to this size, so the month
+ * shrinks with its container instead of holding a fixed 304px floor (FUT-3861).
+ */
 const CELL_SIZE = sxRem(40);
 
 interface DayState extends DayRenderArgs {
@@ -62,8 +66,15 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  // 40 is the size it ASKS for, so the month's intrinsic width stays 304 and a
+  // shrink-wrapping parent (the picker is inline-flex) still sizes to it; the
+  // column's `minmax(0, 1fr)` and this `maxWidth` let it give way below that.
   width: CELL_SIZE,
-  height: CELL_SIZE,
+  maxWidth: '100%',
+  aspectRatio: '1 / 1',
+  justifySelf: 'center',
+  boxSizing: 'border-box',
+  padding: 0,
   border: 'none',
   borderRadius: 1,
   cursor: day.disabled ? 'not-allowed' : 'pointer',

@@ -170,3 +170,41 @@ export const ZoneDecidesWhichDayIsToday: Story = {
     await expect(canvas.getByTestId(`${TEST_ID}-from`)).toHaveValue('10/08/2026');
   },
 };
+
+// 6. The width (FUT-3861)
+
+/**
+ * The narrowest boxes a one-month picker lands in: a 320 bottom sheet (296px of
+ * content after its gutters) and a 390 `Dialog size="sm"` (327px). The day grid
+ * used to hold a 304px floor and cut Saturday off at both.
+ */
+const fitsIn = (width: number): Story => ({
+  render: () => (
+    <div data-testid="drp-box" style={{ width, overflow: 'hidden' }}>
+      <Harness numberOfMonths={1} quickRanges={[]} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const box = canvas.getByTestId('drp-box').getBoundingClientRect();
+    const picker = canvas.getByTestId(TEST_ID);
+    const grid = canvas.getByTestId('calendar-grid');
+
+    // The picker itself fits the box...
+    await expect(picker.getBoundingClientRect().right).toBeLessThanOrEqual(box.right);
+    // ...and every day, the last column included, ends inside its CONTENT
+    // edge. Against the box alone the 390 case passed on the old grid too: the
+    // 304px floor spilled only into the picker's own right padding.
+    const contentRight =
+      picker.getBoundingClientRect().right - parseFloat(getComputedStyle(picker).paddingRight);
+    const rights = Array.from(grid.children, (cell) => cell.getBoundingClientRect().right);
+    await expect(Math.max(...rights)).toBeLessThanOrEqual(contentRight + 0.5);
+    // ...and the days give way only as far as the box needs: they stay
+    // readable, never collapsing to a sliver.
+    const widths = Array.from(grid.children, (cell) => cell.getBoundingClientRect().width);
+    await expect(Math.min(...widths)).toBeGreaterThanOrEqual(30);
+  },
+});
+
+export const FitsA320Sheet: Story = fitsIn(296);
+export const FitsA390Dialog: Story = fitsIn(327);
