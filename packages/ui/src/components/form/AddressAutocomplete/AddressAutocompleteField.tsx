@@ -51,6 +51,7 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       onInputChange={handleInputChange}
       onChange={handleSelect}
       loading={loading}
+      loadingText={text.loadingSuggestions}
       disabled={disabled}
       fullWidth={fullWidth}
       getOptionLabel={addressOptionLabel}

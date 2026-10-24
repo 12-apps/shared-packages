@@ -113,6 +113,13 @@ export interface NavigationMenuProps {
    * @default "Collapse" — a host passes `UI_LABELS[locale].navigationMenu.collapse`.
    */
   collapseLabel?: string;
+
+  /**
+   * The collapse control's accessible name while the menu is collapsed, when it
+   * shows only its icon (vertical, `collapsible` only).
+   * @default "Expand" — a host passes `UI_LABELS[locale].navigationMenu.expand`.
+   */
+  expandLabel?: string;
   
   /**
    * Custom logo/brand element

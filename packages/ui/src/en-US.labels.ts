@@ -67,6 +67,7 @@ export const EN_US_UI_LABELS: UiLabels = {
   },
   navigationMenu: {
     collapse: "Collapse",
+    expand: "Expand",
   },
   workflowStep: {
     step: (position, title) => `Step ${position}: ${title}`,

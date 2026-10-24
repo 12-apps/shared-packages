@@ -22,6 +22,7 @@ export const PT_BR_ADDRESS_AUTOCOMPLETE_COPY: Required<AddressAutocompleteCopy> 
   placeholder: "Digite um endereço",
   typeToSearch: "Digite ao menos 3 caracteres",
   noAddressesFound: "Nenhum endereço encontrado",
+  loadingSuggestions: "Carregando…",
   mapsApiLoadFailed: "Não foi possível carregar o mapa",
   mapsServicesInitFailed: "Não foi possível iniciar o mapa",
   fetchSuggestionsFailed: "Não foi possível buscar sugestões de endereço",
@@ -113,6 +114,9 @@ export const PT_BR_PHONE_INPUT_COPY: Required<PhoneInputCopy> = {
   invalidNumber: (countryName) => `Telefone inválido para ${countryName}`,
   unknownCountry: "o país selecionado",
   countryName: (code, englishName) => ptBrCountryName(code) ?? englishName,
+  label: "Telefone",
+  // 92px: the input beside the country picker is 95px wide on a 320 screen.
+  placeholder: "Seu número",
 };
 
 export const PT_BR_UPLOAD_BUTTON_COPY: Required<UploadButtonCopy> = {

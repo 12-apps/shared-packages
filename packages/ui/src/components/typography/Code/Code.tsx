@@ -4,6 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
 import Tooltip from '@mui/material/Tooltip/index.js';
 import { alpha, styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import React, { useState } from 'react';
 
@@ -11,15 +12,24 @@ import type { CodeProps } from './Code.types';
 import { modeInk, neutralTones } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 
+/**
+ * The badge's inset, its own height (12px type at the block's 1.5 line height,
+ * 2px padding and a 1px border, each twice) and a gap of the same inset again.
+ */
+const languageClearance = (theme: Theme): string =>
+  `calc(${theme.spacing(2)} + ${rem(theme, 12 * 1.5 + 4 + 2)})`;
+
 const StyledCodeContainer = styled(Box, {
   shouldForwardProp: (prop) =>
-    !['customVariant', 'customSize', 'copyable'].includes(prop as string),
+    !['customVariant', 'customSize', 'copyable', 'labelled'].includes(prop as string),
 })<{
   customVariant?: string;
   customSize?: string;
   copyable?: boolean;
+  /** A language badge sits in the top-left corner. */
+  labelled?: boolean;
   component?: React.ElementType;
-}>(({ theme, customVariant = 'inline', customSize = 'md', copyable }) => {
+}>(({ theme, customVariant = 'inline', customSize = 'md', copyable, labelled }) => {
   // Size mapping
   const sizeMap = {
     xs: { fontSize: rem(theme, 12), padding: rems(theme, 2, 4) },
@@ -88,7 +98,11 @@ const StyledCodeContainer = styled(Box, {
     },
   };
 
-  return variantStyles[customVariant as keyof typeof variantStyles] || variantStyles.inline;
+  return {
+    ...(variantStyles[customVariant as keyof typeof variantStyles] || variantStyles.inline),
+    // The first line starts below the language badge rather than under it.
+    ...(labelled && { paddingTop: languageClearance(theme) }),
+  };
 });
 
 const StyledCode = styled('code')({
@@ -249,6 +263,7 @@ export const Code = React.forwardRef<HTMLElement, CodeProps>(
         customVariant={variant}
         customSize={size}
         copyable={showCopy}
+        labelled={showLanguage}
         {...props}
       >
         {showLanguage && <LanguageLabel>{language}</LanguageLabel>}

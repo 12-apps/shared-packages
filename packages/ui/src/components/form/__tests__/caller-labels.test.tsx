@@ -14,8 +14,11 @@ import {
   EN_US_UPLOAD_BUTTON_COPY,
 } from '../../../en-US.form';
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
-import { PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR.form';
+import { PT_BR_ADDRESS_AUTOCOMPLETE_COPY, PT_BR_PHONE_INPUT_COPY } from '../../../pt-BR.form';
 import { AddressAutocomplete } from '../AddressAutocomplete';
+import { resolveAddressProps } from '../AddressAutocomplete/AddressAutocomplete.helpers';
+import { AddressAutocompleteField } from '../AddressAutocomplete/AddressAutocompleteField';
+import type { AddressAutocompleteCopy } from '../../../copy';
 import { PhoneInput } from '../PhoneInput';
 import { RichTextEditor } from '../RichTextEditor';
 import { TextareaRichEditor } from '../Textarea/TextareaRichEditor';
@@ -108,6 +111,44 @@ describe('PhoneInput countries', () => {
   });
 });
 
+describe('PhoneInput label and placeholder', () => {
+  const olderPhoneCopy = () => {
+    const { label: _label, placeholder: _placeholder, ...older } = EN_US_PHONE_INPUT_COPY;
+    return older;
+  };
+
+  it('keeps "Phone Number" and "Enter phone number" for a pack without the keys', () => {
+    render(<PhoneInput copy={olderPhoneCopy()} />);
+    expect(screen.getByLabelText('Phone Number')).toHaveAttribute('placeholder', 'Enter phone number');
+  });
+
+  it('renders the same English through the en-US pack', () => {
+    render(<PhoneInput copy={EN_US_PHONE_INPUT_COPY} />);
+    expect(screen.getByLabelText('Phone Number')).toHaveAttribute('placeholder', 'Enter phone number');
+  });
+
+  it('words the label and placeholder with the pt-BR pack', () => {
+    render(<PhoneInput copy={PT_BR_PHONE_INPUT_COPY} />);
+    expect(screen.getByLabelText(PT_BR_PHONE_INPUT_COPY.label)).toHaveAttribute(
+      'placeholder',
+      PT_BR_PHONE_INPUT_COPY.placeholder,
+    );
+  });
+
+  it('lets the props win over the pack', () => {
+    render(<PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label="Celular" placeholder="Seu número" />);
+    expect(screen.getByLabelText('Celular')).toHaveAttribute('placeholder', 'Seu número');
+  });
+
+  it('falls back to the pack when a prop is passed as undefined', () => {
+    render(<PhoneInput copy={PT_BR_PHONE_INPUT_COPY} label={undefined} placeholder={undefined} />);
+    expect(screen.getByLabelText(PT_BR_PHONE_INPUT_COPY.label)).toHaveAttribute(
+      'placeholder',
+      PT_BR_PHONE_INPUT_COPY.placeholder,
+    );
+  });
+});
+
 // The editor `Textarea variant="rich"` lazy-loads, rendered directly.
 describe('Textarea rich editorLabel', () => {
   it('names the editing area with the caller pack when there is no placeholder', () => {
@@ -154,5 +195,37 @@ describe('AddressAutocomplete optional copy keys', () => {
       <AddressAutocomplete googleMapsApiKey="test-key" onSelect={vi.fn()} copy={{ loadingMaps, mapsLoadFailed, useCurrentLocation }} />,
     );
     expect(screen.getByLabelText('Address')).toHaveAttribute('placeholder', 'Enter an address');
+  });
+});
+
+// The field itself, held mid-request: no options yet and `loading` on.
+describe('AddressAutocomplete loading row', () => {
+  const renderLoading = (copy: AddressAutocompleteCopy) => {
+    render(
+      <AddressAutocompleteField
+        {...resolveAddressProps({ googleMapsApiKey: 'test-key', onSelect: vi.fn(), copy })}
+        inputValue="Rua Augusta"
+        options={[]}
+        loading
+        apiError={null}
+        mapsError={null}
+        isLoaded
+        handleInputChange={vi.fn()}
+        handleSelect={vi.fn()}
+        handleGetCurrentLocation={vi.fn()}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+  };
+
+  it('words the row with the pt-BR pack', () => {
+    renderLoading(PT_BR_ADDRESS_AUTOCOMPLETE_COPY);
+    expect(screen.getByText(PT_BR_ADDRESS_AUTOCOMPLETE_COPY.loadingSuggestions)).toBeInTheDocument();
+  });
+
+  it("keeps MUI's \"Loading…\" for a pack without the key", () => {
+    const { loadingMaps, mapsLoadFailed, useCurrentLocation } = EN_US_ADDRESS_AUTOCOMPLETE_COPY;
+    renderLoading({ loadingMaps, mapsLoadFailed, useCurrentLocation });
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
   });
 });

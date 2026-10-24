@@ -225,6 +225,8 @@ const MenuItemContent: React.FC<{
         collapsed={collapsed}
         minimal={minimal}
         disabled={item.disabled}
+        // Collapsed, the row is its icon alone; the item's own label names it.
+        aria-label={collapsed ? item.label : undefined}
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}

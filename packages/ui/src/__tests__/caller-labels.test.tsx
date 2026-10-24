@@ -14,6 +14,7 @@ import { Code } from '../components/typography/Code';
 import { WorkflowStep } from '../components/utility/WorkflowStep';
 import { EN_US_COMMAND_PALETTE_COPY } from '../en-US.navigation';
 import { PT_BR_UI_LABELS } from '../pt-BR.labels';
+import { PT_BR_COMMAND_PALETTE_COPY } from '../pt-BR.navigation';
 
 afterEach(cleanup);
 
@@ -93,6 +94,39 @@ describe('NavigationMenu collapseLabel', () => {
     render(<NavigationMenu items={items} variant="vertical" collapsible />);
     expect(screen.getByText('Collapse')).toBeInTheDocument();
   });
+
+  it('names the expanded control by its visible text alone', () => {
+    render(<NavigationMenu items={items} variant="vertical" collapsible />);
+    expect(screen.getByRole('button', { name: 'Collapse' })).not.toHaveAttribute('aria-label');
+  });
+
+  it('names the icon-only control "Expand" when collapsed and no label is given', () => {
+    render(<NavigationMenu items={items} variant="vertical" collapsible collapsed />);
+    expect(screen.getByRole('button', { name: 'Expand' })).toBeInTheDocument();
+  });
+
+  it('names the icon-only control with the pt-BR labels when collapsed', () => {
+    const { collapse, expand } = PT_BR_UI_LABELS.navigationMenu;
+    render(
+      <NavigationMenu items={items} variant="vertical" collapsible collapsed collapseLabel={collapse} expandLabel={expand} />,
+    );
+    expect(screen.getByRole('button', { name: 'Expandir' })).toBeInTheDocument();
+  });
+
+  it('names each collapsed item by its own label', () => {
+    const rows = [
+      { id: 'a', label: 'Pedidos', href: '#pedidos' },
+      { id: 'b', label: 'Estoque', children: [{ id: 'b1', label: 'Itens', href: '#itens' }] },
+    ];
+    render(<NavigationMenu items={rows} variant="vertical" collapsible collapsed />);
+    expect(screen.getByRole('link', { name: 'Pedidos' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Estoque' })).toBeInTheDocument();
+  });
+
+  it('adds no aria-label to an expanded item, whose text already names it', () => {
+    render(<NavigationMenu items={[{ id: 'a', label: 'Pedidos', href: '#pedidos' }]} variant="vertical" />);
+    expect(screen.getByRole('link', { name: 'Pedidos' })).not.toHaveAttribute('aria-label');
+  });
 });
 
 describe('CommandPalette optional copy keys', () => {
@@ -137,6 +171,21 @@ describe('CommandPalette optional copy keys', () => {
     expect(screen.getByPlaceholderText('Type a command or search...')).toBeInTheDocument();
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(screen.getByText('2 commands')).toBeInTheDocument();
+  });
+
+  it('counts one command in the singular with the pt-BR pack', () => {
+    const one = [{ id: 'a', label: 'Abrir pedidos', action: vi.fn() }];
+    render(<CommandPalette open onClose={vi.fn()} commands={one} copy={PT_BR_COMMAND_PALETTE_COPY} />);
+    expect(screen.getByText('1 comando')).toBeInTheDocument();
+  });
+
+  it('counts several commands in the plural with the pt-BR pack', () => {
+    render(<CommandPalette open onClose={vi.fn()} commands={commands} copy={PT_BR_COMMAND_PALETTE_COPY} />);
+    expect(screen.getByText('2 comandos')).toBeInTheDocument();
+  });
+
+  it('keeps the English count byte for byte', () => {
+    expect([0, 1, 2].map(EN_US_COMMAND_PALETTE_COPY.commandCount)).toEqual(['0 commands', '1 commands', '2 commands']);
   });
 });
 

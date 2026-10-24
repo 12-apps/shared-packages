@@ -40,7 +40,9 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
 
 const PaletteContainer = styled(Paper)(({ theme }) => ({
   width: '100%',
-  maxWidth: rem(theme, 640),
+  // 640 is the desktop width (FUT-3347); below it the palette takes the dialog's
+  // own width, which already keeps MUI's 32px gutters, so a phone sees it whole.
+  maxWidth: `min(${rem(theme, 640)}, 100%)`,
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
   backdropFilter: `blur(${rem(theme, 20)})`,
   WebkitBackdropFilter: `blur(${rem(theme, 20)})`,
@@ -111,13 +113,16 @@ const PaletteFooter: React.FC<{ commandCount: number; copy: CommandPaletteCopy }
     <Box
       sx={{
         display: 'flex',
+        // Wraps the count under the hints on a phone; one row on desktop.
+        flexWrap: 'wrap',
+        gap: 1,
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 1,
         borderTop: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
         background: alpha(theme.palette.background.default, 0.4) }}
     >
-      <Box sx={{ display: 'flex', gap: 1 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         <ShortcutChip
           icon={<EnterIcon sx={{ fontSize: sxRem(12) }} />}
           label={copy.execute}

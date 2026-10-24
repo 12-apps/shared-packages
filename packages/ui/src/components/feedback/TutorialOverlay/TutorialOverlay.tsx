@@ -85,7 +85,9 @@ const Spotlight = styled(Box, {
 const TooltipContainer = styled(Paper, {
   shouldForwardProp: (prop) => prop !== 'placement' })<{ placement: string }>(({ theme, placement }) => ({
   position: 'absolute',
-  maxWidth: rem(theme, 360),
+  // 360 on desktop; on a phone, the viewport less the 16px the placement keeps
+  // clear on each side (`calculateTooltipPosition`).
+  maxWidth: `min(${rem(theme, 360)}, calc(100vw - ${rem(theme, 32)}))`,
   padding: theme.spacing(3),
   background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.98)} 0%, ${alpha(theme.palette.background.paper, 0.95)} 100%)`,
   backdropFilter: `blur(${rem(theme, 20)})`,

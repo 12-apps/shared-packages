@@ -6,6 +6,7 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import { styled } from '@mui/material/styles/index.js';
+import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { Step, StepItemProps, StepperProps } from './Stepper.types';
@@ -22,6 +23,8 @@ import type { SizeValue } from '../../../tokens/scales';
  */
 const STEP_MIN_WIDTH: Record<SizeValue, number> = { xs: 44, sm: 56, md: 80, lg: 96, xl: 112 };
 const STEP_ICON_SIZE: Record<SizeValue, number> = { xs: 14, sm: 18, md: 24, lg: 30, xl: 36 };
+/** A horizontal connector's shortest dash; its 8px margins either side add 16. */
+const CONNECTOR_MIN = 8;
 
 
 const StepperRoot = styled(Box, {
@@ -44,6 +47,10 @@ const StepItem = styled(Box, {
   // For vertical: center to align connector with centered circle
   alignItems: orientation === 'horizontal' ? 'flex-start' : 'center',
   flex: orientation === 'horizontal' && !isLast ? 1 : 'none',
+  // Horizontal, the last step takes an equal share capped at its own width:
+  // on desktop that IS its own width, as `none` gave; on a phone it lets the
+  // last step give up room instead of pushing the row past the viewport.
+  ...(orientation === 'horizontal' && isLast && { flex: '1 1 0%', maxWidth: 'max-content' }),
   position: 'relative',
   // For vertical: ensure consistent width for proper centering
   ...(orientation === 'vertical' && {
@@ -109,7 +116,8 @@ const StepConnector = styled(Box, {
           marginTop: rem(theme, CIRCLE_SIZE[size] / 2 - 1),
           marginLeft: rem(theme, 8),
           marginRight: rem(theme, 8),
-          minWidth: rem(theme, 24),
+          // Only binds when the row is squeezed: a phone keeps a short dash.
+          minWidth: rem(theme, CONNECTOR_MIN),
         }
       : {
           width: rem(theme, 2),
@@ -128,6 +136,8 @@ const StepLabel = styled(Box, {
 })<{ orientation: 'horizontal' | 'vertical' }>(({ theme, orientation }) => ({
   textAlign: 'center',
   marginTop: orientation === 'horizontal' ? rem(theme, 8) : 0,
+  // A word wider than a phone's step column breaks rather than overflowing.
+  overflowWrap: orientation === 'horizontal' ? 'anywhere' : undefined,
 }));
 
 type StepSize = SizeValue;
@@ -144,10 +154,19 @@ function stepClasses(isActive: boolean, isCompleted: boolean, optional?: boolean
     .join(' ');
 }
 
-/** The circle content-column width per orientation/size. */
+/**
+ * The circle content-column width per orientation/size. The floor yields to
+ * the step's own width less its connector, so three steps fit a 320 screen;
+ * on desktop the step is far wider and the floor is the size's stop.
+ */
 function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
   return orientation === 'horizontal'
-    ? { minWidth: sxRem(STEP_MIN_WIDTH[size]), maxWidth: sxRem(150), flex: '0 1 auto' }
+    ? {
+        minWidth: (theme: Theme) =>
+          `min(${rem(theme, STEP_MIN_WIDTH[size])}, calc(100% - ${rem(theme, CONNECTOR_MIN + 16)}))`,
+        maxWidth: sxRem(150),
+        flex: '0 1 auto',
+      }
     : { flexShrink: 0 };
 }
 

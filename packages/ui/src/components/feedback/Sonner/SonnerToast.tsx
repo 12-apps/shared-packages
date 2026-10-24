@@ -178,8 +178,10 @@ export const SonnerToast: React.FC<SonnerItem & { onDismiss: (id: string) => voi
           ...buildToastStyles(theme, variant, visible),
           p: 2,
           mb: 1,
-          minWidth: sxRem(356),
-          maxWidth: sxRem(400),
+          // 356–400 on desktop; on a phone, the viewport less the toaster's 16px
+          // inset on each side, so the stack never starts off the left edge.
+          minWidth: `min(${rem(theme, 356)}, calc(100vw - ${rem(theme, 32)}))`,
+          maxWidth: `min(${rem(theme, 400)}, calc(100vw - ${rem(theme, 32)}))`,
           display: 'flex',
           alignItems: 'flex-start',
           gap: 1.5,

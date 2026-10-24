@@ -122,6 +122,7 @@ export const NavigationMenu = React.forwardRef<HTMLDivElement, NavigationMenuPro
       collapsed: controlledCollapsed,
       onCollapseChange,
       collapseLabel,
+      expandLabel,
       logo,
       endContent,
       maxWidth,
@@ -181,6 +182,7 @@ export const NavigationMenu = React.forwardRef<HTMLDivElement, NavigationMenuPro
           logo={logo}
           endContent={endContent}
           collapseLabel={collapseLabel}
+          expandLabel={expandLabel}
           onCollapseToggle={handleCollapseToggle}
         />
       </NavigationShell>

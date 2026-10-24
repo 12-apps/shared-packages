@@ -17,6 +17,7 @@ export const EN_US_TUTORIAL_COPY: Required<TutorialCopy> = {
   finish: "Finish",
   requiresAction: "Complete the required action first",
   progress: (current, total) => `${current} of ${total}`,
+  close: "Close",
 };
 
 export const EN_US_CHROME_COPY: ChromeCopy = {

@@ -213,10 +213,13 @@ export const MenuList: React.FC<PropsWithChildren<{ variant?: string; size?: str
   ...props
 }) => <StyledList {...props}>{children}</StyledList>;
 
-export const CollapseToggle: React.FC<PropsWithChildren<{ onClick: () => void }>> = ({
-  children,
-  onClick,
-}) => <CollapseButton onClick={onClick}>{children}</CollapseButton>;
+export const CollapseToggle: React.FC<
+  PropsWithChildren<{ onClick: () => void; ariaLabel?: string }>
+> = ({ children, onClick, ariaLabel }) => (
+  <CollapseButton onClick={onClick} aria-label={ariaLabel}>
+    {children}
+  </CollapseButton>
+);
 
 export const MegaSection: React.FC<{ children: ReactNode }> = ({ children }) => (
   <MegaMenuSection>{children}</MegaMenuSection>

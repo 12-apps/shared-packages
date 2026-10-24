@@ -15,7 +15,7 @@ export const PT_BR_COMMAND_PALETTE_COPY: Required<CommandPaletteCopy> = {
   recent: "Recentes",
   tryAnotherTerm: "Tente outro termo",
   placeholder: "Digite um comando ou pesquise...",
-  commandCount: (count) => `${count} comandos`,
+  commandCount: (count) => (count === 1 ? "1 comando" : `${count} comandos`),
   noCommandsFound: (query) => `Nenhum comando encontrado para "${query}"`,
   general: "Geral",
 };

@@ -144,8 +144,6 @@ const PhoneField: React.FC<{
 
 const PHONE_INPUT_DEFAULTS = {
   variant: 'outlined',
-  label: 'Phone Number',
-  placeholder: 'Enter phone number',
   icon: <PhoneIcon />,
   defaultValue: '',
   // The owner's market: a host that names no country starts at Brazil.
@@ -163,6 +161,12 @@ const definedProps = (props: PhoneInputProps): Partial<PhoneInputProps> =>
   Object.fromEntries(
     Object.entries(props).filter(([, value]) => value !== undefined),
   ) as Partial<PhoneInputProps>;
+
+// The label and placeholder a host passes as props win; then the copy pack's;
+// then the English the field has always shown.
+const copyDefaults = (copy: PhoneInputCopy): Pick<PhoneInputProps, 'label' | 'placeholder'> => ({
+  label: copy.label ?? 'Phone Number',
+  placeholder: copy.placeholder ?? 'Enter phone number' });
 
 const CountryAdornment: React.FC<{
   country?: CountryData;
@@ -318,7 +322,10 @@ export const PhoneInput: FC<PhoneInputProps> = (props) => {
     errorMessage,
     disabled,
     required,
-    fullWidth } = { ...PHONE_INPUT_DEFAULTS, ...definedProps(props) };
+    fullWidth } = {
+    ...PHONE_INPUT_DEFAULTS,
+    ...copyDefaults(copy),
+    ...definedProps(props) };
   const {
     value,
     selectedCountry,

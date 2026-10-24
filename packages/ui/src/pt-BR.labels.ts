@@ -66,6 +66,7 @@ export const PT_BR_UI_LABELS: UiLabels = {
   },
   navigationMenu: {
     collapse: "Recolher",
+    expand: "Expandir",
   },
   workflowStep: {
     step: (position, title) => `Etapa ${position}: ${title}`,

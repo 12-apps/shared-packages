@@ -22,6 +22,8 @@ export const EN_US_ADDRESS_AUTOCOMPLETE_COPY: Required<AddressAutocompleteCopy> 
   placeholder: "Enter an address",
   typeToSearch: "Type at least 3 characters",
   noAddressesFound: "No addresses found",
+  // MUI's own words for the row, which the field showed before it had a key.
+  loadingSuggestions: "Loading…",
   mapsApiLoadFailed: "Failed to load Google Maps API",
   mapsServicesInitFailed: "Failed to initialize Google Maps services",
   fetchSuggestionsFailed: "Failed to fetch address suggestions",
@@ -107,6 +109,8 @@ export const EN_US_PHONE_INPUT_COPY: Required<PhoneInputCopy> = {
   // read as a noun phrase inside it rather than as a sentence of its own.
   unknownCountry: "the selected country",
   countryName: (_code, englishName) => englishName,
+  label: "Phone Number",
+  placeholder: "Enter phone number",
 };
 
 export const EN_US_UPLOAD_BUTTON_COPY: Required<UploadButtonCopy> = {

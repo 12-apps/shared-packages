@@ -31,6 +31,8 @@ export interface AddressAutocompleteCopy {
   /** The empty list's text: nothing typed yet, then typed with no match. */
   typeToSearch?: string;
   noAddressesFound?: string;
+  /** The list's row while suggestions are being fetched. */
+  loadingSuggestions?: string;
   /** Shown as the field's helper text when Google Maps or Places fails. */
   mapsApiLoadFailed?: string;
   mapsServicesInitFailed?: string;
@@ -160,6 +162,17 @@ export interface PhoneInputCopy {
    * `Intl.DisplayNames`, so every country the field lists is covered.
    */
   countryName?: (code: string, englishName: string) => string;
+  /**
+   * The field's label when the host passes no `label` prop. Optional: without
+   * it the field reads "Phone Number", as it always did.
+   */
+  label?: string;
+  /**
+   * The field's placeholder when the host passes no `placeholder` prop.
+   * Optional: without it the field reads "Enter phone number", as it always
+   * did. Keep it short — it shares a 320px field with the country picker.
+   */
+  placeholder?: string;
 }
 
 /**

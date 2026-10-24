@@ -90,6 +90,11 @@ export interface DashboardLabels {
 /** `NavigationMenu`'s collapse control. */
 export interface NavigationMenuLabels {
   collapse: string;
+  /**
+   * The same control's accessible name while the menu is collapsed and shows
+   * only its icon. Optional: without it the control is named "Expand".
+   */
+  expand?: string;
 }
 
 /** `WorkflowStep`'s indicator names and its progressbar's value text. */
