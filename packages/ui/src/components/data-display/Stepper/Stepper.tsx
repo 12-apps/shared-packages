@@ -136,8 +136,8 @@ const StepLabel = styled(Box, {
 })<{ orientation: 'horizontal' | 'vertical' }>(({ theme, orientation }) => ({
   textAlign: 'center',
   marginTop: orientation === 'horizontal' ? rem(theme, 8) : 0,
-  // A word wider than a phone's step column breaks rather than overflowing.
-  overflowWrap: orientation === 'horizontal' ? 'anywhere' : undefined,
+  // Last resort only: a single word wider than the whole row may break.
+  overflowWrap: orientation === 'horizontal' ? 'break-word' : undefined,
 }));
 
 type StepSize = SizeValue;
@@ -155,18 +155,19 @@ function stepClasses(isActive: boolean, isCompleted: boolean, optional?: boolean
 }
 
 /**
- * The circle content-column width per orientation/size. The floor yields to
- * the step's own width less its connector, so three steps fit a 320 screen;
- * on desktop the step is far wider and the floor is the size's stop.
+ * The circle content-column width per orientation/size. On a phone the column
+ * may shrink to its longest word, never inside one ("pagame / nto"), and the
+ * connectors give up the rest; from `sm` up the floor is the size's stop, as
+ * it always was, so a desktop row is unchanged.
  */
 function contentSx(orientation: 'horizontal' | 'vertical', size: StepSize) {
   return orientation === 'horizontal'
-    ? {
-        minWidth: (theme: Theme) =>
-          `min(${rem(theme, STEP_MIN_WIDTH[size])}, calc(100% - ${rem(theme, CONNECTOR_MIN + 16)}))`,
-        maxWidth: sxRem(150),
+    ? (theme: Theme) => ({
+        minWidth: 'min-content',
+        [theme.breakpoints.up('sm')]: { minWidth: rem(theme, STEP_MIN_WIDTH[size]) },
+        maxWidth: rem(theme, 150),
         flex: '0 1 auto',
-      }
+      })
     : { flexShrink: 0 };
 }
 
@@ -228,6 +229,9 @@ const StepLabelBlock: React.FC<StepPartProps & { orientation: 'horizontal' | 've
       color={isActive ? 'primary' : 'textPrimary'}
     >
       {step.label}
+      {/* A break opportunity with no width: a narrow column may put the marker
+          on its own line instead of welding it to the label's last word. */}
+      {step.optional && <wbr />}
       {step.optional && (
         <Typography component="span" variant="caption" color="textSecondary" sx={{ ml: 1 }}>
           ({labels.optional})

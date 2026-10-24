@@ -31,6 +31,22 @@ const mediaRules = (element: Element, media: string): string =>
     .map((rule) => rule.style.cssText.replace(/\s/g, ''))
     .join(';');
 
+/**
+ * Every raw declaration emotion wrote for `element`'s classes, at any width,
+ * read from the style tags themselves: jsdom's style parser drops intrinsic
+ * sizes such as `min-content`, so neither the computed style nor the CSSOM
+ * can show them.
+ */
+const rawRules = (element: Element): string => {
+  const css = Array.from(document.querySelectorAll('style'))
+    .map((tag) => tag.textContent ?? '')
+    .join('');
+  return Array.from(element.classList)
+    .flatMap((cls) => css.match(new RegExp(`\\.${cls}\\{([^}]*)\\}`, 'g')) ?? [])
+    .join(';')
+    .replace(/\s/g, '');
+};
+
 describe('CommandPalette width', () => {
   it('keeps 640 as the cap and yields to the dialog width below it', () => {
     render(
@@ -123,9 +139,13 @@ describe('Stepper horizontal fit', () => {
     { id: 's3', label: 'Revisão', description: 'Confira antes de publicar' },
   ];
 
-  it('lets the step column yield below its size stop to the step less its connector', () => {
+  it('lets a phone column shrink to its longest word, never inside one', () => {
     render(<Stepper steps={steps} activeId="s2" />);
-    expect(style(screen.getByTestId('stepper-step-content-0')).minWidth).toBe('min(5rem, calc(100% - 1.5rem))');
+    const column = screen.getByTestId('stepper-step-content-0');
+    // The phone rule (MUI writes `xs` under `min-width:0px`)...
+    expect(rawRules(column)).toContain('min-width:min-content');
+    // ...and from `sm` (600px) up the size's stop holds, as it always did.
+    expect(mediaRules(column, '(min-width:600px)')).toContain('min-width:5rem');
     expect(style(screen.getByTestId('stepper-connector-0')).minWidth).toBe('0.5rem');
   });
 
@@ -137,15 +157,15 @@ describe('Stepper horizontal fit', () => {
     expect(last.maxWidth).toBe('max-content');
   });
 
-  it('breaks a word too wide for its column', () => {
+  it('breaks a word only when it is wider than the whole row', () => {
     render(<Stepper steps={steps} activeId="s2" />);
-    expect(style(screen.getByTestId('stepper-step-label-1')).overflowWrap).toBe('anywhere');
+    expect(style(screen.getByTestId('stepper-step-label-1')).overflowWrap).toBe('break-word');
   });
 
   it('leaves the vertical stepper as it was', () => {
     render(<Stepper steps={steps} activeId="s2" orientation="vertical" />);
     expect(style(screen.getByTestId('stepper-step-2')).flexGrow).toBe('0');
-    expect(style(screen.getByTestId('stepper-step-label-1')).overflowWrap).not.toBe('anywhere');
+    expect(style(screen.getByTestId('stepper-step-label-1')).overflowWrap).not.toBe('break-word');
   });
 });
 
