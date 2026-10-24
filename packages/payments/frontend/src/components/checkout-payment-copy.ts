@@ -76,6 +76,12 @@ export interface LegacyRefusalCopy {
   cardUnavailable: string;
   /** The interstitial before a hosted provider's own page. */
   redirectNotice: string;
+  /**
+   * The payment options could not be loaded. OPTIONAL so a host's
+   * own pack keeps compiling; absent, the English sentence shows — never the
+   * gateway's message.
+   */
+  requestFailed?: string;
 }
 
 /** Everything above, in one object a host passes at the mount. */

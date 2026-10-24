@@ -43,6 +43,10 @@ export const PT_BR_STRIPE_COPY: StripeCopy = {
     'Não conseguimos falar com a Stripe agora. ' +
     'Suas credenciais foram salvas — teste a conexão de novo em instantes.',
   fields: {
+    secretKey: 'Chave secreta (sk_...)',
+    publishableKey: 'Chave publicável (pk_...)',
+    webhookSecret: 'Segredo de assinatura do webhook (whsec_...)',
+    connectedAccount: 'Conta conectada (acct_...)',
     connectedAccountHelp:
       'Deixe em branco. Só preencha se você é uma plataforma Connect cobrando em nome de outra conta — com as suas próprias chaves, este campo faz a Stripe recusar a conexão.',
   },

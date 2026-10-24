@@ -23,7 +23,8 @@ import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCar
 import { expiryProximity, isConnected } from './connection-state';
 import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX, T } from './panel-tokens';
 import type { OAuthConnectionCopy } from './settings-copy';
-import { usePaymentsSettingsCopy } from './settings-copy-context';
+import { describeFailure } from './failure-copy';
+import { usePaymentsFailureCopy, usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
  * The `authMode: 'oauth'` half of the settings page: a provider whose
@@ -291,6 +292,7 @@ function ConnectionActions(props: {
 
 /** One in-flight action at a time, with its failure surfaced to the owner. */
 function useConnectionAction(onChanged: () => void) {
+  const failures = usePaymentsFailureCopy();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -301,7 +303,7 @@ function useConnectionAction(onChanged: () => void) {
       await action();
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeFailure(err, failures));
     } finally {
       setBusy(null);
     }

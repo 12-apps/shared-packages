@@ -47,6 +47,8 @@ export class PaymentsClientError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** The gateway's error name (`CredentialsError`, …), when it sent one. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'PaymentsClientError';
@@ -74,6 +76,20 @@ export interface PaymentsClientOptions {
  * translate it (see `ProviderConnection`). This function's job is only to stop
  * shipping the envelope.
  */
+/** The gateway's error name in the body, if any — what a screen translates. */
+function failureCode(body: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed !== null && typeof parsed === 'object' && 'error' in parsed) {
+      const { error } = parsed as { error?: unknown };
+      if (typeof error === 'string' && error.trim() !== '') return error;
+    }
+  } catch {
+    // Not JSON: no code to translate.
+  }
+  return undefined;
+}
+
 function failureMessage(body: string, status: number): string {
   const fallback = `Payments request failed (${status})`;
   if (!body) return fallback;
@@ -99,7 +115,7 @@ function makeRequest(options: PaymentsClientOptions) {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new PaymentsClientError(res.status, failureMessage(body, res.status));
+      throw new PaymentsClientError(res.status, failureMessage(body, res.status), failureCode(body));
     }
     return (await res.json()) as T;
   };

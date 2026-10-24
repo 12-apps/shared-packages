@@ -22,6 +22,8 @@
  * made elsewhere.
  */
 
+import type { PaymentsFailureCopy } from './failure-copy';
+
 /** The chip and the two lines under it — where this connection stands. */
 export interface ConnectionStatusCopy {
   /** A real charge has gone through — the strongest thing the chip can say. */
@@ -342,4 +344,10 @@ export interface PaymentsSettingsCopy {
   providerList: ProviderListCopy;
   confirmSave: ConfirmCredentialSaveCopy;
   setupGuide: SetupGuideCopy;
+  /**
+   * What a failed request reads as, by the gateway's error code.
+   * OPTIONAL so a host's own pack keeps compiling; absent, the screen falls
+   * back to the English pack's sentences rather than the server's message.
+   */
+  failures?: PaymentsFailureCopy;
 }
