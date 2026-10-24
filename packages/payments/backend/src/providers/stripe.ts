@@ -193,18 +193,18 @@ const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
  */
 function credentialSchemaFor(copy: StripeCopy): readonly CredentialFieldSpec[] {
   return [
-    { key: 'secretKey', label: 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
-    { key: 'publishableKey', label: 'Publishable key (pk_...)', secret: false, required: false },
+    { key: 'secretKey', label: copy.fields.secretKey ?? 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
+    { key: 'publishableKey', label: copy.fields.publishableKey ?? 'Publishable key (pk_...)', secret: false, required: false },
     {
       key: 'webhookSecret',
-      label: 'Webhook signing secret (whsec_...)',
+      label: copy.fields.webhookSecret ?? 'Webhook signing secret (whsec_...)',
       secret: true,
       required: false,
       role: 'webhookSecret',
     },
     {
       key: 'connectedAccountId',
-      label: 'Connected account (acct_...)',
+      label: copy.fields.connectedAccount ?? 'Connected account (acct_...)',
       secret: false,
       required: false,
       // Sends `Stripe-Account:` — only meaningful for a platform charging on

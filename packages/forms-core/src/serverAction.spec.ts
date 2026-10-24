@@ -6,6 +6,7 @@ import {
   email,
   err,
   ok,
+  PT_BR_FORMS_MESSAGES,
   required,
 } from './index';
 
@@ -77,6 +78,22 @@ describe('forms-core/createServerAction', () => {
     }
     // The real cause is logged server-side for diagnosis, never returned.
     expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("returns the host's generic sentence when one is given", async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const action = createServerAction(
+      schema,
+      async () => {
+        throw new Error('boom');
+      },
+      { genericError: PT_BR_FORMS_MESSAGES.genericError },
+    );
+
+    const result = await action({ email: 'a@b.com' });
+
+    expect(result).toEqual(err('Algo deu errado. Tente novamente.'));
     errorSpy.mockRestore();
   });
 

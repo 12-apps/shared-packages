@@ -23,6 +23,8 @@ import {
   summaryOf,
 } from './credential-rules';
 import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
+import { describeFailure } from './failure-copy';
+import { usePaymentsFailureCopy } from './settings-copy-context';
 
 /**
  * The `authMode: 'credentials'` half of the settings page — a provider whose
@@ -44,6 +46,7 @@ function useSettingsAction(
   // Generic in the action's result: `verify` returns a MaskedProviderConfig
   // with the probe outcome attached, and narrowing it here would throw away
   // the only field that reports what the probe actually found.
+  const failures = usePaymentsFailureCopy();
   const run = useCallback(
     async <T extends MaskedProviderConfig>(
       label: string,
@@ -57,13 +60,13 @@ function useSettingsAction(
         onSaved();
         return next;
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(describeFailure(err, failures));
         return null;
       } finally {
         setBusy(null);
       }
     },
-    [onChanged, onSaved],
+    [onChanged, onSaved, failures],
   );
   return { busy, error, run };
 }

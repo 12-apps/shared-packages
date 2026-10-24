@@ -2,7 +2,9 @@
 
 import { createContext, useContext, type JSX, type ReactNode } from 'react';
 
+import type { PaymentsFailureCopy } from './failure-copy';
 import type { PaymentsSettingsCopy } from './settings-copy';
+import { EN_US_PAYMENTS_SETTINGS_COPY } from './settings-en-US';
 
 /**
  * The settings surface's words, for the fifteen components that render them
@@ -47,4 +49,15 @@ export function usePaymentsSettingsCopy(): PaymentsSettingsCopy {
     );
   }
   return copy;
+}
+
+/**
+ * The failure sentences in force: the host's pack's when it states
+ * them, else the English pack's. Never throws, so a hook that loads data above
+ * the provider can still turn a refusal into a sentence instead of relaying the
+ * server's message.
+ */
+export function usePaymentsFailureCopy(): PaymentsFailureCopy {
+  const copy = useContext(PaymentsSettingsCopyContext);
+  return copy?.failures ?? EN_US_PAYMENTS_SETTINGS_COPY.failures!;
 }

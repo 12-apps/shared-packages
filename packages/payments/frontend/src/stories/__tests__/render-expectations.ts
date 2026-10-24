@@ -369,7 +369,8 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // The gate stories: here the gate IS the pinned state, so asserting it is
   // legitimate — everywhere else these markers are exactly what a wire break
   // produces, and are therefore banned.
-  "Settings/SettingsReadFailed": { text: ['{"error":"indisponível","code":"SERVER_ERROR"}'] },
+  // The host's sentence, not the gateway's envelope or message.
+  "Settings/SettingsReadFailed": { text: ["Não foi possível concluir a operação (500). Tente novamente."] },
   "Settings/SettingsReadPending": { testIds: ["payments-settings-loading"] },
   "Settings/ProductionEnvironment": {
     testIds: ["payments-environment-notice-PRODUCTION"],

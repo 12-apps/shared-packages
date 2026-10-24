@@ -15,7 +15,8 @@ import { useCallback, useState } from 'react';
 import type { MerchantSettingsView, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { usePaymentsSettingsCopy } from './settings-copy-context';
+import { describeFailure } from './failure-copy';
+import { usePaymentsFailureCopy, usePaymentsSettingsCopy } from './settings-copy-context';
 import { richText } from './rich-text';
 
 /**
@@ -158,6 +159,7 @@ function useChainReorder(
   onReordered?: (next: MerchantSettingsView) => void,
 ) {
   const copy = usePaymentsSettingsCopy().priority;
+  const failures = usePaymentsFailureCopy();
   const [chain, setChain] = useState<string[]>(() => chainOf(view));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -178,11 +180,13 @@ function useChainReorder(
         })
         .catch((err: unknown) => {
           setChain(previous);
-          setError(err instanceof Error ? err.message : copy.saveFailed);
+          // A gateway refusal reads as its code's sentence, never the server's
+          // English; a non-Error as the list's own "could not save".
+          setError(err instanceof Error ? describeFailure(err, failures) : copy.saveFailed);
         })
         .finally(() => setSaving(false));
     },
-    [chain, client, onReordered],
+    [chain, client, onReordered, failures],
   );
 
   return { chain, error, saving, move };

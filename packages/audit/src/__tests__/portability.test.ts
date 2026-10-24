@@ -16,7 +16,7 @@ import { runWithActorScope, setActor } from '../server/actor-context';
 import { createApiAudit } from '../server/create-api-audit';
 import type { AuditDb, AuditLogCreateData, AuditLogRecord } from '../server/db';
 
-import { foreignPatterns, HOST1, HOST2 } from './foreign-vocabulary';
+import { foreignPatterns, HOST1, HOST2, removedCopyPatterns } from './foreign-vocabulary';
 
 /**
  * A REAL SECOND HOST, in a domain the extraction origin does not touch.
@@ -364,7 +364,7 @@ describe('the fixtures themselves', () => {
       'CURATOR',
     ];
 
-    const bans = foreignPatterns();
+    const bans = [...foreignPatterns(), ...removedCopyPatterns()];
     for (const word of fixtureWords) {
       expect(bans.filter(({ pattern }) => new RegExp(pattern.source, 'i').test(word))).toEqual([]);
     }

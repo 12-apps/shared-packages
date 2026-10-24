@@ -24,7 +24,10 @@ export { ApiError, apiFetch, type ApiFetchOptions } from './core/api';
 
 export { joinApiPath, stripTrailingSlashes } from './core/paths';
 
-export { restResult, type Result } from './core/rest-result';
+export { restResult, type RestResultFallbacks, type Result } from './core/rest-result';
+export { EN_US_REST_RESULT_FALLBACKS } from './core/en-US';
+export { REST_RESULT_FALLBACKS } from './core/locales';
+export { PT_BR_REST_RESULT_FALLBACKS } from './core/pt-BR';
 
 export { formatBRL, formatMinutesLabel, formatMoney, type MoneyFormat } from './core/format';
 

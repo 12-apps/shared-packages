@@ -200,14 +200,14 @@ describe('the redesigned provider panel', () => {
     const disclosure = await screen.findByTestId('payments-manual-fallback');
     fireEvent.click(within(disclosure).getByText(/Prefiro informar as credenciais manualmente/i));
 
-    const secret = await screen.findByLabelText(/Secret key/i);
+    const secret = await screen.findByLabelText(/Chave secreta/i);
     fireEvent.change(secret, { target: { value: 'sk_test_x' } });
-    fireEvent.change(await screen.findByLabelText(/Publishable key/i), {
+    fireEvent.change(await screen.findByLabelText(/Chave publicável/i), {
       target: { value: 'pk_live_x' },
     });
     // Every non-advanced field: the save only probes once the set is complete,
     // and `Connected account` is the one that must stay empty.
-    fireEvent.change(await screen.findByLabelText(/Webhook signing secret/i), {
+    fireEvent.change(await screen.findByLabelText(/Segredo de assinatura do webhook/i), {
       target: { value: 'whsec_x' },
     });
     fireEvent.click(await screen.findByTestId('payments-save'));

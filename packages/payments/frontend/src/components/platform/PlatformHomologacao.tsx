@@ -5,6 +5,8 @@ import { useState, type ReactNode } from 'react';
 
 import type { HomologacaoGuide } from '@12-apps/payments-backend';
 
+import { PaymentsClientError } from '../../client';
+
 import { CARD_SX } from './ConnectEnvironmentCard';
 import { HomologacaoGuideCard } from './HomologacaoGuideCard';
 import {
@@ -67,7 +69,11 @@ function AnexoCard({ onGenerate }: { onGenerate: () => Promise<void> }): ReactNo
     try {
       await onGenerate();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.generateFailed);
+      // The gateway's refusal is developer English; the card's own sentence
+      // stands in for it. A local failure keeps its message.
+      setError(
+        cause instanceof Error && !(cause instanceof PaymentsClientError) ? cause.message : copy.generateFailed,
+      );
     } finally {
       setBusy(false);
     }

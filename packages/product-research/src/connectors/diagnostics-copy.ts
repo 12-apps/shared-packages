@@ -135,6 +135,28 @@ export interface ManualImportCopy {
   unimportableRow(path: string, message: string): string;
 }
 
+/**
+ * A connector's own failures that are not transport or config.
+ * OPTIONAL on {@link ResearchDiagnosticsCopy} so a host's pack keeps compiling;
+ * absent, the connectors fall back to the English sentences of
+ * `EN_US_RESEARCH_DIAGNOSTICS`, which are the sentences this package always
+ * recorded. The unreachable reasons carry the failing request's URL and the
+ * manual store's carries its cause, as they always did: the reason on the
+ * source row is the only diagnosis an admin gets. Never a token.
+ */
+export interface ConnectorFailureCopy {
+  /** The search answered nothing; `url` is the request that failed. */
+  mercadoLivreSearchUnreachable(url: string): string;
+  /** The catalog lookup answered nothing; `url` is the request that failed. */
+  mercadoLivreCatalogUnreachable(url: string): string;
+  /** No access token for the source — the host's Mercado Livre credentials. */
+  mercadoLivreAuthFailed(sourceLabel: string): string;
+  /** The manual price store threw; `cause` is its message. */
+  manualStoreUnavailable(cause: string): string;
+  /** No connector registered for the source's type. */
+  noConnector(sourceType: string): string;
+}
+
 export interface ResearchDiagnosticsCopy {
   manualImport: ManualImportCopy;
   fetch: FetchFailureCopy;
@@ -143,5 +165,6 @@ export interface ResearchDiagnosticsCopy {
   vtex: VtexCopy;
   vtexValidate: VtexValidateCopy;
   budget: SourceBudgetCopy;
+  connectors?: ConnectorFailureCopy;
 }
 

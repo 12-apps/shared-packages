@@ -12,6 +12,7 @@ import type {
 import type { PaymentsSettingsClient } from '../client';
 import { useCheckoutAck } from './checkout-ack';
 import { CHECKOUT_CONFIRM_ACTION } from './SetupGuideSection';
+import { describeFailure, type PaymentsFailureCopy } from './failure-copy';
 
 /**
  * Everything the settings screen KNOWS, separated from what it draws.
@@ -191,7 +192,12 @@ export function useCanonicalProviderSegment(
   }, [controlled, active, onProviderChange]);
 }
 
-export function useSettingsState(client: PaymentsSettingsClient) {
+/**
+ * The settings view, loaded once and on `reload`. `failures` is passed in, not
+ * read from context: this hook runs ABOVE the copy provider, at the mount
+ * point, so the provider's words are not reachable from here.
+ */
+export function useSettingsState(client: PaymentsSettingsClient, failures: PaymentsFailureCopy) {
   const [view, setView] = useState<MerchantSettingsView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
@@ -199,9 +205,9 @@ export function useSettingsState(client: PaymentsSettingsClient) {
       setView(await client.getSettings());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeFailure(err, failures));
     }
-  }, [client]);
+  }, [client, failures]);
   useEffect(() => {
     void reload();
   }, [reload]);

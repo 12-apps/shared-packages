@@ -24,6 +24,7 @@ import { openSection, SetupGuideSection } from './SetupGuideSection';
 import { useSettingsLive, type PaymentsSettingsLiveSignal } from './settings-live';
 import type { PaymentsSettingsCopy } from './settings-copy';
 import { PaymentsSettingsCopyProvider } from './settings-copy-context';
+import { EN_US_PAYMENTS_SETTINGS_COPY } from './settings-en-US';
 
 /**
  * Plug-and-play settings page for payment providers — the reusable
@@ -312,7 +313,10 @@ export function PaymentProviderSettings({
   renderVerification,
   live,
 }: PaymentProviderSettingsProps) {
-  const { view, error, reload } = useSettingsState(client);
+  const { view, error, reload } = useSettingsState(
+    client,
+    copy.failures ?? EN_US_PAYMENTS_SETTINGS_COPY.failures!,
+  );
   useSettingsLive(live, () => void reload());
   const { selected, setSelected } = useSelectedProvider(
     initialProvider,

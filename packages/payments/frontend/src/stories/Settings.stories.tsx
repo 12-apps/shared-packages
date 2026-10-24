@@ -273,11 +273,10 @@ export const VerifyUnreachable: StoryObj = scene(
  * is the HOST's outage (`settingsRead: "failing"`, `settings-host.tsx`) — the
  * live mount cannot be asked to refuse its own view read.
  *
- * PACKAGE FINDING, documented rather than restyled: the alert prints the
- * client error's message raw, and `createPaymentsSettingsClient` throws the
- * response BODY verbatim — so a merchant reads an English JSON envelope
- * (`{"error":"indisponível","code":"SERVER_ERROR"}`) on a pt-BR screen. The
- * sentence belongs to the package to fix, not to a story to hide.
+ * The alert reads the host's sentence for the refusal — the pack's generic one
+ * with the status, since `indisponível` is no gateway code — and never the
+ * response body or the server's message, which used to put an English JSON
+ * envelope on a pt-BR screen.
  */
 export const SettingsReadFailed: StoryObj = {
   name: "Falha ao carregar — o portão de erro",

@@ -239,6 +239,15 @@ export interface StripeCopy extends ProbeUnreachableCopy {
      * until it said so (which makes Stripe refuse every call).
      */
     connectedAccountHelp: string;
+    /**
+     * The four credential boxes' labels. OPTIONAL so a host's own
+     * pack keeps compiling; absent, they read in English ("Secret key
+     * (sk_...)"). The shipped en-US and pt-BR packs state all four.
+     */
+    secretKey?: string;
+    publishableKey?: string;
+    webhookSecret?: string;
+    connectedAccount?: string;
   };
 }
 
