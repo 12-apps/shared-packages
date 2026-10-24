@@ -91,13 +91,13 @@ describe('a host-kept set of grants', () => {
     const port = mapPort();
     const host = await hostWith(port);
     enrolMember(host.state, TENANT_A, 'waiter-1', 'CLERK');
-    const day = 24 * 60 * 60 * 1000;
-    const now = Date.now();
+    // Fixed instants on either side of any run: the engine compares the
+    // windows with the wall clock.
     for (const [id, clientId, from, to] of [
-      ['live-a', TENANT_A, now - day, null],
-      ['live-b', TENANT_B, now - day, null],
-      ['ended-a', TENANT_A, now - 2 * day, now - day],
-      ['later-a', TENANT_A, now + day, null],
+      ['live-a', TENANT_A, '2020-01-01T00:00:00Z', null],
+      ['live-b', TENANT_B, '2020-01-01T00:00:00Z', null],
+      ['ended-a', TENANT_A, '2020-01-01T00:00:00Z', '2021-01-01T00:00:00Z'],
+      ['later-a', TENANT_A, '2999-01-01T00:00:00Z', null],
     ] as const) {
       host.state.resourceAssignments.push({
         id: `ra-${id}`,
