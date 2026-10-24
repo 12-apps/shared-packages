@@ -120,7 +120,18 @@ export {
   getTenantRolesByName,
   isOrgScope,
   isTenantScope,
+  loadSubjectGrants,
 } from './engine';
+
+// A host that keeps a subject's grants (resolved at sign-in, invalidated on
+// change) hands them to the engine through `grants` (FUT-3906).
+export {
+  activeResourceIds,
+  nextGrantBoundary,
+  type RbacGrantsPort,
+  type RbacResourceGrant,
+  type RbacSubjectGrants,
+} from './grants';
 
 // The ceiling's OTHER half. `./guards` already consumes one — it intersects
 // with it and forces `isSuper` off whenever it is present — but computing it
