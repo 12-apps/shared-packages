@@ -4,9 +4,10 @@ import { Suspense, useEffect, useState, type JSX, type ReactNode } from "react";
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
 import type { ListChargeFailure } from "./charge-runners";
+import { raisedMethod } from "./choice";
 import { PartBoundary, deferredPart } from "./lazy-body";
 import { cpfHolds } from "./top-cpf";
-import type { CheckoutPaymentList } from "./types";
+import type { CheckoutOnlineChoice, CheckoutPaymentList } from "./types";
 import type { ListCapability } from "./use-capability";
 import type { ListState } from "./use-list-state";
 
@@ -24,6 +25,22 @@ export function gateFields(
 ): CheckoutCustomerField[] {
   if (method === null || !state.top) return state.asked;
   return cpfHolds(state.top, buyer, config?.chain, method) ? [state.top, ...state.asked] : state.asked;
+}
+
+/**
+ * Whether choosing the online option `choice` leaves the CPF at the top to
+ * type (FUT-3995): the same hold `gateFields` puts on the bar's button — the
+ * chain of the method it raises needs a CPF the buyer has not given, or the
+ * one typed is not valid. `false` with no CPF at the top at all.
+ */
+export function cpfAskedBy(
+  state: Pick<ListState, "top">,
+  buyer: BuyerInfo,
+  config: CheckoutProviderConfig | null,
+  offered: PaymentMethod[] | null,
+  choice: CheckoutOnlineChoice,
+): boolean {
+  return cpfHolds(state.top, buyer, config?.chain, raisedMethod(choice, offered));
 }
 
 /**
