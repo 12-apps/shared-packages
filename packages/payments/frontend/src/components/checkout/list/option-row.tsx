@@ -88,6 +88,7 @@ export function OptionRow({
   label,
   hint,
   onChoose,
+  onChooseAgain,
   testId,
   open = false,
   children,
@@ -100,6 +101,11 @@ export function OptionRow({
   label: string;
   hint?: string;
   onChoose: () => void;
+  /**
+   * The row was tapped while already chosen — a click a radio answers with no
+   * change (FUT-3995). Never called for the choice itself, nor at load.
+   */
+  onChooseAgain?: () => void;
   testId: string;
   /** Render `children` while NOT chosen too (a door option's `showContentWhileIdle`). */
   open?: boolean;
@@ -127,6 +133,7 @@ export function OptionRow({
           checked={chosen}
           disabled={disabled}
           onChange={onChoose}
+          onClick={chosen ? onChooseAgain : undefined}
           size="small"
           sx={{ p: 0, flex: "none", mt: RADIO_ON_TITLE }}
           inputProps={{ "data-testid": `${testId}-radio` } as Record<string, string>}

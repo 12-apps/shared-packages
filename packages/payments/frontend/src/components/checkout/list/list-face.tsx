@@ -16,7 +16,7 @@ import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
 import { ActionButton, ChargeBar, ListBar } from "./list-bar";
-import { ListTop, TopAndRows, gateFields, walletsHeld } from "./list-top";
+import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
 import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
@@ -382,7 +382,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
     <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
         <TopAndRows rowsShown={rowsShown} drawn={state.settled}>
-          <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} top={top} />
+          <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
         </TopAndRows>
       ) : null}
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />

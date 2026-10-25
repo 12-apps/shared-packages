@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { useId, type JSX, type ReactNode } from "react";
+import { useId, useRef, type JSX, type ReactNode } from "react";
 
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo } from "../types";
@@ -8,7 +8,7 @@ import { cardName, type OnlineRow } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import { OnlineContent, opensContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
-import type { CheckoutDoorOption, PaymentListCopy } from "./types";
+import type { CheckoutDoorOption, CheckoutOnlineChoice, PaymentListCopy } from "./types";
 import type { ListState } from "./use-list-state";
 
 /** An online row's label and hint, worded for what the store and the buyer hold. */
@@ -41,6 +41,20 @@ function useUnavailableHint(): string {
   return useCheckoutCopy().screens.method.unavailableHere;
 }
 
+/**
+ * Put the buyer in the CPF at the top of Pagamento (FUT-3995): its field takes
+ * the focus — in the tap's own handler, so a phone opens its keyboard — and
+ * the block, words included, is scrolled into view only when it is not already.
+ */
+function focusTopCpf(list: HTMLElement | null): void {
+  const block = list?.querySelector<HTMLElement>('[data-testid="list-cpf"]');
+  const input = block?.querySelector<HTMLInputElement>("input");
+  if (!block || !input) return;
+  input.focus({ preventScroll: true });
+  // Absent where there is no layout (jsdom, a host's own tests): the focus alone.
+  if (typeof block.scrollIntoView === "function") block.scrollIntoView({ block: "nearest" });
+}
+
 /** What every row of the list is drawn from. */
 interface RowProps {
   name: string;
@@ -52,6 +66,10 @@ interface RowProps {
   failure: ListChargeFailure | null;
   /** The host's balance pays the whole amount: the card asks for no card at all. */
   covered?: boolean;
+  /** Whether choosing this online option leaves the CPF at the top to type (FUT-3995). */
+  cpfAsked?: (choice: CheckoutOnlineChoice) => boolean;
+  /** The buyer chose an online row themselves — the list may take them to the CPF. */
+  onChosenOnline: (choice: CheckoutOnlineChoice) => void;
 }
 
 /** One of the store's online options, with what opens inside it. */
@@ -68,7 +86,14 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
       disabled={row.disabled}
       label={words.label}
       hint={row.disabled ? unavailable : words.hint}
-      onChoose={() => state.choose({ kind: "online", method: row.method, ...(row.funding ? { funding: row.funding } : {}) })}
+      onChoose={() => {
+        state.choose({ kind: "online", method: row.method, ...(row.funding ? { funding: row.funding } : {}) });
+        // Only the buyer's own choice: a preselection never comes through here.
+        props.onChosenOnline(row.method);
+      }}
+      // A tap on the row already chosen (a preselected last method) changes
+      // nothing, but is the buyer's own choice all the same.
+      onChooseAgain={() => props.onChosenOnline(row.method)}
       testId={`list-option-${rowKey(row)}`}
     >
       {opensContent(row.method, state.asked, props.failure, props.covered) ? (
@@ -145,7 +170,7 @@ export function ChoiceList({
   locked,
   top,
   ...rest
-}: Omit<RowProps, "name"> & {
+}: Omit<RowProps, "name" | "onChosenOnline"> & {
   door: readonly CheckoutDoorOption[];
   /** A charge or a send is under way: the list is inert. */
   locked: boolean;
@@ -153,13 +178,29 @@ export function ChoiceList({
   top?: ReactNode;
 }): JSX.Element {
   const base = useId();
-  const props: RowProps = { ...rest, name: `${base}-choice` };
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // The last thing the buyer did in the list was a key: the arrows walking the
+  // radio group (or Space) keep the focus in it. A pointer — a tap, a click —
+  // clears it. (A tap on a row's words reaches the radio as a click with no
+  // click count, so the event itself cannot tell a tap from the arrows.)
+  const keyed = useRef(false);
+  const onChosenOnline = (choice: CheckoutOnlineChoice): void => {
+    if (!keyed.current && rest.cpfAsked?.(choice)) focusTopCpf(listRef.current);
+  };
+  const props: RowProps = { ...rest, name: `${base}-choice`, onChosenOnline };
   const { copy, state } = props;
   // Nothing to tap before the saved cards answer: a row tapped now would move
   // when the saved card is preselected and opens its chips (FUT-3849).
   if (!state.settled) return <Box data-testid="payment-list-loading" aria-busy="true" sx={{ minHeight: (theme) => theme.spacing(30) }} />;
   return (
     <Box
+      ref={listRef}
+      onKeyDownCapture={() => {
+        keyed.current = true;
+      }}
+      onPointerDownCapture={() => {
+        keyed.current = false;
+      }}
       data-testid="payment-list"
       data-locked={locked ? "true" : "false"}
       aria-disabled={locked || undefined}
