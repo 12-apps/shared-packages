@@ -276,8 +276,11 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
 
   return (
     <CheckoutFrame payment={c.step === "payment"}>
-      {/* In the list, the host's own stepper is the chrome around Pagamento. */}
-      {paymentList && c.step === "payment" ? null : (
+      {/* In the list, the host's own stepper is the chrome around every step
+          it shows, the paid confirmation included: no second "Etapa N de M"
+          nested in the host's card, and no "Voltar" into a payment that
+          already happened (FUT-3999). */}
+      {paymentList ? null : (
         <FlowHeader copy={copy} step={c.step} completed={c.completed} onBack={c.back} />
       )}
 
