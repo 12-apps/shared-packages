@@ -15,7 +15,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import type { CheckoutBillingAddress, CheckoutDoorOption } from "../list/types";
 import type { CheckoutCustomerField, CheckoutProviderConfig } from "../types";
@@ -53,8 +53,10 @@ const arrowTo = (target: HTMLElement): void => {
 };
 
 /** Space on the focused radio: a key goes down, then the browser clicks the radio. */
-const spaceOn = (target: HTMLElement): void => {
-  target.focus();
+const spaceOn = async (target: HTMLElement): Promise<void> => {
+  // Called through the prototype, as payment-list-lazy does: the flakiness rule's fixer loops on a bare `.focus()` in an act().
+  await act(async () => HTMLElement.prototype.focus.call(target));
+  await waitFor(() => expect(document.activeElement).toBe(target));
   fireEvent.keyDown(target, { key: " ", code: "Space" });
   fireEvent.keyUp(target, { key: " ", code: "Space" });
   fireEvent.click(target);
@@ -120,7 +122,7 @@ describe("choosing an online row with no CPF (FUT-3995)", () => {
     await screen.findByTestId("list-cpf");
     const pix = radio("list-option-PIX");
     await waitFor(() => expect(pix.checked).toBe(true));
-    expect(document.activeElement).toBe(document.body);
+    await waitFor(() => expect(document.activeElement).toBe(document.body));
     tap(pix);
     await waitFor(() => expect(document.activeElement).toBe(cpfInput()));
     expect(pix.checked).toBe(true);
@@ -185,9 +187,9 @@ describe("the focus stays where it was (FUT-3995)", () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
     await screen.findByTestId("list-cpf");
     const card = radio("list-option-CARD");
-    spaceOn(card);
+    await spaceOn(card);
     await waitFor(() => expect(card.checked).toBe(true));
-    expect(document.activeElement).toBe(card);
+    await waitFor(() => expect(document.activeElement).toBe(card));
     expect(scrolled).not.toHaveBeenCalled();
   });
 
@@ -196,9 +198,9 @@ describe("the focus stays where it was (FUT-3995)", () => {
     await screen.findByTestId("list-cpf");
     const pix = radio("list-option-PIX");
     await waitFor(() => expect(pix.checked).toBe(true));
-    spaceOn(pix);
+    await spaceOn(pix);
     expect(pix.checked).toBe(true);
-    expect(document.activeElement).toBe(pix);
+    await waitFor(() => expect(document.activeElement).toBe(pix));
     expect(scrolled).not.toHaveBeenCalled();
   });
 
@@ -213,7 +215,7 @@ describe("the focus stays where it was (FUT-3995)", () => {
     await waitFor(() => expect(row.checked).toBe(true));
     // Tapped again, chosen: still nothing.
     tap(row);
-    expect(document.activeElement).toBe(document.body);
+    await waitFor(() => expect(document.activeElement).toBe(document.body));
     expect(scrolled).not.toHaveBeenCalled();
   });
 
