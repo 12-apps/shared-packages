@@ -91,6 +91,9 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
         // Only the buyer's own choice: a preselection never comes through here.
         props.onChosenOnline(row.method);
       }}
+      // A tap on the row already chosen (a preselected last method) changes
+      // nothing, but is the buyer's own choice all the same.
+      onChooseAgain={() => props.onChosenOnline(row.method)}
       testId={`list-option-${rowKey(row)}`}
     >
       {opensContent(row.method, state.asked, props.failure, props.covered) ? (

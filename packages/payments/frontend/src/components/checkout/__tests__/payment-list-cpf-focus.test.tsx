@@ -9,12 +9,16 @@
  *  - A preselected option at load moves neither the focus nor the scroll.
  *  - A choice made from the keyboard (the arrows walking the group, Space)
  *    keeps the focus in the radio group.
+ *  - Tapping the online row already chosen (a preselected last method) takes
+ *    the buyer to the CPF too: it is a deliberate tap, not the load.
+ *  - A door row (Dinheiro, Maquininha) is paid at the door and moves nothing.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
-import type { CheckoutCustomerField } from "../types";
+import type { CheckoutBillingAddress, CheckoutDoorOption } from "../list/types";
+import type { CheckoutCustomerField, CheckoutProviderConfig } from "../types";
 import { onPageStore, renderList, stubClient } from "./list-harness";
 
 const scrolled = vi.fn();
@@ -48,6 +52,38 @@ const arrowTo = (target: HTMLElement): void => {
   fireEvent.click(target);
 };
 
+/** Space on the focused radio: a key goes down, then the browser clicks the radio. */
+const spaceOn = (target: HTMLElement): void => {
+  target.focus();
+  fireEvent.keyDown(target, { key: " ", code: "Space" });
+  fireEvent.keyUp(target, { key: " ", code: "Space" });
+  fireEvent.click(target);
+};
+
+/** The billing address the bank checks — without it no debit row is drawn. */
+const ADDRESS: CheckoutBillingAddress = { street: "Av. Brigadeiro Faria Lima", number: "1384", city: "São Paulo", regionCode: "SP", postalCode: "01452-002" };
+
+/** A store whose provider has debit on, so "Cartão de débito" is drawn under the credit card. */
+function debitStore(): CheckoutProviderConfig {
+  const config = onPageStore();
+  return { ...config, chain: config.chain?.map((link) => ({ ...link, debit: true })) };
+}
+
+/** A client that can open a 3-D Secure session — the debit row is drawn only beside one. */
+function debitClient() {
+  return {
+    ...stubClient([]),
+    threeDSecureSession: vi.fn(async () => ({
+      ok: true as const,
+      data: { provider: "stubpay", session: "stub-3ds-session", expiresAt: 1_800_000_000_000, environment: "SANDBOX" as const },
+    })),
+  };
+}
+
+function door(overrides: Partial<CheckoutDoorOption> = {}): CheckoutDoorOption {
+  return { id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: "Diga se precisa de troco.", onSend: vi.fn(), ...overrides };
+}
+
 /** Only the CARD needs a CPF at this store; Pix does not. */
 const CPF_FOR_CARD: CheckoutCustomerField[] = [{ key: "taxId", type: "CPF", required: true, methods: ["CARD"] }];
 
@@ -67,6 +103,28 @@ describe("choosing an online row with no CPF (FUT-3995)", () => {
     tap(radio("list-option-CARD"));
     await waitFor(() => expect(document.activeElement).toBe(cpfInput()));
     expect(scrolled).toHaveBeenCalled();
+  });
+
+  it("focuses the CPF at the top when Cartão de débito is tapped", async () => {
+    renderList({ config: debitStore(), client: debitClient(), taxIdOnFile: false, list: { billingAddress: ADDRESS } });
+    await screen.findByTestId("list-cpf");
+    const debit = radio("list-option-CARD-DEBIT");
+    tap(debit);
+    await waitFor(() => expect(debit.checked).toBe(true));
+    await waitFor(() => expect(document.activeElement).toBe(cpfInput()));
+    expect(scrolled.mock.contexts).toContain(screen.getByTestId("list-cpf"));
+  });
+
+  it("focuses it when the buyer taps the online row already chosen — a preselected last method", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, list: { lastMethod: "PIX" } });
+    await screen.findByTestId("list-cpf");
+    const pix = radio("list-option-PIX");
+    await waitFor(() => expect(pix.checked).toBe(true));
+    expect(document.activeElement).toBe(document.body);
+    tap(pix);
+    await waitFor(() => expect(document.activeElement).toBe(cpfInput()));
+    expect(pix.checked).toBe(true);
+    expect(scrolled.mock.contexts).toContain(screen.getByTestId("list-cpf"));
   });
 
   it("focuses it for a CPF typed that is not valid", async () => {
@@ -121,6 +179,42 @@ describe("the focus stays where it was (FUT-3995)", () => {
     // A tap after the keys is the buyer's own choice again.
     tap(radio("list-option-CARD"));
     await waitFor(() => expect(document.activeElement).toBe(cpfInput()));
+  });
+
+  it("for a choice made from the keyboard — Space on a radio of the group", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
+    await screen.findByTestId("list-cpf");
+    const card = radio("list-option-CARD");
+    spaceOn(card);
+    await waitFor(() => expect(card.checked).toBe(true));
+    expect(document.activeElement).toBe(card);
+    expect(scrolled).not.toHaveBeenCalled();
+  });
+
+  it("for Space on the online row already chosen", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, list: { lastMethod: "PIX" } });
+    await screen.findByTestId("list-cpf");
+    const pix = radio("list-option-PIX");
+    await waitFor(() => expect(pix.checked).toBe(true));
+    spaceOn(pix);
+    expect(pix.checked).toBe(true);
+    expect(document.activeElement).toBe(pix);
+    expect(scrolled).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Dinheiro", "cash"],
+    ["Maquininha", "reader"],
+  ])("for a door row — %s is paid at the door", async (label, id) => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, list: { door: [door({ id, label })] } });
+    await screen.findByTestId("list-cpf");
+    const row = radio(`list-door-${id}`);
+    tap(row);
+    await waitFor(() => expect(row.checked).toBe(true));
+    // Tapped again, chosen: still nothing.
+    tap(row);
+    expect(document.activeElement).toBe(document.body);
+    expect(scrolled).not.toHaveBeenCalled();
   });
 
   it("for an option preselected at load: neither the focus nor the scroll moves", async () => {
