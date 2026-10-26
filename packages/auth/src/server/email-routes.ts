@@ -130,6 +130,26 @@ export interface EmailAuthRoutesConfig {
 }
 
 /**
+ * The codes behind a refusal's sentences, when this pack knows every one of
+ * them, and whether the only broken rule is `too-common`.
+ *
+ * A common password breaks no rule the person could meet by trying harder, so
+ * its sentence stands alone, the same one the screen's banner shows. A code the
+ * pack has no sentence for (a host's own rule) means the codes are not sent at
+ * all: a screen must not treat a partial list as the whole.
+ */
+function knownViolations(
+  raw: readonly string[],
+  messages: EmailAuthMessages,
+): { codes: PasswordPolicyViolation[] | null; onlyTooCommon: boolean } {
+  const codes = raw.filter((code): code is PasswordPolicyViolation =>
+    Object.hasOwn(messages.violations, code),
+  );
+  if (raw.length === 0 || codes.length !== raw.length) return { codes: null, onlyTooCommon: false };
+  return { codes, onlyTooCommon: codes.length === 1 && codes[0] === "too-common" };
+}
+
+/**
  * A refusal, as the wire sees it.
  *
  * The broken password rules are TRANSLATED here, not passed through.
@@ -140,16 +160,9 @@ export interface EmailAuthRoutesConfig {
  */
 function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): EmailAuthResponse {
   const { reason } = refusalResult;
-  const violations = (refusalResult.violations ?? []).map(
-    (code) => messages.violations[code as PasswordPolicyViolation] ?? code,
-  );
-  const codes = (refusalResult.violations ?? []).filter(
-    (code): code is PasswordPolicyViolation => Object.hasOwn(messages.violations, code),
-  );
-  const known = violations.length > 0 && codes.length === violations.length;
-  // A common password breaks no rule the person could meet by trying harder, so
-  // the sentence for it stands alone, the same one the screen's banner shows.
-  const onlyTooCommon = known && codes.length === 1 && codes[0] === "too-common";
+  const raw = refusalResult.violations ?? [];
+  const violations = raw.map((code) => messages.violations[code as PasswordPolicyViolation] ?? code);
+  const { codes, onlyTooCommon } = knownViolations(raw, messages);
   const detail = violations.length > 0 ? ` ${violations.join(" ")}` : "";
   return {
     status: EMAIL_AUTH_STATUS[reason],
@@ -159,7 +172,7 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
       ...(violations.length > 0 ? { violations } : {}),
       // The codes behind `violations`, so a screen can tell WHICH rule was
       // broken without matching on a sentence that is the host's to reword.
-      ...(known ? { violationCodes: codes } : {}),
+      ...(codes ? { violationCodes: codes } : {}),
     },
   };
 }

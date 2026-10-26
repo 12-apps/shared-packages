@@ -11,7 +11,7 @@ import { createEmailAuth, type EmailAuth } from "../create-email-auth";
 import { createWebEmailAuth } from "../create-web-email-auth";
 import { EN_US_PAGES } from "../pages/en-US";
 import { PT_BR_PAGES } from "../pages/pt-BR";
-import type { EmailAuthCopy } from "../screens/copy";
+import { failureMessage, type EmailAuthCopy } from "../screens/copy";
 import { EN_US } from "../screens/en-US";
 import { PT_BR } from "../screens/pt-BR";
 
@@ -68,28 +68,55 @@ const PACKS: Pack[] = [
 const useSession = (): ReturnType<Parameters<typeof createWebEmailAuth>[0]["useSession"]> =>
   ({ status: "unauthenticated", refresh: async () => {} }) as never;
 
-/** The wire body the real server routes answer a sign-up for `PASSWORD` with. */
-async function serverRefusal(messages: EmailAuthMessages): Promise<{
-  violations: string[];
-  violationCodes?: string[];
-}> {
+/** The wire body the real server routes answer a sign-up for `password` with. */
+async function serverBody(
+  messages: EmailAuthMessages,
+  password: string,
+): Promise<{ error: string; violations: string[]; violationCodes?: string[] }> {
   const credentials = {
     signUp: vi.fn(async () => ({
       ok: false as const,
       reason: "weak-password" as const,
-      violations: checkPasswordPolicy(PASSWORD),
+      violations: checkPasswordPolicy(password),
     })),
   } as unknown as EmailCredentials;
   const signup = emailAuthRoutes({ credentials, messages }).find(
     (entry) => entry.method === "POST" && entry.path === "/signup",
   );
-  const response = await signup?.handle({ body: { email: "a@b.co", password: PASSWORD }, userId: null });
-  return response?.body as { violations: string[]; violationCodes?: string[] };
+  const response = await signup?.handle({ body: { email: "a@b.co", password }, userId: null });
+  return response?.body as { error: string; violations: string[]; violationCodes?: string[] };
 }
 
-/** The whole wire body, for the fields `serverRefusal` does not narrow to. */
-async function serverBody(messages: EmailAuthMessages): Promise<{ error: string }> {
-  return (await serverRefusal(messages)) as unknown as { error: string };
+/** The refusal the sign-up, reset and security-card transports all answer with. */
+async function tooCommonRefusal(pack: Pack): Promise<{
+  ok: false;
+  reason: "weak-password";
+  violations: string[];
+  violationCodes: string[];
+}> {
+  const body = await serverBody(pack.messages, PASSWORD);
+  return {
+    ok: false,
+    reason: "weak-password",
+    violations: body.violations,
+    violationCodes: body.violationCodes ?? [],
+  };
+}
+
+/** The screens of one pack, over `overrides` on a real transport. */
+function screensFor(pack: Pack, overrides: Partial<EmailAuth>): ReturnType<typeof createWebEmailAuth> {
+  return createWebEmailAuth({
+    basePath: "/api/auth/email",
+    copy: pack.copy,
+    pages: pack.pages,
+    useSession,
+    transport: { ...createEmailAuth({ basePath: "/api/auth/email" }), ...overrides },
+  });
+}
+
+/** The banner's text once it has appeared. */
+async function bannerText(): Promise<string> {
+  return (await screen.findByTestId("auth-failure")).textContent ?? "";
 }
 
 afterEach(cleanup);
@@ -132,10 +159,10 @@ describe.each(PACKS)("the password rule in $name", (pack) => {
   });
 
   it("renders the too-common refusal as one sentence under the banner title", async () => {
-    const body = await serverRefusal(pack.messages);
+    const body = await serverBody(pack.messages, PASSWORD);
     expect(body.violationCodes).toEqual(["too-common"]);
     // The API's own `error` agrees with the banner: the same single sentence.
-    expect((await serverBody(pack.messages)).error).toBe(pack.tooCommonSentence);
+    expect(body.error).toBe(pack.tooCommonSentence);
 
     const transport: EmailAuth = {
       ...createEmailAuth({ basePath: "/api/auth/email" }),
@@ -168,31 +195,58 @@ describe.each(PACKS)("the password rule in $name", (pack) => {
   });
 
   it("keeps the old wording for every other violation", async () => {
-    const credentials = {
-      signUp: vi.fn(async () => ({
-        ok: false as const,
-        reason: "weak-password" as const,
-        violations: checkPasswordPolicy("abc"),
-      })),
-    } as unknown as EmailCredentials;
-    const signup = emailAuthRoutes({ credentials, messages: pack.messages }).find(
-      (entry) => entry.method === "POST" && entry.path === "/signup",
-    );
-    const response = await signup?.handle({ body: { email: "a@b.co", password: "abc" }, userId: null });
-    const body = response?.body as { violations: string[]; violationCodes: string[] };
+    const body = await serverBody(pack.messages, "abc");
 
     expect(body.violationCodes).toEqual(["too-short", "needs-number"]);
-    expect((response?.body as { error: string }).error).toBe(
-      `${pack.messages["weak-password"]} ${body.violations.join(" ")}`,
-    );
-    const { failureMessage } = await import("../screens/copy");
+    expect(body.error).toBe(`${pack.messages["weak-password"]} ${body.violations.join(" ")}`);
     expect(failureMessage(pack.copy, "weak-password", body.violations, body.violationCodes)).toBe(
       `${pack.copy.failures["weak-password"]} ${body.violations.join(" ")}`,
     );
   });
 
+  it("shows the reset screen's too-common refusal as one sentence", async () => {
+    const refusal = await tooCommonRefusal(pack);
+    const { ResetPasswordScreen } = screensFor(pack, { resetPassword: vi.fn(async () => refusal) });
+    render(<ResetPasswordScreen token="t" onDone={() => {}} onRequestNewLink={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText(pack.copy.resetPassword.newPasswordLabel), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.change(screen.getByLabelText(pack.copy.resetPassword.confirmationLabel), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.submit(screen.getByTestId("reset-password-form"));
+
+    const text = await bannerText();
+    expect(text).toContain(pack.tooCommonSentence);
+    expect(text).not.toContain(pack.oldPrefix);
+  });
+
+  it("shows the security card's too-common refusal as one sentence", async () => {
+    const refusal = await tooCommonRefusal(pack);
+    const { PasswordSecurityCard } = screensFor(pack, {
+      getSecurity: vi.fn(async () => ({
+        ok: true as const,
+        data: { hasPassword: false, emailVerified: true, enabled: true },
+      })),
+      setPassword: vi.fn(async () => refusal),
+    });
+    render(<PasswordSecurityCard />);
+
+    fireEvent.change(await screen.findByLabelText(pack.copy.securityCard.newPasswordLabelAdd), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.change(screen.getByLabelText(pack.copy.securityCard.confirmationLabel), {
+      target: { value: PASSWORD },
+    });
+    fireEvent.submit(screen.getByTestId("set-password-form"));
+
+    const text = await bannerText();
+    expect(text).toContain(pack.tooCommonSentence);
+    expect(text).not.toContain(pack.oldPrefix);
+  });
+
   it("falls back to the old wording from a server that sends no codes", async () => {
-    const { failureMessage } = await import("../screens/copy");
     expect(failureMessage(pack.copy, "weak-password", [pack.tooCommonSentence])).toBe(
       `${pack.copy.failures["weak-password"]} ${pack.tooCommonSentence}`,
     );

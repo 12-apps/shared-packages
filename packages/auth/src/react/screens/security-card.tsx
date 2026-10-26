@@ -11,6 +11,7 @@ import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
+import { useRefusal } from "./use-refusal";
 
 /**
  * The account's password, on a security screen — **the flow this whole feature
@@ -69,9 +70,7 @@ function useSecurityCard(): CardState {
   const [confirmation, setConfirmation] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [pending, setPending] = useState(false);
-  const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
-  const [violations, setViolations] = useState<readonly string[] | null>(null);
-  const [violationCodes, setViolationCodes] = useState<readonly string[] | null>(null);
+  const refusal = useRefusal();
   const [saved, setSaved] = useState(false);
   const [savedAdding, setSavedAdding] = useState(false);
   const mismatch = confirmation.length > 0 && password !== confirmation;
@@ -92,9 +91,7 @@ function useSecurityCard(): CardState {
     event.preventDefault();
     if (pending || mismatch) return;
     setPending(true);
-    setReason(null);
-    setViolations(null);
-    setViolationCodes(null);
+    refusal.clear();
     setSaved(false);
     try {
       const result = await client.setPassword({
@@ -109,9 +106,7 @@ function useSecurityCard(): CardState {
         setCurrentPassword("");
         await load();
       } else {
-        setReason(result.reason);
-        setViolations(result.violations ?? null);
-        setViolationCodes(result.violationCodes ?? null);
+        refusal.refuse(result);
       }
     } finally {
       setPending(false);
@@ -125,16 +120,16 @@ function useSecurityCard(): CardState {
     confirmation,
     currentPassword,
     pending,
-    reason,
-    violations,
-    violationCodes,
+    reason: refusal.reason,
+    violations: refusal.violations,
+    violationCodes: refusal.violationCodes,
     saved,
     savedAdding,
     mismatch,
     setPassword,
     setConfirmation,
     setCurrentPassword,
-    dismiss: () => setReason(null),
+    dismiss: refusal.clear,
     submit,
   };
 }

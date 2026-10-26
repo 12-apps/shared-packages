@@ -144,18 +144,21 @@ interface ErrorBody {
   violationCodes?: unknown;
 }
 
+/** The strings of a wire array, or `undefined` when the field is not an array. */
+function stringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+}
+
 /** Narrow a refusal body to the closed vocabulary, or `unknown`. */
 function toRefusal<T>(body: ErrorBody | null): EmailAuthClientResult<T> {
   const reason =
     typeof body?.reason === "string" && FAILURES.includes(body.reason)
       ? (body.reason as EmailAuthFailure)
       : "unknown";
-  const violations = Array.isArray(body?.violations)
-    ? body.violations.filter((entry): entry is string => typeof entry === "string")
-    : undefined;
-  const violationCodes = Array.isArray(body?.violationCodes)
-    ? body.violationCodes.filter((entry): entry is string => typeof entry === "string")
-    : undefined;
+  const violations = stringArray(body?.violations);
+  const violationCodes = stringArray(body?.violationCodes);
   return {
     ok: false,
     reason,

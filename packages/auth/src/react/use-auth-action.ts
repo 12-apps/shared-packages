@@ -31,7 +31,7 @@ export interface AuthActionState<T> {
   /** Which password rules were broken, when `reason` is `weak-password`. */
   violations: readonly string[] | null;
   /** The codes behind {@link violations}, when the server sent them. */
-  violationCodes: readonly string[] | null;
+  violationCodes?: readonly string[] | null;
   /** The payload of the last successful attempt. */
   data: T | null;
   /** The last attempt succeeded. */
