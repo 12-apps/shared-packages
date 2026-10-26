@@ -74,7 +74,7 @@ export function VersionRow({
         {isCurrent && <Chip label={copy.currentBadge} size="sm" color="primary" />}
         {entry.restoredFromVersion !== null && (
           <Chip
-            label={`a partir da v${entry.restoredFromVersion}`}
+            label={copy.restoredFrom(entry.restoredFromVersion)}
             size="sm"
             variant="outlined"
           />

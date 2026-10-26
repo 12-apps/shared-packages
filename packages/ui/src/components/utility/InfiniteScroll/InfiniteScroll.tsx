@@ -25,6 +25,7 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   endText,
   endMessage,
   error,
+  errorText,
   errorComponent,
   onError,
   className,
@@ -54,7 +55,7 @@ export const InfiniteScroll: React.FC<InfiniteScrollProps> = ({
   // spinner, or the sentinel that asks for the next page.
   const renderSentinel = () => {
     if (!hasMore) return endMessage || <DefaultEndMessage endText={endText} />;
-    if (error) return errorComponent || <DefaultError error={error} />;
+    if (error) return errorComponent || <DefaultError error={error} errorText={errorText} />;
     if (loading) return loader || <DefaultLoader loadingText={loadingText} />;
 
     return (

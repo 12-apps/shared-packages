@@ -203,6 +203,13 @@ describe('createWebStorage', () => {
     await waitFor(() => expect(text('storage-image-field-key')).toBe(KEY));
   });
 
+  it("names the preview with the host's own label, never a word of the package's", () => {
+    const storage = createWebStorage({ messages: PT_BR_WEB_STORAGE_MESSAGES, apiBase: '/api' });
+    render(<storage.ImageField {...LABELS} previewUrl="https://cdn.test/a.webp" onChange={() => undefined} />);
+
+    expect(screen.getByTestId('storage-image-field-preview').getAttribute('alt')).toBe(LABELS.label);
+  });
+
   it('clears the key and the error when the image is removed', async () => {
     installBrowserGaps();
     const { fetchImpl } = stubFetch(accepted);

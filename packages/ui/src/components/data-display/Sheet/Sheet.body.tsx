@@ -12,6 +12,7 @@ export interface SheetBodyProps extends Pick<
   | 'title'
   | 'description'
   | 'showCloseButton'
+  | 'closeLabel'
   | 'showHandle'
   | 'header'
   | 'footer'
@@ -67,6 +68,7 @@ export const SheetBody: React.FC<SheetBodyProps> = (props) => {
     title,
     description,
     showCloseButton,
+    closeLabel,
     showHandle,
     header,
     footer,
@@ -108,6 +110,7 @@ export const SheetBody: React.FC<SheetBodyProps> = (props) => {
           title={title}
           description={description}
           showCloseButton={showCloseButton}
+          closeLabel={closeLabel}
           onClose={onClose}
           showHandle={showHandle && isVerticalSheet}
           isDraggable={isDraggableVariant && isVerticalSheet}

@@ -21,6 +21,7 @@ import {
 import type { AvatarGroupProps, AvatarProps } from './Avatar.types.native';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import type { ColorValue } from '../../../tokens/vocabulary';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 interface AvatarModel {
   args: SurfaceArgs;
@@ -92,7 +93,7 @@ function useAvatarModel(raw: AvatarProps): AvatarModel {
       showSpinner: loading || imageLoading,
       imgSrc: imageError ? undefined : src,
       alt,
-      ariaLabel: alt || 'Avatar',
+      ariaLabel: alt || EN_US_UI_LABELS.avatar.name,
       content: contentNode({
         pick,
         children,

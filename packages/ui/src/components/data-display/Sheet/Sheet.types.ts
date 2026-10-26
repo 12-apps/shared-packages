@@ -28,6 +28,11 @@ export interface SheetProps {
   closeOnOverlayClick?: boolean;
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
+  /**
+   * The close button's accessible name. Defaults to `close`, as the Dialog's
+   * does; a pt-BR host passes `UI_LABELS['pt-BR'].common.close`.
+   */
+  closeLabel?: string;
   showHandle?: boolean;
   swipeable?: boolean;
   snapPoints?: number[];
@@ -64,6 +69,11 @@ export interface SheetHeaderProps {
   title?: string;
   description?: string;
   showCloseButton?: boolean;
+  /**
+   * The close button's accessible name. Defaults to `close`, as the Dialog's
+   * does; a pt-BR host passes `UI_LABELS['pt-BR'].common.close`.
+   */
+  closeLabel?: string;
   onClose?: () => void;
   showHandle?: boolean;
   isDraggable?: boolean;

@@ -39,6 +39,8 @@ export interface DeleteViewCopy {
   sharedWarning: string;
   /** `entityLabel` is the host's own noun for the rows — never this package's. */
   rowsUnaffected(entityLabel: string): string;
+  /** `entityLabel` when the host names no noun for its rows: "The records". */
+  entityFallback: string;
   confirm: string;
   /** The way out, beside the destructive button. */
   cancel: string;
@@ -170,6 +172,12 @@ export interface DataViewsGridCopy extends DataGridCopy {
   emptyFilteredTitle: string;
   emptyFilteredHint: string;
   emptyFilteredAction: string;
+  /**
+   * The two orders every sortable column offers when a page supplies no sort
+   * fields of its own.
+   */
+  sortAscending: string;
+  sortDescending: string;
 }
 
 export interface DataViewsFiltersCopy {
@@ -252,6 +260,9 @@ export interface DataViewsSelectionCopy {
 export interface DataViewsNavCopy {
   mainView: string;
   defaultTag: string;
+  /** The glyphs' names beside a view that is pinned, or shared with the team. */
+  pinnedTag: string;
+  sharedTag: string;
   viewOptions(viewName: string): string;
   emptyHint: string;
   setDefault: string;

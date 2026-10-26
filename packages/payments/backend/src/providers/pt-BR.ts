@@ -167,7 +167,7 @@ export const PT_BR_INFINITEPAY_COPY: InfinitePayCopy = {
   noCheckoutUrl: 'InfinitePay não retornou a URL do checkout.',
   handleHelp:
     'Confira caractere por caractere. Mostramos a tag em fonte monoespaçada para você distinguir 0 de O e l de 1.',
-  fields: { handle: 'InfiniteTag ($usuario)' },
+  fields: { handle: 'InfiniteTag ($usuario)', handlePlaceholder: '$suatag' },
 };
 
 /**

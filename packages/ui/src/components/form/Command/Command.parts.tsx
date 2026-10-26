@@ -11,9 +11,10 @@ import type {
   CommandSeparatorProps,
 } from './Command.types';
 import { rem } from '../../../tokens/relative';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 export const CommandEmpty: React.FC<CommandEmptyProps> = ({
-  message = 'No results found',
+  message = EN_US_UI_LABELS.command.empty,
   className,
   style,
   dataTestId,
@@ -33,7 +34,7 @@ export const CommandEmpty: React.FC<CommandEmptyProps> = ({
   );
 
 export const CommandLoading: React.FC<CommandLoadingProps> = ({
-  message = 'Loading...',
+  message = EN_US_UI_LABELS.command.loading,
   className,
   style,
   dataTestId,

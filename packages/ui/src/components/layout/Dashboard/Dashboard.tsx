@@ -261,7 +261,10 @@ const DashboardFilters = ({ children, className }: DashboardFiltersProps): React
 DashboardFilters.displayName = 'Dashboard.Filters';
 (DashboardFilters as SlottedComponent).dashboardSlot = 'filters';
 
-const DashboardMoreFilters = ({ children, label = 'More filters' }: DashboardMoreFiltersProps): React.JSX.Element => {
+const DashboardMoreFilters = ({
+  children,
+  label = EN_US_UI_LABELS.dashboard.moreFilters,
+}: DashboardMoreFiltersProps): React.JSX.Element => {
   const { moreFiltersOpen, toggleMoreFilters, testIdPrefix } = useDashboardContext();
   return (
     <Box>

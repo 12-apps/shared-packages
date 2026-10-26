@@ -32,7 +32,7 @@ export function infinitePayCredentialSchema(
       // before it starts receiving the store's money.
       mono: true,
       confirmOnSave: true,
-      placeholder: '$suatag',
+      placeholder: copy.fields.handlePlaceholder,
       pattern: '^\\$[a-zA-Z0-9][a-zA-Z0-9._-]{2,}$',
       helperText: copy.handleHelp,
     },

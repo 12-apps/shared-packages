@@ -7,6 +7,7 @@ import React from 'react';
 
 import type { FilterTriggerProps } from './ContentToolbar.types';
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
@@ -28,7 +29,9 @@ export function FilterTrigger({
   onOpenChange,
   hasActiveFilters = false,
   activeCount = 0,
-  label = 'Filtros',
+  // Portuguese by default, as it always rendered; the pack names it so a host
+  // passes `label` from its own locale's `contentToolbar.filters`.
+  label = PT_BR_UI_LABELS.contentToolbar.filters,
   openFiltersLabel,
   closeFiltersLabel,
   'data-testid': testId = 'toggle-filters-btn',

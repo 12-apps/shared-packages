@@ -28,6 +28,9 @@ import {
   SPINNER_SIZES,
 } from './LoadingState.metrics';
 import type { LoadingStateProps, LoadingStateSize } from './LoadingState.types.native';
+import type { LoadingStateLabels } from '../../../copy/labels';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
+import { resolveLabels } from '../../../utils/resolve-labels';
 import { resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { alpha } from '../../../tokens/color';
@@ -51,6 +54,7 @@ function spinnerSize(px: number): number | 'small' | 'large' {
 
 interface ViewArgs {
   message?: string;
+  labels: LoadingStateLabels;
   size: LoadingStateSize;
   skeletonRows: number;
   testIds: LoadingStateTestIds;
@@ -96,13 +100,13 @@ function SkeletonRows({ size, skeletonRows, testIds }: Pick<ViewArgs, 'size' | '
   );
 }
 
-function SkeletonView({ message, size, skeletonRows, testIds, style, rest }: ViewArgs): React.JSX.Element {
+function SkeletonView({ message, labels, size, skeletonRows, testIds, style, rest }: ViewArgs): React.JSX.Element {
   const theme = useUiTheme();
   return (
     <View
       role="status"
       aria-busy
-      aria-label={message || 'Loading content'}
+      aria-label={message || labels.skeleton}
       testID={testIds.base}
       style={[styles.skeleton, { padding: theme.spacing(SKELETON_PADDING_UNITS) }, style]}
       {...rest}
@@ -118,13 +122,13 @@ function SkeletonView({ message, size, skeletonRows, testIds, style, rest }: Vie
   );
 }
 
-function SpinnerView({ message, size, testIds, style, rest }: ViewArgs): React.JSX.Element {
+function SpinnerView({ message, labels, size, testIds, style, rest }: ViewArgs): React.JSX.Element {
   const theme = useUiTheme();
   return (
     <View
       role="status"
       aria-busy
-      aria-label={message || 'Loading'}
+      aria-label={message || labels.spinner}
       testID={testIds.base}
       style={[
         styles.spinner,
@@ -149,9 +153,10 @@ function SpinnerView({ message, size, testIds, style, rest }: ViewArgs): React.J
 
 export const LoadingState: React.FC<LoadingStateProps> = React.memo(function LoadingState(rawProps) {
   const resolved = resolveLoadingStateProps(rawProps);
-  const { variant, message, size, skeletonRows, style, ...others } = resolved;
+  const { variant, message, labels, size, skeletonRows, style, ...others } = resolved;
   const args: ViewArgs = {
     message,
+    labels: resolveLabels(EN_US_UI_LABELS.loadingState, labels),
     size,
     skeletonRows,
     style,

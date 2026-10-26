@@ -4,6 +4,7 @@ import React from 'react';
 
 import { Toast } from '../../feedback/Toast';
 import { useFormContext } from './FormContext';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 /** Props for {@link FormErrorSnackbar}. */
 export interface FormErrorSnackbarProps {
@@ -17,7 +18,7 @@ export interface FormErrorSnackbarProps {
  * error toast (testid `total-form-error-snackbar`) once any field has an error.
  */
 export function FormErrorSnackbar({
-  message = 'Please fix the highlighted fields and try again.',
+  message = EN_US_UI_LABELS.formErrorSnackbar.message,
 }: FormErrorSnackbarProps): React.ReactElement | null {
   const { errors } = useFormContext();
   const hasErrors = Object.values(errors).some(Boolean);

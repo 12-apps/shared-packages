@@ -74,17 +74,26 @@ export interface CodeLabels {
   copied: string;
 }
 
-/** `ViewSelector`'s two options and `FilterTrigger`'s accessible name. */
+/**
+ * `ViewSelector`'s two options, `FilterTrigger`'s accessible name and visible
+ * label, and `MultiSelectDropdown`'s "everything" option, search box and empty
+ * list.
+ */
 export interface ContentToolbarLabels {
   gridView: string;
   listView: string;
   openFilters: string;
   closeFilters: string;
+  filters: string;
+  all: string;
+  search: string;
+  noResults: string;
 }
 
-/** `Dashboard.Breadcrumb`'s landmark name. */
+/** `Dashboard.Breadcrumb`'s landmark name and `Dashboard.MoreFilters`' toggle. */
 export interface DashboardLabels {
   breadcrumb: string;
+  moreFilters: string;
 }
 
 /** `NavigationMenu`'s collapse control. */
@@ -103,6 +112,108 @@ export interface WorkflowStepLabels {
   progress(position: number, total: number): string;
 }
 
+/** `AlertDialog`'s two buttons, when the host names neither. */
+export interface AlertDialogLabels {
+  cancel: string;
+  confirm: string;
+}
+
+/** `Avatar`'s accessible name when it carries no `alt` and no `aria-label`. */
+export interface AvatarLabels {
+  name: string;
+}
+
+/** `EmptyState`'s two built-in actions. */
+export interface EmptyStateLabels {
+  refresh: string;
+  create: string;
+}
+
+/** `ErrorState`'s retry button. */
+export interface ErrorStateLabels {
+  retry: string;
+}
+
+/** `LoadingState`'s accessible name while it shows no `message`, per variant. */
+export interface LoadingStateLabels {
+  skeleton: string;
+  spinner: string;
+}
+
+/** `StackedModal`'s line while a panel loads. */
+export interface StackedModalLabels {
+  loading: string;
+}
+
+/** `Command`'s search box, its empty list and its busy line. */
+export interface CommandLabels {
+  placeholder: string;
+  empty: string;
+  loading: string;
+}
+
+/** `FormErrorSnackbar`'s sentence when the form names none. */
+export interface FormErrorSnackbarLabels {
+  message: string;
+}
+
+/** `ColumnsMenu`'s heading and its trigger's accessible name. */
+export interface ColumnsMenuLabels {
+  title: string;
+  toggle: string;
+}
+
+/** `Drawer`'s close button. */
+export interface DrawerLabels {
+  close: string;
+}
+
+/** `SettingsLayout`'s navigation name (when its title is not text), search and back control. */
+export interface SettingsLayoutLabels {
+  navigation: string;
+  searchPlaceholder: string;
+  emptySearch: string;
+  back: string;
+}
+
+/** `TableFilter`'s landmark name and its keyword box. */
+export interface TableFilterLabels {
+  filters: string;
+  keywordPlaceholder: string;
+  keywordLabel: string;
+}
+
+/** `AppHeader`'s identity disclosure, named after the host's own title. */
+export interface AppHeaderLabels {
+  disclose(title: string): string;
+}
+
+/** `Breadcrumbs`' landmark name. */
+export interface BreadcrumbsLabels {
+  navigation: string;
+}
+
+/** `AnimatedIcon`'s accessible name, from the animation it plays. */
+export interface AnimatedIconLabels {
+  name(variant: string): string;
+}
+
+/** `InfiniteScroll`'s default error, when the failure carries no message. */
+export interface InfiniteScrollLabels {
+  loadFailed: string;
+}
+
+/** `SocialLoginContainer`'s heading and the word on its divider. */
+export interface SocialLoginLabels {
+  title: string;
+  divider: string;
+}
+
+/** `DateRangePicker`'s calendar popover name. */
+export interface DateRangePickerLabels {
+  calendar: string;
+}
+
 /** Every family above, keyed by the component that renders it. */
 export interface UiLabels {
   common: CommonLabels;
@@ -117,4 +228,22 @@ export interface UiLabels {
   dashboard: DashboardLabels;
   navigationMenu: NavigationMenuLabels;
   workflowStep: WorkflowStepLabels;
+  alertDialog: AlertDialogLabels;
+  avatar: AvatarLabels;
+  emptyState: EmptyStateLabels;
+  errorState: ErrorStateLabels;
+  loadingState: LoadingStateLabels;
+  stackedModal: StackedModalLabels;
+  command: CommandLabels;
+  formErrorSnackbar: FormErrorSnackbarLabels;
+  columnsMenu: ColumnsMenuLabels;
+  drawer: DrawerLabels;
+  settingsLayout: SettingsLayoutLabels;
+  tableFilter: TableFilterLabels;
+  appHeader: AppHeaderLabels;
+  breadcrumbs: BreadcrumbsLabels;
+  animatedIcon: AnimatedIconLabels;
+  infiniteScroll: InfiniteScrollLabels;
+  socialLogin: SocialLoginLabels;
+  dateRangePicker: DateRangePickerLabels;
 }

@@ -77,6 +77,8 @@ export interface VersionHistoryCopy {
   title: (itemLabel: string) => string;
   actions: { create: string; update: string; restore: string };
   currentBadge: string;
+  /** The badge on a version that a restore produced, naming the version it came from. */
+  restoredFrom: (version: number) => string;
   restoreAction: string;
   compareAria: (version: number) => string;
   restored: (version: number) => string;

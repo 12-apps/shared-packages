@@ -2,6 +2,7 @@
 
 import type { Theme } from "@mui/material/styles/index.js";
 
+import type { DataViewsGridCopy } from "./data-views-copy";
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
@@ -133,9 +134,13 @@ function renderAutoKebab<T extends Record<string, unknown>>(
   );
 }
 
-/** Sort options derived from the sortable columns when a page supplies none. */
+/**
+ * Sort options derived from the sortable columns when a page supplies none,
+ * each offering the two orders in the host's words.
+ */
 export function defaultSortFields<T extends Record<string, unknown>>(
   columns: DataViewColumn<T>[],
+  copy: Pick<DataViewsGridCopy, "sortAscending" | "sortDescending">,
 ): SortFieldDefinition[] {
   return columns
     .filter(
@@ -150,8 +155,8 @@ export function defaultSortFields<T extends Record<string, unknown>>(
       value: col.id,
       label: col.header as string,
       orderOptions: [
-        { value: "asc", label: "Crescente" },
-        { value: "desc", label: "Decrescente" },
+        { value: "asc", label: copy.sortAscending },
+        { value: "desc", label: copy.sortDescending },
       ],
     }));
 }

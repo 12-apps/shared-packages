@@ -201,6 +201,12 @@ export interface SettingsLayoutProps {
   /** Label on the back control. Defaults to `"Back"`. */
   backLabel?: string;
   /**
+   * The navigation's accessible name while `title` is not plain text (a node,
+   * or nothing). Defaults to `"Settings"`; a plain-string `title` names it
+   * instead, whatever this says.
+   */
+  navigationLabel?: string;
+  /**
    * The open section's own name.
    *
    * Supplying it turns the narrow-width back link into a compact header: a

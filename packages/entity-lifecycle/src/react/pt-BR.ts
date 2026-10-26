@@ -55,6 +55,7 @@ export const PT_BR_LIFECYCLE_WEB_COPY: LifecycleWebCopy = {
     title: (itemLabel) => `Histórico de versões — ${itemLabel}`,
     actions: { create: 'Criação', update: 'Alteração', restore: 'Restauração' },
     currentBadge: 'Versão atual',
+    restoredFrom: (version) => `a partir da v${version}`,
     restoreAction: 'Restaurar',
     compareAria: (version) => `Comparar a versão v${version}`,
     restored: (version) => `Versão v${version} restaurada.`,

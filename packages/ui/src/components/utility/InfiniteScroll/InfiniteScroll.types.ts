@@ -22,6 +22,12 @@ export interface InfiniteScrollProps {
   loader?: ReactNode;
   endMessage?: ReactNode;
   error?: Error | null;
+  /**
+   * The error line when `error` carries no message of its own. Defaults to the
+   * English it always read; a pt-BR host passes
+   * `UI_LABELS['pt-BR'].infiniteScroll.loadFailed`.
+   */
+  errorText?: string;
   errorComponent?: ReactNode;
   onError?: (error: Error) => void;
   className?: string;

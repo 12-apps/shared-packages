@@ -102,6 +102,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     sharedWarning: "Esta visão está compartilhada — a equipe perderá o acesso a ela.",
     rowsUnaffected: (entityLabel) =>
       `${entityLabel} não são afetados; apenas o recorte salvo é removido.`,
+    entityFallback: "Os registros",
     confirm: "Excluir visão",
     cancel: "Cancelar",
   },
@@ -197,6 +198,8 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     emptyFilteredTitle: "Nenhum resultado para esses filtros",
     emptyFilteredHint: "Ajuste ou remova os filtros.",
     emptyFilteredAction: "Limpar filtros",
+    sortAscending: "Crescente",
+    sortDescending: "Decrescente",
   },
   filters: {
     moreFilters: (count) => `Mais filtros: ${count} sem espaço na barra`,
@@ -241,6 +244,8 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
   nav: {
     mainView: "Visão principal",
     defaultTag: "Padrão",
+    pinnedTag: "Fixada",
+    sharedTag: "Compartilhada",
     viewOptions: (viewName) => `Opções de ${viewName}`,
     emptyHint: "Nenhuma visão salva. Ajuste filtros, colunas ou ordenação e salve abaixo.",
     setDefault: "Definir como padrão",

@@ -92,7 +92,7 @@ export function ImageField(props: BoundImageFieldProps): JSX.Element {
               component, and this preview is a local blob half the time. */}
           <img
             src={preview}
-            alt={props.label ?? 'Imagem'}
+            alt={props.label}
             data-testid={`${testId}-preview`}
             style={{ maxWidth: 160, maxHeight: 160, objectFit: 'contain' }}
           />

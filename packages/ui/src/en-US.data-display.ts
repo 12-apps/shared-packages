@@ -103,6 +103,7 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     // built around it rather than naming a noun of its own.
     rowsUnaffected: (entityLabel) =>
       `${entityLabel} are not affected; only the saved slice is removed.`,
+    entityFallback: "The records",
     confirm: "Delete view",
     cancel: "Cancel",
   },
@@ -200,6 +201,8 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     emptyFilteredTitle: "No results for these filters",
     emptyFilteredHint: "Adjust or remove the filters.",
     emptyFilteredAction: "Clear filters",
+    sortAscending: "Ascending",
+    sortDescending: "Descending",
   },
   filters: {
     moreFilters: (count) => `More filters: ${count} did not fit in the bar`,
@@ -249,6 +252,8 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
   nav: {
     mainView: "Main view",
     defaultTag: "Default",
+    pinnedTag: "Pinned",
+    sharedTag: "Shared",
     viewOptions: (viewName) => `${viewName} options`,
     emptyHint: "No saved views. Adjust filters, columns or sorting and save below.",
     setDefault: "Set as default",
