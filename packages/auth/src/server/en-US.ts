@@ -22,7 +22,7 @@ export const EN_US_MESSAGES: EmailAuthMessages = {
     "too-long": "That password is too long.",
     "needs-letter": "Include at least one letter.",
     "needs-number": "Include at least one number.",
-    "too-common": "That password is too common. Choose another.",
+    "too-common": "That password is too common. Choose another one.",
   },
   "method-disabled": "Signing in with an e-mail and password is unavailable right now.",
   "invalid-email": "Enter a valid e-mail address.",

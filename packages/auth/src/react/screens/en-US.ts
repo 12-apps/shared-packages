@@ -68,7 +68,7 @@ export const EN_US: EmailAuthCopy = {
     passwordLabel: "Password",
     // The rule stated here has to match what the server enforces; it is the
     // package's own floor, not host config.
-    passwordHint: "At least 8 characters, with a letter and a number.",
+    passwordHint: "At least 8 characters, with a letter and a number, and not a common password.",
     submit: "Create account",
     failureTitle: "Could not create the account",
     sentTitle: "Check your e-mail",
@@ -90,7 +90,8 @@ export const EN_US: EmailAuthCopy = {
   },
   resetPassword: {
     title: "Set a new password",
-    intro: "Choose a password of at least 8 characters, including a letter and a number.",
+    intro:
+      "Choose a password of at least 8 characters, including a letter and a number, and not a common password.",
     newPasswordLabel: "New password",
     confirmationLabel: "Repeat the new password",
     mismatch: "The passwords do not match.",

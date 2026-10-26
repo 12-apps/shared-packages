@@ -47,6 +47,7 @@ export interface SignupState {
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
+  violationCodes: readonly string[] | null;
   sent: boolean;
   /** The webmail the server read off the domain's MX, by key, when it knew one. */
   inboxHost: string | null;
@@ -101,7 +102,7 @@ export type SignupStep = "email" | "details";
  * A mirror of `checkPasswordPolicy`'s defaults (`../../password.ts`), which the
  * browser cannot import (it hashes with `node:crypto`). The server stays the
  * judge: this only decides when the hint turns red before a submit, and the
- * common-password list is caught by the server's refusal instead.
+ * common-password rule the hint also states is caught by the server's refusal instead.
  */
 function meetsPasswordHint(password: string): boolean {
   return password.length >= 8 && /\p{L}/u.test(password) && /\d/u.test(password);
@@ -172,6 +173,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [pending, setPending] = useState(false);
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
+  const [violationCodes, setViolationCodes] = useState<readonly string[] | null>(null);
   const [sent, setSent] = useState(false);
   const [inboxHost, setInboxHost] = useState<string | null>(null);
   const passwordCheck = usePasswordFailure(password, setPassword);
@@ -183,6 +185,7 @@ function useSignup(config: SignupConfig): SignupState {
     if (!result.ok) {
       setReason(result.reason);
       setViolations(result.violations ?? null);
+      setViolationCodes(result.violationCodes ?? null);
       if (result.reason === "weak-password") passwordCheck.refuse(password);
       return;
     }
@@ -211,6 +214,7 @@ function useSignup(config: SignupConfig): SignupState {
     setPending(true);
     setReason(null);
     setViolations(null);
+    setViolationCodes(null);
     try {
       try {
         await config.onBeforeSubmit();
@@ -234,6 +238,7 @@ function useSignup(config: SignupConfig): SignupState {
     pending,
     reason,
     violations,
+    violationCodes,
     sent,
     inboxHost,
     setName,
@@ -332,6 +337,7 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         title={copy.signUp.failureTitle}
         reason={form.reason}
         violations={form.violations}
+        violationCodes={form.violationCodes}
         onDismiss={form.dismiss}
       />
       {props.emailFirst ? (

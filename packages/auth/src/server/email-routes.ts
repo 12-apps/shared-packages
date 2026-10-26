@@ -143,6 +143,9 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
   const violations = (refusalResult.violations ?? []).map(
     (code) => messages.violations[code as PasswordPolicyViolation] ?? code,
   );
+  const codes = (refusalResult.violations ?? []).filter(
+    (code): code is PasswordPolicyViolation => Object.hasOwn(messages.violations, code),
+  );
   const detail = violations.length > 0 ? ` ${violations.join(" ")}` : "";
   return {
     status: EMAIL_AUTH_STATUS[reason],
@@ -150,6 +153,11 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
       error: `${messages[reason]}${detail}`,
       reason,
       ...(violations.length > 0 ? { violations } : {}),
+      // The codes behind `violations`, so a screen can tell WHICH rule was
+      // broken without matching on a sentence that is the host's to reword.
+      ...(violations.length > 0 && codes.length === violations.length
+        ? { violationCodes: codes }
+        : {}),
     },
   };
 }

@@ -32,7 +32,12 @@ import type {
 /** What any of these calls produced. Never throws for an ordinary refusal. */
 export type EmailAuthClientResult<T> =
   | { ok: true; data: T }
-  | { ok: false; reason: EmailAuthFailure | "unknown"; violations?: readonly string[] };
+  | {
+      ok: false;
+      reason: EmailAuthFailure | "unknown";
+      violations?: readonly string[];
+      violationCodes?: readonly string[];
+    };
 
 /** What `signUp` reports back — see `SignUpResult` for what the two mean. */
 export interface SignUpClientData {
@@ -136,6 +141,7 @@ interface ErrorBody {
   error?: unknown;
   reason?: unknown;
   violations?: unknown;
+  violationCodes?: unknown;
 }
 
 /** Narrow a refusal body to the closed vocabulary, or `unknown`. */
@@ -147,7 +153,15 @@ function toRefusal<T>(body: ErrorBody | null): EmailAuthClientResult<T> {
   const violations = Array.isArray(body?.violations)
     ? body.violations.filter((entry): entry is string => typeof entry === "string")
     : undefined;
-  return violations ? { ok: false, reason, violations } : { ok: false, reason };
+  const violationCodes = Array.isArray(body?.violationCodes)
+    ? body.violationCodes.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+  return {
+    ok: false,
+    reason,
+    ...(violations ? { violations } : {}),
+    ...(violations && violationCodes ? { violationCodes } : {}),
+  };
 }
 
 /** Build the browser e-mail-flow client. One call, one config object. */

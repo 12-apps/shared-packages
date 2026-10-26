@@ -43,6 +43,7 @@ interface CardState {
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
+  violationCodes: readonly string[] | null;
   saved: boolean;
   /**
    * Was the save an ADD rather than a change?
@@ -70,6 +71,7 @@ function useSecurityCard(): CardState {
   const [pending, setPending] = useState(false);
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
+  const [violationCodes, setViolationCodes] = useState<readonly string[] | null>(null);
   const [saved, setSaved] = useState(false);
   const [savedAdding, setSavedAdding] = useState(false);
   const mismatch = confirmation.length > 0 && password !== confirmation;
@@ -92,6 +94,7 @@ function useSecurityCard(): CardState {
     setPending(true);
     setReason(null);
     setViolations(null);
+    setViolationCodes(null);
     setSaved(false);
     try {
       const result = await client.setPassword({
@@ -108,6 +111,7 @@ function useSecurityCard(): CardState {
       } else {
         setReason(result.reason);
         setViolations(result.violations ?? null);
+        setViolationCodes(result.violationCodes ?? null);
       }
     } finally {
       setPending(false);
@@ -123,6 +127,7 @@ function useSecurityCard(): CardState {
     pending,
     reason,
     violations,
+    violationCodes,
     saved,
     savedAdding,
     mismatch,
@@ -243,6 +248,7 @@ export function PasswordSecurityCard(): JSX.Element | null {
         title={copy.securityCard.failureTitle}
         reason={card.reason}
         violations={card.violations}
+        violationCodes={card.violationCodes}
         onDismiss={card.dismiss}
       />
 

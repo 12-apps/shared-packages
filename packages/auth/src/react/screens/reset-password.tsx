@@ -73,6 +73,7 @@ interface ResetState {
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
+  violationCodes: readonly string[] | null;
   done: boolean;
   mismatch: boolean;
   setPassword: (value: string) => void;
@@ -88,6 +89,7 @@ function useReset(token: string | null): ResetState {
   const [pending, setPending] = useState(false);
   const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
   const [violations, setViolations] = useState<readonly string[] | null>(null);
+  const [violationCodes, setViolationCodes] = useState<readonly string[] | null>(null);
   const [done, setDone] = useState(false);
   const mismatch = confirmation.length > 0 && password !== confirmation;
 
@@ -97,6 +99,7 @@ function useReset(token: string | null): ResetState {
     setPending(true);
     setReason(null);
     setViolations(null);
+    setViolationCodes(null);
     try {
       const result = await client.resetPassword(token, password);
       if (result.ok) {
@@ -104,6 +107,7 @@ function useReset(token: string | null): ResetState {
       } else {
         setReason(result.reason);
         setViolations(result.violations ?? null);
+        setViolationCodes(result.violationCodes ?? null);
       }
     } finally {
       setPending(false);
@@ -116,6 +120,7 @@ function useReset(token: string | null): ResetState {
     pending,
     reason,
     violations,
+    violationCodes,
     done,
     mismatch,
     setPassword,
@@ -190,6 +195,7 @@ function ResetForm({ form }: { form: ResetState }): JSX.Element {
           title={copy.resetPassword.failureTitle}
           reason={form.reason}
           violations={form.violations}
+          violationCodes={form.violationCodes}
           onDismiss={form.dismiss}
         />
 
