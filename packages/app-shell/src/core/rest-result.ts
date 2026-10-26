@@ -112,7 +112,10 @@ export async function restResult<T>(
       | null;
     if (!response.ok) return foldError(response.status, payload, fallbacks);
     return { ok: true, data: (payload?.data ?? null) as T };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : fallbacks.network };
+  } catch {
+    // Whatever was thrown, the reader is told nothing answered, in the host's
+    // words. fetch rejects with a TypeError whose message is the browser's own
+    // English ("Failed to fetch"), never a sentence for this screen.
+    return { ok: false, error: fallbacks.network };
   }
 }

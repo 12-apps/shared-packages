@@ -100,7 +100,9 @@ describe('a call nothing answered', () => {
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('Failed to fetch');
     });
-    expect(await restResult('/api/things')).toEqual({ ok: false, error: 'Failed to fetch' });
+    // The browser's own "Failed to fetch" is not a sentence for the reader: the
+    // fallback is (FUT-3860).
+    expect(await restResult('/api/things')).toEqual({ ok: false, error: 'network error' });
   });
 
   it('R9: leaves `status` ABSENT there, which is how a caller tells the two apart', async () => {
@@ -126,6 +128,14 @@ describe("the host's fallback sentences", () => {
 
     vi.stubGlobal('fetch', async () => {
       throw 'offline';
+    });
+    expect(await restResult('/api/things', 'GET', undefined, PT_BR_REST_RESULT_FALLBACKS)).toEqual({
+      ok: false,
+      error: 'Falha de conexão',
+    });
+
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('Failed to fetch');
     });
     expect(await restResult('/api/things', 'GET', undefined, PT_BR_REST_RESULT_FALLBACKS)).toEqual({
       ok: false,
