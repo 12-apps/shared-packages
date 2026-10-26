@@ -34,8 +34,9 @@ describe('onlyReads', () => {
 });
 
 describe('noWrites', () => {
-  it('accepts an empty probe: a host that read nothing wrote nothing', () => {
+  it('finds no write in an empty probe or a placeholder (liveness is checked apart)', () => {
     expect(noWrites('')).toBe(true);
+    expect(noWrites('(none)')).toBe(true);
   });
 
   it('accepts reads, with or without the config read', () => {
@@ -46,5 +47,6 @@ describe('noWrites', () => {
   it('refuses any write', () => {
     expect(noWrites('POST /api/checkout')).toBe(false);
     expect(noWrites('GET /api/checkout/config,POST /api/checkout/charge')).toBe(false);
+    expect(noWrites('GET /api/checkout/heartbeat\nPUT /api/checkout/x')).toBe(false);
   });
 });

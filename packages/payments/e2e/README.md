@@ -43,7 +43,7 @@ definePaymentsWorld({
   fixtures: { headProvider, tailProvider, hostedUrlFragment, payableRef, taxId, platformBrand, oauthProvider },
   wire: {
     paths, chargeKeys, chargeBody, tokensByProvider, providerCharges, providerChargeCount, navigated,
-    connectionStatus, connectionEnabled, rotation,
+    connectionStatus, connectionEnabled, rotation, heartbeat /* optional */,
   },
 });
 ```
@@ -93,12 +93,21 @@ Pagamento (`list-buyer-taxId`) when the list asks for one, choose a row
 (`list-option-<METHOD>-radio`) and press the bar (`list-pay`). Every purchase
 goes through that list (FUT-4028), so it is the screen the journeys prove.
 
-Three things about the list a host has to provide for:
+Four things about the list a host has to provide for:
 
-- **A store with the Pix bank flow** (`pixBank`) copies the code as it is
+- **Every store with the Pix bank flow** (`pixBank`) copies the code as it is
   generated and lands on the after-copy face. On a computer that face no longer
-  draws the code, so the step that checks it reads the buyer's clipboard: grant
-  the page `clipboard-read` and `clipboard-write` for that store.
+  draws the code, so the step that checks it reads the buyer's clipboard. In
+  `open`, for EVERY store whose list has `pixBank`, grant the page
+  `clipboard-read` and `clipboard-write`, and empty the clipboard
+  (`navigator.clipboard.writeText('')`) before the checkout mounts, so a code
+  copied earlier cannot pass for this one.
+- **"Nothing was written" needs a live probe.** On a store that cannot charge,
+  the step reads `wire.paths` for a short window and fails on any write. It
+  proves the probe is recording first: implement `wire.heartbeat`, one known
+  read sent through the recorder your checkout uses, returning the line it
+  records. Without it the probe must already hold a read; an empty probe is
+  never accepted.
 - **A card charge waits five seconds** behind the list's charge bar before it
   is sent. Give the expect timeout room above that (the harness uses 15s).
 - **The card row is `list-option-CARD`.** A store whose list splits the card by

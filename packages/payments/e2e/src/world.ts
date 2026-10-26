@@ -196,6 +196,15 @@ export interface PaymentsFixtures {
 export interface PaymentsWireProbe {
   /** Every request path the client made, in order. */
   paths(page: Page): ReturnType<Page['getByTestId']>;
+  /**
+   * OPTIONAL, and what makes "nothing was written" provable on a screen that
+   * reads nothing (FUT-4028). Send ONE known read through the same recorder
+   * the checkout's requests go through, and return the line `paths` will show
+   * for it (`GET /api/checkout/heartbeat`). A host without it must have
+   * recorded at least one read by the time that step runs, or the step fails:
+   * an empty probe is never proof that nothing was written.
+   */
+  heartbeat?(page: Page): Promise<string>;
   /** The charge body's own top-level keys. */
   chargeKeys(page: Page): ReturnType<Page['getByTestId']>;
   /** The charge body, verbatim. */

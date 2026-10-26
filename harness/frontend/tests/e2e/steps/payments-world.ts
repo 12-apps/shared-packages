@@ -28,7 +28,7 @@ import { openCase, openPage } from '../helpers/checkout';
  */
 
 /** Which harness page holds a store of each shape, and which case on it. */
-const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string }>> = {
+const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string; pixBank?: true }>> = {
   'pix-only': { slug: 'payments-checkout-pix', caseId: 'awaiting' },
   card: { slug: 'payments-checkout-card' },
   'google-pay': { slug: 'payments-checkout-google-pay' },
@@ -40,7 +40,7 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   // the code is copied as it is generated, and the Pix opens on its after-copy
   // face. `pix-only` keeps the plain face, and `checkout-pix-faces.spec.ts`
   // drives both.
-  awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting-bank' },
+  awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting-bank', pixBank: true },
   settles: { slug: 'payments-checkout-pix', caseId: 'settles' },
   declined: { slug: 'payments-checkout-failures', caseId: 'declined' },
   unresolved: { slug: 'payments-checkout-failures', caseId: 'unresolved' },
@@ -113,10 +113,14 @@ async function expectTheList(page: Page): Promise<void> {
 definePaymentsWorld({
   async open(page, store) {
     const where = LOCATIONS[store];
-    // The bank flow copies the code as it is generated; a clipboard the page
-    // may write is what lets it land on the after-copy face, as on a phone.
-    if (store === 'awaiting') await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    // Every store with the bank flow copies the code as it is generated: the
+    // page may write the clipboard (that is what lands it on the after-copy
+    // face) and the journey may read it back. Granted wherever `pixBank` is on.
+    if (where.pixBank) await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await openPage(page, where.slug, NOT_A_CHECKOUT.has(store) ? {} : { checkout: 'list' });
+    // Emptied before the case mounts, so a code a previous scenario copied
+    // can never pass for the one this store generates.
+    if (where.pixBank) await page.evaluate(() => navigator.clipboard.writeText(''));
     currentSlug = where.slug;
     if (where.caseId) await openCase(page, where.caseId);
     if (!NOT_A_CHECKOUT.has(store)) await expectTheList(page);
@@ -177,6 +181,12 @@ definePaymentsWorld({
 
   wire: {
     paths: (page) => page.getByTestId('wire-paths'),
+    // A read through the probe's own recorder: the "nothing was written" step
+    // proves the probe live with it before it trusts an absence.
+    async heartbeat(page) {
+      await page.getByTestId('wire-heartbeat').click();
+      return 'GET /api/checkout/heartbeat';
+    },
     chargeKeys: (page) => page.getByTestId('wire-charge-keys'),
     chargeBody: (page) => page.getByTestId('wire-charge-body'),
     tokensByProvider: (page) => page.getByTestId('wire-tokens-by-provider'),

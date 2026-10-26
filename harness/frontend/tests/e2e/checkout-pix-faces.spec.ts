@@ -31,6 +31,8 @@ test('without the bank flow, the code and its QR are on the face', async ({ page
 async function copiedByTheBankFlow(page: Page): Promise<string> {
   await openPage(page, 'payments-checkout-pix', { checkout: 'list' });
   await openCase(page, 'awaiting-bank');
+  // Emptied first, so a code left there by anything else cannot pass.
+  await page.evaluate(() => navigator.clipboard.writeText(''));
   await reachPayment(page);
   // Copied as it was generated: the after-copy face, which draws no code.
   await expect(page.getByTestId('pix-after-copy')).toBeVisible();
@@ -44,8 +46,12 @@ test('with the bank flow on a computer, the QR stands beside the steps', async (
   const copied = await copiedByTheBankFlow(page);
   await expect(page.getByTestId('pix-show-qr')).toBeHidden();
   await showListPixQr(page);
-  await expect(page.getByTestId('pix-after-copy').locator('[role="img"]')).toBeVisible();
-  expect(await listPixCode(page)).toBe(copied);
+  await expect(page.getByTestId('pix-after-copy').locator('[role="img"] > svg[viewBox]')).toBeVisible();
+  // What the clipboard holds, checked against a source that is NOT the
+  // clipboard: the code the face draws once a phone-width screen brings it back.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByTestId('pix-show-qr').click();
+  await expect(page.getByTestId('list-pix-code')).toHaveText(copied);
 });
 
 test('with the bank flow on a phone, "Ver QR code" brings the code and its QR back', async ({ page }) => {
@@ -54,6 +60,7 @@ test('with the bank flow on a phone, "Ver QR code" brings the code and its QR ba
   await showListPixQr(page);
   await expect(page.getByTestId('pix-after-copy')).toHaveCount(0);
   await expect(page.getByTestId('list-pix-qr').locator('svg')).toBeVisible();
+  // The drawn code against the clipboard's: two sources, one code.
   await expect(page.getByTestId('list-pix-code')).toHaveText(copied);
   expect(await listPixCode(page)).toBe(copied);
 });

@@ -260,7 +260,12 @@ Then('o pagamento volta confirmado', async ({ page }) => {
 Then('nenhum pedido chegou a ser criado', async ({ page }) => {
   // Nothing but reads went out: a store that cannot charge must not have a
   // payable brought into existence. Whether the config was read is not the
-  // claim — a host may draw this screen from what it already knows.
+  // claim — a host may draw this screen from what it already knows. The screen
+  // that says the store cannot charge comes first, so the probe is read once
+  // the checkout has settled on it.
+  await expect(
+    page.getByTestId('checkout-payments-disabled').or(page.getByTestId('checkout-payments-remedy')).first(),
+  ).toBeVisible();
   await expectNoWrites(page);
 });
 

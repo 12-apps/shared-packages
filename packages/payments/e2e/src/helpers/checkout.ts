@@ -120,6 +120,9 @@ export async function payCard(page: Page): Promise<void> {
   await cardPay.click();
 }
 
+/** How long {@link showListPixQr} keeps trying the faces before it fails. */
+const SHOW_QR_TIMEOUT_MS = 10_000;
+
 /**
  * Show the list's Pix QR, the way the buyer would (FUT-4028).
  *
@@ -146,15 +149,16 @@ export async function showListPixQr(page: Page): Promise<void> {
       const showQr = page.getByTestId('pix-show-qr');
       if (await showQr.isVisible()) await showQr.click();
       else {
-        expect(await afterCopy.locator('[role="img"]').isVisible()).toBe(true);
+        // The QR itself: the code's image (`role="img"`) and the SVG drawn in it.
+        expect(await afterCopy.locator('[role="img"] > svg[viewBox]').isVisible()).toBe(true);
         return;
       }
     } else if (!(await qr.isVisible())) {
       const toggle = page.getByTestId('list-pix-toggle-qr');
       if (await toggle.isVisible()) await toggle.click();
     }
-    expect(await qr.isVisible()).toBe(true);
-  }).toPass();
+    expect(await qr.locator('svg[viewBox]').isVisible()).toBe(true);
+  }).toPass({ timeout: SHOW_QR_TIMEOUT_MS });
 }
 
 /**
