@@ -31,7 +31,8 @@
     "clean": "rm -rf node_modules dist",
     "lint": "eslint src --max-warnings 0",
     "check-types": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node ../../../scripts/vitest-with-teardown.mjs run"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40.0",
@@ -42,7 +43,8 @@
     "@12-apps/typescript-config": "workspace:*",
     "@playwright/test": "^1.56.1",
     "playwright-bdd": "^8.4.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
