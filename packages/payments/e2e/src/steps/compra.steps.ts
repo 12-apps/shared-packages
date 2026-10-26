@@ -7,9 +7,11 @@ import {
   fillCard,
   payCard,
   reachPayment,
+  listPixCode,
+  showListPixQr,
 } from '../helpers/checkout.js';
 
-import { expectOnlyReads } from '../helpers/wire.js';
+import { expectNoWrites } from '../helpers/wire.js';
 import { paymentsWorld } from '../world.js';
 
 import { Then, When } from './fixtures.js';
@@ -126,19 +128,26 @@ Then('só a opção PIX é oferecida', async ({ page }) => {
 });
 
 Then('ela vê o QR code do PIX', async ({ page }) => {
-  // The tabs' `pix-view`, or the list's own Pix face (`list-pix`).
+  // The tabs' `pix-view`, or the list's own Pix face (`list-pix`) — opened on
+  // its QR the way the buyer opens it (see `showListPixQr`).
   const list = page.getByTestId('list-pix');
   await expect(page.getByTestId('pix-view').or(list).first()).toBeVisible();
-  if (await list.isVisible()) await expect(page.getByTestId('list-pix-qr')).toBeVisible();
+  if (await list.isVisible()) await showListPixQr(page);
   else await expect(page.getByTestId('pix-qr')).toBeVisible();
 });
 
 Then('o código copia-e-cola veio do provedor', async ({ page }) => {
   // The Banco Central GUI, in either case: the specification spells it in
   // lowercase and many PSPs print it in capitals, and both are a real code.
-  await expect(page.getByTestId('pix-code').or(page.getByTestId('list-pix-code')).first()).toContainText(
-    /br\.gov\.bcb\.pix/i,
-  );
+  // On the list, see `listPixCode`: the after-copy face hands the code to the
+  // clipboard rather than drawing it.
+  const list = page.getByTestId('list-pix');
+  await expect(page.getByTestId('pix-view').or(list).first()).toBeVisible();
+  if (await list.isVisible()) {
+    expect(await listPixCode(page)).toMatch(/br\.gov\.bcb\.pix/i);
+    return;
+  }
+  await expect(page.getByTestId('pix-code')).toContainText(/br\.gov\.bcb\.pix/i);
 });
 
 Then('ela vê o formulário de cartão', async ({ page }) => {
@@ -249,9 +258,10 @@ Then('o pagamento volta confirmado', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 Then('nenhum pedido chegou a ser criado', async ({ page }) => {
-  // The config was read, and nothing but reads went out. A store that cannot
-  // charge must not have a payable brought into existence.
-  await expectOnlyReads(page);
+  // Nothing but reads went out: a store that cannot charge must not have a
+  // payable brought into existence. Whether the config was read is not the
+  // claim — a host may draw this screen from what it already knows.
+  await expectNoWrites(page);
 });
 
 Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ page }) => {

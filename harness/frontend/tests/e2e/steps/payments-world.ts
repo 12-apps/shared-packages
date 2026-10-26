@@ -36,7 +36,11 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
   'apple-pay-unsupported': { slug: 'payments-checkout-apple-pay', caseId: 'no-device' },
   'both-methods': { slug: 'payments-checkout-both' },
   hosted: { slug: 'payments-checkout-redirect' },
-  awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting' },
+  // With the host's Pix bank flow, as the origin host passes it (FUT-3612):
+  // the code is copied as it is generated, and the Pix opens on its after-copy
+  // face. `pix-only` keeps the plain face, and `checkout-pix-faces.spec.ts`
+  // drives both.
+  awaiting: { slug: 'payments-checkout-pix', caseId: 'awaiting-bank' },
   settles: { slug: 'payments-checkout-pix', caseId: 'settles' },
   declined: { slug: 'payments-checkout-failures', caseId: 'declined' },
   unresolved: { slug: 'payments-checkout-failures', caseId: 'unresolved' },
@@ -109,6 +113,9 @@ async function expectTheList(page: Page): Promise<void> {
 definePaymentsWorld({
   async open(page, store) {
     const where = LOCATIONS[store];
+    // The bank flow copies the code as it is generated; a clipboard the page
+    // may write is what lets it land on the after-copy face, as on a phone.
+    if (store === 'awaiting') await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await openPage(page, where.slug, NOT_A_CHECKOUT.has(store) ? {} : { checkout: 'list' });
     currentSlug = where.slug;
     if (where.caseId) await openCase(page, where.caseId);

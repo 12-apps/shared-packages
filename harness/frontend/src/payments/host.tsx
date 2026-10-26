@@ -21,7 +21,7 @@ import {
   type PaymentFlows,
   type PaymentFlowsConfig,
 } from '@12-apps/payments-frontend';
-import { PAYMENT_LIST_COPY } from '@12-apps/payments-frontend/locales';
+import { PAYMENT_LIST_COPY, PIX_BANK_COPY } from '@12-apps/payments-frontend/locales';
 import { useMemo, type JSX, type ReactNode } from 'react';
 
 import { brlLabel } from './adapter';
@@ -128,6 +128,13 @@ export interface HarnessHost {
    * asks — see {@link listRequested}. `storefront` always draws the list.
    */
   paymentList?: boolean;
+  /**
+   * On the list: the host's Pix bank flow (`pixBank`, FUT-3612), as the origin
+   * host passes it. The bar's button then GENERATES AND COPIES the code, and
+   * the Pix opens on its after-copy face ("Código Pix copiado"), whose QR is
+   * one tap away ("Ver QR code"). Off a phone, so no bank app is opened.
+   */
+  pixBank?: boolean;
 }
 
 /**
@@ -145,9 +152,23 @@ function listRequested(): boolean {
   return new URLSearchParams(window.location.search).get('checkout') === 'list';
 }
 
-/** The ONE list with nothing of a host's own around it: the package's pt-BR pack and the amount due. */
-function useHarnessPaymentList(amountCents: number): CheckoutPaymentList {
-  return useMemo(() => ({ copy: PAYMENT_LIST_COPY['pt-BR'], totalCents: amountCents }), [amountCents]);
+/** The bank flow with no bank remembered, on a computer: generate-and-copy only. */
+const HARNESS_PIX_BANK: NonNullable<CheckoutPaymentList['pixBank']> = {
+  remembered: null,
+  onPick: () => undefined,
+  copy: PIX_BANK_COPY['pt-BR'],
+  phone: false,
+};
+
+/**
+ * The ONE list with nothing of a host's own around it: the package's pt-BR
+ * pack and the amount due — and, with `pixBank`, the Pix bank flow.
+ */
+function useHarnessPaymentList(amountCents: number, pixBank: boolean): CheckoutPaymentList {
+  return useMemo(
+    () => ({ copy: PAYMENT_LIST_COPY['pt-BR'], totalCents: amountCents, ...(pixBank ? { pixBank: HARNESS_PIX_BANK } : {}) }),
+    [amountCents, pixBank],
+  );
 }
 
 /** Wrap the mount's fetch so `/config` can stall or refuse. */
@@ -197,7 +218,7 @@ export function harnessFlowsConfig(
     ...(host.storefront
       ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit) }
       : (host.paymentList ?? listRequested())
-        ? { usePaymentList: () => useHarnessPaymentList(amountCents) }
+        ? { usePaymentList: () => useHarnessPaymentList(amountCents, host.pixBank ?? false) }
         : {}),
     // Required now, and stated by THIS host in its own words. It used to be
     // omitted, which meant rendering the package's pt-BR default — another

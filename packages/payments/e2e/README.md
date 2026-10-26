@@ -93,6 +93,18 @@ Pagamento (`list-buyer-taxId`) when the list asks for one, choose a row
 (`list-option-<METHOD>-radio`) and press the bar (`list-pay`). Every purchase
 goes through that list (FUT-4028), so it is the screen the journeys prove.
 
+Three things about the list a host has to provide for:
+
+- **A store with the Pix bank flow** (`pixBank`) copies the code as it is
+  generated and lands on the after-copy face. On a computer that face no longer
+  draws the code, so the step that checks it reads the buyer's clipboard: grant
+  the page `clipboard-read` and `clipboard-write` for that store.
+- **A card charge waits five seconds** behind the list's charge bar before it
+  is sent. Give the expect timeout room above that (the harness uses 15s).
+- **The card row is `list-option-CARD`.** A store whose list splits the card by
+  funding draws `list-option-CARD-CREDIT` and `list-option-CARD-DEBIT` instead,
+  and the card steps do not choose between those.
+
 Every step still answers for the older Dados step and Pix/Cartão tabs, so a
 host can move its stores to the list without its journeys changing; that path
 goes when the tabs are deleted. On the tabs, `open` returns with the buyer **on the Dados step**, the

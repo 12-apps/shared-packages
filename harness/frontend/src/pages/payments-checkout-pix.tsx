@@ -45,6 +45,10 @@ function pixStore(settlesOnPoll: boolean, pixConfirmation?: 'MANUAL') {
 
 const CASES: HarnessCase[] = [
   checkoutCase('awaiting', 'Nobody has paid yet', pixStore(false)),
+  // FUT-3612 / FUT-4028: the same store, with the host's Pix bank flow. On the
+  // list the button generates AND copies, and the Pix opens on its after-copy
+  // face — the QR one tap away. Open with `?checkout=list` to see it.
+  checkoutCase('awaiting-bank', 'Nobody has paid yet, bank flow', pixStore(false), { pixBank: true }),
   checkoutCase('settles', 'The poll settles PAID', pixStore(true)),
   // FUT-3232: the host marks the code as one only the STORE confirms.
   checkoutCase('manual', 'The store confirms by hand', pixStore(false, 'MANUAL')),
