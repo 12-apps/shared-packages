@@ -167,6 +167,20 @@ function redactCard(value: unknown, insideCard = false): unknown {
 }
 
 /**
+ * The `x-idempotency-key` PagBank accepts. Its PRODUCTION API refuses any key
+ * outside `[\w-]+` with `400 40002 must match the pattern "[\w-]+"` — the
+ * sandbox takes it — and the checkout keys an attempt as `<order>:<n>`
+ * (`attemptIdempotencyKey`), so every live card and Pix order died on its
+ * first create (Future Drink, 2026-10-26). Mapped here, at the wire, rather
+ * than by changing the shared formula: the stored key and every in-flight
+ * attempt stay as they are, and the mapping is deterministic, so a retried
+ * create still dedupes at PagBank.
+ */
+export function pagbankIdempotencyKey(key: string): string {
+  return key.replace(/[^\w-]/g, '_');
+}
+
+/**
  * The request as evidence — redacted, and built ONLY on the failure path.
  * A successful charge's body is noise and a standing PII surface; a refused
  * one is the thing support asks for.
@@ -184,7 +198,7 @@ function snapshotOf(
       // Never the real token. It is not captured and then hidden — it is
       // never read into the snapshot at all.
       Authorization: `Bearer ${REDACTED}`,
-      ...(init.idempotencyKey ? { 'x-idempotency-key': init.idempotencyKey } : {}),
+      ...(init.idempotencyKey ? { 'x-idempotency-key': pagbankIdempotencyKey(init.idempotencyKey) } : {}),
     },
     body: init.body === undefined ? undefined : redactCard(init.body),
   };
@@ -205,7 +219,7 @@ export async function pagbankRequest<T>(
         // A multipart body names its own boundary in the Content-Type fetch sets.
         ...(init.form ? {} : { 'Content-Type': 'application/json' }),
         Authorization: `Bearer ${credentials.fields['token'] ?? ''}`,
-        ...(init.idempotencyKey ? { 'x-idempotency-key': init.idempotencyKey } : {}),
+        ...(init.idempotencyKey ? { 'x-idempotency-key': pagbankIdempotencyKey(init.idempotencyKey) } : {}),
       },
       body: init.form ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
     });

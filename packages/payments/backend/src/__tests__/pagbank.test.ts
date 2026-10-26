@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProviderRequestError } from '../core/errors';
 import { createMemoryChargeStore } from '../memory';
 import { pagbankProvider } from '../providers/pagbank';
+import { pagbankIdempotencyKey } from '../providers/pagbank-http';
 import { cardInput, pixInput } from './fixtures';
 import { PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
 
@@ -86,8 +87,9 @@ describe('pagbank adapter — charges', () => {
 
     const [url, init] = spy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://sandbox.api.pagseguro.com/orders');
-    // The provider-side double-charge guard.
-    expect((init.headers as Record<string, string>)['x-idempotency-key']).toBe('order-1:1');
+    // The provider-side double-charge guard, in the only alphabet PagBank
+    // production accepts (`[\w-]+`): `order-1:1` was refused with 40002.
+    expect((init.headers as Record<string, string>)['x-idempotency-key']).toBe('order-1_1');
     expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tok_live');
     const body = JSON.parse(init.body as string) as {
       reference_id: string;
@@ -1092,5 +1094,17 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
       fields: { token: 't', googlePayMerchantId: '' },
     });
     expect(config.googlePay).toEqual({ gateway: 'pagbank', gatewayMerchantId: null, environment: 'TEST' });
+  });
+});
+
+describe('pagbankIdempotencyKey', () => {
+  it("keeps every key inside PagBank production's [\\w-]+ pattern, deterministically", () => {
+    // The checkout's attempt key is `<order>:<n>`; production refused the colon.
+    const key = pagbankIdempotencyKey('143837c7-cbc3-4481-a33a-11518c2c2871:1');
+    expect(key).toBe('143837c7-cbc3-4481-a33a-11518c2c2871_1');
+    expect(key).toMatch(/^[\w-]+$/);
+    // The same attempt maps to the same key, so a retried create still dedupes.
+    expect(pagbankIdempotencyKey('a:1')).toBe(pagbankIdempotencyKey('a:1'));
+    expect(pagbankIdempotencyKey('verify-pagbank-x--mvpi6qs8')).toBe('verify-pagbank-x--mvpi6qs8');
   });
 });
