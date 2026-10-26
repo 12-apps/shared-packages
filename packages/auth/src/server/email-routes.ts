@@ -146,18 +146,20 @@ function refusal(refusalResult: EmailAuthRefusal, messages: EmailAuthMessages): 
   const codes = (refusalResult.violations ?? []).filter(
     (code): code is PasswordPolicyViolation => Object.hasOwn(messages.violations, code),
   );
+  const known = violations.length > 0 && codes.length === violations.length;
+  // A common password breaks no rule the person could meet by trying harder, so
+  // the sentence for it stands alone, the same one the screen's banner shows.
+  const onlyTooCommon = known && codes.length === 1 && codes[0] === "too-common";
   const detail = violations.length > 0 ? ` ${violations.join(" ")}` : "";
   return {
     status: EMAIL_AUTH_STATUS[reason],
     body: {
-      error: `${messages[reason]}${detail}`,
+      error: onlyTooCommon ? (violations[0] ?? messages[reason]) : `${messages[reason]}${detail}`,
       reason,
       ...(violations.length > 0 ? { violations } : {}),
       // The codes behind `violations`, so a screen can tell WHICH rule was
       // broken without matching on a sentence that is the host's to reword.
-      ...(violations.length > 0 && codes.length === violations.length
-        ? { violationCodes: codes }
-        : {}),
+      ...(known ? { violationCodes: codes } : {}),
     },
   };
 }

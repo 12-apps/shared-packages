@@ -87,6 +87,11 @@ async function serverRefusal(messages: EmailAuthMessages): Promise<{
   return response?.body as { violations: string[]; violationCodes?: string[] };
 }
 
+/** The whole wire body, for the fields `serverRefusal` does not narrow to. */
+async function serverBody(messages: EmailAuthMessages): Promise<{ error: string }> {
+  return (await serverRefusal(messages)) as unknown as { error: string };
+}
+
 afterEach(cleanup);
 
 describe.each(PACKS)("the password rule in $name", (pack) => {
@@ -129,6 +134,8 @@ describe.each(PACKS)("the password rule in $name", (pack) => {
   it("renders the too-common refusal as one sentence under the banner title", async () => {
     const body = await serverRefusal(pack.messages);
     expect(body.violationCodes).toEqual(["too-common"]);
+    // The API's own `error` agrees with the banner: the same single sentence.
+    expect((await serverBody(pack.messages)).error).toBe(pack.tooCommonSentence);
 
     const transport: EmailAuth = {
       ...createEmailAuth({ basePath: "/api/auth/email" }),
@@ -175,6 +182,9 @@ describe.each(PACKS)("the password rule in $name", (pack) => {
     const body = response?.body as { violations: string[]; violationCodes: string[] };
 
     expect(body.violationCodes).toEqual(["too-short", "needs-number"]);
+    expect((response?.body as { error: string }).error).toBe(
+      `${pack.messages["weak-password"]} ${body.violations.join(" ")}`,
+    );
     const { failureMessage } = await import("../screens/copy");
     expect(failureMessage(pack.copy, "weak-password", body.violations, body.violationCodes)).toBe(
       `${pack.copy.failures["weak-password"]} ${body.violations.join(" ")}`,
