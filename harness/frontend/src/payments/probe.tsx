@@ -91,6 +91,15 @@ function tokenProviders(body: Record<string, unknown> | null): string {
 export const HEARTBEAT_PATH = '/api/checkout/heartbeat';
 
 /**
+ * Send through the world's recorder and drop the answer. The request is
+ * recorded the moment it starts, which is all these controls are for, so a
+ * refused or failed answer must not surface as an unhandled rejection.
+ */
+function sendIgnoringAnswer(world: HarnessWorld, target: string, init?: RequestInit): void {
+  world.fetchImpl(target, init).catch(() => undefined);
+}
+
+/**
  * Two requests sent through the SAME recorder the checkout uses (FUT-4028):
  * a heartbeat read, which proves the probe is live on this screen, and a
  * forced write, which exists only so a self-test can prove the "nothing was
@@ -99,13 +108,13 @@ export const HEARTBEAT_PATH = '/api/checkout/heartbeat';
 function WireControls({ world }: { world: HarnessWorld }): JSX.Element {
   return (
     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-      <button type="button" data-testid="wire-heartbeat" onClick={() => void world.fetchImpl(HEARTBEAT_PATH)}>
+      <button type="button" data-testid="wire-heartbeat" onClick={() => sendIgnoringAnswer(world, HEARTBEAT_PATH)}>
         Heartbeat read
       </button>
       <button
         type="button"
         data-testid="wire-force-write"
-        onClick={() => void world.fetchImpl(HEARTBEAT_PATH, { method: 'POST', body: '{}' })}
+        onClick={() => sendIgnoringAnswer(world, HEARTBEAT_PATH, { method: 'POST', body: '{}' })}
       >
         Force a write (self-test)
       </button>

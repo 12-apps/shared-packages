@@ -45,8 +45,18 @@ function isRead(entry: string): boolean {
   return request(entry)?.[0] === 'GET';
 }
 
-/** A request line whose verb is anything but `GET` — `POST /api/checkout`. */
+/** The HTTP verbs that write. */
+const WRITE_VERBS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * An entry whose first token is a writing verb — `POST /api/checkout` — or any
+ * other well-formed request line that is not a `GET`. A writing verb counts
+ * whatever follows it, malformed or not: a broken line is never a pass. What
+ * is no request at all (a host's "(none)") is not a write.
+ */
 function isWrite(entry: string): boolean {
+  const [verb = ''] = entry.split(' ').filter((part) => part !== '');
+  if (WRITE_VERBS.has(verb.toUpperCase())) return true;
   const line = request(entry);
   return line !== null && line[0] !== 'GET';
 }

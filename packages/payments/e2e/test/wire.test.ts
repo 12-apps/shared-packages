@@ -49,4 +49,11 @@ describe('noWrites', () => {
     expect(noWrites('GET /api/checkout/config,POST /api/checkout/charge')).toBe(false);
     expect(noWrites('GET /api/checkout/heartbeat\nPUT /api/checkout/x')).toBe(false);
   });
+
+  it('counts a writing verb as a write whatever follows it', () => {
+    expect(noWrites('POST')).toBe(false);
+    expect(noWrites('POST /a b')).toBe(false);
+    expect(noWrites('POST /x extra')).toBe(false);
+    expect(noWrites('GET /api/checkout/config,DELETE')).toBe(false);
+  });
 });
