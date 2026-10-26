@@ -171,7 +171,7 @@ function redactCard(value: unknown, insideCard = false): unknown {
  * outside `[\w-]+` with `400 40002 must match the pattern "[\w-]+"` — the
  * sandbox takes it — and the checkout keys an attempt as `<order>:<n>`
  * (`attemptIdempotencyKey`), so every live card and Pix order died on its
- * first create (Future Drink, 2026-10-26). Mapped here, at the wire, rather
+ * first create (the first live store, 2026-10-26). Mapped here, at the wire, rather
  * than by changing the shared formula: the stored key and every in-flight
  * attempt stay as they are, and the mapping is deterministic, so a retried
  * create still dedupes at PagBank.
