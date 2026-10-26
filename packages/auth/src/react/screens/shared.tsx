@@ -285,11 +285,13 @@ export function FailureBanner({
   title,
   reason,
   violations,
+  violationCodes,
   onDismiss,
 }: {
   title: string;
   reason: EmailAuthScreenReason | null;
   violations?: readonly string[] | null;
+  violationCodes?: readonly string[] | null;
   onDismiss: () => void;
 }): JSX.Element | null {
   const { copy } = useScreens();
@@ -307,7 +309,7 @@ export function FailureBanner({
         <Alert
           variant="danger"
           title={title}
-          description={failureMessage(copy, reason, violations)}
+          description={failureMessage(copy, reason, violations, violationCodes)}
           closable
           closeLabel={copy.dismissFailure}
           onClose={onDismiss}

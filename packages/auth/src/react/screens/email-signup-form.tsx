@@ -11,6 +11,7 @@ import { inboxLink } from "./inbox-link";
 import { inboxLogo } from "./inbox-logos";
 import type { EmailAuth } from "../create-email-auth";
 import { FailureBanner } from "./shared";
+import { useRefusal } from "./use-refusal";
 import { EmailInput, NameInput, SignupDetails } from "./signup-fields";
 import { usePhone, type PhoneState, type SignupPhoneField } from "./signup-phone";
 
@@ -47,6 +48,7 @@ export interface SignupState {
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
+  violationCodes: readonly string[] | null;
   sent: boolean;
   /** The webmail the server read off the domain's MX, by key, when it knew one. */
   inboxHost: string | null;
@@ -96,12 +98,14 @@ export interface SignupConfig {
 export type SignupStep = "email" | "details";
 
 /**
- * The rule the sign-up hint states: at least 8 characters, a letter and a number.
+ * The first three of the four rules the sign-up hint states: at least 8
+ * characters, a letter and a number. The fourth, not a common password, stays
+ * with the server.
  *
  * A mirror of `checkPasswordPolicy`'s defaults (`../../password.ts`), which the
  * browser cannot import (it hashes with `node:crypto`). The server stays the
  * judge: this only decides when the hint turns red before a submit, and the
- * common-password list is caught by the server's refusal instead.
+ * common-password rule is caught by the server's refusal instead.
  */
 function meetsPasswordHint(password: string): boolean {
   return password.length >= 8 && /\p{L}/u.test(password) && /\d/u.test(password);
@@ -170,8 +174,7 @@ function useSignup(config: SignupConfig): SignupState {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
-  const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
-  const [violations, setViolations] = useState<readonly string[] | null>(null);
+  const refusal = useRefusal();
   const [sent, setSent] = useState(false);
   const [inboxHost, setInboxHost] = useState<string | null>(null);
   const passwordCheck = usePasswordFailure(password, setPassword);
@@ -181,8 +184,7 @@ function useSignup(config: SignupConfig): SignupState {
   async function register(): Promise<void> {
     const result = await client.signUp(signUpRequest(config, { email, password, name }, phone.value));
     if (!result.ok) {
-      setReason(result.reason);
-      setViolations(result.violations ?? null);
+      refusal.refuse(result);
       if (result.reason === "weak-password") passwordCheck.refuse(password);
       return;
     }
@@ -202,20 +204,19 @@ function useSignup(config: SignupConfig): SignupState {
       callbackUrl: config.callbackUrl,
     });
     if (signedIn.ok) config.onSignedIn();
-    else setReason(signedIn.reason);
+    else refusal.refuseWith(signedIn.reason);
   }
 
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
     if (pending || config.disabled || phone.blocking !== null) return;
     setPending(true);
-    setReason(null);
-    setViolations(null);
+    refusal.clear();
     try {
       try {
         await config.onBeforeSubmit();
       } catch {
-        setReason("unknown");
+        refusal.refuseWith("unknown");
         return;
       }
       await register();
@@ -232,14 +233,15 @@ function useSignup(config: SignupConfig): SignupState {
     passwordFailed: passwordCheck.failed,
     leavePassword: passwordCheck.leave,
     pending,
-    reason,
-    violations,
+    reason: refusal.reason,
+    violations: refusal.violations,
+    violationCodes: refusal.violationCodes,
     sent,
     inboxHost,
     setName,
     setEmail,
     setPassword: passwordCheck.change,
-    dismiss: () => setReason(null),
+    dismiss: refusal.clear,
     submit,
   };
 }
@@ -332,6 +334,7 @@ export function EmailSignupForm(props: SignupConfig): JSX.Element {
         title={copy.signUp.failureTitle}
         reason={form.reason}
         violations={form.violations}
+        violationCodes={form.violationCodes}
         onDismiss={form.dismiss}
       />
       {props.emailFirst ? (

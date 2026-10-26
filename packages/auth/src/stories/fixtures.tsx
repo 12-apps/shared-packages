@@ -67,7 +67,7 @@ export const STORY_COPY: EmailAuthCopy = {
     nameLabel: "Your name",
     emailLabel: "E-mail",
     passwordLabel: "Password",
-    passwordHint: "At least 8 characters, with a letter and a number.",
+    passwordHint: "At least 8 characters, with a letter and a number, and not a common password.",
     submit: "Create account",
     failureTitle: "Could not create the account",
     sentTitle: "Check your e-mail",
@@ -91,7 +91,8 @@ export const STORY_COPY: EmailAuthCopy = {
   },
   resetPassword: {
     title: "Choose a new password",
-    intro: "Pick a password with at least 8 characters, including a letter and a number.",
+    intro:
+      "Pick a password with at least 8 characters, including a letter and a number, and not a common password.",
     newPasswordLabel: "New password",
     confirmationLabel: "Repeat the new password",
     mismatch: "The passwords do not match.",

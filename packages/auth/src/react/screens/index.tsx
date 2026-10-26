@@ -84,6 +84,7 @@ export interface EmailAuthScreens {
     title: string;
     reason: EmailAuthScreenReason | null;
     violations?: readonly string[] | null;
+    violationCodes?: readonly string[] | null;
     onDismiss: () => void;
   }>;
   /** A button that reads as a link. Unbound — it needs no config. */

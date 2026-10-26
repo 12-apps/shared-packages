@@ -75,7 +75,7 @@ export const PT_BR: EmailAuthCopy = {
     nameLabel: "Seu nome",
     emailLabel: "E-mail",
     passwordLabel: "Senha",
-    passwordHint: "Pelo menos 8 caracteres, com uma letra e um número.",
+    passwordHint: "Pelo menos 8 caracteres, com uma letra e um número, e que não seja uma senha comum.",
     submit: "Criar conta",
     failureTitle: "Não foi possível criar a conta",
     sentTitle: "Confira seu e-mail",
@@ -100,7 +100,8 @@ export const PT_BR: EmailAuthCopy = {
   },
   resetPassword: {
     title: "Criar uma nova senha",
-    intro: "Escolha uma senha com pelo menos 8 caracteres, incluindo uma letra e um número.",
+    intro:
+      "Escolha uma senha com pelo menos 8 caracteres, incluindo uma letra e um número, e que não seja uma senha comum.",
     newPasswordLabel: "Nova senha",
     confirmationLabel: "Repita a nova senha",
     mismatch: "As senhas não são iguais.",

@@ -11,6 +11,7 @@ import { useScreens } from "./context";
 import type { EmailAuthScreenReason } from "./copy";
 import { PasswordField } from "./password-field";
 import { FailureBanner } from "./shared";
+import { useRefusal } from "./use-refusal";
 
 /**
  * Choose a new password, using the token from the reset link.
@@ -73,6 +74,7 @@ interface ResetState {
   pending: boolean;
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
+  violationCodes: readonly string[] | null;
   done: boolean;
   mismatch: boolean;
   setPassword: (value: string) => void;
@@ -86,8 +88,7 @@ function useReset(token: string | null): ResetState {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [pending, setPending] = useState(false);
-  const [reason, setReason] = useState<EmailAuthScreenReason | null>(null);
-  const [violations, setViolations] = useState<readonly string[] | null>(null);
+  const refusal = useRefusal();
   const [done, setDone] = useState(false);
   const mismatch = confirmation.length > 0 && password !== confirmation;
 
@@ -95,15 +96,13 @@ function useReset(token: string | null): ResetState {
     event.preventDefault();
     if (pending || mismatch || !token) return;
     setPending(true);
-    setReason(null);
-    setViolations(null);
+    refusal.clear();
     try {
       const result = await client.resetPassword(token, password);
       if (result.ok) {
         setDone(true);
       } else {
-        setReason(result.reason);
-        setViolations(result.violations ?? null);
+        refusal.refuse(result);
       }
     } finally {
       setPending(false);
@@ -114,13 +113,14 @@ function useReset(token: string | null): ResetState {
     password,
     confirmation,
     pending,
-    reason,
-    violations,
+    reason: refusal.reason,
+    violations: refusal.violations,
+    violationCodes: refusal.violationCodes,
     done,
     mismatch,
     setPassword,
     setConfirmation,
-    dismiss: () => setReason(null),
+    dismiss: refusal.clear,
     submit,
   };
 }
@@ -190,6 +190,7 @@ function ResetForm({ form }: { form: ResetState }): JSX.Element {
           title={copy.resetPassword.failureTitle}
           reason={form.reason}
           violations={form.violations}
+          violationCodes={form.violationCodes}
           onDismiss={form.dismiss}
         />
 

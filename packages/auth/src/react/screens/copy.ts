@@ -133,6 +133,11 @@ export interface EmailAuthCopy {
   };
 }
 
+/** The server named `too-common` as the one rule broken. */
+function isOnlyTooCommon(violationCodes?: readonly string[] | null): boolean {
+  return violationCodes?.length === 1 && violationCodes[0] === "too-common";
+}
+
 /**
  * The sentence for a refusal, with the broken password rules appended when the
  * server listed them.
@@ -145,12 +150,18 @@ export function failureMessage(
   copy: EmailAuthCopy,
   reason: EmailAuthScreenReason,
   violations?: readonly string[] | null,
+  violationCodes?: readonly string[] | null,
 ): string {
   // `?? unknown` is not dead code under `noUncheckedIndexedAccess`: the reason
   // arrives from the network, so a code this package added after the host's
   // bundle was built reaches here as a string the table has no row for.
   const base = copy.failures[reason] ?? copy.failures.unknown;
   if (reason === "weak-password" && violations && violations.length > 0) {
+    // A common password breaks no rule the person could have met by trying
+    // harder, so "choose a stronger password" in front of it is noise: the
+    // server's own sentence says all there is to say, on its own (FUT-2396).
+    const [only] = violations;
+    if (violations.length === 1 && only && isOnlyTooCommon(violationCodes)) return only;
     return `${base} ${violations.join(" ")}`;
   }
   return base;

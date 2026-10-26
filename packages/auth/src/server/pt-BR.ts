@@ -15,7 +15,7 @@ export const PT_BR_MESSAGES: EmailAuthMessages = {
     "too-long": "A senha é longa demais.",
     "needs-letter": "Inclua pelo menos uma letra.",
     "needs-number": "Inclua pelo menos um número.",
-    "too-common": "Esta senha é muito comum. Escolha outra.",
+    "too-common": "Essa senha é muito comum. Escolha outra.",
   },
   "method-disabled": "Entrar com e-mail e senha está indisponível no momento.",
   "invalid-email": "Informe um e-mail válido.",

@@ -30,6 +30,8 @@ export interface AuthActionState<T> {
   reason: EmailAuthFailure | "unknown" | null;
   /** Which password rules were broken, when `reason` is `weak-password`. */
   violations: readonly string[] | null;
+  /** The codes behind {@link violations}, when the server sent them. */
+  violationCodes?: readonly string[] | null;
   /** The payload of the last successful attempt. */
   data: T | null;
   /** The last attempt succeeded. */
@@ -47,6 +49,7 @@ const IDLE = {
   pending: false,
   reason: null,
   violations: null,
+  violationCodes: null,
   data: null,
   done: false,
 } as const;
@@ -84,11 +87,12 @@ export function useAuthAction<Input, T>(
         if (mounted.current) {
           setState(
             result.ok
-              ? { pending: false, reason: null, violations: null, data: result.data, done: true }
+              ? { pending: false, reason: null, violations: null, violationCodes: null, data: result.data, done: true }
               : {
                   pending: false,
                   reason: result.reason,
                   violations: result.violations ?? null,
+                  violationCodes: result.violationCodes ?? null,
                   data: null,
                   done: false,
                 },
