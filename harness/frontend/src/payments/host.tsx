@@ -14,12 +14,14 @@ import {
   type BuyerInfo,
   type CheckoutAvailability,
   type CheckoutCartView,
+  type CheckoutPaymentList,
   type ComandaCheckout,
   type CreateOrderRequest,
   type CreateOrderResult,
   type PaymentFlows,
   type PaymentFlowsConfig,
 } from '@12-apps/payments-frontend';
+import { PAYMENT_LIST_COPY } from '@12-apps/payments-frontend/locales';
 import { useMemo, type JSX, type ReactNode } from 'react';
 
 import { brlLabel } from './adapter';
@@ -120,6 +122,32 @@ export interface HarnessHost {
   storefront?: boolean;
   /** With `storefront`: the buyer holds store credit, paying part of the cart (FUT-3711). */
   storeCredit?: boolean;
+  /**
+   * Draw Pagamento as the ONE list (`paymentList`) rather than the Dados step
+   * and the Pix/Cartão tabs (FUT-4028). Omitted ⇒ whatever the page's URL
+   * asks — see {@link listRequested}. `storefront` always draws the list.
+   */
+  paymentList?: boolean;
+}
+
+/**
+ * `?checkout=list` in the page's real query string puts every checkout on the
+ * page on the ONE list (FUT-4028), whatever its store.
+ *
+ * It is how the packaged journeys run here: `tests/e2e/steps/payments-world.ts`
+ * opens every store with it, because a host's every purchase now goes through
+ * the list, and the journeys have to prove the list, not the tabs it replaces.
+ * The hand-written specs still open the same pages without it, on the tabs,
+ * until the tabs are deleted. The REAL query, not the hash's: a case switch
+ * rewrites the hash, and the choice has to survive it.
+ */
+function listRequested(): boolean {
+  return new URLSearchParams(window.location.search).get('checkout') === 'list';
+}
+
+/** The ONE list with nothing of a host's own around it: the package's pt-BR pack and the amount due. */
+function useHarnessPaymentList(amountCents: number): CheckoutPaymentList {
+  return useMemo(() => ({ copy: PAYMENT_LIST_COPY['pt-BR'], totalCents: amountCents }), [amountCents]);
 }
 
 /** Wrap the mount's fetch so `/config` can stall or refuse. */
@@ -166,7 +194,11 @@ export function harnessFlowsConfig(
     components: host.components ?? (host.storefront ? STOREFRONT_SLOTS : undefined),
     // The one list, read as a hook every render, as the origin host's entrega mounts it.
     // A door send places nothing here: the harness has no pedido to raise at the door.
-    ...(host.storefront ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit) } : {}),
+    ...(host.storefront
+      ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit) }
+      : (host.paymentList ?? listRequested())
+        ? { usePaymentList: () => useHarnessPaymentList(amountCents) }
+        : {}),
     // Required now, and stated by THIS host in its own words. It used to be
     // omitted, which meant rendering the package's pt-BR default — another
     // product's restaurant vocabulary — while claiming to be an independent

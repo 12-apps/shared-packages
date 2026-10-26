@@ -25,9 +25,15 @@ export {
   VALID_CPF,
 } from '@12-apps/payments-e2e';
 
-/** Open a harness page BY SLUG, and prove the shell really rendered that one. */
-export async function openPage(page: Page, slug: string): Promise<void> {
-  await page.goto(`#/${slug}`);
+/**
+ * Open a harness page BY SLUG, and prove the shell really rendered that one.
+ *
+ * `checkout: 'list'` opens it with `?checkout=list`, which draws every checkout
+ * on the page as the ONE list instead of the Dados step and tabs (FUT-4028,
+ * `src/payments/host.tsx`).
+ */
+export async function openPage(page: Page, slug: string, options: { checkout?: 'list' } = {}): Promise<void> {
+  await page.goto(options.checkout === 'list' ? `/?checkout=list#/${slug}` : `#/${slug}`);
   await expect(page.getByTestId('harness-page')).toHaveAttribute('data-page', slug);
 }
 

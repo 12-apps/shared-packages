@@ -1,6 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 
-import { VALID_CPF, fillCard } from '../helpers/checkout.js';
+import { VALID_CPF, fillCard, listTopSettled } from '../helpers/checkout.js';
 import { paymentsWorld } from '../world.js';
 
 import { Given, Then, When } from './fixtures.js';
@@ -22,14 +22,8 @@ import { Given, Then, When } from './fixtures.js';
  * request.
  */
 
-/**
- * The list's top (the CPF and "PAGAMENTO RÁPIDO") is a chunk of its own
- * (FUT-3711): wait for it to land before asking what it shows — an absence
- * read while it loads proves nothing, and a field looked for then is missed.
- */
-async function topSettled(page: Page): Promise<void> {
-  await expect(page.getByTestId('list-top-loading')).toHaveCount(0);
-}
+/** The list's top is a chunk of its own (FUT-3711): see {@link listTopSettled}. */
+const topSettled = listTopSettled;
 
 Given('a compradora abre o checkout de uma loja com Google Pay', async ({ page }) => {
   await paymentsWorld().open(page, 'google-pay');

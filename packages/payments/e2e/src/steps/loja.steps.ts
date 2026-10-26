@@ -1,5 +1,4 @@
-import { expect } from '@playwright/test';
-
+import { expectOnlyReads } from '../helpers/wire.js';
 import { paymentsWorld } from '../world.js';
 
 import { Given } from './fixtures.js';
@@ -62,9 +61,8 @@ Given('a loja não tem provedor nenhum e oferece chamar o garçom', async ({ pag
  * this store has switched online payments off, so only the application can say.
  */
 Given('a loja tem provedor mas desligou os pagamentos online', async ({ page }) => {
-  const world = paymentsWorld();
-  await world.open(page, 'payments-off');
-  await expect(world.wire.paths(page)).toHaveText('GET /api/checkout/config');
+  await paymentsWorld().open(page, 'payments-off');
+  await expectOnlyReads(page);
 });
 
 Given('a loja tem dois provedores que geram token no navegador', async ({ page }) => {

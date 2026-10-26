@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
  *
  * The journeys themselves are portable: every assertion in them reads a test id
  * the payments package's own components render, so `card-number`,
- * `checkout-method-CARD` and `payment-paid` mean the same thing in any app that
+ * `list-option-CARD` and `payment-paid` mean the same thing in any app that
  * mounts the checkout. What is NOT portable is everything around them — how
  * this app routes to a checkout, how a merchant of a given shape gets set up,
  * and where a host records what crossed the wire.
@@ -231,7 +231,14 @@ export interface PaymentsWorld {
   /**
    * Put the browser on a checkout for a store of this shape.
    *
-   * For a checkout shape that means ON THE DADOS STEP, with every field the
+   * For a checkout shape that means ON THE ONE LIST (`payment-list`) — what
+   * every purchase goes through now (FUT-4028) — with no CPF on file:
+   * `reachPayment` types the CPF at the top of Pagamento (`list-buyer-taxId`)
+   * when the list asks for one, and the steps choose rows and press the bar.
+   * Whatever a row asks beyond the CPF is, as below, the store's.
+   *
+   * A host still on the older tabs is served too, until they are deleted: it
+   * opens ON THE DADOS STEP, with every field the
    * chain requires already filled EXCEPT the CPF (FUT-3627): `reachPayment`
    * types the CPF when the form asks for one and presses Continuar, and
    * nothing else. Which fields a chain requires — InfinitePay's mobile phone,

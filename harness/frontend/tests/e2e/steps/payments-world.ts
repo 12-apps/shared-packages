@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { definePaymentsWorld, type PaymentsStore } from '@12-apps/payments-e2e';
 
 import { openCase, openPage } from '../helpers/checkout';
@@ -19,6 +19,12 @@ import { openCase, openPage } from '../helpers/checkout';
  * It lives in the `steps` glob on purpose: playwright-bdd imports every step
  * file before any scenario runs, so the `definePaymentsWorld` call below lands
  * in every worker before the first Given executes.
+ *
+ * Every store opens on the ONE list (FUT-4028): `open` adds `?checkout=list`,
+ * which `src/payments/host.tsx` reads, so each checkout shape is the list a
+ * host's purchase now goes through and none of them reaches the old Dados step
+ * and Pix/Cartão tabs. The pages themselves are unchanged; the hand-written
+ * specs still open them without it, on the tabs, until the tabs are deleted.
  */
 
 /** Which harness page holds a store of each shape, and which case on it. */
@@ -64,6 +70,18 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
 };
 
 /**
+ * The shapes that are not a checkout: a buyer's saved cards, or an admin
+ * surface. They open with no `?checkout=list`, which would mean nothing to them
+ * and is one more query string in front of an OAuth return that reads its own.
+ */
+const NOT_A_CHECKOUT: ReadonlySet<PaymentsStore> = new Set([
+  'wallet',
+  'activation',
+  'setup-guide',
+  'reconnect-required',
+]);
+
+/**
  * The page a scenario is on, so the return leg can come back to it.
  *
  * A module-level value rather than a fixture: the packaged `test` deliberately
@@ -72,12 +90,29 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string 
  */
 let currentSlug: string | null = null;
 
+/**
+ * A checkout shape is the ONE list, or the screen that says the store cannot
+ * charge — never the Dados step or the tabs (FUT-4028). Without this, a page
+ * that stopped reading `?checkout=list` would put every journey back on the
+ * tabs, and the steps, which answer for both, would stay green.
+ */
+async function expectTheList(page: Page): Promise<void> {
+  const settled = page
+    .getByTestId('payment-list')
+    .or(page.getByTestId('checkout-payments-disabled'))
+    .or(page.getByTestId('checkout-payments-remedy'));
+  await expect(settled.first()).toBeVisible();
+  await expect(page.getByTestId('checkout-continue')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
+}
+
 definePaymentsWorld({
   async open(page, store) {
     const where = LOCATIONS[store];
-    await openPage(page, where.slug);
+    await openPage(page, where.slug, NOT_A_CHECKOUT.has(store) ? {} : { checkout: 'list' });
     currentSlug = where.slug;
     if (where.caseId) await openCase(page, where.caseId);
+    if (!NOT_A_CHECKOUT.has(store)) await expectTheList(page);
     if (store === 'activation') {
       // The admin shape lands ON the provider's panel: the journey's subject
       // is one provider's switch and activation step, not the landing list.
@@ -107,7 +142,7 @@ definePaymentsWorld({
     // The way a hosted provider really sends her back: a fresh load of this
     // app's own route, carrying the markers the provider appends. The
     // application was destroyed in between.
-    await page.goto(`/?transaction_nsu=NSU-HARNESS&slug=inv-harness#/${currentSlug ?? ''}`);
+    await page.goto(`/?checkout=list&transaction_nsu=NSU-HARNESS&slug=inv-harness#/${currentSlug ?? ''}`);
   },
 
   hostedReturnStatus: (page) => page.getByTestId('hosted-return-status'),

@@ -1,7 +1,15 @@
 import { expect } from '@playwright/test';
 
-import { DECLINE_PAN, fillCard, payCard, reachPayment } from '../helpers/checkout.js';
+import {
+  DECLINE_PAN,
+  checkoutSurface,
+  chooseListOption,
+  fillCard,
+  payCard,
+  reachPayment,
+} from '../helpers/checkout.js';
 
+import { expectOnlyReads } from '../helpers/wire.js';
 import { paymentsWorld } from '../world.js';
 
 import { Then, When } from './fixtures.js';
@@ -20,6 +28,12 @@ import { Then, When } from './fixtures.js';
  * fifteen green checks with three criticals live, every one of them in the seam
  * between the published client and the published mount, and not one of them
  * visible to a test that only looked at a screen.
+ *
+ * Every step answers for BOTH checkouts a host may draw (FUT-4028): the ONE
+ * list (`payment-list`, its rows `list-option-<METHOD>` and its bar
+ * `list-pay`) and the older Dados step with Pix/Cartão tabs. A gesture finds
+ * whichever is on the page; an absence is asserted for both shapes, so an
+ * absence on one screen cannot pass for the other.
  */
 
 // ---------------------------------------------------------------------------
@@ -33,14 +47,25 @@ When('ela informa o CPF e segue para o pagamento', async ({ page }) => {
 When('ela escolhe pagar com cartão', async ({ page }) => {
   // Deliberately does NOT wait for the card form: a store may answer the card
   // choice with something other than a form, and that is a scenario of its own.
-  await page.getByTestId('checkout-method-CARD').click();
+  if ((await checkoutSurface(page)) === 'list') await chooseListOption(page, 'CARD');
+  else await page.getByTestId('checkout-method-CARD').click();
 });
 
 When('ela segue para o pagamento no provedor', async ({ page }) => {
   // The ONE action a hand-off store offers in place of the picker. There is
   // nothing to choose here: every method mints the same checkout link, so the
   // PIX-or-card question is binding on the provider's page and nowhere else.
-  await page.getByTestId('checkout-handoff-start').click();
+  // On the list that action is the hand-off row (its one online row, so
+  // already chosen) and the bar's "Ir para …".
+  const tabs = page.getByTestId('checkout-handoff-start');
+  const row = page.getByTestId('list-option-HAND_OFF');
+  await expect(tabs.or(row).first()).toBeVisible();
+  if (await tabs.isVisible()) {
+    await tabs.click();
+    return;
+  }
+  await chooseListOption(page, 'HAND_OFF');
+  await page.getByTestId('list-pay').click();
 });
 
 When('ela paga com um cartão novo', async ({ page }) => {
@@ -77,29 +102,50 @@ Then('não lhe perguntam entre PIX e cartão', async ({ page }) => {
   // The picker is ABSENT, not merely narrowed to one tile. A one-option
   // "choice" at a store that hands the buyer over still says the answer decides
   // something, and it decides nothing until she is on the provider's own page.
+  // On the list, the store's one online row is the hand-off, never a Pix or
+  // a card row.
   await expect(page.getByTestId('checkout-method')).toHaveCount(0);
   await expect(page.getByTestId('checkout-method-PIX')).toHaveCount(0);
   await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+  await expect(page.getByTestId('list-option-PIX')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="list-option-CARD"]')).toHaveCount(0);
 });
 
 Then('só a opção PIX é oferecida', async ({ page }) => {
-  await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();
+  // The tabs: one tile. The list: one online row, already raised by the time
+  // this is read (see `reachPayment`), so its Pix face may stand in its place.
+  await expect(
+    page
+      .getByTestId('checkout-method-PIX')
+      .or(page.getByTestId('list-option-PIX'))
+      .or(page.getByTestId('list-pix'))
+      .first(),
+  ).toBeVisible();
   await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="list-option-CARD"]')).toHaveCount(0);
 });
 
 Then('ela vê o QR code do PIX', async ({ page }) => {
-  await expect(page.getByTestId('pix-view')).toBeVisible();
-  await expect(page.getByTestId('pix-qr')).toBeVisible();
+  // The tabs' `pix-view`, or the list's own Pix face (`list-pix`).
+  const list = page.getByTestId('list-pix');
+  await expect(page.getByTestId('pix-view').or(list).first()).toBeVisible();
+  if (await list.isVisible()) await expect(page.getByTestId('list-pix-qr')).toBeVisible();
+  else await expect(page.getByTestId('pix-qr')).toBeVisible();
 });
 
 Then('o código copia-e-cola veio do provedor', async ({ page }) => {
   // The Banco Central GUI, in either case: the specification spells it in
   // lowercase and many PSPs print it in capitals, and both are a real code.
-  await expect(page.getByTestId('pix-code')).toContainText(/br\.gov\.bcb\.pix/i);
+  await expect(page.getByTestId('pix-code').or(page.getByTestId('list-pix-code')).first()).toContainText(
+    /br\.gov\.bcb\.pix/i,
+  );
 });
 
 Then('ela vê o formulário de cartão', async ({ page }) => {
-  await expect(page.getByTestId('card-view')).toBeVisible();
+  // The tabs' `card-view`, or the card row's own fields on the list.
+  await expect(
+    page.getByTestId('card-view').or(page.getByTestId('payment-list').getByTestId('card-number')).first(),
+  ).toBeVisible();
 });
 
 Then('nenhum formulário de cartão é mostrado', async ({ page }) => {
@@ -117,11 +163,15 @@ Then('o recibo mostra o valor pago', async ({ page }) => {
 });
 
 Then('o pagamento falha', async ({ page }) => {
-  await expect(page.getByTestId('payment-failed')).toBeVisible();
+  // The tabs' failure screen, or the refusal the list shows inside the card row.
+  await expect(page.getByTestId('payment-failed').or(page.getByTestId('card-error')).first()).toBeVisible();
 });
 
 Then('ela pode tentar novamente', async ({ page }) => {
-  await expect(page.getByTestId('payment-retry')).toBeVisible();
+  // The tabs' retry, or the list's bar back on "Pagar" beside the refusal.
+  const retry = page.getByTestId('payment-retry').or(page.getByTestId('list-pay')).first();
+  await expect(retry).toBeVisible();
+  await expect(retry).toBeEnabled();
 });
 
 Then('ela é avisada de que o pagamento está sendo confirmado', async ({ page }) => {
@@ -135,11 +185,14 @@ Then('não existe nenhum botão de pagar na tela', async ({ page }) => {
   // reaches for.
   await expect(page.getByTestId('card-pay-bar')).toHaveCount(0);
   await expect(page.getByTestId('card-pay')).toHaveCount(0);
+  await expect(page.getByTestId('list-pay')).toHaveCount(0);
+  await expect(page.getByTestId('list-charge-bar')).toHaveCount(0);
 });
 
 Then('não existe nenhum botão de tentar novamente na tela', async ({ page }) => {
   await expect(page.getByTestId('payment-retry')).toHaveCount(0);
   await expect(page.getByTestId('checkout-retry-payment')).toHaveCount(0);
+  await expect(page.getByTestId('list-pay')).toHaveCount(0);
 });
 
 Then('o erro do cartão menciona o outro meio de pagamento', async ({ page }) => {
@@ -148,7 +201,7 @@ Then('o erro do cartão menciona o outro meio de pagamento', async ({ page }) =>
 });
 
 Then('a opção PIX continua na tela', async ({ page }) => {
-  await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();
+  await expect(page.getByTestId('checkout-method-PIX').or(page.getByTestId('list-option-PIX')).first()).toBeVisible();
 });
 
 Then('ela é avisada de que a loja não cobra online', async ({ page }) => {
@@ -162,6 +215,8 @@ Then('ela recebe a opção de chamar o garçom', async ({ page }) => {
 
 Then('nenhuma forma de pagamento é oferecida', async ({ page }) => {
   await expect(page.getByTestId('checkout-method')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="list-option-"]')).toHaveCount(0);
+  await expect(page.getByTestId('list-pay')).toHaveCount(0);
   await expect(page.getByTestId('card-view')).toHaveCount(0);
   await expect(page.getByTestId('pix-view')).toHaveCount(0);
 });
@@ -194,9 +249,9 @@ Then('o pagamento volta confirmado', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 Then('nenhum pedido chegou a ser criado', async ({ page }) => {
-  // The config read is the only request there is. A store that cannot charge
-  // must not have a payable brought into existence.
-  await expect(paymentsWorld().wire.paths(page)).toHaveText('GET /api/checkout/config');
+  // The config was read, and nothing but reads went out. A store that cannot
+  // charge must not have a payable brought into existence.
+  await expectOnlyReads(page);
 });
 
 Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ page }) => {

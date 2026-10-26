@@ -69,12 +69,17 @@ export {
  * payments components render, so they are as portable as the journeys.
  */
 export {
+  checkoutSurface,
   chooseCard,
+  chooseListOption,
   DECLINE_PAN,
   fillCard,
   fillCpf,
   GOOD_PAN,
+  listTopSettled,
   payCard,
   reachPayment,
   VALID_CPF,
+  type CheckoutSurface,
+  type ListMethod,
 } from './helpers/checkout.js';
