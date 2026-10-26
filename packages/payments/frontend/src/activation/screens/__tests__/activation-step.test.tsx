@@ -45,6 +45,7 @@ const IDLE_CHARGE = {
   cpf: '',
   setCpf: vi.fn(),
   cpfError: undefined,
+  setCpfError: vi.fn(),
   amountCents: null,
   state: { kind: 'idle' } as const,
   submit: vi.fn(),
@@ -139,6 +140,42 @@ describe('the activation step router', () => {
     mountStep({ provider: 'stone', displayName: 'Stone' });
 
     expect(screen.getByText('Stone requires the card holder tax id')).not.toBeNull();
+  });
+
+  it('judges the holder document on blur, and only once something was typed (FUT-4048)', () => {
+    // The blur used to call the validator and drop its answer, so a wrong CNPJ
+    // was only reported on submit.
+    const setCpfError = vi.fn();
+    const Step = createActivationStep({
+      verifyChargeUrl: (provider) => `/verify/${provider}`,
+      copy: TEST_COPY,
+      formatAmount,
+      CardSurface: TestCardSurface,
+      validateTaxId: (value) => (value === '11222333000182' ? 'CPF ou CNPJ inválido.' : undefined),
+    });
+    const props = {
+      provider: 'pagbank',
+      displayName: 'PagBank',
+      connected: true,
+      proven: false,
+      blocked: false,
+      hidden: false,
+      onVerified: vi.fn(),
+      onSetupIncomplete: vi.fn(),
+      ownerEmail: 'owner@example.test',
+      storeUrl: 'https://shop.example.test/menu',
+      onProviderOrder: vi.fn(),
+    } satisfies ActivationStepProps;
+
+    hooks.charge.mockReturnValue({ ...IDLE_CHARGE, setCpfError });
+    const { rerender } = render(<Step {...props} />);
+    fireEvent.blur(screen.getByTestId('verify-charge-cpf').querySelector('input') ?? screen.getByTestId('verify-charge-cpf'));
+    expect(setCpfError).not.toHaveBeenCalled();
+
+    hooks.charge.mockReturnValue({ ...IDLE_CHARGE, cpf: '11222333000182', setCpfError });
+    rerender(<Step {...props} />);
+    fireEvent.blur(screen.getByTestId('verify-charge-cpf').querySelector('input') ?? screen.getByTestId('verify-charge-cpf'));
+    expect(setCpfError).toHaveBeenCalledWith('CPF ou CNPJ inválido.');
   });
 
   it('hands each flow the host route for the provider that is open', () => {

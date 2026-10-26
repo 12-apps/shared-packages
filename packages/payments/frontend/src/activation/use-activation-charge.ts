@@ -91,6 +91,8 @@ export interface ActivationCharge {
   cpf: string;
   setCpf: (value: string) => void;
   cpfError: string | undefined;
+  /** Show (or clear) the holder document's error — the field's blur sets it (FUT-4048). */
+  setCpfError: (error: string | undefined) => void;
   /**
    * What this charge will COST, in cents — `null` until the endpoint answers.
    *
@@ -320,6 +322,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     cpf: form.cpf,
     setCpf: form.setCpf,
     cpfError: form.cpfError,
+    setCpfError: form.setCpfError,
     amountCents: probe.amountCents,
     state,
     submit,
