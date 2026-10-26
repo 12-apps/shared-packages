@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { EmailAuthScreenReason } from "./copy";
 
 /** What a form's refusal banner is told: the code, and the password rules behind it. */
-export interface RefusalState {
+interface RefusalState {
   reason: EmailAuthScreenReason | null;
   violations: readonly string[] | null;
   violationCodes: readonly string[] | null;
