@@ -47,5 +47,8 @@ Then('ela é avisada de que vai ser levada para o provedor', async ({ page }) =>
   // trip and offers the one action that starts it; the pending state is what
   // the same screen becomes once she presses it, and a warning that only
   // appears after the decision is not a warning.
-  await expect(page.getByTestId('checkout-handoff-invite')).toBeVisible();
+  // On the list it is the hand-off row, whose hint says where she pays.
+  await expect(
+    page.getByTestId('checkout-handoff-invite').or(page.getByTestId('list-option-HAND_OFF')).first(),
+  ).toBeVisible();
 });

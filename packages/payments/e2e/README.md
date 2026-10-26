@@ -18,7 +18,7 @@ later runs in your app on the next version bump.
 ## Why a port at all
 
 The scenarios are portable because every assertion in them reads a test id the
-payments components themselves render — `card-number`, `checkout-method-CARD`,
+payments components themselves render — `card-number`, `list-option-CARD`,
 `pix-code`, `payment-paid` mean the same thing in every consumer.
 
 What is **not** portable is everything around them: how your app routes to a
@@ -86,7 +86,16 @@ which is worse than a red one.
 
 ### What `open` must leave on screen
 
-For a checkout shape, `open` returns with the buyer **on the Dados step**, the
+For a checkout shape, `open` returns with the buyer **on the ONE payment list**
+(`payment-list`, from `paymentList`), the store's checkout config already
+resolved, and **no CPF on file**: the packaged steps type the CPF at the top of
+Pagamento (`list-buyer-taxId`) when the list asks for one, choose a row
+(`list-option-<METHOD>-radio`) and press the bar (`list-pay`). Every purchase
+goes through that list (FUT-4028), so it is the screen the journeys prove.
+
+Every step still answers for the older Dados step and Pix/Cartão tabs, so a
+host can move its stores to the list without its journeys changing; that path
+goes when the tabs are deleted. On the tabs, `open` returns with the buyer **on the Dados step**, the
 store's checkout config already resolved, and every field the chain requires
 filled in **except the CPF** — the packaged steps type the CPF when the form
 asks for one, and press Continuar. Which other fields a chain requires (a mobile
