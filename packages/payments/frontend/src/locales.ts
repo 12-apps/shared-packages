@@ -3,9 +3,6 @@ import { EN_US_ACTIVATION_STEP_COPY } from './activation/screens/copy-en-US';
 import { PT_BR_ACTIVATION_STEP_COPY } from './activation/screens/copy-pt-BR';
 import type { CardCopy } from './card/copy';
 import { EN_US_CARD_COPY, PT_BR_CARD_COPY } from './card';
-import type { CheckoutPaymentCopy } from './components/checkout-payment-copy';
-import { EN_US_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-en-US';
-import { PT_BR_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-pt-BR';
 import type { CheckoutCopy } from './components/checkout/copy-context';
 import {
   EN_US_CHECKOUT_COPY,
@@ -114,11 +111,6 @@ export const PAYMENT_STATUS_COPY = {
   'en-US': EN_US_PAYMENT_STATUS_COPY,
 } as const satisfies LocalePack<PaymentStatusCopy>;
 
-export const CHECKOUT_PAYMENT_COPY = {
-  'pt-BR': PT_BR_CHECKOUT_PAYMENT_COPY,
-  'en-US': EN_US_CHECKOUT_PAYMENT_COPY,
-} as const satisfies LocalePack<CheckoutPaymentCopy>;
-
 export const PAYMENTS_SETTINGS_COPY = {
   'pt-BR': PT_BR_PAYMENTS_SETTINGS_COPY,
   'en-US': EN_US_PAYMENTS_SETTINGS_COPY,
@@ -139,7 +131,6 @@ export const PLATFORM_HOMOLOGACAO_COPY = {
  */
 export { EN_US_ACTIVATION_STEP_COPY } from './activation/screens/copy-en-US';
 export { EN_US_CARD_COPY } from './card';
-export { EN_US_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-en-US';
 export {
   EN_US_CHECKOUT_COPY,
   EN_US_CHECKOUT_VIEW_COPY,

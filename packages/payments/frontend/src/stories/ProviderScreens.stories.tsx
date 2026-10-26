@@ -170,29 +170,11 @@ export const AwaitingTheMethodChoice: StoryObj = {
   ),
 };
 
-export const HandoffInvite: StoryObj = {
-  name: "hosted-link — a única ação",
-  render: () => (
-    // THE state this screen exists for. The shell hides its PIX/card picker
-    // here, because every method mints the same link and the choice is only
-    // binding on the provider's own page — so the screen says where the buyer
-    // is going, that they come back, and offers the one action that goes.
-    <Mounted
-      screen={HostedLinkScreen}
-      config={handoffStore("hosted-link")}
-      method={null}
-      onStart={() => undefined}
-    />
-  ),
-};
-
 export const HandoffNotice: StoryObj = {
   name: "hosted-link — indo para a página do provedor",
   render: () => (
-    // The moment after the press: the charge is being raised and the buyer is
-    // about to leave. It repeats the invite's sentence word for word — a screen
-    // that reworded the destination at the moment of commitment read as one
-    // changing its mind.
+    // The moment after the press of the list's "Ir para …": the charge is
+    // being raised and the buyer is about to leave.
     <Mounted screen={HostedLinkScreen} config={handoffStore("hosted-link")} method="CARD" />
   ),
 };

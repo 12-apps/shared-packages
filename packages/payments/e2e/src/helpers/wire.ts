@@ -118,7 +118,7 @@ export async function expectNoWrites(page: Page): Promise<void> {
  * The wire carried the config read and nothing that writes (FUT-4028). For a
  * scenario whose premise IS that the config was read and answered. A read
  * beside it is no payable: the list also reads the buyer's saved cards
- * (`GET /api/checkout/cards`), where the tabs read the config alone. Every
+ * (`GET /api/checkout/cards`) beside the config. Every
  * recorded line is a GET, however a host separates them (`,` or a new line).
  */
 export async function expectOnlyReads(page: Page): Promise<void> {

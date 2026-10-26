@@ -34,18 +34,8 @@ import type { CheckoutCopyFE } from '@12-apps/payments-frontend';
  */
 export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
   views: {
-    steps: {
-      dados: 'Identificação',
-      payment: 'Pagamento',
-      status: 'Comprovante',
-    },
-    dados: {
+    consent: {
       saveProfile: 'Guardar meus dados nesta loja',
-      cannotContinueTitle: 'Confira seus dados',
-      continueAction: 'Continuar',
-      secureNotice: 'Seus dados trafegam protegidos',
-      keepShopping: 'Voltar às compras',
-      back: 'Voltar',
     },
     emptyCart: {
       title: 'Seu carrinho está vazio.',
@@ -291,7 +281,6 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           cardOnly: 'cartão',
           handoff: (destination, choice) => `Vamos te levar ${destination}${choice}.`,
           afterwards: 'Terminando o pagamento lá, você volta para cá e confirmamos o pedido.',
-          startAction: 'Ir para o pagamento',
           preparing: 'Abrindo o pagamento',
         },
         transport: {
@@ -336,8 +325,6 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
   returnPending: 'Confirmando seu pagamento…',
   returnUnknown:
     'Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.',
-  continueAction: 'Continuar',
-  secureNotice: 'Seus dados trafegam protegidos',
   addCardTitle: 'Adicionar cartão',
   addCardAction: 'Salvar cartão',
   addCardPreparing: 'Preparando o formulário…',

@@ -35,8 +35,6 @@ export const STORY_CHECKOUT_COPY: CheckoutCopyFE = {
   returnCheckAgain: "Verificar de novo",
   returnUnknown:
     "Não encontramos um pagamento em andamento nesta sessão. Verifique seus pedidos em instantes.",
-  continueAction: "Continuar",
-  secureNotice: "Pagamento seguro",
   addCardTitle: "Adicionar cartão",
   addCardAction: "Salvar cartão",
   addCardPreparing: "Preparando o formulário…",

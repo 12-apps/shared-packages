@@ -50,8 +50,8 @@ test('an UNRESOLVED charge removes the pay bar and offers no retry anywhere', as
 
   // REMOVED, not disabled. A live "Pagar R$ …" under that message is what a
   // thumb reaches for, and a disabled one becomes live again on any re-render.
-  await expect(page.getByTestId('card-pay-bar')).toHaveCount(0);
-  await expect(page.getByTestId('card-pay')).toHaveCount(0);
+  await expect(page.getByTestId('list-pay')).toHaveCount(0);
+  await expect(page.getByTestId('list-charge-bar')).toHaveCount(0);
   await expect(page.getByTestId('payment-retry')).toHaveCount(0);
   await expect(page.getByTestId('checkout-retry-payment')).toHaveCount(0);
 });
@@ -69,13 +69,13 @@ test('an exhausted chain is worded by METHOD and leaves PIX on the table', async
   // the method that failed and points at the one that still works.
   await expect(page.getByTestId('card-error')).toContainText('cartão');
   await expect(page.getByTestId('card-error')).toContainText('PIX');
-  // …and the PIX tile really is still there to take.
-  await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();
+  // …and the PIX row really is still there to take.
+  await expect(page.getByTestId('list-option-PIX')).toBeVisible();
   // The pay bar survives: this failure IS retryable, unlike the one above.
-  await expect(page.getByTestId('card-pay')).toBeVisible();
+  await expect(page.getByTestId('list-pay')).toBeEnabled();
 });
 
-test('a charge with no CPF is refused by name, on the input that is missing', async ({ page }) => {
+test('a charge with no CPF is refused by name, and the list never lets one through', async ({ page }) => {
   await openPage(page, 'payments-checkout-buyer-fields');
   await openCase(page, 'server-refusal');
 
@@ -86,8 +86,12 @@ test('a charge with no CPF is refused by name, on the input that is missing', as
   await expect(page.getByTestId('refusal-code')).toHaveText('MISSING_BUYER_FIELD');
   await expect(page.getByTestId('refusal-field')).toHaveText('cpf');
 
-  // And the name lands on that exact input, which is the half FUT-740's third
-  // critical was missing: a buyer told "informe: taxId" at the top of a form
-  // with no such box has been told nothing.
-  await expect(page.getByTestId('buyer-cpf')).toHaveAttribute('aria-invalid', 'true');
+  // And the checkout in front of that guard asks the CPF at the top of
+  // Pagamento and holds the bar until it is there (FUT-4028): the buyer cannot
+  // send the charge the server would refuse.
+  await openCase(page, 'taxid-required');
+  await expect(page.getByTestId('list-buyer-taxId')).toBeVisible();
+  await page.getByTestId('list-option-CARD-radio').check();
+  await expect(page.getByTestId('list-pay')).toBeDisabled();
+  await expect(page.getByTestId('wire-paths')).not.toContainText('POST');
 });

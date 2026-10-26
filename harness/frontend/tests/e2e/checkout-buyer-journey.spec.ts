@@ -1,9 +1,19 @@
 import { expect, test } from '@playwright/test';
 
-import { fillCard, openCase, openPage, payCard, reachPayment, VALID_CPF } from './helpers/checkout';
+import {
+  chooseCard,
+  fillCard,
+  openCase,
+  openPage,
+  payCard,
+  reachPayment,
+  showListPixQr,
+  VALID_CPF,
+} from './helpers/checkout';
 
 /**
- * The buyer's own journey, end to end, against a real mount (FUT-743).
+ * The buyer's own journey, end to end, against a real mount (FUT-743), on the
+ * ONE payment list every purchase goes through (FUT-4028).
  *
  * These are the paths a shopper actually walks — pay by PIX, pay by card,
  * change their mind — and the one thing that decides whether any of them work:
@@ -25,23 +35,23 @@ test.describe('PIX', () => {
     await openCase(page, 'awaiting');
     await reachPayment(page);
 
-    // One declared method is not a choice: the tile is there and already taken.
-    await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();
-    await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+    // One declared method is not a choice: the row is there and already taken,
+    // and the bar's one tap ("Gerar Pix", made by `reachPayment`) raised it.
+    await expect(page.getByTestId('list-option-CARD')).toHaveCount(0);
 
     // The payload came from the provider and survived the host's own view — a
     // PIX create answers with the VIEW and nothing else, so a payload that did
     // not make that hop is a payment step with no code on it.
-    await expect(page.getByTestId('pix-view')).toBeVisible();
-    await expect(page.getByTestId('pix-qr')).toBeVisible();
-    await expect(page.getByTestId('pix-code')).toContainText('BR.GOV.BCB.PIX');
+    await expect(page.getByTestId('list-pix')).toBeVisible();
+    await showListPixQr(page);
+    await expect(page.getByTestId('list-pix-code')).toContainText('BR.GOV.BCB.PIX');
   });
 
   test('the raise goes out on the paths the published client writes', async ({ page }) => {
     await openPage(page, 'payments-checkout-pix');
     await openCase(page, 'awaiting');
     await reachPayment(page);
-    await expect(page.getByTestId('pix-view')).toBeVisible();
+    await expect(page.getByTestId('list-pix')).toBeVisible();
 
     // The config read is public and carries the store; the raise is a POST at
     // the base url itself. Both are the shipped paths, verbatim — the default
@@ -70,8 +80,8 @@ test.describe('card', () => {
     await openPage(page, 'payments-checkout-card');
     await reachPayment(page);
 
-    // A chain declaring CARD alone takes the buyer straight to the form.
-    await expect(page.getByTestId('card-view')).toBeVisible();
+    // A chain declaring CARD alone opens on the card row and its form.
+    await chooseCard(page);
     await fillCard(page);
     await payCard(page);
 
@@ -102,6 +112,7 @@ test.describe('card', () => {
   test('a single-entry chain sends no tokensByProvider', async ({ page }) => {
     await openPage(page, 'payments-checkout-card');
     await reachPayment(page);
+    await chooseCard(page);
     await fillCard(page);
     await payCard(page);
 
@@ -113,29 +124,32 @@ test.describe('card', () => {
 });
 
 test.describe('both methods', () => {
-  test('switching method drops the order raised for the previous one', async ({ page }) => {
+  test('a pick raises nothing, and leaving a raised Pix for the card drops its code', async ({
+    page,
+  }) => {
     await openPage(page, 'payments-checkout-both');
     await reachPayment(page);
 
-    // Two real options, so nothing is preselected and no order exists yet.
-    await expect(page.getByTestId('checkout-method-PIX')).toBeVisible();
-    await expect(page.getByTestId('checkout-method-CARD')).toBeVisible();
-    await expect(page.getByTestId('pix-view')).toHaveCount(0);
-    await expect(page.getByTestId('card-view')).toHaveCount(0);
+    // Two real options; choosing between them raises nothing — the bar's
+    // button is the only way an order is made (FUT-3591).
+    await page.getByTestId('list-option-PIX-radio').check();
+    await page.getByTestId('list-option-CARD-radio').check();
+    await page.getByTestId('list-option-PIX-radio').check();
+    await expect(page.getByTestId('wire-paths')).not.toContainText('POST');
+    await expect(page.getByTestId('provider-charge-count')).toHaveText('0');
 
-    await page.getByTestId('checkout-method-PIX').click();
-    await expect(page.getByTestId('pix-view')).toBeVisible();
+    await page.getByTestId('list-pay').click();
+    await expect(page.getByTestId('list-pix')).toBeVisible();
 
-    await page.getByTestId('checkout-method-CARD').click();
-    await expect(page.getByTestId('card-view')).toBeVisible();
-    // The whole point: no stale QR behind the card form.
-    await expect(page.getByTestId('pix-view')).toHaveCount(0);
+    // "Pagar com outro meio" goes back to the rows: no stale QR behind them.
+    await page.getByTestId('list-pix-change-method').click();
+    await expect(page.getByTestId('list-pix')).toHaveCount(0);
+    await chooseCard(page);
 
     // Exactly one charge exists at the provider, and it is the abandoned PIX
-    // one. Raising the card payable does NOT raise a card charge — the mount
-    // answers a CARD create with the view alone and waits for the instrument,
-    // which is what keeps a buyer who is still choosing from accumulating
-    // charges at their bank.
+    // one. Choosing the card raises no card charge — the mount waits for the
+    // instrument, which is what keeps a buyer who is still choosing from
+    // accumulating charges at their bank.
     await expect(page.getByTestId('provider-charge-count')).toHaveText('1');
     await expect(page.getByTestId('provider-charges')).toContainText('aurora:PIX');
   });

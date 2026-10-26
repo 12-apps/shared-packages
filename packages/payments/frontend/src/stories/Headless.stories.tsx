@@ -27,7 +27,7 @@ import { CLIENT_BASE_URL, createClientStoryStore, type ClientStorySpec } from ".
  *
  * `isSettled` is exercised where it is load-bearing: it is the published test
  * for "will waiting change the answer?", so it decides here — as it does in
- * `CheckoutPayment` — whether the status hook is given a charge to poll.
+ * a payment step — whether the status hook is given a charge to poll.
  */
 const meta: Meta = {
   title: "Checkout/Headless client",
@@ -206,7 +206,7 @@ export const PixChargeLifecycle: StoryObj = {
 /**
  * A declined card settles ON CREATE: `isSettled('DECLINED')` is true, so the
  * status hook is given nothing to poll and the panel says the answer is
- * final. This is the exact test `CheckoutPayment` applies before polling.
+ * final. This is the exact test a payment step applies before polling.
  */
 export const DeclinedCardIsSettled: StoryObj = {
   name: "Cartão recusado — liquidado no criar, sem consulta",

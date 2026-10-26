@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { fillCard, openPage, payCard, reachPayment } from './helpers/checkout';
+import { fillCard, openPage } from './helpers/checkout';
 
 /**
  * The two portability claims, in a browser (FUT-743).
@@ -27,19 +27,20 @@ test('the same flow renders through a foreign design system, with the same test 
   // The same hook exists on both sides of the seam. That is the contract: an
   // e2e selector must find it whichever system drew the pixels, or every
   // existing spec silently becomes a spec about MUI.
-  await expect(mui.getByTestId('checkout-continue')).toBeVisible();
-  await expect(foreign.getByTestId('checkout-continue')).toBeVisible();
+  await expect(mui.getByTestId('list-pay')).toBeVisible();
+  await expect(foreign.getByTestId('list-pay')).toBeVisible();
 
   // …and they really are different systems.
-  await expect(foreign.getByTestId('checkout-continue')).toHaveAttribute('data-ds', 'foreign');
-  await expect(mui.getByTestId('checkout-continue')).not.toHaveAttribute('data-ds', 'foreign');
+  await expect(foreign.getByTestId('list-pay')).toHaveAttribute('data-ds', 'foreign');
+  await expect(mui.getByTestId('list-pay')).not.toHaveAttribute('data-ds', 'foreign');
 
   // The flow WORKS through the foreign table, not merely renders: the buyer
-  // gets past the gate and reaches a picker built from foreign primitives.
-  await foreign.getByTestId('buyer-cpf').fill('529.982.247-25');
-  await foreign.getByTestId('checkout-continue').click();
-  await expect(foreign.getByTestId('checkout-method-PIX')).toBeVisible();
-  await expect(foreign.getByTestId('checkout-method-CARD')).toBeVisible();
+  // types the CPF into a foreign input, and the rows and the card row's form
+  // are there to pay with.
+  await foreign.getByTestId('list-buyer-taxId').fill('529.982.247-25');
+  await expect(foreign.getByTestId('list-option-PIX')).toBeVisible();
+  await foreign.getByTestId('list-option-CARD-radio').check();
+  await expect(foreign.getByTestId('card-number')).toBeVisible();
 });
 
 test('the flat exports still compose a working checkout with no factory', async ({ page }) => {
@@ -51,7 +52,8 @@ test('the flat exports still compose a working checkout with no factory', async 
   await expect(page.getByTestId('headless-required-fields')).toHaveText('taxId');
 
   await fillCard(page);
-  await payCard(page);
+  // The hand-composed card form's own button: no list, no factory here.
+  await page.getByTestId('card-pay').click();
 
   await expect(page.getByTestId('headless-outcome')).toHaveText('PAID');
 

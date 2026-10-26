@@ -14,8 +14,7 @@ import type { CheckoutViewCopy, PaymentStatusCopy } from "./view-copy";
  *  - `failed.support` and `expired.support` both open by saying nothing was
  *    charged;
  *  - `awaitingTimedOut.support` says "do not pay again" before anything else it
- *    has to say, because a second payment is the expensive mistake here;
- *  - `dados.secureNotice` is the one reassurance on the details step.
+ *    has to say, because a second payment is the expensive mistake here.
  */
 export const EN_US_PAYMENT_STATUS_COPY: PaymentStatusCopy = {
   paid: {
@@ -125,31 +124,12 @@ export const EN_US_CHECKOUT_COPY: CheckoutCopy = {
 
 export const EN_US_CHECKOUT_VIEW_COPY: CheckoutViewCopy = {
   screens: EN_US_CHECKOUT_COPY,
-  // The step KEYS are the package's own ids; only the labels are words.
-  steps: {
-    dados: "Details",
-    payment: "Payment",
-    status: "Confirmation",
-  },
-  dados: {
+  consent: {
     saveProfile: "Save my details for next time",
-    cannotContinueTitle: "Could not continue",
-    continueAction: "Continue",
-    secureNotice: "Secure payment",
-    keepShopping: "Keep shopping",
-    back: "Back",
   },
   emptyCart: {
     title: "Your cart is empty.",
     action: "See the menu",
   },
   status: EN_US_PAYMENT_STATUS_COPY,
-  pipeline: {
-    loading: "Loading…",
-    // The KEYS are the package's own settlement-method ids, never words.
-    awaitingHandover: {
-      PIX: "Opening Pix…",
-      CARD: "Opening the card payment…",
-    },
-  },
 };

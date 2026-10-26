@@ -244,21 +244,15 @@ export interface PaymentsWorld {
    * every purchase goes through now (FUT-4028) — with no CPF on file:
    * `reachPayment` types the CPF at the top of Pagamento (`list-buyer-taxId`)
    * when the list asks for one, and the steps choose rows and press the bar.
-   * Whatever a row asks beyond the CPF is, as below, the store's.
-   *
-   * A host still on the older tabs is served too, until they are deleted: it
-   * opens ON THE DADOS STEP, with every field the
-   * chain requires already filled EXCEPT the CPF (FUT-3627): `reachPayment`
-   * types the CPF when the form asks for one and presses Continuar, and
-   * nothing else. Which fields a chain requires — InfinitePay's mobile phone,
+   * Whatever a row asks beyond the CPF — InfinitePay's mobile phone,
    * Stripe's name and e-mail — is a fact about the store the host built, so
-   * the host answers it. A buyer with a CPF on file skips Dados altogether;
-   * the host must not arrive with one.
+   * the host answers it (FUT-3627). A buyer with a CPF on file gets the payer
+   * line instead of the field; the host must not arrive with one.
    *
-   * And return only once the store's checkout CONFIG has resolved. Dados
-   * draws before it arrives, defaulting to a required CPF; a host that fetches
-   * its config (any real one) would otherwise hand `reachPayment` a CPF field
-   * that vanishes as the chain lands.
+   * And return only once the store's checkout CONFIG has resolved: the rows
+   * and the CPF the list asks are the chain's, and a host that fetches its
+   * config (any real one) would otherwise hand `reachPayment` a list still
+   * deciding what to ask.
    */
   open(page: Page, store: PaymentsStore): Promise<void>;
   /** Raise a hosted payable and show the hand-off interstitial. */

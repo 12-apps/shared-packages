@@ -19,6 +19,8 @@ import type {
   CreateOrderResult,
 } from "../index";
 
+import { PT_BR_PAYMENT_LIST_COPY } from "../components/checkout/list/pt-BR";
+import type { CheckoutPaymentList } from "../components/checkout/list/types";
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
 import { brlLabel, createStoryStore, type StorySpec, type StoryWorld } from "./store";
 
@@ -89,7 +91,7 @@ export interface StoryHost {
   availability?: CheckoutAvailability;
   /** What the buyer form opens pre-filled with. */
   buyer?: BuyerInfo;
-  /** The store already holds this buyer's CPF ⇒ Dados is skipped (FUT-465). */
+  /** The store already holds this buyer's CPF ⇒ the list shows the payer line (FUT-465). */
   taxIdOnFile?: boolean;
   components?: PaymentFlowsConfig["components"];
   /**
@@ -113,7 +115,7 @@ export interface StoryHost {
    * asked to produce:
    *
    *   - `pending` — never answers, so the flow renders while it waits;
-   *   - `failing` — answers 500, which must fail OPEN for the UI (both tiles)
+   *   - `failing` — answers 500, which must fail OPEN for the UI (both rows)
    *     and CLOSED for the money (no mock permission is invented).
    *
    * Only `/config` is affected; everything else still reaches the real mount.
@@ -131,12 +133,8 @@ export interface StoryHost {
 
 const noCart = (): Partial<CheckoutCartView> => ({});
 
-/**
- * Wrap the mount's fetch so `/config` can stall or refuse. Exported for the
- * legacy surface's stories: `CheckoutPayment`'s own config read speaks a
- * different wire (`client-store.ts`) but stalls the same way.
- */
-export function withConfigRead(inner: typeof fetch, mode: StoryHost["configRead"]): typeof fetch {
+/** Wrap the mount's fetch so `/config` can stall or refuse. */
+function withConfigRead(inner: typeof fetch, mode: StoryHost["configRead"]): typeof fetch {
   if (!mode || mode === "ok") return inner;
   const shim = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (!String(input).includes("/config")) return inner(input, init);
@@ -162,6 +160,11 @@ function cartOf(amountCents: number, overrides?: Partial<CheckoutCartView>): Che
   };
 }
 
+/** The one list with nothing of a host's own: the package's pt-BR pack and the amount due. */
+function plainList(amountCents: number): CheckoutPaymentList {
+  return { copy: PT_BR_PAYMENT_LIST_COPY, totalCents: amountCents };
+}
+
 /**
  * Build a factory for one story: a real mount behind the transport, and a real
  * host in front of it.
@@ -174,6 +177,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
   const amountCents = spec.amountCents ?? 7500;
   const useHostCart = host.useCart ?? noCart;
   const refused = host.refuseRaise;
+  const defaultList = plainList(amountCents);
   const flows = createPaymentFlows({
     // The DEFAULT base url is left in place on purpose: `/api/checkout`,
     // verbatim, is what the shipped client posts and what the mount's shim
@@ -183,7 +187,9 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
     useCart: () => cartOf(amountCents, { ...host.cart, ...useHostCart() }),
     useBuyerDefaults: () => ({ buyer: host.buyer, taxIdOnFile: host.taxIdOnFile ?? false }),
     useSettlement: () => host.settlement ?? null,
-    usePaymentList: host.usePaymentList,
+    // The Pagamento step is the one list (FUT-4028); a story that dresses it
+    // passes its own, every other story gets the package's pt-BR pack.
+    usePaymentList: host.usePaymentList ?? (() => defaultList),
     components: host.components,
     copy: { ...STORY_CHECKOUT_COPY, ...host.copy },
     confirmation:

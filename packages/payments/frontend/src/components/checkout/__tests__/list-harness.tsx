@@ -220,6 +220,8 @@ interface ListHost {
   components?: Partial<CheckoutComponents>;
   /** A ready total the checkout settles instead of the cart's (a comanda's conta). */
   settlement?: SettlementCheckout;
+  /** The host's "the order settled PAID" port. */
+  onPaid?: () => void;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -242,6 +244,7 @@ export function listFlow(host: ListHost): JSX.Element {
           saveBuyerContact={host.saveBuyerContact}
           createOrder={createOrder}
           onExitToMenu={vi.fn()}
+          onPaid={host.onPaid}
           providerConfig={host.config}
           tenantSlug="loja-1"
           taxIdOnFile={host.taxIdOnFile ?? true}

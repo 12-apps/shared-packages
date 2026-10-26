@@ -29,6 +29,8 @@ import type { JSX, ReactNode } from "react";
 
 import { CheckoutClientProvider } from "../client-context";
 import { CheckoutFlow } from "../checkout-flow";
+import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
+import { onPageStore } from "./list-harness";
 import { PixView } from "../pix-view";
 import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import type { CheckoutClient } from "../transport";
@@ -108,6 +110,8 @@ function pixWorld(): {
       world.asked.set(ref, (world.asked.get(ref) ?? 0) + 1);
       return world.answers.get(ref) ?? AWAITING;
     },
+    // The list reads the buyer's saved cards; this store has none.
+    listInstruments: async () => [],
   } as unknown as CheckoutClient;
 
   return {
@@ -136,8 +140,9 @@ async function elapse(ms: number): Promise<void> {
 }
 
 /**
- * Open the checkout on Pagamento (a buyer with a CPF on file) and choose PIX.
- * Returns once the first charge has been raised and its code is on screen.
+ * Open the checkout on Pagamento — the one list, a buyer with a CPF on file at
+ * a Pix-only store — and press the bar's "Gerar Pix". Returns once the first
+ * charge has been raised and its code is on screen.
  */
 async function openOnPix(server: ReturnType<typeof pixWorld>): Promise<void> {
   render(
@@ -147,11 +152,15 @@ async function openOnPix(server: ReturnType<typeof pixWorld>): Promise<void> {
       createOrder={server.createOrder}
       onExitToMenu={vi.fn()}
       taxIdOnFile
+      providerConfig={onPageStore({ methods: ["PIX"] })}
+      paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY }}
     />,
     { wrapper: withClient(server.client) },
   );
 
-  fireEvent.click(screen.getByTestId("checkout-method-PIX"));
+  await elapse(0);
+  fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+  fireEvent.click(screen.getByTestId("list-pay"));
   await elapse(0);
 }
 

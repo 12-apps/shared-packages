@@ -4,7 +4,6 @@ import {
   ACTIVATION_STEP_COPY,
   CARD_COPY,
   CHECKOUT_COPY,
-  CHECKOUT_PAYMENT_COPY,
   CHECKOUT_SCREENS_COPY,
   CHECKOUT_VIEW_COPY,
   PAYMENT_STATUS_COPY,
@@ -29,7 +28,6 @@ describe('the locale packs', () => {
     ['CHECKOUT_COPY', CHECKOUT_COPY],
     ['CHECKOUT_VIEW_COPY', CHECKOUT_VIEW_COPY],
     ['PAYMENT_STATUS_COPY', PAYMENT_STATUS_COPY],
-    ['CHECKOUT_PAYMENT_COPY', CHECKOUT_PAYMENT_COPY],
     ['PAYMENTS_SETTINGS_COPY', PAYMENTS_SETTINGS_COPY],
     ['PLATFORM_HOMOLOGACAO_COPY', PLATFORM_HOMOLOGACAO_COPY],
   ])('%s speaks both languages the same way', (name, pack) => {
@@ -118,8 +116,6 @@ describe('the locale packs', () => {
   it('carries its own formatting locale, so words and money agree', () => {
     // A pack whose sentences were English and whose amounts were formatted
     // pt-BR would be a screen written for nobody.
-    expect(CHECKOUT_PAYMENT_COPY['pt-BR'].money.amountLocale).toBe('pt-BR');
-    expect(CHECKOUT_PAYMENT_COPY['en-US'].money.amountLocale).toBe('en-US');
     expect(CHECKOUT_SCREENS_COPY['pt-BR'].pix.expiryLocale).toBe('pt-BR');
     expect(CHECKOUT_SCREENS_COPY['en-US'].pix.expiryLocale).toBe('en-US');
   });

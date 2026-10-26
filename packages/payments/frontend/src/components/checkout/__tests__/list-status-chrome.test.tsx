@@ -9,20 +9,15 @@
  * Pagamento card: a step header nested in a step, counting three steps the
  * host never showed, with a "Voltar" into a payment that already happened.
  *
- * The method tabs (no list) keep the header on their confirmation, unchanged.
+ * Since FUT-4028 the flow draws no header anywhere; these keep the paid
+ * confirmation honest about it.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
-import { CheckoutClientProvider } from "../client-context";
-import { CheckoutFlow } from "../checkout-flow";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
-import { CheckoutNavigateProvider } from "../navigate-context";
-import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
-import type { CheckoutClient } from "../transport";
-import type { CreateOrderResult } from "../types";
-import { SAVED_VISA, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
 
 const HEADER_TEST_IDS = ["checkout-back", "checkout-step-progress", "checkout-stepper"] as const;
 
@@ -45,29 +40,6 @@ async function payThroughTheList(): Promise<void> {
   await screen.findByTestId("payment-receipt");
 }
 
-/** The method tabs, no list: a one-click buyer with a saved card is charged and lands on the confirmation. */
-async function payThroughTheTabs(): Promise<void> {
-  const client = stubClient([SAVED_VISA]);
-  client.getStatus.mockImplementation(async () => ({ ok: true as const, data: "PAID" as never }));
-  render(
-    <CheckoutClientProvider client={client as unknown as CheckoutClient}>
-      <CheckoutNavigateProvider navigate={vi.fn()}>
-        <CheckoutFlow
-          copy={PT_BR_CHECKOUT_VIEW_COPY}
-          cart={{ empty: false, totalLabel: "R$ 27,00", totalItems: 2 }}
-          createOrder={async (): Promise<CreateOrderResult> => ({ ok: true, data: orderFor("CARD") })}
-          onExitToMenu={vi.fn()}
-          providerConfig={onPageStore()}
-          tenantSlug="loja-1"
-          taxIdOnFile
-          oneClick
-        />
-      </CheckoutNavigateProvider>
-    </CheckoutClientProvider>,
-  );
-  await screen.findByTestId("payment-receipt");
-}
-
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
   vi.restoreAllMocks();
@@ -87,21 +59,5 @@ describe("the one list's paid confirmation (FUT-3999)", () => {
       for (const testId of HEADER_TEST_IDS) expect(screen.queryByTestId(testId)).toBeNull();
       expect(screen.queryByText(/Etapa \d+ de \d+/)).toBeNull();
     });
-  });
-});
-
-describe("the method tabs' confirmation keeps its header", () => {
-  it("draws Voltar and 'Etapa 3 de 3' on a phone", async () => {
-    frameWidth(390);
-    await payThroughTheTabs();
-    expect(screen.getByTestId("checkout-back")).toBeTruthy();
-    expect(screen.getByTestId("checkout-step-progress").textContent).toMatch(/Etapa 3 de 3/);
-  });
-
-  it("draws Voltar and the stepper on a computer", async () => {
-    frameWidth(1280);
-    await payThroughTheTabs();
-    expect(screen.getByTestId("checkout-back")).toBeTruthy();
-    expect(screen.getByTestId("checkout-stepper")).toBeTruthy();
   });
 });

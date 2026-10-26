@@ -20,12 +20,9 @@
  * leave the PIX store depending on a poll to do a job the raise already knew
  * the answer to.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CheckoutFlow } from "../checkout-flow";
-import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
-import { CheckoutNavigateProvider } from "../navigate-context";
 import type {
   CheckoutOrder,
   CheckoutProviderConfig,
@@ -33,6 +30,7 @@ import type {
   CreateOrderResult,
   OrderStatus,
 } from "../types";
+import { renderList, stubClient } from "./list-harness";
 
 afterEach(cleanup);
 
@@ -90,19 +88,14 @@ function renderFlow(options: {
   navigate?: (url: string) => void;
   onPaid?: () => void;
 }): void {
-  render(
-    <CheckoutNavigateProvider navigate={options.navigate ?? vi.fn()}>
-      <CheckoutFlow
-        copy={PT_BR_CHECKOUT_VIEW_COPY}
-        cart={{ empty: false, totalLabel: "R$ 13,50", totalItems: 1 }}
-        createOrder={options.createOrder}
-        onExitToMenu={vi.fn()}
-        onPaid={options.onPaid}
-        providerConfig={options.config}
-        taxIdOnFile
-      />
-    </CheckoutNavigateProvider>,
-  );
+  renderList({
+    config: options.config,
+    client: stubClient(),
+    createOrder: options.createOrder,
+    navigate: options.navigate,
+    onPaid: options.onPaid,
+    cartTotal: "R$ 13,50",
+  });
 }
 
 /** A `createOrder` port that answers with exactly this order. */
@@ -110,9 +103,10 @@ function answers(order: CheckoutOrder): (input: CreateOrderRequest) => Promise<C
   return async () => ({ ok: true, data: order });
 }
 
-/** Get past the hand-off store's one control, which is the buyer's own consent. */
+/** The hand-off store's one row and the bar's "Ir para …" — the buyer's own consent. */
 async function pressHandOff(): Promise<void> {
-  fireEvent.click(await screen.findByTestId("checkout-handoff-start"));
+  fireEvent.click(await screen.findByTestId("list-option-HAND_OFF-radio"));
+  fireEvent.click(screen.getByTestId("list-pay"));
 }
 
 describe("an order raised already settled", () => {
@@ -129,7 +123,7 @@ describe("an order raised already settled", () => {
     await waitFor(() => expect(screen.getByTestId("payment-status")).toBeTruthy());
     // The three things the stall showed instead, none of which may survive.
     expect(screen.queryAllByTestId("checkout-handoff-pending")).toHaveLength(0);
-    expect(screen.queryAllByTestId("checkout-handoff-invite")).toHaveLength(0);
+    expect(screen.queryAllByTestId("list-option-HAND_OFF")).toHaveLength(0);
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -154,8 +148,9 @@ describe("an order raised already settled", () => {
       config: ON_PAGE,
     });
 
-    // Choosing a method is what raises the order on this screen.
-    fireEvent.click(await screen.findByTestId("checkout-method-PIX"));
+    // The bar's "Gerar Pix" is what raises the order on this screen.
+    fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
 
     await waitFor(() => expect(screen.getByTestId("payment-status")).toBeTruthy());
   });

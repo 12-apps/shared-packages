@@ -113,10 +113,11 @@ describe("the payments-frontend manifests, through wiring's own producer", () =>
   });
 
   it("routes the checkout at the one-line mount createPaymentFlows returns", () => {
-    // Not built here: `createPaymentFlows` needs a host's cart, scope, ports
-    // and copy pack, and none of that is this suite's to invent. What an area
-    // row depends on is the KEY, and `PaymentFlows.Checkout` is the mount the
-    // package documents as "a complete buyer checkout in one line".
+    // Not built here: `createPaymentFlows` needs a host's cart, scope, ports,
+    // copy pack and — since the checkout is the one payment list (FUT-4028) —
+    // its `usePaymentList`, and none of that is this suite's to invent. What an
+    // area row depends on is the KEY, and `PaymentFlows.Checkout` is the mount
+    // the package documents as "a complete buyer checkout in one line".
     const [area] = checkoutWeb().areas ?? [];
     expect(area?.routes?.map((route) => route.screen)).toEqual(["Checkout"]);
     expect(typeof paymentsCheckoutFrontendWebManifest.surface.create).toBe("function");

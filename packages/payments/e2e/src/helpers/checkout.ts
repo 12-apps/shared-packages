@@ -37,7 +37,11 @@ const CARD_EXPIRY_TYPED = '12/31';
  */
 export const CARD_EXPIRY_SHOWN = '12/2031';
 
-/** Fill the Dados step's CPF (the tabs' checkout; the list asks it as `list-buyer-taxId`). */
+/**
+ * Fill a card form's own CPF (`buyer-cpf`) — the activation step's, which asks
+ * it beside the card. The checkout's list asks it at its top instead
+ * (`list-buyer-taxId`, see {@link reachPayment}).
+ */
 export async function fillCpf(page: Page, cpf: string = VALID_CPF): Promise<void> {
   await page.getByTestId('buyer-cpf').fill(cpf);
 }
@@ -50,25 +54,9 @@ export async function fillCard(page: Page, pan: string = GOOD_PAN): Promise<void
   await page.getByTestId('card-cvv').fill('123');
 }
 
-/**
- * Which checkout the page drew (FUT-4028): the ONE list (`payment-list`), or
- * the older Dados step and Pix/Cartão tabs. Waits for whichever arrives first.
- *
- * Every buyer gesture below answers for both, so a host can move a store from
- * the tabs to the list without its journeys changing — the scenarios say what
- * the buyer does, never which screen she does it on.
- */
-export type CheckoutSurface = 'list' | 'tabs';
-
-/** {@link CheckoutSurface}: which of the two the page drew. */
-export async function checkoutSurface(page: Page): Promise<CheckoutSurface> {
-  const list = page.getByTestId('payment-list');
-  const tabs = page
-    .getByTestId('checkout-continue')
-    .or(page.getByTestId('checkout-method'))
-    .or(page.getByTestId('buyer-cpf'));
-  await expect(list.or(tabs).first()).toBeVisible();
-  return (await list.isVisible()) ? 'list' : 'tabs';
+/** The checkout is the ONE list (FUT-4028): wait for it to be drawn. */
+async function onTheList(page: Page): Promise<void> {
+  await expect(page.getByTestId('payment-list')).toBeVisible();
 }
 
 /**
@@ -80,7 +68,12 @@ export async function listTopSettled(page: Page): Promise<void> {
   await expect(page.getByTestId('list-top-loading')).toHaveCount(0);
 }
 
-/** A row of the list, by its method: `list-option-PIX`, `list-option-CARD`, `list-option-HAND_OFF`. */
+/**
+ * A row of the list, by its method: `list-option-PIX`, `list-option-CARD`,
+ * `list-option-HAND_OFF`. A store whose list splits the card by funding draws
+ * `list-option-CARD-CREDIT` and `list-option-CARD-DEBIT` instead, which these
+ * helpers do not choose between.
+ */
 export type ListMethod = 'PIX' | 'CARD' | 'HAND_OFF';
 
 /** Choose an online row of the list (a no-op when it is already the chosen one). */
@@ -88,36 +81,27 @@ export async function chooseListOption(page: Page, method: ListMethod): Promise<
   await page.getByTestId(`list-option-${method}-radio`).check();
 }
 
-/** Pick the card on a store that offers it, and wait for the form — a tile on the tabs, a row on the list. */
+/** Pick the card row on a store that offers it, and wait for its form. */
 export async function chooseCard(page: Page): Promise<void> {
-  if ((await checkoutSurface(page)) === 'list') {
-    await chooseListOption(page, 'CARD');
-    await expect(page.getByTestId('payment-list').getByTestId('card-number')).toBeVisible();
-    return;
-  }
-  await page.getByTestId('checkout-method-CARD').click();
-  await expect(page.getByTestId('card-view')).toBeVisible();
+  await onTheList(page);
+  await chooseListOption(page, 'CARD');
+  await expect(page.getByTestId('payment-list').getByTestId('card-number')).toBeVisible();
 }
 
 /**
- * Press pay and wait for the submit to have actually started.
+ * Press the list's bar (`list-pay`) and wait for the charge to have started.
  *
- * On the tabs that is the card form's own `card-pay`. On the list it is the
- * bar's `list-pay`, which turns into the five-second charge bar: nothing is
- * sent until it fills, so whatever is asserted next waits for the outcome.
+ * The bar turns into the five-second charge bar: nothing is sent until it
+ * fills, so whatever is asserted next waits for the outcome — give the expect
+ * timeout room above those five seconds. Waited for rather than read at an
+ * instant: on a retry after a refusal the bar's button comes back a moment
+ * later.
  */
 export async function payCard(page: Page): Promise<void> {
-  const listPay = page.getByTestId('list-pay');
-  const cardPay = page.getByTestId('card-pay');
-  // Whichever pay control is on the page — waited for, not read at an instant:
-  // on a retry after a refusal the bar's button comes back a moment later.
-  await expect(listPay.or(cardPay).first()).toBeEnabled();
-  if (await listPay.isVisible()) {
-    await listPay.click();
-    await expect(page.getByTestId('list-charge-bar')).toBeVisible();
-    return;
-  }
-  await cardPay.click();
+  const pay = page.getByTestId('list-pay');
+  await expect(pay).toBeEnabled();
+  await pay.click();
+  await expect(page.getByTestId('list-charge-bar')).toBeVisible();
 }
 
 /** How long {@link showListPixQr} keeps trying the faces before it fails. */
@@ -186,39 +170,26 @@ async function listIsPixOnly(page: Page): Promise<boolean> {
 }
 
 /**
- * Land on Pagamento, with what the buyer has to give typed in.
+ * Land on Pagamento — the ONE list (FUT-4028) — with what the buyer has to give
+ * typed in.
  *
- * ON THE TABS: walk the Dados step. The CPF is typed only when the form ASKS
- * for it (FUT-3627). The Dados step renders the fields the store's chain
- * declares, and a chain whose providers need no tax id — InfinitePay's hosted
- * checkout is one — renders no `buyer-cpf` at all. Demanding it made every
- * hand-off journey unreachable in a real host; only the harness, whose hosted
- * store declared a CPF it did not need, could walk past it.
+ * The CPF is asked once, at the top of Pagamento (`list-buyer-taxId`), and only
+ * when the store needs one the buyer has not got on file: a chain whose
+ * providers need no tax id — InfinitePay's hosted checkout is one — asks none
+ * (FUT-3627). A store that takes Pix and nothing else online raises the Pix on
+ * the bar's one tap, "Gerar Pix", so that tap is made here — the buyer has no
+ * other gesture to make, and the scenario's next line is about the code.
  *
- * ON THE LIST (FUT-4028): there is no Dados step. The CPF is asked once, at the
- * top of Pagamento (`list-buyer-taxId`), and only when the store needs one the
- * buyer has not got on file. A store that takes Pix and nothing else online is
- * the one place the tabs did something by themselves: they raised the Pix the
- * moment its tab mounted. The list raises it on its one tap, "Gerar Pix", so
- * that tap is made here — the buyer has no other gesture to make, and the
- * scenario's next line is about the code.
- *
- * Whatever ELSE the form asks for is the host's to have filled in `open`:
- * which fields a provider requires is a fact about the store, not the buyer.
+ * Whatever ELSE a row asks for is the host's to have filled in `open`: which
+ * fields a provider requires is a fact about the store, not the buyer.
  */
 export async function reachPayment(page: Page): Promise<void> {
-  if ((await checkoutSurface(page)) === 'list') {
-    await listTopSettled(page);
-    const cpf = page.getByTestId('list-buyer-taxId');
-    if ((await cpf.count()) > 0) await cpf.fill(VALID_CPF);
-    if (await listIsPixOnly(page)) {
-      await chooseListOption(page, 'PIX');
-      await page.getByTestId('list-pay').click();
-    }
-    return;
+  await onTheList(page);
+  await listTopSettled(page);
+  const cpf = page.getByTestId('list-buyer-taxId');
+  if ((await cpf.count()) > 0) await cpf.fill(VALID_CPF);
+  if (await listIsPixOnly(page)) {
+    await chooseListOption(page, 'PIX');
+    await page.getByTestId('list-pay').click();
   }
-  const proceed = page.getByTestId('checkout-continue');
-  await expect(proceed).toBeVisible();
-  if ((await page.getByTestId('buyer-cpf').count()) > 0) await fillCpf(page);
-  await proceed.click();
 }

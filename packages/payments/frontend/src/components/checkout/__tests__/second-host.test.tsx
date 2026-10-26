@@ -8,17 +8,19 @@
  * below renders through the raw-MUI default slots (`mui-defaults.tsx`),
  * because no `components` prop is passed and no provider sits above the flow.
  *
- * The walk is the buyer's own: Dados (CPF form, consent checkbox, pay bar) →
- * Pagamento (method picker) → the card form, with the order raised through the
- * host port. The load-bearing test ids must survive the default slots too —
+ * The walk is the buyer's own: Pagamento as the one list (the CPF at its top,
+ * the rows, the bar) → the card row's form, with the order raised through the
+ * host port when the bar is pressed (FUT-4028). The load-bearing test ids must survive the default slots too —
  * they are the same hooks the storefront journeys click.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutFlow } from "../checkout-flow";
+import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import type { CheckoutOrder, CreateOrderRequest, CreateOrderResult } from "../types";
+import { onPageStore, renderList, stubClient } from "./list-harness";
 
 afterEach(cleanup);
 // A raised order is parked in `sessionStorage` now (FUT-1140), and these suites
@@ -41,41 +43,26 @@ const CARD_ORDER: CheckoutOrder = {
 const VALID_CPF = "52998224725";
 
 describe("CheckoutFlow with no design system present (raw-MUI default slots)", () => {
-  it("walks Dados → Pagamento → card form through the default slots", async () => {
+  it("walks the list → the card form → the bar through the default slots", async () => {
     const createOrder = vi.fn<(input: CreateOrderRequest) => Promise<CreateOrderResult>>(
       async () => ({ ok: true, data: CARD_ORDER }),
     );
 
-    render(
-      <CheckoutFlow
-        copy={PT_BR_CHECKOUT_VIEW_COPY}
-        cart={{ empty: false, totalLabel: "R$ 10,00", totalItems: 1 }}
-        createOrder={createOrder}
-        onExitToMenu={vi.fn()}
-      />,
-    );
+    renderList({ config: onPageStore(), client: stubClient(), createOrder, taxIdOnFile: false, buyer: {} });
 
-    // Dados renders through the defaults: stepper, CPF field, consent, pay bar.
-    expect(screen.getByTestId("checkout-stepper")).toBeTruthy();
-    expect(screen.getByTestId("buyer-save-profile")).toBeTruthy();
-    expect(screen.getByTestId("checkout-pay-bar")).toBeTruthy();
+    // Pagamento renders through the defaults: the CPF at the top, the rows, the bar.
+    await screen.findByTestId("payment-list");
+    expect(screen.getByTestId("list-option-PIX")).toBeTruthy();
+    expect(screen.getByTestId("list-option-CARD")).toBeTruthy();
+    fireEvent.change(await screen.findByTestId("list-buyer-taxId"), { target: { value: VALID_CPF } });
 
-    fireEvent.change(screen.getByTestId("buyer-cpf"), { target: { value: VALID_CPF } });
-    fireEvent.click(screen.getByTestId("checkout-continue"));
-
-    // Pagamento: the method picker, with both in-browser methods on offer.
-    await waitFor(() => expect(screen.getByTestId("checkout-method")).toBeTruthy());
-    expect(screen.getByTestId("checkout-method-PIX")).toBeTruthy();
-
-    // Choosing card auto-raises the order through the HOST port…
-    fireEvent.click(screen.getByTestId("checkout-method-CARD"));
-    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(1));
-    expect(createOrder.mock.calls[0]?.[0]).toMatchObject({ method: "CARD", saveProfile: true });
-
-    // …and the card form renders, again through the default slots.
+    // Choosing the card opens its form, again through the default slots…
+    fireEvent.click(screen.getByTestId("list-option-CARD-radio"));
     await waitFor(() => expect(screen.getByTestId("card-number")).toBeTruthy());
     expect(screen.getByTestId("card-holder")).toBeTruthy();
-    expect(screen.getByTestId("card-pay")).toBeTruthy();
+    // …and nothing is raised until the bar is pressed: the pick alone sends nothing.
+    expect(screen.getByTestId("list-pay")).toBeTruthy();
+    expect(createOrder).not.toHaveBeenCalled();
   });
 
   it("shows the empty-cart state for a cart with nothing to pay", () => {
@@ -85,6 +72,7 @@ describe("CheckoutFlow with no design system present (raw-MUI default slots)", (
         cart={{ empty: true, totalLabel: "R$ 0,00", totalItems: 0 }}
         createOrder={vi.fn()}
         onExitToMenu={vi.fn()}
+        paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY }}
       />,
     );
 

@@ -11,9 +11,8 @@ import { Given, Then, When } from './fixtures.js';
  * A wallet store opens on the ONE list (`paymentList`): the CPF asked once at
  * the top, then "PAGAMENTO RÁPIDO" — the wallet buttons — above the rows. The
  * wallet is not a fourth method: its press opens the sheet and raises a CARD
- * order behind it, and never changes the chosen row. A store that does NOT
- * declare a wallet may still be a tabs checkout, so the steps that assert an
- * absence look for both shapes of the button.
+ * order behind it, and never changes the chosen row. The steps that assert an
+ * absence look for both the list's slot and the shipped button's container.
  *
  * The button element itself is rendered by the wallet's own script (brand
  * rules), inside the package's `google-pay-button` container — a host

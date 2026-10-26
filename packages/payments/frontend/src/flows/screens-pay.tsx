@@ -15,7 +15,6 @@ import { PixView } from "../components/checkout/pix-view";
 import type { CheckoutOrder, OrderStatus } from "../components/checkout/types";
 import { useCheckoutComponents } from "../components/checkout/ui";
 
-import { useCatalogExit } from "./catalog-exit";
 import { FlowsShell, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
@@ -83,7 +82,7 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
     // The SAME door the chrome's back link takes (FUT-1240). Bound straight to
     // the port, this control ignored a registered `exit` — so one host got its
     // router from one way out of the checkout and a page load from the other.
-    const backToMenu = useCatalogExit(runtime);
+    const backToMenu = runtime.config.ports.exitToCatalog;
     return (
       <FlowsShell runtime={runtime}>
         <PaymentStatusView

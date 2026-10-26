@@ -1,12 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
 import {
   resumeSurface,
-  useCheckoutNav,
   useCreateFailure,
   useDropOrder,
-  useGoToPayment,
   useResumedCheckout,
   useRetryAction,
   useSettledPort,
@@ -15,7 +13,6 @@ import {
 import { useOrderRefresh } from "./cart-changed";
 import { useRaisedOrderRoute, useStartPayment } from "./start-payment";
 import { useConfirmationWait } from "./confirmation-wait";
-import { useCheckoutCopy } from "./copy-context";
 
 import { forgetHostedOrder } from "./hosted-return";
 import { useCheckoutNavigate } from "./navigate-context";
@@ -25,20 +22,12 @@ import type {
   BuyerInfo,
   CheckoutOrder,
   CreateOrderRequest,
-  CheckoutCustomerField,
   CreateOrderResult,
   OrderStatus,
   PaymentMethod,
 } from "./types";
 import { useResolutionActions } from "./resolution-actions";
 import { useHostedResume } from "./use-hosted-resume";
-
-const STEP_ORDER: Step[] = ["dados", "payment", "status"];
-
-/** The pre-FUT-595 demand, and the safe reading of a chain that declared none. */
-const CPF_ONLY: readonly CheckoutCustomerField[] = [
-  { key: "taxId", type: "CPF", required: true },
-];
 
 /**
  * Everything the flow needs FROM its host, as explicit ports (FUT-564). The
@@ -53,9 +42,9 @@ export interface CheckoutHostPorts {
  */
   createOrder: (input: CreateOrderRequest) => Promise<CreateOrderResult>;
   /**
-   * Persist the buyer's contact when they press "Continuar" on Dados — the
-   * host's account surface owns the write (and the blank-CPF-never-clears
-   * rule). Fire-and-forget by contract: the flow advances regardless of the
+   * Persist the buyer's contact when an order is raised under the "salvar
+   * meus dados" consent — the host's account surface owns the write (and the
+   * blank-CPF-never-clears rule). Fire-and-forget by contract: the flow advances regardless of the
    * outcome, and only calls this under the "salvar meus dados" consent.
  */
   saveBuyerContact?: (contact: BuyerContact) => void;
@@ -73,25 +62,11 @@ export interface CheckoutHostPorts {
 /**
  * All checkout state + handlers, so the checkout flow stays presentational.
  * - `setMethod` drops any order raised for the previous method (no stale QR/form).
- * - `back` is step-aware: Pagamento → Dados, else to the menu. With a CPF on
- *   file the flow never has a Dados step, so Pagamento goes back to the menu.
- * - `goToPayment` gates on the CPF (required for every charge) and PERSISTS the
- *   buyer's contact — through the host port — before advancing; nothing
- *   downstream of this step is allowed to be a precondition for their details
- *   being saved.
  * - `startPayment` raises the order (PIX → QR, CARD → chargeable); `payWithEmail`
  *   re-raises with a corrected e-mail for the merchant-email rejection.
  * - `retry` re-charges the SAME order when the refusal says another instrument
  *   could work (FUT-1145), and raises a fresh one when it does not.
  *
- * @param taxIdOnFile The buyer already has a CPF saved (FUT-465) ⇒ the Dados
- *   step has nothing left to ask, so checkout opens on Pagamento and `back`
- *   goes to the menu rather than to a form the buyer never saw. The CPF itself
- *   is never in the client's hands — the server reads it from the encrypted
- *   profile when the charge is raised.
- * @param buyerFields What the store's chain declares it needs from the buyer
- *   (FUT-595). Absent ⇒ CPF-required, which is what this gate demanded before
- *   there was a declaration to read — never "ask nothing".
  * @param basket WHICH basket this checkout is for (FUT-1213). Absent ⇒ the
  *   pre-1213 behaviour: a parked payment resumes on whatever checkout mounts
  *   next. See `./basket.ts` for why it is a signature of the lines.
@@ -99,19 +74,16 @@ export interface CheckoutHostPorts {
 export function useCheckoutController(
   ports: CheckoutHostPorts,
   defaultBuyer?: BuyerInfo,
-  taxIdOnFile = false,
-  buyerFields: readonly CheckoutCustomerField[] = CPF_ONLY,
   tenantSlug?: string,
   basket?: CheckoutBasketIdentity,
 ) {
-  const { createOrder, saveBuyerContact, onExitToMenu, onPaid } = ports;
-  const validation = useCheckoutCopy().screens.validation;
+  const { createOrder, onExitToMenu, onPaid } = ports;
   const navigate = useCheckoutNavigate();
   const resume = useHostedResume(tenantSlug, basket);
-  const [step, setStep] = useState<Step>(taxIdOnFile ? "payment" : "dados");
-  // No method pre-selected: the Pagamento step shows just the picker until the
-  // buyer chooses PIX or card, then that method's order is raised and its UI
-  // revealed. Avoids raising a throwaway PIX charge for a buyer who wants card.
+  // Pagamento is the first step (FUT-4028): the list asks a missing CPF at its top.
+  const [step, setStep] = useState<Step>("payment");
+  // No method pre-selected: nothing is raised until the buyer presses the
+  // list's bar, so no throwaway PIX charge for a buyer who wants card.
   const [method, setMethodState] = useState<PaymentMethod | null>(null);
   const [buyer, setBuyerState] = useState<BuyerInfo>(defaultBuyer ?? {});
   const [saveProfile, setSaveProfile] = useState(true);
@@ -125,7 +97,6 @@ export function useCheckoutController(
 
   const clearError = failure.clear;
   const setBuyer = useCallback((next: BuyerInfo) => { setBuyerState(next); clearError(); }, [clearError]);
-  const { back, editBuyer } = useCheckoutNav(taxIdOnFile, onExitToMenu, setStep);
   const setMethod = useCallback((next: PaymentMethod) => {
     setMethodState((prev) => {
       // SCOPED (FUT-1240): the order dropped here is THIS store's, and so is
@@ -137,9 +108,6 @@ export function useCheckoutController(
     });
   }, [clearError, tenantSlug]);
   const dropOrder = useDropOrder(setOrder, tenantSlug, clearError);
-  const goToPayment = useGoToPayment({
-    buyer, buyerFields, taxIdOnFile, saveProfile, saveBuyerContact, validation, failure, setStep,
-  });
   const startPayment = useStartPayment({
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
     setCreating, setDecline, setOrder, setFinalStatus, setStep,
@@ -153,7 +121,6 @@ export function useCheckoutController(
   const retry = useRetryAction({
     decline, order, clearError, setOrder, setDecline, setFinalStatus, setStep, setFreshInstrument,
   });
-  const completed = useMemo(() => new Set(STEP_ORDER.slice(0, STEP_ORDER.indexOf(step))), [step]);
   const settled = finalStatus ?? resume.status;
   useSettledPort(settled, onPaid);
   // The confirmation screen's own wait (FUT-1170). Live only where nothing else
@@ -171,7 +138,7 @@ export function useCheckoutController(
     decline, freshInstrument,
     ...resumeSurface(resume, confirming),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
-    goToMenu: onExitToMenu, back, editBuyer,
-    goToPayment, startPayment, refresh, payWithEmail, handleResolved, retry, completed, dropOrder,
+    goToMenu: onExitToMenu,
+    startPayment, refresh, payWithEmail, handleResolved, retry, dropOrder,
   };
 }

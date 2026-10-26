@@ -273,7 +273,6 @@ export interface HostedHandoverCopy {
   handoff(destination: string, choice: string): string;
   /** What happens after they pay over there. */
   afterwards: string;
-  startAction: string;
   preparing: string;
 }
 

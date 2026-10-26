@@ -14,7 +14,7 @@ import { openCase, openPage } from './helpers/checkout';
  */
 
 async function onTheNoProviderScreen(page: Page): Promise<void> {
-  await openPage(page, 'payments-checkout-no-provider', { checkout: 'list' });
+  await openPage(page, 'payments-checkout-no-provider');
   await openCase(page, 'empty-chain');
   await expect(page.getByTestId('checkout-payments-disabled')).toBeVisible();
 }

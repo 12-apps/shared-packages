@@ -17,7 +17,7 @@ import { openCase, openPage, reachPayment } from './helpers/checkout';
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
 test('without the bank flow, the code and its QR are on the face', async ({ page }) => {
-  await openPage(page, 'payments-checkout-pix', { checkout: 'list' });
+  await openPage(page, 'payments-checkout-pix');
   await openCase(page, 'awaiting');
   await reachPayment(page);
 
@@ -29,7 +29,7 @@ test('without the bank flow, the code and its QR are on the face', async ({ page
 
 /** Open the bank-flow store and land on its after-copy face; returns the code copied. */
 async function copiedByTheBankFlow(page: Page): Promise<string> {
-  await openPage(page, 'payments-checkout-pix', { checkout: 'list' });
+  await openPage(page, 'payments-checkout-pix');
   await openCase(page, 'awaiting-bank');
   // Emptied first, so a code left there by anything else cannot pass.
   await page.evaluate(() => navigator.clipboard.writeText(''));

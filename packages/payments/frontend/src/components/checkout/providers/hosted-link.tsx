@@ -85,48 +85,11 @@ function handoffMessage(
   return copy.handoff(destinationLabel(copy, config), choice);
 }
 
-/** The invitation: what happens next, and the one button that starts it. */
-function HandOffInvite({
-  config,
-  onStart,
-}: {
-  config: CheckoutProviderConfig | null;
-  onStart: () => void;
-}): JSX.Element {
-  const { Button, Text } = useCheckoutComponents();
-  const copy = useCheckoutCopy().screens.hosted;
-  return (
-    <Box
-      data-testid="checkout-handoff-invite"
-      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-    >
-      <Text variant="body" size="md" as="p">
-        {handoffMessage(copy, config)}
-      </Text>
-      <Text variant="caption" size="sm" as="p" color="secondary">
-        {copy.afterwards}
-      </Text>
-      <Button
-        variant="solid"
-        color="primary"
-        size="lg"
-        fullWidth
-        onClick={onStart}
-        dataTestId="checkout-handoff-start"
-      >
-        {copy.startAction}
-      </Button>
-    </Box>
-  );
-}
-
 /**
  * The moment after the button: the charge is being raised, then we navigate.
  *
- * Says the SAME sentence the invite did, from the same helper. It used to word
- * the destination differently — "a página segura do provedor" against the
- * invite's named one — so the screen appeared to change its mind about where
- * the buyer was going at the exact moment they committed to going there.
+ * Names the destination the way the store's chain declares it, from the one
+ * helper, so the screen never words the provider two different ways.
  */
 function HandOffPending({ config }: { config: CheckoutProviderConfig | null }): JSX.Element {
   const { Text, LoadingState } = useCheckoutComponents();
@@ -150,14 +113,10 @@ function HandOffPending({ config }: { config: CheckoutProviderConfig | null }): 
 export function HostedLinkScreen({
   method,
   config,
-  onStart,
 }: ProviderCheckoutScreenProps): JSX.Element | null {
-  // A method is only ever set here once the buyer has committed — either by
-  // pressing the CTA below, or (on a host whose shell still renders a picker)
-  // by choosing a tile. Both mean the same thing: the hand-off is underway.
+  // A method is set here once the buyer has committed — the list's bar ("Ir
+  // para …") raised the hand-off. Until then the list's own hand-off row says
+  // where she is going, and this pane stays out of the way.
   if (method) return <HandOffPending config={config} />;
-  // No method and no CTA to offer ⇒ the shell is still showing its picker, and
-  // the pane stays out of the way exactly as every other screen does.
-  if (!onStart) return null;
-  return <HandOffInvite config={config} onStart={onStart} />;
+  return null;
 }

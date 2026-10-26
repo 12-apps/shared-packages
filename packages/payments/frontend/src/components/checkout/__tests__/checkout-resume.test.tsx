@@ -101,13 +101,13 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     const { client, tally } = scriptedClient({ status: "AWAITING_PAYMENT" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(OTHER)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(OTHER)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
 
     // The shopper gets THEIR checkout, for the basket they are holding.
-    expect(result.current.step).toBe("dados");
+    expect(result.current.step).toBe("payment");
     expect(result.current.order).toBeNull();
     expect(result.current.finalStatus).toBeNull();
     // Asked exactly once — the decision is a question, not a wait.
@@ -121,7 +121,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     const { client } = scriptedClient({ status: "PAID" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(OTHER)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(OTHER)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -139,7 +139,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     const { client, tally } = scriptedClient({ status: "AWAITING_PAYMENT" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -155,7 +155,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     const { client } = scriptedClient({ status: "PAID" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(null)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(null)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -171,7 +171,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
 
     const { result, rerender } = renderHook(
       ({ basket }: { basket: { signature: string | null; ready: boolean } }) =>
-        useCheckoutController(makePorts(), undefined, false, undefined, undefined, basket),
+        useCheckoutController(makePorts(), undefined, undefined, basket),
       {
         wrapper: wrapperFor(client),
         initialProps: { basket: { signature: null as string | null, ready: false } },
@@ -179,7 +179,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     );
     await settle();
 
-    expect(result.current.step).toBe("dados");
+    expect(result.current.step).toBe("payment");
     expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).not.toBeNull();
 
     rerender({ basket: ready(RAISED) });
@@ -200,7 +200,7 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
 
       const { result } = renderHook(
         () =>
-          useCheckoutController(makePorts(), undefined, false, undefined, undefined, {
+          useCheckoutController(makePorts(), undefined, undefined, {
             signature: null as string | null,
             ready: false,
           }),
@@ -224,12 +224,12 @@ describe("a parked hand-off met by the basket in front of the shopper", () => {
     const { client } = scriptedClient({ statusFails: true });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(OTHER)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(OTHER)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
 
-    expect(result.current.step).toBe("dados");
+    expect(result.current.step).toBe("payment");
     expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).not.toBeNull();
   });
 });
@@ -250,7 +250,7 @@ describe("an order in flight survives a discarded tab (FUT-1140)", () => {
     const { client } = scriptedClient();
 
     const { result } = renderHook(
-      () => useCheckoutController(ports, undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(ports, undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await act(async () => {
@@ -268,7 +268,7 @@ describe("an order in flight survives a discarded tab (FUT-1140)", () => {
     const { client } = scriptedClient();
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -287,7 +287,7 @@ describe("an order in flight survives a discarded tab (FUT-1140)", () => {
     const { client } = scriptedClient({ status: "PAID" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(null)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(null)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -301,7 +301,7 @@ describe("an order in flight survives a discarded tab (FUT-1140)", () => {
     const { client } = scriptedClient({ status: "PAID" });
 
     renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await settle();
@@ -332,7 +332,7 @@ describe("the buyer says they did not pay (FUT-1146)", () => {
     const { client } = scriptedClient();
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await elapse(5_000);
@@ -345,7 +345,7 @@ describe("the buyer says they did not pay (FUT-1146)", () => {
     const { client, tally } = scriptedClient({ release: "FAILED" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await elapse(31_000);
@@ -369,7 +369,7 @@ describe("the buyer says they did not pay (FUT-1146)", () => {
     const { client } = scriptedClient({ release: "PAID" });
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await elapse(31_000);
@@ -385,7 +385,7 @@ describe("the buyer says they did not pay (FUT-1146)", () => {
     const { client } = scriptedClient();
 
     const { result } = renderHook(
-      () => useCheckoutController(makePorts(), undefined, false, undefined, undefined, ready(RAISED)),
+      () => useCheckoutController(makePorts(), undefined, undefined, ready(RAISED)),
       { wrapper: wrapperFor(client) },
     );
     await elapse(60_000);

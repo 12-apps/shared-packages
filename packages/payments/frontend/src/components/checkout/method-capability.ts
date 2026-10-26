@@ -1,12 +1,10 @@
 /**
  * What the store's active provider lets THIS browser do (FUT-697/698) — the
- * capability reads the Pagamento step derives its picker and card path from.
+ * capability reads the Pagamento list derives its rows and card path from.
  * Every rule here fails OPEN for the UI and CLOSED for the money: a missing
  * config renders everything, and the tokenizer/server still refuse a charge
  * they cannot honour.
  */
-import { useEffect } from "react";
-
 import { tokenizerFor, type CardTokenizationConfig } from "../../card";
 
 import type { CheckoutChainLink, CheckoutProviderConfig, PaymentMethod } from "./types";
@@ -31,7 +29,7 @@ import type { CheckoutChainLink, CheckoutProviderConfig, PaymentMethod } from ".
  * has nothing to say about the card path and must not be read as "this store
  * hands the buyer over". A store with no card-capable entry at all has no card
  * path — `offeredMethods` is already not offering one, and saying so here is
- * what lets {@link usePreselectSoleMethod} pick the store's only method.
+ * what lets a screen pick the store's only method.
  *
  * `null` config (still loading / fetch blip) fails OPEN for the UI — the
  * tokenizer itself still fails CLOSED.
@@ -203,22 +201,6 @@ export function offeredMethods(config: CheckoutProviderConfig | null): PaymentMe
 }
 
 /**
- * The methods a buyer can actually pick right now.
- *
- * `null` offered — still loading, or a fetch blip — fails OPEN and offers both;
- * the server still refuses the charge closed. A CARD tile with no in-browser
- * path is not selectable, so it does not count towards a "sole" method either.
- */
-export function selectableMethods(
-  offered: PaymentMethod[] | null,
-  cardUnavailable: boolean,
-): PaymentMethod[] {
-  return (offered ?? ["PIX", "CARD"]).filter(
-    (method) => !(method === "CARD" && cardUnavailable),
-  );
-}
-
-/**
  * The method a HAND-OFF checkout raises on the buyer's behalf, when the buyer
  * was never asked (see `providers/registry.ts`'s `methodChosenAtProvider`).
  *
@@ -245,23 +227,3 @@ export function handOffMethod(offered: PaymentMethod[] | null): PaymentMethod {
   return offered[0] ?? "PIX";
 }
 
-/**
- * A SOLE remaining method is not a choice — take it (FUT-697 review, widened by
- * FUT-741).
- *
- * A one-option radiogroup that still demands a tap is a click that buys the
- * buyer nothing. It used to fire only when the CARD tile was disabled, which
- * missed the other shape entirely: a store whose chain declares PIX alone
- * renders one tile, nothing preselects it, and the buyer sits on a picker with
- * a single option and no payment below it.
- */
-export function usePreselectSoleMethod(
-  selectable: readonly PaymentMethod[],
-  method: PaymentMethod | null,
-  onMethodChange: (method: PaymentMethod) => void,
-): void {
-  const sole = selectable.length === 1 ? selectable[0] : undefined;
-  useEffect(() => {
-    if (method === null && sole) onMethodChange(sole);
-  }, [sole, method, onMethodChange]);
-}

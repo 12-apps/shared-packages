@@ -20,11 +20,9 @@ import { openCase, openPage } from '../helpers/checkout';
  * file before any scenario runs, so the `definePaymentsWorld` call below lands
  * in every worker before the first Given executes.
  *
- * Every store opens on the ONE list (FUT-4028): `open` adds `?checkout=list`,
- * which `src/payments/host.tsx` reads, so each checkout shape is the list a
- * host's purchase now goes through and none of them reaches the old Dados step
- * and Pix/Cartão tabs. The pages themselves are unchanged; the hand-written
- * specs still open them without it, on the tabs, until the tabs are deleted.
+ * Every checkout shape opens on the ONE list (FUT-4028), the only Pagamento
+ * the package draws; `expectTheList` below still fails a shape that lands
+ * anywhere else.
  */
 
 /** Which harness page holds a store of each shape, and which case on it. */
@@ -73,11 +71,7 @@ const LOCATIONS: Readonly<Record<PaymentsStore, { slug: string; caseId?: string;
   'reconnect-required': { slug: 'payments-provider-connect', caseId: 'reconnect' },
 };
 
-/**
- * The shapes that are not a checkout: a buyer's saved cards, or an admin
- * surface. They open with no `?checkout=list`, which would mean nothing to them
- * and is one more query string in front of an OAuth return that reads its own.
- */
+/** The shapes that are not a checkout: a buyer's saved cards, or an admin surface. */
 const NOT_A_CHECKOUT: ReadonlySet<PaymentsStore> = new Set([
   'wallet',
   'activation',
@@ -96,9 +90,8 @@ let currentSlug: string | null = null;
 
 /**
  * A checkout shape is the ONE list, or the screen that says the store cannot
- * charge — never the Dados step or the tabs (FUT-4028). Without this, a page
- * that stopped reading `?checkout=list` would put every journey back on the
- * tabs, and the steps, which answer for both, would stay green.
+ * charge (FUT-4028) — proven before a scenario leans on it, so a page that
+ * drew anything else fails here rather than three steps later.
  */
 async function expectTheList(page: Page): Promise<void> {
   const settled = page
@@ -106,8 +99,6 @@ async function expectTheList(page: Page): Promise<void> {
     .or(page.getByTestId('checkout-payments-disabled'))
     .or(page.getByTestId('checkout-payments-remedy'));
   await expect(settled.first()).toBeVisible();
-  await expect(page.getByTestId('checkout-continue')).toHaveCount(0);
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
 }
 
 definePaymentsWorld({
@@ -117,7 +108,7 @@ definePaymentsWorld({
     // page may write the clipboard (that is what lands it on the after-copy
     // face) and the journey may read it back. Granted wherever `pixBank` is on.
     if (where.pixBank) await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-    await openPage(page, where.slug, NOT_A_CHECKOUT.has(store) ? {} : { checkout: 'list' });
+    await openPage(page, where.slug);
     // Emptied before the case mounts, so a code a previous scenario copied
     // can never pass for the one this store generates.
     if (where.pixBank) await page.evaluate(() => navigator.clipboard.writeText(''));
@@ -153,7 +144,7 @@ definePaymentsWorld({
     // The way a hosted provider really sends her back: a fresh load of this
     // app's own route, carrying the markers the provider appends. The
     // application was destroyed in between.
-    await page.goto(`/?checkout=list&transaction_nsu=NSU-HARNESS&slug=inv-harness#/${currentSlug ?? ''}`);
+    await page.goto(`/?transaction_nsu=NSU-HARNESS&slug=inv-harness#/${currentSlug ?? ''}`);
   },
 
   hostedReturnStatus: (page) => page.getByTestId('hosted-return-status'),
