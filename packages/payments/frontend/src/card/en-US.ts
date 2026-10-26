@@ -34,6 +34,8 @@ export const EN_US_CARD_COPY: CardCopy = {
     cvvDigits: (length) => `The CVV must be ${length} digits.`,
     cpfRequired: 'CPF is required.',
     cpfInvalid: 'That CPF is not valid.',
+    taxIdRequired: 'Enter the CPF or the CNPJ.',
+    taxIdInvalid: 'That CPF or CNPJ is not valid.',
     savedCardsLabel: 'Card',
     savedCardExpiry: (month, year) => `Expires ${month}/${year}`,
     newCard: 'New card',

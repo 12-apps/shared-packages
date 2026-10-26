@@ -23,8 +23,9 @@ import type { ActivationStepCopy } from './copy';
  *
  * **Checkout Integrado** is the exact label on PagBank's own console; an owner
  * sent looking for "Integrated Checkout" is looking for a screen that does not
- * exist. **CPF** and its `000.000.000-00` mask are a Brazilian document and a
- * FORMAT — a translated mask shows a shape the field refuses. **PagBank** and
+ * exist. **CPF** and **CNPJ** are Brazilian documents, named as they are. The field
+ * takes either, so its placeholder asks for digits rather than drawing one
+ * document's mask (FUT-4048). **PagBank** and
  * **InfinitePay** are names — PagBank now only as the console label above, since
  * the tax-id hint takes the provider as an ARGUMENT rather than naming one
  * (FUT-675). `{provider}` is this package's own placeholder, substituted after
@@ -105,7 +106,8 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
       'provedor não cria nenhum link de pagamento, e esta cobrança falharia.',
   },
   taxId: {
-    label: 'CPF do titular',
+    // A company card's holder has a CNPJ, not a CPF (FUT-4048).
+    label: 'CPF ou CNPJ do titular',
     // No article, deliberately (FUT-675). This field renders from the CARD
     // flow only — pagbank, stone, stripe — and no single article fits all
     // three: "a Stone" and "a Stripe" are natural where PagBank is
@@ -122,7 +124,7 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
     // with `settledBody`, which takes no `displayName` at all and so tells any
     // such provider's owner that refunds happen in InfinitePay's app.
     hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
-    placeholder: '000.000.000-00',
+    placeholder: 'Só os números',
   },
   charge: {
     card: PT_BR_CARD_COPY,

@@ -28,6 +28,7 @@ export {
 } from "./format";
 
 export { formatCpf, isValidCpf, validateCpf } from "./cpf";
+export { validateCpfOrCnpj } from "./tax-id";
 
 export { CardPayBar, NewCardForm, SavedCardsPicker } from "./fields";
 

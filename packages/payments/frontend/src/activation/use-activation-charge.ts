@@ -9,7 +9,6 @@ import {
   tokenizeCard,
   tokenizerFor,
   validateCardNumber,
-  validateCpf,
   validateCvv,
   validateExpiry,
   validateHolder,
@@ -76,6 +75,11 @@ export interface ActivationChargeOptions {
   email: string;
   /** The charge landed; the caller refreshes so the provider shows as active. */
   onVerified: () => void;
+  /**
+   * The host's holder-document validator — the SAME one the field runs on blur,
+   * so the submit cannot refuse what the blur accepted (FUT-4048).
+   */
+  validateTaxId: (value: string) => string | undefined;
   copy: ActivationChargeCopy;
 }
 
@@ -167,7 +171,12 @@ function useActivationProbe(verifyChargeUrl: string): ActivationProbe {
 }
 
 /** Local validation — nothing reaches the provider until the card is well-formed. */
-function validateAll(card: CardDetails, cpf: string, copy: CardCopy) {
+function validateAll(
+  card: CardDetails,
+  cpf: string,
+  copy: CardCopy,
+  validateTaxId: (value: string) => string | undefined,
+) {
   const brand = detectBrand(onlyDigits(card.number));
   const fields = copy.fields;
   return {
@@ -177,7 +186,7 @@ function validateAll(card: CardDetails, cpf: string, copy: CardCopy) {
       expiry: validateExpiry(card.expiry, fields),
       cvv: validateCvv(card.cvv, fields, brand),
     } satisfies CardFieldErrors,
-    cpfError: validateCpf(cpf, fields),
+    cpfError: validateTaxId(cpf),
   };
 }
 
@@ -254,14 +263,14 @@ function useCardForm() {
 }
 
 export function useActivationCharge(options: ActivationChargeOptions): ActivationCharge {
-  const { verifyChargeUrl, provider, email, onVerified, copy } = options;
+  const { verifyChargeUrl, provider, email, onVerified, validateTaxId, copy } = options;
   const probe = useActivationProbe(verifyChargeUrl);
   const form = useCardForm();
   const [state, setState] = useState<ActivationChargeState>({ kind: 'idle' });
   const { card, cpf, setFieldErrors, setCpfError, clear } = form;
 
   const submit = useCallback(async () => {
-    const validation = validateAll(card, cpf, options.copy.card);
+    const validation = validateAll(card, cpf, options.copy.card, validateTaxId);
     setFieldErrors(validation.fieldErrors);
     setCpfError(validation.cpfError);
     if (Object.values(validation.fieldErrors).some(Boolean) || validation.cpfError) return;
@@ -291,6 +300,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     email,
     copy,
     onVerified,
+    validateTaxId,
     setFieldErrors,
     setCpfError,
     clear,

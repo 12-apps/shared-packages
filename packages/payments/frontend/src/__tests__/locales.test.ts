@@ -45,6 +45,8 @@ describe('the locale packs', () => {
       expect(copy.outcome.refusedBody('PagBank')).toContain('Checkout Integrado');
       expect(copy.outcome.blockedBody).toContain('Checkout Integrado');
       expect(copy.taxId.label).toContain('CPF');
+      // A company card's holder has a CNPJ (FUT-4048): both documents, untranslated.
+      expect(copy.taxId.label).toContain('CNPJ');
       // The hint names the PROVIDER rather than the document — it is the
       // sentence explaining who demands the field, and a provider's name is a
       // name. It is an ARGUMENT now rather than a literal (FUT-675): both packs
@@ -55,7 +57,6 @@ describe('the locale packs', () => {
       // here is the one argument that cannot tell an interpolating pack from
       // one that re-hardcodes PagBank and ignores its parameter.
       expect(copy.taxId.hint('Stone')).toContain('Stone');
-      expect(copy.taxId.placeholder).toBe('000.000.000-00');
     }
   });
 

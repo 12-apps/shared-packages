@@ -5,7 +5,7 @@ import type { ComponentType, JSX, ReactNode } from 'react';
 
 import { NewCardForm } from '../../card/fields';
 import { detectBrand, onlyDigits } from '../../card/format';
-import { formatCpf } from '../../card/cpf';
+import { formatCpfOrCnpj, taxIdDigits } from '../../card/tax-id';
 import { useCheckoutComponents } from '../../components/checkout/ui';
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useActivationCharge, type ActivationCharge } from '../use-activation-charge';
@@ -66,10 +66,10 @@ function ChargeForm({
         size="md"
         fullWidth
         placeholder={taxId.placeholder}
-        value={formatCpf(cpf)}
+        value={formatCpfOrCnpj(cpf)}
         error={Boolean(cpfError)}
         helperText={cpfError ?? taxId.hint(displayName)}
-        onChange={(event) => setCpf(onlyDigits(event.target.value))}
+        onChange={(event) => setCpf(taxIdDigits(event.target.value))}
         onBlur={() => validateTaxId(cpf)}
         data-testid="verify-charge-cpf"
       />
@@ -137,6 +137,7 @@ export function CardVerification({
     provider,
     email: ownerEmail,
     onVerified,
+    validateTaxId,
     copy: copy.charge,
   });
   // The verification endpoint answers the amount alongside the store's card

@@ -297,6 +297,20 @@ const capabilities: ProviderCapabilities = {
   activationCharge: true,
 };
 
+/**
+ * The smallest card charge PagBank PRODUCTION will create. Its reference
+ * states no minimum and the sandbox takes one cent, so the refusal is the
+ * specification (FUT-4048, the first live activation):
+ *
+ *     400 {"code":"40002","error":"THIS CHARGE DOES NOT COMPLY WITH THE MIN
+ *          AND MAX AMOUNT VALUE REQUIREMENTS",
+ *          "parameter_name":"charges[0].amount.value"}
+ *
+ * for `value: 1`. R$ 1,00 is the owner's call for the proof; the activation
+ * screens name the figure from here, never a cent.
+ */
+const MINIMUM_CHARGE_CENTS = 100;
+
 // `copy` is resolved at each BOUNDARY below, never once here — `src/copy-source.ts`.
 export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): PaymentProviderAdapter {
   const copy = (locale?: string): PagbankCopy => resolvePaymentsCopy(source, locale);
@@ -305,6 +319,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     name: NAME,
     displayName: 'PagBank',
     webhookPath,
+    minimumChargeCents: MINIMUM_CHARGE_CENTS,
     // Connect is the happy path; the credential form below stays as the
     // fallback for stores connected before Connect, and for deployments with
     // no registered PagBank application.
