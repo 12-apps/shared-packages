@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActivationChargeCopy } from '../charge-copy';
 import { useActivationCharge } from '../use-activation-charge';
 import { PT_BR_CARD_COPY } from '../../card/pt-BR';
+import { validateCpfOrCnpj } from '../../card/tax-id';
 
 /**
  * The card half of the activation step.
@@ -106,6 +107,7 @@ function options(overrides: Partial<Parameters<typeof useActivationCharge>[0]> =
     provider: 'pagbank',
     email: 'dona@loja.example',
     onVerified: vi.fn(),
+    validateTaxId: (value: string) => validateCpfOrCnpj(value, PT_BR_CARD_COPY.fields),
     copy: COPY,
     ...overrides,
   };
@@ -238,6 +240,42 @@ describe('useActivationCharge — the charge', () => {
     });
     expect(JSON.stringify(sent?.body)).not.toContain('4111');
     expect(JSON.stringify(sent?.body)).not.toContain('123');
+  });
+
+  it('sends a company card holder’s CNPJ as its fourteen digits (FUT-4048)', async () => {
+    const io = stubFetch({ post: [{ ok: true, refunded: true }] });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(io.calls.length).toBeGreaterThan(0));
+    act(() => {
+      result.current.setCard(GOOD_CARD);
+      result.current.setCpf('11222333000181');
+    });
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(result.current.cpfError).toBeUndefined();
+    expect(io.posted()[0]?.body).toMatchObject({ taxId: '11222333000181' });
+  });
+
+  it('refuses a CNPJ whose check digits are wrong, before anything is charged', async () => {
+    const io = stubFetch({ post: [{ ok: true, refunded: true }] });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(io.calls.length).toBeGreaterThan(0));
+    act(() => {
+      result.current.setCard(GOOD_CARD);
+      result.current.setCpf('11222333000182');
+    });
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(result.current.cpfError).toBe('CPF ou CNPJ inválido.');
+    expect(io.posted()).toHaveLength(0);
   });
 
   it('passes only on the server’s own answer, and reports the refund', async () => {

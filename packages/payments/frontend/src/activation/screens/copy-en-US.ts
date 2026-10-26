@@ -7,8 +7,8 @@ import type { ActivationStepCopy } from './copy';
  *
  * A pack, not a default — see that file for the whole argument, and for the
  * list of strings that deliberately do not move across the pair: **Checkout
- * Integrado** (PagBank's own console label), **CPF** and its `000.000.000-00`
- * mask (a Brazilian document and a FORMAT), the provider names, and this
+ * Integrado** (PagBank's own console label), **CPF** and **CNPJ**
+ * (Brazilian documents), the provider names, and this
  * package's `{provider}` placeholder.
  */
 export const EN_US_ACTIVATION_STEP_COPY: ActivationStepCopy = {
@@ -87,9 +87,9 @@ export const EN_US_ACTIVATION_STEP_COPY: ActivationStepCopy = {
       'provider creates no payment link at all, and this charge would fail.',
   },
   taxId: {
-    label: "Cardholder's CPF",
+    label: "Cardholder's CPF or CNPJ",
     hint: (displayName) => `${displayName} requires it on every card charge.`,
-    placeholder: '000.000.000-00',
+    placeholder: 'Digits only',
   },
   charge: {
     card: EN_US_CARD_COPY,

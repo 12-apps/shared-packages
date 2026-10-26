@@ -5,7 +5,7 @@ import type { ComponentType, JSX, ReactNode } from 'react';
 
 import { NewCardForm } from '../../card/fields';
 import { detectBrand, onlyDigits } from '../../card/format';
-import { formatCpf } from '../../card/cpf';
+import { formatCpfOrCnpj, taxIdDigits } from '../../card/tax-id';
 import { useCheckoutComponents } from '../../components/checkout/ui';
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useActivationCharge, type ActivationCharge } from '../use-activation-charge';
@@ -46,7 +46,8 @@ function ChargeForm({
 }): JSX.Element {
   const { taxId, actions } = useActivationCopy();
   const { Input } = useCheckoutComponents();
-  const { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, state } = verification;
+  const { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, setCpfError, state } =
+    verification;
   const submitting = state.kind === 'submitting';
 
   return (
@@ -66,11 +67,20 @@ function ChargeForm({
         size="md"
         fullWidth
         placeholder={taxId.placeholder}
-        value={formatCpf(cpf)}
+        value={formatCpfOrCnpj(cpf)}
         error={Boolean(cpfError)}
         helperText={cpfError ?? taxId.hint(displayName)}
-        onChange={(event) => setCpf(onlyDigits(event.target.value))}
-        onBlur={() => validateTaxId(cpf)}
+        onChange={(event) => {
+          setCpf(taxIdDigits(event.target.value));
+          // A shown error goes as soon as the owner edits; blur judges again.
+          if (cpfError) setCpfError(undefined);
+        }}
+        // The validator's answer used to be thrown away here, so a wrong
+        // document was only reported on submit (FUT-4048). An untouched empty
+        // field stays quiet until then.
+        onBlur={() => {
+          if (cpf) setCpfError(validateTaxId(cpf));
+        }}
         data-testid="verify-charge-cpf"
       />
       <Button
@@ -137,6 +147,7 @@ export function CardVerification({
     provider,
     email: ownerEmail,
     onVerified,
+    validateTaxId,
     copy: copy.charge,
   });
   // The verification endpoint answers the amount alongside the store's card

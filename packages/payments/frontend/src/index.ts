@@ -234,6 +234,7 @@ export {
   tokenizerFor,
   validateCardNumber,
   validateCpf,
+  validateCpfOrCnpj,
   validateCvv,
   validateExpiry,
   validateHolder,

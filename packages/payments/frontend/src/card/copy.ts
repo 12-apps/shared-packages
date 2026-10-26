@@ -76,6 +76,10 @@ export interface CardFieldCopy {
   cvvDigits(length: number): string;
   cpfRequired: string;
   cpfInvalid: string;
+  /** A field that takes a CPF or a CNPJ (a company card's holder), left empty. */
+  taxIdRequired: string;
+  /** Neither a valid CPF nor a valid CNPJ. */
+  taxIdInvalid: string;
   /** The saved-cards radio group's own label. */
   savedCardsLabel: string;
   /**

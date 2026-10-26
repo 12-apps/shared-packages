@@ -3,8 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   ownsVerificationReference,
   parseVerificationReference,
+  verificationAmountCents,
   verificationReference,
 } from '../activation/reference';
+import { defineProviders } from '../core/registry';
+import { infinitePayProvider } from '../providers/infinitepay';
+import { pagbankProvider } from '../providers/pagbank';
+import { PT_BR_INFINITEPAY_COPY, PT_BR_PAGBANK_COPY } from '../providers/pt-BR';
+import { activationAdapter } from './activation-fixtures';
 
 /**
  * The reference was constant per store, and InfinitePay dedupes on `order_nsu`
@@ -50,5 +56,28 @@ describe('verificationReference', () => {
 
   it('answers null for a reference that is not an activation charge at all', () => {
     expect(parseVerificationReference('order-123')).toBeNull();
+  });
+});
+
+/**
+ * What the activation charge costs, per provider. PagBank production refused
+ * `value: 1` with `40002 THIS CHARGE DOES NOT COMPLY WITH THE MIN AND MAX
+ * AMOUNT VALUE REQUIREMENTS` on the first live activation (FUT-4048), so its
+ * adapter declares R$ 1,00; a provider that declares nothing keeps one cent.
+ */
+describe('verificationAmountCents', () => {
+  const providers = defineProviders({
+    pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
+    infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
+    plain: activationAdapter('plain'),
+  });
+
+  it('charges PagBank R$ 1,00, the floor its production API enforces', () => {
+    expect(verificationAmountCents(providers, 'pagbank')).toBe(100);
+  });
+
+  it('keeps every other provider on its own floor', () => {
+    expect(verificationAmountCents(providers, 'infinitepay')).toBe(101);
+    expect(verificationAmountCents(providers, 'plain')).toBe(1);
   });
 });
