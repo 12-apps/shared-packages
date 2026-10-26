@@ -131,6 +131,8 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
           cvvDigits: (length) => `O CVV deste cartão tem ${length} dígitos.`,
           cpfRequired: 'Informe o CPF.',
           cpfInvalid: 'Esse CPF não confere.',
+          taxIdRequired: 'Informe o CPF ou o CNPJ.',
+          taxIdInvalid: 'Esse CPF ou CNPJ não confere.',
           savedCardsLabel: 'Cartão',
           savedCardExpiry: (month, year) => `Validade ${month}/${year}`,
           newCard: 'Usar outro cartão',

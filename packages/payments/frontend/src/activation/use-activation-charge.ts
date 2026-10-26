@@ -9,6 +9,7 @@ import {
   tokenizeCard,
   tokenizerFor,
   validateCardNumber,
+  validateCpfOrCnpj,
   validateCvv,
   validateExpiry,
   validateHolder,
@@ -77,9 +78,10 @@ export interface ActivationChargeOptions {
   onVerified: () => void;
   /**
    * The host's holder-document validator — the SAME one the field runs on blur,
-   * so the submit cannot refuse what the blur accepted (FUT-4048).
+   * so the submit cannot refuse what the blur accepted (FUT-4048). Omitted, a
+   * CPF or a CNPJ is accepted, refused in the card pack's own words.
    */
-  validateTaxId: (value: string) => string | undefined;
+  validateTaxId?: (value: string) => string | undefined;
   copy: ActivationChargeCopy;
 }
 
@@ -272,7 +274,12 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
   const { card, cpf, setFieldErrors, setCpfError, clear } = form;
 
   const submit = useCallback(async () => {
-    const validation = validateAll(card, cpf, options.copy.card, validateTaxId);
+    const validation = validateAll(
+      card,
+      cpf,
+      options.copy.card,
+      validateTaxId ?? ((value) => validateCpfOrCnpj(value, options.copy.card.fields)),
+    );
     setFieldErrors(validation.fieldErrors);
     setCpfError(validation.cpfError);
     if (Object.values(validation.fieldErrors).some(Boolean) || validation.cpfError) return;
