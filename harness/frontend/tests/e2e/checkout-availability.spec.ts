@@ -23,13 +23,14 @@ test('an empty chain renders the unavailable screen and never touches the wire',
   await expect(page.getByTestId('checkout-payments-disabled')).toBeVisible();
 
   // Nothing that could take money is on screen at all — not disabled, absent.
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
-  await expect(page.getByTestId('card-view')).toHaveCount(0);
-  await expect(page.getByTestId('pix-view')).toHaveCount(0);
+  await expect(page.getByTestId('payment-list')).toHaveCount(0);
+  await expect(page.getByTestId('list-pay')).toHaveCount(0);
+  await expect(page.getByTestId('card-number')).toHaveCount(0);
 
-  // And nothing was raised. The config read is the ONLY request on the wire —
-  // a store that cannot charge must not have a payable brought into existence.
-  await expect(page.getByTestId('wire-paths')).toHaveText('GET /api/checkout/config');
+  // And nothing was raised: reads only, never a POST — a store that cannot
+  // charge must not have a payable brought into existence.
+  await expect(page.getByTestId('wire-paths')).toContainText('GET /api/checkout/config');
+  await expect(page.getByTestId('wire-paths')).not.toContainText('POST');
 });
 
 test('a host remedy is a different sentence, with something to do', async ({ page }) => {
@@ -49,7 +50,8 @@ test('the host veto beats a chain that would otherwise charge', async ({ page })
 
   // The chain is live and the config read succeeds — the store still cannot
   // charge, because online payments are switched off and only the host knows.
-  await expect(page.getByTestId('wire-paths')).toHaveText('GET /api/checkout/config');
+  await expect(page.getByTestId('wire-paths')).toContainText('GET /api/checkout/config');
   await expect(page.getByTestId('checkout-payments-disabled')).toBeVisible();
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
+  await expect(page.getByTestId('payment-list')).toHaveCount(0);
+  await expect(page.getByTestId('wire-paths')).not.toContainText('POST');
 });

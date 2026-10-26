@@ -64,8 +64,9 @@ export const paymentsFrontendWebManifest = {
 
 /**
  * The SHOPPER's checkout surface. `screen: 'Checkout'` is the one-line mount
- * `createPaymentFlows` returns; everything under `screens` is for a host
- * composing its own pixels and is deliberately not routed here.
+ * `createPaymentFlows` returns — the one payment list, so the host's config
+ * must carry `usePaymentList` (FUT-4028); everything under `screens` is for a
+ * host composing its own pixels and is deliberately not routed here.
  */
 export const paymentsCheckoutFrontendWebManifest = {
   name: '@12-apps/payments-checkout-ui',

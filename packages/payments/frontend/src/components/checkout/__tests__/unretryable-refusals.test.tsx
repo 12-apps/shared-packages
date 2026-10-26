@@ -22,10 +22,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 
-import { CheckoutFlow } from "../checkout-flow";
 import { PaymentErrorPanel } from "../payment-error-panel";
-import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
 import { PT_BR_CHECKOUT_SCREENS_COPY } from "../screens-pt-BR";
+import { onPageStore, renderList, stubClient } from "./list-harness";
 
 /** The server's own sentence, whatever it was — the panel renders it verbatim. */
 const REFUSAL = "A loja está fechada no momento.";
@@ -116,17 +115,10 @@ describe("the Pagamento step a shut store refuses", () => {
       error: { message: REFUSAL, field: null, code: "STORE_CLOSED" },
     }));
 
-    const { container } = render(
-      <CheckoutFlow
-        copy={PT_BR_CHECKOUT_VIEW_COPY}
-        cart={{ empty: false, totalLabel: "R$ 24,00", totalItems: 1 }}
-        createOrder={createOrder}
-        onExitToMenu={vi.fn()}
-        taxIdOnFile
-      />,
-    );
+    const { container } = renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient(), createOrder });
 
-    fireEvent.click(screen.getByTestId("checkout-method-PIX"));
+    fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
     await waitFor(() => expect(screen.getByTestId("checkout-error")).toBeTruthy());
 
     // The buyer keeps the store's own sentence — the host's gate is arriving

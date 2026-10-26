@@ -121,7 +121,7 @@ export function useWalletCharge(
     const charged = await client.chargeWallet({
       orderId: order.orderId,
       wallet: { type, key },
-      // The CPF the Dados step collected — the provider's required-field gate
+      // The CPF the list collected — the provider's required-field gate
       // reads it from the charge, the payable row has nowhere to keep it.
       taxId: buyer.taxId,
     });

@@ -20,7 +20,7 @@ import { PT_BR_CHECKOUT_COPY } from "../pt-BR";
  * makes every suite rendering them a host, so they get what a host provides
  * rather than each file growing a wrapper of its own. `renderHook` is wrapped
  * for the same reason and not a different one: `useCheckoutController` reads
- * the buyer-gate complaints from this context, so a suite driving the hook is
+ * the buyer's field complaints from this context, so a suite driving the hook is
  * as much a host as one rendering a screen.
  *
  * The pt-BR pack, because these suites assert on the sentences it produces:

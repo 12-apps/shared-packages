@@ -2,7 +2,7 @@ import { useState, type JSX } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import type { CheckoutScreens, PaymentFlows } from "../flows/types";
-import type { BuyerInfo, CheckoutOrder, OrderStatus, PaymentMethod } from "../index";
+import type { CheckoutOrder, OrderStatus } from "../index";
 
 import { StoryFlow, type StoryHost } from "./host";
 import type { StorySpec } from "./store";
@@ -64,137 +64,6 @@ function screen(
     ),
   };
 }
-
-// ---------------------------------------------------------------------------
-// MethodChoice
-// ---------------------------------------------------------------------------
-
-/** Both methods offered; the tiles are real focusable radios. */
-export const MethodChoiceBoth: StoryObj = screen(
-  { chain: [{ name: "aurora", methods: ["PIX", "CARD"], ...STUB }] },
-  (flows) => <MethodChoiceDemo Screen={flows.screens.MethodChoice} />,
-);
-
-/** PIX-only: one tile, and it is taken rather than demanded. */
-export const MethodChoicePixOnly: StoryObj = screen(
-  { chain: [{ name: "aurora", methods: ["PIX"], ...STUB }] },
-  (flows) => <MethodChoiceDemo Screen={flows.screens.MethodChoice} />,
-);
-
-/**
- * A chain that declares CARD but gives this browser no way to mint for it: the
- * tile is DISABLED with a caption saying so, rather than silently vanishing
- * into an unexplained one-option "choice".
- */
-export const MethodChoiceCardUnmintable: StoryObj = screen(
-  {
-    chain: [
-      { name: "aurora", methods: ["PIX", "CARD"], tokenization: "PUBLIC_KEY", publicKey: null },
-    ],
-  },
-  (flows) => <MethodChoiceDemo Screen={flows.screens.MethodChoice} />,
-);
-
-function MethodChoiceDemo({ Screen }: { Screen: CheckoutScreens["MethodChoice"] }): JSX.Element {
-  const [value, setValue] = useState<PaymentMethod | null>(null);
-  return (
-    <>
-      <Screen value={value} onChange={setValue} />
-      <p style={{ opacity: 0.6, fontSize: 12 }}>escolhido: {value ?? "—"}</p>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// BuyerDetails — fields derived from the chain's declaration (FUT-595)
-// ---------------------------------------------------------------------------
-
-function BuyerDetailsDemo({
-  Screen,
-  method,
-  error,
-}: {
-  Screen: CheckoutScreens["BuyerDetails"];
-  method: PaymentMethod | null;
-  error?: { field: "cpf" | "email" | "name" | "phone"; message: string } | null;
-}): JSX.Element {
-  const [buyer, setBuyer] = useState<BuyerInfo>({});
-  return (
-    <Screen
-      value={buyer}
-      onChange={setBuyer}
-      method={method}
-      error={error}
-      onContinue={() => undefined}
-    />
-  );
-}
-
-/** The chain asks for a CPF. */
-export const BuyerDetailsTaxId: StoryObj = screen(
-  {
-    chain: [
-      { name: "aurora", ...STUB, customerSchema: [{ key: "taxId", type: "CPF", required: true }] },
-    ],
-  },
-  (flows) => <BuyerDetailsDemo Screen={flows.screens.BuyerDetails} method="CARD" />,
-);
-
-/** The chain asks for a MOBILE — and never mentions a CPF. */
-export const BuyerDetailsPhone: StoryObj = screen(
-  {
-    chain: [
-      {
-        name: "aurora",
-        ...STUB,
-        customerSchema: [{ key: "phone", type: "MOBILE", required: true }],
-      },
-    ],
-  },
-  (flows) => <BuyerDetailsDemo Screen={flows.screens.BuyerDetails} method="CARD" />,
-);
-
-/** The chain asks for nothing required; the receipt fields stay optional. */
-export const BuyerDetailsNothingRequired: StoryObj = screen(
-  { chain: [{ name: "aurora", ...STUB, customerSchema: [] }] },
-  (flows) => <BuyerDetailsDemo Screen={flows.screens.BuyerDetails} method="CARD" />,
-);
-
-/**
- * Different requirements per METHOD. Switch the story's `method` and the form
- * changes with it — one flat required/optional flag cannot express this.
- */
-export const BuyerDetailsPerMethod: StoryObj = screen(
-  {
-    chain: [
-      {
-        name: "aurora",
-        ...STUB,
-        customerSchema: [
-          { key: "taxId", type: "CPF", required: true, methods: ["PIX"] },
-          { key: "email", type: "EMAIL", required: true, methods: ["CARD"] },
-        ],
-      },
-    ],
-  },
-  (flows) => <BuyerDetailsDemo Screen={flows.screens.BuyerDetails} method="PIX" />,
-);
-
-/** A server 400 echoed onto the exact input it named. */
-export const BuyerDetailsServerRefusal: StoryObj = screen(
-  {
-    chain: [
-      { name: "aurora", ...STUB, customerSchema: [{ key: "taxId", type: "CPF", required: true }] },
-    ],
-  },
-  (flows) => (
-    <BuyerDetailsDemo
-      Screen={flows.screens.BuyerDetails}
-      method="CARD"
-      error={{ field: "cpf", message: "Informe: taxId." }}
-    />
-  ),
-);
 
 // ---------------------------------------------------------------------------
 // PixPayment / CardEntry / PaymentStatus
@@ -268,7 +137,7 @@ export const StatusPaidWithHostHero: StoryObj = screen(
 );
 
 // ---------------------------------------------------------------------------
-// PaymentsUnavailable / PayerSummary / SavedCards / EmptyCart
+// PaymentsUnavailable / SavedCards / EmptyCart
 // ---------------------------------------------------------------------------
 
 /** No remedy: say plainly that this store does not charge online. */
@@ -287,19 +156,6 @@ export const UnavailableWithRemedy: StoryObj = screen(
     },
   },
 );
-
-/** "Pagando como …", with Alterar to reopen the form. */
-export const PayerSummaryWithEdit: StoryObj = screen({}, (flows) => (
-  <flows.screens.PayerSummary
-    buyer={{ name: "Ana Compradora", taxId: "52998224725" }}
-    onEdit={() => undefined}
-  />
-));
-
-/** The saved CPF is never shown, because the client never receives it. */
-export const PayerSummarySavedTaxId: StoryObj = screen({}, (flows) => (
-  <flows.screens.PayerSummary buyer={{ name: "Ana Compradora" }} onEdit={() => undefined} />
-));
 
 /** A list to pick from. */
 export const SavedCardsList: StoryObj = screen(

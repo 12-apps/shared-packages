@@ -335,10 +335,9 @@ capability table, so a host should not draw an Apple Pay button from it.
 - Settings page: render `<PaymentProviderSettings client={...} />` where the
   provider config screen lives today. It renders every registered provider
   from its credential schema — adding a vendor changes NOTHING here.
-- Payment step only: render `<CheckoutPayment ... />` inside a
-  `<PaymentsProvider>`. Inject `tokenizeCard` per the active provider's
-  `tokenization` (`SDK` → load the provider's JS SDK; `PUBLIC_KEY` → encrypt
-  with `config.publicKey`; `REDIRECT`/PIX flows need no tokenizer).
+- The buyer checkout: mount `createPaymentFlows(...).Checkout` (below) — its
+  Pagamento step is the one payment list. The standalone `CheckoutPayment`
+  method-card step was removed with the tabbed checkout (FUT-4028).
 
 ### The activation step, mounted (`createActivationStep`, FUT-764)
 
@@ -466,8 +465,8 @@ own — each fetches `/config` if nothing above it did. Wrap them in
 ```tsx
 <flows.Provider>
   <MyLayout>
-    <flows.screens.BuyerDetails value={buyer} onChange={setBuyer} method={method} onContinue={next} />
-    <flows.screens.MethodChoice value={method} onChange={setMethod} />
+    <flows.screens.PixPayment payable={payable} onResolved={done} />
+    <flows.screens.CardEntry payable={payable} onResolved={done} />
   </MyLayout>
 </flows.Provider>
 ```
@@ -507,155 +506,25 @@ confirmed.
 `createPaymentFlowsBE` mount in the page — so a state can be reviewed without
 seeding a store or running a backend.
 
-### The checkout PIPELINE — steps, gates and settlement methods (FUT-1240)
-
-Everything above stays true. What this adds is a way to say three things the
-config had no room for: *this store has a step of its own*, *this shopper may
-not check out yet*, and *this settlement raises no charge* — the last of which
-had no seam at all, so every in-person payment path was written BESIDE the
-checkout instead of inside it.
-
-**It is opt-in, key by key.** Set any of `steps`, `gates`, `settlementMethods`,
-`useIntent`, `useOpenPayable`, `exit` or `onSettled` and `<flows.Checkout />`
-renders through the pipeline. Set none and it renders exactly the flat
-`CheckoutFlow` it always did — same screens, same test ids. There is no flag to
-flip and no migration to schedule.
-
-```tsx
-// checkout-plugins.ts — MODULE SCOPE. See "hook order" below.
-const STEPS = [scheduleStep, addressStep] as const;
-const GATES = [sessionGate, storeOpenGate, cartGate] as const;
-const METHODS = [payOnDeliveryMethod, payTheWaiterMethod] as const;
-
-export const checkout = createPaymentFlows({
-  /* everything from the section above, plus: */
-  steps: STEPS, gates: GATES, settlementMethods: METHODS,
-  useIntent, useOpenPayable, exit: catalogExit, onSettled,
-});
-```
-
-**A step declares WHERE it sits and WHEN it is finished, never that it is
-"current".** The current step is DERIVED — the first applying step whose
-`complete()` is false — so a reload, a discarded tab and a return from a
-provider's own page all land where the server's facts say they should, rather
-than on whatever a `useState` had before the page went away.
-
-```tsx
-export const addressStep: CheckoutStep<void, { cart: CartView }> = {
-  id: "address", phase: "details", order: 0, label: "dados",
-  useFacts: () => ({ cart: useCart() }),          // runs EVERY render, in array order
-  applies: (ctx, f) => ctx.settlement === null,   // pure
-  complete: (_ctx, f) => f.cart.deliveryAddress !== null,  // the cart ROW, not React state
-  answersCodes: ["DELIVERY_ADDRESS_REQUIRED"],    // re-rendered HERE, never as a generic retry
-  render: ({ advance, error }) => <AddressForm error={error} onSaved={advance} />,
-};
-```
-
-**`back` and `editBuyer` are the engine's**, and they reproduce the flat
-controller exactly: back re-opens the PREVIOUS APPLYING step and leaves for the
-catalog when there is none, so a shopper whose buyer-details step was skipped
-goes back to the catalog rather than to a form they never saw — and `editBuyer`
-(the payer block's "alterar") makes that step part of their flow from then on.
-
-**Back off the CONFIRMATION is the catalog, always** — once `ctx.outcome` is
-set there is nothing behind it a shopper should be sent into. That is not the
-"previous applying step" rule: a settled Pix or card order leaves its pane
-applying and merely COMPLETE, so the step behind the confirmation is the
-payment surface for money that already moved. Re-offering it puts a live pay
-button in front of a shopper who has paid — the hazard recorded earlier in this
-document, where one owner read a re-offered button as "it did not work" and
-paid four times.
-
-**The confirmation's own "voltar ao cardápio" takes the same door**: a
-registered `exit` when there is one, `ports.exitToCatalog` otherwise. Two ways
-out of a checkout answering differently is a defect, not a choice.
-
-**A step's slice is declared, not held.** `persist: "session"` parks it under
-`payments.checkout.<slug>.<stepId>` — scoped to the store, because one tab
-holds one slot for every store on a multi-tenant storefront. Nothing is
-rehydrated without the step's own `parse`: storage is the one input that did
-not come from this render.
-
-**`raisesCharge: false` is the no-charge seam.** A settlement method that
-declares it mounts NO `pay`-phase step — no buyer-details-for-the-charge, no
-method pane, no polling — and placing the order IS the settlement, so the walk
-goes straight to the confirmation. The engine enforces that ONCE, over the
-phase, so no lane can forget it.
-
-**`pane` names the `pay`-phase step your method settles on**, and the engine
-reads it: a `pay` step that some method claimed as its pane applies only while
-THAT method is the chosen one. `null` — the value every no-charge method uses —
-claims none, and the walk goes to the confirmation. A charged method of your
-own either names its own step or reuses one of the package's two (`"pix"`,
-`"card"`) by naming it.
-
-**Your method's id reaches `createOrder` as `settlementMethod`.** The request's
-`method` is what the CHAIN can be asked to charge, so it is only ever `PIX` or
-`CARD`; the id you registered rides its own optional field beside it, and is
-ABSENT for the package's own two. Without it every no-charge settlement arrives
-identical — a courier, a waiter and a Pix charge as one request — which is
-exactly the fact `raisesCharge: false` exists to let you act on. A step may set
-the same field from its `contribute` when the settlement has a finer name than
-the tile does.
-
-```tsx
-export const payOnDeliveryMethod: SettlementMethodDescriptor<TablesState | undefined> = {
-  id: "ON_DELIVERY", raisesCharge: false, pane: null,   // `null` ⇒ no pane, straight to the confirmation
-  useFacts: () => useMenuTables(slug).data,
-  offered: (ctx, tables) => tables?.delivery?.payOnDelivery === true,
-  Review: ConfirmOnDelivery,       // optional: what they confirm before it is placed
-  Confirmation: DeliveryPlaced,    // optional: default is the package's PaymentStatus
-  tile: (copy) => ({ label: copy.…, hint: copy.… }),
-};
-
-// …and the create port is told which one it is:
-//   { method: "PIX", settlementMethod: "ON_DELIVERY", buyer, saveProfile }
-// `method` is the chain's, `settlementMethod` is yours — read the second one.
-```
-
-**A gate is `useFacts()` + a pure `decide()`**, evaluated in array order before
-any step renders; the first non-`pass` verdict wins, so put the gate that is
-still WAITING for a fact before the one that would curtain the screen.
-`standsAsideForResume` skips a gate for a shopper coming back from a payment —
-that route is where money gets confirmed. The same list is exported headless as
-`flows.useAdmission()`, so a cart drawer's CTA and a buy-now button consume the
-answer the checkout will give rather than a second one of their own.
-
-**Refusals are ROUTED.** A server refusal whose `code` a step's `answersCodes`
-names re-opens that step and renders there. A gate's code re-renders the gate
-WHEN that gate is refusing — its `Screen` is handed the error — and otherwise
-falls back to the current step, because a gate that admitted this shopper draws
-nothing and a refusal drawn nowhere is a shopper pressing pay against a screen
-that never changes. A code nobody claimed reaches the shopper the same way, on
-whichever step they are on — which is what lets a host adopt this one plugin at
-a time.
-
-**Hook order is a function of the ARRAYS.** Every plugin's `useFacts()` runs on
-every render in array order, so `steps`, `gates` and `settlementMethods` must
-be the SAME arrays each render: hoist them to module scope or memoise them. A
-config that rebuilds one (a getter, a `filter` in a component body) THROWS in a
-development build, naming the array — because the failure it prevents is
-silent, and only appears the day a plugin leaves the middle of a list.
-
-**Two new copy keys are required**, both under `copy.views.pipeline`:
-`loading` (what is on screen while a gate decides) and `awaitingHandover`, a
-record keyed by settlement-method id. Both packs ship PIX and CARD; a host
-registering a charged method of its own adds one line.
-
 ### The buyer checkout surface (`<CheckoutFlow>`, FUT-564)
 
-The full three-step buyer flow — Dados (CPF + LGPD "salvar meus dados") →
-Pagamento (method picker, PIX QR + polling, card form + tokenization, saved
-cards, hosted-checkout redirect + return resume) → Confirmação — mounts in
-one line:
+The buyer flow — Pagamento as the ONE payment list (the CPF at its top, PIX
+QR + polling, card form + tokenization, saved cards, wallets, hosted-checkout
+redirect + return resume) → Confirmação — mounts in one line:
 
 ```tsx
 <CheckoutFlow
   cart={{ empty, totalLabel, totalItems }}   // display facts, never money math
   createOrder={(input) => ...}               // REQUIRED — see ports below
   onExitToMenu={() => ...}                   // REQUIRED — leave for your catalog
+  paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY }} // REQUIRED — the Pagamento step (below)
 />
 ```
+
+There is no other Pagamento. The Dados step, the Pix/Cartão method tabs, the
+flow's own "Etapa N de M" header, one-click (`oneClick`) and the checkout
+pipeline were removed in FUT-4028; the list does what each did (the CPF at the
+top, the rows, the host's own stepper, the last method preselected).
 
 It talks to the host-mounted `/api/checkout*` surface (`/api/checkout/status`,
 `/config`, `/charge`, `/cards`, `/refresh-key`) and speaks the store's ACTIVE
@@ -669,19 +538,19 @@ order CREATION never enter the package; they arrive as explicit props:
 | port | required | what the host does with it |
 | ---- | -------- | -------------------------- |
 | `cart` | yes | `{ empty, totalLabel, totalItems, discountLines?, identity? }` — read from YOUR cart; `discountLines` is your own rendered discount itemization, and `identity` is what binds a parked payment to a basket (below) |
-| `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`). `input.settlementMethod` is set — and only set — when a PIPELINE host's own registered settlement was chosen |
+| `createOrder(input)` | yes | raise the order from your cart/comanda; close over tenant + comanda scope; answer `CreateOrderResult` (`{ok:true,data:CheckoutOrder}` or a structured `CheckoutError`) |
 | `onExitToMenu()` | yes | navigate to your catalog |
-| `saveBuyerContact(contact)` | no | persist name/phone/CPF on "Continuar" (LGPD-gated by the flow); the WIRE rules — e.g. a blank CPF must be omitted, never sent as `""` — are yours |
+| `saveBuyerContact(contact)` | no | persist name/phone/CPF when the list raises an order under "salvar meus dados" (LGPD-gated by the list); the WIRE rules — e.g. a blank CPF must be omitted, never sent as `""` — are yours |
 | `onPaid()` | no | the order settled PAID — re-read your server-emptied cart |
 | `comanda` | no | `{ scope, totalLabel, totalItems }` when settling a comanda instead of the cart |
-| `taxIdOnFile` | no | `true` skips Dados (FUT-465) — the payer block offers the way back |
+| `taxIdOnFile` | no | `true`: the list shows the payer line instead of the CPF field (FUT-465); its "Alterar" reveals the field |
 | `providerConfig` | no | the `GET /api/checkout/config` answer (`fetchCheckoutConfig` is exported); `null` while loading degrades safely |
 | `tenantSlug` | no | scopes the saved-card list to the store being paid |
 | `confirmationExtra` | no | host content on the PAID confirmation, ABOVE the action row — put what the buyer has to DO next here, beside the way out |
 | `confirmationHero` | no | an illustration that REPLACES the PAID confirmation's icon (the storefront's mascot on a buyer's first order) — pass it only when there is one, and mark it `aria-hidden`: the heading beside it carries the meaning |
 | `confirmationFooter` | no | host content on the PAID confirmation, BELOW the action row — put what is merely OFFERED here (an install invite, an ask to turn alerts on), so a panel never lands between two controls |
 | `backActionEmphasis` | no | `"secondary"` when the host renders its own lead action in `confirmationExtra`, so the flow's "back to the menu" stands down instead of being a second primary. Read on PAID only; defaults to `"primary"` |
-| `oneClick` | no | the buyer pressed a BUY button rather than opening a checkout — pay with their saved card and land on Confirmação with no tap (see below) |
+| `paymentList` | **yes** | the Pagamento step — see "The Pagamento step as ONE list" below |
 
 **Three copy keys are new and REQUIRED on this bump**, and a hand-written pack
 that misses one fails at RUNTIME rather than at compile time if the host does
@@ -744,30 +613,6 @@ this call leaves half the fix on the floor. The check stays local and
 non-consuming, so a gate may ask it on every render; a host that freezes the
 answer at mount must not freeze it before its cart is `ready`.
 
-**One-click (`oneClick`).** A host that offers a *Buy now* control — beside a
-product, or on a past order — passes `oneClick` and the flow makes the taps
-that button already stands for: it selects the card method (which raises the
-order), charges the buyer's saved instrument, and lands them on Confirmação.
-Nothing about the charge differs from a buyer who tapped it themselves; it is
-the same controller, the same card path, the same failover instruments and the
-same poll.
-
-It is a REQUEST, never an instruction. Every one of these degrades to the
-ordinary flow with nothing charged, because standing down only costs the taps
-the buyer would have made anyway while arming wrongly charges a card nobody
-chose:
-
-- the store finishes payment on the provider's own page (a hosted redirect) —
-  one-click must never redirect a checkout the moment it renders;
-- the chain declares no card path this browser can mint or charge for;
-- `providerConfig` is still `null`, so the store's protocol is a guess;
-- `taxIdOnFile` is false, so the buyer still has a Dados step to fill;
-- the buyer has no saved card at this store — they land on Pagamento with the
-  picker and the card form, which is the ordinary step 2.
-
-A declined card is terminal for one-click: the refusal and the buyer's own
-"Pagar" come back, and nothing retries on their behalf.
-
 **The design-system contract (decision: option 3 — slot injection).** The
 package ships behavior + structure and renders its pixels through a
 `components` prop of primitive slots; unfilled slots fall back to raw MUI, so
@@ -815,16 +660,15 @@ This repo's `@12-apps/ui` binding lives in `@12-apps/spa-shared/payments-ui`
 (`checkoutUiComponents`); the storefront spreads it plus its `ActionBar`, and
 `@12-apps/spa-shared/card` re-exports the card form pre-wired with it for the
 admin's activation charge. The second-host proof is the package's own
-`src/components/checkout/__tests__/second-host.test.tsx`: the full flow walks
-Dados → Pagamento → card form with NO `@12-apps/ui` present (it is not even
+`src/components/checkout/__tests__/second-host.test.tsx`: the flow walks
+the list → the card row's form with NO `@12-apps/ui` present (it is not even
 resolvable from the package), rendering entirely through the raw-MUI default
 slots.
 
 ### The Pagamento step as ONE list (`paymentList`, FUT-3591/3592)
 
-Opt-in, and additive: a host that passes nothing keeps the method tabs, the
-order summary and raise-on-pick, exactly as above. Pass `paymentList` and the
-Pagamento step becomes one radio group — the store's online options under
+REQUIRED since FUT-4028 (it was opt-in beside the method tabs, which are gone):
+the Pagamento step is one radio group — the store's online options under
 "PAGAR AGORA, PELO APP" and the HOST's own pay-at-the-door options under
 "PAGAR NA ENTREGA" — over one bar whose button is the only thing that raises an
 order or a charge:
@@ -854,9 +698,9 @@ What changes for the buyer:
   chosen — "Cartão de crédito" with the card used LAST selected: the one whose
   `SavedCard.lastUsedAt` is latest, or the head of your list when no card says.
   Answer `lastUsedAt` on `/cards` (stamp it when a charge with the card goes
-  through); the tabs layout ignores it and keeps your list's head.
+  through).
 - **The CPF is asked once, at the top of Pagamento** (FUT-3685), above the
-  wallets, instead of on a Dados step: it shows when ANY online method or
+  wallets: it shows when ANY online method or
   wallet the list offers needs it under the chain rule (the union, never the
   chosen row), with "o PagBank pede para pagar pelo app" under it — the
   provider named is the chain member that asks. The field is ~280px once the
@@ -864,8 +708,7 @@ What changes for the buyer:
   it stops in your own ~680px left column too — and full width under that. Until it is valid, the wallet
   buttons and the online rows' button are held with `copy.reasons.cpf`; a door
   row never is. A buyer with one on file sees no field but the payer line, and
-  its "Alterar" reveals the field at the top — the list never opens a Dados
-  step. The hand-off provider's mobile is still asked inside its own row.
+  its "Alterar" reveals the field at the top. The hand-off provider's mobile is still asked inside its own row.
 - **No confirmation dialog.** The card's "Pagar" becomes a bar that fills in
   five seconds (`CHARGE_WINDOW_MS`) with "Cancelar" under it; nothing is sent
   before it fills. "Gerar Pix" raises the order and the code at once, and the
@@ -886,8 +729,8 @@ What changes for the buyer:
   total, your `paymentList.lines`), `cart.discountLines` (your fee and discount
   rows), "Total", then `summary`, the extras and the pay button — no bar at the
   bottom. On a phone the bar stays, and draws no lines.
-- No method tabs, no `orderNote`, and no step header on Pagamento: the host's
-  own stepper is the chrome around it. The list's `copy.title` names the list
+- No `orderNote`, and no step header anywhere in the flow: the host's own
+  stepper is the chrome around it. The list's `copy.title` names the list
   for a screen reader only.
 
 **The list's own fields.**

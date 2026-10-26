@@ -11,7 +11,7 @@ import type { StorySpec } from "./store";
  * deployed one would. Nothing is faked above the credentials.
  *
  * How to read a story: fill the CPF (`529.982.247-25` passes the check digits),
- * press Continuar, pick a method. The card stories run in the server's stub
+ * type the CPF, pick a row. The card stories run in the server's stub
  * mode, so `4111 1111 1111 1111` settles and `4000 0000 0000 0002` declines.
  */
 const meta: Meta = {
@@ -20,7 +20,7 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          "`createPaymentFlows(...).Checkout` — Dados → Pagamento → Confirmação, " +
+          "`createPaymentFlows(...).Checkout` — Pagamento (the one list) → Confirmação, " +
           "driven against a live `createPaymentFlowsBE` mount running in the page.",
       },
     },
@@ -49,7 +49,7 @@ const STUB = { stub: true, publicKey: null } as const;
 export const ConfigPending: StoryObj = scene({}, { configRead: "pending" });
 
 /**
- * `/config` failed. The picker fails OPEN — both tiles — and nothing is raised
+ * `/config` failed. The list fails OPEN — both rows — and nothing is raised
  * as an error to the buyer, because the server still fails the charge CLOSED.
  * A blip must never hide a working checkout, and must never invent permission
  * to mock a token.
@@ -60,7 +60,7 @@ export const ConfigFailed: StoryObj = scene({}, { configRead: "failing" });
 // A store that cannot charge
 // ---------------------------------------------------------------------------
 
-/** No provider connected. The method picker never renders at all. */
+/** No provider connected. The payment list never renders at all. */
 export const NoProviderConnected: StoryObj = scene({ chain: [] });
 
 /** …and with a remedy the host can offer, the sentence is a different one. */
@@ -86,12 +86,12 @@ export const HostVetoWithLiveChain: StoryObj = scene({}, { availability: { payab
 // What the chain offers
 // ---------------------------------------------------------------------------
 
-/** PIX only: the CARD tile is absent, PIX is taken, no extra tap is demanded. */
+/** PIX only: the CARD row is absent, and PIX is taken. */
 export const PixOnly: StoryObj = scene({
   chain: [{ name: "aurora", methods: ["PIX"], ...STUB }],
 });
 
-/** Card only: the PIX tile is absent and the card form is reached directly. */
+/** Card only: the PIX row is absent and the card form opens directly. */
 export const CardOnly: StoryObj = scene({
   chain: [{ name: "aurora", methods: ["CARD"], ...STUB }],
 });
@@ -191,7 +191,7 @@ export const PaymentUnavailable: StoryObj = scene({
 // What the buyer is asked for (FUT-595)
 // ---------------------------------------------------------------------------
 
-/** The chain declares the CPF. Continuar refuses until it is a valid one. */
+/** The chain declares the CPF. The bar holds until it is a valid one. */
 export const RequiresTaxId: StoryObj = scene({
   chain: [
     {
@@ -222,25 +222,6 @@ export const RequiresPhone: StoryObj = scene({
 export const RequiresNothing: StoryObj = scene({
   chain: [{ name: "aurora", ...STUB, customerSchema: [] }],
 });
-
-/**
- * The server refuses with `MISSING_BUYER_FIELD` and names the field. Reached by
- * a chain that requires a CPF the buyer's saved profile supposedly holds — so
- * Dados is skipped, and the 400 arrives with nowhere to have typed it.
- */
-export const MissingBuyerFieldFromServer: StoryObj = scene(
-  {
-    chain: [
-      {
-        name: "aurora",
-        methods: ["PIX"],
-        ...STUB,
-        customerSchema: [{ key: "taxId", type: "CPF", required: true }],
-      },
-    ],
-  },
-  { taxIdOnFile: true },
-);
 
 // ---------------------------------------------------------------------------
 // Cart, settlement and the returning buyer
@@ -280,8 +261,8 @@ export const HostDiscountLines: StoryObj = scene(
 );
 
 /**
- * The buyer already has a CPF on file: Dados is skipped, and `PayerSummary`
- * states who is about to be charged with "Alterar" to reopen the form.
+ * The buyer already has a CPF on file: the list's payer line states who is
+ * about to be charged, with "Alterar" to reveal the CPF field.
  */
 export const TaxIdOnFile: StoryObj = scene(
   { chain: [{ name: "aurora", methods: ["PIX", "CARD"], ...STUB }] },

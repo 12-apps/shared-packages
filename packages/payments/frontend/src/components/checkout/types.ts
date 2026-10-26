@@ -54,7 +54,7 @@ export interface BuyerInfo {
    * charge (`customer.tax_id`).
    *
    * Persisted when the buyer opts in via "salvar meus dados" (LGPD consent),
-   * through the host's `saveBuyerContact` port at the end of the "Dados" step.
+   * through the host's `saveBuyerContact` port when the list continues.
    * It is never returned by any read — the host's profile API answers with
    * `hasTaxId` only — so a returning buyer re-enters it. Order creation
    * deliberately does NOT write it: that surface is MCP-exposed, and CPF must
@@ -193,7 +193,7 @@ export interface CreateOrderRequest {
    * registered settlement — "pay the courier", "pay the waiter" — cannot be
    * said there, and without this every one of them arrives as the same request.
    * ABSENT for `PIX` and `CARD`, which is what keeps it additive; otherwise the
-   * registered `SettlementMethodDescriptor.id` verbatim (`flows/pipeline`).
+   * id of the registered settlement verbatim.
    */
   settlementMethod?: string;
 }

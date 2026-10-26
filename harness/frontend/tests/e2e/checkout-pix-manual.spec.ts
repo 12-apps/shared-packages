@@ -30,12 +30,12 @@ for (const viewport of WIDTHS) {
     await openCase(page, 'manual');
     await reachPayment(page);
 
-    const pane = page.getByTestId('pix-view');
-    await expect(page.getByTestId('pix-awaiting')).toHaveText('Esperando a loja confirmar o pagamento…');
-    await expect(page.getByTestId('pix-expiry')).toContainText('A loja confirma o pagamento até');
+    // The list's Pix face: nothing on it promises the bank's own confirmation.
+    const pane = page.getByTestId('list-pix');
+    await expect(pane).toBeVisible();
     await expect(pane).not.toContainText(/automátic/i);
 
-    await page.getByTestId('pix-copy').click();
+    await page.getByTestId('list-pix-code').click();
     await expect(page.getByTestId('pix-after-copy-title')).toHaveText('Esperando a loja');
     await expect(page.getByTestId('pix-after-copy-step-3')).toContainText(/A loja confere — até \d{2}:\d{2}/);
     await expect(pane).not.toContainText(/automátic/i);
@@ -55,10 +55,8 @@ test('an automatic Pix still promises the automatic confirmation', async ({ page
   await openCase(page, 'awaiting');
   await reachPayment(page);
 
-  await expect(page.getByTestId('pix-awaiting')).toHaveText('Esperando o pagamento…');
-  await expect(page.getByTestId('pix-expiry')).toContainText(/automática/);
-
-  await page.getByTestId('pix-copy').click();
+  await expect(page.getByTestId('list-pix')).toBeVisible();
+  await page.getByTestId('list-pix-code').click();
   await expect(page.getByTestId('pix-after-copy-title')).toHaveText('Esperando o pagamento');
   await expect(page.getByTestId('pix-after-copy-step-3')).toContainText('O banco dá a baixa sozinho');
   const shotDir = process.env.SHOT_DIR;

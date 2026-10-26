@@ -16,14 +16,11 @@
  */
 import { useCallback, type JSX, type ReactNode } from "react";
 
-import { buyerFieldsFor } from "../components/checkout/buyer-fields";
 import { CheckoutFlow } from "../components/checkout/checkout-flow";
 import { createCheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
-import { buildPipeline } from "./pipeline/engine";
-import { pipelineRequested } from "./pipeline/types";
 import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
@@ -78,12 +75,22 @@ function confirmationProps(confirmation: PaymentFlowsConfig["confirmation"]) {
   };
 }
 
-/** The host's one-list Pagamento (FUT-3591), when it opted in — a hook, read every render. */
+/**
+ * The host's one-list Pagamento (FUT-3591) — a hook, read every render. There
+ * is no other Pagamento (FUT-4028), so a host that mounts `Checkout` without
+ * one is told so here rather than handed a checkout with nothing to pay with.
+ */
 function useHostPaymentList(runtime: FlowsRuntime) {
-  return runtime.config.usePaymentList?.();
+  const usePaymentList = runtime.config.usePaymentList;
+  if (!usePaymentList) {
+    throw new Error(
+      "createPaymentFlows: `Checkout` needs `usePaymentList` — the payment step is the one payment list (FUT-4028).",
+    );
+  }
+  return usePaymentList();
 }
 
-/** The whole three-step flow, with the config fetched and availability decided. */
+/** The whole flow — the one list, then the confirmation — with the config fetched and availability decided. */
 function buildCheckout(
   runtime: FlowsRuntime,
   screens: CheckoutScreens,
@@ -144,18 +151,15 @@ function buildCheckout(
   };
 }
 
-/** Assemble the thirteen screens from their builders. */
+/** Assemble the screens from their builders. */
 function buildScreens(runtime: FlowsRuntime): CheckoutScreens {
   return {
-    MethodChoice: buyerScreens.buildMethodChoice(runtime),
-    BuyerDetails: buyerScreens.buildBuyerDetails(runtime),
     CardEntry: payScreens.buildCardEntry(runtime),
     PixPayment: payScreens.buildPixPayment(runtime),
     HostedHandoff: hostedScreens.buildHostedHandoff(runtime),
     HostedReturn: hostedScreens.buildHostedReturn(runtime),
     PaymentStatus: payScreens.buildPaymentStatus(runtime),
     PaymentsUnavailable: payScreens.buildPaymentsUnavailable(runtime),
-    PayerSummary: buyerScreens.buildPayerSummary(runtime),
     SavedCards: buyerScreens.buildSavedCards(runtime),
     EmptyCart: buyerScreens.buildEmptyCart(runtime),
     AddCard: vaultScreens.buildAddCard(runtime),
@@ -163,11 +167,10 @@ function buildScreens(runtime: FlowsRuntime): CheckoutScreens {
   };
 }
 
-/** The flow controller, pre-bound to the ports and the chain's declaration. */
+/** The flow controller, pre-bound to the ports. */
 function buildUseCheckout(runtime: FlowsRuntime): () => CheckoutController {
   const { ports } = runtime.config;
   return function useCheckout(): CheckoutController {
-    const { config } = useResolvedConfig(runtime);
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
     const cart = runtime.config.useCart();
     const scope = { tenantSlug: runtime.useTenantSlug() };
@@ -179,10 +182,6 @@ function buildUseCheckout(runtime: FlowsRuntime): () => CheckoutController {
         onPaid: ports.onPaid,
       },
       defaults.buyer,
-      defaults.taxIdOnFile ?? false,
-      // Resolved for NO method: the gate runs on the Dados step, before the
-      // picker, and FUT-595's rule is to collect the union up front.
-      buyerFieldsFor(config?.chain, null),
       scope.tenantSlug,
       // WHICH basket, so a payment raised from another one cannot resume itself
       // over it (FUT-1213). The host answers on its cart view; a host that does
@@ -222,21 +221,13 @@ export function createPaymentFlows(config: PaymentFlowsConfig): PaymentFlows {
     );
   }
 
-  // THE ADDITIVE SWITCH (FUT-1240). A host that registered a step, a gate, a
-  // settlement method, an intent, an open payable, an exit or a settle
-  // callback gets the pipeline; a host that registered none gets the flat
-  // three-step flow, unchanged, down to its test ids. `useAdmission` is built
-  // either way — with no gates registered it passes, which is the honest
-  // answer for a host that has declared no admission rules.
-  const pipeline = buildPipeline(runtime, screens);
 
   return {
-    Checkout: pipelineRequested(config) ? pipeline.Checkout : buildCheckout(runtime, screens),
+    Checkout: buildCheckout(runtime, screens),
     Provider,
     screens,
     useCheckout: buildUseCheckout(runtime),
     useCheckoutConfig: () => useResolvedConfig(runtime),
-    useAdmission: pipeline.useAdmission,
     client: runtime.client,
   };
 }

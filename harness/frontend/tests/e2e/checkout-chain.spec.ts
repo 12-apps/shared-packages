@@ -22,7 +22,7 @@ test('two mintable entries: one instrument each, head skipped, tail settles', as
   await openCase(page, 'two-mintable');
   await reachPayment(page);
 
-  await expect(page.getByTestId('card-view')).toBeVisible();
+  await chooseCard(page);
   await fillCard(page);
   await payCard(page);
 

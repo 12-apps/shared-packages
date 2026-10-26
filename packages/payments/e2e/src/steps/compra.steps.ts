@@ -2,7 +2,6 @@ import { expect } from '@playwright/test';
 
 import {
   DECLINE_PAN,
-  checkoutSurface,
   chooseListOption,
   fillCard,
   payCard,
@@ -31,11 +30,9 @@ import { Then, When } from './fixtures.js';
  * between the published client and the published mount, and not one of them
  * visible to a test that only looked at a screen.
  *
- * Every step answers for BOTH checkouts a host may draw (FUT-4028): the ONE
- * list (`payment-list`, its rows `list-option-<METHOD>` and its bar
- * `list-pay`) and the older Dados step with Pix/Cartão tabs. A gesture finds
- * whichever is on the page; an absence is asserted for both shapes, so an
- * absence on one screen cannot pass for the other.
+ * The checkout is the ONE list (FUT-4028): `payment-list`, its rows
+ * `list-option-<METHOD>` and its bar `list-pay`. The Dados step and the
+ * Pix/Cartão tabs it replaced are gone from the package.
  */
 
 // ---------------------------------------------------------------------------
@@ -49,23 +46,14 @@ When('ela informa o CPF e segue para o pagamento', async ({ page }) => {
 When('ela escolhe pagar com cartão', async ({ page }) => {
   // Deliberately does NOT wait for the card form: a store may answer the card
   // choice with something other than a form, and that is a scenario of its own.
-  if ((await checkoutSurface(page)) === 'list') await chooseListOption(page, 'CARD');
-  else await page.getByTestId('checkout-method-CARD').click();
+  await chooseListOption(page, 'CARD');
 });
 
 When('ela segue para o pagamento no provedor', async ({ page }) => {
-  // The ONE action a hand-off store offers in place of the picker. There is
-  // nothing to choose here: every method mints the same checkout link, so the
-  // PIX-or-card question is binding on the provider's page and nowhere else.
-  // On the list that action is the hand-off row (its one online row, so
-  // already chosen) and the bar's "Ir para …".
-  const tabs = page.getByTestId('checkout-handoff-start');
-  const row = page.getByTestId('list-option-HAND_OFF');
-  await expect(tabs.or(row).first()).toBeVisible();
-  if (await tabs.isVisible()) {
-    await tabs.click();
-    return;
-  }
+  // The ONE action a hand-off store offers: its one online row and the bar's
+  // "Ir para …". There is nothing to choose here: every method mints the same
+  // checkout link, so the PIX-or-card question is binding on the provider's
+  // page and nowhere else.
   await chooseListOption(page, 'HAND_OFF');
   await page.getByTestId('list-pay').click();
 });
@@ -101,60 +89,41 @@ When('ela volta da página do provedor', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 Then('não lhe perguntam entre PIX e cartão', async ({ page }) => {
-  // The picker is ABSENT, not merely narrowed to one tile. A one-option
-  // "choice" at a store that hands the buyer over still says the answer decides
-  // something, and it decides nothing until she is on the provider's own page.
-  // On the list, the store's one online row is the hand-off, never a Pix or
-  // a card row.
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
-  await expect(page.getByTestId('checkout-method-PIX')).toHaveCount(0);
-  await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+  // The store's one online row is the hand-off, never a Pix or a card row. A
+  // one-option "choice" at a store that hands the buyer over would still say
+  // the answer decides something, and it decides nothing until she is on the
+  // provider's own page.
+  await expect(page.getByTestId('list-option-HAND_OFF')).toBeVisible();
   await expect(page.getByTestId('list-option-PIX')).toHaveCount(0);
   await expect(page.locator('[data-testid^="list-option-CARD"]')).toHaveCount(0);
 });
 
 Then('só a opção PIX é oferecida', async ({ page }) => {
-  // The tabs: one tile. The list: one online row, already raised by the time
-  // this is read (see `reachPayment`), so its Pix face may stand in its place.
-  await expect(
-    page
-      .getByTestId('checkout-method-PIX')
-      .or(page.getByTestId('list-option-PIX'))
-      .or(page.getByTestId('list-pix'))
-      .first(),
-  ).toBeVisible();
-  await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+  // One online row, already raised by the time this is read (see
+  // `reachPayment`), so its Pix face may stand in its place.
+  await expect(page.getByTestId('list-option-PIX').or(page.getByTestId('list-pix')).first()).toBeVisible();
   await expect(page.locator('[data-testid^="list-option-CARD"]')).toHaveCount(0);
 });
 
 Then('ela vê o QR code do PIX', async ({ page }) => {
-  // The tabs' `pix-view`, or the list's own Pix face (`list-pix`) — opened on
-  // its QR the way the buyer opens it (see `showListPixQr`).
-  const list = page.getByTestId('list-pix');
-  await expect(page.getByTestId('pix-view').or(list).first()).toBeVisible();
-  if (await list.isVisible()) await showListPixQr(page);
-  else await expect(page.getByTestId('pix-qr')).toBeVisible();
+  // The list's Pix face (`list-pix`), opened on its QR the way the buyer
+  // opens it (see `showListPixQr`).
+  await expect(page.getByTestId('list-pix')).toBeVisible();
+  await showListPixQr(page);
 });
 
 Then('o código copia-e-cola veio do provedor', async ({ page }) => {
   // The Banco Central GUI, in either case: the specification spells it in
   // lowercase and many PSPs print it in capitals, and both are a real code.
-  // On the list, see `listPixCode`: the after-copy face hands the code to the
-  // clipboard rather than drawing it.
-  const list = page.getByTestId('list-pix');
-  await expect(page.getByTestId('pix-view').or(list).first()).toBeVisible();
-  if (await list.isVisible()) {
-    expect(await listPixCode(page)).toMatch(/br\.gov\.bcb\.pix/i);
-    return;
-  }
-  await expect(page.getByTestId('pix-code')).toContainText(/br\.gov\.bcb\.pix/i);
+  // See `listPixCode`: the after-copy face hands the code to the clipboard
+  // rather than drawing it.
+  await expect(page.getByTestId('list-pix')).toBeVisible();
+  expect(await listPixCode(page)).toMatch(/br\.gov\.bcb\.pix/i);
 });
 
 Then('ela vê o formulário de cartão', async ({ page }) => {
-  // The tabs' `card-view`, or the card row's own fields on the list.
-  await expect(
-    page.getByTestId('card-view').or(page.getByTestId('payment-list').getByTestId('card-number')).first(),
-  ).toBeVisible();
+  // The card row's own fields.
+  await expect(page.getByTestId('payment-list').getByTestId('card-number')).toBeVisible();
 });
 
 Then('nenhum formulário de cartão é mostrado', async ({ page }) => {
@@ -172,12 +141,14 @@ Then('o recibo mostra o valor pago', async ({ page }) => {
 });
 
 Then('o pagamento falha', async ({ page }) => {
-  // The tabs' failure screen, or the refusal the list shows inside the card row.
+  // The confirmation's failure screen an issuer decline lands on, or the
+  // refusal the list keeps inside the card row.
   await expect(page.getByTestId('payment-failed').or(page.getByTestId('card-error')).first()).toBeVisible();
 });
 
 Then('ela pode tentar novamente', async ({ page }) => {
-  // The tabs' retry, or the list's bar back on "Pagar" beside the refusal.
+  // The failure screen's retry, or the list's bar back on "Pagar" beside the
+  // refusal — live either way.
   const retry = page.getByTestId('payment-retry').or(page.getByTestId('list-pay')).first();
   await expect(retry).toBeVisible();
   await expect(retry).toBeEnabled();
@@ -192,8 +163,6 @@ Then('não existe nenhum botão de pagar na tela', async ({ page }) => {
   // REMOVED, not disabled: a disabled control becomes live again on the next
   // render, and a live "Pagar R$ …" under "não pague de novo" is what a thumb
   // reaches for.
-  await expect(page.getByTestId('card-pay-bar')).toHaveCount(0);
-  await expect(page.getByTestId('card-pay')).toHaveCount(0);
   await expect(page.getByTestId('list-pay')).toHaveCount(0);
   await expect(page.getByTestId('list-charge-bar')).toHaveCount(0);
 });
@@ -210,7 +179,7 @@ Then('o erro do cartão menciona o outro meio de pagamento', async ({ page }) =>
 });
 
 Then('a opção PIX continua na tela', async ({ page }) => {
-  await expect(page.getByTestId('checkout-method-PIX').or(page.getByTestId('list-option-PIX')).first()).toBeVisible();
+  await expect(page.getByTestId('list-option-PIX')).toBeVisible();
 });
 
 Then('ela é avisada de que a loja não cobra online', async ({ page }) => {
@@ -223,7 +192,6 @@ Then('ela recebe a opção de chamar o garçom', async ({ page }) => {
 });
 
 Then('nenhuma forma de pagamento é oferecida', async ({ page }) => {
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
   await expect(page.locator('[data-testid^="list-option-"]')).toHaveCount(0);
   await expect(page.getByTestId('list-pay')).toHaveCount(0);
   await expect(page.getByTestId('card-view')).toHaveCount(0);

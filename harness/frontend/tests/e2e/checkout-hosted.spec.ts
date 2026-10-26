@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { openPage, reachPayment } from './helpers/checkout';
+import { chooseListOption, openPage, reachPayment } from './helpers/checkout';
 
 /**
  * The hosted handover, both legs (FUT-743 / FUT-556).
@@ -22,20 +22,20 @@ test('a REDIRECT chain asks for no method, and the departure is observable', asy
   await openPage(page, 'payments-checkout-redirect');
   await reachPayment(page);
 
-  // NO PICKER. Every method at this store mints the same checkout link, so the
-  // PIX-or-card question is only binding on the provider's own page — asking it
-  // here as well told the buyer their first answer decided something when it
-  // decided nothing.
-  await expect(page.getByTestId('checkout-method')).toHaveCount(0);
-  await expect(page.getByTestId('checkout-method-CARD')).toHaveCount(0);
+  // NO PIX-OR-CARD QUESTION. Every method at this store mints the same checkout
+  // link, so the choice is only binding on the provider's own page — the list
+  // draws the one hand-off row and no Pix or card row beside it.
+  await expect(page.getByTestId('list-option-HAND_OFF')).toBeVisible();
+  await expect(page.getByTestId('list-option-PIX')).toHaveCount(0);
+  await expect(page.getByTestId('list-option-CARD')).toHaveCount(0);
 
-  await page.getByTestId('checkout-handoff-start').click();
+  await chooseListOption(page, 'HAND_OFF');
+  await page.getByTestId('list-pay').click();
 
   // Nobody in this chain tokenizes in the browser, so the card is typed on the
   // provider's own page — asking for a PAN here would be asking for something
   // this store cannot mint an instrument from.
   await expect(page.getByTestId('card-number')).toHaveCount(0);
-  await expect(page.getByTestId('card-view')).toHaveCount(0);
 
   // The handover happened, and it is VISIBLE. A `location.assign` buried in a
   // hook leaves nothing to assert on at all.

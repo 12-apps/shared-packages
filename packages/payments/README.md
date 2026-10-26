@@ -8,7 +8,7 @@ deliberately shaped so it can later become a standalone application
 | package                   | contents |
 | ------------------------- | -------- |
 | `@12-apps/payments-backend`  | normalized charge/refund/webhook domain, per-provider adapters (PagBank, Stone, InfinitePay, Stripe, Itau), the gateway, merchant-scoped credential settings (masking, verify, single active provider), fetch-native HTTP handlers, storage ports with in-memory + Prisma implementations, and the OWNED Prisma schema fragment + migration |
-| `@12-apps/payments-frontend` | plug-and-play MUI components for the payment surfaces — `PaymentProviderSettings` (per-provider config page), `CheckoutPayment` (buyer payment step) and `CheckoutFlow` (the FULL three-step buyer checkout, host-composed through ports + design-system slots; see `ADOPTING.md` §3) — plus the headless hooks/clients they build on |
+| `@12-apps/payments-frontend` | plug-and-play MUI components for the payment surfaces — `PaymentProviderSettings` (per-provider config page) and `CheckoutFlow` / `createPaymentFlows().Checkout` (the buyer checkout: Pagamento as the one payment list, then the confirmation, host-composed through ports + design-system slots; see `ADOPTING.md` §3) — plus the headless hooks/clients they build on |
 
 Everything payment-related lives here: code, HTTP surface, UI, database
 schema, and migration. Hosts mount it; they don't re-implement any of it.
@@ -85,28 +85,24 @@ HOST owns auth and merchant attribution (it passes `{ merchant }` per call).
 
 ```tsx
 import {
-  PaymentsProvider, createPaymentsClient, createPaymentsSettingsClient,
-  CheckoutPayment, PaymentProviderSettings,
+  createPaymentFlows, createPaymentsSettingsClient, PaymentProviderSettings,
+  PT_BR_CHECKOUT_VIEW_COPY, PT_BR_PAYMENT_LIST_COPY,
 } from '@12-apps/payments-frontend';
 
 // Settings page (admin):
 <PaymentProviderSettings client={createPaymentsSettingsClient({ baseUrl: '/api/payments' })} />
 
-// Checkout page (buyer):
-<PaymentsProvider client={createPaymentsClient({ baseUrl: '/api/payments' })}>
-  <CheckoutPayment
-    reference={order.id}
-    amount={{ amountCents: total, currency: 'BRL' }}
-    customer={{ name, email, taxId }}
-    tokenizeCard={tokenizeForProvider} // host-injected per-provider tokenizer
-    onPaid={(charge) => confirmOrder(charge)}
-  />
-</PaymentsProvider>
+// Checkout page (buyer) — Pagamento is the one payment list:
+const flows = createPaymentFlows({
+  useCart, ports, copy,                                  // see ADOPTING.md §3
+  usePaymentList: () => ({ copy: PT_BR_PAYMENT_LIST_COPY }),
+});
+<flows.Checkout />
 ```
 
-Both components are theme-inheriting MUI; hosts that want their own pixels
-use the exported headless hooks (`useCreateCharge`, `useChargeStatus`) and
-clients instead.
+Both are theme-inheriting MUI; hosts that want their own pixels use the
+exported headless hooks (`useCreateCharge`, `useChargeStatus`) and clients
+instead.
 
 ### Money taken in person: `@12-apps/payments-frontend/tender-split`
 

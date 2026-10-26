@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
-import { buyerGateError } from "./buyer-gate";
 import type { ConfirmationWait } from "./confirmation-wait";
 import type { CheckoutDecline } from "./decline";
 import { forgetHostedOrder } from "./hosted-return";
-import type { CheckoutScreensCopy } from "./screens-copy";
 import type {
-  BuyerContact,
   BuyerField,
-  BuyerInfo,
-  CheckoutCustomerField,
   CheckoutOrder,
   OrderStatus,
   PaymentMethod,
@@ -27,39 +22,7 @@ import { useResumeEffect, type HostedResume } from "./use-hosted-resume";
  */
 
 /** Where the flow can be — the step ids, which are the flow's own contract. */
-export type Step = "dados" | "payment" | "status";
-
-/**
- * The flow's navigation actions, split out of {@link useCheckoutController} for
- * the 80-line per-function gate.
- *
- * `back` is where "the Dados step was skipped" has to be honoured: going back
- * off Pagamento normally lands on Dados, but for a buyer with a CPF on file
- * that step is not part of their flow, so the menu is the only honest
- * destination — until they open it themselves via `editBuyer` ("alterar" on the
- * payer block), after which it IS part of their flow and back returns to it.
- */
-export function useCheckoutNav(
-  taxIdOnFile: boolean,
-  goToMenu: () => void,
-  setStep: Dispatch<SetStateAction<Step>>,
-): { back: () => void; editBuyer: (() => void) | undefined } {
-  const [dadosOpened, setDadosOpened] = useState(false);
-  const openDados = useCallback(() => {
-    setDadosOpened(true);
-    setStep("dados");
-  }, [setStep]);
-  const back = useCallback(() => {
-    setStep((current) => {
-      if (current === "payment" && (!taxIdOnFile || dadosOpened)) return "dados";
-      goToMenu();
-      return current;
-    });
-  }, [dadosOpened, goToMenu, setStep, taxIdOnFile]);
-  // Undefined unless Dados was skipped — the payer block keys off its presence,
-  // so the decision lives here rather than being re-derived by every caller.
-  return { back, editBuyer: taxIdOnFile ? openDados : undefined };
-}
+export type Step = "payment" | "status";
 
 /**
  * WHAT THE CONFIRMATION SCREEN KNOWS ABOUT ITS WAIT, from whichever wait is
@@ -203,43 +166,6 @@ export function useCreateFailure() {
   return { message, field, code, clear, fail };
 }
 
-
-/**
- * "Continuar" on the Dados step: gate on what the store's chain demands, then
- * PERSIST the buyer's details before advancing.
- *
- * The write happens HERE and not when a payment is raised, because everything
- * after this step can fail — no provider configured, a declined card, an
- * abandoned PIX, a closed tab — and the details must survive all of it.
- * Fire-and-forget on purpose: making the buyer wait on the write, or blocking
- * them when it fails, would trade the bug for a worse one. Gated on the
- * "salvar meus dados" consent (LGPD), which is what the checkbox means.
- */
-export function useGoToPayment(input: {
-  buyer: BuyerInfo;
-  buyerFields: readonly CheckoutCustomerField[];
-  taxIdOnFile: boolean;
-  saveProfile: boolean;
-  saveBuyerContact: ((contact: BuyerContact) => void) | undefined;
-  validation: CheckoutScreensCopy["validation"];
-  failure: { clear: () => void; fail: (next: { message: string; field?: BuyerField | null }) => void };
-  setStep: Dispatch<SetStateAction<Step>>;
-}): () => void {
-  const { buyer, buyerFields, taxIdOnFile, saveProfile, saveBuyerContact } = input;
-  const { validation, failure, setStep } = input;
-  return useCallback(() => {
-    failure.clear();
-    const complaint = buyerGateError(validation, buyer, buyerFields, taxIdOnFile);
-    if (complaint) {
-      failure.fail(complaint);
-      return;
-    }
-    if (saveProfile) {
-      saveBuyerContact?.({ name: buyer.name, phone: buyer.phone, taxId: buyer.taxId });
-    }
-    setStep("payment");
-  }, [buyer, buyerFields, saveProfile, taxIdOnFile, failure, saveBuyerContact, validation, setStep]);
-}
 
 /**
  * "Tentar novamente" after a refusal — and WHICH order it goes against.

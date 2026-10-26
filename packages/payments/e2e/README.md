@@ -114,14 +114,11 @@ Four things about the list a host has to provide for:
   funding draws `list-option-CARD-CREDIT` and `list-option-CARD-DEBIT` instead,
   and the card steps do not choose between those.
 
-Every step still answers for the older Dados step and Pix/Cartão tabs, so a
-host can move its stores to the list without its journeys changing; that path
-goes when the tabs are deleted. On the tabs, `open` returns with the buyer **on the Dados step**, the
-store's checkout config already resolved, and every field the chain requires
-filled in **except the CPF** — the packaged steps type the CPF when the form
-asks for one, and press Continuar. Which other fields a chain requires (a mobile
-phone, a name, an e-mail) is a fact about the store you built. A buyer with a
-CPF on file skips Dados entirely, so do not arrive with one.
+Which other fields a chain requires (a mobile phone, a name, an e-mail) is a
+fact about the store you built, so `open` fills them. A buyer with a CPF on file
+gets the payer line instead of the CPF field, so do not arrive with one. The
+Dados step and the Pix/Cartão tabs the steps once also drove are gone from
+`@12-apps/payments-frontend` (FUT-4028), and so are their branches here.
 
 ## `PaymentsStore` — the shapes a scenario asks for
 

@@ -228,6 +228,29 @@ describe("a stale Pix in the list", () => {
     const sentence = within(veiled.closest("[data-testid=pix-stale-veil]") as HTMLElement).getByText("Atualize para gerar um novo Pix");
     expect(sentence.hasAttribute("data-ui-overlay")).toBe(true);
   });
+
+  // Moved from the tabbed checkout's `pix-stale-veil.test.tsx` (FUT-3535) when
+  // the tabs went (FUT-4028): the after-copy face refuses a stale copy too.
+  it("refuses the after-copy face's copy once the cart moved, and veils its QR", async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const host = { config: onPageStore(), client: stubClient(), createOrder: raising(), basket: "l1x1" };
+    const { rerender } = renderList(host);
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    fireEvent.click(payButton());
+    fireEvent.click(await screen.findByTestId("list-pix-code"));
+    await screen.findByTestId("pix-after-copy");
+    // The first copy, before the cart moved, is the only one there may be.
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    rerender(listFlow({ ...host, basket: "l1x3" }));
+    const again = screen.getByTestId("pix-copy-again") as HTMLButtonElement;
+    await waitFor(() => expect(again.disabled).toBe(true));
+    fireEvent.click(again);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("pix-stale-veil").length).toBeGreaterThan(0);
+  });
 });
 
 describe("the focus", () => {

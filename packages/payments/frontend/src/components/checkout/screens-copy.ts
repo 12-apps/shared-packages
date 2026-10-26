@@ -36,8 +36,7 @@ export interface MethodPickerCopy {
   cardLabel: string;
   /**
    * What each method is like to use. The checkout's tiles no longer draw it
-   * (the 2026-10-06 Pix redesign kept the picker to one line); the flow
-   * pipeline's method list (`flows/pipeline/methods.ts`) still says it.
+   * (the 2026-10-06 Pix redesign kept the picker to one line).
    */
   pixDescription: string;
   /**
@@ -273,7 +272,6 @@ export interface HostedHandoverCopy {
   handoff(destination: string, choice: string): string;
   /** What happens after they pay over there. */
   afterwards: string;
-  startAction: string;
   preparing: string;
 }
 
@@ -323,7 +321,7 @@ export interface CheckoutValidationCopy {
  * payment on a computer, and the phone's header, total and pay bar.
  */
 export interface PaymentLayoutCopy {
-  /** Over the method tabs on a computer. */
+  /** Over the payment list on a computer. */
   payHeading: string;
   /** The summary card's title. */
   summaryTitle: string;

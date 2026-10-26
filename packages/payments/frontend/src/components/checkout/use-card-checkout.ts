@@ -26,7 +26,6 @@ import { useCardPublicKey, useSavedCards } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
-import { useOneClickArmed, useOneClickPay } from "./one-click";
 import type { BuyerInfo, ChargeCardInput, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
 import { authenticateDebit, type DebitAuthentication } from "./debit-charge";
 import type { CheckoutClient } from "./transport";
@@ -329,13 +328,6 @@ export function useCardCheckout(
     providerChain,
     scope,
   );
-  // The tap a one-click buyer already made (`./one-click.tsx`). Nothing about
-  // the charge differs — this only presses the button, and only while a SAVED
-  // card is the selection, which is a state the picker reaches exactly when the
-  // instrument list came back with something. A buyer with no saved card is
-  // left on the form, which is the ordinary step 2.
-  const ready = !usingNewCard && !submit.submitting && !submit.submitted && submit.error === null;
-  useOneClickPay({ armed: useOneClickArmed(), ready, pay: submit.handlePay });
 
   return {
     savedCards,

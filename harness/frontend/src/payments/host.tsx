@@ -123,33 +123,12 @@ export interface HarnessHost {
   /** With `storefront`: the buyer holds store credit, paying part of the cart (FUT-3711). */
   storeCredit?: boolean;
   /**
-   * Draw Pagamento as the ONE list (`paymentList`) rather than the Dados step
-   * and the Pix/Cartão tabs (FUT-4028). Omitted ⇒ whatever the page's URL
-   * asks — see {@link listRequested}. `storefront` always draws the list.
-   */
-  paymentList?: boolean;
-  /**
-   * On the list: the host's Pix bank flow (`pixBank`, FUT-3612), as the origin
+   * The host's Pix bank flow (`pixBank`, FUT-3612), as the origin
    * host passes it. The bar's button then GENERATES AND COPIES the code, and
    * the Pix opens on its after-copy face ("Código Pix copiado"), whose QR is
    * one tap away ("Ver QR code"). Off a phone, so no bank app is opened.
    */
   pixBank?: boolean;
-}
-
-/**
- * `?checkout=list` in the page's real query string puts every checkout on the
- * page on the ONE list (FUT-4028), whatever its store.
- *
- * It is how the packaged journeys run here: `tests/e2e/steps/payments-world.ts`
- * opens every store with it, because a host's every purchase now goes through
- * the list, and the journeys have to prove the list, not the tabs it replaces.
- * The hand-written specs still open the same pages without it, on the tabs,
- * until the tabs are deleted. The REAL query, not the hash's: a case switch
- * rewrites the hash, and the choice has to survive it.
- */
-function listRequested(): boolean {
-  return new URLSearchParams(window.location.search).get('checkout') === 'list';
 }
 
 /** The bank flow with no bank remembered, on a computer: generate-and-copy only. */
@@ -215,11 +194,11 @@ export function harnessFlowsConfig(
     components: host.components ?? (host.storefront ? STOREFRONT_SLOTS : undefined),
     // The one list, read as a hook every render, as the origin host's entrega mounts it.
     // A door send places nothing here: the harness has no pedido to raise at the door.
-    ...(host.storefront
-      ? { usePaymentList: () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit) }
-      : (host.paymentList ?? listRequested())
-        ? { usePaymentList: () => useHarnessPaymentList(amountCents, host.pixBank ?? false) }
-        : {}),
+    // Every page's Pagamento is the one list (FUT-4028): dressed as the origin
+    // host's storefront with `storefront`, the package's own pack otherwise.
+    usePaymentList: host.storefront
+      ? () => useStorefrontPaymentList(amountCents, () => undefined, host.storeCredit)
+      : () => useHarnessPaymentList(amountCents, host.pixBank ?? false),
     // Required now, and stated by THIS host in its own words. It used to be
     // omitted, which meant rendering the package's pt-BR default — another
     // product's restaurant vocabulary — while claiming to be an independent

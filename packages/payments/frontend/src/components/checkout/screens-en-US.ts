@@ -147,7 +147,6 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     handoff: (destination, choice) => `You will be taken ${destination}${choice}.`,
     afterwards:
       'Once the payment goes through, you come back here and we confirm the order.',
-    startAction: 'Continue to payment',
     preparing: 'Preparing the payment',
   },
   transport: {

@@ -22,18 +22,12 @@ import {
   useOrderRefresh,
   useRefreshOnCartChanged,
 } from "../cart-changed";
-import { CheckoutClientProvider } from "../client-context";
-import { CheckoutFlow } from "../checkout-flow";
-import { PaymentStep } from "../checkout-steps";
-import { PT_BR_CHECKOUT_VIEW_COPY } from "../pt-BR";
-import type { CheckoutClient } from "../transport";
-import type { CheckoutOrder, CreateOrderResult, OrderStatus } from "../types";
-import type { Result } from "../../../result";
+import type { CheckoutOrder, CreateOrderResult, SettlementCheckout } from "../types";
+import { listFlow, onPageStore, renderList, stubClient } from "./list-harness";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "./test-utils";
 
 /** Far enough out that a real-timer run never meets an expired code. */
 const EXPIRES_AT = "2099-01-01T00:00:00.000Z";
-const AWAITING: Result<OrderStatus> = { ok: true, data: "AWAITING_PAYMENT" };
 
 function order(id: string, method: "PIX" | "CARD", totalCents: number): CheckoutOrder {
   return {
@@ -51,61 +45,8 @@ function order(id: string, method: "PIX" | "CARD", totalCents: number): Checkout
   };
 }
 
-const CLIENT = { getStatus: async () => AWAITING } as unknown as CheckoutClient;
-
-function Wrapper({ children }: { children: ReactNode }): JSX.Element {
-  return <CheckoutClientProvider client={CLIENT}>{children}</CheckoutClientProvider>;
-}
-
-
 beforeEach(() => window.sessionStorage.clear());
 afterEach(cleanup);
-
-// REAL timers here: the absences below are asserted through `waitFor`, which
-// cannot advance a faked clock.
-describe("a PIX code raised from a basket the buyer has since changed (FUT-1139)", () => {
-  function flow(signature: string, createOrder: () => Promise<CreateOrderResult>): JSX.Element {
-    return (
-      <CheckoutFlow
-        copy={PT_BR_CHECKOUT_VIEW_COPY}
-        cart={{ empty: false, totalLabel: "R$ 6,90", totalItems: 1, identity: { signature, ready: true } }}
-        createOrder={createOrder}
-        onExitToMenu={vi.fn()}
-        taxIdOnFile
-      />
-    );
-  }
-
-  it("says so, and mints a code for the cart as it stands", async () => {
-    const raised = [order("o1", "PIX", 690), order("o1", "PIX", 2070)];
-    const createOrder = vi.fn(async (): Promise<CreateOrderResult> => ({ ok: true, data: raised.shift()! }));
-    const { rerender } = render(flow("l1x1", createOrder), { wrapper: Wrapper });
-    fireEvent.click(screen.getByTestId("checkout-method-PIX"));
-    await screen.findByTestId("pix-view");
-    await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed")).toBeNull());
-
-    // Another tab took the same line to three.
-    rerender(flow("l1x3", createOrder));
-    expect((await screen.findByTestId("checkout-cart-changed")).textContent).toContain("Seu carrinho mudou");
-
-    fireEvent.click(screen.getByTestId("checkout-cart-changed-refresh"));
-    await waitFor(() => expect(createOrder).toHaveBeenCalledTimes(2));
-    expect(createOrder).toHaveBeenLastCalledWith(expect.objectContaining({ method: "PIX" }));
-    // The new code is for the new basket, so there is nothing left to warn about.
-    await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed")).toBeNull());
-    expect(screen.getByTestId("pix-view")).toBeTruthy();
-  });
-
-  it("stays quiet while the basket is the one the code was raised from", async () => {
-    const createOrder = vi.fn(async (): Promise<CreateOrderResult> => ({ ok: true, data: order("o1", "PIX", 690) }));
-    const { rerender } = render(flow("l1x1", createOrder), { wrapper: Wrapper });
-    fireEvent.click(screen.getByTestId("checkout-method-PIX"));
-    await screen.findByTestId("pix-view");
-    // A re-read of the same cart (the focus refresh) hands back an equal signature.
-    rerender(flow("l1x1", createOrder));
-    await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed")).toBeNull());
-  });
-});
 
 describe("useBasketChanged", () => {
   it("never warns before the host's cart has answered, nor without a basket at all", () => {
@@ -334,27 +275,23 @@ describe("the warning's own states", () => {
   });
 
   it("never warns on a settlement, which pays a balance rather than the cart", async () => {
-    const settling = order("o1", "PIX", 690);
-    const step = (signature: string): JSX.Element => (
-      <PaymentStep
-        method="PIX"
-        onMethodChange={vi.fn()}
-        order={settling}
-        buyer={{}}
-        creating={false}
-        createError={null}
-        errorField={null}
-        onGenerate={vi.fn()}
-        onUseEmail={vi.fn()}
-        providerConfig={null}
-        totalOverride={{ label: "R$ 6,90", items: 1 }}
-        basket={{ signature, ready: true }}
-        onResolved={vi.fn()}
-      />
-    );
-    const { rerender } = render(step("l1x1"), { wrapper: Wrapper });
-    await screen.findByTestId("pix-view");
-    rerender(step("l1x3"));
+    // On the one list (FUT-4028): the conta is raised as a Pix, then the cart
+    // under it changes — the balance being paid did not, so nothing is stale.
+    const createOrder = vi.fn(async (): Promise<CreateOrderResult> => ({ ok: true, data: order("o1", "PIX", 690) }));
+    const host = {
+      config: onPageStore(),
+      client: stubClient(),
+      createOrder,
+      basket: "l1x1",
+      settlement: { totalLabel: "R$ 6,90", totalItems: 1 } as SettlementCheckout,
+    };
+    const { rerender } = renderList(host);
+    await screen.findByTestId("payment-list");
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await screen.findByTestId("list-pix");
+    rerender(listFlow({ ...host, basket: "l1x3" }));
     await waitFor(() => expect(screen.queryByTestId("checkout-cart-changed")).toBeNull());
+    expect(screen.getByTestId("list-pay").textContent).not.toBe("Atualizar pagamento");
   });
 });

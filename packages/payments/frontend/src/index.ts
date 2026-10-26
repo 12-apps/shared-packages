@@ -31,31 +31,13 @@ export {
   type PaymentsProviderProps,
 } from './context';
 
-export {
-  CheckoutPayment,
-  type CardFormValues,
-  type CheckoutPaymentProps,
-  type SavedCardOption,
-} from './components/CheckoutPayment';
-// The words that step renders — required on the prop above, so a host wiring
-// the legacy surface has to answer them (FUT-760).
-export type {
-  CheckoutPaymentCopy,
-  LegacyCardCopy,
-  LegacyMethodCopy,
-  LegacyMoneyCopy,
-  LegacyPixCopy,
-  LegacyRefusalCopy,
-} from './components/checkout-payment-copy';
-export { PT_BR_CHECKOUT_PAYMENT_COPY } from './components/checkout-payment-pt-BR';
-
 // ---------------------------------------------------------------------------
-// The buyer checkout surface (FUT-564) — the storefront's three-step flow,
-// mounted by a host in one line. See ADOPTING.md §3 for the ports and the
+// The buyer checkout surface (FUT-564) — Pagamento as the one payment list,
+// then the confirmation (FUT-4028), mounted by a host in one line. See ADOPTING.md §3 for the ports and the
 // design-system slot contract.
 // ---------------------------------------------------------------------------
 export { CheckoutFlow, type CheckoutCartView, type CheckoutFlowProps } from './components/checkout/checkout-flow';
-// The Pagamento step as ONE list (FUT-3591/3592) — opt-in via `CheckoutFlowProps.paymentList`.
+// The Pagamento step as ONE list (FUT-3591/3592) — `CheckoutFlowProps.paymentList`, required.
 export type { CheckoutBillingAddress, CheckoutDoorOption, CheckoutDoorRowControls, CheckoutListChoice, CheckoutListHold, CheckoutOnlineChoice, CheckoutPaymentList, CheckoutPixBank, PaymentListCopy, PaymentListDebitCopy, PixBankCopy, PixBankId, PixBankName } from './components/checkout/list/types';
 export { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
 export type { BackActionEmphasis } from './components/checkout/payment-status-parts';
@@ -91,9 +73,8 @@ export { type CheckoutHostPorts } from './components/checkout/use-checkout-contr
 // that host's remedy actually is. The component this line used to export was a
 // second copy of the same screen with the origin host's dining room in its API.
 export type {
-  CheckoutStepperCopy,
+  CheckoutConsentCopy,
   CheckoutViewCopy,
-  DadosStepCopy,
   EmptyCartCopy,
   PaymentStatusCopy,
   StatusOutcomeCopy,

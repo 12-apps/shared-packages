@@ -15,6 +15,8 @@ import type { JSX, ReactNode } from "react";
 
 import { CheckoutClientProvider } from "../client-context";
 import { CheckoutFlow } from "../checkout-flow";
+import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
+import { onPageStore } from "./list-harness";
 import { EN_US_PAYMENT_STATUS_COPY } from "../en-US";
 import { PaymentStatus } from "../payment-status";
 import { PT_BR_CHECKOUT_VIEW_COPY, PT_BR_PAYMENT_STATUS_COPY } from "../pt-BR";
@@ -154,6 +156,8 @@ function manualPixServer(): {
   };
   const client = {
     getStatus: async () => ({ ok: true as const, data: state.status }),
+    // The list reads the buyer's saved cards; this store has none.
+    listInstruments: async () => [],
   } as unknown as CheckoutClient;
   return {
     client,
@@ -196,10 +200,14 @@ describe("the checkout flow, end to end", () => {
         createOrder={server.createOrder}
         onExitToMenu={vi.fn()}
         taxIdOnFile
+        providerConfig={onPageStore({ methods: ["PIX"] })}
+        paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY }}
       />,
       { wrapper: withClient(server.client) },
     );
-    fireEvent.click(screen.getByTestId("checkout-method-PIX"));
+    await elapse(0);
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
     await elapse(0);
     expect(screen.getByTestId("pix-view")).toBeTruthy();
 

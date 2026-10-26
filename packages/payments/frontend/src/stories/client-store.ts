@@ -7,8 +7,8 @@
  *
  * `store.ts` serves the FUT-741 checkout mount (`createPaymentFlowsBE`:
  * `/config`, `/charge`, `/status`, …). The headless client and everything
- * built on it — `createPaymentsClient`, `PaymentsProvider` + its hooks,
- * `CheckoutPayment` — predate that mount and speak a DIFFERENT published
+ * built on it — `createPaymentsClient`, `PaymentsProvider` + its hooks —
+ * predate that mount and speak a DIFFERENT published
  * wire: `GET /config`, `POST /charges`, `GET /charges/:provider/:chargeId`
  * on the host's `mountPayments` prefix. A story about them therefore runs
  * the REAL `createPaymentsHttp` handlers behind the REAL `mountPayments`

@@ -37,7 +37,6 @@ import type {
   CreateOrderRequest,
   CreateOrderResult,
   OrderStatus,
-  PaymentMethod,
 } from "../components/checkout/types";
 import type {
   CheckoutTransportBinding,
@@ -47,7 +46,6 @@ import type { useCheckoutController } from "../components/checkout/use-checkout-
 import type { Result } from "../result";
 
 import type { CheckoutCopyFE } from "./copy";
-import type { CheckoutPipelineConfig, GateVerdict } from "./pipeline/types";
 
 /** The host's remedy on the unavailable screen, and its veto over a live chain. */
 export interface CheckoutAvailability {
@@ -91,17 +89,8 @@ export interface CheckoutPorts {
   useAvailability?(): CheckoutAvailability;
 }
 
-/**
- * What `createPaymentFlows` is configured with.
- *
- * It extends {@link CheckoutPipelineConfig}, whose every key is OPTIONAL: set
- * one and `Checkout` renders through the checkout PIPELINE (FUT-1240); set
- * none and it renders exactly the `CheckoutFlow` it always did, with the same
- * pixels and the same test ids. That is the whole meaning of the pipeline
- * landing additively — a host adopts it when it has a step, a gate or a
- * settlement method of its own to register, and not a release earlier.
- */
-export interface PaymentFlowsConfig extends CheckoutPipelineConfig {
+/** What `createPaymentFlows` is configured with. */
+export interface PaymentFlowsConfig {
   /** Where the `createPaymentFlowsBE` mount lives. Default `/api/checkout`. */
   transport?: CheckoutTransportBinding;
 
@@ -118,11 +107,14 @@ export interface PaymentFlowsConfig extends CheckoutPipelineConfig {
   /** Present ⇒ this checkout settles a settlement rather than the cart. */
   useSettlement?(): SettlementCheckout | null;
   /**
-   * The Pagamento step as ONE list (FUT-3591) — `CheckoutFlowProps.paymentList`,
-   * read through a HOOK because the host's door options follow its own state.
-   * Absent, or answering `undefined`, keeps the method tabs.
+   * The Pagamento step, which is ONE list (FUT-3591) —
+   * `CheckoutFlowProps.paymentList`, read through a HOOK because the host's
+   * door options follow its own state. REQUIRED to mount `Checkout`
+   * (FUT-4028): there is no other Pagamento, and `Checkout` throws without
+   * it. Optional only so a host that mounts just `screens` (a Pix pane, a card
+   * pane) is not asked for a checkout it never draws.
    */
-  usePaymentList?(): CheckoutPaymentList | undefined;
+  usePaymentList?(): CheckoutPaymentList;
 
   /** Design-system slots, filled ONCE instead of per screen. */
   components?: Partial<CheckoutComponents>;
@@ -181,28 +173,14 @@ export interface BoundCheckoutClient {
   refreshBrowserKey(input: { orderId: string }): Promise<Result<{ publicKey: string | null }>>;
 }
 
-/** What the schema-derived buyer form renders. */
-export interface BuyerDetailsProps {
-  value: BuyerInfo;
-  onChange(b: BuyerInfo): void;
-  /** Narrows the chain's declaration to this method (FUT-595); `null` ⇒ union. */
-  method: PaymentMethod | null;
-  onContinue(): void;
-  /** A server refusal to echo onto the offending input (MISSING_BUYER_FIELD). */
-  error?: { field: "cpf" | "email" | "name" | "phone"; message: string } | null;
-}
-
 /** The screens a host may nest itself. Every one works standalone. */
 export interface CheckoutScreens {
-  MethodChoice: ComponentType<{ value: PaymentMethod | null; onChange(m: PaymentMethod): void }>;
-  BuyerDetails: ComponentType<BuyerDetailsProps>;
   CardEntry: ComponentType<{ payable: CheckoutOrder; onResolved(s: OrderStatus): void }>;
   PixPayment: ComponentType<{ payable: CheckoutOrder; onResolved(s: OrderStatus): void }>;
   HostedHandoff: ComponentType<{ url: string; payable: CheckoutOrder; onCancel?(): void }>;
   HostedReturn: ComponentType<{ onResolved(s: OrderStatus): void }>;
   PaymentStatus: ComponentType<{ status: OrderStatus | null; payable?: CheckoutOrder | null }>;
   PaymentsUnavailable: ComponentType<Record<string, never>>;
-  PayerSummary: ComponentType<{ buyer: BuyerInfo; onEdit?(): void }>;
   SavedCards: ComponentType<{ selection: string; onSelect(id: string): void }>;
   EmptyCart: ComponentType<Record<string, never>>;
   /**
@@ -234,19 +212,6 @@ export interface PaymentFlows {
   screens: CheckoutScreens;
   /** The flow controller, pre-bound to the ports — the easy path is not the only path. */
   useCheckout(): CheckoutController;
-  /**
-   * MAY THIS SHOPPER CHECK OUT — the registered gate list, headless (FUT-1240).
-   *
-   * The same list, in the same order, that `Checkout` runs before it renders
-   * anything. Exported so the surfaces that OFFER a checkout — a cart
-   * drawer's CTA, a buy-now button — consume the answer the checkout will
-   * give rather than a second one of their own. Two surfaces deciding this
-   * separately is how a storefront ends up offering a checkout the checkout
-   * itself refuses.
-   *
-   * A host that registered no gates always passes.
-   */
-  useAdmission(): GateVerdict;
   useCheckoutConfig(): CheckoutConfigState;
   client: BoundCheckoutClient;
 }

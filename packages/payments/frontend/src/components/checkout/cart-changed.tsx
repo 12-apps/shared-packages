@@ -82,7 +82,7 @@ export function useBasketChanged(
 }
 
 /** The step's "bring this payment up to date", with what the buyer must see of it. */
-export interface OrderRefresh {
+interface OrderRefresh {
   run: () => void;
   /** A refresh is on its way — the control waits rather than firing twice. */
   pending: boolean;

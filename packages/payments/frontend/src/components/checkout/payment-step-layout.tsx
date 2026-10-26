@@ -77,7 +77,7 @@ export function usePaymentPixStage(
 export const WIDE_CHECKOUT_MIN = 900;
 
 /** The phone panel's padding, in px — the sticky pay bar reaches past it. */
-export const PANEL_PAD_PHONE = 16;
+const PANEL_PAD_PHONE = 16;
 
 interface CheckoutLayout {
   wide: boolean;
@@ -119,8 +119,6 @@ export function useWideLayout(): [boolean, (element: HTMLElement | null) => void
 
 /** The amount the phone's pay bar shows beside its button; set by the Pagamento step. */
 const PayBarTotalContext = createContext<string | null>(null);
-
-export const PayBarTotalProvider = PayBarTotalContext.Provider;
 
 /**
  * The phone's sticky pay bar (FUT-3525): "Total" over the amount at its left,

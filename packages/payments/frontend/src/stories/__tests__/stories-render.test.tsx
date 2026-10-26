@@ -34,7 +34,6 @@ import * as compositionStories from "../Composition.stories";
 import * as connectionStories from "../Connection.stories";
 import * as headlessStories from "../Headless.stories";
 import * as hostedStories from "../Hosted.stories";
-import * as legacyStories from "../Legacy.stories";
 import * as paymentListStories from "../PaymentList.stories";
 import * as paymentListStatesStories from "../PaymentListStates.stories";
 import * as paymentListWalletsStories from "../PaymentListWallets.stories";
@@ -98,7 +97,6 @@ function moduleEntries(): [string, Record<string, unknown>][] {
     ["Priorities", priorityStories],
     ["SetupGuide", setupGuideStories],
     ["Wallets", walletStories],
-    ["Legacy", legacyStories],
     ["Headless", headlessStories],
     ["TenderSplit", tenderSplitStories],
     ["PaymentList", paymentListStories],

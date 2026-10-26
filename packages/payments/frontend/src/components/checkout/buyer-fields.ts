@@ -42,7 +42,7 @@ function fieldsOf(
   method: PaymentMethod | null,
 ): readonly CheckoutCustomerField[] {
   const declared = link.customerSchema ?? [];
-  // No method chosen yet (the Dados step opens before the picker): collect the
+  // No method chosen yet (the list opens before a row is picked): collect the
   // union across every method, which is the up-front collection FUT-595 asks
   // for — a form that has to be re-opened after the method is picked is the
   // double typing this exists to remove.

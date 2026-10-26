@@ -40,20 +40,26 @@ export interface RenderExpectation {
   empty?: true;
 }
 
-/** The Dados step at rest — where most full-flow checkout stories open. */
-const DADOS_STEP: RenderExpectation = {
-  testIds: ["checkout-stepper", "buyer-cpf", "checkout-pay-bar", "checkout-continue"],
-  text: ["Informe seu CPF (obrigatório para o pagamento)."],
+/** The list's top for a buyer with no CPF on file: the CPF field and the bar. */
+const LIST_TOP = ["payment-list", "list-buyer-taxId", "list-pay"] as const;
+
+/** Pagamento — the one list — at rest for a new buyer, offering both methods. */
+const LIST_NEW_BUYER: RenderExpectation = {
+  testIds: [...LIST_TOP, "list-option-PIX", "list-option-CARD"],
+  absentTestIds: ["checkout-continue", "checkout-method"],
 };
 
 export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // -------------------------------------------------------------- Checkout
-  // `/config` stalling or failing must fail OPEN: the buyer form renders, no
-  // error is raised — so the marker for both gates is the ordinary Dados step.
-  "Checkout/ConfigPending": DADOS_STEP,
-  "Checkout/ConfigFailed": DADOS_STEP,
+  // Every full-flow story opens on Pagamento, which is the one list (FUT-4028):
+  // the CPF at its top for a new buyer, then the rows the chain can drive.
+  // `/config` stalling holds the list on its loading face; failing fails OPEN
+  // to the ordinary rows — no error is raised.
+  "Checkout/ConfigPending": { testIds: ["payment-list-loading", "list-pay"] },
+  "Checkout/ConfigFailed": LIST_NEW_BUYER,
   "Checkout/NoProviderConnected": {
     testIds: ["checkout-payments-disabled"],
+    absentTestIds: ["payment-list"],
     text: ["Pagamento online indisponível"],
   },
   "Checkout/NoProviderWithRemedy": {
@@ -62,84 +68,50 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "Checkout/HostVetoWithLiveChain": {
     testIds: ["checkout-payments-disabled"],
+    absentTestIds: ["payment-list"],
     text: ["Pagamento online indisponível"],
   },
-  // The chain-shape stories open on Dados; their differences are one
-  // Continuar away (the method tiles, the card form, the failure copy).
-  "Checkout/PixOnly": DADOS_STEP,
-  "Checkout/CardOnly": DADOS_STEP,
-  "Checkout/PixAndCard": DADOS_STEP,
-  "Checkout/StubTokenizationGranted": DADOS_STEP,
-  "Checkout/TokenizationNone": DADOS_STEP,
-  "Checkout/RedirectChain": DADOS_STEP,
-  "Checkout/TwoMintableProviders": DADOS_STEP,
-  "Checkout/RedirectHeadMintableTail": DADOS_STEP,
-  "Checkout/IssuerDecline": DADOS_STEP,
-  "Checkout/PaymentUnresolved": DADOS_STEP,
-  "Checkout/PaymentUnavailable": DADOS_STEP,
-  "Checkout/RequiresTaxId": DADOS_STEP,
+  // The chain-shape stories differ in the rows the list draws.
+  "Checkout/PixOnly": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-PIX"], absentTestIds: ["list-option-CARD"] },
+  "Checkout/CardOnly": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"], absentTestIds: ["list-option-PIX"] },
+  "Checkout/PixAndCard": LIST_NEW_BUYER,
+  "Checkout/StubTokenizationGranted": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
+  "Checkout/TokenizationNone": LIST_NEW_BUYER,
+  "Checkout/RedirectChain": {
+    testIds: [...LIST_TOP, "list-option-HAND_OFF"],
+    absentTestIds: ["list-option-PIX", "list-option-CARD"],
+    text: ["Você paga na página da aurora"],
+  },
+  "Checkout/TwoMintableProviders": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
+  "Checkout/RedirectHeadMintableTail": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
+  "Checkout/IssuerDecline": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
+  "Checkout/PaymentUnresolved": LIST_NEW_BUYER,
+  "Checkout/PaymentUnavailable": LIST_NEW_BUYER,
+  "Checkout/RequiresTaxId": LIST_NEW_BUYER,
+  // A chain that asks a phone and no CPF: no CPF at the top; the phone is the
+  // row's own field once a row is chosen.
   "Checkout/RequiresPhone": {
-    testIds: ["buyer-phone"],
-    absentTestIds: ["buyer-cpf"],
-    text: ["Informe seu telefone (obrigatório para o pagamento)."],
+    testIds: ["payment-list", "list-option-PIX", "list-option-CARD"],
+    absentTestIds: ["list-buyer-taxId"],
   },
   "Checkout/RequiresNothing": {
-    absentTestIds: ["buyer-cpf"],
-    text: ["Nome, e-mail e telefone são opcionais"],
-  },
-  // Dados is skipped (CPF on file), so the server's 400 already rendered.
-  "Checkout/MissingBuyerFieldFromServer": {
-    testIds: ["checkout-payer", "checkout-error", "checkout-retry-payment"],
-    text: ["Informe: taxId."],
+    testIds: ["payment-list", "list-option-PIX", "list-option-CARD"],
+    absentTestIds: ["list-buyer-taxId"],
   },
   "Checkout/EmptyCartFlow": { testIds: ["checkout-empty", "checkout-empty-back"] },
-  "Checkout/ComandaTable": { testIds: ["checkout-pay-bar"], text: ["R$ 214,00"] },
-  "Checkout/ComandaMine": { testIds: ["checkout-pay-bar"], text: ["R$ 62,50"] },
-  "Checkout/HostDiscountLines": {
-    testIds: ["checkout-pay-bar"],
-    text: ["Cupom BEMVINDO · −R$ 7,50"],
-  },
+  "Checkout/ComandaTable": { testIds: ["payment-list", "list-bar-total"], text: ["R$ 214,00"] },
+  "Checkout/ComandaMine": { testIds: ["payment-list", "list-bar-total"], text: ["R$ 62,50"] },
+  "Checkout/HostDiscountLines": { testIds: ["payment-list", "list-bar-total"] },
   "Checkout/TaxIdOnFile": {
-    testIds: ["checkout-payer", "checkout-method", "checkout-method-PIX", "checkout-method-CARD"],
-    // The phone frame's payer chip (FUT-3525); "Pagando como" is its accessible name.
+    testIds: ["list-payer", "list-payer-change", "list-option-PIX", "list-option-CARD"],
+    absentTestIds: ["list-buyer-taxId"],
     text: ["Ana Compradora · CPF ✓"],
   },
-  "Checkout/SavedCardsAvailable": DADOS_STEP,
-  "Checkout/SavedCardNotUsableHere": DADOS_STEP,
-  "Checkout/ConfirmationExtra": DADOS_STEP,
+  "Checkout/SavedCardsAvailable": { testIds: [...LIST_TOP, "list-option-CARD", "list-card-card_1", "list-card-card_2", "list-card-new"] },
+  "Checkout/SavedCardNotUsableHere": { testIds: [...LIST_TOP, "list-option-CARD", "list-card-card_1", "list-card-new"] },
+  "Checkout/ConfirmationExtra": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
 
   // --------------------------------------------------------------- Screens
-  "Screens/MethodChoiceBoth": {
-    testIds: ["checkout-method-PIX", "checkout-method-CARD"],
-    text: ["escolhido: —"],
-  },
-  "Screens/MethodChoicePixOnly": {
-    testIds: ["checkout-method-PIX"],
-    absentTestIds: ["checkout-method-CARD"],
-    text: ["escolhido: PIX"],
-  },
-  "Screens/MethodChoiceCardUnmintable": {
-    testIds: ["checkout-method-CARD"],
-    text: ["Indisponível nesta loja", "escolhido: PIX"],
-  },
-  "Screens/BuyerDetailsTaxId": {
-    testIds: ["buyer-cpf"],
-    text: ["Informe seu CPF (obrigatório para o pagamento)."],
-  },
-  "Screens/BuyerDetailsPhone": {
-    testIds: ["buyer-phone"],
-    absentTestIds: ["buyer-cpf"],
-    text: ["Informe seu telefone (obrigatório para o pagamento)."],
-  },
-  "Screens/BuyerDetailsNothingRequired": {
-    absentTestIds: ["buyer-cpf"],
-    text: ["Nome, e-mail e telefone são opcionais"],
-  },
-  "Screens/BuyerDetailsPerMethod": {
-    testIds: ["buyer-cpf"],
-    text: ["Informe seu CPF (obrigatório para o pagamento)."],
-  },
-  "Screens/BuyerDetailsServerRefusal": { testIds: ["buyer-cpf"], text: ["Informe: taxId."] },
   "Screens/PixPaymentLive": {
     testIds: ["pix-view", "pix-qr", "pix-code", "pix-awaiting"],
     text: ["Pague com Pix"],
@@ -176,14 +148,6 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "Screens/UnavailableWithRemedy": {
     testIds: ["checkout-payments-remedy-action"],
     text: ["Chamar garçom"],
-  },
-  "Screens/PayerSummaryWithEdit": {
-    testIds: ["checkout-payer", "checkout-payer-edit"],
-    text: ["CPF 529.982.247-25"],
-  },
-  "Screens/PayerSummarySavedTaxId": {
-    testIds: ["checkout-payer"],
-    text: ["CPF já cadastrado"],
   },
   "Screens/SavedCardsList": { testIds: ["saved-cards"], text: ["Novo cartão"] },
   "Screens/SavedCardsEmpty": { text: ["(nada acima desta linha — é o estado vazio)"] },
@@ -241,7 +205,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
 
   // ----------------------------------------------------------- Composition
   "Composition/SlotsSideBySide": {
-    testIds: ["buyer-cpf", "checkout-pay-bar"],
+    testIds: ["list-buyer-taxId", "list-pay"],
     text: ["slots padrão (MUI)", "design system do host"],
   },
   "Composition/HeadlessByHand": {
@@ -257,12 +221,6 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // Pinned EMPTINESS: no payable yet, so the screen deliberately stays out of
   // the way — anything on screen here (an error alert included) is a failure.
   "ProviderScreens/AwaitingTheMethodChoice": { empty: true },
-  "ProviderScreens/HandoffInvite": {
-    testIds: ["checkout-handoff-invite", "checkout-handoff-start"],
-    // Named destination, and the return trip promised before the buyer commits.
-    text: ["Você será levado à página de pagamento da Boreal", "Seguir para o pagamento"],
-    absentTestIds: ["checkout-method", "checkout-method-PIX", "checkout-method-CARD"],
-  },
   "ProviderScreens/HandoffNotice": {
     testIds: ["checkout-handoff-pending"],
     // The SAME sentence the invite made — see the story's own comment.
@@ -609,42 +567,6 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   "Wallets/WalletFastLaneAssembled": {
     testIds: ["apple-pay-button", "google-pay-button", "card-view", "card-pay"],
     text: ["ou pague com cartão", "Pagar R$ 75,00"],
-  },
-
-  // ---------------------------------------------------------------- Legacy
-  "Legacy/CheckoutFlowByHand": DADOS_STEP,
-  // The method chooser — precisely what a dead `/config` wire replaces with
-  // an error alert, which is why it is the marker.
-  "Legacy/CheckoutPaymentPixAndCard": {
-    text: ["Total: R$ 75,00", "Forma de pagamento", "Gerar QR Code PIX"],
-  },
-  // Same chooser at rest; the saved-card radios are one "Cartão" tap in.
-  "Legacy/CheckoutPaymentSavedCards": {
-    text: ["Total: R$ 75,00", "Forma de pagamento"],
-  },
-  "Legacy/CheckoutPaymentRedirect": {
-    text: ["Continuar para o pagamento"],
-    absentText: ["Forma de pagamento"],
-  },
-  "Legacy/CheckoutPaymentStoreOff": {
-    text: ["Esta loja ainda não aceita pagamentos online."],
-  },
-  "Legacy/CheckoutPaymentLoading": { testIds: ["checkout-payment-loading"] },
-  "Legacy/SavedCardsPickerDirect": {
-    testIds: ["saved-cards"],
-    text: ["Visa •••• 4242", "Validade 04/2030", "Selecionado: cartao_1"],
-  },
-  "Legacy/CopyOverridden": {
-    testIds: ["checkout-payments-disabled", "buyer-cpf"],
-    text: [
-      "Pagamentos em pausa na cantina",
-      "Ir para o pagamento",
-      // "sem o override", not "padrão": there is no package default any more
-      // (FUT-760), so the caption contrasts this demo host's own baseline copy
-      // with its per-store override. Pinned here precisely so the wording
-      // cannot drift back to implying a default the package no longer ships.
-      "sem o override: “Pagamento online indisponível”",
-    ],
   },
 
   // -------------------------------------------------------------- Headless

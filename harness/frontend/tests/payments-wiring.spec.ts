@@ -41,7 +41,8 @@ test('the SHOPPER surface renders from the adopted factory', async ({ page }) =>
   // `createPaymentFlows` bound once, with this host's cart, scope and ports —
   // the same config object `harnessFlowsConfig` gives the scenario pages, so
   // the adoption cannot drift from what is under test.
-  await expect(page.getByTestId('adopted-checkout').getByTestId('checkout-back')).toBeVisible();
+  // Its Pagamento is the one list (FUT-4028).
+  await expect(page.getByTestId('adopted-checkout').getByTestId('payment-list')).toBeVisible();
 });
 
 test('the settings screen has no error banner — the client is really wired', async ({ page }) => {
