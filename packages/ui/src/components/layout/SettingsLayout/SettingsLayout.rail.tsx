@@ -23,6 +23,8 @@ import type {
 
 interface RailToggleProps {
   title?: React.ReactNode;
+  /** The navigation's accessible name, resolved by the layout from `title`. */
+  ariaLabel: string;
   activeLabel?: string;
   open: boolean;
   onToggle: () => void;
@@ -37,6 +39,7 @@ interface RailToggleProps {
  */
 function SettingsRailToggle({
   title,
+  ariaLabel,
   activeLabel,
   open,
   onToggle,
@@ -49,7 +52,7 @@ function SettingsRailToggle({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      aria-label={typeof title === 'string' ? title : 'Settings'}
+      aria-label={ariaLabel}
       data-testid={`${testIdPrefix}-toggle`}
       sx={(theme) => ({
         ...displayAcrossRail(theme, breakpoint, 'flex', 'none'),
@@ -238,6 +241,8 @@ function SettingsRailBody({
 /** Props for {@link SettingsRail}: the rail body's inputs plus the mobile chrome. */
 export type SettingsRailProps = RailBodyProps & {
   title?: React.ReactNode;
+  /** The navigation's accessible name, resolved by the layout from `title`. */
+  ariaLabel: string;
   activeLabel?: string;
   onToggleNav: () => void;
   /** Scroll inside the rail rather than with the page. See `fillHeight`. */
@@ -268,6 +273,7 @@ function railColumnSx(theme: Theme, railVariant: SettingsRailVariant): Record<st
 /** The navigation column: title, the `switcher`'s disclosure, and the body. */
 export function SettingsRail({
   title,
+  ariaLabel,
   activeLabel,
   navOpen,
   onToggleNav,
@@ -287,7 +293,7 @@ export function SettingsRail({
   return (
     <Box
       component="nav"
-      aria-label={typeof title === 'string' ? title : 'Settings'}
+      aria-label={ariaLabel}
       data-testid={`${testIdPrefix}-rail`}
       data-rail-variant={railVariant}
       sx={(theme) => ({
@@ -326,6 +332,7 @@ export function SettingsRail({
       {variant === 'switcher' ? (
         <SettingsRailToggle
           title={title}
+          ariaLabel={ariaLabel}
           activeLabel={activeLabel}
           open={navOpen}
           onToggle={onToggleNav}

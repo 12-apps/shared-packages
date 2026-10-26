@@ -91,7 +91,9 @@ export type { ApiAuth, ApiAuthConfig } from "../create-api-auth";
 export type { SignInClaims } from "../sign-in-claims";
 
 export { credentialsProvider } from "../credentials-provider";
-export type { CredentialsProviderConfig } from "../credentials-provider";
+export type { CredentialsProviderConfig, CredentialsProviderLabels } from "../credentials-provider";
+export { EN_US_CREDENTIALS_LABELS } from "../credentials-provider.en-US";
+export { PT_BR_CREDENTIALS_LABELS } from "../credentials-provider.pt-BR";
 
 export { setSignInGate, setSessionAdminResolver } from "../config";
 export type { ExtendedSession, SignInGate, SessionAdminResolver } from "../config";

@@ -113,7 +113,7 @@ export function ReportControls({
         />
       ) : null}
       <Box sx={{ ml: "auto", display: "flex", gap: 8 }}>
-        <PrintExportButton title={printTitle} />
+        <PrintExportButton title={printTitle} label={copy.exportPdf} />
         {onExport ? (
           <Button variant="outline" size="sm" onClick={onExport} data-testid="report-export-csv">
             {copy.exportCsv}

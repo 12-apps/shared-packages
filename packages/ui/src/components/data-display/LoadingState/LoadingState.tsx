@@ -25,11 +25,15 @@ import {
   SPINNER_PADDING_UNITS,
 } from './LoadingState.metrics';
 import type { LoadingStateProps, LoadingStateSize } from './LoadingState.types';
+import type { LoadingStateLabels } from '../../../copy/labels';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveTestId } from '../../../platform/test-id';
 import { rem } from '../../../tokens/relative';
+import { resolveLabels } from '../../../utils/resolve-labels';
 
 interface ViewProps {
   message?: string;
+  labels: LoadingStateLabels;
   size: LoadingStateSize;
   skeletonRows: number;
   className?: string;
@@ -55,6 +59,7 @@ const LoadingMessage: React.FC<{
 
 const SkeletonView: React.FC<ViewProps> = ({
   message,
+  labels,
   size,
   skeletonRows,
   className,
@@ -66,7 +71,7 @@ const SkeletonView: React.FC<ViewProps> = ({
     <Box
       role="status"
       aria-busy="true"
-      aria-label={message || 'Loading content'}
+      aria-label={message || labels.skeleton}
       className={className}
       data-testid={testIds.base}
       sx={{
@@ -98,14 +103,14 @@ const SkeletonView: React.FC<ViewProps> = ({
   );
 };
 
-const SpinnerView: React.FC<ViewProps> = ({ message, size, className, testIds }) => {
+const SpinnerView: React.FC<ViewProps> = ({ message, labels, size, className, testIds }) => {
   const theme = useTheme();
 
   return (
     <Box
       role="status"
       aria-busy="true"
-      aria-label={message || 'Loading'}
+      aria-label={message || labels.spinner}
       className={className}
       data-testid={testIds.base}
       sx={{
@@ -132,6 +137,7 @@ export const LoadingState: React.FC<LoadingStateProps> = React.memo((rawProps) =
   const { variant, message, size, skeletonRows, className } = resolved;
   const viewProps: ViewProps = {
     message,
+    labels: resolveLabels(EN_US_UI_LABELS.loadingState, resolved.labels),
     size,
     skeletonRows,
     className,

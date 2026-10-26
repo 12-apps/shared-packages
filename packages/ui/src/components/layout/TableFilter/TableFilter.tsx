@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography/index.js';
 import React, { useRef, useState } from 'react';
 
 import { TableFilterContext, useTableFilterContext } from './TableFilterContext';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import type {
   TableFilterCheckboxFieldProps,
   TableFilterKeywordProps,
@@ -96,7 +97,7 @@ TableFilterMain.displayName = 'TableFilter.Main';
 const TableFilterPanel = ({
   children,
   onClearAll,
-  ariaLabel = 'Filters',
+  ariaLabel = EN_US_UI_LABELS.tableFilter.filters,
   clearTestId,
 }: TableFilterPanelProps): React.JSX.Element => {
   const { open, copy } = useTableFilterContext();
@@ -158,8 +159,8 @@ TableFilterPanel.displayName = 'TableFilter.Panel';
 const TableFilterKeyword = ({
   value,
   onChange,
-  placeholder = 'Press Enter to filter',
-  label = 'Filter by keyword',
+  placeholder = EN_US_UI_LABELS.tableFilter.keywordPlaceholder,
+  label = EN_US_UI_LABELS.tableFilter.keywordLabel,
   testId,
 }: TableFilterKeywordProps): React.JSX.Element => {
   const { copy } = useTableFilterContext();

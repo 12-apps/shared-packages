@@ -60,9 +60,14 @@ export const PT_BR_UI_LABELS: UiLabels = {
     listView: "Lista",
     openFilters: "Abrir filtros",
     closeFilters: "Fechar filtros",
+    filters: "Filtros",
+    all: "Todos",
+    search: "Buscar…",
+    noResults: "Nenhum resultado",
   },
   dashboard: {
     breadcrumb: "Trilha de navegação",
+    moreFilters: "Mais filtros",
   },
   navigationMenu: {
     collapse: "Recolher",
@@ -71,5 +76,71 @@ export const PT_BR_UI_LABELS: UiLabels = {
   workflowStep: {
     step: (position, title) => `Etapa ${position}: ${title}`,
     progress: (position, total) => `Etapa ${position} de ${total}`,
+  },
+  alertDialog: {
+    cancel: "Cancelar",
+    confirm: "Confirmar",
+  },
+  avatar: {
+    name: "Avatar",
+  },
+  emptyState: {
+    refresh: "Atualizar",
+    create: "Criar novo",
+  },
+  errorState: {
+    retry: "Tentar novamente",
+  },
+  loadingState: {
+    skeleton: "Carregando conteúdo",
+    spinner: "Carregando",
+  },
+  stackedModal: {
+    loading: "Carregando...",
+  },
+  command: {
+    placeholder: "Digite um comando ou pesquise...",
+    empty: "Nenhum resultado encontrado",
+    loading: "Carregando...",
+  },
+  formErrorSnackbar: {
+    message: "Corrija os campos destacados e tente novamente.",
+  },
+  columnsMenu: {
+    title: "Colunas",
+    toggle: "Mostrar ou ocultar colunas",
+  },
+  drawer: {
+    close: "Fechar painel",
+  },
+  settingsLayout: {
+    navigation: "Configurações",
+    searchPlaceholder: "Buscar configurações",
+    emptySearch: "Nenhuma configuração corresponde à busca.",
+    back: "Voltar",
+  },
+  tableFilter: {
+    filters: "Filtros",
+    keywordPlaceholder: "Pressione Enter para filtrar",
+    keywordLabel: "Filtrar por palavra-chave",
+  },
+  appHeader: {
+    disclose: (title) => `Detalhes de ${title}`,
+  },
+  breadcrumbs: {
+    navigation: "Trilha de navegação",
+  },
+  animatedIcon: {
+    name: (variant) => `Ícone animado: ${variant}`,
+  },
+  infiniteScroll: {
+    loadFailed: "Ocorreu um erro ao carregar mais itens",
+  },
+  socialLogin: {
+    title: "Entre para continuar",
+    divider: "ou",
+  },
+  dateRangePicker: {
+    calendar: "Calendário",
   },
 };

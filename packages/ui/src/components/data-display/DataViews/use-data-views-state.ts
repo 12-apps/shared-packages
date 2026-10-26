@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type GridColumn } from "../DataGrid";
 import { type SortFieldDefinition } from "../../layout/ContentToolbar";
 
+import { useDataViewsCopy } from "./data-views-copy-context";
 import { filterRows } from "./data-views-filter";
 import {
   useColumnsWithActions,
@@ -316,6 +317,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   scopeFieldId,
 }: UseDataViewsStateArgs<T>): DataViewsController<T> {
   useScopeConfigChecks(scopes, fields.map((field) => field.id), scopeFieldId, server !== undefined);
+  const copy = useDataViewsCopy();
   const { columnsWithActions, allColumnIds } = useColumnsWithActions(columns, {
     rowActions,
     rowActionsLeading,
@@ -347,7 +349,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
   );
   // Server mode is where `matched` is a PAGE — see `useSelection` (FUT-942).
   const selection = useSelection(matched, getRowId, { rememberOffPage: Boolean(server) });
-  const resolvedSortFields = sortFields ?? defaultSortFields(columns);
+  const resolvedSortFields = sortFields ?? defaultSortFields(columns, copy.grid);
 
   return {
     state,

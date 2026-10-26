@@ -9,6 +9,7 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import type { Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { scrim, sheen } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
@@ -84,6 +85,7 @@ const SheetHandle: React.FC<{ isDraggable: boolean }> = ({ isDraggable }) => {
 };
 
 const HEADER_DEFAULTS: Partial<SheetHeaderProps> = {
+  closeLabel: EN_US_UI_LABELS.common.close,
   isDraggable: false,
   dataTestId: 'sheet-header',
 };
@@ -93,6 +95,7 @@ export const SheetHeader: React.FC<SheetHeaderProps> = (props) => {
     title,
     description,
     showCloseButton,
+    closeLabel,
     onClose,
     showHandle,
     isDraggable,
@@ -137,6 +140,7 @@ export const SheetHeader: React.FC<SheetHeaderProps> = (props) => {
         {showCloseButton && (
           <IconButton
             onClick={onClose}
+            aria-label={closeLabel}
             size="small"
             sx={{ ml: 1, mt: -0.5 }}
             data-testid={`${dataTestId}-close-button`}

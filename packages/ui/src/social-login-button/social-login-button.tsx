@@ -11,6 +11,7 @@ import { Text } from '../components/typography/Text';
 import { Separator } from '../components/layout/Separator';
 import type { SocialLoginCopy } from '../copy/form';
 import { EN_US_SOCIAL_LOGIN_COPY } from '../en-US.form';
+import { EN_US_UI_LABELS } from '../en-US.labels';
 import { uiInk, type UiInk } from '../tokens/ink';
 import { rem, sxRem } from '../tokens/relative';
 
@@ -294,10 +295,10 @@ function cardMaxWidth(theme: Theme, value: number | string): string {
 
 export function SocialLoginContainer({
   children,
-  title = "Sign in to continue",
+  title = EN_US_UI_LABELS.socialLogin.title,
   subtitle,
   showDivider = false,
-  dividerText = "or",
+  dividerText = EN_US_UI_LABELS.socialLogin.divider,
   maxWidth,
 }: SocialLoginContainerProps): React.ReactElement {
   const theme = useTheme();

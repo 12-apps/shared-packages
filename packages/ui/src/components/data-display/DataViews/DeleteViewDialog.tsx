@@ -25,7 +25,7 @@ export function DeleteViewDialog({
   onClose,
   onConfirm,
   /** What this table holds, for the "your records are safe" line. */
-  entityLabel = "Os registros",
+  entityLabel,
   testIdPrefix = "view",
 }: {
   view: SavedViewSummary | null;
@@ -58,7 +58,7 @@ export function DeleteViewDialog({
           )}
 
           <Text variant="body" color="secondary" as="p">
-            {copy.deleteView.rowsUnaffected(entityLabel)}
+            {copy.deleteView.rowsUnaffected(entityLabel ?? copy.deleteView.entityFallback)}
           </Text>
 
           <Stack direction="row" spacing={1.5} sx={{ justifyContent: "flex-end", pt: 0.5 }}>

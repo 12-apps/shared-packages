@@ -16,6 +16,7 @@ import { countriesByDisplayName, countryDisplayName } from './countries';
 import { usePhoneInput } from './PhoneInput.hooks';
 import type { CountryData,PhoneInputProps } from './PhoneInput.types';
 import type { PhoneInputCopy } from '../../../copy';
+import { EN_US_PHONE_INPUT_COPY } from '../../../en-US.form';
 
 import { fieldEdge } from '../../../tokens/field-edge';
 import { fieldRadius } from '../../../tokens/field-radius';
@@ -165,8 +166,8 @@ const definedProps = (props: PhoneInputProps): Partial<PhoneInputProps> =>
 // The label and placeholder a host passes as props win; then the copy pack's;
 // then the English the field has always shown.
 const copyDefaults = (copy: PhoneInputCopy): Pick<PhoneInputProps, 'label' | 'placeholder'> => ({
-  label: copy.label ?? 'Phone Number',
-  placeholder: copy.placeholder ?? 'Enter phone number' });
+  label: copy.label ?? EN_US_PHONE_INPUT_COPY.label,
+  placeholder: copy.placeholder ?? EN_US_PHONE_INPUT_COPY.placeholder });
 
 const CountryAdornment: React.FC<{
   country?: CountryData;

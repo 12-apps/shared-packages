@@ -4,6 +4,7 @@ import type { Provider } from "@auth/core/providers";
 import type { User } from "@auth/core/types";
 
 import { CREDENTIALS_PROVIDER_ID } from "./credentials-provider-id";
+import { EN_US_CREDENTIALS_LABELS } from "./credentials-provider.en-US";
 import type { AuthenticateResult, EmailAuthFailure } from "./email-credentials/types";
 import { parseCookieHeader, SIGNUP_BINDING_COOKIE } from "./server/auth-cookies";
 
@@ -69,8 +70,21 @@ export interface CredentialsProviderConfig {
   authenticateLink?: (token: string, binding: string | undefined) => Promise<AuthenticateResult>;
   /** Provider id. Defaults to {@link CREDENTIALS_PROVIDER_ID}. */
   id?: string;
-  /** Human label, for hosts that render Auth.js's own sign-in page. */
+  /** Human label, for hosts that render Auth.js's own sign-in page. Wins over `labels.name`. */
   name?: string;
+  /**
+   * The words Auth.js's own sign-in page shows: the method's name and its two
+   * fields. Each one omitted reads in English, as it always did; a pt-BR host
+   * passes `PT_BR_CREDENTIALS_LABELS`.
+   */
+  labels?: Partial<CredentialsProviderLabels>;
+}
+
+/** What Auth.js's own sign-in page shows for the Credentials provider. */
+export interface CredentialsProviderLabels {
+  name: string;
+  email: string;
+  password: string;
 }
 
 /** Read a credentials field as a string, whatever the form encoding produced. */
@@ -102,12 +116,13 @@ async function signInFromLink(
  * user add a password.
  */
 export function credentialsProvider(config: CredentialsProviderConfig): Provider {
+  const labels = config.labels ?? {};
   return Credentials({
     id: config.id ?? CREDENTIALS_PROVIDER_ID,
-    name: config.name ?? "Email and password",
+    name: config.name ?? labels.name ?? EN_US_CREDENTIALS_LABELS.name,
     credentials: {
-      email: { label: "Email", type: "email" },
-      password: { label: "Password", type: "password" },
+      email: { label: labels.email ?? EN_US_CREDENTIALS_LABELS.email, type: "email" },
+      password: { label: labels.password ?? EN_US_CREDENTIALS_LABELS.password, type: "password" },
     },
     authorize: async (credentials, request): Promise<User | null> => {
       const linkToken = field(credentials, "linkToken");

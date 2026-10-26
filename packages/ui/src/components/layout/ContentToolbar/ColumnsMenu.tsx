@@ -10,6 +10,7 @@ import MenuItem from '@mui/material/MenuItem/index.js';
 import React, { useState } from 'react';
 
 import type { ColumnVisibilityOption, ColumnsMenuProps } from './ContentToolbar.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
@@ -55,8 +56,8 @@ function ColumnRow({
 export function ColumnsMenu({
   columns,
   onToggle,
-  title = 'Columns',
-  ariaLabel = 'Toggle columns',
+  title = EN_US_UI_LABELS.columnsMenu.title,
+  ariaLabel = EN_US_UI_LABELS.columnsMenu.toggle,
   'data-testid': testId,
 }: ColumnsMenuProps): React.JSX.Element {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);

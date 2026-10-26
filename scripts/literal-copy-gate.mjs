@@ -30,36 +30,59 @@
 //
 // ## WHAT IS FLAGGED
 //
-// Two shapes, both narrow on purpose. A gate that cries wolf gets an ever
-// longer exceptions file and then protects nothing.
+// Every shape is narrow on purpose. A gate that cries wolf gets an ever longer
+// exceptions file and then protects nothing, so each one below was measured
+// against the whole tree before it was admitted, and each has a positive and
+// a negative case in `selftest()`.
 //
 //   1. A COPY PROP given a bare string literal. `label`, `title`,
-//      `placeholder`, `aria-label`, `helperText`, `alt`, … — the props whose
-//      value a person reads. Everything else on an element is structure,
-//      styling or identity, and a literal there is not copy.
+//      `placeholder`, `aria-label`, `accessibilityLabel`, `helperText`, `alt`,
+//      … and any `…Label` / `…Title` / `…Text` name — the props whose value a
+//      person reads. Everything else on an element is structure, styling or
+//      identity, and a literal there is not copy. Inside a copy prop a single
+//      lower-case word counts too (`aria-label="close"`): that slot says the
+//      value is read, so `close` cannot be an identifier there.
 //
-//   2. A JSX TEXT CHILD that is prose, alone on its line between an opening
-//      and a closing tag. `<Button>Publicar</Button>` split across three
-//      lines is how this repo's formatter writes it, and it is where the
-//      leaks that hid the longest were: `draft-banner.tsx` read `copy.title`
-//      on one line and rendered `Publicar` on the next.
+//   2. A JSX TEXT CHILD that is prose: alone on its line between an opening
+//      and a closing tag (`<Button>` / `Publicar` / `</Button>`, how this
+//      repo's formatter writes a button's words, a leading `+ ` glyph
+//      included), or inside a matched tag pair on one line.
+//
+//   3. A copy prop given an EXPRESSION whose value can be a literal: a
+//      template literal with a word in its literal part (`Go to slide ${n}`),
+//      a ternary's branches, the right side of `??` / `||` / `&&`
+//      (`alt={label ?? 'Image'}`). Only what the expression can EVALUATE TO
+//      counts, so a key lookup (`copy[open ? 'a' : 'b']`), a comparison and a
+//      call's argument never do.
+//
+//   4. An expression TEXT CHILD of the same kind: `{error.message || 'Failed'}`.
+//
+//   5. An OBJECT LITERAL key that names copy — a component's `*_DEFAULTS`
+//      table (`PHONE_INPUT_DEFAULTS = { label: 'Phone Number' }`). Prose only
+//      here: a lone `label: 'bold'` is a lookup key, and `message`,
+//      `description` and `summary` keys are left out (see `OBJECT_KEY_DEV`).
+//
+//   6. A DEFAULT VALUE for a copy-named parameter or destructured prop —
+//      `({ title = 'Sign in' })`, `(message = 'This field is required')`.
+//      Prose only, and never in a class constructor (an `Error`'s message).
+//
+// `.ts` files are scanned too, for shapes 5 and 6 only: a plain module holds
+// no JSX, but it does hold the defaults tables and the curried validators
+// whose fallback sentences a user reads. `.d.ts` files are not scanned.
 //
 // `isProse` then drops what is not a word a reader sees: camelCase tokens,
-// kebab/snake ids, SCREAMING constants, URLs and paths, and anything under two
-// characters or carrying no letter. Those are the false positives that would
-// have made the ledger meaningless.
+// kebab/snake ids, SCREAMING constants, URLs and paths, CSS functions, product
+// and format names, and anything under two characters or carrying no letter.
 //
 // Deliberately NOT flagged, each because the alternative is worse:
 //
-//   - `.ts` files. A rendered word lives in a component; a string in a plain
-//     module is far more often a key, a header name or a developer-facing
-//     `Error` message, which CLAUDE.md puts in English on purpose. The two
-//     existing gates still sweep those files for language.
-//   - A template literal or an expression. `{`${a}/${b}`}` may or may not be
-//     copy, and guessing would put unanswerable entries in the ledger.
+//   - A token glued to a placeholder in a template (`tab-${id}`, `${n}px`,
+//     `v${n}`): a unit, an id or a prefix, never a word.
 //   - Multi-line prose. Narrow beats complete here: this gate's value is that
 //     every entry is real, so that the ledger is a work list rather than a
 //     wall of noise to be exempted wholesale.
+//   - The NAMED PACKS (`en-US.ts`, `pt-BR.*.ts`, `locales/`): they are where
+//     the words are supposed to be, which is why a fallback is read from one.
 //
 // ## THE RATCHET
 //
@@ -74,7 +97,15 @@ import { pathToFileURL } from "node:url";
 
 import { checkLedger, readLedger, summarize } from "./lib/exception-ledger.mjs";
 import { inScope } from "./lib/shipped-source.mjs";
-import { stripComments } from "./copy-portability-gate.mjs";
+import {
+  copyProps,
+  findLiterals,
+  isCopyName,
+  isCopyWord,
+  isProse,
+  templateHasWords,
+  valueLiterals,
+} from "./lib/literal-copy-shapes.mjs";
 
 const LABEL = "[literal-copy]";
 const EXCEPTIONS_PATH = ".literal-copy-exceptions.json";
@@ -103,6 +134,13 @@ const DEV_SURFACES = new Map([
       "that deployment — never by its users.",
   ],
   [
+    "packages/payments/backend/src/platform/homologacao-anexo.ts",
+    "A payment provider's homologation evidence file. Its reader is that provider's " +
+      "integration reviewer, the platform uploads it once to the provider's own Portuguese form, and " +
+      "its step titles describe the sandbox calls captured beside them — no host " +
+      "renders it and no host would ever write different words for it.",
+  ],
+  [
     "packages/ui/src/components/utility/Portal/Portal.button-container.example.tsx",
     "A worked example of mounting a Portal into an HTMLButtonElement. Nothing " +
       "imports it and it is not in the package's exports — it exists to be READ, " +
@@ -114,103 +152,37 @@ const DEV_SURFACES = new Map([
 ]);
 
 /**
- * The props whose value a PERSON reads.
- *
- * Built fresh per call so no caller can mutate what a later one checks
- * against — the same rule the vocabulary gate's list follows.
+ * Files that hold sample data rather than the package's own words: a story's
+ * fixture table, a `*.fixtures.ts` file a test and a story share. Their strings
+ * are what a HOST would pass — the other side of the question this gate asks.
+ * Local to this gate on purpose: the copy and vocabulary gates ask about the
+ * language of anything in the tarball, and a fixture is in the tarball.
  */
-export function copyProps() {
-  return new Set([
-    "label", "title", "placeholder", "description", "helperText", "alt",
-    "aria-label", "ariaLabel", "confirmText", "cancelText", "submitLabel",
-    "emptyText", "caption", "heading", "subtitle", "tooltip", "hint",
-    "removeLabel", "buttonLabel", "actionLabel", "message", "summary",
-  ]);
-}
+const SAMPLE_DATA = /(?:^|\/)(?:stories|fixtures)\/|(?:^|\/)fixtures\.[jt]sx?$|\.fixtures\.[jt]sx?$/;
 
-/**
- * Is this literal a word a reader sees, rather than a token, an id or a path?
- *
- * Every rule here was measured against the whole tree before it was admitted.
- * The camelCase and kebab rules alone drop the bulk of what a naive "any
- * string literal" reading would report.
- */
-export function isProse(text) {
-  const t = text.trim();
-  if (t.length < 2) return false;
-  if (!/[A-Za-zÀ-ÿ]/.test(t)) return false;
-  if (/^[a-z][a-z0-9]*([A-Z][a-z0-9]*)*$/.test(t)) return false;
-  if (/^[a-z0-9]+([-_.][a-z0-9]+)*$/.test(t)) return false;
-  if (/^[A-Z0-9_]+$/.test(t)) return false;
-  if (/^(https?:|\/|\.\/|\.\.\/|data:|blob:|#)/.test(t)) return false;
-  return true;
-}
-
-/** Shape 1: a copy prop given a bare string literal, on one line. */
-function propFindings(line, props) {
-  const out = [];
-  for (const match of line.matchAll(/([A-Za-z-]+)=(?:"([^"\n]*)"|'([^'\n]*)')/g)) {
-    const value = match[2] ?? match[3] ?? "";
-    if (props.has(match[1]) && isProse(value)) out.push(`${match[1]}="${value}"`);
-  }
-  return out;
-}
-
-/**
- * Shape 2b: `<Tag>Prose</Tag>` on ONE line, short enough that the formatter
- * left it alone — which is how `Agrupar por` sat inside a `<SectionHeading>`
- * through the block rule below.
- *
- * A MATCHED tag pair, never a bare `>…<`: a TypeScript generic supplies both
- * characters, so `() => Promise<void>` reads as "prose between two angles" and
- * produced 62 false findings when this was first written the loose way.
- */
-function inlineFindings(line) {
-  const out = [];
-  for (const match of line.matchAll(/<([A-Za-z][\w.]*)(?:\s[^<>]*)?>([^<>{}"'`]+)<\/\1>/g)) {
-    const inner = match[2].trim();
-    if (isProse(inner)) out.push(`(text) ${inner}`);
-  }
-  return out;
-}
-
-/**
- * Shape 2a: prose ALONE on its line, between an opening and a closing tag —
- * how this repo's formatter writes a button's own words, and where the leaks
- * that hid longest were.
- */
-function blockFinding(lines, index) {
-  const text = lines[index].trim();
-  if (!/^[A-Za-zÀ-ÿ][^<>{}"'`=;()[\]]*$/.test(text) || !isProse(text)) return null;
-  const opens = />$/.test(lines[index - 1]?.trim() ?? "");
-  const closes = /^<\//.test(lines[index + 1]?.trim() ?? "");
-  return opens && closes ? `(text) ${text}` : null;
-}
-
-/** Every literal-copy finding in one file's comment-stripped source. */
-export function findLiterals(source) {
-  const props = copyProps();
-  const lines = stripComments(source).split("\n");
-  return lines.flatMap((line, index) => {
-    const block = blockFinding(lines, index);
-    const snippets = block === null ? inlineFindings(line) : [block];
-    return [...propFindings(line, props), ...snippets].map((snippet) => [index + 1, snippet]);
-  });
-}
+export { copyProps, findLiterals, isCopyName, isCopyWord, isProse, templateHasWords, valueLiterals };
 
 /** How a finding is keyed in the ledger, and printed in the failure list. */
 export function describe(path, line, snippet) {
   return `${path}:${line} — ${snippet}`;
 }
 
+/**
+ * `.tsx` and plain `.ts`, never a declaration file. A `copy/*.ts` contract is
+ * types plus doc comments, and the packs (`en-US.*.ts`, `pt-BR.*.ts`,
+ * `locales/`) are out of scope by `inScope` already: they are where the words
+ * are SUPPOSED to be.
+ */
+const SCANNED = /(?<!\.d)\.tsx?$/;
+
 function scanRepo() {
   const tracked = execFileSync("git", ["ls-files"], { encoding: "utf8" }).split("\n").filter(Boolean);
-  // `.tsx` only: see the header on why a plain module's strings are not this
-  // gate's business.
   const keyed = tracked
-    .filter((path) => path.endsWith(".tsx") && inScope(path) && !DEV_SURFACES.has(path))
+    .filter((path) => SCANNED.test(path) && inScope(path) && !DEV_SURFACES.has(path) && !SAMPLE_DATA.test(path))
     .flatMap((path) =>
-      findLiterals(readFileSync(path, "utf8")).map(([line, snippet]) => describe(path, line, snippet)),
+      findLiterals(readFileSync(path, "utf8"), { jsx: path.endsWith(".tsx") }).map(([line, snippet]) =>
+        describe(path, line, snippet),
+      ),
     );
   return new Set(keyed);
 }
@@ -236,6 +208,44 @@ function selftest() {
     [inScope("packages/ui/src/components/form/Button.tsx"), "shipped src is in scope"],
     [[...DEV_SURFACES.values()].every((why) => why.length > 40), "every dev surface states why"],
     [!inScope("packages/ui/src/components/form/__tests__/Button.test.tsx"), "tests are out of scope"],
+    // Shape 1, widened: one lower-case word in a slot that says it is read.
+    [findLiterals('<IconButton aria-label="close" />').length === 1, "a lone lower-case word in aria-label is copy"],
+    [findLiterals('<Spinner accessibilityLabel="loading" />').length === 1, "and in accessibilityLabel"],
+    [findLiterals('<Panel closeLabel="close" />').length === 1, "and in a …Label prop"],
+    [findLiterals('<Input type="email" variant="outlined" />').length === 0, "a lower-case word in a structural prop is not"],
+    [findLiterals('<Box label="x" aria-label="_" />').length === 0, "a single character is not a word"],
+    // Shape 2a, widened: the add-row glyph.
+    [findLiterals("<Button>\n  + Medida\n</Button>").length === 1, "a text child led by `+ ` is a finding"],
+    [findLiterals("<Button>\n  + 1\n</Button>").length === 0, "but `+ 1` carries no word"],
+    // Shape 3: a copy prop given an expression.
+    [findLiterals("<Dot aria-label={`Go to slide ${n}`} />").length === 1, "a template literal with a word is a finding"],
+    [findLiterals("<Dot aria-label={`${a}/${b}`} key={`tab-${id}`} />").length === 0, "a template of placeholders and ids is not"],
+    [findLiterals("<Chip label={`v${version}`} />").length === 0, "nor a prefix glued to a placeholder"],
+    [findLiterals("<Btn title={open ? 'Collapse' : 'Expand'} />").length === 2, "both branches of a conditional are findings"],
+    [findLiterals("<Btn title={copy[open ? 'collapse' : 'expand']} />").length === 0, "a conditional KEY lookup is not"],
+    [findLiterals("<Tab aria-current={active ? 'page' : undefined} />").length === 0, "nor a conditional in a structural prop"],
+    [findLiterals("<Img alt={label ?? 'Image'} />").length === 1, "a `??` fallback literal is a finding"],
+    [findLiterals("<Img alt={label ?? copy.image} />").length === 0, "a `??` fallback from the pack is not"],
+    [findLiterals("<Btn aria-label={t('close')} />").length === 0, "a call's argument is not a value the slot takes"],
+    // Shape 4: an expression text child.
+    [findLiterals("<Alert>\n  {error.message || 'Something failed'}\n</Alert>").length === 1, "a `||` fallback child is a finding"],
+    [findLiterals("<Alert>\n  {error.message || copy.failed}\n</Alert>").length === 0, "the same child from the pack is not"],
+    [findLiterals("<Text>{' '}</Text>").length === 0, "a spacer child is not"],
+    // Shape 5: a defaults table, the PHONE_INPUT_DEFAULTS case.
+    [findLiterals("const PHONE_INPUT_DEFAULTS = { label: 'Phone Number' };").length === 1, "a copy key in a defaults table is a finding"],
+    [findLiterals("const PHONE_INPUT_DEFAULTS = { label: COPY.label, size: 'Medium Large' };").length === 0, "a pack read and a structural key are not"],
+    [findLiterals("const tools = [{ label: 'bold', icon: Bold }];").length === 0, "a lone lower-case word under a key is a lookup key"],
+    [findLiterals("throw { message: 'Webhook verification failed' };").length === 0, "an error body's message key is not copy"],
+    // Shape 6: default parameter values.
+    [findLiterals("function Card({ title = 'Sign in to continue' }) {}").length === 1, "a copy-named prop default is a finding"],
+    [findLiterals("const required = (message = 'This field is required') => message;").length === 1, "and a curried validator's default"],
+    [findLiterals("function Card({ title = COPY.title, size = 'Extra Large' }) {}").length === 0, "a pack default and a structural default are not"],
+    [findLiterals("class E extends Error {\n  constructor(message = 'Webhook verification failed') {}\n}").length === 0, "an Error constructor's default is a developer's sentence"],
+    [findLiterals("const label = 'Not a default';").length === 0, "a declaration is not a default"],
+    // `.ts` files: only the two unambiguous shapes.
+    [findLiterals("export const D = { placeholder: 'Search settings' };", { jsx: false }).length === 1, "a .ts defaults table is scanned"],
+    [findLiterals('const html = `<Button label="Publicar" />`;', { jsx: false }).length === 0, "a .ts file gets no JSX shape"],
+    [SCANNED.test("packages/forms-core/src/validators.ts") && !SCANNED.test("packages/ui/src/index.d.ts"), ".ts is scanned, .d.ts is not"],
   ];
   const failed = cases.filter(([ok]) => !ok);
   for (const [, name] of failed) console.error(`${LABEL} selftest FAILED: ${name}`);
@@ -264,7 +274,7 @@ function main() {
     summarize({
       label: LABEL,
       total: findings.size,
-      noun: "literal(s) in shipped .tsx",
+      noun: "literal(s) in shipped .ts/.tsx",
       counts,
       burndown: "the burn-down is each package's copy contract",
     }),

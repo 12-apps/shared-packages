@@ -8,6 +8,7 @@ import { alpha, useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import type { DrawerContentProps,DrawerHeaderProps, DrawerProps } from './Drawer.types';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { shadowInk } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 
@@ -166,7 +167,7 @@ export const DrawerHeader: React.FC<DrawerHeaderProps> = ({
         <IconButton
           onClick={onClose}
           edge="end"
-          aria-label={closeLabel ?? 'Close drawer'}
+          aria-label={closeLabel ?? EN_US_UI_LABELS.drawer.close}
           data-testid={dataTestId ? `${dataTestId}-close` : 'drawer-close'}
         >
           <Close />

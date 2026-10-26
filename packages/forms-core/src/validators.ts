@@ -8,6 +8,8 @@
  * @module forms-core/validators
  */
 
+import { EN_US_FORMS_MESSAGES } from './en-US';
+
 /** A field validator: returns an error message, or `undefined` when valid. */
 export type Validator = (value: string) => string | undefined;
 
@@ -20,7 +22,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * @returns A validator returning the message for empty input, else `undefined`.
  */
 export const required =
-  (message = 'This field is required'): Validator =>
+  (message = EN_US_FORMS_MESSAGES.required): Validator =>
   (value) =>
     value.trim().length === 0 ? message : undefined;
 
@@ -31,7 +33,7 @@ export const required =
  * @returns A validator returning the message for invalid input, else `undefined`.
  */
 export const email =
-  (message = 'Enter a valid email address'): Validator =>
+  (message = EN_US_FORMS_MESSAGES.email): Validator =>
   (value) =>
     EMAIL_PATTERN.test(value) ? undefined : message;
 
@@ -43,7 +45,7 @@ export const email =
  * @returns A validator returning the message for short input, else `undefined`.
  */
 export const minLength =
-  (length: number, message = `Must be at least ${length} characters`): Validator =>
+  (length: number, message = EN_US_FORMS_MESSAGES.minLength(length)): Validator =>
   (value) =>
     value.length < length ? message : undefined;
 

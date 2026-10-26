@@ -206,6 +206,7 @@ does not ask.
 | atIndex           | boolean                                                | `false`             | `drilldown`: the router is at the area's index, not in a section    |
 | indexHref         | string                                                 | -                   | `drilldown`: where the back link goes                              |
 | backLabel         | string                                                 | `'Back'`            | Label on the back control                                          |
+| navigationLabel   | string                                                 | `'Settings'`        | The navigation's accessible name while `title` is not plain text   |
 | sectionChips      | SettingsNavItem[]                                      | -                   | Sections carried by the narrow-width chip strip                    |
 
 ### SettingsNavGroup

@@ -45,16 +45,25 @@ const MODE_WORD = (live: boolean): string => (live ? 'live' : 'test');
  */
 const SOURCE = (viaGrant: boolean): string => (viaGrant ? 'The authorisation' : 'The secret key');
 
+/**
+ * Stripe's four credential boxes in English. Named on its own because it is
+ * also what the adapter labels them with when a host's pack omits them — the
+ * four keys are optional so a hand-written pack keeps compiling.
+ */
+export const EN_US_STRIPE_FIELD_LABELS = {
+  secretKey: 'Secret key (sk_...)',
+  publishableKey: 'Publishable key (pk_...)',
+  webhookSecret: 'Webhook signing secret (whsec_...)',
+  connectedAccount: 'Connected account (acct_...)',
+} as const satisfies Required<Omit<StripeCopy['fields'], 'connectedAccountHelp'>>;
+
 export const EN_US_STRIPE_COPY: StripeCopy = {
   setupGuide: EN_US_STRIPE_SETUP_GUIDE_COPY,
   unreachable:
     'We could not reach Stripe just now. ' +
     'Your credentials are saved — test the connection again in a moment.',
   fields: {
-    secretKey: 'Secret key (sk_...)',
-    publishableKey: 'Publishable key (pk_...)',
-    webhookSecret: 'Webhook signing secret (whsec_...)',
-    connectedAccount: 'Connected account (acct_...)',
+    ...EN_US_STRIPE_FIELD_LABELS,
     connectedAccountHelp:
       'Leave this blank. Fill it in only if you are a Connect platform charging on behalf of another account — with your own keys, this field makes the connection be refused.',
   },
@@ -176,7 +185,7 @@ export const EN_US_INFINITEPAY_COPY: InfinitePayCopy = {
   noCheckoutUrl: 'InfinitePay returned no checkout URL.',
   handleHelp:
     'Check it character by character. We show the tag in a monospaced font so you can tell 0 from O and l from 1.',
-  fields: { handle: 'InfiniteTag ($username)' },
+  fields: { handle: 'InfiniteTag ($username)', handlePlaceholder: '$yourtag' },
 };
 
 /**

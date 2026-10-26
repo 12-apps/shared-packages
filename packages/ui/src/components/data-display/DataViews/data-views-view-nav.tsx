@@ -114,10 +114,10 @@ export function ViewsList({
                 <StarOutlineRoundedIcon fontSize="small" sx={{ color: "warning.main" }} titleAccess={copy.nav.defaultTag} />
               )}
               {view.pinned && (
-                <PushPinOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess="Fixada" />
+                <PushPinOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess={copy.nav.pinnedTag} />
               )}
               {view.shared && (
-                <GroupOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess="Compartilhada" />
+                <GroupOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} titleAccess={copy.nav.sharedTag} />
               )}
               {active && <CheckRoundedIcon fontSize="small" />}
             </Box>

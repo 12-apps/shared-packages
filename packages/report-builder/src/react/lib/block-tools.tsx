@@ -186,7 +186,7 @@ export function BlockToolCluster({
   if (csv !== undefined && render !== undefined) {
     tools.push({
       id: "export-csv",
-      label: "Baixar CSV",
+      label: words.downloadCsv,
       icon: <DownloadGlyph />,
       onSelect: () => {
         exportRows("csv", render.rows, exportColumnsFor(render, copy.values), csv.filename);

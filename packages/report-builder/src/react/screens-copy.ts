@@ -276,6 +276,19 @@ export interface ReportBuilderPanelCopy {
   stacked: string;
   duplicate: string;
   exportCsv: string;
+  /** The block tool that downloads a table's rows as CSV. */
+  downloadCsv: string;
+  /** The print-to-PDF button, in its long form (the saved report passes `view.export`). */
+  exportPdf: string;
+  /** The empty choice at the top of a field select: no grouping, no series. */
+  noneOption: string;
+  /** Why "one series per" is disabled until a grouping is chosen. */
+  seriesNeedsGrouping: string;
+  /** A measure row's select, numbered: its visible label and its accessible name. */
+  measure(position: number): string;
+  /** The buttons that append a measure row and a filter row. */
+  addMeasure: string;
+  addFilter: string;
   grouping: string;
   discard: string;
   statusLabel: string;

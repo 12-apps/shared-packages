@@ -11,6 +11,7 @@ import {
   breadcrumbsBarStyles,
   sizeIconMap } from './Breadcrumbs.styles';
 import { BreadcrumbEntry } from './BreadcrumbEntry';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import type { BreadcrumbItem,BreadcrumbsProps } from './Breadcrumbs.types';
 import { sxRem } from '../../../tokens/relative';
 
@@ -174,7 +175,7 @@ export const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
         color={color}
         visualStyle={variant}
         elevation={elevation}
-        aria-label={ariaLabel || 'breadcrumb navigation'}
+        aria-label={ariaLabel || EN_US_UI_LABELS.breadcrumbs.navigation}
         role="navigation"
         data-testid={dataTestId || 'breadcrumbs'}
         {...props}

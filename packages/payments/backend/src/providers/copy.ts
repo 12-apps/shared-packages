@@ -147,8 +147,11 @@ export interface InfinitePayCopy extends ProbeUnreachableCopy {
   noCheckoutUrl: string;
   /** The line under the tag input — how to check the value, not what it is for. */
   handleHelp: string;
-  /** The tag field's own label. */
-  fields: { handle: string };
+  /**
+   * The tag field's own label, and the sample tag shown in the empty box —
+   * a sample in the reader's language (`$suatag`, `$yourtag`).
+   */
+  fields: { handle: string; handlePlaceholder: string };
 }
 
 /**

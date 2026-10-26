@@ -6,6 +6,7 @@ import {
 import type { CredentialFieldSpec } from '../core/types';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type { StripeCopy } from './copy';
+import { EN_US_STRIPE_FIELD_LABELS } from './en-US';
 import type { CustomerSchema } from '../core/customer-schema';
 import type { NormalizedWebhookEvent, WebhookDelivery } from '../core/types';
 import { sha256Hex } from './shared';
@@ -193,18 +194,18 @@ const oauth: NonNullable<PaymentProviderAdapter['oauth']> = {
  */
 function credentialSchemaFor(copy: StripeCopy): readonly CredentialFieldSpec[] {
   return [
-    { key: 'secretKey', label: copy.fields.secretKey ?? 'Secret key (sk_...)', secret: true, required: false, fulfilledBy: 'accessToken' },
-    { key: 'publishableKey', label: copy.fields.publishableKey ?? 'Publishable key (pk_...)', secret: false, required: false },
+    { key: 'secretKey', label: copy.fields.secretKey ?? EN_US_STRIPE_FIELD_LABELS.secretKey, secret: true, required: false, fulfilledBy: 'accessToken' },
+    { key: 'publishableKey', label: copy.fields.publishableKey ?? EN_US_STRIPE_FIELD_LABELS.publishableKey, secret: false, required: false },
     {
       key: 'webhookSecret',
-      label: copy.fields.webhookSecret ?? 'Webhook signing secret (whsec_...)',
+      label: copy.fields.webhookSecret ?? EN_US_STRIPE_FIELD_LABELS.webhookSecret,
       secret: true,
       required: false,
       role: 'webhookSecret',
     },
     {
       key: 'connectedAccountId',
-      label: copy.fields.connectedAccount ?? 'Connected account (acct_...)',
+      label: copy.fields.connectedAccount ?? EN_US_STRIPE_FIELD_LABELS.connectedAccount,
       secret: false,
       required: false,
       // Sends `Stripe-Account:` — only meaningful for a platform charging on

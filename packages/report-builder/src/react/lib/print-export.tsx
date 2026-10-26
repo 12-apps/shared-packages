@@ -79,17 +79,18 @@ function DownloadIcon(): JSX.Element {
 
 export function PrintExportButton({
   title,
-  label = "Exportar PDF",
+  label,
   dataTestId = "report-export-pdf",
 }: {
   title: string;
   /**
-   * Defaults to the long form the built-in report screens have always shown.
-   * The saved-report page passes the prototype's shorter `Exportar`, where the
+   * The built-in report screens pass the long form, `builder.exportPdf`. The
+   * saved-report page passes the prototype's shorter `view.export`, where the
    * button sits in a right-hand cluster of three and the extra word only
-   * competes with the primary action beside it.
+   * competes with the primary action beside it. REQUIRED — this package ships
+   * no default copy.
    */
-  label?: string;
+  label: string;
   dataTestId?: string;
 }): JSX.Element {
   return (

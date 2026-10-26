@@ -4,6 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useMemo, useState } from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { withDefaults } from '../../../utils/withDefaults';
 import { activeItemLabel, filterGroups } from './SettingsLayout.filters';
 import { SettingsRail } from './SettingsLayout.rail';
@@ -32,18 +33,20 @@ type ResolvedProps = SettingsLayoutProps &
       | 'navVariant'
       | 'atIndex'
       | 'backLabel'
+      | 'navigationLabel'
     >
   >;
 
 const DEFAULTS = {
-  searchPlaceholder: 'Search settings',
+  searchPlaceholder: EN_US_UI_LABELS.settingsLayout.searchPlaceholder,
   defaultQuery: '',
-  emptySearchLabel: 'No settings match your search.',
+  emptySearchLabel: EN_US_UI_LABELS.settingsLayout.emptySearch,
   testIdPrefix: 'settings',
   railBreakpoint: 'md',
   navVariant: 'switcher',
   atIndex: false,
-  backLabel: 'Back',
+  backLabel: EN_US_UI_LABELS.settingsLayout.back,
+  navigationLabel: EN_US_UI_LABELS.settingsLayout.navigation,
 } satisfies Partial<SettingsLayoutProps>;
 
 /**
@@ -55,6 +58,14 @@ function railLookOf({
   railVariant = 'divided',
 }: SettingsLayoutProps): Required<Pick<SettingsLayoutProps, 'searchable' | 'railVariant'>> {
   return { searchable, railVariant };
+}
+
+/**
+ * The navigation's accessible name: a plain-string `title`, else the host's
+ * `navigationLabel`, else "Settings".
+ */
+function navigationNameOf({ title, navigationLabel = DEFAULTS.navigationLabel }: SettingsLayoutProps): string {
+  return typeof title === 'string' ? title : navigationLabel;
 }
 
 /** Stacked below the rail's breakpoint, two columns at and above it. */
@@ -136,7 +147,6 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
   const activeLabel = useMemo(() => activeItemLabel(groups, activeItemId), [groups, activeItemId]);
 
   const drilldown = navVariant === 'drilldown';
-  const ariaLabel = typeof title === 'string' ? title : 'Settings';
 
   return (
     <Box
@@ -147,6 +157,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
     >
       <SettingsRail
         title={title}
+        ariaLabel={navigationNameOf(props)}
         activeLabel={activeLabel}
         navOpen={navOpen}
         onToggleNav={() => setNavOpen((open) => !open)}
@@ -176,7 +187,7 @@ export const SettingsLayout: React.FC<SettingsLayoutProps> = (props) => {
         sectionTitle={props.sectionTitle}
         sectionDescription={props.sectionDescription}
         backLabel={backLabel}
-        ariaLabel={ariaLabel}
+        ariaLabel={navigationNameOf(props)}
         sectionChips={sectionChips}
         activeItemId={activeItemId}
         linkComponent={linkComponent}

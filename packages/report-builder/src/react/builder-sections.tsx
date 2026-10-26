@@ -30,7 +30,10 @@ interface SectionProps {
   update: Patch;
 }
 
-const NONE = { value: "", label: "(nenhuma)" };
+/** The empty choice at the top of a field select, in the host's words. */
+function noneOption(label: string): { value: string; label: string } {
+  return { value: "", label };
+}
 
 /** A section's heading, at the one level every section in this form uses. */
 function SectionHeading({ children }: { children: string }): JSX.Element {
@@ -60,7 +63,7 @@ export function GroupBySection({ draft, fields, update }: SectionProps): JSX.Ele
         <Select
           size="sm"
           label={copy.axisLabel}
-          options={[NONE, ...fieldOptions(fields, "dimension")]}
+          options={[noneOption(copy.noneOption), ...fieldOptions(fields, "dimension")]}
           value={dimension.field}
           onChange={(event) => update(withDimension(draft, 0, { field: event.target.value as string }))}
           data-testid="builder-dimension-0"
@@ -99,8 +102,8 @@ export function SplitBySection({ draft, fields, update }: SectionProps): JSX.Ele
         // Splitting without grouping has nothing to split, so the control is
         // disabled with the reason rather than silently producing nothing.
         disabled={axis.field === ""}
-        helperText={axis.field === "" ? "Escolha um agrupamento primeiro." : undefined}
-        options={[NONE, ...fieldOptions(fields, "dimension")]}
+        helperText={axis.field === "" ? copy.seriesNeedsGrouping : undefined}
+        options={[noneOption(copy.noneOption), ...fieldOptions(fields, "dimension")]}
         value={dimensionAt(draft, 1).field}
         onChange={(event) => update(withDimension(draft, 1, { field: event.target.value as string }))}
         data-testid="builder-dimension-1"
@@ -128,8 +131,8 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
               MUI's own name would otherwise be the current value. */}
           <Select
             size="sm"
-            label={`Medida ${index + 1}`}
-            aria-label={`Medida ${index + 1}`}
+            label={copy.measure(index + 1)}
+            aria-label={copy.measure(index + 1)}
             options={fieldOptions(fields)}
             value={measure.field}
             onChange={(event) => setMeasure(index, event.target.value as string, measure.aggregation)}
@@ -165,7 +168,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
         onClick={() => update({ measures: [...draft.measures, { field: "", aggregation: "sum" }] })}
         data-testid="builder-add-measure"
       >
-        + Medida
+        {copy.addMeasure}
       </Button>
     </Stack>
   );
@@ -174,7 +177,7 @@ export function MeasuresSection({ draft, fields, update }: SectionProps): JSX.El
 export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Element {
   const copy = useReportCopy().screens.builder;
   const byName = new Map(fields.map((field) => [field.field, field]));
-  const options = [NONE, ...fieldOptions(fields)];
+  const options = [noneOption(copy.noneOption), ...fieldOptions(fields)];
   return (
     <Stack spacing={1}>
       <SectionHeading>{copy.filtersHeading}</SectionHeading>
@@ -197,7 +200,7 @@ export function FiltersSection({ draft, fields, update }: SectionProps): JSX.Ele
         }
         data-testid="builder-add-filter"
       >
-        + Filtro
+        {copy.addFilter}
       </Button>
     </Stack>
   );

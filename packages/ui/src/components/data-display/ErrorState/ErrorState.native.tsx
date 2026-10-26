@@ -24,6 +24,7 @@ import { useUiTheme } from '../../../provider/use-ui-theme.native';
 import { MUI_FONT_WEIGHT_MEDIUM, MUI_TYPE, muiTypeStyle } from '../../../tokens/mui-type';
 import type { UiTheme } from '../../../tokens/theme';
 import { Button } from '../../form/Button/Button.native';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 
 const makeTestId =
   (dataTestId?: string) =>
@@ -130,7 +131,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo(function ErrorSt
     message,
     title,
     onRetry,
-    retryLabel = 'Retry',
+    retryLabel = EN_US_UI_LABELS.errorState.retry,
     severity = 'error',
     icon,
     style,

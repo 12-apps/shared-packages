@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography/index.js';
 import { useTheme, type SxProps, type Theme } from '@mui/material/styles/index.js';
 import React from 'react';
 
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { rem } from '../../../tokens/relative';
 
 import type { InfiniteScrollProps } from './InfiniteScroll.types';
@@ -38,9 +39,12 @@ export const DefaultEndMessage: React.FC<{ endText: string }> = ({ endText }) =>
   </Box>
 );
 
-export const DefaultError: React.FC<{ error: Error }> = ({ error }) => (
+export const DefaultError: React.FC<{ error: Error; errorText?: string }> = ({
+  error,
+  errorText = EN_US_UI_LABELS.infiniteScroll.loadFailed,
+}) => (
   <Alert severity="error" sx={{ m: 2 }}>
-    {error.message || 'An error occurred while loading more items'}
+    {error.message || errorText}
   </Alert>
 );
 

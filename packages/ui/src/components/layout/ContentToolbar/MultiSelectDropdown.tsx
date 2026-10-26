@@ -18,6 +18,7 @@ import type {
   MultiSelectOption,
 } from './ContentToolbar.types';
 import { buildTriggerLabel, InlineTrigger, PillTrigger, StackedTrigger } from './MultiSelectTriggers';
+import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
 
@@ -60,14 +61,14 @@ export function MultiSelectDropdown<TValue extends string = string>({
   selected,
   onToggle,
   onClear,
-  allLabel = 'All',
+  allLabel = EN_US_UI_LABELS.contentToolbar.all,
   clearLabel,
   clearText,
   extraOptionsHeading,
   extraOptions,
   searchable,
-  searchPlaceholder = 'Search…',
-  noResultsLabel = 'No results',
+  searchPlaceholder = EN_US_UI_LABELS.contentToolbar.search,
+  noResultsLabel = EN_US_UI_LABELS.contentToolbar.noResults,
   layout = 'inline',
   'data-testid': testId,
   onOpenChange,
