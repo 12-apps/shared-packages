@@ -87,6 +87,41 @@ function tokenProviders(body: Record<string, unknown> | null): string {
   return joined(Object.keys(map as Record<string, unknown>).sort());
 }
 
+/** The line the heartbeat records: a read no checkout ever makes. */
+export const HEARTBEAT_PATH = '/api/checkout/heartbeat';
+
+/**
+ * Send through the world's recorder and drop the answer. The request is
+ * recorded the moment it starts, which is all these controls are for, so a
+ * refused or failed answer must not surface as an unhandled rejection.
+ */
+function sendIgnoringAnswer(world: HarnessWorld, target: string, init?: RequestInit): void {
+  world.fetchImpl(target, init).catch(() => undefined);
+}
+
+/**
+ * Two requests sent through the SAME recorder the checkout uses (FUT-4028):
+ * a heartbeat read, which proves the probe is live on this screen, and a
+ * forced write, which exists only so a self-test can prove the "nothing was
+ * written" check goes red when something was.
+ */
+function WireControls({ world }: { world: HarnessWorld }): JSX.Element {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <button type="button" data-testid="wire-heartbeat" onClick={() => sendIgnoringAnswer(world, HEARTBEAT_PATH)}>
+        Heartbeat read
+      </button>
+      <button
+        type="button"
+        data-testid="wire-force-write"
+        onClick={() => sendIgnoringAnswer(world, HEARTBEAT_PATH, { method: 'POST', body: '{}' })}
+      >
+        Force a write (self-test)
+      </button>
+    </div>
+  );
+}
+
 export function WireProbe({ world, label }: { world: HarnessWorld; label?: string }): JSX.Element {
   useWorldTick(world);
   const body = lastChargeBody(world);
@@ -106,6 +141,7 @@ export function WireProbe({ world, label }: { world: HarnessWorld; label?: strin
       <Fact id="provider-charges" value={joined(chargeLines(world))} />
       <Fact id="provider-vaulted" value={joined(world.vaulted.map((v) => v.provider))} />
       <Fact id="host-navigated" value={joined(world.navigated)} />
+      <WireControls world={world} />
     </section>
   );
 }

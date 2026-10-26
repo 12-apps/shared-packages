@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { onlyReads } from '../src/helpers/wire.js';
+import { noWrites, onlyReads } from '../src/helpers/wire.js';
 
 describe('onlyReads', () => {
   it('accepts the config read alone', () => {
@@ -30,5 +30,30 @@ describe('onlyReads', () => {
   it('answers on the input that made the old pattern backtrack', () => {
     const hostile = `GET !\tGET ${'!,\tGET '.repeat(50_000)}`;
     expect(onlyReads(hostile)).toBe(false);
+  });
+});
+
+describe('noWrites', () => {
+  it('finds no write in an empty probe or a placeholder (liveness is checked apart)', () => {
+    expect(noWrites('')).toBe(true);
+    expect(noWrites('(none)')).toBe(true);
+  });
+
+  it('accepts reads, with or without the config read', () => {
+    expect(noWrites('GET /api/checkout/cards')).toBe(true);
+    expect(noWrites('GET /api/checkout/config\nGET /api/checkout/cards')).toBe(true);
+  });
+
+  it('refuses any write', () => {
+    expect(noWrites('POST /api/checkout')).toBe(false);
+    expect(noWrites('GET /api/checkout/config,POST /api/checkout/charge')).toBe(false);
+    expect(noWrites('GET /api/checkout/heartbeat\nPUT /api/checkout/x')).toBe(false);
+  });
+
+  it('counts a writing verb as a write whatever follows it', () => {
+    expect(noWrites('POST')).toBe(false);
+    expect(noWrites('POST /a b')).toBe(false);
+    expect(noWrites('POST /x extra')).toBe(false);
+    expect(noWrites('GET /api/checkout/config,DELETE')).toBe(false);
   });
 });

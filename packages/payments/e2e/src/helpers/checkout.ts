@@ -108,12 +108,71 @@ export async function chooseCard(page: Page): Promise<void> {
  */
 export async function payCard(page: Page): Promise<void> {
   const listPay = page.getByTestId('list-pay');
+  const cardPay = page.getByTestId('card-pay');
+  // Whichever pay control is on the page — waited for, not read at an instant:
+  // on a retry after a refusal the bar's button comes back a moment later.
+  await expect(listPay.or(cardPay).first()).toBeEnabled();
   if (await listPay.isVisible()) {
     await listPay.click();
     await expect(page.getByTestId('list-charge-bar')).toBeVisible();
     return;
   }
-  await page.getByTestId('card-pay').click();
+  await cardPay.click();
+}
+
+/** How long {@link showListPixQr} keeps trying the faces before it fails. */
+const SHOW_QR_TIMEOUT_MS = 10_000;
+
+/**
+ * Show the list's Pix QR, the way the buyer would (FUT-4028).
+ *
+ * The list's Pix has two faces, and each draws its QR differently:
+ *
+ *  - BEFORE the code is copied it shows the code (`list-pix-code`) and the QR
+ *    (`list-pix-qr`): beside the code on a wide screen, behind "Ver QR code"
+ *    (`list-pix-toggle-qr`) on a narrow one;
+ *  - AFTER it is copied (`pix-after-copy`) — at once with the host's bank
+ *    flow (`pixBank`, FUT-3612), whose button generates AND copies — it says
+ *    what to do in the bank app. On a narrow screen "Ver QR code"
+ *    (`pix-show-qr`) brings the code and its QR back; on a wide one the QR
+ *    already stands beside the steps ("Ainda falta pagar?").
+ *
+ * Whichever face is up, this taps what the buyer would tap, and then a QR has
+ * to be on screen. Retried as a whole: the copy that turns one face into the
+ * other may land while it looks.
+ */
+export async function showListPixQr(page: Page): Promise<void> {
+  const qr = page.getByTestId('list-pix-qr');
+  const afterCopy = page.getByTestId('pix-after-copy');
+  await expect(async () => {
+    if (await afterCopy.isVisible()) {
+      const showQr = page.getByTestId('pix-show-qr');
+      if (await showQr.isVisible()) await showQr.click();
+      else {
+        // The QR itself: the code's image (`role="img"`) and the SVG drawn in it.
+        expect(await afterCopy.locator('[role="img"] > svg[viewBox]').isVisible()).toBe(true);
+        return;
+      }
+    } else if (!(await qr.isVisible())) {
+      const toggle = page.getByTestId('list-pix-toggle-qr');
+      if (await toggle.isVisible()) await toggle.click();
+    }
+    expect(await qr.locator('svg[viewBox]').isVisible()).toBe(true);
+  }).toPass({ timeout: SHOW_QR_TIMEOUT_MS });
+}
+
+/**
+ * The copia-e-cola the list's Pix gave the buyer (FUT-4028): the code on its
+ * face, or — on the after-copy face of a wide screen, which no longer draws
+ * it — the code it put on her clipboard ("Código copiado"). Reading that one
+ * needs the page to hold the `clipboard-read` permission, which a host grants
+ * when its store uses the bank flow.
+ */
+export async function listPixCode(page: Page): Promise<string> {
+  await showListPixQr(page);
+  const code = page.getByTestId('list-pix-code');
+  if (await code.isVisible()) return (await code.textContent()) ?? '';
+  return page.evaluate(() => navigator.clipboard.readText());
 }
 
 /** Whether the list offers Pix and nothing else online — no card row, no hand-off. */

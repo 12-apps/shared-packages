@@ -44,6 +44,18 @@ export {
 export { paymentsFeatures, paymentsFeaturesRoot, paymentsSteps } from './globs.js';
 
 /**
+ * The wire checks the packaged steps make, for a host's own specs and for a
+ * self-test that a forced write turns them red (FUT-4028).
+ */
+export {
+  expectNoWritesOn,
+  noWrites,
+  NO_WRITE_WINDOW_MS,
+  onlyReads,
+  type NoWriteProbe,
+} from './helpers/wire.js';
+
+/**
  * The PLATFORM-OPERATIONS journeys (FUT-479 / FUT-483, packaged by FUT-573):
  * the Connect-application consult and the platform homologação, for the app
  * that operates the platform. A separate OPT-IN port and glob triple — see
@@ -76,9 +88,11 @@ export {
   fillCard,
   fillCpf,
   GOOD_PAN,
+  listPixCode,
   listTopSettled,
   payCard,
   reachPayment,
+  showListPixQr,
   VALID_CPF,
   type CheckoutSurface,
   type ListMethod,
