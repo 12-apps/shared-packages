@@ -7,7 +7,7 @@ import { useCheckoutComponents } from "./ui";
 
 /**
  * Order-creation failure shown inline on Pagamento — the buyer never leaves the
- * step. Split out of `checkout-steps.tsx` when it grew a second presentation.
+ * step.
  *
  * Four shapes, and which one renders is decided by the failure's CODE, never
  * by its prose:

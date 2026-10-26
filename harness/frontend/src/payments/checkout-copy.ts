@@ -15,7 +15,7 @@ import type { CheckoutCopyFE } from '@12-apps/payments-frontend';
  * sentences stop appearing and the specs that read them fail — which is the
  * only way a consumer can notice a default coming back.
  *
- * The same rule now covers `views` — the stepper, the Dados step, the empty
+ * The same rule now covers `views` — the consent line, the empty
  * cart and the whole confirmation screen. Those views used to carry their own
  * compiled-in Portuguese (the `PT_BR_CHECKOUT_VIEW_COPY` pack is that text,
  * named); this host words them itself for the same reason as everything else.

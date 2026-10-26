@@ -25,7 +25,7 @@ import type {
 } from "../types";
 
 /**
- * What every screen is handed. Every field is already a prop of `PaymentStep`,
+ * What every screen is handed. Every field is already in the list's props,
  * so resolving a screen threads nothing new through the shell.
  */
 export interface ProviderCheckoutScreenProps {

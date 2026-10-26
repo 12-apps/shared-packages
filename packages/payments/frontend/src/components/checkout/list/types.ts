@@ -4,8 +4,8 @@
  * door — as one radio group under two headings, with one bar whose button is
  * the only thing that creates the order and the charge.
  *
- * Opt-in, through `CheckoutFlowProps.paymentList`. A host that passes nothing
- * keeps the method tabs, the order summary and the raise-on-pick it has today — this is additive.
+ * Required, through `CheckoutFlowProps.paymentList`: the list is the only
+ * checkout there is (FUT-4028 deleted the method tabs).
  *
  * ## The door options are the HOST's
  *
