@@ -76,15 +76,20 @@ voided, or marked superseded on its row and handed to your recorder. A link the
 void finds already PAID becomes the answer, and the charge raised in its place
 is retired instead — unless that one was paid too, which is recorded as
 `DOUBLE_PAID` (both charge ids, for a refund) and answered with the charge paid
-in this attempt.
+in this attempt. Every further moved-past link the void finds paid is recorded
+`DOUBLE_PAID` against the charge answered, and reported to `onProviderFailure`.
 
 **`createChargeRaiser` resolves `{ answer, paidEarlier }`** (it used to resolve
 the snapshot). `answer` is the charge to answer the buyer with. When
 `paidEarlier` is `true`, `answer` is an EARLIER charge of the reference that the
-buyer already paid (its status is PAID), not one raised now. A host must then:
+buyer already paid (its status is PAID or AUTHORIZED), not one raised now. A
+host must then:
 
 - **settle** the reference with `answer` — the same settlement a webhook or a
   poll would apply, with `answer.amount` as the captured amount;
+- when `answer.status` is AUTHORIZED, still **capture** it — or **refund** it:
+  the buyer's money is held, not yet taken, and an authorization left alone
+  lapses back to the buyer while the reference reads paid;
 - **show paid**;
 - and **skip** everything it does with a freshly raised charge: no redirect to
   `answer.hostedCheckoutUrl`, no attaching it as the pending charge, no
