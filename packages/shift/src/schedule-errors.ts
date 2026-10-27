@@ -11,7 +11,12 @@ export type ShiftScheduleErrorCode =
   | 'SLOT_OVERLAP'
   | 'SLOT_NOT_FOUND'
   | 'SLOT_CANCELED'
-  | 'SLOT_OVER';
+  | 'SLOT_OVER'
+  /** The slot is canceled for a reason the host does not let an undo clear. */
+  | 'SLOT_NOT_RESTORABLE'
+  | 'SERIES_NOT_FOUND'
+  /** An undo found a row or rule it would touch changed since the write. */
+  | 'SCHEDULE_CHANGED';
 
 export class ShiftScheduleError extends Error {
   constructor(
@@ -31,4 +36,7 @@ export const SHIFT_SCHEDULE_ERROR_STATUS = {
   SLOT_NOT_FOUND: 404,
   SLOT_CANCELED: 409,
   SLOT_OVER: 409,
+  SLOT_NOT_RESTORABLE: 409,
+  SERIES_NOT_FOUND: 404,
+  SCHEDULE_CHANGED: 409,
 } as const satisfies Record<ShiftScheduleErrorCode, number>;
