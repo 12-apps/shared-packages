@@ -268,16 +268,17 @@ function coveredByHost(list: CheckoutPaymentList): boolean {
 /**
  * Why the button is held: the host's hold, then the list's own reasons, in the
  * prototype's order — the CPF or CNPJ at the top first, for an online choice that needs
- * it (E3); a door choice never does (R3).
+ * it (E3); a door choice never does (R3). The debit card's billing address comes
+ * last, as it sits below the card's fields (FUT-4109).
  */
 function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null): string | null {
   const { c, list, state, config } = props;
   const debitChosen = state.choice?.kind === "online" && state.choice.funding === "DEBIT";
-  return (debitChosen ? debitAddressReason(debit, list.copy.debit) : null) ?? blockedReason({
+  return blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door,
     asked: gateFields(state, c.buyer, config, raisedOf(props)),
     buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
-  });
+  }) ?? (debitChosen ? debitAddressReason(debit, list.copy.debit) : null);
 }
 
 /** The chain method the chosen online option would raise, or `null`. */
