@@ -137,7 +137,9 @@ The calendar opens on the chosen `value` (single) or `range.start` (range);
 with neither, on `defaultMonth` when given, else on today's month. It is read
 once, on mount, like the value it stands in for. A birth-date picker passes a
 month decades back (the storefront's Perfil field passes January 2001) rather
-than opening on today.
+than opening on today. It is not clamped: a `defaultMonth` outside
+`minDate`/`maxDate` opens on that month with every day disabled, so pass one
+inside the bounds.
 
 ### Month and year selectors: `captionLayout="selectors"` (FUT-4121)
 

@@ -61,7 +61,7 @@ export interface CalendarSelectorsCaptionProps {
   canGoPrevious: boolean;
   canGoNext: boolean;
   onToggle: (view: Exclude<CalendarView, 'days'>) => void;
-  /** Escape on a caption control closes an open grid. */
+  /** Escape on a caption control closes an open grid; with none open it is the host's. */
   onEscape: () => void;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
@@ -70,6 +70,8 @@ export interface CalendarSelectorsCaptionProps {
 /**
  * `<Month> ▾` and `<Year> ▾`, then the month arrows. Its keys are its own: the
  * container's day keys would otherwise turn Enter on a button into a day pick.
+ * Escape is the exception while no grid is open, so the sheet or popover that
+ * holds the calendar still closes on it.
  */
 export const CalendarSelectorsCaption: FC<CalendarSelectorsCaptionProps> = ({
   monthText,
@@ -88,6 +90,7 @@ export const CalendarSelectorsCaption: FC<CalendarSelectorsCaptionProps> = ({
   <Box
     data-testid="calendar-header"
     onKeyDown={(event) => {
+      if (event.key === 'Escape' && view === 'days') return;
       event.stopPropagation();
       if (event.key === 'Escape') onEscape();
     }}

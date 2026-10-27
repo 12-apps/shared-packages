@@ -264,6 +264,43 @@ describe('captionLayout="selectors" from the keyboard', () => {
     expect(yearButton()).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('hands Escape on a caption button to the host while no grid is open', () => {
+    const escapes = { count: 0 };
+    render(
+      <div
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') escapes.count += 1;
+        }}
+      >
+        <Harness />
+      </div>,
+    );
+
+    fireEvent.keyDown(yearButton(), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByTestId('calendar-next-month'), { key: 'Escape' });
+
+    expect(escapes.count).toBe(2);
+  });
+
+  it('keeps Escape from the host while it closes a grid', async () => {
+    const escapes = { count: 0 };
+    render(
+      <div
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') escapes.count += 1;
+        }}
+      >
+        <Harness />
+      </div>,
+    );
+
+    fireEvent.click(monthButton());
+    fireEvent.keyDown(monthButton(), { key: 'Escape' });
+
+    expect(escapes.count).toBe(0);
+    await waitFor(() => expect(monthButton()).toHaveAttribute('aria-expanded', 'false'));
+  });
+
   it('closes a grid on Escape from a caption button too', async () => {
     render(<Harness />);
     fireEvent.click(monthButton());
