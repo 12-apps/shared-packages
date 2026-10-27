@@ -17,6 +17,7 @@ import { secureEquals, sha256Hex } from './shared';
 import { NAME } from './stone-http';
 import {
   cancelCharge,
+  captureCharge,
   createChargeWith,
   findChargeByReference,
   getCharge,
@@ -261,6 +262,7 @@ export function stoneProvider(source: PaymentsCopySource<StoneCopy>): PaymentPro
     getCharge,
     findChargeByReference,
     cancelCharge,
+    captureCharge,
     refund,
 
     webhook: {

@@ -3,7 +3,7 @@ import type { PaymentProviderAdapter } from '../core/provider';
 import type { ResolvedCredentials } from '../core/types';
 import type { StoneCopy } from './copy';
 import { unreachableOutcome } from './probe-shared';
-import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { stubCapturedSnapshot, stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import { stubFindChargeByReference } from './stub-fault';
 import { NAME, stoneRequest } from './stone-http';
 import { methodOf, orderSnapshot, settledCharge, type StoneCharge, type StoneOrder } from './stone-orders';
@@ -143,6 +143,31 @@ export const cancelCharge: NonNullable<PaymentProviderAdapter['cancelCharge']> =
       currency: charge.currency ?? 'BRL',
       method: methodOf(charge, 'PIX'),
       id: providerChargeId,
+    },
+  );
+};
+
+/**
+ * Capture an AUTHORIZED charge (`authorized_pending_capture`) in full
+ * (FUT-4082): Pagar.me's `POST /charges/{id}/capture`, which answers with the
+ * charge as it now stands — `paid` once the capture took.
+ */
+export const captureCharge: NonNullable<PaymentProviderAdapter['captureCharge']> = async (
+  input,
+  credentials,
+) => {
+  if (credentials.stub) return stubCapturedSnapshot(NAME, input);
+  const charge = await stoneRequest<StoneCharge>(
+    `/charges/${encodeURIComponent(input.providerChargeId)}/capture`,
+    credentials,
+    { method: 'POST', body: input.amount ? { amount: input.amount.amountCents } : {} },
+  );
+  return orderSnapshot(
+    { charges: [charge] },
+    {
+      currency: charge.currency ?? 'BRL',
+      method: methodOf(charge, 'CARD'),
+      id: input.providerChargeId,
     },
   );
 };

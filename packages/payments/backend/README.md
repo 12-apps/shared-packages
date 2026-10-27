@@ -65,6 +65,7 @@ These are the seams hosts most often re-implement by accident:
 | `createPrismaChargeStore` | the charge store the gateway and the sweep share |
 | `classifyReversalEvent` | which reversal shape a delivery is — chargeback, refund, dispute |
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
+| `gateway.captureCharge` | takes the money an AUTHORIZED charge only holds, and persists the PAID it answers (FUT-4082); `UnsupportedOperationError` where the provider cannot |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
 
 ### Parked hosted links (FUT-4072)
@@ -87,9 +88,14 @@ host must then:
 
 - **settle** the reference with `answer` — the same settlement a webhook or a
   poll would apply, with `answer.amount` as the captured amount;
-- when `answer.status` is AUTHORIZED, still **capture** it — or **refund** it:
-  the buyer's money is held, not yet taken, and an authorization left alone
-  lapses back to the buyer while the reference reads paid;
+- when `answer.status` is AUTHORIZED, **capture** it first —
+  `gateway.captureCharge(merchant, provider, providerChargeId)` (FUT-4082) —
+  and settle only on the PAID it answers: the buyer's money is held, not yet
+  taken, and an authorization left alone lapses back to the buyer while the
+  reference reads paid. PagBank, Stone and Stripe capture; a provider with
+  none throws `UnsupportedOperationError`, and that charge is the owner's to
+  capture or refund in the provider's panel. The same holds for the charge a
+  `DOUBLE_PAID` keeps;
 - **show paid**;
 - and **skip** everything it does with a freshly raised charge: no redirect to
   `answer.hostedCheckoutUrl`, no attaching it as the pending charge, no

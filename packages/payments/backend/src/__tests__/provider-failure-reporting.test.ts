@@ -48,6 +48,8 @@ interface Script {
   probe?: () => Promise<ChargeSnapshot | null>;
   getCharge?: () => Promise<ChargeSnapshot>;
   cancelCharge?: () => Promise<ChargeSnapshot>;
+
+  captureCharge?: () => Promise<ChargeSnapshot>;
   refund?: () => Promise<never>;
   vault?: PaymentProviderAdapter['vault'];
   methods?: ('PIX' | 'CARD' | 'BOLETO')[];
@@ -89,6 +91,7 @@ function scripted(name: string, script: Script = {}): PaymentProviderAdapter {
   };
   if (script.probe) adapter.findChargeByReference = async () => script.probe!();
   if (script.cancelCharge) adapter.cancelCharge = async () => script.cancelCharge!();
+  if (script.captureCharge) adapter.captureCharge = async () => script.captureCharge!();
   if (script.refund) adapter.refund = async () => script.refund!();
   return script.vault ? { ...adapter, vault: script.vault } : adapter;
 }
@@ -542,6 +545,26 @@ describe("the gateway's follow-up provider calls report and rethrow", () => {
 
     const unable = world({ chain: [{ adapter: scripted('alpha') }] });
     await expect(unable.gateway.cancelCharge(TENANT, 'alpha', 'ch_1')).rejects.toBeInstanceOf(
+      UnsupportedOperationError,
+    );
+    expect(unable.reports).toEqual([]);
+  });
+
+  it('captureCharge: a provider failure is an error; "cannot capture" is not reported (FUT-4082)', async () => {
+    const refusing = world({
+      chain: [
+        {
+          adapter: scripted('alpha', {
+            captureCharge: refuse(new ProviderRequestError('alpha', 'alpha 409', { httpStatus: 409 })),
+          }),
+        },
+      ],
+    });
+    await expect(refusing.gateway.captureCharge(TENANT, 'alpha', 'ch_1')).rejects.toThrow('alpha 409');
+    expect(refusing.reports.map((r) => [r.path, r.severity, r.httpStatus])).toEqual([['CAPTURE', 'error', 409]]);
+
+    const unable = world({ chain: [{ adapter: scripted('alpha') }] });
+    await expect(unable.gateway.captureCharge(TENANT, 'alpha', 'ch_1')).rejects.toBeInstanceOf(
       UnsupportedOperationError,
     );
     expect(unable.reports).toEqual([]);

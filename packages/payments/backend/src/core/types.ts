@@ -233,6 +233,16 @@ export interface RefundInput {
   reason?: string;
 }
 
+/**
+ * What a capture of an AUTHORIZED charge names (FUT-4082): the charge, and
+ * the amount it authorized when the caller knows it. An adapter whose API
+ * needs the amount reads it back from the provider when it is absent.
+ */
+export interface CaptureInput {
+  providerChargeId: string;
+  amount?: Money;
+}
+
 export interface RefundSnapshot {
   provider: ProviderName;
   providerChargeId: string;

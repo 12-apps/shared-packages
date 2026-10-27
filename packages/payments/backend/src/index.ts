@@ -39,6 +39,7 @@ export {
 } from './core/gateway';
 // Pre-inbox refusal observability (FUT-761) — wire as `PaymentsGatewayConfig.webhookObserver`.
 export type { WebhookPipelineObserver } from './core/webhook-pipeline';
+export type { CaptureChargeMethods } from './core/charge-capture';
 export type { FailoverPolicy } from './core/charge-walk';
 /**
  * The webhook-replay sweep's inputs and result. The entry point itself is
@@ -216,6 +217,7 @@ export type {
   OnboardingStage,
   ProviderAuthMode,
   ProviderSetupGuide,
+  CaptureInput,
   RefundInput,
   RefundSnapshot,
   ResolvedCredentials,
