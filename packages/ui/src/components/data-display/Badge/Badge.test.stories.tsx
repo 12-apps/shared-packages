@@ -13,6 +13,7 @@ import React, { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { Badge } from './Badge';
+import { CLOSE_DELAY_MS } from './Badge.metrics';
 
 const meta: Meta<typeof Badge> = {
   title: 'Indicators/Badge/Tests',
@@ -749,12 +750,17 @@ export const ClosableBadgeTest: Story = {
 
       if (closeButton) {
         await userEvent.click(closeButton);
-        // Wait for fade out animation
+        // `onClose` fires only once the CLOSE_DELAY_MS zoom-out has FINISHED.
+        // On native that is an rAF-driven `Animated.timing`, which a loaded CI
+        // runner stretches well past its nominal length, so a 500ms budget
+        // (300ms of animation plus 200ms of slack) raced the frame clock and
+        // failed intermittently. The budget is the animation plus generous
+        // headroom; a callback that never comes still fails.
         await waitFor(
           () => {
             expect(args.onClose).toHaveBeenCalledTimes(1);
           },
-          { timeout: 500 },
+          { timeout: CLOSE_DELAY_MS + 3000 },
         );
       }
     });
