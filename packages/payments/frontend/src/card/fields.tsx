@@ -2,7 +2,7 @@ import { Box } from "@mui/material";
 import type { JSX } from "react";
 
 import { useCheckoutCopy } from "../components/checkout/copy-context";
-import { useCheckoutComponents } from "../components/checkout/ui";
+import { useCheckoutComponents, type CheckoutInputHints } from "../components/checkout/ui";
 import {
   StickyPayBar,
   useCheckoutLayout,
@@ -23,6 +23,17 @@ import { NEW_CARD, type CardDetails, type CardFieldErrors, type SavedCard } from
 
 type SetCard = React.Dispatch<React.SetStateAction<CardDetails>>;
 type SetErrors = React.Dispatch<React.SetStateAction<CardFieldErrors>>;
+
+/**
+ * The name is printed on the card in capitals: no auto-capitalised first
+ * letter, no "corrected" surname, no spellcheck squiggle (FUT-4107). Through
+ * `inputProps`, the one route that reaches the `<input>` in every binding.
+ */
+const HOLDER_INPUT_HINTS: CheckoutInputHints = {
+  autoCapitalize: "characters",
+  autoCorrect: "off",
+  spellCheck: false,
+};
 
 /** Saved-cards radio list, with a trailing "Novo cartão" option. */
 export function SavedCardsPicker({
@@ -196,6 +207,7 @@ export function NewCardForm({
         size="md"
         fullWidth
         autoComplete="cc-name"
+        inputProps={HOLDER_INPUT_HINTS}
         value={card.holder}
         error={Boolean(fieldErrors.holder)}
         helperText={fieldErrors.holder}

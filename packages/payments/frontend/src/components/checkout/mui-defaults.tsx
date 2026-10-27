@@ -138,7 +138,7 @@ function ownerStateOf(props: TextFieldProps): OwnerState {
  * The slot's own props, run through the theme's `MuiTextField` defaults the way
  * `TextField` runs them (`useDefaultProps` is `useThemeProps` by another name).
  */
-function useTextFieldProps({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, ...rest }: CheckoutInputProps): TextFieldProps {
+function useTextFieldProps({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, inputProps, ...rest }: CheckoutInputProps): TextFieldProps {
   return useThemeProps({
     name: 'MuiTextField',
     props: {
@@ -154,7 +154,7 @@ function useTextFieldProps({ label, type = 'text', inputMode, fullWidth, require
       onChange,
       onBlur,
       slotProps: {
-        htmlInput: { inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] },
+        htmlInput: { ...inputProps, inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] },
         input: { endAdornment },
       },
     } as TextFieldProps,
