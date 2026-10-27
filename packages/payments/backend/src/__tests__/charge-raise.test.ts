@@ -34,6 +34,8 @@ function deps(over: {
   count?: number;
   charge?: ChargeRaiseDeps['gateway']['charge'];
   cancelCharge?: ChargeRaiseDeps['gateway']['cancelCharge'];
+  /** The merchant's CURRENT enabled chain (FUT-4072); defaults to the links' own provider. */
+  chain?: string[];
 }): { d: ChargeRaiseDeps; calls: { warn: string[]; error: string[] } } {
   const calls = { warn: [] as string[], error: [] as string[] };
   const listPayable = vi.fn(async (q: { method?: string; amountNot?: Money }) => {
@@ -53,6 +55,9 @@ function deps(over: {
           snapshot: snapshot({ providerChargeId: 'NEW' }),
         })) as unknown as ChargeRaiseDeps['gateway']['charge']),
       cancelCharge: over.cancelCharge ?? vi.fn(async () => snapshot()),
+      clientConfigChain: vi.fn(async () =>
+        (over.chain ?? ['pagbank']).map((provider) => ({ provider, methods: ['PIX', 'CARD'] as const })),
+      ),
     },
     charges: {
       listPayable,

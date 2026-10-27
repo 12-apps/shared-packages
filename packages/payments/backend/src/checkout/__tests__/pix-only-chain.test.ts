@@ -180,11 +180,14 @@ describe('separating the two paths leaves the surfaces as they were', () => {
     expect(world.charges.all()).toHaveLength(0);
   });
 
-  it('COMMITS the walk on a PIX charge that failed over onto a hosted page', async () => {
+  it('re-walks the CURRENT chain on a re-tap after a failover, and supersedes the link it moved past', async () => {
     // FUT-563, from the mount's side: the buyer asked for a QR and the walk
     // landed somewhere that mints a link instead. The answer follows the charge
-    // that exists, and the link is payable from now on — so a re-tap must hand
-    // back that same link rather than raise a second payable charge.
+    // that exists. FUT-4072 then narrows the re-tap: the link is handed back
+    // only where a fresh walk would land FIRST, and `alpha` still heads the
+    // chain for PIX — so the re-tap walks again. The link it moves past cannot
+    // be voided here, so it is recorded superseded: never two payable charges
+    // nobody knows about.
     const world = setupCheckoutWorld({
       chain: [
         { name: 'alpha', adapter: testAdapter('alpha', { tokenization: 'NONE', refuses: true }) },
@@ -196,8 +199,13 @@ describe('separating the two paths leaves the surfaces as they were', () => {
     const second = await call(world.routes, 'POST', '/', {});
 
     const url = (first.body.data as Record<string, unknown>).hostedCheckoutUrl;
+    const next = (second.body.data as Record<string, unknown>).hostedCheckoutUrl;
     expect(typeof url).toBe('string');
-    expect((second.body.data as Record<string, unknown>).hostedCheckoutUrl).toBe(url);
-    expect(world.charges.all()).toHaveLength(1);
+    expect(typeof next).toBe('string');
+    expect(next).not.toBe(url);
+    expect(world.charges.all()).toHaveLength(2);
+    expect(world.correlation.superseded).toHaveLength(1);
+    expect(world.correlation.superseded[0]?.why).toBe('VOID_UNSUPPORTED');
+    expect(String(url)).toContain(world.correlation.superseded[0]?.charge.providerChargeId ?? '?');
   });
 });

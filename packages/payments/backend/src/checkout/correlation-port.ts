@@ -1,3 +1,4 @@
+import type { SupersededWhy } from '../core/hosted-retire';
 import type { Money, PaymentMethodKind, ProviderName } from '../core/types';
 
 /**
@@ -100,4 +101,24 @@ export interface ChargeCorrelationPort {
    * server-side tidy-up.
    */
   abandon?(ref: string): Promise<string>;
+  /**
+   * A hosted link this payable held was MOVED PAST and its provider could not
+   * void it (FUT-4072): the chain changed, a new charge was raised where the
+   * walk now lands, and the old link is still payable at its provider.
+   *
+   * Record it so a later payment of `charge` is handled as a SUPERSEDED payment
+   * — audited and reconciled, never applied as if it were the payable's
+   * current charge — rather than settling unnoticed. Called only once the new
+   * charge is live. Awaited and contained: a throw is logged and never fails
+   * the buyer's new charge.
+   *
+   * Omit it and the line is logged as an error by name instead.
+   */
+  supersede?(input: {
+    ref: string;
+    charge: AttachedCharge;
+    amount: Money;
+    replacedBy: AttachedCharge;
+    why: SupersededWhy;
+  }): Promise<void>;
 }

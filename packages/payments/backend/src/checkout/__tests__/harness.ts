@@ -154,6 +154,8 @@ interface CorrelationLog {
   expiries: string[];
   /** The buyer released the payable and the provider agreed (FUT-1146). */
   abandons: string[];
+  /** A moved-past hosted link the provider could not void (FUT-4072). */
+  superseded: { ref: string; charge: AttachedCharge; replacedBy: AttachedCharge; why: string }[];
 }
 
 /** Every vaulting the mount asked for — the opt-in half of the charge body. */
@@ -255,6 +257,7 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     settlements: [],
     expiries: [],
     abandons: [],
+    superseded: [],
   };
   const vault: VaultLog = { saved: [] };
   /**
@@ -321,6 +324,9 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
         correlation.abandons.push(ref);
         world.payable = { ...world.payable, state: 'CLOSED' };
         return 'RELEASED';
+      },
+      supersede: async ({ ref, charge, replacedBy, why }) => {
+        correlation.superseded.push({ ref, charge, replacedBy, why });
       },
     },
     instruments: {
