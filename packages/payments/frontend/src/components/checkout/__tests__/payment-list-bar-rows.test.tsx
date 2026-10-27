@@ -31,7 +31,7 @@ describe("the bar's rows", () => {
   it("takes the live region out of the flow once there is no reason under the button", async () => {
     renderList({ config: onPageStore(), client: stubClient(), taxIdOnFile: false });
     fireEvent.click(await screen.findByTestId("list-option-PIX-radio"));
-    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF para pagar pelo app."));
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app."));
     const live = screen.getByTestId("list-bar-live");
     expect(getComputedStyle(live).position).not.toBe("absolute");
     fireEvent.change(await screen.findByTestId("list-buyer-taxId"), { target: { value: "529.982.247-25" } });

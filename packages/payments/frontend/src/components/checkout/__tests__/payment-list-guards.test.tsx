@@ -169,7 +169,7 @@ describe("the LGPD consent beside the CPF at the top", () => {
     expect(consent.checked).toBe(true);
     fireEvent.click(payButton());
     await waitFor(() => expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ saveProfile: true })));
-    expect(save).toHaveBeenCalledWith(expect.objectContaining({ taxId: "529.982.247-25" }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ taxId: "52998224725" }));
   });
 
   it("saves nothing when the buyer unticks it", async () => {

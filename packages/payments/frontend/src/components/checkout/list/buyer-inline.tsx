@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX } from "react";
 
-import { formatCpf, onlyDigits, validateCpf } from "../../../card";
+import { formatCpfOrCnpj, isIncompleteCpfOrCnpj, taxIdDigits, validateCpfOrCnpj } from "../../../card";
 import { fieldSatisfied } from "../buyer-fields";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -34,18 +34,41 @@ function nameOf(field: CheckoutCustomerField, copy: Copy): string {
   return names[field.key];
 }
 
-/** The sentence under a field the buyer has started and not finished. */
-export function complaintOf(field: CheckoutCustomerField, value: string, copy: Copy, cpfInvalid: (v: string) => string | undefined): string | undefined {
+/**
+ * The sentence under a field the buyer has started and not finished. The
+ * document takes a CPF or a CNPJ (FUT-4080): short of either length it says
+ * how long each is, at a full length that fails its check digits it asks for a
+ * valid one.
+ */
+export function complaintOf(field: CheckoutCustomerField, value: string, copy: Copy, taxIdInvalid: (v: string) => string | undefined): string | undefined {
   if (!value.trim() || fieldSatisfied(field, value)) return undefined;
-  if (field.key === "taxId") return onlyDigits(value).length < 11 ? copy.cpfIncomplete : cpfInvalid(value);
+  if (field.key === "taxId") return isIncompleteCpfOrCnpj(value) ? copy.cpfIncomplete : taxIdInvalid(value);
   if (field.key === "phone") return copy.phoneIncomplete;
   return undefined;
 }
 
-export const PLACEHOLDERS: Partial<Record<CheckoutCustomerField["key"], string>> = {
+const PLACEHOLDERS: Partial<Record<CheckoutCustomerField["key"], string>> = {
   taxId: "000.000.000-00",
   phone: "(00) 00000-0000",
 };
+
+/**
+ * What an empty field shows. The document's comes from the pack — "CPF ou
+ * CNPJ" (FUT-4080): the CPF mask told a buyer holding a company card that the
+ * field wanted a CPF, and either mask alone says the same of the other. A
+ * pack without it keeps the CPF mask.
+ */
+export function placeholderOf(key: CheckoutCustomerField["key"], copy: Copy): string | undefined {
+  if (key === "taxId") return copy.taxIdPlaceholder ?? PLACEHOLDERS.taxId;
+  return PLACEHOLDERS[key];
+}
+
+/**
+ * The document as the field shows it — masked as a CPF or a CNPJ by its length
+ * — and as the buyer state keeps it: plain digits (FUT-4080), which is what
+ * the charge, the order and "Salvar meus dados" then carry.
+ */
+export const taxIdField = { shown: formatCpfOrCnpj, kept: taxIdDigits } as const;
 
 /** Call `onComplete` once each time `complete` turns true — the focus moves on to what is next. */
 export function useOnComplete(complete: boolean, onComplete: (() => void) | undefined): void {
@@ -85,8 +108,9 @@ export function BuyerInline({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
       {asked.map((field) => {
-        const value = buyer[field.key] ?? "";
-        const complaint = complaintOf(field, value, copy, (v) => validateCpf(v, cardCopy.fields));
+        const kept = buyer[field.key] ?? "";
+        const value = field.key === "taxId" ? taxIdField.shown(kept) : kept;
+        const complaint = complaintOf(field, value, copy, (v) => validateCpfOrCnpj(v, cardCopy.fields));
         // The label sits ABOVE the field, whole — "CPF (o PagBank pede para
         // pagar pelo app)" (FN:182) — and a native <label> around both names
         // the input with it; a floating label would cut the reason short.
@@ -105,14 +129,14 @@ export function BuyerInline({
             size="md"
             fullWidth
             required
-            placeholder={PLACEHOLDERS[field.key]}
+            placeholder={placeholderOf(field.key, copy)}
             value={value}
             error={Boolean(complaint)}
             helperText={complaint}
             onChange={(event) =>
               onBuyerChange({
                 ...buyer,
-                [field.key]: field.key === "taxId" ? formatCpf(event.target.value) : event.target.value,
+                [field.key]: field.key === "taxId" ? taxIdField.kept(event.target.value) : event.target.value,
               })
             }
             data-testid={`list-buyer-${field.key}`}

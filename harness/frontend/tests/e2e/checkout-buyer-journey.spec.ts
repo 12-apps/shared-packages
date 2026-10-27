@@ -103,9 +103,33 @@ test.describe('card', () => {
     // stayed green. FUT-740's third critical rides in the same line: the payable
     // has no column for a CPF, so it can only travel with the request that
     // raises one.
+    // The document travels as plain digits, whatever mask the buyer saw (FUT-4080).
     await expect(page.getByTestId('provider-charges')).toContainText(
-      `aurora:CARD:${VALID_CPF}:tok:`,
+      `aurora:CARD:${VALID_CPF.replace(/\D/g, '')}:tok:`,
     );
+    await expect(page.getByTestId('provider-charge-count')).toHaveText('1');
+  });
+
+  test('a company card: the CNPJ typed at the top reaches the provider as fourteen digits', async ({
+    page,
+  }) => {
+    // FUT-4080: the field took 11 digits only, so a buyer paying with a
+    // company card could not give its CNPJ. It reads "CPF ou CNPJ" now, masks
+    // a CNPJ from the 12th digit, and the charge carries the digits.
+    await openPage(page, 'payments-checkout-card');
+    await reachPayment(page);
+
+    const field = page.getByTestId('list-buyer-taxId');
+    await expect(page.getByTestId('list-cpf')).toContainText('CPF ou CNPJ');
+    await field.fill('11222333000181');
+    await expect(field).toHaveValue('11.222.333/0001-81');
+
+    await chooseCard(page);
+    await fillCard(page);
+    await payCard(page);
+
+    await expect(page.getByTestId('payment-paid')).toBeVisible();
+    await expect(page.getByTestId('provider-charges')).toContainText('aurora:CARD:11222333000181:tok:');
     await expect(page.getByTestId('provider-charge-count')).toHaveText('1');
   });
 

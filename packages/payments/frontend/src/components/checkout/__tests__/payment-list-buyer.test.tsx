@@ -42,12 +42,13 @@ function door(): CheckoutDoorOption {
 const CPF_FOR_CARD: CheckoutCustomerField[] = [{ key: "taxId", type: "CPF", required: true, methods: ["CARD"] }];
 
 describe("the CPF at the top of Pagamento (E1)", () => {
-  it("is asked before anything is chosen, above the rows, with the provider's reason under 'CPF'", async () => {
+  it("is asked before anything is chosen, above the rows, with the provider's reason under 'CPF ou CNPJ'", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
     const top = await screen.findByTestId("list-cpf");
-    expect(within(top).getByText("CPF")).toBeTruthy();
+    expect(within(top).getByText("CPF ou CNPJ")).toBeTruthy();
     expect(within(top).getByText("o PagBank pede para pagar pelo app")).toBeTruthy();
-    expect(within(top).getByLabelText(/^CPFo PagBank pede para pagar pelo app/)).toBeTruthy();
+    expect(within(top).getByLabelText(/^CPF ou CNPJo PagBank pede para pagar pelo app/)).toBeTruthy();
+    expect(within(top).getByPlaceholderText("CPF ou CNPJ")).toBeTruthy();
     expect(within(top).getByLabelText("Salvar meus dados para a próxima compra")).toBeTruthy();
     expect(top.compareDocumentPosition(screen.getByTestId("list-option-PIX")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Never inside a row any more.
@@ -65,7 +66,7 @@ describe("the CPF at the top of Pagamento (E1)", () => {
     // …and holds only the method that needs it.
     await waitFor(() => expect(payButton().disabled).toBe(false));
     fireEvent.click(radio("list-option-CARD"));
-    await waitFor(() => expect(reason()).toBe("Digite seu CPF para pagar pelo app."));
+    await waitFor(() => expect(reason()).toBe("Digite seu CPF ou CNPJ para pagar pelo app."));
   });
 
   it("is asked for a wallet alone: a store whose only CPF-needing way to pay is the card behind Google Pay", async () => {
@@ -92,9 +93,9 @@ describe("the CPF at the top of Pagamento (E1)", () => {
     await screen.findByTestId("list-cpf");
     fireEvent.click(radio("list-option-PIX"));
     type("list-buyer-taxId", "123");
-    await screen.findByText("O CPF tem 11 dígitos.");
+    await screen.findByText("O CPF tem 11 dígitos, e o CNPJ, 14.");
     expect(payButton().disabled).toBe(true);
-    expect(reason()).toBe("Digite seu CPF para pagar pelo app.");
+    expect(reason()).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");
     type("list-buyer-taxId", "529.982.247-25");
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
@@ -124,7 +125,7 @@ describe("the CPF at the top of Pagamento (E1)", () => {
     renderList({ config: walletStore(), client: stubClient([]), taxIdOnFile: false, list: { totalCents: 2700 } });
     const native = await screen.findByTestId("google-pay-native");
     await waitFor(() => expect(native.getAttribute("aria-disabled")).toBe("true"));
-    expect(screen.getByTestId("list-wallets-held").textContent).toBe("Digite seu CPF para pagar pelo app.");
+    expect(screen.getByTestId("list-wallets-held").textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");
     type("list-buyer-taxId", "529.982.247-25");
     await waitFor(() => expect(screen.getByTestId("google-pay-native").getAttribute("aria-disabled")).toBeNull());
     await waitFor(() => expect(screen.queryByTestId("list-wallets-held")).toBeNull());
@@ -159,7 +160,7 @@ describe("a CPF on file (E2)", () => {
     expect(payButton().disabled).toBe(false);
     type("list-buyer-taxId", "111.111.111-1");
     await waitFor(() => expect(payButton().disabled).toBe(true));
-    expect(reason()).toBe("Digite seu CPF para pagar pelo app.");
+    expect(reason()).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");
     type("list-buyer-taxId", "529.982.247-25");
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
@@ -176,7 +177,7 @@ describe("a CPF on file (E2)", () => {
     await waitFor(() => expect(payButton().disabled).toBe(false));
   });
 
-  it("'Manter o CPF salvo' closes the field, drops what was typed and brings the payer line back", async () => {
+  it("'Manter o documento salvo' closes the field, drops what was typed and brings the payer line back", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, buyer: { name: "Ana Teste" } });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));
@@ -184,7 +185,7 @@ describe("a CPF on file (E2)", () => {
     await screen.findByTestId("list-buyer-taxId");
     type("list-buyer-taxId", "123");
     await waitFor(() => expect(payButton().disabled).toBe(true));
-    fireEvent.click(screen.getByRole("button", { name: "Manter o CPF salvo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manter o documento salvo" }));
     await screen.findByTestId("list-payer");
     await waitFor(() => expect(screen.queryByTestId("list-cpf")).toBeNull());
     await waitFor(() => expect(payButton().disabled).toBe(false));
@@ -208,7 +209,7 @@ describe("remembering the CPF", () => {
     type("list-buyer-taxId", "529.982.247-25");
     await waitFor(() => expect(payButton().disabled).toBe(false));
     fireEvent.click(payButton());
-    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ taxId: "529.982.247-25" })));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ taxId: "52998224725" })));
     first.unmount();
     // The raised Pix is parked for a resume; the next checkout must not pick it up.
     window.sessionStorage.clear();

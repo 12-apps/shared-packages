@@ -729,6 +729,13 @@ What changes for the buyer:
   buttons and the online rows' button are held with `copy.reasons.cpf`; a door
   row never is. A buyer with one on file sees no field but the payer line, and
   its "Alterar" reveals the field at the top. The hand-off provider's mobile is still asked inside its own row.
+- **The field takes a CPF or a CNPJ** (FUT-4080), "CPF ou CNPJ": a buyer
+  paying with a company card gives its CNPJ. It is masked `000.000.000-00` up
+  to 11 digits and `00.000.000/0000-00` from the 12th, accepts either pasted
+  with or without punctuation, checks the check digits of either, and keeps
+  PLAIN DIGITS in the buyer state — so `createOrder`, `saveBuyerContact` and
+  the charge body all carry digits. Numeric CNPJs only: the adapters strip the
+  value to digits, so the alphanumeric CNPJ is not accepted yet.
 - **No confirmation dialog.** The card's "Pagar" becomes a bar that fills in
   five seconds (`CHARGE_WINDOW_MS`) with "Cancelar" under it; nothing is sent
   before it fills. "Gerar Pix" raises the order and the code at once, and the
@@ -779,7 +786,7 @@ What changes for the buyer:
 | `CheckoutFlowProps.validateApplePayMerchant` | the Apple Pay merchant-validation port (server-side). The list offers no Apple Pay without it — its session could only abort. `ports.validateApplePayMerchant` on `createPaymentFlows` |
 | `cart.lines`, `cart.discountLines` | the "Resumo do pedido" column on a computer: your lines, then your fee/discount rows above "Total". `cart.lines` is the cart's: settling a ready total it is not drawn, and `paymentList.lines` takes its place; `cart.discountLines` is drawn either way |
 | `paymentList.summaryTarget` | lay out the computer's two columns YOURSELF: your step cards on the left (≤ 680px), and an element of yours on the right — pass it here and the list portals the whole "Resumo do pedido" column into it (lines, money rows, Total, `summary`, extras and the pay button), with no bar at the bottom. `null` while your element is not mounted yet (the bar waits rather than flash). Leave it out on a phone, or to keep the list's own layout (the step and the column side by side once the flow's frame is ≥ 900px). The Pix screen and the hand-off always keep their bar |
-| `defaultBuyer.taxId` with `taxIdOnFile` | the CPF on file, plain digits: "Alterar" on the payer line opens it at the top, filled and editable. Without it the field opens empty. Either way the field is optional while a CPF is on file — empty keeps the saved one, only a typed CPF that is not valid holds the online ways to pay — and "Manter o CPF salvo" (`copy.buyer.keepSavedCpf`) closes it again, dropping what was typed |
+| `defaultBuyer.taxId` with `taxIdOnFile` | the CPF or CNPJ on file, plain digits: "Alterar" on the payer line opens it at the top, filled — masked as a CNPJ when it is one — and editable, and the payer line names the kind ("CNPJ ✓"). Without it the field opens empty and the line says "CPF ✓". Either way the field is optional while a document is on file — empty keeps the saved one, only a typed CPF or CNPJ that is not valid holds the online ways to pay — and "Manter o documento salvo" (`copy.buyer.keepSavedCpf`) closes it again, dropping what was typed |
 | `onlineExtras` | drawn whenever a payment here is possible — the list offers an online row or a wallet, and no door row is chosen (nothing chosen counts: a wallet pays with no row). The payer line follows the same rule |
 | `copy.wallets`, `copy.buyer.cpfHint` | new in the packs: "Pagamento rápido", "Pagar com Google Pay", "Pagar com Apple Pay", "ou escolha como pagar"; "o PagBank pede para pagar pelo app". A host building its own `PaymentListCopy` adds them. `copy.googlePay` is no longer drawn |
 | `CheckoutOnlineChoice` | never `"GOOGLE_PAY"` any more: the wallets are not rows, so `onChoiceChange` does not report one |

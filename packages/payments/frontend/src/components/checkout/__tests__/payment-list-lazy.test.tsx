@@ -155,7 +155,7 @@ describe("while the top's chunk loads", () => {
     const { loader, open } = gatedLoader();
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
     await screen.findByTestId("list-top-loading");
-    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF para pagar pelo app."));
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app."));
     expect(payButton().disabled).toBe(true);
     await waitFor(() => expect(screen.queryByTestId("list-option-CARD")).toBeNull());
     await act(async () => open());
@@ -243,7 +243,7 @@ describe("a part whose chunk fails to load", () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), taxIdOnFile: false, components: { lazy: loader } });
     // The preload and the top share one build: one failed import fails both.
     await screen.findByTestId("list-option-CARD");
-    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF para pagar pelo app."));
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app."));
     expect(payButton().disabled).toBe(true);
     expect(await screen.findByTestId("list-buyer-taxId", {}, { timeout: PART_RETRY_MS * 5 })).toBeTruthy();
     expect(attempts()).toBe(2);

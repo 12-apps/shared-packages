@@ -40,7 +40,7 @@ export const BothWallets: StoryObj = scene(
 
 /**
  * A new buyer: the CPF at the top, the provider's reason under it; the wallets and
- * the online rows' button held with "Digite seu CPF para pagar pelo app." —
+ * the online rows' button held with "Digite seu CPF ou CNPJ para pagar pelo app." —
  * a door row still sends (E1, E3, R3).
  */
 export const CpfMissing: StoryObj = scene(

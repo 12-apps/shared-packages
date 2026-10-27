@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 
+import { taxIdKind } from "../../../card";
 import { cardChain, cardTokenization, handOffMethod } from "../method-capability";
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
@@ -47,7 +48,7 @@ interface ListFaceProps {
   /** "Alterar" on the payer line opened the CPF at the top (E2 → E1). */
   revealed: boolean;
   onRevealCpf: () => void;
-  /** "Manter o CPF salvo": close the revealed CPF, keeping the one on file. */
+  /** "Manter o documento salvo": close the revealed field, keeping the document on file. */
   onKeepSavedCpf: () => void;
 }
 
@@ -149,7 +150,7 @@ function Payer({ props }: { props: ListFaceProps }): JSX.Element | null {
   const { c, list, taxIdOnFile } = props;
   const name = c.buyer.name?.trim();
   if (!taxIdOnFile || !name || props.revealed || !payingHere(props)) return null;
-  return <PayerLine copy={list.copy} name={name} onChange={props.onRevealCpf} />;
+  return <PayerLine copy={list.copy} name={name} document={taxIdKind(c.buyer.taxId)} onChange={props.onRevealCpf} />;
 }
 
 /** The card's charge is past the button: counting down, or going out. */

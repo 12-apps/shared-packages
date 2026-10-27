@@ -4,6 +4,7 @@ import {
   NEW_CARD,
   detectBrand,
   onlyDigits,
+  plainTaxId,
   validateCardNumber,
   validateCvv,
   validateExpiry,
@@ -101,7 +102,7 @@ async function chargeBodyOf(
     tokensByProvider: instruments.tokensByProvider,
     saveCard: form.usingNewCard && form.saveCard,
     cardMeta: instruments.cardMeta,
-    taxId: ctx.buyer.taxId,
+    taxId: plainTaxId(ctx.buyer.taxId),
   };
   if (!form.debit) return ok(body);
   const authenticated = await authenticateDebit({ ...ctx, encryptedCard: instruments.token, debit: form.debit });

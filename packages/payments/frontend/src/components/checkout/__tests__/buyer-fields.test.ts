@@ -117,6 +117,15 @@ describe("whether one field is satisfied", () => {
     expect(fieldSatisfied(cpf, "")).toBe(false);
   });
 
+  it("takes a CNPJ under the CPF type, by its own check digits, as the server does (FUT-4080)", () => {
+    const cpf = { key: "taxId", type: "CPF", required: true } as const;
+    expect(fieldSatisfied(cpf, "11.222.333/0001-81")).toBe(true);
+    expect(fieldSatisfied(cpf, "11222333000181")).toBe(true);
+    expect(fieldSatisfied(cpf, "11.222.333/0001-82")).toBe(false);
+    expect(fieldSatisfied(cpf, "11111111111111")).toBe(false);
+    expect(fieldSatisfied(cpf, "112223330001")).toBe(false);
+  });
+
   it("holds MOBILE to the narrower rule PHONE accepts", () => {
     const mobile = { key: "phone", type: "MOBILE", required: true } as const;
     const phone = { key: "phone", type: "PHONE", required: true } as const;

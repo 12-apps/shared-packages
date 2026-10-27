@@ -208,7 +208,7 @@ describe("GooglePayButton — the token becomes the charge", () => {
     expect(walletCharges[0]).toEqual({
       orderId: "order-1",
       wallet: { type: "GOOGLE_PAY", key: "gp_tok_42" },
-      taxId: "529.982.247-25",
+      taxId: "52998224725",
     });
     // The tokenizationSpecification came from the chain head, not a literal.
     expect(calls.loadRequests[0]).toMatchObject({

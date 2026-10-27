@@ -108,7 +108,7 @@ describe("why the button waits", () => {
 
   it("asks for a choice, then the CPF, then the card, in the prototype's order", () => {
     expect(blockedReason({ ...base, choice: null })).toBe("Escolha como pagar.");
-    expect(blockedReason({ ...base, asked: [CPF], selection: NEW_CARD })).toBe("Digite seu CPF para pagar pelo app.");
+    expect(blockedReason({ ...base, asked: [CPF], selection: NEW_CARD })).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");
     expect(blockedReason({ ...base, selection: null })).toBe("Escolha o cartão.");
     expect(blockedReason({ ...base, selection: NEW_CARD })).toBe("Preencha os dados do cartão.");
     expect(blockedReason({ ...base, selection: NEW_CARD, cardIsComplete: true })).toBeNull();
@@ -194,8 +194,9 @@ describe("the list's words (FUT-3685, T5–T8)", () => {
     expect(COPY.pix).toEqual({ label: "Pix", hint: "Gera o código para copiar e colar" });
     expect(COPY.card.label).toBe("Cartão de crédito");
     expect(COPY.card.hintNew).toBe("Digite os dados do cartão");
-    expect(COPY.buyer.cpf).toBe("CPF");
-    expect(COPY.buyer.keepSavedCpf).toBe("Manter o CPF salvo");
+    expect(COPY.buyer.cpf).toBe("CPF ou CNPJ");
+    expect(COPY.buyer.taxIdPlaceholder).toBe("CPF ou CNPJ");
+    expect(COPY.buyer.keepSavedCpf).toBe("Manter o documento salvo");
     expect(COPY.actions.card).toBe("Pagar");
     expect(COPY.actions.pix).toBe("Gerar Pix");
   });

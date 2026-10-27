@@ -6,7 +6,7 @@
  *    the list's container — a host's ~680px left column is under the flow's
  *    900px "wide" and the field still stops; full width on a phone.
  *  - "Salvar meus dados para a próxima compra" flush with the field's left
- *    edge (no checkbox ring, no label inset), "Manter o CPF salvo" flush too
+ *    edge (no checkbox ring, no label inset), "Manter o documento salvo" flush too
  *    and in the neutral ink, one 12px step between each.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,7 +75,7 @@ describe("the rows under the field (L7)", () => {
     expect(css).toMatch(new RegExp(`\\.${emotionClass(screen.getByTestId("list-cpf"))}\\{[^}]*gap:12px`));
   });
 
-  it("draws 'Manter o CPF salvo' as a neutral link, flush with the field", async () => {
+  it("draws 'Manter o documento salvo' as a neutral link, flush with the field", async () => {
     const buttons: CheckoutButtonProps[] = [];
     const Button = (props: CheckoutButtonProps) => {
       buttons.push(props);

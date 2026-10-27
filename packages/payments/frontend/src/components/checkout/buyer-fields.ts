@@ -28,7 +28,7 @@
  * the two must not disagree about what a chain needs.
  */
 
-import { isValidCpf } from "../../card";
+import { isValidCpfOrCnpj } from "../../card";
 
 import type { CheckoutChainLink, CheckoutCustomerField, PaymentMethod } from "./types";
 import { brLocalNumber } from "../../phone";
@@ -105,11 +105,13 @@ const RULES: Record<CheckoutCustomerField["type"], (value: string) => boolean> =
   // DDD + an 8-digit landline or a 9-digit mobile, mirroring the server's rule.
   PHONE: (value) => /^\d{10,11}$/.test(brLocalNumber(value) ?? ""),
   MOBILE: (value) => /^\d{2}9\d{8}$/.test(brLocalNumber(value) ?? ""),
-  // The real check-digit rule, not a length test: the same validator the CPF
-  // input has always used, so the form and the gate cannot disagree. The
+  // The real check-digit rule, not a length test: the same validator the
+  // document input uses, so the form and the gate cannot disagree. The
   // PREDICATE rather than the message — this is a gate, and it would only be
-  // throwing the sentence away (FUT-760).
-  CPF: (value) => isValidCpf(value),
+  // throwing the sentence away (FUT-760). A CPF OR a CNPJ (FUT-4080), exactly
+  // as the server's `CPF` type reads it: a buyer paying with a company card
+  // gives its CNPJ, and every adapter that forwards `taxId` sends either.
+  CPF: (value) => isValidCpfOrCnpj(value),
 };
 
 /** Whether a declared field is satisfied by what the buyer typed. */

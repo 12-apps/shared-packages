@@ -274,7 +274,7 @@ describe('useActivationCharge — the charge', () => {
       await result.current.submit();
     });
 
-    expect(result.current.cpfError).toBe('CPF ou CNPJ inválido.');
+    expect(result.current.cpfError).toBe('Informe um CPF ou CNPJ válido.');
     expect(io.posted()).toHaveLength(0);
   });
 

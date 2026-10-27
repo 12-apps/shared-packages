@@ -330,6 +330,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
   otherCard: string;
   /** The buyer's own details asked inside the option, when the store needs one the buyer has not given. */
   buyer: {
+    /** "CPF ou CNPJ": the field takes a company card's CNPJ too (FUT-4080). The key keeps its name for hosts' packs. */
     cpf: string;
     phone: string;
     name: string;
@@ -341,11 +342,9 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
      * pede para pagar pelo app"; `null` when no name was published.
      */
     cpfHint: (provider: string | null) => string;
-    /**
-     * The link under the CPF opened by "Alterar" over a CPF on file, closing it
-     * again — "Manter o CPF salvo" (FUT-3685). Both packs carry it; absent ⇒ no
-     * link (an empty field keeps the saved CPF either way).
-     */
+    /** The empty document field's words — "CPF ou CNPJ" (FUT-4080). Absent ⇒ the CPF mask. */
+    taxIdPlaceholder?: string;
+    /** "Manter o documento salvo" under a field "Alterar" opened over one on file (FUT-3685, FUT-4080); absent ⇒ no link. */
     keepSavedCpf?: string;
     cpfIncomplete: string;
     phoneIncomplete: string;
@@ -371,8 +370,8 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     covered: string;
     handOff: (provider: string | null) => string;
   };
-  /** "Pagando como Ana Teste · CPF ✓". */
-  payer: (name: string) => string;
+  /** "Pagando como Ana Teste · CPF ✓"; `document` is the kind on file when the host passed it (FUT-4080). */
+  payer: (name: string, document?: "CPF" | "CNPJ" | null) => string;
   payerChange: string;
   /** The 5-second bar: "Pagando R$ 27,00 no Visa 4242…"; `card` is `null` for a card typed now. */
   charging: (total: string, card: string | null) => string;
