@@ -51,6 +51,13 @@ export const T = {
   mono: '"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace',
 } as const;
 
+/**
+ * The card's content inset. Every block inside the provider card that is not a
+ * full-bleed band (the header, the connect card's text, its action bar) starts
+ * here, so their left edges line up with the provider's name.
+ */
+export const CARD_INSET = '20px';
+
 /** The card that bounds one provider: hairline, 12px, nothing clipped. */
 export const CARD_SX = {
   border: `1px solid ${T.line}`,

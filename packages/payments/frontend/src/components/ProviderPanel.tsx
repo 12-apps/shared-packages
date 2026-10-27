@@ -10,9 +10,9 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { CARD_SX } from './panel-tokens';
+import { CARD_INSET, CARD_SX } from './panel-tokens';
 import { OAuthPanel } from './OAuthPanel';
-import { EnvironmentNotice, EnvironmentSelector } from './EnvironmentTabs';
+import { EnvironmentNotice, EnvironmentSelector, soleEnvironment } from './EnvironmentTabs';
 import { ProviderForm } from './ProviderCredentialForm';
 import { ProviderStatusBar } from './ProviderStatusBar';
 
@@ -154,7 +154,7 @@ export function ProviderCard({
   // `Paper variant="outlined"` would paint the theme's divider instead.
   return (
     <Paper elevation={0} sx={CARD_SX}>
-      <Box sx={{ px: '20px', pt: '18px', pb: '6px' }}>{header}</Box>
+      <Box sx={{ px: CARD_INSET, pt: '18px', pb: '6px' }}>{header}</Box>
       {band}
       <Box>{children}</Box>
     </Paper>
@@ -226,13 +226,6 @@ function oauthWalkthrough(props: ActivePanelProps, path: 'oauth' | 'credentials'
  * a FUNCTION: which steps to show depends on the disclosure, whose state lives
  * in `OAuthPanel`.
  */
-/** The one environment a provider has, when it declares a single one. */
-function soleEnvironment(descriptor: ActivePanelProps['descriptor']): PaymentEnvironment | null {
-  // Read defensively: a host-built descriptor (and many fixtures) may carry no capabilities at all.
-  const declared = (descriptor.capabilities as typeof descriptor.capabilities | undefined)?.environments;
-  return declared && declared.length === 1 ? (declared[0] ?? null) : null;
-}
-
 /**
  * The environment selector and its notice — full-bleed across the card, and
  * inset for the manual disclosure, where it no longer spans anything (see

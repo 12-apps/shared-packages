@@ -142,7 +142,7 @@ function renderConnection(over: Partial<MaskedProviderConfig>) {
  * provider account a store charges into was to disconnect and reconnect.
  */
 describe('ProviderConnection — the connected account', () => {
-  it('shows the account identity, its scopes in pt-BR, and the connect date', () => {
+  it('states the account and the connect date once, in the facts grid, and the scopes in pt-BR', () => {
     renderConnection({
       status: 'VERIFIED',
       connectedAccount: {
@@ -152,14 +152,18 @@ describe('ProviderConnection — the connected account', () => {
         connectedAt: '2026-08-01T15:00:00Z',
       },
     });
-    const details = screen.getByTestId('payments-connected-account');
-    expect(details.textContent).toContain('Conta conectada');
-    expect(details.textContent).toContain('ACCO_1234');
-    expect(details.textContent).toContain('Conectada em');
+    const body = screen.getByTestId('payments-connection-body');
+    // One place per thing (FUT-4071): the grid already names the account and
+    // the date, so the sentences that repeated them under it are gone.
+    expect(body.textContent?.split('ACCO_1234')).toHaveLength(2);
+    expect(body.textContent).not.toContain('Conta conectada');
+    expect(screen.getAllByText('Conectada em')).toHaveLength(1);
+    expect(body.textContent).not.toMatch(/Conectada em \d/);
     // A known scope reads in the owner's language; an unknown one falls back
     // to the provider's own spelling rather than a wrong translation.
-    expect(details.textContent).toContain('Consultar pagamentos');
-    expect(details.textContent).toContain('custom.scope');
+    const scopes = screen.getByTestId('payments-connected-account');
+    expect(scopes.textContent).toContain('Consultar pagamentos');
+    expect(scopes.textContent).toContain('custom.scope');
   });
 
   it('prefers a human-recognizable label over the raw account id', () => {
@@ -172,9 +176,9 @@ describe('ProviderConnection — the connected account', () => {
         connectedAt: null,
       },
     });
-    expect(screen.getByTestId('payments-connected-account').textContent).toContain(
-      'loja@exemplo.com.br',
-    );
+    const body = screen.getByTestId('payments-connection-body');
+    expect(body.textContent?.split('loja@exemplo.com.br')).toHaveLength(2);
+    expect(body.textContent).not.toContain('ACCO_1234');
   });
 
   it('claims nothing for a store connected before the identity was recorded', async () => {

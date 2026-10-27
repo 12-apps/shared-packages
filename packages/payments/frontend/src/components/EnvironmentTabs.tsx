@@ -2,7 +2,7 @@
 
 import { Alert, Box, Tab, Tabs, Typography } from '@mui/material';
 
-import type { PaymentEnvironment } from '@12-apps/payments-backend';
+import type { PaymentEnvironment, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { T } from './panel-tokens';
 import type { EnvironmentCopy } from './settings-copy';
@@ -17,6 +17,16 @@ import { usePaymentsSettingsCopy } from './settings-copy-context';
  */
 export function environmentLabels(copy: EnvironmentCopy): Record<PaymentEnvironment, string> {
   return { SANDBOX: copy.sandbox, PRODUCTION: copy.production };
+}
+
+/**
+ * The one environment a provider has, when it declares a single one — no
+ * selector is offered for it anywhere (the panel's tabs or the connect card).
+ */
+export function soleEnvironment(descriptor: ProviderDescriptor): PaymentEnvironment | null {
+  // Read defensively: a host-built descriptor (and many fixtures) may carry no capabilities at all.
+  const declared = (descriptor.capabilities as typeof descriptor.capabilities | undefined)?.environments;
+  return declared && declared.length === 1 ? (declared[0] ?? null) : null;
 }
 
 /**

@@ -20,8 +20,17 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCard';
-import { expiryProximity, isConnected } from './connection-state';
-import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX, T } from './panel-tokens';
+import { EnvironmentSelector } from './EnvironmentTabs';
+import { readConnection, useConnectEnvironment } from './connect-environment';
+import { expiryProximity } from './connection-state';
+import {
+  BAR_MSG_SX,
+  BAR_SX,
+  BTN_PRIMARY_SX,
+  BTN_QUIET_DANGER_SX,
+  CARD_INSET,
+  T,
+} from './panel-tokens';
 import type { OAuthConnectionCopy } from './settings-copy';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy, usePaymentsSettingsCopy } from './settings-copy-context';
@@ -145,44 +154,32 @@ function scopeLabels(copy: OAuthConnectionCopy): Record<string, string> {
 }
 
 /**
- * WHICH account is connected (FUT-300): identity, granted scopes and the
- * connect date — the difference between "conectado" and "conectado como".
- * Without it, the only way an owner could tell which PagBank account a store
- * charges into was to disconnect and connect again.
+ * WHAT the connected grant may do (FUT-300): its granted scopes, in the
+ * owner's words.
+ *
+ * The account and the connect date used to be repeated here, as sentences
+ * under the facts grid that already states both (`ConnectionFacts`). One place
+ * per thing: the grid answers "which account, since when"; this answers only
+ * what the grid cannot.
  */
-function ConnectedAccountDetails(props: { account: ConnectedOAuthAccount }) {
+function GrantedScopes(props: { account: ConnectedOAuthAccount }) {
   const copy = usePaymentsSettingsCopy().oauth;
-  const { account } = props;
-  const identity = account.accountLabel ?? account.accountId;
+  const { grantedScopes } = props.account;
+  if (grantedScopes.length === 0) return null;
   return (
-    <Stack spacing={0.5} data-testid="payments-connected-account">
-      {identity ? (
-        <Typography variant="body2">
-          Conta conectada: <strong>{identity}</strong>
-        </Typography>
-      ) : null}
-      {account.connectedAt ? (
-        <Typography variant="caption" color="text.secondary">
-          {copy.connectedAt(new Date(account.connectedAt).toLocaleString())}
-        </Typography>
-      ) : null}
-      {account.grantedScopes.length > 0 ? (
-        <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
-          {account.grantedScopes.map((scope) => (
-            <Chip
-              key={scope}
-              size="small"
-              variant="outlined"
-              label={scopeLabels(copy)[scope] ?? scope}
-            />
-          ))}
-        </Stack>
-      ) : null}
+    <Stack
+      direction="row"
+      spacing={0.5}
+      useFlexGap
+      flexWrap="wrap"
+      data-testid="payments-connected-account"
+    >
+      {grantedScopes.map((scope) => (
+        <Chip key={scope} size="small" variant="outlined" label={scopeLabels(copy)[scope] ?? scope} />
+      ))}
     </Stack>
   );
 }
-
-
 
 /** Header + explanatory copy + any warning banner for the connection. */
 function ConnectionSummary(props: {
@@ -230,7 +227,7 @@ function ConnectionSummary(props: {
       </Typography>
       {props.connected ? null : <ConnectSteps displayName={props.displayName} />}
       {props.connected && props.connectedAccount ? (
-        <ConnectedAccountDetails account={props.connectedAccount} />
+        <GrantedScopes account={props.connectedAccount} />
       ) : null}
       {props.status === 'RECONNECT_REQUIRED' ? (
         <Alert severity="warning">
@@ -262,7 +259,10 @@ function ConnectionActions(props: {
   const copy = usePaymentsSettingsCopy().oauth;
   const { displayName, connected, busy, onConnect, onDisconnect } = props;
   return (
-    <Box sx={BAR_SX} data-testid="payments-connection-bar">
+    // The bar runs full-bleed for its rule, but its text starts at the card's
+    // inset like every block above it — BAR_SX's own 18px is tuned for a bar
+    // nested inside a step panel, which this one is not.
+    <Box sx={{ ...BAR_SX, px: CARD_INSET }} data-testid="payments-connection-bar">
       <Typography sx={BAR_MSG_SX}>
         {connected
           ? copy.connectedNote(displayName)
@@ -317,30 +317,17 @@ function useConnectionAction(onChanged: () => void) {
   return { busy, error, run };
 }
 
-/**
- * The connection as this card reads it, with every default applied once.
- *
- * `environment` follows whatever the provider is already configured for and
- * falls back to SANDBOX, so a live grant is never the accident — changing it is
- * an ADVANCED action that lives with the manual credentials, not on the
- * one-button connect card.
- */
-function readConnection(config: MaskedProviderConfig | null) {
-  return {
-    environment: (config?.environment ?? 'SANDBOX') as PaymentEnvironment,
-    status: config?.status ?? 'UNVERIFIED',
-    connected: isConnected(config),
-    expiresAt: config?.expiresAt ?? null,
-    account: config?.connectedAccount ?? null,
-    receiving: config?.enabled === true,
-  };
-}
-
 export function ProviderConnection(props: ProviderConnectionProps) {
   const { descriptor, config, client, prepareConnect, onChanged } = props;
   const { busy, error, run } = useConnectionAction(onChanged);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  const { environment, status, connected, expiresAt, account, receiving } = readConnection(config);
+  const stored = readConnection(config);
+  const { status, connected, expiresAt, account, receiving } = stored;
+  const { environment, selectable, setChosen } = useConnectEnvironment(
+    descriptor,
+    stored.environment,
+    connected,
+  );
 
   /** Run a dialog action and shut the dialog once it has actually landed. */
   const close = (kind: string, action: () => Promise<unknown>) =>
@@ -351,8 +338,8 @@ export function ProviderConnection(props: ProviderConnectionProps) {
 
   const connect = () =>
     void run('connect', async () => {
-      // The host re-reads and seals the environment server-side; sending it
-      // here is what stops a SANDBOX choice from authorizing a LIVE account.
+      // The host seals this environment into the state cookie and the callback
+      // trusts only that sealed value, so the grant lands where it was asked.
       const ctx = await prepareConnect(descriptor.name, environment);
       const { url } = await client.beginOAuth(descriptor.name, { environment, ...ctx });
       // Full-page navigation: the provider's consent screen must be a
@@ -362,16 +349,25 @@ export function ProviderConnection(props: ProviderConnectionProps) {
 
   return (
     <Stack spacing={2}>
-      <ConnectionSummary
-        displayName={descriptor.displayName}
-        status={status}
-        connected={connected}
-        expiresAt={expiresAt}
-        environment={environment}
-        connectedAccount={account}
-      />
+      {/* Every block but the full-bleed bar shares the card's inset, so the
+          facts, the sentences and the scopes start where the provider's name
+          does instead of against the card's border. */}
+      <Stack spacing={2} sx={{ px: CARD_INSET }} data-testid="payments-connection-body">
+        <ConnectionSummary
+          displayName={descriptor.displayName}
+          status={status}
+          connected={connected}
+          expiresAt={expiresAt}
+          environment={environment}
+          connectedAccount={account}
+        />
 
-      {error ? <ConnectError message={error} displayName={descriptor.displayName} /> : null}
+        {selectable ? (
+          <EnvironmentSelector environment={environment} onChange={setChosen} />
+        ) : null}
+
+        {error ? <ConnectError message={error} displayName={descriptor.displayName} /> : null}
+      </Stack>
 
       <ConnectionActions
         displayName={descriptor.displayName}
