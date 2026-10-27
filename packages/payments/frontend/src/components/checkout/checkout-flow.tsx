@@ -75,6 +75,13 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
   settlement?: SettlementCheckout | null;
   /** The buyer has a CPF saved ⇒ the list shows the payer line, not the CPF field (FUT-465). */
   taxIdOnFile?: boolean;
+  /**
+   * WHICH document is on file, when the host knows (FUT-4080). The payer line
+   * reads the kind from the document typed in the list, and a buyer with one on
+   * file typed none — a host never hands the digits over — so without this a
+   * saved CNPJ reads "CPF ✓". Absent ⇒ the copy's own fallback.
+   */
+  taxIdKindOnFile?: "CPF" | "CNPJ" | null;
   /** The store's active payment protocol (FUT-697); absent while loading. */
   providerConfig?: CheckoutProviderConfig | null;
   /** Scopes the saved-card list to the store being paid. */

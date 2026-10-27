@@ -36,6 +36,7 @@ export function PaymentPhase({
       providerConfig={providerConfig}
       tenantSlug={tenantSlug}
       taxIdOnFile={props.taxIdOnFile ?? false}
+      taxIdKindOnFile={props.taxIdKindOnFile ?? null}
       defaultBuyer={props.defaultBuyer}
       saveBuyerContact={props.saveBuyerContact}
       consentLabel={props.copy.consent.saveProfile}

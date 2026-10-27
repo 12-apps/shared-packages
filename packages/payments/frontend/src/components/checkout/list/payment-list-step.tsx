@@ -44,6 +44,8 @@ interface PaymentListStepProps {
   providerConfig: CheckoutProviderConfig | null | undefined;
   tenantSlug: string | undefined;
   taxIdOnFile: boolean;
+  /** Which document is on file, when the host knows (FUT-4080). */
+  taxIdKindOnFile: "CPF" | "CNPJ" | null;
   /** What the buyer arrived with — the asked fields are decided against it. */
   defaultBuyer: BuyerInfo | undefined;
   saveBuyerContact?: (contact: BuyerContact) => void;
@@ -134,6 +136,7 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
       total={displayTotals(totalOverride, cart).label}
       provider={providerName(config)}
       taxIdOnFile={props.taxIdOnFile}
+      taxIdKindOnFile={props.taxIdKindOnFile}
       tenantSlug={props.tenantSlug}
       basket={totalOverride ? undefined : cart.identity}
       pollIntervalMs={props.pollIntervalMs ?? 2500}
