@@ -41,8 +41,20 @@ function useTaxIdAdvance(
   const satisfied = value.trim() !== "" && fieldSatisfied(field, value);
   const kind = taxIdKind(value);
   useOnComplete(satisfied && (kind === "CNPJ" || (kind === "CPF" && arrivedWhole)), onComplete);
-  // Two digits or more in one change is a paste or an autofill, not a keystroke.
-  return { arrivedWhole, onTyped: (next) => setArrivedWhole(taxIdDigits(next).length - taxIdDigits(value).length > 1) };
+  return { arrivedWhole, onTyped: (next) => setArrivedWhole(arrivedInOneGo(taxIdDigits(value), taxIdDigits(next))) };
+}
+
+/**
+ * Whether a change wrote the document in one go — a paste or an autofill —
+ * rather than one keystroke. A keystroke adds or removes ONE digit at the end
+ * of what was there; anything else is a fill, including a whole document
+ * pasted over another of the same length (the "Alterar" flow opens on the
+ * CPF on file, so select-all and paste there gains no digits at all).
+ */
+export function arrivedInOneGo(before: string, after: string): boolean {
+  if (after === before) return false;
+  const oneKeystroke = Math.abs(after.length - before.length) === 1 && (after.startsWith(before) || before.startsWith(after));
+  return !oneKeystroke;
 }
 
 /** A CNPJ's length — the most digits the document keeps — and a CPF's. */

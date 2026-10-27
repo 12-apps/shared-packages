@@ -18,7 +18,7 @@
 import { useState, type JSX } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CpfTop, taxIdJudged } from "../list/cpf-top";
+import { arrivedInOneGo, CpfTop, taxIdJudged } from "../list/cpf-top";
 import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 
@@ -192,6 +192,14 @@ describe("a whole document set in one go (FUT-4106)", () => {
     expect(red()).toBe(false);
   });
 
+  it("judges a whole document pasted over another of the same length while focused", async () => {
+    render(<Document initial={VALID_CPF} />);
+    enter();
+    type(INVALID_CPF);
+    await waitFor(() => expect(complaint()).toBe(INVALID));
+    expect(red()).toBe(true);
+  });
+
   it("judges a value an autofill sets while the buyer is elsewhere", async () => {
     render(<Document />);
     type("123");
@@ -222,5 +230,19 @@ describe("the focus advance under the deferred judgment (FUT-4080)", () => {
     enter();
     type(VALID_CPF);
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("arrivedInOneGo", () => {
+  it.each([
+    ["", "5", false],
+    ["5299822472", "52998224725", false],
+    ["52998224725", "5299822472", false],
+    ["", "52998224725", true],
+    ["52998224725", "52998224700", true],
+    ["529982", "52998224725", true],
+    ["52998224725", "52998224725", false],
+  ])("%s → %s is %s", (before, after, expected) => {
+    expect(arrivedInOneGo(before, after)).toBe(expected);
   });
 });

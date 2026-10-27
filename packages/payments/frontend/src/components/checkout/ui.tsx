@@ -70,6 +70,7 @@ export interface CheckoutInputProps {
   helperText?: string;
   endAdornment?: ReactNode;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** A slot that does not forward it keeps the document field judged on every change (FUT-4106 needs it). */
   onFocus?: () => void;
   onBlur?: () => void;
   'data-testid'?: string;

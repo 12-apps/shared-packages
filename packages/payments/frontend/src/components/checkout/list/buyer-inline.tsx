@@ -67,7 +67,12 @@ const AUTOCOMPLETE: Partial<Record<CheckoutCustomerField["key"], string>> = {
   phone: "tel",
 };
 
-/** The `<input>` attributes that say what `key` holds — its type, autocomplete token, `name` and a stable id. */
+/**
+ * The `<input>` attributes that say what `key` holds — its type, autocomplete
+ * token, `name` and a stable id. BuyerInline's own document branch shares the
+ * top field's name and id: it is filtered out of the shipped list
+ * (`use-list-state.ts`, `!isTaxId`), so the two never render side by side.
+ */
 export function inputAttributesOf(key: CheckoutCustomerField["key"]): { type: "text" | "email" | "tel"; autoComplete?: string; name: string; id: string } {
   return { type: INPUT_TYPES[key], autoComplete: AUTOCOMPLETE[key], name: key, id: `checkout-buyer-${key}` };
 }
