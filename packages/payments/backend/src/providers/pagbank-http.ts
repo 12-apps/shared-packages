@@ -42,6 +42,7 @@ interface PagBankPhone {
   country: string;
   area: string;
   number: string;
+  type: 'MOBILE' | 'HOME';
 }
 
 /**
@@ -53,10 +54,13 @@ interface PagBankPhone {
  * worse than no entry. Hence all-or-nothing — anything we cannot split into all
  * three parts yields `undefined` and the array is omitted entirely.
  *
- * `type` is deliberately not sent. It appears in PagBank's request EXAMPLES but
- * not in the request schema's item properties, and we would be guessing it from
- * digit count; sending only the three documented fields asserts nothing we
- * cannot support.
+ * `type` is sent too (FUT-4073). It was left out once because it appears in
+ * PagBank's request examples but not in the schema's item properties, and
+ * production refused every checkout that carried a phone with 400 / 40001
+ * "`customer.phones[0].type` must not be null" — silently failed over to the
+ * next provider. Digit count decides it, which in Brazil is not a guess: a
+ * 9-digit local number is a mobile (the leading 9 every mobile has carried
+ * since 2016) and an 8-digit one a landline.
  *
  * Brazil-only by construction, which the rest of this checkout already is (CPF,
  * PIX). Length is what disambiguates, and it does so cleanly: a local number is
@@ -73,7 +77,9 @@ function customerPhones(phone: string | null | undefined): PagBankPhone[] | unde
   // 2-digit DDD + an 8-digit landline or 9-digit mobile. Anything else is not
   // a Brazilian phone we can split into all three parts, so nothing is sent.
   if (local === null || local.length < 10 || local.length > 11) return undefined;
-  return [{ country: '55', area: local.slice(0, 2), number: local.slice(2) }];
+  const number = local.slice(2);
+  const type = number.length === 9 ? 'MOBILE' : 'HOME';
+  return [{ country: '55', area: local.slice(0, 2), number, type }];
 }
 
 /**

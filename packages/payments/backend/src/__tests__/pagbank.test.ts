@@ -438,7 +438,7 @@ describe('pagbank adapter — customer.phones', () => {
       LIVE,
     );
     const body = JSON.parse((spy.mock.calls[0]?.[1] as { body: string }).body) as {
-      customer: { phones?: Array<{ country: string; area: string; number: string }> };
+      customer: { phones?: Array<{ country: string; area: string; number: string; type: string }> };
     };
     return body.customer;
   }
@@ -446,25 +446,55 @@ describe('pagbank adapter — customer.phones', () => {
   it('splits a typed Brazilian mobile into country/area/number', async () => {
     // The shape a checkout form actually produces, punctuation and all.
     expect((await sentCustomer('(11) 98888-7777')).phones).toEqual([
-      { country: '55', area: '11', number: '988887777' },
+      { country: '55', area: '11', number: '988887777', type: 'MOBILE' },
     ]);
   });
 
   it('accepts an already-prefixed number without eating the DDD', async () => {
     // DDD 55 is Santa Maria/RS — a naive "strip a leading 55" loses it.
     expect((await sentCustomer('+55 (55) 99999-8888')).phones).toEqual([
-      { country: '55', area: '55', number: '999998888' },
+      { country: '55', area: '55', number: '999998888', type: 'MOBILE' },
     ]);
     // ...and the same digits WITHOUT a country code are a DDD-55 number.
     expect((await sentCustomer('55999998888')).phones).toEqual([
-      { country: '55', area: '55', number: '999998888' },
+      { country: '55', area: '55', number: '999998888', type: 'MOBILE' },
     ]);
   });
 
   it('sends an 8-digit landline as readily as a 9-digit mobile', async () => {
     expect((await sentCustomer('(31) 3222-1100')).phones).toEqual([
-      { country: '55', area: '31', number: '32221100' },
+      { country: '55', area: '31', number: '32221100', type: 'HOME' },
     ]);
+  });
+
+  it('never sends a phone without its type — production refuses it (FUT-4073)', async () => {
+    // PagBank production answered 400 / 40001 "customer.phones[0].type must
+    // not be null" to every Future Drink checkout, and the walk failed over.
+    for (const phone of ['11988887777', '(31) 3222-1100', '+55 21 99876-5432', '2133334444']) {
+      const phones = (await sentCustomer(phone)).phones ?? [];
+      expect(phones).toHaveLength(1);
+      expect(['MOBILE', 'HOME']).toContain(phones[0]?.type);
+    }
+  });
+
+  it('sends the typed phone on a CARD order too — one customer block for both', async () => {
+    const spy = mockFetch({ id: 'ORDE_2', charges: [{ id: 'CHAR_2', status: 'PAID', amount: { value: 1000 } }] });
+    const input = cardInput('order-card');
+    await pagbankProvider(PT_BR_PAGBANK_COPY).createCharge(
+      { ...input, customer: { ...input.customer, phone: '(11) 98888-7777' } },
+      LIVE,
+    );
+    const body = JSON.parse((spy.mock.calls[0]?.[1] as { body: string }).body) as {
+      customer: { phones?: unknown[] };
+    };
+    expect(body.customer.phones).toEqual([
+      { country: '55', area: '11', number: '988887777', type: 'MOBILE' },
+    ]);
+  });
+
+  it('types a 9-digit local number MOBILE and an 8-digit one HOME', async () => {
+    expect((await sentCustomer('21998765432')).phones?.[0]?.type).toBe('MOBILE');
+    expect((await sentCustomer('2133334444')).phones?.[0]?.type).toBe('HOME');
   });
 
   it('omits phones entirely rather than sending a partial entry', async () => {
