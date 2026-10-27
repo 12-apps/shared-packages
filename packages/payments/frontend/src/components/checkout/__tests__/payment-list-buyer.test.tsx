@@ -88,11 +88,13 @@ describe("the CPF at the top of Pagamento (E1)", () => {
     await waitFor(() => expect(screen.queryByTestId("list-cpf")).toBeNull());
   });
 
-  it("says the CPF has 11 digits while it is short, and holds an online row's button for it (E3)", async () => {
+  it("says the CPF has 11 digits once the buyer leaves it short, and holds an online row's button for it (E3)", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
     await screen.findByTestId("list-cpf");
     fireEvent.click(radio("list-option-PIX"));
     type("list-buyer-taxId", "123");
+    // Not while it is typed (FUT-4106): the bar's reason says why the button waits.
+    fireEvent.blur(screen.getByTestId("list-buyer-taxId"));
     await screen.findByText("O CPF tem 11 dígitos, e o CNPJ, 14.");
     expect(payButton().disabled).toBe(true);
     expect(reason()).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");

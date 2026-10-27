@@ -80,11 +80,13 @@ describe("the document field takes a CNPJ (FUT-4080)", () => {
     expect(field().getAttribute("aria-invalid")).not.toBe("true");
   });
 
-  it("says how long each document is while a CNPJ is short, and holds the button", async () => {
+  it("says how long each document is once the buyer leaves a CNPJ short, and holds the button", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
     await screen.findByTestId("list-cpf");
     fireEvent.click(radio("list-option-PIX"));
     type("1122233300018");
+    // Not while it is typed (FUT-4106): thirteen digits may still become a CNPJ.
+    fireEvent.blur(screen.getByTestId("list-buyer-taxId"));
     await screen.findByText("O CPF tem 11 dígitos, e o CNPJ, 14.");
     expect(payButton().disabled).toBe(true);
   });

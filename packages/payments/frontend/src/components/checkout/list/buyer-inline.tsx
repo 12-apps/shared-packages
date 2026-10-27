@@ -47,6 +47,31 @@ export function complaintOf(field: CheckoutCustomerField, value: string, copy: C
   return undefined;
 }
 
+/**
+ * What each field holds, said to the browser on its `<input>` (FUT-4104,
+ * FUT-4105): the type that opens the right keyboard on a phone — `@` for the
+ * e-mail, digits for the phone — and the autocomplete token that lets the
+ * browser offer the saved value. HTML has no token for a CPF or a CNPJ; its
+ * stable `name` is what a form history or a password manager matches.
+ */
+const INPUT_TYPES: Record<CheckoutCustomerField["key"], "text" | "email" | "tel"> = {
+  taxId: "text",
+  phone: "tel",
+  name: "text",
+  email: "email",
+};
+
+const AUTOCOMPLETE: Partial<Record<CheckoutCustomerField["key"], string>> = {
+  name: "name",
+  email: "email",
+  phone: "tel",
+};
+
+/** The `<input>` attributes that say what `key` holds — its type, autocomplete token, `name` and a stable id. */
+export function inputAttributesOf(key: CheckoutCustomerField["key"]): { type: "text" | "email" | "tel"; autoComplete?: string; name: string; id: string } {
+  return { type: INPUT_TYPES[key], autoComplete: AUTOCOMPLETE[key], name: key, id: `checkout-buyer-${key}` };
+}
+
 const PLACEHOLDERS: Partial<Record<CheckoutCustomerField["key"], string>> = {
   taxId: "000.000.000-00",
   phone: "(00) 00000-0000",
@@ -123,7 +148,7 @@ export function BuyerInline({
               </Text>
             </Text>
           <Input
-            type={field.key === "phone" ? "tel" : "text"}
+            {...inputAttributesOf(field.key)}
             inputMode={field.key === "taxId" ? "numeric" : undefined}
             variant="outlined"
             size="md"
