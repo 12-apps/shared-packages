@@ -43,17 +43,22 @@ interface Row {
 }
 
 /**
- * A one-table delegate; `updateMany` checks and writes in one step, as SQL
- * does. `control.staleOnce` makes the NEXT read answer a row as it was before
- * a payment landed — the window the compare-and-set exists for.
+ * A one-table delegate. `updateMany` checks and writes in one step, as SQL
+ * does, on the row's `updatedAt` (and status, when asked) and moves
+ * `updatedAt` on every write, as Prisma's `@updatedAt` does.
+ * `control.staleOnce` makes the NEXT read answer a row as it was before another
+ * writer landed — the window the compare-and-set exists for.
  */
 function tableDelegate(): { delegate: ChargeDelegate; rows: Row[]; control: { staleOnce?: Row } } {
   const rows: Row[] = [];
   const control: { staleOnce?: Row } = {};
   const delegate: ChargeDelegate = {
     count: async () => rows.length,
+    // Newest first, by insertion — every row here shares one `createdAt`.
     findMany: async ({ where }) =>
-      rows.filter((r) => !('status' in where) || typeof where.status !== 'string' || r.status === where.status),
+      rows
+        .filter((r) => !('status' in where) || typeof where.status !== 'string' || r.status === where.status)
+        .reverse(),
     findUnique: async ({ where }) => {
       if (!('provider_providerChargeId' in where)) return null;
       const { provider, providerChargeId } = where.provider_providerChargeId;
@@ -63,19 +68,24 @@ function tableDelegate(): { delegate: ChargeDelegate; rows: Row[]; control: { st
       return stale ?? (row ? { ...row } : null);
     },
     create: async ({ data }) => {
-      const row: Row = { ...data, id: `row_${rows.length + 1}`, createdAt: CREATED_AT, updatedAt: CREATED_AT };
+      const row: Row = { ...data, id: `row_${rows.length + 1}`, createdAt: CREATED_AT, updatedAt: new Date(CREATED_AT) };
       rows.push(row);
       return row;
     },
     update: async ({ where, data }) => {
       const row = rows.find((r) => r.id === where.id);
       if (!row) throw new Error('missing row');
-      Object.assign(row, data);
+      Object.assign(row, data, { updatedAt: new Date(row.updatedAt.getTime() + 1) });
       return row;
     },
     updateMany: async ({ where, data }) => {
-      const row = rows.find((r) => r.id === where.id && r.status === where.status);
-      if (row) Object.assign(row, data);
+      const row = rows.find(
+        (r) =>
+          r.id === where.id &&
+          r.updatedAt.getTime() === where.updatedAt.getTime() &&
+          (where.status === undefined || r.status === where.status),
+      );
+      if (row) Object.assign(row, data, { updatedAt: new Date(row.updatedAt.getTime() + 1) });
       return { count: row ? 1 : 0 };
     },
   };
@@ -114,6 +124,20 @@ describe.each(Object.entries(stores))('markSuperseded in the %s store', (_name, 
     expect(row?.snapshot.superseded).toEqual(MARK);
   });
 
+  it('the status poll skips a superseded row and follows the charge the buyer holds', async () => {
+    const store = build();
+    await store.create({ merchant: TENANT, reference: 'order-1', snapshot: { ...LINK, status: 'PAID' } });
+    await store.create({
+      merchant: TENANT,
+      reference: 'order-1--1',
+      snapshot: { ...LINK, providerChargeId: 'NEW', reference: 'order-1--1' },
+    });
+
+    await store.markSuperseded!(TENANT, 'hosted', 'NEW', { ...MARK, replacedBy: 'LINK' });
+
+    expect((await store.latestByReference(TENANT, 'order-1'))?.providerChargeId).toBe('LINK');
+  });
+
   it('leaves another merchant\'s charge alone', async () => {
     const store = build();
     await store.create({ merchant: TENANT, reference: 'order-1', snapshot: LINK });
@@ -124,21 +148,71 @@ describe.each(Object.entries(stores))('markSuperseded in the %s store', (_name, 
   });
 });
 
-describe('markSuperseded over Prisma never rolls a payment back', () => {
-  it('marks the PAID row when the payment landed between its read and its write', async () => {
-    const table = tableDelegate();
-    const store = createPrismaChargeStore(table.delegate);
-    await store.create({ merchant: TENANT, reference: 'order-1', snapshot: LINK });
-    const before = { ...(table.rows[0] as Row) };
-    Object.assign(table.rows[0] as Row, { status: 'PAID', snapshot: { ...LINK, status: 'PAID' } });
+/** A table holding LINK, and a store over it. */
+async function linked() {
+  const table = tableDelegate();
+  const linkedStore = createPrismaChargeStore(table.delegate);
+  await linkedStore.create({ merchant: TENANT, reference: 'order-1', snapshot: { ...LINK, settlementHints: { slug: 's' } } });
+  return { table, store: linkedStore, row: () => table.rows[0] as Row, snapshot: () => table.rows[0]?.snapshot as ChargeSnapshot };
+}
+
+describe('Prisma charge writes are a compare-and-set on the row version', () => {
+  it('a payment that lands between the mark read and its write is not rolled back', async () => {
+    const { table, store, row, snapshot } = await linked();
+    const before = { ...row() };
+    await store.upsertByProviderChargeId(TENANT, { ...LINK, status: 'PAID' });
     table.control.staleOnce = before;
 
     await store.markSuperseded!(TENANT, 'hosted', 'LINK', MARK);
 
-    expect(table.rows[0]?.status).toBe('PAID');
-    expect((table.rows[0]?.snapshot as ChargeSnapshot).superseded).toEqual(MARK);
+    expect(row().status).toBe('PAID');
+    expect(snapshot().superseded).toEqual(MARK);
   });
 
+  it('a webhook that read the row BEFORE the mark keeps the mark when it writes PAID', async () => {
+    const { table, store, row, snapshot } = await linked();
+    const before = { ...row() };
+    await store.markSuperseded!(TENANT, 'hosted', 'LINK', MARK);
+    table.control.staleOnce = before;
+
+    await store.upsertByProviderChargeId(TENANT, { ...LINK, status: 'PAID' });
+
+    expect(row().status).toBe('PAID');
+    expect(snapshot().superseded).toEqual(MARK);
+  });
+
+  it('a mark that read the row BEFORE a same-status refresh keeps that refresh', async () => {
+    const { table, store, snapshot } = await linked();
+    const before = { ...(table.rows[0] as Row) };
+    await store.upsertByProviderChargeId(TENANT, { ...LINK, settlementHints: { transactionNsu: 'N1' } });
+    table.control.staleOnce = before;
+
+    await store.markSuperseded!(TENANT, 'hosted', 'LINK', MARK);
+
+    expect(snapshot().settlementHints).toEqual({ slug: 's', transactionNsu: 'N1' });
+    expect(snapshot().superseded).toEqual(MARK);
+  });
+
+  it('a refresh that read the row BEFORE the mark keeps both', async () => {
+    const { table, store, snapshot } = await linked();
+    const before = { ...(table.rows[0] as Row) };
+    await store.markSuperseded!(TENANT, 'hosted', 'LINK', MARK);
+    table.control.staleOnce = before;
+
+    await store.upsertByProviderChargeId(TENANT, { ...LINK, settlementHints: { transactionNsu: 'N1' } });
+
+    expect(snapshot().settlementHints).toEqual({ slug: 's', transactionNsu: 'N1' });
+    expect(snapshot().superseded).toEqual(MARK);
+  });
+
+  it('the first mark stands', async () => {
+    const { store, snapshot } = await linked();
+
+    await store.markSuperseded!(TENANT, 'hosted', 'LINK', MARK);
+    await store.markSuperseded!(TENANT, 'hosted', 'LINK', { ...MARK, replacedBy: 'LATER' });
+
+    expect(snapshot().superseded).toEqual(MARK);
+  });
 });
 
 describe('providersWalkedPast', () => {

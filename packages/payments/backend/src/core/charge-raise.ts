@@ -4,7 +4,7 @@ import type { ChargeQueryStore } from './charge-queries';
 import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
 import { judgeParkedHosted, type ChainMember } from './hosted-landing';
-import { retireMovedPast, type SupersededRecorder } from './hosted-retire';
+import { answerHeld, type SupersededRecorder } from './hosted-retire';
 import type { ProviderFailureReporter } from './provider-failure';
 import { attemptIdempotencyKey, attemptReference } from './reference';
 import type {
@@ -80,11 +80,11 @@ export interface ChargeRaiseGateway {
    */
   clientConfigChain(merchant: MerchantRef): Promise<readonly ChainMember[]>;
   /**
-   * The walk ledger's failed-over-from providers (FUT-4072). Optional: without
-   * it a link minted during the head's outage is not reused, and each re-tap
-   * mints a fresh one and retires the last.
+   * Providers the minting walk failed over from that are STILL down (FUT-4072).
+   * Optional, but without it a link minted during a head outage is never
+   * reused: each re-tap mints a fresh one and retires the last.
    */
-  failedOverBefore?(merchant: MerchantRef, idempotencyKey: string): Promise<string[]>;
+  stillWalkedPast?(merchant: MerchantRef, idempotencyKey: string): Promise<string[]>;
 }
 
 /**
@@ -248,16 +248,20 @@ function reason(error: unknown): string {
  * Build the raise. A DECLINE is a normal return value (`status: 'DECLINED'`) —
  * the buyer needs a message, not a stack trace. Only a transport or account
  * failure throws, plus {@link ChargeIdentityError} for rule 3 above.
+ *
+ * It may answer with an EARLIER charge of the reference whose status is PAID
+ * (FUT-4072): a parked link the buyer paid while this raise was voiding it. Its
+ * `providerChargeId` is that charge's; treat it as settled, not as something to
+ * present for payment.
  */
 export function createChargeRaiser(deps: ChargeRaiseDeps) {
   return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeSnapshot> {
     const { live, movedPast } = await reusableCharge(deps, request);
-    const retire = (raised: ChargeSnapshot) =>
-      retireMovedPast(deps, { merchant: request.merchant, reference: request.reference, movedPast, raised });
-    if (live) {
-      await retire(live);
-      return live;
-    }
+    // A moved-past link the void finds PAID is the answer instead (FUT-4072):
+    // the buyer paid it, and the charge they were about to hold is retired.
+    const answer = async (held: ChargeSnapshot) =>
+      (await answerHeld(deps, { merchant: request.merchant, reference: request.reference, movedPast, held })).answer;
+    if (live) return answer(live);
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);
     const idempotencyKey = attemptIdempotencyKey(request.reference, attempt);
@@ -287,7 +291,6 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
     if (mismatch) throw new ChargeIdentityError(stored, mismatch);
 
     await voidSuperseded(deps, request);
-    await retire(stored.snapshot);
-    return stored.snapshot;
+    return answer(stored.snapshot);
   };
 }

@@ -3,14 +3,13 @@ import type {
   ChargeQueryStore,
   ChargeStore,
   PayableChargeQuery,
-  PendingTransition,
   StoredCharge,
 } from '../core/ports';
 import { attemptReferencePrefix } from '../core/reference';
-import { mergeRefreshedSnapshot } from '../core/snapshot-merge';
-import { isForwardTransition } from '../core/status';
-import { isSuperseded, type ChargeSupersession } from '../core/supersession';
+import { isSuperseded } from '../core/supersession';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
+
+import { markSupersededRow, transitionPendingRow, upsertRow } from './charge-writes';
 
 /**
  * Prisma-backed storage ports over the models this package OWNS
@@ -98,9 +97,13 @@ export interface ChargeDelegate {
       providerChargeId: string;
     };
   }): Promise<ChargeRow>;
-  /** The conditional write behind `transitionPending`: Prisma answers how many rows matched. */
+  /**
+   * Every write to a charge row: a compare-and-set on the row's `updatedAt`
+   * (its version) and, for `transitionPending`, its status. Prisma answers how
+   * many rows matched — see `charge-writes.ts`.
+   */
   updateMany(args: {
-    where: { id: string; status: string };
+    where: { id: string; updatedAt: Date; status?: string };
     data: { snapshot: unknown; status: string; amountCents: number; method: string; providerChargeId: string };
   }): Promise<{ count: number }>;
 }
@@ -119,41 +122,8 @@ function rowToStoredCharge(row: ChargeRow): StoredCharge {
   };
 }
 
-/**
- * The columns a REFRESH writes — MERGED over the stored snapshot, never
- * replacing it, because a re-read answers what happened to the charge and must
- * not erase what creating it established ({@link mergeRefreshedSnapshot}).
- *
- * `amountCents` and `method` are rewritten alongside the snapshot deliberately:
- * they are what every lookup filters on, so leaving them behind lets a row
- * disagree with itself and hides a settled charge's real captured amount from
- * every query that reads it.
- *
- * `providerChargeId` is rewritten for the same reason (FUT-681): a PIX row is
- * created under the provider's ORDER id — the only id an unpaid PIX has — and
- * the refresh that learns the real charge id must RE-KEY the row, or every
- * later lookup by that id (the next webhook, a refund) misses it. For a
- * refresh found by its own id this writes the value already there.
- */
-function refreshedRow(
-  stored: ChargeSnapshot,
-  refreshed: ChargeSnapshot,
-): {
-  snapshot: unknown;
-  status: string;
-  amountCents: number;
-  method: string;
-  providerChargeId: string;
-} {
-  const merged = mergeRefreshedSnapshot(stored, refreshed);
-  return {
-    snapshot: merged,
-    status: merged.status,
-    amountCents: merged.amount.amountCents,
-    method: merged.method,
-    providerChargeId: merged.providerChargeId,
-  };
-}
+/** How many of a payable's newest rows the poll looks through for one not superseded. */
+const LATEST_WINDOW = 25;
 
 /** Every attempt reference of one payable, under one merchant. */
 function referenceWhere(merchant: MerchantRef, reference: string): ChargeWhere {
@@ -193,14 +163,15 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
     async latestByReference(merchant, reference) {
       // No status clause — deliberately the SAME row set `countByReference`
       // counts, newest first. A poll asks what became of the charge, so it must
-      // still find one that has stopped being PENDING.
+      // still find one that has stopped being PENDING. A row this package marked
+      // SUPERSEDED is skipped (FUT-4072): the poll tracks what the buyer holds.
       const rows = await delegate.findMany({
         where: referenceWhere(merchant, reference),
         orderBy: { createdAt: 'desc' },
-        take: 1,
+        take: LATEST_WINDOW,
       });
-      const newest = rows[0];
-      return newest ? rowToStoredCharge(newest) : null;
+      const newest = rows.map(rowToStoredCharge).find((row) => !isSuperseded(row.snapshot));
+      return newest ?? null;
     },
     async listPayable(query) {
       const rows = await delegate.findMany({
@@ -211,8 +182,6 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
       // and a payable holds a handful of rows, so it is filtered here, not in SQL.
       return rows.map(rowToStoredCharge).filter((row) => !isSuperseded(row.snapshot));
     },
-    markSuperseded: (merchant, provider, providerChargeId, supersession) =>
-      markSupersededRow(delegate, merchant, { provider, providerChargeId }, supersession),
     async listPendingCharges(window) {
       // PENDING/AUTHORIZED = `isTerminal`'s complement, spelled as an `in`
       // so the filter runs in SQL. Oldest first — the sweep's fairness
@@ -228,24 +197,6 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
       return rows.map(rowToStoredCharge);
     },
   };
-}
-
-/**
- * The stored row a refreshed snapshot names: by its charge id first, then —
- * when the snapshot labels a distinct ORDER id — by that (FUT-681). A PIX row
- * is created under the order id because an unpaid PIX has no charge id yet;
- * the paid webhook presents the real charge id plus the order-id hint, and
- * without the second lookup it updates nothing, forever.
- */
-async function storedRowFor(
-  store: Pick<ChargeStore, 'findByProviderChargeId'>,
-  snapshot: ChargeSnapshot,
-): Promise<StoredCharge | null> {
-  const direct = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
-  if (direct) return direct;
-  const orderId = snapshot.settlementHints?.orderId;
-  if (!orderId || orderId === snapshot.providerChargeId) return null;
-  return store.findByProviderChargeId(snapshot.provider, orderId);
 }
 
 /**
@@ -318,72 +269,14 @@ export function createPrismaChargeStore(
         throw error;
       }
     },
-    async upsertByProviderChargeId(merchant, snapshot) {
-      const existing = await storedRowFor(this, snapshot);
-      if (!existing) return null;
-      if (existing.merchant.kind !== merchant.kind || existing.merchant.id !== merchant.id) return null;
-      if (!isForwardTransition(existing.snapshot.status, snapshot.status)) return existing;
-      const row = await delegate.update({
-        where: { id: existing.id },
-        data: refreshedRow(existing.snapshot, snapshot),
-      });
-      return rowToStoredCharge(row);
+    upsertByProviderChargeId(merchant, snapshot) {
+      return upsertRow(delegate, this, merchant, snapshot);
+    },
+    markSuperseded(merchant, provider, providerChargeId, supersession) {
+      return markSupersededRow(delegate, this, merchant, { provider, providerChargeId }, supersession);
     },
     transitionPending(merchant, snapshot) {
       return transitionPendingRow(delegate, this, merchant, snapshot);
     },
   };
-}
-
-/**
- * `ChargeStore.transitionPending` over Prisma — outside the factory for its
- * function-length gate. ONE statement checks and writes: the status in the
- * WHERE is what makes two concurrent staff taps resolve to exactly one winner.
- */
-async function transitionPendingRow(
-  delegate: ChargeDelegate,
-  store: Pick<ChargeStore, 'findByProviderChargeId'>,
-  merchant: MerchantRef,
-  snapshot: ChargeSnapshot,
-): Promise<PendingTransition> {
-  const existing = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
-  if (!existing || existing.merchant.kind !== merchant.kind || existing.merchant.id !== merchant.id) {
-    return { applied: false, stored: null };
-  }
-  const { count } = await delegate.updateMany({
-    where: { id: existing.id, status: 'PENDING' },
-    data: refreshedRow(existing.snapshot, snapshot),
-  });
-  const stored = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
-  return { applied: count === 1, stored };
-}
-
-/**
- * `ChargeQueryStore.markSuperseded` over Prisma. A COMPARE-AND-SET on the
- * status the row was read with, so a payment that lands between the read and
- * the write is never rolled back to PENDING; on a lost race the fresh row is
- * marked instead, once.
- */
-async function markSupersededRow(
-  delegate: ChargeDelegate,
-  merchant: MerchantRef,
-  key: { provider: string; providerChargeId: string },
-  supersession: ChargeSupersession,
-): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const row = await delegate.findUnique({ where: { provider_providerChargeId: key } });
-    if (!row || row.merchantKind !== merchant.kind || row.merchantId !== merchant.id) return;
-    const snapshot: ChargeSnapshot = { ...(row.snapshot as ChargeSnapshot), superseded: supersession };
-    const { count } = await delegate.updateMany({
-      where: { id: row.id, status: snapshot.status },
-      data: {
-        snapshot,
-        status: snapshot.status,
-        amountCents: snapshot.amount.amountCents,
-        method: snapshot.method,
-        providerChargeId: snapshot.providerChargeId,
-      },
-    });
-    if (count === 1) return;
-  }
 }

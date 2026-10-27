@@ -59,7 +59,7 @@ function raiser(over: {
       })) as unknown as ChargeRaiseDeps['gateway']['charge'],
       cancelCharge: vi.fn(over.cancel ?? (async () => snapshot({ status: 'CANCELED' }))),
       clientConfigChain: vi.fn(async () => over.chain),
-      ...(over.walkedPast ? { failedOverBefore: vi.fn(async () => over.walkedPast ?? []) } : {}),
+      ...(over.walkedPast ? { stillWalkedPast: vi.fn(async () => over.walkedPast ?? []) } : {}),
     },
     charges: {
       listPayable: vi.fn(async (q: { method?: string }) =>
@@ -146,7 +146,7 @@ describe('createChargeRaiser — the ledger and the links not reused', () => {
     const { raise, d } = raiser({ chain: BROWSER_FIRST, parked: [snapshot()], walkedPast: ['browser'] });
 
     expect((await raise(REQUEST)).providerChargeId).toBe('LINK');
-    expect(d.gateway.failedOverBefore).toHaveBeenCalledWith(TENANT, 'ord_1:0');
+    expect(d.gateway.stillWalkedPast).toHaveBeenCalledWith(TENANT, 'ord_1:0');
     expect(d.gateway.charge).not.toHaveBeenCalled();
   });
 
@@ -163,6 +163,32 @@ describe('createChargeRaiser — the ledger and the links not reused', () => {
     expect((await raise(REQUEST)).providerChargeId).toBe('LINK');
     expect(d.gateway.cancelCharge).toHaveBeenCalledWith(TENANT, 'elsewhere', 'OLDER');
     expect(d.gateway.cancelCharge).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createChargeRaiser — a moved-past link the buyer already paid', () => {
+  it('answers with the PAID link and retires the charge it just raised', async () => {
+    const recorded: SupersededCharge[] = [];
+    const { raise, d } = raiser({
+      chain: BROWSER_FIRST,
+      parked: [snapshot()],
+      // The parked link comes back PAID; the fresh charge cannot be voided.
+      cancel: vi
+        .fn()
+        .mockResolvedValueOnce(snapshot({ status: 'PAID' }))
+        .mockRejectedValueOnce(new UnsupportedOperationError('browser', 'cancelling a charge')),
+      onSuperseded: (charge) => {
+        recorded.push(charge);
+      },
+    });
+
+    const got = await raise(REQUEST);
+
+    expect([got.providerChargeId, got.status]).toEqual(['LINK', 'PAID']);
+    expect(d.gateway.cancelCharge).toHaveBeenNthCalledWith(2, TENANT, 'browser', 'NEW');
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['NEW', 'LINK', 'VOID_UNSUPPORTED'],
+    ]);
   });
 });
 
@@ -235,7 +261,7 @@ describe('retireMovedPast', () => {
       },
     });
 
-    await expect(retireMovedPast(deps, input(NEW))).resolves.toBeUndefined();
+    await expect(retireMovedPast(deps, input(NEW))).resolves.toBeNull();
     expect(calls.error.join()).toContain('could not record');
   });
   it('counts a void as done only when the provider answers a state nobody can pay', async () => {
@@ -246,7 +272,7 @@ describe('retireMovedPast', () => {
     expect(deps.charges.markSuperseded).not.toHaveBeenCalled();
   });
 
-  it('records PAID_BEFORE_VOID, logs an error and reports it when the void comes back settled', async () => {
+  it('answers a link the void found PAID (PAID_BEFORE_VOID): logged, reported, never marked', async () => {
     const recorded: SupersededCharge[] = [];
     const reports: ProviderFailureReport[] = [];
     const { deps, calls } = retireDeps({
@@ -259,17 +285,13 @@ describe('retireMovedPast', () => {
       },
     });
 
-    await retireMovedPast(deps, input(NEW));
+    const paid = await retireMovedPast(deps, input(NEW));
 
-    expect(recorded.map((r) => [r.why, r.snapshot.status])).toEqual([['PAID_BEFORE_VOID', 'PAID']]);
+    expect([paid?.providerChargeId, paid?.status]).toEqual(['LINK', 'PAID']);
+    expect(recorded).toEqual([]);
+    expect(deps.charges.markSuperseded).not.toHaveBeenCalled();
     expect(reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'hosted']]);
-    expect(calls.error.join()).toContain('the buyer paid it');
-    expect(deps.charges.markSuperseded).toHaveBeenCalledWith(
-      TENANT,
-      'hosted',
-      'LINK',
-      expect.objectContaining({ replacedBy: 'NEW', why: 'PAID_BEFORE_VOID' }),
-    );
+    expect(calls.error.join()).toContain('PAID_BEFORE_VOID');
   });
 
   it('records VOID_NOT_CONFIRMED when the void comes back still PENDING', async () => {

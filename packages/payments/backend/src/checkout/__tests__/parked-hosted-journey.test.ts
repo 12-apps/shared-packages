@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { stubPendingSnapshot } from '../../providers/shared';
+
 import { BRL, MERCHANT, call, setupCheckoutWorld, testAdapter } from './harness';
 import { parkedHostedWorld } from './parked-hosted-world';
 
@@ -247,18 +249,59 @@ describe('a moved-past link is retired once', () => {
   });
 });
 
-describe('a void the provider answers with a payment', () => {
-  it('records PAID_BEFORE_VOID, reports it, and never offers the link back', async () => {
+describe('a void the provider answers with a payment (PAID_BEFORE_VOID)', () => {
+  it('answers with the PAID link, and retires the charge it was about to hand out', async () => {
     const world = parkedHostedWorld({ alphaVoids: 'paid' });
     const link = await world.park('parked');
     world.credentials.chain = ['beta', 'alpha'];
 
-    const got = await world.pay('PIX');
+    const held = await world.payHeld('PIX');
 
-    expect(got.provider).toBe('beta');
-    expect(world.superseded.map((s) => [s.why, s.snapshot.status])).toEqual([['PAID_BEFORE_VOID', 'PAID']]);
+    expect(held.paidEarlier).toBe(true);
+    expect([held.answer.providerChargeId, held.answer.status]).toEqual([link?.providerChargeId, 'PAID']);
+    // beta's fresh QR cannot be voided here, so it is marked and recorded —
+    // replaced by the payment the buyer already made.
+    const fresh = world.charges.all().find((row) => row.provider === 'beta');
+    expect(world.superseded.map((s) => [s.snapshot.providerChargeId, s.replacedBy.providerChargeId, s.why])).toEqual([
+      [fresh?.providerChargeId, link?.providerChargeId, 'VOID_UNSUPPORTED'],
+    ]);
+    expect(fresh?.snapshot.superseded?.replacedBy).toBe(link?.providerChargeId);
     expect(world.reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'alpha']]);
-    expect(world.statusOf(link ?? got)).toBe('PAID');
+    expect(world.statusOf(link ?? held.answer)).toBe('PAID');
+    expect(world.logs.error.some((line) => line.includes('PAID_BEFORE_VOID'))).toBe(true);
+  });
+
+  it('through the checkout: the payable is SETTLED with the paid link, and the buyer sees no new QR', async () => {
+    const paidOnVoid = testAdapter('alpha', { tokenization: 'REDIRECT', hosted: true });
+    const world = setupCheckoutWorld({
+      chain: [
+        {
+          name: 'alpha',
+          adapter: {
+            ...paidOnVoid,
+            async cancelCharge(providerChargeId: string) {
+              return { ...stubPendingSnapshot('alpha', providerChargeId), status: 'PAID' as const, amount: BRL(7500) };
+            },
+          },
+        },
+        browserBeta,
+      ],
+    });
+    await call(world.routes, 'POST', '/', {});
+    const link = world.correlation.pending[0]?.charge.providerChargeId;
+
+    world.credentials.setChain(MERCHANT, ['beta', 'alpha']);
+    const paid = await call(world.routes, 'POST', '/', {});
+
+    expect(paid.status).toBe(200);
+    expect(dataOf(paid).hostedCheckoutUrl).toBeUndefined();
+    expect(dataOf(paid).state).toBe('SETTLED');
+    expect(world.correlation.settlements).toEqual([{ ref: REF, capturedAmount: BRL(7500) }]);
+    // Only the first link was ever attached; beta's fresh QR never reached the buyer.
+    expect(world.correlation.pending.map((p) => p.charge.providerChargeId)).toEqual([link]);
+    expect(world.correlation.superseded.map((s) => [s.charge.provider, s.replacedBy.providerChargeId])).toEqual([
+      ['beta', link],
+    ]);
   });
 
   it('records VOID_NOT_CONFIRMED when the void leaves it PENDING', async () => {
@@ -272,7 +315,7 @@ describe('a void the provider answers with a payment', () => {
   });
 });
 
-describe('an outage at the head does not churn links (FUT-563 + FUT-604)', () => {
+describe('an outage at the head: reuse lasts as long as the outage (FUT-563 + FUT-604)', () => {
   it('re-taps while the head is still down reuse the link the failover minted', async () => {
     const world = parkedHostedWorld({ alphaVoids: false });
     world.credentials.chain = ['beta', 'alpha'];
@@ -288,13 +331,39 @@ describe('an outage at the head does not churn links (FUT-563 + FUT-604)', () =>
     expect(world.superseded).toEqual([]);
   });
 
-  it('still reuses it once the head is back — the chain was never reordered', async () => {
+  it('reuses the link while the head\'s breaker is still open, even with the head answering again', async () => {
     const world = parkedHostedWorld({ alphaVoids: false });
-    const link = await world.park('failover');
+    const link = await world.park('outage');
     world.credentials.chain = ['beta', 'alpha'];
 
     expect((await world.pay('PIX')).providerChargeId).toBe(link?.providerChargeId);
     expect(world.charges.all()).toHaveLength(1);
+  });
+
+  it('once the head is back, walks the chain to it and retires the link', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    const link = await world.park('outage');
+    world.credentials.chain = ['beta', 'alpha'];
+    world.recover();
+
+    const got = await world.pay('PIX');
+
+    expect(got.provider).toBe('beta');
+    expect(world.superseded.map((s) => [s.snapshot.providerChargeId, s.why])).toEqual([
+      [link?.providerChargeId, 'VOID_UNSUPPORTED'],
+    ]);
+  });
+
+  it('a CARD re-tap does not reuse a link a PIX walk minted — the ledger is per method', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    const link = await world.park('outage');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    const got = await world.pay('CARD', { tokensByProvider: { beta: 'tok_beta' } });
+
+    // beta is still breaker-skipped, so the walk lands on alpha again — a new link.
+    expect(got.provider).toBe('alpha');
+    expect(got.providerChargeId).not.toBe(link?.providerChargeId);
   });
 });
 

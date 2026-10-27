@@ -1,5 +1,6 @@
 import { createPaymentsGateway } from '../../core/gateway';
 import type { PaymentProviderAdapter } from '../../core/provider';
+import type { ProviderHealth } from '../../core/provider-health';
 import { defineProviders } from '../../core/registry';
 import type {
   ClientTokenization,
@@ -192,6 +193,8 @@ const silentTestLogger: CheckoutLogger = {
 
 interface WorldOptions {
   chain?: readonly { name: string; adapter: PaymentProviderAdapter }[];
+  /** The gateway's outage breaker; none by default. */
+  health?: ProviderHealth;
   payable?: Partial<Payable>;
   offlineSettlement?: { afterMs: number };
   /**
@@ -227,6 +230,7 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
     Object.fromEntries(chain.map((entry) => [entry.name, entry.adapter])),
   );
   const gateway = createPaymentsGateway({
+    ...(options.health ? { health: options.health } : {}),
     providers,
     credentials,
     charges,

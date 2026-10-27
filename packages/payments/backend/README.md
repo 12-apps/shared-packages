@@ -67,6 +67,31 @@ These are the seams hosts most often re-implement by accident:
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
 
+### Parked hosted links (FUT-4072)
+
+A re-tap hands back a parked hosted link only where a fresh walk would land
+first — the link's provider heads the current chain, or the providers ahead of
+it are ones its walk failed over from and are still down. A link moved past is
+voided, or marked superseded on its row and handed to your recorder; a link
+the void finds already PAID becomes the answer, and the charge raised in its
+place is retired instead. Three seams carry those guarantees, and are
+effectively **required** for them, though optional in the types for
+compatibility:
+
+- `ChargeQueryStore.markSuperseded` (both shipped stores implement it). Without
+  it a superseded link is never marked, so it can be offered back after the
+  chain flips again and is retired on every attempt that meets it.
+- `gateway.stillWalkedPast` (the shipped gateway implements it, from the attempt
+  ledger and the outage breaker `health`). Without it — or without `health` —
+  every re-tap during a head outage mints a fresh link and retires the last.
+- `correlation.supersede` on the checkout mount, `onSuperseded` on
+  `createChargeRaiser`: the record a later payment of the superseded link must
+  meet in your payment handling. Make it idempotent on provider + charge id.
+
+`createChargeRaiser` may now answer with an EARLIER charge of the reference whose
+status is PAID — treat it as settled. A hand-written gateway passed as
+`ChargeRaiseGateway` must implement `clientConfigChain`.
+
 Nothing here decides what a payment *means* to your domain. Orders, stock,
 subscription cycles and the copy a buyer reads stay in the host, on its own
 vocabulary.

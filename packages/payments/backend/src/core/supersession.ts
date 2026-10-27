@@ -5,7 +5,7 @@ import type { ChargeSnapshot } from './types';
  *
  * When a checkout walks past a parked hosted link and the provider cannot void
  * it — no `cancelCharge`, a void that failed, a void the provider did not
- * confirm, or a link the buyer paid in the meantime — the link stays what it
+ * confirm — the link stays what it
  * was at the provider. What changes is OURS: the stored row is marked, so it is
  * never offered back as "the live charge" again (`ChargeQueryStore.listPayable`
  * leaves it out) and it is retired exactly once.
@@ -16,16 +16,17 @@ import type { ChargeSnapshot } from './types';
  * host's webhook reaction sees `snapshot.superseded` on it.
  */
 
-/** Why a moved-past charge is still the buyer's to pay, or was paid anyway. */
+/**
+ * Why a moved-past charge is still the buyer's to pay. A link the void found
+ * already PAID is not superseded: it is the payment (`hosted-retire.ts`).
+ */
 export type SupersededWhy =
   /** The provider has no `cancelCharge`. */
   | 'VOID_UNSUPPORTED'
   /** The void threw: network, credentials, a disabled provider, a refusal. */
   | 'VOID_FAILED'
   /** The provider answered the void with a charge that is still PENDING. */
-  | 'VOID_NOT_CONFIRMED'
-  /** The provider answered the void with a SETTLED charge: the buyer paid it. */
-  | 'PAID_BEFORE_VOID';
+  | 'VOID_NOT_CONFIRMED';
 
 export interface ChargeSupersession {
   /** ISO-8601 instant the replacement was recorded. */

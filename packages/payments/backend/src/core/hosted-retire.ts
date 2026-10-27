@@ -23,11 +23,13 @@ export type { SupersededWhy } from './supersession';
  *     (`ChargeQueryStore.markSuperseded`) — so it is never offered back as the
  *     live charge and never retired twice — and then RECORDED through the
  *     host's recorder, so a payment of it reaches the host's superseded /
- *     duplicate-payment handling instead of settling unnoticed. A void the
- *     provider answered with a SETTLED charge (`PAID_BEFORE_VOID`: the buyer
- *     paid the old link in the window) is also logged as an error and reported
- *     to `onProviderFailure`. With no recorder wired the line is logged as an
- *     error by name — never silent.
+ *     duplicate-payment handling instead of settling unnoticed. With no
+ *     recorder wired the line is logged as an error by name — never silent.
+ *  3. A void the provider answers with a SETTLED charge (`PAID_BEFORE_VOID`:
+ *     the buyer paid the old link in the window) is not superseded — it IS the
+ *     payment. It is logged as an error, reported to `onProviderFailure`, and
+ *     becomes the buyer's answer ({@link answerHeld}); the charge that was
+ *     about to replace it is retired against it instead.
  *
  * ONLY ONCE THE CHARGE THE BUYER HOLDS IS LIVE. A declined or failed charge
  * leaves the buyer with nothing else to pay, and a recorded-superseded link they
@@ -92,18 +94,52 @@ function sameCharge(a: ChargeSnapshot, b: ChargeSnapshot): boolean {
   return a.provider === b.provider && a.providerChargeId === b.providerChargeId;
 }
 
-/** Void every moved-past link, or mark and record the ones still payable. */
-export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Promise<void> {
+/**
+ * Void every moved-past link, or mark and record the ones still payable.
+ * Answers the first link the provider reported PAID instead of voiding — the
+ * buyer already paid THAT one — or null.
+ */
+export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Promise<ChargeSnapshot | null> {
   const stale = input.movedPast.filter((snapshot) => !sameCharge(snapshot, input.raised));
-  if (stale.length === 0) return;
+  if (stale.length === 0) return null;
   if (!LIVE.has(input.raised.status)) {
     deps.log.warn(
       `payments.superseded kept ${stale.length} hosted link(s) on ${input.reference}: ` +
         `the ${input.raised.provider} charge the buyer holds is ${input.raised.status}`,
     );
-    return;
+    return null;
   }
-  for (const snapshot of stale) await retireOne(deps, input, snapshot);
+  let paid: ChargeSnapshot | null = null;
+  for (const snapshot of stale) {
+    const settled = await retireOne(deps, input, snapshot);
+    paid = paid ?? settled;
+  }
+  return paid;
+}
+
+/** What the buyer is answered with once the moved-past links are retired. */
+export interface HeldAnswer {
+  answer: ChargeSnapshot;
+  /** The answer is an EARLIER charge the buyer already paid (`PAID_BEFORE_VOID`). */
+  paidEarlier: boolean;
+}
+
+/**
+ * Retire the moved-past links against the charge the buyer holds — and when
+ * one of them turns out to be PAID already, answer with THAT one: the buyer
+ * paid, so the checkout must show paid rather than a fresh QR or page. The
+ * charge they were about to be handed is then itself retired against the paid
+ * one (voided, or marked and recorded superseded), so it cannot be paid twice.
+ */
+export async function answerHeld(
+  deps: RetireDeps,
+  input: Omit<RetireInput, 'raised'> & { held: ChargeSnapshot },
+): Promise<HeldAnswer> {
+  const { held, ...rest } = input;
+  const paid = await retireMovedPast(deps, { ...rest, raised: held });
+  if (!paid) return { answer: held, paidEarlier: false };
+  await retireMovedPast(deps, { ...rest, movedPast: [held], raised: paid });
+  return { answer: paid, paidEarlier: true };
 }
 
 function describe(snapshot: ChargeSnapshot, reference: string): string {
@@ -134,7 +170,9 @@ async function voidAt(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnap
     deps.log.error(`payments.void not confirmed for moved-past hosted ${what}: still PENDING`);
     return { why: 'VOID_NOT_CONFIRMED' as const, latest: answer };
   }
-  const message = `moved-past hosted ${what} was ${answer.status} before the void: the buyer paid it`;
+  const message =
+    `PAID_BEFORE_VOID: moved-past hosted ${what} was ${answer.status} before the void: ` +
+    `the buyer paid it, so it is the answer and the charge that replaced it is retired`;
   deps.log.error(`payments.void ${message}`);
   reportProviderFailure(deps.onProviderFailure, {
     path: 'CANCEL',
@@ -144,13 +182,19 @@ async function voidAt(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnap
     reference: snapshot.providerChargeId,
     message,
   });
-  return { why: 'PAID_BEFORE_VOID' as const, latest: answer };
+  return { paid: answer };
 }
 
-async function retireOne(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot): Promise<void> {
+/** Retire one link; answers it when the provider reported it PAID instead. */
+async function retireOne(
+  deps: RetireDeps,
+  input: RetireInput,
+  snapshot: ChargeSnapshot,
+): Promise<ChargeSnapshot | null> {
   const what = describe(snapshot, input.reference);
   const kept = await voidAt(deps, input, snapshot, what);
-  if (!kept) return;
+  if (!kept) return null;
+  if ('paid' in kept) return kept.paid ?? null;
   await markSuperseded(deps, input, snapshot, kept.why, what);
   await recordSuperseded(
     deps,
@@ -163,6 +207,7 @@ async function retireOne(deps: RetireDeps, input: RetireInput, snapshot: ChargeS
     },
     what,
   );
+  return null;
 }
 
 /** The stored mark — FIRST, so a recorder that throws still leaves it retired. */

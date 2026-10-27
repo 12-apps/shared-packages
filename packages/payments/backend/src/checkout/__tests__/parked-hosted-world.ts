@@ -1,5 +1,6 @@
 import { CredentialsError, ProviderRequestError } from '../../core/errors';
 import { createPaymentsGateway } from '../../core/gateway';
+import { createMemoryProviderHealth } from '../../core/provider-health';
 import type { SupersededCharge } from '../../core/hosted-retire';
 import type { CredentialStore } from '../../core/ports';
 import type { ProviderFailureReport } from '../../core/provider-failure';
@@ -28,15 +29,16 @@ export type ProviderState = 'enabled' | 'disabled' | 'removed';
 /**
  * `parked`: a live `alpha` link minted with `alpha` heading the chain.
  * `failover`: a live `alpha` link minted while `beta` headed the chain and was
- * DOWN — the walk failed over onto `alpha` (FUT-563).
+ * DOWN — the walk failed over onto `alpha` (FUT-563) — with `beta` back since.
+ * `outage`: the same link, with `beta`'s outage breaker STILL open.
  */
-export type PriorAttempt = 'none' | 'parked' | 'failover' | 'expired' | 'paid' | 'failed';
+export type PriorAttempt = 'none' | 'parked' | 'failover' | 'outage' | 'expired' | 'paid' | 'failed';
 /** What `alpha` does when asked to void: nothing, void, refuse, or answer PAID / PENDING. */
 type AlphaVoid = boolean | 'fails' | 'paid' | 'pending';
 export type Instrument = 'none' | 'tokenAlpha' | 'tokenBeta';
 
 /** The stored status a non-payable prior attempt is left in. */
-const PRIOR_STATUS: Record<Exclude<PriorAttempt, 'none' | 'parked' | 'failover'>, ChargeStatus> = {
+const PRIOR_STATUS: Record<Exclude<PriorAttempt, 'none' | 'parked' | 'failover' | 'outage'>, ChargeStatus> = {
   expired: 'EXPIRED',
   paid: 'PAID',
   failed: 'DECLINED',
@@ -104,7 +106,12 @@ export function parkedHostedWorld(options: { alphaVoids: AlphaVoid }) {
   const beta = { down: false };
   const charges = createMemoryChargeStore();
   const reports: ProviderFailureReport[] = [];
+  // The outage breaker: one refused connection opens it for a minute of a
+  // clock the world controls, so "still down" and "back" are both reachable.
+  const clock = { now: Date.parse('2026-10-27T12:00:00Z') };
+  const health = createMemoryProviderHealth({ threshold: 1, cooldownMs: 60_000, now: () => clock.now });
   const gateway = createPaymentsGateway({
+    health,
     providers: defineProviders({
       alpha: alphaAdapter(options.alphaVoids),
       beta: betaAdapter(beta),
@@ -146,11 +153,12 @@ export function parkedHostedWorld(options: { alphaVoids: AlphaVoid }) {
   };
 
   /** `[beta, alpha]` with `beta` down: the walk fails over and mints at `alpha`. */
-  async function parkAfterFailover(): Promise<ChargeSnapshot> {
+  async function parkAfterFailover(keepOutage: boolean): Promise<ChargeSnapshot> {
     credentials.state.chain = ['beta', 'alpha'];
     beta.down = true;
-    const parked = await raiseCharge(deps, payable, { method: 'PIX' });
+    const parked = (await raiseCharge(deps, payable, { method: 'PIX' })).answer;
     beta.down = false;
+    if (!keepOutage) clock.now += 61_000;
     credentials.state.chain = ['alpha', 'beta'];
     return parked;
   }
@@ -159,16 +167,23 @@ export function parkedHostedWorld(options: { alphaVoids: AlphaVoid }) {
     charges,
     credentials: credentials.state,
     beta,
+    /** Let `beta`'s breaker cooldown elapse: the outage is over. */
+    recover: () => {
+      clock.now += 61_000;
+    },
     superseded,
     reports,
     logs,
     payable,
-    pay: (method: 'PIX' | 'CARD', card?: CheckoutCard) => raiseCharge(deps, payable, { method, card }),
+    pay: async (method: 'PIX' | 'CARD', card?: CheckoutCard) =>
+      (await raiseCharge(deps, payable, { method, card })).answer,
+    /** The whole answer, `paidEarlier` included. */
+    payHeld: (method: 'PIX' | 'CARD', card?: CheckoutCard) => raiseCharge(deps, payable, { method, card }),
     /** Park an `alpha` link under `[alpha, beta]`, left in the prior's state. */
     async park(prior: PriorAttempt): Promise<ChargeSnapshot | null> {
       if (prior === 'none') return null;
-      if (prior === 'failover') return parkAfterFailover();
-      const parked = await raiseCharge(deps, payable, { method: 'PIX' });
+      if (prior === 'failover' || prior === 'outage') return parkAfterFailover(prior === 'outage');
+      const parked = (await raiseCharge(deps, payable, { method: 'PIX' })).answer;
       if (prior === 'parked') return parked;
       const moved = { ...parked, status: PRIOR_STATUS[prior] };
       await charges.upsertByProviderChargeId(MERCHANT, moved);

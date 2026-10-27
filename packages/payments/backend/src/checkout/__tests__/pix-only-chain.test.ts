@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { createMemoryProviderHealth } from '../../core/provider-health';
+
 import { usesHostedCheckout } from '../config';
 import type { BuyerCheckoutConfig, BuyerProviderLink } from '../types';
 
@@ -184,8 +186,10 @@ describe('separating the two paths leaves the surfaces as they were', () => {
     // FUT-563, from the mount's side: the buyer asked for a QR and the walk
     // landed somewhere that mints a link instead. The answer follows the charge
     // that exists, and the link is payable from now on — so a re-tap must hand
-    // back that same link rather than raise a second payable charge.
+    // back that same link rather than raise a second payable charge. FUT-4072:
+    // for as long as the head's outage lasts, which the breaker is what knows.
     const world = setupCheckoutWorld({
+      health: createMemoryProviderHealth({ threshold: 1 }),
       chain: [
         { name: 'alpha', adapter: testAdapter('alpha', { tokenization: 'NONE', refuses: true }) },
         hostedPage,

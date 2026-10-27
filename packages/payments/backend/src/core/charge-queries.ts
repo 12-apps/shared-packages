@@ -64,7 +64,9 @@ export interface ChargeQueryStore {
    */
   listPayable(query: PayableChargeQuery): Promise<StoredCharge[]>;
   /**
-   * The payable's most recent charge, WHATEVER its status, or null.
+   * The payable's most recent charge, WHATEVER its status, or null — never one
+   * this package marked SUPERSEDED (FUT-4072): the poll follows the charge the
+   * buyer holds, and a payment of a superseded link arrives by webhook or sweep.
    *
    * The read a settlement POLL needs, and the one {@link listPayable} cannot
    * serve: that query is PENDING-only by contract, which is right for "may this

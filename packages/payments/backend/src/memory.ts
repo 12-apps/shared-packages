@@ -134,7 +134,8 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
     async latestByReference(merchant, reference) {
       // Insertion order for the same reason `listPayable` gives below, and NO
       // status clause at all — that is the whole difference between the two.
-      return ofPayable(merchant, reference).at(-1) ?? null;
+      // A row this package marked SUPERSEDED is skipped (FUT-4072).
+      return ofPayable(merchant, reference).filter((row) => !row.snapshot.superseded).at(-1) ?? null;
     },
     async listPayable(query) {
       // Newest first, and by INSERTION rather than by `createdAt`: several

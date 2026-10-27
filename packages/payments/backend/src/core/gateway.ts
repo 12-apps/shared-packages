@@ -22,7 +22,7 @@ import type { PaymentProviderAdapter } from './provider';
 import type { ProviderHealth } from './provider-health';
 import type { SettlementHints } from './settlement-hints';
 import type { ProviderRegistry } from './registry';
-import { providersWalkedPast } from './walk-history';
+import { providersStillWalkedPast } from './walk-history';
 import { runWebhookPipeline, type WebhookPipelineObserver } from './webhook-pipeline';
 import {
   replayRetryableWebhooks,
@@ -232,11 +232,12 @@ export interface PaymentsGateway<P extends string = string> extends ManualCharge
    */
   clientConfigChain(merchant: MerchantRef): Promise<ClientProviderConfig[]>;
   /**
-   * The providers the walk under `idempotencyKey` FAILED OVER from (FUT-4072,
-   * `walk-history.ts`) — what tells a link minted during the head's outage
-   * from one the chain has since been reordered away from.
+   * The providers the walk under `idempotencyKey` FAILED OVER from and whose
+   * outage breaker is STILL open (FUT-4072, `walk-history.ts`) — what tells a
+   * link minted during a head outage that is still going on from one the
+   * chain has since been reordered (or the head recovered) away from.
    */
-  failedOverBefore?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
+  stillWalkedPast?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
   /**
    * Full inbound-webhook pipeline for a delivery already attributed to a
    * merchant (hosts attribute via the webhook URL, e.g. a per-merchant
@@ -390,7 +391,7 @@ export function createPaymentsGateway<P extends string>(
       return configs;
     },
 
-    failedOverBefore: (merchant, key) => providersWalkedPast(config.attempts, merchant, key),
+    stillWalkedPast: (merchant, key) => providersStillWalkedPast(config.attempts, config.health, merchant, key),
     handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
   });

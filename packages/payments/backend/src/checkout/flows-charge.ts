@@ -6,7 +6,8 @@ import { cardOutcomeOf, declineOf } from './decline-wire';
 import { chargeDraftOf } from './draft';
 import { classifyFirstCharge, type FirstChargeSettlement } from './first-charge';
 import { chargeMismatchRefusal } from './failure';
-import { raiseCharge, type RaiseChargeDeps } from './raise';
+import { raiseDeps, settleEarlier } from './flows-raise';
+import { raiseCharge } from './raise';
 import type { CheckoutCard } from './reuse';
 import {
   attachedChargeOf,
@@ -36,32 +37,6 @@ import type { CheckoutChargeDraft, CheckoutRouteIntent, Payable } from './types'
  */
 
 type Runtime<C, V extends object, D> = CheckoutRuntime<C, V, D>;
-
-/**
- * What `raiseCharge` runs on. A moved-past hosted link the provider could not
- * void is recorded through the host's `correlation.supersede` (FUT-4072).
- */
-async function raiseDeps<C, V extends object, D>(runtime: Runtime<C, V, D>): Promise<RaiseChargeDeps> {
-  const supersede = runtime.config.correlation.supersede?.bind(runtime.config.correlation);
-  return {
-    gateway: await runtime.gateway(),
-    charges: runtime.charges,
-    log: runtime.log,
-    ...(runtime.config.onProviderFailure ? { onProviderFailure: runtime.config.onProviderFailure } : {}),
-    ...(supersede
-      ? {
-          onSuperseded: ({ reference, snapshot, replacedBy, why }) =>
-            supersede({
-              ref: reference,
-              charge: attachedChargeOf(snapshot),
-              amount: snapshot.amount,
-              replacedBy: attachedChargeOf(replacedBy),
-              why,
-            }),
-        }
-      : {}),
-  };
-}
 
 /** The payable's view after a correlation write, or the one we already had. */
 async function refreshedView<C, V extends object, D>(
@@ -135,7 +110,12 @@ async function firstChargeResponse<C, V extends object, D>(
   if (!hostedCard && payable.method !== 'PIX') return runtime.respond.ok(view);
 
   const deps = await raiseDeps(runtime);
-  const snapshot = await raiseCharge(deps, payable, { method: payable.method });
+  const raised = await raiseCharge(deps, payable, { method: payable.method });
+  if (raised.paidEarlier) {
+    await settleEarlier(runtime, payable, raised.answer);
+    return runtime.respond.ok(await refreshedView(runtime, payable.ref, view));
+  }
+  const snapshot = raised.answer;
   return answerSettlement(
     runtime,
     payable,
@@ -343,13 +323,17 @@ export async function chargeInstrument<C, V extends object, D>(
 
   try {
     const deps = await raiseDeps(runtime);
-    const snapshot = await raiseCharge(deps, payable, {
+    const raised = await raiseCharge(deps, payable, {
       method: 'CARD',
       card: instrument.card,
       // The CPF the card form asked for reaches the provider's required-field
       // gate from HERE — the host's payable row has nowhere to keep it.
       customer: draft.customer,
     });
+    if (raised.paidEarlier) {
+      return runtime.respond.ok({ status: await settleEarlier(runtime, payable, raised.answer) });
+    }
+    const snapshot = raised.answer;
     // FUT-378 — NEVER record bookkeeping from an unrecognized snapshot. A charge
     // answered out of the gateway's store rather than raised now can be another
     // attempt's: a PIX charge read as a card decline would fail this payable and

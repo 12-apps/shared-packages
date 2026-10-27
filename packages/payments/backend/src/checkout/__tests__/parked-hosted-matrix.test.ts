@@ -45,7 +45,7 @@ interface Case {
 const ORDERS: Order[] = ['alpha>beta', 'beta>alpha'];
 const STATES: ProviderState[] = ['enabled', 'disabled', 'removed'];
 const METHODS: Method[] = ['PIX', 'CARD'];
-const PRIORS: PriorAttempt[] = ['none', 'parked', 'failover', 'expired', 'paid', 'failed'];
+const PRIORS: PriorAttempt[] = ['none', 'parked', 'failover', 'outage', 'expired', 'paid', 'failed'];
 const INSTRUMENTS: Instrument[] = ['none', 'tokenAlpha', 'tokenBeta'];
 const VOIDS = [true, false];
 
@@ -87,27 +87,31 @@ function currentChain(c: Case): ProviderName[] {
   return order.filter((provider) => provider !== 'alpha' || c.alpha === 'enabled');
 }
 
-/** The walk: alpha's hosted page needs no instrument; beta skips a card minted only for alpha. */
+/**
+ * The walk: alpha's hosted page needs no instrument; beta skips a card minted
+ * only for alpha, and is skipped outright while its outage breaker is open.
+ */
 function walkLands(c: Case): ProviderName | null {
   const lands = (provider: ProviderName) =>
-    provider === 'alpha' || c.method === 'PIX' || c.instrument !== 'tokenAlpha';
+    provider === 'alpha' || (c.prior !== 'outage' && (c.method === 'PIX' || c.instrument !== 'tokenAlpha'));
   return currentChain(c).find(lands) ?? null;
 }
 
 /**
  * Would a fresh walk land on alpha? When alpha is the first capable member —
  * or when every member ahead of it is one the walk that minted the link failed
- * over from, for the same method (a `failover` link was minted for PIX, with
- * beta down).
+ * over from, for the same method, AND is still down now: an `outage` link was
+ * minted for PIX with beta down, and beta's breaker is still open. A `failover`
+ * link whose beta is back is judged like any other.
  */
 function walkWouldLandOnAlpha(c: Case): boolean {
   const rank = currentChain(c).indexOf('alpha');
   if (rank < 0) return false;
-  return rank === 0 || (c.prior === 'failover' && c.method === 'PIX');
+  return rank === 0 || (c.prior === 'outage' && c.method === 'PIX');
 }
 
 function expected(c: Case): Expected {
-  const parkedPayable = c.prior === 'parked' || c.prior === 'failover';
+  const parkedPayable = c.prior === 'parked' || c.prior === 'failover' || c.prior === 'outage';
   if (parkedPayable && c.instrument !== 'tokenAlpha' && walkWouldLandOnAlpha(c)) {
     return { reused: true, raisedOn: null, parked: 'reused' };
   }
@@ -130,7 +134,7 @@ async function arrange(c: Case) {
 describe('FUT-4072 — a parked hosted link against the current chain', () => {
   it('covers every combination of the axes', () => {
     const cases = buildCases();
-    expect(cases).toHaveLength(432);
+    expect(cases).toHaveLength(504);
     expect(new Set(cases.map((c) => c.name)).size).toBe(cases.length);
   });
 

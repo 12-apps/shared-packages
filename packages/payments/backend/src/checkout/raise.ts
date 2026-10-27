@@ -1,7 +1,7 @@
 import { ChargeIdentityError, chargeIdentityMismatch } from '../core/charge-identity';
 import type { PaymentsGateway } from '../core/gateway';
 import { judgeParkedHosted } from '../core/hosted-landing';
-import { retireMovedPast, type SupersededRecorder } from '../core/hosted-retire';
+import { answerHeld, type HeldAnswer, type SupersededRecorder } from '../core/hosted-retire';
 import type { ProviderFailureReporter } from '../core/provider-failure';
 import type { ChargeQueryStore } from '../core/ports';
 import { attemptIdempotencyKey, attemptReference } from '../core/reference';
@@ -133,7 +133,9 @@ async function liveChargeFor(
 }
 
 /**
- * Raise a charge for a payable and return the normalized snapshot.
+ * Raise a charge for a payable and answer the charge the buyer now holds — and
+ * whether it is an EARLIER one they already paid (FUT-4072: a moved-past link
+ * the void found PAID), which the caller settles rather than presents.
  *
  * A DECLINE is a normal return value here (`status: 'DECLINED'`), not a throw —
  * the buyer needs a message, not a stack trace. Only a transport, account or
@@ -143,14 +145,11 @@ export async function raiseCharge(
   deps: RaiseChargeDeps,
   payable: Payable,
   request: RaiseChargeRequest,
-): Promise<ChargeSnapshot> {
+): Promise<HeldAnswer> {
   const { live, movedPast } = await liveChargeFor(deps, payable, request);
-  const retire = (raised: ChargeSnapshot) =>
-    retireMovedPast(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, raised });
-  if (live) {
-    await retire(live);
-    return live;
-  }
+  const answer = (held: ChargeSnapshot) =>
+    answerHeld(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, held });
+  if (live) return answer(live);
 
   const attempt = await deps.charges.countByReference(payable.merchant, payable.ref);
   const idempotencyKey = attemptIdempotencyKey(payable.ref, attempt);
@@ -182,6 +181,5 @@ export async function raiseCharge(
   // Only once THIS attempt's charge is proven good: the buyer must never be
   // left with the old code voided and no new one to pay.
   await voidSupersededPixCharges(deps, payable);
-  await retire(stored.snapshot);
-  return stored.snapshot;
+  return answer(stored.snapshot);
 }

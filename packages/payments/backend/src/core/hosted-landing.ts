@@ -17,9 +17,10 @@ import type { ChargeInput, ChargeSnapshot, MerchantRef, PaymentMethodKind, Provi
  * is the FIRST member able to take the requested method. Then reusing and
  * walking reach the same provider, and reusing is the one of the two that does
  * not mint a second payable charge. "Would land anyway" also covers a link
- * minted while the providers ahead of it were DOWN: the ledger of the walk that
- * minted it shows it failed over from each of them (`walk-history.ts`), and a
- * re-tap during that outage must not mint a fresh link on every tap. Otherwise
+ * minted while the providers ahead of it were DOWN and that are STILL down:
+ * the ledger of the walk that minted it shows it failed over from each of them
+ * and their outage breaker is still open (`walk-history.ts`), so a re-tap
+ * during that outage must not mint a fresh link on every tap. Otherwise
  * the checkout walks the CURRENT chain, and the links it moved past are retired
  * against whatever the buyer now holds (`hosted-retire.ts`).
  *
@@ -39,8 +40,8 @@ export interface ChainMember {
 /** The gateway reads the rule needs. */
 interface ChainReader {
   clientConfigChain(merchant: MerchantRef): Promise<readonly ChainMember[]>;
-  /** The walk ledger's providers-failed-over-from (`walk-history.ts`). Optional. */
-  failedOverBefore?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
+  /** Providers the minting walk failed over from, still down now (`walk-history.ts`). Optional. */
+  stillWalkedPast?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
 }
 
 /** The members a fresh walk for `method` may land on, in walk order. */
@@ -98,10 +99,11 @@ const NOTHING_PARKED: ParkedHostedVerdict = { reuse: null, movedPast: [] };
  *
  * Yes when it is the FIRST capable member (the owner's rule). Also yes when
  * every capable member ranked ahead of it is one the walk that minted this
- * link, for this same method, FAILED OVER from — the head was down then
- * (FUT-563), and minting a second link there on every re-tap is the double
- * charge FUT-604 refuses. A chain REORDERED since leaves a member ahead that
- * the walk never tried, which is exactly the trapped payable.
+ * link, for this same method, FAILED OVER from AND that is still down now —
+ * its outage breaker still open (FUT-563): minting a second link there on
+ * every re-tap is the double charge FUT-604 refuses. Once those providers are
+ * back, or when the chain was REORDERED (a member ahead the walk never tried —
+ * the trapped payable), the current chain is walked.
  */
 async function wouldLandOn(
   reader: ChainReader,
@@ -112,9 +114,9 @@ async function wouldLandOn(
   const rank = capable.indexOf(link.snapshot.provider);
   if (rank < 0) return false;
   if (rank === 0) return true;
-  if (!reader.failedOverBefore || !link.idempotencyKey) return false;
+  if (!reader.stillWalkedPast || !link.idempotencyKey) return false;
   if (link.snapshot.method !== request.method) return false;
-  const walkedPast = await reader.failedOverBefore(request.merchant, link.idempotencyKey);
+  const walkedPast = await reader.stillWalkedPast(request.merchant, link.idempotencyKey);
   return capable.slice(0, rank).every((provider) => walkedPast.includes(provider));
 }
 
