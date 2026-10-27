@@ -10,6 +10,7 @@ const CALENDAR_DEFAULTS = {
   minRangeLength: 1,
   allowSameDayRange: true,
   autoFocus: false,
+  captionLayout: 'arrows',
 } as const satisfies Partial<CalendarProps>;
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still
@@ -27,6 +28,9 @@ export const resolveCalendarProps = (props: CalendarProps): ResolvedCalendarProp
   // A range needs two months side by side to be picked comfortably; a single
   // date does not.
   const defaultMonths = merged.selectionMode === 'range' ? 2 : 1;
+
+  // The selectors caption names ONE month and one year, so it shows one month.
+  if (merged.captionLayout === 'selectors') return { ...merged, monthsToShow: 1 };
 
   return { ...merged, monthsToShow: merged.numberOfMonths ?? defaultMonths };
 };

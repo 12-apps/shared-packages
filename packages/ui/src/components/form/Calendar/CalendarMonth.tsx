@@ -25,7 +25,7 @@ const GRID_SX = { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr
  * their gaps (7 × 40 + 6 × 4 design px). Months side by side keep a 280 basis,
  * so a multi-month calendar still wraps rather than squeezing every month.
  */
-const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
+export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
 
 // Only the outermost months carry arrows; the ones between get a spacer so their
 // titles stay centred.
@@ -89,6 +89,29 @@ const WeekdayHeader: FC<{ weekdayNames: string[] }> = ({ weekdayNames }) => (
   </Box>
 );
 
+/** The weekday row and the day grid under a month's caption. */
+export const MonthDays: FC<{
+  matrix: MonthMatrix;
+  monthIndex: number;
+  weekdayNames: string[];
+  dayContext: DayCellContext;
+}> = ({ matrix, monthIndex, weekdayNames, dayContext }) => (
+  <>
+    <WeekdayHeader weekdayNames={weekdayNames} />
+
+    <Box
+      role="grid"
+      aria-labelledby={`month-${monthIndex}`}
+      data-testid="calendar-grid"
+      sx={GRID_SX}
+    >
+      {matrix.weeks.flat().map((day) => (
+        <CalendarDayCell key={day.key} day={day} {...dayContext} />
+      ))}
+    </Box>
+  </>
+);
+
 export interface CalendarMonthProps {
   matrix: MonthMatrix;
   monthIndex: number;
@@ -130,18 +153,12 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
         onNextMonth={onNextMonth}
       />
 
-      <WeekdayHeader weekdayNames={weekdayNames} />
-
-      <Box
-        role="grid"
-        aria-labelledby={`month-${monthIndex}`}
-        data-testid="calendar-grid"
-        sx={GRID_SX}
-      >
-        {matrix.weeks.flat().map((day) => (
-          <CalendarDayCell key={day.key} day={day} {...dayContext} />
-        ))}
-      </Box>
+      <MonthDays
+        matrix={matrix}
+        monthIndex={monthIndex}
+        weekdayNames={weekdayNames}
+        dayContext={dayContext}
+      />
     </Box>
   );
 };

@@ -50,6 +50,9 @@ export interface CalendarProps {
   locale?: string; // e.g. 'en-US'
   showOutsideDays?: boolean; // days from prev/next month
   showWeekNumbers?: boolean;
+  captionLayout?: 'arrows' | 'selectors'; // default: 'arrows'; 'selectors' shows one month
+  defaultMonth?: Date; // month shown while nothing is chosen; default: today's month
+  labels?: Partial<CalendarLabels>; // selectors caption's names; English pack fills the rest
 
   // Constraints
   minDate?: Date;
@@ -128,6 +131,67 @@ export interface CalendarProps {
 - Header buttons move month (or year with modifier keys if desired).
 - Month pagination respects `minDate`/`maxDate`.
 
+### Opening month: `defaultMonth`
+
+The calendar opens on the chosen `value` (single) or `range.start` (range);
+with neither, on `defaultMonth` when given, else on today's month. It is read
+once, on mount, like the value it stands in for. A birth-date picker passes a
+month decades back (the storefront's Perfil field passes January 2001) rather
+than opening on today.
+
+### Month and year selectors: `captionLayout="selectors"` (FUT-4121)
+
+Opt-in; the default `'arrows'` caption is unchanged. For a date far from today
+— a birth date — where ~360 arrow taps would separate today from 30 years ago.
+
+- The caption holds a `<Month> ▾` button, a `<Year> ▾` button and the
+  previous/next month arrows. Always one month (`numberOfMonths` is ignored);
+  `renderHeader` applies to the `'arrows'` caption only.
+- **Year button** swaps the day grid for a year grid: 4 columns, newest year
+  first, from `maxDate`'s year down to `minDate`'s (1900–2099 without bounds;
+  the shown year is always listed, `aria-disabled` when outside the bounds). The shown year is highlighted
+  (`aria-current="true"`) and takes focus, which scrolls the list to it.
+  Picking a year returns to that year's days, in the same month, pulled inside
+  the bounds (December in a year capped at October shows October).
+- **Month button** swaps in a 3 × 4 month grid. Months with no day inside
+  `minDate`/`maxDate` are `aria-disabled` and ignore a tap. Picking returns to
+  the days.
+- Pressing the open grid's button again, or a month arrow, goes back to the
+  days. The arrows are disabled at the first and last month the bounds allow.
+- Days outside `minDate`/`maxDate` stay disabled as in any layout.
+- Example — 14/03/1990 from January 2001: `2001 ▾` → 1990 → `Janeiro ▾` →
+  mar → 14, five taps.
+
+```tsx
+import { Calendar } from '@12-apps/ui';
+import { UI_LABELS } from '@12-apps/ui/locales';
+
+<Calendar
+  ariaLabel="Data de nascimento"
+  locale="pt-BR"
+  captionLayout="selectors"
+  defaultMonth={new Date(2001, 0, 1)}
+  minDate={new Date(1900, 0, 1)}
+  maxDate={thirteenYearsAgo}
+  labels={UI_LABELS['pt-BR'].calendar}
+  value={birthDate}
+  onChange={setBirthDate}
+/>;
+```
+
+**Copy.** Month names and years come from `Intl` in `locale` (the long name,
+capitalised, on the button; the short one, without its dot, in the grid with
+the long one as its accessible name). The accessible names come from
+`labels` (`CalendarLabels` in `copy/labels.ts`): `chooseMonth(month)`,
+`chooseYear(year)`, `previousMonth`, `nextMonth`, and the two grids' names
+`months`/`years`. The English pack answers for any key left out; a pt-BR host
+passes `UI_LABELS['pt-BR'].calendar` ("Março, escolher mês", "Mês anterior",
+"Anos"…).
+
+**Size.** Every caption control and every month/year button is at least 44
+design px tall at any width. In a 320 sheet the two arrows wrap under the
+month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
+
 ### States & Styles (suggested class hooks)
 
 - `.cal-root`, `.cal-header`, `.cal-nav`, `.cal-grid`, `.cal-weekdays`, `.cal-row`, `.cal-cell`
@@ -150,6 +214,24 @@ export interface CalendarProps {
   - Escape: clears hover preview; host can close popover.
 
 - Focus should remain inside the grid; header nav is reachable via Tab.
+
+**Selectors caption (`captionLayout="selectors"`).**
+
+- The month and year buttons are real buttons named by `labels`
+  (`chooseMonth`/`chooseYear`, which start with the visible text), with
+  `aria-expanded` and, while their grid is open, `aria-controls` pointing at
+  it. The arrows are named `previousMonth`/`nextMonth`.
+- Each grid is a `role="group"` named `months`/`years`, with ONE tab stop
+  (roving `tabIndex`). Opening it focuses the shown month/year. Arrows move by
+  one (left/right) or one row (up/down), Home/End to the ends, Enter/Space
+  pick, Escape returns to the days unchanged with focus on the button that
+  opened the grid (Escape on a caption button closes it too). Out-of-bounds months stay focusable and say
+  `aria-disabled`.
+- A pick shows that month's days and moves focus to the day grid's tab stop.
+- The caption and the grids keep their keys to themselves: Enter on a caption
+  button activates it rather than picking the focused day. The day keys
+  (arrows, Home/End, PageUp/PageDown, Shift+PageUp/PageDown) work in the day
+  view exactly as in the `'arrows'` layout.
 
 ---
 
@@ -197,6 +279,8 @@ export interface CalendarProps {
 - `Date/Calendar/WithFooterApplyClear`
 - `Date/Calendar/WeekNumbers`
 - `Date/Calendar/RTL`
+- `Form/Calendar/MonthYearSelectors` — `captionLayout="selectors"` with `defaultMonth` and bounds (FUT-4121)
+- `Form/Calendar/Tests/SelectorsPickABirthDate`, `SelectorsKeyboard`, `SelectorsFitA320Sheet` — the five-tap journey, the grids' keys and focus, and the 320 fit with 44px targets
 
 ---
 
@@ -281,6 +365,23 @@ await userEvent.click(prevButton);
 const nextButton = await canvas.findByTestId('calendar-next-month');
 await userEvent.click(nextButton);
 ```
+
+#### `calendar-month-select` / `calendar-year-select`
+
+- **Element:** the selectors caption's month and year buttons
+- **Only with:** `captionLayout="selectors"` (absent otherwise)
+- **Attributes:** `aria-expanded`, `aria-controls` while open
+- **Test Tip:** `expect(canvas.getByTestId('calendar-year-select')).toHaveTextContent('2001')`
+
+#### `calendar-months` / `calendar-months-${index}`
+
+- **Element:** the month grid (`role="group"`) and each month button, by 0-based month
+- **Only with:** `captionLayout="selectors"`, while the month grid is open
+
+#### `calendar-years` / `calendar-years-${year}`
+
+- **Element:** the year grid (`role="group"`) and each year button, by full year
+- **Only with:** `captionLayout="selectors"`, while the year grid is open
 
 ### Calendar Grid Elements
 
@@ -515,6 +616,14 @@ expect(style.cursor).toBe('not-allowed');
 - **Values:** `(date: Date) => boolean`
 - **Impact:** Custom disabled dates have `aria-disabled="true"`
 - **Test Tip:** Verify callback determines which dates are disabled
+
+#### `captionLayout`
+- **Values:** `'arrows'` (default) | `'selectors'`
+- **Impact:** `'selectors'` adds `calendar-month-select`/`calendar-year-select`, names the arrows, shows one month, and hides `calendar-grid` while a month or year grid is open
+
+#### `defaultMonth`
+- **Values:** `Date`
+- **Impact:** the month on screen at mount when there is no `value`/`range.start` — pin it in a test instead of depending on today
 
 #### `autoFocus`
 - **Values:** `boolean`
@@ -812,3 +921,8 @@ try {
   - Added `calendar-date-${date}`
   - Added `calendar-selected-date`
   - Added `calendar-today`
+
+- **2026-10-27 (FUT-4121):** month/year selectors and the opening month
+  - Added `captionLayout`, `defaultMonth`, `labels` (`CalendarLabels`)
+  - Added `calendar-month-select`, `calendar-year-select`
+  - Added `calendar-months`, `calendar-months-${index}`, `calendar-years`, `calendar-years-${year}`

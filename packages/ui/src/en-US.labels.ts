@@ -144,4 +144,12 @@ export const EN_US_UI_LABELS: UiLabels = {
   dateRangePicker: {
     calendar: "Calendar",
   },
+  calendar: {
+    chooseMonth: (month) => `${month}, choose month`,
+    chooseYear: (year) => `${year}, choose year`,
+    previousMonth: "Previous month",
+    nextMonth: "Next month",
+    months: "Months",
+    years: "Years",
+  },
 };

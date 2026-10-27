@@ -4,6 +4,8 @@ import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
+import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
+
 import { Calendar } from './Calendar';
 import type { DateRange } from './Calendar.types';
 
@@ -50,6 +52,11 @@ const meta: Meta<typeof Calendar> = {
     allowSameDayRange: {
       control: { type: 'boolean' },
       description: 'Allow same day as start and end of range',
+    },
+    captionLayout: {
+      control: { type: 'select' },
+      options: ['arrows', 'selectors'],
+      description: "'selectors' swaps the title for month and year buttons that open a month or year grid",
     },
     autoFocus: {
       control: { type: 'boolean' },
@@ -347,4 +354,42 @@ export const Responsive: Story = {
       <Calendar ariaLabel="Calendário" selectionMode="single" />
     </Box>
   ),
+};
+const BirthDateComponent = () => {
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+      <Typography variant="h6">
+        Selected: {birthDate ? birthDate.toLocaleDateString('pt-BR') : 'None'}
+      </Typography>
+      <Calendar
+        ariaLabel="Data de nascimento"
+        locale="pt-BR"
+        captionLayout="selectors"
+        defaultMonth={new Date(2001, 0, 1)}
+        minDate={new Date(1900, 0, 1)}
+        maxDate={new Date(2013, 9, 27)}
+        labels={PT_BR_UI_LABELS.calendar}
+        value={birthDate}
+        onChange={setBirthDate}
+      />
+    </Box>
+  );
+};
+
+/**
+ * A date decades back (FUT-4121): the month and year buttons open a month or a
+ * year grid, so 14/03/1990 is five taps from January 2001 instead of ~130
+ * arrow taps. Opens on `defaultMonth` while nothing is chosen.
+ */
+export const MonthYearSelectors: Story = {
+  render: () => <BirthDateComponent />,
+  parameters: {
+    docs: {
+      description: {
+        story: "`captionLayout=\"selectors\"` with `defaultMonth`, `minDate`/`maxDate` bounding the year list, and the pt-BR labels pack.",
+      },
+    },
+  },
 };

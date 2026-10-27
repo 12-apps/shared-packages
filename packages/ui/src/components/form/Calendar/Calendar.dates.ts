@@ -98,3 +98,13 @@ export const getWeekdayNames = (locale = 'en-US', firstDayOfWeek = 0): string[] 
 
 export const getMonthName = (month: number, year: number, locale = 'en-US'): string =>
   new Date(year, month, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+
+/**
+ * A month's name on its own, as the selectors caption and month grid show it:
+ * capitalised (pt-BR's `Intl` writes "março"), and `short` without the
+ * trailing abbreviation dot ("mar." → "mar").
+ */
+export const getMonthLabel = (month: number, locale = 'en-US', width: 'long' | 'short' = 'long'): string => {
+  const name = new Date(2025, month, 1).toLocaleDateString(locale, { month: width }).replace(/\.$/, '');
+  return width === 'long' ? name.charAt(0).toLocaleUpperCase(locale) + name.slice(1) : name;
+};
