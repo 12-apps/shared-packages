@@ -96,3 +96,5 @@ export type { CheckoutCard } from './reuse';
  * them is canonical, is the module's own doc.
  */
 export { chargeDraftOf } from './draft';
+
+export { platformGooglePayMerchant } from './google-pay-merchant';

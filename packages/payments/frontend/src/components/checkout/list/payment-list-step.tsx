@@ -4,6 +4,7 @@ import type { CheckoutBasketIdentity } from "../basket";
 import { CartChangedBoundary } from "../cart-changed";
 import { useCheckoutClientApi } from "../client-context";
 import { displayTotals } from "../checkout-totals";
+import { cardHead } from "../method-capability";
 import type { CheckoutSummaryLine } from "../payment-summary";
 import { usePaymentPixStage } from "../payment-step-layout";
 import { PixStageProvider } from "../pix-stage";
@@ -24,6 +25,7 @@ import type { CheckoutListChoice, CheckoutPaymentList } from "./types";
 import { useListCapability } from "./use-capability";
 import { useListCharge } from "./use-list-charge";
 import { useListState } from "./use-list-state";
+import { DebitAddressProvider } from "./debit-address";
 
 type Controller = ReturnType<typeof useCheckoutController>;
 
@@ -147,13 +149,20 @@ function ListFaceFor({ props, state, charge, cap, onHandOff, reveal }: {
 }
 
 /**
- * Everything a debit row needs besides the provider's claim (FUT-3754): the
- * host's billing address, its words for the row, and a client that can ask for
- * the 3-D Secure session. Missing any one, there is no row.
+ * Everything a debit row needs besides the provider's claim (FUT-3754): a
+ * billing address — the host's, or one the row can ask with the host's CEP
+ * lookup (FUT-4109) — its words for the row, and a client that can ask for the
+ * 3-D Secure session. Missing any one, there is no row.
  */
 function useDebitReady(list: CheckoutPaymentList): boolean {
   const client = useCheckoutClientApi();
-  return Boolean(list.billingAddress) && list.copy.debit !== undefined && client.threeDSecureSession !== undefined;
+  const address = Boolean(list.billingAddress) || (list.billingLookup !== undefined && list.copy.debit?.address !== undefined);
+  return address && list.copy.debit !== undefined && client.threeDSecureSession !== undefined;
+}
+
+/** The host's CEP lookup, only when the pack has the words for the row's address fields. */
+function debitLookup(list: CheckoutPaymentList): CheckoutPaymentList["billingLookup"] {
+  return list.copy.debit?.address ? list.billingLookup : undefined;
 }
 
 /**
@@ -164,7 +173,7 @@ function useDebitReady(list: CheckoutPaymentList): boolean {
  * when it is drawn.
  */
 function PreloadTop({ state, cap, config, taxIdOnFile }: { state: ListState; cap: ListCapability; config: CheckoutProviderConfig | null; taxIdOnFile: boolean }): JSX.Element | null {
-  const declared = (config?.chain?.[0]?.wallets?.length ?? 0) > 0;
+  const declared = (cardHead(config)?.wallets?.length ?? 0) > 0;
   if (!state.top && cap.wallets.length === 0 && !declared && !taxIdOnFile) return null;
   return <TopPart.Preload />;
 }
@@ -245,19 +254,21 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   );
   return (
     <PaymentListProvider list={list} onLeavePix={c.dropOrder} consent={consent}>
-      <PixStageProvider stage={pixStage}>
-        <PreloadTop state={state} cap={cap} config={config} taxIdOnFile={props.taxIdOnFile} />
-        <CartChangedBoundary
-          order={c.order}
-          creating={c.creating}
-          onGenerate={(method) => void c.startPayment(method)}
-          refresh={c.refresh}
-          basket={props.totalOverride ? undefined : props.cart.identity}
-          actionInBar={Boolean(pix)}
-        >
-          {face}
-        </CartChangedBoundary>
-      </PixStageProvider>
+      <DebitAddressProvider given={list.billingAddress} lookup={debitLookup(list)}>
+        <PixStageProvider stage={pixStage}>
+          <PreloadTop state={state} cap={cap} config={config} taxIdOnFile={props.taxIdOnFile} />
+          <CartChangedBoundary
+            order={c.order}
+            creating={c.creating}
+            onGenerate={(method) => void c.startPayment(method)}
+            refresh={c.refresh}
+            basket={props.totalOverride ? undefined : props.cart.identity}
+            actionInBar={Boolean(pix)}
+          >
+            {face}
+          </CartChangedBoundary>
+        </PixStageProvider>
+      </DebitAddressProvider>
     </PaymentListProvider>
   );
 }

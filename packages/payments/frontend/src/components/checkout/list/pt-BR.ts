@@ -33,6 +33,14 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     notSupported: "Esse cartão não pode ser usado no débito aqui. Tente no crédito ou no Pix.",
     refused: "O banco não confirmou o pagamento no débito. Tente outro cartão ou o Pix.",
     failed: "O banco não confirmou o débito agora. Tente de novo.",
+    address: {
+      postalCode: "CEP de cobrança",
+      number: "Número",
+      street: "Rua",
+      hint: "O banco confere o endereço do cartão",
+      notFound: "Não achamos esse CEP. Confira os números.",
+      missing: "Informe o CEP e o número do endereço de cobrança",
+    },
   },
   googlePay: { label: "Google Pay", hint: "Com o cartão salvo no seu Google" },
   wallets: {

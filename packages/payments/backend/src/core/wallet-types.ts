@@ -58,6 +58,14 @@ export interface GooglePayClientConfig {
    * older adapter) means `TEST`, the browser's default before this existed.
    */
   environment?: 'TEST' | 'PRODUCTION';
+  /**
+   * The PLATFORM's Google merchant id, from the Google Pay & Wallet Console,
+   * which Google requires on every PRODUCTION request (`merchantInfo`). It is
+   * one per deployment, not per store, so the adapter never knows it: the host
+   * hands it to `buyerCheckoutConfig` (`googlePayMerchant`), which stamps it
+   * here. Absent, a PRODUCTION connection draws no button.
+   */
+  merchantInfo?: { merchantId: string; merchantName?: string };
 }
 
 /**

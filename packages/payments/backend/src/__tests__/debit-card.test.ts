@@ -195,9 +195,9 @@ describe("PagBank's 3-D Secure session", () => {
 describe('debitSessionFor', () => {
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
 
-  function store(provider: string | null, credentials: ResolvedCredentials | null) {
+  function store(provider: string | null, credentials: ResolvedCredentials | null, chain: string[] = provider ? [provider] : []) {
     return {
-      defaultProvider: async () => provider,
+      providerChain: async () => chain,
       getCredentials: async () => credentials,
     };
   }
@@ -211,6 +211,14 @@ describe('debitSessionFor', () => {
   it('answers null with nothing connected, or with no credentials', async () => {
     expect(await debitSessionFor({ providers, credentials: store(null, STUB_CREDS) }, TENANT)).toBeNull();
     expect(await debitSessionFor({ providers, credentials: store('pagbank', null) }, TENANT)).toBeNull();
+  });
+
+  it("mints on the first provider that takes a card, past a Pix-only head (FUT-4109)", async () => {
+    const pagbank = pagbankProvider(PT_BR_PAGBANK_COPY);
+    const pixKey = { ...pagbank, name: 'pix-key', capabilities: { ...pagbank.capabilities, methods: ['PIX' as const], debit: false } };
+    const chain = defineProviders({ 'pix-key': pixKey, pagbank });
+    const minted = await debitSessionFor({ providers: chain, credentials: store(null, STUB_CREDS, ['pix-key', 'pagbank']) }, TENANT);
+    expect(minted?.provider).toBe('pagbank');
   });
 
   it('answers null when the head cannot do debit', async () => {

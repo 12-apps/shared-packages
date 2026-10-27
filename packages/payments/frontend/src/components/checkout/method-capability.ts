@@ -7,6 +7,7 @@
  */
 import { tokenizerFor, type CardTokenizationConfig } from "../../card";
 
+import type { CheckoutGooglePayParams } from "./google-pay-params";
 import type { CheckoutChainLink, CheckoutProviderConfig, PaymentMethod } from "./types";
 
 /**
@@ -139,12 +140,23 @@ function toCardLink(link: CheckoutChainLink): CardChainLink {
 }
 
 /**
+ * The first chain entry that can take a CARD — the provider a card, debit or
+ * wallet charge is raised on, since the walk skips an entry without the method.
+ * Not `chain[0]`: a store whose head is its own Pix key (no card) still takes
+ * debit and the wallets on the card provider after it, in every store type
+ * (FUT-4109).
+ */
+export function cardHead(config: CheckoutProviderConfig | null): CheckoutChainLink | undefined {
+  return config?.chain?.find((entry) => entry.methods.includes("CARD"));
+}
+
+/**
  * Everything the Google Pay button needs to mint a token (FUT-471), or `null`
  * when the button must not render.
  *
- * Read off the chain HEAD only, like the checkout screen: the wallet token is
- * minted against ONE gateway's `gatewayMerchantId`, so only the provider the
- * walk tries first can charge it — a tail entry's declaration cannot be
+ * Read off the CARD head ({@link cardHead}): the wallet token is minted against
+ * ONE gateway's `gatewayMerchantId`, so only the provider a card charge's walk
+ * tries first can charge it — a later card entry's declaration cannot be
  * honoured from this browser.
  *
  * FAILS CLOSED, deliberately the opposite of `offeredMethods`' fail-open: a
@@ -156,15 +168,29 @@ function toCardLink(link: CheckoutChainLink): CardChainLink {
  */
 export function googlePayConfig(
   config: CheckoutProviderConfig | null,
-): { gateway: string; gatewayMerchantId: string; environment: "TEST" | "PRODUCTION" } | null {
-  const head = config?.chain?.[0];
-  if (!head?.methods.includes("CARD")) return null;
-  if (!head.wallets?.includes("GOOGLE_PAY")) return null;
+): {
+  gateway: string;
+  gatewayMerchantId: string;
+  environment: "TEST" | "PRODUCTION";
+  merchantInfo?: { merchantId: string; merchantName?: string };
+} | null {
+  const head = cardHead(config);
+  if (!head?.wallets?.includes("GOOGLE_PAY")) return null;
   const params = head.googlePay;
   if (!params?.gatewayMerchantId) return null;
+  return sheetParams({ ...params, gatewayMerchantId: params.gatewayMerchantId });
+}
+
+/** The published parameters as the sheet takes them, or `null` for a PRODUCTION entry Google would refuse. */
+function sheetParams(params: CheckoutGooglePayParams & { gatewayMerchantId: string }): ReturnType<typeof googlePayConfig> {
   // The connection's own environment (FUT-3756): a production store must never
   // mint Google's test tokens. Absent ⇒ TEST, as before it was published.
-  return { gateway: params.gateway, gatewayMerchantId: params.gatewayMerchantId, environment: params.environment ?? "TEST" };
+  const environment = params.environment ?? "TEST";
+  // Google refuses a PRODUCTION request without its own merchant id, so the
+  // sheet would open onto an error: no button instead.
+  if (environment === "PRODUCTION" && !params.merchantInfo?.merchantId) return null;
+  const merchantInfo = params.merchantInfo ? { merchantInfo: params.merchantInfo } : {};
+  return { gateway: params.gateway, gatewayMerchantId: params.gatewayMerchantId, environment, ...merchantInfo };
 }
 
 /**
@@ -173,16 +199,14 @@ export function googlePayConfig(
  * pay) is `applePaySupported()` in `apple-pay-button.tsx`, because it is a
  * browser fact, not a store fact.
  *
- * FAILS CLOSED like {@link googlePayConfig}, and read off the HEAD for the
- * same reason: the Apple token is decrypted with the head merchant's
- * certificate, so only the provider the walk tries first can charge it.
+ * FAILS CLOSED like {@link googlePayConfig}, and read off the CARD head for
+ * the same reason: the Apple token is decrypted with that merchant's
+ * certificate, so only the provider a card charge tries first can charge it.
  * Unlike Google there are no client parameters to publish — merchant
  * validation runs server-side through the host's port.
  */
 export function applePayDeclared(config: CheckoutProviderConfig | null): boolean {
-  const head = config?.chain?.[0];
-  if (!head?.methods.includes("CARD")) return false;
-  return head.wallets?.includes("APPLE_PAY") ?? false;
+  return cardHead(config)?.wallets?.includes("APPLE_PAY") ?? false;
 }
 
 /**

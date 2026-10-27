@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 
 import { applePaySessionClass, applePaySupported, type ApplePaySessionClass } from "../apple-pay-button";
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
-import { applePayDeclared, cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
+import { applePayDeclared, cardHead, cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
 import { methodChosenAtProvider } from "../providers/registry";
 import type { CheckoutProviderConfig, PaymentMethod } from "../types";
 
@@ -72,11 +72,11 @@ function googleSheet(config: CheckoutProviderConfig | null, client: GooglePaymen
 }
 
 /**
- * The debit row (FUT-3754): the card is here, the head declares debit, and the
- * host gave the address PagBank's 3-D Secure refuses to run without.
+ * The debit row (FUT-3754): the card is here, the card head declares debit,
+ * and there is a billing address — the host's, or one the row asks (FUT-4109).
  */
 function debitOffered(config: CheckoutProviderConfig | null, card: boolean, hasBillingAddress: boolean): boolean {
-  return card && hasBillingAddress && config?.chain?.[0]?.debit === true;
+  return card && hasBillingAddress && cardHead(config)?.debit === true;
 }
 
 /** {@link useListCapability}'s answer, from what it read. */

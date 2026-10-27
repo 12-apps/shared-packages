@@ -57,6 +57,8 @@ export interface GooglePayApi {
 export interface GooglePayGatewayParams {
   gateway: string;
   gatewayMerchantId: string;
+  /** Google's own merchant id, required in PRODUCTION; sent as `merchantInfo` when present. */
+  merchantInfo?: { merchantId: string; merchantName?: string };
 }
 
 /** Google's script, loaded once per page. */
@@ -145,6 +147,7 @@ export function paymentDataRequest(
         },
       },
     ],
+    ...(params.merchantInfo ? { merchantInfo: params.merchantInfo } : {}),
     transactionInfo: {
       totalPriceStatus: "FINAL",
       // Integer cents to Google's decimal string — the one money conversion

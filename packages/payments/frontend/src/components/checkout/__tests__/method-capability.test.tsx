@@ -97,9 +97,46 @@ describe("googlePayConfig — the wallet gate fails CLOSED (FUT-471)", () => {
   it("carries the connection's Google Pay environment, so a production store mints real tokens (FUT-3756)", () => {
     const head = {
       wallets: ["GOOGLE_PAY" as const],
+      googlePay: {
+        gateway: "pagbank",
+        gatewayMerchantId: "MID_1",
+        environment: "PRODUCTION" as const,
+        merchantInfo: { merchantId: "BCR2DN_1", merchantName: "Paladira" },
+      },
+    };
+    expect(googlePayConfig(chained(head))).toEqual({
+      gateway: "pagbank",
+      gatewayMerchantId: "MID_1",
+      environment: "PRODUCTION",
+      merchantInfo: { merchantId: "BCR2DN_1", merchantName: "Paladira" },
+    });
+  });
+
+  it("draws no button in PRODUCTION without Google's own merchant id, which Google requires there", () => {
+    const head = {
+      wallets: ["GOOGLE_PAY" as const],
       googlePay: { gateway: "pagbank", gatewayMerchantId: "MID_1", environment: "PRODUCTION" as const },
     };
-    expect(googlePayConfig(chained(head))?.environment).toBe("PRODUCTION");
+    expect(googlePayConfig(chained(head))).toBeNull();
+  });
+
+  it("reads the first entry that takes a CARD, so a Pix-only head (the store's own key) keeps Google Pay (FUT-4109)", () => {
+    const store: CheckoutProviderConfig = {
+      ...config(["PIX", "CARD"]),
+      chain: [
+        { provider: "manual-pix", tokenization: "NONE", publicKey: null, mockTokenization: false, methods: ["PIX"] },
+        {
+          provider: "pagbank",
+          tokenization: "PUBLIC_KEY",
+          publicKey: "pk",
+          mockTokenization: false,
+          methods: ["PIX", "CARD"],
+          wallets: ["GOOGLE_PAY"],
+          googlePay: { gateway: "pagbank", gatewayMerchantId: "ACCO_1" },
+        },
+      ],
+    } as CheckoutProviderConfig;
+    expect(googlePayConfig(store)?.gatewayMerchantId).toBe("ACCO_1");
   });
 
   it("answers null while the config is loading — the opposite of the picker's fail-open", () => {
