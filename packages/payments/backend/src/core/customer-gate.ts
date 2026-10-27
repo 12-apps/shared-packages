@@ -75,7 +75,7 @@ export async function gateCustomerRequirements(
     outcome: 'SKIPPED',
     failureBucket: 'DEFINITELY_NOT_CHARGED',
     error: message,
-  });
+  }, 'BUYER_FIELDS');
   if (pinned) throw new CustomerRequirementsError(provider, blockers);
   // The issues travel TYPED (FUT-563). They used to travel only inside the
   // message, which a host had to read back with a regex over the field names —

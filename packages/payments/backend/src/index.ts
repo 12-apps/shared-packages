@@ -115,16 +115,14 @@ export {
   unionCustomerFields,
   validateCustomer,
 } from './core/customer-schema';
-/**
- * The walk's TYPED failure channel (FUT-563). A host answering an exhausted
- * chain has to tell "nobody was even asked — the buyer is missing a field"
- * from "a provider was asked and refused", and those are opposite answers:
- * a fixable 4xx naming the field versus one honest payment-outage message.
- * The discriminant is what makes that decidable; it used to be a sentence the
- * host parsed back, which gave up on the first failure it did not recognise.
- */
+// The walk's TYPED failure channel (FUT-563): "nobody was asked — the buyer
+// is missing a field" versus "a provider was asked and refused".
 export { gateIssuesOf, nothingWasAttempted } from './core/walk-failure';
 export type { WalkFailure, WalkFailureKind } from './core/walk-failure';
+// Every provider failure, reported to the host (FUT-4074) — `core/provider-failure.ts`.
+export { describeProviderFailure, redactProviderText } from './core/provider-failure';
+export type { ProviderFailureReport, ProviderFailureReporter, ProviderFailurePath } from './core/provider-failure';
+export type { ProviderFailureSeverity, ProviderFailureSilence } from './core/provider-failure';
 export {
   AdapterContractError,
   AmbiguousChargeError,

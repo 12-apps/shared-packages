@@ -109,6 +109,8 @@ export async function refundCent(
   adapter: PaymentProviderAdapter,
   providerChargeId: string,
   credentials: ResolvedCredentials,
+  /** Told why the cent did NOT come back (FUT-4074); PENDING is not a failure. */
+  onFailure?: (failure: { error?: unknown; message?: string }) => void,
 ): Promise<boolean> {
   if (!adapter.refund) return false;
   try {
@@ -118,8 +120,12 @@ export async function refundCent(
     // that as a completed refund tells the owner a cent came back when it did
     // not. PENDING counts as not-yet-refunded for the same reason — this flag
     // is shown to a human as a done deal or a cent to reconcile.
+    if (refund.status !== 'REFUNDED' && refund.status !== 'PENDING') {
+      onFailure?.({ message: `${adapter.name} answered the verification refund ${refund.status}` });
+    }
     return refund.status === 'REFUNDED';
-  } catch {
+  } catch (error) {
+    onFailure?.({ error });
     return false;
   }
 }

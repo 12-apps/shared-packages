@@ -1,5 +1,8 @@
 import { cancelChargeAt } from './charge-cancel';
-import { isManualConfirmation, manualChargeMethods, refreshManualCharge, type ManualChargeMethods } from './manual-charge';
+import { manualChargeMethods, type ManualChargeMethods } from './manual-charge';
+import { refreshOneCharge } from './charge-refresh';
+import { withProviderFailureReports } from './gateway-reporting';
+import type { ProviderFailureReporter } from './provider-failure';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
 import {
@@ -128,6 +131,14 @@ export interface PaymentsGatewayConfig<P extends string = string> {
    * `WebhookPipelineObserver`. Optional, observational only.
    */
   webhookObserver?: WebhookPipelineObserver;
+  /**
+   * Told of EVERY provider failure the gateway meets (FUT-4074): each charge
+   * attempt that did not succeed, and each failed follow-up call. Optional for
+   * compatibility, but a host that omits it is choosing to hear nothing when a
+   * provider refuses and the walk quietly charges the next one. Never awaited;
+   * a throw is contained. See `core/provider-failure.ts`.
+   */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 export interface ChargeOptions<P extends string = string> {
@@ -264,37 +275,6 @@ function makeResolver<P extends string>(config: PaymentsGatewayConfig<P>): Resol
   };
 }
 
-/**
- * Re-read one charge from the provider and store what it says.
- *
- * The stored snapshot is where a hint learned at CREATION lives, and merging it
- * in is what makes the re-read answerable at all: InfinitePay's `payment_check`
- * will not confirm without the invoice `slug`. A CALLER's hints win — they
- * carry what only the return trip knows, the `transaction_nsu` that does not
- * exist until somebody has paid.
- */
-async function refreshOneCharge<P extends string>(
-  config: PaymentsGatewayConfig<P>,
-  resolve: Resolver,
-  merchant: MerchantRef,
-  provider: P,
-  providerChargeId: string,
-  hints?: SettlementHints,
-): Promise<ChargeSnapshot> {
-  // A store-confirmed charge is read, never re-asked (`manual-charge.ts`) — and
-  // read off the REGISTRY, so a store whose Pix manual settings were cleared
-  // still answers its buyers' polls and its sweep.
-  if (config.providers.has(provider) && isManualConfirmation(config.providers.get(provider))) {
-    return refreshManualCharge(config.charges, merchant, provider, providerChargeId);
-  }
-  const { adapter, creds } = await resolve(merchant, provider);
-  const stored = await config.charges.findByProviderChargeId(provider, providerChargeId);
-  const merged = { ...stored?.snapshot.settlementHints, ...hints };
-  const snapshot = await adapter.getCharge(providerChargeId, creds, merged);
-  await config.charges.upsertByProviderChargeId(merchant, snapshot);
-  return snapshot;
-}
-
 function walkDepsOf<P extends string>(config: PaymentsGatewayConfig<P>): ChargeWalkDeps {
   return {
     providers: config.providers,
@@ -304,6 +284,7 @@ function walkDepsOf<P extends string>(config: PaymentsGatewayConfig<P>): ChargeW
     failoverPolicy: config.failoverPolicy ?? 'TECHNICAL',
     failoverPolicyFor: config.failoverPolicyFor,
     health: config.health,
+    onProviderFailure: config.onProviderFailure,
   };
 }
 
@@ -327,7 +308,7 @@ export function createPaymentsGateway<P extends string>(
   // must not each start their own failover walk down the same chain.
   const inFlight = new Map<string, Promise<StoredCharge>>();
 
-  return {
+  return withProviderFailureReports(config.onProviderFailure, {
     async charge(merchant, input, options = {}) {
       if (!input.idempotencyKey) return walkChargeChain(walkDeps, merchant, input, options);
       // JSON tuple, not delimiter concatenation — distinct (merchant, key)
@@ -392,5 +373,5 @@ export function createPaymentsGateway<P extends string>(
 
     handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
-  };
+  });
 }

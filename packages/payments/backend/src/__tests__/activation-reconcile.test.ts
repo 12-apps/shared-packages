@@ -513,3 +513,51 @@ describe('Cenário: cobrança encalhada é curada pela varredura', () => {
     expect(db.applied).toHaveLength(1);
   });
 });
+
+/**
+ * FUT-4074 — the sweep has no screen, so its provider failures are reported
+ * to the host rather than only logged.
+ */
+describe('reconcileActivationCharges reports provider failures (FUT-4074)', () => {
+  it('reports a stranded cent whose refund failed', async () => {
+    const onProviderFailure = vi.fn();
+    db.outstanding.push(strandedCard());
+    pendingCardRow();
+    cure.findChargeByReference.mockResolvedValue({ status: 'PAID', providerChargeId: 'CH_LOST' });
+    cure.refund.mockRejectedValue(new Error('refund unavailable'));
+
+    await reconcileActivationCharges({ ...context(), onProviderFailure });
+
+    expect(onProviderFailure).toHaveBeenCalledTimes(1);
+    expect(onProviderFailure.mock.calls[0]?.[0]).toMatchObject({
+      path: 'ACTIVATION_REFUND',
+      provider: 'cardpay',
+      merchant: { kind: 'TENANT', id: TENANT_ID },
+      message: 'refund unavailable',
+    });
+  });
+
+  it('reports a probe the provider did not answer as a warning', async () => {
+    const onProviderFailure = vi.fn();
+    db.outstanding.push(strandedCard());
+    pendingCardRow();
+    cure.findChargeByReference.mockRejectedValue(new Error('socket hang up'));
+
+    const report = await reconcileActivationCharges({ ...context(), onProviderFailure });
+
+    expect(report.stamped).toBe(0);
+    expect(onProviderFailure.mock.calls.map(([r]) => [r.path, r.severity, r.reference])).toEqual([
+      ['ACTIVATION_RECONCILE', 'warning', cardReference()],
+    ]);
+  });
+
+  it('does not report a store failure — that is ours, not the provider\'s', async () => {
+    const onProviderFailure = vi.fn();
+    db.outstanding.push(stranded('infinitepay', 'broken-tenant'));
+    paidCharge('infinitepay', 'broken-tenant');
+
+    await reconcileActivationCharges({ ...context(), onProviderFailure });
+
+    expect(onProviderFailure).not.toHaveBeenCalled();
+  });
+});

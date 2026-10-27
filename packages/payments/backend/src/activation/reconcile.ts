@@ -1,3 +1,5 @@
+import { isProviderEndpointFailure, type ProviderFailureReporter } from '../core/provider-failure';
+import { reportActivationFailure } from './report';
 import { resolvedFrom } from '../config/enablement';
 import type { ProviderConfigStore } from '../config/types';
 import type { SettingsService } from '../config/service';
@@ -132,6 +134,8 @@ export interface ActivationReconcileContext {
    */
   allowStubMode?: boolean;
   log?: ActivationLogger;
+  /** Told of every provider failure a pass meets (FUT-4074). */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 interface Stranded {
@@ -275,6 +279,11 @@ async function applyCardCure(
     return releaseDeadAttempt(ctx, stranded, outcome.kind);
   }
   if (outcome.kind === 'UNANSWERED') {
+    reportActivationFailure(ctx.onProviderFailure, { ...stranded, credentials }, 'ACTIVATION_RECONCILE', {
+      error: outcome.error,
+      reference: stranded.reference,
+      severity: 'warning',
+    });
     ctx.log?.warn(
       `payments.reconcile-activations could not resolve card attempt for ${stranded.provider} ` +
         `(${stranded.merchant.id}): ${outcome.error instanceof Error ? outcome.error.message : String(outcome.error)}`,
@@ -293,7 +302,9 @@ async function refundStrandedCent(
   outcome: { providerChargeId: string; alreadyRefunded: boolean },
 ): Promise<void> {
   if (outcome.alreadyRefunded) return;
-  if (await refundCent(adapter, outcome.providerChargeId, credentials)) return;
+  const report = (failure: { error?: unknown; message?: string }) =>
+    reportActivationFailure(ctx.onProviderFailure, { ...stranded, credentials }, 'ACTIVATION_REFUND', failure);
+  if (await refundCent(adapter, outcome.providerChargeId, credentials, report)) return;
   ctx.log?.warn(
     `payments.reconcile-activations could not refund verification cent ` +
       `${outcome.providerChargeId} (${stranded.provider}, ${stranded.merchant.id})`,
@@ -355,6 +366,14 @@ export async function reconcileActivationCharges(
     try {
       if (await settleIfProven(ctx, row)) report.stamped += 1;
     } catch (error) {
+      // Only the PROVIDER's failures — a store error here is ours, not news to the owner.
+      if (isProviderEndpointFailure(error)) {
+        reportActivationFailure(ctx.onProviderFailure, row, 'ACTIVATION_RECONCILE', {
+          error,
+          reference: row.reference,
+          severity: 'warning',
+        });
+      }
       ctx.log?.warn(
         `payments.reconcile-activations could not settle ${row.provider} for ${row.merchant.id}: ${
           error instanceof Error ? error.message : String(error)
