@@ -12,7 +12,7 @@ import { TextField, ThemeProvider, createTheme } from '@mui/material';
 import type { Theme } from '@mui/material';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import type { JSX } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { defaultCheckoutComponents } from '../mui-defaults';
 import type { CheckoutInputProps } from '../ui';
@@ -20,9 +20,11 @@ import type { CheckoutInputProps } from '../ui';
 const DefaultInput = defaultCheckoutComponents.Input;
 
 /** What the slot used to render, verbatim. */
-function TextFieldInput({ label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onBlur, ...rest }: CheckoutInputProps): JSX.Element {
+function TextFieldInput({ id, name, label, type = 'text', inputMode, fullWidth, required, autoComplete, placeholder, maxLength, value, error, helperText, endAdornment, onChange, onFocus, onBlur, ...rest }: CheckoutInputProps): JSX.Element {
   return (
     <TextField
+      id={id}
+      name={name}
       label={label}
       type={type}
       size="small"
@@ -33,6 +35,7 @@ function TextFieldInput({ label, type = 'text', inputMode, fullWidth, required, 
       error={error}
       helperText={helperText}
       onChange={onChange}
+      onFocus={onFocus}
       onBlur={onBlur}
       slotProps={{
         htmlInput: { inputMode, maxLength, autoComplete, 'data-testid': rest['data-testid'] },
@@ -126,6 +129,7 @@ const CASES: Record<string, CheckoutInputProps> = {
     'data-testid': 'buyer-email',
   },
   'helper without a label': { value: 'x', helperText: 'Obrigatório' },
+  'a stable id and name (FUT-4105)': { id: 'checkout-buyer-taxId', name: 'taxId', label: 'CPF ou CNPJ', value: '123', helperText: 'O CPF tem 11 dígitos' },
 };
 
 describe('the default Input slot', () => {
@@ -135,6 +139,20 @@ describe('the default Input slot', () => {
 
   it('renders what TextField rendered once focused', async () => {
     expect(await focusedHtml(<DefaultInput {...LABELLED} />)).toBe(await focusedHtml(<TextFieldInput {...LABELLED} />));
+  });
+
+  it('puts the id and name on the <input> and tells the caller when it takes and loses the focus (FUT-4105, FUT-4106)', () => {
+    const onFocus = vi.fn();
+    const onBlur = vi.fn();
+    const { container, unmount } = render(<DefaultInput id="checkout-buyer-taxId" name="taxId" value="" onFocus={onFocus} onBlur={onBlur} />);
+    const input = container.querySelector('input') as HTMLInputElement;
+    expect(input.id).toBe('checkout-buyer-taxId');
+    expect(input.getAttribute('name')).toBe('taxId');
+    fireEvent.focusIn(input);
+    fireEvent.focusOut(input);
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   describe.each(Object.entries(THEMES))('under a host theme with %s', (_name, theme) => {

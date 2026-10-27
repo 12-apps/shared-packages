@@ -7,7 +7,7 @@ import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 import { useCheckoutComponents } from "../ui";
 
-import { complaintOf, placeholderOf, taxIdField, useOnComplete } from "./buyer-inline";
+import { complaintOf, inputAttributesOf, placeholderOf, taxIdField, useOnComplete } from "./buyer-inline";
 import { usePaymentListMode } from "./context";
 import type { PaymentListCopy } from "./types";
 
@@ -32,13 +32,73 @@ const FIELD_CAP_FROM_PX = 560;
  * valid CPF that arrived whole in one change — pasted or autofilled. A CPF
  * typed digit by digit stays put, and the buyer taps the next field.
  */
-function useTaxIdAdvance(field: CheckoutCustomerField, value: string, onComplete: (() => void) | undefined): (next: string) => void {
+function useTaxIdAdvance(
+  field: CheckoutCustomerField,
+  value: string,
+  onComplete: (() => void) | undefined,
+): { arrivedWhole: boolean; onTyped: (next: string) => void } {
   const [arrivedWhole, setArrivedWhole] = useState(false);
   const satisfied = value.trim() !== "" && fieldSatisfied(field, value);
   const kind = taxIdKind(value);
   useOnComplete(satisfied && (kind === "CNPJ" || (kind === "CPF" && arrivedWhole)), onComplete);
-  // Two digits or more in one change is a paste or an autofill, not a keystroke.
-  return (next) => setArrivedWhole(taxIdDigits(next).length - taxIdDigits(value).length > 1);
+  return {
+    arrivedWhole,
+    // A change that leaves the digits as they were — a mask "." or "-" deleted —
+    // keeps the verdict the last real change earned.
+    onTyped: (next) => {
+      if (taxIdDigits(next) !== taxIdDigits(value)) setArrivedWhole(arrivedInOneGo(taxIdDigits(value), taxIdDigits(next)));
+    },
+  };
+}
+
+/**
+ * Whether a change wrote the document in one go — a paste or an autofill —
+ * rather than one keystroke. A keystroke adds or removes ONE digit, wherever
+ * the caret is (a fix in the middle of a CNPJ is still typing); anything else
+ * is a fill, including a whole document pasted over another of the same length
+ * (the "Alterar" flow opens on the CPF on file, so select-all and paste there
+ * gains no digits at all).
+ */
+export function arrivedInOneGo(before: string, after: string): boolean {
+  return after !== before && Math.abs(after.length - before.length) !== 1;
+}
+
+/** A CNPJ's length — the most digits the document keeps — and a CPF's. */
+const CNPJ_DIGITS = 14;
+const CPF_DIGITS = 11;
+
+/**
+ * Whether the field's complaint shows now (FUT-4106). While the buyer is in
+ * the field, a value under 14 digits is a CPF or a CNPJ on its way, and red
+ * from the first digit only scolds them for not having finished. So it is
+ * judged once they leave the field, at 14 digits (the most it keeps), or when
+ * a whole CPF or CNPJ arrives in one change — a paste or an autofill, judged
+ * at once, which keeps the recovery after one. Eleven typed digits are not a
+ * trigger: a CNPJ's first eleven are usually not a valid CPF.
+ */
+export function taxIdJudged(input: { focused: boolean; digits: number; arrivedWhole: boolean }): boolean {
+  const { focused, digits, arrivedWhole } = input;
+  if (!focused || digits >= CNPJ_DIGITS) return true;
+  return arrivedWhole && digits === CPF_DIGITS;
+}
+
+/**
+ * The document field's complaint, shown only once the value is judged
+ * (FUT-4106, {@link taxIdJudged}), plus the change/focus handlers that feed
+ * that judgement and FUT-4080's focus-advance.
+ */
+function useDocumentVerdict(
+  field: CheckoutCustomerField,
+  value: string,
+  copy: PaymentListCopy["buyer"],
+  onComplete: (() => void) | undefined,
+): { complaint: string | undefined; onTyped: (next: string) => void; onFocus: () => void; onBlur: () => void } {
+  const fieldCopy = useCheckoutCopy().card.fields;
+  const { arrivedWhole, onTyped } = useTaxIdAdvance(field, value, onComplete);
+  const [focused, setFocused] = useState(false);
+  const judged = taxIdJudged({ focused, digits: taxIdDigits(value).length, arrivedWhole });
+  const complaint = judged ? complaintOf(field, value, copy, (typed) => validateCpfOrCnpj(typed, fieldCopy)) : undefined;
+  return { complaint, onTyped, onFocus: () => setFocused(true), onBlur: () => setFocused(false) };
 }
 
 /**
@@ -68,16 +128,14 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
 }): JSX.Element {
   const { Button, Checkbox, Input, Text } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
-  const fieldCopy = useCheckoutCopy().card.fields;
   // The document the store already holds, when the host passed it, shown
   // masked — as a CNPJ when it is one — and editable.
   const value = taxIdField.shown(buyer.taxId ?? "");
-  const onTyped = useTaxIdAdvance(field, value, onComplete);
+  const { complaint, onTyped, onFocus, onBlur } = useDocumentVerdict(field, value, copy, onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (focusOnMount) scope.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [focusOnMount]);
-  const complaint = complaintOf(field, value, copy, (typed) => validateCpfOrCnpj(typed, fieldCopy));
   return (
     <Box ref={scope} data-testid="list-cpf" sx={{ display: "flex", flexDirection: "column", gap: 1.5, containerType: "inline-size" }}>
       {/* A native <label> around the words and the field names the input with both. */}
@@ -92,7 +150,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
         </Box>
         <Box data-testid="list-cpf-field" sx={(t) => ({ width: "100%", [`@container (min-width: ${FIELD_CAP_FROM_PX}px)`]: { maxWidth: t.spacing(FIELD_WIDE_MAX) } })}>
           <Input
-            type="text"
+            {...inputAttributesOf("taxId")}
             inputMode="numeric"
             variant="outlined"
             size="md"
@@ -102,6 +160,8 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
             value={value}
             error={Boolean(complaint)}
             helperText={complaint}
+            onFocus={onFocus}
+            onBlur={onBlur}
             onChange={(event) => {
               onTyped(event.target.value);
               onBuyerChange({ ...buyer, taxId: taxIdField.kept(event.target.value) });

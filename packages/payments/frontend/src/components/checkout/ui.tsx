@@ -49,6 +49,13 @@ export interface CheckoutButtonProps {
 /** Text field. `data-testid` must land on the `<input>` itself (e2e fills it). */
 export interface CheckoutInputProps {
   label?: string;
+  /**
+   * A stable id and `name` on the `<input>` (FUT-4105): what lets the browser's
+   * form history and a password manager match the field again. Both are plain
+   * `<input>` attributes `@12-apps/ui`'s `Input` forwards as they are.
+   */
+  id?: string;
+  name?: string;
   type?: 'text' | 'email' | 'tel';
   inputMode?: 'numeric';
   variant?: 'outlined';
@@ -63,6 +70,8 @@ export interface CheckoutInputProps {
   helperText?: string;
   endAdornment?: ReactNode;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** A slot that does not forward it keeps the document field judged on every change (FUT-4106 needs it). */
+  onFocus?: () => void;
   onBlur?: () => void;
   /**
    * Typing hints for the `<input>` itself (FUT-4107). Here rather than at the
