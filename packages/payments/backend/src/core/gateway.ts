@@ -22,6 +22,7 @@ import type { PaymentProviderAdapter } from './provider';
 import type { ProviderHealth } from './provider-health';
 import type { SettlementHints } from './settlement-hints';
 import type { ProviderRegistry } from './registry';
+import { providersStillWalkedPast } from './walk-history';
 import { runWebhookPipeline, type WebhookPipelineObserver } from './webhook-pipeline';
 import {
   replayRetryableWebhooks,
@@ -231,6 +232,13 @@ export interface PaymentsGateway<P extends string = string> extends ManualCharge
    */
   clientConfigChain(merchant: MerchantRef): Promise<ClientProviderConfig[]>;
   /**
+   * The providers the walk under `idempotencyKey` FAILED OVER from and whose
+   * outage breaker is STILL open (FUT-4072, `walk-history.ts`) — what tells a
+   * link minted during a head outage that is still going on from one the
+   * chain has since been reordered (or the head recovered) away from.
+   */
+  stillWalkedPast?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
+  /**
    * Full inbound-webhook pipeline for a delivery already attributed to a
    * merchant (hosts attribute via the webhook URL, e.g. a per-merchant
    * connect key in the path). Returns the normalized events that were newly
@@ -273,6 +281,20 @@ function makeResolver<P extends string>(config: PaymentsGatewayConfig<P>): Resol
     }
     return { adapter, creds };
   };
+}
+
+/**
+ * A chain member's credentials, or null when it is not chargeable. A refusal
+ * (a disabled member) is absence, as in the walk; anything else — the store
+ * itself failing — is not, and propagates (FUT-4072).
+ */
+async function chainCredentials(credentials: CredentialStore, merchant: MerchantRef, name: ProviderName) {
+  try {
+    return await credentials.getCredentials(merchant, name);
+  } catch (error) {
+    if (error instanceof CredentialsError) return null;
+    throw error;
+  }
 }
 
 function walkDepsOf<P extends string>(config: PaymentsGatewayConfig<P>): ChargeWalkDeps {
@@ -362,15 +384,14 @@ export function createPaymentsGateway<P extends string>(
         // A provider whose credentials cannot be resolved is simply absent
         // from the list rather than failing the whole call: the checkout can
         // still tokenize for the ones that ARE reachable.
-        const creds = await config.credentials
-          .getCredentials(merchant, name)
-          .catch(() => null);
+        const creds = await chainCredentials(config.credentials, merchant, name);
         if (!creds) continue;
         configs.push(toClientProviderConfig(config.providers.get(name), creds));
       }
       return configs;
     },
 
+    stillWalkedPast: (merchant, key) => providersStillWalkedPast(config.attempts, config.health, merchant, key),
     handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
   });

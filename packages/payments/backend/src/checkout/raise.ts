@@ -1,15 +1,13 @@
 import { ChargeIdentityError, chargeIdentityMismatch } from '../core/charge-identity';
 import type { PaymentsGateway } from '../core/gateway';
+import { judgeParkedHosted } from '../core/hosted-landing';
+import { answerHeld, type HeldAnswer, type SupersededRecorder } from '../core/hosted-retire';
+import type { ProviderFailureReporter } from '../core/provider-failure';
 import type { ChargeQueryStore } from '../core/ports';
 import { attemptIdempotencyKey, attemptReference } from '../core/reference';
 import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
 
-import {
-  holdsInstrumentFor,
-  reusableHostedCharge,
-  reusablePixCharge,
-  type CheckoutCard,
-} from './reuse';
+import { parkedHostedCharges, reusablePixCharge, type CheckoutCard } from './reuse';
 import { voidSupersededPixCharges } from './supersede';
 import type { CheckoutLogger, Payable } from './types';
 
@@ -38,10 +36,14 @@ import type { CheckoutLogger, Payable } from './types';
  * question can be asked at all.
  */
 
-interface RaiseChargeDeps {
+export interface RaiseChargeDeps {
   gateway: PaymentsGateway;
   charges: ChargeQueryStore;
   log: CheckoutLogger;
+  /** Where a moved-past link the provider could not void is recorded (FUT-4072). */
+  onSuperseded?: SupersededRecorder;
+  /** Told when a moved-past link turns out to have been paid before its void. */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 interface RaiseChargeRequest {
@@ -99,27 +101,41 @@ function chargeInstrument(card: CheckoutCard | undefined): CheckoutCard | undefi
 }
 
 /**
- * A live charge this request must be answered with instead of raising a new one.
+ * A live charge this request must be answered with instead of raising a new
+ * one, and the parked hosted links a raise would move past.
  *
  * Checked BEFORE the ordinal is read, because reusing must not advance it: the
  * reused charge is still the payable's current attempt, and bumping the count
  * here would hand the NEXT real attempt a key one ahead of the row it stores.
+ *
+ * A parked link is handed back only where the CURRENT chain would land anyway
+ * (FUT-4072, `core/hosted-landing.ts`) — still enabled, still in the chain, the
+ * first member able to take this method — and never over an instrument the
+ * buyer brought for its provider (FUT-604).
  */
 async function liveChargeFor(
   deps: RaiseChargeDeps,
   payable: Payable,
   request: RaiseChargeRequest,
-): Promise<ChargeSnapshot | null> {
-  const hosted = await reusableHostedCharge(deps.charges, payable);
-  if (hosted && !holdsInstrumentFor(request.card, hosted.provider)) return hosted;
-  if (request.method === 'PIX' && !request.card) {
-    return reusablePixCharge(deps.charges, payable);
+): Promise<{ live: ChargeSnapshot | null; movedPast: ChargeSnapshot[] }> {
+  const parked = await parkedHostedCharges(deps.charges, payable);
+  const hosted = await judgeParkedHosted(deps.gateway, parked, {
+    merchant: payable.merchant,
+    method: request.method,
+    card: request.card,
+  });
+  if (hosted.reuse || request.method !== 'PIX' || request.card) {
+    return { live: hosted.reuse, movedPast: hosted.movedPast };
   }
-  return null;
+  // The moved-past links travel with a reused QR too: it is what the buyer
+  // holds now, so they are retired against it rather than left payable.
+  return { live: await reusablePixCharge(deps.charges, payable), movedPast: hosted.movedPast };
 }
 
 /**
- * Raise a charge for a payable and return the normalized snapshot.
+ * Raise a charge for a payable and answer the charge the buyer now holds — and
+ * whether it is an EARLIER one they already paid (FUT-4072: a moved-past link
+ * the void found PAID), which the caller settles rather than presents.
  *
  * A DECLINE is a normal return value here (`status: 'DECLINED'`), not a throw —
  * the buyer needs a message, not a stack trace. Only a transport, account or
@@ -129,9 +145,11 @@ export async function raiseCharge(
   deps: RaiseChargeDeps,
   payable: Payable,
   request: RaiseChargeRequest,
-): Promise<ChargeSnapshot> {
-  const live = await liveChargeFor(deps, payable, request);
-  if (live) return live;
+): Promise<HeldAnswer> {
+  const { live, movedPast } = await liveChargeFor(deps, payable, request);
+  const answer = (held: ChargeSnapshot) =>
+    answerHeld(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, held });
+  if (live) return answer(live);
 
   const attempt = await deps.charges.countByReference(payable.merchant, payable.ref);
   const idempotencyKey = attemptIdempotencyKey(payable.ref, attempt);
@@ -163,5 +181,5 @@ export async function raiseCharge(
   // Only once THIS attempt's charge is proven good: the buyer must never be
   // left with the old code voided and no new one to pay.
   await voidSupersededPixCharges(deps, payable);
-  return stored.snapshot;
+  return answer(stored.snapshot);
 }

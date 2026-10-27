@@ -67,6 +67,56 @@ These are the seams hosts most often re-implement by accident:
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
 
+### Parked hosted links (FUT-4072)
+
+A re-tap hands back a parked hosted link only where a fresh walk would land
+first — the link's provider heads the current chain, or the providers ahead of
+it are ones its walk failed over from and are still down. A link moved past is
+voided, or marked superseded on its row and handed to your recorder. A link the
+void finds already PAID becomes the answer, and the charge raised in its place
+is retired instead — unless that one was paid too, which is recorded as
+`DOUBLE_PAID` (both charge ids, for a refund) and answered with the charge paid
+in this attempt.
+
+**`createChargeRaiser` resolves `{ answer, paidEarlier }`** (it used to resolve
+the snapshot). `answer` is the charge to answer the buyer with. When
+`paidEarlier` is `true`, `answer` is an EARLIER charge of the reference that the
+buyer already paid (its status is PAID), not one raised now. A host must then:
+
+- **settle** the reference with `answer` — the same settlement a webhook or a
+  poll would apply, with `answer.amount` as the captured amount;
+- **show paid**;
+- and **skip** everything it does with a freshly raised charge: no redirect to
+  `answer.hostedCheckoutUrl`, no attaching it as the pending charge, no
+  recording it as this attempt's instrument use (a "last used" stamp), and no
+  refusing it as a method or amount mismatch with the request.
+
+When `paidEarlier` is `false`, handle `answer` exactly as the snapshot the
+raiser used to return. (The checkout mount does all of this itself.)
+
+Seams the guarantees need — optional in the types for compatibility, effectively
+**required**:
+
+- `ChargeQueryStore.markSuperseded` (both shipped stores implement it). Without
+  it a superseded link is never marked, so it can be offered back after the
+  chain flips again and is retired on every attempt that meets it.
+- `gateway.stillWalkedPast` (the shipped gateway implements it, from the attempt
+  ledger and the outage breaker `health`). Without it — or without `health` —
+  every re-tap during a head outage mints a fresh link and retires the last.
+- `correlation.supersede` on the checkout mount, `onSuperseded` on
+  `createChargeRaiser`: the record a later payment of the superseded link must
+  meet in your payment handling. Make it idempotent on provider + charge id, and
+  route `DOUBLE_PAID` to a refund.
+- `ChargeRaiseGateway.clientConfigChain` is now required.
+
+**Outage reuse is only as wide as the breaker's memory.** Reuse during an
+outage asks the gateway's `health` whether the providers ahead are STILL out.
+`createMemoryProviderHealth` is per process: a re-tap that lands on another
+instance, or arrives after a restart, finds the breaker closed, walks the chain
+again, and supersedes the parked link — marked on its row and recorded, never
+silent, but a new link for the buyer all the same. A host running more than one
+instance should pass a `ProviderHealth` backed by shared storage.
+
 Nothing here decides what a payment *means* to your domain. Orders, stock,
 subscription cycles and the copy a buyer reads stay in the host, on its own
 vocabulary.

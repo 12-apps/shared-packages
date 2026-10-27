@@ -257,7 +257,7 @@ export function holdsInstrumentFor(
   // under the same attribution rule — the map above, when there is one, still
   // decides alone. The buyer just authorized THIS payment on the wallet sheet;
   // answering with a parked hosted link would discard that authorization the
-  // way ignoring a typed card would. `checkout/reuse.ts` already asked it so.
+  // way ignoring a typed card would. Both raisers ask it through `hosted-landing.ts`.
   return Boolean(card.token ?? card.savedCardToken ?? card.wallet);
 }
 

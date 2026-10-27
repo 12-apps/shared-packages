@@ -1,3 +1,4 @@
+import type { SupersededWhy, VoidOutcome } from '../core/hosted-retire';
 import type { Money, PaymentMethodKind, ProviderName } from '../core/types';
 
 /**
@@ -100,4 +101,36 @@ export interface ChargeCorrelationPort {
    * server-side tidy-up.
    */
   abandon?(ref: string): Promise<string>;
+  /**
+   * A charge of this payable was SUPERSEDED and not voided (FUT-4072), `why`:
+   *
+   *  - `VOID_UNSUPPORTED` / `VOID_FAILED` / `VOID_NOT_CONFIRMED` — a hosted link
+   *    MOVED PAST: a newer charge is what the buyer holds, and the old link is
+   *    still payable at its provider;
+   *  - `PAID_ELSEWHERE` — the charge raised in this attempt, made redundant
+   *    because an older link turned out PAID (the payable was settled with
+   *    that one); still payable, `voidOutcome` says why;
+   *  - `DOUBLE_PAID` — `charge` (an older link) AND `replacedBy` (paid in this
+   *    attempt) were BOTH paid. Refund `charge`.
+   *
+   * Record it so a later payment of `charge` is handled as a SUPERSEDED payment
+   * — audited and reconciled, never applied as if it were the payable's
+   * current charge — rather than settling unnoticed. The library has already
+   * marked the stored row (`snapshot.superseded`), so the link is never offered
+   * back and this is called once per charge in the ordinary case; it MUST still
+   * be IDEMPOTENT on `charge.provider` + `charge.providerChargeId`, because a
+   * mark that failed meets the same link again on the next attempt. Called only
+   * while the charge the buyer holds is live. Awaited and contained: a throw is
+   * logged and never fails the buyer's charge.
+   *
+   * Omit it and the line is logged as an error by name instead.
+   */
+  supersede?(input: {
+    ref: string;
+    charge: AttachedCharge;
+    amount: Money;
+    replacedBy: AttachedCharge;
+    why: SupersededWhy;
+    voidOutcome?: VoidOutcome;
+  }): Promise<void>;
 }

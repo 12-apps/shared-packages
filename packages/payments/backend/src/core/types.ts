@@ -1,6 +1,7 @@
 import type { CardDetails } from './card-details';
 import type { CustomerInfo } from './customer-schema';
 import type { SettlementHints } from './settlement-hints';
+import type { ChargeSupersession } from './supersession';
 import type { WalletType } from './wallet-types';
 
 export type { DebitCapability, ThreeDSecureSession } from './card-funding';
@@ -218,6 +219,8 @@ export interface ChargeSnapshot {
    * reads the reason.
    */
   declineRetriable?: boolean;
+  /** Set by this package when a newer charge replaced this unvoided one (FUT-4072). */
+  superseded?: ChargeSupersession;
   /** Verbatim provider payload, for audit/debugging. Never branch on it. */
   raw?: unknown;
 }

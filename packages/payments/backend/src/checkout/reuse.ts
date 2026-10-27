@@ -1,4 +1,4 @@
-import type { ChargeQueryStore } from '../core/ports';
+import type { ChargeQueryStore, StoredCharge } from '../core/ports';
 import type { CardDetails, ChargeSnapshot, Money, ProviderName } from '../core/types';
 
 import type { Payable } from './types';
@@ -47,7 +47,8 @@ async function payableCharges(
 }
 
 /**
- * The still-payable HOSTED-CHECKOUT charge for this payable, or null (FUT-604).
+ * The payable's still-payable HOSTED-CHECKOUT charges at this price, newest
+ * first (FUT-604 / FUT-4072).
  *
  * This is the ACROSS-REQUESTS half of "a REDIRECT provider commits the walk the
  * moment it mints a link". The in-walk half lives in `core/charge-attempt.ts`;
@@ -57,20 +58,31 @@ async function payableCharges(
  * of the link. Two payable charges for one payable, which is the exact double
  * charge the walk's own proof rules exist to prevent.
  *
- * Asked FIRST and for EITHER method, because a redirect provider's page offers
- * its own choice — the method picked here narrows nothing about what is payable.
+ * Superseded links never appear: `listPayable` leaves them out (FUT-4072).
+ *
+ * Listed for EITHER method, because a redirect provider's page offers its own
+ * choice — the method picked here narrows nothing about what is payable. WHICH
+ * of them may be handed back is not decided here: that is the current chain's
+ * call (`core/hosted-landing.ts`), because a link minted under an older chain
+ * order traps the payable on a provider the store no longer routes to first.
  *
  * NO EXPIRY CLAUSE, deliberately: a hosted provider keeps its page alive on its
  * own schedule and tells us nothing about it, so there is no honest local test.
  * A link the provider has since closed fails at the provider, which is the same
  * place it would have failed anyway.
  */
-export async function reusableHostedCharge(
+export async function parkedHostedCharges(
   charges: ChargeQueryStore,
   payable: Pick<Payable, 'ref' | 'merchant' | 'amount'>,
-): Promise<ChargeSnapshot | null> {
-  const snapshots = await payableCharges(charges, payable);
-  return snapshots.find((snapshot) => snapshot.hostedCheckoutUrl !== undefined) ?? null;
+): Promise<StoredCharge[]> {
+  // The ROWS, not just the snapshots: the walk that minted a link is named by
+  // the row's idempotency key, and its ledger is part of the reuse rule.
+  const rows = await charges.listPayable({
+    merchant: payable.merchant,
+    reference: payable.ref,
+    amount: payable.amount,
+  });
+  return rows.filter((row) => row.snapshot.hostedCheckoutUrl !== undefined);
 }
 
 /**
@@ -97,40 +109,6 @@ export async function reusablePixCharge(
       (snapshot) => snapshot.pix?.qrText && !isExpired(snapshot.pix.expiresAt),
     ) ?? null
   );
-}
-
-/**
- * Whether the request holds a card instrument THAT PROVIDER could charge.
- *
- * This is what decides whether a live hosted link is the honest answer to a
- * re-tap. The FUT-604 reuse guard used to read "the request carries no card",
- * which a card charge can never satisfy — it always sends one — so once a chain
- * could land on a REDIRECT provider from the card form, a second POST walked the
- * chain again while the first link was still payable.
- *
- * The question is not "is there a card in the request" but "could the card in
- * the request have produced a DIFFERENT charge at the provider holding the live
- * link". For a provider we minted no instrument for — a hosted page, which takes
- * the card on its own site — the answer is no, so the buyer gets the link they
- * already hold. For one we DID mint for (a redirect-based 3-D Secure raised from
- * the buyer's own instrument) the answer is yes, and reusing there would
- * silently ignore the card the buyer just entered.
- *
- * `tokensByProvider[provider]` reads a provider name only as a MAP KEY THE
- * BROWSER SUPPLIED — never as a comparison against a literal. No provider name
- * appears in this package's checkout code, and this is the closest it comes.
- */
-export function holdsInstrumentFor(
-  card: CheckoutCard | undefined,
-  provider: ProviderName,
-): boolean {
-  if (!card) return false;
-  const minted = card.tokensByProvider;
-  if (minted && Object.keys(minted).length > 0) return Boolean(minted[provider]);
-  // A wallet key counts (FUT-471): the buyer just authorized THIS payment on
-  // the wallet sheet, and answering with a parked hosted link would silently
-  // discard that authorization the same way ignoring a typed card would.
-  return Boolean(card.token ?? card.savedCardToken ?? card.wallet);
 }
 
 /** The instrument fields a checkout request may carry. */

@@ -107,6 +107,8 @@ function matchesPayableQuery(row: StoredCharge, query: PayableChargeQuery): bool
     merchantKey(row.merchant) === merchantKey(query.merchant) &&
     ownsReference(query.reference, row.reference) &&
     row.snapshot.status === 'PENDING' &&
+    // Replaced and recorded (FUT-4072): never offered back, never retired twice.
+    !row.snapshot.superseded &&
     (!query.method || row.snapshot.method === query.method) &&
     matchesAmount(row.snapshot.amount, query)
   );
@@ -132,7 +134,8 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
     async latestByReference(merchant, reference) {
       // Insertion order for the same reason `listPayable` gives below, and NO
       // status clause at all — that is the whole difference between the two.
-      return ofPayable(merchant, reference).at(-1) ?? null;
+      // A row this package marked SUPERSEDED is skipped (FUT-4072).
+      return ofPayable(merchant, reference).filter((row) => !row.snapshot.superseded).at(-1) ?? null;
     },
     async listPayable(query) {
       // Newest first, and by INSERTION rather than by `createdAt`: several
@@ -151,6 +154,16 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
             row.createdAt > window.after,
         )
         .slice(0, window.limit);
+    },
+    async markSuperseded(merchant, provider, providerChargeId, superseded) {
+      const row = rows.find(
+        (held) =>
+          held.provider === provider &&
+          held.providerChargeId === providerChargeId &&
+          merchantKey(held.merchant) === merchantKey(merchant),
+      );
+      // The same object the indexes hold, so every read sees the mark.
+      if (row) row.snapshot = { ...row.snapshot, superseded };
     },
   };
 }

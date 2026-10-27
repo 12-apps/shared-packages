@@ -69,7 +69,9 @@ export function mergeRefreshedSnapshot(
 }
 
 /** The fields a silent refresh inherits from the row it is refreshing. */
-const INHERITED = ['reference', 'hostedCheckoutUrl', 'pix', 'boleto', 'card'] as const;
+// `superseded` is OURS (FUT-4072): no provider ever reports it, so a refresh
+// can only be silent about it.
+const INHERITED = ['reference', 'hostedCheckoutUrl', 'pix', 'boleto', 'card', 'superseded'] as const;
 
 function keepIfAbsent(
   stored: ChargeSnapshot,

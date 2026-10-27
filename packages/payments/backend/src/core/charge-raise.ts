@@ -1,8 +1,11 @@
-import { attributedCard, holdsInstrumentFor } from './card-instrument';
+import { attributedCard } from './card-instrument';
 import { ChargeIdentityError, chargeIdentityMismatch } from './charge-identity';
 import type { ChargeQueryStore } from './charge-queries';
 import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
+import { judgeParkedHosted, type ChainMember } from './hosted-landing';
+import { answerHeld, type HeldAnswer, type SupersededRecorder } from './hosted-retire';
+import type { ProviderFailureReporter } from './provider-failure';
 import { attemptIdempotencyKey, attemptReference } from './reference';
 import type {
   CardDetails,
@@ -33,7 +36,9 @@ import type {
  *     page offers its own methods, so the method the buyer picked does not
  *     narrow what is payable. It is skipped when the caller brings an
  *     instrument for that provider — a card the buyer just typed must not be
- *     silently ignored in favour of an old link.
+ *     silently ignored in favour of an old link — and when the CURRENT chain
+ *     would not land on its provider (FUT-4072, `hosted-landing.ts`). A link
+ *     moved past is voided or recorded superseded once the new charge is live.
  *  3. **The returned row is not taken on trust.** A provider that dedupes on
  *     its own reference answers this attempt with the LAST one's charge; the
  *     mismatch THROWS rather than returning, because writing bookkeeping
@@ -69,6 +74,17 @@ export interface ChargeRaiseGateway {
     provider: string,
     providerChargeId: string,
   ): Promise<ChargeSnapshot>;
+  /**
+   * The enabled chain in failover order (FUT-4072) — what decides whether a
+   * parked hosted link is still where a fresh walk would land.
+   */
+  clientConfigChain(merchant: MerchantRef): Promise<readonly ChainMember[]>;
+  /**
+   * Providers the minting walk failed over from that are STILL down (FUT-4072).
+   * Optional, but without it a link minted during a head outage is never
+   * reused: each re-tap mints a fresh one and retires the last.
+   */
+  stillWalkedPast?(merchant: MerchantRef, idempotencyKey: string): Promise<string[]>;
 }
 
 /**
@@ -88,7 +104,18 @@ export interface ChargeRaiseDeps {
   gateway: ChargeRaiseGateway;
   charges: ChargeQueryStore;
   log: ChargeRaiseLog;
+  /**
+   * Record a moved-past hosted link the provider could not void (FUT-4072), so
+   * a later payment of it reaches the host's superseded / duplicate-payment
+   * handling. Omitted, the link is logged as an error by name instead.
+   */
+  onSuperseded?: SupersededRecorder;
+  /** Told when a moved-past link turns out to have been paid before its void. */
+  onProviderFailure?: ProviderFailureReporter;
 }
+
+/** What `createChargeRaiser` resolves: the charge to answer with, and whether it was paid EARLIER. */
+export type ChargeRaiseResult = HeldAnswer;
 
 export interface RaiseChargeRequest {
   merchant: MerchantRef;
@@ -128,24 +155,25 @@ interface SupersededCharge {
   amountCents: number;
 }
 
-/** The payable charge to hand back instead of raising, or null. */
+/** The payable charge to hand back instead of raising, and the links to retire. */
 async function reusableCharge(
   deps: ChargeRaiseDeps,
   request: RaiseChargeRequest,
-): Promise<ChargeSnapshot | null> {
+): Promise<{ live: ChargeSnapshot | null; movedPast: ChargeSnapshot[] }> {
   const { merchant, reference, amount } = request;
-  const [hosted] = await deps.charges.listPayable({ merchant, reference, amount });
-  if (hosted && hostedChargePayable(hosted.snapshot)) {
-    // An instrument for THIS provider means the buyer chose a card now; the
-    // link they had is not the same answer any more.
-    if (!holdsInstrumentFor(request.card, hosted.snapshot.provider)) return hosted.snapshot;
-  }
+  const rows = await deps.charges.listPayable({ merchant, reference, amount });
+  const parked = rows.filter((row) => hostedChargePayable(row.snapshot));
+  // Reused only where the CURRENT chain would land anyway, and never over an
+  // instrument the buyer brought for that provider (`hosted-landing.ts`). The
+  // links NOT reused are retired against whatever the buyer ends up holding.
+  const hosted = await judgeParkedHosted(deps.gateway, parked, request);
+  if (hosted.reuse) return { live: hosted.reuse, movedPast: hosted.movedPast };
   // PIX ONLY. A card attempt carries an instrument, so reusing would ignore the
   // card the buyer just typed. PIX carries none — the QR IS the charge.
-  if (request.method !== 'PIX' || request.card) return null;
+  if (request.method !== 'PIX' || request.card) return { live: null, movedPast: hosted.movedPast };
   const [pix] = await deps.charges.listPayable({ merchant, reference, amount, method: 'PIX' });
-  if (!pix) return null;
-  return pixChargePayable(pix.snapshot) ? pix.snapshot : null;
+  const live = pix && pixChargePayable(pix.snapshot) ? pix.snapshot : null;
+  return { live, movedPast: hosted.movedPast };
 }
 
 /**
@@ -223,11 +251,21 @@ function reason(error: unknown): string {
  * Build the raise. A DECLINE is a normal return value (`status: 'DECLINED'`) —
  * the buyer needs a message, not a stack trace. Only a transport or account
  * failure throws, plus {@link ChargeIdentityError} for rule 3 above.
+ *
+ * It resolves `{ answer, paidEarlier }` (FUT-4072). `paidEarlier` means
+ * `answer` is an EARLIER charge of the reference — a parked link the buyer paid
+ * while this raise was voiding it — not one raised or reused now: SETTLE the
+ * reference with it and show paid. Never redirect to it, attach it as pending,
+ * record it as this attempt's instrument use, or refuse it as a mismatch.
  */
 export function createChargeRaiser(deps: ChargeRaiseDeps) {
-  return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeSnapshot> {
-    const live = await reusableCharge(deps, request);
-    if (live) return live;
+  return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeRaiseResult> {
+    const { live, movedPast } = await reusableCharge(deps, request);
+    // A moved-past link the void finds PAID is the answer instead (FUT-4072):
+    // the buyer paid it, and the charge they were about to hold is retired.
+    const answer = (held: ChargeSnapshot) =>
+      answerHeld(deps, { merchant: request.merchant, reference: request.reference, movedPast, held });
+    if (live) return answer(live);
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);
     const idempotencyKey = attemptIdempotencyKey(request.reference, attempt);
@@ -257,6 +295,6 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
     if (mismatch) throw new ChargeIdentityError(stored, mismatch);
 
     await voidSuperseded(deps, request);
-    return stored.snapshot;
+    return answer(stored.snapshot);
   };
 }

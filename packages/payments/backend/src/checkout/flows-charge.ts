@@ -6,6 +6,7 @@ import { cardOutcomeOf, declineOf } from './decline-wire';
 import { chargeDraftOf } from './draft';
 import { classifyFirstCharge, type FirstChargeSettlement } from './first-charge';
 import { chargeMismatchRefusal } from './failure';
+import { raiseDeps, settleEarlier } from './flows-raise';
 import { raiseCharge } from './raise';
 import type { CheckoutCard } from './reuse';
 import {
@@ -108,8 +109,13 @@ async function firstChargeResponse<C, V extends object, D>(
 ): Promise<Response> {
   if (!hostedCard && payable.method !== 'PIX') return runtime.respond.ok(view);
 
-  const deps = { gateway: await runtime.gateway(), charges: runtime.charges, log: runtime.log };
-  const snapshot = await raiseCharge(deps, payable, { method: payable.method });
+  const deps = await raiseDeps(runtime);
+  const raised = await raiseCharge(deps, payable, { method: payable.method });
+  if (raised.paidEarlier) {
+    await settleEarlier(runtime, payable, raised.answer);
+    return runtime.respond.ok(await refreshedView(runtime, payable.ref, view));
+  }
+  const snapshot = raised.answer;
   return answerSettlement(
     runtime,
     payable,
@@ -316,14 +322,18 @@ export async function chargeInstrument<C, V extends object, D>(
   if ('response' in instrument) return instrument.response;
 
   try {
-    const deps = { gateway: await runtime.gateway(), charges: runtime.charges, log: runtime.log };
-    const snapshot = await raiseCharge(deps, payable, {
+    const deps = await raiseDeps(runtime);
+    const raised = await raiseCharge(deps, payable, {
       method: 'CARD',
       card: instrument.card,
       // The CPF the card form asked for reaches the provider's required-field
       // gate from HERE — the host's payable row has nowhere to keep it.
       customer: draft.customer,
     });
+    if (raised.paidEarlier) {
+      return runtime.respond.ok({ status: await settleEarlier(runtime, payable, raised.answer) });
+    }
+    const snapshot = raised.answer;
     // FUT-378 — NEVER record bookkeeping from an unrecognized snapshot. A charge
     // answered out of the gateway's store rather than raised now can be another
     // attempt's: a PIX charge read as a card decline would fail this payable and

@@ -22,6 +22,7 @@ import { probe } from './charge-probe';
 import type { StoredCharge } from './ports';
 import { isOutageSignal } from './provider-health';
 import type { WalkFailure } from './walk-failure';
+import { OUTAGE_SKIP } from './walk-history';
 import type { PaymentProviderAdapter } from './provider';
 import type {
   ChargeInput,
@@ -319,7 +320,7 @@ export async function step(
   // walk that starts at it: nothing is sent, so nothing can have been charged,
   // and the chain advances on proof rather than on inference.
   if (!(await breakerAllows(deps, provider, pinned))) {
-    const message = `provider ${provider} skipped: recent failures indicate an outage`;
+    const message = `provider ${provider} skipped: ${OUTAGE_SKIP}`;
     await recordAttempt(deps, ctx, provider, {
       outcome: 'SKIPPED',
       failureBucket: 'DEFINITELY_NOT_CHARGED',

@@ -322,8 +322,10 @@ export type {
   ChargeRaiseDeps,
   ChargeRaiseGateway,
   ChargeRaiseLog,
+  ChargeRaiseResult,
   RaiseChargeRequest,
 } from './core/charge-raise';
+export * from './core/supersede-public';
 export { isValidCpf } from './core/cpf';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument
