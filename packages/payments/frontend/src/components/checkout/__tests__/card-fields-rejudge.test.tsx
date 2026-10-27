@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { useState, type JSX } from "react";
 
-import { cleanup, render, screen } from "./test-utils";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 
 import { NewCardForm } from "../../../card/fields";
 import { detectBrand, onlyDigits } from "../../../card/format";
@@ -63,6 +63,19 @@ function MergingInput({ value, error, helperText, onChange, onBlur, inputProps, 
 const input = (testId: string): HTMLInputElement => screen.getByTestId(testId) as HTMLInputElement;
 
 afterEach(() => cleanup());
+
+describe("the expiry takes a four-digit year (FUT-4103)", () => {
+  it.each(["12/2034", "12 / 2034"])("shows 12/34 when %s is pasted", async (pasted) => {
+    render(<CardHost />);
+    fireEvent.change(input("card-expiry"), { target: { value: pasted } });
+    await waitFor(() => expect(input("card-expiry").value).toBe("12/34"));
+  });
+
+  it("carries no native maxlength that would cut the year before the formatter runs", () => {
+    render(<CardHost />);
+    expect(input("card-expiry").hasAttribute("maxlength")).toBe(false);
+  });
+});
 
 describe("the holder's input asks for capitals with no autocorrect (FUT-4107)", () => {
   const expectHints = (node: HTMLInputElement): void => {
