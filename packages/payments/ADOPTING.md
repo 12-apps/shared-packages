@@ -736,6 +736,12 @@ What changes for the buyer:
   PLAIN DIGITS in the buyer state — so `createOrder`, `saveBuyerContact` and
   the charge body all carry digits. Numeric CNPJs only: the adapters strip the
   value to digits, so the alphanumeric CNPJ is not accepted yet.
+  **Behaviour change:** `createOrder`'s `buyer.taxId` and `saveBuyerContact`'s
+  `taxId` now carry plain digits (`52998224725`), not the masked CPF
+  (`529.982.247-25`) they carried before; a host that parsed the mask must read
+  digits. The focus moves on to "Número do cartão" only for what cannot grow: a
+  valid CNPJ, or a valid CPF pasted or autofilled whole — a CPF typed digit by
+  digit may be the start of a CNPJ, so the field keeps the focus.
 - **No confirmation dialog.** The card's "Pagar" becomes a bar that fills in
   five seconds (`CHARGE_WINDOW_MS`) with "Cancelar" under it; nothing is sent
   before it fills. "Gerar Pix" raises the order and the code at once, and the

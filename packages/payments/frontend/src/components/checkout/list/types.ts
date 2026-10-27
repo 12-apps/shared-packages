@@ -338,7 +338,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     /** "(o PagBank pede para pagar pelo app)" — `null` when no name was published. */
     why: (provider: string | null) => string;
     /**
-     * The line under "CPF" at the top of Pagamento (FUT-3685, T3) — "o PagBank
+     * The line under "CPF ou CNPJ" at the top of Pagamento (FUT-3685, T3) — "o PagBank
      * pede para pagar pelo app"; `null` when no name was published.
      */
     cpfHint: (provider: string | null) => string;

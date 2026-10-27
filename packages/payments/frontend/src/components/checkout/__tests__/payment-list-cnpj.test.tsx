@@ -14,7 +14,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
-import { SAVED_VISA, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, installGoogle, onPageStore, orderFor, renderList, stubClient, uninstallWallets, walletStore } from "./list-harness";
 
 const CNPJ = "11222333000181";
 const CNPJ_SHOWN = "11.222.333/0001-81";
@@ -36,8 +36,17 @@ function recordingCreateOrder() {
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => {
   vi.useRealTimers();
+  uninstallWallets();
   cleanup();
 });
+
+/** A CNPJ whose first 11 digits are, on their own, a valid CPF (`112.223.550-00`). */
+const CPF_SHAPED_CNPJ = "11222355000141";
+
+/** Type `digits` one keystroke at a time, the way a buyer does. */
+function typeDigitByDigit(digits: string, upTo = digits.length): void {
+  for (let n = 1; n <= upTo; n += 1) type(digits.slice(0, n));
+}
 
 describe("the document field takes a CNPJ (FUT-4080)", () => {
   it("reads 'CPF ou CNPJ', with the same words as its placeholder", async () => {
@@ -99,7 +108,63 @@ describe("the document field takes a CNPJ (FUT-4080)", () => {
   });
 });
 
+describe("the focus while a CNPJ is typed", () => {
+  it("stays in the field when its first 11 digits make a valid CPF, and the 14 digits land", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
+    await screen.findByTestId("list-cpf");
+    fireEvent.click(radio("list-option-CARD"));
+    await screen.findByTestId("card-number");
+    await act(async () => HTMLElement.prototype.focus.call(field()));
+    typeDigitByDigit(CPF_SHAPED_CNPJ, 11);
+    await waitFor(() => expect(field().value).toBe("112.223.550-00"));
+    await waitFor(() => expect(document.activeElement).toBe(field()));
+    typeDigitByDigit(CPF_SHAPED_CNPJ);
+    await waitFor(() => expect(field().value).toBe("11.222.355/0001-41"));
+    // A valid CNPJ cannot grow, so only now does the buyer move on to the card.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("card-number")));
+  });
+
+  it("keeps a CPF typed digit by digit in the field — it may be a CNPJ's start", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
+    await screen.findByTestId("list-cpf");
+    fireEvent.click(radio("list-option-CARD"));
+    await screen.findByTestId("card-number");
+    await act(async () => HTMLElement.prototype.focus.call(field()));
+    typeDigitByDigit("52998224725");
+    await waitFor(() => expect(field().value).toBe("529.982.247-25"));
+    await waitFor(() => expect(document.activeElement).toBe(field()));
+  });
+
+  it("goes back to the CPF mask when a CNPJ is deleted back to 11 digits", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false });
+    await screen.findByTestId("list-cpf");
+    type(CNPJ_SHOWN);
+    await waitFor(() => expect(field().value).toBe(CNPJ_SHOWN));
+    type("11.222.333/0001-8");
+    await waitFor(() => expect(field().value).toBe("11.222.333/0001-8"));
+    type("11.222.333/000");
+    await waitFor(() => expect(field().value).toBe("112.223.330-00"));
+    type("112.223.330-0");
+    await waitFor(() => expect(field().value).toBe("112.223.330-0"));
+  });
+});
+
 describe("a CNPJ on its way out", () => {
+  it("is fourteen plain digits on the Google Pay charge", async () => {
+    installGoogle();
+    const client = stubClient([SAVED_VISA]);
+    client.chargeWallet.mockResolvedValue({ ok: true, data: { status: "PAID" } });
+    renderList({ config: walletStore(), client, createOrder: recordingCreateOrder(), taxIdOnFile: false, list: { totalCents: 2700 } });
+    await screen.findByTestId("list-cpf");
+    type(CNPJ_SHOWN);
+    await waitFor(() => expect(field().value).toBe(CNPJ_SHOWN));
+    const press = await screen.findByTestId("google-pay-native");
+    await waitFor(() => expect(screen.queryByTestId("list-wallets-held")).toBeNull());
+    fireEvent.click(press);
+    await waitFor(() => expect(client.chargeWallet).toHaveBeenCalledTimes(1));
+    expect(client.chargeWallet).toHaveBeenCalledWith(expect.objectContaining({ taxId: CNPJ, wallet: { type: "GOOGLE_PAY", key: "gpay-key" } }));
+  });
+
   it("is fourteen plain digits on the order, on 'Salvar meus dados' and on the card charge", async () => {
     const createOrder = recordingCreateOrder();
     const save = vi.fn();

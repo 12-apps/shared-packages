@@ -243,9 +243,11 @@ Then('a cobrança enviada ao provedor carrega o cartão e o CPF dela', async ({ 
   // only fail if the CLIENT changes; this line is the one that fails if the
   // MOUNT stops reading the flat body — the instrument then reads
   // `(no-instrument)` and the charge was never payable at all.
+  // The document travels as plain digits (FUT-4080), so a host fixture written
+  // with the mask still names the charge the provider received.
   const { fixtures, wire } = paymentsWorld();
   await expect(wire.providerCharges(page)).toContainText(
-    `${fixtures.headProvider}:CARD:${fixtures.taxId}:tok:`,
+    `${fixtures.headProvider}:CARD:${fixtures.taxId.replace(/\D/g, '')}:tok:`,
   );
 });
 

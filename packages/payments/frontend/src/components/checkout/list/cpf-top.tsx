@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
-import { useEffect, useRef, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
-import { validateCpfOrCnpj } from "../../../card";
+import { taxIdDigits, taxIdKind, validateCpfOrCnpj } from "../../../card";
 import { fieldSatisfied } from "../buyer-fields";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -23,6 +23,25 @@ const FIELD_WIDE_MAX = 35;
 const FIELD_CAP_FROM_PX = 560;
 
 /**
+ * Whether the document is complete enough to move the buyer on (FUT-4080).
+ *
+ * A CNPJ's first 11 digits can themselves be a valid CPF (`11222355000141`),
+ * so a CPF reached by TYPING may be a CNPJ on its way: moving the focus then
+ * would send the rest of the CNPJ into the card number. So the field moves on
+ * only for what cannot grow: a valid CNPJ (14 digits, the most it keeps), or a
+ * valid CPF that arrived whole in one change — pasted or autofilled. A CPF
+ * typed digit by digit stays put, and the buyer taps the next field.
+ */
+function useTaxIdAdvance(field: CheckoutCustomerField, value: string, onComplete: (() => void) | undefined): (next: string) => void {
+  const [arrivedWhole, setArrivedWhole] = useState(false);
+  const satisfied = value.trim() !== "" && fieldSatisfied(field, value);
+  const kind = taxIdKind(value);
+  useOnComplete(satisfied && (kind === "CNPJ" || (kind === "CPF" && arrivedWhole)), onComplete);
+  // Two digits or more in one change is a paste or an autofill, not a keystroke.
+  return (next) => setArrivedWhole(taxIdDigits(next).length - taxIdDigits(value).length > 1);
+}
+
+/**
  * The document at the TOP of Pagamento, above the wallets (FUT-3685, C3, C4,
  * E1, L7): "CPF ou CNPJ" (FUT-4080), the provider's reason under it ("o PagBank pede para pagar pelo
  * app"), the field — masked, checked by its digits — and "Salvar meus dados
@@ -32,7 +51,7 @@ const FIELD_CAP_FROM_PX = 560;
  * The field takes a CPF or a CNPJ, masked by its length — a buyer paying with
  * a company card gives its CNPJ — and keeps plain digits in the buyer state.
  *
- * When the document is complete, `onComplete` fires once — the list moves the focus
+ * When the document is complete and cannot grow ({@link useTaxIdAdvance}), `onComplete` fires once — the list moves the focus
  * to "Número do cartão" when a card typed now is chosen.
  */
 export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete, focusOnMount = false, onKeepSaved }: {
@@ -53,7 +72,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   // The document the store already holds, when the host passed it, shown
   // masked — as a CNPJ when it is one — and editable.
   const value = taxIdField.shown(buyer.taxId ?? "");
-  useOnComplete(value.trim() !== "" && fieldSatisfied(field, value), onComplete);
+  const onTyped = useTaxIdAdvance(field, value, onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (focusOnMount) scope.current?.querySelector<HTMLInputElement>("input")?.focus();
@@ -83,7 +102,10 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
             value={value}
             error={Boolean(complaint)}
             helperText={complaint}
-            onChange={(event) => onBuyerChange({ ...buyer, taxId: taxIdField.kept(event.target.value) })}
+            onChange={(event) => {
+              onTyped(event.target.value);
+              onBuyerChange({ ...buyer, taxId: taxIdField.kept(event.target.value) });
+            }}
             data-testid="list-buyer-taxId"
           />
         </Box>
