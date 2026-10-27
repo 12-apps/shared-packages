@@ -162,7 +162,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     pixVeil: 'Update to get a new Pix code',
   },
   validation: {
-    taxIdInvalid: 'That CPF is not valid.',
+    taxIdInvalid: 'Enter a valid CPF or CNPJ.',
     nameRequired: 'Enter your name.',
     emailInvalid: 'That e-mail address is not valid.',
     phoneInvalid: 'That phone number is not valid.',

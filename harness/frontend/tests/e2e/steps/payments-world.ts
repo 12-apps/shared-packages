@@ -159,7 +159,9 @@ definePaymentsWorld({
     tailProvider: 'boreal',
     hostedUrlFragment: 'infinito.example',
     payableRef: 'inv_harness_0043',
-    taxId: '529.982.247-25',
+    // As the provider receives it: the list keeps the document as plain
+    // digits, whatever mask the buyer saw (FUT-4080).
+    taxId: '52998224725',
     // The same word `admin-ports.ts` passes as `SetupGuideContext.brandName`.
     // Deliberately a name no real adopter uses: if the guide were still
     // carrying a compiled-in brand, this would not appear and the journey

@@ -27,8 +27,16 @@ export {
   type CardBrand,
 } from "./format";
 
-export { formatCpf, isValidCpf, validateCpf } from "./cpf";
-export { validateCpfOrCnpj } from "./tax-id";
+export { formatCpf, validateCpf } from "./cpf";
+export {
+  formatCpfOrCnpj,
+  isIncompleteCpfOrCnpj,
+  isValidCpfOrCnpj,
+  plainTaxId,
+  taxIdDigits,
+  taxIdKind,
+  validateCpfOrCnpj,
+} from "./tax-id";
 
 export { CardPayBar, NewCardForm, SavedCardsPicker } from "./fields";
 

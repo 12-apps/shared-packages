@@ -661,7 +661,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
   "PaymentListWallets/CpfMissing": {
     testIds: ["list-cpf", "list-buyer-taxId", "list-save-profile", "list-wallets", "list-wallets-held"],
-    text: ["CPF", "a aurora pede para pagar pelo app", "Digite seu CPF para pagar pelo app."],
+    text: ["CPF", "a aurora pede para pagar pelo app", "Digite seu CPF ou CNPJ para pagar pelo app."],
   },
   "PaymentListWallets/CpfOnFile": {
     testIds: ["list-wallets", "list-payer", "list-payer-change"],

@@ -11,9 +11,11 @@ import type { PaymentListCopy } from "./types";
  * Pagamento (FUT-3685, E2 → E1) — never a Dados step: the list has none
  * (R9). Shown only while an online option is chosen and the CPF is not open.
  */
-export function PayerLine({ copy, name, onChange }: {
+export function PayerLine({ copy, name, document = null, onChange }: {
   copy: PaymentListCopy;
   name: string;
+  /** The kind on file when the host passed its value — "CNPJ ✓" for a company's (FUT-4080). */
+  document?: "CPF" | "CNPJ" | null;
   onChange: () => void;
 }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
@@ -22,7 +24,7 @@ export function PayerLine({ copy, name, onChange }: {
     // the name is long; the link keeps a 40px target and a visible focus ring.
     <Box data-testid="list-payer" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", columnGap: 0 }}>
       <Text variant="body" size="sm" color="secondary" as="span">
-        {copy.payer(name)}
+        {copy.payer(name, document)}
       </Text>
       <Box
         sx={{

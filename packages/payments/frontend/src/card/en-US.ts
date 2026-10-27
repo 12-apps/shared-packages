@@ -35,7 +35,7 @@ export const EN_US_CARD_COPY: CardCopy = {
     cpfRequired: 'CPF is required.',
     cpfInvalid: 'That CPF is not valid.',
     taxIdRequired: 'Enter the CPF or the CNPJ.',
-    taxIdInvalid: 'That CPF or CNPJ is not valid.',
+    taxIdInvalid: 'Enter a valid CPF or CNPJ.',
     savedCardsLabel: 'Card',
     savedCardExpiry: (month, year) => `Expires ${month}/${year}`,
     newCard: 'New card',

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { plainTaxId } from "../../card";
+
 import { parkedBasket } from "./basket";
 import type { ChallengeScope } from "./card-outcome";
 import { useCheckoutClientApi } from "./client-context";
@@ -121,9 +123,9 @@ export function useWalletCharge(
     const charged = await client.chargeWallet({
       orderId: order.orderId,
       wallet: { type, key },
-      // The CPF the list collected — the provider's required-field gate
-      // reads it from the charge, the payable row has nowhere to keep it.
-      taxId: buyer.taxId,
+      // The CPF or CNPJ the list collected, as digits (FUT-4080) — the provider's
+      // required-field gate reads it from the charge, the payable has no column.
+      taxId: plainTaxId(buyer.taxId),
     });
     if (!charged.ok) {
       setError(charged.error);

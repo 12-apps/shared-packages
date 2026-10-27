@@ -240,7 +240,7 @@ describe("ApplePayButton — the session", () => {
     expect(walletCharges[0]).toEqual({
       orderId: "order-1",
       wallet: { type: "APPLE_PAY", key: JSON.stringify({ data: "opaque", signature: "sig" }) },
-      taxId: "529.982.247-25",
+      taxId: "52998224725",
     });
     // The charge was accepted ⇒ the sheet completes SUCCESS.
     await waitFor(() => expect(world.sessions[0]?.completions).toEqual([{ status: 0 }]));

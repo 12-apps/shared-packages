@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 
+import { taxIdKind } from "../../../card";
 import { cardChain, cardTokenization, handOffMethod } from "../method-capability";
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
@@ -44,10 +45,10 @@ interface ListFaceProps {
   saveBuyerContact?: (contact: BuyerContact) => void;
   /** The hand-off was started: the step shows where the buyer is going. */
   onHandOff: () => void;
-  /** "Alterar" on the payer line opened the CPF at the top (E2 → E1). */
+  /** "Alterar" on the payer line opened the document (CPF or CNPJ) at the top (E2 → E1). */
   revealed: boolean;
   onRevealCpf: () => void;
-  /** "Manter o CPF salvo": close the revealed CPF, keeping the one on file. */
+  /** "Manter o documento salvo": close the revealed field, keeping the document on file. */
   onKeepSavedCpf: () => void;
 }
 
@@ -66,8 +67,8 @@ function inFlight(props: ListFaceProps): boolean {
 /** Remember the asked details for next time, as the Dados step's "Continuar" did — only with the buyer's consent. */
 function saveAsked(props: ListFaceProps): void {
   const { c, state, saveBuyerContact } = props;
-  // The CPF at the top counts once the buyer typed one: a field revealed over a
-  // CPF on file and left empty asks the host to remember nothing new.
+  // The document at the top counts once the buyer typed one: a field revealed
+  // over one on file and left empty asks the host to remember nothing new.
   const typedCpf = state.top !== null && (c.buyer.taxId ?? "").trim() !== "";
   if ((state.asked.length === 0 && !typedCpf) || !c.saveProfile) return;
   saveBuyerContact?.({ name: c.buyer.name, phone: c.buyer.phone, taxId: c.buyer.taxId });
@@ -144,12 +145,12 @@ function payingHere(props: ListFaceProps): boolean {
   return offersOnline && props.state.choice?.kind !== "door";
 }
 
-/** "Pagando como … · CPF ✓ Alterar" — while a payment here is possible and the CPF is not open. */
+/** "Pagando como … · CPF ✓ Alterar" (or "CNPJ ✓") — while a payment here is possible and the document is not open. */
 function Payer({ props }: { props: ListFaceProps }): JSX.Element | null {
   const { c, list, taxIdOnFile } = props;
   const name = c.buyer.name?.trim();
   if (!taxIdOnFile || !name || props.revealed || !payingHere(props)) return null;
-  return <PayerLine copy={list.copy} name={name} onChange={props.onRevealCpf} />;
+  return <PayerLine copy={list.copy} name={name} document={taxIdKind(c.buyer.taxId)} onChange={props.onRevealCpf} />;
 }
 
 /** The card's charge is past the button: counting down, or going out. */
@@ -271,7 +272,7 @@ function coveredByHost(list: CheckoutPaymentList): boolean {
 
 /**
  * Why the button is held: the host's hold, then the list's own reasons, in the
- * prototype's order — the CPF at the top first, for an online choice that needs
+ * prototype's order — the CPF or CNPJ at the top first, for an online choice that needs
  * it (E3); a door choice never does (R3).
  */
 function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined): string | null {

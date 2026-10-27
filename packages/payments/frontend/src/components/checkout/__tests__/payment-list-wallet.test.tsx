@@ -337,7 +337,7 @@ describe("a press, whatever is chosen (FUT-3685 review)", () => {
     const apple = (await screen.findByRole("button", { name: "Pagar com Apple Pay" })) as HTMLButtonElement;
     expect(apple.disabled).toBe(true);
     const reasonId = apple.getAttribute("aria-describedby");
-    expect(reasonId && document.getElementById(reasonId)?.textContent).toBe("Digite seu CPF para pagar pelo app.");
+    expect(reasonId && document.getElementById(reasonId)?.textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app.");
     expect(screen.getByTestId("list-wallet-buttons").closest("[inert]")).toBeNull();
   });
 });

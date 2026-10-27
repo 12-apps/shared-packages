@@ -161,7 +161,7 @@ export interface PaymentsFixtures {
   hostedUrlFragment: string;
   /** A substring of the payable reference the host parks before navigating. */
   payableRef: string;
-  /** The CPF the buyer types, as the provider should receive it. */
+  /** The CPF the buyer types; compared as digits, the shape the provider receives (FUT-4080). */
   taxId: string;
   /**
    * What the HOST platform calls itself — the value it passes as
