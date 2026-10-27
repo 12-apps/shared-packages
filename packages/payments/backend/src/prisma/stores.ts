@@ -9,6 +9,7 @@ import type {
 import { attemptReferencePrefix } from '../core/reference';
 import { mergeRefreshedSnapshot } from '../core/snapshot-merge';
 import { isForwardTransition } from '../core/status';
+import { isSuperseded, type ChargeSupersession } from '../core/supersession';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 
 /**
@@ -206,8 +207,12 @@ function payableQueries(delegate: ChargeDelegate): ChargeQueryStore {
         where: payableWhere(query),
         orderBy: { createdAt: 'desc' },
       });
-      return rows.map(rowToStoredCharge);
+      // The supersede mark lives in the snapshot (FUT-4072, `core/supersession.ts`)
+      // and a payable holds a handful of rows, so it is filtered here, not in SQL.
+      return rows.map(rowToStoredCharge).filter((row) => !isSuperseded(row.snapshot));
     },
+    markSuperseded: (merchant, provider, providerChargeId, supersession) =>
+      markSupersededRow(delegate, merchant, { provider, providerChargeId }, supersession),
     async listPendingCharges(window) {
       // PENDING/AUTHORIZED = `isTerminal`'s complement, spelled as an `in`
       // so the filter runs in SQL. Oldest first — the sweep's fairness
@@ -351,4 +356,34 @@ async function transitionPendingRow(
   });
   const stored = await store.findByProviderChargeId(snapshot.provider, snapshot.providerChargeId);
   return { applied: count === 1, stored };
+}
+
+/**
+ * `ChargeQueryStore.markSuperseded` over Prisma. A COMPARE-AND-SET on the
+ * status the row was read with, so a payment that lands between the read and
+ * the write is never rolled back to PENDING; on a lost race the fresh row is
+ * marked instead, once.
+ */
+async function markSupersededRow(
+  delegate: ChargeDelegate,
+  merchant: MerchantRef,
+  key: { provider: string; providerChargeId: string },
+  supersession: ChargeSupersession,
+): Promise<void> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const row = await delegate.findUnique({ where: { provider_providerChargeId: key } });
+    if (!row || row.merchantKind !== merchant.kind || row.merchantId !== merchant.id) return;
+    const snapshot: ChargeSnapshot = { ...(row.snapshot as ChargeSnapshot), superseded: supersession };
+    const { count } = await delegate.updateMany({
+      where: { id: row.id, status: snapshot.status },
+      data: {
+        snapshot,
+        status: snapshot.status,
+        amountCents: snapshot.amount.amountCents,
+        method: snapshot.method,
+        providerChargeId: snapshot.providerChargeId,
+      },
+    });
+    if (count === 1) return;
+  }
 }

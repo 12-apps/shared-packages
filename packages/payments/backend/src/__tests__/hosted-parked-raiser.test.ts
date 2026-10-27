@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createChargeRaiser, type ChargeRaiseDeps } from '../core/charge-raise';
-import { UnsupportedOperationError } from '../core/errors';
+import { CredentialsError, UnsupportedOperationError } from '../core/errors';
+import { createPaymentsGateway } from '../core/gateway';
 import { landingProvider, type ChainMember } from '../core/hosted-landing';
 import { retireMovedPast, type RetireDeps, type SupersededCharge } from '../core/hosted-retire';
+import type { ProviderFailureReport } from '../core/provider-failure';
+import { defineProviders } from '../core/registry';
 import type { ChargeSnapshot, MerchantRef, Money } from '../core/types';
+import { testAdapter } from '../checkout/__tests__/harness';
+import { createMemoryAttemptLedger, createMemoryChargeStore } from '../memory';
+import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 
 /**
  * FUT-4072 at the host-facing raiser (`createChargeRaiser`) — the path an
@@ -40,6 +46,8 @@ function raiser(over: {
   parked?: ChargeSnapshot[];
   cancel?: () => Promise<ChargeSnapshot>;
   onSuperseded?: ChargeRaiseDeps['onSuperseded'];
+  /** The walk that minted each parked link, as the ledger answers it. */
+  walkedPast?: string[];
 }) {
   const calls = { warn: [] as string[], error: [] as string[] };
   const d: ChargeRaiseDeps = {
@@ -51,10 +59,11 @@ function raiser(over: {
       })) as unknown as ChargeRaiseDeps['gateway']['charge'],
       cancelCharge: vi.fn(over.cancel ?? (async () => snapshot({ status: 'CANCELED' }))),
       clientConfigChain: vi.fn(async () => over.chain),
+      ...(over.walkedPast ? { failedOverBefore: vi.fn(async () => over.walkedPast ?? []) } : {}),
     },
     charges: {
       listPayable: vi.fn(async (q: { method?: string }) =>
-        q.method ? [] : (over.parked ?? []).map((s) => ({ snapshot: s })),
+        q.method ? [] : (over.parked ?? []).map((s) => ({ snapshot: s, idempotencyKey: 'ord_1:0' })),
       ),
       countByReference: vi.fn(async () => 1),
       latestByReference: vi.fn(async () => null),
@@ -132,6 +141,31 @@ describe('createChargeRaiser — a parked link against the current chain', () =>
   });
 });
 
+describe('createChargeRaiser — the ledger and the links not reused', () => {
+  it('reuses a link minted while the head was down, per the walk ledger', async () => {
+    const { raise, d } = raiser({ chain: BROWSER_FIRST, parked: [snapshot()], walkedPast: ['browser'] });
+
+    expect((await raise(REQUEST)).providerChargeId).toBe('LINK');
+    expect(d.gateway.failedOverBefore).toHaveBeenCalledWith(TENANT, 'ord_1:0');
+    expect(d.gateway.charge).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse it when the ledger shows the head was never tried', async () => {
+    const { raise } = raiser({ chain: BROWSER_FIRST, parked: [snapshot()], walkedPast: [] });
+
+    expect((await raise(REQUEST)).providerChargeId).toBe('NEW');
+  });
+
+  it('retires the other parked links against the one it reuses', async () => {
+    const older = snapshot({ provider: 'elsewhere', providerChargeId: 'OLDER' });
+    const { raise, d } = raiser({ chain: HOSTED_FIRST, parked: [snapshot(), older] });
+
+    expect((await raise(REQUEST)).providerChargeId).toBe('LINK');
+    expect(d.gateway.cancelCharge).toHaveBeenCalledWith(TENANT, 'elsewhere', 'OLDER');
+    expect(d.gateway.cancelCharge).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('landingProvider', () => {
   it('is the first member able to take the method', () => {
     const chain: ChainMember[] = [
@@ -149,6 +183,7 @@ describe('retireMovedPast', () => {
     const calls = { warn: [] as string[], error: [] as string[] };
     const deps: RetireDeps = {
       gateway: { cancelCharge: vi.fn(async () => snapshot({ status: 'CANCELED' })) },
+      charges: { markSuperseded: vi.fn(async () => undefined) },
       log: { warn: (m) => calls.warn.push(m), error: (m) => calls.error.push(m) },
       ...over,
     };
@@ -202,5 +237,117 @@ describe('retireMovedPast', () => {
 
     await expect(retireMovedPast(deps, input(NEW))).resolves.toBeUndefined();
     expect(calls.error.join()).toContain('could not record');
+  });
+  it('counts a void as done only when the provider answers a state nobody can pay', async () => {
+    const { deps } = retireDeps({ gateway: { cancelCharge: vi.fn(async () => snapshot({ status: 'EXPIRED' })) } });
+
+    await retireMovedPast(deps, input(NEW));
+
+    expect(deps.charges.markSuperseded).not.toHaveBeenCalled();
+  });
+
+  it('records PAID_BEFORE_VOID, logs an error and reports it when the void comes back settled', async () => {
+    const recorded: SupersededCharge[] = [];
+    const reports: ProviderFailureReport[] = [];
+    const { deps, calls } = retireDeps({
+      gateway: { cancelCharge: vi.fn(async () => snapshot({ status: 'PAID' })) },
+      onSuperseded: (charge) => {
+        recorded.push(charge);
+      },
+      onProviderFailure: (report) => {
+        reports.push(report);
+      },
+    });
+
+    await retireMovedPast(deps, input(NEW));
+
+    expect(recorded.map((r) => [r.why, r.snapshot.status])).toEqual([['PAID_BEFORE_VOID', 'PAID']]);
+    expect(reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'hosted']]);
+    expect(calls.error.join()).toContain('the buyer paid it');
+    expect(deps.charges.markSuperseded).toHaveBeenCalledWith(
+      TENANT,
+      'hosted',
+      'LINK',
+      expect.objectContaining({ replacedBy: 'NEW', why: 'PAID_BEFORE_VOID' }),
+    );
+  });
+
+  it('records VOID_NOT_CONFIRMED when the void comes back still PENDING', async () => {
+    const recorded: SupersededCharge[] = [];
+    const { deps } = retireDeps({
+      gateway: { cancelCharge: vi.fn(async () => snapshot()) },
+      onSuperseded: (charge) => {
+        recorded.push(charge);
+      },
+    });
+
+    await retireMovedPast(deps, input(NEW));
+
+    expect(recorded.map((r) => r.why)).toEqual(['VOID_NOT_CONFIRMED']);
+  });
+
+  it('marks the row even when the recorder throws', async () => {
+    const { deps } = retireDeps({
+      gateway: {
+        cancelCharge: vi.fn(async () => {
+          throw new UnsupportedOperationError('hosted', 'cancelling a charge');
+        }),
+      },
+      onSuperseded: () => {
+        throw new Error('db down');
+      },
+    });
+
+    await retireMovedPast(deps, input(NEW));
+
+    expect(deps.charges.markSuperseded).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so by name when the store cannot mark', async () => {
+    const { deps, calls } = retireDeps({
+      charges: {},
+      gateway: {
+        cancelCharge: vi.fn(async () => {
+          throw new UnsupportedOperationError('hosted', 'cancelling a charge');
+        }),
+      },
+    });
+
+    await retireMovedPast(deps, input(NEW));
+
+    expect(calls.error.join()).toContain('has no markSuperseded');
+  });
+});
+describe('clientConfigChain — the chain the reuse rule reads', () => {
+  function gatewayWith(getCredentials: () => Promise<null>) {
+    return createPaymentsGateway({
+      providers: defineProviders({ hosted: testAdapter('hosted'), browser: testAdapter('browser') }),
+      credentials: {
+        providerChain: async () => ['hosted', 'browser'],
+        defaultProvider: async () => 'hosted',
+        getCredentials: async (_merchant, provider) =>
+          provider === 'hosted' ? getCredentials() : { environment: 'SANDBOX', fields: {}, stub: true },
+      },
+      charges: createMemoryChargeStore(),
+      webhooks: createMemoryWebhookInbox(),
+      attempts: createMemoryAttemptLedger(),
+      onWebhookEvent: async () => undefined,
+    });
+  }
+
+  it('leaves out a member whose credentials are refused (disabled), as the walk does', async () => {
+    const gateway = gatewayWith(async () => {
+      throw new CredentialsError('hosted', 'disabled');
+    });
+
+    expect((await gateway.clientConfigChain(TENANT)).map((entry) => entry.provider)).toEqual(['browser']);
+  });
+
+  it('propagates any other failure instead of reading it as absence', async () => {
+    const gateway = gatewayWith(async () => {
+      throw new Error('database unreachable');
+    });
+
+    await expect(gateway.clientConfigChain(TENANT)).rejects.toThrow('database unreachable');
   });
 });

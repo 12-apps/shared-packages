@@ -2,6 +2,7 @@ import { ChargeIdentityError, chargeIdentityMismatch } from '../core/charge-iden
 import type { PaymentsGateway } from '../core/gateway';
 import { judgeParkedHosted } from '../core/hosted-landing';
 import { retireMovedPast, type SupersededRecorder } from '../core/hosted-retire';
+import type { ProviderFailureReporter } from '../core/provider-failure';
 import type { ChargeQueryStore } from '../core/ports';
 import { attemptIdempotencyKey, attemptReference } from '../core/reference';
 import type { ChargeSnapshot, CustomerInfo, PaymentMethodKind } from '../core/types';
@@ -41,6 +42,8 @@ export interface RaiseChargeDeps {
   log: CheckoutLogger;
   /** Where a moved-past link the provider could not void is recorded (FUT-4072). */
   onSuperseded?: SupersededRecorder;
+  /** Told when a moved-past link turns out to have been paid before its void. */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 interface RaiseChargeRequest {
@@ -121,10 +124,12 @@ async function liveChargeFor(
     method: request.method,
     card: request.card,
   });
-  if (hosted.reuse) return { live: hosted.reuse, movedPast: [] };
-  if (request.method !== 'PIX' || request.card) return { live: null, movedPast: hosted.movedPast };
-  const live = await reusablePixCharge(deps.charges, payable);
-  return { live, movedPast: live ? [] : hosted.movedPast };
+  if (hosted.reuse || request.method !== 'PIX' || request.card) {
+    return { live: hosted.reuse, movedPast: hosted.movedPast };
+  }
+  // The moved-past links travel with a reused QR too: it is what the buyer
+  // holds now, so they are retired against it rather than left payable.
+  return { live: await reusablePixCharge(deps.charges, payable), movedPast: hosted.movedPast };
 }
 
 /**
@@ -140,7 +145,12 @@ export async function raiseCharge(
   request: RaiseChargeRequest,
 ): Promise<ChargeSnapshot> {
   const { live, movedPast } = await liveChargeFor(deps, payable, request);
-  if (live) return live;
+  const retire = (raised: ChargeSnapshot) =>
+    retireMovedPast(deps, { merchant: payable.merchant, reference: payable.ref, movedPast, raised });
+  if (live) {
+    await retire(live);
+    return live;
+  }
 
   const attempt = await deps.charges.countByReference(payable.merchant, payable.ref);
   const idempotencyKey = attemptIdempotencyKey(payable.ref, attempt);
@@ -172,11 +182,6 @@ export async function raiseCharge(
   // Only once THIS attempt's charge is proven good: the buyer must never be
   // left with the old code voided and no new one to pay.
   await voidSupersededPixCharges(deps, payable);
-  await retireMovedPast(deps, {
-    merchant: payable.merchant,
-    reference: payable.ref,
-    movedPast,
-    raised: stored.snapshot,
-  });
+  await retire(stored.snapshot);
   return stored.snapshot;
 }

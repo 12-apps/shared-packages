@@ -16,9 +16,12 @@ import type { ChargeInput, ChargeSnapshot, MerchantRef, PaymentMethodKind, Provi
  * its provider anyway — that provider is still enabled, still in the chain, and
  * is the FIRST member able to take the requested method. Then reusing and
  * walking reach the same provider, and reusing is the one of the two that does
- * not mint a second payable charge. Otherwise the checkout walks the CURRENT
- * chain, and the link it moved past is retired once the new charge exists
- * (`hosted-retire.ts`).
+ * not mint a second payable charge. "Would land anyway" also covers a link
+ * minted while the providers ahead of it were DOWN: the ledger of the walk that
+ * minted it shows it failed over from each of them (`walk-history.ts`), and a
+ * re-tap during that outage must not mint a fresh link on every tap. Otherwise
+ * the checkout walks the CURRENT chain, and the links it moved past are retired
+ * against whatever the buyer now holds (`hosted-retire.ts`).
  *
  * "Enabled and in the chain" is read from the gateway's `clientConfigChain`,
  * the same enabled-and-connected chain the checkout tokenizes for: a member the
@@ -33,9 +36,22 @@ export interface ChainMember {
   confirmation?: 'AUTOMATIC' | 'MANUAL';
 }
 
-/** The one gateway read the rule needs. */
+/** The gateway reads the rule needs. */
 interface ChainReader {
   clientConfigChain(merchant: MerchantRef): Promise<readonly ChainMember[]>;
+  /** The walk ledger's providers-failed-over-from (`walk-history.ts`). Optional. */
+  failedOverBefore?(merchant: MerchantRef, idempotencyKey: string): Promise<ProviderName[]>;
+}
+
+/** The members a fresh walk for `method` may land on, in walk order. */
+function capableMembers(
+  chain: readonly ChainMember[],
+  method: PaymentMethodKind,
+  automaticOnly: boolean,
+): ProviderName[] {
+  return chain
+    .filter((entry) => entry.methods.includes(method) && !(automaticOnly && entry.confirmation === 'MANUAL'))
+    .map((entry) => entry.provider);
 }
 
 /**
@@ -48,11 +64,7 @@ export function landingProvider(
   method: PaymentMethodKind,
   automaticOnly = false,
 ): ProviderName | null {
-  const member = chain.find(
-    (entry) =>
-      entry.methods.includes(method) && !(automaticOnly && entry.confirmation === 'MANUAL'),
-  );
-  return member?.provider ?? null;
+  return capableMembers(chain, method, automaticOnly)[0] ?? null;
 }
 
 /** What to do with the payable's parked hosted links. */
@@ -60,10 +72,16 @@ interface ParkedHostedVerdict {
   /** The link to hand back instead of raising, or null. */
   reuse: ChargeSnapshot | null;
   /**
-   * The links a new charge moves past — every parked link when nothing is
-   * reused. They are retired only AFTER the new charge is proven live.
+   * Every OTHER parked link. Retired against whatever charge the buyer ends up
+   * holding — the reused one or a new one — never dropped (`hosted-retire.ts`).
    */
   movedPast: ChargeSnapshot[];
+}
+
+/** A parked link as the store holds it: the snapshot and the walk that minted it. */
+interface ParkedLink {
+  snapshot: ChargeSnapshot;
+  idempotencyKey?: string | null;
 }
 
 interface ParkedHostedRequest {
@@ -76,8 +94,33 @@ interface ParkedHostedRequest {
 const NOTHING_PARKED: ParkedHostedVerdict = { reuse: null, movedPast: [] };
 
 /**
- * Judge the payable's still-payable hosted links (newest first) against the
- * merchant's CURRENT chain.
+ * Would a fresh walk land on this link's provider?
+ *
+ * Yes when it is the FIRST capable member (the owner's rule). Also yes when
+ * every capable member ranked ahead of it is one the walk that minted this
+ * link, for this same method, FAILED OVER from — the head was down then
+ * (FUT-563), and minting a second link there on every re-tap is the double
+ * charge FUT-604 refuses. A chain REORDERED since leaves a member ahead that
+ * the walk never tried, which is exactly the trapped payable.
+ */
+async function wouldLandOn(
+  reader: ChainReader,
+  request: ParkedHostedRequest,
+  capable: readonly ProviderName[],
+  link: ParkedLink,
+): Promise<boolean> {
+  const rank = capable.indexOf(link.snapshot.provider);
+  if (rank < 0) return false;
+  if (rank === 0) return true;
+  if (!reader.failedOverBefore || !link.idempotencyKey) return false;
+  if (link.snapshot.method !== request.method) return false;
+  const walkedPast = await reader.failedOverBefore(request.merchant, link.idempotencyKey);
+  return capable.slice(0, rank).every((provider) => walkedPast.includes(provider));
+}
+
+/**
+ * Judge the payable's still-payable, not-superseded hosted links (newest first)
+ * against the merchant's CURRENT chain.
  *
  * The chain is read only when there is a link to judge, so a payable with none
  * costs nothing extra. A chain read that throws PROPAGATES: without it neither
@@ -85,21 +128,26 @@ const NOTHING_PARKED: ParkedHostedVerdict = { reuse: null, movedPast: [] };
  * second payable charge FUT-604 exists to prevent — and the walk would fail on
  * the same read anyway.
  *
- * The instrument clause is FUT-604's and stays: a link at the landing provider
- * is still skipped when the buyer brought an instrument for that provider,
- * because reusing would silently ignore the card they just typed.
+ * The instrument clause is FUT-604's and stays: a link is still skipped when
+ * the buyer brought an instrument for its provider, because reusing would
+ * silently ignore the card they just typed.
  */
 export async function judgeParkedHosted(
   reader: ChainReader,
-  parked: readonly ChargeSnapshot[],
+  parked: readonly ParkedLink[],
   request: ParkedHostedRequest,
 ): Promise<ParkedHostedVerdict> {
   if (parked.length === 0) return NOTHING_PARKED;
   const chain = await reader.clientConfigChain(request.merchant);
-  const landing = landingProvider(chain, request.method, request.confirmation === 'AUTOMATIC');
-  const reuse =
-    parked.find(
-      (snapshot) => snapshot.provider === landing && !holdsInstrumentFor(request.card, snapshot.provider),
-    ) ?? null;
-  return reuse ? { reuse, movedPast: [] } : { reuse: null, movedPast: [...parked] };
+  const capable = capableMembers(chain, request.method, request.confirmation === 'AUTOMATIC');
+  let reuse: ChargeSnapshot | null = null;
+  for (const link of parked) {
+    if (holdsInstrumentFor(request.card, link.snapshot.provider)) continue;
+    if (await wouldLandOn(reader, request, capable, link)) {
+      reuse = link.snapshot;
+      break;
+    }
+  }
+  const movedPast = parked.map((link) => link.snapshot).filter((snapshot) => snapshot !== reuse);
+  return { reuse, movedPast };
 }

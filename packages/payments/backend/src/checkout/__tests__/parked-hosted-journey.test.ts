@@ -179,3 +179,150 @@ describe('a void that fails never blocks the buyer', () => {
     expect(world.superseded.map((s) => s.why)).toEqual(['VOID_FAILED']);
   });
 });
+
+/** Every PENDING charge but the buyer's answer must carry the supersede mark. */
+function unaccounted(scene: ReturnType<typeof parkedHostedWorld>, answer: string): string[] {
+  return scene.charges
+    .all()
+    .filter((row) => row.snapshot.status === 'PENDING' && !row.snapshot.superseded)
+    .map((row) => row.providerChargeId)
+    .filter((id) => id !== answer);
+}
+
+describe('a superseded link is never handed back (flip, raise, flip back, re-tap)', () => {
+  const cases = (['PIX', 'CARD'] as const).flatMap((method) =>
+    ([false, 'fails', 'pending'] as const).map((alphaVoids) => ({
+      name: `method=${method} alphaVoids=${String(alphaVoids)}`,
+      method,
+      alphaVoids,
+    })),
+  );
+
+  it.each(cases)('$name', async ({ method, alphaVoids }) => {
+    const scene = parkedHostedWorld({ alphaVoids });
+    const card = method === 'CARD' ? { tokensByProvider: { beta: 'tok_beta' } } : undefined;
+    const link = await scene.park('parked');
+    scene.credentials.chain = ['beta', 'alpha'];
+    const second = await scene.pay(method, card);
+    scene.credentials.chain = ['alpha', 'beta'];
+
+    const third = await scene.pay(method, card);
+    const fourth = await scene.pay(method, card);
+
+    expect(second.provider).toBe('beta');
+    for (const answer of [third, fourth]) {
+      expect(answer.providerChargeId).not.toBe(link?.providerChargeId);
+      expect(unaccounted(scene, answer.providerChargeId)).toEqual([]);
+    }
+    // The old link was retired ONCE, however many attempts met it afterwards.
+    expect(scene.superseded.map((s) => s.snapshot.providerChargeId)).toEqual([link?.providerChargeId]);
+  });
+});
+
+describe('a moved-past link is retired once', () => {
+  it('two raises after a flip: one record, one void attempt', async () => {
+    const world = parkedHostedWorld({ alphaVoids: 'fails' });
+    await world.park('parked');
+    world.credentials.chain = ['beta', 'alpha'];
+    const card = { tokensByProvider: { beta: 'tok_beta' } };
+
+    await world.pay('CARD', card);
+    await world.pay('CARD', card);
+
+    expect(world.superseded).toHaveLength(1);
+    expect(world.reports.filter((r) => r.path === 'CANCEL')).toHaveLength(1);
+    expect(world.logs.error.filter((line) => line.includes('payments.void failed'))).toHaveLength(1);
+  });
+
+  it('a provider with no void is asked once too', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    await world.park('parked');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    await world.pay('CARD', { tokensByProvider: { beta: 'tok_beta' } });
+    await world.pay('CARD', { tokensByProvider: { beta: 'tok_beta' } });
+
+    expect(world.superseded.map((s) => s.why)).toEqual(['VOID_UNSUPPORTED']);
+    expect(world.logs.warn.filter((line) => line.includes('payments.void unsupported'))).toHaveLength(1);
+  });
+});
+
+describe('a void the provider answers with a payment', () => {
+  it('records PAID_BEFORE_VOID, reports it, and never offers the link back', async () => {
+    const world = parkedHostedWorld({ alphaVoids: 'paid' });
+    const link = await world.park('parked');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    const got = await world.pay('PIX');
+
+    expect(got.provider).toBe('beta');
+    expect(world.superseded.map((s) => [s.why, s.snapshot.status])).toEqual([['PAID_BEFORE_VOID', 'PAID']]);
+    expect(world.reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'alpha']]);
+    expect(world.statusOf(link ?? got)).toBe('PAID');
+  });
+
+  it('records VOID_NOT_CONFIRMED when the void leaves it PENDING', async () => {
+    const world = parkedHostedWorld({ alphaVoids: 'pending' });
+    await world.park('parked');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    await world.pay('PIX');
+
+    expect(world.superseded.map((s) => s.why)).toEqual(['VOID_NOT_CONFIRMED']);
+  });
+});
+
+describe('an outage at the head does not churn links (FUT-563 + FUT-604)', () => {
+  it('re-taps while the head is still down reuse the link the failover minted', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    world.credentials.chain = ['beta', 'alpha'];
+    world.beta.down = true;
+    const link = await world.pay('PIX');
+
+    const again = await world.pay('PIX');
+    const thrice = await world.pay('PIX');
+
+    expect(link.provider).toBe('alpha');
+    expect([again.providerChargeId, thrice.providerChargeId]).toEqual([link.providerChargeId, link.providerChargeId]);
+    expect(world.charges.all()).toHaveLength(1);
+    expect(world.superseded).toEqual([]);
+  });
+
+  it('still reuses it once the head is back — the chain was never reordered', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    const link = await world.park('failover');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    expect((await world.pay('PIX')).providerChargeId).toBe(link?.providerChargeId);
+    expect(world.charges.all()).toHaveLength(1);
+  });
+});
+
+describe('the links not reused are retired on the REUSE path too', () => {
+  it('a re-tap that reuses a live QR retires a stray hosted link against it', async () => {
+    const world = parkedHostedWorld({ alphaVoids: false });
+    world.credentials.chain = ['beta', 'alpha'];
+    const qr = await world.pay('PIX');
+    await world.charges.create({
+      merchant: MERCHANT,
+      reference: `${world.payable.ref}--9`,
+      idempotencyKey: `${world.payable.ref}:9`,
+      snapshot: {
+        provider: 'alpha',
+        providerChargeId: 'stray_alpha',
+        status: 'PENDING',
+        amount: world.payable.amount,
+        method: 'PIX',
+        hostedCheckoutUrl: 'https://alpha.example/checkout/stray_alpha',
+      },
+    });
+
+    const again = await world.pay('PIX');
+
+    expect(again.providerChargeId).toBe(qr.providerChargeId);
+    expect(world.superseded.map((s) => [s.snapshot.providerChargeId, s.replacedBy.providerChargeId])).toEqual([
+      ['stray_alpha', qr.providerChargeId],
+    ]);
+    expect(unaccounted(world, qr.providerChargeId)).toEqual([]);
+  });
+});

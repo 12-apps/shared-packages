@@ -7,6 +7,7 @@ import { defineProviders } from '../../core/registry';
 import type { ChargeSnapshot, ChargeStatus, ProviderName } from '../../core/types';
 import { createMemoryAttemptLedger, createMemoryChargeStore, createMemoryCredentialStore } from '../../memory';
 import { createMemoryWebhookInbox } from '../../memory-webhook-inbox';
+import { stubPendingSnapshot } from '../../providers/shared';
 import { raiseCharge } from '../raise';
 import type { CheckoutCard } from '../reuse';
 import type { Payable } from '../types';
@@ -24,11 +25,18 @@ import { BRL, MERCHANT, testAdapter } from './harness';
  */
 
 export type ProviderState = 'enabled' | 'disabled' | 'removed';
-export type PriorAttempt = 'none' | 'parked' | 'expired' | 'paid' | 'failed';
+/**
+ * `parked`: a live `alpha` link minted with `alpha` heading the chain.
+ * `failover`: a live `alpha` link minted while `beta` headed the chain and was
+ * DOWN — the walk failed over onto `alpha` (FUT-563).
+ */
+export type PriorAttempt = 'none' | 'parked' | 'failover' | 'expired' | 'paid' | 'failed';
+/** What `alpha` does when asked to void: nothing, void, refuse, or answer PAID / PENDING. */
+type AlphaVoid = boolean | 'fails' | 'paid' | 'pending';
 export type Instrument = 'none' | 'tokenAlpha' | 'tokenBeta';
 
 /** The stored status a non-payable prior attempt is left in. */
-const PRIOR_STATUS: Record<Exclude<PriorAttempt, 'none' | 'parked'>, ChargeStatus> = {
+const PRIOR_STATUS: Record<Exclude<PriorAttempt, 'none' | 'parked' | 'failover'>, ChargeStatus> = {
   expired: 'EXPIRED',
   paid: 'PAID',
   failed: 'DECLINED',
@@ -65,33 +73,48 @@ function switchableCredentials() {
   return { store, state };
 }
 
-/** `alpha` with the void behaviour a case asks for: none, a working one, or a refusing one. */
-function alphaAdapter(voids: boolean | 'fails') {
+/** `alpha` with the void behaviour a case asks for. */
+function alphaAdapter(voids: AlphaVoid) {
   const adapter = testAdapter('alpha', { tokenization: 'REDIRECT', hosted: true, cancelable: voids === true });
-  if (voids !== 'fails') return adapter;
+  if (typeof voids === 'boolean') return adapter;
   return {
     ...adapter,
-    async cancelCharge(): Promise<ChargeSnapshot> {
-      throw new ProviderRequestError('alpha', 'alpha refused the void', { httpStatus: 502 });
+    async cancelCharge(providerChargeId: string): Promise<ChargeSnapshot> {
+      if (voids === 'fails') throw new ProviderRequestError('alpha', 'alpha refused the void', { httpStatus: 502 });
+      const status: ChargeStatus = voids === 'paid' ? 'PAID' : 'PENDING';
+      return { ...stubPendingSnapshot('alpha', providerChargeId), status, amount: BRL(4200) };
     },
   };
 }
 
-export function parkedHostedWorld(options: { alphaVoids: boolean | 'fails' }) {
+/** `beta`, switchable DOWN: a refused connection, which provably created nothing. */
+function betaAdapter(state: { down: boolean }) {
+  const adapter = testAdapter('beta', { tokenization: 'PUBLIC_KEY' });
+  return {
+    ...adapter,
+    async createCharge(...args: Parameters<typeof adapter.createCharge>) {
+      if (state.down) throw new TypeError('fetch failed: beta is down', { cause: { code: 'ECONNREFUSED' } });
+      return adapter.createCharge(...args);
+    },
+  };
+}
+
+export function parkedHostedWorld(options: { alphaVoids: AlphaVoid }) {
   const credentials = switchableCredentials();
+  const beta = { down: false };
   const charges = createMemoryChargeStore();
   const reports: ProviderFailureReport[] = [];
   const gateway = createPaymentsGateway({
     providers: defineProviders({
       alpha: alphaAdapter(options.alphaVoids),
-      beta: testAdapter('beta', { tokenization: 'PUBLIC_KEY' }),
+      beta: betaAdapter(beta),
     }),
     credentials: credentials.store,
     charges,
     webhooks: createMemoryWebhookInbox(),
     attempts: createMemoryAttemptLedger(),
     onWebhookEvent: async () => undefined,
-    onProviderFailure: (report) => {
+    onProviderFailure: (report: ProviderFailureReport) => {
       reports.push(report);
     },
   });
@@ -108,6 +131,10 @@ export function parkedHostedWorld(options: { alphaVoids: boolean | 'fails' }) {
     onSuperseded: (charge: SupersededCharge) => {
       superseded.push(charge);
     },
+    // The same reporter the gateway was handed, as a host passes both.
+    onProviderFailure: (report: ProviderFailureReport) => {
+      reports.push(report);
+    },
   };
   const payable: Payable = {
     ref: 'inv_4072',
@@ -118,9 +145,20 @@ export function parkedHostedWorld(options: { alphaVoids: boolean | 'fails' }) {
     state: 'OPEN',
   };
 
+  /** `[beta, alpha]` with `beta` down: the walk fails over and mints at `alpha`. */
+  async function parkAfterFailover(): Promise<ChargeSnapshot> {
+    credentials.state.chain = ['beta', 'alpha'];
+    beta.down = true;
+    const parked = await raiseCharge(deps, payable, { method: 'PIX' });
+    beta.down = false;
+    credentials.state.chain = ['alpha', 'beta'];
+    return parked;
+  }
+
   return {
     charges,
     credentials: credentials.state,
+    beta,
     superseded,
     reports,
     logs,
@@ -129,6 +167,7 @@ export function parkedHostedWorld(options: { alphaVoids: boolean | 'fails' }) {
     /** Park an `alpha` link under `[alpha, beta]`, left in the prior's state. */
     async park(prior: PriorAttempt): Promise<ChargeSnapshot | null> {
       if (prior === 'none') return null;
+      if (prior === 'failover') return parkAfterFailover();
       const parked = await raiseCharge(deps, payable, { method: 'PIX' });
       if (prior === 'parked') return parked;
       const moved = { ...parked, status: PRIOR_STATUS[prior] };

@@ -21,10 +21,12 @@ import {
  *   × whether alpha can void
  *
  * The expected answer comes from the owner's rule, written once below as a
- * plain spec (`expected`): a parked link is reused ONLY when the current chain
- * would land on its provider first, and never over an instrument minted for it
- * (FUT-604); otherwise the current chain is walked, and the link it moved past
- * is voided where alpha can void, or recorded superseded where it cannot.
+ * plain spec (`expected`): a parked link is reused ONLY when a fresh walk would
+ * land on its provider first — it heads the current chain, or every member
+ * ahead of it is one the walk that minted it failed over from — and never over
+ * an instrument minted for it (FUT-604); otherwise the current chain is walked,
+ * and the link it moved past is voided where alpha can void, or marked and
+ * recorded superseded where it cannot.
  */
 
 type Order = 'alpha>beta' | 'beta>alpha';
@@ -43,7 +45,7 @@ interface Case {
 const ORDERS: Order[] = ['alpha>beta', 'beta>alpha'];
 const STATES: ProviderState[] = ['enabled', 'disabled', 'removed'];
 const METHODS: Method[] = ['PIX', 'CARD'];
-const PRIORS: PriorAttempt[] = ['none', 'parked', 'expired', 'paid', 'failed'];
+const PRIORS: PriorAttempt[] = ['none', 'parked', 'failover', 'expired', 'paid', 'failed'];
 const INSTRUMENTS: Instrument[] = ['none', 'tokenAlpha', 'tokenBeta'];
 const VOIDS = [true, false];
 
@@ -92,10 +94,21 @@ function walkLands(c: Case): ProviderName | null {
   return currentChain(c).find(lands) ?? null;
 }
 
+/**
+ * Would a fresh walk land on alpha? When alpha is the first capable member —
+ * or when every member ahead of it is one the walk that minted the link failed
+ * over from, for the same method (a `failover` link was minted for PIX, with
+ * beta down).
+ */
+function walkWouldLandOnAlpha(c: Case): boolean {
+  const rank = currentChain(c).indexOf('alpha');
+  if (rank < 0) return false;
+  return rank === 0 || (c.prior === 'failover' && c.method === 'PIX');
+}
+
 function expected(c: Case): Expected {
-  const landing = currentChain(c)[0] ?? null;
-  const parkedPayable = c.prior === 'parked';
-  if (parkedPayable && landing === 'alpha' && c.instrument !== 'tokenAlpha') {
+  const parkedPayable = c.prior === 'parked' || c.prior === 'failover';
+  if (parkedPayable && c.instrument !== 'tokenAlpha' && walkWouldLandOnAlpha(c)) {
     return { reused: true, raisedOn: null, parked: 'reused' };
   }
   const raisedOn = walkLands(c);
@@ -117,7 +130,7 @@ async function arrange(c: Case) {
 describe('FUT-4072 — a parked hosted link against the current chain', () => {
   it('covers every combination of the axes', () => {
     const cases = buildCases();
-    expect(cases).toHaveLength(360);
+    expect(cases).toHaveLength(432);
     expect(new Set(cases.map((c) => c.name)).size).toBe(cases.length);
   });
 
@@ -159,6 +172,8 @@ describe('FUT-4072 — a parked hosted link against the current chain', () => {
       expect(world.superseded[0]?.snapshot.providerChargeId).toBe(parked.providerChargeId);
       expect(world.superseded[0]?.replacedBy.providerChargeId).toBe(got.providerChargeId);
       expect(world.superseded[0]?.why).toBe(want.why);
+      expect(world.charges.all().find((r) => r.providerChargeId === parked.providerChargeId)?.snapshot.superseded)
+        .toMatchObject({ replacedBy: got.providerChargeId, why: want.why });
     }
     // The invariant underneath every case: no payable charge is left that is
     // neither the buyer's answer nor recorded as superseded.

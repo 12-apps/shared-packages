@@ -325,6 +325,7 @@ export type {
   RaiseChargeRequest,
 } from './core/charge-raise';
 export type { SupersededCharge, SupersededRecorder, SupersededWhy } from './core/hosted-retire';
+export { isSuperseded, type ChargeSupersession } from './core/supersession';
 export { isValidCpf } from './core/cpf';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument

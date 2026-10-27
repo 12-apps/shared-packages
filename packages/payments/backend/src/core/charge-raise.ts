@@ -5,6 +5,7 @@ import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
 import { judgeParkedHosted, type ChainMember } from './hosted-landing';
 import { retireMovedPast, type SupersededRecorder } from './hosted-retire';
+import type { ProviderFailureReporter } from './provider-failure';
 import { attemptIdempotencyKey, attemptReference } from './reference';
 import type {
   CardDetails,
@@ -78,6 +79,12 @@ export interface ChargeRaiseGateway {
    * parked hosted link is still where a fresh walk would land.
    */
   clientConfigChain(merchant: MerchantRef): Promise<readonly ChainMember[]>;
+  /**
+   * The walk ledger's failed-over-from providers (FUT-4072). Optional: without
+   * it a link minted during the head's outage is not reused, and each re-tap
+   * mints a fresh one and retires the last.
+   */
+  failedOverBefore?(merchant: MerchantRef, idempotencyKey: string): Promise<string[]>;
 }
 
 /**
@@ -103,6 +110,8 @@ export interface ChargeRaiseDeps {
    * handling. Omitted, the link is logged as an error by name instead.
    */
   onSuperseded?: SupersededRecorder;
+  /** Told when a moved-past link turns out to have been paid before its void. */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 export interface RaiseChargeRequest {
@@ -143,24 +152,25 @@ interface SupersededCharge {
   amountCents: number;
 }
 
-/** The payable charge to hand back instead of raising, and the links a raise moves past. */
+/** The payable charge to hand back instead of raising, and the links to retire. */
 async function reusableCharge(
   deps: ChargeRaiseDeps,
   request: RaiseChargeRequest,
 ): Promise<{ live: ChargeSnapshot | null; movedPast: ChargeSnapshot[] }> {
   const { merchant, reference, amount } = request;
   const rows = await deps.charges.listPayable({ merchant, reference, amount });
-  const parked = rows.map((row) => row.snapshot).filter(hostedChargePayable);
+  const parked = rows.filter((row) => hostedChargePayable(row.snapshot));
   // Reused only where the CURRENT chain would land anyway, and never over an
-  // instrument the buyer brought for that provider (`hosted-landing.ts`).
+  // instrument the buyer brought for that provider (`hosted-landing.ts`). The
+  // links NOT reused are retired against whatever the buyer ends up holding.
   const hosted = await judgeParkedHosted(deps.gateway, parked, request);
-  if (hosted.reuse) return { live: hosted.reuse, movedPast: [] };
+  if (hosted.reuse) return { live: hosted.reuse, movedPast: hosted.movedPast };
   // PIX ONLY. A card attempt carries an instrument, so reusing would ignore the
   // card the buyer just typed. PIX carries none — the QR IS the charge.
   if (request.method !== 'PIX' || request.card) return { live: null, movedPast: hosted.movedPast };
   const [pix] = await deps.charges.listPayable({ merchant, reference, amount, method: 'PIX' });
   const live = pix && pixChargePayable(pix.snapshot) ? pix.snapshot : null;
-  return { live, movedPast: live ? [] : hosted.movedPast };
+  return { live, movedPast: hosted.movedPast };
 }
 
 /**
@@ -242,7 +252,12 @@ function reason(error: unknown): string {
 export function createChargeRaiser(deps: ChargeRaiseDeps) {
   return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeSnapshot> {
     const { live, movedPast } = await reusableCharge(deps, request);
-    if (live) return live;
+    const retire = (raised: ChargeSnapshot) =>
+      retireMovedPast(deps, { merchant: request.merchant, reference: request.reference, movedPast, raised });
+    if (live) {
+      await retire(live);
+      return live;
+    }
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);
     const idempotencyKey = attemptIdempotencyKey(request.reference, attempt);
@@ -272,12 +287,7 @@ export function createChargeRaiser(deps: ChargeRaiseDeps) {
     if (mismatch) throw new ChargeIdentityError(stored, mismatch);
 
     await voidSuperseded(deps, request);
-    await retireMovedPast(deps, {
-      merchant: request.merchant,
-      reference: request.reference,
-      movedPast,
-      raised: stored.snapshot,
-    });
+    await retire(stored.snapshot);
     return stored.snapshot;
   };
 }

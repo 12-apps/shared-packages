@@ -47,6 +47,7 @@ async function raiseDeps<C, V extends object, D>(runtime: Runtime<C, V, D>): Pro
     gateway: await runtime.gateway(),
     charges: runtime.charges,
     log: runtime.log,
+    ...(runtime.config.onProviderFailure ? { onProviderFailure: runtime.config.onProviderFailure } : {}),
     ...(supersede
       ? {
           onSuperseded: ({ reference, snapshot, replacedBy, why }) =>

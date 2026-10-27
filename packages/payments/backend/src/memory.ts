@@ -107,6 +107,8 @@ function matchesPayableQuery(row: StoredCharge, query: PayableChargeQuery): bool
     merchantKey(row.merchant) === merchantKey(query.merchant) &&
     ownsReference(query.reference, row.reference) &&
     row.snapshot.status === 'PENDING' &&
+    // Replaced and recorded (FUT-4072): never offered back, never retired twice.
+    !row.snapshot.superseded &&
     (!query.method || row.snapshot.method === query.method) &&
     matchesAmount(row.snapshot.amount, query)
   );
@@ -151,6 +153,16 @@ function payableQueries(rows: readonly StoredCharge[]): ChargeQueryStore {
             row.createdAt > window.after,
         )
         .slice(0, window.limit);
+    },
+    async markSuperseded(merchant, provider, providerChargeId, superseded) {
+      const row = rows.find(
+        (held) =>
+          held.provider === provider &&
+          held.providerChargeId === providerChargeId &&
+          merchantKey(held.merchant) === merchantKey(merchant),
+      );
+      // The same object the indexes hold, so every read sees the mark.
+      if (row) row.snapshot = { ...row.snapshot, superseded };
     },
   };
 }

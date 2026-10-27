@@ -1,4 +1,5 @@
-import type { MerchantRef, Money, PaymentMethodKind } from './types';
+import type { ChargeSupersession } from './supersession';
+import type { MerchantRef, Money, PaymentMethodKind, ProviderName } from './types';
 import type { PendingChargeWindow } from './payable-sweep';
 import type { StoredCharge } from './ports';
 
@@ -51,7 +52,9 @@ export interface ChargeQueryStore {
    */
   countByReference(merchant: MerchantRef, reference: string): Promise<number>;
   /**
-   * The payable's still-PAYABLE charges — `PENDING` only — newest first.
+   * The payable's still-PAYABLE charges — `PENDING` only, and never one this
+   * package already marked SUPERSEDED (FUT-4072, {@link markSuperseded}) —
+   * newest first.
    *
    * `PENDING` is the whole point: a settled, failed, cancelled or expired
    * charge is not something a buyer can pay, so it can neither be handed back
@@ -84,4 +87,20 @@ export interface ChargeQueryStore {
    * stores implement it; the sweep refuses loudly on one that does not.
    */
   listPendingCharges?(window: PendingChargeWindow): Promise<StoredCharge[]>;
+  /**
+   * Mark a stored charge as replaced by a newer one it could not be voided in
+   * favour of (FUT-4072), so {@link listPayable} never offers it back and it is
+   * retired exactly once. Written into the stored snapshot (`superseded`) over
+   * whatever status the row holds NOW — never over a status it no longer holds,
+   * so a payment that lands in between is not rolled back. A charge of another
+   * merchant, or one the store does not hold, is left alone. OPTIONAL for
+   * compatibility; both in-repo stores implement it, and without it a
+   * moved-past link is logged as unmarked on every attempt that meets it.
+   */
+  markSuperseded?(
+    merchant: MerchantRef,
+    provider: ProviderName,
+    providerChargeId: string,
+    supersession: ChargeSupersession,
+  ): Promise<void>;
 }

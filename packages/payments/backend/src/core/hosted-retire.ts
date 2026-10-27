@@ -1,43 +1,53 @@
+import type { ChargeQueryStore } from './charge-queries';
 import { UnsupportedOperationError } from './errors';
+import { reportProviderFailure, type ProviderFailureReporter } from './provider-failure';
+import type { SupersededWhy } from './supersession';
 import type { ChargeSnapshot, ChargeStatus, MerchantRef } from './types';
 
+export type { SupersededWhy } from './supersession';
+
 /**
- * RETIRING THE HOSTED LINK A WALK MOVED PAST (FUT-4072).
+ * RETIRING THE HOSTED LINKS A CHECKOUT MOVED PAST (FUT-4072).
  *
- * When the parked link is not reused (`hosted-landing.ts`), the walk mints a new
- * charge and the old link is still payable at its provider. Left alone that is
- * two payable charges for one payable — the exact double payment FUT-604 exists
- * to prevent, now produced by the fix for the trapped payable. So the link is
- * retired, in this order:
+ * When a parked link is not handed back (`hosted-landing.ts`), the buyer ends
+ * up holding another charge — a new one, or a different live one that was
+ * reused — and the old link is still payable at its provider. Left alone that
+ * is two payable charges for one payable, the exact double payment FUT-604
+ * exists to prevent. So each moved-past link is retired, ONCE:
  *
- *  1. VOIDED at the provider, when its adapter can (`cancelCharge`). The void
- *     goes through the gateway, so a provider that refuses it is reported to
- *     the host's `onProviderFailure` like every other follow-up call (FUT-4074).
- *  2. Otherwise RECORDED AS SUPERSEDED through the host's recorder: the link
- *     stays payable at a provider that cannot void (or would not, this time),
- *     and a payment of it must be caught by the host's superseded / duplicate
- *     payment handling rather than settle unnoticed. With no recorder wired the
- *     line is logged as an error by name — never silent.
+ *  1. VOIDED at the provider when its adapter can (`cancelCharge`) AND the
+ *     provider confirms it — the answer must read CANCELED (or another state a
+ *     buyer cannot pay). The void goes through the gateway, so a refusal is
+ *     reported to the host's `onProviderFailure` (FUT-4074).
+ *  2. Otherwise MARKED SUPERSEDED on the stored row
+ *     (`ChargeQueryStore.markSuperseded`) — so it is never offered back as the
+ *     live charge and never retired twice — and then RECORDED through the
+ *     host's recorder, so a payment of it reaches the host's superseded /
+ *     duplicate-payment handling instead of settling unnoticed. A void the
+ *     provider answered with a SETTLED charge (`PAID_BEFORE_VOID`: the buyer
+ *     paid the old link in the window) is also logged as an error and reported
+ *     to `onProviderFailure`. With no recorder wired the line is logged as an
+ *     error by name — never silent.
  *
- * ONLY ONCE THE NEW CHARGE IS LIVE. A declined or failed new charge leaves the
- * buyer with nothing else to pay, and a recorded-superseded link they then pay
- * would be refused by the host. The link is retired by the next attempt that
- * does produce a live charge.
+ * ONLY ONCE THE CHARGE THE BUYER HOLDS IS LIVE. A declined or failed charge
+ * leaves the buyer with nothing else to pay, and a recorded-superseded link they
+ * then pay would be refused by the host. The link is retired by the next
+ * attempt that does produce a live one. A PENDING charge counts as live: it is
+ * what the buyer is now holding — a QR, a hosted page, a card awaiting 3-D
+ * Secure. If that 3-D Secure then fails, the next attempt mints a fresh link;
+ * the superseded one, paid anyway, reaches the host's superseded handling.
  *
- * NEVER THROWS. The new charge is valid and the buyer is waiting on it; failing
- * their checkout because an OLD link could not be retired would turn a stale
- * link into an outage of the payment path.
+ * NEVER THROWS. The buyer is waiting on the charge they hold; failing their
+ * checkout because an OLD link could not be retired would turn a stale link
+ * into an outage of the payment path.
  */
 
-/** Why a moved-past link is still payable at its provider. */
-export type SupersededWhy = 'VOID_UNSUPPORTED' | 'VOID_FAILED';
-
-/** A moved-past charge the provider could not void — still payable there. */
+/** A moved-past charge that is still the buyer's to pay — or was paid anyway. */
 export interface SupersededCharge {
   merchant: MerchantRef;
   /** The host's own reference for the thing being paid. */
   reference: string;
-  /** The moved-past charge, as last stored. */
+  /** The moved-past charge, as last known. */
   snapshot: ChargeSnapshot;
   /** The charge that replaced it. */
   replacedBy: ChargeSnapshot;
@@ -45,8 +55,12 @@ export interface SupersededCharge {
 }
 
 /**
- * The host's record of a superseded charge. Awaited and CONTAINED: a recorder
- * that throws is logged and cannot fail the buyer's new charge.
+ * The host's record of a superseded charge. Called once per charge in the
+ * ordinary case — the stored mark keeps it from being met again — but it MUST
+ * be idempotent on `(snapshot.provider, snapshot.providerChargeId)`: a store
+ * without `markSuperseded`, or a mark that failed, meets the same link on the
+ * next attempt and records it again. Awaited and CONTAINED: a recorder that
+ * throws is logged and cannot fail the buyer's charge.
  */
 export type SupersededRecorder = (charge: SupersededCharge) => Promise<void> | void;
 
@@ -54,76 +68,136 @@ export interface RetireDeps {
   gateway: {
     cancelCharge(merchant: MerchantRef, provider: string, providerChargeId: string): Promise<ChargeSnapshot>;
   };
+  charges: Pick<ChargeQueryStore, 'markSuperseded'>;
   log: { warn(message: string): void; error(message: string): void };
   onSuperseded?: SupersededRecorder;
+  /** Told when a void comes back SETTLED (FUT-4074). */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 interface RetireInput {
   merchant: MerchantRef;
   reference: string;
   movedPast: readonly ChargeSnapshot[];
-  /** The charge this attempt produced. */
+  /** The charge the buyer holds now: raised by this attempt, or reused. */
   raised: ChargeSnapshot;
 }
 
 /** A charge a buyer holds or has paid — the only kind that may replace a link. */
 const LIVE: ReadonlySet<ChargeStatus> = new Set<ChargeStatus>(['PENDING', 'AUTHORIZED', 'PAID']);
+/** A void answer a buyer can no longer pay. */
+const GONE: ReadonlySet<ChargeStatus> = new Set<ChargeStatus>(['CANCELED', 'EXPIRED', 'DECLINED']);
 
 function sameCharge(a: ChargeSnapshot, b: ChargeSnapshot): boolean {
   return a.provider === b.provider && a.providerChargeId === b.providerChargeId;
 }
 
-/** Void every moved-past link, or record the ones that could not be voided. */
+/** Void every moved-past link, or mark and record the ones still payable. */
 export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Promise<void> {
   const stale = input.movedPast.filter((snapshot) => !sameCharge(snapshot, input.raised));
   if (stale.length === 0) return;
   if (!LIVE.has(input.raised.status)) {
     deps.log.warn(
       `payments.superseded kept ${stale.length} hosted link(s) on ${input.reference}: ` +
-        `the new ${input.raised.provider} charge is ${input.raised.status}`,
+        `the ${input.raised.provider} charge the buyer holds is ${input.raised.status}`,
     );
     return;
   }
   for (const snapshot of stale) await retireOne(deps, input, snapshot);
 }
 
-async function retireOne(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot): Promise<void> {
-  const what =
+function describe(snapshot: ChargeSnapshot, reference: string): string {
+  return (
     `${snapshot.provider} charge ${snapshot.providerChargeId} ` +
-    `(${snapshot.amount.amountCents} ${snapshot.amount.currency}) on ${input.reference}`;
-  let why: SupersededWhy;
-  try {
-    await deps.gateway.cancelCharge(input.merchant, snapshot.provider, snapshot.providerChargeId);
-    deps.log.warn(`payments.void voided moved-past hosted ${what}`);
-    return;
-  } catch (error) {
-    why = error instanceof UnsupportedOperationError ? 'VOID_UNSUPPORTED' : 'VOID_FAILED';
-    const line = `payments.void ${why === 'VOID_UNSUPPORTED' ? 'unsupported' : 'failed'} for moved-past hosted ${what}`;
-    if (why === 'VOID_UNSUPPORTED') deps.log.warn(line);
-    else deps.log.error(`${line}: ${reason(error)}`);
-  }
-  await recordSuperseded(deps, { ...input, snapshot, replacedBy: input.raised, why }, what);
+    `(${snapshot.amount.amountCents} ${snapshot.amount.currency}) on ${reference}`
+  );
 }
 
-async function recordSuperseded(
+/** Ask the provider to void; answer null when it is gone, else why it is not. */
+async function voidAt(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot, what: string) {
+  let answer: ChargeSnapshot;
+  try {
+    answer = await deps.gateway.cancelCharge(input.merchant, snapshot.provider, snapshot.providerChargeId);
+  } catch (error) {
+    if (error instanceof UnsupportedOperationError) {
+      deps.log.warn(`payments.void unsupported for moved-past hosted ${what}`);
+      return { why: 'VOID_UNSUPPORTED' as const, latest: snapshot };
+    }
+    deps.log.error(`payments.void failed for moved-past hosted ${what}: ${reason(error)}`);
+    return { why: 'VOID_FAILED' as const, latest: snapshot };
+  }
+  if (GONE.has(answer.status)) {
+    deps.log.warn(`payments.void voided moved-past hosted ${what} (${answer.status})`);
+    return null;
+  }
+  if (answer.status === 'PENDING') {
+    deps.log.error(`payments.void not confirmed for moved-past hosted ${what}: still PENDING`);
+    return { why: 'VOID_NOT_CONFIRMED' as const, latest: answer };
+  }
+  const message = `moved-past hosted ${what} was ${answer.status} before the void: the buyer paid it`;
+  deps.log.error(`payments.void ${message}`);
+  reportProviderFailure(deps.onProviderFailure, {
+    path: 'CANCEL',
+    severity: 'error',
+    merchant: input.merchant,
+    provider: snapshot.provider,
+    reference: snapshot.providerChargeId,
+    message,
+  });
+  return { why: 'PAID_BEFORE_VOID' as const, latest: answer };
+}
+
+async function retireOne(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot): Promise<void> {
+  const what = describe(snapshot, input.reference);
+  const kept = await voidAt(deps, input, snapshot, what);
+  if (!kept) return;
+  await markSuperseded(deps, input, snapshot, kept.why, what);
+  await recordSuperseded(
+    deps,
+    {
+      merchant: input.merchant,
+      reference: input.reference,
+      snapshot: kept.latest,
+      replacedBy: input.raised,
+      why: kept.why,
+    },
+    what,
+  );
+}
+
+/** The stored mark — FIRST, so a recorder that throws still leaves it retired. */
+async function markSuperseded(
   deps: RetireDeps,
-  charge: SupersededCharge,
+  input: RetireInput,
+  snapshot: ChargeSnapshot,
+  why: SupersededWhy,
   what: string,
 ): Promise<void> {
+  const mark = deps.charges.markSuperseded;
+  if (!mark) {
+    deps.log.error(`payments.superseded cannot mark ${what}: the charge store has no markSuperseded`);
+    return;
+  }
+  try {
+    await mark.call(deps.charges, input.merchant, snapshot.provider, snapshot.providerChargeId, {
+      at: new Date().toISOString(),
+      replacedBy: input.raised.providerChargeId,
+      why,
+    });
+  } catch (error) {
+    deps.log.error(`payments.superseded could not mark ${what}: ${reason(error)}`);
+  }
+}
+
+async function recordSuperseded(deps: RetireDeps, charge: SupersededCharge, what: string): Promise<void> {
   if (!deps.onSuperseded) {
     deps.log.error(
-      `payments.superseded ${what} stays payable and no superseded recorder is wired: reconcile by hand`,
+      `payments.superseded ${what} (${charge.why}) and no superseded recorder is wired: reconcile by hand`,
     );
     return;
   }
   try {
-    await deps.onSuperseded({
-      merchant: charge.merchant,
-      reference: charge.reference,
-      snapshot: charge.snapshot,
-      replacedBy: charge.replacedBy,
-      why: charge.why,
-    });
+    await deps.onSuperseded(charge);
   } catch (error) {
     deps.log.error(`payments.superseded could not record ${what}: ${reason(error)}`);
   }

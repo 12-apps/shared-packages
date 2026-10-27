@@ -102,15 +102,21 @@ export interface ChargeCorrelationPort {
    */
   abandon?(ref: string): Promise<string>;
   /**
-   * A hosted link this payable held was MOVED PAST and its provider could not
-   * void it (FUT-4072): the chain changed, a new charge was raised where the
-   * walk now lands, and the old link is still payable at its provider.
+   * A hosted link this payable held was MOVED PAST and is not voided
+   * (FUT-4072): a newer charge is what the buyer holds now, and the old link is
+   * still payable at its provider — no `cancelCharge`, a void that failed or
+   * was not confirmed — or the provider answered the void with a payment
+   * (`PAID_BEFORE_VOID`: the buyer paid it in the window).
    *
    * Record it so a later payment of `charge` is handled as a SUPERSEDED payment
    * — audited and reconciled, never applied as if it were the payable's
-   * current charge — rather than settling unnoticed. Called only once the new
-   * charge is live. Awaited and contained: a throw is logged and never fails
-   * the buyer's new charge.
+   * current charge — rather than settling unnoticed. The library has already
+   * marked the stored row (`snapshot.superseded`), so the link is never offered
+   * back and this is called once per charge in the ordinary case; it MUST still
+   * be IDEMPOTENT on `charge.provider` + `charge.providerChargeId`, because a
+   * mark that failed meets the same link again on the next attempt. Called only
+   * while the charge the buyer holds is live. Awaited and contained: a throw is
+   * logged and never fails the buyer's charge.
    *
    * Omit it and the line is logged as an error by name instead.
    */

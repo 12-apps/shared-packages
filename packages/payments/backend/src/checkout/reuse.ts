@@ -1,4 +1,4 @@
-import type { ChargeQueryStore } from '../core/ports';
+import type { ChargeQueryStore, StoredCharge } from '../core/ports';
 import type { CardDetails, ChargeSnapshot, Money, ProviderName } from '../core/types';
 
 import type { Payable } from './types';
@@ -58,6 +58,8 @@ async function payableCharges(
  * of the link. Two payable charges for one payable, which is the exact double
  * charge the walk's own proof rules exist to prevent.
  *
+ * Superseded links never appear: `listPayable` leaves them out (FUT-4072).
+ *
  * Listed for EITHER method, because a redirect provider's page offers its own
  * choice — the method picked here narrows nothing about what is payable. WHICH
  * of them may be handed back is not decided here: that is the current chain's
@@ -72,9 +74,15 @@ async function payableCharges(
 export async function parkedHostedCharges(
   charges: ChargeQueryStore,
   payable: Pick<Payable, 'ref' | 'merchant' | 'amount'>,
-): Promise<ChargeSnapshot[]> {
-  const snapshots = await payableCharges(charges, payable);
-  return snapshots.filter((snapshot) => snapshot.hostedCheckoutUrl !== undefined);
+): Promise<StoredCharge[]> {
+  // The ROWS, not just the snapshots: the walk that minted a link is named by
+  // the row's idempotency key, and its ledger is part of the reuse rule.
+  const rows = await charges.listPayable({
+    merchant: payable.merchant,
+    reference: payable.ref,
+    amount: payable.amount,
+  });
+  return rows.filter((row) => row.snapshot.hostedCheckoutUrl !== undefined);
 }
 
 /**
