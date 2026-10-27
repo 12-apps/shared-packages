@@ -25,6 +25,11 @@ interface StepperProps {
     state: { completed: boolean; active: boolean },
   ) => React.ReactNode;
   className?: string;
+  // The words the stepper adds to your step labels; any key left out reads in
+  // English: step(position, label) → `Step ${position}: ${label}`, optional →
+  // "optional", completed → "completed", current → "current".
+  // A pt-BR host passes UI_LABELS["pt-BR"].stepper.
+  labels?: Partial<StepperLabels>;
 }
 ```
 

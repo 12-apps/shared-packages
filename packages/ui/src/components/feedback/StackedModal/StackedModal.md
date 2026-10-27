@@ -126,6 +126,7 @@ new component that portals should too.
 | `onClose` | `() => void` | - | Callback when modal is closed |
 | `navigationTitle` | `string` | - | Title displayed in modal header |
 | `hideClose` | `boolean` | `false` | Drop the header's ✕ — the content owns the dismiss |
+| `closeLabel` | `string` | `close` | The header ✕'s accessible name (it carries only a glyph); a host passes `CHROME_COPY[locale].closePanel` |
 | `hideHeader` | `boolean` | `false` | Draw no header bar at all, for a root panel whose content brings its own header (✕ and name). Pass `aria-labelledby` naming that header's title (a dev warning fires without it). Root panel only |
 | `children` | `ReactNode` | - | Modal content |
 | `glass` | `boolean` | `false` | Enable glass morphism effect |

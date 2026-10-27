@@ -18,6 +18,22 @@ kind.
 | **Prisma** | `prisma/report-builder.prisma` + `prisma/migrations/*` | Run `pnpm --filter @12-apps/report-builder prisma:sync -- <host schema dir>`: the partial is **COPIED** into the host's multi-file schema folder — never symlinked (a symlinked migration is silently skipped by Prisma, a symlinked partial dangles under `turbo prune`, and `npm pack` drops it from the tarball). Migrations are discovered structurally from the installed package's `prisma/migrations` by the host's plugin-migration sync. |
 | **E2E journeys** | `@12-apps/report-builder/e2e` | Implement `defineReportsWorld({ ... })` in a module inside your own playwright-bdd `steps` glob, then add `reportsFeatures` / `reportsFeaturesRoot` / `reportsSteps` to `defineBddConfig`. The Gherkin ships HERE; nothing is copied, so a scenario added upstream runs on your next version bump. See *The journeys ship with the package* below. |
 
+## Migrating 5.18.x → 5.19.0 — seven more builder words (FUT-3860)
+
+The block builder still compiled a few labels in. They are now keys of
+`ReportScreensCopy.builder` (`ReportBuilderPanelCopy`), REQUIRED, and both
+`PT_BR_REPORT_SCREENS_COPY` and `EN_US_REPORT_SCREENS_COPY` fill them. A host
+passing a shipped pack changes nothing; a hand-written pack adds:
+
+| key | what it labels | en-US |
+|---|---|---|
+| `downloadCsv` | the block tool that downloads a table's rows | `Download CSV` |
+| `exportPdf` | the print-to-PDF button, long form | `Export PDF` |
+| `noneOption` | the empty choice atop a field select | `(none)` |
+| `seriesNeedsGrouping` | why "one series per" is disabled | `Choose a grouping first.` |
+| `measure(position)` | a measure row's select, visible label and accessible name | `` `Measure ${position}` `` |
+| `addMeasure`, `addFilter` | the buttons that append a row | `+ Measure`, `+ Filter` |
+
 ## Migrating 5.5.x → 5.6.0 — the SCREENS take their words too (FUT-760)
 
 5.5.0 moved the ENGINE's words out. This is the other thirty-eight files: the

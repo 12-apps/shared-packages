@@ -34,6 +34,7 @@ The Input component provides a flexible text input field with comprehensive vali
 - `error`: Error state flag
 - `helperText`: Helper or error text displayed below input
 - `loading`: Shows loading spinner and disables input
+- `loadingLabel`: React Native only — the busy spinner's accessible name (`string`, default `loading`; `UI_LABELS[locale].common.loading`)
 
 ### Visual Props
 - `fullWidth`: Makes input take full container width (default: true)

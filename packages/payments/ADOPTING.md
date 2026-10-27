@@ -73,6 +73,16 @@ Two constructor arguments are security-critical:
 > next deployment to find. Resolve it once at startup, thread that one value
 > everywhere, and run any stub-mode e2e suite before shipping the bump.
 
+The provider adapters take their words as an argument —
+`stripeProvider(PT_BR_STRIPE_COPY)`, and the `EN_US_*` / `PT_BR_*` pack for
+every other vendor (`PT_BR_PROVIDER_COPY` / `EN_US_PROVIDER_COPY` hold them all).
+Two keys are recent. Stripe's `fields` gained `secretKey`, `publishableKey`,
+`webhookSecret` and `connectedAccount`, the four credential boxes' labels;
+they are OPTIONAL, and a pack without them labels the boxes in English
+(`Secret key (sk_...)`). InfinitePay's `fields.handlePlaceholder` is the sample
+tag in the empty box (`$yourtag`, `$suatag`) and is REQUIRED, so a hand-written
+`InfinitePayCopy` adds it.
+
 Mount the surface with ONE call instead of a route file per handler
 (FUT-559). `mountPayments` carries the canonical layout as data and returns
 `{ GET, POST, PUT }` for a single catch-all segment route:
@@ -335,6 +345,16 @@ capability table, so a host should not draw an Apple Pay button from it.
 - Settings page: render `<PaymentProviderSettings client={...} />` where the
   provider config screen lives today. It renders every registered provider
   from its credential schema — adding a vendor changes NOTHING here.
+  Its `copy` (`PaymentsSettingsCopy`) is required: `PT_BR_PAYMENTS_SETTINGS_COPY`
+  or `EN_US_PAYMENTS_SETTINGS_COPY`, or `PAYMENTS_SETTINGS_COPY[locale]` from
+  `./locales`. Its optional `failures` block words a failed request by the
+  gateway's error code — `byCode` (a `Partial` map from the code, e.g.
+  `CredentialsError`, to a sentence) and `generic(status)` for any code left
+  out, where `status` is `null` when nothing answered. The screen never shows
+  the server's own `message`, which is developer English; it still reaches the
+  console and error reporting on the thrown `PaymentsClientError`, which now
+  carries the code as `code`. A pack without `failures` reads the English
+  pack's sentences. Both shipped packs fill it.
 - The buyer checkout: mount `createPaymentFlows(...).Checkout` (below) — its
   Pagamento step is the one payment list. The standalone `CheckoutPayment`
   method-card step was removed with the tabbed checkout (FUT-4028).

@@ -202,7 +202,7 @@ reporting. It carries no payload beyond the tenant: a listener re-reads.
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `apiBase` | yes | — | the admin mount the routes live under (`/api/admin/minha-loja`) |
-| `copy` | yes | — | every sentence the screens render (`LifecycleWebCopy`); pt-BR hosts pass `PT_BR_LIFECYCLE_WEB_COPY` |
+| `copy` | yes | — | every sentence the screens render (`LifecycleWebCopy`); pt-BR hosts pass `PT_BR_LIFECYCLE_WEB_COPY`. A hand-written pack needs `versionHistory.restoredFrom(version)`, the badge on a restored version (en-US `` `from v${version}` ``) |
 | `transport` | no | same-origin `fetch` | the ONLY way the screens perform I/O — substitute it and you have substituted the backend |
 | `entityTypeLabels` | no | — | the host's own pt-BR catalog; the package ships none, and an unlisted type renders as its raw key |
 

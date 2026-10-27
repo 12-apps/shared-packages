@@ -60,6 +60,7 @@ const items = [
 | animated      | `boolean`                              | `true`       | Enable slide-in animations               |
 | alternating   | `boolean`                              | `false`      | Alternate item positions (vertical only) |
 | onItemClick   | `(item: TimelineItem) => void`         | -            | Callback when item is clicked            |
+| labels        | `Partial<TimelineLabels>`              | English pack | The expand toggle's names (`Expand item details` / `Collapse item details`) and each card's (`` `Timeline item: ${title}` ``); any key left out reads in English. A pt-BR host passes `UI_LABELS['pt-BR'].timeline` |
 
 ### TimelineItem
 

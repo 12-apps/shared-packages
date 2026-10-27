@@ -26,6 +26,8 @@ A flexible and feature-rich navigation menu component that supports horizontal, 
 | collapsible       | `boolean`                                 | false      | Whether the vertical menu can be collapsed              |
 | collapsed         | `boolean`                                 | undefined  | Controlled collapsed state                              |
 | onCollapseChange  | `(collapsed: boolean) => void`           | undefined  | Callback when collapse state changes                    |
+| collapseLabel     | `string`                                  | 'Collapse' | The collapse control's text (vertical, `collapsible` only); `UI_LABELS[locale].navigationMenu.collapse` |
+| expandLabel       | `string`                                  | 'Expand'   | The collapse control's accessible name while collapsed to its icon (vertical, `collapsible` only); `UI_LABELS[locale].navigationMenu.expand` |
 | logo              | `ReactNode`                               | undefined  | Custom logo/brand element                               |
 | endContent        | `ReactNode`                               | undefined  | Additional content to render at the end                 |
 | maxWidth          | `number \| string`                       | undefined  | Maximum width for mega menu                             |

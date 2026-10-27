@@ -31,6 +31,7 @@ The AlertDialog component provides a modal dialog for alerts, confirmations, and
 | `onCancel`        | `function` | -         | Callback fired when the cancel button is clicked  |
 | `confirmText`     | `string`   | 'Confirm' | Text for the confirm button                       |
 | `cancelText`      | `string`   | 'Cancel'  | Text for the cancel button                        |
+| `closeLabel`      | `string`   | `close`   | The corner close button's accessible name; a pt-BR host passes `UI_LABELS['pt-BR'].common.close` or `CHROME_COPY[locale].closePanel` |
 | `showCancel`      | `boolean`  | true      | Whether to show the cancel button                 |
 | `confirmDisabled` | `boolean`  | false     | Whether the confirm button is disabled            |
 | `loading`         | `boolean`  | false     | Shows loading state on confirm button             |

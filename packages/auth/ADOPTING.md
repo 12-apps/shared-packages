@@ -38,6 +38,12 @@ THAT browser only. What a host has to do:
   Firefox accept it.
 - **Wire `authenticateLink`** into `credentialsProvider` from
   `credentials.signInWithLink`.
+- **Name the sign-in fields** if you render Auth.js's own sign-in page:
+  `credentialsProvider({ labels })` takes `Partial<CredentialsProviderLabels>`
+  (`name`, `email`, `password`); each key left out reads in English
+  (`EN_US_CREDENTIALS_LABELS`: "Email and password", "Email", "Password"). A
+  pt-BR host passes `PT_BR_CREDENTIALS_LABELS` from `./server`. `name`, when
+  given, still wins over `labels.name`.
 - **On the verify page, pass `onVerified` and `callbackUrl`** to
   `VerifyEmailScreen` to take over: `{ signedIn: true }` means navigate to the
   destination; `{ signedIn: false, email }` means send the person to sign in

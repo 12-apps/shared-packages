@@ -22,6 +22,7 @@ interface ChipProps {
 
   onClick?: () => void; // select/toggle
   onDelete?: () => void; // shown when deletable
+  deleteLabel?: string; // React Native only: the delete button's accessible name; default `delete` (UI_LABELS[locale].common.delete)
   className?: string;
 }
 ```

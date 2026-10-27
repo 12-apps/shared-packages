@@ -174,6 +174,21 @@ labels:   { title: '…', systemActor: '…', onBehalfOf: '{actor} … {subject}
 locale:   'pt-BR'   // the stamp formatter, or pass formatDate for full control
 ```
 
+Both halves also ship whole packs, as NAMED exports nothing defaults to. The
+viewer's are on `@12-apps/audit/react`: `EN_US_AUDIT_LABELS` (what `labels`
+falls back to — `DEFAULT_LABELS` is this object), `PT_BR_AUDIT_LABELS`, and
+`AUDIT_LABELS`, both keyed by tag for `localeCopy` from `@12-apps/i18n`. The
+server's are on `@12-apps/audit/server`: `EN_US_AUDIT_MESSAGES`,
+`PT_BR_AUDIT_MESSAGES` and `AUDIT_MESSAGES`.
+
+```ts
+import { PT_BR_AUDIT_MESSAGES } from '@12-apps/audit/server';
+import { PT_BR_AUDIT_LABELS } from '@12-apps/audit/react';
+
+createApiAudit({ /* … */ messages: PT_BR_AUDIT_MESSAGES });
+createWebAudit({ /* … */ labels: { ...PT_BR_AUDIT_LABELS, title: 'Histórico' } });
+```
+
 `locale` decides the STAMP formatter and nothing else. The day window is the
 grid's own day-range pill now, and its inputs follow the host's `DataViewsCopy`
 and locale like every other date field on the screen — which is the consistency

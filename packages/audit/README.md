@@ -175,6 +175,11 @@ Copy defaults to English and dates to the runtime's own locale. Both are
 fallbacks rather than recommendations — a package cannot know your market, and
 1.x defaulted to one application's.
 
+A host whose readers speak Portuguese passes the shipped pack rather than
+retyping it: `PT_BR_AUDIT_LABELS` (`./react`) to `labels`, `PT_BR_AUDIT_MESSAGES`
+(`./server`) to `messages`. Each has an `EN_US_*` twin and a tag-keyed map
+(`AUDIT_LABELS`, `AUDIT_MESSAGES`) — ADOPTING.md §4.
+
 ## The database
 
 The package owns one model (`prisma/audit.prisma`) and its migration. A host

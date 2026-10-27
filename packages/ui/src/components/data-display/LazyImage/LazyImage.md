@@ -241,6 +241,7 @@ wrapping element, rounded to match the image:
 | `lazy` | `boolean` | `true` | Enable lazy loading |
 | `loadingState` | `'skeleton' \| 'spinner' \| 'placeholder' \| 'none'` | `'skeleton'` | Type of loading indicator. `'placeholder'` shows the `placeholder` image until the real image has faded in over it; set a `width` (or `"100%"`) with it |
 | `placeholder` | `string` | - | Low-res image shown while loading, only under `loadingState="placeholder"` (ignored otherwise). See [With Placeholder](#with-placeholder) |
+| `placeholderAlt` | `string` | `` `${alt} (loading)` `` | The placeholder image's `alt` while the real one loads (`UI_LABELS[locale].lazyImage.loadingAlt(alt)`) |
 | `rootMargin` | `string` | `'100px'` | Intersection Observer margin |
 | `threshold` | `number \| number[]` | `0` | Intersection Observer threshold |
 
@@ -249,6 +250,7 @@ wrapping element, rounded to match the image:
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `fallback` | `string \| ReactNode` | - | Fallback content on error |
+| `fallbackAlt` | `string` | `` `${alt} (fallback)` `` | A string `fallback` image's `alt` after the real one failed (`UI_LABELS[locale].lazyImage.fallbackAlt(alt)`) |
 | `retryOnError` | `boolean` | `false` | Retry loading on error |
 | `maxRetries` | `number` | `3` | Maximum retry attempts |
 | `retryDelay` | `number` | `1000` | Delay between retries (ms) |
