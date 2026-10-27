@@ -394,6 +394,10 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["bloqueado: true", "oculto: true"],
     absentTestIds: ["story-activation-pay"],
   },
+  "Settings/ActivationSlotOAuth": {
+    testIds: ["story-activation-slot", "story-activation-pay", "payments-connection-probe"],
+    text: ["conectado: true"],
+  },
 
   // ------------------------------------------------------------ Connection
   "Connection/ConnectInvitation": {
