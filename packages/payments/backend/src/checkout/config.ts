@@ -51,6 +51,13 @@ export interface CheckoutConfigDeps {
    * unless its connection is a stub. See {@link applePayConfigured}.
    */
   applePay?: ApplePayIdentityPort;
+  /**
+   * The platform's Google merchant id (Google Pay & Wallet Console), which
+   * Google requires in PRODUCTION. Stamped onto every entry that publishes
+   * Google Pay parameters; omit it and a production checkout draws no Google
+   * Pay button, since its sheet would refuse the request.
+   */
+  googlePayMerchant?: { merchantId: string; merchantName?: string } | null;
 }
 
 const NO_PROVIDER: BuyerCheckoutConfig = {
@@ -148,6 +155,15 @@ function identityOnce(deps: CheckoutConfigDeps, merchant: MerchantRef): () => Pr
   };
 }
 
+/** The entry's Google Pay parameters with the platform's merchant id, when both are there. */
+function withMerchantInfo(
+  googlePay: ClientProviderConfig['googlePay'],
+  merchant: CheckoutConfigDeps['googlePayMerchant'],
+): ClientProviderConfig['googlePay'] {
+  if (!googlePay || !merchant?.merchantId) return googlePay;
+  return { ...googlePay, merchantInfo: { ...merchant } };
+}
+
 /**
  * One chain entry's buyer-safe view: what the adapter declares, plus the two
  * facts only the stored row knows — whether this connection runs the stub, and
@@ -173,7 +189,7 @@ async function toBuyerLink(
     mockTokenization: isStub && publicKey === null,
     methods: [...entry.methods],
     wallets: declaredWallets(entry.wallets, await applePayConfigured(deps, merchant, entry, identity)),
-    googlePay: entry.googlePay,
+    googlePay: withMerchantInfo(entry.googlePay, deps.googlePayMerchant),
     debit: entry.debit,
     customerSchema: [...entry.customerSchema],
     checkoutScreen: entry.checkoutScreen,

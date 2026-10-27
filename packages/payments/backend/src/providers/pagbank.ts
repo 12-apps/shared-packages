@@ -246,10 +246,9 @@ function credentialSchemaFor(copy: PagbankCopy): readonly CredentialFieldSpec[] 
     { key: 'webhookToken', label: copy.fields.webhookToken, secret: true, required: false, role: 'webhookSecret' },
     // The merchant's id at PagBank as Google Pay's `gatewayMerchantId`
     // (FUT-471). Optional and NOT secret — it is baked into every integrating
-    // page — and the Google Pay button simply does not render for a connection
-    // that has none. Whose id applies under Connect (platform vs connected
-    // seller) is undocumented by PagBank and still an open question on the
-    // ticket; a per-connection field can hold either answer.
+    // page. PagBank answered the Connect question (FUT-3756): it is the
+    // connected seller's account id, which `clientConfig` falls back to, so
+    // this field is only an override for a store connected by token.
     {
       key: 'googlePayMerchantId',
       label: copy.fields.googlePayMerchantId,
@@ -365,7 +364,11 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     // owner here must never be handed the form — see FUT-483.
 
     clientConfig(credentials) {
-      const gatewayMerchantId = credentials.fields['googlePayMerchantId'];
+      // PagBank defines `gatewayMerchantId` as the seller's account id
+      // (`ACCO_…`, FUT-3756). Connect stores it as `accountId`, so a store
+      // connected by OAuth has it without anyone typing the field; the
+      // field stays as the override for a store connected by token.
+      const gatewayMerchantId = credentials.fields['googlePayMerchantId'] || credentials.fields['accountId'];
       return {
         provider: NAME,
         tokenization: 'PUBLIC_KEY',

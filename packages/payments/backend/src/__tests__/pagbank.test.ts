@@ -1116,6 +1116,24 @@ describe('pagbank adapter — wallet capability and client config (FUT-471)', ()
     expect(config.googlePay?.environment).toBe('PRODUCTION');
   });
 
+  it("falls back to the Connect account id, which PagBank names as the merchant id (FUT-3756)", () => {
+    // A store connected by OAuth never fills `googlePayMerchantId`, so without
+    // the fallback its buyers never saw the Google Pay button.
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
+      environment: 'PRODUCTION',
+      fields: { token: 't', accountId: 'ACCO_1' },
+    });
+    expect(config.googlePay?.gatewayMerchantId).toBe('ACCO_1');
+  });
+
+  it('keeps the typed merchant id over the Connect account id', () => {
+    const config = pagbankProvider(PT_BR_PAGBANK_COPY).clientConfig({
+      environment: 'SANDBOX',
+      fields: { token: 't', accountId: 'ACCO_1', googlePayMerchantId: 'MID_123' },
+    });
+    expect(config.googlePay?.gatewayMerchantId).toBe('MID_123');
+  });
+
   it('publishes a null merchant id for a connection that has none', () => {
     // The button must not render for this store: a token minted against a
     // missing gatewayMerchantId charges nobody. Blank normalizes to null too.

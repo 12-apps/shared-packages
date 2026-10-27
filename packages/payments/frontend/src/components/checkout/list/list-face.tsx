@@ -6,7 +6,6 @@ import { cardChain, cardTokenization, handOffMethod } from "../method-capability
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
 import type { CheckoutBasketIdentity } from "../basket";
-import type { DebitAuthentication } from "../debit-charge";
 import type { BuyerContact, CheckoutProviderConfig, PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
@@ -15,6 +14,7 @@ import { usePaymentListMode, type PaymentListMode } from "./context";
 import { armPixCopy, armedReady, otherBankShown, pixBankLabel, useArmedCharge, useDropRefusedCopy } from "./list-memory";
 import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
+import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
 import { ActionButton, ChargeBar, ListBar } from "./list-bar";
 import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
@@ -231,14 +231,6 @@ function BarAction({ props, failure, act, onCancel, reason, returnFocus }: {
   return <PressButton props={props} act={act} reason={reason} returnFocus={returnFocus} />;
 }
 
-/** The debit card's 3-D Secure inputs when the debit row is the choice (FUT-3754), else none. */
-function debitOf(props: ListFaceProps): DebitAuthentication | undefined {
-  const { choice } = props.state;
-  const { billingAddress, copy } = props.list;
-  if (choice?.kind !== "online" || choice.funding !== "DEBIT" || !billingAddress || !copy.debit) return undefined;
-  return { billingAddress, copy: copy.debit };
-}
-
 /** The charge under way, once there is an order to run it against. */
 function Runners({ props, sheet, onFailed, onWalletFailed }: {
   props: ListFaceProps;
@@ -248,6 +240,7 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
   onWalletFailed: (failure: ListChargeFailure | null) => void;
 }): JSX.Element | null {
   const { c, charge, config } = props;
+  const debit = useDebitRun(props.state.choice, props.list);
   const order = charge.chargeable;
   if (!order) return null;
   const common = {
@@ -255,7 +248,7 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
-    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debitOf(props)} />;
+    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
   return null;
@@ -277,9 +270,10 @@ function coveredByHost(list: CheckoutPaymentList): boolean {
  * prototype's order — the CPF or CNPJ at the top first, for an online choice that needs
  * it (E3); a door choice never does (R3).
  */
-function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined): string | null {
+function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null): string | null {
   const { c, list, state, config } = props;
-  return blockedReason({
+  const debitChosen = state.choice?.kind === "online" && state.choice.funding === "DEBIT";
+  return (debitChosen ? debitAddressReason(debit, list.copy.debit) : null) ?? blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door,
     asked: gateFields(state, c.buyer, config, raisedOf(props)),
     buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
@@ -371,7 +365,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
     clearWalletFailure();
   });
   const door = chosenDoor(props);
-  const reason = reasonOf(props, door);
+  const reason = reasonOf(props, door, useDebitAddress());
   useChargeGuard(props, reason);
   const free = reason === null && props.charge.phase === "idle" && !c.creating;
   useArmedCharge(armedReady(list, state, free), act);

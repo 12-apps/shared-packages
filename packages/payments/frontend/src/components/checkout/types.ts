@@ -8,6 +8,7 @@
  * host app and reach the flow through the ports declared on `CheckoutFlowProps`.
  */
 import type { DebitChargeFields, DebitDeclaration } from "./debit-types";
+import type { GooglePayDeclaration } from "./google-pay-params";
 import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
 
 /** Payment methods offered at checkout. Mirrors `Payment.method` (FUT-42). */
@@ -271,7 +272,7 @@ export interface CheckoutCustomerField {
  * answers it. The same protocol facts as the head, stated per provider —
  * which is what lets the card path mint an instrument for each of them.
  */
-export interface CheckoutChainLink extends DebitDeclaration {
+export interface CheckoutChainLink extends DebitDeclaration, GooglePayDeclaration {
   provider: string;
   /**
    * The provider's own name as a BUYER should read it ("InfinitePay"), which
@@ -315,14 +316,6 @@ export interface CheckoutChainLink extends DebitDeclaration {
    * wallet buttons, which is exactly what that host's charge route supports.
    */
   wallets?: CheckoutWalletType[];
-  /**
-   * Google Pay's `PAYMENT_GATEWAY` tokenizationSpecification parameters for
-   * THIS entry (FUT-471), or absent/`null` when it cannot run Google Pay.
-   * `gatewayMerchantId: null` means the connection carries no merchant id yet
-   * — the button must not render, because a token minted against a missing id
-   * charges nobody.
-   */
-  googlePay?: { gateway: string; gatewayMerchantId: string | null; environment?: "TEST" | "PRODUCTION" } | null;
   /**
    * The buyer screen THIS provider's flow needs (FUT-596) — an opaque id the
    * adapter declares and `providers/registry.ts` resolves to a component.

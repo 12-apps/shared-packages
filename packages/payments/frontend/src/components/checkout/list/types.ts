@@ -20,9 +20,9 @@
 import type { ReactNode } from "react";
 
 import type { PaymentListCredit, PaymentListCreditCopy, PaymentListSummary } from "./credit-types";
-import type { CheckoutBillingAddress, PaymentListDebitCopy } from "./debit-copy";
+import type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy, PaymentListDebitInputs } from "./debit-copy";
 
-export type { CheckoutBillingAddress, PaymentListDebitCopy };
+export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
 
 /**
  * What a door option's `content` function is handed (FUT-3715).
@@ -121,7 +121,7 @@ export interface CheckoutListHold {
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */
-export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSummary {
+export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSummary, PaymentListDebitInputs {
   /** Every sentence the list draws. REQUIRED, with no default (FUT-760). */
   copy: PaymentListCopy;
   /**
@@ -218,8 +218,6 @@ export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSumma
    * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
    */
   summaryTarget?: HTMLElement | null;
-  /** The billing address a DEBIT card's 3-D Secure needs (FUT-3754); none ⇒ no debit row. */
-  billingAddress?: CheckoutBillingAddress | null;
 }
 
 /** The six banks the Pix face offers to open, in the prototype's order. */

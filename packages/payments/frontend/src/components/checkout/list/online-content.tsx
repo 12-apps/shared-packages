@@ -7,6 +7,7 @@ import { UNRESOLVED_CODE } from "../failure-codes";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 
 import { BuyerInline } from "./buyer-inline";
+import { DebitAddressFields } from "./debit-address";
 import { cardName } from "./choice";
 import type { ListChargeFailure } from "./charge-runners";
 import type { PaymentListCopy } from "./types";
@@ -106,6 +107,7 @@ function CardFields({ card, copy, debit }: { card: ListCard; copy: PaymentListCo
           onSaveCardChange={debit ? undefined : card.setSaveCard}
         />
       ) : null}
+      {debit && copy.debit ? <DebitAddressFields copy={copy.debit} /> : null}
     </>
   );
 }

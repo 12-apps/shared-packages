@@ -4,9 +4,11 @@ import type { MerchantRef, ThreeDSecureSession } from './types';
 
 /**
  * The 3-D Secure session for a merchant's debit charge (FUT-3754), minted by
- * the HEAD of the merchant's chain — the provider whose browser key the card
- * was encrypted with, and so the only one whose authentication id that card's
- * charge can carry. A debit charge does not fail over: the authentication is
+ * the CARD head of the merchant's chain — the first provider that takes a card
+ * (FUT-4109), whose browser key the card was encrypted with, and so the only
+ * one whose authentication id that card's charge can carry. Not `chain[0]`: a
+ * head that takes no card (the store's own Pix key) would hide debit from
+ * every buyer. A debit charge does not fail over: the authentication is
  * bound to the provider that ran it.
  *
  * `null` when the head cannot do debit (no adapter claim, or no credentials):
@@ -16,12 +18,13 @@ import type { MerchantRef, ThreeDSecureSession } from './types';
 export async function debitSessionFor(
   deps: {
     providers: ProviderRegistry;
-    credentials: Pick<CredentialStore, 'defaultProvider' | 'getCredentials'>;
+    credentials: Pick<CredentialStore, 'providerChain' | 'getCredentials'>;
   },
   merchant: MerchantRef,
 ): Promise<{ provider: string; session: ThreeDSecureSession } | null> {
-  const provider = await deps.credentials.defaultProvider(merchant);
-  if (!provider || !deps.providers.has(provider)) return null;
+  const chain = await deps.credentials.providerChain(merchant);
+  const provider = chain.find((name) => deps.providers.has(name) && deps.providers.get(name).capabilities.methods.includes('CARD'));
+  if (!provider) return null;
   const adapter = deps.providers.get(provider);
   if (!adapter.capabilities.debit || !adapter.debit) return null;
   const credentials = await deps.credentials.getCredentials(merchant, provider);

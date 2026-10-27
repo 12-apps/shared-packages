@@ -17,6 +17,14 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     notSupported: "This card can't be used as debit here. Try credit or Pix.",
     refused: "Your bank didn't confirm the debit payment. Try another card or Pix.",
     failed: "We couldn't confirm the debit with your bank. Try again.",
+    address: {
+      postalCode: "Billing ZIP code (CEP)",
+      number: "Number",
+      street: "Street",
+      hint: "Your bank checks the card's address",
+      notFound: "We couldn't find this CEP. Check the digits.",
+      missing: "Enter the billing address's CEP and number",
+    },
   },
   googlePay: { label: "Google Pay", hint: "With the card saved in your Google account" },
   wallets: {

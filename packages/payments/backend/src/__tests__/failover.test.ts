@@ -25,7 +25,7 @@ import {
   createMemoryCredentialStore,
 } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
-import { TENANT, STUB_CREDS, pixInput } from './fixtures';
+import { TENANT, STUB_CREDS, cardInput, pixInput } from './fixtures';
 
 /**
  * The failover walk (FUT-303).
@@ -1011,5 +1011,18 @@ describe('failover and idempotency', () => {
     // Two attempts, still zero charges anywhere.
     expect(second.spy.chargeCalls).toHaveLength(0);
     expect(w.charges.all()).toHaveLength(0);
+  });
+});
+
+// ── a head that takes no card (FUT-4109) ────────────────────────────────────
+
+describe('a bare card instrument belongs to the first provider that takes a card', () => {
+  it("charges a debit-style bare token on the card provider past a Pix-only head (the store's own key)", async () => {
+    const pixKey = scripted('pix-key', { methods: ['PIX'], tokenization: 'NONE' });
+    const acquirer = scripted('acquirer');
+    const charged = await world([pixKey, acquirer]).gateway.charge(TENANT, cardInput('order-pix-head'));
+    expect(charged.provider).toBe('acquirer');
+    expect(acquirer.spy.chargeCalls).toEqual(['order-pix-head']);
+    expect(pixKey.spy.chargeCalls).toEqual([]);
   });
 });

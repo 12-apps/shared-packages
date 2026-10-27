@@ -38,7 +38,7 @@ export {
 // ---------------------------------------------------------------------------
 export { CheckoutFlow, type CheckoutCartView, type CheckoutFlowProps } from './components/checkout/checkout-flow';
 // The Pagamento step as ONE list (FUT-3591/3592) — `CheckoutFlowProps.paymentList`, required.
-export type { CheckoutBillingAddress, CheckoutDoorOption, CheckoutDoorRowControls, CheckoutListChoice, CheckoutListHold, CheckoutOnlineChoice, CheckoutPaymentList, CheckoutPixBank, PaymentListCopy, PaymentListDebitCopy, PixBankCopy, PixBankId, PixBankName } from './components/checkout/list/types';
+export type { CheckoutBillingAddress, CheckoutBillingLookup, CheckoutDoorOption, CheckoutDoorRowControls, CheckoutListChoice, CheckoutListHold, CheckoutOnlineChoice, CheckoutPaymentList, CheckoutPixBank, PaymentListCopy, PaymentListDebitCopy, PixBankCopy, PixBankId, PixBankName } from './components/checkout/list/types';
 export { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
 export type { BackActionEmphasis } from './components/checkout/payment-status-parts';
 export type { CheckoutDeliverySummary, CheckoutSummaryLine } from './components/checkout/payment-summary';

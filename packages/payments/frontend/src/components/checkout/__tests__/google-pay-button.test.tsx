@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { err, ok } from "../../../result";
 import { CheckoutClientProvider } from "../client-context";
 import { UNRESOLVED_CODE } from "../failure-codes";
-import type { GooglePayApi } from "../google-pay-button";
+import { paymentDataRequest, type GooglePayApi } from "../google-pay-button";
 import type { CheckoutClient } from "../transport";
 import type {
   ChargeWalletInput,
@@ -296,5 +296,19 @@ describe("GooglePayButton — the token becomes the charge", () => {
     await screen.findByTestId("wallet-sheet-error");
     expect(walletCharges).toHaveLength(0);
     expect(screen.getByTestId("card-view")).toBeTruthy();
+  });
+});
+
+describe("paymentDataRequest — Google's own merchant id", () => {
+  it("sends merchantInfo when the platform configured one, as Google requires in PRODUCTION", () => {
+    const request = paymentDataRequest(
+      { gateway: "pagbank", gatewayMerchantId: "ACCO_1", merchantInfo: { merchantId: "BCR2DN_1", merchantName: "Paladira" } },
+      { totalCents: 1250 },
+    );
+    expect(request.merchantInfo).toEqual({ merchantId: "BCR2DN_1", merchantName: "Paladira" });
+  });
+
+  it("sends none in TEST without one", () => {
+    expect(paymentDataRequest({ gateway: "pagbank", gatewayMerchantId: "ACCO_1" }, { totalCents: 1250 })).not.toHaveProperty("merchantInfo");
   });
 });
