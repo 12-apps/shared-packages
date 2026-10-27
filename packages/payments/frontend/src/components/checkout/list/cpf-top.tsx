@@ -83,6 +83,25 @@ export function taxIdJudged(input: { focused: boolean; digits: number; arrivedWh
 }
 
 /**
+ * The document field's complaint, shown only once the value is judged
+ * (FUT-4106, {@link taxIdJudged}), plus the change/focus handlers that feed
+ * that judgement and FUT-4080's focus-advance.
+ */
+function useDocumentVerdict(
+  field: CheckoutCustomerField,
+  value: string,
+  copy: PaymentListCopy["buyer"],
+  onComplete: (() => void) | undefined,
+): { complaint: string | undefined; onTyped: (next: string) => void; onFocus: () => void; onBlur: () => void } {
+  const fieldCopy = useCheckoutCopy().card.fields;
+  const { arrivedWhole, onTyped } = useTaxIdAdvance(field, value, onComplete);
+  const [focused, setFocused] = useState(false);
+  const judged = taxIdJudged({ focused, digits: taxIdDigits(value).length, arrivedWhole });
+  const complaint = judged ? complaintOf(field, value, copy, (typed) => validateCpfOrCnpj(typed, fieldCopy)) : undefined;
+  return { complaint, onTyped, onFocus: () => setFocused(true), onBlur: () => setFocused(false) };
+}
+
+/**
  * The document at the TOP of Pagamento, above the wallets (FUT-3685, C3, C4,
  * E1, L7): "CPF ou CNPJ" (FUT-4080), the provider's reason under it ("o PagBank pede para pagar pelo
  * app"), the field — masked, checked by its digits — and "Salvar meus dados
@@ -109,18 +128,14 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
 }): JSX.Element {
   const { Button, Checkbox, Input, Text } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
-  const fieldCopy = useCheckoutCopy().card.fields;
   // The document the store already holds, when the host passed it, shown
   // masked — as a CNPJ when it is one — and editable.
   const value = taxIdField.shown(buyer.taxId ?? "");
-  const { arrivedWhole, onTyped } = useTaxIdAdvance(field, value, onComplete);
-  const [focused, setFocused] = useState(false);
+  const { complaint, onTyped, onFocus, onBlur } = useDocumentVerdict(field, value, copy, onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (focusOnMount) scope.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [focusOnMount]);
-  const judged = taxIdJudged({ focused, digits: taxIdDigits(value).length, arrivedWhole });
-  const complaint = judged ? complaintOf(field, value, copy, (typed) => validateCpfOrCnpj(typed, fieldCopy)) : undefined;
   return (
     <Box ref={scope} data-testid="list-cpf" sx={{ display: "flex", flexDirection: "column", gap: 1.5, containerType: "inline-size" }}>
       {/* A native <label> around the words and the field names the input with both. */}
@@ -145,8 +160,8 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
             value={value}
             error={Boolean(complaint)}
             helperText={complaint}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onFocus={onFocus}
+            onBlur={onBlur}
             onChange={(event) => {
               onTyped(event.target.value);
               onBuyerChange({ ...buyer, taxId: taxIdField.kept(event.target.value) });
