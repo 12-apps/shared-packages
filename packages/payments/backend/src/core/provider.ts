@@ -2,7 +2,6 @@ import type { PaymentsCopySource } from '../copy-source';
 import type {
   ApplePayActivation,
   ApplePayCsr,
-  CaptureInput,
   ChargeInput,
   ChargeSnapshot,
   ClientTokenization,
@@ -23,6 +22,7 @@ import type {
   ResolvedCredentials,
 } from './types';
 import type { BrowserKeyCapability } from './browser-key-capability';
+import type { CaptureInput } from './charge-capture';
 import type { CredentialExpiry } from './credential-expiry';
 import type { ProviderWebhookHandling } from './provider-webhook';
 import type { SettlementHints } from './settlement-hints';

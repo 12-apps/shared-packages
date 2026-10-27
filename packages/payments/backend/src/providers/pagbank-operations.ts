@@ -248,6 +248,12 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   };
 };
 
+/** The amount a charge holds, in cents, or null when it names none. */
+function authorizedCents(charge: PagBankOrderCharge): number | null {
+  const value = charge.amount?.value;
+  return typeof value === 'number' ? value : null;
+}
+
 /**
  * The AUTHORIZED charge a capture must name at `/charges/{id}/capture`, and
  * the amount it holds. Same routing as {@link refundTarget}: a charge id is
@@ -269,7 +275,7 @@ async function captureTarget(
         credentials,
         { method: 'GET' },
       ));
-    return { chargeId: providerChargeId, cents: typeof charge.amount?.value === 'number' ? charge.amount.value : null };
+    return { chargeId: providerChargeId, cents: authorizedCents(charge) };
   }
   const res = await pagbankRequest<PagBankOrderResponse>(
     `/orders/${encodeURIComponent(providerChargeId)}`,
@@ -284,7 +290,7 @@ async function captureTarget(
       { retriable: false },
     );
   }
-  return { chargeId: charge.id, cents: typeof charge.amount?.value === 'number' ? charge.amount.value : null };
+  return { chargeId: charge.id, cents: authorizedCents(charge) };
 }
 
 /**

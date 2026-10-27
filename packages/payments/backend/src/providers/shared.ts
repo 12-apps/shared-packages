@@ -1,10 +1,10 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
+import type { CaptureInput } from '../core/charge-capture';
 import { ProviderRequestError } from '../core/errors';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { PaymentProviderAdapter } from '../core/provider';
 import type {
-  CaptureInput,
   ChargeInput,
   ChargeSnapshot,
   NormalizedWebhookEvent,

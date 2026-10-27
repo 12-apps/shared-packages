@@ -1,7 +1,7 @@
 import { UnsupportedOperationError } from './errors';
 import type { ChargeStore } from './ports';
 import type { PaymentProviderAdapter } from './provider';
-import type { ChargeSnapshot, MerchantRef, ResolvedCredentials } from './types';
+import type { ChargeSnapshot, MerchantRef, Money, ResolvedCredentials } from './types';
 
 /**
  * CAPTURING an AUTHORIZED charge (FUT-4082).
@@ -16,6 +16,16 @@ import type { ChargeSnapshot, MerchantRef, ResolvedCredentials } from './types';
  * Same seam as `charge-cancel.ts`: a factory closed over the gateway's ports,
  * kept out of `gateway.ts`, which sits at its size ceiling.
  */
+
+/**
+ * What a capture of an AUTHORIZED charge names: the charge, and the amount it
+ * authorized when the caller knows it. An adapter whose API needs the amount
+ * reads it back from the provider when it is absent.
+ */
+export interface CaptureInput {
+  providerChargeId: string;
+  amount?: Money;
+}
 
 /** The gateway's `(merchant, provider) -> adapter + credentials` resolution. */
 type ResolveFor = (
