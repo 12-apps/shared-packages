@@ -58,6 +58,12 @@ export const T = {
  */
 export const CARD_INSET = '20px';
 
+/**
+ * The vertical gap between two stacked blocks of the card, the same step the
+ * connect card's own body spaces its rows by (`Stack spacing={2}`).
+ */
+export const BLOCK_GAP = 2;
+
 /** The card that bounds one provider: hairline, 12px, nothing clipped. */
 export const CARD_SX = {
   border: `1px solid ${T.line}`,
