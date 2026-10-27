@@ -39,6 +39,8 @@ interface ListFaceProps {
   total: string;
   provider: string | null;
   taxIdOnFile: boolean;
+  /** Which document is on file, when the host knows (FUT-4080); a document typed now wins. */
+  taxIdKindOnFile: "CPF" | "CNPJ" | null;
   tenantSlug: string | undefined;
   basket: CheckoutBasketIdentity | undefined;
   pollIntervalMs: number;
@@ -150,7 +152,7 @@ function Payer({ props }: { props: ListFaceProps }): JSX.Element | null {
   const { c, list, taxIdOnFile } = props;
   const name = c.buyer.name?.trim();
   if (!taxIdOnFile || !name || props.revealed || !payingHere(props)) return null;
-  return <PayerLine copy={list.copy} name={name} document={taxIdKind(c.buyer.taxId)} onChange={props.onRevealCpf} />;
+  return <PayerLine copy={list.copy} name={name} document={taxIdKind(c.buyer.taxId) ?? props.taxIdKindOnFile} onChange={props.onRevealCpf} />;
 }
 
 /** The card's charge is past the button: counting down, or going out. */

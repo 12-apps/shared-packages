@@ -214,4 +214,18 @@ describe("a CNPJ on file", () => {
     expect(payButton().disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Manter o documento salvo" })).toBeTruthy();
   });
+
+  it("names the kind the host passes when it hands no digits over", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, taxIdKindOnFile: "CNPJ", buyer: { name: "Ana Teste" } });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    await waitFor(() => expect(screen.getByTestId("list-payer").textContent).toContain("Pagando como Ana Teste · CNPJ ✓"));
+  });
+
+  it("lets the document the host hands over win over the kind on file", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, taxIdKindOnFile: "CNPJ", buyer: { name: "Ana Teste", taxId: "52998224725" } });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(radio("list-option-PIX"));
+    await waitFor(() => expect(screen.getByTestId("list-payer").textContent).toContain("Pagando como Ana Teste · CPF ✓"));
+  });
 });

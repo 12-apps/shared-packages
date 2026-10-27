@@ -203,6 +203,7 @@ interface ListHost {
   createOrder?: (input: CreateOrderRequest) => Promise<CreateOrderResult>;
   list?: Partial<CheckoutPaymentList>;
   taxIdOnFile?: boolean;
+  taxIdKindOnFile?: "CPF" | "CNPJ" | null;
   buyer?: BuyerInfo;
   navigate?: (url: string) => void;
   orderNote?: ReactNode;
@@ -248,6 +249,7 @@ export function listFlow(host: ListHost): JSX.Element {
           providerConfig={host.config}
           tenantSlug="loja-1"
           taxIdOnFile={host.taxIdOnFile ?? true}
+          taxIdKindOnFile={host.taxIdKindOnFile}
           validateApplePayMerchant={host.validateApplePayMerchant}
           defaultBuyer={host.buyer ?? { name: "Ana Teste" }}
           paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY, ...host.list }}
