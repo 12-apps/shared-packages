@@ -36,6 +36,7 @@ export type ProviderFailurePath =
   | 'CHARGE'
   | 'REFRESH'
   | 'CANCEL'
+  | 'CAPTURE'
   | 'REFUND'
   | 'VAULT'
   | 'BROWSER_KEY'

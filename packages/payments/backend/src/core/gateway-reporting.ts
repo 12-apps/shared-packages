@@ -81,6 +81,9 @@ export function withProviderFailureReports<P extends string>(
     cancelCharge: guarded(reporter, 'CANCEL', 'error', gateway.cancelCharge, (merchant, provider, id) => ({
       merchant, provider, reference: id,
     })),
+    captureCharge: guarded(reporter, 'CAPTURE', 'error', gateway.captureCharge, (merchant, provider, id) => ({
+      merchant, provider, reference: id,
+    })),
     refund: guarded(reporter, 'REFUND', 'error', gateway.refund, (merchant, provider, input) => ({
       merchant, provider, reference: input.providerChargeId,
     })),

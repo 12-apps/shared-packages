@@ -18,7 +18,7 @@ import { createPagbankThreeDSecureSession } from './pagbank-3ds';
 import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { pixPayload, summaryItems } from './pagbank-payloads';
-import { findChargeByReference, getCharge, refund } from './pagbank-operations';
+import { captureCharge, findChargeByReference, getCharge, refund } from './pagbank-operations';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
@@ -356,6 +356,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     getCharge,
     findChargeByReference,
     refund,
+    captureCharge,
 
     webhook,
 

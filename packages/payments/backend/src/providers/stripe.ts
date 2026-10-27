@@ -20,6 +20,7 @@ import {
 } from './stripe-http';
 import {
   cancelCharge,
+  captureCharge,
   createCharge,
   findChargeByReference,
   getCharge,
@@ -260,6 +261,7 @@ export function stripeProvider(source: PaymentsCopySource<StripeCopy>): PaymentP
     // Card vaulting for off-session subscription charges (FUT-340).
     vault: stripeVault,
     cancelCharge,
+    captureCharge,
     refund,
     oauth,
 

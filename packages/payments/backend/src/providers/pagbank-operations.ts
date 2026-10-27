@@ -9,7 +9,7 @@ import {
   type PagBankOrderCharge,
   type PagBankOrderResponse,
 } from './pagbank-snapshots';
-import { stubPendingSnapshot, stubRefund } from './shared';
+import { stubCapturedSnapshot, stubPendingSnapshot, stubRefund } from './shared';
 import { stubFindChargeByReference } from './stub-fault';
 
 /**
@@ -246,4 +246,82 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
     amount: input.amount ?? { amountCents: reportedRefundCents(res), currency: 'BRL' },
     raw: res,
   };
+};
+
+/** The amount a charge holds, in cents, or null when it names none. */
+function authorizedCents(charge: PagBankOrderCharge): number | null {
+  const value = charge.amount?.value;
+  return typeof value === 'number' ? value : null;
+}
+
+/**
+ * The AUTHORIZED charge a capture must name at `/charges/{id}/capture`, and
+ * the amount it holds. Same routing as {@link refundTarget}: a charge id is
+ * read back through its order when the row names one, an order id resolves to
+ * its AUTHORIZED charge, and an order holding none is refused loudly — there
+ * is nothing honest to capture.
+ */
+async function captureTarget(
+  providerChargeId: string,
+  credentials: ResolvedCredentials,
+  orderId?: string,
+): Promise<{ chargeId: string; cents: number | null }> {
+  if (!ORDER_ID_PREFIX.test(providerChargeId)) {
+    const inOrder = orderId ? await chargeInOrder(orderId, providerChargeId, credentials) : null;
+    const charge =
+      inOrder ??
+      (await pagbankRequest<PagBankOrderCharge>(
+        `/charges/${encodeURIComponent(providerChargeId)}`,
+        credentials,
+        { method: 'GET' },
+      ));
+    return { chargeId: providerChargeId, cents: authorizedCents(charge) };
+  }
+  const res = await pagbankRequest<PagBankOrderResponse>(
+    `/orders/${encodeURIComponent(providerChargeId)}`,
+    credentials,
+    { method: 'GET' },
+  );
+  const charge = res.charges?.find((c) => c.status === 'AUTHORIZED');
+  if (typeof charge?.id !== 'string') {
+    throw new ProviderRequestError(
+      NAME,
+      `PagBank order ${providerChargeId} carries no authorized charge to capture.`,
+      { retriable: false },
+    );
+  }
+  return { chargeId: charge.id, cents: authorizedCents(charge) };
+}
+
+/**
+ * Capture an AUTHORIZED charge in full (FUT-4082): `POST
+ * /charges/{id}/capture`, whose `amount.value` PagBank requires. The caller's
+ * amount (the stored row's) is used when known, else the charge's own. The
+ * response is the charge as it now stands — `PAID` once the capture took —
+ * mapped as `getCharge` maps a bare charge.
+ */
+export const captureCharge: NonNullable<PaymentProviderAdapter['captureCharge']> = async (
+  input,
+  credentials,
+  hints,
+) => {
+  if (credentials.stub) return stubCapturedSnapshot(NAME, input);
+  const { chargeId, cents } =
+    input.amount && !ORDER_ID_PREFIX.test(input.providerChargeId)
+      ? { chargeId: input.providerChargeId, cents: input.amount.amountCents }
+      : await captureTarget(input.providerChargeId, credentials, hints?.orderId);
+  const value = input.amount?.amountCents ?? cents;
+  if (value === null) {
+    throw new ProviderRequestError(NAME, `PagBank charge ${chargeId} names no amount to capture.`, {
+      retriable: false,
+    });
+  }
+  const charge = await pagbankRequest<PagBankOrderCharge & { reference_id?: unknown }>(
+    `/charges/${encodeURIComponent(chargeId)}/capture`,
+    credentials,
+    { method: 'POST', body: { amount: { value } } },
+  );
+  // The order id rides back in as the snapshot's hint, so the persisted row
+  // keeps the `/orders/{id}` its later reads go through (FUT-3722).
+  return orderSnapshot({ id: hints?.orderId, reference_id: charge.reference_id, charges: [charge] }, chargeId);
 };
