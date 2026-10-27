@@ -200,6 +200,15 @@ describe("a whole document set in one go (FUT-4106)", () => {
     expect(red()).toBe(true);
   });
 
+  it("keeps a pasted invalid document red when only a mask character is deleted", async () => {
+    render(<Document />);
+    enter();
+    type(INVALID_CPF);
+    await waitFor(() => expect(complaint()).toBe(INVALID));
+    type(input().value.slice(0, -3) + input().value.slice(-2));
+    await waitFor(() => expect(red()).toBe(true));
+  });
+
   it("judges a value an autofill sets while the buyer is elsewhere", async () => {
     render(<Document />);
     type("123");
@@ -242,6 +251,8 @@ describe("arrivedInOneGo", () => {
     ["52998224725", "52998224700", true],
     ["529982", "52998224725", true],
     ["52998224725", "52998224725", false],
+    ["522998224725", "52998224725", false],
+    ["52998224725", "5299824725", false],
   ])("%s → %s is %s", (before, after, expected) => {
     expect(arrivedInOneGo(before, after)).toBe(expected);
   });
