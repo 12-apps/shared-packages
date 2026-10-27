@@ -28,6 +28,7 @@ The Toast component provides a non-intrusive notification system for displaying 
 | duration   | `number`                                                                | `5000`      | Auto-dismiss duration in milliseconds    |
 | persistent | `boolean`                                                               | `false`     | If true, toast won't auto-dismiss        |
 | closable   | `boolean`                                                               | `true`      | If true, shows a close button            |
+| closeLabel | `string`                                                                | `close`     | The close button's accessible name; a host passes `CHROME_COPY[locale].dismissToast`. Overrides the container's |
 | glass      | `boolean`                                                               | `false`     | Enables glass morphism effect            |
 | action     | `{ label: string; onClick: () => void }`                                | `undefined` | Action button configuration              |
 | promise    | `{ loading: string; success: string; error: string }`                   | `undefined` | Messages for promise-based notifications |
@@ -41,6 +42,7 @@ The Toast component provides a non-intrusive notification system for displaying 
 | position   | `'top-left' \| 'top-center' \| 'top-right' \| 'bottom-left' \| 'bottom-center' \| 'bottom-right'` | `'bottom-right'`     | Position of the toast container     |
 | maxToasts  | `number`                                                                                          | `5`                  | Maximum number of toasts to display |
 | gap        | `number`                                                                                          | `12`                 | Gap between toasts in pixels        |
+| closeLabel | `string`                                                                                          | `close`              | Applied to every toast that sets no `closeLabel` of its own |
 | className  | `string`                                                                                          | `undefined`          | CSS class name for styling          |
 | dataTestId | `string`                                                                                          | `'toast-container'`  | Test ID for testing and automation  |
 

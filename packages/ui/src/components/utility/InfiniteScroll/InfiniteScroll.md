@@ -60,6 +60,7 @@ function MyComponent() {
 | `loader` | `ReactNode` | Default spinner | Custom loading indicator |
 | `endMessage` | `ReactNode` | Default message | Message when no more items |
 | `error` | `Error \| null` | - | Error object if load failed |
+| `errorText` | `string` | `"An error occurred while loading more items"` | The error line when `error` carries no message of its own; a pt-BR host passes `UI_LABELS['pt-BR'].infiniteScroll.loadFailed` |
 | `errorComponent` | `ReactNode` | Default error UI | Custom error component |
 | `onError` | `(error: Error) => void` | - | Error callback |
 | `className` | `string` | - | CSS class name |

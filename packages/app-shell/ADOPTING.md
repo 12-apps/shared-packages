@@ -248,7 +248,7 @@ app.route('/api', shell.router);
    **If your readers do not share a language, pass a resolver instead of a
    table.** Both fields take `AppShellCopySource<T>` — the words, or
    `(ctx) => words`, which is what `localeCopy(PACK)` from `@12-apps/i18n`
-   returns. There is still no pack in this package and there will not be: these
+   returns. There is still no `AppShellMessages` pack in this package and there will not be: these
    sentences are wholly yours, so the pt-BR/en-US pair lives beside your copy,
    not inside somebody else's dependency.
 
@@ -267,6 +267,23 @@ app.route('/api', shell.router);
 
    A host with one audience wires neither, passes its table, and nothing about
    its adoption changes.
+
+   **Write `routeErrorBody` too.** It is OPTIONAL on `AppShellMessages`, and
+   without it the crashed-route screen's body is the error's own `message` —
+   browser or JS English ("Cannot read properties of undefined …") on a page a
+   shopper reads. With it, the screen says your sentence and the raw message
+   still reaches `onCrash`. A stale-chunk crash prefers `routeUpdate.body`, then
+   `routeErrorBody`, then the raw message.
+
+   **`restResult` is the one sentence source outside `messages`.** Its fourth
+   argument, `fallbacks: RestResultFallbacks`, words the two failures that carry
+   no server sentence: `status(n)` for a refusal whose body has no `error`, and
+   `network` for a call nothing answered. It defaults to
+   `EN_US_REST_RESULT_FALLBACKS` (`HTTP ${n}`, `'network error'`); the root
+   entry also exports `PT_BR_REST_RESULT_FALLBACKS` and the tag-keyed
+   `REST_RESULT_FALLBACKS`. Since 5.14.1 `network` is used for EVERY thrown
+   call — before it, an `Error` passed its own message through, so an offline
+   screen said the browser's "Failed to fetch".
 9. **Static imports only.** A dynamic non-literal `import()` of a subpath
    crashes a bundled server.
 10. **Every entry ships COMPILED, and `./vite` is why the rest do too.** Vite

@@ -31,6 +31,7 @@ The Dialog component provides a powerful, flexible modal dialog system with mult
 | `title` | `ReactNode` | `undefined` | Dialog title content |
 | `description` | `string` | `undefined` | Dialog subtitle/description text |
 | `showCloseButton` | `boolean` | `true` | Whether to show close button in header |
+| `closeLabel` | `string` | `close` | The close button's accessible name; a host passes `CHROME_COPY[locale].closePanel` |
 | `backdrop` | `boolean` | `true` | Whether to show backdrop overlay |
 | `persistent` | `boolean` | `false` | If true, prevents dismissal via backdrop or escape key |
 | `glass` | `boolean` | `false` | Enables glass morphism effect with backdrop blur |
@@ -48,6 +49,7 @@ The Dialog component provides a powerful, flexible modal dialog system with mult
 | `title` | `ReactNode` | `undefined` | Header title content |
 | `subtitle` | `ReactNode` | `undefined` | Header subtitle content |
 | `showCloseButton` | `boolean` | `true` | Whether to show close button |
+| `closeLabel` | `string` | `close` | The close button's accessible name; a host passes `CHROME_COPY[locale].closePanel` |
 | `onClose` | `() => void` | `undefined` | Callback when close button is clicked |
 | `children` | `ReactNode` | `undefined` | Custom header content (overrides title/subtitle) |
 | `dataTestId` | `string` | `undefined` | Custom test ID for testing |

@@ -33,6 +33,16 @@ The Code component is a versatile typography element designed for displaying cod
 - **Default**: `false`
 - **Description**: Enables copy-to-clipboard functionality with visual feedback (block/highlight variants only)
 
+### copyLabel
+- **Type**: `string`
+- **Default**: `'Copy code'`
+- **Description**: The copy button's tooltip and accessible name (`UI_LABELS[locale].code.copy`)
+
+### copiedLabel
+- **Type**: `string`
+- **Default**: `'Copied!'`
+- **Description**: The same button right after a copy (`UI_LABELS[locale].code.copied`)
+
 ### lineNumbers
 - **Type**: `boolean`
 - **Default**: `false`

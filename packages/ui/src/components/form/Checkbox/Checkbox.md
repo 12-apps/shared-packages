@@ -51,6 +51,7 @@ import { Checkbox } from '@/components/form/Checkbox';
 | error | `boolean` | `false` | Error state flag |
 | helperText | `string` | - | Helper or error text displayed below |
 | loading | `boolean` | `false` | Shows loading spinner and disables checkbox |
+| loadingLabel | `string` | `loading` | React Native only: the busy spinner's accessible name (`UI_LABELS[locale].common.loading`) |
 | ripple | `boolean` | `true` | Enable/disable ripple effect on click |
 | glow | `boolean` | `false` | Enable glow animation |
 | pulse | `boolean` | `false` | Enable pulse animation |

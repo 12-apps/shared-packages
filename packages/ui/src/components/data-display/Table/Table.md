@@ -58,6 +58,7 @@ import { Table } from '@procurement/ui';
 - **virtualScrolling** `boolean` - Enable virtual scrolling for large datasets
 - **loading** `boolean` - Show loading state
 - **hoverable** `boolean` - Enable row hover effects
+- **labels** `Partial<TableLabels>` - The accessible names the table adds: `sortBy(header)` (default `` `Sort by ${header}` ``), `selectRow(rowNumber)` (`` `select row ${rowNumber}` ``) and `selectAllRows` (`select all`). Any key left out keeps its English wording; a host passes `DATA_GRID_COPY[locale]` or `UI_LABELS[locale].table`
 
 ### Visual Effects
 

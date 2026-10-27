@@ -22,6 +22,12 @@ import { Carousel } from '@/components/data-display/Carousel';
 
 ## Props
 
+### copy
+
+- **Type**: `CarouselCopy` — `{ previous: string; next: string; goToSlide?: (position: number) => string }`
+- **Required**: Yes
+- **Description**: The arrows' accessible names (they render only a glyph) and each indicator's, from its 1-based position. `goToSlide` is optional; omitted, it reads `Go to slide ${position}`. Pass `CAROUSEL_COPY[locale]` from `@12-apps/ui/locales` (`PT_BR_CAROUSEL_COPY` for pt-BR)
+
 ### items
 
 - **Type**: `CarouselItem[]`

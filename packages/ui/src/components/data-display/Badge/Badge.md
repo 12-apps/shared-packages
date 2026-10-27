@@ -69,6 +69,7 @@ import { Badge } from '@/components/data-display/Badge';
 | bounce | `boolean` | `false` | Enable bounce animation on mount |
 | closable | `boolean` | `false` | Show close button to dismiss badge |
 | onClose | `() => void` | - | Callback when badge is closed |
+| closeLabel | `string` | `close` | React Native only: the close button's accessible name (`UI_LABELS[locale].common.close`) |
 | icon | `React.ReactNode` | - | Icon element to display before content |
 | invisible | `boolean` | `false` | Hide the badge |
 | aria-label | `string` | - | Accessibility label for screen readers |

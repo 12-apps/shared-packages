@@ -57,6 +57,7 @@ import { Button } from '@procurement/ui';
 | `color`      | `'primary' \| 'secondary' \| 'success' \| 'warning' \| 'info' \| 'danger' \| 'neutral'`      | `'primary'` | Color theme                               |
 | `size`       | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'`                                        | `'md'`      | Button size                               |
 | `loading`    | `boolean`                                                                     | `false`     | Shows loading spinner over the label, sets `aria-busy`, disables button |
+| `loadingLabel` | `string`                                                                    | `loading`   | React Native only: the busy spinner's accessible name (`UI_LABELS[locale].common.loading`) |
 | `disabled`   | `boolean`                                                                     | `false`     | Disables button interaction               |
 | `icon`       | `ReactNode`                                                                   | -           | Icon element to display before text       |
 | `glow`       | `boolean`                                                                     | `false`     | Adds glow visual effect                   |

@@ -63,6 +63,9 @@ import { Dashboard } from '@12-apps/ui/layout/Dashboard';
 | `Dashboard.MoreFilters` | (in filters) | Expandable advanced panel for ranges/dates. |
 | `Dashboard.Body` | body | Main content area (the table/grid). |
 
+`Dashboard.Breadcrumb` takes `ariaLabel?: string`, the trail's landmark name
+(default `"breadcrumb"`); a host passes `UI_LABELS[locale].dashboard.breadcrumb`.
+
 ## State
 
 `Dashboard` owns only **UI** state (which regions are open) through

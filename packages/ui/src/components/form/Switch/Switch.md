@@ -86,6 +86,7 @@ import { Switch } from '@procurement/ui';
 | `onChange`      | `(event, checked) => void`                                                    | -           | Change event handler                             |
 | `animated`      | `boolean`                                                                     | `true`      | Enable/disable animations                        |
 | `loading`       | `boolean`                                                                     | `false`     | Shows loading spinner and disables switch        |
+| `loadingLabel`  | `string`                                                                      | `loading`   | React Native only: the busy spinner's accessible name (`UI_LABELS[locale].common.loading`) |
 | `ripple`        | `boolean`                                                                     | `false`     | Enable ripple effect on interaction              |
 | `pulse`         | `boolean`                                                                     | `false`     | Enable pulse animation on thumb                  |
 | `disabled`      | `boolean`                                                                     | `false`     | Disables switch interaction                      |

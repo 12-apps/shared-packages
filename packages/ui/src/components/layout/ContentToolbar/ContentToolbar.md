@@ -36,6 +36,18 @@ pages and projects.
 | `MultiSelectDropdown` | Checkbox multi-select with counts, an optional "Options" section, and a Clear action (e.g. "Content Type"). |
 | `FilterTrigger` | Funnel toggle button with an active-filters indicator dot. |
 
+### Label props
+
+Optional; each omitted one reads in English. A host passes
+`UI_LABELS[locale].contentToolbar` from `@12-apps/ui/locales`.
+
+| Prop | On | Type | Default | Description |
+| --- | --- | --- | --- | --- |
+| `gridViewLabel` | `ViewSelector` | `string` | `"Grid View"` | The grid option's name, in the menu and on the trigger while it is active (`contentToolbar.gridView`) |
+| `listViewLabel` | `ViewSelector` | `string` | `"List View"` | The list option's name (`contentToolbar.listView`) |
+| `openFiltersLabel` | `FilterTrigger` | `string` | `"Open filters"` | The button's accessible name while the panel is closed (`contentToolbar.openFilters`) |
+| `closeFiltersLabel` | `FilterTrigger` | `string` | `"Close filters"` | The button's accessible name while the panel is open (`contentToolbar.closeFilters`) |
+
 ## Usage
 
 ```tsx

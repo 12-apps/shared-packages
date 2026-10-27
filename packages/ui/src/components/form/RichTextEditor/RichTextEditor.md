@@ -79,7 +79,8 @@ function App() {
 |------|------|---------|-------------|
 | `value` | `string` | `''` | The current value of the rich text editor content |
 | `onChange` | `(value: string) => void` | - | Callback when the content changes |
-| `placeholder` | `string` | `'Start typing...'` | Placeholder text when empty |
+| `placeholder` | `string` | `'Start typing...'` | Placeholder text when empty; defaults to `labels.placeholder` |
+| `labels` | `Partial<RichTextEditorLabels>` | English pack | The toolbar's tooltips (`bold`, `italic`, `underline`, `strikethrough`, `numberedList`, `bulletedList`, `insertLink`, `insertImage`, `codeBlock`, `quote`), the link and image prompts (`linkPrompt`, `imagePrompt`), the new list item's text (`listItem`), the default `placeholder` and the default `ariaLabel`. Any key left out reads in English (`Bold`, `Enter URL:`, `Start typing...`, `Rich text editor`, …); a pt-BR host passes `UI_LABELS['pt-BR'].richTextEditor` |
 | `disabled` | `boolean` | `false` | Whether the editor is disabled |
 | `readOnly` | `boolean` | `false` | Whether the editor is read-only |
 | `toolbar` | `ToolbarConfig` | Default config | Configuration for toolbar buttons and features |
@@ -89,7 +90,7 @@ function App() {
 | `onBlur` | `() => void` | - | Callback when editor loses focus |
 | `className` | `string` | - | Additional CSS classes |
 | `data-testid` | `string` | - | Test ID for testing purposes |
-| `aria-label` | `string` | `'Rich text editor'` | ARIA label for accessibility |
+| `aria-label` | `string` | `'Rich text editor'` | ARIA label for accessibility; defaults to `labels.ariaLabel` |
 | `aria-describedby` | `string` | - | ARIA described by for accessibility |
 
 ## ToolbarConfig

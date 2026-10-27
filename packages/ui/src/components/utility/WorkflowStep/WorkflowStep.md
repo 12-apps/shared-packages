@@ -35,6 +35,7 @@ The WorkflowStep component is an advanced workflow visualization component that 
 | `errorIcon` | `React.ReactNode` | - | Custom icon for error steps |
 | `onStepClick` | `(stepIndex: number) => void` | - | Callback when a step is clicked |
 | `disabled` | `boolean` | `false` | Disable all interactions |
+| `labels` | `Partial<WorkflowStepLabels>` | English pack | The indicators' accessible names, `step(position, title)` (`` `Step ${position}: ${title}` ``), and the progressbar's value text, `progress(position, total)` (`` `Step ${position} of ${total}` ``). Any key left out keeps its English wording; a host passes `UI_LABELS[locale].workflowStep` |
 | `className` | `string` | - | Additional CSS classes |
 | `style` | `React.CSSProperties` | - | Inline styles |
 

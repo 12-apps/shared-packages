@@ -337,6 +337,44 @@ FUT-2766–2768, tracked separately.
 - Focus management
 - WCAG compliance
 
+### Labels: every word is the host's (FUT-3860)
+
+A component never writes a word a reader sees or hears. Sentences come from the
+copy packs (`CHROME_COPY`, `DATA_GRID_COPY`, …); the small accessible names and
+captions a component adds on its own (a close glyph's name, a spinner's, a sort
+button's) come from the **labels pack**, and each is an OPTIONAL prop:
+
+- **`labels?: Partial<XLabels>`** where the component adds several words
+  (`Stepper`, `Timeline`, `Table`, `RichTextEditor`, `WorkflowStep`,
+  `LoadingState`). The families are typed in `src/copy/labels.ts` (`UiLabels`,
+  exported from `@12-apps/ui/copy`).
+- **One `…Label` prop** where it adds one word (`closeLabel`, `deleteLabel`,
+  `loadingLabel`, `copyLabel`, `collapseLabel`, …).
+
+Omitted, each falls back to the English pack, `EN_US_UI_LABELS`
+(`src/en-US.labels.ts`), which keeps the wording these components always
+rendered — including the lower-case `close` / `loading` names tests query by —
+so a new key is never breaking. A component resolves its `labels` with
+`resolveLabels(defaults, overrides)` (`src/utils/resolve-labels.ts`): the
+caller's keys laid over the English pack one by one, a key left `undefined`
+ignored.
+
+A host passes its own language from the pack:
+
+```tsx
+import { UI_LABELS } from '@12-apps/ui/locales';   // or PT_BR_UI_LABELS from '@12-apps/ui/pt-BR'
+
+<Stepper steps={steps} activeId={current} labels={UI_LABELS['pt-BR'].stepper} />
+<Dialog open={open} onClose={close} closeLabel={UI_LABELS['pt-BR'].common.close}>…</Dialog>
+```
+
+When you add a word to a component: add the key to its family in
+`copy/labels.ts`, fill it in BOTH `en-US.labels.ts` and `pt-BR.labels.ts`, take
+it as an optional prop defaulting to the English pack, and list the prop in the
+component's `.md`. In this repository, `scripts/literal-copy-gate.mjs` (at the
+repository root, not in the published package) refuses a bare literal in a copy
+prop.
+
 ## React Native
 
 A component can render on React Native from the same import path. The switch

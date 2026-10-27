@@ -190,6 +190,10 @@ const storage = createWebStorage({ apiBase: '/api' });
 // storage.useUpload   the primitive, for a bespoke affordance
 ```
 
+`ImageField`'s `label` is REQUIRED and has no default word: it
+names the dropzone and is the preview image's `alt`, with no packaged word
+behind it.
+
 ## The image pipeline is a port
 
 Image processing means a native module, and a native module is build surface

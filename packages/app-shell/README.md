@@ -85,6 +85,21 @@ show, the other is a retry — and it is what lets a concurrent surface tell a 4
 ("not yours", say so beside the button) from a 409 ("somebody was faster",
 refresh).
 
+`restResult(path, method, body, fallbacks)` words the two failures that carry no
+sentence from the server. `fallbacks.status(n)` is the `error` of a refusal
+whose body has none; `fallbacks.network` is the `error` of a call nothing
+answered — any thrown call, as of 5.14.1, so the browser's own "Failed to fetch"
+never reaches the screen. The default is `EN_US_REST_RESULT_FALLBACKS`
+(`HTTP ${n}`, `'network error'`); a pt-BR host passes
+`PT_BR_REST_RESULT_FALLBACKS`, and `REST_RESULT_FALLBACKS` keys both by tag.
+
+```ts
+import { PT_BR_REST_RESULT_FALLBACKS, restResult } from '@12-apps/app-shell';
+
+const result = await restResult('/api/items', 'POST', draft, PT_BR_REST_RESULT_FALLBACKS);
+// offline → { ok: false, error: 'Falha de conexão' }   (no `status`)
+```
+
 ## `useServerDataViews` — the URL is the query
 
 A `DataViewsGrid` in server mode filters and sorts nothing itself: it EMITS a
