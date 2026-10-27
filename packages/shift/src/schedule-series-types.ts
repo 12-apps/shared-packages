@@ -70,7 +70,13 @@ export interface ScheduleChange {
   createdSlotIds: string[];
   canceledSlotIds: string[];
   createdSeriesIds: string[];
-  closedSeries: { id: string; priorEndsOn: LocalDate | null }[];
+  /** Each rule the write ended or reopened, with its end — and the memory of a `following` cancel — before. */
+  closedSeries: {
+    id: string;
+    priorEndsOn: LocalDate | null;
+    priorCanceledFrom: LocalDate | null;
+    priorEndsOnBeforeCancel: LocalDate | null;
+  }[];
   editedSlots: { id: string; prior: ShiftSlotPrior }[];
   /**
    * How each row and rule named above looked right after the write. The undo

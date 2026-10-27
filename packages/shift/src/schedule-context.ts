@@ -168,7 +168,12 @@ export class ChangeBuilder {
 
   closedSeries(before: ShiftSlotSeries): this {
     if (!this.change.closedSeries.some((entry) => entry.id === before.id)) {
-      this.change.closedSeries.push({ id: before.id, priorEndsOn: before.endsOn });
+      this.change.closedSeries.push({
+        id: before.id,
+        priorEndsOn: before.endsOn,
+        priorCanceledFrom: before.canceledFrom,
+        priorEndsOnBeforeCancel: before.endsOnBeforeCancel,
+      });
     }
     return this;
   }

@@ -14,7 +14,7 @@ import {
   type ScheduleContext,
 } from './schedule-context';
 import { ShiftScheduleError } from './schedule-errors';
-import { buildRuleSlot, occurrencesBetween, repeatOf, ruleAuditFields, validateRule } from './schedule-rule';
+import { buildRuleSlot, occurrencesBetween, repeatOf, ruleAuditFields, ruleTimesExist, validateRule } from './schedule-rule';
 import type {
   ExtendSeriesResult,
   MaterialiseSeriesInput,
@@ -23,7 +23,7 @@ import type {
   ScheduleWriteResult,
   ShiftSlotSeries,
 } from './schedule-series-types';
-import { addLocalDays, isLocalDate, zonedInstant, zonedParts, type LocalDate } from './schedule-time';
+import { addLocalDays, isLocalDate, zonedParts, type LocalDate } from './schedule-time';
 import type { ShiftScheduleTransaction, ShiftSlot } from './schedule-types';
 
 interface MaterialiseOptions {
@@ -48,24 +48,23 @@ function horizonEnd(ctx: ScheduleContext, today: LocalDate): LocalDate {
   return addLocalDays(today, ctx.horizonWeeks * 7 - 1);
 }
 
+const EARLIEST = new Date(0);
 const LATEST = new Date(8.64e15);
 
 /**
  * The days the rule already has a row for — canceled, handed out or moved
- * included. Keyed by the day each row was BUILT for, so the window is read by
- * start wide on both sides: a row is built at most a horizon ahead of its day
- * and may be moved to any later date.
+ * included. Keyed by the day each row was BUILT for, and read with no bound on
+ * its start: a row may be moved to any day, however far before the day it was
+ * built for (and `materialiseSeries` builds days past the horizon).
  */
 async function existingDays(
-  ctx: ScheduleContext,
   tx: ShiftScheduleTransaction,
   rule: ShiftSlotSeries,
   dates: readonly LocalDate[],
 ): Promise<Set<LocalDate>> {
   const first = dates[0] as LocalDate;
   const last = dates[dates.length - 1] as LocalDate;
-  const from = zonedInstant(addLocalDays(first, -(ctx.horizonWeeks * 7 + 2)), 0, rule.timeZone);
-  const rows = await tx.listSeriesRows(rule.clientId, rule.id, from, LATEST);
+  const rows = await tx.listSeriesRows(rule.clientId, rule.id, EARLIEST, LATEST);
   const key = (row: ShiftSlot): LocalDate => row.seriesDate ?? zonedParts(row.startsAt, rule.timeZone).date;
   return new Set(rows.map(key).filter((day) => day >= first && day <= last));
 }
@@ -74,6 +73,21 @@ async function existingDays(
 async function isTaken(tx: ShiftScheduleTransaction, slot: ShiftSlot, built: readonly ShiftSlot[]): Promise<boolean> {
   if (built.some((other) => other.startsAt < slot.endsAt && slot.startsAt < other.endsAt)) return true;
   return clashesFor(tx, slot);
+}
+
+/** Why the rule cannot build `date` — its hours in a daylight-saving gap, unstorable, or taken — or null. */
+async function dayRefusal(
+  tx: ShiftScheduleTransaction,
+  rule: ShiftSlotSeries,
+  date: LocalDate,
+  slot: ShiftSlot,
+  built: readonly ShiftSlot[],
+): Promise<ShiftScheduleError | null> {
+  if (!ruleTimesExist(rule, date)) {
+    return new ShiftScheduleError('WALL_CLOCK_GAP', `The series' hours do not exist on ${date} in ${rule.timeZone}.`);
+  }
+  if (!slotIsStorable(slot)) return invalid(`The series cannot be planned on ${date} in its time zone.`);
+  return (await isTaken(tx, slot, built)) ? overlapError() : null;
 }
 
 /** One missing day: built, refused, or recorded as skipped. A day already started is left alone. */
@@ -88,14 +102,10 @@ async function placeDay(
   const now = ctx.now();
   const slot = buildRuleSlot(rule, date, ctx.createId(), now);
   if (slot.startsAt.getTime() < now.getTime()) return;
-  const storable = slotIsStorable(slot);
-  if (storable && !(await isTaken(tx, slot, outcome.built))) {
-    outcome.built.push(slot);
-  } else if (options.onConflict === 'refuse') {
-    throw storable ? overlapError() : invalid(`The series cannot be planned on ${date} in its time zone.`);
-  } else {
-    outcome.skipped.push(date);
-  }
+  const refusal = await dayRefusal(tx, rule, date, slot, outcome.built);
+  if (refusal === null) outcome.built.push(slot);
+  else if (options.onConflict === 'refuse') throw refusal;
+  else outcome.skipped.push(date);
 }
 
 /**
@@ -112,7 +122,7 @@ async function materialiseRule(
   const outcome: MaterialiseOutcome = { built: [], skipped: [] };
   const dates = occurrencesBetween(rule, options.from, options.until);
   if (dates.length === 0) return outcome;
-  const existing = await existingDays(ctx, tx, rule, dates);
+  const existing = await existingDays(tx, rule, dates);
   for (const date of dates.filter((day) => !existing.has(day))) {
     await placeDay(ctx, tx, rule, date, options, outcome);
   }

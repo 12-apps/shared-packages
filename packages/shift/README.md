@@ -118,7 +118,10 @@ const { series, slots, change } = await schedule.scheduleSeries({
   preview })` builds past the horizon on demand, or lists the days it would.
   Both are idempotent: a day that already has a row of the rule — canceled,
   moved or handed out included — is never rebuilt. A day the person is already
-  taken is skipped, recorded on the rule (`skippedDates`) and audited once.
+  taken is skipped, recorded on the rule (`skippedDates`) and audited once —
+  and so is a day whose hours fall in a daylight-saving gap, which a WRITE
+  (`scheduleSeries`, `editSeries`, `promoteToSeries`) refuses instead with
+  `WALL_CLOCK_GAP`, as `editSlot` does for one slot moved into the gap.
 - **The job.** `@12-apps/shift/jobs` declares `extend-series` (daily, leased).
   The host binds `extendSeries()` to its service and `onMaterialised(clientId,
   slotIds)` to whatever it reconciles beside the schedule.
@@ -127,8 +130,11 @@ const { series, slots, change } = await schedule.scheduleSeries({
   person, which takes it out of its series (`seriesId` null, `originSeriesId`
   kept); `rejoinSeries: true` puts it back, to the rule's own person only.
   `editSeries({ from })` closes the rule the day before `from` and opens a
-  successor (`previousSeriesId`). `promoteToSeries` turns one person's singles
-  into a rule, copying their hours and break; `demoteToSlot` ends a rule into
+  successor (`previousSeriesId`); an every-two-weeks successor with the same
+  repeat keeps the old rule's weeks, and a row already under way is kept, its
+  day left out of the successor. `promoteToSeries` turns one person's singles
+  into a rule, copying their hours and break, and refuses (`INVALID_SLOT`) a
+  single on a day the rule does not fall on; `demoteToSlot` ends a rule into
   one detached single.
 - **A rule ends when its future is canceled.** `cancelSlot` with `following`
   on a rule's row ends the rule the day before; `restoreSlot` of those rows
@@ -136,14 +142,16 @@ const { series, slots, change } = await schedule.scheduleSeries({
   `restorableReasons` — the package names none — on slots not yet over.
 - **Every rule write returns a `ScheduleChange`**, plain JSON, and
   `revertScheduleChange` undoes it in one transaction, refusing with
-  `SCHEDULE_CHANGED` when a row or rule it names has moved since. `cancelSlot`
+  `SCHEDULE_CHANGED` when a row or rule it names has moved since. It never
+  touches a row handed to another person: that row stays theirs, and the rule
+  the undo puts back leaves its day. `cancelSlot`
   keeps returning its slots; the change rides on the array as `.change`.
 - **`allowRunning: true`** on `scheduleSlot` and `editSlot` admits a slot
   already under way (a substitute); without it a past start is refused.
 
 `ShiftScheduleError` carries its own codes (`INVALID_SLOT`, `SLOT_OVERLAP`,
 `SLOT_NOT_FOUND`, `SLOT_CANCELED`, `SLOT_OVER`, `SLOT_NOT_RESTORABLE`,
-`SERIES_NOT_FOUND`, `SCHEDULE_CHANGED`) and
+`WALL_CLOCK_GAP`, `SERIES_NOT_FOUND`, `SCHEDULE_CHANGED`) and
 `SHIFT_SCHEDULE_ERROR_STATUS` maps them to HTTP statuses; `ShiftError`'s codes
 are unchanged, so a host that matches them exhaustively keeps compiling.
 

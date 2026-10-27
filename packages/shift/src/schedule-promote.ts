@@ -5,9 +5,9 @@
 import { ChangeBuilder, invalid, requireText, type ScheduleContext } from './schedule-context';
 import { editableSlot, lockUsers } from './schedule-edit';
 import { ShiftScheduleError } from './schedule-errors';
-import { ruleAuditFields } from './schedule-rule';
+import { occurrencesBetween, ruleAuditFields } from './schedule-rule';
 import { newRule, todayIn, writeRule } from './schedule-series';
-import type { DemoteToSlotInput, PromoteToSeriesInput, ScheduleWriteResult } from './schedule-series-types';
+import type { DemoteToSlotInput, PromoteToSeriesInput, ScheduleWriteResult, ShiftSlotSeries } from './schedule-series-types';
 import { addLocalDays, isKnownTimeZone, isLocalDate, isoWeekday, zonedParts, type LocalDate } from './schedule-time';
 import type { ShiftScheduleTransaction, ShiftSlot } from './schedule-types';
 
@@ -45,6 +45,13 @@ async function promotable(ctx: ScheduleContext, tx: ShiftScheduleTransaction, in
   return slots;
 }
 
+/** Every single's day must be a day of the rule: canceled, a day it does not build would simply be lost. */
+function refuseOffRuleDays(rule: ShiftSlotSeries, dates: readonly LocalDate[]): void {
+  const days = new Set(occurrencesBetween(rule, dates[0] as LocalDate, dates[dates.length - 1] as LocalDate));
+  const off = dates.filter((date) => !days.has(date));
+  if (off.length > 0) throw invalid(`The rule does not fall on ${off.join(', ')}: those slots cannot be promoted to it.`);
+}
+
 export async function promoteToSeries(ctx: ScheduleContext, input: PromoteToSeriesInput): Promise<ScheduleWriteResult> {
   requireText(input.clientId, 'clientId');
   requireText(input.actorUserId, 'actorUserId');
@@ -77,6 +84,7 @@ export async function promoteToSeries(ctx: ScheduleContext, input: PromoteToSeri
       coverage: first.coverage,
       actorUserId: input.actorUserId,
     });
+    refuseOffRuleDays(rule, dates);
     const builder = new ChangeBuilder();
     // A slot is a plan: the singles are canceled, and the rule builds their days again as its own.
     const canceled = await tx.cancelSlots({

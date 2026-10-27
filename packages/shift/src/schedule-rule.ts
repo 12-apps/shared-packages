@@ -1,6 +1,6 @@
 /**
  * The series rule as pure functions: which local days it falls on, and the
- * slot it builds on one of them. No I/O — see `schedule-materialise.ts`.
+ * slot it builds on one of them. No I/O — `schedule-series.ts` writes and builds.
  */
 import { DAY_MINUTES, invalid, validateBreak } from './schedule-context';
 import type { ShiftSeriesRepeat, ShiftSlotSeries } from './schedule-series-types';
@@ -11,6 +11,7 @@ import {
   isLocalDate,
   isoWeekday,
   localDaysBetween,
+  wallTimeExists,
   zonedInstant,
   type LocalDate,
 } from './schedule-time';
@@ -97,6 +98,17 @@ function repeatLandsOn(rule: Pick<ShiftSlotSeries, 'weekdays' | 'everyWeeks' | '
   return weeks % (rule.everyWeeks ?? 1) === 0;
 }
 
+/**
+ * Where a successor with the SAME every-two-weeks repeat starts so its on weeks
+ * stay the old rule's: `from` in an on week, else the Monday after. Its weeks
+ * are counted from its own start, so starting it in an off week would flip them.
+ */
+export function sameParityStart(rule: Pick<ShiftSlotSeries, 'everyWeeks' | 'startsOn'>, from: LocalDate): LocalDate {
+  if (rule.everyWeeks !== 2) return from;
+  const weeks = localDaysBetween(mondayOf(rule.startsOn), mondayOf(from)) / 7;
+  return weeks % 2 === 0 ? from : addLocalDays(mondayOf(from), 7);
+}
+
 /** The rule's days in `[from, until]`, inside its own bounds, skipped days left out. */
 export function occurrencesBetween(rule: ShiftSlotSeries, from: LocalDate, until: LocalDate): LocalDate[] {
   const first = from > rule.startsOn ? from : rule.startsOn;
@@ -109,9 +121,21 @@ export function occurrencesBetween(rule: ShiftSlotSeries, from: LocalDate, until
   return dates;
 }
 
+function endDateOf(rule: Pick<ShiftSlotSeries, 'startMinutes' | 'endMinutes'>, date: LocalDate): LocalDate {
+  return rule.endMinutes > rule.startMinutes ? date : addLocalDays(date, 1);
+}
+
+/** Whether the rule's start and end both exist on `date`'s wall clock — not inside a spring-forward gap. */
+export function ruleTimesExist(rule: ShiftSlotSeries, date: LocalDate): boolean {
+  return (
+    wallTimeExists(date, rule.startMinutes, rule.timeZone) &&
+    wallTimeExists(endDateOf(rule, date), rule.endMinutes, rule.timeZone)
+  );
+}
+
 /** The slot the rule plans on `date`, wall-clock hours resolved in its zone. */
 export function buildRuleSlot(rule: ShiftSlotSeries, date: LocalDate, id: string, createdAt: Date): ShiftSlot {
-  const endDate = rule.endMinutes > rule.startMinutes ? date : addLocalDays(date, 1);
+  const endDate = endDateOf(rule, date);
   return {
     id,
     clientId: rule.clientId,

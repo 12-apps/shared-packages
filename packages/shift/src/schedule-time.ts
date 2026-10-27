@@ -172,3 +172,13 @@ export function zonedInstant(date: LocalDate, minutes: number, timeZone: string)
     ),
   );
 }
+
+/**
+ * Whether `minutes` past local midnight of `date` is a time the wall clock of
+ * `timeZone` actually shows — false inside a spring-forward gap, which
+ * {@link zonedInstant} would otherwise push forward without a word.
+ */
+export function wallTimeExists(date: LocalDate, minutes: number, timeZone: string): boolean {
+  const shown = zonedParts(zonedInstant(date, minutes, timeZone), timeZone);
+  return shown.date === date && shown.minutes === minutes;
+}

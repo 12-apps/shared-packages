@@ -20,6 +20,7 @@ import type {
   ScheduleChange,
   ScheduleWriteResult,
   ShiftSlotPrior,
+  ShiftSlotSeries,
 } from './schedule-series-types';
 import { addLocalDays, zonedParts } from './schedule-time';
 import type { ShiftScheduleTransaction, ShiftSlot, ShiftSlotPatch } from './schedule-types';
@@ -137,7 +138,12 @@ async function cancelForUndo(tx: ShiftScheduleTransaction, clientId: string, ids
   return tx.cancelSlots({ clientId, slotIds: ids, canceledAt: now, canceledByUserId: actorUserId, cancelReason: 'undo' });
 }
 
-/** Retire each rule the write created: closed, and every live row of it canceled — later-built ones too. */
+/**
+ * Retire each rule the write created: closed, and every live row of it
+ * canceled — later-built ones too. A row handed to another person is theirs
+ * now and is never touched; the day it holds is left to it by the rule the
+ * undo puts back, which would otherwise build that day a second time.
+ */
 async function retireCreatedSeries(
   tx: ShiftScheduleTransaction,
   input: RevertScheduleChangeInput,
@@ -147,9 +153,11 @@ async function retireCreatedSeries(
   for (const id of input.change.createdSeriesIds) {
     const rule = await tx.getSeries(input.clientId, id);
     if (!rule) continue;
-    const rows = await tx.listSeriesRows(input.clientId, id, EARLIEST, LATEST);
-    const live = rows.filter((row) => row.canceledAt === null).map((row) => row.id);
-    builder.canceled(await cancelForUndo(tx, input.clientId, live, input.actorUserId, now));
+    const rows = (await tx.listSeriesRows(input.clientId, id, EARLIEST, LATEST)).filter((row) => row.canceledAt === null);
+    const own = rows.filter((row) => row.seriesId === id && row.userId === rule.userId);
+    const handed = rows.filter((row) => !own.includes(row));
+    builder.canceled(await cancelForUndo(tx, input.clientId, own.map((row) => row.id), input.actorUserId, now));
+    await leaveHandedDays(tx, rule, handed);
     builder.closedSeries(rule);
     const endsOn = addLocalDays(rule.startsOn, -1);
     await tx.updateSeries(input.clientId, id, { endsOn });
@@ -160,21 +168,32 @@ async function retireCreatedSeries(
       resourceType: 'shift_slot_series',
       resourceId: id,
       before: { endsOn: rule.endsOn },
-      after: { endsOn, canceled: String(live.length), reason: 'undo' },
+      after: { endsOn, canceled: String(own.length), kept: handed.length > 0 ? handed.map((row) => row.id).join(',') : null, reason: 'undo' },
     });
   }
 }
 
+/** The days rows handed out of a retired rule hold, recorded as skipped on the rule it replaced. */
+async function leaveHandedDays(tx: ShiftScheduleTransaction, rule: ShiftSlotSeries, handed: readonly ShiftSlot[]): Promise<void> {
+  if (handed.length === 0 || rule.previousSeriesId === null) return;
+  const previous = await tx.getSeries(rule.clientId, rule.previousSeriesId);
+  if (!previous) return;
+  const days = handed.map((row) => row.seriesDate ?? zonedParts(row.startsAt, rule.timeZone).date);
+  await tx.updateSeries(previous.clientId, previous.id, {
+    skippedDates: [...new Set([...previous.skippedDates, ...days])].sort(),
+  });
+}
+
 async function putBackSeriesEnds(tx: ShiftScheduleTransaction, input: RevertScheduleChangeInput, builder: ChangeBuilder): Promise<void> {
-  for (const { id, priorEndsOn } of input.change.closedSeries) {
+  for (const { id, priorEndsOn, priorCanceledFrom, priorEndsOnBeforeCancel } of input.change.closedSeries) {
     const rule = await tx.getSeries(input.clientId, id);
     if (!rule) continue;
     builder.closedSeries(rule);
-    // The end a `following` cancel set goes with the memory of that cancel.
-    const setByCancel = rule.canceledFrom !== null && rule.endsOn === addLocalDays(rule.canceledFrom, -1);
+    // The memory of a `following` cancel goes back too: an undone restore leaves the rule restorable again.
     await tx.updateSeries(input.clientId, id, {
       endsOn: priorEndsOn,
-      ...(setByCancel ? { canceledFrom: null, endsOnBeforeCancel: null } : {}),
+      canceledFrom: priorCanceledFrom,
+      endsOnBeforeCancel: priorEndsOnBeforeCancel,
     });
     await tx.writeAudit({
       clientId: input.clientId,
@@ -182,8 +201,8 @@ async function putBackSeriesEnds(tx: ShiftScheduleTransaction, input: RevertSche
       action: 'shift.schedule.series',
       resourceType: 'shift_slot_series',
       resourceId: id,
-      before: { endsOn: rule.endsOn },
-      after: { endsOn: priorEndsOn, reason: 'undo' },
+      before: { endsOn: rule.endsOn, canceledFrom: rule.canceledFrom },
+      after: { endsOn: priorEndsOn, canceledFrom: priorCanceledFrom, reason: 'undo' },
     });
   }
 }

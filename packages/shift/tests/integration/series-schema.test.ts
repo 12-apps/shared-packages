@@ -82,6 +82,16 @@ describe('the series migration', () => {
       { series_id: 'repeat-1', detached: false, origin_series_id: null, series_date: null, break_minutes: null },
     ]);
   });
+
+  it('runs twice without failing, and leaves the break CHECK validated', async () => {
+    const dirs = await migrationDirs();
+    await apply(db, dirs);
+    await apply(db, dirs.filter((dir) => dir === SERIES_MIGRATION));
+    const checks = await db.query<{ convalidated: boolean }>(
+      `SELECT "convalidated" FROM "pg_constraint" WHERE "conname" = 'shift_slots_break_check'`,
+    );
+    expect(checks.rows).toEqual([{ convalidated: true }]);
+  });
 });
 
 describe('shift_slots break', () => {

@@ -15,10 +15,10 @@ import {
   type ScheduleContext,
 } from './schedule-context';
 import { ShiftScheduleError } from './schedule-errors';
-import { ruleAuditFields } from './schedule-rule';
+import { ruleAuditFields, sameParityStart } from './schedule-rule';
 import { newRule, todayIn, writeRule } from './schedule-series';
 import type { EditSeriesInput, EditSlotInput, ScheduleWriteResult, ShiftSlotSeries } from './schedule-series-types';
-import { addLocalDays, isLocalDate, isoWeekday, zonedInstant, zonedParts, type LocalDate } from './schedule-time';
+import { addLocalDays, isLocalDate, isoWeekday, wallTimeExists, zonedInstant, zonedParts, type LocalDate } from './schedule-time';
 import type { ShiftScheduleTransaction, ShiftSlot, ShiftSlotPatch } from './schedule-types';
 
 const EARLIEST = new Date(0);
@@ -72,6 +72,13 @@ function requireWallMinute(minutes: number): void {
   if (!Number.isInteger(minutes) || minutes < 0 || minutes >= 24 * 60) throw invalid('Hours are whole minutes from 0 to 1439.');
 }
 
+/** Refuse hours a spring-forward skips: the slot would silently start or end an hour off. */
+function refuseGap(day: LocalDate, from: number, endDay: LocalDate, to: number, timeZone: string): void {
+  if (!wallTimeExists(day, from, timeZone) || !wallTimeExists(endDay, to, timeZone)) {
+    throw new ShiftScheduleError('WALL_CLOCK_GAP', `Those hours do not exist on ${day} in ${timeZone}.`);
+  }
+}
+
 /** The slot's new start and end, read on the wall clock of `timeZone`. */
 function newTimes(slot: ShiftSlot, input: EditSlotInput, timeZone: string | undefined): { startsAt: Date; endsAt: Date } {
   const { startMinutes, endMinutes, date } = input.patch;
@@ -86,10 +93,9 @@ function newTimes(slot: ShiftSlot, input: EditSlotInput, timeZone: string | unde
   const to = endMinutes ?? zonedParts(slot.endsAt, timeZone).minutes;
   requireWallMinute(from);
   requireWallMinute(to);
-  return {
-    startsAt: zonedInstant(day, from, timeZone),
-    endsAt: zonedInstant(to > from ? day : addLocalDays(day, 1), to, timeZone),
-  };
+  const endDay = to > from ? day : addLocalDays(day, 1);
+  refuseGap(day, from, endDay, to, timeZone);
+  return { startsAt: zonedInstant(day, from, timeZone), endsAt: zonedInstant(endDay, to, timeZone) };
 }
 
 /** Whose series a handed-out row may go back to: the rule's person, or — before rules — the series' own. */
@@ -214,34 +220,42 @@ async function legacyRule(tx: ShiftScheduleTransaction, input: EditSeriesInput):
   };
 }
 
-/** The old rule's rows the edit replaces from `from`, and the days its hand-edited rows keep. */
+/**
+ * The old rule's rows the edit replaces from `from`, and the days the new rule
+ * leaves to rows the edit keeps: a hand-edited row, and one already under way.
+ * Read by start from a day before `now`, not from `from`: a row built for a
+ * later day may have been moved to any day still ahead.
+ */
 async function rowsFrom(
   ctx: ScheduleContext,
   tx: ShiftScheduleTransaction,
   rule: ShiftSlotSeries,
   from: LocalDate,
 ): Promise<{ replaced: ShiftSlot[]; keptDays: LocalDate[] }> {
-  const now = ctx.now();
-  const rows = await tx.listSeriesRows(rule.clientId, rule.id, zonedInstant(addLocalDays(from, -1), 0, rule.timeZone), LATEST);
-  const ahead = rows.filter((row) => {
-    const day = row.seriesDate ?? zonedParts(row.startsAt, rule.timeZone).date;
-    return row.canceledAt === null && row.startsAt.getTime() >= now.getTime() && day >= from;
-  });
-  const kept = ahead.filter((row) => row.seriesId === rule.id && row.detached);
+  const now = ctx.now().getTime();
+  const rows = await tx.listSeriesRows(rule.clientId, rule.id, new Date(now - MAX_SLOT_MS), LATEST);
+  const dayOf = (row: ShiftSlot): LocalDate => row.seriesDate ?? zonedParts(row.startsAt, rule.timeZone).date;
+  const live = rows.filter((row) => row.canceledAt === null && row.endsAt.getTime() > now && dayOf(row) >= from);
+  const kept = live.filter((row) => row.startsAt.getTime() < now || (row.seriesId === rule.id && row.detached));
   return {
-    replaced: ahead.filter((row) => !kept.includes(row)),
-    keptDays: kept.map((row) => row.seriesDate ?? zonedParts(row.startsAt, rule.timeZone).date),
+    replaced: live.filter((row) => !kept.includes(row)),
+    keptDays: kept.map(dayOf),
   };
+}
+
+/** The patch's repeat when it names one, else the rule's own. */
+function repeatFor(rule: ShiftSlotSeries, patch: EditSeriesInput['patch']): Pick<ShiftSlotSeries, 'everyWeeks' | 'monthlyNth'> {
+  const everyWeeks = patch.everyWeeks ?? null;
+  const monthlyNth = patch.monthlyNth ?? null;
+  if (everyWeeks === null && monthlyNth === null) return { everyWeeks: rule.everyWeeks, monthlyNth: rule.monthlyNth };
+  return { everyWeeks, monthlyNth };
 }
 
 function successorOf(ctx: ScheduleContext, rule: ShiftSlotSeries, input: EditSeriesInput): ShiftSlotSeries {
   const { patch } = input;
-  const repeat =
-    (patch.everyWeeks ?? null) !== null || (patch.monthlyNth ?? null) !== null
-      ? { everyWeeks: patch.everyWeeks ?? null, monthlyNth: patch.monthlyNth ?? null }
-      : { everyWeeks: rule.everyWeeks, monthlyNth: rule.monthlyNth };
+  const repeat = repeatFor(rule, patch);
   const pick = <T>(value: T | undefined, fallback: T): T => (value === undefined ? fallback : value);
-  return newRule(
+  const next = newRule(
     ctx,
     {
       clientId: rule.clientId,
@@ -262,6 +276,9 @@ function successorOf(ctx: ScheduleContext, rule: ShiftSlotSeries, input: EditSer
     },
     rule.id,
   );
+  const sameRepeat = repeat.everyWeeks === rule.everyWeeks && repeat.monthlyNth === rule.monthlyNth;
+  // Validated as starting on `from`; an end before the moved start is a rule with no day, which is allowed.
+  return sameRepeat ? { ...next, startsOn: sameParityStart(rule, input.from) } : next;
 }
 
 async function closeBefore(

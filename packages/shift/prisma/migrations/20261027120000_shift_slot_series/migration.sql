@@ -82,12 +82,18 @@ ALTER TABLE "shift_slots" ADD COLUMN IF NOT EXISTS "break_minutes" INTEGER;
 -- Offsets from the start, so the break survives a slot across midnight or a
 -- daylight-saving change: both or neither (tested on its own, since half a pair
 -- would make the rest NULL and pass), strictly inside the slot.
-ALTER TABLE "shift_slots" ADD CONSTRAINT "shift_slots_break_check" CHECK (
-  ("break_offset_minutes" IS NULL) = ("break_minutes" IS NULL)
-  AND ("break_offset_minutes" IS NULL OR (
-    "break_offset_minutes" > 0 AND "break_minutes" > 0
-    AND "starts_at" + make_interval(mins => "break_offset_minutes" + "break_minutes") < "ends_at"
-  ))
-);
+-- Added NOT VALID, so the ALTER takes no long lock over a table with live rows,
+-- then validated on its own (a scan that lets writes through); a re-run finds
+-- the constraint already there, and validating a valid one is a no-op.
+DO $$ BEGIN
+    ALTER TABLE "shift_slots" ADD CONSTRAINT "shift_slots_break_check" CHECK (
+      ("break_offset_minutes" IS NULL) = ("break_minutes" IS NULL)
+      AND ("break_offset_minutes" IS NULL OR (
+        "break_offset_minutes" > 0 AND "break_minutes" > 0
+        AND "starts_at" + make_interval(mins => "break_offset_minutes" + "break_minutes") < "ends_at"
+      ))
+    ) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "shift_slots" VALIDATE CONSTRAINT "shift_slots_break_check";
 
 CREATE INDEX IF NOT EXISTS "shift_slots_origin_series_id_idx" ON "shift_slots"("origin_series_id");
