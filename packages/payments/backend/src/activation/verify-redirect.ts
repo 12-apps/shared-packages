@@ -1,3 +1,4 @@
+import { reportActivationFailure } from './report';
 import type { PendingVerification } from '../config/types';
 import type { ChargeInput, MerchantRef } from '../core/types';
 import type { ActivationContext } from './context';
@@ -111,6 +112,10 @@ export async function startRedirectVerification(
   try {
     snapshot = await adapter.createCharge(input, credentials);
   } catch (error) {
+    reportActivationFailure(ctx.onProviderFailure, { merchant, provider, credentials }, 'ACTIVATION', {
+      error,
+      reference: input.reference,
+    });
     return startFailure(ctx.copy, adapter.displayName, error);
   }
 
@@ -256,14 +261,18 @@ export async function pollRedirectVerification(
 
   const hints = mergedHints(pending?.slug, returned);
 
+  const reference = polledReference(pending, provider, merchant.id);
   let snapshot;
   try {
-    snapshot = await adapter.findChargeByReference(
-      polledReference(pending, provider, merchant.id),
-      credentials,
-      hints,
-    );
+    snapshot = await adapter.findChargeByReference(reference, credentials, hints);
   } catch (error) {
+    // The next tick asks again, so a blip is a warning — but a provider that
+    // never answers must not be heard only by the owner's spinner.
+    reportActivationFailure(ctx.onProviderFailure, { merchant, provider, credentials }, 'ACTIVATION_POLL', {
+      error,
+      reference,
+      severity: 'warning',
+    });
     // `pending: true`, deliberately: a poll that could not REACH the provider
     // has learned nothing about the charge. Settling it as failed cleared the
     // pending row — destroying the stored slug — and switched the provider

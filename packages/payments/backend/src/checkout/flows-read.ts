@@ -1,6 +1,7 @@
 import type { SettlementHints } from '../core/settlement-hints';
 import type { StoredCharge } from '../core/ports';
 import type { MerchantRef } from '../core/types';
+import { reportProviderFailure } from '../core/provider-failure';
 
 import { buyerCheckoutConfig } from './config';
 import {
@@ -268,6 +269,15 @@ export async function refreshBrowserKey<C, V extends object, D>(
   try {
     return runtime.respond.ok({ publicKey: await mint(payable.merchant, provider, credentials) });
   } catch (error) {
+    // The buyer only sees "try again"; the owner must hear the provider refused.
+    reportProviderFailure(runtime.config.onProviderFailure, {
+      path: 'BROWSER_KEY',
+      merchant: payable.merchant,
+      provider,
+      reference: payable.ref,
+      environment: credentials.environment,
+      error,
+    });
     // The MESSAGE only, never the error object: a provider error retains the
     // provider's parsed body, buyer tax id and all.
     runtime.log.error(

@@ -11,6 +11,7 @@ import {
 } from './card-attempt';
 import type { ActivationContext } from './context';
 import type { ActivationCopy } from './copy';
+import { reportActivationFailure } from './report';
 import { failureFor, type VerifyChargeResult } from './failure';
 import {
   ownsVerificationReference,
@@ -210,7 +211,7 @@ export async function verifyProviderCharge(
   // Give the cent back. A failed refund must NOT fail the verification — the
   // merchant demonstrably charges, which is what was being proven — so it is
   // reported instead, and the owner sees a cent they can reconcile.
-  return { ok: true, refunded: await refundCent(adapter, snapshot.providerChargeId, credentials) };
+  return { ok: true, refunded: await refundCent(adapter, snapshot.providerChargeId, credentials, refundReport(phase)) };
 }
 
 /**
@@ -250,7 +251,18 @@ async function resolveEarlierAttempt(phase: CardPhase): Promise<VerifyChargeResu
   if (outcome.kind === 'OPEN') {
     return { ok: false, reason: phase.copy.stillProcessing };
   }
+  reportActivationFailure(ctx.onProviderFailure, phase, 'ACTIVATION_POLL', {
+    error: outcome.error,
+    reference: pending.reference,
+    severity: 'warning',
+  });
   return stillUnaccounted(phase, adapter.displayName, outcome.error);
+}
+
+/** The cent that did not come back is money the owner must reconcile. */
+function refundReport(phase: CardPhase) {
+  return (failure: { error?: unknown; message?: string }) =>
+    reportActivationFailure(phase.ctx.onProviderFailure, phase, 'ACTIVATION_REFUND', failure);
 }
 
 /**
@@ -271,6 +283,7 @@ async function settleFailedCreate(
   error: unknown,
 ): Promise<VerifyChargeResult> {
   const { adapter, credentials } = phase;
+  reportActivationFailure(phase.ctx.onProviderFailure, phase, 'ACTIVATION', { error, reference });
   const failure: VerifyChargeResult = { ok: false, ...failureFor(error, phase.copy) };
   if (!adapter.findChargeByReference) return failure;
 
@@ -308,7 +321,8 @@ async function adoptProvenAttempt(
 ): Promise<VerifyChargeResult> {
   const { ctx, adapter, merchant, provider, credentials } = phase;
   const refunded =
-    outcome.alreadyRefunded || (await refundCent(adapter, outcome.providerChargeId, credentials));
+    outcome.alreadyRefunded ||
+    (await refundCent(adapter, outcome.providerChargeId, credentials, refundReport(phase)));
   await ctx.settings.setPendingVerification(merchant, provider, null);
   return { ok: true, refunded };
 }

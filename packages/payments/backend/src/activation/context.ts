@@ -4,6 +4,7 @@ import type { ProviderRegistry } from '../core/registry';
 import type { MerchantRef, ResolvedCredentials } from '../core/types';
 import type { MerchantWebhookUrlResolver } from '../core/webhook-url';
 import type { ActivationCopy } from './copy';
+import type { ProviderFailureReporter } from '../core/provider-failure';
 
 /**
  * What the activation/verification flow needs from a host (FUT-558).
@@ -78,6 +79,11 @@ export interface ActivationContext {
    * host decisions" — half of which stopped being true the moment the vendor
    * call moved into this package.
    */
+  /**
+   * Told of every provider failure this flow meets (FUT-4074) — the create,
+   * the refund of the cent, the poll. See `activation/report.ts`.
+   */
+  onProviderFailure?: ProviderFailureReporter;
   mintCardPublicKey?: (
     merchant: MerchantRef,
     provider: string,

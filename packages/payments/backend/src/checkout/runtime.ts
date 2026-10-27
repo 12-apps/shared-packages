@@ -1,4 +1,5 @@
 import type { ApplePayIdentityPort } from '../apple-pay/types';
+import type { ProviderFailureReporter } from '../core/provider-failure';
 import type { ProviderConfigStore } from '../config/types';
 import { providerCorrelationId } from '../core/client-view';
 import type { PaymentsGateway } from '../core/gateway';
@@ -128,6 +129,12 @@ export interface PaymentFlowsBEConfig<Caller, View extends object, Display = unk
    * logged and cannot mask the refusal the buyer is owed.
    */
   onChargeError?: (merchant: MerchantRef, error: unknown) => Promise<void> | void;
+  /**
+   * Told when a provider call the CHECKOUT makes itself fails (FUT-4074) — the
+   * browser key. Charge attempts are reported by the gateway's own
+   * `onProviderFailure`; pass the same function to both.
+   */
+  onProviderFailure?: ProviderFailureReporter;
   respond?: CheckoutResponder;
   logger?: CheckoutLogger;
 

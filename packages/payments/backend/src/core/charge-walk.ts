@@ -174,7 +174,7 @@ async function settleStopped(
       failureBucket: 'AMBIGUOUS',
       probeResult: 'NOT_CHARGED',
       error: 're-probe on retry proved no charge exists',
-    });
+    }, 'RESOLVED_ON_RETRY');
     return null;
   }
 
@@ -189,7 +189,7 @@ async function settleStopped(
       probeResult: 'CHARGE_FOUND',
       providerChargeId: outcome.snapshot.providerChargeId,
       error: 're-probe on retry found the charge',
-    });
+    }, 'RESOLVED_ON_RETRY');
     return persistCreated(deps, ctx, provider, outcome.snapshot, recorded);
   }
 

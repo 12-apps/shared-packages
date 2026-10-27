@@ -17,7 +17,8 @@ import {
   UnknownProviderError,
   UnsupportedOperationError,
 } from './errors';
-import { type ProbeResult, classifyFailure, describeFailure } from './failover';
+import { classifyFailure, describeFailure } from './failover';
+import { probe } from './charge-probe';
 import type { StoredCharge } from './ports';
 import { isOutageSignal } from './provider-health';
 import type { WalkFailure } from './walk-failure';
@@ -33,21 +34,7 @@ import type {
 } from './types';
 
 export type { AttemptContext, ChargeWalkDeps, FailoverPolicy };
-export { persistCreated, recordAttempt };
-
-/**
- * Statuses that mean the provider is holding — or has held — the buyer's
- * money. Finding one of these during a probe ends the walk: the charge
- * exists, so creating a second one elsewhere would bill the buyer twice.
- */
-const LIVE_STATUSES: ReadonlySet<ChargeSnapshot['status']> = new Set([
-  'PENDING',
-  'AUTHORIZED',
-  'PAID',
-  'REFUNDED',
-  'PARTIALLY_REFUNDED',
-]);
-
+export { persistCreated, probe, recordAttempt };
 
 /**
  * ONE PROVIDER'S TURN in a failover walk: attempt the charge, classify what
@@ -76,35 +63,6 @@ interface Skipped {
   reason: SkipReason;
 }
 
-
-/**
- * The reconciliation probe: ask the provider whether the charge we could not
- * confirm actually exists.
- *
- * A thrown probe error is NOT converted to "no charge". That distinction is
- * the whole safety property — an unanswerable question must stop the walk,
- * never quietly authorize a second attempt elsewhere.
- */
-export async function probe(
-  adapter: PaymentProviderAdapter,
-  reference: string,
-  creds: ResolvedCredentials,
-): Promise<{ result: ProbeResult; snapshot?: ChargeSnapshot; error?: unknown }> {
-  if (!adapter.findChargeByReference) return { result: 'UNSUPPORTED' };
-  try {
-    const found = await adapter.findChargeByReference(reference, creds);
-    if (!found) return { result: 'NOT_CHARGED' };
-    // A charge that was canceled or expired never took the buyer's money and
-    // never will, so it is not a reason to stop: the next provider can
-    // safely be tried. Anything else is live money.
-    if (!LIVE_STATUSES.has(found.status) && found.status !== 'DECLINED') {
-      return { result: 'NOT_CHARGED', snapshot: found };
-    }
-    return { result: 'CHARGE_FOUND', snapshot: found };
-  } catch (error) {
-    return { result: 'PROBE_FAILED', error };
-  }
-}
 
 /**
  * Handle a provider that worked and said no. Under the default policy a
@@ -269,6 +227,8 @@ async function stepFailed(
 ): Promise<StepResult> {
   const bucket = classifyFailure(error);
   const message = describeFailure(error);
+  // Carried to the failure report only (FUT-4074): its status and codes.
+  ctx = { ...ctx, cause: error };
 
   // Before any of the walk's own decisions, and never in place of them: the
   // breaker changes where the NEXT charge starts, not what happens to this one.
@@ -321,7 +281,7 @@ async function instrumentFor(
     outcome: 'SKIPPED',
     failureBucket: 'DEFINITELY_NOT_CHARGED',
     error: forProvider.reason,
-  });
+  }, 'NO_INSTRUMENT');
   if (pinned) throw new UnsupportedOperationError(provider, forProvider.reason);
   return { provider, message: forProvider.reason, kind: 'SKIP' };
 }
@@ -337,15 +297,19 @@ export async function step(
 ): Promise<StepResult> {
   const resolved = await resolveProvider(deps, ctx.merchant, provider, ctx.input.method);
   if ('skip' in resolved) {
+    // A misconfigured member (not registered, not connected) IS reported; a
+    // provider that simply cannot do this method is the chain working.
     await recordAttempt(deps, ctx, provider, {
       outcome: 'SKIPPED',
       failureBucket: 'DEFINITELY_NOT_CHARGED',
       error: resolved.skip,
-    });
+    }, resolved.reason === 'UNSUPPORTED_METHOD' ? 'METHOD_NOT_OFFERED' : undefined);
     if (pinned) throw skipError(provider, resolved, ctx.input.method);
     return { kind: 'ADVANCE', failure: { provider, message: resolved.skip, kind: 'SKIP' } };
   }
   const { adapter, creds } = resolved;
+  // From here on every report names the account's environment (FUT-4074).
+  ctx = { ...ctx, environment: creds.environment };
 
   // Buyer requirements the charge does not meet (FUT-595) — `customer-gate.ts`.
   const unmet = await gateCustomerRequirements(deps, ctx, provider, adapter, pinned);
@@ -360,7 +324,7 @@ export async function step(
       outcome: 'SKIPPED',
       failureBucket: 'DEFINITELY_NOT_CHARGED',
       error: message,
-    });
+    }, 'BREAKER_OPEN');
     return { kind: 'ADVANCE', failure: { provider, message, kind: 'SKIP' } };
   }
 

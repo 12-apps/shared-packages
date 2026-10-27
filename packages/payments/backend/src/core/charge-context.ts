@@ -2,8 +2,9 @@ import { ChargeNotPersistedError, PaymentsError } from './errors';
 import type { AttemptOutcome, FailureBucket, ProbeResult } from './failover';
 import type { AttemptLedger, ChargeStore, CredentialStore, StoredCharge } from './ports';
 import type { ProviderHealth } from './provider-health';
+import { type ProviderFailureReporter, type ProviderFailureSilence, reportProviderFailure } from './provider-failure';
 import type { ProviderRegistry } from './registry';
-import type { ChargeInput, ChargeSnapshot, MerchantRef, ProviderName } from './types';
+import type { ChargeInput, ChargeSnapshot, MerchantRef, PaymentEnvironment, ProviderName } from './types';
 
 /**
  * The context a failover walk carries, and the storage operations every step
@@ -36,12 +37,18 @@ export interface ChargeWalkDeps {
    * nothing keeps the walk it already had.
    */
   health?: ProviderHealth;
+  /** Told of every non-success attempt (FUT-4074) — `provider-failure.ts`. */
+  onProviderFailure?: ProviderFailureReporter;
 }
 
 export interface AttemptContext {
   merchant: MerchantRef;
   input: ChargeInput;
   attemptNo: number;
+  /** The provider account's environment, once its credentials resolved. */
+  environment?: PaymentEnvironment;
+  /** What the provider threw on this attempt — read for the failure report only. */
+  cause?: unknown;
 }
 /**
  * Most ledger writes are best-effort ON PURPOSE. A charge that reached the
@@ -56,6 +63,12 @@ export interface AttemptContext {
  * that a provider may be holding an unresolved charge; lose it and a retry
  * has nothing to re-probe and will issue a fresh request. Swallowing that
  * failure would quietly delete the guarantee this whole module exists for.
+ *
+ * Every outcome but `SUCCEEDED` is also REPORTED to the host (FUT-4074) —
+ * here, the one place every attempt passes, so no branch of the walk can
+ * forget it. `silence` names the documented reason a skip is not; the report
+ * goes out whether or not the ledger write landed, since a lost row is no
+ * reason to also lose the alert.
  */
 export async function recordAttempt(
   deps: ChargeWalkDeps,
@@ -68,7 +81,9 @@ export async function recordAttempt(
     providerChargeId?: string | null;
     error?: string | null;
   },
+  silence?: ProviderFailureSilence,
 ): Promise<boolean> {
+  if (fields.outcome !== 'SUCCEEDED' && !silence) reportAttempt(deps, ctx, provider, fields);
   try {
     await deps.attempts.record({
       merchant: ctx.merchant,
@@ -82,6 +97,27 @@ export async function recordAttempt(
   } catch {
     return false;
   }
+}
+
+function reportAttempt(
+  deps: ChargeWalkDeps,
+  ctx: AttemptContext,
+  provider: ProviderName,
+  fields: Parameters<typeof recordAttempt>[3],
+): void {
+  reportProviderFailure(deps.onProviderFailure, {
+    path: 'CHARGE',
+    merchant: ctx.merchant,
+    provider,
+    reference: ctx.input.reference,
+    outcome: fields.outcome,
+    failureBucket: fields.failureBucket ?? null,
+    probeResult: fields.probeResult ?? null,
+    attemptNo: ctx.attemptNo,
+    environment: ctx.environment ?? null,
+    ...(ctx.cause === undefined ? {} : { error: ctx.cause }),
+    message: fields.error ?? null,
+  });
 }
 /**
  * Health bookkeeping, always best-effort.
