@@ -222,7 +222,7 @@ describe("a CNPJ on file", () => {
     await waitFor(() => expect(screen.getByTestId("list-payer").textContent).toContain("Pagando como Ana Teste · CNPJ ✓"));
   });
 
-  it("lets a document typed now win over the kind on file", async () => {
+  it("lets the document the host hands over win over the kind on file", async () => {
     renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: true, taxIdKindOnFile: "CNPJ", buyer: { name: "Ana Teste", taxId: "52998224725" } });
     await screen.findByTestId("payment-list");
     fireEvent.click(radio("list-option-PIX"));

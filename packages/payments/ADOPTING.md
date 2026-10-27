@@ -564,7 +564,7 @@ order CREATION never enter the package; they arrive as explicit props:
 | `onPaid()` | no | the order settled PAID — re-read your server-emptied cart |
 | `comanda` | no | `{ scope, totalLabel, totalItems }` when settling a comanda instead of the cart |
 | `taxIdOnFile` | no | `true`: the list shows the payer line instead of the CPF field (FUT-465); its "Alterar" reveals the field |
-| `taxIdKindOnFile` | no | `"CPF"` or `"CNPJ"`: which document is on file, for a host that never hands the digits over — the payer line then names it ("CNPJ ✓") instead of falling back to "CPF". A document in `defaultBuyer.taxId` or typed in the list wins (FUT-4080) |
+| `taxIdKindOnFile` | no | `"CPF"` or `"CNPJ"`: which document is on file, for a host that never hands the digits over — the payer line then names it ("CNPJ ✓") instead of falling back to "CPF". A document in `defaultBuyer.taxId` or typed in the list wins (FUT-4080). Mount `CheckoutFlow` to pass it: `createPaymentFlows`'s Checkout reads its buyer from `useBuyerDefaults`, which does not carry the kind yet |
 | `providerConfig` | no | the `GET /api/checkout/config` answer (`fetchCheckoutConfig` is exported); `null` while loading degrades safely |
 | `tenantSlug` | no | scopes the saved-card list to the store being paid |
 | `confirmationExtra` | no | host content on the PAID confirmation, ABOVE the action row — put what the buyer has to DO next here, beside the way out |
