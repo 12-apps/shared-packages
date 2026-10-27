@@ -123,55 +123,71 @@ export function debitAddressReason(debit: DebitAddress | null, copy: PaymentList
   return copy.address.missing;
 }
 
+type AddressWords = NonNullable<PaymentListDebitCopy["address"]>;
+
+/** The CEP and the number, side by side while both fit and stacked at 320px. */
+function CepAndNumber({ debit, words }: { debit: DebitAddress; words: AddressWords }): JSX.Element {
+  const { Input } = useCheckoutComponents();
+  const notFound = debit.lookup === "missing";
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, "& > *": { flex: "1 1 140px" } }}>
+      <Input
+        label={words.postalCode}
+        type="text"
+        inputMode="numeric"
+        variant="outlined"
+        size="md"
+        fullWidth
+        autoComplete="billing postal-code"
+        value={debit.postalCode}
+        error={notFound}
+        helperText={notFound ? words.notFound : undefined}
+        onChange={(event) => debit.setPostalCode(event.target.value)}
+        data-testid="debit-address-cep"
+      />
+      <Input
+        label={words.number}
+        type="text"
+        variant="outlined"
+        size="md"
+        fullWidth
+        autoComplete="billing address-line2"
+        value={debit.number}
+        onChange={(event) => debit.setNumber(event.target.value)}
+        data-testid="debit-address-number"
+      />
+    </Box>
+  );
+}
+
 /** CEP, number and — when the CEP names none — the street, inside the debit row. */
 export function DebitAddressFields({ copy }: { copy: PaymentListDebitCopy }): JSX.Element | null {
   const debit = useDebitAddress();
-  const { Input } = useCheckoutComponents();
+  const { Input, Text } = useCheckoutComponents();
   const words = copy.address;
   if (!debit?.asks || !words) return null;
-  const notFound = debit.lookup === "missing";
   return (
-    <Box data-testid="debit-address" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, "& > *": { flex: "1 1 140px" } }}>
-        <Input
-          label={words.postalCode}
-          type="text"
-          inputMode="numeric"
-          variant="outlined"
-          size="md"
-          fullWidth
-          autoComplete="billing postal-code"
-          value={debit.postalCode}
-          error={notFound}
-          helperText={notFound ? words.notFound : words.hint}
-          onChange={(event) => debit.setPostalCode(event.target.value)}
-          data-testid="debit-address-cep"
-        />
-        <Input
-          label={words.number}
-          type="text"
-          variant="outlined"
-          size="md"
-          fullWidth
-          autoComplete="billing address-line2"
-          value={debit.number}
-          onChange={(event) => debit.setNumber(event.target.value)}
-          data-testid="debit-address-number"
-        />
+    <Box data-testid="debit-address" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <CepAndNumber debit={debit} words={words} />
+        {debit.lookup === "found" && !debit.streetKnown ? (
+          <Input
+            label={words.street}
+            type="text"
+            variant="outlined"
+            size="md"
+            fullWidth
+            autoComplete="billing address-line1"
+            value={debit.street}
+            onChange={(event) => debit.setStreet(event.target.value)}
+            data-testid="debit-address-street"
+          />
+        ) : null}
       </Box>
-      {debit.lookup === "found" && !debit.streetKnown ? (
-        <Input
-          label={words.street}
-          type="text"
-          variant="outlined"
-          size="md"
-          fullWidth
-          autoComplete="billing address-line1"
-          value={debit.street}
-          onChange={(event) => debit.setStreet(event.target.value)}
-          data-testid="debit-address-street"
-        />
-      ) : null}
+      {/* Under the fields, not under the CEP: stacked at 320px it would sit between the CEP and the number. */}
+      <Text variant="caption" size="xs" color="secondary" as="p" style={{ margin: 0 }} data-testid="debit-address-hint">
+        {words.hint}
+      </Text>
     </Box>
   );
 }
