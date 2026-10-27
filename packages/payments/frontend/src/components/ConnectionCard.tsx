@@ -54,7 +54,11 @@ export function ConnectionFacts({
   // row, which also carries the "AMBIENTE" label — makes that assertion read
   // the whole card. Every consumer of this id wants the one string.
   const facts: { key: string; value: string; testId?: string }[] = [
-    { key: copy.accountLabel, value: account?.accountLabel ?? account?.accountId ?? copy.accountHeading(displayName) },
+    {
+      key: copy.accountLabel,
+      value: account?.accountLabel ?? account?.accountId ?? copy.accountHeading(displayName),
+      testId: 'payments-connected-identity',
+    },
     { key: copy.connectionLabel, value: copy.authorizedAt(displayName) },
     {
       key: copy.environmentLabel,

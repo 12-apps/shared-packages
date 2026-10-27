@@ -60,11 +60,12 @@ test('the full round trip: prepare, begin, consent, callback, connected', async 
   // The host erased the outcome query, so a reload cannot replay it.
   await expect(page).toHaveURL(/#\/payments-provider-connect$/);
 
-  // WHICH account is connected: identity, scope chip, sealed environment.
-  await expect(page.getByTestId('payments-connected-account')).toBeVisible();
-  await expect(page.getByTestId('payments-connected-account')).toContainText(
+  // WHICH account is connected: identity (the facts grid's Conta, its one
+  // place since FUT-4071), scope chip, sealed environment.
+  await expect(page.getByTestId('payments-connected-identity')).toHaveText(
     'Loja Harness (cerrado)',
   );
+  await expect(page.getByTestId('payments-connected-account')).toBeVisible();
   await expect(page.getByTestId('payments-connected-account')).toContainText(
     'Consultar pagamentos',
   );
