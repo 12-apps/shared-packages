@@ -1,4 +1,4 @@
-import type { SupersededWhy } from '../core/hosted-retire';
+import type { SupersededWhy, VoidOutcome } from '../core/hosted-retire';
 import type { Money, PaymentMethodKind, ProviderName } from '../core/types';
 
 /**
@@ -102,11 +102,16 @@ export interface ChargeCorrelationPort {
    */
   abandon?(ref: string): Promise<string>;
   /**
-   * A hosted link this payable held was MOVED PAST and is not voided
-   * (FUT-4072): a newer charge is what the buyer holds now, and the old link is
-   * still payable at its provider — no `cancelCharge`, a void that failed or
-   * was not confirmed — or the provider answered the void with a payment
-   * (`PAID_BEFORE_VOID`: the buyer paid it in the window).
+   * A charge of this payable was SUPERSEDED and not voided (FUT-4072), `why`:
+   *
+   *  - `VOID_UNSUPPORTED` / `VOID_FAILED` / `VOID_NOT_CONFIRMED` — a hosted link
+   *    MOVED PAST: a newer charge is what the buyer holds, and the old link is
+   *    still payable at its provider;
+   *  - `PAID_ELSEWHERE` — the charge raised in this attempt, made redundant
+   *    because an older link turned out PAID (the payable was settled with
+   *    that one); still payable, `voidOutcome` says why;
+   *  - `DOUBLE_PAID` — `charge` (an older link) AND `replacedBy` (paid in this
+   *    attempt) were BOTH paid. Refund `charge`.
    *
    * Record it so a later payment of `charge` is handled as a SUPERSEDED payment
    * — audited and reconciled, never applied as if it were the payable's
@@ -126,5 +131,6 @@ export interface ChargeCorrelationPort {
     amount: Money;
     replacedBy: AttachedCharge;
     why: SupersededWhy;
+    voidOutcome?: VoidOutcome;
   }): Promise<void>;
 }

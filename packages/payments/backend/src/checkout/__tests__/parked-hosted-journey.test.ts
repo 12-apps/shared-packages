@@ -262,9 +262,9 @@ describe('a void the provider answers with a payment (PAID_BEFORE_VOID)', () => 
     // beta's fresh QR cannot be voided here, so it is marked and recorded —
     // replaced by the payment the buyer already made.
     const fresh = world.charges.all().find((row) => row.provider === 'beta');
-    expect(world.superseded.map((s) => [s.snapshot.providerChargeId, s.replacedBy.providerChargeId, s.why])).toEqual([
-      [fresh?.providerChargeId, link?.providerChargeId, 'VOID_UNSUPPORTED'],
-    ]);
+    expect(
+      world.superseded.map((s) => [s.snapshot.providerChargeId, s.replacedBy.providerChargeId, s.why, s.voidOutcome]),
+    ).toEqual([[fresh?.providerChargeId, link?.providerChargeId, 'PAID_ELSEWHERE', 'VOID_UNSUPPORTED']]);
     expect(fresh?.snapshot.superseded?.replacedBy).toBe(link?.providerChargeId);
     expect(world.reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'alpha']]);
     expect(world.statusOf(link ?? held.answer)).toBe('PAID');
@@ -301,6 +301,54 @@ describe('a void the provider answers with a payment (PAID_BEFORE_VOID)', () => 
     expect(world.correlation.pending.map((p) => p.charge.providerChargeId)).toEqual([link]);
     expect(world.correlation.superseded.map((s) => [s.charge.provider, s.replacedBy.providerChargeId])).toEqual([
       ['beta', link],
+    ]);
+  });
+
+  it('a card PAID in this request while the old link was paid too: DOUBLE_PAID, the card is the answer', async () => {
+    const world = parkedHostedWorld({ alphaVoids: 'paid' });
+    const link = await world.park('parked');
+    world.credentials.chain = ['beta', 'alpha'];
+
+    const held = await world.payHeld('CARD', { tokensByProvider: { beta: 'tok_beta' } });
+
+    expect([held.answer.provider, held.answer.status, held.paidEarlier]).toEqual(['beta', 'PAID', false]);
+    expect(world.superseded.map((s) => [s.snapshot.providerChargeId, s.replacedBy.providerChargeId, s.why])).toEqual([
+      [link?.providerChargeId, held.answer.providerChargeId, 'DOUBLE_PAID'],
+    ]);
+    const old = world.charges.all().find((row) => row.providerChargeId === link?.providerChargeId);
+    expect([old?.snapshot.status, old?.snapshot.superseded?.why]).toEqual(['PAID', 'DOUBLE_PAID']);
+    expect(world.reports.some((r) => r.message.includes('BOTH paid'))).toBe(true);
+  });
+
+  it('through the checkout: a double-paid card is recorded approved, never settled with the old link', async () => {
+    const paidOnVoid = testAdapter('alpha', { tokenization: 'REDIRECT', hosted: true });
+    const world = setupCheckoutWorld({
+      chain: [
+        {
+          name: 'alpha',
+          adapter: {
+            ...paidOnVoid,
+            async cancelCharge(providerChargeId: string) {
+              return { ...stubPendingSnapshot('alpha', providerChargeId), status: 'PAID' as const, amount: BRL(7500) };
+            },
+          },
+        },
+        browserBeta,
+      ],
+      payable: { method: 'CARD' },
+    });
+    const card = { orderId: REF, card: { tokensByProvider: { beta: 'tok_beta' } } };
+    await call(world.routes, 'POST', '/charge', card);
+    const link = world.correlation.pending[0]?.charge.providerChargeId;
+
+    world.credentials.setChain(MERCHANT, ['beta', 'alpha']);
+    const paid = await call(world.routes, 'POST', '/charge', card);
+
+    expect(paid.status).toBe(200);
+    expect(world.correlation.cardOutcomes).toEqual([{ ref: REF, approved: true, amount: BRL(7500) }]);
+    expect(world.correlation.settlements).toEqual([]);
+    expect(world.correlation.superseded.map((s) => [s.charge.providerChargeId, s.replacedBy.provider, s.why])).toEqual([
+      [link, 'beta', 'DOUBLE_PAID'],
     ]);
   });
 

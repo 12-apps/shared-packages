@@ -59,6 +59,12 @@ export async function providersStillWalkedPast(
   const walkedPast = await providersWalkedPast(attempts, merchant, idempotencyKey);
   const still: ProviderName[] = [];
   for (const provider of new Set(walkedPast)) {
+    // `isAvailable` is not a pure read: once a provider's cooldown has elapsed
+    // it lets ONE half-open trial through, closing the circuit, and asking here
+    // spends that step. That is acceptable, and in fact what is wanted: the
+    // answer is then "available", so the checkout walks the chain — and the
+    // walk's own call is the trial, against a circuit that will re-open on the
+    // next outage signal exactly as it would have.
     if (!(await health.isAvailable(provider))) still.push(provider);
   }
   return still;

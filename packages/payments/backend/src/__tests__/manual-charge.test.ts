@@ -204,7 +204,7 @@ describe('automatic-only charging, for a lane nobody watches', () => {
       log: { warn: () => undefined, error: () => undefined },
     });
 
-    const raised = await raise({
+    const { answer: raised } = await raise({
       merchant: TENANT,
       reference: 'market-2',
       amount: pixInput('x').amount,

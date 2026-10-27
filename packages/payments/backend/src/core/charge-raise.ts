@@ -4,7 +4,7 @@ import type { ChargeQueryStore } from './charge-queries';
 import { hostedChargePayable, pixChargePayable } from './charge-reuse';
 import { UnsupportedOperationError } from './errors';
 import { judgeParkedHosted, type ChainMember } from './hosted-landing';
-import { answerHeld, type SupersededRecorder } from './hosted-retire';
+import { answerHeld, type HeldAnswer, type SupersededRecorder } from './hosted-retire';
 import type { ProviderFailureReporter } from './provider-failure';
 import { attemptIdempotencyKey, attemptReference } from './reference';
 import type {
@@ -113,6 +113,9 @@ export interface ChargeRaiseDeps {
   /** Told when a moved-past link turns out to have been paid before its void. */
   onProviderFailure?: ProviderFailureReporter;
 }
+
+/** What `createChargeRaiser` resolves: the charge to answer with, and whether it was paid EARLIER. */
+export type ChargeRaiseResult = HeldAnswer;
 
 export interface RaiseChargeRequest {
   merchant: MerchantRef;
@@ -249,18 +252,19 @@ function reason(error: unknown): string {
  * the buyer needs a message, not a stack trace. Only a transport or account
  * failure throws, plus {@link ChargeIdentityError} for rule 3 above.
  *
- * It may answer with an EARLIER charge of the reference whose status is PAID
- * (FUT-4072): a parked link the buyer paid while this raise was voiding it. Its
- * `providerChargeId` is that charge's; treat it as settled, not as something to
- * present for payment.
+ * It resolves `{ answer, paidEarlier }` (FUT-4072). `paidEarlier` means
+ * `answer` is an EARLIER charge of the reference — a parked link the buyer paid
+ * while this raise was voiding it — not one raised or reused now: SETTLE the
+ * reference with it and show paid. Never redirect to it, attach it as pending,
+ * record it as this attempt's instrument use, or refuse it as a mismatch.
  */
 export function createChargeRaiser(deps: ChargeRaiseDeps) {
-  return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeSnapshot> {
+  return async function raiseCharge(request: RaiseChargeRequest): Promise<ChargeRaiseResult> {
     const { live, movedPast } = await reusableCharge(deps, request);
     // A moved-past link the void finds PAID is the answer instead (FUT-4072):
     // the buyer paid it, and the charge they were about to hold is retired.
-    const answer = async (held: ChargeSnapshot) =>
-      (await answerHeld(deps, { merchant: request.merchant, reference: request.reference, movedPast, held })).answer;
+    const answer = (held: ChargeSnapshot) =>
+      answerHeld(deps, { merchant: request.merchant, reference: request.reference, movedPast, held });
     if (live) return answer(live);
 
     const attempt = await deps.charges.countByReference(request.merchant, request.reference);

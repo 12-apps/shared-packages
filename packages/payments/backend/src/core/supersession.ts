@@ -16,17 +16,28 @@ import type { ChargeSnapshot } from './types';
  * host's webhook reaction sees `snapshot.superseded` on it.
  */
 
-/**
- * Why a moved-past charge is still the buyer's to pay. A link the void found
- * already PAID is not superseded: it is the payment (`hosted-retire.ts`).
- */
-export type SupersededWhy =
+/** Why a void left a charge payable at its provider. */
+export type VoidOutcome =
   /** The provider has no `cancelCharge`. */
   | 'VOID_UNSUPPORTED'
   /** The void threw: network, credentials, a disabled provider, a refusal. */
   | 'VOID_FAILED'
   /** The provider answered the void with a charge that is still PENDING. */
   | 'VOID_NOT_CONFIRMED';
+
+/**
+ * Why a charge was superseded (`hosted-retire.ts`):
+ *
+ *  - a {@link VoidOutcome} — a moved-past link replaced by the charge the buyer
+ *    holds now, which the void could not take back;
+ *  - `PAID_ELSEWHERE` — the charge raised for the buyer in THIS attempt, made
+ *    redundant because the void of an older link found that link already
+ *    PAID; it could not be voided either (`voidOutcome` says why);
+ *  - `DOUBLE_PAID` — BOTH were paid: the older link (the superseded one) and
+ *    the charge the buyer paid in this attempt. Money moved twice; one must be
+ *    refunded.
+ */
+export type SupersededWhy = VoidOutcome | 'PAID_ELSEWHERE' | 'DOUBLE_PAID';
 
 export interface ChargeSupersession {
   /** ISO-8601 instant the replacement was recorded. */

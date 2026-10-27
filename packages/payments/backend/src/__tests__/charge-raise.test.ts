@@ -83,7 +83,7 @@ describe('rule 1 — reuse is checked before the ordinal is read', () => {
     const live = snapshot({ providerChargeId: 'LIVE', pix: { qrText: 'QR' } } as never);
     const { d } = deps({ pixPayable: [{ snapshot: live }] });
 
-    expect(await createChargeRaiser(d)(REQUEST)).toBe(live);
+    expect(await createChargeRaiser(d)(REQUEST)).toEqual({ answer: live, paidEarlier: false });
     // Bumping here would hand the NEXT real attempt a key one ahead of its row.
     expect(d.charges.countByReference).not.toHaveBeenCalled();
     expect(d.gateway.charge).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('rule 2 — hosted is checked first, and for either method', () => {
     const link = snapshot({ providerChargeId: 'LINK', hostedCheckoutUrl: 'https://pay/x' });
     const { d } = deps({ payable: [{ snapshot: link }] });
 
-    const got = await createChargeRaiser(d)({ ...REQUEST, method: 'CARD' });
+    const { answer: got } = await createChargeRaiser(d)({ ...REQUEST, method: 'CARD' });
 
     expect(got).toBe(link);
     expect(d.gateway.charge).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe('rule 2 — hosted is checked first, and for either method', () => {
     const link = snapshot({ providerChargeId: 'LINK', hostedCheckoutUrl: 'https://pay/x' });
     const { d } = deps({ payable: [{ snapshot: link }] });
 
-    const got = await createChargeRaiser(d)({
+    const { answer: got } = await createChargeRaiser(d)({
       ...REQUEST,
       method: 'CARD',
       card: { wallet: { type: 'APPLE_PAY', key: '{"paymentData":"x"}' } },
@@ -217,7 +217,7 @@ describe('rule 4 — superseded codes are voided only after the new charge is go
       }) as unknown as ChargeRaiseDeps['gateway']['cancelCharge'],
     });
 
-    const got = await createChargeRaiser(d)(REQUEST);
+    const { answer: got } = await createChargeRaiser(d)(REQUEST);
 
     expect(got.providerChargeId).toBe('NEW');
     expect(calls.warn.join()).toContain('OLD');

@@ -122,7 +122,13 @@ function rowToStoredCharge(row: ChargeRow): StoredCharge {
   };
 }
 
-/** How many of a payable's newest rows the poll looks through for one not superseded. */
+/**
+ * How many of a payable's newest rows the poll looks through for one not
+ * superseded (FUT-4072). A payable holds a handful of attempts; a superseded
+ * row is never newer than more than one or two live ones. Past 25 superseded
+ * rows in a row the poll answers null — "nothing to reconcile", the same as a
+ * payable with no charge — and the webhook and the sweep still settle it.
+ */
 const LATEST_WINDOW = 25;
 
 /** Every attempt reference of one payable, under one merchant. */

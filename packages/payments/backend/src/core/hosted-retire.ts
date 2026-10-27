@@ -1,10 +1,10 @@
 import type { ChargeQueryStore } from './charge-queries';
 import { UnsupportedOperationError } from './errors';
 import { reportProviderFailure, type ProviderFailureReporter } from './provider-failure';
-import type { SupersededWhy } from './supersession';
+import type { SupersededWhy, VoidOutcome } from './supersession';
 import type { ChargeSnapshot, ChargeStatus, MerchantRef } from './types';
 
-export type { SupersededWhy } from './supersession';
+export type { SupersededWhy, VoidOutcome } from './supersession';
 
 /**
  * RETIRING THE HOSTED LINKS A CHECKOUT MOVED PAST (FUT-4072).
@@ -29,7 +29,8 @@ export type { SupersededWhy } from './supersession';
  *     the buyer paid the old link in the window) is not superseded — it IS the
  *     payment. It is logged as an error, reported to `onProviderFailure`, and
  *     becomes the buyer's answer ({@link answerHeld}); the charge that was
- *     about to replace it is retired against it instead.
+ *     about to replace it is retired against it instead (`PAID_ELSEWHERE`) —
+ *     unless that one was paid too, which is a `DOUBLE_PAID` to refund.
  *
  * ONLY ONCE THE CHARGE THE BUYER HOLDS IS LIVE. A declined or failed charge
  * leaves the buyer with nothing else to pay, and a recorded-superseded link they
@@ -51,9 +52,11 @@ export interface SupersededCharge {
   reference: string;
   /** The moved-past charge, as last known. */
   snapshot: ChargeSnapshot;
-  /** The charge that replaced it. */
+  /** The charge that replaced it — for `DOUBLE_PAID`, the other payment. */
   replacedBy: ChargeSnapshot;
   why: SupersededWhy;
+  /** For `PAID_ELSEWHERE`: why this charge's own void did not take it back. */
+  voidOutcome?: VoidOutcome;
 }
 
 /**
@@ -111,7 +114,7 @@ export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Pro
   }
   let paid: ChargeSnapshot | null = null;
   for (const snapshot of stale) {
-    const settled = await retireOne(deps, input, snapshot);
+    const settled = await retireOne(deps, input, snapshot, 'MOVED_PAST');
     paid = paid ?? settled;
   }
   return paid;
@@ -119,17 +122,31 @@ export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Pro
 
 /** What the buyer is answered with once the moved-past links are retired. */
 export interface HeldAnswer {
+  /** The charge the buyer now holds — or the one they already paid. */
   answer: ChargeSnapshot;
-  /** The answer is an EARLIER charge the buyer already paid (`PAID_BEFORE_VOID`). */
+  /**
+   * The answer is an EARLIER charge the buyer already paid (`PAID_BEFORE_VOID`),
+   * not one raised or reused now: SETTLE the payable with it and show paid —
+   * never redirect to it, attach it as pending, or refuse it as a mismatch.
+   */
   paidEarlier: boolean;
 }
 
+/** Charge states in which the buyer's money has already moved. */
+const SETTLED: ReadonlySet<ChargeStatus> = new Set<ChargeStatus>(['PAID', 'AUTHORIZED']);
+
 /**
- * Retire the moved-past links against the charge the buyer holds — and when
- * one of them turns out to be PAID already, answer with THAT one: the buyer
- * paid, so the checkout must show paid rather than a fresh QR or page. The
- * charge they were about to be handed is then itself retired against the paid
- * one (voided, or marked and recorded superseded), so it cannot be paid twice.
+ * Retire the moved-past links against the charge the buyer holds (`held`) —
+ * and when the void finds one of them PAID already:
+ *
+ *  - `held` still payable: answer with the PAID link (`paidEarlier`); the
+ *    buyer paid, so the checkout must show paid rather than a fresh QR or page.
+ *    `held` is retired against it: voided, or marked and recorded
+ *    `PAID_ELSEWHERE` with the reason its own void failed;
+ *  - `held` already paid too — a card paid in this very request, or one the
+ *    void finds paid — is a DOUBLE PAYMENT, never something to void. The answer
+ *    stays `held` (what the buyer paid in this attempt) and the older link is
+ *    marked and recorded `DOUBLE_PAID`, with both charge ids, for a refund.
  */
 export async function answerHeld(
   deps: RetireDeps,
@@ -138,8 +155,55 @@ export async function answerHeld(
   const { held, ...rest } = input;
   const paid = await retireMovedPast(deps, { ...rest, raised: held });
   if (!paid) return { answer: held, paidEarlier: false };
-  await retireMovedPast(deps, { ...rest, movedPast: [held], raised: paid });
+  if (SETTLED.has(held.status)) return doublePaid(deps, rest, paid, held);
+  reportPaidBeforeVoid(deps, rest, paid);
+  const heldPaid = await retireOne(deps, { ...rest, raised: paid }, held, 'REPLACED_BY_PAYMENT');
+  if (heldPaid) return doublePaid(deps, rest, paid, heldPaid);
   return { answer: paid, paidEarlier: true };
+}
+
+type Scope = Omit<RetireInput, 'raised' | 'movedPast'>;
+
+/** Both were paid: keep the one paid in this attempt, record the other for a refund. */
+async function doublePaid(
+  deps: RetireDeps,
+  scope: Scope,
+  duplicate: ChargeSnapshot,
+  kept: ChargeSnapshot,
+): Promise<HeldAnswer> {
+  const what = describe(duplicate, scope.reference);
+  const message =
+    `DOUBLE_PAID: ${what} and ${kept.provider} charge ${kept.providerChargeId} were BOTH paid ` +
+    `on ${scope.reference}; the latter is the answer, refund the former`;
+  deps.log.error(`payments.superseded ${message}`);
+  reportProviderFailure(deps.onProviderFailure, {
+    path: 'CANCEL',
+    severity: 'error',
+    merchant: scope.merchant,
+    provider: duplicate.provider,
+    reference: duplicate.providerChargeId,
+    message,
+  });
+  const input = { ...scope, movedPast: [], raised: kept };
+  await markSuperseded(deps, input, duplicate, 'DOUBLE_PAID', what);
+  await recordSuperseded(deps, { ...scope, snapshot: duplicate, replacedBy: kept, why: 'DOUBLE_PAID' }, what);
+  return { answer: kept, paidEarlier: false };
+}
+
+/** A moved-past link the void found PAID: it is the payment, and that is news. */
+function reportPaidBeforeVoid(deps: RetireDeps, input: Scope, paid: ChargeSnapshot): void {
+  const message =
+    `PAID_BEFORE_VOID: moved-past hosted ${describe(paid, input.reference)} was ${paid.status} ` +
+    `before the void: the buyer paid it, so it is the answer and the charge raised in its place is retired`;
+  deps.log.error(`payments.void ${message}`);
+  reportProviderFailure(deps.onProviderFailure, {
+    path: 'CANCEL',
+    severity: 'error',
+    merchant: input.merchant,
+    provider: paid.provider,
+    reference: paid.providerChargeId,
+    message,
+  });
 }
 
 function describe(snapshot: ChargeSnapshot, reference: string): string {
@@ -149,61 +213,60 @@ function describe(snapshot: ChargeSnapshot, reference: string): string {
   );
 }
 
-/** Ask the provider to void; answer null when it is gone, else why it is not. */
-async function voidAt(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot, what: string) {
+/** What a void left: nothing payable, still payable (and why), or a payment. */
+type VoidResult = { kind: 'GONE' } | { kind: 'KEPT'; why: VoidOutcome; latest: ChargeSnapshot } | { kind: 'PAID'; latest: ChargeSnapshot };
+
+/** Ask the provider to void, and read its answer strictly. */
+async function voidAt(deps: RetireDeps, input: RetireInput, snapshot: ChargeSnapshot, what: string): Promise<VoidResult> {
   let answer: ChargeSnapshot;
   try {
     answer = await deps.gateway.cancelCharge(input.merchant, snapshot.provider, snapshot.providerChargeId);
   } catch (error) {
     if (error instanceof UnsupportedOperationError) {
-      deps.log.warn(`payments.void unsupported for moved-past hosted ${what}`);
-      return { why: 'VOID_UNSUPPORTED' as const, latest: snapshot };
+      deps.log.warn(`payments.void unsupported for ${what}`);
+      return { kind: 'KEPT', why: 'VOID_UNSUPPORTED', latest: snapshot };
     }
-    deps.log.error(`payments.void failed for moved-past hosted ${what}: ${reason(error)}`);
-    return { why: 'VOID_FAILED' as const, latest: snapshot };
+    deps.log.error(`payments.void failed for ${what}: ${reason(error)}`);
+    return { kind: 'KEPT', why: 'VOID_FAILED', latest: snapshot };
   }
   if (GONE.has(answer.status)) {
-    deps.log.warn(`payments.void voided moved-past hosted ${what} (${answer.status})`);
-    return null;
+    deps.log.warn(`payments.void voided ${what} (${answer.status})`);
+    return { kind: 'GONE' };
   }
   if (answer.status === 'PENDING') {
-    deps.log.error(`payments.void not confirmed for moved-past hosted ${what}: still PENDING`);
-    return { why: 'VOID_NOT_CONFIRMED' as const, latest: answer };
+    deps.log.error(`payments.void not confirmed for ${what}: still PENDING`);
+    return { kind: 'KEPT', why: 'VOID_NOT_CONFIRMED', latest: answer };
   }
-  const message =
-    `PAID_BEFORE_VOID: moved-past hosted ${what} was ${answer.status} before the void: ` +
-    `the buyer paid it, so it is the answer and the charge that replaced it is retired`;
-  deps.log.error(`payments.void ${message}`);
-  reportProviderFailure(deps.onProviderFailure, {
-    path: 'CANCEL',
-    severity: 'error',
-    merchant: input.merchant,
-    provider: snapshot.provider,
-    reference: snapshot.providerChargeId,
-    message,
-  });
-  return { paid: answer };
+  return { kind: 'PAID', latest: answer };
 }
 
-/** Retire one link; answers it when the provider reported it PAID instead. */
+/**
+ * Retire one charge: a moved-past link (`MOVED_PAST`, recorded with its void's
+ * outcome), or the charge raised in this attempt after an older link turned out
+ * PAID (`REPLACED_BY_PAYMENT`, recorded `PAID_ELSEWHERE`). Answers the charge
+ * when the provider reported it PAID instead of voiding it.
+ */
 async function retireOne(
   deps: RetireDeps,
   input: RetireInput,
   snapshot: ChargeSnapshot,
+  role: 'MOVED_PAST' | 'REPLACED_BY_PAYMENT',
 ): Promise<ChargeSnapshot | null> {
-  const what = describe(snapshot, input.reference);
-  const kept = await voidAt(deps, input, snapshot, what);
-  if (!kept) return null;
-  if ('paid' in kept) return kept.paid ?? null;
-  await markSuperseded(deps, input, snapshot, kept.why, what);
+  const what = `${role === 'MOVED_PAST' ? 'moved-past hosted' : 'replaced'} ${describe(snapshot, input.reference)}`;
+  const result = await voidAt(deps, input, snapshot, what);
+  if (result.kind === 'GONE') return null;
+  if (result.kind === 'PAID') return result.latest;
+  const why: SupersededWhy = role === 'MOVED_PAST' ? result.why : 'PAID_ELSEWHERE';
+  await markSuperseded(deps, input, snapshot, why, what);
   await recordSuperseded(
     deps,
     {
       merchant: input.merchant,
       reference: input.reference,
-      snapshot: kept.latest,
+      snapshot: result.latest,
       replacedBy: input.raised,
-      why: kept.why,
+      why,
+      ...(role === 'MOVED_PAST' ? {} : { voidOutcome: result.why }),
     },
     what,
   );

@@ -25,13 +25,14 @@ export async function raiseDeps<C, V extends object, D>(runtime: Runtime<C, V, D
     ...(runtime.config.onProviderFailure ? { onProviderFailure: runtime.config.onProviderFailure } : {}),
     ...(supersede
       ? {
-          onSuperseded: ({ reference, snapshot, replacedBy, why }) =>
+          onSuperseded: ({ reference, snapshot, replacedBy, why, voidOutcome }) =>
             supersede({
               ref: reference,
               charge: attachedChargeOf(snapshot),
               amount: snapshot.amount,
               replacedBy: attachedChargeOf(replacedBy),
               why,
+              ...(voidOutcome ? { voidOutcome } : {}),
             }),
         }
       : {}),

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createChargeRaiser, type ChargeRaiseDeps } from '../core/charge-raise';
+import { createChargeRaiser, type ChargeRaiseDeps, type RaiseChargeRequest } from '../core/charge-raise';
 import { CredentialsError, UnsupportedOperationError } from '../core/errors';
 import { createPaymentsGateway } from '../core/gateway';
 import { landingProvider, type ChainMember } from '../core/hosted-landing';
-import { retireMovedPast, type RetireDeps, type SupersededCharge } from '../core/hosted-retire';
+import { answerHeld, retireMovedPast, type RetireDeps, type SupersededCharge } from '../core/hosted-retire';
 import type { ProviderFailureReport } from '../core/provider-failure';
 import { defineProviders } from '../core/registry';
 import type { ChargeSnapshot, MerchantRef, Money } from '../core/types';
@@ -48,6 +48,8 @@ function raiser(over: {
   onSuperseded?: ChargeRaiseDeps['onSuperseded'];
   /** The walk that minted each parked link, as the ledger answers it. */
   walkedPast?: string[];
+  /** The status the fresh charge comes back in (a card can be PAID at once). */
+  raisedStatus?: ChargeSnapshot['status'];
 }) {
   const calls = { warn: [] as string[], error: [] as string[] };
   const d: ChargeRaiseDeps = {
@@ -55,7 +57,12 @@ function raiser(over: {
       charge: vi.fn(async (_m: MerchantRef, input: { idempotencyKey?: string }) => ({
         reference: 'ord_1',
         idempotencyKey: input.idempotencyKey ?? null,
-        snapshot: snapshot({ provider: 'browser', providerChargeId: 'NEW', hostedCheckoutUrl: undefined }),
+        snapshot: snapshot({
+          provider: 'browser',
+          providerChargeId: 'NEW',
+          hostedCheckoutUrl: undefined,
+          ...(over.raisedStatus ? { status: over.raisedStatus } : {}),
+        }),
       })) as unknown as ChargeRaiseDeps['gateway']['charge'],
       cancelCharge: vi.fn(over.cancel ?? (async () => snapshot({ status: 'CANCELED' }))),
       clientConfigChain: vi.fn(async () => over.chain),
@@ -72,7 +79,9 @@ function raiser(over: {
     log: { warn: (m) => calls.warn.push(m), error: (m) => calls.error.push(m) },
     ...(over.onSuperseded ? { onSuperseded: over.onSuperseded } : {}),
   };
-  return { raise: createChargeRaiser(d), d, calls };
+  const full = createChargeRaiser(d);
+  // Most cases read the answer; `full` keeps `paidEarlier` for the ones about it.
+  return { raise: async (request: RaiseChargeRequest) => (await full(request)).answer, full, d, calls };
 }
 
 const HOSTED_FIRST: ChainMember[] = [
@@ -166,10 +175,37 @@ describe('createChargeRaiser — the ledger and the links not reused', () => {
   });
 });
 
+/** A recorder that keeps what it was told. */
+function recorder() {
+  const sink: SupersededCharge[] = [];
+  return { recorded: sink, onSuperseded: (charge: SupersededCharge) => void sink.push(charge) };
+}
+
+/** `answerHeld`'s deps, with a void that answers whatever `cancel` says. */
+function heldDeps(cancel: (id: string) => ChargeSnapshot) {
+  const sink: SupersededCharge[] = [];
+  const sent: ProviderFailureReport[] = [];
+  const lines: string[] = [];
+  const deps: RetireDeps = {
+    gateway: { cancelCharge: vi.fn(async (_m: MerchantRef, _p: string, id: string) => cancel(id)) },
+    charges: { markSuperseded: vi.fn(async () => undefined) },
+    log: { warn: () => undefined, error: (m) => lines.push(m) },
+    onSuperseded: (charge) => {
+      sink.push(charge);
+    },
+    onProviderFailure: (report) => {
+      sent.push(report);
+    },
+  };
+  return { deps, recorded: sink, reports: sent, errors: lines };
+}
+
+const HELD_SCOPE = { merchant: TENANT, reference: 'o1', movedPast: [snapshot({ providerChargeId: 'L1', method: 'CARD' })] };
+
 describe('createChargeRaiser — a moved-past link the buyer already paid', () => {
-  it('answers with the PAID link and retires the charge it just raised', async () => {
-    const recorded: SupersededCharge[] = [];
-    const { raise, d } = raiser({
+  it('answers with the PAID link (paidEarlier) and retires the charge it just raised', async () => {
+    const { recorded, onSuperseded } = recorder();
+    const { full, d } = raiser({
       chain: BROWSER_FIRST,
       parked: [snapshot()],
       // The parked link comes back PAID; the fresh charge cannot be voided.
@@ -177,18 +213,55 @@ describe('createChargeRaiser — a moved-past link the buyer already paid', () =
         .fn()
         .mockResolvedValueOnce(snapshot({ status: 'PAID' }))
         .mockRejectedValueOnce(new UnsupportedOperationError('browser', 'cancelling a charge')),
-      onSuperseded: (charge) => {
-        recorded.push(charge);
-      },
+      onSuperseded,
     });
 
-    const got = await raise(REQUEST);
+    const got = await full(REQUEST);
 
-    expect([got.providerChargeId, got.status]).toEqual(['LINK', 'PAID']);
+    expect([got.answer.providerChargeId, got.answer.status, got.paidEarlier]).toEqual(['LINK', 'PAID', true]);
     expect(d.gateway.cancelCharge).toHaveBeenNthCalledWith(2, TENANT, 'browser', 'NEW');
-    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
-      ['NEW', 'LINK', 'VOID_UNSUPPORTED'],
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why, r.voidOutcome])).toEqual([
+      ['NEW', 'LINK', 'PAID_ELSEWHERE', 'VOID_UNSUPPORTED'],
     ]);
+  });
+
+  it('a card PAID in this request is a DOUBLE_PAID: never voided, answered, the old link recorded', async () => {
+    const { recorded, onSuperseded } = recorder();
+    const { full, d, calls } = raiser({
+      chain: BROWSER_FIRST,
+      parked: [snapshot()],
+      raisedStatus: 'PAID',
+      cancel: async () => snapshot({ status: 'PAID' }),
+      onSuperseded,
+    });
+
+    const got = await full({ ...REQUEST, method: 'CARD', card: { tokensByProvider: { browser: 'tok' } } });
+
+    expect([got.answer.providerChargeId, got.paidEarlier]).toEqual(['NEW', false]);
+    // Only the parked link was asked to void; the paid card never is.
+    expect(d.gateway.cancelCharge).toHaveBeenCalledTimes(1);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['LINK', 'NEW', 'DOUBLE_PAID'],
+    ]);
+    expect(calls.error.join()).toContain('DOUBLE_PAID');
+  });
+
+  it('a fresh charge its own void finds PAID is a DOUBLE_PAID too, answered with it', async () => {
+    const { recorded, onSuperseded } = recorder();
+    const { full } = raiser({
+      chain: BROWSER_FIRST,
+      parked: [snapshot()],
+      cancel: vi
+        .fn()
+        .mockResolvedValueOnce(snapshot({ status: 'PAID' }))
+        .mockResolvedValueOnce(snapshot({ provider: 'browser', providerChargeId: 'NEW', status: 'PAID' })),
+      onSuperseded,
+    });
+
+    const got = await full(REQUEST);
+
+    expect([got.answer.providerChargeId, got.answer.status, got.paidEarlier]).toEqual(['NEW', 'PAID', false]);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.why])).toEqual([['LINK', 'DOUBLE_PAID']]);
   });
 });
 
@@ -246,7 +319,8 @@ describe('retireMovedPast', () => {
 
     await retireMovedPast(deps, input(NEW));
 
-    expect(calls.error.join()).toContain('payments.superseded hosted charge LINK');
+    expect(calls.error.join()).toContain('hosted charge LINK');
+    expect(calls.error.join()).toContain('no superseded recorder is wired');
   });
 
   it('contains a recorder that throws', async () => {
@@ -272,17 +346,11 @@ describe('retireMovedPast', () => {
     expect(deps.charges.markSuperseded).not.toHaveBeenCalled();
   });
 
-  it('answers a link the void found PAID (PAID_BEFORE_VOID): logged, reported, never marked', async () => {
-    const recorded: SupersededCharge[] = [];
-    const reports: ProviderFailureReport[] = [];
-    const { deps, calls } = retireDeps({
+  it('hands back a link the void found PAID, without marking or recording it', async () => {
+    const { recorded, onSuperseded } = recorder();
+    const { deps } = retireDeps({
       gateway: { cancelCharge: vi.fn(async () => snapshot({ status: 'PAID' })) },
-      onSuperseded: (charge) => {
-        recorded.push(charge);
-      },
-      onProviderFailure: (report) => {
-        reports.push(report);
-      },
+      onSuperseded,
     });
 
     const paid = await retireMovedPast(deps, input(NEW));
@@ -290,8 +358,6 @@ describe('retireMovedPast', () => {
     expect([paid?.providerChargeId, paid?.status]).toEqual(['LINK', 'PAID']);
     expect(recorded).toEqual([]);
     expect(deps.charges.markSuperseded).not.toHaveBeenCalled();
-    expect(reports.map((r) => [r.path, r.severity, r.provider])).toEqual([['CANCEL', 'error', 'hosted']]);
-    expect(calls.error.join()).toContain('PAID_BEFORE_VOID');
   });
 
   it('records VOID_NOT_CONFIRMED when the void comes back still PENDING', async () => {
@@ -371,5 +437,56 @@ describe('clientConfigChain — the chain the reuse rule reads', () => {
     });
 
     await expect(gateway.clientConfigChain(TENANT)).rejects.toThrow('database unreachable');
+  });
+});
+
+describe('answerHeld — what the buyer is answered with', () => {
+  it('held card N1 PAID, old link L1 found PAID: DOUBLE_PAID, answer N1, L1 the duplicate', async () => {
+    const { deps, recorded, reports, errors } = heldDeps((id) => snapshot({ providerChargeId: id, status: 'PAID' }));
+    const N1 = snapshot({ provider: 'browser', providerChargeId: 'N1', status: 'PAID', hostedCheckoutUrl: undefined });
+
+    const out = await answerHeld(deps, { ...HELD_SCOPE, held: N1 });
+
+    expect([out.answer.providerChargeId, out.paidEarlier]).toEqual(['N1', false]);
+    expect(deps.gateway.cancelCharge).toHaveBeenCalledTimes(1);
+    expect(deps.charges.markSuperseded).toHaveBeenCalledWith(
+      TENANT,
+      'hosted',
+      'L1',
+      expect.objectContaining({ replacedBy: 'N1', why: 'DOUBLE_PAID' }),
+    );
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['L1', 'N1', 'DOUBLE_PAID'],
+    ]);
+    expect(reports.map((r) => [r.path, r.reference])).toEqual([['CANCEL', 'L1']]);
+    expect(reports[0]?.message).toContain('BOTH paid');
+    expect(errors.join()).toContain('DOUBLE_PAID');
+  });
+
+  it('held N1 still payable, L1 found PAID: answer L1 (paidEarlier), N1 PAID_ELSEWHERE', async () => {
+    const { deps, recorded, reports } = heldDeps((id) =>
+      id === 'L1' ? snapshot({ providerChargeId: id, status: 'PAID' }) : snapshot({ providerChargeId: id }),
+    );
+    const N1 = snapshot({ provider: 'browser', providerChargeId: 'N1', hostedCheckoutUrl: undefined });
+
+    const out = await answerHeld(deps, { ...HELD_SCOPE, held: N1 });
+
+    expect([out.answer.providerChargeId, out.paidEarlier]).toEqual(['L1', true]);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why, r.voidOutcome])).toEqual([
+      ['N1', 'L1', 'PAID_ELSEWHERE', 'VOID_NOT_CONFIRMED'],
+    ]);
+    expect(reports.map((r) => r.message.startsWith('PAID_BEFORE_VOID'))).toEqual([true]);
+  });
+
+  it('held N1 voided cleanly after L1 was found PAID: nothing recorded', async () => {
+    const { deps, recorded } = heldDeps((id) =>
+      id === 'L1' ? snapshot({ providerChargeId: id, status: 'PAID' }) : snapshot({ providerChargeId: id, status: 'CANCELED' }),
+    );
+    const N1 = snapshot({ provider: 'browser', providerChargeId: 'N1', hostedCheckoutUrl: undefined });
+
+    const out = await answerHeld(deps, { ...HELD_SCOPE, held: N1 });
+
+    expect([out.answer.providerChargeId, out.paidEarlier]).toEqual(['L1', true]);
+    expect(recorded).toEqual([]);
   });
 });
