@@ -46,9 +46,17 @@ export function formatCardNumber(value: string): string {
   return parts.join(" ");
 }
 
-/** Format an expiry as `MM/YY`, inserting the slash after the month. */
+/**
+ * Format an expiry as `MM/YY`, inserting the slash after the month.
+ *
+ * A value written in one go — autofill, a password manager, a paste — may carry
+ * a four-digit year (`12/2034`). Six digits whose last four start with `20` are
+ * read as `MM` + `YYYY` and keep the year's last two digits (FUT-4103); any
+ * other value keeps its first four digits, as typing in the MM/AA form does.
+ */
 export function formatExpiry(value: string): string {
-  const digits = onlyDigits(value).slice(0, 4);
+  const all = onlyDigits(value);
+  const digits = /^\d{2}20\d{2}$/.test(all) ? `${all.slice(0, 2)}${all.slice(4)}` : all.slice(0, 4);
   return digits.length <= 2 ? digits : `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 

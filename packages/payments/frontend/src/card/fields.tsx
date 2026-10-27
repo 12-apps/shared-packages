@@ -1,8 +1,8 @@
 import { Box } from "@mui/material";
-import type { JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
 
 import { useCheckoutCopy } from "../components/checkout/copy-context";
-import { useCheckoutComponents } from "../components/checkout/ui";
+import { useCheckoutComponents, type CheckoutInputHints } from "../components/checkout/ui";
 import {
   StickyPayBar,
   useCheckoutLayout,
@@ -19,10 +19,64 @@ import {
   validateHolder,
   type CardBrand,
 } from "./format";
+import type { CardFieldCopy } from "./copy";
 import { NEW_CARD, type CardDetails, type CardFieldErrors, type SavedCard } from "./types";
 
 type SetCard = React.Dispatch<React.SetStateAction<CardDetails>>;
 type SetErrors = React.Dispatch<React.SetStateAction<CardFieldErrors>>;
+
+/**
+ * The name is printed on the card in capitals: no auto-capitalised first
+ * letter, no "corrected" surname, no spellcheck squiggle (FUT-4107). Through
+ * `inputProps`, the one route that reaches the `<input>` in every binding.
+ */
+const HOLDER_INPUT_HINTS: CheckoutInputHints = {
+  autoCapitalize: "characters",
+  autoCorrect: "off",
+  spellCheck: false,
+};
+
+/** What the four fields' judgements depend on: their values and, for the CVV, the brand. */
+type Judged = Pick<CardDetails, "number" | "holder" | "expiry" | "cvv"> & { brand: CardBrand };
+
+/**
+ * A field already red is re-judged when its value changes (FUT-4102).
+ *
+ * The fields are judged on blur and on submit only, so a value written with
+ * no blur — autofill, a password manager, a paste into another field — left an
+ * earlier error standing beside a now-valid value. Only a field that HOLDS an
+ * error is re-judged: an empty field the shopper has not left stays unjudged,
+ * as before. The CVV is also re-judged when the brand moves, since its length
+ * is the brand's.
+ */
+function useRejudgeRedFields(
+  judged: Judged,
+  copy: CardFieldCopy,
+  setFieldErrors: SetErrors,
+): void {
+  const { number, holder, expiry, cvv, brand } = judged;
+  const last = useRef<Judged>(judged);
+  useEffect(() => {
+    const prev = last.current;
+    last.current = { number, holder, expiry, cvv, brand };
+    const moved = {
+      number: number !== prev.number,
+      holder: holder !== prev.holder,
+      expiry: expiry !== prev.expiry,
+      cvv: cvv !== prev.cvv || brand !== prev.brand,
+    };
+    if (!moved.number && !moved.holder && !moved.expiry && !moved.cvv) return;
+    setFieldErrors((errors) => {
+      const next: CardFieldErrors = { ...errors };
+      if (moved.number && errors.number) next.number = validateCardNumber(number, copy);
+      if (moved.holder && errors.holder) next.holder = validateHolder(holder, copy);
+      if (moved.expiry && errors.expiry) next.expiry = validateExpiry(expiry, copy);
+      if (moved.cvv && errors.cvv) next.cvv = validateCvv(cvv, copy, brand);
+      const changed = (Object.keys(next) as (keyof CardFieldErrors)[]).some((key) => next[key] !== errors[key]);
+      return changed ? next : errors;
+    });
+  }, [number, holder, expiry, cvv, brand, copy, setFieldErrors]);
+}
 
 /** Saved-cards radio list, with a trailing "Novo cartão" option. */
 export function SavedCardsPicker({
@@ -180,6 +234,11 @@ export function NewCardForm({
 }): JSX.Element {
   const { Input, Checkbox } = useCheckoutComponents();
   const copy = useCheckoutCopy().card.fields;
+  useRejudgeRedFields(
+    { number: card.number, holder: card.holder, expiry: card.expiry, cvv: card.cvv, brand },
+    copy,
+    setFieldErrors,
+  );
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <CardNumberInput
@@ -196,6 +255,7 @@ export function NewCardForm({
         size="md"
         fullWidth
         autoComplete="cc-name"
+        inputProps={HOLDER_INPUT_HINTS}
         value={card.holder}
         error={Boolean(fieldErrors.holder)}
         helperText={fieldErrors.holder}

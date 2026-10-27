@@ -663,7 +663,7 @@ any design system satisfies them with a thin — often identity — mapping):
 | ---- | ------------------- |
 | `Text` | semantic `variant`/`size`/`weight`/`color`, `as`, `data-testid` |
 | `Button` | `variant` solid/outline/text, `color`, `size`, `fullWidth`, `loading`, `icon`, `dataTestId` **on the button element** |
-| `Input` | `label`, `error`+`helperText`, `endAdornment`, `data-testid` **on the `<input>` itself** (e2e fills it) |
+| `Input` | `label`, `error`+`helperText`, `endAdornment`, `data-testid` **on the `<input>` itself** (e2e fills it); `inputProps` (typing hints: `autoCapitalize`/`autoCorrect`/`spellCheck`, FUT-4107) must reach the `<input>` too |
 | `Checkbox` | `checked`, `onChange(event, checked)`, `label`. The list's consent row under the CPF (FUT-3711) sits flush with the field by zeroing MUI's `.MuiFormControlLabel-root` inset and `.MuiCheckbox-root` padding inside it — a Checkbox built on MUI's (the default, `@12-apps/ui`'s) is flush; one built otherwise keeps its own inset |
 | `Alert` | `variant` info/warning/danger, `title`, `description`, `showIcon` |
 | `LoadingState` | spinner + `message` |
