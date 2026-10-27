@@ -63,6 +63,12 @@ export {
   type BreakerOptions,
   type ProviderHealth,
 } from './core/provider-health';
+export {
+  createSharedProviderHealth,
+  createStoreProviderHealth,
+  type ProviderHealthStore,
+  type SharedBreakerOptions,
+} from './core/provider-health-shared';
 export type {
   DeliveryPaymentProof,
   PaymentProviderAdapter,

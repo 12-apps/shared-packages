@@ -126,7 +126,10 @@ outage asks the gateway's `health` whether the providers ahead are STILL out.
 instance, or arrives after a restart, finds the breaker closed, walks the chain
 again, and supersedes the parked link — marked on its row and recorded, never
 silent, but a new link for the buyer all the same. A host running more than one
-instance should pass a `ProviderHealth` backed by shared storage.
+instance should pass `createSharedProviderHealth(resolve)` (FUT-4083): `resolve`
+answers a store with a Redis text cache's `get`/`set`/`del`/`incrementWindow`
+(or null, for the memory breaker), and every instance over it shares open,
+half-open and closed.
 
 Nothing here decides what a payment *means* to your domain. Orders, stock,
 subscription cycles and the copy a buyer reads stay in the host, on its own
