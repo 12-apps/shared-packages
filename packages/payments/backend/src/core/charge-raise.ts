@@ -254,8 +254,9 @@ function reason(error: unknown): string {
  *
  * It resolves `{ answer, paidEarlier }` (FUT-4072). `paidEarlier` means
  * `answer` is an EARLIER charge of the reference — a parked link the buyer paid
- * while this raise was voiding it — not one raised or reused now: SETTLE the
- * reference with it and show paid. Never redirect to it, attach it as pending,
+ * while this raise was voiding it, PAID or AUTHORIZED — not one raised or reused
+ * now: SETTLE the reference with it and show paid (an AUTHORIZED one must still
+ * be captured or refunded). Never redirect to it, attach it as pending,
  * record it as this attempt's instrument use, or refuse it as a mismatch.
  */
 export function createChargeRaiser(deps: ChargeRaiseDeps) {

@@ -30,7 +30,8 @@ export type { SupersededWhy, VoidOutcome } from './supersession';
  *     payment. It is logged as an error, reported to `onProviderFailure`, and
  *     becomes the buyer's answer ({@link answerHeld}); the charge that was
  *     about to replace it is retired against it instead (`PAID_ELSEWHERE`) —
- *     unless that one was paid too, which is a `DOUBLE_PAID` to refund.
+ *     unless that one was paid too, which is a `DOUBLE_PAID` to refund. Any
+ *     further link found paid is a `DOUBLE_PAID` too, against the answer.
  *
  * ONLY ONCE THE CHARGE THE BUYER HOLDS IS LIVE. A declined or failed charge
  * leaves the buyer with nothing else to pay, and a recorded-superseded link they
@@ -99,23 +100,33 @@ function sameCharge(a: ChargeSnapshot, b: ChargeSnapshot): boolean {
 
 /**
  * Void every moved-past link, or mark and record the ones still payable.
- * Answers the first link the provider reported PAID instead of voiding — the
- * buyer already paid THAT one — or null.
+ * Answers the first link the provider reported PAID or AUTHORIZED instead of
+ * voiding — the buyer already paid THAT one — or null. Every further link found
+ * paid is a second payment of the same payable: marked, recorded and reported
+ * `DOUBLE_PAID` against the first, for a refund.
  */
 export async function retireMovedPast(deps: RetireDeps, input: RetireInput): Promise<ChargeSnapshot | null> {
+  const [paid, ...more] = await retireStale(deps, input);
+  if (!paid) return null;
+  await recordDoublePaid(deps, input, more, paid);
+  return paid;
+}
+
+/** Retire each moved-past link; answer EVERY one the void found paid, in order. */
+async function retireStale(deps: RetireDeps, input: RetireInput): Promise<ChargeSnapshot[]> {
   const stale = input.movedPast.filter((snapshot) => !sameCharge(snapshot, input.raised));
-  if (stale.length === 0) return null;
+  if (stale.length === 0) return [];
   if (!LIVE.has(input.raised.status)) {
     deps.log.warn(
       `payments.superseded kept ${stale.length} hosted link(s) on ${input.reference}: ` +
         `the ${input.raised.provider} charge the buyer holds is ${input.raised.status}`,
     );
-    return null;
+    return [];
   }
-  let paid: ChargeSnapshot | null = null;
+  const paid: ChargeSnapshot[] = [];
   for (const snapshot of stale) {
     const settled = await retireOne(deps, input, snapshot, 'MOVED_PAST');
-    paid = paid ?? settled;
+    if (settled) paid.push(settled);
   }
   return paid;
 }
@@ -125,9 +136,11 @@ export interface HeldAnswer {
   /** The charge the buyer now holds — or the one they already paid. */
   answer: ChargeSnapshot;
   /**
-   * The answer is an EARLIER charge the buyer already paid (`PAID_BEFORE_VOID`),
-   * not one raised or reused now: SETTLE the payable with it and show paid —
+   * The answer is an EARLIER charge the buyer already paid — its status is PAID
+   * or AUTHORIZED (`PAID_BEFORE_VOID`), not one raised or reused now: SETTLE the payable with it and show paid —
    * never redirect to it, attach it as pending, or refuse it as a mismatch.
+   * An AUTHORIZED answer still holds the buyer's money uncaptured: capture it,
+   * or refund it.
    */
   paidEarlier: boolean;
 }
@@ -147,47 +160,64 @@ const SETTLED: ReadonlySet<ChargeStatus> = new Set<ChargeStatus>(['PAID', 'AUTHO
  *    void finds paid — is a DOUBLE PAYMENT, never something to void. The answer
  *    stays `held` (what the buyer paid in this attempt) and the older link is
  *    marked and recorded `DOUBLE_PAID`, with both charge ids, for a refund.
+ *
+ * Every OTHER moved-past link the void finds paid is a `DOUBLE_PAID` against
+ * the charge kept as the answer, whichever of the two cases above applies.
  */
 export async function answerHeld(
   deps: RetireDeps,
   input: Omit<RetireInput, 'raised'> & { held: ChargeSnapshot },
 ): Promise<HeldAnswer> {
   const { held, ...rest } = input;
-  const paid = await retireMovedPast(deps, { ...rest, raised: held });
+  const paidLinks = await retireStale(deps, { ...rest, raised: held });
+  const [paid, ...more] = paidLinks;
   if (!paid) return { answer: held, paidEarlier: false };
-  if (SETTLED.has(held.status)) return doublePaid(deps, rest, paid, held);
+  if (SETTLED.has(held.status)) return keep(deps, rest, paidLinks, held);
   reportPaidBeforeVoid(deps, rest, paid);
   const heldPaid = await retireOne(deps, { ...rest, raised: paid }, held, 'REPLACED_BY_PAYMENT');
-  if (heldPaid) return doublePaid(deps, rest, paid, heldPaid);
+  if (heldPaid) return keep(deps, rest, paidLinks, heldPaid);
+  await recordDoublePaid(deps, rest, more, paid);
   return { answer: paid, paidEarlier: true };
 }
 
 type Scope = Omit<RetireInput, 'raised' | 'movedPast'>;
 
-/** Both were paid: keep the one paid in this attempt, record the other for a refund. */
-async function doublePaid(
+/** `kept` was paid in this attempt: it is the answer, every link paid before it a duplicate. */
+async function keep(
   deps: RetireDeps,
   scope: Scope,
-  duplicate: ChargeSnapshot,
+  duplicates: readonly ChargeSnapshot[],
   kept: ChargeSnapshot,
 ): Promise<HeldAnswer> {
-  const what = describe(duplicate, scope.reference);
-  const message =
-    `DOUBLE_PAID: ${what} and ${kept.provider} charge ${kept.providerChargeId} were BOTH paid ` +
-    `on ${scope.reference}; the latter is the answer, refund the former`;
-  deps.log.error(`payments.superseded ${message}`);
-  reportProviderFailure(deps.onProviderFailure, {
-    path: 'CANCEL',
-    severity: 'error',
-    merchant: scope.merchant,
-    provider: duplicate.provider,
-    reference: duplicate.providerChargeId,
-    message,
-  });
-  const input = { ...scope, movedPast: [], raised: kept };
-  await markSuperseded(deps, input, duplicate, 'DOUBLE_PAID', what);
-  await recordSuperseded(deps, { ...scope, snapshot: duplicate, replacedBy: kept, why: 'DOUBLE_PAID' }, what);
+  await recordDoublePaid(deps, scope, duplicates, kept);
   return { answer: kept, paidEarlier: false };
+}
+
+/** Each duplicate and `kept` were BOTH paid: report, mark and record each duplicate for a refund. */
+async function recordDoublePaid(
+  deps: RetireDeps,
+  scope: Scope,
+  duplicates: readonly ChargeSnapshot[],
+  kept: ChargeSnapshot,
+): Promise<void> {
+  const { merchant, reference } = scope;
+  for (const duplicate of duplicates) {
+    const what = describe(duplicate, reference);
+    const message =
+      `DOUBLE_PAID: ${what} and ${kept.provider} charge ${kept.providerChargeId} were BOTH paid ` +
+      `on ${reference}; the latter is the answer, refund the former`;
+    deps.log.error(`payments.superseded ${message}`);
+    reportProviderFailure(deps.onProviderFailure, {
+      path: 'CANCEL',
+      severity: 'error',
+      merchant,
+      provider: duplicate.provider,
+      reference: duplicate.providerChargeId,
+      message,
+    });
+    await markSuperseded(deps, { merchant, reference, movedPast: [], raised: kept }, duplicate, 'DOUBLE_PAID', what);
+    await recordSuperseded(deps, { merchant, reference, snapshot: duplicate, replacedBy: kept, why: 'DOUBLE_PAID' }, what);
+  }
 }
 
 /** A moved-past link the void found PAID: it is the payment, and that is news. */

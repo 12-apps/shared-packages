@@ -490,3 +490,110 @@ describe('answerHeld — what the buyer is answered with', () => {
     expect(recorded).toEqual([]);
   });
 });
+
+describe('two parked links both found PAID — every second payment is recorded for a refund', () => {
+  const TWO_LINKS = {
+    merchant: TENANT,
+    reference: 'o1',
+    movedPast: [snapshot({ providerChargeId: 'L1' }), snapshot({ provider: 'other', providerChargeId: 'L2' })],
+  };
+  const N1 = snapshot({ provider: 'browser', providerChargeId: 'N1', hostedCheckoutUrl: undefined });
+  const paidLinks = (id: string) =>
+    id === 'L2' ? snapshot({ provider: 'other', providerChargeId: id, status: 'PAID' }) : snapshot({ providerChargeId: id, status: 'PAID' });
+
+  it('retireMovedPast answers the first and marks, records and reports the second DOUBLE_PAID against it', async () => {
+    const { deps, recorded, reports } = heldDeps(paidLinks);
+
+    const paid = await retireMovedPast(deps, { ...TWO_LINKS, raised: N1 });
+
+    expect(paid?.providerChargeId).toBe('L1');
+    expect(deps.charges.markSuperseded).toHaveBeenCalledTimes(1);
+    expect(deps.charges.markSuperseded).toHaveBeenCalledWith(
+      TENANT,
+      'other',
+      'L2',
+      expect.objectContaining({ replacedBy: 'L1', why: 'DOUBLE_PAID' }),
+    );
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['L2', 'L1', 'DOUBLE_PAID'],
+    ]);
+    expect(reports.map((r) => [r.path, r.provider, r.reference])).toEqual([['CANCEL', 'other', 'L2']]);
+  });
+
+  it('held N1 still payable: answer L1 (paidEarlier), N1 PAID_ELSEWHERE, L2 DOUBLE_PAID against L1', async () => {
+    const { deps, recorded, reports } = heldDeps((id) => (id === 'N1' ? snapshot({ providerChargeId: id }) : paidLinks(id)));
+
+    const out = await answerHeld(deps, { ...TWO_LINKS, held: N1 });
+
+    expect([out.answer.providerChargeId, out.paidEarlier]).toEqual(['L1', true]);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['N1', 'L1', 'PAID_ELSEWHERE'],
+      ['L2', 'L1', 'DOUBLE_PAID'],
+    ]);
+    expect(reports.map((r) => [r.reference, r.message.split(':')[0]])).toEqual([
+      ['L1', 'PAID_BEFORE_VOID'],
+      ['L2', 'DOUBLE_PAID'],
+    ]);
+  });
+
+  it('held card N1 PAID: answer N1, BOTH links DOUBLE_PAID against it', async () => {
+    const { deps, recorded, reports } = heldDeps(paidLinks);
+
+    const out = await answerHeld(deps, { ...TWO_LINKS, held: { ...N1, status: 'PAID' } });
+
+    expect([out.answer.providerChargeId, out.paidEarlier]).toEqual(['N1', false]);
+    expect(deps.gateway.cancelCharge).toHaveBeenCalledTimes(2);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['L1', 'N1', 'DOUBLE_PAID'],
+      ['L2', 'N1', 'DOUBLE_PAID'],
+    ]);
+    expect(reports.map((r) => r.reference)).toEqual(['L1', 'L2']);
+  });
+
+  it('held N1 its own void finds PAID: answer N1, BOTH links DOUBLE_PAID against it', async () => {
+    const { deps, recorded } = heldDeps((id) =>
+      id === 'N1' ? snapshot({ provider: 'browser', providerChargeId: id, status: 'PAID' }) : paidLinks(id),
+    );
+
+    const out = await answerHeld(deps, { ...TWO_LINKS, held: N1 });
+
+    expect([out.answer.providerChargeId, out.answer.status, out.paidEarlier]).toEqual(['N1', 'PAID', false]);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['L1', 'N1', 'DOUBLE_PAID'],
+      ['L2', 'N1', 'DOUBLE_PAID'],
+    ]);
+  });
+
+  it('an AUTHORIZED second link counts as paid too', async () => {
+    const { deps, recorded } = heldDeps((id) =>
+      id === 'L2' ? snapshot({ provider: 'other', providerChargeId: id, status: 'AUTHORIZED' }) : paidLinks(id),
+    );
+
+    await retireMovedPast(deps, { ...TWO_LINKS, raised: N1 });
+
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.snapshot.status, r.why])).toEqual([
+      ['L2', 'AUTHORIZED', 'DOUBLE_PAID'],
+    ]);
+  });
+
+  it('through createChargeRaiser: the second parked link reaches the host recorder', async () => {
+    const { recorded, onSuperseded } = recorder();
+    const { full } = raiser({
+      chain: BROWSER_FIRST,
+      parked: [snapshot(), snapshot({ provider: 'other', providerChargeId: 'LINK2' })],
+      cancel: vi
+        .fn()
+        .mockResolvedValueOnce(snapshot({ status: 'PAID' }))
+        .mockResolvedValueOnce(snapshot({ provider: 'other', providerChargeId: 'LINK2', status: 'PAID' }))
+        .mockResolvedValueOnce(snapshot({ provider: 'browser', providerChargeId: 'NEW', status: 'CANCELED' })),
+      onSuperseded,
+    });
+
+    const got = await full(REQUEST);
+
+    expect([got.answer.providerChargeId, got.paidEarlier]).toEqual(['LINK', true]);
+    expect(recorded.map((r) => [r.snapshot.providerChargeId, r.replacedBy.providerChargeId, r.why])).toEqual([
+      ['LINK2', 'LINK', 'DOUBLE_PAID'],
+    ]);
+  });
+});
