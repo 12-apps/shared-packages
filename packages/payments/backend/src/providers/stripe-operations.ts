@@ -7,7 +7,7 @@ import type {
   RefundSnapshot,
 } from '../core/types';
 import type { StripeCopy } from './copy';
-import { stubCharge, stubPendingSnapshot, stubRefund } from './shared';
+import { stubCapturedSnapshot, stubCharge, stubPendingSnapshot, stubRefund } from './shared';
 import { stubFindChargeByReference } from './stub-fault';
 import {
   declineReasonOf,
@@ -289,6 +289,23 @@ export const cancelCharge: NonNullable<PaymentProviderAdapter['cancelCharge']> =
     `/v1/payment_intents/${encodeURIComponent(providerChargeId)}/cancel`,
     'POST',
     providerChargeId,
+    credentials,
+  );
+};
+
+/**
+ * Capture an AUTHORIZED intent (`requires_capture`) in full (FUT-4082). The
+ * response is the intent as it now stands, `succeeded` once the capture took.
+ */
+export const captureCharge: NonNullable<PaymentProviderAdapter['captureCharge']> = async (
+  input,
+  credentials,
+) => {
+  if (credentials.stub) return stubCapturedSnapshot(NAME, input);
+  return intentOperation(
+    `/v1/payment_intents/${encodeURIComponent(input.providerChargeId)}/capture`,
+    'POST',
+    input.providerChargeId,
     credentials,
   );
 };

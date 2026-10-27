@@ -1,14 +1,12 @@
 import { cancelChargeAt } from './charge-cancel';
+import { captureChargeAt, type CaptureChargeMethods } from './charge-capture';
 import { manualChargeMethods, type ManualChargeMethods } from './manual-charge';
 import { refreshOneCharge } from './charge-refresh';
 import { withProviderFailureReports } from './gateway-reporting';
 import type { ProviderFailureReporter } from './provider-failure';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
-import {
-  CredentialsError,
-  UnsupportedOperationError,
-} from './errors';
+import { CredentialsError, UnsupportedOperationError } from './errors';
 import type {
   AttemptLedger,
   ChargeStore,
@@ -159,7 +157,8 @@ export interface ChargeOptions<P extends string = string> {
   confirmation?: 'AUTOMATIC';
 }
 
-export interface PaymentsGateway<P extends string = string> extends ManualChargeMethods<P> {
+export interface PaymentsGateway<P extends string = string>
+  extends ManualChargeMethods<P>, CaptureChargeMethods<P> {
   /**
    * Create a charge, walking the merchant's provider chain until one
    * succeeds. Throws `AmbiguousChargeError` when a provider's outcome cannot
@@ -348,6 +347,7 @@ export function createPaymentsGateway<P extends string>(
       refreshOneCharge(config, resolve, merchant, provider, chargeId, hints),
 
     cancelCharge: cancelChargeAt(config.charges, resolve),
+    captureCharge: captureChargeAt(config.charges, resolve),
     ...manualChargeMethods<P>(manualDepsOf(config)),
     async refund(merchant, provider, input) {
       const { adapter, creds } = await resolve(merchant, provider);

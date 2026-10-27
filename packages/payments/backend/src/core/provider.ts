@@ -22,6 +22,7 @@ import type {
   ResolvedCredentials,
 } from './types';
 import type { BrowserKeyCapability } from './browser-key-capability';
+import type { CaptureInput } from './charge-capture';
 import type { CredentialExpiry } from './credential-expiry';
 import type { ProviderWebhookHandling } from './provider-webhook';
 import type { SettlementHints } from './settlement-hints';
@@ -306,6 +307,18 @@ export interface PaymentProviderAdapterBase {
 
   /** Void a not-yet-paid charge. Optional: capability-gated by the gateway. */
   cancelCharge?(providerChargeId: string, credentials: ResolvedCredentials): Promise<ChargeSnapshot>;
+
+  /**
+   * Take the money an AUTHORIZED charge only holds (FUT-4082). Optional and
+   * gated on the method, like `cancelCharge`: a vendor whose charges are never
+   * authorized-only (InfinitePay, a PIX-only adapter) has nothing to capture.
+   * Answers the charge as it now stands — PAID when the capture took.
+   */
+  captureCharge?(
+    input: CaptureInput,
+    credentials: ResolvedCredentials,
+    hints?: SettlementHints,
+  ): Promise<ChargeSnapshot>;
 
   /**
    * Optional: capability-gated by the gateway (`capabilities.refunds`).

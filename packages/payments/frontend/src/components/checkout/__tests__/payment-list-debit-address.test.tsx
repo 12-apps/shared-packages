@@ -118,3 +118,21 @@ describe("debit without the host's address", () => {
     await waitFor(() => expect(screen.queryByTestId("debit-address")).toBeNull());
   });
 });
+
+describe("the debit address is the last thing the button waits for", () => {
+  it("asks the card before the address, the order they sit in", async () => {
+    await chooseDebit(async () => ({ street: "Rua Augusta", city: "São Paulo", regionCode: "SP" }));
+    expect(screen.getByTestId("list-blocked-reason").textContent).not.toContain("CEP");
+    typeCard();
+    await screen.findByText("Informe o CEP e o número do endereço de cobrança");
+  });
+
+  it("asks the CPF at the top before the address", async () => {
+    renderList({ config: debitStore(), client: debitClient(), buyer: { ...BUYER, taxId: undefined }, taxIdOnFile: false, list: { billingLookup: async () => null } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    fireEvent.click(radio("list-option-CARD-DEBIT"));
+    await waitFor(() => expect(radio("list-option-CARD-DEBIT").checked).toBe(true));
+    typeCard();
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Digite seu CPF ou CNPJ para pagar pelo app."));
+  });
+});

@@ -39,6 +39,7 @@ export {
 } from './core/gateway';
 // Pre-inbox refusal observability (FUT-761) — wire as `PaymentsGatewayConfig.webhookObserver`.
 export type { WebhookPipelineObserver } from './core/webhook-pipeline';
+export type { CaptureChargeMethods, CaptureInput } from './core/charge-capture';
 export type { FailoverPolicy } from './core/charge-walk';
 /**
  * The webhook-replay sweep's inputs and result. The entry point itself is
@@ -56,12 +57,9 @@ export {
   type FailureBucket,
   type ProbeResult,
 } from './core/failover';
-export {
-  createMemoryProviderHealth,
-  isOutageSignal,
-  type BreakerOptions,
-  type ProviderHealth,
-} from './core/provider-health';
+export { createMemoryProviderHealth, isOutageSignal, type BreakerOptions, type ProviderHealth } from './core/provider-health';
+export { createSharedProviderHealth, createStoreProviderHealth } from './core/provider-health-shared';
+export type { ProviderHealthStore, SharedBreakerOptions } from './core/provider-health-shared';
 export type {
   DeliveryPaymentProof,
   PaymentProviderAdapter,

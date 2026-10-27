@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
+import type { CaptureInput } from '../core/charge-capture';
 import { ProviderRequestError } from '../core/errors';
 import { stubDeliveryTrusted } from '../core/stub-mode';
 import type { PaymentProviderAdapter } from '../core/provider';
@@ -163,6 +164,21 @@ export function stubPendingSnapshot(
     providerChargeId,
     status: 'PENDING',
     amount: { amountCents: 0, currency: 'BRL' },
+    method,
+  };
+}
+
+/** Stub capture result: the charge it names, PAID at the amount asked (FUT-4082). */
+export function stubCapturedSnapshot(
+  provider: ProviderName,
+  input: CaptureInput,
+  method: PaymentMethodKind = 'CARD',
+): ChargeSnapshot {
+  return {
+    provider,
+    providerChargeId: input.providerChargeId,
+    status: 'PAID',
+    amount: input.amount ?? { amountCents: 0, currency: 'BRL' },
     method,
   };
 }

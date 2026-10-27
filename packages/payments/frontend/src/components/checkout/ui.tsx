@@ -15,7 +15,7 @@
  * mapping. The contract is documented for adopters in
  * `packages/payments/ADOPTING.md` §3.
  */
-import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type JSX, type lazy, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type InputHTMLAttributes, type JSX, type lazy, type ReactNode } from 'react';
 
 import { defaultCheckoutComponents } from './mui-defaults';
 
@@ -73,8 +73,17 @@ export interface CheckoutInputProps {
   /** A slot that does not forward it keeps the document field judged on every change (FUT-4106 needs it). */
   onFocus?: () => void;
   onBlur?: () => void;
+  /**
+   * Typing hints for the `<input>` itself (FUT-4107). Here rather than at the
+   * top level because a top-level prop does not reach the `<input>` in a
+   * `@12-apps/ui` binding: its `Input` merges `inputProps` onto the element.
+   */
+  inputProps?: CheckoutInputHints;
   'data-testid'?: string;
 }
+
+/** What a field may ask of the phone's keyboard: capitals, no autocorrect, no spellcheck. */
+export type CheckoutInputHints = Pick<InputHTMLAttributes<HTMLInputElement>, 'autoCapitalize' | 'autoCorrect' | 'spellCheck'>;
 
 export interface CheckoutCheckboxProps {
   checked: boolean;
