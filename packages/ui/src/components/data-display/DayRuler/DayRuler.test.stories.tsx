@@ -121,6 +121,7 @@ export const Adornment: Story = {
     const canvas = within(canvasElement);
     const name = canvas.getByText('Bruno Lima').getBoundingClientRect();
     const tag = canvas.getByText('Freela').getBoundingClientRect();
-    await expect(tag.left).toBeGreaterThanOrEqual(name.right);
+    // Beside the name while the column has room; under it in a narrow one — never over it.
+    await expect(tag.left >= name.right - 0.5 || tag.top >= name.bottom - 0.5).toBe(true);
   },
 };

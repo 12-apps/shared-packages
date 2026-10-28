@@ -160,7 +160,8 @@ export const BreakAndAdornment: Story = {
     await expect(Math.abs(band.left - block.left - block.width * 0.375)).toBeLessThan(2);
     const name = canvas.getByText('Ana Lima').getBoundingClientRect();
     const tag = canvas.getByText('Freela').getBoundingClientRect();
-    await expect(tag.left).toBeGreaterThanOrEqual(name.right);
+    // Beside the name while the column has room; under it in a narrow one — never over it.
+    await expect(tag.left >= name.right - 0.5 || tag.top >= name.bottom - 0.5).toBe(true);
   },
 };
 

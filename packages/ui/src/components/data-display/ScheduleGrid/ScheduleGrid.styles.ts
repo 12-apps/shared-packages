@@ -284,8 +284,7 @@ export function breakSx(span: { start: number; end: number }): SxProps<Theme> {
     bottom: 0,
     left: `${span.start * 100}%`,
     width: `${(span.end - span.start) * 100}%`,
-    background: breakHatch(theme, rem(theme, M.breakStripe), rem(theme, M.breakStripe * 2)),
-    opacity: 0.7,
+    background: breakHatch(theme, rem(theme, M.breakStripe.ink), rem(theme, M.breakStripe.ink + M.breakStripe.gap)),
     pointerEvents: 'none',
   });
 }

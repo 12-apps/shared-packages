@@ -28,5 +28,5 @@ export const DAY_RULER_METRICS = {
   minHours: 0.5,
   skeletonRows: 4,
   /** The hatch of a break inside a block: stripe width. */
-  breakStripe: 3,
+  breakStripe: { ink: 2, gap: 3 },
 } as const;

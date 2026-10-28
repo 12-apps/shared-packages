@@ -164,8 +164,7 @@ export function breakSx(span: Span): SxProps<Theme> {
     bottom: 0,
     left: `${span.at}%`,
     width: `${span.share}%`,
-    background: breakHatch(theme, rem(theme, M.breakStripe), rem(theme, M.breakStripe * 2)),
-    opacity: 0.7,
+    background: breakHatch(theme, rem(theme, M.breakStripe.ink), rem(theme, M.breakStripe.ink + M.breakStripe.gap)),
     pointerEvents: 'none',
   });
 }

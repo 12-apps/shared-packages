@@ -59,13 +59,15 @@ export function blockToneStyles(theme: Theme, tone: ScheduleBlockTone, dashedPla
 }
 
 /**
- * A break inside a block (a meal break): diagonal stripes of the page's own
- * ground over the block, so the block reads as cut there in any tone, light or
- * dark. `stripe` is the stripe's width as a CSS length.
+ * A break inside a block (a meal break): the page's own ground with diagonal
+ * stripes of the disabled action colour, opaque, so the block reads as CUT there in any
+ * tone, light or dark. `stripe` / `period` are CSS lengths (a stripe and the
+ * stripe plus its gap).
  */
-export function breakHatch(theme: Theme, stripe: string, stripe2: string): string {
-  const gap = theme.palette.background.default;
-  return `repeating-linear-gradient(135deg, ${gap} 0, ${gap} ${stripe}, transparent ${stripe}, transparent ${stripe2})`;
+export function breakHatch(theme: Theme, stripe: string, period: string): string {
+  const ink = theme.palette.action.disabled;
+  const ground = theme.palette.background.default;
+  return `repeating-linear-gradient(135deg, ${ink} 0, ${ink} ${stripe}, ${ground} ${stripe}, ${ground} ${period}), ${ground}`;
 }
 
 /** The thin bar under a ruler row that says the shift is really running. */
