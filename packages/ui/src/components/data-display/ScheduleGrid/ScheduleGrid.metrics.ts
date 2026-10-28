@@ -5,28 +5,30 @@
  */
 export const SCHEDULE_GRID_METRICS = {
   /**
-   * The name column: 200px on a wide computer; 120px on a narrow one (it
-   * clamps a name at two lines, whole in `title`); 140px while the days
+   * The name column: 200px on a wide computer; 140px on a narrow one (a long
+   * name or meta still takes two lines, never three); 140px while the days
    * scroll sideways; 120px on a phone-sized pane.
    */
-  nameColumn: { wide: 200, medium: 120, scrolled: 140, narrow: 120 },
+  nameColumn: { wide: 200, medium: 140, scrolled: 140, narrow: 120 },
   /**
    * The narrowest a day column gets. With its edge grips `wide` keeps the
    * hours whole ("20:39–00:00" is 67px; long notes ellipsize, whole in
-   * `title`, as the prototype's 1280 frame does). While the days scroll,
+   * `title`, as the prototype's 1280 frame does); `medium` does the same with
+   * the block's text 9px off each edge (`blockPadding.tight`), clear of the
+   * grips' bars. While the days scroll,
    * `scrolled` keeps every hours and note line whole beside the grips (the
    * longest note, "↻ a cada 2 semanas", is 113px; 152 − 24 grips − 12 is 116);
    * below the narrow break the grips go and `narrow` does the same. Never
    * slivers, never cut hours.
    */
-  dayMin: { wide: 104, scrolled: 152, narrow: 136 },
+  dayMin: { wide: 104, medium: 98, scrolled: 152, narrow: 136 },
   /** The total column ("18h"). */
   totalColumn: { wide: 56, narrow: 40 },
   /**
    * Container widths, from wide to narrow:
    * - `medium` (1040): seven 104px days stop fitting beside a 200px name and a
-   *   56px total (200 + 728 + 56 + 48 = 1032): the name narrows to 120px and
-   *   the total to 40px (120 + 728 + 40 + 48 = 936);
+   *   56px total (200 + 728 + 56 + 48 = 1032): the name narrows to 140px, the
+   *   total to 40px and the days to 98px (140 + 686 + 40 + 48 = 914);
    * - `scroll` (939, so a 940px container is the first that never scrolls): those stop fitting too, so the days get `dayMin.scrolled`
    *   and scroll sideways under the pinned names — grips kept, so edge copy
    *   works at every computer width;
@@ -44,7 +46,7 @@ export const SCHEDULE_GRID_METRICS = {
   blockGap: 4,
   blockRadius: 6,
   /** Inside a block: room for the grips on both sides. */
-  blockPadding: { y: 4, start: 10, end: 14 },
+  blockPadding: { y: 4, start: 10, end: 14, tight: 9 },
   blockFont: 12,
   /** The edge grip's hit area and its bar. */
   grip: { width: 12, barWidth: 3, barHeight: 16, barRadius: 2 },

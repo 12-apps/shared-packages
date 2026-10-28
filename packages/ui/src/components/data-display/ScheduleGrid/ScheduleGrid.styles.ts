@@ -37,10 +37,16 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
       [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
         '--sg-name': rem(theme, M.nameColumn.medium),
         '--sg-total': rem(theme, M.totalColumn.narrow),
+        '--sg-day': rem(theme, M.dayMin.medium),
+        '& [data-sg-block]': { paddingLeft: rem(theme, M.blockPadding.tight), paddingRight: rem(theme, M.blockPadding.tight) },
       },
       [`@container (max-width: ${rem(theme, M.containerBreak.scroll)})`]: {
         '--sg-name': rem(theme, M.nameColumn.scrolled),
         '--sg-day': rem(theme, M.dayMin.scrolled),
+        '& [data-sg-block]': {
+          paddingLeft: rem(theme, M.blockPadding.start),
+          paddingRight: rem(theme, M.blockPadding.end),
+        },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {

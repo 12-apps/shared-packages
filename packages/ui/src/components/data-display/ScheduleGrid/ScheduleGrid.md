@@ -91,8 +91,8 @@ places them.
   closed day's `blockedLabel` stays on one line inside its cell, cut with an ellipsis.
 - **Container queries, not media queries.** From a 1040px container the name column is 200px and
   every day at least 104px — a block's hours whole beside its edge grips (a long note ellipsizes,
-  whole in `title`, as in the prototype's 1280 frame). From 940 to 1040px the name column is 120px
-  and the total 40px, so seven 104px days still fit: no sideways scroll, grips kept, the header row
+  whole in `title`, as in the prototype's 1280 frame). From 940 to 1040px the name column is 140px,
+  the total 40px and each day at least 98px (its text 9px off the edges), so the hours still fit: no sideways scroll, grips kept, the header row
   sticking to the page — a 1280 laptop beside the admin's rail and panel. Below 940px each day keeps
   at least 152px, grips kept, so every hours and note line is whole; the days scroll sideways
   inside the grid's own region under the pinned names (the header row then sticks within the grid,
