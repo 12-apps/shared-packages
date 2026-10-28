@@ -44,13 +44,16 @@ const STEPS_PEEK_PX = 64;
  * stops. Re-measured while it is open whenever the bar changes height (the payer
  * line, the saldo, a reason under the button), so the sheet stays on the bar.
  */
-function useRoomBelow(anchor: React.RefObject<HTMLElement | null>, open: boolean): number {
-  const [below, setBelow] = useState(0);
+function useRoomBelow(anchor: React.RefObject<HTMLElement | null>, open: boolean): Room {
+  const [room, setRoom] = useState<Room>({ below: 0, left: 0, width: null });
   useLayoutEffect(() => {
     if (!open) return undefined;
     const measure = () => {
-      const top = anchor.current?.getBoundingClientRect().top ?? window.innerHeight;
-      setBelow(Math.max(0, window.innerHeight - top + SHEET_GAP_PX));
+      const line = anchor.current?.getBoundingClientRect();
+      const top = line?.top ?? window.innerHeight;
+      // The sheet's content takes the bar's own column: on a tablet the bar's content is a
+      // centred column, and a sheet spread over the whole width would not line up with it.
+      setRoom({ below: Math.max(0, window.innerHeight - top + SHEET_GAP_PX), left: line?.left ?? 0, width: line && line.width > 0 ? line.width : null });
     };
     measure();
     window.addEventListener("resize", measure);
@@ -62,7 +65,15 @@ function useRoomBelow(anchor: React.RefObject<HTMLElement | null>, open: boolean
       observer?.disconnect();
     };
   }, [anchor, open]);
-  return below;
+  return room;
+}
+
+/** Where the sheet sits: its bottom above the bar, and its content in the bar's column. */
+interface Room {
+  below: number;
+  left: number;
+  /** The bar line's width; `null` before it is measured, when the content takes the sheet's own width. */
+  width: number | null;
 }
 
 /** Escape closes the sheet; a listener only while it is open. */
@@ -87,7 +98,9 @@ function Chevron({ open }: { open: boolean }): JSX.Element {
 }
 
 /** The sheet itself: a scrim over the steps, and the summary above the bar. */
-function Sheet({ id, below, onClose, children }: { id: string; below: number; onClose: () => void; children: ReactNode }): JSX.Element {
+function Sheet({ id, room, onClose, children }: { id: string; room: Room; onClose: () => void; children: ReactNode }): JSX.Element {
+  const { below } = room;
+  const column = room.width === null ? { px: 2 } : { ml: `${room.left}px`, width: `${room.width}px`, maxWidth: "100%" };
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.layout;
   const headingRef = useRef<HTMLDivElement | null>(null);
@@ -123,34 +136,32 @@ function Sheet({ id, below, onClose, children }: { id: string; below: number; on
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
           boxShadow: 8,
-          px: 2,
           pt: 2,
           pb: 1.75,
-          display: "flex",
-          flexDirection: "column",
-          gap: 1.75,
         }}
       >
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-          <Box ref={headingRef} id={headingId} tabIndex={-1} sx={{ outline: "none" }}>
-            <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
-              {copy.summaryTitle}
-            </Text>
-          </Box>
-          <Box
-            component="button"
-            type="button"
-            aria-label={copy.summaryClose}
-            onClick={onClose}
-            data-testid="list-summary-close"
-            sx={{ width: 40, height: 40, m: -1, mr: -1, flex: "none", border: 0, p: 0, bgcolor: "transparent", color: "text.secondary", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, "&:focus-visible": { outline: 2, outlineColor: "primary.main" } }}
-          >
-            <Box component="svg" aria-hidden viewBox="0 0 24 24" sx={{ width: 20, height: 20 }}>
-              <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+        <Box sx={{ ...column, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 1.75 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+            <Box ref={headingRef} id={headingId} tabIndex={-1} sx={{ outline: "none" }}>
+              <Text variant="heading" size="md" weight="bold" as="h2" style={{ margin: 0 }}>
+                {copy.summaryTitle}
+              </Text>
+            </Box>
+            <Box
+              component="button"
+              type="button"
+              aria-label={copy.summaryClose}
+              onClick={onClose}
+              data-testid="list-summary-close"
+              sx={{ width: 40, height: 40, m: -1, mr: -1, flex: "none", border: 0, p: 0, bgcolor: "transparent", color: "text.secondary", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, "&:focus-visible": { outline: 2, outlineColor: "primary.main" } }}
+            >
+              <Box component="svg" aria-hidden viewBox="0 0 24 24" sx={{ width: 20, height: 20 }}>
+                <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+              </Box>
             </Box>
           </Box>
+          {children}
         </Box>
-        {children}
       </Box>
     </>,
     document.body,
@@ -177,7 +188,7 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement | null>(null);
   const id = useId();
-  const below = useRoomBelow(toggle, open && !held);
+  const room = useRoomBelow(toggle, open && !held);
   const close = useCallback(() => {
     setOpen(false);
     toggle.current?.focus();
@@ -208,7 +219,7 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
         </Box>
       </Box>
       {open && !held ? (
-        <Sheet id={id} below={below} onClose={close}>
+        <Sheet id={id} room={room} onClose={close}>
           <PartBoundary fallback={null} retry={forget}>
             <Suspense fallback={<Box data-testid="list-summary-loading" sx={{ minHeight: 48 }} />}>
               <InSheet.Provider value>
