@@ -1,6 +1,8 @@
+import { EN_US_FORMS_MESSAGES } from '@12-apps/forms-core';
 import {
   EN_US_CONFIRM_ACTION_COPY,
   EN_US_DATA_VIEWS_COPY,
+  EN_US_UI_LABELS,
 } from '@12-apps/ui/en-US';
 
 import type { RbacWebCopy } from './copy';
@@ -119,6 +121,9 @@ export const EN_US_RBAC_WEB_COPY: RbacWebCopy = {
     inviteNoRole: 'Pick at least one role.',
     inviteHint:
       'If they already have an account, access is granted right away. Otherwise we e-mail them an invitation with a link to accept.',
+    inviteEmailRequired: 'Enter their e-mail address.',
+    inviteEmailInvalid: EN_US_FORMS_MESSAGES.email,
+    inviteFormError: EN_US_UI_LABELS.formErrorSnackbar.message,
     inviteDeferredTitle: 'Invitation sent',
     inviteFailedTitle: 'Could not add them',
     inviteDeferredBody:

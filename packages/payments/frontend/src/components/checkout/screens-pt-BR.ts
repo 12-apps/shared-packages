@@ -92,6 +92,8 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
   layout: {
     payHeading: 'Como você quer pagar?',
     summaryTitle: 'Resumo do pedido',
+    summaryOpen: 'Ver resumo',
+    summaryClose: 'Fechar o resumo',
     total: 'Total',
     totalDueCaption: (items) => `Total a pagar · ${items} ${items === 1 ? 'item' : 'itens'}`,
     lineLabel: (quantity, name) => `${quantity}× ${name}`,

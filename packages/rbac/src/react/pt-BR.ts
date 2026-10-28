@@ -1,6 +1,8 @@
+import { PT_BR_FORMS_MESSAGES } from '@12-apps/forms-core';
 import {
   PT_BR_CONFIRM_ACTION_COPY,
   PT_BR_DATA_VIEWS_COPY,
+  PT_BR_UI_LABELS,
 } from '@12-apps/ui/pt-BR';
 
 import type { RbacWebCopy } from './copy';
@@ -107,6 +109,9 @@ export const PT_BR_RBAC_WEB_COPY: RbacWebCopy = {
     inviteNoRole: 'Escolha ao menos um papel.',
     inviteHint:
       'Se a pessoa já tiver uma conta, o acesso é concedido na hora. Caso contrário, enviamos um convite por e-mail com um link para aceitar.',
+    inviteEmailRequired: 'Informe o e-mail da pessoa.',
+    inviteEmailInvalid: PT_BR_FORMS_MESSAGES.email,
+    inviteFormError: PT_BR_UI_LABELS.formErrorSnackbar.message,
     inviteDeferredTitle: 'Convite enviado',
     inviteFailedTitle: 'Não foi possível adicionar',
     inviteDeferredBody:
