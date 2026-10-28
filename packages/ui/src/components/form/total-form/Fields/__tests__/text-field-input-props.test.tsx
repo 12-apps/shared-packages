@@ -79,10 +79,10 @@ describe('Fields.TextField: inputProps', () => {
     }
   });
 
-  it('keeps the field-owned id, name, type, value and test id when a caller tries to replace them', () => {
+  it('keeps the field-owned id, name, type, value, size, color and test id when a caller tries to replace them', () => {
     // The type keeps these out; plain JS (or a cast) does not, and a renamed
     // test id would silently break every spec that finds the field by it.
-    const hostile = { 'data-testid': 'renamed', id: 'other', name: 'other', type: 'number', value: 'x' } as TextFieldProps['inputProps'];
+    const hostile = { 'data-testid': 'renamed', id: 'other', name: 'other', type: 'number', value: 'x', size: 99, color: 'red' } as TextFieldProps['inputProps'];
     const { input } = renderField({ inputProps: hostile });
 
     expect(input).toHaveAttribute('data-testid', 'total-form-field-phone');
@@ -90,6 +90,8 @@ describe('Fields.TextField: inputProps', () => {
     expect(input).toHaveAttribute('name', 'phone');
     expect(input).toHaveAttribute('type', 'text');
     expect(input).toHaveValue('');
+    expect(input).not.toHaveAttribute('size');
+    expect(input).not.toHaveAttribute('color');
   });
 
   it('still writes the typed value into the form, with inputProps given', () => {

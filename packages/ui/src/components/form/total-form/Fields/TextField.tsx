@@ -44,7 +44,18 @@ export type TextFieldInputProps = Omit<
 >;
 
 /** The keys {@link TextFieldInputProps} leaves out, also dropped at runtime. */
-const FIELD_OWNED = ['id', 'name', 'type', 'value', 'defaultValue', 'onChange', 'placeholder', 'data-testid'];
+const FIELD_OWNED = [
+  'id',
+  'name',
+  'type',
+  'value',
+  'defaultValue',
+  'onChange',
+  'placeholder',
+  'size',
+  'color',
+  'data-testid',
+];
 
 /**
  * The caller's `<input>` attributes, minus what the field owns.
