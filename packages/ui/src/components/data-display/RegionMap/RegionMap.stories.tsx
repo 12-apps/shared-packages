@@ -131,3 +131,29 @@ export const Desktop: Story = {
     </Box>
   ),
 };
+
+export const NeighbouringLabels: Story = {
+  name: 'Neighbouring excluded areas — a colliding label gives way',
+  args: {
+    regions: REGION_MAP_AREAS.map((area) => ({
+      ...area,
+      excluded: ['Minascaixa', 'Conjunto Minascaixa', 'Venda Nova', 'Serra Verde'].includes(area.name),
+    })),
+    highlightedIds: ['3106200471'],
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Four excluded neighbours and a highlighted one. Where two names would be drawn over each ' +
+          'other, the higher-priority one stays (highlighted, then excluded, then larger, then by ' +
+          'name) and the other is hidden: the area keeps its name in its `<title>` and in the list.',
+      },
+    },
+  },
+  render: (args) => (
+    <Box sx={{ width: '20rem' }}>
+      <RegionMap {...args} />
+    </Box>
+  ),
+};

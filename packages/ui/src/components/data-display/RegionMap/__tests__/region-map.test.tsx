@@ -80,6 +80,16 @@ describe('the drawing', () => {
     expect(testIdsStartingWith('map-highlight-')).toHaveLength(2);
   });
 
+  it('lays labels out in priority order: highlighted first, then excluded', () => {
+    renderMap({ highlightedIds: [VENDA_NOVA] });
+
+    const order = Array.from(document.querySelectorAll('[data-region-label]')).map((label) =>
+      label.getAttribute('data-testid'),
+    );
+    expect(order[0]).toBe(`map-label-${VENDA_NOVA}`);
+    expect(order).toHaveLength(3);
+  });
+
   it('draws nothing at all with no centre and no areas', () => {
     const { container } = render(
       <RegionMap regions={[]} center={null} copy={REGION_MAP_COPY} dataTestId="map" />,

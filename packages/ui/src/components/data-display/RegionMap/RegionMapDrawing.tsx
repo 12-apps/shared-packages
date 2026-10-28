@@ -7,6 +7,7 @@ import { rem, remPx } from '../../../tokens/relative';
 
 import { labelPosition, type AreaGeometry, type DrawnRegion, type PlaneBox } from './RegionMap.helpers';
 import type { RegionMapModel } from './RegionMap.hooks';
+import { labelOrder, placeLabels } from './RegionMap.labels';
 
 export interface RegionMapDrawingProps {
   model: RegionMapModel & { view: PlaneBox };
@@ -43,7 +44,11 @@ export function RegionMapDrawing({
   const { view, drawn } = model;
   const wanted = new Set(highlightedIds);
   const highlighted = drawn.filter((d) => wanted.has(d.id));
-  const labelled = [...drawn.filter((d) => d.excluded), ...highlighted.filter((d) => !d.excluded)];
+  // Highlighted, then excluded, then larger, then by name: the order labels
+  // claim their place in, so a collision hides the less important one.
+  const labelled = labelOrder(drawn.filter((d) => d.excluded || wanted.has(d.id)), wanted);
+  const boxRef = React.useRef<HTMLDivElement>(null);
+  useLabelPlacement(boxRef, labelled.map((d) => d.id).join('|'), remPx(theme, 4));
   const base = drawn.map((d) => ({ id: d.id, name: d.name, geometry: d.geometry, outside: d.outside === true }));
   return (
     <Box
@@ -60,6 +65,7 @@ export function RegionMapDrawing({
         bgcolor: 'background.paper',
       }}
       data-testid={`${testId}-canvas`}
+      ref={boxRef}
     >
       <svg
         viewBox={`${view.minX} ${view.minY} ${view.spanX} ${view.spanY}`}
@@ -73,19 +79,7 @@ export function RegionMapDrawing({
         <BaseAreas areas={base} testId={testId} theme={theme} />
         <ExcludedAreas drawn={drawn} hatchId={hatchId} testId={testId} theme={theme} />
         <Circles radii={model.radii} theme={theme} />
-        {highlighted.map((d) => (
-          <path
-            key={`h-${d.id}`}
-            d={d.geometry.path}
-            fillRule="evenodd"
-            vectorEffect="non-scaling-stroke"
-            fill={alpha(theme.palette.primary.main, 0.3)}
-            stroke={theme.palette.primary.main}
-            strokeWidth={2.5}
-            pointerEvents="none"
-            data-testid={`${testId}-highlight-${d.id}`}
-          />
-        ))}
+        <Highlights areas={highlighted} testId={testId} theme={theme} />
         {showCenter && (
           <circle
             cx={0}
@@ -104,6 +98,35 @@ export function RegionMapDrawing({
         <AreaLabel key={`l-${d.id}`} area={d} view={view} testId={testId} theme={theme} />
       ))}
     </Box>
+  );
+}
+
+/** The highlighted areas, drawn over everything but the centre. */
+function Highlights({
+  areas,
+  testId,
+  theme,
+}: {
+  areas: readonly DrawnRegion[];
+  testId: string;
+  theme: Theme;
+}): React.JSX.Element {
+  return (
+    <>
+      {areas.map((d) => (
+        <path
+          key={`h-${d.id}`}
+          d={d.geometry.path}
+          fillRule="evenodd"
+          vectorEffect="non-scaling-stroke"
+          fill={alpha(theme.palette.primary.main, 0.3)}
+          stroke={theme.palette.primary.main}
+          strokeWidth={2.5}
+          pointerEvents="none"
+          data-testid={`${testId}-highlight-${d.id}`}
+        />
+      ))}
+    </>
   );
 }
 
@@ -225,16 +248,52 @@ function Circles({ radii, theme }: { radii: readonly number[]; theme: Theme }): 
   );
 }
 
-/** Where a label's centre may go along one axis so the whole label stays in view. */
-function clampCentre(wanted: number, half: number, span: number, gap: number): number {
-  if (span <= 2 * (half + gap)) return span / 2;
-  return Math.min(span - half - gap, Math.max(half + gap, wanted));
+/**
+ * Places every label the drawing carries, in their DOM order (the priority
+ * order), and hides one that would overlap a label already drawn
+ * (`placeLabels`). Measured by a ResizeObserver, never in a layout effect: its
+ * first call comes after the browser's own layout, so mounting a label on a
+ * tap forces no synchronous reflow of the drawing.
+ */
+function useLabelPlacement(boxRef: React.RefObject<HTMLDivElement | null>, key: string, gap: number): void {
+  React.useEffect(() => {
+    const box = boxRef.current;
+    if (!box || typeof ResizeObserver === 'undefined') return undefined;
+    const labels = Array.from(box.querySelectorAll<HTMLElement>('[data-region-label]'));
+    const place = (): void => {
+      const spanX = box.clientWidth;
+      const spanY = box.clientHeight;
+      if (spanX === 0 || spanY === 0) return;
+      const placed = placeLabels(
+        labels.map((label) => ({
+          fractionX: Number(label.dataset.fractionX),
+          fractionY: Number(label.dataset.fractionY),
+          spanX: label.offsetWidth,
+          spanY: label.offsetHeight,
+        })),
+        { spanX, spanY },
+        gap,
+      );
+      placed.forEach(({ x, y, visible }, index) => {
+        const label = labels[index]!;
+        label.style.left = `${(x / spanX) * 100}%`;
+        label.style.top = `${(y / spanY) * 100}%`;
+        label.style.visibility = visible ? 'visible' : 'hidden';
+        label.dataset.hidden = visible ? 'false' : 'true';
+      });
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(box);
+    for (const label of labels) observer.observe(label);
+    return () => observer.disconnect();
+  }, [boxRef, key, gap]);
 }
 
 /**
  * An area's name over the drawing, at the theme's type size whatever the
- * width — and moved in by its own measured size, so it is never clipped at
- * the drawing's edge.
+ * width. Placed — and hidden on a collision — by {@link useLabelPlacement}.
+ * Decorative (`aria-hidden`): the area's name is its `<title>` and its row in
+ * the list.
  */
 function AreaLabel({
   area,
@@ -248,42 +307,25 @@ function AreaLabel({
   theme: Theme;
 }): React.JSX.Element {
   const at = labelPosition(area.geometry.rings, view);
-  const ref = React.useRef<HTMLSpanElement>(null);
-  const gap = remPx(theme, 4);
-  // Measured by a ResizeObserver, never in a layout effect: the observer's
-  // first call comes after the browser's own layout, so mounting a label on a
-  // tap forces no synchronous reflow of the drawing.
-  React.useEffect(() => {
-    const label = ref.current;
-    const box = label?.parentElement;
-    if (!label || !box || typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(() => {
-      const width = box.clientWidth;
-      const height = box.clientHeight;
-      if (width === 0 || height === 0) return;
-      const x = clampCentre(at.fractionX * width, label.offsetWidth / 2, width, gap);
-      const y = clampCentre(at.fractionY * height, label.offsetHeight / 2, height, gap);
-      label.style.left = `${(x / width) * 100}%`;
-      label.style.top = `${(y / height) * 100}%`;
-    });
-    observer.observe(box);
-    observer.observe(label);
-    return () => observer.disconnect();
-  }, [at.fractionX, at.fractionY, gap]);
   const halo = `0 0 ${rem(theme, 3)} ${theme.palette.background.paper}`;
   return (
     <Typography
-      ref={ref}
       component="span"
       aria-hidden
       data-testid={`${testId}-label-${area.id}`}
+      data-region-label=""
+      data-fraction-x={at.fractionX}
+      data-fraction-y={at.fractionY}
       // Position as an inline style, not `sx`: a per-label class would insert
       // a new CSS rule (and a style recalculation) on every tap.
-      style={{ left: `${(at.fractionX * 100).toFixed(2)}%`, top: `${(at.fractionY * 100).toFixed(2)}%` }}
+      style={{
+        left: `${(at.fractionX * 100).toFixed(2)}%`,
+        top: `${(at.fractionY * 100).toFixed(2)}%`,
+      }}
       sx={{
         position: 'absolute',
         transform: 'translate(-50%, -50%)',
-        fontSize: rem(theme, 11),
+        fontSize: rem(theme, 12),
         fontWeight: 700,
         lineHeight: 1.1,
         textAlign: 'center',
