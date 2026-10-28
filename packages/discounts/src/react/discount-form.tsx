@@ -146,8 +146,9 @@ function makeSubmit(
       schedule: extra.schedule,
     });
     if (Object.keys(invalid).length > 0) {
+      // ONE message for a client refusal: the red fields and the toast
+      // (FUT-4143). The `saveFailed` alert is the SERVER's, below.
       setFieldErrors(invalid);
-      setError(copy.form.reviewFields);
       return;
     }
     const payload: DiscountFormPayload = {

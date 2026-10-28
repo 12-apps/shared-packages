@@ -147,7 +147,11 @@ export interface DiscountsFormCopy {
   /** The first-purchase condition (FUT-2825), and what it does to the menu. */
   readonly firstOrderOnly: string;
   readonly firstOrderOnlyHint: string;
-  /** The banner over a form the operator must fix before it will send. */
+  /**
+   * The banner over a form the operator must fix before it will send. No
+   * longer rendered (FUT-4143): a client refusal says it once, in the toast
+   * (`errorSnackbar`). Kept so a host's own pack still type-checks.
+   */
   readonly reviewFields: string;
   /**
    * The toast a failed submit raises over the whole form (FUT-4143). The packs

@@ -44,11 +44,23 @@ function recordingTransport(): { transport: DiscountsTransport; sent: unknown[] 
   };
 }
 
+/** A transport whose every write the SERVER refuses, with a sentence of its own. */
+function refusingTransport(): DiscountsTransport {
+  return {
+    ...recordingTransport().transport,
+    send: <T,>(): Promise<DiscountsResult<T>> =>
+      Promise.resolve({ ok: false, error: "Já existe um cupom com esse código." }),
+  };
+}
+
 function renderForm(
   editing: DiscountWireRecord | null = null,
   pack: DiscountsWebCopy = copy,
+  refusing = false,
 ): { sent: unknown[] } {
-  const { transport, sent } = recordingTransport();
+  const recording = recordingTransport();
+  const sent = recording.sent;
+  const transport = refusing ? refusingTransport() : recording.transport;
   render(
     <DiscountForm
       api={createDiscountsApiClient("/api/admin/loja", transport, formatters)}
@@ -138,6 +150,29 @@ describe("the banner after a failed submit speaks the form's language", () => {
     submit();
     const banner = await screen.findByTestId("total-form-error-snackbar");
     expect(banner.textContent).toContain(EN_US_DISCOUNTS_WEB_COPY.form.errorSnackbar);
+  });
+});
+
+describe("one message per failure", () => {
+  it("M1: a client refusal shows the toast and the red fields, NOT the saveFailed alert", async () => {
+    renderForm();
+    type("total-form-field-percentOff", "150");
+    submit();
+    const banner = await screen.findByTestId("total-form-error-snackbar");
+    expect(banner.textContent).toContain("Corrija os campos destacados e tente novamente.");
+    expect(fieldMessage("name")).toBe(copy.form.nameRequired);
+    expect(fieldMessage("percentOff")).toBe(copy.form.invalidPercent);
+    expect(screen.queryAllByTestId("discount-form-error")).toHaveLength(0);
+    expect(document.body.textContent).not.toContain(copy.form.saveFailed);
+  });
+
+  it("M2: a server refusal still shows the saveFailed alert with the server's reason", async () => {
+    renderForm(null, copy, true);
+    fillValidPercentage();
+    submit();
+    const alert = await screen.findByTestId("discount-form-error");
+    expect(alert.textContent).toContain(copy.form.saveFailed);
+    expect(alert.textContent).toContain("Já existe um cupom com esse código.");
   });
 });
 
