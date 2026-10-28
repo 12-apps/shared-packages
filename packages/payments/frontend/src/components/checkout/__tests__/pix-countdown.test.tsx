@@ -138,6 +138,14 @@ describe("the countdown on screen", () => {
     expect(line).not.toMatch(/gerar outro|nada é cobrado/u);
   });
 
+  it("keeps a store-confirmed Pix's warning at zero, while the order still waits on the store", () => {
+    vi.useFakeTimers({ now: NOW });
+    render(<Probe expiresAt={inMs(1000)} storeConfirms />);
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(clock()).toBe("expira em 00:00");
+    expect(screen.getByTestId("pix-countdown-urgent").textContent).toBe(copy.lastMinutesByStore);
+  });
+
   it("asks once as it reaches zero, and stops ticking", () => {
     vi.useFakeTimers({ now: NOW });
     const onLapse = vi.fn();

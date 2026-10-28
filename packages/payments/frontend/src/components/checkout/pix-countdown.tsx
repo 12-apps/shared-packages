@@ -179,7 +179,9 @@ export function PixCountdown({ state, copy, title, storeConfirms = false }: {
       </Box>
       {/* Announced once, as it appears (a status, unlike the timer above). Gone at
           00:00: the screen then learns from the server what the lapse meant. */}
-      {state.urgent && !state.lapsed ? (
+      {/* A store-confirmed Pix keeps its warning at 00:00: the order still waits on the store, so the
+          buyer who paid by hand is exactly who must not be invited to pay again. */}
+      {state.urgent && (!state.lapsed || storeConfirms) ? (
         <Box component="p" role="status" data-testid="pix-countdown-urgent" sx={{ m: 0, typography: "body2", color: "warning.dark" }}>
           {storeConfirms ? copy.lastMinutesByStore : copy.lastMinutes}
         </Box>
