@@ -244,6 +244,24 @@ export interface DayRulerLabels {
   loading: string;
 }
 
+/**
+ * `Calendar`'s month/year caption (`captionLayout="selectors"`): the two
+ * selector buttons, the month arrows and the two pick grids. The month and
+ * year themselves come from `Intl` in the calendar's `locale`.
+ */
+export interface CalendarLabels {
+  /** The month button's accessible name, from the month it shows ("March"). */
+  chooseMonth(month: string): string;
+  /** The year button's accessible name, from the year it shows. */
+  chooseYear(year: number): string;
+  previousMonth: string;
+  nextMonth: string;
+  /** The month grid's accessible name. */
+  months: string;
+  /** The year grid's accessible name. */
+  years: string;
+}
+
 /** Every family above, keyed by the component that renders it. */
 export interface UiLabels {
   common: CommonLabels;
@@ -278,4 +296,5 @@ export interface UiLabels {
   dateRangePicker: DateRangePickerLabels;
   scheduleGrid: ScheduleGridLabels;
   dayRuler: DayRulerLabels;
+  calendar: CalendarLabels;
 }

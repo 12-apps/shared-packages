@@ -98,8 +98,60 @@ await schedule.scheduleSlot({
   where is the host's knowledge, so an empty list is refused rather than read
   as "everywhere".
 
+### Series rules and the rolling horizon
+
+A repeat can also be a **rule** (`shift_slot_series`) rather than N copies:
+
+```ts
+const { series, slots, change } = await schedule.scheduleSeries({
+  clientId, userId, kind: 'ward', actorUserId,
+  weekdays: [1, 3], everyWeeks: 1,          // or monthlyNth: 3 with ONE weekday
+  startMinutes: 22 * 60, endMinutes: 6 * 60, // an end at or before the start is the next day
+  breakOffsetMinutes: 240, breakMinutes: 30, // optional, from the start, both or neither
+  timeZone: 'America/New_York', startsOn: '2026-10-26', endsOn: null, // null = no end
+});
+```
+
+- **Days are materialised up to a horizon** (`horizonWeeks`, default 12) as
+  ordinary slots carrying `seriesId` and `seriesDate`. `extendSeries()` builds
+  the next days of every open rule in every tenant; `materialiseSeries({ until,
+  preview })` builds past the horizon on demand, or lists the days it would.
+  Both are idempotent: a day that already has a row of the rule — canceled,
+  moved or handed out included — is never rebuilt. A day the person is already
+  taken is skipped, recorded on the rule (`skippedDates`) and audited once —
+  and so is a day whose hours fall in a daylight-saving gap, which a WRITE
+  (`scheduleSeries`, `editSeries`, `promoteToSeries`) refuses instead with
+  `WALL_CLOCK_GAP`, as `editSlot` does for one slot moved into the gap.
+- **The job.** `@12-apps/shift/jobs` declares `extend-series` (daily, leased).
+  The host binds `extendSeries()` to its service and `onMaterialised(clientId,
+  slotIds)` to whatever it reconciles beside the schedule.
+- **Edits are in place.** `editSlot` moves one row (hours or date make it
+  `detached`, which a later rule change leaves alone) or hands it to another
+  person, which takes it out of its series (`seriesId` null, `originSeriesId`
+  kept); `rejoinSeries: true` puts it back, to the rule's own person only.
+  `editSeries({ from })` closes the rule the day before `from` and opens a
+  successor (`previousSeriesId`); an every-two-weeks successor with the same
+  repeat keeps the old rule's weeks, and a row already under way is kept, its
+  day left out of the successor. `promoteToSeries` turns one person's singles
+  into a rule, copying their hours and break, and refuses (`INVALID_SLOT`) a
+  single on a day the rule does not fall on; `demoteToSlot` ends a rule into
+  one detached single.
+- **A rule ends when its future is canceled.** `cancelSlot` with `following`
+  on a rule's row ends the rule the day before; `restoreSlot` of those rows
+  reopens it. `restoreSlot` clears only the cancel reasons the host passes in
+  `restorableReasons` — the package names none — on slots not yet over.
+- **Every rule write returns a `ScheduleChange`**, plain JSON, and
+  `revertScheduleChange` undoes it in one transaction, refusing with
+  `SCHEDULE_CHANGED` when a row or rule it names has moved since. It never
+  touches a row handed to another person: that row stays theirs, and the rule
+  the undo puts back leaves its day. `cancelSlot`
+  keeps returning its slots; the change rides on the array as `.change`.
+- **`allowRunning: true`** on `scheduleSlot` and `editSlot` admits a slot
+  already under way (a substitute); without it a past start is refused.
+
 `ShiftScheduleError` carries its own codes (`INVALID_SLOT`, `SLOT_OVERLAP`,
-`SLOT_NOT_FOUND`, `SLOT_CANCELED`, `SLOT_OVER`) and
+`SLOT_NOT_FOUND`, `SLOT_CANCELED`, `SLOT_OVER`, `SLOT_NOT_RESTORABLE`,
+`WALL_CLOCK_GAP`, `SERIES_NOT_FOUND`, `SCHEDULE_CHANGED`) and
 `SHIFT_SCHEDULE_ERROR_STATUS` maps them to HTTP statuses; `ShiftError`'s codes
 are unchanged, so a host that matches them exhaustively keeps compiling.
 
@@ -131,7 +183,7 @@ rules, the sweep and every error code are as they were.
 | `createMemoryShiftScheduleDb()` | An in-memory `ShiftScheduleDb`, for host tests. |
 | `ShiftScheduleError` / `SHIFT_SCHEDULE_ERROR_STATUS` | A schedule refusal, and its HTTP status. |
 | `ShiftError` / `ShiftConfigError` | A request outcome, and a wiring mistake. |
-| `@12-apps/shift/jobs` | The auto-close blueprint, deps left open. |
+| `@12-apps/shift/jobs` | The auto-close and extend-series blueprints, deps left open. |
 | `@12-apps/shift/manifest` | The wiring manifest and its server half. |
 
 ## Database

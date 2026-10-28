@@ -1,11 +1,29 @@
 import { randomUUID } from 'node:crypto';
 
 import { ShiftConfigError } from './errors';
+import {
+  ChangeBuilder,
+  MAX_SLOT_MS,
+  MINUTE_MS,
+  invalid,
+  overlapError,
+  refusePastStart,
+  resourceFields,
+  validateWho,
+  requireText,
+  validateBreak,
+  type ScheduleContext,
+} from './schedule-context';
+import { demoteToSlot, promoteToSeries } from './schedule-promote';
+import { editSeries, editSlot } from './schedule-edit';
 import { ShiftScheduleError } from './schedule-errors';
+import { restoreSlot, revertScheduleChange } from './schedule-revert';
+import { extendSeries, materialiseSeries, scheduleSeries } from './schedule-series';
 import { slotStandingAt } from './schedule-standing';
-import { addZonedDays, isKnownTimeZone } from './schedule-time';
+import { addLocalDays, addZonedDays, isKnownTimeZone, zonedParts } from './schedule-time';
 import type {
   CancelSlotInput,
+  CancelSlotResult,
   ListSlotsInput,
   NextSlotsInput,
   ScheduleSlotInput,
@@ -15,31 +33,13 @@ import type {
   ShiftScheduleTransaction,
   ShiftSlot,
 } from './schedule-types';
-import { defineShiftVocabulary, type ShiftKindTuple, type ShiftVocabulary } from './vocabulary';
+import type { ScheduleChange } from './schedule-series-types';
+import { defineShiftVocabulary, type ShiftKindTuple } from './vocabulary';
 
-const DAY_MS = 24 * 60 * 60_000;
 const WEEK_DAYS = 7;
-/** A slot longer than a day is a typo, not a plan. */
-const MAX_SLOT_MS = DAY_MS;
 const DEFAULT_MAX_REPEAT_WEEKS = 12;
 const DEFAULT_DUE_WINDOW_MINUTES = 15;
-
-interface ScheduleContext {
-  db: ShiftScheduleDb;
-  vocabulary: ShiftVocabulary<string>;
-  now: () => Date;
-  createId: () => string;
-  maxRepeatWeeks: number;
-  dueWindowMinutes: number;
-}
-
-function invalid(message: string): ShiftScheduleError {
-  return new ShiftScheduleError('INVALID_SLOT', message);
-}
-
-function requireText(value: string, field: string): void {
-  if (value.trim().length === 0) throw invalid(`${field} must not be empty.`);
-}
+const DEFAULT_HORIZON_WEEKS = 12;
 
 function validateTimes(input: ScheduleSlotInput, now: Date): void {
   const start = input.startsAt.getTime();
@@ -47,7 +47,8 @@ function validateTimes(input: ScheduleSlotInput, now: Date): void {
   if (Number.isNaN(start) || Number.isNaN(end)) throw invalid('startsAt and endsAt must be valid dates.');
   if (end <= start) throw invalid('endsAt must be after startsAt.');
   if (end - start > MAX_SLOT_MS) throw invalid('A slot may last at most 24 hours.');
-  if (start < now.getTime()) throw invalid('A slot may not start in the past.');
+  refusePastStart(input.startsAt, input.endsAt, now, input.allowRunning);
+  validateBreak(input.breakOffsetMinutes, input.breakMinutes, (end - start) / MINUTE_MS);
 }
 
 function validateRepeat(input: ScheduleSlotInput, maxRepeatWeeks: number): number {
@@ -62,18 +63,25 @@ function validateRepeat(input: ScheduleSlotInput, maxRepeatWeeks: number): numbe
 }
 
 function validateInput(ctx: ScheduleContext, input: ScheduleSlotInput): number {
-  requireText(input.clientId, 'clientId');
-  requireText(input.userId, 'userId');
-  requireText(input.actorUserId, 'actorUserId');
-  if (!ctx.vocabulary.has(input.kind)) throw invalid(`Unknown kind: ${input.kind}.`);
+  validateWho(ctx, input);
   validateTimes(input, ctx.now());
   return validateRepeat(input, ctx.maxRepeatWeeks);
+}
+
+/** The fields every copy of the input shares, optional ones defaulted. */
+function sharedFields(input: ScheduleSlotInput) {
+  return {
+    ...resourceFields(input),
+    breakOffsetMinutes: input.breakOffsetMinutes ?? null,
+    breakMinutes: input.breakMinutes ?? null,
+  };
 }
 
 /** The slot and each weekly repeat, keeping wall-clock time in the input's zone. */
 function buildSlots(ctx: ScheduleContext, input: ScheduleSlotInput, weeks: number): ShiftSlot[] {
   const createdAt = ctx.now();
   const seriesId = weeks > 0 ? ctx.createId() : null;
+  const shared = sharedFields(input);
   return Array.from({ length: weeks + 1 }, (_, week) => {
     const days = week * WEEK_DAYS;
     const zone = input.timeZone ?? 'UTC';
@@ -84,10 +92,11 @@ function buildSlots(ctx: ScheduleContext, input: ScheduleSlotInput, weeks: numbe
       kind: input.kind,
       startsAt: week === 0 ? new Date(input.startsAt) : addZonedDays(input.startsAt, days, zone),
       endsAt: week === 0 ? new Date(input.endsAt) : addZonedDays(input.endsAt, days, zone),
-      resourceType: input.resource?.type ?? null,
-      resourceId: input.resource?.id ?? null,
-      coverage: input.coverage ? input.coverage.map((entry) => ({ ...entry })) : null,
+      ...shared,
       seriesId,
+      originSeriesId: null,
+      seriesDate: null,
+      detached: false,
       createdByUserId: input.actorUserId,
       createdAt,
       canceledAt: null,
@@ -104,6 +113,7 @@ function validateBuilt(slots: readonly ShiftSlot[]): void {
     if (!(length > 0) || length > MAX_SLOT_MS) {
       throw invalid(`The repeat in week ${week} would not last between 0 and 24 hours in that time zone.`);
     }
+    validateBreak(slot.breakOffsetMinutes, slot.breakMinutes, length / MINUTE_MS);
   });
 }
 
@@ -115,9 +125,7 @@ async function refuseOverlap(tx: ShiftScheduleTransaction, slots: readonly Shift
   const clash = slots.find((slot) =>
     live.some((other) => other.startsAt < slot.endsAt && slot.startsAt < other.endsAt),
   );
-  if (clash) {
-    throw new ShiftScheduleError('SLOT_OVERLAP', 'The worker already has a slot at that time.');
-  }
+  if (clash) throw overlapError();
 }
 
 async function scheduleSlot(ctx: ScheduleContext, input: ScheduleSlotInput): Promise<ShiftSlot[]> {
@@ -142,6 +150,8 @@ async function scheduleSlot(ctx: ScheduleContext, input: ScheduleSlotInput): Pro
         startsAt: first.startsAt.toISOString(),
         endsAt: first.endsAt.toISOString(),
         seriesId: first.seriesId,
+        breakOffsetMinutes: first.breakOffsetMinutes === null ? null : String(first.breakOffsetMinutes),
+        breakMinutes: first.breakMinutes === null ? null : String(first.breakMinutes),
         count: String(slots.length),
       },
     });
@@ -157,7 +167,40 @@ async function slotToCancel(tx: ShiftScheduleTransaction, input: CancelSlotInput
   return slot;
 }
 
-async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise<ShiftSlot[]> {
+/**
+ * A `following` cancel on a rule's row ends the rule the day before, so the
+ * extension builds no more days; the end it had is kept for `restoreSlot`.
+ */
+async function endRuleFrom(
+  tx: ShiftScheduleTransaction,
+  slot: ShiftSlot,
+  actorUserId: string | null,
+  builder: ChangeBuilder,
+): Promise<void> {
+  const rule = slot.seriesId === null ? null : await tx.getSeries(slot.clientId, slot.seriesId);
+  if (!rule) return;
+  const from = slot.seriesDate ?? zonedParts(slot.startsAt, rule.timeZone).date;
+  const endsOn = addLocalDays(from, -1);
+  if (rule.endsOn !== null && rule.endsOn <= endsOn) return;
+  builder.closedSeries(rule);
+  await tx.updateSeries(rule.clientId, rule.id, { endsOn, canceledFrom: from, endsOnBeforeCancel: rule.endsOn });
+  await tx.writeAudit({
+    clientId: rule.clientId,
+    actorUserId,
+    action: 'shift.schedule.series',
+    resourceType: 'shift_slot_series',
+    resourceId: rule.id,
+    before: { endsOn: rule.endsOn },
+    after: { endsOn, canceledFrom: from },
+  });
+}
+
+function withChange(slots: ShiftSlot[], change: ScheduleChange): CancelSlotResult {
+  // Not enumerable: the array still reads, compares and serialises as the slots it was.
+  return Object.defineProperty(slots, 'change', { value: change, enumerable: false }) as CancelSlotResult;
+}
+
+async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise<CancelSlotResult> {
   requireText(input.clientId, 'clientId');
   requireText(input.slotId, 'slotId');
   const now = ctx.now();
@@ -178,6 +221,8 @@ async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise
       canceledByUserId: input.actorUserId,
       cancelReason: input.reason ?? null,
     });
+    const builder = new ChangeBuilder().canceled(canceled);
+    if (input.scope === 'following') await endRuleFrom(tx, slot, input.actorUserId, builder);
     await tx.writeAudit({
       clientId: slot.clientId,
       actorUserId: input.actorUserId,
@@ -187,7 +232,8 @@ async function cancelSlot(ctx: ScheduleContext, input: CancelSlotInput): Promise
       before: { startsAt: slot.startsAt.toISOString(), seriesId: slot.seriesId },
       after: { reason: input.reason ?? null, count: String(canceled.length) },
     });
-    return [...canceled].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+    const sorted = [...canceled].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+    return withChange(sorted, await builder.seal(tx, slot.clientId));
   });
 }
 
@@ -215,31 +261,48 @@ function listSlots(ctx: ScheduleContext, input: ListSlotsInput): Promise<ShiftSl
  * The schedule of planned shift slots — see `ShiftSlot`. Built beside
  * `createShiftService`, on the same vocabulary, over its own db seam.
  */
-export function createShiftScheduleService<const Kinds extends ShiftKindTuple>(
-  db: ShiftScheduleDb,
-  options: ShiftScheduleServiceOptions<Kinds>,
-): ShiftScheduleService<Kinds[number]> {
+/** The numeric options, defaulted and checked where a wiring mistake is legible. */
+function resolveOptions(options: ShiftScheduleServiceOptions): Pick<ScheduleContext, 'maxRepeatWeeks' | 'dueWindowMinutes' | 'horizonWeeks'> {
   const maxRepeatWeeks = options.maxRepeatWeeks ?? DEFAULT_MAX_REPEAT_WEEKS;
   const dueWindowMinutes = options.dueWindowMinutes ?? DEFAULT_DUE_WINDOW_MINUTES;
+  const horizonWeeks = options.horizonWeeks ?? DEFAULT_HORIZON_WEEKS;
   if (!Number.isInteger(maxRepeatWeeks) || maxRepeatWeeks < 0) {
     throw new ShiftConfigError('maxRepeatWeeks must be a whole number of weeks, 0 or more.');
   }
   if (!Number.isFinite(dueWindowMinutes) || dueWindowMinutes < 0) {
     throw new ShiftConfigError('dueWindowMinutes must be a number of minutes, 0 or more.');
   }
+  if (!Number.isInteger(horizonWeeks) || horizonWeeks < 1) {
+    throw new ShiftConfigError('horizonWeeks must be a whole number of weeks, 1 or more.');
+  }
+  return { maxRepeatWeeks, dueWindowMinutes, horizonWeeks };
+}
+
+export function createShiftScheduleService<const Kinds extends ShiftKindTuple>(
+  db: ShiftScheduleDb,
+  options: ShiftScheduleServiceOptions<Kinds>,
+): ShiftScheduleService<Kinds[number]> {
   const ctx: ScheduleContext = {
     db,
     vocabulary: defineShiftVocabulary(options.kinds),
     now: options.now ?? (() => new Date()),
     createId: options.createId ?? randomUUID,
-    maxRepeatWeeks,
-    dueWindowMinutes,
+    ...resolveOptions(options),
   };
   return {
     scheduleSlot: (input) => scheduleSlot(ctx, input),
     cancelSlot: (input) => cancelSlot(ctx, input),
     listSlots: (input) => listSlots(ctx, input),
     nextSlots: (input) => nextSlots(ctx, input),
+    scheduleSeries: (input) => scheduleSeries(ctx, input),
+    extendSeries: (now) => extendSeries(now === undefined ? ctx : { ...ctx, now: () => now }),
+    materialiseSeries: (input) => materialiseSeries(ctx, input),
+    editSlot: (input) => editSlot(ctx, input),
+    editSeries: (input) => editSeries(ctx, input),
+    promoteToSeries: (input) => promoteToSeries(ctx, input),
+    demoteToSlot: (input) => demoteToSlot(ctx, input),
+    restoreSlot: (input) => restoreSlot(ctx, input),
+    revertScheduleChange: (input) => revertScheduleChange(ctx, input),
     slotStanding: (input) =>
       slotStandingAt({ ...input, now: input.now ?? ctx.now() }, ctx.dueWindowMinutes),
   };

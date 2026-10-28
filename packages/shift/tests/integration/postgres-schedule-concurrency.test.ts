@@ -93,6 +93,17 @@ function pgScheduleDb(schema: string, options: { applicationName?: string; onAud
           },
           cancelSlots: async () => [],
           listSeriesFrom: async () => [],
+          // Unused by the single-slot writes this suite races.
+          listSeriesRows: async () => [],
+          updateSlot: async () => {
+            throw new Error('not used');
+          },
+          restoreSlots: async () => [],
+          getSeries: async () => null,
+          createSeries: async () => undefined,
+          updateSeries: async () => {
+            throw new Error('not used');
+          },
           writeAudit: async () => {
             await options.onAudit?.();
           },
@@ -108,7 +119,7 @@ function pgScheduleDb(schema: string, options: { applicationName?: string; onAud
     },
   };
   return createShiftScheduleService(
-    { ...db, listSlots: async () => [], listUpcoming: async () => [] },
+    { ...db, listSlots: async () => [], listUpcoming: async () => [], listOpenSeries: async () => [] },
     { kinds: ['ward'] as const },
   );
 }

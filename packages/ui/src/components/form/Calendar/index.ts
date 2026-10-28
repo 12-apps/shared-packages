@@ -1,5 +1,6 @@
 export { Calendar,Calendar as default } from './Calendar';
 export type {
+  CalendarCaptionLayout,
   CalendarInternalState,
   CalendarProps,
   DateRange,

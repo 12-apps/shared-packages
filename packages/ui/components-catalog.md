@@ -351,9 +351,9 @@ Components for user input and form interactions.
 
 ### Calendar
 **Purpose**: Date picker and calendar component
-**Use Cases**: Date selection, date range picker, scheduling
-**Features**: Single/range selection, min/max dates, disabled dates
-**Types**: `SelectionMode` (single/range)
+**Use Cases**: Date selection, date range picker, scheduling, a date decades back (birth date)
+**Features**: Single/range selection, min/max dates, disabled dates, `defaultMonth` (the month it opens on while nothing is chosen), opt-in `captionLayout="selectors"` — `<Month> ▾`/`<Year> ▾` buttons that swap the days for a 3×4 month grid or a newest-first year grid bounded by `minDate`/`maxDate`, keyboard and 44px touch targets, names from `labels` (`UI_LABELS[locale].calendar`)
+**Types**: `SelectionMode` (single/range), `CalendarCaptionLayout` (arrows/selectors), `CalendarLabels`
 **Location**: `src/components/form/Calendar`
 **Docs**: `src/components/form/Calendar/Calendar.md`
 

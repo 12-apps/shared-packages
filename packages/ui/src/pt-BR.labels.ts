@@ -158,4 +158,12 @@ export const PT_BR_UI_LABELS: UiLabels = {
     refused: "Não dá para ir além",
     loading: "Carregando o dia",
   },
+  calendar: {
+    chooseMonth: (month) => `${month}, escolher mês`,
+    chooseYear: (year) => `${year}, escolher ano`,
+    previousMonth: "Mês anterior",
+    nextMonth: "Próximo mês",
+    months: "Meses",
+    years: "Anos",
+  },
 };

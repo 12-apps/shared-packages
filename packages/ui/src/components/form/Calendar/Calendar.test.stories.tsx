@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { must } from '../../../test-utils/must';
 
 import { Calendar } from './Calendar';
@@ -470,6 +471,136 @@ export const IntegrationTest: Story = {
         expect(secondClickables[5]).toHaveAttribute('aria-selected', 'true');
         expect(secondClickables[10]).toHaveAttribute('aria-selected', 'true');
       });
+    }
+  },
+};
+
+// captionLayout="selectors" (FUT-4121)
+
+/** The Perfil birth-date window on 2026-10-27, pinned so the list never moves. */
+const BirthDateCalendar = () => {
+  const [value, setValue] = useState<Date | null>(null);
+  return (
+    <Calendar
+      ariaLabel={CALENDAR_ARIA_LABEL}
+      locale="pt-BR"
+      captionLayout="selectors"
+      defaultMonth={new Date(2001, 0, 1)}
+      minDate={new Date(1900, 0, 1)}
+      maxDate={new Date(2013, 9, 27)}
+      labels={PT_BR_UI_LABELS.calendar}
+      value={value}
+      onChange={setValue}
+    />
+  );
+};
+
+/** Year button, 1990, month button, mar, 14: the owner's five taps, in a browser. */
+export const SelectorsPickABirthDate: Story = {
+  render: () => <BirthDateCalendar />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('calendar-year-select'));
+    // Opening the list puts focus on the shown year, scrolled into view.
+    await waitFor(() => expect(canvas.getByTestId('calendar-years-2001')).toHaveFocus());
+    await userEvent.click(canvas.getByTestId('calendar-years-1990'));
+    await userEvent.click(canvas.getByTestId('calendar-month-select'));
+    await userEvent.click(canvas.getByTestId('calendar-months-2'));
+    await userEvent.click(within(canvas.getByTestId('calendar-grid')).getByText('14'));
+
+    await waitFor(() => expect(canvas.getByTestId('calendar-selected-date').parentElement).toHaveTextContent('14'));
+    await expect(canvas.getByTestId('calendar-month-select-text')).toHaveTextContent('Março');
+    await expect(canvas.getByTestId('calendar-year-select')).toHaveTextContent('1990');
+  },
+};
+
+/** The grids from the keyboard: move, pick with Enter, Escape back to the button. */
+export const SelectorsKeyboard: Story = {
+  render: () => <BirthDateCalendar />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('calendar-year-select'));
+    await waitFor(() => expect(canvas.getByTestId('calendar-years-2001')).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+
+    await waitFor(() => expect(canvas.getByTestId('calendar-year-select')).toHaveTextContent('1997'));
+    // Focus lands on the picked month's day grid, on its one tab stop.
+    const tabStop = within(canvas.getByTestId('calendar-grid'))
+      .getAllByRole('gridcell')
+      .find((cell) => cell.tabIndex === 0);
+    await waitFor(() => expect(tabStop).toHaveFocus());
+
+    await userEvent.click(canvas.getByTestId('calendar-month-select'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(canvas.getByTestId('calendar-month-select')).toHaveFocus());
+    await expect(canvas.getByTestId('calendar-month-select')).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
+/**
+ * A 320 bottom sheet's content box (296px): nothing spills out, and every
+ * caption and grid control stays a 44px touch target.
+ */
+export const SelectorsFitA320Sheet: Story = {
+  render: () => (
+    <div data-testid="selectors-box" style={{ width: 296, overflow: 'hidden' }}>
+      <BirthDateCalendar />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const box = canvas.getByTestId('selectors-box').getBoundingClientRect();
+    const header = canvas.getByTestId('calendar-header');
+
+    const controls = within(header).getAllByRole('button');
+    for (const control of controls) {
+      const rect = control.getBoundingClientRect();
+      await expect(rect.right).toBeLessThanOrEqual(box.right + 0.5);
+      await expect(rect.height).toBeGreaterThanOrEqual(44);
+    }
+
+    await userEvent.click(canvas.getByTestId('calendar-year-select'));
+    const year = await canvas.findByTestId('calendar-years-2001');
+    await expect(year.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    await expect(year.getBoundingClientRect().right).toBeLessThanOrEqual(box.right + 0.5);
+  },
+};
+
+/**
+ * Nothing moves under the thumb: stepping through a year leaves the arrows and
+ * the caption where they were whatever the month's name, and opening the month
+ * or year grid keeps the calendar's size. 343 is a 375 phone less its gutters,
+ * where "Setembro" once pushed the arrows onto a second row.
+ */
+export const SelectorsHoldStill: Story = {
+  render: () => (
+    <div style={{ width: 343 }}>
+      <BirthDateCalendar />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const header = canvas.getByTestId('calendar-header');
+    const next = canvas.getByTestId('calendar-next-month');
+    const container = canvas.getByTestId('calendar-container');
+    const startHeader = header.getBoundingClientRect().height;
+    const startNext = next.getBoundingClientRect();
+    const startSize = container.getBoundingClientRect();
+
+    for (let step = 0; step < 12; step += 1) {
+      await userEvent.click(next);
+      await expect(header.getBoundingClientRect().height).toBe(startHeader);
+      await expect(next.getBoundingClientRect().top).toBe(startNext.top);
+      await expect(next.getBoundingClientRect().left).toBe(startNext.left);
+    }
+
+    for (const toggle of ['calendar-month-select', 'calendar-year-select']) {
+      await userEvent.click(canvas.getByTestId(toggle));
+      const open = container.getBoundingClientRect();
+      await expect(open.width).toBe(startSize.width);
+      await expect(open.height).toBe(startSize.height);
+      await userEvent.keyboard('{Escape}');
     }
   },
 };

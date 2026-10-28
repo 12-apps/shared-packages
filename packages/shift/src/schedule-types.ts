@@ -1,3 +1,10 @@
+import type {
+  ShiftSlotSeries,
+  ShiftSlotSeriesPatch,
+  ShiftSlotSeriesService,
+  ScheduleChange,
+} from './schedule-series-types';
+import type { LocalDate } from './schedule-time';
 import type { Shift } from './types';
 import type { ShiftKindTuple } from './vocabulary';
 
@@ -8,7 +15,8 @@ import type { ShiftKindTuple } from './vocabulary';
  * opened, closed, immutable once ended — and its rules make a planned one
  * impossible to express as an unopened shift: a start more than a couple of
  * minutes ahead is refused, and one open shift per worker per tenant is a
- * unique index. A slot is a plan, and plans are edited by cancelling them.
+ * unique index. A slot is a plan: it is edited IN PLACE (`editSlot`), so it
+ * keeps its id and its history stays together, and cancelled with a reason.
  *
  * Tenant, user, kind and resource are stored by value, exactly as on a shift:
  * the host owns what the values mean.
@@ -24,8 +32,28 @@ export interface ShiftSlot {
   resourceId: string | null;
   /** The host's own coverage, as `{ type, id }` pairs; null when none. */
   coverage: ShiftSlotCoverage[] | null;
-  /** Shared by the slots one weekly repeat created; null for a single slot. */
+  /**
+   * The series the slot belongs to: a {@link ShiftSlotSeries} rule, or — for a
+   * slot written before rules existed — the id a weekly repeat shared. Null for
+   * a single slot, including one handed to another person out of a series.
+   */
   seriesId: string | null;
+  /**
+   * The series a slot was handed OUT of (its person changed): kept for the
+   * history, for the rule's "this day exists" check and for `rejoinSeries`.
+   */
+  originSeriesId: string | null;
+  /** The rule's day this row was built for; kept when the row is moved. Null when no rule built it. */
+  seriesDate: LocalDate | null;
+  /** True once its hours or its date were edited on their own: a later rule change leaves it. */
+  detached: boolean;
+  /**
+   * The break, as minutes from the slot's START and its length — offsets, so it
+   * survives a slot that crosses midnight or a daylight-saving change. Both
+   * null or both set, and strictly inside the slot.
+   */
+  breakOffsetMinutes: number | null;
+  breakMinutes: number | null;
   createdByUserId: string;
   createdAt: Date;
   canceledAt: Date | null;
@@ -55,6 +83,11 @@ export interface ScheduleSlotInput<Kind extends string = string> {
   endsAt: Date;
   resource?: { type: string; id: string } | null;
   coverage?: readonly ShiftSlotCoverage[] | null;
+  /** The break, as offsets from the start — both or neither. */
+  breakOffsetMinutes?: number | null;
+  breakMinutes?: number | null;
+  /** Admit a slot already under way (its start past, its end ahead). */
+  allowRunning?: boolean;
   /** How many FOLLOWING weeks to repeat the slot in; 0 or absent for one slot. */
   repeatWeeks?: number;
   /**
@@ -101,11 +134,35 @@ export interface SlotStandingInput {
   now?: Date;
 }
 
+export type ShiftScheduleAuditAction =
+  | 'shift.schedule'
+  | 'shift.schedule.cancel'
+  | 'shift.schedule.edit'
+  | 'shift.schedule.series'
+  | 'shift.schedule.promote'
+  | 'shift.schedule.demote'
+  | 'shift.schedule.restore';
+
+/** The fields of a slot an edit, a hand-over or an undo may change in place. */
+export type ShiftSlotPatch = Partial<
+  Pick<
+    ShiftSlot,
+    | 'startsAt'
+    | 'endsAt'
+    | 'userId'
+    | 'seriesId'
+    | 'originSeriesId'
+    | 'detached'
+    | 'breakOffsetMinutes'
+    | 'breakMinutes'
+  >
+>;
+
 export interface ShiftScheduleAuditInput {
   clientId: string;
   actorUserId: string | null;
-  action: 'shift.schedule' | 'shift.schedule.cancel';
-  resourceType: 'shift_slot';
+  action: ShiftScheduleAuditAction;
+  resourceType: 'shift_slot' | 'shift_slot_series';
   resourceId: string;
   before: Record<string, string | null>;
   after: Record<string, string | null>;
@@ -131,8 +188,21 @@ export interface ShiftScheduleTransaction {
     canceledByUserId: string | null;
     cancelReason: string | null;
   }): Promise<ShiftSlot[]>;
-  /** Live slots of the series starting at or after `from`. */
+  /** Live slots of the series starting at or after `from` — by `seriesId` alone. */
   listSeriesFrom(clientId: string, seriesId: string, from: Date): Promise<ShiftSlot[]>;
+  /**
+   * EVERY row of a series, canceled included, whose `seriesId` OR
+   * `originSeriesId` is `seriesId`, starting in `[from, to)` — what "the rule
+   * already has this day" is read from, and what an undo of the rule cancels.
+   */
+  listSeriesRows(clientId: string, seriesId: string, from: Date, to: Date): Promise<ShiftSlot[]>;
+  /** Change one slot in place; returns it as stored. */
+  updateSlot(clientId: string, slotId: string, patch: ShiftSlotPatch): Promise<ShiftSlot>;
+  /** Clear the cancel of each canceled slot named; returns those actually restored. */
+  restoreSlots(clientId: string, slotIds: readonly string[]): Promise<ShiftSlot[]>;
+  getSeries(clientId: string, seriesId: string): Promise<ShiftSlotSeries | null>;
+  createSeries(series: ShiftSlotSeries): Promise<void>;
+  updateSeries(clientId: string, seriesId: string, patch: ShiftSlotSeriesPatch): Promise<ShiftSlotSeries>;
   writeAudit(input: ShiftScheduleAuditInput): Promise<void>;
 }
 
@@ -150,6 +220,12 @@ export interface ShiftScheduleDb {
     after: Date;
     limit: number;
   }): Promise<ShiftSlot[]>;
+  /**
+   * Every rule, in every tenant, that may still have days to build: no end,
+   * or an end on or after `onOrAfter`. Read outside a transaction by the
+   * daily extension, which then locks each person in turn.
+   */
+  listOpenSeries(onOrAfter: LocalDate): Promise<ShiftSlotSeries[]>;
 }
 
 export interface ShiftScheduleServiceOptions<Kinds extends ShiftKindTuple = ShiftKindTuple> {
@@ -161,11 +237,17 @@ export interface ShiftScheduleServiceOptions<Kinds extends ShiftKindTuple = Shif
   maxRepeatWeeks?: number;
   /** How long before its start a slot counts as due (default 15 minutes). */
   dueWindowMinutes?: number;
+  /** How many weeks ahead a series rule keeps its days built (default 12). */
+  horizonWeeks?: number;
 }
 
-export interface ShiftScheduleService<Kind extends string = string> {
+/** What `cancelSlot` returns: the canceled slots, as before, carrying the change that undoes it. */
+export type CancelSlotResult = ShiftSlot[] & { change: ScheduleChange };
+
+export interface ShiftScheduleService<Kind extends string = string> extends ShiftSlotSeriesService<Kind> {
   scheduleSlot(input: ScheduleSlotInput<Kind>): Promise<ShiftSlot[]>;
-  cancelSlot(input: CancelSlotInput): Promise<ShiftSlot[]>;
+  /** `following` on a rule's row also ends the rule the day before; `restoreSlot` reopens it. */
+  cancelSlot(input: CancelSlotInput): Promise<CancelSlotResult>;
   listSlots(input: ListSlotsInput): Promise<ShiftSlot[]>;
   nextSlots(input: NextSlotsInput): Promise<ShiftSlot[]>;
   slotStanding(input: SlotStandingInput): ShiftSlotStandingResult;
