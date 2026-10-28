@@ -8,10 +8,12 @@ import type { MonthMatrix, ResolvedCalendarProps } from './Calendar.types';
 
 const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
 
-// Which day the calendar opens on: whatever is already chosen, else today.
+// Which day the calendar opens on: whatever is already chosen, else the first
+// of `defaultMonth`, else today.
 const initialFocus = (props: ResolvedCalendarProps, today: Date): Date => {
   if (props.selectionMode === 'single' && props.value) return normalizeDate(props.value);
   if (props.selectionMode === 'range' && props.range.start) return normalizeDate(props.range.start);
+  if (props.defaultMonth) return normalizeDate(startOfMonth(props.defaultMonth));
   return today;
 };
 
@@ -44,22 +46,24 @@ const useVisibleMonths = ({
   currentMonth,
   monthsToShow,
   firstDayOfWeek,
+  fixedWeeks,
 }: {
   currentMonth: Date;
   monthsToShow: number;
   firstDayOfWeek: number;
+  fixedWeeks: boolean;
 }): MonthMatrix[] =>
   useMemo(() => {
     const matrices: MonthMatrix[] = [];
     let cursor = currentMonth;
 
     for (let i = 0; i < monthsToShow; i++) {
-      matrices.push(generateMonthMatrix(cursor.getMonth(), cursor.getFullYear(), firstDayOfWeek));
+      matrices.push(generateMonthMatrix(cursor.getMonth(), cursor.getFullYear(), firstDayOfWeek, fixedWeeks));
       cursor = addMonths(cursor, 1);
     }
 
     return matrices;
-  }, [currentMonth, monthsToShow, firstDayOfWeek]);
+  }, [currentMonth, monthsToShow, firstDayOfWeek, fixedWeeks]);
 
 // A click either sets a single date or advances the range by one step; the range
 // rules themselves live in nextRangeStep.
@@ -215,6 +219,9 @@ export const useCalendar = (props: ResolvedCalendarProps) => {
     currentMonth: state.currentMonth,
     monthsToShow,
     firstDayOfWeek,
+    // The selectors caption steps month by month under the thumb; six weeks
+    // every time keep it, and a sheet anchored below, where they are.
+    fixedWeeks: props.captionLayout === 'selectors',
   });
 
   const weekdayNames = useMemo(
@@ -264,6 +271,9 @@ export const useCalendar = (props: ResolvedCalendarProps) => {
     gridRef,
     today,
     focusedDate: state.focusedDate,
+    setFocusedDate: state.setFocusedDate,
+    currentMonth: state.currentMonth,
+    setCurrentMonth: state.setCurrentMonth,
     hoveredDate: state.hoveredDate,
     monthMatrices,
     weekdayNames,

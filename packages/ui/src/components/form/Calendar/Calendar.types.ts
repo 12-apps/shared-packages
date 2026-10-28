@@ -1,3 +1,5 @@
+import type { CalendarLabels } from '../../../copy/labels';
+
 export type SelectionMode = 'single' | 'range';
 
 export interface DateRange {
@@ -16,6 +18,14 @@ export interface DayRenderArgs {
   today: boolean;
   hovered?: boolean;
 }
+
+/**
+ * What the caption above the days holds. `'arrows'` (the default) is the month
+ * title between previous/next arrows. `'selectors'` replaces the title with a
+ * month button and a year button that swap the day grid for a month grid or a
+ * year grid — for dates far from today, such as a birth date.
+ */
+export type CalendarCaptionLayout = 'arrows' | 'selectors';
 
 export interface HeaderRenderContext {
   month: number;
@@ -46,6 +56,19 @@ export interface CalendarProps {
   locale?: string; // e.g. 'en-US'
   showOutsideDays?: boolean; // days from prev/next month
   showWeekNumbers?: boolean;
+  /** default: 'arrows'. `'selectors'` always shows one month. */
+  captionLayout?: CalendarCaptionLayout;
+  /**
+   * The month the calendar opens on when nothing is chosen yet (no `value`, no
+   * `range.start`). Default: today's month. Read once, on mount.
+   */
+  defaultMonth?: Date;
+  /**
+   * The selectors caption's accessible names (`captionLayout="selectors"`);
+   * the English pack answers for any key left out. A pt-BR host passes
+   * `UI_LABELS['pt-BR'].calendar`.
+   */
+  labels?: Partial<CalendarLabels>;
 
   // Constraints
   minDate?: Date;
@@ -79,7 +102,8 @@ type CalendarDefaultedKeys =
   | 'showOutsideDays'
   | 'minRangeLength'
   | 'allowSameDayRange'
-  | 'autoFocus';
+  | 'autoFocus'
+  | 'captionLayout';
 
 // CalendarProps with the defaults already applied, plus the month count resolved
 // from numberOfMonths and the selection mode.

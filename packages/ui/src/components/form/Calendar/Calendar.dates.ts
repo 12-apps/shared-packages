@@ -50,10 +50,15 @@ const endOfMonth = (date: Date): Date =>
 const dayKey = (date: Date): string =>
   `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
+/**
+ * The weeks of `month`. `fixedWeeks` always gives six, the next month's days
+ * filling the rest, so a calendar's height does not change from month to month.
+ */
 export const generateMonthMatrix = (
   month: number,
   year: number,
   firstDayOfWeek = 0,
+  fixedWeeks = false,
 ): MonthMatrix => {
   const firstDay = new Date(year, month, 1);
   const lastDay = endOfMonth(firstDay);
@@ -78,7 +83,7 @@ export const generateMonthMatrix = (
 
     // Stop on a week boundary once the month is behind us, so a month that fits
     // in five rows does not get a trailing sixth.
-    if (currentWeek.length === 0 && currentDate > lastDay) break;
+    if (!fixedWeeks && currentWeek.length === 0 && currentDate > lastDay) break;
   }
 
   return { weeks, month, year };
@@ -98,3 +103,13 @@ export const getWeekdayNames = (locale = 'en-US', firstDayOfWeek = 0): string[] 
 
 export const getMonthName = (month: number, year: number, locale = 'en-US'): string =>
   new Date(year, month, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+
+/**
+ * A month's name on its own, as the selectors caption and month grid show it:
+ * capitalised (pt-BR's `Intl` writes "março"), and `short` without the
+ * trailing abbreviation dot ("mar." → "mar").
+ */
+export const getMonthLabel = (month: number, locale = 'en-US', width: 'long' | 'short' = 'long'): string => {
+  const name = new Date(2025, month, 1).toLocaleDateString(locale, { month: width }).replace(/\.$/, '');
+  return width === 'long' ? name.charAt(0).toLocaleUpperCase(locale) + name.slice(1) : name;
+};
