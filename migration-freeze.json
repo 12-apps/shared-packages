@@ -75,6 +75,7 @@
   "packages/prisma/prisma/migrations/20261003120000_add_chat_thread_activity_index/migration.sql": "4aa5d1f8b2470a52baabb422944e86a5ad9884b1fb540d59f855bd0c52b4cc8a",
   "packages/prisma/prisma/migrations/20261006120000_shift_slots/migration.sql": "854df50f19b925d46c524ff49fdef1a798bf32e7df6d741e20e26a569817270f",
   "packages/prisma/prisma/migrations/20261009200000_auth_sign_in_grant/migration.sql": "6145f2b1b7f5f04de668be1869c9d81f3345524a65573b40487c62fc02adb623",
+  "packages/prisma/prisma/migrations/20261027120000_shift_slot_series/migration.sql": "56fb081031b2aa1cefe79e1e0dcb1f3b92de487fcbd87f492743d977d8c98d19",
   "packages/product-research/prisma/migrations/20260728120000_add_product_research/migration.sql": "1da080bdc4facd970b73cdaaf9739aa678267ea314e636d40f19ed108d0d2e2d",
   "packages/product-research/prisma/migrations/20260728170000_add_manual_price_entries/migration.sql": "2667f2660a8745bcf451b82dcf108f4d0b5fdcf528f8a80ca158424d9c47d660",
   "packages/product-research/prisma/migrations/20260729090000_integration_source_singleton/migration.sql": "ffa88e3bd6a2f78dade022c913d8931c0a202572ebe087bfb85637c7802b6aaf",
