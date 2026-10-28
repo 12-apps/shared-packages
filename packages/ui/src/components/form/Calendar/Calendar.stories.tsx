@@ -3,6 +3,7 @@ import Button from '@mui/material/Button/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 
@@ -110,7 +111,10 @@ const RangeSelectionComponent = () => {
         selectionMode="range"
         range={selectedRange}
         onRangeChange={(range) => setSelectedRange(range)}
-        onIntermediateRangeChange={(partial) => void partial}
+        // A controlled range calendar keeps the first click only if the host
+        // stores it: without this the start was dropped and the second click
+        // began a new range (FUT-4162).
+        onIntermediateRangeChange={(partial) => setSelectedRange(partial)}
       />
       <Button onClick={() => setSelectedRange({ start: null, end: null })} variant="outlined">
         Clear
@@ -121,6 +125,18 @@ const RangeSelectionComponent = () => {
 
 export const RangeSelection: Story = {
   render: () => <RangeSelectionComponent />,
+  play: async ({ canvasElement }) => {
+    // 16-20: no month's leading or trailing outside days reach them, so each
+    // test id names exactly one cell whatever month the story opens on.
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('calendar-date-16'));
+    await userEvent.click(canvas.getByTestId('calendar-date-20'));
+
+    await expect(canvas.getByTestId('calendar-date-16')).toHaveClass('range-start');
+    await expect(canvas.getByTestId('calendar-date-20')).toHaveClass('range-end');
+    await expect(canvas.getByTestId('calendar-date-18')).toHaveClass('in-range');
+    await expect(canvas.getByRole('heading', { name: /^Range: / })).not.toHaveTextContent('None');
+  },
 };
 
 export const DualMonth: Story = {

@@ -15,7 +15,7 @@ import {
 import type { AddressAutocompleteState } from './AddressAutocomplete.hooks';
 import { AddressInputField } from './AddressInputField';
 import { AddressOption } from './AddressOption';
-import { AddressSuggestionsPaper } from './AddressSuggestionsPaper';
+import { AddressSuggestionsPaper, type AddressSuggestionsPaperProps } from './AddressSuggestionsPaper';
 
 export type AddressAutocompleteFieldProps = ResolvedAddressProps & AddressAutocompleteState;
 
@@ -42,6 +42,9 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
   handleGetCurrentLocation,
 }) => {
   const text = resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, copy);
+  const paperProps: AddressSuggestionsPaperProps = {
+    emptyText: inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound,
+  };
   return (
   <Box data-testid="address-autocomplete-container">
     <Autocomplete
@@ -57,9 +60,7 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       getOptionLabel={addressOptionLabel}
       isOptionEqualToValue={isSameAddressOption}
       PaperComponent={AddressSuggestionsPaper}
-      noOptionsText={
-        inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound
-      }
+      slotProps={{ paper: paperProps }}
       renderOption={({ key, ...optionProps }, option, state) => (
         <AddressOption
           key={key}
