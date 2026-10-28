@@ -35,8 +35,10 @@ model ShiftTenantConfig {
 
 // A PLANNED work period (a schedule slot): who should work, of which kind,
 // from when to when. Apart from Shift on purpose: a shift is a fact that
-// happened, a slot is a plan, edited by cancelling it. Tenant, user, kind and
-// resource are stored by value, as on Shift; the migration adds the CHECKs.
+// happened, a slot is a plan. A slot is edited IN PLACE, so it keeps its id
+// and its history stays together; a rule change cancels and rebuilds the rows
+// it owns, and leaves a detached one alone. Tenant, user, kind and resource
+// are stored by value, as on Shift; the migration adds the CHECKs.
 model ShiftSlot {
   id               String    @id @default(uuid())
   clientId         String    @map("client_id")
@@ -48,8 +50,18 @@ model ShiftSlot {
   resourceId       String?   @map("resource_id")
   // The host's own coverage, as a list of { type, id } pairs.
   coverage         Json?
-  // Shared by the slots one weekly repeat created.
-  seriesId         String?   @map("series_id")
+  // The ShiftSlotSeries rule the slot belongs to, or the id one weekly repeat
+  // shared before rules existed. Null for a single slot.
+  seriesId           String?   @map("series_id")
+  // The series a slot was handed out of when its person changed.
+  originSeriesId     String?   @map("origin_series_id")
+  // The rule's day this row was built for, kept when the row is moved.
+  seriesDate         DateTime? @map("series_date") @db.Date
+  // Edited on its own (hours or date): a later rule change leaves it.
+  detached           Boolean   @default(false)
+  // The break, as minutes from the start and its length: both or neither.
+  breakOffsetMinutes Int?      @map("break_offset_minutes")
+  breakMinutes       Int?      @map("break_minutes")
   createdByUserId  String    @map("created_by_user_id")
   createdAt        DateTime  @default(now()) @map("created_at")
   canceledAt       DateTime? @map("canceled_at")
@@ -59,5 +71,46 @@ model ShiftSlot {
   @@index([clientId, startsAt])
   @@index([clientId, userId, startsAt])
   @@index([seriesId])
+  @@index([originSeriesId])
   @@map("shift_slots")
+}
+
+// The RULE a repeating series is built from; its days are materialised as
+// ShiftSlot rows up to a rolling horizon. Exactly one repeat (everyWeeks 1|2,
+// or monthlyNth 1-5 of the one weekday); hours are wall-clock minutes in
+// timeZone, an end at or before the start being the next day. A rule whose
+// endsOn is before its startsOn is closed. The migration adds the CHECKs.
+model ShiftSlotSeries {
+  id                 String    @id @default(uuid())
+  clientId           String    @map("client_id")
+  userId             String    @map("user_id")
+  kind               String
+  // ISO weekdays, 1 = Monday ... 7 = Sunday.
+  weekdays           Int[]
+  everyWeeks         Int?      @map("every_weeks")
+  monthlyNth         Int?      @map("monthly_nth")
+  startMinutes       Int       @map("start_minutes")
+  endMinutes         Int       @map("end_minutes")
+  breakOffsetMinutes Int?      @map("break_offset_minutes")
+  breakMinutes       Int?      @map("break_minutes")
+  timeZone           String    @map("time_zone")
+  startsOn           DateTime  @map("starts_on") @db.Date
+  // Null for no end.
+  endsOn             DateTime? @map("ends_on") @db.Date
+  // Days left unbuilt because the person was taken, each audited once.
+  skippedDates       DateTime[] @default([]) @map("skipped_dates") @db.Date
+  // The rule an edit replaced.
+  previousSeriesId   String?   @map("previous_series_id")
+  // A following-cancel's day, and the end the rule had before it.
+  canceledFrom       DateTime? @map("canceled_from") @db.Date
+  endsOnBeforeCancel DateTime? @map("ends_on_before_cancel") @db.Date
+  resourceType       String?   @map("resource_type")
+  resourceId         String?   @map("resource_id")
+  coverage           Json?
+  createdByUserId    String    @map("created_by_user_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([endsOn])
+  @@index([clientId, userId])
+  @@map("shift_slot_series")
 }
