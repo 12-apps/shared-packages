@@ -26,8 +26,9 @@ export const SEQUENCE_METRICS = {
   /** The overview's title in the header row. */
   overviewTitle: 18,
   /**
-   * The chrome's width below which the header is narrow: Back is its chevron
-   * alone and the step label moves to the end of the progress row. A 360px
+   * With "Ver todos", the chrome's width below which the header is narrow:
+   * Back is its chevron alone and the step label takes its own line under
+   * the bar. A resolver without an overview never changes its header. A 360px
    * phone's sheet leaves the chrome 280px, a 390px one 310px — where Back's
    * word, the label, "Ver todos (N)" and close all fit whole (about 294px).
    */

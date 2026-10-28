@@ -34,11 +34,13 @@ data-sized and shrinks while you go.
 - **< 600px**: the `Dialog` inset `bottom-sheet` variant, at most 95% of the dynamic
   viewport, scrolling inside; a drag handle on top is decoration only (the sheet does not
   drag). Every header and footer target is at least 44px tall there.
-- **The header is one line at every width, 320 included, and nothing on it is cut**: Back,
-  "Ver todos (N)" and close keep their size. On a chrome under 300px (a phone under 375px)
-  Back is its chevron alone — a 44px target named by `backAccessible`, else `back` — and the
-  step label moves to the end of the progress row. Only a long host label on a wider chrome
-  is cut, with an ellipsis.
+- **Without `overview` the header is the one it always was**: Back with its word, the step label
+  beside it or on its own row when the sheet is narrow, close, the bar under them.
+- **With "Ver todos (N)" the header is one line at every width, 320 included, and nothing on it
+  is cut**: Back, "Ver todos (N)" and close keep their size. On a chrome under 300px (a phone
+  under 375px) Back is its chevron alone — a 44px target named by `backAccessible`, else
+  `back` — and the step label takes its own line under the full-width bar (it wraps if long,
+  never beside the bar). Only a long host label on a wider chrome is cut, with an ellipsis.
 
 ## Props
 
