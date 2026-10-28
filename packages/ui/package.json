@@ -212,6 +212,10 @@
       "types": "./dist/types/components/data-display/FleetMap/index.d.ts",
       "default": "./dist/data-display/FleetMap.js"
     },
+    "./data-display/RegionMap": {
+      "types": "./dist/types/components/data-display/RegionMap/index.d.ts",
+      "default": "./dist/data-display/RegionMap.js"
+    },
     "./data-display/SectionOnboarding": {
       "types": "./dist/types/components/data-display/SectionOnboarding/index.d.ts",
       "default": "./dist/data-display/SectionOnboarding.js"

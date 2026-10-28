@@ -182,6 +182,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/MapPreview`
 **Docs**: `src/components/data-display/MapPreview/MapPreview.md`
 
+### RegionMap
+**Purpose**: Show named areas (polygons with holes) around a point, and let a tap toggle each one in or out
+**Use Cases**: Bairros a store does not deliver to, delivery or sales zones, sectors switched on and off, a read-only in/out picture
+**Features**: Inline SVG with no tile server, hatched AND named excluded areas (never only colour, never red), dashed circles, highlighted area, hit test that prefers the smallest area and reaches slivers by distance, accessible list of toggle buttons (shown, collapsed behind a count, or none), Google polyline decoder, every word injected
+**Location**: `src/components/data-display/RegionMap`
+**Docs**: `src/components/data-display/RegionMap/RegionMap.md`
+
 ### Popover
 **Purpose**: Display floating content anchored to an element
 **Use Cases**: Context menus, tooltips with complex content, dropdown panels
