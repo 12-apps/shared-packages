@@ -68,10 +68,17 @@ export const billingProviders = {
   },
 };
 
+/** Both stubs take a card, which is all the billing paths ask of them. */
+const CARD_CAPABILITIES = { methods: ['CARD'] } as unknown as PaymentProviderAdapter['capabilities'];
+
 function vaultingAdapter(sessions: Map<string, StubSession>): PaymentProviderAdapter {
   let counter = 0;
   return {
     name: VAULTING_PROVIDER,
+    // Declared, as every real adapter does: the package asks which link of a
+    // chain takes a card (FUT-3138), and a stub without the block is a shape
+    // no consumer can register.
+    capabilities: CARD_CAPABILITIES,
     async charge(input) {
       return {
         provider: VAULTING_PROVIDER,
@@ -142,6 +149,7 @@ function vaultingAdapter(sessions: Map<string, StubSession>): PaymentProviderAda
 function chargeOnlyAdapter(): PaymentProviderAdapter {
   return {
     name: CHARGE_ONLY_PROVIDER,
+    capabilities: CARD_CAPABILITIES,
     async charge(input) {
       return {
         provider: CHARGE_ONLY_PROVIDER,

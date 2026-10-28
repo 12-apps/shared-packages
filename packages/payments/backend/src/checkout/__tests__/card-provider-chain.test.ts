@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { UnsupportedOperationError } from '../../core/errors';
+import { createPaymentsGateway } from '../../core/gateway';
 import { cardProviderFor } from '../../core/method-head';
 import type { PaymentProviderAdapter } from '../../core/provider';
 import { defineProviders } from '../../core/registry';
-import { createMemoryCredentialStore } from '../../memory';
+import type { ChargeInput } from '../../core/types';
+import { createMemoryAttemptLedger, createMemoryChargeStore, createMemoryCredentialStore } from '../../memory';
+import { createMemoryWebhookInbox } from '../../memory-webhook-inbox';
 import type { InstrumentScope } from '../types';
 
 import { MERCHANT, call, setupCheckoutWorld, testAdapter } from './harness';
@@ -15,10 +19,11 @@ import { MERCHANT, call, setupCheckoutWorld, testAdapter } from './harness';
  * that charges cards — used to scope the vault, the saved-instrument list and
  * the saved-card lookup to that head: every card the provider behind it
  * vaulted vanished, vaulting answered "not enabled", and a saved-card charge
- * was refused as "not usable here". Each of them now asks the first link that
- * takes a CARD, the same rule the 3-D Secure session and the walk's owner of a
- * bare instrument already follow (FUT-4109). A head that takes cards is still
- * that first link, so those chains answer exactly as before.
+ * was refused as "not usable here". Each of them now names ONE provider, the
+ * first link that takes a CARD — resolved once per request and handed to the
+ * gateway's vault by name — the same rule the 3-D Secure session and the
+ * walk's owner of a bare instrument already follow (FUT-4109). A head that
+ * takes cards is still that first link, so those chains answer as before.
  */
 
 const REF = 'inv_2024_0043';
@@ -26,37 +31,63 @@ const REF = 'inv_2024_0043';
 /** A provider that settles PIX and nothing else. */
 const pixOnly = (name: string): PaymentProviderAdapter => testAdapter(name, { methods: ['PIX'] });
 
-/** A card provider whose vault seam names whoever it was asked as. */
-function vaultingCards(name: string): PaymentProviderAdapter {
+/** Every card each provider's `createCharge` was handed, by provider. */
+type Sent = { provider: string; card: ChargeInput['card'] }[];
+
+/**
+ * A card provider whose vault seam answers as `answersAs` (itself unless a
+ * test wants a provider that misreports), recording every charge it is sent.
+ */
+function cardProvider(
+  name: string,
+  sent: Sent,
+  options: { answersAs?: string; refuses?: boolean } = {},
+): PaymentProviderAdapter {
+  const base = testAdapter(name, options.refuses ? { refuses: true } : {});
+  const as = options.answersAs ?? name;
   return {
-    ...testAdapter(name),
+    ...base,
+    async createCharge(input, credentials) {
+      sent.push({ provider: name, card: input.card });
+      return base.createCharge(input, credentials);
+    },
     vault: {
-      begin: async () => ({ provider: name, tokenization: 'PUBLIC_KEY', publicKey: `pub_${name}`, sessionId: 'vs_1' }),
-      complete: async () => ({ provider: name, instrumentId: `vault_${name}`, brand: 'visa', last4: '4242' }),
+      begin: async () => ({ provider: as, tokenization: 'PUBLIC_KEY', publicKey: `pub_${as}`, sessionId: 'vs_1' }),
+      complete: async () => ({ provider: as, instrumentId: `vault_${as}`, brand: 'visa', last4: '4242' }),
     },
   };
 }
 
-/** Every scope the host's instrument port was asked about. */
+/** Every scope the host's ports were asked about. */
 interface ScopeLog {
+  /** `vault(caller, scope)` — whose ownership facts (`customerRef`) were asked. */
+  owner: string[];
   listed: string[];
   resolved: string[];
   saved: string[];
 }
 
 /**
- * A checkout world over `chain`, its instrument port recording each scope it
- * is asked for, and — unless `registry: false` — the adapter registry the
- * runtime asks capabilities of.
+ * A checkout world over `chain`, its vault and instrument ports recording each
+ * scope they are asked for, and — unless `registry: false` — the adapter
+ * registry the runtime asks capabilities of.
  */
 function world(chain: { name: string; adapter: PaymentProviderAdapter }[], options: { registry?: boolean } = {}) {
-  const scopes: ScopeLog = { listed: [], resolved: [], saved: [] };
+  const scopes: ScopeLog = { owner: [], listed: [], resolved: [], saved: [] };
   const providers = defineProviders(Object.fromEntries(chain.map((entry) => [entry.name, entry.adapter])));
   const built = setupCheckoutWorld({
     chain,
     payable: { method: 'CARD' },
     config: {
       ...(options.registry === false ? {} : { providers }),
+      vault: async (caller, scope: InstrumentScope) => {
+        scopes.owner.push(scope.provider);
+        return {
+          reference: `vault_${caller.id}`,
+          customer: { name: 'Ana Buyer', email: 'ana@example.com', taxId: '12345678909' },
+          customerRef: `cus_${scope.provider}`,
+        };
+      },
       instruments: {
         list: async (_caller, scope: InstrumentScope) => {
           scopes.listed.push(scope.provider);
@@ -75,70 +106,113 @@ function world(chain: { name: string; adapter: PaymentProviderAdapter }[], optio
   return { ...built, scopes };
 }
 
-const itauFirst = () => [
-  { name: 'pixonly', adapter: pixOnly('pixonly') },
-  { name: 'cards', adapter: vaultingCards('cards') },
-];
+/** The Itáu-first shape: a PIX-only head, then the provider that takes cards. */
+function pixHeadThenCards(sent: Sent) {
+  return [
+    { name: 'pixonly', adapter: pixOnly('pixonly') },
+    { name: 'cards', adapter: cardProvider('cards', sent) },
+  ];
+}
+
+/** Drive every card question once: list, begin, complete, saved-card charge. */
+async function everyCardQuestion(at: ReturnType<typeof world>) {
+  const listed = await call(at.routes, 'GET', '/cards');
+  const begun = await call(at.routes, 'POST', '/cards/begin');
+  const completed = await call(at.routes, 'POST', '/cards/complete', { sessionId: 'vs_1' });
+  const charged = await call(at.routes, 'POST', '/charge', { orderId: REF, card: { savedCardToken: 'card_1' } });
+  return { listed, begun, completed, charged };
+}
 
 describe('a chain whose head takes no card', () => {
-  it('lists the saved cards of the first provider that takes one', async () => {
-    const at = world(itauFirst());
+  it('names the card provider in every card question, the ownership facts included', async () => {
+    const sent: Sent = [];
+    const at = world(pixHeadThenCards(sent));
 
-    const listed = await call(at.routes, 'GET', '/cards');
+    const { listed, begun, completed, charged } = await everyCardQuestion(at);
 
-    expect(listed.status).toBe(200);
     expect(listed.body.data).toEqual([{ id: 'card_1', last4: '4242' }]);
-    expect(at.scopes.listed).toEqual(['cards']);
-  });
-
-  it('vaults a new card at that provider instead of answering "not enabled"', async () => {
-    const at = world(itauFirst());
-
-    const begun = await call(at.routes, 'POST', '/cards/begin');
     expect(begun.status).toBe(200);
     expect(begun.body.data).toMatchObject({ provider: 'cards', publicKey: 'pub_cards' });
-
-    const completed = await call(at.routes, 'POST', '/cards/complete', { sessionId: 'vs_1' });
     expect(completed.status).toBe(200);
-    expect(at.scopes.saved).toEqual(['cards']);
+    expect(charged.status).toBe(200);
+    expect(at.scopes).toEqual({
+      owner: ['cards', 'cards'],
+      listed: ['cards'],
+      resolved: ['cards'],
+      saved: ['cards'],
+    });
+    expect(sent).toEqual([{ provider: 'cards', card: { savedCardToken: 'vault_cards', tokenProvider: 'cards' } }]);
   });
 
-  it('charges a saved card there, looked up under that provider', async () => {
-    const at = world(itauFirst());
+  it('never hands one provider\'s saved card to the next when the first is down', async () => {
+    const sent: Sent = [];
+    const at = world([
+      { name: 'pixonly', adapter: pixOnly('pixonly') },
+      { name: 'cards', adapter: cardProvider('cards', sent, { refuses: true }) },
+      { name: 'cards2', adapter: cardProvider('cards2', sent) },
+    ]);
 
     const charged = await call(at.routes, 'POST', '/charge', { orderId: REF, card: { savedCardToken: 'card_1' } });
 
-    expect(charged.status).toBe(200);
-    expect(at.scopes.resolved).toEqual(['cards']);
-    expect(at.charges.all().map((charge) => charge.provider)).toEqual(['cards']);
+    expect(charged.status).toBe(502);
+    expect(sent.map((entry) => entry.provider)).toEqual(['cards']);
+    expect(at.charges.all()).toEqual([]);
+  });
+
+  it('refuses to store a card the vault answered for another provider', async () => {
+    const sent: Sent = [];
+    const at = world([
+      { name: 'pixonly', adapter: pixOnly('pixonly') },
+      { name: 'cards', adapter: cardProvider('cards', sent, { answersAs: 'elsewhere' }) },
+    ]);
+
+    const begun = await call(at.routes, 'POST', '/cards/begin');
+    const completed = await call(at.routes, 'POST', '/cards/complete', { sessionId: 'vs_1' });
+
+    expect(begun.status).toBe(502);
+    expect(completed.status).toBe(502);
+    expect(completed.body.code).toBe('VAULT_NOT_SAVED');
+    expect(at.scopes.saved).toEqual([]);
   });
 });
 
 describe('a chain whose head takes cards', () => {
-  it('still scopes the list, the vault and the lookup to the head', async () => {
+  it('names the head in every card question, as before', async () => {
+    const sent: Sent = [];
     const at = world([
-      { name: 'alpha', adapter: vaultingCards('alpha') },
-      { name: 'beta', adapter: vaultingCards('beta') },
+      { name: 'alpha', adapter: cardProvider('alpha', sent) },
+      { name: 'beta', adapter: cardProvider('beta', sent) },
     ]);
 
-    await call(at.routes, 'GET', '/cards');
-    const begun = await call(at.routes, 'POST', '/cards/begin');
-    await call(at.routes, 'POST', '/charge', { orderId: REF, card: { savedCardToken: 'card_1' } });
+    const { begun, completed, charged } = await everyCardQuestion(at);
 
-    expect(at.scopes.listed).toEqual(['alpha']);
     expect(begun.body.data).toMatchObject({ provider: 'alpha' });
-    expect(at.scopes.resolved).toEqual(['alpha']);
-    expect(at.charges.all().map((charge) => charge.provider)).toEqual(['alpha']);
+    expect(completed.status).toBe(200);
+    expect(charged.status).toBe(200);
+    expect(at.scopes).toEqual({ owner: ['alpha', 'alpha'], listed: ['alpha'], resolved: ['alpha'], saved: ['alpha'] });
+    expect(sent.map((entry) => entry.provider)).toEqual(['alpha']);
   });
 });
 
 describe('a runtime that wired no adapter registry', () => {
-  it('cannot ask who takes a card, so it keeps the head it always used', async () => {
-    const at = world(itauFirst(), { registry: false });
+  it('cannot ask who takes a card, so every question names the head — and the head cannot vault', async () => {
+    const sent: Sent = [];
+    const at = world(pixHeadThenCards(sent), { registry: false });
 
-    await call(at.routes, 'GET', '/cards');
+    const { begun, completed } = await everyCardQuestion(at);
 
-    expect(at.scopes.listed).toEqual(['pixonly']);
+    // The answer it gave before FUT-3138: the head has no vault.
+    expect(begun.status).toBe(404);
+    expect(begun.body.code).toBe('VAULT_NOT_ENABLED');
+    expect(completed.status).toBe(404);
+    expect(at.scopes).toEqual({
+      owner: ['pixonly', 'pixonly'],
+      listed: ['pixonly'],
+      resolved: ['pixonly'],
+      saved: [],
+    });
+    // A token found under the head's scope is the head's: never offered to the card provider.
+    expect(sent).toEqual([]);
   });
 });
 
@@ -161,5 +235,61 @@ describe('cardProviderFor', () => {
 
   it('answers null when payments are off', async () => {
     expect(await cardProviderFor({ providers, credentials: createMemoryCredentialStore() }, MERCHANT)).toBeNull();
+  });
+});
+
+/**
+ * THE GATEWAY'S OWN VAULT, as subscription billing calls it: no provider
+ * named, so the head — the provider billing loads the customer of and collects
+ * at. Its adapters are registered from PARTIAL objects with no `capabilities`
+ * at all, as the billing harness does; nothing may read through that.
+ */
+describe('the gateway vault', () => {
+  const vaultOnly = {
+    name: 'vaulter',
+    vault: {
+      begin: async () => ({ provider: 'vaulter', tokenization: 'PUBLIC_KEY', sessionId: 'vs_1' }),
+      complete: async () => ({ provider: 'vaulter', instrumentId: 'vault_1' }),
+    },
+  } as unknown as PaymentProviderAdapter;
+  const chargeOnly = { name: 'charger' } as unknown as PaymentProviderAdapter;
+  const ownership = { reference: 'sub_1', customer: { name: 'Tenant', email: 't@example.com' } };
+
+  function billing(chain: string[]) {
+    const credentials = createMemoryCredentialStore();
+    credentials.set(MERCHANT, 'vaulter', { environment: 'SANDBOX', fields: {} });
+    credentials.set(MERCHANT, 'charger', { environment: 'SANDBOX', fields: {} });
+    credentials.setChain(MERCHANT, chain);
+    return createPaymentsGateway({
+      providers: defineProviders({ vaulter: vaultOnly, charger: chargeOnly }),
+      credentials,
+      charges: createMemoryChargeStore(),
+      webhooks: createMemoryWebhookInbox(),
+      attempts: createMemoryAttemptLedger(),
+    });
+  }
+
+  it('vaults at the head when no provider is named', async () => {
+    expect((await billing(['vaulter', 'charger']).beginVault(MERCHANT, ownership)).provider).toBe('vaulter');
+  });
+
+  it('refuses as unsupported when the head cannot vault, whatever stands behind it', async () => {
+    await expect(billing(['charger', 'vaulter']).beginVault(MERCHANT, ownership)).rejects.toBeInstanceOf(
+      UnsupportedOperationError,
+    );
+  });
+
+  it('vaults at a NAMED provider, with no failover to the head', async () => {
+    const gateway = billing(['charger', 'vaulter']);
+    expect((await gateway.beginVault(MERCHANT, ownership, 'vaulter')).provider).toBe('vaulter');
+    await expect(gateway.beginVault(MERCHANT, ownership, 'charger')).rejects.toBeInstanceOf(UnsupportedOperationError);
+  });
+
+  it('asks a registry of capability-less adapters without reading through them', async () => {
+    const store = createMemoryCredentialStore();
+    store.setChain(MERCHANT, ['charger', 'vaulter']);
+    const registry = defineProviders({ vaulter: vaultOnly, charger: chargeOnly });
+
+    expect(await cardProviderFor({ providers: registry, credentials: store }, MERCHANT)).toBe('charger');
   });
 });
