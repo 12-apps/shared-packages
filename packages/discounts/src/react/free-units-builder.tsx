@@ -41,6 +41,11 @@ function onlySlot(slots: readonly ComboRequirement[]): ComboRequirement {
   return slots[0] ?? blankSlot();
 }
 
+/** Typed with something besides digits: marked as it is typed, like the other counts. */
+function notDigits(typed: string): boolean {
+  return typed.trim() !== "" && !/^\d+$/u.test(typed.trim());
+}
+
 /** How many the customer pays for: what they take, minus what is free. */
 function paidUnits(taken: number, free: number): number {
   return Math.max(taken - free, 0);
@@ -88,6 +93,7 @@ function FreeUnitsCounts({
         label={copy.combo.buyQuantity}
         value={quantity}
         copy={copy}
+        invalidMessage={copy.form.invalidComboQuantity}
         dataTestId="free-units-quantity"
         onChange={onQuantity}
       />
@@ -96,7 +102,7 @@ function FreeUnitsCounts({
       <WholeNumberInput
         label={copy.form.freeUnits}
         value={freeUnits}
-        error={error !== undefined}
+        error={error !== undefined || notDigits(freeUnits)}
         dataTestId="free-units-free"
         onChange={onFreeUnits}
       />
@@ -161,9 +167,9 @@ export function FreeUnitsBuilder({
           autocompleteCopy={copy.autocomplete}
           dataTestId="free-units-items"
         />
-        {error !== undefined && (
+        {(error !== undefined || notDigits(freeUnits)) && (
           <FormMessage error dataTestId="free-units-free-message">
-            {error}
+            {error ?? copy.form.wholeNumberOnly}
           </FormMessage>
         )}
         {empty ? (

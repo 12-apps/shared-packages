@@ -410,3 +410,96 @@ describe("the counts take whole numbers only", () => {
     });
   });
 });
+
+describe("a count box always shows the state it holds", () => {
+  /** A combo of two groups, 2 and 3 units. */
+  function twoGroups(): DiscountWireRecord {
+    return comboRecord({
+      comboRequirements: [
+        { menuItemIds: [], categoryIds: ["c-sodas"], quantity: 2 },
+        { menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 },
+      ],
+    });
+  }
+
+  it("R1: removing a group does not hand its draft to the group below", async () => {
+    const { sent } = renderForm(twoGroups());
+    type("combo-slot-1-quantity", "");
+    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    await waitFor(() => expect(screen.queryAllByTestId(/^combo-slot-\d+$/u)).toHaveLength(1));
+    const survivor = input("combo-slot-0-quantity");
+    expect(survivor.value).toBe("");
+    expect(survivor.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
+      copy.form.invalidComboQuantity,
+    );
+    expect(screen.getByTestId("combo-summary").textContent).toBe("O combo leva 0 itens em 1 grupos.");
+    submit();
+    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    expect(sent).toHaveLength(0);
+  });
+
+  it("R2: the surviving group keeps its OWN draft", async () => {
+    renderForm(twoGroups());
+    type("combo-slot-1-quantity", "2,5");
+    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    await waitFor(() => expect(input("combo-slot-0-quantity").value).toBe("2,5"));
+    expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
+      copy.form.wholeNumberOnly,
+    );
+  });
+
+  it("R3: the row ids stay on screen and never reach the wire", async () => {
+    const { sent } = renderForm(twoGroups());
+    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    await waitFor(() => expect(input("combo-slot-0-quantity").value).toBe("3"));
+    submit();
+    await waitFor(() => expect(sent).toHaveLength(1));
+    const body = sent[0] as { comboRequirements: Record<string, unknown>[] };
+    expect(body.comboRequirements).toEqual([
+      { menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 },
+    ]);
+  });
+
+  it("R4: Itens grátis marks '2,5' as it is typed, before any Criar", async () => {
+    renderForm(freeUnitsRecord());
+    type("free-units-free", "2,5");
+    await waitFor(() =>
+      expect(screen.getByTestId("free-units-free-message").textContent).toBe(
+        copy.form.wholeNumberOnly,
+      ),
+    );
+    expect(input("free-units-free").getAttribute("aria-invalid")).toBe("true");
+  });
+});
+
+describe("editing a clock in place", () => {
+  function openSchedule(): void {
+    renderForm();
+    fireEvent.click(screen.getByTestId("repetition-specific"));
+  }
+
+  it("E1: '09:00', the hour selected and '1','5' typed, reads 15:00", async () => {
+    openSchedule();
+    type("schedule-from-0", "0900");
+    await waitFor(() => expect(input("schedule-from-0").value).toBe("09:00"));
+    type("schedule-from-0", "1:00");
+    await waitFor(() => expect(input("schedule-from-0").value).toBe("1:00"));
+    type("schedule-from-0", "15:00");
+    await waitFor(() => expect(input("schedule-from-0").value).toBe("15:00"));
+  });
+
+  it("E2: another separator typed over a whole time is read as the colon", async () => {
+    openSchedule();
+    type("schedule-to-0", "25/10");
+    await waitFor(() => expect(input("schedule-to-0").value).toBe("25:10"));
+    expect(screen.getByTestId("schedule-to-0-message").textContent).toBe(copy.schedule.invalidTime);
+  });
+
+  it("E3: a time with no colon yet is still masked from its digits", async () => {
+    openSchedule();
+    type("schedule-from-0", "");
+    type("schedule-from-0", "16h30");
+    await waitFor(() => expect(input("schedule-from-0").value).toBe("16:30"));
+  });
+});

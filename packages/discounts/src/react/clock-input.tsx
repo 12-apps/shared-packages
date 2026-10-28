@@ -24,8 +24,23 @@ import { toMinutes } from "../engine/schedule";
  * day has (25:00, 12:60) is marked on the spot, in the pack's words.
  */
 
-/** Keep four digits and put the colon after the second. */
-function maskTime(raw: string): string {
+/**
+ * Keep four digits and put the colon after the second.
+ *
+ * Except while EDITING a time that already has its colon: select "09" in
+ * "09:00" and type "1" and the box holds "1:00", whose digits re-masked would
+ * read "10:0". So when the previous value had a separator and the new one
+ * still does, each side keeps its own digits — "1:00" stays, then "15:00".
+ * Any separator counts ("25/10" reads 25:10), and the result is still at most
+ * two digits a side.
+ */
+function maskTime(raw: string, previous: string): string {
+  const separator = /\D/u.exec(raw);
+  if (separator !== null && previous.includes(":")) {
+    const hours = raw.slice(0, separator.index).replace(/\D/gu, "").slice(0, 2);
+    const minutes = raw.slice(separator.index + 1).replace(/\D/gu, "").slice(0, 2);
+    return `${hours}:${minutes}`;
+  }
   const digits = raw.replace(/\D/gu, "").slice(0, 4);
   if (digits.length <= 2) return digits;
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
@@ -62,7 +77,7 @@ export function ClockInput({
         error={impossible}
         aria-label={label}
         inputProps={{ inputMode: "numeric", maxLength: 5, autoComplete: "off" }}
-        onChange={(event) => onChange(maskTime(event.target.value))}
+        onChange={(event) => onChange(maskTime(event.target.value, value))}
         data-testid={dataTestId}
       />
       {impossible && (

@@ -75,33 +75,51 @@ export function WholeNumberInput({
 }
 
 /**
+ * What a count box shows for the number its caller holds.
+ *
+ * The STATE decides; the draft is only how it is spelled. A draft that reads
+ * as the held number is shown as typed. A draft that is not a number at all
+ * ("2,5", "") is shown while the held value is "not a number" too. Anything
+ * else is stale — a draft left from another row, a value changed from outside
+ * — and the state wins: the number, or an empty box for `NaN`.
+ */
+function countShown(typed: string, value: number): string {
+  const parsed = isWholeNumber(typed) ? Number(typed.trim()) : Number.NaN;
+  if (Number.isNaN(value)) return Number.isNaN(parsed) ? typed : "";
+  return parsed === value ? typed : String(value);
+}
+
+/**
  * A count the caller holds as a NUMBER — a combo group's quantity, the units
  * "leve 3, pague 2" takes.
  *
  * It keeps what was typed so "2,5" stays on screen and is refused there, in
  * the pack's words, instead of becoming `NaN` in the box. What the caller gets
  * is the number, or `NaN` while the text is not one — which its own validator
- * already refuses at submit, so nothing typed with a comma is ever sent.
+ * refuses at submit, so nothing typed with a comma is ever sent. The box is
+ * red whenever the held value is not a count from 1, so it never looks fine
+ * beside a summary that says otherwise.
  */
 export function CountInput({
   label,
   value,
   copy,
+  invalidMessage,
   dataTestId,
   onChange,
 }: {
   label: string;
   value: number;
   copy: DiscountsWebCopy;
+  /** Under an empty box or a zero — the caller's own refusal. */
+  invalidMessage: string;
   dataTestId: string;
   onChange: (next: number) => void;
 }): JSX.Element {
   const [typed, setTyped] = useState<string>(() => (Number.isFinite(value) ? String(value) : ""));
-  // A value changed from outside (a group replaced, a kind switched) wins over
-  // a stale draft; one this box sent back is the draft itself.
-  const parsed = isWholeNumber(typed) ? Number(typed.trim()) : Number.NaN;
-  const shown = Number.isNaN(value) || parsed === value ? typed : String(value);
-  const refused = shown.trim() !== "" && !isWholeNumber(shown);
+  const shown = countShown(typed, value);
+  const notDigits = shown.trim() !== "" && !isWholeNumber(shown);
+  const refused = !Number.isInteger(value) || value <= 0;
   return (
     <Stack spacing={0.5}>
       <WholeNumberInput
@@ -116,7 +134,7 @@ export function CountInput({
       />
       {refused && (
         <FormMessage error dataTestId={`${dataTestId}-message`}>
-          {copy.form.wholeNumberOnly}
+          {notDigits ? copy.form.wholeNumberOnly : invalidMessage}
         </FormMessage>
       )}
     </Stack>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { useRef, type JSX } from "react";
 
 import { Button } from "@12-apps/ui/form/Button";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
@@ -51,6 +51,26 @@ export function comboUnits(slots: readonly ComboRequirement[]): number {
 /** An empty group: one unit, nothing chosen yet. */
 export function blankSlot(): ComboRequirement {
   return { quantity: 1, categoryIds: [], menuItemIds: [] };
+}
+
+/**
+ * One screen-only id per group, in list order (FUT-4143).
+ *
+ * A group has no id until the database gives it one, and an index key hands a
+ * removed row's component — and its half-typed draft — to the row that moves
+ * up. These ids live here and nowhere else: the wire still carries the plain
+ * `ComboRequirement`s. Appends get a fresh id; a removal drops its own (see
+ * `onRemove`); a list replaced from outside is padded or cut to length.
+ */
+function useRowIds(length: number): { current: number[] } {
+  const ids = useRef<number[]>([]);
+  const next = useRef(0);
+  while (ids.current.length < length) {
+    ids.current = [...ids.current, next.current];
+    next.current += 1;
+  }
+  if (ids.current.length > length) ids.current = ids.current.slice(0, length);
+  return ids;
 }
 
 /** Replace one group, leaving the rest (and their order) alone. */
@@ -122,6 +142,7 @@ function ComboSlotRow({
           label={copy.combo.quantity}
           value={slot.quantity}
           copy={copy}
+          invalidMessage={copy.form.invalidComboQuantity}
           dataTestId={`combo-slot-${index}-quantity`}
           onChange={(quantity) => onChange({ ...slot, quantity })}
         />
@@ -171,6 +192,7 @@ export function ComboSlotBuilder({
   copy: DiscountsWebCopy;
   onChange: (next: ComboRequirement[]) => void;
 }): JSX.Element {
+  const rowIds = useRowIds(slots.length);
   return (
     <FormControl fullWidth>
       <FormLabel>{copy.combo.title}</FormLabel>
@@ -178,17 +200,19 @@ export function ComboSlotBuilder({
       <Stack spacing={2} sx={{ mt: 1 }} data-testid="combo-slots">
         {slots.map((slot, index) => (
           <ComboSlotRow
-            // The index IS the identity here: `position` is the array index,
-            // and a group carries no id of its own until the database gives it
-            // one. Removing a group renumbers the rest, which is exactly what
-            // the operator sees happen.
-            key={index}
+            // `position` is the array index, and removing a group renumbers
+            // the rest — but the ROW is keyed by a screen-only id, so the
+            // group below does not inherit the removed one's draft.
+            key={rowIds.current[index]}
             slot={slot}
             index={index}
             groups={groups}
             copy={copy}
             onChange={(next) => onChange(replaceAt(slots, index, next))}
-            onRemove={() => onChange(slots.filter((_, position) => position !== index))}
+            onRemove={() => {
+              rowIds.current = rowIds.current.filter((_, position) => position !== index);
+              onChange(slots.filter((_, position) => position !== index));
+            }}
           />
         ))}
         {slots.length === 0 && (
