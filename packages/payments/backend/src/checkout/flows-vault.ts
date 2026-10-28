@@ -1,4 +1,5 @@
 import { CredentialsError, UnsupportedOperationError } from '../core/errors';
+import { cardProviderFor } from '../core/method-head';
 import type { MerchantRef } from '../core/types';
 import type { VaultBeginInput, VaultCompleteInput, VaultedInstrument, VaultSession } from '../core/vault-types';
 
@@ -41,10 +42,11 @@ import type { BuyerVaultSession, VaultedCardDisplay } from './vault-port';
  * file stays a merchant/host concern, on the admin surface's named-provider
  * `vault/:provider/forget` row.
  *
- * The provider is the chain HEAD, resolved by the same rule the gateway's
+ * The provider is the chain's CARD provider — its first link that takes a
+ * card, not its head (FUT-3138) — resolved by the same rule the gateway's
  * `activeVault()` pins (`core/gateway-vault.ts`): no failover, because an
  * instrument minted at provider #2 is garbage input to the provider the
- * merchant actually charges through.
+ * merchant actually charges cards through.
  */
 
 type Runtime<C, V extends object, D> = CheckoutRuntime<C, V, D>;
@@ -79,7 +81,7 @@ async function vaultContext<C, V extends object, D>(
   if (!runtime.config.vault || !runtime.config.instruments?.save) {
     return { response: vaultNotEnabled(runtime) };
   }
-  const provider = await runtime.config.credentials.defaultProvider(merchant);
+  const provider = await cardProviderFor(runtime.config, merchant);
   // No provider at all is the merchant-cannot-charge state the surface already
   // words (409), not a vault-specific gap.
   if (!provider) return { response: notConfigured(runtime) };

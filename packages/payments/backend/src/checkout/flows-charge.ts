@@ -1,5 +1,6 @@
 import { chargeSnapshotMismatch } from '../core/charge-identity';
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
+import { cardProviderFor } from '../core/method-head';
 
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
 import { cardOutcomeOf, declineOf } from './decline-wire';
@@ -315,7 +316,10 @@ export async function chargeInstrument<C, V extends object, D>(
     return runtime.respond.ok({ status: runtime.config.payables.stateToken(payable) });
   }
 
-  const provider = await runtime.config.credentials.defaultProvider(payable.merchant);
+  // The saved card is looked up where cards are charged — the first link that
+  // takes one, not a PIX-only head (FUT-3138) — the provider the walk hands a
+  // bare saved instrument to.
+  const provider = await cardProviderFor(runtime.config, payable.merchant);
   if (!provider) return notConfigured(runtime);
 
   const instrument = await resolveInstrument(runtime, caller, payable, provider, draft);
