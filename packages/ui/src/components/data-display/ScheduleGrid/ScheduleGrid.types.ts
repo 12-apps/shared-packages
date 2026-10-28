@@ -40,6 +40,13 @@ export interface ScheduleGridRow {
   onLabelClick?: () => void;
   /** The name button's accessible name, when it says more than `label` ("Ana: horas e afastamento"). */
   labelAccessible?: string;
+  /**
+   * Beside the name, on its line (a "Freela" tag). It keeps its size; when the
+   * name column has no room for both, it moves under the name.
+   */
+  nameAdornment?: React.ReactNode;
+  /** Under the meta line: the host's chips ("2 regras ›"). One line; a chip that does not fit shrinks, its label cut. */
+  chips?: React.ReactNode;
 }
 
 /** Rows under one heading ("Cozinha"). */
@@ -47,6 +54,16 @@ export interface ScheduleGridGroup {
   /** Shown upper-case above the rows; also names the row group. Omit for no heading. */
   title?: string;
   rows: ScheduleGridRow[];
+}
+
+/**
+ * A stretch inside a block that is not worked (a meal break), drawn hatched
+ * across the block's height. Fractions of the block's length, `0 <= start < end <= 1`;
+ * the words for it ("pausa 14–15") are the block's `note`.
+ */
+export interface ScheduleBlockBreak {
+  start: number;
+  end: number;
 }
 
 /** One block inside a cell. */
@@ -66,6 +83,8 @@ export interface ScheduleGridBlock {
   selected?: boolean;
   /** The tooltip and the full text. Default: `label` and `note`. */
   title?: string;
+  /** A break inside the block, drawn as a hatched gap. */
+  breakSpan?: ScheduleBlockBreak;
 }
 
 /** What a cell holds. */
@@ -121,7 +140,7 @@ export interface ScheduleGridProps {
   /**
    * Base test id (default `schedule-grid`). Parts: `-header`, `-row-${rowId}`,
    * `-cell-${rowId}-${day}`, `-block-${blockId}`, `-grip-l-${blockId}`,
-   * `-grip-r-${blockId}`, `-live`, `-loading`.
+   * `-grip-r-${blockId}`, `-break-${blockId}`, `-live`, `-loading`.
    */
   dataTestId?: string;
 }

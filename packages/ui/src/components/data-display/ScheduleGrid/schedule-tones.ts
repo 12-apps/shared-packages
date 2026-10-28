@@ -58,6 +58,16 @@ export function blockToneStyles(theme: Theme, tone: ScheduleBlockTone, dashedPla
   }
 }
 
+/**
+ * A break inside a block (a meal break): diagonal stripes of the page's own
+ * ground over the block, so the block reads as cut there in any tone, light or
+ * dark. `stripe` is the stripe's width as a CSS length.
+ */
+export function breakHatch(theme: Theme, stripe: string, stripe2: string): string {
+  const gap = theme.palette.background.default;
+  return `repeating-linear-gradient(135deg, ${gap} 0, ${gap} ${stripe}, transparent ${stripe}, transparent ${stripe2})`;
+}
+
 /** The thin bar under a ruler row that says the shift is really running. */
 export function actualBarColor(theme: Theme): string {
   return theme.palette.success.main;

@@ -5,6 +5,7 @@ import { expect, fireEvent, waitFor, within } from 'storybook/test';
 import { useState } from 'react';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
+import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
 import { ScheduleGrid } from './ScheduleGrid';
@@ -22,6 +23,8 @@ interface Slot {
   to: string;
   note?: string;
   tone?: ScheduleGridBlock['tone'];
+  /** A meal break inside the turno ("14:00", "15:00"). */
+  pause?: [string, string];
 }
 
 interface Person {
@@ -33,6 +36,10 @@ interface Person {
   /** Days closed by an afastamento. */
   leave?: number[];
   leaveMeta?: string;
+  /** A tag beside the name ("Freela"). */
+  tag?: string;
+  /** A chip under the name ("2 regras ›"). */
+  rules?: string;
 }
 
 const DAYS = ['Seg 19/10', 'Ter 20/10', 'Qua 21/10', 'Qui 22/10', 'Sex 23/10', 'Sáb 24/10', 'Dom 25/10'];
@@ -93,6 +100,17 @@ const lengthOf = (slot: Slot): number => {
   const span = minutes(slot.to) - minutes(slot.from);
   return span <= 0 ? span + 24 * 60 : span;
 };
+/** Where a turno's break falls along it, as the grid's fractions. */
+const breakOf = (slot: Slot): ScheduleGridBlock['breakSpan'] => {
+  if (!slot.pause) return undefined;
+  const length = lengthOf(slot);
+  const at = (hhmm: string): number => {
+    const offset = minutes(hhmm) - minutes(slot.from);
+    return (offset < 0 ? offset + 24 * 60 : offset) / length;
+  };
+  return { start: at(slot.pause[0]), end: at(slot.pause[1]) };
+};
+
 const hoursText = (total: number): string => {
   if (total === 0) return '—';
   const h = Math.floor(total / 60);
@@ -131,7 +149,8 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
     const blocks: ScheduleGridBlock[] = mine.map((slot) => ({
       id: slot.id,
       label: `${slot.from}–${slot.to}`,
-      note: slot.note,
+      note: slot.note ?? (slot.pause ? `pausa ${slot.pause[0]}–${slot.pause[1]}` : undefined),
+      breakSpan: breakOf(slot),
       tone: slot.tone ?? 'plan',
       movable: true,
       copyable: slot.tone !== 'away',
@@ -167,6 +186,8 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
             total: hoursText(total),
             labelAccessible: `${p.name}: horas e afastamento`,
             onLabelClick: () => setLog(`Abrir ${p.name}`),
+            nameAdornment: p.tag ? <Chip label={p.tag} size="sm" variant="outlined" /> : undefined,
+            chips: p.rules ? <Chip label={p.rules} size="sm" variant="outlined" color="warning" onClick={() => setLog(`Regras · ${p.name}`)} /> : undefined,
           };
         }),
     }))
@@ -300,3 +321,32 @@ export const TecladoCopia: Story = {
     await waitFor(() => expect(canvas.getByTestId('grid-cell-kelly-3')).toHaveTextContent('11:00–15:00'));
   },
 };
+
+const PAUSA: Person[] = [
+  { id: 'bruno', name: 'Bruno Lima', area: 'Cozinha', rules: '1 regra ›' },
+  { id: 'maria', name: 'Maria Aparecida dos Santos Figueiredo', area: 'Cozinha', rules: '1 regra ›' },
+  { id: 'joana', name: 'Joana Prado', area: 'Salão', rules: '2 regras ›' },
+  { id: 'kelly', name: 'Kelly Fontoura', area: 'Entregas', tag: 'Freela', rules: '1 regra ›' },
+  { id: 'anderson', name: 'Anderson Paiva', area: 'Entregas', tag: 'Freela' },
+];
+const PAUSA_SLOTS: Slot[] = [
+  ...[0, 1, 2].map((day) => ({ id: `b${day}`, who: 'bruno', day, from: '11:00', to: '19:00', pause: ['14:00', '15:00'] as [string, string] })),
+  { id: 'b5', who: 'bruno', day: 5, from: '16:00', to: '00:00', pause: ['19:00', '20:00'] },
+  { id: 'b6', who: 'bruno', day: 6, from: '08:00', to: '14:00', note: 'sem pausa' },
+  { id: 'm1', who: 'maria', day: 1, from: '09:00', to: '17:00', pause: ['12:00', '13:00'] },
+  { id: 'j3', who: 'joana', day: 3, from: '11:00', to: '15:00', pause: ['13:00', '13:15'] },
+  { id: 'j3b', who: 'joana', day: 3, from: '18:00', to: '23:00', pause: ['20:00', '20:15'] },
+  { id: 'k0', who: 'kelly', day: 0, from: '18:00', to: '23:00', note: 'sem pausa' },
+  { id: 'k4', who: 'kelly', day: 4, from: '16:00', to: '00:00', pause: ['19:00', '20:00'] },
+  { id: 'a2', who: 'anderson', day: 2, from: '08:00', to: '14:00', pause: ['11:00', '11:15'] },
+];
+
+/**
+ * The slots a later story fills (FUT-3881): a "Freela" tag beside a name, a
+ * rules chip under it, and each turno's meal break drawn inside its block as a
+ * hatched gap (its words are the block's note).
+ */
+export const PausaEMarcadores: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
+
+/** The same, in a narrow pane: the tag moves under a long name, the chip stays on one line. */
+export const PausaEMarcadoresEstreito: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: DESKTOP };

@@ -27,4 +27,6 @@ export const DAY_RULER_METRICS = {
   /** The shortest block a resize leaves, in hours. */
   minHours: 0.5,
   skeletonRows: 4,
+  /** The hatch of a break inside a block: stripe width. */
+  breakStripe: 3,
 } as const;

@@ -389,3 +389,57 @@ describe("states", () => {
     expect(screen.getByRole("button", { name: "Schedule Caio Nunes, Ter 20/10" })).toBeInTheDocument();
   });
 });
+
+describe("the slots a later story fills (FUT-3881)", () => {
+  const withBreak: ScheduleGridCell = {
+    blocks: [{ id: "p1", label: "11:00–19:00", note: "pausa 14:00–15:00", tone: "plan", breakSpan: { start: 0.375, end: 0.5 } }],
+  };
+
+  it("draws a block's break as a hatched band at its share of the block, out of the accessibility tree", async () => {
+    renderGrid({ cell: (rowId, day) => (rowId === "ana" && day === 0 ? withBreak : cell(rowId, day)) });
+    const band = screen.getByTestId("sg-break-p1");
+    expect(block("p1")).toContainElement(band);
+    expect(band).toHaveAttribute("aria-hidden", "true");
+    expect(getComputedStyle(band).left).toBe("37.5%");
+    expect(getComputedStyle(band).width).toBe("12.5%");
+    expect(block("p1")).toHaveTextContent("11:00–19:00pausa 14:00–15:00");
+  });
+
+  it("keeps a break the host sent out of range inside the block, and draws none for an empty one", async () => {
+    const odd: ScheduleGridCell = {
+      blocks: [
+        { id: "o1", label: "a", tone: "plan", breakSpan: { start: -0.2, end: 1.4 } },
+        { id: "o2", label: "b", tone: "plan", breakSpan: { start: 0.6, end: 0.6 } },
+      ],
+    };
+    renderGrid({ cell: (rowId, day) => (rowId === "ana" && day === 0 ? odd : cell(rowId, day)) });
+    expect(getComputedStyle(screen.getByTestId("sg-break-o1")).left).toBe("0%");
+    expect(getComputedStyle(screen.getByTestId("sg-break-o1")).width).toBe("100%");
+    await waitFor(() => expect(screen.queryByTestId("sg-break-o2")).toBeNull());
+  });
+
+  it("puts the name's adornment beside the name and the chips under the meta, both inside the row header", async () => {
+    renderGrid({
+      groups: [
+        {
+          title: "Entregas",
+          rows: [
+            {
+              id: "ana",
+              label: "Ana Lima",
+              meta: "8h na semana",
+              nameAdornment: <span>Freela</span>,
+              chips: <button type="button">2 regras ›</button>,
+              onLabelClick: vi.fn(),
+            },
+          ],
+        },
+      ],
+    });
+    const header = screen.getByRole("rowheader");
+    expect(within(header).getByText("Freela")).toBeInTheDocument();
+    expect(within(header).getByRole("button", { name: "Ana Lima" })).toBeInTheDocument();
+    expect(header).toHaveTextContent("Ana LimaFreela8h na semana2 regras ›");
+    expect(within(header).getByRole("button", { name: "2 regras ›" })).toBeInTheDocument();
+  });
+});

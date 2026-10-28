@@ -9,7 +9,9 @@ import { SCHEDULE_GRID_METRICS } from './ScheduleGrid.metrics';
 import {
   blockedLabelSx,
   blockSx,
+  breakSx,
   cellSx,
+  chipsSx,
   ghostSx,
   gripSx,
   groupTitleSx,
@@ -19,6 +21,7 @@ import {
   metaSx,
   nameButtonSx,
   nameCellSx,
+  nameLineSx,
   nameTextSx,
   personRowSx,
   plusButtonSx,
@@ -91,6 +94,14 @@ function Grip({ side, onPointerDown, testId }: { side: 'l' | 'r'; onPointerDown:
   return <Box component="span" aria-hidden sx={gripSx(side)} onPointerDown={onPointerDown} data-sg-grip="" data-testid={testId} />;
 }
 
+/** The block's break, kept inside it whatever the host sent. */
+function BreakBand({ span, testId }: { span: { start: number; end: number }; testId: string }): React.JSX.Element | null {
+  const start = Math.min(1, Math.max(0, span.start));
+  const end = Math.min(1, Math.max(0, span.end));
+  if (!(end > start)) return null;
+  return <Box component="span" aria-hidden sx={breakSx({ start, end })} data-sg-break="" data-testid={testId} />;
+}
+
 function BlockButton({ block, row, day, can, dragApi, onBlockClick, testId }: BlockProps): React.JSX.Element {
   const movable = can.move && Boolean(block.movable);
   const copyable = can.copy && Boolean(block.copyable);
@@ -115,6 +126,7 @@ function BlockButton({ block, row, day, can, dragApi, onBlockClick, testId }: Bl
         if (!dragApi.takeClick()) onBlockClick?.(block.id);
       }}
     >
+      {block.breakSpan ? <BreakBand span={block.breakSpan} testId={`${testId}-break-${block.id}`} /> : null}
       {copyable ? <Grip side="l" onPointerDown={startCopy} testId={`${testId}-grip-l-${block.id}`} /> : null}
       <span data-sg-line="label">{block.label}</span>
       {block.note ? <span data-sg-line="note">{block.note}</span> : null}
@@ -210,27 +222,38 @@ export function GridCell(props: CellProps): React.JSX.Element {
   );
 }
 
-/** The first column: the name (a button when the host acts on it) and its meta line. */
+/** The first column: the name (a button when the host acts on it), its adornment, its meta line and chips. */
 export function NameCell({ row }: { row: ScheduleGridRow }): React.JSX.Element {
   const name = (
     <Box component="span" sx={nameTextSx}>
       {row.label}
     </Box>
   );
+  const named = row.onLabelClick ? (
+    <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
+      {name}
+    </Box>
+  ) : (
+    name
+  );
   return (
     <Box role="rowheader" sx={nameCellSx}>
-      {row.onLabelClick ? (
-        <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
-          {name}
+      {row.nameAdornment ? (
+        <Box sx={nameLineSx}>
+          {named}
+          <Box component="span" data-sg-adornment="">
+            {row.nameAdornment}
+          </Box>
         </Box>
       ) : (
-        name
+        named
       )}
       {row.meta ? (
         <Box component="span" sx={metaSx(row.metaTone ?? 'default')}>
           {row.meta}
         </Box>
       ) : null}
+      {row.chips ? <Box sx={chipsSx}>{row.chips}</Box> : null}
     </Box>
   );
 }

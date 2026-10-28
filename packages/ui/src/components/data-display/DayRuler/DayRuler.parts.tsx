@@ -10,6 +10,7 @@ import {
   actualSx,
   axisSx,
   blockSx,
+  breakSx,
   chipsSx,
   coverageCellSx,
   coverageLabelSx,
@@ -18,6 +19,7 @@ import {
   lineSx,
   metaSx,
   nameButtonSx,
+  nameLineSx,
   nameSx,
   nowSx,
   rowSx,
@@ -65,16 +67,34 @@ interface BlockProps {
   block: DayRulerBlock;
   /** Where it is drawn: its own hours, or where a drag has it now. */
   span: Span;
+  /** The hours it is drawn at (its own, or a drag's). */
+  at?: { start: RulerHour; end: RulerHour };
   text: string;
   ctx: RowContext;
   testId: string;
 }
 
-function RulerBlock({ row, block, span, text, ctx, testId }: BlockProps): React.JSX.Element {
+/**
+ * The block's break, where it falls inside the block as drawn: it moves with a
+ * dragged block (same offset from its start) and is cut to the block's ends.
+ */
+function breakShare(block: DayRulerBlock, start: RulerHour, end: RulerHour): { left: number; width: number } | null {
+  const span = block.breakSpan;
+  const length = end - start;
+  if (!span || !(length > 0)) return null;
+  const shift = Math.abs(length - (block.end - block.start)) < 1e-6 ? start - block.start : 0;
+  const a = Math.max(start, span.start + shift);
+  const b = Math.min(end, span.end + shift);
+  if (!(b > a)) return null;
+  return { left: ((a - start) / length) * 100, width: ((b - a) / length) * 100 };
+}
+
+function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): React.JSX.Element {
   const { can, dragApi, scale } = ctx;
   const movable = can.move && Boolean(block.movable);
   const resizable = can.resize && Boolean(block.resizable);
   const narrow = (block.end - block.start) / (scale.to - scale.from) < M.narrowShare;
+  const gap = breakShare(block, at?.start ?? block.start, at?.end ?? block.end);
   const press = (mode: 'move' | 'start' | 'end') => (event: React.PointerEvent<HTMLElement>) =>
     dragApi.startBlock(event, row.id, block, mode);
   return (
@@ -94,6 +114,7 @@ function RulerBlock({ row, block, span, text, ctx, testId }: BlockProps): React.
       }}
       onKeyDown={(event: React.KeyboardEvent) => ctx.onBlockKey(event, block)}
     >
+      {gap ? <Box component="span" aria-hidden sx={breakSx(gap.left, gap.width)} data-dr-break="" data-testid={`${ctx.testId}-break-${block.id}`} /> : null}
       {resizable ? <Handle side="l" onPointerDown={press('start')} testId={`${ctx.testId}-handle-l-${block.id}`} /> : null}
       <span data-dr-text="full">{text}</span>
       <span data-dr-text="short">{block.shortLabel ?? text}</span>
@@ -117,6 +138,7 @@ function Blocks({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.
             row={row}
             block={block}
             span={spanOf(start, end, ctx.scale)}
+            at={{ start, end }}
             text={live?.moved ? formatRange(start, end) : block.label}
             ctx={ctx}
             testId={`${ctx.testId}-block-${block.id}`}
@@ -192,15 +214,25 @@ export function RulerRow({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): R
       {row.label}
     </Box>
   );
+  const named = row.onLabelClick ? (
+    <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
+      {name}
+    </Box>
+  ) : (
+    name
+  );
   return (
     <Box sx={rowSx} data-testid={`${ctx.testId}-row-${row.id}`} role="listitem">
       <Box sx={whoSx}>
-        {row.onLabelClick ? (
-          <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
-            {name}
+        {row.nameAdornment ? (
+          <Box sx={nameLineSx}>
+            {named}
+            <Box component="span" data-dr-adornment="">
+              {row.nameAdornment}
+            </Box>
           </Box>
         ) : (
-          name
+          named
         )}
         {row.meta ? (
           <Box component="span" sx={metaSx(row.metaTone ?? 'default')}>

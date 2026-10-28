@@ -227,14 +227,14 @@ Components for displaying data, visualizations, and information to users.
 ### ScheduleGrid
 **Purpose**: A week grid of people (or resources) × days with blocks that have a start and an end
 **Use Cases**: Staff schedules (turnos), rosters, resource booking by day
-**Features**: Click an empty cell to create, drag across a row to create on each day, drag a block's edge grip to copy it along the row, drag its middle to move it, click to open; blocked (hatched) days refuse drops; five tones that each carry their note text; sticky header row; keyboard twins (Shift+←/→ copy, Alt+←/→ move, arrows move focus) with a live region; touch never drags; read-only, loading, error, empty; container queries
+**Features**: Click an empty cell to create, drag across a row to create on each day, drag a block's edge grip to copy it along the row, drag its middle to move it, click to open; blocked (hatched) days refuse drops; a block's break drawn as a hatched gap; a name adornment and a chips slot per row; five tones that each carry their note text; sticky header row; keyboard twins (Shift+←/→ copy, Alt+←/→ move, arrows move focus) with a live region; touch never drags; read-only, loading, error, empty; container queries
 **Location**: `src/components/data-display/ScheduleGrid`
 **Docs**: `src/components/data-display/ScheduleGrid/ScheduleGrid.md`
 
 ### DayRuler
 **Purpose**: One day as an hour ruler per row — scheduled blocks, the real shift under them, a now line and people per hour
 **Use Cases**: A schedule's day view, on-shift vs scheduled, a phone's day list of who works when
-**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, HH:MM axis past midnight, row chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
+**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, HH:MM axis past midnight, a block's break as a hatched gap, row name-adornment, chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
 **Location**: `src/components/data-display/DayRuler`
 **Docs**: `src/components/data-display/DayRuler/DayRuler.md`
 

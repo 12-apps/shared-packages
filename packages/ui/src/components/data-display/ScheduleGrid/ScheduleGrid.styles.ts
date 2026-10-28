@@ -3,7 +3,7 @@ import type { CSSObject } from '@mui/material/styles/index.js';
 
 import { rem, sxRem } from '../../../tokens/relative';
 import { SCHEDULE_GRID_METRICS as M } from './ScheduleGrid.metrics';
-import { blockToneStyles } from './schedule-tones';
+import { blockToneStyles, breakHatch } from './schedule-tones';
 import type { ScheduleBlockTone } from './ScheduleGrid.types';
 
 /**
@@ -271,10 +271,47 @@ export function blockSx(tone: ScheduleBlockTone, opts: { selected: boolean; mova
     margin: 0,
     boxShadow: opts.selected ? `0 0 0 ${rem(theme, M.ring)} ${theme.palette.primary.main}` : 'none',
     '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 1) },
-    '& > [data-sg-line]': { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '& > [data-sg-line]': { position: 'relative', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     '& > [data-sg-line="note"]': { fontWeight: 400 },
   });
 }
+
+/** A break inside a block: a hatched band across its height, under its text. */
+export function breakSx(span: { start: number; end: number }): SxProps<Theme> {
+  return (theme: Theme) => ({
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: `${span.start * 100}%`,
+    width: `${(span.end - span.start) * 100}%`,
+    background: breakHatch(theme, rem(theme, M.breakStripe), rem(theme, M.breakStripe * 2)),
+    opacity: 0.7,
+    pointerEvents: 'none',
+  });
+}
+
+/** The name and its adornment: one line while both fit, the adornment under the name when not. */
+export const nameLineSx: SxProps<Theme> = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  columnGap: 0.75,
+  rowGap: 0.25,
+  minWidth: 0,
+  '& > :first-of-type': { minWidth: 0 },
+  '& > [data-sg-adornment]': { flexShrink: 0, display: 'inline-flex' },
+};
+
+/** The host's chips under the meta: ONE line; a chip that does not fit shrinks and cuts its label. */
+export const chipsSx: SxProps<Theme> = {
+  display: 'flex',
+  flexWrap: 'nowrap',
+  gap: 0.75,
+  mt: 0.5,
+  minWidth: 0,
+  overflow: 'hidden',
+  '& > *': { minWidth: 0, flexShrink: 1, maxWidth: '100%' },
+};
 
 export function gripSx(side: 'l' | 'r'): SxProps<Theme> {
   return (theme: Theme) => ({

@@ -27,6 +27,13 @@ export interface DayRulerBlock {
   selected?: boolean;
   /** Tooltip and full text. Default: `label`. */
   title?: string;
+  /**
+   * A stretch inside the block that is not worked (a meal break), in ruler
+   * hours, drawn as a hatched gap. It travels with the block while it is
+   * dragged and is cut to the block's ends. The words for it are the host's
+   * (`label`, `title`).
+   */
+  breakSpan?: { start: RulerHour; end: RulerHour };
 }
 
 /** The shift as it really runs: a thin bar under the blocks. */
@@ -42,7 +49,9 @@ export interface DayRulerRow {
   /** Under the name ("em turno desde 08:26 · sem escala", "atrasado · era 20:39"). */
   meta?: string;
   metaTone?: 'default' | 'warning';
-  /** Under the meta: the host's chips (praça, "Em pausa desde …"). */
+  /** Beside the name, on its line (a "Freela" tag); moves under the name when the column has no room for both. */
+  nameAdornment?: React.ReactNode;
+  /** Under the meta: the host's chips (praça, "Em pausa desde …"). One line; a chip that does not fit shrinks, its label cut. */
   chips?: React.ReactNode;
   /** The row's own buttons ("Encerrar turno", "Iniciar agora"), at the end of the row. */
   actions?: React.ReactNode;
@@ -91,7 +100,7 @@ export interface DayRulerProps {
   labels?: Partial<DayRulerLabels>;
   /**
    * Base test id (default `day-ruler`). Parts: `-coverage`, `-axis`, `-row-${rowId}`,
-   * `-track-${rowId}`, `-block-${blockId}`, `-handle-l-${blockId}`, `-handle-r-${blockId}`,
+   * `-track-${rowId}`, `-block-${blockId}`, `-handle-l-${blockId}`, `-handle-r-${blockId}`, `-break-${blockId}`,
    * `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`.
    */
   dataTestId?: string;

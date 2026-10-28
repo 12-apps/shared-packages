@@ -36,4 +36,6 @@ export const SCHEDULE_GRID_METRICS = {
   skeletonRows: 4,
   /** The hatch of a blocked cell: stripe width. */
   hatch: 6,
+  /** The hatch of a break inside a block: stripe width. */
+  breakStripe: 3,
 } as const;

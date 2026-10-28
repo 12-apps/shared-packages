@@ -37,7 +37,7 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 
 | Prop | Type | Description |
 |---|---|---|
-| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `chips?` (node), `actions?` (node — "Encerrar turno", "Iniciar agora"), `blocks` (`id`, `start`, `end`, `label`, `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
+| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when there is no room for both), `chips?` (node — one line, a chip that does not fit shrinks and cuts its label), `actions?` (node — "Encerrar turno", "Iniciar agora"), `blocks` (`id`, `start`, `end`, `label`, `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` in ruler hours, a meal break drawn as a hatched gap inside the block: it travels with a moved block and is cut to its ends while one is dragged; its words are the host's, in `label` / `title`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
 | `from` / `to` | `number` (default 6 / 26) | The ruler's span. |
 | `now` | `number?` | The "agora" line, when on the ruler. |
 | `coverage` | `number[]?` | People per hour, index 0 = `from…from+1`. |
@@ -51,7 +51,7 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 | `loading` / `error` / `empty` | `boolean` / node / node | Skeleton rows with `aria-busy`; the host's error; the host's empty sentence. |
 | `aria-label` | `string?` | The region's name. |
 | `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`. Default: the English pack; pt-BR: `UI_LABELS['pt-BR'].dayRuler`. |
-| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
+| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
 
 Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over a faint ground.
 

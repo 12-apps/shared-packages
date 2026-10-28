@@ -314,3 +314,47 @@ describe("states", () => {
     expect(track("kelly")).toHaveAttribute("aria-label", "Schedule Kelly Fontoura");
   });
 });
+
+describe("the slots a later story fills (FUT-3881)", () => {
+  const rows: DayRulerProps["rows"] = [
+    {
+      id: "bruno",
+      label: "Bruno Lima",
+      nameAdornment: <span>Freela</span>,
+      blocks: [{ id: "p1", start: 11, end: 19, label: "11:00–19:00", tone: "plan", movable: true, resizable: true, breakSpan: { start: 14, end: 15 } }],
+    },
+  ];
+  const band = (): HTMLElement => screen.getByTestId("dr-break-p1");
+
+  it("draws the break inside its block at its hours, hidden from the accessibility tree", async () => {
+    renderRuler({ rows });
+    expect(block("p1")).toContainElement(band());
+    expect(band()).toHaveAttribute("aria-hidden", "true");
+    expect(getComputedStyle(band()).left).toBe("37.5%");
+    expect(getComputedStyle(band()).width).toBe("12.5%");
+  });
+
+  it("carries the break with a block being moved, and keeps it at its hours while an end is dragged", async () => {
+    renderRuler({ rows });
+    press(block("p1"), 12);
+    moveTo(14);
+    expect(block("p1")).toHaveTextContent("13:00–21:00");
+    expect(getComputedStyle(band()).left).toBe("37.5%");
+    release();
+    cleanup();
+    renderRuler({ rows });
+    press(screen.getByTestId("dr-handle-l-p1"), 11);
+    moveTo(15);
+    expect(block("p1")).toHaveTextContent("15:00–19:00");
+    await waitFor(() => expect(screen.queryByTestId("dr-break-p1")).toBeNull());
+    moveTo(13);
+    expect(getComputedStyle(band()).left).toMatch(/^16\.66\d*%$/);
+    release();
+  });
+
+  it("puts the name's adornment beside the name", async () => {
+    renderRuler({ rows });
+    expect(within(screen.getByTestId("dr-row-bruno")).getByText("Freela")).toBeInTheDocument();
+    expect(screen.getByTestId("dr-row-bruno")).toHaveTextContent(/^Bruno LimaFreela/);
+  });
+});

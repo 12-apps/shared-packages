@@ -1,5 +1,6 @@
 export { ScheduleGrid } from './ScheduleGrid';
 export type {
+  ScheduleBlockBreak,
   ScheduleBlockTone,
   ScheduleGridBlock,
   ScheduleGridCell,

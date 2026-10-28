@@ -25,6 +25,8 @@ interface Person {
   since?: number;
   chip?: string;
   late?: boolean;
+  /** A tag beside the name ("Freela"). */
+  tag?: string;
 }
 
 interface Slot {
@@ -34,6 +36,8 @@ interface Slot {
   end: number;
   repeats?: boolean;
   tone?: DayRulerBlock['tone'];
+  /** A meal break inside the turno, in hours. */
+  pause?: [number, number];
 }
 
 const NOW = 20.75;
@@ -93,6 +97,7 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
       meta,
       group: p.area,
       chips: p.chip ? <Chip label={p.chip} size="sm" variant="outlined" /> : undefined,
+      nameAdornment: p.tag ? <Chip label={p.tag} size="sm" variant="outlined" /> : undefined,
       actions: working ? (
         <Button variant="outline" color="primary" size="md" onClick={() => setLog(`Encerrar ${p.name}`)}>
           {compact ? 'Encerrar' : 'Encerrar turno'}
@@ -111,7 +116,8 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
         tone: slot.tone ?? 'plan',
         movable: true,
         resizable: true,
-        title: `${p.name}, ${formatRange(slot.start, slot.end)}`,
+        title: `${p.name}, ${formatRange(slot.start, slot.end)}${slot.pause ? ` · pausa ${formatRange(slot.pause[0], slot.pause[1])}` : ''}`,
+        breakSpan: slot.pause ? { start: slot.pause[0], end: slot.pause[1] } : undefined,
       })),
       actual: working ? { start: p.since ?? 0, end: NOW } : undefined,
       actualLabel: working && mine.length === 0 ? `sem escala · desde ${hh(p.since ?? 0)}` : undefined,
@@ -225,3 +231,20 @@ export const Teclado: Story = {
     await waitFor(() => expect(canvas.getByTestId('ruler-live')).toHaveTextContent('↻ 20:39–00:00 agora 20:54–00:15'));
   },
 };
+
+const PAUSA: Person[] = [
+  { id: 'bruno', name: 'Bruno Lima', area: 'Cozinha' },
+  { id: 'carla', name: 'Carla Mendes', area: 'Cozinha', chip: 'Chapa' },
+  { id: 'kelly', name: 'Kelly Fontoura', area: 'Entregas', tag: 'Freela' },
+];
+const PAUSA_SLOTS: Slot[] = [
+  { id: 'p1', who: 'bruno', start: 11, end: 19, pause: [14, 15] },
+  { id: 'p2', who: 'carla', start: 10, end: 21.5, pause: [15, 16] },
+  { id: 'p3', who: 'kelly', start: 18, end: 23 },
+];
+
+/** The slots a later story fills (FUT-3881): a "Freela" tag beside a name and the meal break as a hatched gap inside a block — it moves with the block. */
+export const PausaEMarcadores: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
+
+/** The same on a phone. */
+export const PausaEMarcadoresCelular: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };

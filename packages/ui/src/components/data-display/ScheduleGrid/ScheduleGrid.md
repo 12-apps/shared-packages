@@ -42,8 +42,8 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | Prop | Type | Description |
 |---|---|---|
 | `columns` | `ScheduleGridColumn[]` | `label`, `shortLabel?` (shown in a narrow grid), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
-| `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`. |
-| `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
+| `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when the column has no room for both), `chips?` (node under the meta — "2 regras ›"; one line, a chip that does not fit shrinks and cuts its label). |
+| `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
 | `totalLabel` | `string?` | The last column's header ("horas"). |
 | `readOnly` | `boolean?` | No "+", no grips, no drag; empty cells are not focusable. Block clicks still reach `onBlockClick`. |
 | `onCreate` / `onCopy` / `onMove` / `onBlockClick` | see Gestures | Each gesture is offered only when its handler is given. |
@@ -54,7 +54,7 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | `stickyTop` | `number?` (px, default 0) | Offset of the sticky header row under a pinned page bar. |
 | `aria-label` | `string?` | The grid's name. |
 | `labels` | `Partial<ScheduleGridLabels>` | `createCell(row, column)`, `blockedCell(row, column)`, `copied(block, column)`, `moved(block, row, column)`, `refused`, `loading`. Default: the English pack; a pt-BR host passes `UI_LABELS['pt-BR'].scheduleGrid`. |
-| `dataTestId` | `string?` (default `schedule-grid`) | Parts: `-header`, `-row-${rowId}`, `-cell-${rowId}-${day}`, `-block-${blockId}`, `-grip-l-${blockId}`, `-grip-r-${blockId}`, `-live`, `-loading`. |
+| `dataTestId` | `string?` (default `schedule-grid`) | Parts: `-header`, `-row-${rowId}`, `-cell-${rowId}-${day}`, `-block-${blockId}`, `-grip-l-${blockId}`, `-grip-r-${blockId}`, `-break-${blockId}`, `-live`, `-loading`. |
 
 ### Tones — never colour alone
 
@@ -65,6 +65,14 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | `away` | dashed warning outline | "Ausente" |
 | `uncovered` | dashed warning outline | "Sem ninguém" |
 | `onduty` | soft success ground, success border | "desde 08:26" |
+
+### Breaks and row adornments
+
+A block's `breakSpan` is drawn as a band of diagonal stripes in the page's ground across the
+block's height, under its text, so the block reads as cut there in every tone; it is decorative
+(`aria-hidden`), and the block's `note` says it in words ("pausa 14:00–15:00"). A row's
+`nameAdornment` and `chips` are the host's nodes (an `@12-apps/ui` `Chip` fits): the grid only
+places them.
 
 ## Layout
 
