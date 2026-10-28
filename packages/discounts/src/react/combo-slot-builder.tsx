@@ -1,10 +1,9 @@
 "use client";
 
-import type { JSX } from "react";
+import { useRef, type JSX } from "react";
 
 import { Button } from "@12-apps/ui/form/Button";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
-import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -13,6 +12,7 @@ import type { ComboRequirement } from "../engine/types";
 
 import type { WireTargetGroup } from "./api";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { CountInput } from "./number-fields";
 import { TargetPickerField } from "./target-picker-field";
 
 /**
@@ -48,9 +48,43 @@ export function comboUnits(slots: readonly ComboRequirement[]): number {
   return slots.reduce((total, slot) => total + (Number.isFinite(slot.quantity) ? slot.quantity : 0), 0);
 }
 
+/** "1 item" or "4 itens": the pack's one form for exactly 1, its other form otherwise. */
+function counted(count: number, one: string, other: string): string {
+  return fill(count === 1 ? one : other, { count });
+}
+
+/** The read-back sentence, both nouns in the right number. */
+function comboSummary(slots: readonly ComboRequirement[], copy: DiscountsWebCopy): string {
+  const { combo } = copy;
+  return fill(combo.summary, {
+    units: counted(comboUnits(slots), combo.unitsOne, combo.unitsOther),
+    groups: counted(slots.length, combo.groupsOne, combo.groupsOther),
+  });
+}
+
 /** An empty group: one unit, nothing chosen yet. */
 export function blankSlot(): ComboRequirement {
   return { quantity: 1, categoryIds: [], menuItemIds: [] };
+}
+
+/**
+ * One screen-only id per group, in list order (FUT-4143).
+ *
+ * A group has no id until the database gives it one, and an index key hands a
+ * removed row's component — and its half-typed draft — to the row that moves
+ * up. These ids live here and nowhere else: the wire still carries the plain
+ * `ComboRequirement`s. Appends get a fresh id; a removal drops its own (see
+ * `onRemove`); a list replaced from outside is padded or cut to length.
+ */
+function useRowIds(length: number): { current: number[] } {
+  const ids = useRef<number[]>([]);
+  const next = useRef(0);
+  while (ids.current.length < length) {
+    ids.current = [...ids.current, next.current];
+    next.current += 1;
+  }
+  if (ids.current.length > length) ids.current = ids.current.slice(0, length);
+  return ids;
 }
 
 /** Replace one group, leaving the rest (and their order) alone. */
@@ -75,8 +109,9 @@ function withIds(slot: ComboRequirement, targetType: string, ids: string[]): Com
  * One group: its quantity, one picker per registered collection, and the
  * control that removes it.
  *
- * The quantity is a `number` input rather than a masked one — it counts units,
- * not money, so there is no locale in it. It is held as a NUMBER in state
+ * The quantity is a digits-only text box (`CountInput`, FUT-4143) rather than
+ * `type="number"`, which read "2,5" by the browser's language — as 25 in an
+ * English one. It is held as a NUMBER in state
  * rather than as the form's string, because the summary line above adds them up
  * and the validator compares them against `freeUnits`; parsing on every read
  * would put the same `Number()` in three places.
@@ -117,12 +152,13 @@ function ComboSlotRow({
         </Button>
       </Stack>
       <Stack spacing={2} sx={{ mt: 1 }}>
-        <Input
-          type="number"
+        <CountInput
           label={copy.combo.quantity}
-          value={String(slot.quantity)}
-          onChange={(event) => onChange({ ...slot, quantity: Number(event.target.value) })}
-          data-testid={`combo-slot-${index}-quantity`}
+          value={slot.quantity}
+          copy={copy}
+          invalidMessage={copy.form.invalidComboQuantity}
+          dataTestId={`combo-slot-${index}-quantity`}
+          onChange={(quantity) => onChange({ ...slot, quantity })}
         />
         {groups.map((group) => (
           <TargetPickerField
@@ -170,6 +206,7 @@ export function ComboSlotBuilder({
   copy: DiscountsWebCopy;
   onChange: (next: ComboRequirement[]) => void;
 }): JSX.Element {
+  const rowIds = useRowIds(slots.length);
   return (
     <FormControl fullWidth>
       <FormLabel>{copy.combo.title}</FormLabel>
@@ -177,17 +214,19 @@ export function ComboSlotBuilder({
       <Stack spacing={2} sx={{ mt: 1 }} data-testid="combo-slots">
         {slots.map((slot, index) => (
           <ComboSlotRow
-            // The index IS the identity here: `position` is the array index,
-            // and a group carries no id of its own until the database gives it
-            // one. Removing a group renumbers the rest, which is exactly what
-            // the operator sees happen.
-            key={index}
+            // `position` is the array index, and removing a group renumbers
+            // the rest — but the ROW is keyed by a screen-only id, so the
+            // group below does not inherit the removed one's draft.
+            key={rowIds.current[index]}
             slot={slot}
             index={index}
             groups={groups}
             copy={copy}
             onChange={(next) => onChange(replaceAt(slots, index, next))}
-            onRemove={() => onChange(slots.filter((_, position) => position !== index))}
+            onRemove={() => {
+              rowIds.current = rowIds.current.filter((_, position) => position !== index);
+              onChange(slots.filter((_, position) => position !== index));
+            }}
           />
         ))}
         {slots.length === 0 && (
@@ -195,20 +234,27 @@ export function ComboSlotBuilder({
             {copy.combo.empty}
           </Text>
         )}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-          <Button
-            variant="outline"
-            onClick={() => onChange([...slots, blankSlot()])}
-            data-testid="combo-add-slot"
-          >
-            {copy.combo.addSlot}
-          </Button>
+        {/* Wraps as a ROW, never inside the button: where the note does not
+            fit beside "Adicionar grupo" it takes the line below, and the
+            button's own label stays on one line (FUT-4143 UI review). */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 2, rowGap: 1 }}>
+          <Box sx={{ flexShrink: 0, "& > button": { whiteSpace: "nowrap" } }}>
+            <Button
+              variant="outline"
+              onClick={() => onChange([...slots, blankSlot()])}
+              data-testid="combo-add-slot"
+            >
+              {copy.combo.addSlot}
+            </Button>
+          </Box>
           {slots.length > 0 && (
-            <Text variant="caption" data-testid="combo-summary">
-              {fill(copy.combo.summary, { units: comboUnits(slots), groups: slots.length })}
-            </Text>
+            <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
+              <Text variant="caption" data-testid="combo-summary">
+                {comboSummary(slots, copy)}
+              </Text>
+            </Box>
           )}
-        </Stack>
+        </Box>
       </Stack>
     </FormControl>
   );

@@ -70,5 +70,9 @@ export interface DiscountsScheduleCopy {
   /** Refusals. */
   readonly daysRequired: string;
   readonly timesRequired: string;
+  /** Under a clock holding a whole `HH:MM` that no day has, such as 25:00. */
+  readonly invalidTime: string;
+  /** A clock left half-typed ("1:00"): shown once the box is left, or at Criar. */
+  readonly timeIncomplete: string;
   readonly windowsRequired: string;
 }

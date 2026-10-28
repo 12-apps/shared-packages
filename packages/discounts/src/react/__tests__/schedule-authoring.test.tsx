@@ -233,7 +233,7 @@ describe("what the form refuses", () => {
     fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     await submit();
-    await waitFor(() => expect(screen.getByTestId("discount-form-error")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
     expect(sent).toHaveLength(0);
   });
 });

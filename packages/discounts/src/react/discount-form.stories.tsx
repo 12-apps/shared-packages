@@ -42,6 +42,9 @@ function propsFor(editing: DiscountWireRecord | null, options: StoryWorldOptions
     editing,
     onSaved: () => {},
     onError: storyOnError,
+    // What a host derives from the store's IANA zone; without it the schedule
+    // builder's note reads "Fuso horário: .".
+    timezoneLabel: "Horário de Brasília",
   };
 }
 

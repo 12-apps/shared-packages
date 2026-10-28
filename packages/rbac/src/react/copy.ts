@@ -151,6 +151,14 @@ export interface TeamScreenCopy {
   inviteEmailLabel: string;
   inviteHint: string;
   /**
+   * The e-mail box's two refusals — left empty, and not an address — and the
+   * banner over a submit the form refused (FUT-4143/FUT-4144). The packs take
+   * the last two from `@12-apps/forms-core` and `@12-apps/ui`'s own packs.
+   */
+  inviteEmailRequired: string;
+  inviteEmailInvalid: string;
+  inviteFormError: string;
+  /**
    * The headings over the invite's two checklists — the system roles, and the
    * custom roles the tenant has built. An invite grants roles explicitly;
    * leaving it implicit made every address added through this dialog an
