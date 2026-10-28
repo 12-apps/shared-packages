@@ -68,7 +68,13 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
           paddingRight: rem(theme, M.blockPadding.end),
         },
         '& > [data-sg-scroll]': { overflowX: 'auto', overscrollBehaviorX: 'contain' },
-        '& > [data-sg-head]': { overflowX: 'hidden' },
+        // The header row scrolls with the days (kept in step both ways), its own scrollbar hidden.
+        '& > [data-sg-head]': {
+          overflowX: 'auto',
+          overscrollBehaviorX: 'contain',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
+        },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {

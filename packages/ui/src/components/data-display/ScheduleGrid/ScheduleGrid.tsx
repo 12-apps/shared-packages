@@ -70,9 +70,10 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
 
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  // The header row keeps the body's sideways scroll, so each day's header stays over its column.
-  const followSideways = (): void => {
-    if (headRef.current && bodyRef.current) headRef.current.scrollLeft = bodyRef.current.scrollLeft;
+  // The header row and the days keep one sideways scroll, so each day's header stays over its column.
+  const followSideways = (event: React.UIEvent<HTMLElement>): void => {
+    const other = event.currentTarget === bodyRef.current ? headRef.current : bodyRef.current;
+    if (other && other.scrollLeft !== event.currentTarget.scrollLeft) other.scrollLeft = event.currentTarget.scrollLeft;
   };
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
@@ -94,7 +95,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         onPointerDownCapture={focus.forget}
       >
         {/* The header row sits outside the sideways scroller, so it sticks to the page; it follows the days sideways. */}
-        <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`}>
+        <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onScroll={followSideways}>
           <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} rowSx={rowSx} testId={testId} />
         </Box>
         <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={followSideways}>
