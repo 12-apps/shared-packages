@@ -126,15 +126,17 @@ const RangeSelectionComponent = () => {
 export const RangeSelection: Story = {
   render: () => <RangeSelectionComponent />,
   play: async ({ canvasElement }) => {
-    // 16-20: no month's leading or trailing outside days reach them, so each
-    // test id names exactly one cell whatever month the story opens on.
+    // The range calendar shows two months, so the days are found inside the
+    // first. 16-20: no leading or trailing outside days reach them, so each test
+    // id names one cell there whatever month the story opens on.
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByTestId('calendar-date-16'));
-    await userEvent.click(canvas.getByTestId('calendar-date-20'));
+    const month = within(canvas.getByTestId('calendar-month-0'));
+    await userEvent.click(month.getByTestId('calendar-date-16'));
+    await userEvent.click(month.getByTestId('calendar-date-20'));
 
-    await expect(canvas.getByTestId('calendar-date-16')).toHaveClass('range-start');
-    await expect(canvas.getByTestId('calendar-date-20')).toHaveClass('range-end');
-    await expect(canvas.getByTestId('calendar-date-18')).toHaveClass('in-range');
+    await expect(month.getByTestId('calendar-date-16')).toHaveClass('range-start');
+    await expect(month.getByTestId('calendar-date-20')).toHaveClass('range-end');
+    await expect(month.getByTestId('calendar-date-18')).toHaveClass('in-range');
     await expect(canvas.getByRole('heading', { name: /^Range: / })).not.toHaveTextContent('None');
   },
 };
