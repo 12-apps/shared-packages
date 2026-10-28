@@ -51,7 +51,7 @@ const SelectorButton: FC<{
     onClick={onClick}
     sx={{
       minHeight: TARGET_SIZE,
-      px: 1,
+      px: 0.5,
       whiteSpace: 'nowrap',
       textTransform: 'none',
       typography: 'subtitle1',
