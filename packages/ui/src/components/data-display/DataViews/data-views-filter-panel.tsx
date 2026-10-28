@@ -30,6 +30,12 @@ export interface GridFilterPanelProps<T extends Record<string, unknown>> {
   onChangeRange: (fieldId: string, range: RangeValue) => void;
   onClearField: (fieldId: string) => void;
   onClearAll: () => void;
+  /**
+   * Changes on every clear-all, from any surface (`useClearFilters`). The
+   * controls are keyed on it, so a clear also empties a field holding text the
+   * filter never applied — a refused day under an open range (FUT-4144).
+   */
+  clearKey?: number;
 }
 
 /** One pill field: a compact multi-select for long lists, else a checkbox list. */
@@ -135,7 +141,7 @@ export function GridFilterPanel<T extends Record<string, unknown>>(
       clearTestId={`${props.testIdPrefix}-clear-filters`}
       ariaLabel={copy.filters.panelTitle}
     >
-      <FilterControls {...props} />
+      <FilterControls key={props.clearKey} {...props} />
     </TableFilter.Panel>
   );
 }
@@ -180,7 +186,7 @@ export function FilterDialog<T extends Record<string, unknown>>({
               {copy.filters.clearAllFilters}
             </Link>
           </Box>
-          <FilterControls {...props} />
+          <FilterControls key={props.clearKey} {...props} />
         </Box>
       </StackedModalContent>
     </StackedModal>

@@ -9,7 +9,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DayBoundInput, isoToMasked, maskDate, maskedToIso } from "../data-views-day-input";
+import { PT_BR_DATA_VIEWS_COPY } from "../../../../pt-BR";
+import { DataViewsCopyProvider } from "../data-views-copy-context";
+import {
+  DayBoundInput,
+  isImpossibleDay,
+  isoToMasked,
+  maskDate,
+  maskedToIso,
+  readDayText,
+} from "../data-views-day-input";
+import { FilterDialog, GridFilterPanel, type GridFilterPanelProps } from "../data-views-filter-panel";
+import { RangeBounds } from "../data-views-range-pill";
+import type { RangeValue } from "../data-views-types";
+import { TableFilter } from "../../../layout/TableFilter";
 
 /**
  * The two masks in the estate's own packs. Every helper case below runs against
@@ -220,5 +233,349 @@ describe("DayBoundInput", () => {
     typeSequentially(input, "06082026");
     rerender(<DayBoundInput mask="dd/mm/aaaa" label="De" value="2026-08-06" onChange={onChange} testId="day" />);
     await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
+  });
+});
+
+/**
+ * FUT-4144: an impossible day was forgotten without a word, and a pasted ISO
+ * day was read day-first into `20/26/1001`. The cases above still hold — a
+ * field given no message keeps its old silence — and these pin the new half.
+ */
+const INVALID = "Essa data não existe.";
+
+function renderWithMessage(value?: string, describedBy?: string) {
+  const onChange = vi.fn();
+  render(
+    <DayBoundInput
+      mask="dd/mm/aaaa"
+      label="De"
+      value={value}
+      onChange={onChange}
+      testId="day"
+      invalidMessage={INVALID}
+      describedBy={describedBy}
+    />,
+  );
+  return { onChange, input: screen.getByTestId("day") as HTMLInputElement };
+}
+
+/** Paste `text` the way a browser fires it; answers whether the default ran. */
+function paste(element: HTMLInputElement, text: string): boolean {
+  return fireEvent.paste(element, { clipboardData: { getData: () => text } });
+}
+
+describe("readDayText", () => {
+  it("reads a whole ISO day as that day, in the mask's own order", () => {
+    expect(readDayText("2026-10-01", BR)).toBe("01/10/2026");
+    expect(readDayText("2026-10-01", US)).toBe("10/01/2026");
+    expect(readDayText("2026-10-01", "yyyy-mm-dd")).toBe("2026-10-01");
+    expect(readDayText("  2026-10-01\n", BR)).toBe("01/10/2026");
+  });
+
+  it("lands the pasted and the typed forms of one day on the same text", () => {
+    expect(readDayText("2026-10-01", BR)).toBe(readDayText("01102026", BR));
+    expect(readDayText("2026-10-01", BR)).toBe(maskDate("01102026", BR));
+  });
+
+  it("masks everything that is not a whole ISO day exactly as typing does", () => {
+    expect(readDayText("0608", BR)).toBe("06/08");
+    expect(readDayText("06/08/2026", BR)).toBe("06/08/2026");
+    // Not a WHOLE ISO day: a partial one, or one with a time, is digits.
+    expect(readDayText("2026-10", BR)).toBe(maskDate("2026-10", BR));
+    expect(readDayText("2026-10-01T10:00", BR)).toBe(maskDate("2026-10-01T10:00", BR));
+  });
+
+  it("keeps an ISO day that does not exist in the mask's order, for the field to refuse", () => {
+    expect(readDayText("2026-02-31", BR)).toBe("31/02/2026");
+    expect(maskedToIso(readDayText("2026-02-31", BR), BR)).toBe("");
+  });
+});
+
+describe("isImpossibleDay", () => {
+  it("is true only for a WHOLE day that does not exist", () => {
+    expect(isImpossibleDay("31/02/2026", BR)).toBe(true);
+    expect(isImpossibleDay("01/13/2026", BR)).toBe(true);
+    expect(isImpossibleDay("31/12/2099", US)).toBe(true);
+  });
+
+  it("is false for a real day, a partial one and an empty field", () => {
+    expect(isImpossibleDay("28/02/2026", BR)).toBe(false);
+    expect(isImpossibleDay("31/02/20", BR)).toBe(false);
+    expect(isImpossibleDay("", BR)).toBe(false);
+  });
+});
+
+describe("DayBoundInput: an impossible day is marked and said", () => {
+  it("marks the <input> invalid and says why, and writes nothing", async () => {
+    const { onChange, input } = renderWithMessage();
+    typeSequentially(input, "31022026");
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+    const message = screen.getByText(INVALID);
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(message.id);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the refused text and its message on blur instead of snapping back", async () => {
+    const { input } = renderWithMessage("2026-08-06");
+    fireEvent.change(input, { target: { value: "31022026" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(INVALID)).toBeInTheDocument();
+  });
+
+  it("clears the mark and commits once the day is corrected", async () => {
+    const { onChange, input } = renderWithMessage();
+    fireEvent.change(input, { target: { value: "31022026" } });
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+
+    fireEvent.change(input, { target: { value: "28022026" } });
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "false"));
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+    expect(onChange).toHaveBeenCalledWith("2026-02-28");
+  });
+
+  it("does not mark a half-typed day, and still snaps that back on blur", async () => {
+    const { input } = renderWithMessage("2026-08-06");
+    fireEvent.change(input, { target: { value: "31/02/20" } });
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "false"));
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+    fireEvent.blur(input);
+    expect(input).toHaveValue("06/08/2026");
+  });
+
+  it("keeps a caller's describedBy beside its own message", async () => {
+    const { input } = renderWithMessage(undefined, "pair-status");
+    expect(input).toHaveAttribute("aria-describedby", "pair-status");
+
+    fireEvent.change(input, { target: { value: "31022026" } });
+
+    const message = await screen.findByText(INVALID);
+    expect(input.getAttribute("aria-describedby")).toBe(`${message.id} pair-status`);
+  });
+
+  it("stays silent, as before, when the host gives it no message", async () => {
+    const { input } = renderInput("2026-08-06");
+    fireEvent.change(input, { target: { value: "31022026" } });
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "false");
+    fireEvent.blur(input);
+    expect(input).toHaveValue("06/08/2026");
+  });
+});
+
+describe("DayBoundInput: a pasted ISO day", () => {
+  it("is read as that day and applied, shown in the mask's order", async () => {
+    const { onChange, input } = renderWithMessage();
+    const defaultRan = paste(input, "2026-10-01");
+
+    expect(defaultRan).toBe(false);
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenCalledWith("2026-10-01");
+  });
+
+  it("replaces what the field held rather than adding its digits to it", async () => {
+    const { onChange, input } = renderWithMessage();
+    fireEvent.change(input, { target: { value: "0608" } });
+    paste(input, " 2026-10-01 ");
+
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenLastCalledWith("2026-10-01");
+  });
+
+  it("marks a pasted ISO day that does not exist", async () => {
+    const { onChange, input } = renderWithMessage();
+    paste(input, "2026-02-31");
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("leaves any other paste to the browser and the mask", () => {
+    const { input } = renderWithMessage();
+
+    expect(paste(input, "01102026")).toBe(true);
+    expect(paste(input, "01/10/2026")).toBe(true);
+  });
+
+  it("reads an ISO day that arrives as a change (autofill, a drop) the same way", async () => {
+    const { onChange, input } = renderInput();
+    fireEvent.change(input, { target: { value: "2026-10-01" } });
+
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenCalledWith("2026-10-01");
+  });
+});
+
+describe("RangeBounds: the DataViews day filter says the day does not exist", () => {
+  it("shows the pt-BR message from the copy pack under the field it was typed into", async () => {
+    render(
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <RangeBounds
+          field={{ id: "created", label: "Data", kind: "day", accessor: () => null }}
+          value={{}}
+          onChange={vi.fn()}
+          testId="range"
+        />
+      </DataViewsCopyProvider>,
+    );
+    const from = screen.getByTestId("range-min") as HTMLInputElement;
+    fireEvent.change(from, { target: { value: "31022026" } });
+
+    const message = await screen.findByText(PT_BR_DATA_VIEWS_COPY.filters.dayInvalid);
+    expect(message.textContent).toBe("Essa data não existe.");
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("range-max")).toHaveAttribute("aria-invalid", "false");
+  });
+});
+
+describe("DayBoundInput: a cleared bound clears a refused day too", () => {
+  it("drops an impossible day and its mark when the applied bound is cleared from outside", async () => {
+    const onChange = vi.fn();
+    const props = { mask: "dd/mm/aaaa", label: "De", onChange, testId: "day", invalidMessage: INVALID };
+    const { rerender } = render(<DayBoundInput {...props} value="2026-08-06" />);
+    const input = screen.getByTestId("day") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "31022026" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+
+    // "Limpar" on the pill, or "Limpar todos os filtros": the bound goes away.
+    rerender(<DayBoundInput {...props} value={undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId("day")).toHaveValue(""));
+    expect(screen.getByTestId("day")).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+  });
+
+  it("still keeps a real day the field itself just applied", async () => {
+    const onChange = vi.fn();
+    const props = { mask: "dd/mm/aaaa", label: "De", onChange, testId: "day", invalidMessage: INVALID };
+    const { rerender } = render(<DayBoundInput {...props} value={undefined} />);
+    fireEvent.change(screen.getByTestId("day"), { target: { value: "06082026" } });
+    rerender(<DayBoundInput {...props} value="2026-08-06" />);
+
+    await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
+  });
+});
+
+/**
+ * A clear moves no bound that was already open, so the field's own re-sync
+ * cannot see it: the surfaces that clear remount the fields instead, or a red
+ * `31/02/2026` the filter never applied outlives "Limpar" (FUT-4144).
+ */
+type Row = Record<string, unknown>;
+const DAY_FIELD = { id: "created", label: "Data", kind: "day" as const, accessor: () => null };
+
+function panelProps(onClearAll: () => void): GridFilterPanelProps<Row> {
+  return {
+    testIdPrefix: "grid",
+    search: "",
+    fields: [],
+    rangeFields: [DAY_FIELD],
+    pills: {},
+    ranges: {},
+    onSearchChange: vi.fn(),
+    onTogglePill: vi.fn(),
+    onChangeRange: vi.fn(),
+    onClearField: vi.fn(),
+    onClearAll,
+  };
+}
+
+async function refuseInMin(prefix: string): Promise<HTMLInputElement> {
+  const min = screen.getByTestId(`${prefix}-min`) as HTMLInputElement;
+  fireEvent.change(min, { target: { value: "31022026" } });
+  fireEvent.blur(min);
+  await waitFor(() => expect(min).toHaveAttribute("aria-invalid", "true"));
+  return min;
+}
+
+describe("The filter panel and dialog remount their controls when clearKey moves", () => {
+  // The key itself is the controller's (`useClearFilters`, bumped by every
+  // clear-all surface); `clear-filters.test.tsx` drives the real grid.
+  it("empties a refused day in the slide-in panel", async () => {
+    const onClearAll = vi.fn();
+    const ui = (clearKey: number) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open onOpenChange={vi.fn()}>
+          <GridFilterPanel {...panelProps(onClearAll)} clearKey={clearKey} />
+        </TableFilter>
+      </DataViewsCopyProvider>
+    );
+    const { rerender } = render(ui(0));
+    await refuseInMin("grid-range-created");
+
+    fireEvent.click(screen.getByTestId("grid-clear-filters"));
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+    rerender(ui(1));
+
+    await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
+    expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() => expect(screen.queryByText(PT_BR_DATA_VIEWS_COPY.filters.dayInvalid)).toBeNull());
+  });
+
+  it("empties a refused day in the narrow-screen filter dialog", async () => {
+    const onClearAll = vi.fn();
+    const ui = (clearKey: number) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open={false} onOpenChange={vi.fn()}>
+          <FilterDialog open onClose={vi.fn()} {...panelProps(onClearAll)} clearKey={clearKey} />
+        </TableFilter>
+      </DataViewsCopyProvider>
+    );
+    const { rerender } = render(ui(0));
+    await refuseInMin("grid-range-created");
+
+    fireEvent.click(screen.getByTestId("grid-clear-filters"));
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+    rerender(ui(1));
+
+    await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
+    expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
+  });
+});
+
+describe("RangeBounds: a clear from outside empties the bound it did not move", () => {
+  function renderBounds(value: RangeValue, onChange = vi.fn()) {
+    const ui = (range: RangeValue) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <RangeBounds field={DAY_FIELD} value={range} onChange={onChange} testId="range" />
+      </DataViewsCopyProvider>
+    );
+    const view = render(ui(value));
+    return { onChange, rerender: (range: RangeValue) => view.rerender(ui(range)) };
+  }
+
+  it("drops a refused Ate when the pill's Limpar clears an applied De", async () => {
+    const { rerender } = renderBounds({ min: "2026-08-06" });
+    const max = screen.getByTestId("range-max") as HTMLInputElement;
+    fireEvent.change(max, { target: { value: "31022026" } });
+    fireEvent.blur(max);
+    await waitFor(() => expect(max).toHaveAttribute("aria-invalid", "true"));
+
+    rerender({});
+
+    await waitFor(() => expect(screen.getByTestId("range-max")).toHaveValue(""));
+    expect(screen.getByTestId("range-max")).toHaveAttribute("aria-invalid", "false");
+    expect(screen.getByTestId("range-min")).toHaveValue("");
+  });
+
+  it("does not remount a field for its own write, so typing keeps its place", async () => {
+    const { onChange, rerender } = renderBounds({});
+    const typedInto = screen.getByTestId("range-min");
+    fireEvent.change(typedInto, { target: { value: "06082026" } });
+    expect(onChange).toHaveBeenCalledWith({ min: "2026-08-06" });
+
+    rerender({ min: "2026-08-06" });
+
+    // The SAME element: a remount would have replaced it, and the caret with it.
+    await waitFor(() => expect(screen.getByTestId("range-min")).toHaveValue("06/08/2026"));
+    expect(screen.getByTestId("range-min")).toBe(typedInto);
   });
 });

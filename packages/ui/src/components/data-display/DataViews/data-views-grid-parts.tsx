@@ -85,6 +85,8 @@ interface FilterSurfaceProps<T extends Record<string, unknown>> {
   onChangeRange: (fieldId: string, range: RangeValue) => void;
   onClearField: (fieldId: string) => void;
   onClearAll: () => void;
+  /** Changes on every clear-all; the panel's controls are keyed on it. */
+  clearKey: number;
   /** Press a quick chip (its field becomes `[value]`), or release the pressed one. */
   onToggleQuick: (quick: QuickFilterConfig) => void;
 }
@@ -175,7 +177,7 @@ function useGridShellFilters<T extends Record<string, unknown>>({
       c.patch(({ pills }) => ({ pills: { ...pills, [fieldId]: togglePillValues(pills[fieldId], value, checked) } })),
     onChangeRange: (fieldId, range) => c.patch({ ranges: { ...c.ranges, [fieldId]: range } }),
     onClearField: (fieldId) => c.patch({ pills: { ...state.pills, [fieldId]: [] } }),
-    onClearAll: () => c.patch({ search: "", pills: {}, ranges: {} }),
+    onClearAll: c.clearFilters, clearKey: c.clearKey,
     onToggleQuick: (quick) => c.patch(({ pills }) => ({ pills: toggleQuick(pills, quick) })),
   };
   return {

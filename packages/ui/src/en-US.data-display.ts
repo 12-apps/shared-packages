@@ -219,6 +219,7 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     // rather than being carried over. A translated label above an unchanged
     // mask is the shape that gets a date entered backwards.
     dayMask: "mm/dd/yyyy",
+    dayInvalid: "That date does not exist.",
     clearAllFilters: "Clear all filters",
     // The KEYS are the package's own preset ids and stay as they are — the
     // surface matches on them. Only the labels beside them are words.

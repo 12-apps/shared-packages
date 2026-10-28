@@ -34,6 +34,11 @@ export interface CepFieldProps {
   size?: InputSize;
   /** `above` (default) stacks the label over the box; `inside` floats it in the box like `Input`. */
   labelPlacement?: 'above' | 'inside';
+  /**
+   * The `<input>`'s `autocomplete`. Defaults to `postal-code`; pass `off` when
+   * the form holds somebody else's address (FUT-4140).
+   */
+  autoComplete?: string;
 }
 
 const PARTS: readonly CepPart[] = ['street', 'neighborhood', 'city', 'state'];
@@ -114,6 +119,7 @@ export function CepField({
   copy,
   size,
   labelPlacement,
+  autoComplete,
 }: CepFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   const { write, clearOwned } = useOwnedAutofill();
@@ -151,6 +157,7 @@ export function CepField({
       debounceMs={debounceMs}
       size={size}
       labelPlacement={labelPlacement}
+      autoComplete={autoComplete}
       dataTestId={`total-form-field-${name}`}
     />
   );
