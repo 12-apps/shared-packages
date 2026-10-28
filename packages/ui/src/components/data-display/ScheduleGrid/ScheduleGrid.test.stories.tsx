@@ -396,3 +396,160 @@ async function keyboardWalksLeft(canvasElement: HTMLElement): Promise<void> {
 
 export const KeyboardClearsTheNames704: Story = { args: tabletArgs, decorators: pane(704), play: async ({ canvasElement }) => keyboardWalksLeft(canvasElement) };
 export const KeyboardClearsTheNames836: Story = { args: tabletArgs, decorators: pane(836), play: async ({ canvasElement }) => keyboardWalksLeft(canvasElement) };
+
+/** Scrolls `element` sideways by a write and resolves once its scroll event has been handled. */
+const scrollTo = async (element: HTMLElement, left: number): Promise<void> => {
+  const arrived = new Promise((resolve) => element.addEventListener('scroll', resolve, { once: true }));
+  element.scrollLeft = left;
+  await arrived;
+};
+
+/** A press on a day half under the pinned names lands where it was aimed: no scroll mid-press. */
+export const PressOnHalfHiddenDayKeepsTheScroll: Story = {
+  args: { ...tabletArgs, onCreate: fn() },
+  decorators: pane(704),
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = canvas.getByTestId('sg-scroll');
+    await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+    // The earliest empty day past the first: far enough to scroll under the names, near enough to reach.
+    const target = [...canvasElement.querySelectorAll<HTMLElement>('button[data-sg-focus][aria-label^="Agendar"]')]
+      .filter((button) => Number(button.dataset.sgDay) >= 1)
+      .sort((a, b) => Number(a.dataset.sgDay) - Number(b.dataset.sgDay))[0];
+    if (!target) throw new Error('no empty day to press');
+    const names = target.closest('[role="row"]')?.querySelector('[role="rowheader"]');
+    if (!names) throw new Error('no names');
+    // Leave only 20px of the day out from under the names.
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await scrollTo(body, body.scrollLeft + target.getBoundingClientRect().left + 20 - names.getBoundingClientRect().right);
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    const before = body.scrollLeft;
+    await waitFor(() => expect(names.getBoundingClientRect().right - target.getBoundingClientRect().left).toBeGreaterThan(0));
+    await userEvent.click(target);
+    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith(target.dataset.sgRow, [Number(target.dataset.sgDay)]));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(body.scrollLeft).toBe(before));
+  },
+};
+
+/** The header and the days stay in step when their sideways reach differs (a host's vertical scrollbar on one of them). */
+export const MismatchedReachStaysInStep: Story = {
+  args: tabletArgs,
+  decorators: pane(736),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = canvas.getByTestId('sg-scroll');
+    const head = canvas.getByTestId('sg-head');
+    await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+    head.style.boxSizing = 'border-box';
+    head.style.borderRight = '15px solid transparent';
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(head.scrollWidth - head.clientWidth).toBeGreaterThan(body.scrollWidth - body.clientWidth));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    body.scrollLeft = body.scrollWidth;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(head.scrollLeft).toBe(body.scrollLeft));
+    // The header reaches further than the days can follow: the write to the days clamps, no event.
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await scrollTo(head, head.scrollWidth);
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    body.scrollLeft = 200;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(head.scrollLeft).toBe(200));
+  },
+};
+
+/** U1: today's header label as the admin writes it. */
+const TODAY_COLUMNS = COLUMNS.map((column, day) => (day === 0 ? { ...column, label: 'Hoje · Seg 19/10' } : column));
+
+/** U1: at the admin's real widths every note and every day header is whole: a long one wraps. */
+async function nothingCut(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  await waitFor(() => expect(canvas.getAllByRole('columnheader').length).toBeGreaterThan(0));
+  const lines = [...canvasElement.querySelectorAll<HTMLElement>('[data-sg-line="note"], [data-sg-col="full"]')];
+  await waitFor(() => expect(lines.length).toBeGreaterThan(7));
+  for (const line of lines) {
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the layout at the pane's pinned width
+    await waitFor(() => expect({ text: line.textContent, cut: line.scrollWidth > line.clientWidth + 0.5 }).toEqual({ text: line.textContent, cut: false }));
+  }
+  const hours = [...canvasElement.querySelectorAll<HTMLElement>('[data-sg-line="label"]')];
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the layout at the pane's pinned width
+  for (const line of hours) await waitFor(() => expect(line.getClientRects().length).toBe(1));
+}
+const u1Args = { ...tabletArgs, columns: TODAY_COLUMNS };
+export const NothingCutAt923: Story = { args: u1Args, decorators: laptop(923), play: async ({ canvasElement }) => nothingCut(canvasElement) };
+export const NothingCutAt940: Story = { args: u1Args, decorators: laptop(940), play: async ({ canvasElement }) => nothingCut(canvasElement) };
+export const NothingCutAt1216: Story = { args: u1Args, decorators: laptop(1216), play: async ({ canvasElement }) => nothingCut(canvasElement) };
+
+/** U2: the header only follows; it is no scroller (so no tab stop), and a sideways wheel over it scrolls the days. */
+export const HeaderIsNoScrollerOfItsOwn: Story = {
+  args: tabletArgs,
+  decorators: pane(704),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = canvas.getByTestId('sg-scroll');
+    const head = canvas.getByTestId('sg-head');
+    await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+    await expect(getComputedStyle(head).overflowX).toBe('hidden');
+    fireEvent.wheel(head, { deltaX: 120 });
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(body.scrollLeft).toBe(120));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(head.scrollLeft).toBe(120));
+  },
+};
+
+/** U3: walking right, each day the keyboard reaches is whole inside the days, its ring too. */
+async function keyboardWalksRight(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  const first = canvasElement.querySelector<HTMLElement>('[data-sg-focus][data-sg-row="bia"][data-sg-day="1"]');
+  if (!first) throw new Error('no day 1');
+  await userEvent.click(first);
+  await waitFor(() => expect(first).toHaveFocus());
+  for (let day = 2; day <= 6; day += 1) {
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect((canvasElement.ownerDocument.activeElement as HTMLElement).dataset.sgDay).toBe(String(day)));
+    const focused = canvasElement.ownerDocument.activeElement as HTMLElement;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    const edge = (): number => body.getBoundingClientRect().left + body.clientWidth;
+    const style = getComputedStyle(focused);
+    const ring = Number.parseFloat(style.outlineWidth) + Math.max(0, Number.parseFloat(style.outlineOffset));
+    await waitFor(() => expect(ring).toBeGreaterThan(0));
+    await waitFor(() => expect(focused.getBoundingClientRect().right + ring).toBeLessThanOrEqual(edge() + 0.5));
+  }
+}
+export const KeyboardReachesTheRightEdge704: Story = { args: tabletArgs, decorators: pane(704), play: async ({ canvasElement }) => keyboardWalksRight(canvasElement) };
+export const KeyboardReachesTheRightEdge836: Story = { args: tabletArgs, decorators: pane(836), play: async ({ canvasElement }) => keyboardWalksRight(canvasElement) };
+
+/** U4: six people, so a row can sit under the sticky header while the page scrolls. */
+const SIX = ['Ana Lima', 'Bia Souza', 'Carla Mendes', 'Diego Reis', 'Eva Prado', 'Fábio Dias'];
+const sixArgs = {
+  groups: [{ title: 'Entregas', rows: SIX.map((label) => ({ id: label.split(' ')[0].toLowerCase(), label, total: '—' })) }],
+  cell: (): ScheduleGridCell => ({ blocks: [] }),
+};
+
+/** U4: ArrowUp into a row the sticky header covers brings it out below the header. */
+async function keyboardClearsTheHeader(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const head = canvas.getByTestId('sg-head');
+  const start = canvasElement.querySelector<HTMLElement>('[data-sg-focus][data-sg-row="diego"][data-sg-day="1"]');
+  if (!start) throw new Error('no diego');
+  await userEvent.click(start);
+  await waitFor(() => expect(start).toHaveFocus());
+  // Diego just below the header, Carla's row under it.
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the page scrolling under a sticky header
+  window.scrollBy(0, start.getBoundingClientRect().top - head.getBoundingClientRect().height - 8);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the page scrolling under a sticky header
+  await waitFor(() => expect(head.getBoundingClientRect().top).toBe(0));
+  await userEvent.keyboard('{ArrowUp}');
+  await waitFor(() => expect((canvasElement.ownerDocument.activeElement as HTMLElement).dataset.sgRow).toBe('carla'));
+  const focused = canvasElement.ownerDocument.activeElement as HTMLElement;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the page scrolling under a sticky header
+  await waitFor(() => expect(focused.getBoundingClientRect().top).toBeGreaterThanOrEqual(head.getBoundingClientRect().bottom - 0.5));
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the page scrolling under a sticky header
+  window.scrollTo(0, 0);
+}
+export const KeyboardClearsTheStickyHeader704: Story = { args: sixArgs, decorators: laptop(704), play: async ({ canvasElement }) => keyboardClearsTheHeader(canvasElement) };
+export const KeyboardClearsTheStickyHeader1216: Story = { args: sixArgs, decorators: laptop(1216), play: async ({ canvasElement }) => keyboardClearsTheHeader(canvasElement) };

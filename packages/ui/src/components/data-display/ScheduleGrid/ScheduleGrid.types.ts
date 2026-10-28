@@ -70,7 +70,7 @@ export interface ScheduleGridBlock {
   id: string;
   /** The first line ("17:00–23:00", "Em turno"). One line, ellipsis. */
   label: string;
-  /** The second line ("↻ toda semana", "Atrasado"). One line, ellipsis. */
+  /** The second line ("↻ toda semana", "Atrasado"). Wraps when long; never cut. */
   note?: string;
   tone: ScheduleBlockTone;
   /** Its middle can be dragged to another cell (and Alt+←/→ moves it a day). */

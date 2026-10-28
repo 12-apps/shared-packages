@@ -40,7 +40,7 @@ export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
         {categories.map((category, index) => (
           <Box component="li" key={`${index}-${category.label}`} sx={overviewRowSx}>
             <Box sx={categoryTextSx}>
-              <Typography component="span" variant="body2" fontWeight={500}>
+              <Typography component="span" variant="body2" sx={{ fontWeight: 500 }}>
                 {category.label}
               </Typography>
               {category.description ? (

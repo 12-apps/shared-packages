@@ -11,19 +11,28 @@ import { frameSx, headerSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './Sc
 import type { ScheduleGridProps } from './ScheduleGrid.types';
 import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
+import { useSidewaysScroll } from './useSidewaysScroll';
 
 /**
  * After a keyboard move the host re-renders the block in its new cell (a new
- * element): focus follows it there. A host that refused keeps it where it was;
- * the next key or pointer press forgets the wait.
+ * element): focus follows it there. After a keyboard create (Enter or Space on
+ * an empty day's "+") the "+" gives way to the host's new block: focus moves
+ * to it. A host that refused keeps focus where it was; the next key or pointer
+ * press forgets the wait.
  */
+type FollowTarget = { kind: 'move'; id: string; day: number } | { kind: 'create'; row: string; day: number };
+
 function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
-  const pending = useRef<{ id: string; day: number } | null>(null);
+  const pending = useRef<FollowTarget | null>(null);
   useEffect(() => {
     const follow = pending.current;
     if (!follow || !rootRef.current) return;
-    const block = focusables(rootRef.current).find(
-      (el) => el.dataset.sgBlock === follow.id && Number(el.dataset.sgDay) === follow.day,
+    const block = focusables(rootRef.current).find((el) =>
+      Number(el.dataset.sgDay) !== follow.day || el.dataset.sgBlock === undefined
+        ? false
+        : follow.kind === 'move'
+          ? el.dataset.sgBlock === follow.id
+          : el.dataset.sgRow === follow.row,
     );
     if (!block) return;
     block.focus();
@@ -31,7 +40,15 @@ function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
   });
   return {
     follow: (id: string, day: number): void => {
-      pending.current = { id, day };
+      pending.current = { kind: 'move', id, day };
+    },
+    /** A key that presses an empty day's "+" (its click creates there). */
+    followCreate: (event: React.KeyboardEvent): void => {
+      const plus = event.target;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (!(plus instanceof HTMLElement) || plus.dataset.sgBlock !== undefined || plus.dataset.sgRow === undefined) return;
+      if (!plus.matches('button[data-sg-focus]')) return;
+      pending.current = { kind: 'create', row: plus.dataset.sgRow, day: Number(plus.dataset.sgDay) };
     },
     forget: (): void => {
       pending.current = null;
@@ -70,38 +87,13 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
 
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  // The header row and the days keep one sideways scroll, so each day's header stays over its column.
-  // The scroll this sets echoes back as an event on the other side; that echo is skipped, so it
-  // never fights a scroll still running (a trackpad's momentum).
-  const echo = useRef<HTMLElement | null>(null);
-  // While the days scroll, a cell the keyboard (or a script) focuses is brought out from under
-  // the pinned names: the browser counts a cell under a sticky column as already in view.
-  const clearTheNames = (event: React.FocusEvent<HTMLElement>): void => {
-    const body = bodyRef.current;
-    const target = event.target;
-    if (!body || !(target instanceof HTMLElement) || target.closest('[role="rowheader"]')) return;
-    const row = target.closest('[role="row"]');
-    const names = row?.querySelector('[role="rowheader"]');
-    if (!row || !names) return;
-    const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
-    const hidden = names.getBoundingClientRect().right + gap - target.getBoundingClientRect().left;
-    if (hidden > 0) body.scrollLeft -= hidden;
-  };
-  const followSideways = (event: React.UIEvent<HTMLElement>): void => {
-    const from = event.currentTarget;
-    if (echo.current === from) {
-      echo.current = null;
-      return;
-    }
-    const other = from === bodyRef.current ? headRef.current : bodyRef.current;
-    if (!other || other.scrollLeft === from.scrollLeft) return;
-    echo.current = other;
-    other.scrollLeft = from.scrollLeft;
-  };
+  const sideways = useSidewaysScroll(headRef, bodyRef);
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
+    sideways.release();
     focus.forget();
     if (!rootRef.current) return;
+    if (can.create) focus.followCreate(event);
     handleGridKey(event, { root: rootRef.current, rows, columns, cell, can, onCopy, onMove, labels, say, follow: focus.follow });
   };
 
@@ -118,10 +110,15 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         onPointerDownCapture={focus.forget}
       >
         {/* The header row sits outside the sideways scroller, so it sticks to the page; it follows the days sideways. */}
-        <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onScroll={followSideways}>
+        <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onWheel={sideways.forwardWheel}>
           <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} rowSx={rowSx} testId={testId} />
         </Box>
-        <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={followSideways} onFocus={clearTheNames}>
+        <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={sideways.follow}
+          onFocus={sideways.bringOut}
+          onPointerDownCapture={sideways.press}
+          onPointerUpCapture={sideways.release}
+          onPointerCancelCapture={sideways.release}
+        >
           <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
         </Box>
       </Box>

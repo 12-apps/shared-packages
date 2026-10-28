@@ -73,14 +73,9 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
           overscrollBehaviorX: 'contain',
           scrollPaddingInlineStart: `calc(var(--sg-name) + ${rem(theme, M.gap)})`,
         },
-        // The header row scrolls with the days (kept in step both ways), its own scrollbar hidden.
-        '& > [data-sg-head]': {
-          overflowX: 'auto',
-          overscrollBehaviorX: 'contain',
-          scrollPaddingInlineStart: `calc(var(--sg-name) + ${rem(theme, M.gap)})`,
-          scrollbarWidth: 'none',
-          '&::-webkit-scrollbar': { display: 'none' },
-        },
+        // The header row follows the days sideways (the grid sets its scroll). It is no scroller of
+        // its own: a scroller with nothing focusable inside is a tab stop of its own.
+        '& > [data-sg-head]': { overflowX: 'hidden' },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {
@@ -153,7 +148,8 @@ export function headerCellSx(today: boolean): SxProps<Theme> {
     color: today ? 'primary.main' : 'text.primary',
     p: 0.5,
     minWidth: 0,
-    '& > *': { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    // A long label ("Hoje · Seg 19/10") wraps to a second line, as the prototype's: never cut.
+    '& > *': { display: 'block', overflowWrap: 'anywhere' },
   };
 }
 
@@ -325,8 +321,11 @@ export function blockSx(tone: ScheduleBlockTone, opts: { selected: boolean; mova
     margin: 0,
     boxShadow: opts.selected ? `0 0 0 ${rem(theme, M.ring)} ${theme.palette.primary.main}` : 'none',
     '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, M.ringOffset) },
-    '& > [data-sg-line]': { position: 'relative', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-    '& > [data-sg-line="note"]': { fontWeight: 400 },
+    // The hours stay on one line; the note wraps (the block grows), as the prototype's
+    // "↻ a cada 2 / semanas": a note is never cut, so a break keeps its end.
+    '& > [data-sg-line]': { position: 'relative', display: 'block' },
+    '& > [data-sg-line="label"]': { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '& > [data-sg-line="note"]': { fontWeight: 400, overflowWrap: 'anywhere' },
   });
 }
 

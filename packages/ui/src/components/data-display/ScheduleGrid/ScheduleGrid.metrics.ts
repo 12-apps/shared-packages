@@ -14,7 +14,8 @@ export const SCHEDULE_GRID_METRICS = {
    * The narrowest a day column gets, per layout (see `layoutsOf` in the
    * styles, which derives each layout's minimum container from these):
    * - `wide`: with its edge grips, the hours whole ("20:39–00:00" is 67px);
-   *   a long note ellipsizes, whole in `title`, as the prototype's 1280 frame;
+   *   a long note wraps to a second line (the block grows), as the
+   *   prototype's `.wb .note` does ("↻ a cada 2 / semanas");
    * - `compact`: the same, the block's text 9px off each edge
    *   (`blockPadding.tight`), clear of the grips' bars;
    * - `scrolled`: the days scroll sideways under the pinned names, grips kept,
