@@ -15,6 +15,25 @@ const StyledOTPInput = styled(TextField, {
     !['customColor', 'customSize', 'glass', 'gradient'].includes(prop as string),
 })<OtpSlotFlags>(({ theme, ...flags }) => ({ ...otpSlotSx(theme, flags) }));
 
+/**
+ * What tells a phone that a `numeric` code is digits (FUT-4144).
+ *
+ * The hook already refused letters, but nothing reached the `<input>` to say
+ * so, and the courier's six-digit join code opened the letter keyboard.
+ * `inputMode` picks the keypad; `pattern` is what iOS reads for the same; and
+ * `one-time-code` on the FIRST slot lets the phone offer a code from an SMS —
+ * the first slot, because it is the one that takes a paste and spreads it.
+ * `alphanumeric` and `masked` are left exactly as they were.
+ */
+function keypadProps(variant: InputOTPProps['variant'], index: number): Record<string, string> {
+  if (variant !== 'numeric') return {};
+  return {
+    inputMode: 'numeric',
+    pattern: '[0-9]*',
+    ...(index === 0 ? { autoComplete: 'one-time-code' } : {}),
+  };
+}
+
 const DEFAULTS = {
   variant: 'numeric',
   color: 'primary',
@@ -49,6 +68,9 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
     <Box
       ref={ref}
       data-testid={dataTestId}
+      // A group, so the `aria-label` a caller gives the code names the six
+      // slots together: on a plain `div` it named nothing anyone could reach.
+      role="group"
       sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}
       {...rest}
     >
@@ -75,6 +97,7 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
             maxLength: 1,
             style: { textAlign: 'center' },
             'data-testid': dataTestId ? `${dataTestId}-slot-${index}` : undefined,
+            ...keypadProps(variant, index),
           }}
         />
       ))}
