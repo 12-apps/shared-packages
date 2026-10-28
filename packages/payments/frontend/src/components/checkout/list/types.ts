@@ -216,6 +216,9 @@ export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSumma
    * than flash. Leave it OUT (undefined) on a phone, or to keep the list's own
    * layout — the step and the column side by side once the flow's frame is
    * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
+   * On a phone the bar's line opens the same summary as a sheet (FUT-589); a
+   * host whose `cart.discountLines` carry a control reads `useInSummarySheet()`
+   * to leave it out there, as it does inside its own column.
    */
   summaryTarget?: HTMLElement | null;
 }
