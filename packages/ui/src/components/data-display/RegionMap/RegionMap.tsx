@@ -8,12 +8,15 @@ import { RegionMapDrawing } from './RegionMapDrawing';
 import { RegionMapLegend } from './RegionMapLegend';
 import { RegionMapList } from './RegionMapList';
 
+/** One empty list, so the default does not change identity per render. */
+const NO_IDS: readonly string[] = [];
+
 /**
  * A hand-drawn map of named areas around a centre; a tap toggles an area.
  *
  * Drawn as inline SVG over a plain background — no tile server, no API key,
  * nothing fetched — because the question it answers is "which of THESE areas",
- * not "what is the street called". Three choices shape it:
+ * not "what is the street called". Four choices shape it:
  *
  * - **The list is the accessible way in.** The drawing is one `role="img"`
  *   with a name; its areas are not tab stops (dozens of them, many too small to
@@ -22,18 +25,22 @@ import { RegionMapList } from './RegionMapList';
  *   and what reaches a sliver no finger can.
  * - **Excluded is hatched AND named, never only coloured,** and never in the
  *   error colour: leaving an area out is a choice, not a failure.
- * - **The hit test is ours, not only the browser's.** A tap on a path is that
- *   path; a tap on a border line or beside a sliver takes the nearest area
- *   within a few pixels' worth of metres (`hitRegion`).
+ * - **The hit test is ours, not only the browser's.** A mouse click on a path
+ *   is that path. A finger's tap takes the SMALLEST area within a few pixels'
+ *   worth of metres (`hitRegion`), so a sliver beside a big area can be hit
+ *   from the map; one too thin even for that is still on the list.
+ * - **A toggle is cheap.** Geometry is projected once per `rings` identity,
+ *   and the base layer is memoised, so a tap re-renders the hatch and labels.
  */
 export function RegionMap({
   regions,
   center,
   circles,
   onToggle,
-  highlightedId = null,
+  highlightedIds = NO_IDS,
   copy,
   listMode = 'collapsed',
+  listSort = 'given',
   maxHeight,
   className,
   dataTestId = 'region-map',
@@ -49,7 +56,7 @@ export function RegionMap({
           <RegionMapDrawing
             model={{ ...model, view }}
             showCenter={center !== null}
-            highlightedId={highlightedId}
+            highlightedIds={highlightedIds}
             maxHeight={maxHeight}
             label={copy.mapLabel}
             tappable={onToggle !== undefined}
@@ -70,6 +77,7 @@ export function RegionMap({
           regions={regions}
           copy={copy}
           mode={listMode}
+          sort={listSort}
           onToggle={onToggle}
           testId={dataTestId}
           theme={theme}

@@ -29,10 +29,19 @@ export interface RegionMapRegion {
   excluded?: boolean;
   /**
    * Drawn faded, for an area shown for context beyond the circles (a ring may
-   * grow). Still tappable.
+   * grow). Still tappable on the map; left off the list unless `listed`.
    */
   outside?: boolean;
-  /** Pre-formatted secondary text on the list row, e.g. "2.7 km away". */
+  /**
+   * Whether the area has a row in the list. Defaults to `!outside`, so the
+   * list — and its count — covers the areas inside the circles while the map
+   * still draws the faded context around them.
+   */
+  listed?: boolean;
+  /**
+   * Pre-formatted secondary text on the list row, e.g. "2.7 km away", or a
+   * size tag such as "tiny" for an area too small to tap.
+   */
   detail?: string;
 }
 
@@ -57,7 +66,16 @@ export interface RegionMapCopy {
   showList: (count: number) => string;
   /** The button that hides it again. */
   hideList: string;
+  /**
+   * A list row's state, read after its name by a screen reader: "excluded"
+   * for an excluded area (pressed, filled, checked), "outside" for a listed
+   * `outside` one (faded). Neither is shown; the row's look carries it.
+   */
+  rowState: { excluded: string; outside: string };
 }
+
+/** The order of the list: as given (e.g. nearest first), or by name. */
+export type RegionMapListSort = 'given' | 'name';
 
 /**
  * How the accessible list of areas — one toggle button each — is offered.
@@ -82,10 +100,15 @@ export interface RegionMapProps {
    * read-only: nothing is tappable and the list rows are not buttons.
    */
   onToggle?: (id: string) => void;
-  /** An area to point at — e.g. a search result — outlined and labelled. */
-  highlightedId?: string | null;
+  /**
+   * Areas to point at — e.g. a search's results — outlined and labelled. More
+   * than one at once: a search lists several hits.
+   */
+  highlightedIds?: readonly string[];
   copy: RegionMapCopy;
   listMode?: RegionMapListMode;
+  /** The list's order; `'given'` keeps the order of `regions`. */
+  listSort?: RegionMapListSort;
   /** The drawing's largest height, any CSS length; it stays square inside it. */
   maxHeight?: string;
   className?: string;

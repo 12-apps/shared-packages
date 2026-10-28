@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decodePolyline,
+  extent,
+  planeBounds,
   hitRegion,
   labelPosition,
   planeArea,
@@ -37,10 +39,16 @@ describe('a point inside rings', () => {
   });
 });
 
+/** A hit-test area from its rings, as the component builds it. */
+const area = (id: string, rings: PlanePoint[][]) => ({
+  id,
+  geometry: { rings, bounds: planeBounds(rings), area: planeArea(rings), path: '' },
+});
+
 describe('which area a tap means', () => {
-  const big = { id: 'big', rings: [square(0, 0, 100), square(40, 40, 20)], area: 10_000 };
-  const inHole = { id: 'hole', rings: [square(40, 40, 20)], area: 400 };
-  const sliver = { id: 'sliver', rings: [square(200, 0, 1)], area: 1 };
+  const big = area('big', [square(0, 0, 100), square(40, 40, 20)]);
+  const inHole = area('hole', [square(40, 40, 20)]);
+  const sliver = area('sliver', [square(200, 0, 1)]);
 
   it('is the area holding the point', () => {
     expect(hitRegion([big, inHole, sliver], { x: 10, y: 10 }, 5)).toBe('big');
@@ -51,12 +59,19 @@ describe('which area a tap means', () => {
   });
 
   it('is the smallest when two hold the point', () => {
-    const overlapping = { id: 'small', rings: [square(0, 0, 30)], area: 900 };
+    const overlapping = area('small', [square(0, 0, 30)]);
     expect(hitRegion([big, overlapping], { x: 10, y: 10 }, 5)).toBe('small');
   });
 
   it('reaches a sliver from a tap beside it, within the tolerance', () => {
     expect(hitRegion([big, inHole, sliver], { x: 203, y: 0.5 }, 5)).toBe('sliver');
+  });
+
+  it('is the sliver for a finger on the big area right beside it', () => {
+    const wide = area('wide', [square(100, 0, 100)]);
+    expect(hitRegion([wide, sliver], { x: 197, y: 0.5 }, 5)).toBe('sliver');
+    // Further in, the big area again.
+    expect(hitRegion([wide, sliver], { x: 150, y: 0.5 }, 5)).toBe('wide');
   });
 
   it('is nothing on empty map beyond the tolerance', () => {
@@ -89,11 +104,19 @@ describe('the view', () => {
   it('puts a label at the centroid, pulled back inside the view', () => {
     const view = { minX: 0, minY: 0, spanX: 1000, spanY: 1000 };
     expect(labelPosition([square(400, 400, 200)], view)).toEqual({ fractionX: 0.5, fractionY: 0.5 });
-    expect(labelPosition([square(-500, 400, 200)], view)).toEqual({ fractionX: 0.15, fractionY: 0.5 });
+    expect(labelPosition([square(-500, 400, 200)], view)).toEqual({ fractionX: 0.04, fractionY: 0.5 });
   });
 
   it('orders by the largest ring', () => {
     expect(planeArea([square(0, 0, 10), square(2, 2, 2)])).toBe(100);
+  });
+});
+
+describe('extent', () => {
+  it('reads a long list without spreading it into arguments', () => {
+    const many = Array.from({ length: 200_000 }, (_, i) => i - 7);
+    expect(extent(many)).toEqual({ min: -7, max: 199_992 });
+    expect(extent([])).toBeNull();
   });
 });
 

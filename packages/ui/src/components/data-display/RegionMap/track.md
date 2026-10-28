@@ -1,7 +1,7 @@
 # RegionMap
 
 A hand-drawn map of named areas around a centre; a tap toggles an area.
-Product-free — built for Future Pay's excluded bairros (FUT-2729), named for
+Product-free — built for a delivery host's excluded neighbourhoods, named for
 what it draws.
 
 ## Status

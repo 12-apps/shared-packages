@@ -56,15 +56,24 @@ export function regionPath(rings: readonly (readonly PlanePoint[])[]): string {
   return rings.map(ringPath).join('');
 }
 
+/** The smallest and largest of some numbers, in one pass (no spread). */
+export function extent(values: Iterable<number>): { min: number; max: number } | null {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const value of values) {
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return min === Infinity ? null : { min, max };
+}
+
 /** The box around projected rings. */
 export function planeBounds(rings: readonly (readonly PlanePoint[])[]): PlaneBox | null {
   const points = rings.flat();
-  if (points.length === 0) return null;
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  return { minX, minY, spanX: Math.max(...xs) - minX, spanY: Math.max(...ys) - minY };
+  const xs = extent(points.map((p) => p.x));
+  const ys = extent(points.map((p) => p.y));
+  if (xs === null || ys === null) return null;
+  return { minX: xs.min, minY: ys.min, spanX: xs.max - xs.min, spanY: ys.max - ys.min };
 }
 
 /**
@@ -136,42 +145,75 @@ function ringDistance(ring: readonly PlanePoint[], point: PlanePoint): number {
 /** The point's distance to the rings: 0 inside, else to the nearest edge. */
 export function ringsDistance(rings: readonly (readonly PlanePoint[])[], point: PlanePoint): number {
   if (ringsContain(rings, point)) return 0;
-  return Math.min(...rings.map((ring) => ringDistance(ring, point)));
+  let best = Infinity;
+  for (const ring of rings) best = Math.min(best, ringDistance(ring, point));
+  return best;
+}
+
+/** An area projected once: what drawing it and hit-testing it read. */
+export interface AreaGeometry {
+  rings: readonly (readonly PlanePoint[])[];
+  /** Null for an area with no points. */
+  bounds: PlaneBox | null;
+  /** Square metres of the largest ring — orders hits and draw order. */
+  area: number;
+  /** The SVG path, every ring, for `fill-rule="evenodd"`. */
+  path: string;
 }
 
 /** A projected area, as the hit test reads it. */
 export interface PlaneRegion {
   id: string;
-  rings: readonly (readonly PlanePoint[])[];
-  /** Square metres, for "the smallest area wins". */
-  area: number;
+  geometry: AreaGeometry;
+}
+
+/** Is the point within `margin` of the box? */
+function nearBox(box: PlaneBox, point: PlanePoint, margin: number): boolean {
+  return (
+    point.x >= box.minX - margin &&
+    point.x <= box.minX + box.spanX + margin &&
+    point.y >= box.minY - margin &&
+    point.y <= box.minY + box.spanY + margin
+  );
 }
 
 /**
- * Which area a tap at this point means.
+ * Which area a tap at this point means: the SMALLEST area within `tolerance`
+ * of it, the ones holding it included (distance 0).
  *
- * Every area holding the point is a candidate, and the SMALLEST wins: an area
- * that sits in another's hole is drawn on top and is what the finger is on.
- * When no area holds it — a tap on a border line, or beside a sliver too thin
- * to hit — the nearest area within `tolerance` metres is taken, so a sliver
- * can still be reached from the map. Beyond it, nothing: a tap on empty map is
- * not a guess.
+ * Smallest, because a fingertip is wider than a sliver: a tap that lands on a
+ * big area a few pixels from a 10 m strip almost always meant the strip, and
+ * the big one stays easy to hit everywhere else. An area in another's hole is
+ * smaller than the one around it, so it wins too. Nothing within the
+ * tolerance — empty map — is nothing: a tap there is not a guess. Areas whose
+ * box is not near the point are skipped before any ray is cast.
  */
 export function hitRegion(
   regions: readonly PlaneRegion[],
   point: PlanePoint,
   tolerance: number,
 ): string | null {
-  const holding = regions.filter((region) => ringsContain(region.rings, point));
-  if (holding.length > 0) return holding.reduce((a, b) => (b.area < a.area ? b : a)).id;
-  let best: { id: string; distance: number } | null = null;
-  for (const region of regions) {
-    const distance = ringsDistance(region.rings, point);
-    if (distance <= tolerance && (best === null || distance < best.distance)) {
-      best = { id: region.id, distance };
+  let best: { id: string; area: number; distance: number } | null = null;
+  for (const { id, geometry } of regions) {
+    const distance = reach(geometry, point, tolerance);
+    if (distance !== null && beats(geometry.area, distance, best)) {
+      best = { id, area: geometry.area, distance };
     }
   }
   return best?.id ?? null;
+}
+
+/** The point's distance to the area, or null when it is beyond the tolerance. */
+function reach(geometry: AreaGeometry, point: PlanePoint, tolerance: number): number | null {
+  if (geometry.bounds === null || !nearBox(geometry.bounds, point, tolerance)) return null;
+  const distance = ringsDistance(geometry.rings, point);
+  return distance <= tolerance ? distance : null;
+}
+
+/** Smaller wins; between two the same size, the nearer. */
+function beats(area: number, distance: number, best: { area: number; distance: number } | null): boolean {
+  if (best === null || area < best.area) return true;
+  return area === best.area && distance < best.distance;
 }
 
 /** Signed area and centroid of one ring (shoelace). */
@@ -199,7 +241,9 @@ function ringCentroid(ring: readonly PlanePoint[]): { area: number; x: number; y
  * first so a small one is never painted over by its neighbour.
  */
 export function planeArea(rings: readonly (readonly PlanePoint[])[]): number {
-  return Math.max(0, ...rings.map((ring) => Math.abs(ringCentroid(ring).area)));
+  let largest = 0;
+  for (const ring of rings) largest = Math.max(largest, Math.abs(ringCentroid(ring).area));
+  return largest;
 }
 
 /**
@@ -210,7 +254,7 @@ export function planeArea(rings: readonly (readonly PlanePoint[])[]): number {
 export function labelPosition(
   rings: readonly (readonly PlanePoint[])[],
   view: PlaneBox,
-  inset = 0.15,
+  inset = 0.04,
 ): { fractionX: number; fractionY: number } {
   const largest = rings
     .map(ringCentroid)
@@ -227,24 +271,42 @@ export function projectRings(rings: readonly RegionMapRing[], projection: Projec
   return rings.map((ring) => ring.map(projection.project));
 }
 
+/** One area's geometry, projected and pathed. */
+export function areaGeometry(rings: readonly RegionMapRing[], projection: Projection): AreaGeometry {
+  const plane = projectRings(rings, projection);
+  return { rings: plane, bounds: planeBounds(plane), area: planeArea(plane), path: regionPath(plane) };
+}
+
+/**
+ * A cache of geometry per `rings` IDENTITY, for one projection. A host that
+ * re-creates its region objects on every toggle (`{ ...area, excluded }`)
+ * keeps the same `rings` arrays, so a tap re-projects nothing.
+ */
+export function geometryCache(projection: Projection): (rings: readonly RegionMapRing[]) => AreaGeometry {
+  const cache = new WeakMap<readonly RegionMapRing[], AreaGeometry>();
+  return (rings) => {
+    let geometry = cache.get(rings);
+    if (geometry === undefined) {
+      geometry = areaGeometry(rings, projection);
+      cache.set(rings, geometry);
+    }
+    return geometry;
+  };
+}
+
+/** An area as the drawing reads it. */
+export type DrawnRegion = RegionMapRegion & { geometry: AreaGeometry };
+
 /** The areas worth drawing — any part in the view — largest first. */
 export function drawOrder(
   regions: readonly RegionMapRegion[],
-  projection: Projection,
+  geometryOf: (rings: readonly RegionMapRing[]) => AreaGeometry,
   view: PlaneBox,
-): (RegionMapRegion & { plane: PlaneRegion; path: string })[] {
+): DrawnRegion[] {
   return regions
-    .map((region) => {
-      const rings = projectRings(region.rings, projection);
-      return { region, rings, bounds: planeBounds(rings) };
-    })
-    .filter(({ bounds }) => bounds !== null && boxesOverlap(bounds, view))
-    .map(({ region, rings }) => ({
-      ...region,
-      plane: { id: region.id, rings, area: planeArea(rings) },
-      path: regionPath(rings),
-    }))
-    .sort((a, b) => b.plane.area - a.plane.area);
+    .map((region) => ({ ...region, geometry: geometryOf(region.rings) }))
+    .filter(({ geometry }) => geometry.bounds !== null && boxesOverlap(geometry.bounds, view))
+    .sort((a, b) => b.geometry.area - a.geometry.area);
 }
 
 /**

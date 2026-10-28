@@ -5,8 +5,8 @@ drawn as inline SVG — where a tap toggles an area's `excluded` state.
 
 Product-free. An area is a bairro, a delivery zone, a sales territory or a
 parking sector alike; coordinates are plain latitude/longitude, and every word
-arrives through `copy`. Built for "which bairros does this store not deliver
-to" (Future Pay, FUT-2729) and deliberately not named after it.
+arrives through `copy`. Built for a delivery host's "which neighbourhoods does this store not
+deliver to", and deliberately not named after it.
 
 ## Use cases
 
@@ -29,32 +29,51 @@ The drawing is ONE `role="img"` with `copy.mapLabel`; its areas are not tab
 stops. Real areas are many and some are far too small to tap on a phone (IBGE
 outlines 11 of the 48 bairros inside a 3 km ring in one Belo Horizonte
 neighbourhood at under 0.1 km²). Every area is also a toggle button in the list
-beneath (`aria-pressed`), which is what a keyboard and a screen reader use, and
-what reaches a sliver no finger can. `listMode` decides how it is offered:
+beneath (`aria-pressed`, plus its state in words from `copy.rowState`), which
+is what a keyboard and a screen reader use, and what reaches a sliver no finger
+can. `listMode` decides how it is offered:
 `shown` (a computer), `collapsed` behind one button that names the count (a
 phone), or `none` for a host that renders its own.
+
+The list holds only the areas in reach: an `outside` area is drawn faded on the
+map for context but has no row unless `listed: true`, and the count matches the
+rows. `listSort: 'name'` orders it by name; `detail` carries a distance or a
+size tag ("tiny") for an area too small to tap.
 
 ### Excluded is hatched AND named, never only coloured
 
 An excluded area gets a hatch, a darker edge and its name on the map, and a
-pressed, filled row with a check in the list. Colour is never the only signal,
+pressed, filled row with a check in the list, whose inverted colours hold under
+hover and keyboard focus, with a focus ring. Colour is never the only signal,
 and the error colour is never used: leaving an area out is a choice, not a
-failure. The highlighted area (`highlightedId`, e.g. a search result) uses the
-primary colour and is named too.
+failure. The highlighted areas (`highlightedIds`, e.g. a search's hits — several
+at once) use the primary colour and are named too.
 
 ### Our hit test, not only the browser's
 
-A tap on an area's path is that area: the browser hit-tests the even-odd fill,
-and areas are drawn largest first, so an area sitting in another's hole is on
-top. A tap that lands on no fill — a border line, beside a sliver — takes the
-nearest area within ~2% of the view (`hitRegion`), so a sliver can still be
-reached from the map. A tap on empty map toggles nothing.
+A MOUSE click on an area's path is that area: the browser hit-tests the
+even-odd fill, and areas are drawn largest first, so an area in another's hole
+is on top. A finger's (or pen's) tap goes to `hitRegion`: the SMALLEST area
+within ~2% of the view (about 8 px on a phone), the ones holding the tap
+included — so a strip a few metres wide beside a big area can be hit from the
+map, and the big one stays easy to hit everywhere else. A tap on empty map
+toggles nothing. An area too thin even for that is on the list.
+
+### A toggle is cheap
+
+Geometry is projected once per `rings` array identity and centre, so a host
+that rebuilds its region objects on every toggle (`{ ...area, excluded }`) but
+keeps their `rings` re-projects nothing. The base areas are a memoised layer: a
+toggle re-renders only the hatch, highlight and label layers. Measured on 102
+areas of 300 vertices each at 4× CPU throttle: 18–46 ms from tap to commit.
 
 ### Strokes and type stay their size at every width
 
 Strokes use `vector-effect: non-scaling-stroke`, and labels are HTML laid over
-the drawing at theme sizes, so the map reads the same at 320 px and at 1600 px.
-The drawing is square; `maxHeight` caps it on a wide screen and centres it.
+the drawing at theme sizes, moved in by their measured width so none is
+clipped at an edge — the map reads the same at 320 px and at 1600 px. The
+drawing is square; `maxHeight` caps it on a wide screen, and where it sits in a
+wider box is the host's call.
 
 ## Props
 
@@ -64,9 +83,10 @@ The drawing is square; `maxHeight` caps it on a wide screen and centres it.
 | `center` | `{ latitude, longitude } \| null` | — | centre, dot and circles; `null` centres on the areas, no dot |
 | `circles` | `readonly { radiusMetres }[]` | `[]` | dashed circles; the view fits the largest |
 | `onToggle` | `(id: string) => void` | — | a tap or a list press; omit for read-only |
-| `highlightedId` | `string \| null` | `null` | an area to point at, outlined and named |
+| `highlightedIds` | `readonly string[]` | `[]` | areas to point at (a search's hits), outlined and named |
 | `copy` | `RegionMapCopy` | — | every word |
 | `listMode` | `'shown' \| 'collapsed' \| 'none'` | `'collapsed'` | how the list is offered |
+| `listSort` | `'given' \| 'name'` | `'given'` | the list's order |
 | `maxHeight` | `string` | — | the drawing's largest height, any CSS length |
 | `className` | `string` | — | on the root |
 | `dataTestId` | `string` | `'region-map'` | every child test id derives from it |
@@ -80,14 +100,16 @@ The drawing is square; `maxHeight` caps it on a wide screen and centres it.
   rings: readonly (readonly [latitude, longitude])[][]; // even-odd: holes are rings
   excluded?: boolean;
   outside?: boolean;  // drawn faded (context beyond the circles); still tappable
-  detail?: string;    // pre-formatted, on the list row: "2.7 km away"
+  listed?: boolean;   // has a list row; defaults to !outside
+  detail?: string;    // pre-formatted, on the list row: "2.7 km away", "tiny"
 }
 ```
 
 ### `RegionMapCopy`
 
 `mapLabel`, `legendExcluded`, `legendCircle(radiusMetres)`, `legendCenter`,
-`listLabel`, `showList(count)`, `hideList`.
+`listLabel`, `showList(count)` (the count of LISTED areas), `hideList`, and
+`rowState: { excluded, outside }` — a row's state in words, for a screen reader.
 
 ## Helpers
 
@@ -110,7 +132,7 @@ The drawing is square; `maxHeight` caps it on a wide screen and centres it.
   center={store}
   circles={rings.map((r) => ({ radiusMetres: r.maxDistanceMetres }))}
   onToggle={toggle}
-  highlightedId={searchHit}
+  highlightedIds={searchHits}
   copy={copy}
   listMode={isPhone ? 'collapsed' : 'shown'}
 />

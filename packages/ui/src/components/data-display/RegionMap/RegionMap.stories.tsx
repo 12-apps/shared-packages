@@ -7,6 +7,7 @@ import {
   REGION_MAP_AREAS,
   REGION_MAP_CENTER,
   REGION_MAP_COPY,
+  REGION_MAP_WITH_CONTEXT,
   REGION_MAP_WITH_EXCLUSIONS,
 } from './RegionMap.fixtures';
 import type { RegionMapProps } from './RegionMap.types';
@@ -73,8 +74,33 @@ export const TapToToggle: Story = {
 };
 
 export const Highlighted: Story = {
-  name: 'Highlighted — a search result',
-  args: { highlightedId: '3106200367' },
+  name: 'Highlighted — a search with several hits',
+  args: { highlightedIds: ['3106200367', '3106200471', '3106200477'] },
+};
+
+export const OutsideContext: Story = {
+  name: 'Outside — faded context, off the list',
+  args: { regions: REGION_MAP_WITH_CONTEXT, listMode: 'shown', listSort: 'name' },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Three areas are `outside`: drawn faded on the map, but left off the list, so the ' +
+          'list and its count cover only the areas in reach. One row carries a size tag in ' +
+          '`detail`, for an area too small to tap.',
+      },
+    },
+  },
+};
+
+export const NoList: Story = {
+  name: "List mode 'none' — the host lists them",
+  args: { listMode: 'none' },
+};
+
+export const Dark: Story = {
+  args: { listMode: 'shown', highlightedIds: ['3106200367'] },
+  globals: { theme: 'dark' },
 };
 
 export const ReadOnly: Story = {

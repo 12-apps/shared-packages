@@ -7,6 +7,7 @@ import {
   REGION_MAP_AREAS,
   REGION_MAP_CENTER,
   REGION_MAP_COPY,
+  REGION_MAP_WITH_CONTEXT,
   REGION_MAP_WITH_EXCLUSIONS,
 } from '../RegionMap.fixtures';
 
@@ -18,6 +19,7 @@ import {
 
 const MINASCAIXA = '3106200484';
 const VENDA_NOVA = '3106200367';
+const CONJUNTO_MINASCAIXA = '3106200471';
 
 /** Every rendered test id with this prefix — an absence read in one call. */
 function testIdsStartingWith(prefix: string): string[] {
@@ -69,11 +71,13 @@ describe('the drawing', () => {
     expect(testIdsStartingWith('map-label-')).not.toContain(`map-label-${VENDA_NOVA}`);
   });
 
-  it('outlines and names the highlighted area', () => {
-    renderMap({ highlightedId: VENDA_NOVA });
+  it('outlines and names every highlighted area — a search shows several hits', () => {
+    renderMap({ highlightedIds: [VENDA_NOVA, CONJUNTO_MINASCAIXA] });
 
-    expect(screen.getByTestId('map-highlight')).toBeInTheDocument();
+    expect(screen.getByTestId(`map-highlight-${VENDA_NOVA}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`map-highlight-${CONJUNTO_MINASCAIXA}`)).toBeInTheDocument();
     expect(screen.getByTestId(`map-label-${VENDA_NOVA}`)).toHaveTextContent('Venda Nova');
+    expect(testIdsStartingWith('map-highlight-')).toHaveLength(2);
   });
 
   it('draws nothing at all with no centre and no areas', () => {
@@ -152,6 +156,43 @@ describe('the list', () => {
     });
 
     expect(screen.getByTestId(`map-row-${VENDA_NOVA}`)).toHaveTextContent('Venda Novanear');
+  });
+
+  it('leaves outside areas off the list, and counts only what it lists', () => {
+    renderMap({ regions: REGION_MAP_WITH_CONTEXT });
+
+    expect(screen.getByTestId('map-list-toggle')).toHaveTextContent('See the 7 neighbourhoods as a list');
+    fireEvent.click(screen.getByTestId('map-list-toggle'));
+    expect(testIdsStartingWith('map-row-')).toHaveLength(7);
+    // Still drawn on the map, faded.
+    expect(testIdsStartingWith('map-area-')).toHaveLength(10);
+  });
+
+  it('lists an outside area when told to, with its state read out', () => {
+    renderMap({
+      regions: REGION_MAP_WITH_CONTEXT.map((area) => ({ ...area, listed: true })),
+      listMode: 'shown',
+    });
+
+    expect(testIdsStartingWith('map-row-')).toHaveLength(10);
+    expect(screen.getByRole('button', { name: /^Mantiqueira\s+outside the radius$/u })).toBeInTheDocument();
+  });
+
+  it('reads an excluded row as excluded, not only pressed', () => {
+    renderMap({ listMode: 'shown' });
+
+    expect(screen.getByRole('button', { name: /^Minascaixa\s+not delivered to$/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('sorts by name when asked', () => {
+    renderMap({ listMode: 'shown', listSort: 'name' });
+
+    const names = testIdsStartingWith('map-row-').map((id) => screen.getByTestId(id).textContent ?? '');
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(names[0]).toMatch(/^Ceu Azul/u);
   });
 
   it('is not rendered at all when the host offers its own', () => {

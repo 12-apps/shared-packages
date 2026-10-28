@@ -5,12 +5,13 @@
 - [x] `RegionMap.test.stories.tsx` created
 - [x] `__tests__/region-map-helpers.test.ts` — the geometry: even-odd with a
       hole, distance, which area a tap means (hole, smallest, sliver within the
-      tolerance, nothing beyond it), the view, label placement, the projection
-      and the polyline decoder
+      tolerance even from inside a big neighbour, nothing beyond it), the view,
+      label placement, `extent` on 200k values, the projection and the decoder
 - [x] `__tests__/region-map.test.tsx` — what is drawn (areas, hatch + name for
-      excluded only, highlight, nothing with no centre and no areas), what a tap
-      reports, read-only, and the list (collapsed by default with its count,
-      `aria-expanded`, `aria-pressed`, a press reports, detail, `none`)
+      excluded only, several highlights, nothing with no centre and no areas),
+      what a tap reports, read-only, and the list (collapsed by default with its
+      count, `aria-expanded`, `aria-pressed`, state in words, outside areas off
+      the list and out of the count, `listed`, sort by name, detail, `none`)
 
 ## Storybook Tests Status
 
