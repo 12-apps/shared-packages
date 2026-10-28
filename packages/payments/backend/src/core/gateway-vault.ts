@@ -1,5 +1,6 @@
 import { CredentialsError, UnsupportedOperationError } from './errors';
 import { isPermanentProviderRefusal } from './error-readers';
+import { cardProviderFor } from './method-head';
 import type { PaymentProviderAdapter } from './provider';
 import type { MerchantRef, ResolvedCredentials } from './types';
 
@@ -18,6 +19,7 @@ interface VaultConfig {
     get(name: string): PaymentProviderAdapter;
   };
   credentials: {
+    providerChain(merchant: MerchantRef): Promise<string[]>;
     defaultProvider(merchant: MerchantRef): Promise<string | null>;
     getCredentials(merchant: MerchantRef, provider: string): Promise<ResolvedCredentials | null>;
   };
@@ -28,19 +30,25 @@ type VaultingAdapter = PaymentProviderAdapter & {
 };
 
 /**
- * Resolve the merchant's ACTIVE provider and prove it can vault.
+ * Resolve the merchant's CARD provider and prove it can vault.
  *
- * Pinned to the chain head with no failover, and the reason is the same one
+ * Pinned to ONE provider with no failover, and the reason is the same one
  * `core/card-instrument.ts` documents: an instrument minted at provider #2 is
  * garbage input to the provider we actually collect through. Vaulting
  * "wherever works" would succeed on the screen and fail months later on a
  * timer, with the tenant long gone.
+ *
+ * That provider is the first link that takes a CARD (`method-head.ts`), not
+ * the chain head (FUT-3138): a head that takes no card (a PIX-only acquirer,
+ * the store's own Pix key) never charges one, so a card vaulted there — or a
+ * refusal to vault at all — is wrong for every buyer of a store whose cards
+ * go to the next link.
  */
 export async function activeVault(
   config: VaultConfig,
   merchant: MerchantRef,
 ): Promise<{ adapter: VaultingAdapter; creds: ResolvedCredentials }> {
-  const name = await config.credentials.defaultProvider(merchant);
+  const name = await cardProviderFor(config, merchant);
   if (!name || !config.providers.has(name)) {
     throw new CredentialsError(
       name ?? 'none',
