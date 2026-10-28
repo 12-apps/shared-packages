@@ -62,13 +62,14 @@ Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over
 
 ## Layout
 
-- **Computer:** name 220px · track (`minmax(0, 1fr)`) · actions 220px, 16px gap; a hairline
-  between rows. Track 40px tall with a line every hour; blocks 24px at +4px; the actual bar 6px
+- **Computer:** name 220px · track (`minmax(0, 1fr)`) · actions 220px (none when no row has
+  `actions`), 16px gap; a hairline between rows. Track 40px tall with a line every hour; blocks 24px at +4px; the actual bar 6px
   at +31px; the now line the track's full height.
-- **Narrow container (< 600px, a phone)** — a container query, not a media query: name, meta,
+- **Narrow container (< 800px: a phone, a tablet in portrait)** — a container query, not a media query: name, meta,
   chips and the actions on top, the track under them at full width, 30px tall with a line every
   `tickHours`; no coverage row and no axis. A block shorter than 30% of the ruler says only its
-  `shortLabel` (its start), never a cut "20:39–00:".
+  `shortLabel` (its start), never a cut "20:39–00:". The 20px blocks and the 24px name buttons
+  answer a 40px finger (an invisible hit area), the look unchanged.
 
 ## Accessibility
 

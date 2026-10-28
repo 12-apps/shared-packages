@@ -178,3 +178,47 @@ export const TouchDoesNotDrag: Story = {
     await waitFor(() => expect(args.onCreate).not.toHaveBeenCalled());
   },
 };
+
+/** The text laid out wider than its box: cut (an ellipsis or a clip). */
+const cut = (el: Element): boolean => {
+  const range = el.ownerDocument.createRange();
+  range.selectNodeContents(el);
+  return range.getBoundingClientRect().width > el.getBoundingClientRect().width + 0.5;
+};
+
+/**
+ * B4 (G-E3): in a pane a phone gives it, the days keep a width where a block
+ * says its hours — no coloured sliver — and scroll sideways under the pinned
+ * names, inside the grid's own region (the page does not scroll sideways).
+ */
+async function phonePane(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const scroll = canvas.getByTestId('sg-scroll');
+  const table = canvas.getByRole('table');
+  await waitFor(() => expect(getComputedStyle(scroll).overflowX).toBe('auto'));
+  await expect(table.getBoundingClientRect().width).toBeGreaterThan(scroll.getBoundingClientRect().width);
+  for (const block of canvas.getAllByRole('button').filter((el) => el.hasAttribute('data-sg-block'))) {
+    await expect(block.getBoundingClientRect().width).toBeGreaterThanOrEqual(80);
+  }
+  const label = canvas.getByTestId('sg-block-k1').querySelector('[data-sg-line="label"]');
+  if (!label) throw new Error('no label line');
+  await expect(cut(label)).toBe(false);
+  await expect(getComputedStyle(canvas.getAllByRole('rowheader')[0] as HTMLElement).position).toBe('sticky');
+  await expect(canvasElement.ownerDocument.documentElement.getBoundingClientRect().width).toBeLessThanOrEqual(
+    canvasElement.ownerDocument.defaultView?.innerWidth ?? 0,
+  );
+}
+
+const pane = (width: number) => [
+  (Story: () => React.JSX.Element) => (
+    <div style={{ width, maxWidth: '100%' }}>
+      <Story />
+    </div>
+  ),
+];
+
+/** A 390px pane: no sliver, the words show, the days scroll. */
+export const PhonePane390: Story = { decorators: pane(390), play: async ({ canvasElement }) => phonePane(canvasElement) };
+
+/** A 320px pane: the same. */
+export const PhonePane320: Story = { decorators: pane(320), play: async ({ canvasElement }) => phonePane(canvasElement) };

@@ -246,16 +246,24 @@ export const overviewTitleSx: SxProps<Theme> = {
   minWidth: 0,
 };
 
-/** One kind: its words take the width, its pick keeps its size on the right, a hairline under it. */
-export const overviewRowSx: SxProps<Theme> = {
+/**
+ * One kind: its words take the width and its pick keeps its size on the right,
+ * a hairline under it. Where the words would have less than `overviewTextMin`
+ * beside the pick (a 320px phone), the pick drops under them instead of the
+ * label breaking word by word.
+ */
+export const overviewRowSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
-  gap: 1.5,
+  columnGap: 1.5,
+  rowGap: 1,
   py: 1.5,
   borderBottom: '1px solid',
   borderColor: 'divider',
+  '& > :not(button)': { flex: `1 1 ${rem(theme, SEQUENCE_METRICS.overviewTextMin)}`, minWidth: 0 },
   '& > button': { flex: 'none' },
-};
+});
 
 /** "Continue in sequence": start-aligned under a hairline, as the prototype draws it. */
 export const overviewFooterSx: SxProps<Theme> = {

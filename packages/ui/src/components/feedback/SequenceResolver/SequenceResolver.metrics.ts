@@ -25,6 +25,8 @@ export const SEQUENCE_METRICS = {
   doneTitle: 20,
   /** The overview's title in the header row. */
   overviewTitle: 18,
+  /** The least an overview row's words get beside its "Resolver"; under that, the button drops below them. */
+  overviewTextMin: 192,
   /**
    * With "Ver todos", the chrome's width below which the header is narrow:
    * Back is its chevron alone and the step label takes its own line under

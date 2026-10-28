@@ -110,7 +110,7 @@ export function DayRuler(props: DayRulerProps): React.JSX.Element {
 
   return (
     <Box
-      sx={rootSx}
+      sx={rootSx(props.rows.some((row) => row.actions !== undefined && row.actions !== null))}
       data-testid={testId}
       role="region"
       aria-label={props['aria-label']}

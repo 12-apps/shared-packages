@@ -12,32 +12,69 @@ import type { ScheduleBlockTone } from './ScheduleGrid.types';
  */
 export const rootSx: SxProps<Theme> = { containerType: 'inline-size', minWidth: 0, width: '100%' };
 
+/** The columns a row has: the name, the days, the total (when there is one). */
+function trackCount(dayCount: number, hasTotal: boolean): number {
+  return 1 + dayCount + (hasTotal ? 1 : 0);
+}
+
 /**
- * The column widths, as variables every row reads: the name column narrows
- * with the container, the day columns share what is left and may shrink to
- * nothing (their text ellipsizes), so the grid never overflows sideways.
+ * The column widths, as variables every row reads. On a computer the day
+ * columns share what is left (their text ellipsizes) and the grid fits its
+ * container. Under a container break each day keeps a minimum width
+ * (`dayMin`), so a block still says its hours and note; the grid is then as
+ * wide as its minimums and the scroll region around it (`scrollSx`) scrolls
+ * it sideways, the name column pinned. Container queries, never media queries.
  */
-export const frameSx: SxProps<Theme> = (theme: Theme) => ({
-  '--sg-name': rem(theme, M.nameColumn.wide),
-  '--sg-total': rem(theme, M.totalColumn.wide),
-  '& [data-sg-col="short"]': { display: 'none' },
+export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
+  return (theme: Theme) => {
+    const terms = ['var(--sg-name)', `${dayCount} * var(--sg-day)`, `${trackCount(dayCount, hasTotal) - 1} * ${rem(theme, M.gap)}`];
+    if (hasTotal) terms.push('var(--sg-total)');
+    return {
+      '--sg-name': rem(theme, M.nameColumn.wide),
+      '--sg-total': rem(theme, M.totalColumn.wide),
+      '--sg-day': '0%',
+      minWidth: `calc(${terms.join(' + ')})`,
+      [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
+        '--sg-name': rem(theme, M.nameColumn.medium),
+        '--sg-day': rem(theme, M.dayMin.medium),
+        // The pinned column: the names (and the cell above them, and the group
+        // titles) stay while the days scroll under them.
+        '& [role="rowheader"], & [data-sg-corner]': {
+          position: 'sticky',
+          left: 0,
+          zIndex: 2,
+          backgroundColor: theme.palette.background.default,
+          // Covers the gap after it too, so nothing scrolling shows between the name and the days.
+          boxShadow: `${rem(theme, M.gap)} 0 0 ${theme.palette.background.default}`,
+        },
+        '& [data-sg-group-title]': { position: 'sticky', left: 0, width: 'fit-content' },
+      },
+      [`@container (max-width: ${rem(theme, M.containerBreak.narrow)})`]: {
+        '--sg-name': rem(theme, M.nameColumn.narrow),
+        '--sg-total': rem(theme, M.totalColumn.narrow),
+        '--sg-day': rem(theme, M.dayMin.narrow),
+        // A narrow grid is read, not dragged (a phone renders DayRuler per
+        // day): the grips would cover the whole block.
+        '& [data-sg-grip]': { display: 'none' },
+        '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
+      },
+      display: 'flex',
+      flexDirection: 'column',
+      userSelect: 'none',
+    };
+  };
+}
+
+/**
+ * Around the table: under the medium break it scrolls sideways when the days'
+ * minimums do not fit (the header row then sticks within it, not the page).
+ */
+export const scrollSx: SxProps<Theme> = (theme: Theme) => ({
+  minWidth: 0,
   [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
-    '--sg-name': rem(theme, M.nameColumn.medium),
+    overflowX: 'auto',
+    overscrollBehaviorX: 'contain',
   },
-  [`@container (max-width: ${rem(theme, M.containerBreak.narrow)})`]: {
-    '--sg-name': rem(theme, M.nameColumn.narrow),
-    '--sg-total': rem(theme, M.totalColumn.narrow),
-    // A narrow grid is read, not dragged (a phone shows the day list): the
-    // grips would cover the whole block, and the columns say their short name.
-    '& [data-sg-grip]': { display: 'none' },
-    '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
-    '& [data-sg-col="short"]': { display: 'block' },
-    '& [role="columnheader"]': { paddingLeft: 0, paddingRight: 0, textAlign: 'center' },
-    '& [data-sg-col="full"]:has(+ [data-sg-col="short"]), & [data-sg-col="sub"]': { display: 'none' },
-  },
-  display: 'flex',
-  flexDirection: 'column',
-  userSelect: 'none',
 });
 
 /** One line of the grid — the header or a person — as the shared columns. */
@@ -47,7 +84,7 @@ type SxPart = (theme: Theme) => CSSObject;
 export function rowGridSx(dayCount: number, hasTotal: boolean): SxPart {
   return (theme: Theme) => ({
     display: 'grid',
-    gridTemplateColumns: `var(--sg-name) repeat(${dayCount}, minmax(0, 1fr))${hasTotal ? ' var(--sg-total)' : ''}`,
+    gridTemplateColumns: `var(--sg-name) repeat(${dayCount}, minmax(var(--sg-day), 1fr))${hasTotal ? ' var(--sg-total)' : ''}`,
     gap: rem(theme, M.gap),
     alignItems: 'stretch',
   });
@@ -208,12 +245,20 @@ export const ghostSx: SxProps<Theme> = (theme: Theme) => ({
   whiteSpace: 'nowrap',
 });
 
+/** A closed day's word ("Afastamento"): one line inside its cell, cut with an ellipsis (the full word in `title`). */
 export const blockedLabelSx: SxProps<Theme> = (theme: Theme) => ({
+  display: 'block',
   fontSize: rem(theme, M.blockFont),
   color: theme.palette.text.secondary,
   px: 0.75,
   py: 0.5,
   lineHeight: 1.3,
+  minWidth: 0,
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 });
 
 export function blockSx(tone: ScheduleBlockTone, opts: { selected: boolean; movable: boolean }): SxProps<Theme> {
@@ -223,6 +268,7 @@ export function blockSx(tone: ScheduleBlockTone, opts: { selected: boolean; mova
     display: 'block',
     width: '100%',
     minWidth: 0,
+    maxWidth: '100%',
     boxSizing: 'border-box',
     textAlign: 'left',
     font: 'inherit',

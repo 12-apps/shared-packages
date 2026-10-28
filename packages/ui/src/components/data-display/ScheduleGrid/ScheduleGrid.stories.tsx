@@ -2,9 +2,12 @@ import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, waitFor, within } from 'storybook/test';
+import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles/index.js';
+import type * as React from 'react';
 import { useState } from 'react';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
+import { densityThemeOptions } from '../../../tokens/density';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
@@ -166,7 +169,7 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
 
   const columns: ScheduleGridColumn[] = DAYS.map((label, day) => {
     const n = slots.filter((slot) => slot.day === day && slot.tone !== 'away').length;
-    return { label: day === 0 ? `Hoje · ${label}` : label, shortLabel: label.split(' ')[1]?.slice(0, 2), sublabel: n === 0 ? 'ninguém' : `${n} ${n === 1 ? 'turno' : 'turnos'}`, today: day === 0 };
+    return { label: day === 0 ? `Hoje · ${label}` : label, sublabel: n === 0 ? 'ninguém' : `${n} ${n === 1 ? 'turno' : 'turnos'}`, today: day === 0 };
   });
 
   const areas = ['Cozinha', 'Salão', 'Entregas'] as const;
@@ -244,6 +247,21 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
   );
 }
 
+
+/**
+ * The same story at the compact density (`densityThemeOptions('compact')`,
+ * what `createUiTheme({ density: 'compact' })` feeds MUI): every length the
+ * component reads through `rem` follows the density's root size.
+ */
+function CompactDensity({ children }: { children: React.ReactNode }) {
+  const outer = useTheme();
+  const theme = createTheme({
+    palette: { mode: outer.palette.mode, primary: { main: outer.palette.primary.main } },
+    ...densityThemeOptions('compact'),
+  });
+  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+}
+
 const meta: Meta<typeof Demo> = {
   title: 'Data Display/ScheduleGrid',
   component: Demo,
@@ -266,6 +284,17 @@ const DESKTOP = { viewport: { value: 'lg', isRotated: false } };
 
 /** d01 — the store's week: a late turno, "Em turno" today, an absence, a weekly turno. */
 export const Week: Story = { args: {}, globals: DESKTOP };
+
+/** Week at the compact density. */
+export const WeekCompact: Story = {
+  args: {},
+  globals: DESKTOP,
+  decorators: [(Story) => (
+    <CompactDensity>
+      <Story />
+    </CompactDensity>
+  )],
+};
 
 /** d11 — a full store: three areas, a long name, a split shift, an afastamento (a 4-day drag on Márcio's row is d13). */
 export const FullStore: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS }, globals: DESKTOP };

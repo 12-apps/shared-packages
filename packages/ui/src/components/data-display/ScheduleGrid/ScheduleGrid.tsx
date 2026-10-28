@@ -7,7 +7,7 @@ import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveLabels } from '../../../utils/resolve-labels';
 import { focusables, handleGridKey } from './ScheduleGrid.keyboard';
 import { GridBody, GridHeader, type CellAbilities } from './ScheduleGrid.parts';
-import { frameSx, rootSx, rowGridSx, SR_ONLY_SX } from './ScheduleGrid.styles';
+import { frameSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './ScheduleGrid.styles';
 import type { ScheduleGridProps } from './ScheduleGrid.types';
 import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
@@ -76,24 +76,26 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
 
   return (
     <Box sx={rootSx} data-testid={testId}>
-      <Box
-        ref={rootRef}
-        role="table"
-        aria-label={props['aria-label']}
-        aria-busy={props.loading || undefined}
-        aria-description={props.loading ? labels.loading : undefined}
-        sx={frameSx}
-        onKeyDown={onKeyDown}
-        onPointerDownCapture={focus.forget}
-      >
-        <GridHeader
-          columns={columns}
-          totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined}
-          rowSx={rowSx}
-          stickyTop={props.stickyTop ?? 0}
-          testId={testId}
-        />
-        <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
+      <Box sx={scrollSx} data-testid={`${testId}-scroll`}>
+        <Box
+          ref={rootRef}
+          role="table"
+          aria-label={props['aria-label']}
+          aria-busy={props.loading || undefined}
+          aria-description={props.loading ? labels.loading : undefined}
+          sx={frameSx(columns.length, hasTotal)}
+          onKeyDown={onKeyDown}
+          onPointerDownCapture={focus.forget}
+        >
+          <GridHeader
+            columns={columns}
+            totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined}
+            rowSx={rowSx}
+            stickyTop={props.stickyTop ?? 0}
+            testId={testId}
+          />
+          <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
+        </Box>
       </Box>
       <Box sx={SR_ONLY_SX} aria-live="polite" role="status" data-testid={`${testId}-live`}>
         {announcement}

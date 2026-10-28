@@ -2,9 +2,12 @@ import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, waitFor, within } from 'storybook/test';
+import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles/index.js';
+import type * as React from 'react';
 import { useState } from 'react';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
+import { densityThemeOptions } from '../../../tokens/density';
 import { Button } from '../../form/Button';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
@@ -179,6 +182,20 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
   );
 }
 
+/**
+ * The same story at the compact density (`densityThemeOptions('compact')`,
+ * what `createUiTheme({ density: 'compact' })` feeds MUI): every length the
+ * component reads through `rem` follows the density's root size.
+ */
+function CompactDensity({ children }: { children: React.ReactNode }) {
+  const outer = useTheme();
+  const theme = createTheme({
+    palette: { mode: outer.palette.mode, primary: { main: outer.palette.primary.main } },
+    ...densityThemeOptions('compact'),
+  });
+  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+}
+
 const meta: Meta<typeof Demo> = {
   title: 'Data Display/DayRuler',
   component: Demo,
@@ -202,6 +219,17 @@ const PHONE = { viewport: { value: 'xs', isRotated: false } };
 
 /** d02 — Dia: the 06→02 ruler, people per hour, the late escala block, the real shifts, the now line, row actions. */
 export const Day: Story = { args: {}, globals: DESKTOP };
+
+/** Day at the compact density. */
+export const DayCompact: Story = {
+  args: {},
+  globals: DESKTOP,
+  decorators: [(Story) => (
+    <CompactDensity>
+      <Story />
+    </CompactDensity>
+  )],
+};
 
 /** A kitchen and a salão: dashed escala blocks over the real shift, chips, an uncovered turno. */
 export const Kitchen: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS }, globals: DESKTOP };

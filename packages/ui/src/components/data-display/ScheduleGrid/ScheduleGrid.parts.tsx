@@ -172,7 +172,7 @@ function CellFill({ props, ghost }: { props: CellProps; ghost: string | null }):
   if (ghost !== null) return <Ghost text={ghost} />;
   if (!cell.blocked || cell.blocks.length > 0 || !cell.blockedLabel) return null;
   return (
-    <Box component="span" sx={blockedLabelSx} aria-hidden>
+    <Box component="span" sx={blockedLabelSx} aria-hidden title={cell.blockedLabel}>
       {cell.blockedLabel}
     </Box>
   );
@@ -238,15 +238,12 @@ export function GridHeader({ columns, totalLabel, rowSx, stickyTop, testId }: He
   return (
     <Box role="row" sx={[rowSx, headerSx(stickyTop)]} data-testid={`${testId}-header`}>
       {/* Above the names: a cell of the header row, with nothing to head. */}
-      <span role="cell" />
+      <span role="cell" data-sg-corner="" />
       {columns.map((column, day) => (
         <Box role="columnheader" key={`${day}-${column.label}`} sx={headerCellSx(Boolean(column.today))}>
-          <span data-sg-col="full">{column.label}</span>
-          {column.shortLabel ? (
-            <span data-sg-col="short" aria-hidden>
-              {column.shortLabel}
-            </span>
-          ) : null}
+          <span data-sg-col="full" title={column.label}>
+            {column.label}
+          </span>
           {column.sublabel ? (
             <Box component="span" sx={headerSublabelSx} data-sg-col="sub">
               {column.sublabel}
@@ -341,7 +338,7 @@ export function GridBody(body: BodyProps): React.JSX.Element | null {
       {grid.groups.map((group, index) => (
         <Box role="rowgroup" key={`${index}-${group.title ?? ''}`} aria-label={group.title}>
           {group.title ? (
-            <Box component="p" sx={groupTitleSx} aria-hidden>
+            <Box component="p" sx={groupTitleSx} aria-hidden data-sg-group-title="">
               {group.title}
             </Box>
           ) : null}

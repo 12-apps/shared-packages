@@ -17,8 +17,6 @@ export type ScheduleBlockTone = 'plan' | 'late' | 'away' | 'uncovered' | 'onduty
 export interface ScheduleGridColumn {
   /** The day ("Ter 20/10", "Hoje · Seg 19/10"). */
   label: string;
-  /** What the column says in a narrow grid instead of a cut `label` ("Ter", "20"). Default: `label`. */
-  shortLabel?: string;
   /** Under the label ("3 turnos", "ninguém"). */
   sublabel?: string;
   /** Today's column: its label in the primary colour and its cells framed. */

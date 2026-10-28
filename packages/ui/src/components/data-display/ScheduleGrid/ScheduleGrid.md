@@ -46,7 +46,7 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 
 | Prop | Type | Description |
 |---|---|---|
-| `columns` | `ScheduleGridColumn[]` | `label`, `shortLabel?` (shown in a narrow grid), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
+| `columns` | `ScheduleGridColumn[]` | `label` (cut with an ellipsis when its column is short, whole in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
 | `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when the column has no room for both), `chips?` (node under the meta — "2 regras ›"; one line, a chip that does not fit shrinks and cuts its label). |
 | `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
 | `totalLabel` | `string?` | The last column's header ("horas"). |
@@ -87,10 +87,18 @@ places them.
 - A block's label and note never wrap: one line each, an ellipsis, the full text in `title`.
 - The header row is `position: sticky` (opaque, `background.default`) — it stays at the top of
   whatever scrolls the grid.
-- **Container queries, not media queries:** below a 900px container the name column narrows to
-  140px; below 600px to 96px, the grips go (drag-copy is a computer gesture; Shift+arrows still
-  copy), the columns show `shortLabel` and drop `sublabel`. The grid always fits its container —
-  but on a phone, render `DayRuler` for one day instead.
+- A row's name and meta take at most two lines each (the rest cut, the whole text in `title`); a
+  closed day's `blockedLabel` stays on one line inside its cell, cut with an ellipsis.
+- **Container queries, not media queries.** Below a 900px container the name column narrows to
+  140px and each day keeps at least 80px; below 600px the name column is 120px, each day at least
+  96px, and the grips go (drag-copy is a computer gesture; Shift+arrows still copy). When the days'
+  minimums do not fit, the days scroll sideways inside the grid's own region with the names
+  pinned — a block always says its hours and note, never a coloured sliver, and the page itself
+  never scrolls sideways. In that scrolling region the header row sticks within the grid, not the
+  page.
+- **The grid is the computer and tablet view.** On a phone, render `DayRuler` for one day at a
+  time (the approved prototype, d11-phone); the sideways scroll is the grid's fallback in a
+  narrow pane, not a phone layout.
 
 ## Accessibility
 

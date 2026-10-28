@@ -6,11 +6,16 @@ export const DAY_RULER_METRICS = {
   /** The name and the actions columns on a computer. */
   sideColumn: 220,
   gap: 16,
-  /** Below this container width a row stacks: name and actions on top, the track under them. */
-  compactBelow: 600,
+  /**
+   * Below this container width a row stacks: name and actions on top, the
+   * track under them. Two 220px side columns, their gaps and a track of at
+   * least 320px (where the hour labels every 4 hours do not collide): 792,
+   * rounded up.
+   */
+  compactBelow: 800,
   rowPaddingY: 8,
   track: { height: 40, compactHeight: 30, radius: 8, compactRadius: 6 },
-  block: { top: 4, height: 24, compactTop: 3, compactHeight: 20, radius: 6, paddingX: 6, font: 12 },
+  block: { top: 4, height: 24, compactTop: 3, compactHeight: 20, radius: 6, paddingX: 6, font: 12, hitArea: 40 },
   /** The end handles' hit area. */
   handle: 10,
   actual: { top: 31, height: 6, compactTop: 24, compactHeight: 4, radius: 3 },

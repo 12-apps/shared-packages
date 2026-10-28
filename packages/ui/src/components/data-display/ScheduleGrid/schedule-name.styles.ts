@@ -21,6 +21,17 @@ export const nameButtonSx: SxProps<Theme> = (theme: Theme) => ({
   cursor: 'pointer',
   minHeight: rem(theme, M.button.minHeight),
   borderRadius: rem(theme, M.button.radius),
+  position: 'relative',
+  // A 40px hit area around the 24px name, the look unchanged (a phone's finger).
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    height: rem(theme, M.button.hitArea),
+    transform: 'translateY(-50%)',
+  },
   '&:hover > span': { textDecoration: 'underline' },
   '&:focus-visible': {
     outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`,
@@ -28,17 +39,25 @@ export const nameButtonSx: SxProps<Theme> = (theme: Theme) => ({
   },
 });
 
+/** At most two lines, the rest cut with an ellipsis (the whole text in `title`). */
+const twoLines = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  overflow: 'hidden',
+  overflowWrap: 'anywhere',
+} as const;
+
 export function nameTextSx(size: number): SxProps<Theme> {
-  return (theme: Theme) => ({ fontSize: rem(theme, size), fontWeight: 500, overflowWrap: 'anywhere', display: 'block' });
+  return (theme: Theme) => ({ ...twoLines, fontSize: rem(theme, size), fontWeight: 500 });
 }
 
 /** The line under the name; `warning` in the signal's ink, readable on the page. */
 export function metaSx(tone: 'default' | 'warning', size: number): SxProps<Theme> {
   return (theme: Theme) => ({
-    display: 'block',
+    ...twoLines,
     fontSize: rem(theme, size),
     mt: 0.25,
-    overflowWrap: 'anywhere',
     color: tone === 'warning' ? signalInk(theme, 'warning', theme.palette.background.default) : theme.palette.text.secondary,
   });
 }

@@ -118,8 +118,12 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
     >
       <BreakBand block={block} at={at} testId={`${ctx.testId}-break-${block.id}`} />
       {resizable ? <Handle side="l" onPointerDown={press('start')} testId={`${ctx.testId}-handle-l-${block.id}`} /> : null}
-      <span data-dr-text="full">{text}</span>
-      <span data-dr-text="short">{block.shortLabel ?? text}</span>
+      <span data-dr-text="full" title={text}>
+        {text}
+      </span>
+      <span data-dr-text="short" title={text}>
+        {block.shortLabel ?? text}
+      </span>
       {resizable ? <Handle side="r" onPointerDown={press('end')} testId={`${ctx.testId}-handle-r-${block.id}`} /> : null}
     </Box>
   );

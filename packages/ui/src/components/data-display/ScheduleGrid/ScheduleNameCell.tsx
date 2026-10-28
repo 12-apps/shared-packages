@@ -32,7 +32,7 @@ interface ScheduleNameCellProps {
  */
 export function ScheduleNameCell({ row, sx, role, sizes }: ScheduleNameCellProps): React.JSX.Element {
   const name = (
-    <Box component="span" sx={nameTextSx(sizes.name)}>
+    <Box component="span" sx={nameTextSx(sizes.name)} title={row.label}>
       {row.label}
     </Box>
   );
@@ -56,7 +56,7 @@ export function ScheduleNameCell({ row, sx, role, sizes }: ScheduleNameCellProps
         named
       )}
       {row.meta ? (
-        <Box component="span" sx={metaSx(row.metaTone ?? 'default', sizes.meta)}>
+        <Box component="span" sx={metaSx(row.metaTone ?? 'default', sizes.meta)} title={row.meta}>
           {row.meta}
         </Box>
       ) : null}

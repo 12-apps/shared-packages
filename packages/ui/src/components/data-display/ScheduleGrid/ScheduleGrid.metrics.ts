@@ -5,10 +5,16 @@
  */
 export const SCHEDULE_GRID_METRICS = {
   /** The name column on a computer; it narrows with the container (see `nameColumn`). */
-  nameColumn: { wide: 200, medium: 140, narrow: 96 },
+  nameColumn: { wide: 200, medium: 140, narrow: 120 },
+  /**
+   * The narrowest a day column gets under a container break: a block there
+   * still says "20:39" and its note. Past it the days scroll sideways under a
+   * pinned name column — never slivers.
+   */
+  dayMin: { medium: 80, narrow: 96 },
   /** The total column ("18h"). */
   totalColumn: { wide: 56, narrow: 40 },
-  /** Container widths below which the name column narrows. */
+  /** Container widths below which the name column narrows and the days get their minimum. */
   containerBreak: { medium: 900, narrow: 600 },
   /** Between columns and between rows. */
   gap: 6,
@@ -49,6 +55,6 @@ export const SCHEDULE_GRID_METRICS = {
  * (`ScheduleNameCell`): the name as a button. In px.
  */
 export const SCHEDULE_NAME_METRICS = {
-  button: { minHeight: 24, radius: 4, ringOffset: 2 },
+  button: { minHeight: 24, radius: 4, ringOffset: 2, hitArea: 40 },
   ring: 2,
 } as const;

@@ -8,7 +8,19 @@ import type { ScheduleBlockTone } from '../ScheduleGrid/ScheduleGrid.types';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 
 /** The container narrow rows answer to (container queries, never media queries). */
-export const rootSx: SxProps<Theme> = { containerType: 'inline-size', minWidth: 0, width: '100%', userSelect: 'none' };
+/**
+ * `--dr-actions`: the actions column, 220px when any row has actions and
+ * nothing when none does (no empty column at the end of every row).
+ */
+export function rootSx(hasActions: boolean): SxProps<Theme> {
+  return (theme: Theme) => ({
+    containerType: 'inline-size',
+    minWidth: 0,
+    width: '100%',
+    userSelect: 'none',
+    '--dr-actions': hasActions ? rem(theme, M.sideColumn) : '0%',
+  });
+}
 
 /** `@container` below which a row stacks and the coverage and axis rows go. */
 function compact(theme: Theme): string {
@@ -18,7 +30,7 @@ function compact(theme: Theme): string {
 /** Name · track · actions, the coverage row and the axis row share these columns on a computer. */
 export const lineSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'grid',
-  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) ${rem(theme, M.sideColumn)}`,
+  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) var(--dr-actions)`,
   columnGap: rem(theme, M.gap),
   alignItems: 'center',
   [compact(theme)]: { display: 'none' },
@@ -76,7 +88,7 @@ export const groupTitleSx: SxProps<Theme> = {
  */
 export const rowSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'grid',
-  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) ${rem(theme, M.sideColumn)}`,
+  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) var(--dr-actions)`,
   gridTemplateAreas: '"who track actions"',
   columnGap: rem(theme, M.gap),
   alignItems: 'center',
@@ -177,6 +189,18 @@ export function blockSx(tone: ScheduleBlockTone, span: Span, opts: { selected: b
     [compact(theme)]: {
       top: rem(theme, M.block.compactTop),
       height: rem(theme, M.block.compactHeight),
+      // A 40px hit area around the 20px bar, the look unchanged: the text cuts
+      // itself (its spans ellipsize), so the block need not clip.
+      overflow: 'visible',
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: '50%',
+        height: rem(theme, M.block.hitArea),
+        transform: 'translateY(-50%)',
+      },
       '&[data-narrow] [data-dr-text="full"]': { display: 'none' },
       '&[data-narrow] [data-dr-text="short"]': { display: 'inline' },
     },
