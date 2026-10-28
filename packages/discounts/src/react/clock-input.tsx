@@ -56,6 +56,7 @@ export function ClockInput({
   label,
   invalidMessage,
   incompleteMessage,
+  submitted = false,
   dataTestId,
   onChange,
 }: {
@@ -66,12 +67,18 @@ export function ClockInput({
   invalidMessage: string;
   /** Under a half-typed time once the box is left — never while typing. */
   incompleteMessage: string;
+  /**
+   * The form refused this row's times at Criar: an unfinished clock says so
+   * now, left or not, and the row does not repeat it (FUT-4143).
+   */
+  submitted?: boolean;
   dataTestId: string;
   onChange: (next: string) => void;
 }): JSX.Element {
   const [left, setLeft] = useState(false);
   const impossible = isImpossibleTime(value);
-  const unfinished = left && value !== "" && !/^\d{2}:\d{2}$/u.test(value);
+  const whole = /^\d{2}:\d{2}$/u.test(value);
+  const unfinished = !whole && ((left && value !== "") || submitted);
   const message = impossible ? invalidMessage : unfinished ? incompleteMessage : undefined;
   return (
     <Stack spacing={0.5}>

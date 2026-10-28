@@ -123,3 +123,57 @@ describe("the schedule's refusal sits under what it is about", () => {
     );
   });
 });
+
+describe("a time refusal is said once, in its own words", () => {
+  function openEveryDay(): void {
+    renderForm();
+    fireEvent.change(screen.getByTestId("total-form-field-name"), { target: { value: "Happy hour" } });
+    fireEvent.change(screen.getByTestId("total-form-field-percentOff"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
+  }
+
+  function copiesOf(text: string): number {
+    return screen.queryAllByText(text).length;
+  }
+
+  it("T1: '1:00' left and then Criar shows 'Termine o horário' exactly once", async () => {
+    openEveryDay();
+    fireEvent.change(screen.getByTestId("schedule-from-0"), { target: { value: "1:00" } });
+    fireEvent.blur(screen.getByTestId("schedule-from-0"));
+    await waitFor(() => expect(copiesOf(copy.schedule.timeIncomplete)).toBe(1));
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await screen.findByTestId("total-form-error-snackbar");
+    expect(copiesOf(copy.schedule.timeIncomplete)).toBe(1);
+  });
+
+  it("T2: '1:00' never left, then Criar, still says it once", async () => {
+    openEveryDay();
+    fireEvent.change(screen.getByTestId("schedule-to-0"), { target: { value: "1:00" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await waitFor(() => expect(copiesOf(copy.schedule.timeIncomplete)).toBe(1));
+  });
+
+  it("T3: an empty clock at Criar is told to finish, once", async () => {
+    openEveryDay();
+    fireEvent.change(screen.getByTestId("schedule-from-0"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await waitFor(() => expect(copiesOf(copy.schedule.timeIncomplete)).toBe(1));
+  });
+
+  it("T4: Das '25:00' at Criar is invalidTime, once, and never timesRequired", async () => {
+    openEveryDay();
+    fireEvent.change(screen.getByTestId("schedule-from-0"), { target: { value: "2500" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await screen.findByTestId("total-form-error-snackbar");
+    expect(copiesOf(copy.schedule.invalidTime)).toBe(1);
+    expect(copiesOf(copy.schedule.timesRequired)).toBe(0);
+  });
+
+  it("T5: equal ends are still timesRequired, under the row", async () => {
+    openEveryDay();
+    fireEvent.change(screen.getByTestId("schedule-to-0"), { target: { value: "1600" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await waitFor(() => expect(copiesOf(copy.schedule.timesRequired)).toBe(1));
+  });
+});

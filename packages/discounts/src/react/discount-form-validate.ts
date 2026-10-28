@@ -223,13 +223,13 @@ function checkSchedule(
   if (ends.some((end) => !/^\d{2}:\d{2}$/u.test(end))) {
     return { schedule: copy.schedule.timeIncomplete };
   }
-  const badTime = windows.some(
-    (window) =>
-      toMinutes(window.from) === null ||
-      toMinutes(window.to) === null ||
-      window.from === window.to,
-  );
-  return badTime ? { schedule: copy.schedule.timesRequired } : {};
+  // Then a whole HH:MM that no day has (25:00), in the clock's own words —
+  // "start and end must differ" would be untrue of it.
+  if (ends.some((end) => toMinutes(end) === null)) {
+    return { schedule: copy.schedule.invalidTime };
+  }
+  const sameEnds = windows.some((window) => window.from === window.to);
+  return sameEnds ? { schedule: copy.schedule.timesRequired } : {};
 }
 
 /** The schedule editor's state: its switch and its rows, kept separate. */

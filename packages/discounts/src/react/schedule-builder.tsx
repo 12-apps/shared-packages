@@ -88,10 +88,16 @@ interface ErrorSpot {
   part: "days" | "times";
 }
 
-function badTimes(window: DiscountScheduleWindow): boolean {
-  const from = toMinutes(window.from);
-  const to = toMinutes(window.to);
-  return from === null || to === null || from === to;
+const WHOLE_TIME = /^\d{2}:\d{2}$/u;
+
+/** Which row a time refusal is about, by the refusal itself. */
+function timeCulprit(error: string, copy: DiscountsWebCopy): ((w: DiscountScheduleWindow) => boolean) | null {
+  const { timesRequired, timeIncomplete, invalidTime } = copy.schedule;
+  const ends = (w: DiscountScheduleWindow): string[] => [w.from, w.to];
+  if (error === timeIncomplete) return (w) => ends(w).some((end) => !WHOLE_TIME.test(end));
+  if (error === invalidTime) return (w) => ends(w).some((end) => toMinutes(end) === null);
+  if (error === timesRequired) return (w) => w.from === w.to;
+  return null;
 }
 
 /**
@@ -105,11 +111,11 @@ function errorSpot(
   copy: DiscountsWebCopy,
 ): ErrorSpot | null {
   if (error == null || error === "") return null;
-  const { daysRequired, timesRequired, timeIncomplete } = copy.schedule;
-  const days = error === daysRequired ? windows.findIndex((w) => w.days.length === 0) : -1;
+  const days =
+    error === copy.schedule.daysRequired ? windows.findIndex((w) => w.days.length === 0) : -1;
   if (days >= 0) return { index: days, part: "days" };
-  const isTime = error === timesRequired || error === timeIncomplete;
-  const times = isTime ? windows.findIndex(badTimes) : -1;
+  const culprit = timeCulprit(error, copy);
+  const times = culprit === null ? -1 : windows.findIndex(culprit);
   return times >= 0 ? { index: times, part: "times" } : null;
 }
 
@@ -162,11 +168,14 @@ function WindowTimes({
   window,
   index,
   copy,
+  submitted,
   onChange,
 }: {
   window: DiscountScheduleWindow;
   index: number;
   copy: DiscountsWebCopy;
+  /** Criar refused one of these clocks in its own words; each clock says it. */
+  submitted: boolean;
   onChange: (next: DiscountScheduleWindow) => void;
 }): JSX.Element {
   return (
@@ -179,6 +188,7 @@ function WindowTimes({
         label={copy.schedule.fromLabel}
         invalidMessage={copy.schedule.invalidTime}
         incompleteMessage={copy.schedule.timeIncomplete}
+        submitted={submitted}
         onChange={(from) => onChange({ ...window, from })}
         dataTestId={`schedule-from-${index}`}
       />
@@ -190,11 +200,24 @@ function WindowTimes({
         label={copy.schedule.toLabel}
         invalidMessage={copy.schedule.invalidTime}
         incompleteMessage={copy.schedule.timeIncomplete}
+        submitted={submitted}
         onChange={(to) => onChange({ ...window, to })}
         dataTestId={`schedule-to-${index}`}
       />
     </Box>
   );
+}
+
+/**
+ * An unfinished or impossible clock says so itself, under the clock; the row
+ * repeats only the time refusal no single clock owns (equal ends).
+ */
+function clocksSayIt(
+  message: { part: "days" | "times"; text: string } | null,
+  copy: DiscountsWebCopy,
+): boolean {
+  if (message?.part !== "times") return false;
+  return message.text === copy.schedule.timeIncomplete || message.text === copy.schedule.invalidTime;
 }
 
 /** One "these days, these hours" row. */
@@ -217,6 +240,7 @@ function WindowRow({
   onRemove: () => void;
 }): JSX.Element {
   const sentence = formatScheduleWindow(window, copy);
+  const clockSays = clocksSayIt(message, copy);
   return (
     <Stack
       spacing={1}
@@ -251,8 +275,14 @@ function WindowRow({
         ))}
       </Box>
       {message?.part === "days" && <ScheduleMessage text={message.text} />}
-      <WindowTimes window={window} index={index} copy={copy} onChange={onChange} />
-      {message?.part === "times" && <ScheduleMessage text={message.text} />}
+      <WindowTimes
+        window={window}
+        index={index}
+        copy={copy}
+        submitted={clockSays}
+        onChange={onChange}
+      />
+      {message?.part === "times" && !clockSays && <ScheduleMessage text={message.text} />}
       {sentence !== null && (
         <Text variant="caption" data-testid={`schedule-summary-${index}`}>
           {sentence}

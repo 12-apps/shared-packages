@@ -363,11 +363,13 @@ describe("an unfinished value is told to finish, not that it is wrong", () => {
     fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
     type("schedule-from-0", "1:00");
     submit();
+    // Said once, by the clock it is about (FUT-4143 code review round 3).
     await waitFor(() =>
-      expect(screen.getByTestId("schedule-builder-message").textContent).toBe(
+      expect(screen.getByTestId("schedule-from-0-message").textContent).toBe(
         copy.schedule.timeIncomplete,
       ),
     );
+    expect(screen.queryAllByText(copy.schedule.timesRequired)).toHaveLength(0);
     expect(sent).toHaveLength(0);
   });
 
