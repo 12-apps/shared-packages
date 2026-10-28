@@ -15,7 +15,14 @@ import type { ColumnBodyProps } from "./summary-column-body";
  * computer, a host laying out its own column, the Pix screen and the hand-off
  * (which are not inside the layout).
  */
-const SheetBody = createContext<{ body: ColumnBodyProps; Body: (props: ColumnBodyProps) => JSX.Element; forget: () => void } | null>(null);
+export interface SummarySheetContent {
+  body: ColumnBodyProps;
+  Body: (props: ColumnBodyProps) => JSX.Element;
+  /** Forget a failed chunk, so the next open fetches it again. */
+  forget: () => void;
+}
+
+const SheetBody = createContext<SummarySheetContent | null>(null);
 
 export const SummarySheetProvider = SheetBody.Provider;
 
@@ -81,7 +88,8 @@ function useEscape(open: boolean, close: () => void): void {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      // An inner control that handled Escape itself (a menu, a field's own clear) keeps the sheet open.
+      if (event.key === "Escape" && !event.defaultPrevented) close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -153,7 +161,7 @@ function Sheet({ id, room, onClose, children }: { id: string; room: Room; onClos
               aria-label={copy.summaryClose}
               onClick={onClose}
               data-testid="list-summary-close"
-              sx={{ width: 40, height: 40, m: -1, mr: -1, flex: "none", border: 0, p: 0, bgcolor: "transparent", color: "text.secondary", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, "&:focus-visible": { outline: 2, outlineColor: "primary.main" } }}
+              sx={{ width: 40, height: 40, m: -1, flex: "none", border: 0, p: 0, bgcolor: "transparent", color: "text.secondary", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, "&:focus-visible": { outline: 2, outlineColor: "primary.main" } }}
             >
               <Box component="svg" aria-hidden viewBox="0 0 24 24" sx={{ width: 20, height: 20 }}>
                 <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
@@ -169,6 +177,50 @@ function Sheet({ id, room, onClose, children }: { id: string; room: Room; onClos
 }
 
 /**
+ * Whether the focus is inside the sheet, kept from `focusin` while it is open.
+ * Read after the sheet is gone: removing the focused element moves the focus
+ * to `<body>` without any `focusin`, so the last answer still stands.
+ */
+function useFocusInside(id: string, open: boolean): { current: boolean } {
+  const inside = useRef(false);
+  useEffect(() => {
+    if (!open) return undefined;
+    const within = (node: EventTarget | null) => node instanceof Node && Boolean(document.getElementById(id)?.contains(node));
+    // The sheet's own effect has already put the focus on its heading.
+    inside.current = within(document.activeElement);
+    const onFocusIn = (event: FocusEvent) => {
+      inside.current = within(event.target);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, [id, open]);
+  return inside;
+}
+
+/** Focus without the visible ring: the ring is for the keyboard, and a pointer close asks for none. */
+const NO_RING: FocusOptions & { focusVisible?: boolean } = { focusVisible: false };
+
+/** What can take the focus in the bar, the line itself left out. */
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * The focus was inside the sheet when something closed it for the buyer (a
+ * charge starting): the element that held it is gone, so it goes to the first
+ * control of the bar that can take it — the line itself is disabled — or, when
+ * the bar has none (a wallet's charge going out holds every one), to the bar.
+ */
+function rehomeFocus(toggle: HTMLElement | null): void {
+  const active = document.activeElement;
+  if (active && active !== document.body && document.contains(active)) return;
+  const bar = toggle?.parentElement;
+  if (!bar) return;
+  const control = Array.from(bar.querySelectorAll<HTMLElement>(FOCUSABLE)).find((element) => element !== toggle);
+  if (control) return control.focus();
+  if (!bar.hasAttribute("tabindex")) bar.setAttribute("tabindex", "-1");
+  bar.focus(NO_RING);
+}
+
+/**
  * The bar's first line on a phone, when the layout has a summary to show
  * (FUT-589, option B): the host's line on the left, "Ver resumo" and a chevron
  * on the right, the whole line one button that opens the sheet above the bar.
@@ -178,28 +230,44 @@ function Sheet({ id, room, onClose, children }: { id: string; room: Room; onClos
  * the line itself close it, and the focus goes back to the line.
  *
  * Without a summary to show (no layout above — the Pix screen, the hand-off —
- * or a layout with nothing in it) the host's line is drawn as before. `held`
- * closes an open sheet and keeps it closed: the card's 5-second bar has
- * started, and what is on screen is that bar, not the summary.
+ * or a layout with nothing in it) the host's line is drawn as before, and an
+ * open sheet is forgotten. `held` closes an open sheet and keeps it closed:
+ * the card's 5-second bar has started, and what is on screen is that bar, not
+ * the summary. `shut` turning true closes it once and leaves the line usable:
+ * the bar sent the buyer up into the steps (the payer line's "Alterar" opened
+ * the CPF at the top), where the sheet would cover what they went to.
  */
-export function SummaryToggleLine({ summary, testId, held = false }: { summary: ReactNode; testId: string; held?: boolean }): JSX.Element {
+export function SummaryToggleLine({ summary, testId, held = false, shut = false }: { summary: ReactNode; testId: string; held?: boolean; shut?: boolean }): JSX.Element {
   const sheet = useContext(SheetBody);
   const copy = useCheckoutCopy().screens.layout;
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement | null>(null);
   const id = useId();
-  const room = useRoomBelow(toggle, open && !held);
+  const shown = open && !held && sheet !== null;
+  const focusInside = useFocusInside(id, shown);
+  const room = useRoomBelow(toggle, shown);
   // Back to the line on close. A pointer close (the ✕, the scrim, the line) asks for no visible ring:
   // the ring is for the keyboard, and Escape keeps it.
   const close = useCallback((byKeyboard = false) => {
     setOpen(false);
-    toggle.current?.focus(byKeyboard ? undefined : ({ focusVisible: false } as FocusOptions));
+    toggle.current?.focus(byKeyboard ? undefined : NO_RING);
   }, []);
   const closeByKeyboard = useCallback(() => close(true), [close]);
-  useEscape(open && !held, closeByKeyboard);
+  useEscape(shown, closeByKeyboard);
   useEffect(() => {
-    if (held) setOpen(false);
-  }, [held]);
+    if (!held) return;
+    setOpen(false);
+    if (focusInside.current) rehomeFocus(toggle.current);
+    focusInside.current = false;
+  }, [held, focusInside]);
+  useEffect(() => {
+    if (shut) setOpen(false);
+  }, [shut]);
+  // The layout has nothing to list any more (the lines emptied in a re-price): the sheet is
+  // forgotten, so it does not come back on its own when they return.
+  useEffect(() => {
+    if (!sheet) setOpen(false);
+  }, [sheet]);
   if (!sheet) return <Box data-testid={testId} sx={{ "&:empty": { display: "none" } }}>{summary}</Box>;
   const { Body, body, forget } = sheet;
   return (
@@ -208,8 +276,8 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
         component="button"
         type="button"
         ref={toggle}
-        aria-expanded={open && !held}
-        aria-controls={open && !held ? id : undefined}
+        aria-expanded={shown}
+        aria-controls={shown ? id : undefined}
         disabled={held}
         onClick={() => (open ? close() : setOpen(true))}
         data-testid="list-summary-toggle"
@@ -218,10 +286,10 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
         <Box component="span" data-testid={testId} sx={{ minWidth: 0 }}>{summary}</Box>
         <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: "none", color: "primary.main", typography: "body2", fontWeight: 600, whiteSpace: "nowrap" }}>
           {copy.summaryOpen}
-          <Chevron open={open} />
+          <Chevron open={shown} />
         </Box>
       </Box>
-      {open && !held ? (
+      {shown ? (
         <Sheet id={id} room={room} onClose={() => close()}>
           <PartBoundary fallback={null} retry={forget}>
             <Suspense fallback={<Box data-testid="list-summary-loading" sx={{ minHeight: 48 }} />}>

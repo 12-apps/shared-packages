@@ -9,7 +9,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { PartBoundary, deferredPart } from "./lazy-body";
 import type { ColumnBodyProps } from "./summary-column-body";
-import { SummarySheetProvider } from "./summary-sheet";
+import { SummarySheetProvider, type SummarySheetContent } from "./summary-sheet";
 
 /**
  * Where the bar's content goes on a computer (FUT-3685, L4): into the
@@ -128,10 +128,13 @@ export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, 
  * phone — no column anywhere — with something to list. `null` otherwise, and
  * then the bar's line is drawn as before.
  */
-function usePhoneSheet(phone: boolean, body: ColumnBodyProps) {
+function usePhoneSheet(phone: boolean, body: ColumnBodyProps): SummarySheetContent | null {
   const forget = ColumnPart.useForget();
   const { lines, moneyLines, totalLabel, credit } = body;
   const memo = useMemo(() => ({ lines, moneyLines, totalLabel, credit }), [lines, moneyLines, totalLabel, credit]);
+  // Any money-rows element counts as something to list, even one that renders nothing: an
+  // element cannot be asked whether it will draw. No host passes an empty one (every cart has
+  // lines), and the worst case is a sheet showing "Total" alone.
   const listed = (lines?.length ?? 0) > 0 || Boolean(moneyLines);
   return phone && listed ? { body: memo, Body: DeferredBody, forget } : null;
 }

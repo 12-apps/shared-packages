@@ -767,10 +767,15 @@ What changes for the buyer:
   the column — the lines, `cart.discountLines`, "Total" and the credit rows —
   fetched on the first tap (FUT-589). The bar stays usable under it; Escape,
   the ✕, the scrim and the line close it, and any charge the bar starts (the
-  card's 5-second bar, a wallet) closes it. Only the list face has it: the Pix
+  card's 5-second bar, a wallet) closes it, as does the payer line's
+  "Alterar", which opens the CPF at the top. Only the list face has it: the Pix
   screen and the hand-off keep their plain line. Your money rows are drawn
   there READ-ONLY: a control among them reads `useInSummarySheet()` (exported
   from the package root) to leave itself out, as it does in your own column.
+  Because the whole line is ONE button on a phone, `summary` is drawn inside
+  a `<button>`: pass non-interactive content only (text, an icon) — a link or
+  a button in it would nest one control in another, which is invalid HTML and
+  breaks screen readers.
 - No `orderNote`, and no step header anywhere in the flow: the host's own
   stepper is the chrome around it. The list's `copy.title` names the list
   for a screen reader only.
@@ -780,7 +785,7 @@ What changes for the buyer:
 | field | what it is |
 | --- | --- |
 | `copy` | the list's words — `PAYMENT_LIST_COPY[locale]`; required |
-| `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
+| `summary?`, `onlineExtras?` | the bar's first line — non-interactive text, since on a phone it is drawn inside the "Ver resumo" button; what joins it while an online option is chosen |
 | `door?` | your pay-at-the-door options — the slot below |
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
 | `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
