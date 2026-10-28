@@ -32,8 +32,10 @@ import {
   overviewRowSx,
   overviewTitleSx,
   seeAllButtonSx,
+  seeAllLabelSx,
   stepLabelSx,
   startAllSx,
+  stepScreenSx,
   tertiarySx,
   titleSx,
 } from './SequenceResolver.styles';
@@ -104,7 +106,9 @@ export function SequenceHeader(props: HeaderProps): React.JSX.Element {
             sx={seeAllButtonSx(touch)}
             dataTestId={`${testId}-see-all`}
           >
-            {seeAll.label}
+            <Box component="span" sx={seeAllLabelSx}>
+              {seeAll.label}
+            </Box>
           </Button>
         ) : null}
         <IconButton aria-label={closeLabel} onClick={onClose} sx={closeButtonSx(touch)} data-testid={`${testId}-close`}>
@@ -135,6 +139,8 @@ export function useFocusOnScreen(
   fallback: React.RefObject<HTMLElement | null>,
 ): void {
   useEffect(() => {
+    // An empty key: the screen is kept but not showing, so it takes no focus.
+    if (!screenKey) return;
     (target.current ?? fallback.current)?.focus();
   }, [screenKey, target, fallback]);
 }
@@ -237,7 +243,7 @@ interface OverviewProps {
 }
 
 /**
- * "Ver todos" inside the run: each kind with its count and a pick that jumps
+ * "Ver todos" inside the run: each kind with its count (the intro's badge) and a pick that jumps
  * there, then "continue in sequence" back to the step it left. The title is
  * in the header row (it names the dialog); focus goes to it on open.
  */
@@ -249,6 +255,9 @@ export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
       <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
         {categories.map((category, index) => (
           <Box component="li" key={`${index}-${category.label}`} sx={overviewRowSx}>
+            <Box component="span" sx={countBadgeSx} data-testid={`${testId}-overview-count-${index}`}>
+              {category.count}
+            </Box>
             <Box sx={categoryTextSx}>
               <Typography component="span" variant="body2" fontWeight={500}>
                 {category.label}
@@ -285,6 +294,12 @@ export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
 
 interface StepProps {
   step: SequenceStep;
+  /**
+   * Kept mounted under the overview, out of sight and out of the
+   * accessibility tree, so what the person half-filled in the host's step is
+   * still there when they continue. Focus returns to it when it shows again.
+   */
+  hidden?: boolean;
   /** The default secondary: skip. */
   skip: SequenceAction;
   busy: boolean;
@@ -325,14 +340,14 @@ function ActionButton({
 
 /** The host's body, its error, the tertiary text button and the footer. */
 export function SequenceStepBody(props: StepProps): React.JSX.Element {
-  const { step, skip, busy, error, touch, testId, screenKey, titleRef } = props;
+  const { step, skip, busy, error, touch, testId, screenKey, titleRef, hidden = false } = props;
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  useFocusOnScreen(screenKey, titleRef, bodyRef);
-  useKeepFocusWhileBusy(busy, bodyRef);
+  useFocusOnScreen(hidden ? '' : screenKey, titleRef, bodyRef);
+  useKeepFocusWhileBusy(busy && !hidden, bodyRef);
   const secondary = step.secondary === false ? undefined : (step.secondary ?? skip);
   const hasFooter = Boolean(secondary || step.primary);
   return (
-    <>
+    <Box hidden={hidden} sx={stepScreenSx(hidden)} data-testid={`${testId}-step`}>
       <Box ref={bodyRef} tabIndex={-1} aria-busy={busy} sx={{ outline: 'none', minWidth: 0 }}>
         {step.content}
       </Box>
@@ -352,7 +367,7 @@ export function SequenceStepBody(props: StepProps): React.JSX.Element {
           ) : null}
         </Box>
       ) : null}
-    </>
+    </Box>
   );
 }
 

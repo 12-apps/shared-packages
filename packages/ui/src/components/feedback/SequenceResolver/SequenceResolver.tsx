@@ -149,24 +149,10 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
   if (props.intro) {
     return <SequenceIntroBody intro={props.intro} titleId={titleId} testId={testId} screenKey="intro" />;
   }
-  if (overview.shown && props.overview) {
-    return (
-      <SequenceOverviewBody
-        categories={props.overview.categories}
-        canPick={overview.canPick}
-        onPick={overview.pick}
-        pickLabel={props.overview.pickLabel}
-        continueLabel={props.overview.continueLabel}
-        onContinue={overview.hide}
-        titleRef={overview.titleRef}
-        touch={touch}
-        testId={testId}
-      />
-    );
-  }
-  if (current && step) {
-    return (
+  const stepBody =
+    current && step ? (
       <SequenceStepBody
+        key={`step:${current.key}`}
         step={step}
         skip={{ label: props.labels.skip, onClick: state.skip }}
         busy={state.busy}
@@ -175,9 +161,30 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
         testId={testId}
         screenKey={`step:${current.key}`}
         titleRef={stepTitleRef}
+        hidden={overview.shown}
       />
+    ) : null;
+  if (overview.shown && props.overview) {
+    // The step stays mounted under the overview, so a half-filled answer survives "continue".
+    return (
+      <>
+        <SequenceOverviewBody
+          key="overview"
+          categories={props.overview.categories}
+          canPick={overview.canPick}
+          onPick={overview.pick}
+          pickLabel={props.overview.pickLabel}
+          continueLabel={props.overview.continueLabel}
+          onContinue={overview.hide}
+          titleRef={overview.titleRef}
+          touch={touch}
+          testId={testId}
+        />
+        {stepBody}
+      </>
     );
   }
+  if (stepBody) return <>{stepBody}</>;
   const summary = summaryOf(state.run);
   return (
     <SequenceDoneBody
@@ -232,16 +239,17 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
   const { run, busy } = state;
   const current = intro ? undefined : currentOf(run);
   const close = (): void => onClose(summaryOf(run));
+  const overview = useOverview(props, state, current, open);
   const api: SequenceStepApi<R> = {
     resolve: state.resolve,
     skip: state.skip,
     back: state.back,
     jumpTo: state.jumpTo,
     busy,
-    titleProps: { id: titleId, tabIndex: -1, ref: titleRef },
+    // Under the overview the step is kept but hidden, and the overview's title names the dialog.
+    titleProps: { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef },
   };
-  const overview = useOverview(props, state, current, open);
-  const step = current && !overview.shown ? props.renderStep(current, api) : undefined;
+  const step = current ? props.renderStep(current, api) : undefined;
   stepAllowsBack.current = step?.canGoBack !== false;
 
   return (

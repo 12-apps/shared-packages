@@ -265,34 +265,34 @@ type Story = StoryObj<typeof meta>;
 const DESKTOP = { viewport: { value: 'lg', isRotated: false } };
 
 /** d01 — the store's week: a late turno, "Em turno" today, an absence, a weekly turno. */
-export const Semana: Story = { args: {}, globals: DESKTOP };
+export const Week: Story = { args: {}, globals: DESKTOP };
 
 /** d11 — a full store: three areas, a long name, a split shift, an afastamento (a 4-day drag on Márcio's row is d13). */
-export const LojaCheia: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS }, globals: DESKTOP };
+export const FullStore: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS }, globals: DESKTOP };
 
 /** d16 — nobody scheduled: "+" everywhere, the "Em turno" blocks still shown. */
-export const NinguemAgendado: Story = { args: { slots: [] }, globals: DESKTOP };
+export const NobodyScheduled: Story = { args: { slots: [] }, globals: DESKTOP };
 
 /** Without the schedule permission: no "+", no grips, no drag; a block still opens. */
-export const SomenteLeitura: Story = { args: { readOnly: true }, globals: DESKTOP };
+export const ReadOnly: Story = { args: { readOnly: true }, globals: DESKTOP };
 
 /** d17 — loading. */
-export const Carregando: Story = { args: { loading: true }, globals: DESKTOP };
+export const Loading: Story = { args: { loading: true }, globals: DESKTOP };
 
 /** d18 — the host's error with "Tentar de novo". */
-export const Erro: Story = { args: { error: true }, globals: DESKTOP };
+export const LoadError: Story = { args: { error: true }, globals: DESKTOP };
 
 /** A store with nobody in the team yet: the host's empty state. */
-export const SemPessoas: Story = { args: { people: [] }, globals: DESKTOP };
+export const NoPeople: Story = { args: { people: [] }, globals: DESKTOP };
 
 /** The grid in a narrow pane (the mock never draws it there): it fits, names narrow, labels cut with an ellipsis. */
-export const PainelEstreito: Story = { args: { paneWidth: 390 }, globals: DESKTOP };
+export const NarrowPane: Story = { args: { paneWidth: 390 }, globals: DESKTOP };
 
 /** Dark mode. */
-export const Escuro: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
+export const Dark: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
 
 /** d13 — Avisar: a five-day week puts Márcio at 70h — "70h na semana · acima de 40h" on his row. */
-export const AcimaDoLimite: Story = {
+export const OverTheLimit: Story = {
   args: { people: CHEIA, slots: [...CHEIA_SLOTS, ...[1, 2, 3, 4].map((day) => ({ id: `m${day}`, who: 'marcio', day, from: '08:00', to: '22:00' }))] },
   globals: DESKTOP,
 };
@@ -300,7 +300,7 @@ export const AcimaDoLimite: Story = {
 const gridIn = (canvasElement: HTMLElement) => within(canvasElement);
 
 /** G-C1: a click on an empty cell schedules that day with the person's last hours. */
-export const CliqueAgenda: Story = {
+export const ClickSchedules: Story = {
   args: {},
   globals: DESKTOP,
   play: async ({ canvasElement }) => {
@@ -311,7 +311,7 @@ export const CliqueAgenda: Story = {
 };
 
 /** G-C8: Shift+→ on Kelly's weekly turno copies it to Thursday, read aloud. */
-export const TecladoCopia: Story = {
+export const KeyboardCopies: Story = {
   args: {},
   globals: DESKTOP,
   play: async ({ canvasElement }) => {
@@ -346,7 +346,7 @@ const PAUSA_SLOTS: Slot[] = [
  * rules chip under it, and each turno's meal break drawn inside its block as a
  * hatched gap (its words are the block's note).
  */
-export const PausaEMarcadores: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
+export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
 
 /** The same, in a narrow pane: the tag moves under a long name, the chip stays on one line. */
-export const PausaEMarcadoresEstreito: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: DESKTOP };
+export const BreakAndMarkersNarrow: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: DESKTOP };

@@ -91,28 +91,43 @@ export const handleSx: SxProps<Theme> = {
   flex: 'none',
 };
 
+/**
+ * ONE line at every width, 320 included (S-L1): Back and close keep their
+ * size; "Ver todos (N)" gives way first, then the step label, each cut with an
+ * ellipsis rather than pushed onto a second row.
+ */
 export const headerSx: SxProps<Theme> = {
   display: 'flex',
+  flexWrap: 'nowrap',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 1.5,
-};
-
-/** Back and the label; on a narrow sheet the label takes its own row rather than squeeze. */
-export const headerStartSx: SxProps<Theme> = {
-  display: 'inline-flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  columnGap: 0.75,
   minWidth: 0,
 };
 
+/** Back and the label, on the header's one line. */
+export const headerStartSx: SxProps<Theme> = {
+  display: 'inline-flex',
+  flexWrap: 'nowrap',
+  alignItems: 'center',
+  columnGap: 0.75,
+  flex: '0 1 auto',
+  minWidth: 0,
+};
+
+/** One line, cut with an ellipsis when the header has no room. */
+const ellipsisSx = { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
+
 export const stepLabelSx: SxProps<Theme> = {
+  ...ellipsisSx,
+  display: 'block',
   fontSize: sxRem(SEQUENCE_METRICS.stepLabel),
   fontWeight: 500,
   color: 'text.secondary',
-  minWidth: 0,
 };
+
+/** The text inside "Ver todos (N)", so the button can cut it. */
+export const seeAllLabelSx: SxProps<Theme> = { ...ellipsisSx, display: 'block' };
 
 export function closeButtonSx(touch: boolean): SxProps<Theme> {
   const size = touch ? SEQUENCE_METRICS.closeSize.touch : SEQUENCE_METRICS.closeSize.pointer;
@@ -237,9 +252,13 @@ export const doneTitleSx: SxProps<Theme> = {
   outline: 'none',
 };
 
-/** "Ver todos (N)": a text button that keeps its one line and its size beside the label. */
+/**
+ * "Ver todos (N)": a text button on the header's line, the first thing to give
+ * way. Its basis is zero, so it only takes the room Back, the label and close
+ * leave (up to its own width); Back and the label shrink only once it is gone.
+ */
 export function seeAllButtonSx(touch: boolean): SxProps<Theme> {
-  const base = { flex: 'none', whiteSpace: 'nowrap', ml: 'auto' } as const;
+  const base = { flex: '1 1 0', minWidth: 0, maxWidth: 'max-content', whiteSpace: 'nowrap', ml: 'auto' } as const;
   return touch ? { ...base, minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : base;
 }
 
@@ -272,3 +291,12 @@ export const overviewFooterSx: SxProps<Theme> = {
   borderTop: '1px solid',
   borderColor: 'divider',
 };
+
+/**
+ * The step's own wrapper: no box of its own while it shows (its parts stay the
+ * body's flex items, keeping the body's gap and their height), nothing at all
+ * while the overview covers it.
+ */
+export function stepScreenSx(hidden: boolean): SxProps<Theme> {
+  return hidden ? { display: 'none' } : { display: 'contents', '& > *': { flexShrink: 0 } };
+}

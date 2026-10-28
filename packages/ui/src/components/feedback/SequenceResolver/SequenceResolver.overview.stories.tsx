@@ -67,8 +67,8 @@ const overviewOf = (open: Problem[]): SequenceOverview => {
     label: (total) => `Ver todos (${total})`,
     title: open.length === 1 ? '1 problema a resolver' : `${open.length} problemas a resolver`,
     categories: [
-      { label: `Atrasado · ${late.length}`, description: `${late.map((p) => p.who).join(', ')} ainda não começou`, count: late.length, keys: late.map((p) => p.key) },
-      { label: `Avisou que não vai · ${away.length}`, description: away.map((p) => `${p.who}, ter`).join(' · '), count: away.length, keys: away.map((p) => p.key) },
+      { label: 'Atrasado', description: `${late.map((p) => p.who).join(', ')} ainda não começou`, count: late.length, keys: late.map((p) => p.key) },
+      { label: 'Avisou que não vai', description: away.map((p) => `${p.who}, ter`).join(' · '), count: away.length, keys: away.map((p) => p.key) },
     ].filter((category) => category.count > 0),
     pickLabel: 'Resolver',
     continueLabel: 'Continuar em sequência',
@@ -168,10 +168,10 @@ const DESKTOP = { viewport: { value: 'lg', isRotated: false } };
 const PHONE = { viewport: { value: 'xs', isRotated: false } };
 
 /** d03 — the chip opens the run at the first problem: "1 de 2" and "Ver todos (2)". */
-export const Passo: Story = { args: {}, globals: DESKTOP };
+export const Step: Story = { args: {}, globals: DESKTOP };
 
 /** d04 — "Ver todos" inside the run: the kinds with counts, Resolver per kind, "Continuar em sequência". */
-export const VerTodos: Story = {
+export const SeeAll: Story = {
   args: {},
   globals: DESKTOP,
   play: async ({ canvasElement }) => {
@@ -182,7 +182,7 @@ export const VerTodos: Story = {
 };
 
 /** A kind's Resolver: the run jumps to it, and Back returns to the step it left. */
-export const DepoisDoSalto: Story = {
+export const AfterJump: Story = {
   args: {},
   globals: DESKTOP,
   play: async ({ canvasElement }) => {
@@ -194,16 +194,16 @@ export const DepoisDoSalto: Story = {
 };
 
 /** A click on Talita's block opens the run at her problem (`initialKey`). */
-export const AbertoNoProblema: Story = { args: { initialKey: 'away:talita' }, globals: DESKTOP };
+export const OpenedAtAProblem: Story = { args: { initialKey: 'away:talita' }, globals: DESKTOP };
 
 /** m01 — the phone sheet: the same header on one line, "Ver todos (2)" beside "1 de 2". */
-export const Celular: Story = { args: {}, globals: PHONE };
+export const Phone: Story = { args: {}, globals: PHONE };
 
 /** The overview on the phone sheet. */
-export const CelularVerTodos: Story = { ...VerTodos, globals: PHONE };
+export const PhoneSeeAll: Story = { ...SeeAll, globals: PHONE };
 
 /** An answer with no inverse (`canGoBack: false`): the next step offers no Back. */
-export const SemVolta: Story = {
+export const NoWayBack: Story = {
   args: { firstIsFinal: true },
   globals: DESKTOP,
   play: async ({ canvasElement }) => {

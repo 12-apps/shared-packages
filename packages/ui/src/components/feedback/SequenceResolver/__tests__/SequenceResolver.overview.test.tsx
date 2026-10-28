@@ -4,7 +4,8 @@
  * the step it left, Back after a jump, `initialKey`, and a step whose answer
  * has no inverse (`canGoBack: false`).
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SequenceResolver } from "../SequenceResolver";
@@ -135,6 +136,58 @@ describe("the overview", () => {
     expect(screen.getByTestId("sr-back")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("sr-close"));
     expect(props.onClose).toHaveBeenCalledWith({ resolved: 1, skipped: 0, total: 3, alsoResolved: 0 });
+  });
+
+  it("draws each kind's count as a badge, as the intro does", async () => {
+    renderResolver();
+    press("Ver todos (3)");
+    expect(screen.getByTestId("sr-overview-count-0")).toHaveTextContent("2");
+    expect(screen.getByTestId("sr-overview-count-1")).toHaveTextContent("1");
+    const row = screen.getByTestId("sr-overview-count-0").closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("Atrasado · 2")).toBeInTheDocument();
+  });
+
+  it("keeps a half-filled step through Ver todos → Continuar em sequência, and gives it focus back", async () => {
+    /** A step with its own state: what the person typed and chose, not yet answered. */
+    function HalfFilled({ api, name }: { api: SequenceStepApi<string>; name: string }) {
+      const [reason, setReason] = useState("");
+      const [picked, setPicked] = useState(false);
+      return (
+        <div>
+          <h3 {...api.titleProps}>{name}</h3>
+          <label>
+            Motivo
+            <input value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          <button type="button" aria-pressed={picked} onClick={() => setPicked(true)}>
+            Passar para alguém
+          </button>
+        </div>
+      );
+    }
+    renderResolver({
+      renderStep: (item, api) => step(item, api, { content: <HalfFilled api={api} name={item.name} /> }),
+    });
+    fireEvent.change(screen.getByLabelText("Motivo"), { target: { value: "trânsito" } });
+    press("Passar para alguém");
+    press("Ver todos (3)");
+    await waitFor(() => expect(screen.getByTestId("sr-step")).not.toBeVisible());
+    await waitFor(() => expect(screen.queryByRole("textbox")).toBeNull());
+    press("Continuar em sequência");
+    expect(screen.getByLabelText("Motivo")).toHaveValue("trânsito");
+    expect(screen.getByRole("button", { name: "Passar para alguém" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(screen.getByRole("heading", { level: 3, name: "Pessoa late-a" })).toHaveFocus());
+  });
+
+  it("names the dialog by the overview's title alone while the step is kept under it", async () => {
+    renderResolver();
+    press("Ver todos (3)");
+    const dialog = screen.getByRole("dialog", { name: "3 problemas a resolver" });
+    const ids = Array.from(dialog.querySelectorAll("[id]"), (el) => el.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    press("Continuar em sequência");
+    expect(screen.getByRole("dialog", { name: "Pessoa late-a" })).toBeInTheDocument();
   });
 
   it("a pick jumps to that kind's first unanswered problem and calls its onPick", async () => {

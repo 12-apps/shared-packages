@@ -201,28 +201,28 @@ const DESKTOP = { viewport: { value: 'lg', isRotated: false } };
 const PHONE = { viewport: { value: 'xs', isRotated: false } };
 
 /** d02 — Dia: the 06→02 ruler, people per hour, the late escala block, the real shifts, the now line, row actions. */
-export const Dia: Story = { args: {}, globals: DESKTOP };
+export const Day: Story = { args: {}, globals: DESKTOP };
 
 /** A kitchen and a salão: dashed escala blocks over the real shift, chips, an uncovered turno. */
-export const Cozinha: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS }, globals: DESKTOP };
+export const Kitchen: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS }, globals: DESKTOP };
 
 /** d01/d11 phone — the same rows in a narrow pane: stacked, 30px bars, a narrow block says only its start. */
-export const Celular: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS, paneWidth: 390 }, globals: PHONE };
+export const Phone: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS, paneWidth: 390 }, globals: PHONE };
 
 /** Without the schedule permission: nothing creates, moves or resizes; a block still opens. */
-export const SomenteLeitura: Story = { args: { readOnly: true, people: KITCHEN, slots: KITCHEN_SLOTS }, globals: DESKTOP };
+export const ReadOnly: Story = { args: { readOnly: true, people: KITCHEN, slots: KITCHEN_SLOTS }, globals: DESKTOP };
 
-export const Carregando: Story = { args: { loading: true }, globals: DESKTOP };
+export const Loading: Story = { args: { loading: true }, globals: DESKTOP };
 
-export const Erro: Story = { args: { error: true }, globals: DESKTOP };
+export const LoadError: Story = { args: { error: true }, globals: DESKTOP };
 
 /** Nobody on the day: the host's empty sentence. */
-export const Vazio: Story = { args: { people: [] }, globals: DESKTOP };
+export const Empty: Story = { args: { people: [] }, globals: DESKTOP };
 
-export const Escuro: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
+export const Dark: Story = { args: { people: KITCHEN, slots: KITCHEN_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
 
 /** D-C8: Enter on Kelly's empty track creates 4h from now; Alt+→ on Luiz's block moves it 15 minutes. */
-export const Teclado: Story = {
+export const Keyboard: Story = {
   args: {},
   globals: DESKTOP,
   play: async ({ canvasElement }) => {
@@ -244,7 +244,7 @@ const PAUSA_SLOTS: Slot[] = [
 ];
 
 /** The slots a later story fills (FUT-3881): a "Freela" tag beside a name and the meal break as a hatched gap inside a block — it moves with the block. */
-export const PausaEMarcadores: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
+export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS }, globals: DESKTOP };
 
 /** The same on a phone. */
-export const PausaEMarcadoresCelular: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };
+export const BreakAndMarkersPhone: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };
