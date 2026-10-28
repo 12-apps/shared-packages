@@ -65,7 +65,7 @@ const live = (): string => screen.getByTestId("sg-live").textContent ?? "";
 /** A mouse press on `from`, moves over each of `over`, release on the last. */
 function drag(from: HTMLElement, over: HTMLElement[], pointerType = "mouse"): void {
   fireEvent.pointerDown(from, { pointerType, button: 0 });
-  for (const target of over) fireEvent.pointerMove(target, { pointerType });
+  for (const target of over) fireEvent.pointerMove(target, { pointerType, buttons: 1 });
   fireEvent.pointerUp(over[over.length - 1] ?? from, { pointerType });
   fireEvent.click(over[over.length - 1] ?? from);
 }
@@ -167,7 +167,7 @@ describe("create", () => {
   it("draws the covered cells dashed with the hours as ghost text while dragging", async () => {
     renderGrid();
     fireEvent.pointerDown(plusOf("caio", 1), { pointerType: "mouse", button: 0 });
-    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "mouse" });
+    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "mouse", buttons: 1 });
     expect(cellEl("caio", 2)).toHaveTextContent("08:00–14:00");
     expect(cellEl("caio", 3)).toHaveTextContent("08:00–14:00");
     expect(cellEl("caio", 4)).not.toHaveTextContent("08:00–14:00");
@@ -178,7 +178,7 @@ describe("create", () => {
   it("a cancelled pointer (the page scrolled) creates nothing", async () => {
     const { props } = renderGrid();
     fireEvent.pointerDown(plusOf("caio", 1), { pointerType: "mouse", button: 0 });
-    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "mouse" });
+    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "mouse", buttons: 1 });
     fireEvent.pointerCancel(cellEl("caio", 3));
     fireEvent.pointerUp(cellEl("caio", 3));
     expect(props.onCreate).not.toHaveBeenCalled();
@@ -210,7 +210,7 @@ describe("copy by the edge grip", () => {
   it("shows the block's hours as ghost text in the target cells", async () => {
     renderGrid();
     fireEvent.pointerDown(screen.getByTestId("sg-grip-r-k1"), { pointerType: "mouse", button: 0 });
-    fireEvent.pointerMove(cellEl("ana", 3), { pointerType: "mouse" });
+    fireEvent.pointerMove(cellEl("ana", 3), { pointerType: "mouse", buttons: 1 });
     expect(cellEl("ana", 3)).toHaveTextContent("11:00–15:00");
     fireEvent.pointerUp(cellEl("ana", 3));
   });
@@ -237,7 +237,7 @@ describe("move by the middle", () => {
     renderGrid();
     fireEvent.pointerDown(block("k1"), { pointerType: "mouse", button: 0 });
     const before = getComputedStyle(cellEl("caio", 5)).borderColor;
-    fireEvent.pointerMove(cellEl("caio", 5), { pointerType: "mouse" });
+    fireEvent.pointerMove(cellEl("caio", 5), { pointerType: "mouse", buttons: 1 });
     expect(getComputedStyle(cellEl("caio", 5)).borderColor).not.toBe(before);
     fireEvent.pointerUp(cellEl("caio", 5));
   });
@@ -267,11 +267,117 @@ describe("click a block", () => {
   });
 });
 
+describe("after a drag", () => {
+  /** A real click: the press and the release reach the window before the click does. */
+  const realClick = (el: HTMLElement): void => {
+    fireEvent.pointerDown(el, { pointerType: "mouse", button: 0 });
+    fireEvent.pointerUp(el, { pointerType: "mouse" });
+    fireEvent.click(el);
+  };
+
+  it("a drag-create does not eat the next click on a block that cannot move", async () => {
+    const { props } = renderGrid();
+    drag(plusOf("caio", 1), [cellEl("caio", 2), cellEl("caio", 3)]);
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [1, 2, 3]);
+    realClick(block("d1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("d1");
+  });
+
+  it("the click left behind dies with the task after the release, even without a new press", async () => {
+    const { props } = renderGrid();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      drag(plusOf("caio", 1), [cellEl("caio", 3)]);
+      vi.runAllTimers();
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.click(block("d1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("d1");
+  });
+
+  it("still swallows the click the release itself leaves on the moved block", async () => {
+    const { props } = renderGrid();
+    fireEvent.pointerDown(block("k1"), { pointerType: "mouse", button: 0 });
+    fireEvent.pointerMove(cellEl("caio", 5), { pointerType: "mouse", buttons: 1 });
+    fireEvent.pointerUp(cellEl("caio", 5), { pointerType: "mouse" });
+    fireEvent.click(block("k1"));
+    expect(props.onMove).toHaveBeenCalledWith("k1", "caio", 5);
+    expect(props.onBlockClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("abandoning a drag", () => {
+  const startCreate = (): void => {
+    fireEvent.pointerDown(plusOf("caio", 1), { pointerType: "mouse", button: 0 });
+    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "mouse", buttons: 1 });
+    expect(cellEl("caio", 3)).toHaveTextContent("08:00–14:00");
+  };
+
+  it("Escape drops it: nothing created, the ghost gone, the release's click ignored", async () => {
+    const { props } = renderGrid();
+    startCreate();
+    const escape = fireEvent.keyDown(window, { key: "Escape" });
+    expect(escape).toBe(false);
+    expect(cellEl("caio", 3)).not.toHaveTextContent("08:00–14:00");
+    fireEvent.pointerUp(cellEl("caio", 3), { pointerType: "mouse" });
+    fireEvent.click(plusOf("caio", 3));
+    expect(props.onCreate).not.toHaveBeenCalled();
+    fireEvent.click(plusOf("caio", 4));
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [4]);
+  });
+
+  it("Escape drops a move: the block stays and its trailing click does not open it", async () => {
+    const { props } = renderGrid();
+    fireEvent.pointerDown(block("k1"), { pointerType: "mouse", button: 0 });
+    fireEvent.pointerMove(cellEl("caio", 5), { pointerType: "mouse", buttons: 1 });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(cellEl("caio", 5), { pointerType: "mouse" });
+    fireEvent.click(block("k1"));
+    expect(props.onMove).not.toHaveBeenCalled();
+    expect(props.onBlockClick).not.toHaveBeenCalled();
+  });
+
+  it("the window losing focus drops it", async () => {
+    const { props } = renderGrid();
+    startCreate();
+    fireEvent.blur(window);
+    expect(cellEl("caio", 3)).not.toHaveTextContent("08:00–14:00");
+    fireEvent.pointerUp(cellEl("caio", 3), { pointerType: "mouse" });
+    expect(props.onCreate).not.toHaveBeenCalled();
+  });
+
+  it("a move with no button down (released outside the page) drops it", async () => {
+    const { props } = renderGrid();
+    startCreate();
+    fireEvent.pointerMove(cellEl("caio", 4), { pointerType: "mouse", buttons: 0 });
+    expect(cellEl("caio", 3)).not.toHaveTextContent("08:00–14:00");
+    expect(cellEl("caio", 4)).not.toHaveTextContent("08:00–14:00");
+    fireEvent.pointerUp(cellEl("caio", 4), { pointerType: "mouse" });
+    expect(props.onCreate).not.toHaveBeenCalled();
+    fireEvent.click(plusOf("caio", 4));
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [4]);
+  });
+
+  it("other keys leave it running, and a release outside the grid still commits", async () => {
+    const { props } = renderGrid();
+    startCreate();
+    expect(fireEvent.keyDown(window, { key: "a" })).toBe(true);
+    fireEvent.pointerUp(document.body, { pointerType: "mouse" });
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [1, 2, 3]);
+  });
+
+  it("Escape with no drag running is left to the page", async () => {
+    renderGrid();
+    expect(fireEvent.keyDown(window, { key: "Escape" })).toBe(true);
+  });
+});
+
 describe("touch", () => {
   it("never drags: a swipe across cells creates nothing, a tap still creates", async () => {
     const { props } = renderGrid();
     fireEvent.pointerDown(plusOf("caio", 1), { pointerType: "touch", button: 0 });
-    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "touch" });
+    fireEvent.pointerMove(cellEl("caio", 3), { pointerType: "touch", buttons: 1 });
     fireEvent.pointerUp(cellEl("caio", 3), { pointerType: "touch" });
     expect(props.onCreate).not.toHaveBeenCalled();
     fireEvent.click(plusOf("caio", 1));

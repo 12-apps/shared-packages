@@ -64,7 +64,7 @@ export const DragCreates: Story = {
     const track = canvas.getByTestId('dr-track-kelly');
     fireEvent.pointerDown(track, { ...mouse, button: 0, clientX: xOf(track, 10) });
     await settle();
-    fireEvent.pointerMove(window, { ...mouse, clientX: xOf(track, 12.55) });
+    fireEvent.pointerMove(window, { ...mouse, buttons: 1, clientX: xOf(track, 12.55) });
     await settle();
     await waitFor(() => expect(canvas.getByTestId('dr-preview')).toHaveTextContent('10:00–12:30'));
     fireEvent.pointerUp(window, mouse);
@@ -80,7 +80,7 @@ export const MoveCarriesTheBreak: Story = {
     const block = canvas.getByTestId('dr-block-p1');
     fireEvent.pointerDown(block, { ...mouse, button: 0, clientX: xOf(track, 12) });
     await settle();
-    fireEvent.pointerMove(window, { ...mouse, clientX: xOf(track, 14) });
+    fireEvent.pointerMove(window, { ...mouse, buttons: 1, clientX: xOf(track, 14) });
     await settle();
     await waitFor(() => expect(block).toHaveTextContent('13:00–21:00'));
     const band = canvas.getByTestId('dr-break-p1').getBoundingClientRect();
@@ -97,7 +97,7 @@ export const ResizeEnd: Story = {
     const track = canvas.getByTestId('dr-track-bruno');
     fireEvent.pointerDown(canvas.getByTestId('dr-handle-r-p1'), { ...mouse, button: 0, clientX: xOf(track, 19) });
     await settle();
-    fireEvent.pointerMove(window, { ...mouse, clientX: xOf(track, 20) });
+    fireEvent.pointerMove(window, { ...mouse, buttons: 1, clientX: xOf(track, 20) });
     await settle();
     fireEvent.pointerUp(window, mouse);
     await waitFor(() => expect(args.onResize).toHaveBeenCalledWith('p1', 11, 20));

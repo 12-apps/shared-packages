@@ -79,7 +79,7 @@ const press = (el: Element): void => {
   fireEvent.pointerDown(el, { pointerType: 'mouse', button: 0, isPrimary: true });
 };
 const over = (el: Element): void => {
-  fireEvent.pointerMove(el, { pointerType: 'mouse', isPrimary: true });
+  fireEvent.pointerMove(el, { pointerType: 'mouse', isPrimary: true, buttons: 1 });
 };
 const lift = (el: Element): void => {
   fireEvent.pointerUp(el, { pointerType: 'mouse', isPrimary: true });
@@ -172,9 +172,9 @@ export const TouchDoesNotDrag: Story = {
     const plus = within(canvas.getByTestId('sg-cell-ana-0')).getByRole('button');
     fireEvent.pointerDown(plus, { pointerType: 'touch', button: 0, isPrimary: true });
     await settle();
-    fireEvent.pointerMove(canvas.getByTestId('sg-cell-ana-1'), { pointerType: 'touch', isPrimary: true });
+    fireEvent.pointerMove(canvas.getByTestId('sg-cell-ana-1'), { pointerType: 'touch', isPrimary: true, buttons: 1 });
     await settle();
-    fireEvent.pointerUp(canvas.getByTestId('sg-cell-ana-1'), { pointerType: 'touch', isPrimary: true });
+    fireEvent.pointerUp(canvas.getByTestId('sg-cell-ana-1'), { pointerType: 'touch', isPrimary: true, buttons: 1 });
     await waitFor(() => expect(args.onCreate).not.toHaveBeenCalled());
   },
 };

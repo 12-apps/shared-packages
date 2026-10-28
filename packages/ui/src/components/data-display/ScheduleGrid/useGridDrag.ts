@@ -1,6 +1,7 @@
 import type * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
+import { useDragWindow, useTrailingClick } from './drag-session';
 import { canDrop, copyTargets, createTargets } from './schedule-grid-model';
 import type { ScheduleGridCell } from './ScheduleGrid.types';
 
@@ -79,70 +80,58 @@ function finish(drag: GridDrag, handlers: DragHandlers): boolean {
  * row, copy a block along its row by an edge grip, move a block by its middle.
  *
  * Window listeners while a drag runs, so the pointer may leave the grid and
- * come back; the cell under the pointer comes from the event's own target
- * (a mouse is never captured, so it is the element under the pointer).
+ * come back, and a release anywhere commits; the cell under the pointer comes
+ * from the event's own target (a mouse is never captured, so it is the
+ * element under the pointer). Escape, the window losing focus, or a move with
+ * no button down abandons the drag: nothing is reported.
  */
 export function useGridDrag(rootRef: React.RefObject<HTMLElement | null>, handlers: DragHandlers): GridDragApi {
   const [drag, setDrag] = useState<GridDrag | null>(null);
   const live = useRef<GridDrag | null>(null);
   const latest = useRef(handlers);
   latest.current = handlers;
-  const swallowClick = useRef(false);
+  const click = useTrailingClick();
 
   const set = useCallback((next: GridDrag | null) => {
     live.current = next;
     setDrag(next);
   }, []);
 
-  // Bound while a drag runs; re-bound only when one starts or ends.
-  const dragging = drag !== null;
-  useEffect(() => {
-    if (!dragging) return undefined;
-    const onMove = (event: PointerEvent): void => {
+  useDragWindow(drag !== null, {
+    move: (event) => {
       const current = live.current;
       const under = cellUnder(event.target, rootRef.current);
       if (!current || !under) return;
       const rowId = current.mode === 'move' ? under.rowId : current.rowId;
       if (under.day === current.day && rowId === current.rowId) return;
       set({ ...current, rowId, day: under.day, moved: true } as GridDrag);
-    };
-    const onUp = (): void => {
+    },
+    up: () => {
       const current = live.current;
       set(null);
-      if (current) swallowClick.current = finish(current, latest.current);
-    };
-    const onCancel = (): void => set(null);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onCancel);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onCancel);
-    };
-  }, [dragging, rootRef, set]);
+      if (current && finish(current, latest.current)) click.arm(true);
+    },
+    // Abandoned: nothing reported, the ghost and the highlight gone. With the
+    // button still down, the click its release leaves is not a click either.
+    abort: (reason) => {
+      set(null);
+      if (reason === 'escape' || reason === 'blur') click.arm(false);
+    },
+  });
 
-  const startCreate = (event: React.PointerEvent, rowId: string, day: number): void => {
+  const begin = (event: React.PointerEvent, next: GridDrag): void => {
     if (!startsDrag(event)) return;
-    swallowClick.current = false;
-    set({ mode: 'create', rowId, anchor: day, day, moved: false });
+    click.reset();
+    set(next);
   };
+  const startCreate = (event: React.PointerEvent, rowId: string, day: number): void =>
+    begin(event, { mode: 'create', rowId, anchor: day, day, moved: false });
   const startCopy = (event: React.PointerEvent, blockId: string, rowId: string, day: number, preview: string): void => {
     event.stopPropagation();
-    if (!startsDrag(event)) return;
-    swallowClick.current = false;
-    set({ mode: 'copy', rowId, blockId, preview, anchor: day, day, moved: false });
+    begin(event, { mode: 'copy', rowId, blockId, preview, anchor: day, day, moved: false });
   };
-  const startMove = (event: React.PointerEvent, blockId: string, rowId: string, day: number): void => {
-    if (!startsDrag(event)) return;
-    swallowClick.current = false;
-    set({ mode: 'move', blockId, fromRow: rowId, fromDay: day, rowId, day, moved: false });
-  };
-  const takeClick = (): boolean => {
-    const swallow = swallowClick.current;
-    swallowClick.current = false;
-    return swallow;
-  };
+  const startMove = (event: React.PointerEvent, blockId: string, rowId: string, day: number): void =>
+    begin(event, { mode: 'move', blockId, fromRow: rowId, fromDay: day, rowId, day, moved: false });
 
-  return { drag, startCreate, startCopy, startMove, takeClick };
+  return { drag, startCreate, startCopy, startMove, takeClick: click.take };
 }

@@ -83,7 +83,7 @@ function press(el: HTMLElement, hour: number, pointerType = "mouse"): void {
   fireEvent.pointerDown(el, { clientX: x(hour), pointerType, button: 0 });
 }
 function moveTo(hour: number, pointerType = "mouse"): void {
-  fireEvent.pointerMove(window, { clientX: x(hour), pointerType });
+  fireEvent.pointerMove(window, { clientX: x(hour), pointerType, buttons: 1 });
 }
 function release(el: HTMLElement = document.body): void {
   fireEvent.pointerUp(el);
@@ -213,6 +213,98 @@ describe("move and resize", () => {
     release(screen.getByTestId("dr-handle-r-b1"));
     expect(props.onResize).not.toHaveBeenCalled();
     expect(props.onBlockClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("after a drag, and abandoning one", () => {
+  const rows: DayRulerProps["rows"] = [
+    { id: "kelly", label: "Kelly Fontoura", blocks: [] },
+    { id: "dina", label: "Dina Prado", blocks: [{ id: "e1", start: 8, end: 12, label: "Em turno", tone: "onduty" }] },
+    { id: "luiz", label: "Luiz", blocks: [{ id: "b1", start: 20, end: 24, label: "20:00–00:00", tone: "plan", movable: true, resizable: true }] },
+  ];
+  const realClick = (el: HTMLElement): void => {
+    fireEvent.pointerDown(el, { pointerType: "mouse", button: 0, clientX: x(10) });
+    fireEvent.pointerUp(el);
+    fireEvent.click(el);
+  };
+
+  it("a drag-create does not eat the next click on a block that cannot move", async () => {
+    const props = renderRuler({ rows });
+    press(track("kelly"), 10);
+    moveTo(14);
+    release(track("kelly"));
+    expect(props.onCreate).toHaveBeenCalledWith("kelly", 10, 14);
+    realClick(block("e1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("e1");
+  });
+
+  it("the click left behind dies with the task after the release", async () => {
+    const props = renderRuler({ rows });
+    press(track("kelly"), 10);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      release(track("kelly"));
+      vi.runAllTimers();
+    } finally {
+      vi.useRealTimers();
+    }
+    fireEvent.click(block("e1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("e1");
+  });
+
+  it("Escape drops a move: the block back at its hours, nothing reported, the release's click ignored", async () => {
+    const props = renderRuler({ rows });
+    const before = block("b1").style.left || getComputedStyle(block("b1")).left;
+    press(block("b1"), 22);
+    moveTo(18);
+    expect(block("b1")).toHaveTextContent("16:00–20:00");
+    expect(fireEvent.keyDown(window, { key: "Escape" })).toBe(false);
+    expect(block("b1")).toHaveTextContent("20:00–00:00");
+    expect(getComputedStyle(block("b1")).left).toBe(before);
+    release(block("b1"));
+    expect(props.onMove).not.toHaveBeenCalled();
+    expect(props.onBlockClick).not.toHaveBeenCalled();
+  });
+
+  it("Escape drops a create: the preview gone, nothing created", async () => {
+    const props = renderRuler({ rows });
+    press(track("kelly"), 10);
+    moveTo(14);
+    expect(screen.getByTestId("dr-preview")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("dr-preview")).toBeNull());
+    release(track("kelly"));
+    expect(props.onCreate).not.toHaveBeenCalled();
+  });
+
+  it("the window losing focus drops a resize", async () => {
+    const props = renderRuler({ rows });
+    press(screen.getByTestId("dr-handle-r-b1"), 24);
+    moveTo(25);
+    fireEvent.blur(window);
+    expect(block("b1")).toHaveTextContent("20:00–00:00");
+    release();
+    expect(props.onResize).not.toHaveBeenCalled();
+  });
+
+  it("a move with no button down drops it, and the next press works", async () => {
+    const props = renderRuler({ rows });
+    press(block("b1"), 22);
+    moveTo(18);
+    fireEvent.pointerMove(window, { clientX: x(17), pointerType: "mouse", buttons: 0 });
+    expect(block("b1")).toHaveTextContent("20:00–00:00");
+    fireEvent.pointerUp(document.body);
+    expect(props.onMove).not.toHaveBeenCalled();
+    realClick(block("e1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("e1");
+  });
+
+  it("a release outside the ruler still commits", async () => {
+    const props = renderRuler({ rows });
+    press(block("b1"), 22);
+    moveTo(21);
+    fireEvent.pointerUp(document.body);
+    expect(props.onMove).toHaveBeenCalledWith("b1", 19, 23);
   });
 });
 

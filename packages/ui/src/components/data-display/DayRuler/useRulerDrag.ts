@@ -1,6 +1,7 @@
 import type * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
+import { useDragWindow, useTrailingClick } from '../ScheduleGrid/drag-session';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { createdSpan, hourAt, moved, resized } from './day-ruler-model';
 import type { DayRulerBlock, RulerHour } from './DayRuler.types';
@@ -94,45 +95,42 @@ function finish(drag: RulerDrag, origin: Origin, scale: Scale, handlers: RulerHa
  * Click-and-drag on the day ruler (FUT-3825): create on an empty track (a
  * click alone is `createHours`), slide a block by its middle, change its start
  * or end by its handles — every hour snapped to `snapMinutes` and kept on the
- * ruler. Window listeners while a drag runs; the hour comes from the pointer's
- * x over the track's box as it was when the drag started.
+ * ruler. Window listeners while a drag runs (a release anywhere commits); the
+ * hour comes from the pointer's x over the track's box as it was when the drag
+ * started. Escape, the window losing focus, or a move with no button down
+ * abandons the drag and puts the block back.
  */
 export function useRulerDrag(scale: Scale, handlers: RulerHandlers): RulerDragApi {
   const [drag, setDrag] = useState<RulerDrag | null>(null);
   const live = useRef<{ drag: RulerDrag; origin: Origin } | null>(null);
   const latest = useRef({ scale, handlers });
   latest.current = { scale, handlers };
-  const swallowClick = useRef(false);
+  const click = useTrailingClick();
 
   const set = useCallback((value: { drag: RulerDrag; origin: Origin } | null) => {
     live.current = value;
     setDrag(value?.drag ?? null);
   }, []);
 
-  const dragging = drag !== null;
-  useEffect(() => {
-    if (!dragging) return undefined;
-    const onMove = (event: PointerEvent): void => {
+  useDragWindow(drag !== null, {
+    move: (event) => {
       const current = live.current;
       if (!current) return;
       const updated = next(current.drag, current.origin, event.clientX, latest.current.scale);
       if (updated !== current.drag) set({ drag: updated, origin: current.origin });
-    };
-    const onUp = (): void => {
+    },
+    up: () => {
       const current = live.current;
       set(null);
-      if (current) swallowClick.current = finish(current.drag, current.origin, latest.current.scale, latest.current.handlers);
-    };
-    const onCancel = (): void => set(null);
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onCancel);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onCancel);
-    };
-  }, [dragging, set]);
+      if (current && finish(current.drag, current.origin, latest.current.scale, latest.current.handlers)) click.arm(true);
+    },
+    // Abandoned: nothing reported, the block back at its own hours, the
+    // preview gone. With the button still down, its release is not a click.
+    abort: (reason) => {
+      set(null);
+      if (reason === 'escape' || reason === 'blur') click.arm(false);
+    },
+  });
 
   const begin = (event: React.PointerEvent<HTMLElement>, value: Omit<RulerDrag, 'moved'>, block?: DayRulerBlock): void => {
     const track = trackOf(event.currentTarget);
@@ -142,7 +140,7 @@ export function useRulerDrag(scale: Scale, handlers: RulerHandlers): RulerDragAp
     const anchor = hourAt(event.clientX, boxStart, boxSize, from, to, snap);
     const start = block ? block.start : anchor;
     const end = block ? block.end : anchor;
-    swallowClick.current = false;
+    click.reset();
     set({
       drag: { ...value, start, end, moved: false },
       origin: { boxStart, boxSize, anchor, start, end },
@@ -164,11 +162,6 @@ export function useRulerDrag(scale: Scale, handlers: RulerHandlers): RulerDragAp
     if (!startsDrag(event)) return;
     begin(event, { mode, rowId, blockId: block.id, start: block.start, end: block.end }, block);
   };
-  const takeClick = (): boolean => {
-    const swallow = swallowClick.current;
-    swallowClick.current = false;
-    return swallow;
-  };
 
-  return { drag, startCreate, startBlock, takeClick };
+  return { drag, startCreate, startBlock, takeClick: click.take };
 }
