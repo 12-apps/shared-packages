@@ -38,6 +38,15 @@ function firstSlotFill(variant: string, index: number, inputValue: string, curre
   return overtype ? 'overtype' : 'code';
 }
 
+/**
+ * The code inside a first-slot fill. A phone that INSERTS the SMS code at the
+ * caret rather than replacing the slot leaves the digit already there in
+ * front: `4` + `482913` arrives as `4482913`, which spread as-is would give
+ * `448291`. Longer than the code and led by that digit: the digit is dropped.
+ */
+const codeOfFill = (inputValue: string, current: string, length: number): string =>
+  inputValue.length > length && current !== '' && inputValue.startsWith(current) ? inputValue.slice(1) : inputValue;
+
 interface OtpInput {
   variant: string;
   length: number;
@@ -92,7 +101,7 @@ export const useOtpDigits = ({ variant, length, value, onChange, onComplete }: O
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
       const fill = firstSlotFill(variant, index, inputValue, digits[0] ?? '');
-      if (fill) return fill === 'code' ? spread(inputValue) : undefined;
+      if (fill) return fill === 'code' ? spread(codeOfFill(inputValue, digits[0] ?? '', length)) : undefined;
       if (!isAllowed(variant, inputValue)) return;
 
       const next = [...digits];

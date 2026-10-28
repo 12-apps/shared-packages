@@ -135,6 +135,27 @@ describe('InputOTP: a whole code filled into the first slot (SMS, password manag
     expect(slots.map((slot) => (slot as HTMLInputElement).value)).toEqual(['8', '2', '9', '1']);
   });
 
+  it('drops the old digit when the phone INSERTS the code at the caret instead of replacing', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '4' } });
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '4482913' } });
+
+    expect(slots.map((slot) => (slot as HTMLInputElement).value)).toEqual(['4', '8', '2', '9', '1', '3']);
+    expect(onChange).toHaveBeenLastCalledWith('482913');
+  });
+
+  it('keeps a fill that is exactly the code length even when it starts with the old digit', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '4' } });
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '482913' } });
+
+    expect(onChange).toHaveBeenLastCalledWith('482913');
+  });
+
   it('does not spread on the alphanumeric variant, whose slots stay one character', () => {
     const onChange = vi.fn();
     const slots = slotsOf({ variant: 'alphanumeric', onChange });
