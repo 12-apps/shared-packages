@@ -13,6 +13,7 @@ import {
   viewBoxFor,
   type PlanePoint,
 } from '../RegionMap.helpers';
+import { clampCentre, labelOrder, placeLabels } from '../RegionMap.labels';
 
 /** A square of `side` metres with its corner at (x, y). */
 const square = (x: number, y: number, side: number): PlanePoint[] => [
@@ -142,5 +143,41 @@ describe('an encoded polyline', () => {
 
   it('is no points when empty', () => {
     expect(decodePolyline('')).toEqual([]);
+  });
+});
+
+describe('which labels are drawn', () => {
+  const area = (id: string, name: string, size: number, excluded = false) => ({
+    id,
+    name,
+    excluded,
+    geometry: { area: size },
+  });
+
+  it('ranks highlighted, then excluded, then the larger area, then the name', () => {
+    const ranked = labelOrder(
+      [area('a', 'Bravo', 10), area('b', 'Alfa', 10), area('c', 'Big', 99), area('d', 'Ex', 1, true), area('e', 'Hi', 1)],
+      new Set(['e']),
+    );
+    expect(ranked.map((a) => a.id)).toEqual(['e', 'd', 'c', 'b', 'a']);
+  });
+
+  it('hides a label whose box overlaps one already drawn, and keeps one that does not', () => {
+    const placed = placeLabels(
+      [
+        { fractionX: 0.5, fractionY: 0.5, spanX: 100, spanY: 14 },
+        { fractionX: 0.55, fractionY: 0.51, spanX: 120, spanY: 14 },
+        { fractionX: 0.5, fractionY: 0.8, spanX: 100, spanY: 14 },
+      ],
+      { spanX: 400, spanY: 400 },
+      4,
+    );
+    expect(placed.map((p) => p.visible)).toEqual([true, false, true]);
+  });
+
+  it('pulls a label in from the edge by its own size before judging a collision', () => {
+    const [placed] = placeLabels([{ fractionX: 0, fractionY: 1, spanX: 80, spanY: 14 }], { spanX: 400, spanY: 400 }, 4);
+    expect(placed).toEqual({ x: 44, y: 389, visible: true });
+    expect(clampCentre(5, 40, 60, 4)).toBe(30);
   });
 });
