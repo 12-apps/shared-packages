@@ -161,6 +161,11 @@ Opt-in; the default `'arrows'` caption is unchanged. For a date far from today
 - Pressing the open grid's button again, or a month arrow, goes back to the
   days. The arrows are disabled at the first and last month the bounds allow.
 - Days outside `minDate`/`maxDate` stay disabled as in any layout.
+- Nothing moves as the month changes: the month always shows six weeks (the
+  next month's days fill the rest), the month button keeps the width of the
+  longest month name, and an open month or year grid takes the days' place at
+  their size. Whether the arrows share the caption's row depends on the width
+  only (at 296 px they take a row of their own).
 - Example — 14/03/1990 from January 2001: `2001 ▾` → 1990 → `Janeiro ▾` →
   mar → 14, five taps.
 

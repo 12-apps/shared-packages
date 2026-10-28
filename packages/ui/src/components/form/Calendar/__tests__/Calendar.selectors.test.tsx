@@ -52,6 +52,8 @@ const Harness = (props: Partial<CalendarProps>) => {
 
 const monthButton = () => screen.getByTestId('calendar-month-select');
 const yearButton = () => screen.getByTestId('calendar-year-select');
+/** The month the button shows; the button also holds every name, hidden, for its width. */
+const monthText = () => screen.getByTestId('calendar-month-select-text');
 const dayOf = (date: Date | null | undefined) =>
   date ? [date.getFullYear(), date.getMonth(), date.getDate()] : null;
 
@@ -94,7 +96,7 @@ describe('defaultMonth', () => {
 });
 
 describe('captionLayout="selectors"', () => {
-  it('names its buttons and says which grid is open', () => {
+  it('names its buttons and says which grid is open', async () => {
     render(<Harness />);
 
     expect(monthButton()).toHaveAccessibleName('Janeiro, escolher mês');
@@ -108,7 +110,7 @@ describe('captionLayout="selectors"', () => {
     expect(yearButton()).toHaveAttribute('aria-expanded', 'true');
     const years = screen.getByRole('group', { name: 'Anos' });
     expect(yearButton()).toHaveAttribute('aria-controls', years.id);
-    expect(screen.queryAllByTestId('calendar-grid')).toHaveLength(0);
+    await waitFor(() => expect(screen.getByTestId('calendar-days')).not.toBeVisible());
   });
 
   it('falls back to the English names without labels', () => {
@@ -129,11 +131,11 @@ describe('captionLayout="selectors"', () => {
     fireEvent.click(yearButton());
     fireEvent.click(screen.getByTestId('calendar-years-1990'));
     expect(yearButton()).toHaveTextContent('1990');
-    expect(monthButton()).toHaveTextContent('Janeiro');
+    expect(monthText()).toHaveTextContent('Janeiro');
 
     fireEvent.click(monthButton());
     fireEvent.click(screen.getByTestId('calendar-months-2'));
-    expect(monthButton()).toHaveTextContent('Março');
+    expect(monthText()).toHaveTextContent('Março');
 
     fireEvent.click(within(screen.getByTestId('calendar-grid')).getByText('14'));
     expect(dayOf(seen.picked.at(-1))).toEqual([1990, 2, 14]);
@@ -160,7 +162,7 @@ describe('captionLayout="selectors"', () => {
 
     fireEvent.click(screen.getByTestId('calendar-months-10'));
     expect(screen.getByRole('group', { name: 'Meses' })).toBeInTheDocument();
-    expect(monthButton()).toHaveTextContent('Janeiro');
+    expect(monthText()).toHaveTextContent('Janeiro');
   });
 
   it('pulls the month inside the bounds when the picked year cannot show it', () => {
@@ -169,7 +171,7 @@ describe('captionLayout="selectors"', () => {
     fireEvent.click(yearButton());
     fireEvent.click(screen.getByTestId('calendar-years-2013'));
 
-    expect(monthButton()).toHaveTextContent('Outubro');
+    expect(monthText()).toHaveTextContent('Outubro');
   });
 
   it('shows the days past the ceiling disabled, and the arrows stop at both ends', () => {
@@ -192,7 +194,7 @@ describe('captionLayout="selectors"', () => {
     fireEvent.click(screen.getByTestId('calendar-next-month'));
 
     expect(screen.getByTestId('calendar-grid')).toBeInTheDocument();
-    expect(monthButton()).toHaveTextContent('Fevereiro');
+    expect(monthText()).toHaveTextContent('Fevereiro');
   });
 
   it('lists a shown year past the bounds, disabled, so the list still holds where you are', () => {
@@ -212,6 +214,28 @@ describe('captionLayout="selectors"', () => {
 
     expect(monthButton()).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByTestId('calendar-grid')).toBeInTheDocument();
+  });
+});
+
+describe('captionLayout="selectors" holds still', () => {
+  it('always shows six weeks, February 2026 (four weeks long) included', () => {
+    render(<Harness defaultMonth={new Date(2026, 1, 1)} maxDate={undefined} />);
+
+    expect(within(screen.getByTestId('calendar-grid')).getAllByRole('gridcell')).toHaveLength(42);
+  });
+
+  it('keeps the arrows layout at the month length', () => {
+    render(<Calendar ariaLabel="Datas" locale="en-US" value={new Date(2026, 1, 10)} />);
+
+    expect(within(screen.getByTestId('calendar-grid')).getAllByRole('gridcell')).toHaveLength(28);
+  });
+
+  it('sizes the month button by every month name, the shown one alone readable', async () => {
+    render(<Harness />);
+
+    expect(monthButton()).toHaveAccessibleName('Janeiro, escolher mês');
+    expect(monthText()).toHaveTextContent(/^Janeiro$/);
+    await waitFor(() => expect(within(monthButton()).getByText('Setembro')).not.toBeVisible());
   });
 });
 
@@ -315,7 +339,7 @@ describe('captionLayout="selectors" from the keyboard', () => {
     const container = screen.getByTestId('calendar-container');
 
     fireEvent.keyDown(container, { key: 'PageDown' });
-    expect(monthButton()).toHaveTextContent('Fevereiro');
+    expect(monthText()).toHaveTextContent('Fevereiro');
     fireEvent.keyDown(container, { key: 'PageUp', shiftKey: true });
     expect(yearButton()).toHaveTextContent('2000');
     fireEvent.keyDown(container, { key: 'ArrowRight' });
@@ -337,7 +361,7 @@ describe('captionLayout="selectors" from the keyboard', () => {
     fireEvent.click(monthButton());
     fireEvent.keyDown(screen.getByRole('group', { name: 'Meses' }), { key: 'PageDown' });
 
-    expect(monthButton()).toHaveTextContent('Janeiro');
+    expect(monthText()).toHaveTextContent('Janeiro');
     expect(seen.picked).toHaveLength(0);
   });
 });

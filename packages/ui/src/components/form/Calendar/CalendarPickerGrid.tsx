@@ -10,9 +10,6 @@ import { moveInGrid } from './Calendar.views';
 /** A pick button's smallest edge: a touch target at any width (44 design px). */
 const TARGET_SIZE = sxRem(44);
 
-/** The year list scrolls inside about the height of the day grid it replaces. */
-const SCROLL_HEIGHT = sxRem(288);
-
 export interface PickerOption {
   value: number;
   label: string;
@@ -49,14 +46,18 @@ const optionSx = (option: PickerOption): SxProps<Theme> => ({
   },
 });
 
+// The grid fills the box the day grid leaves (see CalendarSelectorsMonth), so
+// opening it never resizes the calendar: a short grid's rows stretch to fill
+// it, a long one scrolls inside it.
 const gridSx = (columns: number, scrollable: boolean): SxProps<Theme> => ({
   display: 'grid',
   gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
   gap: 1,
-  alignContent: 'start',
-  // Room for the focus ring of the edge buttons inside the scroll box.
+  boxSizing: 'border-box',
+  height: '100%',
+  // Room for the focus ring of the edge buttons inside the box.
   p: 0.5,
-  ...(scrollable ? { maxHeight: SCROLL_HEIGHT, overflowY: 'auto' } : {}),
+  ...(scrollable ? { alignContent: 'start', overflowY: 'auto' } : { gridAutoRows: '1fr' }),
 });
 
 export interface CalendarPickerGridProps {

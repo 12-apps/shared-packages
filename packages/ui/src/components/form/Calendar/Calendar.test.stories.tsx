@@ -510,7 +510,7 @@ export const SelectorsPickABirthDate: Story = {
     await userEvent.click(within(canvas.getByTestId('calendar-grid')).getByText('14'));
 
     await waitFor(() => expect(canvas.getByTestId('calendar-selected-date').parentElement).toHaveTextContent('14'));
-    await expect(canvas.getByTestId('calendar-month-select')).toHaveTextContent('Março');
+    await expect(canvas.getByTestId('calendar-month-select-text')).toHaveTextContent('Março');
     await expect(canvas.getByTestId('calendar-year-select')).toHaveTextContent('1990');
   },
 };
@@ -564,5 +564,43 @@ export const SelectorsFitA320Sheet: Story = {
     const year = await canvas.findByTestId('calendar-years-2001');
     await expect(year.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     await expect(year.getBoundingClientRect().right).toBeLessThanOrEqual(box.right + 0.5);
+  },
+};
+
+/**
+ * Nothing moves under the thumb: stepping through a year leaves the arrows and
+ * the caption where they were whatever the month's name, and opening the month
+ * or year grid keeps the calendar's size. 343 is a 375 phone less its gutters,
+ * where "Setembro" once pushed the arrows onto a second row.
+ */
+export const SelectorsHoldStill: Story = {
+  render: () => (
+    <div style={{ width: 343 }}>
+      <BirthDateCalendar />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const header = canvas.getByTestId('calendar-header');
+    const next = canvas.getByTestId('calendar-next-month');
+    const container = canvas.getByTestId('calendar-container');
+    const startHeader = header.getBoundingClientRect().height;
+    const startNext = next.getBoundingClientRect();
+    const startSize = container.getBoundingClientRect();
+
+    for (let step = 0; step < 12; step += 1) {
+      await userEvent.click(next);
+      await expect(header.getBoundingClientRect().height).toBe(startHeader);
+      await expect(next.getBoundingClientRect().top).toBe(startNext.top);
+      await expect(next.getBoundingClientRect().left).toBe(startNext.left);
+    }
+
+    for (const toggle of ['calendar-month-select', 'calendar-year-select']) {
+      await userEvent.click(canvas.getByTestId(toggle));
+      const open = container.getBoundingClientRect();
+      await expect(open.width).toBe(startSize.width);
+      await expect(open.height).toBe(startSize.height);
+      await userEvent.keyboard('{Escape}');
+    }
   },
 };

@@ -46,22 +46,24 @@ const useVisibleMonths = ({
   currentMonth,
   monthsToShow,
   firstDayOfWeek,
+  fixedWeeks,
 }: {
   currentMonth: Date;
   monthsToShow: number;
   firstDayOfWeek: number;
+  fixedWeeks: boolean;
 }): MonthMatrix[] =>
   useMemo(() => {
     const matrices: MonthMatrix[] = [];
     let cursor = currentMonth;
 
     for (let i = 0; i < monthsToShow; i++) {
-      matrices.push(generateMonthMatrix(cursor.getMonth(), cursor.getFullYear(), firstDayOfWeek));
+      matrices.push(generateMonthMatrix(cursor.getMonth(), cursor.getFullYear(), firstDayOfWeek, fixedWeeks));
       cursor = addMonths(cursor, 1);
     }
 
     return matrices;
-  }, [currentMonth, monthsToShow, firstDayOfWeek]);
+  }, [currentMonth, monthsToShow, firstDayOfWeek, fixedWeeks]);
 
 // A click either sets a single date or advances the range by one step; the range
 // rules themselves live in nextRangeStep.
@@ -217,6 +219,9 @@ export const useCalendar = (props: ResolvedCalendarProps) => {
     currentMonth: state.currentMonth,
     monthsToShow,
     firstDayOfWeek,
+    // The selectors caption steps month by month under the thumb; six weeks
+    // every time keep it, and a sheet anchored below, where they are.
+    fixedWeeks: props.captionLayout === 'selectors',
   });
 
   const weekdayNames = useMemo(

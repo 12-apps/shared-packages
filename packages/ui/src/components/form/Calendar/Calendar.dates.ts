@@ -50,10 +50,15 @@ const endOfMonth = (date: Date): Date =>
 const dayKey = (date: Date): string =>
   `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
+/**
+ * The weeks of `month`. `fixedWeeks` always gives six, the next month's days
+ * filling the rest, so a calendar's height does not change from month to month.
+ */
 export const generateMonthMatrix = (
   month: number,
   year: number,
   firstDayOfWeek = 0,
+  fixedWeeks = false,
 ): MonthMatrix => {
   const firstDay = new Date(year, month, 1);
   const lastDay = endOfMonth(firstDay);
@@ -78,7 +83,7 @@ export const generateMonthMatrix = (
 
     // Stop on a week boundary once the month is behind us, so a month that fits
     // in five rows does not get a trailing sixth.
-    if (currentWeek.length === 0 && currentDate > lastDay) break;
+    if (!fixedWeeks && currentWeek.length === 0 && currentDate > lastDay) break;
   }
 
   return { weeks, month, year };
