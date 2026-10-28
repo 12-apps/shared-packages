@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useState } from 'react';
 import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
@@ -553,3 +554,35 @@ async function keyboardClearsTheHeader(canvasElement: HTMLElement): Promise<void
 }
 export const KeyboardClearsTheStickyHeader704: Story = { args: sixArgs, decorators: laptop(704), play: async ({ canvasElement }) => keyboardClearsTheHeader(canvasElement) };
 export const KeyboardClearsTheStickyHeader1216: Story = { args: sixArgs, decorators: laptop(1216), play: async ({ canvasElement }) => keyboardClearsTheHeader(canvasElement) };
+
+/** A host that places a turno where the grid asks for one. */
+function CreatingHost(props: React.ComponentProps<typeof ScheduleGrid>): React.JSX.Element {
+  const [made, setMade] = useState<Record<string, ScheduleGridCell>>({});
+  return (
+    <ScheduleGrid
+      {...props}
+      cell={(rowId, day) => made[`${rowId}:${day}`] ?? props.cell(rowId, day)}
+      onCreate={(rowId, days) => {
+        props.onCreate?.(rowId, days);
+        setMade((before) => ({
+          ...before,
+          ...Object.fromEntries(days.map((day) => [`${rowId}:${day}`, { blocks: [{ id: `new-${rowId}-${day}`, label: '08:00–14:00', tone: 'plan' as const }] }])),
+        }));
+      }}
+    />
+  );
+}
+
+/** Enter on an empty day's "+" creates there, and focus moves to the new block (the "+" is gone). */
+export const KeyboardCreateFocusesTheNewBlock: Story = {
+  render: (args) => <CreatingHost {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const plus = canvasElement.querySelector<HTMLElement>('button[data-sg-focus][data-sg-row="ana"][data-sg-day="4"]');
+    if (!plus) throw new Error('no empty day');
+    plus.focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('ana', [4]));
+    await waitFor(() => expect(canvas.getByTestId('sg-block-new-ana-4')).toHaveFocus());
+  },
+};

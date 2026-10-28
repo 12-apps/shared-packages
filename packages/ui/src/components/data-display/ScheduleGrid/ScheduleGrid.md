@@ -40,13 +40,14 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 - A keyboard copy or move, and a refusal (taken, closed, past either end), are read by a polite
   live region; on a block that is not `copyable` / `movable` it reads `labels.notMovable` ("Este
   turno não muda por aqui"). With Ctrl or Meta held the keys are not the grid's. After a keyboard move, focus follows the block to its new cell once the host
-  re-renders it there.
+  re-renders it there; after a keyboard create (Enter or Space on a "+"), focus moves to the
+  block the host renders in that cell. A host that renders nothing there keeps focus on the "+".
 
 ## Props
 
 | Prop | Type | Description |
 |---|---|---|
-| `columns` | `ScheduleGridColumn[]` | `label` (cut with an ellipsis when its column is short, whole in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
+| `columns` | `ScheduleGridColumn[]` | `label` (wraps to a second line when its column is short, never cut; also in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
 | `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when the column has no room for both), `chips?` (node under the meta — "2 regras ›"; one line, a chip that does not fit shrinks and cuts its label). |
 | `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
 | `totalLabel` | `string?` | The last column's header ("horas"). |
@@ -84,7 +85,9 @@ places them.
 
 - Name column 200px · the day columns share the rest equally (`minmax(0, 1fr)`) · total 56px;
   6px gaps. Cells at least 56px tall; a cell's blocks stack (a split shift is two blocks).
-- A block's label and note never wrap: one line each, an ellipsis, the full text in `title`.
+- A block's hours (`label`) stay on one line (an ellipsis at worst, the full text in `title`);
+  its `note` wraps to a second line when it is long and the block grows taller, as the
+  prototype's "↻ a cada 2 / semanas": a note is never cut, so a break keeps its end.
 - The header row is `position: sticky` (opaque, `background.default`) — it stays at the top of
   whatever scrolls the grid.
 - A row's name and meta take at most two lines each (the rest cut, the whole text in `title`); a
@@ -92,13 +95,15 @@ places them.
 - **Container queries, not media queries; every bound is "from that width up".** The bounds come
   from the grid's own columns (for a week with totals they fall at 1032px and 914px):
   - while 200px names, days of at least 104px, the 56px total and the gaps fit: the computer frame
-    — a block's hours whole beside its edge grips; a long note ellipsizes, whole in `title`;
+    — a block's hours whole beside its edge grips; a long note wraps;
   - while 140px names, days of at least 98px (their text 9px off each edge) and a 40px total fit:
     the same, unscrolled, grips kept, the header row sticking to the page — a 1280 laptop beside
     the admin's rail and panel, even with an always-visible scrollbar (923px);
   - below that: days of at least 152px, grips kept, every hours and note line whole; the days
     scroll sideways under the pinned names, and the header row — outside that scroller — still
-    sticks to the page and follows the days sideways;
+    sticks to the page and follows the days sideways. The header row is no scroller of its own
+    (`overflow-x: hidden`, so it is never a tab stop): the grid sets its scroll from the days',
+    and a sideways wheel or trackpad swipe over it scrolls the days;
   - below 600px: 120px names, days of at least 136px, no grips (Shift+arrows still copy; the
     middle still moves).
   Never a coloured sliver, never cut hours, and the page itself never scrolls sideways — whatever
@@ -116,6 +121,13 @@ shortcuts in `aria-keyshortcuts`, and the `selected` block is `aria-current="tru
 cell is named by `blockedLabel` (or `labels.blockedCell`). The live region is `role="status"`,
 polite, and stays mounted: each sentence clears it and is written on the next frame, so the
 same sentence twice is read twice.
+
+A cell or block the **keyboard** focuses is brought fully into view (WCAG 2.4.11): out from
+under the pinned names, in from past the days' right edge with its 3px focus ring, and down
+from under the sticky header row (the page, or the nearest vertical scroller, scrolls). The
+browser counts a target under a sticky column or header as already in view, so the grid does
+it. A pointer press or a tap is left where it is: scrolling then would move the cell out from
+under the pointer and lose the click.
 
 Every tone's text reads at 4.5:1 on its ground in light and dark mode: the `late` block keeps
 `warning.contrastText` when it reads on `warning.main` and takes the page's dark ink otherwise;

@@ -38,7 +38,7 @@ function below(theme: Theme, px: number): string {
  *   unscrolled, grips kept, the header row sticking to the page;
  * - below `compact`: days of at least 152px, grips kept; the body scrolls
  *   sideways under the pinned names and the header row follows it sideways
- *   while it still sticks to the page (`GridScrolls` keeps the two in step);
+ *   while it still sticks to the page (`useSidewaysScroll` sets its scroll);
  * - below 600px: 120px names, 136px days, no grips.
  * The `wide` and `compact` bounds come from this grid's own day count
  * (`fitsFrom`). Container queries, never media queries.

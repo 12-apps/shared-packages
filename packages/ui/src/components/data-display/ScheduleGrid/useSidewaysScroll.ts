@@ -26,6 +26,18 @@ function ringOf(element: HTMLElement): number {
   return width + offset;
 }
 
+/**
+ * Whether this focus is the keyboard's (or a script's after a key). A tap's focus arrives after
+ * its pointerup, so the press flag alone would miss it; the browser's own heuristic does not.
+ */
+function keyboardFocus(element: HTMLElement): boolean {
+  try {
+    return element.matches(':focus-visible');
+  } catch {
+    return true; // an engine without the selector: the press flag still guards the pointer
+  }
+}
+
 /** The nearest ancestor that scrolls up and down, or the page. */
 function verticalScroller(from: HTMLElement): HTMLElement | null {
   for (let node = from.parentElement; node; node = node.parentElement) {
@@ -56,8 +68,9 @@ function sidewaysOverflow(body: HTMLElement, target: HTMLElement, ring: number):
  * so it is never a tab stop). And a cell the keyboard focuses is brought fully
  * into view: out from under the pinned names, in from past the right edge, and
  * down from under the sticky header — the browser counts a cell under a sticky
- * column or header as already in view. A press is left alone: scrolling then
- * would move the cell out from under the pointer and lose the click.
+ * column or header as already in view. A press (mouse, pen, a tap) is left
+ * alone: scrolling then would move the cell out from under the pointer and lose
+ * the click.
  */
 export function useSidewaysScroll(
   headRef: React.RefObject<HTMLElement | null>,
@@ -79,7 +92,7 @@ export function useSidewaysScroll(
     const body = bodyRef.current;
     const head = headRef.current;
     const target = event.target;
-    if (pressing.current || !body || !(target instanceof HTMLElement)) return;
+    if (pressing.current || !body || !(target instanceof HTMLElement) || !keyboardFocus(target)) return;
     const ring = ringOf(target);
     const sideways = sidewaysOverflow(body, target, ring);
     if (sideways) body.scrollLeft -= sideways;
