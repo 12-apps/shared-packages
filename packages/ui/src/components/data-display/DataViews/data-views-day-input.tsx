@@ -275,10 +275,17 @@ function useDayText(
   // "Limpar", a saved view, the other pill resetting the pair. Without that
   // guard the field's own write bounces straight back mid-edit and resets the
   // caret, which is the native control's worst habit reproduced by hand.
+  //
+  // "Already means" is a REAL day equal to the bound, or an empty field for an
+  // open bound. An impossible day parses to `''` too, so a bare comparison let
+  // a "Limpar" (applied → `''`) keep `31/02/2026` on screen, red, over a filter
+  // that had just been cleared.
   useEffect(() => {
-    setText((current) =>
-      maskedToIso(current, mask) === applied ? current : isoToMasked(applied, mask),
-    );
+    setText((current) => {
+      const iso = maskedToIso(current, mask);
+      const means = (iso !== '' || current === '') && iso === applied;
+      return means ? current : isoToMasked(applied, mask);
+    });
   }, [applied, mask]);
 
   return {

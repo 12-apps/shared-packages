@@ -431,3 +431,32 @@ describe("RangeBounds: the DataViews day filter says the day does not exist", ()
     expect(screen.getByTestId("range-max")).toHaveAttribute("aria-invalid", "false");
   });
 });
+
+describe("DayBoundInput: a cleared bound clears a refused day too", () => {
+  it("drops an impossible day and its mark when the applied bound is cleared from outside", async () => {
+    const onChange = vi.fn();
+    const props = { mask: "dd/mm/aaaa", label: "De", onChange, testId: "day", invalidMessage: INVALID };
+    const { rerender } = render(<DayBoundInput {...props} value="2026-08-06" />);
+    const input = screen.getByTestId("day") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "31022026" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+
+    // "Limpar" on the pill, or "Limpar todos os filtros": the bound goes away.
+    rerender(<DayBoundInput {...props} value={undefined} />);
+
+    await waitFor(() => expect(screen.getByTestId("day")).toHaveValue(""));
+    expect(screen.getByTestId("day")).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+  });
+
+  it("still keeps a real day the field itself just applied", async () => {
+    const onChange = vi.fn();
+    const props = { mask: "dd/mm/aaaa", label: "De", onChange, testId: "day", invalidMessage: INVALID };
+    const { rerender } = render(<DayBoundInput {...props} value={undefined} />);
+    fireEvent.change(screen.getByTestId("day"), { target: { value: "06082026" } });
+    rerender(<DayBoundInput {...props} value="2026-08-06" />);
+
+    await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
+  });
+});
