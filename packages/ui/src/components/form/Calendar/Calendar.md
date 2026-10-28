@@ -209,11 +209,21 @@ month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
 
 ## Accessibility
 
-- Container month: `role="grid"`, labelled by month/year (e.g., `aria-labelledby="cal-2025-09"`).
+- Container month: `role="grid"`, named by its month and year in `locale`
+  (`aria-label="outubro de 2026"`). It used to point `aria-labelledby` at an id
+  nothing carried, so the grid had no name (FUT-4144).
 - Weekday headers: `role="columnheader"`, short names with `abbr` for SR if needed.
 - Day cells: `role="gridcell"`, `aria-selected` true for selected day(s). For ranges, set `aria-selected="true"` on all in range or use `aria-current="date"` for today.
+- Each visible day is named whole, in `locale`: `aria-label="1 de outubro de 2026"`
+  (`"October 1, 2026"` in en-US). The cell's text is the bare number, which in a
+  two-month range calendar names two different days (FUT-4144).
+- The arrows of the default caption carry `labels.previousMonth`/`nextMonth`
+  when the host passes `labels`; without `labels` they stay as they were.
 - Disabled days: `aria-disabled="true"`.
-- Keyboard support (roving focus within the grid):
+- Keyboard support (roving focus within the grid). When the key is pressed ON a
+  day (the reader tabbed or clicked onto it), focus follows the tab stop to the
+  new day, across a month change too; with focus on the container it stays
+  there, as before:
   - Arrow keys: move by 1 day (left/right) or 1 week (up/down).
   - Home/End: move to start/end of week.
   - PageUp/PageDown: previous/next month (with Shift for year).

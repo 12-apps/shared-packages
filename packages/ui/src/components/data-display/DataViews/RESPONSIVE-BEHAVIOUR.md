@@ -276,6 +276,39 @@ leaves the board with a single populated column, which reads as data loss.
 
 ---
 
+### A day filter's popover: the range calendar (FUT-4144)
+
+A `kind: "day"` range ("Data" on Pedidos, Auditoria, Agendados) opens with a
+range calendar ALWAYS visible under its typed `De`/`Até` boxes — the owner's
+option B. A period is three taps: open the filter, tap the first day, tap the
+last. Nothing was added in front of the boxes, so typing a date costs exactly
+the keystrokes it did.
+
+| | below `sm` (320, 390) | `sm` to `md` (600) | from `md` (900, 1280, 1920) |
+| --- | --- | --- | --- |
+| popover width | the screen's, less 16px each side | 400px | its content's (~670px) |
+| months | one, `<Month> ▾ <Year> ▾ ‹ ›` caption | one, same caption | two side by side, `‹ setembro` · `outubro ›`, the current month on the right |
+
+- Order in the popover: preset chips, the `De`/`Até` boxes (sharing the row
+  equally), the inclusive/inverted note, the calendar, then the line saying
+  which tap comes next ("Toque no primeiro e no último dia." / "Agora toque no
+  último dia."), then the pill's summary and "Limpar".
+- One view of ONE range: a tap writes the boxes; a typed whole day writes the
+  bound and moves the calendar to it; an impossible typed day (`31/02/2026`)
+  is refused in its box and the calendar does not move; "Limpar", a preset or a
+  saved view re-opens the calendar on the new range. A tap never moves the
+  calendar under the finger.
+- A second tap before the first swaps them — the boxes never show a period
+  backwards. A tap on or before a lone `Até` keeps that `Até`.
+- The slide-in panel and the "Mais" sheet use the same pair, so they get the
+  same calendar, one month wide.
+- The calendar is `Calendar` in `selectionMode="range"`, the one
+  `DateRangePicker` mounts; its words are `copy.filters.dayCalendar` (optional:
+  a host copy without it gets the en-US pack's).
+
+Tested in `__tests__/range-calendar.test.tsx` and
+`data-views-range-calendar.test.stories.tsx`.
+
 ## Where this is tested
 
 `__tests__/data-views-responsive.test.tsx` drives a fake `ResizeObserver` at each

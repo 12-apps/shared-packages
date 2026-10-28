@@ -1,7 +1,7 @@
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import Box from '@mui/material/Box/index.js';
 import Paper from '@mui/material/Paper/index.js';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { rem, sxRem } from '../../../tokens/relative';
@@ -32,6 +32,7 @@ type CalendarState = ReturnType<typeof useCalendar>;
 
 const buildDayContext = (props: ResolvedCalendarProps, calendar: CalendarState): DayCellContext => ({
   selectionMode: props.selectionMode,
+  locale: props.locale,
   value: props.value,
   range: props.range,
   showOutsideDays: props.showOutsideDays,
@@ -60,6 +61,28 @@ const useRootRef = (forwarded: React.ForwardedRef<HTMLDivElement>) => {
   return { rootRef, setRoot };
 };
 
+/**
+ * Keeps the keyboard's place visible when it is on a DAY.
+ *
+ * The arrows move the grid's one tab stop (`focusedDate`), and that is enough
+ * while the container holds focus. But a reader who tabbed onto a day, or
+ * clicked one, has focus on that day's button: the tab stop moved and focus
+ * stayed behind on a cell that is no longer it, so the ring sat on the old day
+ * and a month change unmounted it under the reader. Focus now follows the
+ * tab stop whenever the key that moved it was pressed ON a day.
+ */
+const useFollowDayFocus = (rootRef: React.RefObject<HTMLDivElement | null>, focusedDate: Date) => {
+  const onDay = useRef(false);
+  useEffect(() => {
+    if (!onDay.current) return;
+    onDay.current = false;
+    rootRef.current?.querySelector<HTMLElement>('[role="gridcell"][tabindex="0"]')?.focus();
+  }, [rootRef, focusedDate]);
+  return (event: React.KeyboardEvent) => {
+    onDay.current = (event.target as HTMLElement).getAttribute('role') === 'gridcell';
+  };
+};
+
 export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((componentProps, ref) => {
   const props = resolveCalendarProps(componentProps);
   const { monthsToShow, locale, renderHeader, renderFooter, className, ariaLabel } = props;
@@ -69,6 +92,8 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
   const bounds = { minDate: props.minDate, maxDate: props.maxDate };
   const picker = useCalendarPicker({ rootRef, bounds, ...calendar });
   const dayContext = buildDayContext(props, calendar);
+  const noteKeyTarget = useFollowDayFocus(rootRef, calendar.focusedDate);
+  const labels = resolveLabels(EN_US_UI_LABELS.calendar, props.labels);
   // The selectors caption always resolves to one month (see the helpers).
   const firstMonth = calendar.monthMatrices[0];
 
@@ -81,7 +106,14 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
       tabIndex={0}
       // The day keys belong to the days: with a month or year grid open there
       // is no focused day on screen to move.
-      onKeyDown={picker.view === 'days' ? calendar.handleKeyDown : undefined}
+      onKeyDown={
+        picker.view === 'days'
+          ? (event) => {
+              noteKeyTarget(event);
+              calendar.handleKeyDown(event);
+            }
+          : undefined
+      }
       data-testid="calendar-container"
       sx={containerSx(monthsToShow)}
     >
@@ -93,7 +125,7 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
             weekdayNames={calendar.weekdayNames}
             dayContext={dayContext}
             bounds={bounds}
-            labels={resolveLabels(EN_US_UI_LABELS.calendar, props.labels)}
+            labels={labels}
             picker={picker}
             onPreviousMonth={() => {
               picker.showDays();
@@ -114,6 +146,9 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
               locale={locale}
               weekdayNames={calendar.weekdayNames}
               renderHeader={renderHeader}
+              // Only a host that passed `labels` gets named arrows: without
+              // them the arrows caption stays exactly as it always was.
+              labels={props.labels ? labels : undefined}
               onPreviousMonth={calendar.goToPreviousMonth}
               onNextMonth={calendar.goToNextMonth}
               dayContext={dayContext}

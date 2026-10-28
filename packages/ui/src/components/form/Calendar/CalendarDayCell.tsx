@@ -9,6 +9,8 @@ import { CalendarDay } from './CalendarDay';
 // Everything a cell needs that is the same for every cell in the calendar.
 export interface DayCellContext {
   selectionMode: SelectionMode;
+  /** BCP-47 tag each day's spoken name is written in. */
+  locale: string;
   value: Date | null;
   range: DateRange;
   hoveredDate: Date | null;
@@ -32,6 +34,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   onSelect,
   onHover,
   onHoverEnd,
+  locale,
   ...context
 }) => {
   const args = buildDayArgs({ day, ...context });
@@ -41,6 +44,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   return (
     <CalendarDay
       day={args}
+      locale={locale}
       focused={isSameDay(args.date, focusedDate)}
       showOutsideDays={showOutsideDays}
       dayClassName={dayClassName}

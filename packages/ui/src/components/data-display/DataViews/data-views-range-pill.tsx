@@ -17,14 +17,14 @@ import Box from '@mui/material/Box/index.js';
 import Button from '@mui/material/Button/index.js';
 import Popover from '@mui/material/Popover/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import useMediaQuery from '@mui/material/useMediaQuery/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 import React, { useState } from 'react';
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { TableFilter } from '../../layout/TableFilter';
-import { DayBoundInput } from './data-views-day-input';
-import { NumberBoundInput } from './data-views-number-input';
 import { RangePresets } from './data-views-preset-chips';
-import { useOutsideResetKey } from './data-views-range-reset';
+import { RangeBounds } from './data-views-range-bounds';
 import { presetsFor } from './data-views-range-presets';
 import {
   isRangeInverted,
@@ -36,126 +36,10 @@ import type { RangeFieldConfig, RangeValue } from './data-views-types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { fieldEdge } from '../../../tokens/field-edge';
-import { sxRem } from '../../../tokens/relative';
+import { rem, sxRem } from '../../../tokens/relative';
 
-
-
-/**
- * One end of the range. A day keeps its `AAAA-MM-DD` string verbatim (the form
- * both the field and the backend speak) and is typed through the masked
- * `dd/mm/aaaa` field rather than a native date input — see
- * {@link DayBoundInput} for why. A number parses, and an unparseable/blank
- * entry CLEARS the bound rather than writing `NaN`.
- */
-function BoundField<T extends Record<string, unknown>>({
-  field,
-  label,
-  value,
-  onChange,
-  testId,
-}: {
-  field: RangeFieldConfig<T>;
-  label: string;
-  value: number | string | undefined;
-  onChange: (bound: number | string | undefined) => void;
-  testId: string;
-}): React.JSX.Element {
-  const copy = useDataViewsCopy();
-  if (field.kind === 'day') {
-    return (
-      <DayBoundInput
-        mask={copy.filters.dayMask}
-        invalidMessage={copy.filters.dayInvalid}
-        label={label}
-        value={value == null ? undefined : String(value)}
-        onChange={onChange}
-        testId={testId}
-      />
-    );
-  }
-  return (
-    <NumberBoundInput
-      label={label}
-      value={value}
-      unit={field.unit}
-      onChange={onChange}
-      testId={testId}
-    />
-  );
-}
-
-
-/**
- * The `De`/`Até` pair for a range — shared by the pill's popover and the
- * slide-in panel's day fields, so the two surfaces cannot drift on what a bound
- * accepts or how it clears.
- */
-export function RangeBounds<T extends Record<string, unknown>>({
-  field,
-  value,
-  onChange,
-  testId,
-}: {
-  field: RangeFieldConfig<T>;
-  value: RangeValue;
-  onChange: (range: RangeValue) => void;
-  testId: string;
-}): React.JSX.Element {
-  const copy = useDataViewsCopy();
-  const inverted = isRangeInverted(value);
-  const { key, emitted } = useOutsideResetKey(value);
-  return (
-    <Box data-testid={`${testId}-panel`}>
-      {/* Above the inputs, not below: the presets are the answer for most
-          merchants, and the two date pickers are the escape hatch. */}
-      <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
-        <RangePresets presets={presetsFor(field, copy)} value={value} onChange={onChange} testId={testId} />
-      </Box>
-      {/* Top-aligned: a day that does not exist grows ITS field by a message
-          line, and centring would push the other box half a line down. The two
-          boxes are one height, so with no message this is the same row. */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-        <BoundField
-          key={`min-${key}`}
-          field={field}
-          label={copy.filters.rangeStart}
-          value={value.min}
-          onChange={(min) => onChange(emitted({ ...value, min }))}
-          testId={`${testId}-min`}
-        />
-        <BoundField
-          key={`max-${key}`}
-          field={field}
-          label={copy.filters.rangeEnd}
-          value={value.max}
-          onChange={(max) => onChange(emitted({ ...value, max }))}
-          testId={`${testId}-max`}
-        />
-      </Box>
-      {inverted && (
-        <Typography
-          component="p"
-          data-testid={`${testId}-inverted`}
-          sx={{ mt: 0.75, fontSize: sxRem(12), color: 'error.main' }}
-        >
-          {copy.filters.rangeInvalid}
-        </Typography>
-      )}
-      {/* BOTH days are in the result. Saying so is FUT-668's other half: the
-          bounds compare as ISO strings precisely so `até` keeps its whole day,
-          and nothing on screen would otherwise tell the merchant that. */}
-      {field.kind === 'day' && !inverted && (
-        <Typography
-          component="p"
-          data-testid={`${testId}-inclusive`}
-          sx={{ mt: 0.75, fontSize: sxRem(12), color: 'text.disabled' }}
-        >
-          {copy.filters.rangeInclusiveNote}
-        </Typography>
-      )}
-    </Box>
-  );
-}
+// Re-exported: the pair moved to its own file, and its importers keep their path.
+export { RangeBounds };
 
 /**
  * The pill + its popover. Bounds commit on change (the list is server-driven, so
@@ -265,6 +149,30 @@ function RangeTrigger<T extends Record<string, unknown>>({
   );
 }
 
+/**
+ * How many months the pill's calendar shows: two from the theme's `md` up,
+ * where the popover has the ~670px they take; one below it.
+ *
+ * A media query, not an `sx` breakpoint, because it decides what to RENDER —
+ * CSS cannot un-render a second month. `up('md')` so that where nothing can be
+ * measured (a test, the server) the answer is the one month that always fits.
+ */
+function useCalendarMonths(): 1 | 2 {
+  const theme = useTheme();
+  return useMediaQuery(theme.breakpoints.up('md')) ? 2 : 1;
+}
+
+/**
+ * The day popover's width. Below `sm` it takes the screen's (less the
+ * popover's own 16px margins, which its `maxWidth` already keeps), so the boxes
+ * and the month share it instead of leaving a strip of grid beside a narrow
+ * card. From `sm` to `md` it holds one month, and sized to its content the
+ * preset row alone stretched it to ~515px with the month hugging the left and
+ * a band of nothing beside it; 400 keeps the month and the boxes one width.
+ * From `md` its content — two months — sets it.
+ */
+const DAY_PAPER_SX = (theme: Theme) => ({ width: { xs: '100%', sm: rem(theme, 400), md: 'auto' } });
+
 export function RangePill<T extends Record<string, unknown>>({
   field,
   value,
@@ -283,6 +191,7 @@ export function RangePill<T extends Record<string, unknown>>({
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const active = isRangeSet(value);
   const testId = `${testIdPrefix}-range-${field.id}`;
+  const calendarMonths = useCalendarMonths();
   return (
     <>
       <RangeTrigger
@@ -304,9 +213,15 @@ export function RangePill<T extends Record<string, unknown>>({
           onOpenChange?.(false);
         }}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { p: 2, mt: 0.5 } } }}
+        slotProps={{ paper: { sx: [{ p: 2, mt: 0.5 }, field.kind === 'day' && DAY_PAPER_SX] } }}
       >
-        <RangeBounds field={field} value={value} onChange={onChange} testId={testId} />
+        <RangeBounds
+          field={field}
+          value={value}
+          onChange={onChange}
+          testId={testId}
+          calendarMonths={calendarMonths}
+        />
         {/* An inverted window is not an error the merchant must fix before the
             list responds — it simply matches nothing, and saying so beats an
             empty grid with no explanation (FUT-668). */}

@@ -78,7 +78,10 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   border: 'none',
   borderRadius: 1,
   cursor: day.disabled ? 'not-allowed' : 'pointer',
-  backgroundColor: backgroundFor(day),
+  // A day hidden by `showOutsideDays={false}` paints nothing: a range running
+  // into the next month otherwise drew blank coloured squares after the last
+  // day of this one (FUT-4144).
+  backgroundColor: visible ? backgroundFor(day) : 'transparent',
   color: colorFor(day, visible),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,
   fontWeight: day.today ? 'bold' : 'normal',
@@ -92,8 +95,18 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   },
 });
 
+/**
+ * A day's spoken name, whole: "1 de outubro de 2026". The cell's text is the
+ * bare number, which a screen reader would read as "1" — in a two-month range
+ * calendar that is two different days.
+ */
+const dayName = (date: Date, locale: string): string =>
+  date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+
 export interface CalendarDayProps {
   day: DayRenderArgs;
+  /** BCP-47 tag the day's accessible name is written in. Default: en-US. */
+  locale?: string;
   focused: boolean;
   showOutsideDays: boolean;
   dayClassName?: (args: DayRenderArgs) => string;
@@ -104,6 +117,7 @@ export interface CalendarDayProps {
 
 export const CalendarDay: FC<CalendarDayProps> = ({
   day,
+  locale = 'en-US',
   focused,
   showOutsideDays,
   dayClassName,
@@ -122,6 +136,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       aria-selected={day.selected}
       aria-disabled={day.disabled}
       aria-current={day.today ? 'date' : undefined}
+      aria-label={visible ? dayName(day.date, locale) : undefined}
       className={dayClassNames(state, dayClassName?.(day))}
       data-testid={`calendar-date-${day.date.getDate()}`}
       onClick={() => onSelect(day.date)}
