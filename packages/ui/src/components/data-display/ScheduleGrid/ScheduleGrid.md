@@ -89,15 +89,20 @@ places them.
   whatever scrolls the grid.
 - A row's name and meta take at most two lines each (the rest cut, the whole text in `title`); a
   closed day's `blockedLabel` stays on one line inside its cell, cut with an ellipsis.
-- **Container queries, not media queries.** From a 1040px container the name column is 200px and
-  every day at least 104px — a block's hours whole beside its edge grips (a long note ellipsizes,
-  whole in `title`, as in the prototype's 1280 frame). From 940 to 1040px the name column is 140px,
-  the total 40px and each day at least 98px (its text 9px off the edges), so the hours still fit: no sideways scroll, grips kept, the header row
-  sticking to the page — a 1280 laptop beside the admin's rail and panel. Below 940px each day keeps
-  at least 152px, grips kept, so every hours and note line is whole; the days scroll sideways
-  inside the grid's own region under the pinned names (the header row then sticks within the grid,
-  not the page). Below 600px the grips go (Shift+arrows still copy; the middle still moves). Never
-  a coloured sliver, never cut hours, and the page itself never scrolls sideways.
+- **Container queries, not media queries; every bound is "from that width up".** The bounds come
+  from the grid's own columns (for a week with totals they fall at 1032px and 914px):
+  - while 200px names, days of at least 104px, the 56px total and the gaps fit: the computer frame
+    — a block's hours whole beside its edge grips; a long note ellipsizes, whole in `title`;
+  - while 140px names, days of at least 98px (their text 9px off each edge) and a 40px total fit:
+    the same, unscrolled, grips kept, the header row sticking to the page — a 1280 laptop beside
+    the admin's rail and panel, even with an always-visible scrollbar (923px);
+  - below that: days of at least 152px, grips kept, every hours and note line whole; the days
+    scroll sideways under the pinned names, and the header row — outside that scroller — still
+    sticks to the page and follows the days sideways;
+  - below 600px: 120px names, days of at least 136px, no grips (Shift+arrows still copy; the
+    middle still moves).
+  Never a coloured sliver, never cut hours, and the page itself never scrolls sideways — whatever
+  the number of days.
 - **The grid is the computer and tablet view.** On a phone, render `DayRuler` for one day at a
   time (the approved prototype, d11-phone); the sideways scroll is the grid's fallback in a
   narrow pane, not a phone layout.

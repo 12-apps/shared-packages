@@ -22,9 +22,14 @@ export function rootSx(hasActions: boolean): SxProps<Theme> {
   });
 }
 
-/** `@container` below which a row stacks and the coverage and axis rows go. */
+/** `@container` below which a row stacks (the coverage and axis rows go full width). Bounds are "from px up". */
 function compact(theme: Theme): string {
-  return `@container (max-width: ${rem(theme, M.compactBelow)})`;
+  return `@container (width < ${rem(theme, M.compactBelow)})`;
+}
+
+/** `@container` below which the pane is phone-sized: no coverage row, no axis. Bounds are "from px up". */
+function phone(theme: Theme): string {
+  return `@container (width < ${rem(theme, M.phoneBelow)})`;
 }
 
 /** Name · track · actions, the coverage row and the axis row share these columns on a computer. */
@@ -33,7 +38,13 @@ export const lineSx: SxProps<Theme> = (theme: Theme) => ({
   gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) var(--dr-actions)`,
   columnGap: rem(theme, M.gap),
   alignItems: 'center',
-  [compact(theme)]: { display: 'none' },
+  // Stacked: across the full width, like the tracks; the label above the counts.
+  [compact(theme)]: {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    rowGap: rem(theme, M.coverage.gap),
+    '& > span:empty': { display: 'none' },
+  },
+  [phone(theme)]: { display: 'none' },
 });
 
 export const coverageLabelSx: SxProps<Theme> = { fontSize: sxRem(M.meta), color: 'text.secondary' };

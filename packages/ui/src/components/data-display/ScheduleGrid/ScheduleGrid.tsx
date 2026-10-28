@@ -7,7 +7,7 @@ import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveLabels } from '../../../utils/resolve-labels';
 import { focusables, handleGridKey } from './ScheduleGrid.keyboard';
 import { GridBody, GridHeader, type CellAbilities } from './ScheduleGrid.parts';
-import { frameSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './ScheduleGrid.styles';
+import { frameSx, headerSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './ScheduleGrid.styles';
 import type { ScheduleGridProps } from './ScheduleGrid.types';
 import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
@@ -68,6 +68,13 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const hasTotal = props.totalLabel !== undefined || rows.some((row) => row.total !== undefined);
   const rowSx = rowGridSx(columns.length, hasTotal);
 
+  const headRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  // The header row keeps the body's sideways scroll, so each day's header stays over its column.
+  const followSideways = (): void => {
+    if (headRef.current && bodyRef.current) headRef.current.scrollLeft = bodyRef.current.scrollLeft;
+  };
+
   const onKeyDown = (event: React.KeyboardEvent): void => {
     focus.forget();
     if (!rootRef.current) return;
@@ -76,24 +83,21 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
 
   return (
     <Box sx={rootSx} data-testid={testId}>
-      <Box sx={scrollSx} data-testid={`${testId}-scroll`}>
-        <Box
-          ref={rootRef}
-          role="table"
-          aria-label={props['aria-label']}
-          aria-busy={props.loading || undefined}
-          aria-description={props.loading ? labels.loading : undefined}
-          sx={frameSx(columns.length, hasTotal)}
-          onKeyDown={onKeyDown}
-          onPointerDownCapture={focus.forget}
-        >
-          <GridHeader
-            columns={columns}
-            totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined}
-            rowSx={rowSx}
-            stickyTop={props.stickyTop ?? 0}
-            testId={testId}
-          />
+      <Box
+        ref={rootRef}
+        role="table"
+        aria-label={props['aria-label']}
+        aria-busy={props.loading || undefined}
+        aria-description={props.loading ? labels.loading : undefined}
+        sx={frameSx(columns.length, hasTotal)}
+        onKeyDown={onKeyDown}
+        onPointerDownCapture={focus.forget}
+      >
+        {/* The header row sits outside the sideways scroller, so it sticks to the page; it follows the days sideways. */}
+        <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`}>
+          <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} rowSx={rowSx} testId={testId} />
+        </Box>
+        <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={followSideways}>
           <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
         </Box>
       </Box>

@@ -172,3 +172,54 @@ export const ShortLabelByWidth: Story = {
     await waitFor(() => expect(canvas.getByTestId('dr-block-n').innerText.trim()).toBe('18:00'));
   },
 };
+
+/**
+ * B3 (D-E4, D-E5): a stacked ruler (a 736px pane) still draws "Na escala, por
+ * hora" and the hour axis, across the full width like the tracks; only a
+ * phone-sized pane (560px) drops them.
+ */
+export const CoverageAndAxisWhileStacked: Story = {
+  args: {
+    coverage: [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+    coverageLabel: 'Na escala, por hora',
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ width: 736 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const track = canvas.getByTestId('dr-track-bruno');
+    const row = canvas.getByTestId('dr-row-bruno');
+    // Stacked: the track takes the row's whole width, under the name.
+    await waitFor(() => expect(Math.abs(track.getBoundingClientRect().width - row.getBoundingClientRect().width)).toBeLessThanOrEqual(1));
+    const coverage = canvas.getByTestId('dr-coverage');
+    const axis = canvas.getByTestId('dr-axis');
+    await expect(coverage).toBeVisible();
+    await expect(axis).toBeVisible();
+    await expect(canvas.getByText('Na escala, por hora')).toBeVisible();
+    const bars = coverage.lastElementChild?.previousElementSibling ?? coverage;
+    await expect(Math.abs(bars.getBoundingClientRect().left - track.getBoundingClientRect().left)).toBeLessThanOrEqual(1);
+    await expect(Math.abs(bars.getBoundingClientRect().width - track.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
+  },
+};
+
+/** A phone-sized pane (560px): no coverage row, no axis. */
+export const NoCoverageOnAPhonePane: Story = {
+  args: CoverageAndAxisWhileStacked.args,
+  decorators: [
+    (Story) => (
+      <div style={{ width: 560 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() => expect(canvas.getByTestId('dr-coverage')).not.toBeVisible());
+    await waitFor(() => expect(canvas.getByTestId('dr-axis')).not.toBeVisible());
+  },
+};

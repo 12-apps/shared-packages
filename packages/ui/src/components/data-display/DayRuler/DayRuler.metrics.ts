@@ -13,6 +13,12 @@ export const DAY_RULER_METRICS = {
    * rounded up.
    */
   compactBelow: 800,
+  /**
+   * Below this container width the pane is phone-sized: no coverage row and
+   * no hour axis. Between it and `compactBelow` the rows stack and the two
+   * lines are drawn across the full width, like the tracks.
+   */
+  phoneBelow: 600,
   rowPaddingY: 8,
   track: { height: 40, compactHeight: 30, radius: 8, compactRadius: 6 },
   block: { top: 4, height: 24, compactTop: 3, compactHeight: 20, radius: 6, paddingX: 6, font: 12, hitArea: 40 },

@@ -528,9 +528,12 @@ describe("states", () => {
 
   it("holds only rows directly inside the table: the error and the empty node sit in a row's cell", async () => {
     const { rerender } = renderGrid({ error: <p>Não foi possível carregar a escala</p> });
+    /** The table's children, seen through its role="none" wrappers (the header frame, the scroller). */
     const onlyRows = (): void => {
       const table = screen.getByRole("table");
-      for (const child of Array.from(table.children)) expect(["row", "rowgroup"]).toContain(child.getAttribute("role"));
+      const through = (el: Element): Element[] =>
+        Array.from(el.children).flatMap((child) => (child.getAttribute("role") === "none" ? through(child) : [child]));
+      for (const child of through(table)) expect(["row", "rowgroup"]).toContain(child.getAttribute("role"));
     };
     onlyRows();
     expect(screen.getByText("Não foi possível carregar a escala").closest('[role="cell"]')).not.toBeNull();
@@ -562,9 +565,11 @@ describe("selection and the sticky header", () => {
     expect(block("k1")).not.toHaveAttribute("aria-current");
   });
 
-  it("pins the header row at stickyTop", async () => {
+  it("pins the header row at stickyTop, outside the sideways scroller", async () => {
     renderGrid({ stickyTop: 64 });
-    const header = screen.getByTestId("sg-header");
+    const header = screen.getByTestId("sg-head");
+    expect(header).toContainElement(screen.getByTestId("sg-header"));
+    expect(screen.getByTestId("sg-scroll")).not.toContainElement(screen.getByTestId("sg-header"));
     expect(getComputedStyle(header).position).toBe("sticky");
     expect(getComputedStyle(header).top).toBe("4rem");
   });

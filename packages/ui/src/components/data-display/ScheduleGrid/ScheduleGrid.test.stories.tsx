@@ -194,9 +194,8 @@ const cut = (el: Element): boolean => {
 async function phonePane(canvasElement: HTMLElement): Promise<void> {
   const canvas = within(canvasElement);
   const scroll = canvas.getByTestId('sg-scroll');
-  const table = canvas.getByRole('table');
   await waitFor(() => expect(getComputedStyle(scroll).overflowX).toBe('auto'));
-  await expect(table.getBoundingClientRect().width).toBeGreaterThan(scroll.getBoundingClientRect().width);
+  await expect(canvas.getByTestId('sg-row-ana').getBoundingClientRect().width).toBeGreaterThan(scroll.getBoundingClientRect().width);
   for (const block of canvas.getAllByRole('button').filter((el) => el.hasAttribute('data-sg-block'))) {
     await expect(block.getBoundingClientRect().width).toBeGreaterThanOrEqual(80);
   }
@@ -204,9 +203,9 @@ async function phonePane(canvasElement: HTMLElement): Promise<void> {
   if (!label) throw new Error('no label line');
   await expect(cut(label)).toBe(false);
   await expect(getComputedStyle(canvas.getAllByRole('rowheader')[0] as HTMLElement).position).toBe('sticky');
-  await expect(canvasElement.ownerDocument.documentElement.getBoundingClientRect().width).toBeLessThanOrEqual(
-    canvasElement.ownerDocument.defaultView?.innerWidth ?? 0,
-  );
+  const page = canvasElement.ownerDocument.documentElement;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth);
 }
 
 const pane = (width: number) => [
@@ -279,12 +278,12 @@ async function laptopPane(canvasElement: HTMLElement, scrolls: boolean): Promise
   const scroll = canvas.getByTestId('sg-scroll');
   const table = canvas.getByRole('table');
   await waitFor(() => expect(getComputedStyle(scroll).overflowX).toBe(scrolls ? 'auto' : 'visible'));
-  if (!scrolls) await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(scroll.getBoundingClientRect().width + 0.5);
+  const row = canvas.getByTestId('sg-row-ana');
+  if (!scrolls) await expect(row.getBoundingClientRect().width).toBeLessThanOrEqual(scroll.getBoundingClientRect().width + 0.5);
   await expect(visibleGrips(canvasElement)).toBeGreaterThan(0);
   for (const line of Array.from(canvasElement.querySelectorAll('[data-sg-line="label"]'))) {
     await expect({ text: line.textContent, cut: cut(line) }).toEqual({ text: line.textContent, cut: false });
   }
-  if (scrolls) return;
   const header = canvas.getByTestId('sg-header');
   const view = canvasElement.ownerDocument.defaultView;
   if (!view) throw new Error('no window');
@@ -295,7 +294,9 @@ async function laptopPane(canvasElement: HTMLElement, scrolls: boolean): Promise
   view.scrollTo(0, 0);
 }
 
-export const LaptopPane930: Story = { args: tabletArgs, decorators: laptop(930), play: async ({ canvasElement }) => laptopPane(canvasElement, true) };
+/** R4-1: the real 1280 admin with an always-visible 17px scrollbar on <main> leaves 923px. */
+export const LaptopPane923: Story = { args: tabletArgs, decorators: laptop(923), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
+export const LaptopPane930: Story = { args: tabletArgs, decorators: laptop(930), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
 export const LaptopPane960: Story = { args: tabletArgs, decorators: laptop(960), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
 export const LaptopPane990: Story = { args: tabletArgs, decorators: laptop(990), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
 export const LaptopPane1030: Story = { args: tabletArgs, decorators: laptop(1030), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
@@ -307,5 +308,60 @@ export const ScrolledPaneKeepsGrips: Story = {
   play: async ({ canvasElement }) => {
     await waitFor(() => expect(getComputedStyle(within(canvasElement).getByTestId('sg-scroll')).overflowX).toBe('auto'));
     await expect(visibleGrips(canvasElement)).toBeGreaterThan(0);
+  },
+};
+
+/** A page scroll of `by` px: the header row stays at the top while the table goes past. */
+async function headerSticksToThePage(canvasElement: HTMLElement, by = 40): Promise<void> {
+  const canvas = within(canvasElement);
+  const header = canvas.getByTestId('sg-header');
+  const table = canvas.getByRole('table');
+  const view = canvasElement.ownerDocument.defaultView;
+  if (!view) throw new Error('no window');
+  view.scrollTo(0, header.getBoundingClientRect().top + view.scrollY + by);
+  await waitFor(() => expect(Math.abs(header.getBoundingClientRect().top)).toBeLessThanOrEqual(1));
+  await expect(table.getBoundingClientRect().top).toBeLessThan(-(by - 10));
+  view.scrollTo(0, 0);
+}
+
+/**
+ * B1 (ADR 0173, G-L2): while the days scroll sideways (a 900px and a 768px
+ * window's container) the header row still sticks to the PAGE, and it follows
+ * the days sideways — each day's header over its own column.
+ */
+async function scrolledHeader(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const scroll = canvas.getByTestId('sg-scroll');
+  const row = canvas.getByTestId('sg-row-ana');
+  await waitFor(() => expect(getComputedStyle(scroll).overflowX).toBe('auto'));
+  await expect(row.getBoundingClientRect().width).toBeGreaterThan(scroll.getBoundingClientRect().width + 1);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  scroll.scrollLeft = 120;
+  scroll.dispatchEvent(new Event('scroll'));
+  const day = canvas.getAllByRole('columnheader')[2] as HTMLElement;
+  const cellOfDay = canvas.getByTestId('sg-cell-ana-2');
+  await waitFor(() => expect(Math.abs(day.getBoundingClientRect().left - cellOfDay.getBoundingClientRect().left)).toBeLessThanOrEqual(1));
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  scroll.scrollLeft = 0;
+  scroll.dispatchEvent(new Event('scroll'));
+  await headerSticksToThePage(canvasElement);
+}
+
+export const StickyHeaderWhileScrolling836: Story = { args: tabletArgs, decorators: laptop(836), play: async ({ canvasElement }) => scrolledHeader(canvasElement) };
+export const StickyHeaderWhileScrolling704: Story = { args: tabletArgs, decorators: laptop(704), play: async ({ canvasElement }) => scrolledHeader(canvasElement) };
+
+const FORTNIGHT = Array.from({ length: 14 }, (_, day) => ({ label: `Dia ${day + 1}`, today: day === 0 }));
+
+/** B2: fourteen days in a 1216px container scroll inside the grid; the page never scrolls sideways. */
+export const FourteenDays: Story = {
+  args: { columns: FORTNIGHT, ...tabletArgs },
+  decorators: laptop(1216),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = canvasElement.ownerDocument.documentElement;
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(page.scrollWidth).toBeLessThanOrEqual(page.clientWidth));
+    await expect(getComputedStyle(canvas.getByTestId('sg-scroll')).overflowX).toBe('auto');
+    await headerSticksToThePage(canvasElement);
   },
 };

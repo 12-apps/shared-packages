@@ -88,6 +88,9 @@ export function chipsSx(top: number): SxProps<Theme> {
     mt: top,
     minWidth: 0,
     overflow: 'hidden',
+    // Over the name button's 40px hit area, which reaches into the space above them.
+    position: 'relative',
+    zIndex: 1,
     '& > *': { minWidth: 0, flexShrink: 1, maxWidth: '100%' },
   };
 }

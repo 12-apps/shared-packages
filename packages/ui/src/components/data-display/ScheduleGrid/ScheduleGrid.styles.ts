@@ -18,35 +18,57 @@ function trackCount(dayCount: number, hasTotal: boolean): number {
 }
 
 /**
- * The column widths, as variables every row reads. On a computer the day
- * columns share what is left (their text ellipsizes) and the grid fits its
- * container. Under a container break each day keeps a minimum width
- * (`dayMin`), so a block still says its hours and note; the grid is then as
- * wide as its minimums and the scroll region around it (`scrollSx`) scrolls
- * it sideways, the name column pinned. Container queries, never media queries.
+ * The narrowest container a layout fits in, in px: its name column, its days
+ * at their minimum, its total, and the gaps between them — for THIS grid's
+ * day count, so a fortnight scrolls where a week still fits.
+ */
+function fitsFrom(dayCount: number, hasTotal: boolean, name: number, day: number, total: number): number {
+  return name + dayCount * day + (hasTotal ? total : 0) + (trackCount(dayCount, hasTotal) - 1) * M.gap;
+}
+
+/** `@container (width < px)`: every bound is "from px up" (ranges are exclusive below, inclusive above). */
+function below(theme: Theme, px: number): string {
+  return `@container (width < ${rem(theme, px)})`;
+}
+
+/**
+ * The column widths, as variables every row reads, by the container's width:
+ * - from `wide` up: 200px names, days of at least 104px with their grips;
+ * - from `compact` up: 140px names, 40px total, days of at least 98px — still
+ *   unscrolled, grips kept, the header row sticking to the page;
+ * - below `compact`: days of at least 152px, grips kept; the body scrolls
+ *   sideways under the pinned names and the header row follows it sideways
+ *   while it still sticks to the page (`GridScrolls` keeps the two in step);
+ * - below 600px: 120px names, 136px days, no grips.
+ * The `wide` and `compact` bounds come from this grid's own day count
+ * (`fitsFrom`). Container queries, never media queries.
  */
 export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
   return (theme: Theme) => {
     const terms = ['var(--sg-name)', `${dayCount} * var(--sg-day)`, `${trackCount(dayCount, hasTotal) - 1} * ${rem(theme, M.gap)}`];
     if (hasTotal) terms.push('var(--sg-total)');
+    const wide = fitsFrom(dayCount, hasTotal, M.nameColumn.wide, M.dayMin.wide, M.totalColumn.wide);
+    const compact = fitsFrom(dayCount, hasTotal, M.nameColumn.compact, M.dayMin.compact, M.totalColumn.compact);
     return {
       '--sg-name': rem(theme, M.nameColumn.wide),
       '--sg-total': rem(theme, M.totalColumn.wide),
       '--sg-day': rem(theme, M.dayMin.wide),
-      minWidth: `calc(${terms.join(' + ')})`,
-      [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
-        '--sg-name': rem(theme, M.nameColumn.medium),
-        '--sg-total': rem(theme, M.totalColumn.narrow),
-        '--sg-day': rem(theme, M.dayMin.medium),
+      // What every row is at least: its own columns at their minimums.
+      '--sg-min': `calc(${terms.join(' + ')})`,
+      [below(theme, wide)]: {
+        '--sg-name': rem(theme, M.nameColumn.compact),
+        '--sg-total': rem(theme, M.totalColumn.compact),
+        '--sg-day': rem(theme, M.dayMin.compact),
         '& [data-sg-block]': { paddingLeft: rem(theme, M.blockPadding.tight), paddingRight: rem(theme, M.blockPadding.tight) },
       },
-      [`@container (max-width: ${rem(theme, M.containerBreak.scroll)})`]: {
-        '--sg-name': rem(theme, M.nameColumn.scrolled),
+      [below(theme, compact)]: {
         '--sg-day': rem(theme, M.dayMin.scrolled),
         '& [data-sg-block]': {
           paddingLeft: rem(theme, M.blockPadding.start),
           paddingRight: rem(theme, M.blockPadding.end),
         },
+        '& > [data-sg-scroll]': { overflowX: 'auto', overscrollBehaviorX: 'contain' },
+        '& > [data-sg-head]': { overflowX: 'hidden' },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {
@@ -59,7 +81,7 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
         },
         '& [data-sg-group-title]': { position: 'sticky', left: 0, width: 'fit-content' },
       },
-      [`@container (max-width: ${rem(theme, M.containerBreak.narrow)})`]: {
+      [below(theme, M.narrowBelow)]: {
         '--sg-name': rem(theme, M.nameColumn.narrow),
         '--sg-day': rem(theme, M.dayMin.narrow),
         // A phone-sized pane is read and tapped, not dragged (a phone renders
@@ -69,22 +91,14 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
       },
       display: 'flex',
       flexDirection: 'column',
+      minWidth: 0,
       userSelect: 'none',
     };
   };
 }
 
-/**
- * Around the table: under the scroll break it scrolls sideways when the days'
- * minimums do not fit (the header row then sticks within it, not the page).
- */
-export const scrollSx: SxProps<Theme> = (theme: Theme) => ({
-  minWidth: 0,
-  [`@container (max-width: ${rem(theme, M.containerBreak.scroll)})`]: {
-    overflowX: 'auto',
-    overscrollBehaviorX: 'contain',
-  },
-});
+/** The body: scrolls sideways (under the compact bound) when the days' minimums do not fit. */
+export const scrollSx: SxProps<Theme> = { minWidth: 0 };
 
 /** One line of the grid — the header or a person — as the shared columns. */
 /** A style that may sit in an `sx` array next to another. */
@@ -96,20 +110,29 @@ export function rowGridSx(dayCount: number, hasTotal: boolean): SxPart {
     gridTemplateColumns: `var(--sg-name) repeat(${dayCount}, minmax(var(--sg-day), 1fr))${hasTotal ? ' var(--sg-total)' : ''}`,
     gap: rem(theme, M.gap),
     alignItems: 'stretch',
+    minWidth: 'var(--sg-min)',
   });
 }
 
-/** The header row: opaque, and pinned to the top of whatever scrolls the grid. */
+/**
+ * Around the header row: opaque, pinned to the top of the PAGE (or whatever
+ * scrolls the grid vertically) — it is not inside the sideways scroller, so
+ * it sticks at every width; while the days scroll it follows them sideways.
+ */
 export function headerSx(stickyTop: number): SxPart {
   return (theme: Theme) => ({
     position: 'sticky',
     top: rem(theme, stickyTop),
-    zIndex: 1,
+    zIndex: 3,
     backgroundColor: theme.palette.background.default,
-    paddingTop: theme.spacing(0.75),
-    paddingBottom: theme.spacing(0.75),
   });
 }
+
+/** The header row itself, inside its sticky frame. */
+export const headerRowSx: SxPart = (theme: Theme) => ({
+  paddingTop: theme.spacing(0.75),
+  paddingBottom: theme.spacing(0.75),
+});
 
 export function headerCellSx(today: boolean): SxProps<Theme> {
   return {

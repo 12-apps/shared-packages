@@ -16,7 +16,7 @@ import {
   groupTitleSx,
   headerCellSx,
   headerSublabelSx,
-  headerSx,
+  headerRowSx,
   nameCellSx,
   personRowSx,
   plusButtonSx,
@@ -229,14 +229,13 @@ interface HeaderProps {
   /** Present when the grid has a last column. */
   totalLabel?: string;
   rowSx: RowSx;
-  stickyTop: number;
   testId: string;
 }
 
 /** The days, their counts and the total column's header — pinned while the grid scrolls. */
-export function GridHeader({ columns, totalLabel, rowSx, stickyTop, testId }: HeaderProps): React.JSX.Element {
+export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps): React.JSX.Element {
   return (
-    <Box role="row" sx={[rowSx, headerSx(stickyTop)]} data-testid={`${testId}-header`}>
+    <Box role="row" sx={[rowSx, headerRowSx]} data-testid={`${testId}-header`}>
       {/* Above the names: a cell of the header row, with nothing to head. */}
       <span role="cell" data-sg-corner="" />
       {columns.map((column, day) => (
