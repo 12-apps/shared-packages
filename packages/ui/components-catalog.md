@@ -351,6 +351,13 @@ Components for user input and form interactions.
 **Location**: `src/components/form/DateRangePicker`
 **Docs**: `src/components/form/DateRangePicker/DateRangePicker.md`
 
+### CepField
+**Purpose**: CEP input that masks, looks the address up and hands it back to fill the form
+**Use Cases**: Delivery/checkout address forms, supplier and store-location forms
+**Features**: `#####-###` mask, debounced race-safe lookup injected via `onLookup`, live-region status, degrades to a plain input, `size` (the `Input` scale) and `labelPlacement` (`above` | `inside`) to sit level with `Input`s
+**Location**: `src/components/form/CepField`
+**Docs**: `src/components/form/CepField/CepField.md`
+
 ### Checkbox
 **Purpose**: Toggle selection checkbox
 **Use Cases**: Multi-select, boolean options, agreements

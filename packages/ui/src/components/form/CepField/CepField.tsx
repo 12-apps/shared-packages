@@ -118,6 +118,29 @@ function CepStatus({
   );
 }
 
+/** The stacked label over the box (`labelPlacement="above"`), or nothing when there is no label. */
+function AboveLabel({
+  name,
+  label,
+  error,
+}: {
+  name: string;
+  label?: string;
+  error?: string;
+}): React.ReactElement | null {
+  if (!label) return null;
+  return (
+    <FormLabel htmlFor={name} error={Boolean(error)}>
+      {label}
+    </FormLabel>
+  );
+}
+
+/** The label handed to the `Input`, which draws it in the box: only for `inside`. */
+function insideLabel(label: string | undefined, placement: 'above' | 'inside'): string | undefined {
+  return placement === 'inside' ? label : undefined;
+}
+
 /**
  * A CEP input that fills the rest of the address in.
  *
@@ -156,6 +179,8 @@ export function CepField({
   name = 'postalCode',
   dataTestId,
   copy,
+  size, // undefined reaches `Input`, whose own default is `md`
+  labelPlacement = 'above',
 }: CepFieldProps): React.ReactElement {
   const testId = dataTestId ?? `cep-field-${name}`;
 
@@ -176,17 +201,18 @@ export function CepField({
 
   return (
     <FormControl fullWidth>
-      {label && (
-        <FormLabel htmlFor={name} error={Boolean(error)}>
-          {label}
-        </FormLabel>
-      )}
+      {labelPlacement === 'above' && <AboveLabel name={name} label={label} error={error} />}
       <Input
         id={name}
         name={name}
         type="text"
         inputMode="numeric"
         autoComplete="postal-code"
+        size={size}
+        // `inside`: the label is the Input's own, drawn in the box and floating
+        // up on focus or a value — what every other `Input` in the form does.
+        // `above` keeps the stacked `FormLabel`, for callers that never opted in.
+        label={insideLabel(label, labelPlacement)}
         placeholder={placeholder}
         value={value}
         error={Boolean(error)}

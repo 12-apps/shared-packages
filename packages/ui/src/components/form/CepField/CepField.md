@@ -20,6 +20,7 @@ serves a supplier form, a store-location form or a delivery checkout.
 - Race-safe: a slow response for a since-edited CEP can never overwrite a newer one
 - Degrades to a plain masked input when the lookup fails, throws, or is absent
 - Accessible status via `role="status"` / `aria-live="polite"` and `aria-busy`
+- Takes `Input`'s `size`, and can float its label inside the box like `Input`
 - Works uncontrolled-by-a-form (props) or bound to `total-form` (`Fields.CepField`)
 
 ## Props Documentation
@@ -42,6 +43,11 @@ serves a supplier form, a store-location form or a delivery checkout.
 - `placeholder`: Placeholder text (default `00000-000`)
 - `name`: Field name / input id (default `postalCode`)
 - `dataTestId`: Test id for the input (default `cep-field-<name>`)
+- `size`: A step of the `Input` size scale (`xs` | `sm` | `md` | `lg` | `xl`, default
+  `md`). Same values and same box heights as `Input`, so a `CepField` at `size="sm"`
+  stands level with `sm` `Input`s
+- `labelPlacement`: `above` (default) stacks the label over the box; `inside` draws it
+  in the box and floats it up on focus or a value, exactly as `Input`'s label does
 
 ### State Props
 
@@ -82,6 +88,20 @@ const [cep, setCep] = useState('');
   }}
 />
 ```
+
+### Beside compact `Input`s
+
+An address form made of `Input`s draws every label inside its box. Opt the CEP in to
+the same treatment, and give it the form's `size`, so the CEP block is no taller than
+its neighbours:
+
+```tsx
+<CepField size="sm" labelPlacement="inside" value={cep} onChange={setCep} copy={copy} />
+<Input size="sm" label="Rua" />
+```
+
+`labelPlacement` defaults to `above` so a form that never asked keeps the stacked label
+it has always had. `Fields.CepField` takes the same two props.
 
 ### Bound to `total-form`
 
@@ -135,4 +155,6 @@ the lookup. The pure helpers (`formatCep`, `isValidCep`) live in
 - `aria-busy` reflects the in-flight lookup
 - `aria-describedby` links the input to its status region
 - `inputMode="numeric"` brings up the numeric keypad on mobile
+- With `labelPlacement="inside"` the label is the `Input`'s own, associated to the input
+  by `for`/`id`, so `getByLabelText` and screen readers name the field the same way
 - `autoComplete="postal-code"` lets the browser's own autofill participate

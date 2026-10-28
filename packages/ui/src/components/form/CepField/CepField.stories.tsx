@@ -5,6 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 
 import { CepField } from './CepField';
+import { Input } from '../Input';
 import type { CepAddress } from './CepField.types';
 import { PT_BR_CEP_FIELD_COPY } from '../../../pt-BR';
 
@@ -107,6 +108,29 @@ export const CustomLabel: Story = {
 
 export const Disabled: Story = {
   render: () => <Demo disabled />,
+};
+
+/**
+ * Beside compact `Input`s: `size="sm"` and `labelPlacement="inside"` put the CEP in the
+ * same box height, with the same floating label, as the fields around it.
+ */
+export const BesideInputs: Story = {
+  render: function BesideInputsStory() {
+    const [cep, setCep] = useState('');
+    return (
+      <Stack spacing={2} sx={{ maxWidth: 420 }}>
+        <CepField
+          copy={PT_BR_CEP_FIELD_COPY}
+          size="sm"
+          labelPlacement="inside"
+          value={cep}
+          onChange={setCep}
+        />
+        <Input size="sm" label="Rua" fullWidth />
+        <Input size="sm" label="Número" fullWidth />
+      </Stack>
+    );
+  },
 };
 
 /** Every provider is down. The field degrades to a plain masked input. */
