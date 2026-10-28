@@ -1,9 +1,11 @@
 import Box from '@mui/material/Box/index.js';
 import type * as React from 'react';
+import { useRef } from 'react';
 
 import { ScheduleNameCell } from '../ScheduleGrid/ScheduleNameCell';
 import type { RulerAbilities, RulerScale } from './DayRuler.keyboard';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
+import { useTextFits } from './useTextFits';
 import { formatHour, formatRange, percentOf, ticksOf } from './day-ruler-model';
 import {
   actionsSx,
@@ -96,7 +98,9 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
   const { can, dragApi, scale } = ctx;
   const movable = can.move && Boolean(block.movable);
   const resizable = can.resize && Boolean(block.resizable);
-  const narrow = (block.end - block.start) / (scale.to - scale.from) < M.narrowShare;
+  const ref = useRef<HTMLButtonElement | null>(null);
+  // Short by pixels; where nothing can be measured, by the prototype's 30% rule.
+  const fits = useTextFits(ref, text, (block.end - block.start) / (scale.to - scale.from) >= M.narrowShare);
   const press = (mode: 'move' | 'start' | 'end') => (event: React.PointerEvent<HTMLElement>) =>
     dragApi.startBlock(event, row.id, block, mode);
   return (
@@ -107,7 +111,8 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
       title={block.title ?? block.label}
       aria-keyshortcuts={shortcutsOf(movable, resizable)}
       aria-current={block.selected ? 'true' : undefined}
-      data-narrow={narrow ? '' : undefined}
+      ref={ref}
+      data-narrow={fits ? undefined : ''}
       data-tone={block.tone}
       data-testid={testId}
       onPointerDown={movable ? press('move') : undefined}

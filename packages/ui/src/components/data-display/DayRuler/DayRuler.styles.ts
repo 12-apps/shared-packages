@@ -124,6 +124,10 @@ export function breakSx(span: Span): SxProps<Theme> {
     width: `${span.share}%`,
     background: breakHatch(theme, rem(theme, M.breakStripe.ink), rem(theme, M.breakStripe.ink + M.breakStripe.gap)),
     pointerEvents: 'none',
+    // Where the band meets an end of the block it takes the block's rounding:
+    // on a phone the block does not clip (its hit area reaches past it).
+    ...(span.at <= 0.01 ? { borderTopLeftRadius: 'inherit', borderBottomLeftRadius: 'inherit' } : {}),
+    ...(span.at + span.share >= 99.99 ? { borderTopRightRadius: 'inherit', borderBottomRightRadius: 'inherit' } : {}),
   });
 }
 

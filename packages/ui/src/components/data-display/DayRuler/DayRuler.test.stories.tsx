@@ -125,3 +125,50 @@ export const Adornment: Story = {
     await expect(tag.left >= name.right - 0.5 || tag.top >= name.bottom - 0.5).toBe(true);
   },
 };
+
+/**
+ * R2-2: a name that is a button sits as a block of its own height — no
+ * baseline strut — so the meta starts right under it, as in the prototype
+ * (d02: ~22px from the name's top to the meta's).
+ */
+export const NameButtonKeepsTheRowTight: Story = {
+  args: {
+    rows: [
+      { id: 'b', label: 'Bruno Lima', meta: 'em turno desde 08:26 · sem escala', onLabelClick: fn(), blocks: [] },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole('button', { name: 'Bruno Lima' });
+    const meta = canvas.getByText('em turno desde 08:26 · sem escala');
+    await expect(getComputedStyle(button).display).toBe('block');
+    const gap = meta.getBoundingClientRect().top - button.getBoundingClientRect().bottom;
+    await expect(gap).toBeGreaterThanOrEqual(0);
+    await expect(gap).toBeLessThanOrEqual(3);
+  },
+};
+
+/**
+ * On a narrow ruler a block says only its start when its range does not fit
+ * it, by pixels: a 5-hour block keeps "18:00–23:00", a 1-hour one says "18:00".
+ */
+export const ShortLabelByWidth: Story = {
+  args: {
+    rows: [
+      { id: 'a', label: 'Ana', blocks: [{ id: 'w', start: 18, end: 23, label: '18:00–23:00', shortLabel: '18:00', tone: 'plan' }] },
+      { id: 'c', label: 'Caio', blocks: [{ id: 'n', start: 18, end: 19, label: '18:00–19:00', shortLabel: '18:00', tone: 'plan' }] },
+    ],
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ width: 756 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() => expect(canvas.getByTestId('dr-block-w').innerText.trim()).toBe('18:00–23:00'));
+    await waitFor(() => expect(canvas.getByTestId('dr-block-n').innerText.trim()).toBe('18:00'));
+  },
+};

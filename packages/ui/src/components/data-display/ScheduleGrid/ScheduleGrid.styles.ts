@@ -32,11 +32,15 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
     return {
       '--sg-name': rem(theme, M.nameColumn.wide),
       '--sg-total': rem(theme, M.totalColumn.wide),
-      '--sg-day': '0%',
+      '--sg-day': rem(theme, M.dayMin.wide),
       minWidth: `calc(${terms.join(' + ')})`,
       [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
         '--sg-name': rem(theme, M.nameColumn.medium),
-        '--sg-day': rem(theme, M.dayMin.medium),
+        '--sg-day': rem(theme, M.dayMin.scrolled),
+        // A tablet's grid is read and tapped more than dragged: the grips would
+        // eat the room the hours need (Shift+arrows still copy, the middle still moves).
+        '& [data-sg-grip]': { display: 'none' },
+        '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {
@@ -52,11 +56,6 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
       [`@container (max-width: ${rem(theme, M.containerBreak.narrow)})`]: {
         '--sg-name': rem(theme, M.nameColumn.narrow),
         '--sg-total': rem(theme, M.totalColumn.narrow),
-        '--sg-day': rem(theme, M.dayMin.narrow),
-        // A narrow grid is read, not dragged (a phone renders DayRuler per
-        // day): the grips would cover the whole block.
-        '& [data-sg-grip]': { display: 'none' },
-        '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
       },
       display: 'flex',
       flexDirection: 'column',

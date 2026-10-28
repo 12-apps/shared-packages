@@ -7,15 +7,22 @@ export const SCHEDULE_GRID_METRICS = {
   /** The name column on a computer; it narrows with the container (see `nameColumn`). */
   nameColumn: { wide: 200, medium: 140, narrow: 120 },
   /**
-   * The narrowest a day column gets under a container break: a block there
-   * still says "20:39" and its note. Past it the days scroll sideways under a
-   * pinned name column — never slivers.
+   * The narrowest a day column gets. On a computer (grips on both sides of a
+   * block) `wide` keeps the hours whole ("20:39–00:00" is 67px). Under the
+   * medium break the grips go and `scrolled` keeps every hours and note line
+   * whole (the longest, "↻ a cada 2 semanas", is 113px). Past it the days
+   * scroll sideways under a pinned name column — never slivers, never cut hours.
    */
-  dayMin: { medium: 80, narrow: 96 },
+  dayMin: { wide: 104, scrolled: 136 },
   /** The total column ("18h"). */
   totalColumn: { wide: 56, narrow: 40 },
   /** Container widths below which the name column narrows and the days get their minimum. */
-  containerBreak: { medium: 900, narrow: 600 },
+  /**
+   * `medium`: where seven days at `dayMin.wide` beside a 200px name column
+   * and the total stop fitting (200 + 7 × 104 + 56 + 8 gaps of 6 = 1032,
+   * rounded up). Below it the grid scrolls rather than cut the hours.
+   */
+  containerBreak: { medium: 1040, narrow: 600 },
   /** Between columns and between rows. */
   gap: 6,
   cellMinHeight: 56,

@@ -222,3 +222,35 @@ export const PhonePane390: Story = { decorators: pane(390), play: async ({ canva
 
 /** A 320px pane: the same. */
 export const PhonePane320: Story = { decorators: pane(320), play: async ({ canvasElement }) => phonePane(canvasElement) };
+
+/** Every note a turno carries in the prototype and the FUT-3881 slots, the longest included. */
+const TABLET_CELLS: Record<string, ScheduleGridCell> = {
+  'ana:0': { blocks: [{ id: 't1', label: '20:39–00:00', note: 'Atrasado', tone: 'late', movable: true, copyable: true }] },
+  'ana:1': { blocks: [{ id: 't2', label: '17:00–23:00', note: '↻ toda semana', tone: 'plan', movable: true, copyable: true }] },
+  'ana:2': { blocks: [{ id: 't3', label: '11:00–17:00', note: '↻ a cada 2 semanas', tone: 'plan', movable: true, copyable: true }] },
+  'ana:3': { blocks: [{ id: 't4', label: '11:00–19:00', note: 'pausa 14:00–15:00', tone: 'plan', movable: true, copyable: true }] },
+  'bia:0': { blocks: [{ id: 't5', label: '21:00–23:30', note: 'Sem ninguém', tone: 'uncovered', movable: true }] },
+  'bia:2': { blocks: [{ id: 't6', label: 'Em turno', note: 'desde 08:26', tone: 'onduty' }] },
+  'bia:4': { blocks: [{ id: 't7', label: '18:00–22:00', note: 'Ausente', tone: 'away', movable: true }] },
+};
+
+/**
+ * R2-1 (G-E3): on a tablet's container (a 768px and a 900px window less the
+ * page's padding) every block's hours and note are whole — the state stays in
+ * words — and the days scroll sideways when they do not fit.
+ */
+async function tabletPane(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const lines = Array.from(canvasElement.querySelectorAll('[data-sg-line]'));
+  await expect(lines).toHaveLength(14);
+  for (const line of lines) await expect({ text: line.textContent, cut: cut(line) }).toEqual({ text: line.textContent, cut: false });
+  await expect(getComputedStyle(canvas.getByTestId('sg-scroll')).overflowX).toBe('auto');
+}
+
+const tabletArgs = { cell: (rowId: string, day: number): ScheduleGridCell => TABLET_CELLS[`${rowId}:${day}`] ?? { blocks: [] } };
+
+/** A 768px window: the grid's container is 704px. */
+export const TabletPane768: Story = { args: tabletArgs, decorators: pane(704), play: async ({ canvasElement }) => tabletPane(canvasElement) };
+
+/** A 900px window: the grid's container is 836px. */
+export const TabletPane900: Story = { args: tabletArgs, decorators: pane(836), play: async ({ canvasElement }) => tabletPane(canvasElement) };

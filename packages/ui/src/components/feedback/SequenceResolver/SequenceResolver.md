@@ -114,6 +114,8 @@ the end screen). It shows the overview **in the same dialog without ending the r
 └──────────────────────────────────────────────┘
 ```
 
+- **Each row is the label and description, then the pick on the right.** Where the words would
+  get less than 192px beside it (a 320px phone) the pick drops under them, at its content width.
 - **A pick jumps** to the category's first UNANSWERED problem — the first of its `keys` still ahead
   in the run, else one passed over — then calls its `onPick`. A category with none left has its
   pick disabled.

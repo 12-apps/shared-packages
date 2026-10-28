@@ -249,8 +249,8 @@ export const overviewTitleSx: SxProps<Theme> = {
 /**
  * One kind: its words take the width and its pick keeps its size on the right,
  * a hairline under it. Where the words would have less than `overviewTextMin`
- * beside the pick (a 320px phone), the pick drops under them instead of the
- * label breaking word by word.
+ * beside the pick (a 320px phone), the pick drops under them, still at its
+ * content width, instead of the label breaking word by word.
  */
 export const overviewRowSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'flex',

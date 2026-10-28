@@ -31,7 +31,7 @@ export const DAY_RULER_METRICS = {
   ringOffset: 1,
   /** The loading row's name bar. */
   skeletonNameRadius: 4,
-  /** A block shorter than this share of the ruler says only its start on a narrow ruler. */
+  /** Where a block's text cannot be measured, one shorter than this share of the ruler says only its start on a narrow ruler. */
   narrowShare: 0.3,
   /** The shortest block a resize leaves, in hours. */
   minHours: 0.5,

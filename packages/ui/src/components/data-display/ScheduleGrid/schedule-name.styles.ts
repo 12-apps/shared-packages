@@ -12,6 +12,11 @@ import { signalInk } from './schedule-tones';
 
 /** The name as a button: it reads as text, underlines under the pointer. */
 export const nameButtonSx: SxProps<Theme> = (theme: Theme) => ({
+  // A block of its content's width: an inline-block button would sit on the
+  // line's baseline and its strut would push the meta 6px down.
+  display: 'block',
+  width: 'fit-content',
+  maxWidth: '100%',
   font: 'inherit',
   background: 'transparent',
   border: 0,
