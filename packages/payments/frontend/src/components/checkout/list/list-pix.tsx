@@ -1,10 +1,10 @@
-import { Box, useTheme } from "@mui/material";
-import { useEffect, useRef, useState, type JSX, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { Box } from "@mui/material";
+import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { usePaymentRefresh, usePaymentStale } from "../cart-changed";
 import { useCheckoutCopy } from "../copy-context";
 import { PixAfterCopy } from "../pix-after-copy";
-import { PixQr, StaleVeil } from "../pix-parts";
+import { PixCountdown, usePixCountdown, type PixCountdownCopy } from "../pix-countdown";
 import type { PixAfterCopyCopy } from "../screens-copy";
 import type { CheckoutOrder, PixCharge } from "../types";
 import { useCheckoutComponents } from "../ui";
@@ -12,6 +12,7 @@ import { useCheckoutComponents } from "../ui";
 import { bankFlowOs, type PhoneOs } from "./bank-apps";
 import type { PaymentListMode } from "./context";
 import { ListBar, ActionButton, WaitingLine } from "./list-bar";
+import { BeforeCopy } from "./list-pix-before";
 import { PixBanks, usePixBankState, type PixBankState } from "./pix-banks";
 import type { CheckoutPixBank, PixBankId } from "./types";
 
@@ -19,118 +20,28 @@ import type { CheckoutPixBank, PixBankId } from "./types";
  * The Pix, in the one list (FUT-3592 #3): "Gerar Pix" already created the
  * order and the code, so the pane opens on the code itself.
  *
- * Before the copy — the code in a tinted block that copies on a tap (the same
- * as the bar's "Copiar código Pix"), "Válido até …", and two text links: the
- * QR for paying from another phone, and the way back to the list. On a
- * computer the QR stands beside the code instead. After the copy — ADR 0129's
- * face, as today, with the bar saying what it is waiting for.
+ * Over both faces, the countdown (FUT-1181, FUT-592): "expira em 12:34"
+ * beside the title and a bar draining under it (`../pix-countdown`).
  *
- * The side-by-side switch is a container query on the pane's own width, never
- * the window's (the 512px column a computer gives the checkout is still wider
- * than any phone's).
+ * Before the copy — the code in a tinted block that copies on a tap (the same
+ * as the bar's "Copiar código Pix"), how to pay with it, and two text links:
+ * the QR for paying from another device, and the way back to the list. On a
+ * phone the QR opens under its link; on a computer it stands beside the code.
+ * After the copy — ADR 0129's face, as today, with the bar saying what it is
+ * waiting for. The code's face is `./list-pix-before.tsx`.
  */
-const WIDE = "@container listpix (min-width: 460px)";
 
-/** Select the code and copy it — a tap on it is the bar's button. */
-function selectAll(target: HTMLElement): void {
-  try {
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.selectAllChildren(target);
-  } catch {
-    // Selecting is a courtesy; the copy below is what matters.
-  }
-}
-
-function TappableCode({ pix, label, onCopy }: { pix: PixCharge; label: string; onCopy: () => void }): JSX.Element {
-  const stale = usePaymentStale();
+/** The pane's title, with the countdown beside it while the expiry can be read. */
+function PixHeading({ title, pix, copy, onLapse }: { title: string; pix: PixCharge; copy: PixCountdownCopy; onLapse?: () => void }): JSX.Element {
   const { Text } = useCheckoutComponents();
-  const press = (event: MouseEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => {
-    selectAll(event.currentTarget);
-    onCopy();
-  };
-  // Under the veil the code is not a control at all — no role, no Tab stop,
-  // nothing a tap does (ADR 0121: the veil covers it, so it may not be one).
-  const control = stale
-    ? {}
-    : {
-        role: "button",
-        tabIndex: 0,
-        "aria-label": label,
-        onClick: press,
-        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            press(event);
-          }
-        },
-      };
-  return (
-    <StaleVeil stale={stale}>
-      <Box
-        {...control}
-        data-testid="list-pix-code"
-        sx={{ cursor: stale ? "default" : "pointer", bgcolor: "action.hover", borderRadius: 2, p: 1.25, wordBreak: "break-all" }}
-      >
-        <Text variant="code" size="xs" as="span">
-          {pix.copyPaste}
-        </Text>
-      </Box>
-    </StaleVeil>
+  const countdown = usePixCountdown(pix.expiresAt, onLapse);
+  const heading = (
+    <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
+      {title}
+    </Text>
   );
-}
-
-function TextLink({ onClick, testId, children }: { onClick: () => void; testId: string; children: ReactNode }): JSX.Element {
-  const { Button } = useCheckoutComponents();
-  return (
-    <Box sx={{ alignSelf: "flex-start", ml: -1, "& button": { textDecoration: "underline", textUnderlineOffset: (t) => t.spacing(0.375), minHeight: (t) => t.spacing(5) } }}>
-      <Button variant="text" color="primary" size="md" onClick={onClick} dataTestId={testId}>
-        {children}
-      </Button>
-    </Box>
-  );
-}
-
-function BeforeCopy({ mode, pix, time, onCopy, onChangeMethod, footer }: {
-  mode: PaymentListMode;
-  pix: PixCharge;
-  time: string;
-  onCopy: () => void;
-  onChangeMethod: () => void;
-  footer: ReactNode;
-}): JSX.Element {
-  const { Text } = useCheckoutComponents();
-  const copy = mode.list.copy.pixFace;
-  const qrAlt = useCheckoutCopy().screens.pix.qrAlt;
-  // The prototype's 150px QR, on the theme's spacing scale (the QR draws in px).
-  const qrSize = Number.parseFloat(useTheme().spacing(18.75));
-  const stale = usePaymentStale();
-  return (
-    <Box sx={{ containerType: "inline-size", containerName: "listpix" }}>
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start", flexDirection: "column", [WIDE]: { flexDirection: "row" } }}>
-        <Box data-testid="list-pix-qr" sx={{ display: mode.qrOpen ? "block" : "none", alignSelf: "center", flex: "none", [WIDE]: { display: "block", alignSelf: "flex-start" } }}>
-          <StaleVeil stale={stale}>
-            <PixQr payload={pix.copyPaste} size={qrSize} alt={qrAlt} />
-          </StaleVeil>
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-          <TappableCode pix={pix} label={copy.copyCode} onCopy={onCopy} />
-          <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0 }} data-testid="list-pix-valid">
-            {copy.validUntil(time)}
-          </Text>
-          <Box sx={{ [WIDE]: { display: "none" } }}>
-            <TextLink onClick={() => mode.setQrOpen(!mode.qrOpen)} testId="list-pix-toggle-qr">
-              {mode.qrOpen ? copy.hideQr : copy.showQr}
-            </TextLink>
-          </Box>
-          <TextLink onClick={onChangeMethod} testId="list-pix-change-method">
-            {copy.changeMethod}
-          </TextLink>
-          {footer}
-        </Box>
-      </Box>
-    </Box>
-  );
+  if (!countdown) return heading;
+  return <PixCountdown state={countdown} copy={copy} title={heading} />;
 }
 
 interface ListPixFaceProps {
@@ -149,6 +60,8 @@ interface ListPixFaceProps {
   onPreferCard?: () => void;
   /** The poll's stalled panel, when it has one. */
   footer: ReactNode;
+  /** The countdown reached zero: ask the server now (FUT-1181). */
+  onLapse?: () => void;
   /** The clipboard alone, saying whether it took the code — the bank flow's copy. */
   writeClipboard: () => Promise<boolean>;
   setAfterCopy: (afterCopy: boolean) => void;
@@ -320,7 +233,6 @@ function bankFace(flow: BankFlow | null, pix: PixCharge, stale: boolean): { node
 
 /** Both faces of the list's Pix, and the bar under them. */
 export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode }): JSX.Element {
-  const { Text } = useCheckoutComponents();
   const { mode, order, pix, afterCopy } = props;
   const copy = mode.list.copy.pixFace;
   const flow = useBankFlow(mode);
@@ -332,9 +244,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   const banks = bankFace(flow, pix, stale);
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-      <Text variant="body" size="md" weight="bold" as="p" style={{ margin: 0 }} data-testid="list-pix-title">
-        {copy.title(mode.list.amountDueLabel ?? order.totalLabel)}
-      </Text>
+      <PixHeading title={copy.title(mode.list.amountDueLabel ?? order.totalLabel)} pix={pix} copy={copy} onLapse={props.onLapse} />
       {afterCopy ? (
         <PixAfterCopy
           pix={pix}
@@ -352,7 +262,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
           banks={banks}
         />
       ) : (
-        <BeforeCopy mode={mode} pix={pix} time={props.time} onCopy={onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
+        <BeforeCopy mode={mode} pix={pix} onCopy={onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
       )}
       <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={onCopy} bankFlow={flow} onOtherBank={copies.other} />
     </Box>

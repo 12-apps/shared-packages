@@ -93,10 +93,13 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
   cancel: "Cancelar",
   pixFace: {
     title: (total) => `Pague ${total} com Pix`,
-    validUntil: (time) =>
-      `Válido até ${time}. Copie o código e cole no app do seu banco, em Pix copia e cola.`,
-    showQr: "Ver QR code (pagar de outro celular)",
-    hideQr: "Esconder QR code",
+    howToPay: (storeConfirms) =>
+      "Copie e cole no app do seu banco, em **Pix Copia e Cola**." + (storeConfirms ? "" : " A confirmação é automática."),
+    expiresIn: (clock) => `expira em ${clock}`,
+    lastMinutes: "Menos de 2 minutos. Se expirar, é só gerar outro — nada é cobrado.",
+    showQr: "Mostrar QR code (para outro aparelho)",
+    hideQr: "Ocultar QR code",
+    qrCaption: "Para pagar de outro celular: no app do banco, Pix › Ler QR code.",
     changeMethod: "Trocar a forma de pagamento",
     copyCode: "Copiar código Pix",
     waiting: "Aguardando o pagamento do Pix…",

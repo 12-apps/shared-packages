@@ -192,8 +192,9 @@ describe("Pix, straight away", () => {
     expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({ method: "PIX" }));
     expect(screen.getByTestId("list-pix-title").textContent).toBe("Pague R$ 27,00 com Pix");
     expect(screen.getByTestId("list-pix-code").textContent).toBe("00020126BR.GOV.BCB.PIX.o-pix");
-    expect(screen.getByTestId("list-pix-valid").textContent).toMatch(/^Válido até .+\. Copie o código e cole no app do seu banco, em Pix copia e cola\.$/);
-    expect(screen.getByTestId("list-pix-toggle-qr").textContent).toBe("Ver QR code (pagar de outro celular)");
+    expect(screen.getByTestId("list-pix-how").textContent).toBe("Copie e cole no app do seu banco, em Pix Copia e Cola. A confirmação é automática.");
+    expect(screen.getByTestId("pix-countdown-clock").textContent).toMatch(/^expira em \d+:\d{2}:\d{2}$/);
+    expect(screen.getByTestId("list-pix-toggle-qr").textContent).toBe("Mostrar QR code (para outro aparelho)");
     expect(screen.getByTestId("list-pay").textContent).toBe("Copiar código Pix");
     expect(screen.getByTestId("list-bar-summary").textContent).toBe("2 itens · Entrega grátis");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -239,7 +240,7 @@ describe("Pix, straight away", () => {
   it("opens the QR on the phone's link, and goes back to the list on 'Trocar a forma de pagamento'", async () => {
     await pixRaised();
     fireEvent.click(screen.getByTestId("list-pix-toggle-qr"));
-    expect(screen.getByTestId("list-pix-toggle-qr").textContent).toBe("Esconder QR code");
+    expect(screen.getByTestId("list-pix-toggle-qr").textContent).toBe("Ocultar QR code");
     fireEvent.click(screen.getByTestId("list-pix-change-method"));
     await screen.findByTestId("payment-list");
     expect(radio("list-option-PIX").checked).toBe(true);
