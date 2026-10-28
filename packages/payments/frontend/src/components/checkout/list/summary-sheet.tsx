@@ -189,11 +189,14 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
   const toggle = useRef<HTMLButtonElement | null>(null);
   const id = useId();
   const room = useRoomBelow(toggle, open && !held);
-  const close = useCallback(() => {
+  // Back to the line on close. A pointer close (the ✕, the scrim, the line) asks for no visible ring:
+  // the ring is for the keyboard, and Escape keeps it.
+  const close = useCallback((byKeyboard = false) => {
     setOpen(false);
-    toggle.current?.focus();
+    toggle.current?.focus(byKeyboard ? undefined : ({ focusVisible: false } as FocusOptions));
   }, []);
-  useEscape(open && !held, close);
+  const closeByKeyboard = useCallback(() => close(true), [close]);
+  useEscape(open && !held, closeByKeyboard);
   useEffect(() => {
     if (held) setOpen(false);
   }, [held]);
@@ -213,13 +216,13 @@ export function SummaryToggleLine({ summary, testId, held = false }: { summary: 
         sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, width: "100%", minHeight: 40, my: -0.75, p: 0, border: 0, bgcolor: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer", borderRadius: 1, "&:focus-visible": { outline: 2, outlineColor: "primary.main", outlineOffset: 2 } }}
       >
         <Box component="span" data-testid={testId} sx={{ minWidth: 0 }}>{summary}</Box>
-        <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: "none", color: "primary.main", fontWeight: 600, typography: "body2", whiteSpace: "nowrap" }}>
+        <Box component="span" sx={{ display: "flex", alignItems: "center", gap: 0.5, flex: "none", color: "primary.main", typography: "body2", fontWeight: 600, whiteSpace: "nowrap" }}>
           {copy.summaryOpen}
           <Chevron open={open} />
         </Box>
       </Box>
       {open && !held ? (
-        <Sheet id={id} room={room} onClose={close}>
+        <Sheet id={id} room={room} onClose={() => close()}>
           <PartBoundary fallback={null} retry={forget}>
             <Suspense fallback={<Box data-testid="list-summary-loading" sx={{ minHeight: 48 }} />}>
               <InSheet.Provider value>
