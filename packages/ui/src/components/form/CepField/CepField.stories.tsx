@@ -150,6 +150,23 @@ export const MaskOnly: Story = {
   },
 };
 
+/**
+ * A form for somebody ELSE's address — a supplier. `autoComplete="off"` keeps
+ * the browser from offering the signed-in person's own CEP, which the lookup
+ * would then turn into their street (FUT-4140). The keypad stays numeric: it
+ * sits on the `<input>`.
+ */
+export const ForSomebodyElsesAddress: Story = {
+  render: function ForSomebodyElsesAddressStory() {
+    const [cep, setCep] = useState('');
+    return (
+      <Stack sx={{ maxWidth: 420 }}>
+        <CepField copy={PT_BR_CEP_FIELD_COPY} label="CEP do fornecedor" autoComplete="off" value={cep} onChange={setCep} />
+      </Stack>
+    );
+  },
+};
+
 export const WithError: Story = {
   render: function WithErrorStory() {
     const [cep, setCep] = useState('123');

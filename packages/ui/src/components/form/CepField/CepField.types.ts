@@ -89,4 +89,12 @@ export interface CepFieldProps {
    *   is the same height as its neighbours.
    */
   labelPlacement?: 'above' | 'inside';
+  /**
+   * The `<input>`'s `autocomplete`. Defaults to `postal-code`, which lets the
+   * browser offer the signed-in person's own CEP — right on their own address
+   * form, wrong on a form for somebody else's (a supplier): pass `off` there,
+   * or the owner's CEP goes in and the lookup fills the owner's street
+   * (FUT-4140).
+   */
+  autoComplete?: string;
 }

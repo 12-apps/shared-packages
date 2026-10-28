@@ -206,6 +206,12 @@ export interface DataViewsFiltersCopy {
    * wrong. `dd/mm/aaaa` is one locale's order and one locale's letters.
    */
   dayMask: string;
+  /**
+   * Under a day field holding eight digits that name no day (`31/02/2026`).
+   * Without it the field kept the previous filter and said nothing, so the
+   * list read like an answer to a date nobody could have meant (FUT-4144).
+   */
+  dayInvalid: string;
   /** Drop every applied filter, spelled out in the panel where there is room. */
   clearAllFilters: string;
   /** The day-range presets' labels, keyed by preset id. */

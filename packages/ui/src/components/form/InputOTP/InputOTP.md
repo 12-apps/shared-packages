@@ -161,7 +161,12 @@ function CodeVerification() {
 
 The InputOTP component is designed with accessibility in mind:
 
-- **ARIA Labels**: Each input field has proper ARIA attributes
+- **ARIA Labels**: The container is a `role="group"`, so the `aria-label` you pass names
+  the slots together
+- **Phone keypad** (`variant="numeric"`, FUT-4144): every slot `<input>` carries
+  `inputmode="numeric"` and `pattern="[0-9]*"`, and the first slot
+  `autocomplete="one-time-code"` so the phone can offer a code from an SMS. The
+  `alphanumeric` and `masked` variants carry none of the three
 - **Keyboard Navigation**: Full keyboard support for all interactions
 - **Focus Management**: Clear focus indicators and logical tab order
 - **Screen Reader Support**: Announces field positions and values

@@ -28,7 +28,7 @@
  * date, which is what keeps the run above at one request rather than four.
  */
 import TextField from '@mui/material/TextField/index.js';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { fieldTextFieldStyles } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
 
@@ -146,6 +146,32 @@ export function maskDate(raw: string, mask: string): string {
   return out.join(separator);
 }
 
+/** A wire day on its own, as a paste or an autofill delivers it: `2026-10-01`. */
+const ISO_DAY = /^\s*(\d{4}-\d{2}-\d{2})\s*$/;
+
+/**
+ * What the field shows for whatever arrived — typed, pasted, autofilled.
+ *
+ * A whole ISO day (`AAAA-MM-DD`) is READ AS THAT DAY and written in the mask's
+ * order. Through `maskDate` alone it is eight digits taken day-first, so a
+ * pasted `2026-10-01` came out as `20/26/1001` (FUT-4144). Anything else is
+ * masked exactly as typing always was, so the typed and pasted forms of one day
+ * land on the same text.
+ */
+export function readDayText(raw: string, mask: string): string {
+  const iso = ISO_DAY.exec(raw)?.[1];
+  const masked = iso ? isoToMasked(iso, mask) : '';
+  return masked || maskDate(raw, mask);
+}
+
+/**
+ * Whether `text` is a WHOLE day that does not exist — `31/02/2026`. A partial
+ * entry is not impossible, only unfinished, and is never flagged.
+ */
+export function isImpossibleDay(text: string, mask: string): boolean {
+  return text.replace(/\D/g, '').length === 8 && maskedToIso(text, mask) === '';
+}
+
 /**
  * What has to land on the `<input>` itself rather than on the `TextField`.
  *
@@ -166,30 +192,19 @@ export function maskDate(raw: string, mask: string): string {
  * keypad to suggest names and addresses, none of which are a date, and none of
  * which the mask would keep.
  */
-function dayInputProps(testId: string, describedBy: string | undefined) {
+function dayInputProps(testId: string, describedBy: readonly (string | undefined)[]) {
+  const ids = describedBy.filter(Boolean).join(' ');
   return {
     'data-testid': testId,
     maxLength: 10,
     inputMode: 'numeric' as const,
     autoComplete: 'off',
-    ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+    ...(ids ? { 'aria-describedby': ids } : {}),
   };
 }
 
-/**
- * One end of a day window. The BOUND stays `AAAA-MM-DD` — the form the backend's
- * inclusive day comparison already speaks, and the form the chip label reads —
- * so only the typing surface changes.
- */
-export function DayBoundInput({
-  label,
-  value,
-  onChange,
-  testId,
-  error = false,
-  describedBy,
-  mask,
-}: {
+/** Props of {@link DayBoundInput}. */
+interface DayBoundInputProps {
   label: string;
   /** The applied bound, `AAAA-MM-DD`, or undefined when this end is open. */
   value: string | undefined;
@@ -215,46 +230,127 @@ export function DayBoundInput({
    * of that picker — which is exactly what it did.
    */
   mask: string;
-}): React.JSX.Element {
-  const applied = value ?? '';
+  /**
+   * Said under the field when its eight digits name no day (`31/02/2026`); the
+   * field is then marked invalid and KEEPS the text on blur, so the reader sees
+   * what was refused instead of the old value quietly coming back (FUT-4144).
+   *
+   * Opt-in, because the field ships no words of its own: without it an
+   * impossible day is still never written, and blur still snaps back.
+   */
+  invalidMessage?: string;
+}
+
+/** What {@link useDayText} hands the field: its text, its verdict and its handlers. */
+interface DayText {
+  text: string;
+  impossible: boolean;
+  handleChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handlePaste: (event: React.ClipboardEvent<HTMLDivElement>) => void;
+  handleBlur: () => void;
+}
+
+/** The typed text of one bound, kept apart from the APPLIED bound it may commit. */
+function useDayText(
+  applied: string,
+  mask: string,
+  onChange: (bound: string | undefined) => void,
+  judgesImpossible: boolean,
+): DayText {
   const [text, setText] = useState(() => isoToMasked(applied, mask));
+  const impossible = judgesImpossible && isImpossibleDay(text, mask);
+
+  // Emptying clears the bound. A COMPLETE day applies it. A partial (or an
+  // impossible) one does NEITHER — it leaves whatever is applied alone, so
+  // typing is never fought and a half-typed year never reaches the backend.
+  const enter = (next: string) => {
+    setText(next);
+    if (next === '') return onChange(undefined);
+    const iso = maskedToIso(next, mask);
+    if (iso) onChange(iso);
+  };
 
   // The bound is the APPLIED filter; `text` is what is being typed. Re-sync only
   // when the applied value moved somewhere the text does not already mean — a
   // "Limpar", a saved view, the other pill resetting the pair. Without that
   // guard the field's own write bounces straight back mid-edit and resets the
   // caret, which is the native control's worst habit reproduced by hand.
+  //
+  // "Already means" is a REAL day equal to the bound, or an empty field for an
+  // open bound. An impossible day parses to `''` too, so a bare comparison let
+  // a "Limpar" (applied → `''`) keep `31/02/2026` on screen, red, over a filter
+  // that had just been cleared.
   useEffect(() => {
-    setText((current) =>
-      maskedToIso(current, mask) === applied ? current : isoToMasked(applied, mask),
-    );
+    setText((current) => {
+      const iso = maskedToIso(current, mask);
+      const means = (iso !== '' || current === '') && iso === applied;
+      return means ? current : isoToMasked(applied, mask);
+    });
   }, [applied, mask]);
+
+  return {
+    text,
+    impossible,
+    handleChange: (event) => enter(readDayText(event.target.value, mask)),
+    // A pasted ISO day REPLACES the field whatever it held: inserted at the
+    // caret into existing digits it would be read as more digits, and the
+    // `maxLength` would cut a padded one before `onChange` ever saw it.
+    handlePaste: (event) => {
+      const pasted = event.clipboardData.getData('text');
+      if (!ISO_DAY.test(pasted)) return;
+      event.preventDefault();
+      enter(readDayText(pasted, mask));
+    },
+    // Leaving a half-typed date on screen would show a filter the list is not
+    // actually using. On blur the field snaps back to what IS applied; a
+    // complete date already equals it, so this only ever tidies. An impossible
+    // day the field is SAYING is impossible stays, with its message: snapping
+    // it back is the silent forgetting FUT-4144 removed.
+    handleBlur: () => {
+      if (!impossible) setText(isoToMasked(applied, mask));
+    },
+  };
+}
+
+/**
+ * One end of a day window. The BOUND stays `AAAA-MM-DD` — the form the backend's
+ * inclusive day comparison already speaks, and the form the chip label reads —
+ * so only the typing surface changes.
+ */
+export function DayBoundInput({
+  label,
+  value,
+  onChange,
+  testId,
+  error = false,
+  describedBy,
+  mask,
+  invalidMessage,
+}: DayBoundInputProps): React.JSX.Element {
+  const id = useId();
+  const { text, impossible, handleChange, handlePaste, handleBlur } = useDayText(
+    value ?? '',
+    mask,
+    onChange,
+    invalidMessage !== undefined,
+  );
 
   return (
     <TextField
       size="small"
       type="text"
+      id={id}
       label={label}
-      error={error}
+      error={error || impossible}
+      helperText={impossible ? invalidMessage : undefined}
       placeholder={mask}
       value={text}
-      onChange={(event) => {
-        const next = maskDate(event.target.value, mask);
-        setText(next);
-        // Emptying clears the bound. A COMPLETE day applies it. A partial one
-        // does NEITHER — it leaves whatever is applied alone, so typing is never
-        // fought and a half-typed year never reaches the backend.
-        if (next === '') return onChange(undefined);
-        const iso = maskedToIso(next, mask);
-        if (iso) onChange(iso);
-      }}
-      // Leaving a half-typed (or impossible) date on screen would show a filter
-      // the list is not actually using. On blur the field snaps back to what IS
-      // applied; a complete date already equals it, so this only ever tidies.
-      onBlur={() => setText(isoToMasked(applied, mask))}
+      onChange={handleChange}
+      onPaste={handlePaste}
+      onBlur={handleBlur}
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
-      inputProps={dayInputProps(testId, describedBy)}
+      inputProps={dayInputProps(testId, [impossible ? `${id}-helper-text` : undefined, describedBy])}
       sx={[{ width: sxRem(165) }, fieldTextFieldStyles]}
     />
   );
