@@ -325,6 +325,10 @@ export interface PaymentLayoutCopy {
   payHeading: string;
   /** The summary card's title. */
   summaryTitle: string;
+  /** On a phone, beside the bar's line: opens the summary sheet (FUT-589). */
+  summaryOpen: string;
+  /** The summary sheet's ✕ and scrim, read by a screen reader. */
+  summaryClose: string;
   /** The summary's and the pay bar's label over the amount. */
   total: string;
   /** The phone's caption over the big amount — "Total a pagar · 2 itens". */

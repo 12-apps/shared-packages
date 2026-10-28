@@ -9,6 +9,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { PartBoundary, deferredPart } from "./lazy-body";
 import type { ColumnBodyProps } from "./summary-column-body";
+import { SummarySheetProvider } from "./summary-sheet";
 
 /**
  * Where the bar's content goes on a computer (FUT-3685, L4): into the
@@ -108,15 +109,31 @@ export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, 
   const target = useMemo(() => ({ element: slot }), [slot]);
   const hosted = hostTarget !== undefined;
   const sideBySide = !hosted && wide;
+  const sheet = usePhoneSheet(!hosted && !sideBySide, { lines, moneyLines, totalLabel, credit });
   const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} credit={credit} slot={setSlot} />;
   return (
     <SummaryColumnTarget value={hosted || sideBySide ? target : null}>
-      <Columns sideBySide={sideBySide} column={column}>
-        {children}
-      </Columns>
+      <SummarySheetProvider value={sheet}>
+        <Columns sideBySide={sideBySide} column={column}>
+          {children}
+        </Columns>
+      </SummarySheetProvider>
       {hostTarget ? createPortal(column, hostTarget) : null}
     </SummaryColumnTarget>
   );
+}
+
+/**
+ * What the phone's summary sheet draws (FUT-589): the column's own body, on a
+ * phone — no column anywhere — with something to list. `null` otherwise, and
+ * then the bar's line is drawn as before.
+ */
+function usePhoneSheet(phone: boolean, body: ColumnBodyProps) {
+  const forget = ColumnPart.useForget();
+  const { lines, moneyLines, totalLabel, credit } = body;
+  const memo = useMemo(() => ({ lines, moneyLines, totalLabel, credit }), [lines, moneyLines, totalLabel, credit]);
+  const listed = (lines?.length ?? 0) > 0 || Boolean(moneyLines);
+  return phone && listed ? { body: memo, Body: DeferredBody, forget } : null;
 }
 
 /** Not laid out: the wrappers stay in the tree, drawing nothing. */

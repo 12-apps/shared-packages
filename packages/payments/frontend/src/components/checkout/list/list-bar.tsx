@@ -7,6 +7,7 @@ import { useCheckoutCopy } from "../copy-context";
 import { useCheckoutComponents } from "../ui";
 
 import { useSummaryColumnTarget } from "./summary-column";
+import { SummaryToggleLine } from "./summary-sheet";
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
 
 /** The prototype's 52px action and 44px secondary, on the theme's spacing scale. */
@@ -118,8 +119,10 @@ function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string |
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal, live, children }: {
+export function ListBar({ summary, sheetHeld, extras, payer, reason, actionLabel, heldTotal, live, children }: {
   summary?: ReactNode;
+  /** A charge is under way: the phone's summary sheet closes and stays closed (FUT-589). */
+  sheetHeld?: boolean;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
@@ -140,7 +143,9 @@ export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal
     <LabelCutContext.Provider value={setLabelCut}>
     <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
       {/* The context line in the secondary ink in the column, as in the bar — the column inherits whatever the host's element is inked in. */}
-      {summary ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, ...(column ? { color: "text.secondary" } : {}) }}>{summary}</Box> : null}
+      {summary && column ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, color: "text.secondary" }}>{summary}</Box> : null}
+      {/* On a phone the line opens the "Resumo do pedido" sheet when the layout has one to show (FUT-589). */}
+      {summary && !column ? <SummaryToggleLine summary={summary} testId="list-bar-summary" held={sheetHeld} /> : null}
       {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
       <HeldTotal total={column ? null : heldTotal} />
