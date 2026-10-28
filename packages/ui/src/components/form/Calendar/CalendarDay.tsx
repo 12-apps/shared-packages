@@ -78,10 +78,7 @@ const dayCellSx = (day: DayRenderArgs, visible: boolean): SxProps<Theme> => ({
   border: 'none',
   borderRadius: 1,
   cursor: day.disabled ? 'not-allowed' : 'pointer',
-  // A day hidden by `showOutsideDays={false}` paints nothing: a range running
-  // into the next month otherwise drew blank coloured squares after the last
-  // day of this one (FUT-4144).
-  backgroundColor: visible ? backgroundFor(day) : 'transparent',
+  backgroundColor: backgroundFor(day),
   color: colorFor(day, visible),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,
   fontWeight: day.today ? 'bold' : 'normal',
@@ -128,6 +125,20 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   const visible = day.inCurrentMonth || showOutsideDays;
   const state: DayState = { ...day, outside: !day.inCurrentMonth, focused };
 
+  // A day hidden by `showOutsideDays={false}` keeps its place in the grid and
+  // nothing else: no button to click in a blank, no name, no tab stop that
+  // cannot be seen (FUT-4144).
+  if (!visible) {
+    return (
+      <Box
+        component="span"
+        aria-hidden="true"
+        data-testid="calendar-outside-placeholder"
+        sx={{ width: CELL_SIZE, maxWidth: '100%', aspectRatio: '1 / 1', justifySelf: 'center' }}
+      />
+    );
+  }
+
   return (
     <Box
       component="button"
@@ -136,7 +147,8 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       aria-selected={day.selected}
       aria-disabled={day.disabled}
       aria-current={day.today ? 'date' : undefined}
-      aria-label={visible ? dayName(day.date, locale) : undefined}
+      aria-label={dayName(day.date, locale)}
+      data-in-month={day.inCurrentMonth}
       className={dayClassNames(state, dayClassName?.(day))}
       data-testid={`calendar-date-${day.date.getDate()}`}
       onClick={() => onSelect(day.date)}
@@ -150,7 +162,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       {day.today && (
         <Box component="span" data-testid="calendar-today" sx={{ display: 'none' }} />
       )}
-      {visible ? day.date.getDate() : ''}
+      {day.date.getDate()}
     </Box>
   );
 };

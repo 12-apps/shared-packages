@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import React, { useState } from "react";
 
 import { fireEvent, render, screen, waitFor, within } from "./test-utils";
-import { PanelRangeField, RangePill } from "../data-views-range-pill";
+import { PanelRangeField, RangeBounds, RangePill } from "../data-views-range-pill";
 import type { RangeFieldConfig, RangeValue } from "../data-views-types";
 
 interface Row extends Record<string, unknown> {
@@ -235,5 +235,69 @@ describe("PanelRangeField — the same calendar on the slide-in panel", () => {
 
     expect(onChange).toHaveBeenLastCalledWith({ min: "2026-10-10", max: "2026-10-12" });
     expect(screen.getByTestId("panel-period-max")).toHaveValue("12/10/2026");
+  });
+});
+
+/** The two-month calendar the pill shows from `md` up, where outside days are hidden. */
+function TwoMonths({ initial }: { initial: RangeValue }): React.JSX.Element {
+  const [value, setValue] = useState<RangeValue>(initial);
+  return <RangeBounds field={PERIOD} value={value} onChange={setValue} testId={TEST_ID} calendarMonths={2} />;
+}
+
+describe("RangeBounds — two months, outside days hidden (FUT-4144 review)", () => {
+  const right = () => within(screen.getByTestId("calendar-month-1"));
+
+  it("keeps focus on the day Enter was pressed on", async () => {
+    render(<TwoMonths initial={{ min: "2026-09-10", max: "2026-09-12" }} />);
+    fireEvent.click(right().getByRole("gridcell", { name: "2 de outubro de 2026" }));
+
+    // Enter moves no day, so focus is not moved — not to a blank in setembro.
+    fireEvent.keyDown(right().getByRole("gridcell", { name: "2 de outubro de 2026" }), { key: "Enter" });
+
+    await waitFor(() => expect(document.body).toHaveFocus());
+    expect(field("max")).toHaveValue("02/10/2026");
+  });
+
+  it("draws a hidden outside day as an inert blank: no button, no name, no tab stop", () => {
+    render(<TwoMonths initial={{ min: "2026-09-10", max: "2026-09-12" }} />);
+    const left = within(screen.getByTestId("calendar-month-0"));
+
+    // September only: its trailing October days are placeholders, not cells.
+    expect(left.getAllByRole("gridcell")).toHaveLength(30);
+    const blanks = screen.getByTestId("calendar-month-0").querySelectorAll('[data-testid="calendar-outside-placeholder"]');
+    expect(blanks).toHaveLength(5);
+    blanks.forEach((blank) => {
+      expect(blank.tagName).toBe("SPAN");
+      expect(blank).toHaveAttribute("aria-hidden", "true");
+      expect(blank).not.toHaveAttribute("tabindex");
+    });
+  });
+
+  it("leaves focus where it is when a key that moves no day is pressed on one", async () => {
+    const onChange = vi.fn();
+    function Spy(): React.JSX.Element {
+      const [value, setValue] = useState<RangeValue>({ min: "2026-09-10", max: "2026-09-12" });
+      return (
+        <RangeBounds
+          field={PERIOD}
+          value={value}
+          onChange={(next) => {
+            onChange(next);
+            setValue(next);
+          }}
+          testId={TEST_ID}
+          calendarMonths={2}
+        />
+      );
+    }
+    render(<Spy />);
+    const day = right().getByRole("gridcell", { name: "5 de outubro de 2026" });
+
+    // Tab on a day moves nothing; the click after it must not pull focus to the tab stop.
+    fireEvent.keyDown(day, { key: "Tab" });
+    fireEvent.click(right().getByRole("gridcell", { name: "7 de outubro de 2026" }));
+
+    expect(onChange).toHaveBeenLastCalledWith({ min: "2026-10-07" });
+    await waitFor(() => expect(document.body).toHaveFocus());
   });
 });

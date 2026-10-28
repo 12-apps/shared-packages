@@ -19,10 +19,11 @@ import Popover from '@mui/material/Popover/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useTheme, type Theme } from '@mui/material/styles/index.js';
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { TableFilter } from '../../layout/TableFilter';
+import { TableFilterContext } from '../../layout/TableFilter/TableFilterContext';
 import { RangePresets } from './data-views-preset-chips';
 import { RangeBounds } from './data-views-range-bounds';
 import { presetsFor } from './data-views-range-presets';
@@ -264,13 +265,22 @@ export function PanelRangeField<T extends Record<string, unknown>>({
   testId: string;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
+  // The slide-in panel stays mounted while closed; its calendar does not.
+  // Outside a `TableFilter` (the "Mais" sheet, a test) the pair is on screen.
+  const panel = useContext(TableFilterContext);
   if (field.kind === "day") {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Typography component="span" sx={{ fontSize: sxRem(12), fontWeight: 500, color: "text.secondary" }}>
           {field.label}
         </Typography>
-        <RangeBounds field={field} value={value} onChange={onChange} testId={testId} />
+        <RangeBounds
+          field={field}
+          value={value}
+          onChange={onChange}
+          testId={testId}
+          showCalendar={panel ? panel.open : true}
+        />
       </Box>
     );
   }

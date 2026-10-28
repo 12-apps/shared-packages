@@ -220,10 +220,15 @@ month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
 - The arrows of the default caption carry `labels.previousMonth`/`nextMonth`
   when the host passes `labels`; without `labels` they stay as they were.
 - Disabled days: `aria-disabled="true"`.
-- Keyboard support (roving focus within the grid). When the key is pressed ON a
-  day (the reader tabbed or clicked onto it), focus follows the tab stop to the
-  new day, across a month change too; with focus on the container it stays
-  there, as before:
+- With `showOutsideDays={false}` an outside day is an inert, `aria-hidden`
+  placeholder: no button, no name, no tab stop. Visible outside days are
+  unchanged.
+- Keyboard support (roving focus within the grid). When a NAVIGATION key is
+  pressed on a day (the reader tabbed or clicked onto it), focus follows the tab
+  stop to the new day in its own month (never its muted copy in the month
+  beside it), across a month change too. Enter, Space, Tab and Escape move no
+  day and never move focus; with focus on the container it stays there, as
+  before:
   - Arrow keys: move by 1 day (left/right) or 1 week (up/down).
   - Home/End: move to start/end of week.
   - PageUp/PageDown: previous/next month (with Shift for year).

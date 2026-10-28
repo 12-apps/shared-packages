@@ -9,6 +9,7 @@ import { resolveLabels } from '../../../utils/resolve-labels';
 
 import { resolveCalendarProps } from './Calendar.helpers';
 import { useCalendar } from './Calendar.hooks';
+import { navigateFocus } from './Calendar.keyboard';
 import { useCalendarPicker } from './Calendar.picker';
 import type { CalendarProps, ResolvedCalendarProps } from './Calendar.types';
 import type { DayCellContext } from './CalendarDayCell';
@@ -61,6 +62,10 @@ const useRootRef = (forwarded: React.ForwardedRef<HTMLDivElement>) => {
   return { rootRef, setRoot };
 };
 
+/** The tab stop as a day of its OWN month — side by side, an outside copy of it comes first in the DOM. */
+const OWN_MONTH_STOP = '[role="gridcell"][tabindex="0"][data-in-month="true"]';
+const ANY_STOP = '[role="gridcell"][tabindex="0"]';
+
 /**
  * Keeps the keyboard's place visible when it is on a DAY.
  *
@@ -68,18 +73,31 @@ const useRootRef = (forwarded: React.ForwardedRef<HTMLDivElement>) => {
  * while the container holds focus. But a reader who tabbed onto a day, or
  * clicked one, has focus on that day's button: the tab stop moved and focus
  * stayed behind on a cell that is no longer it, so the ring sat on the old day
- * and a month change unmounted it under the reader. Focus now follows the
- * tab stop whenever the key that moved it was pressed ON a day.
+ * and a month change unmounted it under the reader.
+ *
+ * So a NAVIGATION key pressed on a day notes where the tab stop was, and once
+ * it has moved, focus follows it to the day in its own month. Any other key —
+ * Enter, Tab, Escape — clears the note: Enter re-sets the same day and must
+ * leave focus alone, and a stale note would pull focus into the grid on the
+ * next mouse pick.
  */
-const useFollowDayFocus = (rootRef: React.RefObject<HTMLDivElement | null>, focusedDate: Date) => {
-  const onDay = useRef(false);
+const useFollowDayFocus = (
+  rootRef: React.RefObject<HTMLDivElement | null>,
+  focusedDate: Date,
+  firstDayOfWeek: number,
+) => {
+  const movedFrom = useRef<number | null>(null);
   useEffect(() => {
-    if (!onDay.current) return;
-    onDay.current = false;
-    rootRef.current?.querySelector<HTMLElement>('[role="gridcell"][tabindex="0"]')?.focus();
+    const from = movedFrom.current;
+    movedFrom.current = null;
+    if (from === null || from === focusedDate.getTime()) return;
+    const root = rootRef.current;
+    (root?.querySelector<HTMLElement>(OWN_MONTH_STOP) ?? root?.querySelector<HTMLElement>(ANY_STOP))?.focus();
   }, [rootRef, focusedDate]);
   return (event: React.KeyboardEvent) => {
-    onDay.current = (event.target as HTMLElement).getAttribute('role') === 'gridcell';
+    const onDay = (event.target as HTMLElement).getAttribute('role') === 'gridcell';
+    const moves = navigateFocus(event.key, focusedDate, { firstDayOfWeek, shiftKey: event.shiftKey }) !== null;
+    movedFrom.current = onDay && moves ? focusedDate.getTime() : null;
   };
 };
 
@@ -92,7 +110,7 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
   const bounds = { minDate: props.minDate, maxDate: props.maxDate };
   const picker = useCalendarPicker({ rootRef, bounds, ...calendar });
   const dayContext = buildDayContext(props, calendar);
-  const noteKeyTarget = useFollowDayFocus(rootRef, calendar.focusedDate);
+  const noteKeyTarget = useFollowDayFocus(rootRef, calendar.focusedDate, props.firstDayOfWeek);
   const labels = resolveLabels(EN_US_UI_LABELS.calendar, props.labels);
   // The selectors caption always resolves to one month (see the helpers).
   const firstMonth = calendar.monthMatrices[0];

@@ -112,6 +112,26 @@ function RangeNote({
   );
 }
 
+/** Props of {@link RangeBounds}. */
+interface RangeBoundsProps<T extends Record<string, unknown>> {
+  field: RangeFieldConfig<T>;
+  value: RangeValue;
+  onChange: (range: RangeValue) => void;
+  testId: string;
+  /**
+   * Months the day calendar shows side by side (FUT-4144). Two where the
+   * popover has the room; one, with the month/year selectors, on a phone and
+   * in the panels.
+   */
+  calendarMonths?: 1 | 2;
+  /**
+   * Whether the day calendar is mounted. A host that keeps the pair mounted
+   * while hidden (the slide-in panel) passes its open state, so a closed panel
+   * holds no calendar of its own.
+   */
+  showCalendar?: boolean;
+}
+
 /**
  * The `De`/`Até` pair for a range — shared by the pill's popover and the
  * slide-in panel's day fields, so the two surfaces cannot drift on what a bound
@@ -123,18 +143,8 @@ export function RangeBounds<T extends Record<string, unknown>>({
   onChange,
   testId,
   calendarMonths = 1,
-}: {
-  field: RangeFieldConfig<T>;
-  value: RangeValue;
-  onChange: (range: RangeValue) => void;
-  testId: string;
-  /**
-   * Months the day calendar shows side by side (FUT-4144). Two where the
-   * popover has the room; one, with the month/year selectors, on a phone and
-   * in the panels.
-   */
-  calendarMonths?: 1 | 2;
-}): React.JSX.Element {
+  showCalendar = true,
+}: RangeBoundsProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
   const { key, emitted } = useOutsideResetKey(value);
   // Moves the calendar to a TYPED day. A typed write is the fields' own, so
@@ -183,7 +193,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
       <RangeNote day={day} inverted={isRangeInverted(value)} testId={testId} />
       {/* Under the boxes and the note, with no button to reach it: the typed
           path stays as short as it was, and a period is two taps (FUT-4144). */}
-      {day && (
+      {day && showCalendar && (
         <DayRangeCalendar
           fieldLabel={field.label}
           value={value}
