@@ -11,7 +11,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { bankFlowOs, type PhoneOs } from "./bank-apps";
 import type { PaymentListMode } from "./context";
-import { ListBar, ActionButton, WaitingLine } from "./list-bar";
+import { ListBar, ActionButton } from "./list-bar";
 import { BeforeCopy } from "./list-pix-before";
 import { PixBanks, usePixBankState, type PixBankState } from "./pix-banks";
 import type { CheckoutPixBank, PixBankId } from "./types";
@@ -27,8 +27,10 @@ import type { CheckoutPixBank, PixBankId } from "./types";
  * as the bar's "Copiar código Pix"), how to pay with it, and two text links:
  * the QR for paying from another device, and the way back to the list. On a
  * phone the QR opens under its link; on a computer it stands beside the code.
- * After the copy — ADR 0129's face, as today, with the bar saying what it is
- * waiting for. The code's face is `./list-pix-before.tsx`.
+ * After the copy — ADR 0129's face (kept by the owner, 2026-10-28): the bar
+ * holds "Copiar de novo", outlined; the card the steps and, on a phone, the
+ * outlined "Mostrar QR code (para outro aparelho)"; a computer the QR beside
+ * the steps. The code's face is `./list-pix-before.tsx`.
  */
 
 /** The pane's title, with the countdown beside it while the expiry can be read. */
@@ -83,34 +85,46 @@ function otherBankLabel(flow: BankFlow | null): string | null {
   return flow && rememberedOnPhone(flow) ? flow.bank.copy.openOther : null;
 }
 
-/** The bar's one control: held, "Atualizar pagamento", the wait after the copy, or the copy. */
-function PixBarAction({ mode, afterCopy, onCopy, copyLabel }: {
+/** After the copy, the bar's control (ADR 0129, kept by the owner 2026-10-28): "Copiar de novo", outlined — the next step is in the bank app. */
+interface CopyAgain {
+  onClick: () => void;
+  justCopied: boolean;
+}
+
+/** The bar's one control: held, "Atualizar pagamento", "Copiar de novo" after the copy, or the copy. */
+function PixBarAction({ mode, afterCopy, onCopy, copyLabel, again }: {
   mode: PaymentListMode;
   afterCopy: boolean;
   onCopy: () => void;
   copyLabel: string;
+  again: CopyAgain;
 }): JSX.Element {
   const stale = usePaymentStale();
   const refresh = usePaymentRefresh();
-  const refreshLabel = useCheckoutCopy().screens.cartChanged.refreshAction;
+  const screens = useCheckoutCopy().screens;
   const { hold } = mode.list;
   if (hold) return <ActionButton label={hold.action} total={null} disabled onClick={() => undefined} />;
-  if (stale && refresh) return <ActionButton label={refreshLabel} total={null} disabled={false} onClick={refresh} />;
-  if (afterCopy) return <WaitingLine text={mode.list.copy.pixFace.waiting} />;
+  if (stale && refresh) return <ActionButton label={screens.cartChanged.refreshAction} total={null} disabled={false} onClick={refresh} />;
+  if (afterCopy) {
+    const label = again.justCopied ? screens.pix.copiedAction : screens.pix.copyAgainAction;
+    return <ActionButton look="outline" testId="pix-copy-again" label={label} total={null} disabled={stale} onClick={again.onClick} />;
+  }
   return <ActionButton label={copyLabel} total={null} disabled={stale} onClick={onCopy} />;
 }
 
 /**
  * The Pix's bar: the host's hold first (a step reopened above), then — over a
  * code the cart has outgrown — "Atualizar pagamento" (FUT-3535, E20), then
- * the copy before it and the wait after it.
+ * the copy before it and "Copiar de novo" after it, while the live region
+ * says what it waits for.
  */
-function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
+function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank, again }: {
   mode: PaymentListMode;
   afterCopy: boolean;
   onCopy: () => void;
   bankFlow: BankFlow | null;
   onOtherBank: () => void;
+  again: CopyAgain;
 }): JSX.Element {
   const copy = mode.list.copy.pixFace;
   const stale = usePaymentStale();
@@ -119,7 +133,7 @@ function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank }: {
   const other = settled && !afterCopy ? otherBankLabel(bankFlow) : null;
   return (
     <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} actionLabel={hold?.action} live={afterCopy && settled ? copy.waiting : null}>
-      <PixBarAction mode={mode} afterCopy={afterCopy} onCopy={onCopy} copyLabel={copyLabel(copy.copyCode, bankFlow)} />
+      <PixBarAction mode={mode} afterCopy={afterCopy} onCopy={onCopy} copyLabel={copyLabel(copy.copyCode, bankFlow)} again={again} />
       {other ? <OtherBankLink label={other} onClick={onOtherBank} /> : null}
     </ListBar>
   );
@@ -241,6 +255,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
   // On a phone the bank flow takes the copy: "Copiar e abrir o Nubank", the
   // toast, the app. Without it — or on a computer — the copy is today's.
   const onCopy = flow ? copies.copy : props.onCopy;
+  const again = { onClick: flow ? copies.copy : props.onCopyAgain, justCopied: props.justCopied };
   const banks = bankFace(flow, pix, stale);
   return (
     <Box data-testid="list-pix" sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -252,7 +267,7 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
           totalLabel={mode.list.amountDueLabel ?? order.totalLabel}
           deadline={props.time}
           justCopied={props.justCopied}
-          onCopyAgain={flow ? copies.copy : props.onCopyAgain}
+          onCopyAgain={again.onClick}
           onShowQr={() => {
             mode.setQrOpen(true);
             props.onShowQr();
@@ -260,11 +275,12 @@ export function ListPixFace(props: ListPixFaceProps & { mode: PaymentListMode })
           onPreferCard={props.onPreferCard}
           footer={props.footer}
           banks={banks}
+          inList={{ qrLabel: copy.showQr }}
         />
       ) : (
         <BeforeCopy mode={mode} pix={pix} onCopy={onCopy} onChangeMethod={mode.onLeavePix} footer={props.footer} />
       )}
-      <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={onCopy} bankFlow={flow} onOtherBank={copies.other} />
+      <ListPixBar mode={mode} afterCopy={afterCopy} onCopy={onCopy} bankFlow={flow} onOtherBank={copies.other} again={again} />
     </Box>
   );
 }

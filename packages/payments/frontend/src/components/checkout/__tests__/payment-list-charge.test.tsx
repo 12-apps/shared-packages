@@ -200,7 +200,7 @@ describe("Pix, straight away", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("copies the code on a tap of the code itself, then waits in the bar", async () => {
+  it("copies the code on a tap of the code itself, then offers the copy again in the bar", async () => {
     const writeText = vi.fn(async () => undefined);
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
     await pixRaised();
@@ -210,7 +210,9 @@ describe("Pix, straight away", () => {
     fireEvent.click(code);
     await screen.findByTestId("pix-after-copy");
     expect(writeText).toHaveBeenCalledWith("00020126BR.GOV.BCB.PIX.o-pix");
-    expect(screen.getByTestId("list-waiting").textContent).toBe("Aguardando o pagamento do Pix…");
+    // The bar holds "Copiar de novo", outlined (ADR 0129); its live region says the wait.
+    expect(screen.getByTestId("list-bar-live").textContent).toBe("Aguardando o pagamento do Pix…");
+    expect(screen.getByTestId("pix-copy-again").closest("[data-testid=list-pay-bar]")).not.toBeNull();
   });
 
   it("copies from the bar's button the same way", async () => {

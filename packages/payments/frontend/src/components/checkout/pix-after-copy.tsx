@@ -130,6 +130,29 @@ interface PixAfterCopyProps {
    * column then sits as tight as the prototype's (8px).
    */
   banks?: { node: ReactNode; replacesChecklist: boolean };
+  /**
+   * Inside the one list (FUT-1181, FUT-592; ADR 0129 kept by the owner,
+   * 2026-10-28): "Copiar de novo" is the bar's, so the face keeps only the QR
+   * button, labelled by the list ("Mostrar QR code (para outro aparelho)"), and
+   * on a computer — the list's own container query — the QR stands beside the
+   * steps instead.
+   */
+  inList?: { qrLabel: string };
+}
+
+/** The list pane's computer width: the QR beside the steps (the list's 512px column never reaches {@link PIX_WIDE}). */
+const LIST_WIDE = "@container pixaftercopy (min-width: 460px)";
+
+/** The list's one in-card action: the QR, as an outlined secondary (ADR 0129), on a phone only. */
+function ListActions({ qrLabel, onShowQr }: { qrLabel: string; onShowQr: () => void }): JSX.Element {
+  const { Button } = useCheckoutComponents();
+  return (
+    <Box sx={{ "& button": { minHeight: 48 }, "& button, & button *": { fontWeight: 700 }, [LIST_WIDE]: { display: "none" } }}>
+      <Button variant="outline" color="neutral" size="md" fullWidth icon={<QrCodeIcon fontSize="small" />} onClick={onShowQr} dataTestId="pix-show-qr">
+        {qrLabel}
+      </Button>
+    </Box>
+  );
 }
 
 /**
@@ -178,17 +201,29 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
   );
 }
 
+/** What the list changes in the face's frame: its own width query, the steps' column, and the QR beside them. */
+function frameFor(inList: boolean) {
+  if (!inList) return { root: {}, main: {}, qr: { [PIX_WIDE]: { display: "flex" }, flex: "1 1 240px" }, qrSize: 168 };
+  return {
+    root: { containerType: "inline-size", containerName: "pixaftercopy" },
+    main: { [LIST_WIDE]: { flex: "1 1 0" } },
+    qr: { [LIST_WIDE]: { display: "flex" }, flex: "none" },
+    qrSize: 120,
+  };
+}
+
 export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
-  const { pix, words, totalLabel, deadline, onPreferCard, footer } = props;
+  const { pix, words, totalLabel, deadline, onPreferCard, footer, inList } = props;
   const stale = usePaymentStale();
+  const frame = frameFor(Boolean(inList));
   return (
-    <Box data-testid="pix-after-copy" sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
-      <Box sx={{ flex: "999 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: props.banks?.replacesChecklist ? 1 : 2.5 }}>
+    <Box data-testid="pix-after-copy" sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start", ...frame.root }}>
+      <Box sx={{ flex: "999 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: props.banks?.replacesChecklist ? 1 : 2.5, ...frame.main }}>
         {props.banks ? props.banks.node : <Heading words={words} totalLabel={totalLabel} />}
         {props.banks?.replacesChecklist ? null : <Checklist words={words} deadline={deadline} />}
-        <Actions {...props} />
+        {inList ? <ListActions qrLabel={inList.qrLabel} onShowQr={props.onShowQr} /> : <Actions {...props} />}
         {footer}
         {onPreferCard ? (
           <Box sx={{ ...LINK_SX, display: "flex", justifyContent: "center", [PIX_WIDE]: { display: "none" } }}>
@@ -198,12 +233,15 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
           </Box>
         ) : null}
       </Box>
-      <Box sx={{ display: "none", [PIX_WIDE]: { display: "flex" }, flex: "1 1 240px", minWidth: 0, flexDirection: "column", alignItems: "center", gap: 1.5, p: 2.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
+      <Box
+        data-testid="pix-after-copy-qr"
+        sx={{ display: "none", ...frame.qr, minWidth: 0, flexDirection: "column", alignItems: "center", gap: 1.5, p: 2.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}
+      >
         <Text variant="body" size="xs" weight="bold" color="secondary" as="p" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {copy.notPaidYet}
         </Text>
         <StaleVeil stale={stale}>
-          <PixQr payload={pix.copyPaste} size={168} alt={copy.qrAlt} />
+          <PixQr payload={pix.copyPaste} size={frame.qrSize} alt={copy.qrAlt} />
         </StaleVeil>
         <Text variant="body" size="xs" color="secondary" as="p" style={{ margin: 0, textAlign: "center" }}>
           {copy.scanFromPhone}
