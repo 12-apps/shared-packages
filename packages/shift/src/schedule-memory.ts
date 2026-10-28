@@ -1,3 +1,6 @@
+import { slotIsStorable } from './schedule-context';
+import { validateRule } from './schedule-rule';
+import type { ShiftSlotSeries } from './schedule-series-types';
 import type {
   ListSlotsInput,
   ShiftScheduleAuditInput,
@@ -8,7 +11,18 @@ import type {
 
 interface ScheduleState {
   slots: ShiftSlot[];
+  series: ShiftSlotSeries[];
   audits: ShiftScheduleAuditInput[];
+}
+
+function cloneSeries(series: ShiftSlotSeries): ShiftSlotSeries {
+  return {
+    ...series,
+    weekdays: [...series.weekdays],
+    skippedDates: [...series.skippedDates],
+    createdAt: new Date(series.createdAt),
+    coverage: series.coverage ? series.coverage.map((entry) => ({ ...entry })) : null,
+  };
 }
 
 function cloneSlot(slot: ShiftSlot): ShiftSlot {
@@ -25,6 +39,7 @@ function cloneSlot(slot: ShiftSlot): ShiftSlot {
 function cloneState(state: ScheduleState): ScheduleState {
   return {
     slots: state.slots.map(cloneSlot),
+    series: state.series.map(cloneSeries),
     audits: state.audits.map((audit) => ({ ...audit, before: { ...audit.before }, after: { ...audit.after } })),
   };
 }
@@ -35,14 +50,71 @@ function overlaps(slot: ShiftSlot, from: Date, to: Date): boolean {
   return slot.startsAt < to && from < slot.endsAt;
 }
 
-const MAX_SLOT_MS = 24 * 60 * 60_000;
-
 /** What the table's CHECK constraints refuse, so a test cannot pass what Postgres would not. */
 function assertStorable(slot: ShiftSlot): void {
-  const length = slot.endsAt.getTime() - slot.startsAt.getTime();
-  if (slot.kind.trim() === '' || !(length > 0) || length > MAX_SLOT_MS) {
+  if (slot.kind.trim() === '' || !slotIsStorable(slot)) {
     throw new Error(`shift_slots CHECK violated by slot ${slot.id}.`);
   }
+}
+
+function assertSeriesStorable(series: ShiftSlotSeries): void {
+  try {
+    validateRule(series);
+  } catch (cause) {
+    throw new Error(`shift_slot_series CHECK violated by series ${series.id}.`, { cause });
+  }
+}
+
+function belongsTo(slot: ShiftSlot, clientId: string, seriesId: string): boolean {
+  return slot.clientId === clientId && (slot.seriesId === seriesId || slot.originSeriesId === seriesId);
+}
+
+function seriesOps(state: ScheduleState): Pick<ShiftScheduleTransaction, 'getSeries' | 'createSeries' | 'updateSeries'> {
+  const find = (clientId: string, seriesId: string): ShiftSlotSeries | undefined =>
+    state.series.find((series) => series.clientId === clientId && series.id === seriesId);
+  return {
+    getSeries: async (clientId, seriesId) => {
+      const found = find(clientId, seriesId);
+      return found ? cloneSeries(found) : null;
+    },
+    createSeries: async (series) => {
+      assertSeriesStorable(series);
+      if (state.series.some((other) => other.id === series.id)) throw new Error(`Duplicate series ${series.id}.`);
+      state.series.push(cloneSeries(series));
+    },
+    updateSeries: async (clientId, seriesId, patch) => {
+      const found = find(clientId, seriesId);
+      if (!found) throw new Error(`No series ${seriesId}.`);
+      Object.assign(found, cloneSeries({ ...found, ...patch }));
+      return cloneSeries(found);
+    },
+  };
+}
+
+function slotEdits(state: ScheduleState): Pick<ShiftScheduleTransaction, 'updateSlot' | 'restoreSlots' | 'listSeriesRows'> {
+  return {
+    updateSlot: async (clientId, slotId, patch) => {
+      const found = state.slots.find((slot) => slot.clientId === clientId && slot.id === slotId);
+      if (!found) throw new Error(`No slot ${slotId}.`);
+      const next = cloneSlot({ ...found, ...patch });
+      assertStorable(next);
+      Object.assign(found, next);
+      return cloneSlot(found);
+    },
+    restoreSlots: async (clientId, slotIds) => {
+      const wanted = new Set(slotIds);
+      const canceled = state.slots.filter(
+        (slot) => slot.clientId === clientId && wanted.has(slot.id) && slot.canceledAt !== null,
+      );
+      for (const slot of canceled) Object.assign(slot, { canceledAt: null, canceledByUserId: null, cancelReason: null });
+      return canceled.map(cloneSlot);
+    },
+    listSeriesRows: async (clientId, seriesId, from, to) =>
+      state.slots
+        .filter((slot) => belongsTo(slot, clientId, seriesId) && slot.startsAt >= from && slot.startsAt < to)
+        .sort(byStart)
+        .map(cloneSlot),
+  };
 }
 
 function transactionOver(state: ScheduleState): ShiftScheduleTransaction {
@@ -75,6 +147,8 @@ function transactionOver(state: ScheduleState): ShiftScheduleTransaction {
         .filter((slot) => slot.canceledAt === null && slot.startsAt >= from)
         .sort(byStart)
         .map(cloneSlot),
+    ...seriesOps(state),
+    ...slotEdits(state),
     writeAudit: async (audit) => {
       state.audits.push({ ...audit, before: { ...audit.before }, after: { ...audit.after } });
     },
@@ -84,6 +158,7 @@ function transactionOver(state: ScheduleState): ShiftScheduleTransaction {
 export interface MemoryShiftScheduleDb extends ShiftScheduleDb {
   /** Every slot, canceled included — for assertions. */
   slots(): ShiftSlot[];
+  series(): ShiftSlotSeries[];
   audits(): ShiftScheduleAuditInput[];
 }
 
@@ -93,7 +168,7 @@ export interface MemoryShiftScheduleDb extends ShiftScheduleDb {
  * leaves nothing behind — as Postgres would.
  */
 export function createMemoryShiftScheduleDb(): MemoryShiftScheduleDb {
-  let state: ScheduleState = { slots: [], audits: [] };
+  let state: ScheduleState = { slots: [], series: [], audits: [] };
   // One transaction at a time, as the host's per-worker lock would make them:
   // without it two overlapping drafts both commit and the first is lost.
   let queue: Promise<unknown> = Promise.resolve();
@@ -126,7 +201,11 @@ export function createMemoryShiftScheduleDb(): MemoryShiftScheduleDb {
         .slice(0, limit)
         .map(cloneSlot);
     },
+    async listOpenSeries(onOrAfter) {
+      return state.series.filter((series) => series.endsOn === null || series.endsOn >= onOrAfter).map(cloneSeries);
+    },
     slots: () => state.slots.map(cloneSlot),
+    series: () => state.series.map(cloneSeries),
     audits: () => state.audits.map((audit) => ({ ...audit })),
   };
 }

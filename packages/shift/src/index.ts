@@ -9,10 +9,32 @@ export {
 } from './schedule-errors';
 export { createMemoryShiftScheduleDb, type MemoryShiftScheduleDb } from './schedule-memory';
 export type {
+  DemoteToSlotInput,
+  EditSeriesInput,
+  EditSlotInput,
+  ExtendSeriesResult,
+  MaterialiseSeriesInput,
+  MaterialiseSeriesResult,
+  PromoteToSeriesInput,
+  RestoreSlotInput,
+  RevertScheduleChangeInput,
+  ScheduleChange,
+  ScheduleSeriesInput,
+  ScheduleWriteResult,
+  ShiftSeriesRepeat,
+  ShiftSlotPrior,
+  ShiftSlotSeries,
+  ShiftSlotSeriesPatch,
+  ShiftSlotSeriesService,
+} from './schedule-series-types';
+export type { LocalDate } from './schedule-time';
+export type {
   CancelSlotInput,
+  CancelSlotResult,
   ListSlotsInput,
   NextSlotsInput,
   ScheduleSlotInput,
+  ShiftScheduleAuditAction,
   ShiftScheduleAuditInput,
   ShiftScheduleDb,
   ShiftScheduleService,
@@ -20,6 +42,7 @@ export type {
   ShiftScheduleTransaction,
   ShiftSlot,
   ShiftSlotCoverage,
+  ShiftSlotPatch,
   ShiftSlotStanding,
   ShiftSlotStandingResult,
   SlotStandingInput,

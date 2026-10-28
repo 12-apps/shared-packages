@@ -21,6 +21,7 @@
 
 import type { JobsContribution } from '@12-apps/wiring';
 
+import type { ExtendSeriesResult } from './schedule-series-types';
 import type { AutoCloseResult } from './types';
 
 export interface ShiftJobDeps {
@@ -30,6 +31,27 @@ export interface ShiftJobDeps {
    * the lease and the reporting, never the vocabulary inside the call.
    */
   autoCloseOverdue(): Promise<AutoCloseResult>;
+  /**
+   * Build the next days of every open series rule, in every tenant, up to the
+   * horizon — the host closes its schedule service over this
+   * (`schedule.extendSeries()`).
+   */
+  extendSeries(): Promise<ExtendSeriesResult>;
+  /**
+   * Told, per tenant, which rows the extension just built, so the host can
+   * reconcile what it keeps beside the schedule. Called once per tenant that
+   * got rows; a throw is logged and does not stop the other tenants.
+   */
+  onMaterialised(clientId: string, slotIds: readonly string[]): Promise<void>;
+}
+
+/** The built rows, one list per tenant. */
+function builtByTenant(result: ExtendSeriesResult): Map<string, string[]> {
+  const byTenant = new Map<string, string[]>();
+  for (const entry of result.built) {
+    byTenant.set(entry.clientId, [...(byTenant.get(entry.clientId) ?? []), ...entry.slotIds]);
+  }
+  return byTenant;
 }
 
 export const SHIFT_JOBS = {
@@ -54,6 +76,36 @@ export const SHIFT_JOBS = {
           context.logger.error(
             `shift auto-close failed for shift ${failure.shiftId} (tenant ${failure.clientId}): ${failure.code} ${failure.message}`,
           );
+        }
+      },
+    },
+    extendSeries: {
+      name: 'extend-series',
+      /** Daily: the horizon is weeks long, so one run a day keeps it whole. */
+      schedule: { pattern: '17 4 * * *' },
+      /** One run may hold the single-flight name for up to an hour. */
+      lease: { ttlMs: 60 * 60 * 1000 },
+      /** Idempotent, so a missed run is simply caught up by the next one. */
+      attempts: 1,
+      async handle(_payload, deps, context) {
+        const result = await deps.extendSeries();
+        const byTenant = builtByTenant(result);
+        if (byTenant.size > 0 || result.skipped.length > 0) {
+          const built = [...byTenant.values()].reduce((sum, ids) => sum + ids.length, 0);
+          context.logger.info(`shift extend-series: ${built} built, ${result.skipped.length} days skipped`);
+        }
+        for (const failure of result.failures) {
+          context.logger.error(
+            `shift extend-series failed for series ${failure.seriesId} (tenant ${failure.clientId}): ${failure.message}`,
+          );
+        }
+        for (const [clientId, slotIds] of byTenant) {
+          try {
+            await deps.onMaterialised(clientId, slotIds);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            context.logger.error(`shift extend-series: the host's reconcile failed for tenant ${clientId}: ${message}`);
+          }
         }
       },
     },

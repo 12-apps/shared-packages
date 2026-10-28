@@ -104,7 +104,7 @@ describe('the auto-close blueprint — the first with a lease', () => {
     });
     await SHIFT_JOBS.blueprints.autoClose.handle(
       undefined as never,
-      { autoCloseOverdue },
+      { ...idleDeps(), autoCloseOverdue },
       context,
     );
     expect(autoCloseOverdue).toHaveBeenCalledTimes(1);
@@ -120,10 +120,66 @@ describe('the auto-close blueprint — the first with a lease', () => {
     const context = stubContext();
     await SHIFT_JOBS.blueprints.autoClose.handle(
       undefined as never,
-      { autoCloseOverdue: vi.fn().mockResolvedValue({ closed: [], failures: [] }) },
+      { ...idleDeps(), autoCloseOverdue: vi.fn().mockResolvedValue({ closed: [], failures: [] }) },
       context,
     );
     expect(context.logger.info).not.toHaveBeenCalled();
     expect(context.logger.error).not.toHaveBeenCalled();
   });
 });
+
+describe('the extend-series blueprint', () => {
+  it('runs daily under a lease, once per attempt', () => {
+    const blueprint = SHIFT_JOBS.blueprints.extendSeries;
+    expect(blueprint.name).toBe('extend-series');
+    expect(blueprint.schedule).toEqual({ pattern: '17 4 * * *' });
+    expect(blueprint.lease).toEqual({ ttlMs: 60 * 60 * 1000 });
+    expect(blueprint.attempts).toBe(1);
+  });
+
+  it('reports what it built once per tenant, and a failing reconcile does not stop the next tenant', async () => {
+    const context = stubContext();
+    const onMaterialised = vi.fn().mockRejectedValueOnce(new Error('cover lookup down')).mockResolvedValue(undefined);
+    const extendSeries = vi.fn().mockResolvedValue({
+      built: [
+        { clientId: 't1', seriesId: 'r1', slotIds: ['a'] },
+        { clientId: 't2', seriesId: 'r2', slotIds: ['b'] },
+        { clientId: 't1', seriesId: 'r3', slotIds: ['c'] },
+      ],
+      skipped: [{ clientId: 't2', seriesId: 'r2', date: '2026-11-02' }],
+      failures: [{ clientId: 't3', seriesId: 'r4', message: 'row moved' }],
+    });
+    await SHIFT_JOBS.blueprints.extendSeries.handle(
+      undefined as never,
+      { ...idleDeps(), extendSeries, onMaterialised },
+      context,
+    );
+    expect(onMaterialised.mock.calls).toEqual([
+      ['t1', ['a', 'c']],
+      ['t2', ['b']],
+    ]);
+    expect(context.logger.info).toHaveBeenCalledWith('shift extend-series: 3 built, 1 days skipped');
+    expect(context.logger.error).toHaveBeenCalledWith(
+      'shift extend-series failed for series r4 (tenant t3): row moved',
+    );
+    expect(context.logger.error).toHaveBeenCalledWith(
+      "shift extend-series: the host's reconcile failed for tenant t1: cover lookup down",
+    );
+  });
+
+  it('stays silent and calls no reconcile when nothing was built', async () => {
+    const context = stubContext();
+    const deps = idleDeps();
+    await SHIFT_JOBS.blueprints.extendSeries.handle(undefined as never, deps, context);
+    expect(deps.onMaterialised).not.toHaveBeenCalled();
+    expect(context.logger.info).not.toHaveBeenCalled();
+  });
+});
+
+function idleDeps() {
+  return {
+    autoCloseOverdue: vi.fn().mockResolvedValue({ closed: [], failures: [] }),
+    extendSeries: vi.fn().mockResolvedValue({ built: [], skipped: [], failures: [] }),
+    onMaterialised: vi.fn().mockResolvedValue(undefined),
+  };
+}
