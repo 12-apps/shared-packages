@@ -24,6 +24,7 @@ import { TableFilter } from '../../layout/TableFilter';
 import { DayBoundInput } from './data-views-day-input';
 import { NumberBoundInput } from './data-views-number-input';
 import { RangePresets } from './data-views-preset-chips';
+import { useOutsideResetKey } from './data-views-range-reset';
 import { presetsFor } from './data-views-range-presets';
 import {
   isRangeInverted,
@@ -102,6 +103,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
   const inverted = isRangeInverted(value);
+  const { key, emitted } = useOutsideResetKey(value);
   return (
     <Box data-testid={`${testId}-panel`}>
       {/* Above the inputs, not below: the presets are the answer for most
@@ -114,17 +116,19 @@ export function RangeBounds<T extends Record<string, unknown>>({
           boxes are one height, so with no message this is the same row. */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
         <BoundField
+          key={`min-${key}`}
           field={field}
           label={copy.filters.rangeStart}
           value={value.min}
-          onChange={(min) => onChange({ ...value, min })}
+          onChange={(min) => onChange(emitted({ ...value, min }))}
           testId={`${testId}-min`}
         />
         <BoundField
+          key={`max-${key}`}
           field={field}
           label={copy.filters.rangeEnd}
           value={value.max}
-          onChange={(max) => onChange({ ...value, max })}
+          onChange={(max) => onChange(emitted({ ...value, max }))}
           testId={`${testId}-max`}
         />
       </Box>

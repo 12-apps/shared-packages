@@ -19,7 +19,10 @@ import {
   maskedToIso,
   readDayText,
 } from "../data-views-day-input";
+import { FilterDialog, GridFilterPanel, type GridFilterPanelProps } from "../data-views-filter-panel";
 import { RangeBounds } from "../data-views-range-pill";
+import type { RangeValue } from "../data-views-types";
+import { TableFilter } from "../../../layout/TableFilter";
 
 /**
  * The two masks in the estate's own packs. Every helper case below runs against
@@ -458,5 +461,115 @@ describe("DayBoundInput: a cleared bound clears a refused day too", () => {
     rerender(<DayBoundInput {...props} value="2026-08-06" />);
 
     await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
+  });
+});
+
+/**
+ * A clear moves no bound that was already open, so the field's own re-sync
+ * cannot see it: the surfaces that clear remount the fields instead, or a red
+ * `31/02/2026` the filter never applied outlives "Limpar" (FUT-4144).
+ */
+type Row = Record<string, unknown>;
+const DAY_FIELD = { id: "created", label: "Data", kind: "day" as const, accessor: () => null };
+
+function panelProps(onClearAll: () => void): GridFilterPanelProps<Row> {
+  return {
+    testIdPrefix: "grid",
+    search: "",
+    fields: [],
+    rangeFields: [DAY_FIELD],
+    pills: {},
+    ranges: {},
+    onSearchChange: vi.fn(),
+    onTogglePill: vi.fn(),
+    onChangeRange: vi.fn(),
+    onClearField: vi.fn(),
+    onClearAll,
+  };
+}
+
+async function refuseInMin(prefix: string): Promise<HTMLInputElement> {
+  const min = screen.getByTestId(`${prefix}-min`) as HTMLInputElement;
+  fireEvent.change(min, { target: { value: "31022026" } });
+  fireEvent.blur(min);
+  await waitFor(() => expect(min).toHaveAttribute("aria-invalid", "true"));
+  return min;
+}
+
+describe("Limpar todos os filtros empties a refused day under a range that was never applied", () => {
+  it("does so in the slide-in panel", async () => {
+    const onClearAll = vi.fn();
+    render(
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open onOpenChange={vi.fn()}>
+          <GridFilterPanel {...panelProps(onClearAll)} />
+        </TableFilter>
+      </DataViewsCopyProvider>,
+    );
+    await refuseInMin("grid-range-created");
+
+    fireEvent.click(screen.getByTestId("grid-clear-filters"));
+
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
+    expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() => expect(screen.queryByText(PT_BR_DATA_VIEWS_COPY.filters.dayInvalid)).toBeNull());
+  });
+
+  it("does so in the narrow-screen filter dialog", async () => {
+    const onClearAll = vi.fn();
+    render(
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open={false} onOpenChange={vi.fn()}>
+          <FilterDialog open onClose={vi.fn()} {...panelProps(onClearAll)} />
+        </TableFilter>
+      </DataViewsCopyProvider>,
+    );
+    await refuseInMin("grid-range-created");
+
+    fireEvent.click(screen.getByTestId("grid-clear-filters"));
+
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
+    expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
+  });
+});
+
+describe("RangeBounds: a clear from outside empties the bound it did not move", () => {
+  function renderBounds(value: RangeValue, onChange = vi.fn()) {
+    const ui = (range: RangeValue) => (
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <RangeBounds field={DAY_FIELD} value={range} onChange={onChange} testId="range" />
+      </DataViewsCopyProvider>
+    );
+    const view = render(ui(value));
+    return { onChange, rerender: (range: RangeValue) => view.rerender(ui(range)) };
+  }
+
+  it("drops a refused Ate when the pill's Limpar clears an applied De", async () => {
+    const { rerender } = renderBounds({ min: "2026-08-06" });
+    const max = screen.getByTestId("range-max") as HTMLInputElement;
+    fireEvent.change(max, { target: { value: "31022026" } });
+    fireEvent.blur(max);
+    await waitFor(() => expect(max).toHaveAttribute("aria-invalid", "true"));
+
+    rerender({});
+
+    await waitFor(() => expect(screen.getByTestId("range-max")).toHaveValue(""));
+    expect(screen.getByTestId("range-max")).toHaveAttribute("aria-invalid", "false");
+    expect(screen.getByTestId("range-min")).toHaveValue("");
+  });
+
+  it("does not remount a field for its own write, so typing keeps its place", async () => {
+    const { onChange, rerender } = renderBounds({});
+    const typedInto = screen.getByTestId("range-min");
+    fireEvent.change(typedInto, { target: { value: "06082026" } });
+    expect(onChange).toHaveBeenCalledWith({ min: "2026-08-06" });
+
+    rerender({ min: "2026-08-06" });
+
+    // The SAME element: a remount would have replaced it, and the caret with it.
+    await waitFor(() => expect(screen.getByTestId("range-min")).toHaveValue("06/08/2026"));
+    expect(screen.getByTestId("range-min")).toBe(typedInto);
   });
 });

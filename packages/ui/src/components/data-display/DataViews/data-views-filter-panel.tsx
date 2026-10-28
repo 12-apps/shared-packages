@@ -2,6 +2,7 @@
 
 import Box from "@mui/material/Box/index.js";
 import Link from "@mui/material/Link/index.js";
+import { useState } from "react";
 
 import { StackedModal, StackedModalContent } from "../../feedback/StackedModal";
 import { TableFilter } from "../../layout/TableFilter";
@@ -124,18 +125,36 @@ function FilterControls<T extends Record<string, unknown>>({
   );
 }
 
+/**
+ * "Limpar todos os filtros", plus a key that changes with every click of it.
+ *
+ * Keying the controls on it remounts them, so a field holding text the filter
+ * never applied — a refused day (`31/02/2026`) under a range that was open
+ * already — is emptied too. Clearing state that did not change moves nothing
+ * else on screen (FUT-4144).
+ */
+function useClearAll(onClearAll: () => void): { clearKey: number; clearAll: () => void } {
+  const [clearKey, setClearKey] = useState(0);
+  const clearAll = () => {
+    onClearAll();
+    setClearKey((n) => n + 1);
+  };
+  return { clearKey, clearAll };
+}
+
 /** The slide-in filter panel: keyword + checkbox facets + numeric ranges. */
 export function GridFilterPanel<T extends Record<string, unknown>>(
   props: GridFilterPanelProps<T>,
 ): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const { clearKey, clearAll } = useClearAll(props.onClearAll);
   return (
     <TableFilter.Panel
-      onClearAll={props.onClearAll}
+      onClearAll={clearAll}
       clearTestId={`${props.testIdPrefix}-clear-filters`}
       ariaLabel={copy.filters.panelTitle}
     >
-      <FilterControls {...props} />
+      <FilterControls key={clearKey} {...props} />
     </TableFilter.Panel>
   );
 }
@@ -156,6 +175,7 @@ export function FilterDialog<T extends Record<string, unknown>>({
   ...props
 }: FilterDialogProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const { clearKey, clearAll } = useClearAll(props.onClearAll);
   return (
     <StackedModal
       open={open}
@@ -173,14 +193,14 @@ export function FilterDialog<T extends Record<string, unknown>>({
               component="button"
               type="button"
               underline="hover"
-              onClick={props.onClearAll}
+              onClick={clearAll}
               data-testid={`${props.testIdPrefix}-clear-filters`}
               sx={{ fontSize: sxRem(12), color: "text.secondary" }}
             >
               {copy.filters.clearAllFilters}
             </Link>
           </Box>
-          <FilterControls {...props} />
+          <FilterControls key={clearKey} {...props} />
         </Box>
       </StackedModalContent>
     </StackedModal>
