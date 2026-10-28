@@ -3,8 +3,9 @@
  *
  * There is no standard Pix link that pays a copia-e-cola code, so this only
  * OPENS the app; the buyer pastes the code the button already copied. Android
- * opens an app through an `intent:` URL naming its package; iOS only through a
- * URL scheme the bank's app registers. Neither tells the page whether it
+ * opens an app through an `intent:` URL naming its package. iOS goes to the
+ * bank's App Store page, whose "Abrir" opens the installed app (FUT-4081: see
+ * {@link bankAppUrl}). Neither tells the page whether it
  * worked, so {@link openBankApp} watches the page: an app that opened takes
  * the screen within a moment, and a page still visible after
  * {@link OPEN_WAIT_MS} is a bank that did not open — not installed, or a link
@@ -19,13 +20,11 @@ interface BankApp {
   /** The Play Store package of the bank's personal app — each one checked on its Play listing (2026-10-16). */
   android: string;
   /**
-   * The URL scheme its app answers on iOS (without "://"). Only Nubank's
-   * (`nuapp`) is documented — in Nubank's own deep links. The other five
-   * publish no scheme we could find: theirs are the likeliest name, and a
-   * phone that does not know one is a bank that "did not open", which the face
-   * says (owner, 2026-10-16: Android and iOS, and say so when it does not open).
+   * The id of the bank's personal app on the Brazilian App Store, each one read
+   * from the App Store's own lookup, its bundle id the one the bank's site
+   * declares (2026-10-28).
    */
-  ios: string;
+  appStoreId: string;
   /** A scheme Android opens the app with, when one is known; else the app's launcher, by package. */
   scheme?: string;
 }
@@ -34,12 +33,12 @@ interface BankApp {
 export const PIX_BANKS: readonly PixBankId[] = ["nubank", "itau", "bradesco", "bb", "caixa", "santander"];
 
 const APPS: Record<PixBankId, BankApp> = {
-  nubank: { android: "com.nu.production", ios: "nuapp", scheme: "nuapp" },
-  itau: { android: "com.itau", ios: "itau" },
-  bradesco: { android: "com.bradesco", ios: "bradesco" },
-  bb: { android: "br.com.bb.android", ios: "bbapp" },
-  caixa: { android: "br.gov.caixa.CAIXA", ios: "caixa" },
-  santander: { android: "com.santander.app", ios: "santanderpf" },
+  nubank: { android: "com.nu.production", appStoreId: "814456780", scheme: "nuapp" },
+  itau: { android: "com.itau", appStoreId: "474505665" },
+  bradesco: { android: "com.bradesco", appStoreId: "336954985" },
+  bb: { android: "br.com.bb.android", appStoreId: "330984271" },
+  caixa: { android: "br.gov.caixa.CAIXA", appStoreId: "490813624" },
+  santander: { android: "com.santander.app", appStoreId: "613365711" },
 };
 
 export type PhoneOs = "android" | "ios";
@@ -69,10 +68,17 @@ export function bankFlowOs(phone: boolean | undefined): PhoneOs | null {
  * The URL that opens `bank`'s app on `os`. Android: an `intent:` URL naming the
  * package — through the app's scheme when one is known, else its launcher; a
  * phone without the app gets the bank's Play Store page from the browser.
+ *
+ * iOS: the bank's App Store page, whose "Abrir" opens the installed app (and
+ * "Obter" installs a missing one) — one tap more, but it always lands. A guessed
+ * URL scheme made Safari say the address was invalid (`nuapp://` is not one
+ * Nubank's iPhone app answers), and Nubank's universal links name a task each
+ * (`/payment/…`, `/sim/…`): tapped with nothing to do, the app opened and sent
+ * the buyer straight to the browser (owner's iPhone tests, FUT-4081).
  */
 export function bankAppUrl(bank: PixBankId, os: PhoneOs): string {
   const app = APPS[bank];
-  if (os === "ios") return `${app.ios}://`;
+  if (os === "ios") return `https://apps.apple.com/br/app/id${app.appStoreId}`;
   if (app.scheme) return `intent://#Intent;scheme=${app.scheme};package=${app.android};end`;
   return `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${app.android};end`;
 }

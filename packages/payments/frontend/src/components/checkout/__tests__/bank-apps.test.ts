@@ -20,10 +20,19 @@ describe("phoneOs", () => {
 });
 
 describe("bankAppUrl", () => {
-  it("names the package on Android and the scheme on iOS", () => {
+  it("names the package on Android and the bank's App Store page on iOS", () => {
     expect(bankAppUrl("nubank", "android")).toContain("package=com.nu.production");
     expect(bankAppUrl("nubank", "android").startsWith("intent://")).toBe(true);
-    expect(bankAppUrl("nubank", "ios")).toBe("nuapp://");
+    // FUT-4081: the App Store page, whose "Abrir" opens the installed app.
+    expect(bankAppUrl("nubank", "ios")).toBe("https://apps.apple.com/br/app/id814456780");
+  });
+
+  it("sends every bank to its own App Store page on iOS (FUT-4081)", () => {
+    expect(bankAppUrl("itau", "ios")).toBe("https://apps.apple.com/br/app/id474505665");
+    expect(bankAppUrl("bradesco", "ios")).toBe("https://apps.apple.com/br/app/id336954985");
+    expect(bankAppUrl("bb", "ios")).toBe("https://apps.apple.com/br/app/id330984271");
+    expect(bankAppUrl("caixa", "ios")).toBe("https://apps.apple.com/br/app/id490813624");
+    expect(bankAppUrl("santander", "ios")).toBe("https://apps.apple.com/br/app/id613365711");
   });
 
   it("opens a bank with no known scheme by its launcher, naming the Play Store package", () => {
