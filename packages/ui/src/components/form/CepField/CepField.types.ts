@@ -1,4 +1,5 @@
 import type { CepFieldCopy } from "../../../copy";
+import type { InputSize } from "../Input/Input.base";
 /**
  * Types for {@link CepField} — the reusable CEP auto-completer.
  */
@@ -73,4 +74,19 @@ export interface CepFieldProps {
   name?: string;
   /** Test id for the input. Defaults to `cep-field-<name>`. */
   dataTestId?: string;
+  /**
+   * A step of the house size scale — the same values, and the same box
+   * heights, as {@link Input}'s `size`. Defaults to `md`.
+   */
+  size?: InputSize;
+  /**
+   * Where the label is drawn.
+   *
+   * - `above` (default): a stacked label over the box, as the field has always
+   *   rendered. Every existing caller keeps it.
+   * - `inside`: the label sits in the box and floats up on focus or a value,
+   *   exactly as `Input`'s label does. Use it beside `Input`s so the CEP block
+   *   is the same height as its neighbours.
+   */
+  labelPlacement?: 'above' | 'inside';
 }
