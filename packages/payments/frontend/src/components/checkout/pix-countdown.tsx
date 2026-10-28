@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
  */
 
 /** The last stretch: under this, the countdown turns amber and says so. */
-export const PIX_URGENT_MS = 2 * 60_000;
+const PIX_URGENT_MS = 2 * 60_000;
 
 /**
  * The window the bar is drawn against when the charge says nothing longer.
@@ -50,7 +50,7 @@ export function formatCountdown(remainingMs: number): string {
 }
 
 /** What the countdown draws at one instant. */
-export interface PixCountdownState {
+interface PixCountdownState {
   remainingMs: number;
   /** "12:34". */
   clock: string;
