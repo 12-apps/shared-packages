@@ -38,11 +38,17 @@ function keypadProps(variant: InputOTPProps['variant'], index: number): Record<s
  * One character per slot — except the numeric FIRST slot, which carries
  * `one-time-code`: the phone's SMS fill writes the whole code there in one
  * change, and a `maxLength` of 1 would cut it to one digit before the hook
- * could spread it. That slot takes the code's own length; a keystroke into it
- * once filled is still refused, by the hook, as the attribute refused it.
+ * could spread it.
+ *
+ * The code's length PLUS ONE: a phone that INSERTS the code at the caret keeps
+ * the digit already there in front (`4` + `482913`), and the browser caps that
+ * insertion at `maxlength` BEFORE the hook sees it. At the bare length it
+ * arrived as `448291` — a wrong code that looks whole. One more character lets
+ * the hook see the leading digit and drop it. A keystroke into the slot once
+ * filled is still refused, by the hook, as `maxLength={1}` refused it.
  */
 const slotMaxLength = (variant: InputOTPProps['variant'], index: number, length: number): number =>
-  variant === 'numeric' && index === 0 ? length : 1;
+  variant === 'numeric' && index === 0 ? length + 1 : 1;
 
 const DEFAULTS = {
   variant: 'numeric',

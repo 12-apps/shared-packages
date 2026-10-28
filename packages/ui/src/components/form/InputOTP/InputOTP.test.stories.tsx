@@ -177,8 +177,8 @@ export const ScreenReader: Story = {
     // Check that inputs are accessible
     for (const [index, input] of inputs.entries()) {
       expect(input).toBeInTheDocument();
-      // The numeric first slot takes a whole SMS-filled code (FUT-4144).
-      expect(input).toHaveAttribute('maxLength', index === 0 ? '4' : '1');
+      // The numeric first slot takes a whole SMS-filled code, plus one (FUT-4144).
+      expect(input).toHaveAttribute('maxLength', index === 0 ? '5' : '1');
 
       // Verify inputs can receive focus
       await userEvent.click(input);
@@ -497,8 +497,8 @@ export const TestIDImplementation: Story = {
       const slot = canvas.getByTestId(`otp-input-slot-${i}`);
       expect(slot).toBeInTheDocument();
       expect(slot).toBeVisible();
-      // The numeric first slot takes a whole SMS-filled code (FUT-4144).
-      expect(slot).toHaveAttribute('maxLength', i === 0 ? '6' : '1');
+      // The numeric first slot takes a whole SMS-filled code, plus one (FUT-4144).
+      expect(slot).toHaveAttribute('maxLength', i === 0 ? '7' : '1');
     }
 
     // Test interaction with testIds
@@ -589,5 +589,71 @@ export const TestIDWithoutDataTestIdProp: Story = {
     // Functionality should still work
     await userEvent.type(must(inputs[0]), '1');
     expect(must(inputs[0])).toHaveValue('1');
+  },
+};
+
+/**
+ * Put `text` into `input` at its caret the way the browser's own editing does
+ * — `maxlength` applies — which is how a phone's SMS fill or a keyboard
+ * suggestion arrives. `userEvent.type` delivers one key at a time, and the
+ * slot's paste handler takes over a paste, so neither reaches that cap.
+ */
+async function insertAtCaret(input: HTMLInputElement, text: string): Promise<void> {
+  await userEvent.click(input);
+  await waitFor(() => expect(input).toHaveFocus());
+  input.setSelectionRange(input.value.length, input.value.length);
+  // Deprecated, but the one real editing command a page can issue; it is
+  // what makes the browser apply `maxlength` to the insertion.
+  document.execCommand('insertText', false, text);
+}
+
+// FUT-4144: a code INSERTED at the caret into a filled first slot. The browser
+// caps it at `maxlength` before the hook sees it, so the slot takes the code's
+// length plus one: `4` + `482913` arrives whole as `4482913` and is spread as
+// `482913`. At the bare length it arrived as `448291` and was spread wrong.
+export const SmsCodeInsertedAtCaret: Story = {
+  args: {
+    variant: 'numeric',
+    length: 6,
+    dataTestId: 'otp-sms',
+    onChange: fn(),
+    onComplete: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const first = canvas.getByTestId('otp-sms-slot-0') as HTMLInputElement;
+
+    await userEvent.type(first, '4');
+    await waitFor(() => expect(first).toHaveValue('4'));
+    expect(first).toHaveAttribute('maxLength', '7');
+
+    await insertAtCaret(first, '482913');
+
+    await waitFor(() => expect(args.onComplete).toHaveBeenCalledWith('482913'));
+    const values = [0, 1, 2, 3, 4, 5].map((i) => (canvas.getByTestId(`otp-sms-slot-${i}`) as HTMLInputElement).value);
+    expect(values.join('')).toBe('482913');
+  },
+};
+
+// The other half: a second KEY into the filled first slot is still refused,
+// exactly as `maxLength={1}` refused it, with the longer cap in place.
+export const SecondKeyIntoFilledFirstSlot: Story = {
+  args: {
+    variant: 'numeric',
+    length: 6,
+    dataTestId: 'otp-key',
+    onChange: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const first = canvas.getByTestId('otp-key-slot-0') as HTMLInputElement;
+
+    await userEvent.type(first, '4');
+    await waitFor(() => expect(first).toHaveValue('4'));
+    await userEvent.type(first, '7', { initialSelectionStart: 1, initialSelectionEnd: 1 });
+
+    await waitFor(() => expect(first).toHaveValue('4'));
+    expect(canvas.getByTestId('otp-key-slot-1')).toHaveValue('');
+    expect(args.onChange).toHaveBeenCalledTimes(1);
   },
 };

@@ -73,10 +73,12 @@ describe('InputOTP: the code is named as a group', () => {
 });
 
 describe('InputOTP: a whole code filled into the first slot (SMS, password manager)', () => {
-  it('lets the numeric first slot take the whole code, and keeps the others at one', () => {
+  it('lets the numeric first slot take the whole code plus one, and keeps the others at one', () => {
     const [first, ...others] = slotsOf({ variant: 'numeric' });
 
-    expect(first).toHaveAttribute('maxlength', '6');
+    // Plus one: a code inserted at the caret keeps the old digit in front, and
+    // the browser caps the insertion at maxlength before the hook sees it.
+    expect(first).toHaveAttribute('maxlength', '7');
     for (const slot of others) expect(slot).toHaveAttribute('maxlength', '1');
   });
 
@@ -143,6 +145,21 @@ describe('InputOTP: a whole code filled into the first slot (SMS, password manag
     fireEvent.change(slots[0] as HTMLElement, { target: { value: '4482913' } });
 
     expect(slots.map((slot) => (slot as HTMLInputElement).value)).toEqual(['4', '8', '2', '9', '1', '3']);
+    expect(onChange).toHaveBeenLastCalledWith('482913');
+  });
+
+  it('receives a caret-inserted code whole under the browser cap, and spreads the code', () => {
+    // What the browser delivers is the insertion CUT AT maxlength; read the
+    // cap off the rendered <input> so this fails if the attribute regresses.
+    // The real insertion is the `SmsCodeInsertedAtCaret` play test, in Chromium.
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+    const first = slots[0] as HTMLInputElement;
+    fireEvent.change(first, { target: { value: '4' } });
+
+    const delivered = ('4' + '482913').slice(0, Number(first.getAttribute('maxlength')));
+    fireEvent.change(first, { target: { value: delivered } });
+
     expect(onChange).toHaveBeenLastCalledWith('482913');
   });
 
