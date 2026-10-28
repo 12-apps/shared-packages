@@ -122,14 +122,15 @@ export function BeforeCopy({ mode, pix, onCopy, onChangeMethod, footer }: {
         </Box>
         <Box
           data-testid="list-pix-qr"
-          sx={{ gridArea: "qr", display: mode.qrOpen ? "flex" : "none", alignItems: "center", gap: 1.5, [WIDE]: { display: "block" } }}
+          sx={{ gridArea: "qr", display: mode.qrOpen ? "flex" : "none", flexWrap: "wrap", alignItems: "center", gap: 1.5, [WIDE]: { display: "block" } }}
         >
           <Box sx={{ flex: "none" }}>
             <StaleVeil stale={stale}>
               <PixQr payload={pix.copyPaste} size={qrSize} alt={qrAlt} />
             </StaleVeil>
           </Box>
-          <Box sx={{ minWidth: 0, [WIDE]: { display: "none" } }}>
+          {/* Beside the QR while it has room for a few words a line, under it on the narrowest phone. */}
+          <Box sx={{ flex: "1 1 auto", minWidth: 0, width: (t) => t.spacing(15), [WIDE]: { display: "none" } }}>
             <Text variant="body" size="sm" color="secondary" as="p" style={{ margin: 0 }}>
               {copy.qrCaption}
             </Text>
