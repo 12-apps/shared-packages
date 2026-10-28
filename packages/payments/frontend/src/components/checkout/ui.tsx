@@ -15,7 +15,7 @@
  * mapping. The contract is documented for adopters in
  * `packages/payments/ADOPTING.md` §3.
  */
-import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type JSX, type lazy, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ChangeEvent, type ComponentType, type CSSProperties, type InputHTMLAttributes, type JSX, type lazy, type ReactNode } from 'react';
 
 import { defaultCheckoutComponents } from './mui-defaults';
 
@@ -49,6 +49,13 @@ export interface CheckoutButtonProps {
 /** Text field. `data-testid` must land on the `<input>` itself (e2e fills it). */
 export interface CheckoutInputProps {
   label?: string;
+  /**
+   * A stable id and `name` on the `<input>` (FUT-4105): what lets the browser's
+   * form history and a password manager match the field again. Both are plain
+   * `<input>` attributes `@12-apps/ui`'s `Input` forwards as they are.
+   */
+  id?: string;
+  name?: string;
   type?: 'text' | 'email' | 'tel';
   inputMode?: 'numeric';
   variant?: 'outlined';
@@ -63,9 +70,20 @@ export interface CheckoutInputProps {
   helperText?: string;
   endAdornment?: ReactNode;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** A slot that does not forward it keeps the document field judged on every change (FUT-4106 needs it). */
+  onFocus?: () => void;
   onBlur?: () => void;
+  /**
+   * Typing hints for the `<input>` itself (FUT-4107). Here rather than at the
+   * top level because a top-level prop does not reach the `<input>` in a
+   * `@12-apps/ui` binding: its `Input` merges `inputProps` onto the element.
+   */
+  inputProps?: CheckoutInputHints;
   'data-testid'?: string;
 }
+
+/** What a field may ask of the phone's keyboard: capitals, no autocorrect, no spellcheck. */
+export type CheckoutInputHints = Pick<InputHTMLAttributes<HTMLInputElement>, 'autoCapitalize' | 'autoCorrect' | 'spellCheck'>;
 
 export interface CheckoutCheckboxProps {
   checked: boolean;

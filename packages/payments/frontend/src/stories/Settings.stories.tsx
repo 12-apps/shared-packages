@@ -612,3 +612,25 @@ export const ActivationSlotBlocked: StoryObj = {
     />
   ),
 };
+
+/**
+ * The slot on a CONNECTED OAuth store — the PagBank shape: the host's card
+ * sits under the connect card and the "Testar conexão" probe follows it, each
+ * block separated from its neighbours by the card's own vertical gap
+ * (FUT-4084: the probe once sat flush against the activation box and the
+ * manual-credentials link).
+ */
+export const ActivationSlotOAuth: StoryObj = {
+  name: "Passo de ativação — conta OAuth conectada",
+  render: () => (
+    <SettingsScene
+      spec={{
+        providers: [
+          { ...INFINITO, stage: "saved", expiresInDays: 180, account: CONTA_DA_ANA, activationCharge: true },
+        ],
+      }}
+      provider="infinito"
+      renderVerification={renderActivation}
+    />
+  ),
+};

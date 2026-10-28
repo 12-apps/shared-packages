@@ -4,7 +4,7 @@ import { Alert, Box, Button } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import { ConnectionProbe } from './ConnectionProbe';
-import { CARD_INSET, LINKISH_SX } from './panel-tokens';
+import { BLOCK_GAP, CARD_INSET, LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
 import { ProviderCard } from './ProviderPanel';
@@ -149,10 +149,14 @@ export function OAuthPanel({
       )}
       {/* The card's body carries no padding (ProviderCard), so every block sets
           the card's inset itself — the activation outcome and the probe did
-          not, and sat against the card's border (FUT-4071). */}
-      <Box sx={{ px: CARD_INSET }}>{verification}</Box>
+          not, and sat against the card's border (FUT-4071). They also take
+          the card's vertical gap: the probe sat flush against the activation
+          box above it and the manual link below it (FUT-4084). A host step
+          that renders nothing leaves its box empty, and an empty box takes no
+          gap. */}
+      <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
       {manual ? null : walkthrough('oauth')}
-      <Box sx={{ px: CARD_INSET }}>{probe}</Box>
+      <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box>
       {descriptor.credentialSchema.length > 0 ? (
         <PathSwitch
           label={copy.preferCredentials}

@@ -170,6 +170,7 @@ export {
   type CheckoutButtonProps,
   type CheckoutCheckboxProps,
   type CheckoutComponents,
+  type CheckoutInputHints,
   type CheckoutInputProps,
   type CheckoutLazy,
   type CheckoutLoadingStateProps,
