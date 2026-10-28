@@ -359,7 +359,7 @@ describe("keyboard", () => {
     const props = renderRuler();
     fireEvent.keyDown(block("b1"), { key: "ArrowRight", altKey: true });
     expect(props.onMove).toHaveBeenCalledWith("b1", 20.9, 24.25);
-    expect(live()).toBe("↻ 20:39–00:00 agora 20:54–00:15");
+    await waitFor(() => expect(live()).toBe("↻ 20:39–00:00 agora 20:54–00:15"));
   });
 
   it("Shift+← moves the end and Shift+Alt+→ the start", async () => {
@@ -376,7 +376,32 @@ describe("keyboard", () => {
     });
     fireEvent.keyDown(block("z1"), { key: "ArrowRight", altKey: true });
     expect(props.onMove).not.toHaveBeenCalled();
-    expect(live()).toBe("Não dá para ir além");
+    await waitFor(() => expect(live()).toBe("Não dá para ir além"));
+  });
+
+  it("Shift or Alt+arrow on a block that cannot move or resize is refused aloud and goes no further", async () => {
+    const props = renderRuler({
+      rows: [{ id: "d", label: "Dina", blocks: [{ id: "e1", start: 8, end: 12, label: "Em turno", tone: "onduty" }] }],
+    });
+    expect(fireEvent.keyDown(block("e1"), { key: "ArrowLeft", altKey: true })).toBe(false);
+    await waitFor(() => expect(live()).toBe("Não dá para ir além"));
+    expect(fireEvent.keyDown(block("e1"), { key: "ArrowRight", shiftKey: true })).toBe(false);
+    expect(fireEvent.keyDown(block("e1"), { key: "ArrowRight" })).toBe(true);
+    expect(props.onMove).not.toHaveBeenCalled();
+    expect(props.onResize).not.toHaveBeenCalled();
+  });
+
+  it("the same sentence twice is read twice, from one region that stays mounted", async () => {
+    renderRuler({
+      rows: [{ id: "z", label: "Z", blocks: [{ id: "z1", start: 22, end: 26, label: "22:00–02:00", tone: "plan", movable: true }] }],
+    });
+    const region = screen.getByTestId("dr-live");
+    fireEvent.keyDown(block("z1"), { key: "ArrowRight", altKey: true });
+    await waitFor(() => expect(live()).toBe("Não dá para ir além"));
+    fireEvent.keyDown(block("z1"), { key: "ArrowRight", altKey: true });
+    expect(region.textContent).toBe("");
+    await waitFor(() => expect(live()).toBe("Não dá para ir além"));
+    expect(screen.getByTestId("dr-live")).toBe(region);
   });
 
   it("Enter on a block is its click (it is a button)", async () => {
@@ -408,9 +433,10 @@ describe("states", () => {
 });
 
 describe("selection", () => {
-  it("rings the selected block and marks it pressed", async () => {
+  it("rings the selected block and marks it current, not pressed", async () => {
     renderRuler({ rows: [{ id: "a", label: "Ana", blocks: [{ id: "s1", start: 8, end: 12, label: "08:00–12:00", tone: "plan", selected: true }] }] });
-    expect(block("s1")).toHaveAttribute("aria-pressed", "true");
+    expect(block("s1")).toHaveAttribute("aria-current", "true");
+    expect(block("s1")).not.toHaveAttribute("aria-pressed");
     expect(getComputedStyle(block("s1")).boxShadow).toMatch(/^0 0 0 /);
   });
 });

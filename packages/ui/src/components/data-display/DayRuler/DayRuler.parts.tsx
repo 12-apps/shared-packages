@@ -106,7 +106,7 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
       sx={blockSx(block.tone, span, { selected: Boolean(block.selected), movable })}
       title={block.title ?? block.label}
       aria-keyshortcuts={shortcutsOf(movable, resizable)}
-      aria-pressed={block.selected || undefined}
+      aria-current={block.selected ? 'true' : undefined}
       data-narrow={narrow ? '' : undefined}
       data-tone={block.tone}
       data-testid={testId}

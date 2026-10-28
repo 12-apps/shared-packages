@@ -52,13 +52,19 @@ interface BlockKeyContext {
 /**
  * A focused block's keys (FUT-3825): Alt+←/→ moves it one snap, Shift+←/→
  * moves its end, Shift+Alt+←/→ its start. Each is read by the live region; one
- * that cannot go further is refused aloud and changes nothing.
+ * that cannot go further, or that the block does not allow, is refused aloud
+ * and changes nothing.
  */
 export function handleBlockKey(event: React.KeyboardEvent, block: DayRulerBlock, ctx: BlockKeyContext): void {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-  const gesture = gestureOf(event, block, ctx.can);
-  if (!gesture) return;
+  if ((!event.altKey && !event.shiftKey) || event.ctrlKey || event.metaKey) return;
+  // The key is the ruler's either way: Alt+← would otherwise be the browser's Back.
   event.preventDefault();
+  const gesture = gestureOf(event, block, ctx.can);
+  if (!gesture) {
+    ctx.say(ctx.labels.refused);
+    return;
+  }
   const [start, end] = stepped(block, gesture, event.key === 'ArrowLeft' ? -1 : 1, ctx.scale);
   if (start === block.start && end === block.end) {
     ctx.say(ctx.labels.refused);

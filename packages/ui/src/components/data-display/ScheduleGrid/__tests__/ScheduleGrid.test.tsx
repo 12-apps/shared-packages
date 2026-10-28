@@ -414,7 +414,7 @@ describe("keyboard", () => {
     const { props } = renderGrid();
     fireEvent.keyDown(block("k1"), { key: "ArrowRight", shiftKey: true });
     expect(props.onCopy).toHaveBeenCalledWith("k1", [3]);
-    expect(live()).toBe("11:00–15:00 copiado para Qui 22/10");
+    await waitFor(() => expect(live()).toBe("11:00–15:00 copiado para Qui 22/10"));
   });
 
   it("Shift+← into a blocked or taken day is refused aloud", async () => {
@@ -423,14 +423,14 @@ describe("keyboard", () => {
     expect(props.onCopy).toHaveBeenCalledWith("k2", [5]);
     fireEvent.keyDown(block("u1"), { key: "ArrowRight", altKey: true });
     expect(props.onMove).not.toHaveBeenCalled();
-    expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado");
+    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
   });
 
   it("Alt+← moves a block one day, says so, and focus follows it", async () => {
     const { props, rerender } = renderGrid();
     fireEvent.keyDown(block("k1"), { key: "ArrowLeft", altKey: true });
     expect(props.onMove).toHaveBeenCalledWith("k1", "ana", 1);
-    expect(live()).toBe("11:00–15:00 movido para Ana Lima, Ter 20/10");
+    await waitFor(() => expect(live()).toBe("11:00–15:00 movido para Ana Lima, Ter 20/10"));
     const after = (row: string, day: number): ScheduleGridCell => {
       if (row === "ana" && day === 1) return cell("ana", 2);
       if (row === "ana" && day === 2) return EMPTY;
@@ -447,7 +447,32 @@ describe("keyboard", () => {
     });
     fireEvent.keyDown(block("z"), { key: "ArrowRight", shiftKey: true });
     expect(props.onCopy).not.toHaveBeenCalled();
-    expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado");
+    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
+  });
+
+  it("Shift or Alt+arrow on a block that cannot copy or move is refused aloud and goes no further", async () => {
+    const { props } = renderGrid();
+    const shift = fireEvent.keyDown(block("d1"), { key: "ArrowRight", shiftKey: true });
+    expect(shift).toBe(false);
+    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
+    const alt = fireEvent.keyDown(block("d1"), { key: "ArrowLeft", altKey: true });
+    expect(alt).toBe(false);
+    expect(props.onCopy).not.toHaveBeenCalled();
+    expect(props.onMove).not.toHaveBeenCalled();
+  });
+
+  it("the same sentence twice is read twice, from one region that stays mounted", async () => {
+    renderGrid();
+    const region = screen.getByTestId("sg-live");
+    const refusedText = "Não dá para pôr aí: o dia está ocupado ou fechado";
+    fireEvent.keyDown(block("u1"), { key: "ArrowRight", altKey: true });
+    await waitFor(() => expect(live()).toBe(refusedText));
+    fireEvent.keyDown(block("u1"), { key: "ArrowRight", altKey: true });
+    expect(region.textContent).toBe("");
+    await waitFor(() => expect(live()).toBe(refusedText));
+    expect(screen.getByTestId("sg-live")).toBe(region);
+    expect(region).toHaveAttribute("role", "status");
+    expect(region).toHaveAttribute("aria-live", "polite");
   });
 
   it("arrow keys move focus between cells, passing over a closed one", async () => {
@@ -490,6 +515,26 @@ describe("states", () => {
     expect(screen.getByText("Ninguém na equipe")).toBeInTheDocument();
   });
 
+  it("holds only rows directly inside the table: the error and the empty node sit in a row's cell", async () => {
+    const { rerender } = renderGrid({ error: <p>Não foi possível carregar a escala</p> });
+    const onlyRows = (): void => {
+      const table = screen.getByRole("table");
+      for (const child of Array.from(table.children)) expect(["row", "rowgroup"]).toContain(child.getAttribute("role"));
+    };
+    onlyRows();
+    expect(screen.getByText("Não foi possível carregar a escala").closest('[role="cell"]')).not.toBeNull();
+    rerender({ error: undefined, groups: [], empty: <p>Ninguém na equipe</p> });
+    onlyRows();
+    expect(screen.getByText("Ninguém na equipe").closest('[role="cell"]')).not.toBeNull();
+  });
+
+  it("gives every cell of the header row a role", async () => {
+    renderGrid();
+    for (const child of Array.from(screen.getByTestId("sg-header").children)) {
+      expect(["cell", "columnheader"]).toContain(child.getAttribute("role"));
+    }
+  });
+
   it("falls back to the English pack without labels", async () => {
     renderGrid({ labels: undefined });
     expect(screen.getByRole("button", { name: "Schedule Caio Nunes, Ter 20/10" })).toBeInTheDocument();
@@ -497,12 +542,13 @@ describe("states", () => {
 });
 
 describe("selection and the sticky header", () => {
-  it("rings the selected block and marks it pressed", async () => {
+  it("rings the selected block and marks it current, not pressed", async () => {
     const selected: ScheduleGridCell = { blocks: [{ id: "s1", label: "08:00–14:00", tone: "plan", selected: true }] };
     renderGrid({ cell: (rowId, day) => (rowId === "caio" && day === 3 ? selected : cell(rowId, day)) });
-    expect(block("s1")).toHaveAttribute("aria-pressed", "true");
+    expect(block("s1")).toHaveAttribute("aria-current", "true");
+    expect(block("s1")).not.toHaveAttribute("aria-pressed");
     expect(getComputedStyle(block("s1")).boxShadow).toMatch(/^0 0 0 /);
-    expect(block("k1")).not.toHaveAttribute("aria-pressed");
+    expect(block("k1")).not.toHaveAttribute("aria-current");
   });
 
   it("pins the header row at stickyTop", async () => {
@@ -528,17 +574,19 @@ describe("the slots a later story fills (FUT-3881)", () => {
     expect(block("p1")).toHaveTextContent("11:00–19:00pausa 14:00–15:00");
   });
 
-  it("keeps a break the host sent out of range inside the block, and draws none for an empty one", async () => {
+  it("keeps a break the host sent out of range inside the block, and draws none for an empty or a reversed one", async () => {
     const odd: ScheduleGridCell = {
       blocks: [
         { id: "o1", label: "a", tone: "plan", breakSpan: { start: -0.2, end: 1.4 } },
         { id: "o2", label: "b", tone: "plan", breakSpan: { start: 0.6, end: 0.6 } },
+        { id: "o3", label: "c", tone: "plan", breakSpan: { start: 0.8, end: 0.2 } },
       ],
     };
     renderGrid({ cell: (rowId, day) => (rowId === "ana" && day === 0 ? odd : cell(rowId, day)) });
     expect(getComputedStyle(screen.getByTestId("sg-break-o1")).left).toBe("0%");
     expect(getComputedStyle(screen.getByTestId("sg-break-o1")).width).toBe("100%");
     await waitFor(() => expect(screen.queryByTestId("sg-break-o2")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("sg-break-o3")).toBeNull());
   });
 
   it("puts the name's adornment beside the name and the chips under the meta, both inside the row header", async () => {

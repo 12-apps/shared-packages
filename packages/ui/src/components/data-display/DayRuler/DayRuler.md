@@ -31,13 +31,18 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 - While a drag runs the block is redrawn live with its hours.
 - **Touch never drags and a tap on the track creates nothing** (the phone schedules with the host's
   "+ Agendar ⟨dia⟩"); a tap on a block opens it.
-- Keyboard moves, resizes and refusals are read by a polite live region.
+- A release anywhere commits the drag. **Escape**, the window losing focus, or a move with no
+  button down abandons it: nothing is reported, the block goes back to its hours (a create's
+  preview goes), and only the click that release leaves behind is ignored.
+- Keyboard moves, resizes and refusals (past the ruler, or a block that is not `movable` /
+  `resizable`) are read by a polite live region that stays mounted; the same sentence twice is
+  read twice.
 
 ## Props
 
 | Prop | Type | Description |
 |---|---|---|
-| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when there is no room for both), `chips?` (node — one line, a chip that does not fit shrinks and cuts its label), `actions?` (node — "Encerrar turno", "Iniciar agora"), `blocks` (`id`, `start`, `end`, `label`, `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` in ruler hours, a meal break drawn as a hatched gap inside the block: it travels with a moved block and is cut to its ends while one is dragged; its words are the host's, in `label` / `title`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
+| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when there is no room for both), `chips?` (node — one line, a chip that does not fit shrinks and cuts its label), `actions?` (node — "Encerrar turno", "Iniciar agora"), `blocks` (`id`, `start`, `end`, `label`, `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` in ruler hours, a meal break drawn as a hatched gap inside the block: it travels with a moved block and is cut to its ends while one is dragged; a span that falls outside the block, is empty or is reversed (`end <= start`) draws nothing; its words are the host's, in `label` / `title`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
 | `from` / `to` | `number` (default 6 / 26) | The ruler's span. |
 | `now` | `number?` | The "agora" line, when on the ruler. |
 | `coverage` | `number[]?` | People per hour, index 0 = `from…from+1`. |
@@ -67,7 +72,8 @@ Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over
 
 ## Accessibility
 
-Rows are a `list` per group. Blocks are native buttons with `aria-keyshortcuts`. An interactive
+Rows are a `list` per group. Blocks are native buttons with `aria-keyshortcuts`; the `selected`
+block is `aria-current="true"`. An interactive
 track is a focusable `group` named `labels.createTrack(row)`; Enter or Space creates.
 
 ## Related

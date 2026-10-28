@@ -1,7 +1,7 @@
 'use client';
 
 import Box from '@mui/material/Box/index.js';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveLabels } from '../../../utils/resolve-labels';
@@ -9,13 +9,8 @@ import { focusables, handleGridKey } from './ScheduleGrid.keyboard';
 import { GridBody, GridHeader, type CellAbilities } from './ScheduleGrid.parts';
 import { frameSx, rootSx, rowGridSx, SR_ONLY_SX } from './ScheduleGrid.styles';
 import type { ScheduleGridProps } from './ScheduleGrid.types';
+import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
-
-/** The live region's sentence; `seq` makes the same sentence twice read twice. */
-interface Announcement {
-  text: string;
-  seq: number;
-}
 
 /**
  * After a keyboard move the host re-renders the block in its new cell (a new
@@ -65,14 +60,13 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const testId = props.dataTestId ?? 'schedule-grid';
   const labels = resolveLabels(EN_US_UI_LABELS.scheduleGrid, props.labels);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [announcement, setAnnouncement] = useState<Announcement>({ text: '', seq: 0 });
+  const { text: announcement, say } = useAnnouncer();
   const focus = useFollowFocus(rootRef);
   const dragApi = useGridDrag(rootRef, { cell, onCreate, onCopy, onMove });
   const can = abilitiesOf(props);
   const rows = groups.flatMap((group) => group.rows);
   const hasTotal = props.totalLabel !== undefined || rows.some((row) => row.total !== undefined);
   const rowSx = rowGridSx(columns.length, hasTotal);
-  const say = (text: string): void => setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }));
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     focus.forget();
@@ -101,8 +95,8 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         />
         <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
       </Box>
-      <Box sx={SR_ONLY_SX} aria-live="polite" role="status" data-testid={`${testId}-live`} key={announcement.seq}>
-        {announcement.text}
+      <Box sx={SR_ONLY_SX} aria-live="polite" role="status" data-testid={`${testId}-live`}>
+        {announcement}
       </Box>
     </Box>
   );

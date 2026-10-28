@@ -1,22 +1,18 @@
 'use client';
 
 import Box from '@mui/material/Box/index.js';
-import React, { useState } from 'react';
+import type React from 'react';
 
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveLabels } from '../../../utils/resolve-labels';
 import { SR_ONLY_SX } from '../ScheduleGrid/ScheduleGrid.styles';
+import { useAnnouncer } from '../ScheduleGrid/useAnnouncer';
 import { handleBlockKey, keyCreateSpan, type RulerAbilities, type RulerScale } from './DayRuler.keyboard';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { Axis, Coverage, RulerRow, type RowContext } from './DayRuler.parts';
 import { groupTitleSx, rootSx, rowSx, skeletonNameSx, skeletonTrackSx } from './DayRuler.styles';
 import type { DayRulerProps, DayRulerRow } from './DayRuler.types';
 import { useRulerDrag } from './useRulerDrag';
-
-interface Announcement {
-  text: string;
-  seq: number;
-}
 
 /** The rows, grouped under a heading each time `row.group` changes. */
 function grouped(rows: readonly DayRulerRow[]): { title?: string; rows: DayRulerRow[] }[] {
@@ -94,8 +90,7 @@ export function DayRuler(props: DayRulerProps): React.JSX.Element {
   const scale = scaleOf(props);
   const can = abilitiesOf(props);
   const dragApi = useRulerDrag(scale, { onCreate, onMove, onResize });
-  const [announcement, setAnnouncement] = useState<Announcement>({ text: '', seq: 0 });
-  const say = (text: string): void => setAnnouncement((prev) => ({ text, seq: prev.seq + 1 }));
+  const { text: announcement, say } = useAnnouncer();
 
   const ctx: RowContext = {
     scale,
@@ -127,8 +122,8 @@ export function DayRuler(props: DayRulerProps): React.JSX.Element {
       ) : null}
       <Axis scale={scale} testId={testId} />
       <RulerBody props={props} ctx={ctx} />
-      <Box sx={SR_ONLY_SX} aria-live="polite" role="status" data-testid={`${testId}-live`} key={announcement.seq}>
-        {announcement.text}
+      <Box sx={SR_ONLY_SX} aria-live="polite" role="status" data-testid={`${testId}-live`}>
+        {announcement}
       </Box>
     </Box>
   );

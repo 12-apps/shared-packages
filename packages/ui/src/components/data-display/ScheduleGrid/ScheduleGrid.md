@@ -33,8 +33,12 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 - While a create or copy drag runs, each target cell is drawn dashed with the hours as ghost
   text (`createPreview(rowId)` for a create, the block's `label` for a copy); while a move
   runs, the cell under the pointer is highlighted.
-- A keyboard copy or move, and a refusal (taken, closed, past either end), are read by a polite
-  live region. After a keyboard move, focus follows the block to its new cell once the host
+- A drag that is released anywhere — inside the grid or outside it — commits. **Escape**, the
+  window losing focus, or a move with no button down (released where the page could not see it)
+  abandons it: nothing is reported, the ghost and the highlight go, and the click that release
+  leaves behind is ignored. Only that click is: the next click on any block opens it.
+- A keyboard copy or move, and a refusal (taken, closed, past either end, or a block that is not
+  `copyable` / `movable`), are read by a polite live region. After a keyboard move, focus follows the block to its new cell once the host
   re-renders it there.
 
 ## Props
@@ -70,7 +74,8 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 
 A block's `breakSpan` is drawn as a band of diagonal stripes in the page's ground across the
 block's height, under its text, so the block reads as cut there in every tone; it is decorative
-(`aria-hidden`), and the block's `note` says it in words ("pausa 14:00–15:00"). A row's
+(`aria-hidden`), and the block's `note` says it in words ("pausa 14:00–15:00"). Values outside
+0…1 are clamped to the block; a span that is empty or reversed (`end <= start`) draws nothing. A row's
 `nameAdornment` and `chips` are the host's nodes (an `@12-apps/ui` `Chip` fits): the grid only
 places them.
 
@@ -88,10 +93,17 @@ places them.
 
 ## Accessibility
 
-`role="table"` with `rowgroup` / `row` / `columnheader` / `rowheader` / `cell`. Every empty cell's
-"+" and every block is a native `<button>` (Tab, Enter, Space); blocks declare their shortcuts in
-`aria-keyshortcuts`. A blocked cell is named by `blockedLabel` (or `labels.blockedCell`). The live
-region is `role="status"`, polite.
+`role="table"` with `rowgroup` / `row` / `columnheader` / `rowheader` / `cell`; the table holds
+rows only, so the host's `error` and `empty` nodes sit in one full-width row's cell. Every empty
+cell's "+" and every block is a native `<button>` (Tab, Enter, Space); blocks declare their
+shortcuts in `aria-keyshortcuts`, and the `selected` block is `aria-current="true"`. A blocked
+cell is named by `blockedLabel` (or `labels.blockedCell`). The live region is `role="status"`,
+polite, and stays mounted: each sentence clears it and is written on the next frame, so the
+same sentence twice is read twice.
+
+Every tone's text reads at 4.5:1 on its ground in light and dark mode: the `late` block keeps
+`warning.contrastText` when it reads on `warning.main` and takes the page's dark ink otherwise;
+`away`, `uncovered` and a `warning` meta line deepen the warning step until they read.
 
 ## Related
 

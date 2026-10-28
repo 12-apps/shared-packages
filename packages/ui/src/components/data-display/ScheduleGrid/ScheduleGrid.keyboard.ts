@@ -11,7 +11,8 @@ import type { ScheduleGridBlock, ScheduleGridCell, ScheduleGridColumn, ScheduleG
  * - arrows move focus to the nearest focusable cell that way;
  * - Shift+←/→ on a copyable block copies it one day;
  * - Alt+←/→ on a movable block moves it one day (focus follows it);
- * each copy, move or refusal is read by the live region.
+ * either on a block that cannot do it is refused; each copy, move or refusal
+ * is read by the live region.
  */
 export interface GridKeyContext {
   root: HTMLElement;
@@ -90,13 +91,17 @@ function openNeighbour(ctx: GridKeyContext, rowId: string, day: number, step: -1
   return column && isOpen(ctx.cell(rowId, target)) ? { day: target, column } : null;
 }
 
-/** Shift/Alt+←/→ on a block. Returns whether the key was the grid's. */
+/**
+ * Shift/Alt+←/→ on a block. Returns whether the key was the grid's: a block
+ * that cannot be copied or moved that way refuses it aloud, and the key goes
+ * no further (Alt+← would otherwise be the browser's Back).
+ */
 function blockKey(ctx: GridKeyContext, el: HTMLElement, event: React.KeyboardEvent, step: -1 | 1): boolean {
   const under = blockUnder(ctx, el);
-  const gesture = under ? gestureOf(event, under.block, ctx.can) : null;
-  if (!under || !gesture) return false;
+  if (!under) return false;
+  const gesture = gestureOf(event, under.block, ctx.can);
   const { block, row, day } = under;
-  const target = openNeighbour(ctx, row.id, day, step);
+  const target = gesture ? openNeighbour(ctx, row.id, day, step) : null;
   if (!target) {
     ctx.say(ctx.labels.refused);
   } else if (gesture === 'copy') {

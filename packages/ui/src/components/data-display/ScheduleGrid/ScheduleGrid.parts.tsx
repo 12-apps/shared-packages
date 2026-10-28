@@ -110,7 +110,7 @@ function BlockButton({ block, row, day, can, dragApi, onBlockClick, testId }: Bl
       sx={blockSx(block.tone, { selected: Boolean(block.selected), movable })}
       title={titleOf(block)}
       aria-keyshortcuts={shortcutsOf(movable, copyable)}
-      aria-pressed={block.selected || undefined}
+      aria-current={block.selected ? 'true' : undefined}
       data-sg-focus=""
       data-sg-row={row.id}
       data-sg-day={day}
@@ -237,7 +237,8 @@ interface HeaderProps {
 export function GridHeader({ columns, totalLabel, rowSx, stickyTop, testId }: HeaderProps): React.JSX.Element {
   return (
     <Box role="row" sx={[rowSx, headerSx(stickyTop)]} data-testid={`${testId}-header`}>
-      <span />
+      {/* Above the names: a cell of the header row, with nothing to head. */}
+      <span role="cell" />
       {columns.map((column, day) => (
         <Box role="columnheader" key={`${day}-${column.label}`} sx={headerCellSx(Boolean(column.today))}>
           <span data-sg-col="full">{column.label}</span>
@@ -319,12 +320,22 @@ function PersonRow({ row, body }: { row: ScheduleGridRow; body: BodyProps }): Re
   );
 }
 
+/** The host's error or empty node, as the table's one full-width row (a table holds rows only). */
+function MessageRow({ children, testId }: { children: React.ReactNode; testId: string }): React.JSX.Element | null {
+  if (children === null || children === undefined || children === false) return null;
+  return (
+    <Box role="row" data-testid={`${testId}-message`}>
+      <Box role="cell">{children}</Box>
+    </Box>
+  );
+}
+
 /** The groups and their rows — or the skeleton, the host's error, or the host's empty state. */
-export function GridBody(body: BodyProps): React.JSX.Element {
+export function GridBody(body: BodyProps): React.JSX.Element | null {
   const { grid, rows } = body;
-  if (grid.error) return <>{grid.error}</>;
+  if (grid.error) return <MessageRow testId={body.testId}>{grid.error}</MessageRow>;
   if (grid.loading) return <SkeletonRows grid={grid} rowSx={body.rowSx} testId={body.testId} />;
-  if (rows.length === 0) return <>{grid.empty ?? null}</>;
+  if (rows.length === 0) return <MessageRow testId={body.testId}>{grid.empty}</MessageRow>;
   return (
     <>
       {grid.groups.map((group, index) => (
