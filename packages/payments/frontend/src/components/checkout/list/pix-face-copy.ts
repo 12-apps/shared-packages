@@ -16,6 +16,8 @@ export interface PixFaceCopy {
   expiresIn: (clock: string) => string;
   /** Under the countdown in its last two minutes: "Menos de 2 minutos. Se expirar, é só gerar outro — nada é cobrado." */
   lastMinutes: string;
+  /** The same, for a Pix the store confirms: "Menos de 2 minutos. Se você já pagou, não pague de novo — a loja confirma." */
+  lastMinutesByStore: string;
   /** "Mostrar QR code (para outro aparelho)". */
   showQr: string;
   /** "Ocultar QR code". */

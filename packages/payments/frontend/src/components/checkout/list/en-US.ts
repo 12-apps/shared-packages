@@ -82,6 +82,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
       (storeConfirms ? "" : " The confirmation is automatic."),
     expiresIn: (clock) => `expires in ${clock}`,
     lastMinutes: "Less than 2 minutes left. If it expires, just generate another — nothing is charged.",
+    lastMinutesByStore: "Less than 2 minutes left. If you have already paid, do not pay again — the store confirms it.",
     showQr: "Show QR code (for another device)",
     hideQr: "Hide QR code",
     qrCaption: "To pay from another phone: in your bank app, Pix › Read QR code.",

@@ -54,21 +54,21 @@ describe("the clock's arithmetic", () => {
     expect(pixRemainingMs(inMs(90_000), NOW)).toBe(90_000);
   });
 
-  it("turns urgent as the clock shows 01:59, never at zero, and fills the bar against its window", () => {
+  it("turns urgent as the clock shows 01:59, stays so at zero, and fills the bar against its window", () => {
     expect(pixCountdownAt(120_000, PIX_FULL_WINDOW_MS).urgent).toBe(false);
     expect(pixCountdownAt(119_001, PIX_FULL_WINDOW_MS).urgent).toBe(false);
     expect(pixCountdownAt(119_000, PIX_FULL_WINDOW_MS).urgent).toBe(true);
     expect(pixCountdownAt(1, PIX_FULL_WINDOW_MS).urgent).toBe(true);
-    expect(pixCountdownAt(0, PIX_FULL_WINDOW_MS)).toMatchObject({ urgent: false, lapsed: true, fraction: 0 });
+    expect(pixCountdownAt(0, PIX_FULL_WINDOW_MS)).toMatchObject({ urgent: true, lapsed: true, fraction: 0 });
     expect(pixCountdownAt(PIX_FULL_WINDOW_MS / 2, PIX_FULL_WINDOW_MS).fraction).toBe(0.5);
     expect(pixCountdownAt(PIX_FULL_WINDOW_MS * 2, PIX_FULL_WINDOW_MS).fraction).toBe(1);
   });
 });
 
-function Probe({ expiresAt, onLapse }: { expiresAt: string; onLapse?: () => void }) {
+function Probe({ expiresAt, onLapse, storeConfirms }: { expiresAt: string; onLapse?: () => void; storeConfirms?: boolean }) {
   const state = usePixCountdown(expiresAt, onLapse);
   if (!state) return <p data-testid="no-clock">sem relógio</p>;
-  return <PixCountdown state={state} copy={copy} title={<p>Pague R$ 27,00 com Pix</p>} />;
+  return <PixCountdown state={state} copy={copy} title={<p>Pague R$ 27,00 com Pix</p>} storeConfirms={storeConfirms} />;
 }
 
 const clock = (): string => screen.getByTestId("pix-countdown-clock").textContent ?? "";
@@ -123,6 +123,21 @@ describe("the countdown on screen", () => {
     );
   });
 
+  it("announces the last-minutes line once, as a status", () => {
+    vi.useFakeTimers({ now: NOW });
+    render(<Probe expiresAt={inMs(60_000)} />);
+    expect(screen.getByTestId("pix-countdown-urgent").getAttribute("role")).toBe("status");
+  });
+
+  it("never tells a buyer of a store-confirmed Pix to generate another — she may have paid by hand", () => {
+    vi.useFakeTimers({ now: NOW });
+    render(<Probe expiresAt={inMs(60_000)} storeConfirms />);
+    const line = screen.getByTestId("pix-countdown-urgent").textContent ?? "";
+    expect(line).toBe(copy.lastMinutesByStore);
+    expect(line).toBe("Menos de 2 minutos. Se você já pagou, não pague de novo — a loja confirma.");
+    expect(line).not.toMatch(/gerar outro|nada é cobrado/u);
+  });
+
   it("asks once as it reaches zero, and stops ticking", () => {
     vi.useFakeTimers({ now: NOW });
     const onLapse = vi.fn();
@@ -132,7 +147,9 @@ describe("the countdown on screen", () => {
     act(() => void vi.advanceTimersByTime(1000));
     expect(onLapse).toHaveBeenCalledTimes(1);
     expect(clock()).toBe("expira em 00:00");
-    expect(screen.getByTestId("pix-countdown").getAttribute("data-urgent")).toBe("false");
+    // Still amber, but the last-minutes line is gone: the server says what the lapse meant.
+    expect(screen.getByTestId("pix-countdown").getAttribute("data-urgent")).toBe("true");
+    expect(screen.getByTestId("pix-countdown").textContent).not.toContain(copy.lastMinutes);
     rerender(<Probe expiresAt={inMs(2000)} onLapse={onLapse} />);
     act(() => void vi.advanceTimersByTime(10_000));
     expect(onLapse).toHaveBeenCalledTimes(1);
@@ -197,12 +214,44 @@ describe("the list's Pix", () => {
     expect(clock()).toMatch(/^expira em 14:(2\d|30)$/);
   });
 
-  it("asks the server the moment the code lapses, not at the next poll", async () => {
-    const client = await pixRaised(inMs(1500));
-    // The opening ask, then nothing until the next 2.5 s poll — except the lapse's.
-    await waitFor(() => expect(client.getStatus).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(client.getStatus).toHaveBeenCalledTimes(2), { timeout: 2400 });
+  it("asks the server the moment the code lapses, before the next 2.5 s poll", async () => {
+    vi.useFakeTimers({ now: NOW, shouldAdvanceTime: true });
+    const asked: number[] = [];
+    const client = stubClient([]);
+    client.getStatus.mockImplementation(async () => {
+      asked.push(Date.now());
+      return { ok: true as const, data: "AWAITING_PAYMENT" as const };
+    });
+    renderList({ config: onPageStore(), client, createOrder: raising(inMs(1500)) });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await screen.findByTestId("list-pix");
+    await waitFor(() => expect(asked.length).toBeGreaterThanOrEqual(2), { timeout: 5000 });
+    // On the screen's own (fake) clock: the second ask is the lapse's, at the
+    // code's 1.5 s, never the poll's 2.5 s after the first.
+    const [opening, second] = asked as [number, number];
+    expect(second - opening).toBeLessThan(2500);
+    expect(second).toBeGreaterThanOrEqual(Date.parse(inMs(1500)));
     expect(clock()).toBe("expira em 00:00");
+  });
+
+  it("says the store's last minutes for a Pix the store confirms, in the list", async () => {
+    vi.useFakeTimers({ now: NOW, shouldAdvanceTime: true });
+    const createOrder = vi.fn(
+      async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({
+        ok: true,
+        data: orderFor(input.method, {
+          pix: { copyPaste: "00020126BR.GOV.BCB.PIX.o-pix", expiresAt: inMs(90_000), confirmation: "MANUAL" },
+        }),
+      }),
+    );
+    renderList({ config: onPageStore(), client: stubClient([]), createOrder });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await screen.findByTestId("list-pix");
+    expect(screen.getByTestId("pix-countdown-urgent").textContent).toBe(copy.lastMinutesByStore);
   });
 
   it("says nothing automatic about a Pix the store confirms", async () => {

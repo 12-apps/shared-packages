@@ -97,6 +97,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
       "Copie e cole no app do seu banco, em **Pix Copia e Cola**." + (storeConfirms ? "" : " A confirmação é automática."),
     expiresIn: (clock) => `expira em ${clock}`,
     lastMinutes: "Menos de 2 minutos. Se expirar, é só gerar outro — nada é cobrado.",
+    lastMinutesByStore: "Menos de 2 minutos. Se você já pagou, não pague de novo — a loja confirma.",
     showQr: "Mostrar QR code (para outro aparelho)",
     hideQr: "Ocultar QR code",
     qrCaption: "Para pagar de outro celular: no app do banco, Pix › Ler QR code.",

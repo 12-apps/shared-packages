@@ -43,7 +43,7 @@ function PixHeading({ title, pix, copy, onLapse }: { title: string; pix: PixChar
     </Text>
   );
   if (!countdown) return heading;
-  return <PixCountdown state={countdown} copy={copy} title={heading} />;
+  return <PixCountdown state={countdown} copy={copy} title={heading} storeConfirms={pix.confirmation === "MANUAL"} />;
 }
 
 interface ListPixFaceProps {

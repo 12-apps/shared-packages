@@ -69,7 +69,8 @@ export function pixCountdownAt(remainingMs: number, windowMs: number): PixCountd
     remainingMs,
     clock: formatCountdown(remainingMs),
     fraction: Math.min(1, Math.max(0, remainingMs / whole)),
-    urgent: shownMs > 0 && shownMs < PIX_URGENT_MS,
+    // Still amber at 00:00: a lapsed code is not back to calm.
+    urgent: shownMs < PIX_URGENT_MS,
     lapsed: remainingMs <= 0,
   };
 }
@@ -126,6 +127,14 @@ export interface PixCountdownCopy {
   expiresIn: (clock: string) => string;
   /** "Menos de 2 minutos. Se expirar, é só gerar outro — nada é cobrado." */
   lastMinutes: string;
+  /**
+   * The same moment for a Pix the STORE confirms: "Menos de 2 minutos. Se você
+   * já pagou, não pague de novo — a loja confirma." Its code is a static BR
+   * Code on the store's key, which the bank does not expire, and a buyer who
+   * paid by hand waits here for the store: "gere outro, nada é cobrado" would
+   * invite her to pay twice.
+   */
+  lastMinutesByStore: string;
 }
 
 /**
@@ -133,7 +142,13 @@ export interface PixCountdownCopy {
  * last-minutes sentence. The title is the caller's, so the pane keeps its own
  * heading element and test id.
  */
-export function PixCountdown({ state, copy, title }: { state: PixCountdownState; copy: PixCountdownCopy; title: JSX.Element }): JSX.Element {
+export function PixCountdown({ state, copy, title, storeConfirms = false }: {
+  state: PixCountdownState;
+  copy: PixCountdownCopy;
+  title: JSX.Element;
+  /** The store confirms this Pix (`confirmation: "MANUAL"`): the last-minutes line says not to pay again. */
+  storeConfirms?: boolean;
+}): JSX.Element {
   const ink = state.urgent ? "warning.dark" : "text.primary";
   return (
     <Box data-testid="pix-countdown" data-urgent={state.urgent ? "true" : "false"} sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
@@ -162,9 +177,11 @@ export function PixCountdown({ state, copy, title }: { state: PixCountdownState;
           }}
         />
       </Box>
-      {state.urgent ? (
-        <Box component="p" data-testid="pix-countdown-urgent" sx={{ m: 0, typography: "body2", color: "warning.dark" }}>
-          {copy.lastMinutes}
+      {/* Announced once, as it appears (a status, unlike the timer above). Gone at
+          00:00: the screen then learns from the server what the lapse meant. */}
+      {state.urgent && !state.lapsed ? (
+        <Box component="p" role="status" data-testid="pix-countdown-urgent" sx={{ m: 0, typography: "body2", color: "warning.dark" }}>
+          {storeConfirms ? copy.lastMinutesByStore : copy.lastMinutes}
         </Box>
       ) : null}
     </Box>
