@@ -44,6 +44,10 @@ export function SelectField({ name, options, label, placeholder }: SelectFieldPr
         placeholder={placeholder}
         value={values[name] ?? ''}
         error={Boolean(error)}
+        // The `<label htmlFor>` above names nothing: the combobox is MUI's
+        // display div, not a labelable element. `Select` puts `aria-label` on
+        // that div, so the question names the control (FUT-4157).
+        aria-label={label}
         data-testid={testId}
         onChange={(event) => setFieldValue(name, String(event.target.value))}
       />
