@@ -4,13 +4,13 @@ import type { JSX } from "react";
 
 import { Button } from "@12-apps/ui/form/Button";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
-import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { MAX_SCHEDULE_WINDOWS, type DiscountSchedule, type DiscountScheduleWindow } from "../engine/schedule";
 
+import { ClockInput } from "./clock-input";
 import { fill, type DiscountsWebCopy } from "./copy";
 import { formatScheduleWindow } from "./schedule-summary";
 
@@ -127,22 +127,26 @@ function WindowRow({
           </Button>
         )}
       </Box>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-        <Text variant="caption">{copy.schedule.fromLabel}</Text>
-        <Input
-          type="time"
+      <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <Box sx={{ pt: 1 }}>
+          <Text variant="caption">{copy.schedule.fromLabel}</Text>
+        </Box>
+        <ClockInput
           value={window.from}
-          onChange={(event) => onChange({ ...window, from: event.target.value })}
-          aria-label={copy.schedule.fromLabel}
-          data-testid={`schedule-from-${index}`}
+          label={copy.schedule.fromLabel}
+          invalidMessage={copy.schedule.invalidTime}
+          onChange={(from) => onChange({ ...window, from })}
+          dataTestId={`schedule-from-${index}`}
         />
-        <Text variant="caption">{copy.schedule.toLabel}</Text>
-        <Input
-          type="time"
+        <Box sx={{ pt: 1 }}>
+          <Text variant="caption">{copy.schedule.toLabel}</Text>
+        </Box>
+        <ClockInput
           value={window.to}
-          onChange={(event) => onChange({ ...window, to: event.target.value })}
-          aria-label={copy.schedule.toLabel}
-          data-testid={`schedule-to-${index}`}
+          label={copy.schedule.toLabel}
+          invalidMessage={copy.schedule.invalidTime}
+          onChange={(to) => onChange({ ...window, to })}
+          dataTestId={`schedule-to-${index}`}
         />
       </Box>
       {sentence !== null && (

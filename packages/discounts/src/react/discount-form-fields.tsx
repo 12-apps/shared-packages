@@ -14,6 +14,7 @@ import type { DiscountSchedule } from "../engine/schedule";
 
 import type { DiscountsWebCopy } from "./copy";
 import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES, type DiscountKind } from "./form-kind";
+import { PercentField, WholeNumberField } from "./number-fields";
 import { ScheduleBuilder } from "./schedule-builder";
 
 /**
@@ -49,7 +50,7 @@ function HintedField({
 }): JSX.Element {
   return (
     <Stack spacing={0.5}>
-      <Fields.TextField name={name} label={label} type="number" />
+      <WholeNumberField name={name} label={label} />
       <Text variant="caption">{hint}</Text>
     </Stack>
   );
@@ -125,11 +126,7 @@ function ComboRewardFields({
         {values.comboReward === "FIXED_AMOUNT" ? (
           <Currency name="amountOff" label={copy.form.amountOff} />
         ) : (
-          <Fields.TextField
-            name="percentOff"
-            label={copy.form.percentOff}
-            placeholder={copy.form.percentPlaceholder}
-          />
+          <PercentField copy={copy} />
         )}
       </Box>
       <Text variant="caption">{copy.form.comboRewardHint}</Text>
@@ -164,13 +161,7 @@ export function RewardFields({
   if (kind === "FREE_UNITS") return null;
   if (kind === "BUNDLE_PRICE") return <Currency name="bundlePrice" label={copy.form.bundlePrice} />;
   if (kind === "FIXED_AMOUNT") return <Currency name="amountOff" label={copy.form.amountOff} />;
-  return (
-    <Fields.TextField
-      name="percentOff"
-      label={copy.form.percentOff}
-      placeholder={copy.form.percentPlaceholder}
-    />
-  );
+  return <PercentField copy={copy} />;
 }
 
 /** The coupon input, shown only for a CODE-triggered rule. */
@@ -355,8 +346,8 @@ export function LimitFields({
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
       <Currency name="minSubtotal" label={copy.form.minSubtotal} />
-      <Fields.TextField name="usageLimit" label={copy.form.usageLimit} type="number" />
-      <Fields.TextField name="perBuyerLimit" label={copy.form.perBuyerLimit} type="number" />
+      <WholeNumberField name="usageLimit" label={copy.form.usageLimit} />
+      <WholeNumberField name="perBuyerLimit" label={copy.form.perBuyerLimit} />
     </Box>
   );
 }

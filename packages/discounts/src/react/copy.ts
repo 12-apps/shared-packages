@@ -149,10 +149,18 @@ export interface DiscountsFormCopy {
   readonly firstOrderOnlyHint: string;
   /** The banner over a form the operator must fix before it will send. */
   readonly reviewFields: string;
+  /**
+   * The toast a failed submit raises over the whole form (FUT-4143). The packs
+   * take it from `@12-apps/ui`'s own labels; `FormErrorSnackbar`'s fallback is
+   * English, so a form that does not pass one shows English on any screen.
+   */
+  readonly errorSnackbar: string;
   /** The banner over a write the SERVER refused. */
   readonly saveFailed: string;
   /** Per-input refusals, each attached to the input it names. */
   readonly nameRequired: string;
+  /** A name of one character — the two-character floor this form has always held. */
+  readonly nameTooShort: string;
   readonly invalidPercent: string;
   readonly invalidAmount: string;
   readonly invalidBundlePrice: string;
@@ -174,6 +182,15 @@ export interface DiscountsFormCopy {
   readonly comboSlotTargetRequired: string;
   readonly invalidComboQuantity: string;
   readonly invalidMaxComboApplications: string;
+  /** The two redemption caps: whole numbers from 1, or blank for "no cap". */
+  readonly invalidUsageLimit: string;
+  readonly invalidPerBuyerLimit: string;
+  /**
+   * Under a unit count typed with anything but digits ("2,5"), said while it is
+   * typed: a count of units has no decimals, and a browser that read the comma
+   * away stored 25.
+   */
+  readonly wholeNumberOnly: string;
   readonly endsBeforeStarts: string;
 }
 

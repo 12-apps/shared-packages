@@ -3,6 +3,7 @@ import {
   PT_BR_CATEGORY_SELECT_COPY,
   PT_BR_CONFIRM_ACTION_COPY,
   PT_BR_DATA_VIEWS_COPY,
+  PT_BR_UI_LABELS,
 } from "@12-apps/ui/pt-BR";
 
 import type { DiscountsWebCopy } from "./copy";
@@ -122,6 +123,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     activeNow: "Ativa agora",
     daysRequired: "Escolha ao menos um dia.",
     timesRequired: "Informe um horário de início e de fim diferentes.",
+    invalidTime: "Horário inexistente. Use de 00:00 a 23:59.",
     windowsRequired: "Adicione ao menos um horário.",
   },
   form: {
@@ -162,8 +164,10 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     firstOrderOnlyHint:
       "Vale só para quem nunca comprou aqui. O preço do cardápio não muda: o desconto aparece no carrinho de quem pode usar.",
     reviewFields: "Revise os campos destacados.",
+    errorSnackbar: PT_BR_UI_LABELS.formErrorSnackbar.message,
     saveFailed: "Não foi possível salvar o desconto",
     nameRequired: "Informe o nome da promoção.",
+    nameTooShort: "O nome precisa ter pelo menos 2 letras.",
     invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
     invalidAmount: "Informe um valor de desconto maior que zero.",
     invalidBundlePrice: "Informe o preço do combo, maior que zero.",
@@ -178,6 +182,9 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     comboSlotTargetRequired: "Escolha o que pode entrar em cada grupo do combo.",
     invalidComboQuantity: "Informe quantas unidades cada grupo leva, a partir de 1.",
     invalidMaxComboApplications: "Informe quantos combos cabem por pedido, a partir de 1.",
+    invalidUsageLimit: "Informe um número inteiro de usos, a partir de 1, ou deixe em branco.",
+    invalidPerBuyerLimit: "Informe um número inteiro por cliente, a partir de 1, ou deixe em branco.",
+    wholeNumberOnly: "Use só números inteiros, sem vírgula.",
     endsBeforeStarts: "A data de término deve ser posterior à data de início.",
   },
   combo: {

@@ -2,7 +2,6 @@
 
 import { useState, type JSX } from "react";
 
-import { minLength, required } from "@12-apps/forms-core";
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import {
   Fields,
@@ -188,8 +187,10 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
 
   return (
     <FormContainer<DiscountFormValues>
+      // No `schema`: the container runs one before `onSubmit` and stops when
+      // it fails, which judged the name alone. Every rule, the name's too,
+      // lives in `validate` so one Criar marks every field (FUT-4143).
       initialValues={initialValues(editing, formatters)}
-      schema={{ name: [required(copy.form.nameRequired), minLength(2)] }}
       onSubmit={handleSubmit}
       dataTestId="discount-form"
     >
@@ -245,7 +246,7 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           {editing ? copy.form.submitEdit : copy.form.submitCreate}
         </SubmitButton>
       </Stack>
-      <FormErrorSnackbar />
+      <FormErrorSnackbar message={copy.form.errorSnackbar} />
     </FormContainer>
   );
 }

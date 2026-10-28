@@ -1,3 +1,5 @@
+import { minLength, required } from "@12-apps/forms-core";
+
 import { toMinutes, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
@@ -19,12 +21,40 @@ import type { DiscountsFormatters } from "./format";
  * inputs red.
  */
 
-/** A whole number above zero, as typed. `null` when it is neither. */
+/**
+ * A whole number above zero, as typed. `null` when it is neither.
+ *
+ * Digits only (FUT-4143): `Number` reads "2.0" and "1e1" as whole numbers, and
+ * a count an operator typed with a separator in it was meant as something else.
+ */
 function positiveCount(typed: string): number | null {
   const trimmed = typed.trim();
-  if (trimmed === "") return null;
+  if (!/^\d+$/u.test(trimmed)) return null;
   const value = Number(trimmed);
-  return Number.isInteger(value) && value > 0 ? value : null;
+  return value > 0 ? value : null;
+}
+
+/** The name: present, and at least two characters, in the pack's words. */
+function checkName(typed: string, copy: DiscountsWebCopy): Record<string, string> {
+  const refused =
+    required(copy.form.nameRequired)(typed) ?? minLength(2, copy.form.nameTooShort)(typed.trim());
+  return refused === undefined ? {} : { name: refused };
+}
+
+/**
+ * The two redemption caps. Blank is "no cap"; anything else is a whole number
+ * from 1, so "2,5" is refused here instead of reaching the wire as 2 — or, in a
+ * browser that read the comma away, as 25.
+ */
+function checkLimits(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (values.usageLimit.trim() !== "" && positiveCount(values.usageLimit) === null) {
+    errors.usageLimit = copy.form.invalidUsageLimit;
+  }
+  if (values.perBuyerLimit.trim() !== "" && positiveCount(values.perBuyerLimit) === null) {
+    errors.perBuyerLimit = copy.form.invalidPerBuyerLimit;
+  }
+  return errors;
 }
 
 /** A money field that has to hold something above zero. */
@@ -187,8 +217,13 @@ export function validate(
   scheduleState: ScheduleState,
 ): Record<string, string> {
   const slots = targets.comboRequirements;
+  // Every rule in ONE pass, the name's included (FUT-4143): the name used to be
+  // the container's schema, which stops before this function runs, so a 150%
+  // sat unmarked beside a red name until the name was fixed.
   const errors: Record<string, string> = {
+    ...checkName(values.name, copy),
     ...checkValue(values, slots, formatters, copy),
+    ...checkLimits(values, copy),
     ...checkCombo(values, slots, copy),
     ...checkSchedule(scheduleState, copy),
   };

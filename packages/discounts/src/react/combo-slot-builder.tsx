@@ -4,7 +4,6 @@ import type { JSX } from "react";
 
 import { Button } from "@12-apps/ui/form/Button";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
-import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -13,6 +12,7 @@ import type { ComboRequirement } from "../engine/types";
 
 import type { WireTargetGroup } from "./api";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { CountInput } from "./number-fields";
 import { TargetPickerField } from "./target-picker-field";
 
 /**
@@ -75,8 +75,9 @@ function withIds(slot: ComboRequirement, targetType: string, ids: string[]): Com
  * One group: its quantity, one picker per registered collection, and the
  * control that removes it.
  *
- * The quantity is a `number` input rather than a masked one — it counts units,
- * not money, so there is no locale in it. It is held as a NUMBER in state
+ * The quantity is a digits-only text box (`CountInput`, FUT-4143) rather than
+ * `type="number"`, which read "2,5" by the browser's language — as 25 in an
+ * English one. It is held as a NUMBER in state
  * rather than as the form's string, because the summary line above adds them up
  * and the validator compares them against `freeUnits`; parsing on every read
  * would put the same `Number()` in three places.
@@ -117,12 +118,12 @@ function ComboSlotRow({
         </Button>
       </Stack>
       <Stack spacing={2} sx={{ mt: 1 }}>
-        <Input
-          type="number"
+        <CountInput
           label={copy.combo.quantity}
-          value={String(slot.quantity)}
-          onChange={(event) => onChange({ ...slot, quantity: Number(event.target.value) })}
-          data-testid={`combo-slot-${index}-quantity`}
+          value={slot.quantity}
+          copy={copy}
+          dataTestId={`combo-slot-${index}-quantity`}
+          onChange={(quantity) => onChange({ ...slot, quantity })}
         />
         {groups.map((group) => (
           <TargetPickerField

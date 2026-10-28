@@ -3,6 +3,7 @@ import {
   EN_US_CATEGORY_SELECT_COPY,
   EN_US_CONFIRM_ACTION_COPY,
   EN_US_DATA_VIEWS_COPY,
+  EN_US_UI_LABELS,
 } from "@12-apps/ui/en-US";
 
 import type { DiscountsWebCopy } from "./copy";
@@ -131,6 +132,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     activeNow: "Running now",
     daysRequired: "Pick at least one day.",
     timesRequired: "Enter a start and end time that differ.",
+    invalidTime: "That time does not exist. Use 00:00 to 23:59.",
     windowsRequired: "Add at least one time.",
   },
   form: {
@@ -172,8 +174,10 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     firstOrderOnlyHint:
       "Only for customers who have never bought here. Menu prices do not change: the discount shows in the cart of whoever can use it.",
     reviewFields: "Check the highlighted fields.",
+    errorSnackbar: EN_US_UI_LABELS.formErrorSnackbar.message,
     saveFailed: "Could not save the discount",
     nameRequired: "Give the promotion a name.",
+    nameTooShort: "The name needs at least 2 characters.",
     invalidPercent: "Enter a percentage greater than 0 and at most 100.",
     invalidAmount: "Enter a discount amount greater than zero.",
     invalidBundlePrice: "Enter the bundle price, greater than zero.",
@@ -188,6 +192,9 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     comboSlotTargetRequired: "Choose what can go in each group of the bundle.",
     invalidComboQuantity: "Enter how many units each group takes, from 1 upwards.",
     invalidMaxComboApplications: "Enter how many bundles fit in one order, from 1 upwards.",
+    invalidUsageLimit: "Enter a whole number of uses from 1 upwards, or leave it blank.",
+    invalidPerBuyerLimit: "Enter a whole number per customer from 1 upwards, or leave it blank.",
+    wholeNumberOnly: "Whole numbers only, no decimals.",
     endsBeforeStarts: "The end date must be after the start date.",
   },
   combo: {
