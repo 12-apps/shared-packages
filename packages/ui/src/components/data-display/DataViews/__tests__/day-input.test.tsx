@@ -496,40 +496,46 @@ async function refuseInMin(prefix: string): Promise<HTMLInputElement> {
   return min;
 }
 
-describe("Limpar todos os filtros empties a refused day under a range that was never applied", () => {
-  it("does so in the slide-in panel", async () => {
+describe("The filter panel and dialog remount their controls when clearKey moves", () => {
+  // The key itself is the controller's (`useClearFilters`, bumped by every
+  // clear-all surface); `clear-filters.test.tsx` drives the real grid.
+  it("empties a refused day in the slide-in panel", async () => {
     const onClearAll = vi.fn();
-    render(
+    const ui = (clearKey: number) => (
       <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
         <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open onOpenChange={vi.fn()}>
-          <GridFilterPanel {...panelProps(onClearAll)} />
+          <GridFilterPanel {...panelProps(onClearAll)} clearKey={clearKey} />
         </TableFilter>
-      </DataViewsCopyProvider>,
+      </DataViewsCopyProvider>
     );
+    const { rerender } = render(ui(0));
     await refuseInMin("grid-range-created");
 
     fireEvent.click(screen.getByTestId("grid-clear-filters"));
-
     expect(onClearAll).toHaveBeenCalledTimes(1);
+    rerender(ui(1));
+
     await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
     expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
     await waitFor(() => expect(screen.queryByText(PT_BR_DATA_VIEWS_COPY.filters.dayInvalid)).toBeNull());
   });
 
-  it("does so in the narrow-screen filter dialog", async () => {
+  it("empties a refused day in the narrow-screen filter dialog", async () => {
     const onClearAll = vi.fn();
-    render(
+    const ui = (clearKey: number) => (
       <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
         <TableFilter copy={PT_BR_DATA_VIEWS_COPY.tableFilter} open={false} onOpenChange={vi.fn()}>
-          <FilterDialog open onClose={vi.fn()} {...panelProps(onClearAll)} />
+          <FilterDialog open onClose={vi.fn()} {...panelProps(onClearAll)} clearKey={clearKey} />
         </TableFilter>
-      </DataViewsCopyProvider>,
+      </DataViewsCopyProvider>
     );
+    const { rerender } = render(ui(0));
     await refuseInMin("grid-range-created");
 
     fireEvent.click(screen.getByTestId("grid-clear-filters"));
-
     expect(onClearAll).toHaveBeenCalledTimes(1);
+    rerender(ui(1));
+
     await waitFor(() => expect(screen.getByTestId("grid-range-created-min")).toHaveValue(""));
     expect(screen.getByTestId("grid-range-created-min")).toHaveAttribute("aria-invalid", "false");
   });

@@ -111,7 +111,7 @@ export function ShellEmpty<T extends Record<string, unknown>>({
   return (
     <DataViewsEmpty
       filtered={c.activeFilterCount > 0 || c.state.search !== ""}
-      onClearFilters={() => c.patch({ search: "", pills: {}, ranges: {} })}
+      onClearFilters={c.clearFilters}
       emptyState={emptyState}
       testIdPrefix={testIdPrefix}
     />

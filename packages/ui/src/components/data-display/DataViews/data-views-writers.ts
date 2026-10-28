@@ -1,6 +1,6 @@
 "use client";
 
-import { type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction, useState } from "react";
 
 import { type DataViewState, type DataViewStatePatch } from "./data-views-types";
 
@@ -41,5 +41,28 @@ export function useStateWriters(setState: Dispatch<SetStateAction<DataViewState>
         ...prev,
         visibleColumns: nextVisibleColumns(prev.visibleColumns, id, visible),
       })),
+  };
+}
+
+/**
+ * "Limpar filtros", from ANY surface — the bar, the slide-in panel, the modal,
+ * the empty state — plus a key that changes with every click of it.
+ *
+ * The filter controls are keyed on `clearKey`, so a clear remounts them. That
+ * is what empties a field holding text the filter never applied: a refused day
+ * (`31/02/2026`) under a range that was open already. Clearing `{}` to `{}`
+ * changes no state, so nothing else would reach that field (FUT-4144).
+ */
+export function useClearFilters(patch: (next: DataViewStatePatch) => void): {
+  clearKey: number;
+  clearFilters: () => void;
+} {
+  const [clearKey, setClearKey] = useState(0);
+  return {
+    clearKey,
+    clearFilters: () => {
+      patch({ search: "", pills: {}, ranges: {} });
+      setClearKey((n) => n + 1);
+    },
   };
 }
