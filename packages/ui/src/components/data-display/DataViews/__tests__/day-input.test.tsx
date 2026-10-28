@@ -9,7 +9,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { DayBoundInput, isoToMasked, maskDate, maskedToIso } from "../data-views-day-input";
+import { PT_BR_DATA_VIEWS_COPY } from "../../../../pt-BR";
+import { DataViewsCopyProvider } from "../data-views-copy-context";
+import {
+  DayBoundInput,
+  isImpossibleDay,
+  isoToMasked,
+  maskDate,
+  maskedToIso,
+  readDayText,
+} from "../data-views-day-input";
+import { RangeBounds } from "../data-views-range-pill";
 
 /**
  * The two masks in the estate's own packs. Every helper case below runs against
@@ -220,5 +230,204 @@ describe("DayBoundInput", () => {
     typeSequentially(input, "06082026");
     rerender(<DayBoundInput mask="dd/mm/aaaa" label="De" value="2026-08-06" onChange={onChange} testId="day" />);
     await waitFor(() => expect(screen.getByTestId("day")).toHaveValue("06/08/2026"));
+  });
+});
+
+/**
+ * FUT-4144: an impossible day was forgotten without a word, and a pasted ISO
+ * day was read day-first into `20/26/1001`. The cases above still hold — a
+ * field given no message keeps its old silence — and these pin the new half.
+ */
+const INVALID = "Essa data não existe.";
+
+function renderWithMessage(value?: string, describedBy?: string) {
+  const onChange = vi.fn();
+  render(
+    <DayBoundInput
+      mask="dd/mm/aaaa"
+      label="De"
+      value={value}
+      onChange={onChange}
+      testId="day"
+      invalidMessage={INVALID}
+      describedBy={describedBy}
+    />,
+  );
+  return { onChange, input: screen.getByTestId("day") as HTMLInputElement };
+}
+
+/** Paste `text` the way a browser fires it; answers whether the default ran. */
+function paste(element: HTMLInputElement, text: string): boolean {
+  return fireEvent.paste(element, { clipboardData: { getData: () => text } });
+}
+
+describe("readDayText", () => {
+  it("reads a whole ISO day as that day, in the mask's own order", () => {
+    expect(readDayText("2026-10-01", BR)).toBe("01/10/2026");
+    expect(readDayText("2026-10-01", US)).toBe("10/01/2026");
+    expect(readDayText("2026-10-01", "yyyy-mm-dd")).toBe("2026-10-01");
+    expect(readDayText("  2026-10-01\n", BR)).toBe("01/10/2026");
+  });
+
+  it("lands the pasted and the typed forms of one day on the same text", () => {
+    expect(readDayText("2026-10-01", BR)).toBe(readDayText("01102026", BR));
+    expect(readDayText("2026-10-01", BR)).toBe(maskDate("01102026", BR));
+  });
+
+  it("masks everything that is not a whole ISO day exactly as typing does", () => {
+    expect(readDayText("0608", BR)).toBe("06/08");
+    expect(readDayText("06/08/2026", BR)).toBe("06/08/2026");
+    // Not a WHOLE ISO day: a partial one, or one with a time, is digits.
+    expect(readDayText("2026-10", BR)).toBe(maskDate("2026-10", BR));
+    expect(readDayText("2026-10-01T10:00", BR)).toBe(maskDate("2026-10-01T10:00", BR));
+  });
+
+  it("keeps an ISO day that does not exist in the mask's order, for the field to refuse", () => {
+    expect(readDayText("2026-02-31", BR)).toBe("31/02/2026");
+    expect(maskedToIso(readDayText("2026-02-31", BR), BR)).toBe("");
+  });
+});
+
+describe("isImpossibleDay", () => {
+  it("is true only for a WHOLE day that does not exist", () => {
+    expect(isImpossibleDay("31/02/2026", BR)).toBe(true);
+    expect(isImpossibleDay("01/13/2026", BR)).toBe(true);
+    expect(isImpossibleDay("31/12/2099", US)).toBe(true);
+  });
+
+  it("is false for a real day, a partial one and an empty field", () => {
+    expect(isImpossibleDay("28/02/2026", BR)).toBe(false);
+    expect(isImpossibleDay("31/02/20", BR)).toBe(false);
+    expect(isImpossibleDay("", BR)).toBe(false);
+  });
+});
+
+describe("DayBoundInput: an impossible day is marked and said", () => {
+  it("marks the <input> invalid and says why, and writes nothing", async () => {
+    const { onChange, input } = renderWithMessage();
+    typeSequentially(input, "31022026");
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+    const message = screen.getByText(INVALID);
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(message.id);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the refused text and its message on blur instead of snapping back", async () => {
+    const { input } = renderWithMessage("2026-08-06");
+    fireEvent.change(input, { target: { value: "31022026" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(INVALID)).toBeInTheDocument();
+  });
+
+  it("clears the mark and commits once the day is corrected", async () => {
+    const { onChange, input } = renderWithMessage();
+    fireEvent.change(input, { target: { value: "31022026" } });
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+
+    fireEvent.change(input, { target: { value: "28022026" } });
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "false"));
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+    expect(onChange).toHaveBeenCalledWith("2026-02-28");
+  });
+
+  it("does not mark a half-typed day, and still snaps that back on blur", async () => {
+    const { input } = renderWithMessage("2026-08-06");
+    fireEvent.change(input, { target: { value: "31/02/20" } });
+
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "false"));
+    await waitFor(() => expect(screen.queryByText(INVALID)).toBeNull());
+    fireEvent.blur(input);
+    expect(input).toHaveValue("06/08/2026");
+  });
+
+  it("keeps a caller's describedBy beside its own message", async () => {
+    const { input } = renderWithMessage(undefined, "pair-status");
+    expect(input).toHaveAttribute("aria-describedby", "pair-status");
+
+    fireEvent.change(input, { target: { value: "31022026" } });
+
+    const message = await screen.findByText(INVALID);
+    expect(input.getAttribute("aria-describedby")).toBe(`${message.id} pair-status`);
+  });
+
+  it("stays silent, as before, when the host gives it no message", async () => {
+    const { input } = renderInput("2026-08-06");
+    fireEvent.change(input, { target: { value: "31022026" } });
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "false");
+    fireEvent.blur(input);
+    expect(input).toHaveValue("06/08/2026");
+  });
+});
+
+describe("DayBoundInput: a pasted ISO day", () => {
+  it("is read as that day and applied, shown in the mask's order", async () => {
+    const { onChange, input } = renderWithMessage();
+    const defaultRan = paste(input, "2026-10-01");
+
+    expect(defaultRan).toBe(false);
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenCalledWith("2026-10-01");
+  });
+
+  it("replaces what the field held rather than adding its digits to it", async () => {
+    const { onChange, input } = renderWithMessage();
+    fireEvent.change(input, { target: { value: "0608" } });
+    paste(input, " 2026-10-01 ");
+
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenLastCalledWith("2026-10-01");
+  });
+
+  it("marks a pasted ISO day that does not exist", async () => {
+    const { onChange, input } = renderWithMessage();
+    paste(input, "2026-02-31");
+
+    await waitFor(() => expect(input).toHaveValue("31/02/2026"));
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("leaves any other paste to the browser and the mask", () => {
+    const { input } = renderWithMessage();
+
+    expect(paste(input, "01102026")).toBe(true);
+    expect(paste(input, "01/10/2026")).toBe(true);
+  });
+
+  it("reads an ISO day that arrives as a change (autofill, a drop) the same way", async () => {
+    const { onChange, input } = renderInput();
+    fireEvent.change(input, { target: { value: "2026-10-01" } });
+
+    await waitFor(() => expect(input).toHaveValue("01/10/2026"));
+    expect(onChange).toHaveBeenCalledWith("2026-10-01");
+  });
+});
+
+describe("RangeBounds: the DataViews day filter says the day does not exist", () => {
+  it("shows the pt-BR message from the copy pack under the field it was typed into", async () => {
+    render(
+      <DataViewsCopyProvider copy={PT_BR_DATA_VIEWS_COPY}>
+        <RangeBounds
+          field={{ id: "created", label: "Data", kind: "day", accessor: () => null }}
+          value={{}}
+          onChange={vi.fn()}
+          testId="range"
+        />
+      </DataViewsCopyProvider>,
+    );
+    const from = screen.getByTestId("range-min") as HTMLInputElement;
+    fireEvent.change(from, { target: { value: "31022026" } });
+
+    const message = await screen.findByText(PT_BR_DATA_VIEWS_COPY.filters.dayInvalid);
+    expect(message.textContent).toBe("Essa data não existe.");
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("range-max")).toHaveAttribute("aria-invalid", "false");
   });
 });

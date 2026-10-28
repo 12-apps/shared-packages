@@ -64,6 +64,7 @@ function BoundField<T extends Record<string, unknown>>({
     return (
       <DayBoundInput
         mask={copy.filters.dayMask}
+        invalidMessage={copy.filters.dayInvalid}
         label={label}
         value={value == null ? undefined : String(value)}
         onChange={onChange}
@@ -108,7 +109,10 @@ export function RangeBounds<T extends Record<string, unknown>>({
       <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
         <RangePresets presets={presetsFor(field, copy)} value={value} onChange={onChange} testId={testId} />
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      {/* Top-aligned: a day that does not exist grows ITS field by a message
+          line, and centring would push the other box half a line down. The two
+          boxes are one height, so with no message this is the same row. */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
         <BoundField
           field={field}
           label={copy.filters.rangeStart}
