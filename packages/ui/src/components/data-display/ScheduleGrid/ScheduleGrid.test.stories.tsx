@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fireEvent, fn, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { ScheduleGrid } from './ScheduleGrid';
@@ -365,3 +365,34 @@ export const FourteenDays: Story = {
     await headerSticksToThePage(canvasElement);
   },
 };
+
+/**
+ * K1 (WCAG 2.4.11): while the days scroll, a cell reached by the keyboard is
+ * never hidden under the pinned names — the scroller brings it out beside
+ * them — and the header row keeps the body's sideways scroll.
+ */
+async function keyboardWalksLeft(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const head = canvas.getByTestId('sg-head');
+  const names = canvas.getAllByRole('rowheader')[0] as HTMLElement;
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  body.scrollLeft = body.scrollWidth;
+  const last = canvasElement.querySelector<HTMLElement>('[data-sg-focus][data-sg-row="ana"][data-sg-day="6"]');
+  if (!last) throw new Error('no day 6');
+  // The last day's "+": a press focuses it (its create is the story's mock).
+  await userEvent.click(last);
+  await waitFor(() => expect(last).toHaveFocus());
+  for (let day = 5; day >= 0; day -= 1) {
+    await userEvent.keyboard('{ArrowLeft}');
+    await waitFor(() => expect((canvasElement.ownerDocument.activeElement as HTMLElement).dataset.sgDay).toBe(String(day)));
+    const focused = canvasElement.ownerDocument.activeElement as HTMLElement;
+    await waitFor(() => expect(focused.getBoundingClientRect().left).toBeGreaterThanOrEqual(names.getBoundingClientRect().right - 0.5));
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    await waitFor(() => expect(head.scrollLeft).toBe(body.scrollLeft));
+  }
+}
+
+export const KeyboardClearsTheNames704: Story = { args: tabletArgs, decorators: pane(704), play: async ({ canvasElement }) => keyboardWalksLeft(canvasElement) };
+export const KeyboardClearsTheNames836: Story = { args: tabletArgs, decorators: pane(836), play: async ({ canvasElement }) => keyboardWalksLeft(canvasElement) };

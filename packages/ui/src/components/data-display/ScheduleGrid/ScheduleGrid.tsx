@@ -71,9 +71,32 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   // The header row and the days keep one sideways scroll, so each day's header stays over its column.
+  // The scroll this sets echoes back as an event on the other side; that echo is skipped, so it
+  // never fights a scroll still running (a trackpad's momentum).
+  const echo = useRef<HTMLElement | null>(null);
+  // While the days scroll, a cell the keyboard (or a script) focuses is brought out from under
+  // the pinned names: the browser counts a cell under a sticky column as already in view.
+  const clearTheNames = (event: React.FocusEvent<HTMLElement>): void => {
+    const body = bodyRef.current;
+    const target = event.target;
+    if (!body || !(target instanceof HTMLElement) || target.closest('[role="rowheader"]')) return;
+    const row = target.closest('[role="row"]');
+    const names = row?.querySelector('[role="rowheader"]');
+    if (!row || !names) return;
+    const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
+    const hidden = names.getBoundingClientRect().right + gap - target.getBoundingClientRect().left;
+    if (hidden > 0) body.scrollLeft -= hidden;
+  };
   const followSideways = (event: React.UIEvent<HTMLElement>): void => {
-    const other = event.currentTarget === bodyRef.current ? headRef.current : bodyRef.current;
-    if (other && other.scrollLeft !== event.currentTarget.scrollLeft) other.scrollLeft = event.currentTarget.scrollLeft;
+    const from = event.currentTarget;
+    if (echo.current === from) {
+      echo.current = null;
+      return;
+    }
+    const other = from === bodyRef.current ? headRef.current : bodyRef.current;
+    if (!other || other.scrollLeft === from.scrollLeft) return;
+    echo.current = other;
+    other.scrollLeft = from.scrollLeft;
   };
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
@@ -98,7 +121,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onScroll={followSideways}>
           <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} rowSx={rowSx} testId={testId} />
         </Box>
-        <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={followSideways}>
+        <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={followSideways} onFocus={clearTheNames}>
           <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
         </Box>
       </Box>

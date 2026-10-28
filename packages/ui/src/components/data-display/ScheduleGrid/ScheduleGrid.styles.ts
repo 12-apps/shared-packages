@@ -67,11 +67,17 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
           paddingLeft: rem(theme, M.blockPadding.start),
           paddingRight: rem(theme, M.blockPadding.end),
         },
-        '& > [data-sg-scroll]': { overflowX: 'auto', overscrollBehaviorX: 'contain' },
+        // A cell the keyboard reaches is brought out beside the pinned names, never under them.
+        '& > [data-sg-scroll]': {
+          overflowX: 'auto',
+          overscrollBehaviorX: 'contain',
+          scrollPaddingInlineStart: `calc(var(--sg-name) + ${rem(theme, M.gap)})`,
+        },
         // The header row scrolls with the days (kept in step both ways), its own scrollbar hidden.
         '& > [data-sg-head]': {
           overflowX: 'auto',
           overscrollBehaviorX: 'contain',
+          scrollPaddingInlineStart: `calc(var(--sg-name) + ${rem(theme, M.gap)})`,
           scrollbarWidth: 'none',
           '&::-webkit-scrollbar': { display: 'none' },
         },
