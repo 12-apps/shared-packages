@@ -48,6 +48,20 @@ export function comboUnits(slots: readonly ComboRequirement[]): number {
   return slots.reduce((total, slot) => total + (Number.isFinite(slot.quantity) ? slot.quantity : 0), 0);
 }
 
+/** "1 item" or "4 itens": the pack's one form for exactly 1, its other form otherwise. */
+function counted(count: number, one: string, other: string): string {
+  return fill(count === 1 ? one : other, { count });
+}
+
+/** The read-back sentence, both nouns in the right number. */
+function comboSummary(slots: readonly ComboRequirement[], copy: DiscountsWebCopy): string {
+  const { combo } = copy;
+  return fill(combo.summary, {
+    units: counted(comboUnits(slots), combo.unitsOne, combo.unitsOther),
+    groups: counted(slots.length, combo.groupsOne, combo.groupsOther),
+  });
+}
+
 /** An empty group: one unit, nothing chosen yet. */
 export function blankSlot(): ComboRequirement {
   return { quantity: 1, categoryIds: [], menuItemIds: [] };
@@ -220,20 +234,27 @@ export function ComboSlotBuilder({
             {copy.combo.empty}
           </Text>
         )}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-          <Button
-            variant="outline"
-            onClick={() => onChange([...slots, blankSlot()])}
-            data-testid="combo-add-slot"
-          >
-            {copy.combo.addSlot}
-          </Button>
+        {/* Wraps as a ROW, never inside the button: where the note does not
+            fit beside "Adicionar grupo" it takes the line below, and the
+            button's own label stays on one line (FUT-4143 UI review). */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 2, rowGap: 1 }}>
+          <Box sx={{ flexShrink: 0, "& > button": { whiteSpace: "nowrap" } }}>
+            <Button
+              variant="outline"
+              onClick={() => onChange([...slots, blankSlot()])}
+              data-testid="combo-add-slot"
+            >
+              {copy.combo.addSlot}
+            </Button>
+          </Box>
           {slots.length > 0 && (
-            <Text variant="caption" data-testid="combo-summary">
-              {fill(copy.combo.summary, { units: comboUnits(slots), groups: slots.length })}
-            </Text>
+            <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
+              <Text variant="caption" data-testid="combo-summary">
+                {comboSummary(slots, copy)}
+              </Text>
+            </Box>
           )}
-        </Stack>
+        </Box>
       </Stack>
     </FormControl>
   );

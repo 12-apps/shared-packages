@@ -212,7 +212,11 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     // sentence is built around it rather than naming a noun of its own.
     pick: "{collection} in this group",
     empty: "No groups yet. Add the first one to build the bundle.",
-    summary: "The bundle takes {units} items across {groups} groups.",
+    summary: "The bundle takes {units} across {groups}.",
+    unitsOne: "{count} item",
+    unitsOther: "{count} items",
+    groupsOne: "{count} group",
+    groupsOther: "{count} groups",
     freeUnitsTitle: "Buy more, pay less",
     freeUnitsHint:
       'Choose the products, how many the customer takes and how many are free — the classic "buy 3, pay for 2".',

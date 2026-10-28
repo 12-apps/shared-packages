@@ -232,9 +232,17 @@ export interface DiscountsComboCopy {
   readonly empty: string;
   /**
    * The offer read back in the operator's own numbers, so a combo can be
-   * checked without saving it. `{units}` and `{groups}`.
+   * checked without saving it. `{units}` and `{groups}` are the two counted
+   * nouns below, already filled — "4 itens", "1 grupo" (FUT-4143: the sentence
+   * used to say "1 grupos").
    */
   readonly summary: string;
+  /** "1 item" / "{count} itens": one for exactly 1, the other for every other count. */
+  readonly unitsOne: string;
+  readonly unitsOther: string;
+  /** "1 grupo" / "{count} grupos", the same rule. */
+  readonly groupsOne: string;
+  readonly groupsOther: string;
   /**
    * The "leve 3, pague 2" builder (`./free-units-builder`), which is the same
    * stored shape wearing the sentence an operator would actually say. Its own

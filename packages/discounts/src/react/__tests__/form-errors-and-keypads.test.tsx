@@ -433,7 +433,7 @@ describe("a count box always shows the state it holds", () => {
     expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
       copy.form.invalidComboQuantity,
     );
-    expect(screen.getByTestId("combo-summary").textContent).toBe("O combo leva 0 itens em 1 grupos.");
+    expect(screen.getByTestId("combo-summary").textContent).toBe("O combo leva 0 itens em 1 grupo.");
     submit();
     await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
     expect(sent).toHaveLength(0);

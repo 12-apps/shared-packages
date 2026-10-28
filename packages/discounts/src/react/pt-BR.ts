@@ -95,7 +95,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     toLabel: "às",
     presetEveryDay: "Todos os dias",
     presetWeekdays: "Seg a Sex",
-    presetWeekend: "Fim de semana",
+    presetWeekend: "Sáb e Dom",
     dayShort: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
     dayLong: ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"],
     dayEvery: [
@@ -200,7 +200,11 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     quantity: "Quantidade",
     pick: "{collection} deste grupo",
     empty: "Nenhum grupo ainda. Adicione o primeiro para montar o combo.",
-    summary: "O combo leva {units} itens em {groups} grupos.",
+    summary: "O combo leva {units} em {groups}.",
+    unitsOne: "{count} item",
+    unitsOther: "{count} itens",
+    groupsOne: "{count} grupo",
+    groupsOther: "{count} grupos",
     freeUnitsTitle: "Leve mais, pague menos",
     freeUnitsHint:
       "Escolha os produtos, quantos o cliente leva e quantos saem de graça — é o clássico \"leve 3, pague 2\".",
