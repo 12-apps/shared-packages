@@ -3,14 +3,26 @@
 import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
-import React, { useCallback, useId, useRef } from 'react';
+import React, { useCallback, useId, useRef, useState } from 'react';
 
 import { Dialog } from '../Dialog';
-import { currentOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
-import { SequenceDoneBody, SequenceHeader, SequenceIntroBody, SequenceStepBody } from './SequenceResolver.parts';
+import { canReturn, currentOf, jumpTargetOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
+import {
+  SequenceDoneBody,
+  SequenceHeader,
+  SequenceIntroBody,
+  SequenceOverviewBody,
+  SequenceStepBody,
+} from './SequenceResolver.parts';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
 import { chromeSx, columnSx, paperSx, scrollBodySx } from './SequenceResolver.styles';
-import type { SequenceItem, SequenceResolverProps, SequenceStepApi } from './SequenceResolver.types';
+import type {
+  SequenceItem,
+  SequenceOverviewCategory,
+  SequenceResolverProps,
+  SequenceStep,
+  SequenceStepApi,
+} from './SequenceResolver.types';
 import { useSequenceRun, type SequenceRun } from './useSequenceRun';
 
 /** What the header's label says on the screen showing. */
@@ -28,8 +40,80 @@ function headerLabelOf<I extends SequenceItem, R>(
 /** The header's back button, once a previous step exists and the host allows it. */
 function backOf<I extends SequenceItem, R>(props: SequenceResolverProps<I, R>, state: SequenceRun<I, R>) {
   const { intro, labels, canGoBack = true } = props;
-  if (intro || !canGoBack || state.run.visits.length === 0) return undefined;
+  if (intro || !canGoBack || !canReturn(state.run)) return undefined;
   return { label: labels.back, accessible: labels.backAccessible, onClick: state.back, disabled: state.busy };
+}
+
+interface OverviewState {
+  /** The overview is on screen instead of the step. */
+  shown: boolean;
+  /** The header's "Ver todos (N)", while there is a step and more than one problem. */
+  button?: { label: string; onClick: () => void; disabled: boolean };
+  canPick: (category: SequenceOverviewCategory) => boolean;
+  pick: (category: SequenceOverviewCategory) => void;
+  hide: () => void;
+  /** The overview's title (in the header row): focus goes to it when it opens. */
+  titleRef: React.RefObject<HTMLHeadingElement | null>;
+}
+
+/**
+ * "Ver todos" inside the run: whether it shows, its header button, and its
+ * picks. Opening it changes nothing in the run; a pick jumps; "continue"
+ * returns to the step it left. Every opening of the resolver starts closed.
+ */
+function useOverview<I extends SequenceItem, R>(
+  props: SequenceResolverProps<I, R>,
+  state: SequenceRun<I, R>,
+  current: I | undefined,
+  open: boolean,
+): OverviewState {
+  const [shown, setShown] = useState(false);
+  const [wasOpen, setWasOpen] = useState(open);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (shown) setShown(false);
+  }
+  const { overview } = props;
+  const total = summaryOf(state.run).total;
+  const available = Boolean(overview && current && total > 1);
+  const hide = (): void => setShown(false);
+  return {
+    shown: shown && available,
+    button:
+      available && overview
+        ? { label: overview.label(total), onClick: () => setShown(true), disabled: state.busy }
+        : undefined,
+    canPick: (category) => jumpTargetOf(state.run, category.keys) !== undefined,
+    pick: (category) => {
+      const target = jumpTargetOf(state.run, category.keys);
+      if (target === undefined) return;
+      state.jumpTo(target);
+      setShown(false);
+      category.onPick?.();
+    },
+    hide,
+    titleRef,
+  };
+}
+
+interface HeaderInputs<I extends SequenceItem, R> {
+  props: SequenceResolverProps<I, R>;
+  state: SequenceRun<I, R>;
+  current: I | undefined;
+  overview: OverviewState;
+  titleId: string;
+}
+
+/** The header's back, "Ver todos" and label — or, over the overview, its title and close alone. */
+function headerOf<I extends SequenceItem, R>(inputs: HeaderInputs<I, R>) {
+  const { props, state, current, overview, titleId } = inputs;
+  const run = state.run;
+  const base = { label: headerLabelOf(props, run, current), progress: props.intro ? 0 : progressOf(run) };
+  if (overview.shown && props.overview) {
+    return { ...base, title: { id: titleId, text: props.overview.title, ref: overview.titleRef } };
+  }
+  return { ...base, back: backOf(props, state), seeAll: overview.button };
 }
 
 /**
@@ -49,7 +133,9 @@ interface BodyProps<I extends SequenceItem, R> {
   props: SequenceResolverProps<I, R>;
   state: SequenceRun<I, R>;
   current: I | undefined;
-  api: SequenceStepApi<R>;
+  /** The step on screen, rendered once by the resolver (it also reads `canGoBack` from it). */
+  step: SequenceStep | undefined;
+  overview: OverviewState;
   titleId: string;
   stepTitleRef: React.RefObject<HTMLElement | null>;
   touch: boolean;
@@ -59,14 +145,29 @@ interface BodyProps<I extends SequenceItem, R> {
 
 /** The intro, the step on screen, or the end screen. */
 function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.JSX.Element {
-  const { props, state, current, api, titleId, stepTitleRef, touch, testId, close } = body;
+  const { props, state, current, step, overview, titleId, stepTitleRef, touch, testId, close } = body;
   if (props.intro) {
     return <SequenceIntroBody intro={props.intro} titleId={titleId} testId={testId} screenKey="intro" />;
   }
-  if (current) {
+  if (overview.shown && props.overview) {
+    return (
+      <SequenceOverviewBody
+        categories={props.overview.categories}
+        canPick={overview.canPick}
+        onPick={overview.pick}
+        pickLabel={props.overview.pickLabel}
+        continueLabel={props.overview.continueLabel}
+        onContinue={overview.hide}
+        titleRef={overview.titleRef}
+        touch={touch}
+        testId={testId}
+      />
+    );
+  }
+  if (current && step) {
     return (
       <SequenceStepBody
-        step={props.renderStep(current, api)}
+        step={step}
         skip={{ label: props.labels.skip, onClick: state.skip }}
         busy={state.busy}
         error={state.error}
@@ -117,12 +218,16 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     stepTitleRef.current = node;
   }, []);
 
+  // Read when an answer is recorded: the step on screen's own `canGoBack`.
+  const stepAllowsBack = useRef(true);
   const state = useSequenceRun<I, R>({
     open,
     active: open && !intro,
     queue: props.queue,
+    initialKey: props.initialKey,
     onBack: props.onBack,
     failed: labels.failed,
+    stepAllowsBack: () => stepAllowsBack.current,
   });
   const { run, busy } = state;
   const current = intro ? undefined : currentOf(run);
@@ -131,9 +236,13 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     resolve: state.resolve,
     skip: state.skip,
     back: state.back,
+    jumpTo: state.jumpTo,
     busy,
     titleProps: { id: titleId, tabIndex: -1, ref: titleRef },
   };
+  const overview = useOverview(props, state, current, open);
+  const step = current && !overview.shown ? props.renderStep(current, api) : undefined;
+  stepAllowsBack.current = step?.canGoBack !== false;
 
   return (
     <Dialog
@@ -150,27 +259,26 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
       <Box sx={columnSx}>
         <Box sx={chromeSx}>
           <SequenceHeader
-          touch={touch}
-          label={headerLabelOf(props, run, current)}
-          back={backOf(props, state)}
-          closeLabel={labels.close}
-          onClose={close}
-          progress={intro ? 0 : progressOf(run)}
-          progressLabel={labels.progress}
-          testId={testId}
+            touch={touch}
+            {...headerOf({ props, state, current, overview, titleId })}
+            closeLabel={labels.close}
+            onClose={close}
+            progressLabel={labels.progress}
+            testId={testId}
           />
         </Box>
         <Box sx={scrollBodySx} data-testid={`${testId}-body`}>
           <SequenceBody
-          props={props}
-          state={state}
-          current={current}
-          api={api}
-          titleId={titleId}
-          stepTitleRef={stepTitleRef}
-          touch={touch}
-          testId={testId}
-          close={close}
+            props={props}
+            state={state}
+            current={current}
+            step={step}
+            overview={overview}
+            titleId={titleId}
+            stepTitleRef={stepTitleRef}
+            touch={touch}
+            testId={testId}
+            close={close}
           />
         </Box>
       </Box>

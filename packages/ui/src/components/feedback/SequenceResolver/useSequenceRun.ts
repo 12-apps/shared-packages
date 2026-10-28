@@ -2,7 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 
 import {
   backRun,
+  canReturn,
   currentOf,
+  jumpRun,
   pinRun,
   previousOf,
   resolveRun,
@@ -19,9 +21,16 @@ interface RunInputs<I extends SequenceItem, R> {
   /** True while the run is on screen: open, and past the intro. */
   active: boolean;
   queue: readonly I[];
+  /** The key a fresh run opens at (its step goes first; nothing is passed over). */
+  initialKey?: string;
   onBack?: (item: I, result: R) => Promise<void> | void;
   /** The message for a rejection that carries none. */
   failed: string;
+  /**
+   * Read when an answer is recorded: false when the step on screen said
+   * `canGoBack: false` (its answer has no inverse, so Back stops at it).
+   */
+  stepAllowsBack: () => boolean;
 }
 
 export interface SequenceRun<I extends SequenceItem, R> {
@@ -31,6 +40,8 @@ export interface SequenceRun<I extends SequenceItem, R> {
   resolve: (result: R | PromiseLike<R>, options?: SequenceResolveOptions) => void;
   skip: () => void;
   back: () => void;
+  /** Jump to `key`: the step on screen is passed over and the target shows (see `jumpRun`). */
+  jumpTo: (key: string) => void;
 }
 
 interface Tracked<I extends SequenceItem, R> {
@@ -138,15 +149,15 @@ function useAsyncGate(failed: string): AsyncGate {
  * no frame ever shows a step the queue has already dropped.
  */
 function useTrackedRun<I extends SequenceItem, R>(
-  inputs: { open: boolean; active: boolean; queue: readonly I[] },
+  inputs: { open: boolean; active: boolean; queue: readonly I[]; initialKey?: string },
   onRestart: () => void,
 ): { run: RunState<I, R>; update: (step: (run: RunState<I, R>) => RunState<I, R>) => void } {
-  const { open, active, queue } = inputs;
-  const [tracked, setTracked] = useState<Tracked<I, R>>(() => ({ run: startRun(queue), queue, active, open }));
+  const { open, active, queue, initialKey } = inputs;
+  const [tracked, setTracked] = useState<Tracked<I, R>>(() => ({ run: startRun(queue, initialKey), queue, active, open }));
   let current = tracked;
   if (active !== tracked.active || open !== tracked.open || queue !== tracked.queue) {
     const restart = (active && !tracked.active) || (open && !tracked.open);
-    current = { run: restart ? startRun(queue) : syncRun(tracked.run, queue), queue, active, open };
+    current = { run: restart ? startRun(queue, initialKey) : syncRun(tracked.run, queue), queue, active, open };
     if (restart) onRestart();
     setTracked(current);
   }
@@ -158,24 +169,25 @@ function useTrackedRun<I extends SequenceItem, R>(
 
 /** The run's state and its verbs — the index/back/skip/done logic, once (FUT-3671). */
 export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R>): SequenceRun<I, R> {
-  const { open, active, queue, onBack, failed } = inputs;
+  const { open, active, queue, initialKey, onBack, failed, stepAllowsBack } = inputs;
   const gate = useAsyncGate(failed);
-  const { run, update } = useTrackedRun<I, R>({ open, active, queue }, gate.reset);
+  const { run, update } = useTrackedRun<I, R>({ open, active, queue, initialKey }, gate.reset);
   const { settle, isPending, clearError } = gate;
 
   const onScreen = currentOf(run);
   const resolve = (result: R | PromiseLike<R>, options?: SequenceResolveOptions): void => {
     const also = options?.alsoResolved ?? 0;
     if (isPending() || !onScreen) return;
+    const final = !stepAllowsBack();
     if (isThenable(result)) {
       // The host's refetch may drop the entry before its write returns: keep
       // it on screen meanwhile, and answer THIS entry when it does.
       update((prev) => pinRun(prev, onScreen.key));
-      settle(result, 'resolve', onScreen.key, (value) => update((prev) => resolveRun(prev, value, onScreen, also)));
+      settle(result, 'resolve', onScreen.key, (value) => update((prev) => resolveRun(prev, value, onScreen, also, final)));
       return;
     }
     clearError();
-    update((prev) => resolveRun(prev, result, onScreen, also));
+    update((prev) => resolveRun(prev, result, onScreen, also, final));
   };
 
   const skip = (): void => {
@@ -186,7 +198,7 @@ export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R
 
   const back = (): void => {
     const last = previousOf(run);
-    if (isPending() || !last) return;
+    if (isPending() || !last || !canReturn(run)) return;
     if (last.outcome === 'resolved' && onBack) {
       // `new Promise` so a handler that throws synchronously lands in the same
       // rejection path as one that rejects.
@@ -198,8 +210,14 @@ export function useSequenceRun<I extends SequenceItem, R>(inputs: RunInputs<I, R
     update((prev) => backRun(prev, last.item.key));
   };
 
+  const jumpTo = (key: string): void => {
+    if (isPending()) return;
+    clearError();
+    update((prev) => jumpRun(prev, key));
+  };
+
   // An error belongs to the screen it was raised on: once a queue change (or
   // anything else) moves the run to another step, it no longer shows.
   const error = gate.error && gate.error.screen === screenOf(onScreen) ? gate.error.message : null;
-  return { run, busy: gate.busy !== null, error, resolve, skip, back };
+  return { run, busy: gate.busy !== null, error, resolve, skip, back, jumpTo };
 }

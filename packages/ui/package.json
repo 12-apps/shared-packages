@@ -192,6 +192,10 @@
       "types": "./dist/types/components/data-display/DataViews/index.d.ts",
       "default": "./dist/data-display/DataViews.js"
     },
+    "./data-display/DayRuler": {
+      "types": "./dist/types/components/data-display/DayRuler/index.d.ts",
+      "default": "./dist/data-display/DayRuler.js"
+    },
     "./data-display/DescriptionItem": {
       "types": "./dist/types/components/data-display/DescriptionItem/index.d.ts",
       "default": "./dist/data-display/DescriptionItem.js"
@@ -211,6 +215,10 @@
       },
       "types": "./dist/types/components/data-display/FleetMap/index.d.ts",
       "default": "./dist/data-display/FleetMap.js"
+    },
+    "./data-display/ScheduleGrid": {
+      "types": "./dist/types/components/data-display/ScheduleGrid/index.d.ts",
+      "default": "./dist/data-display/ScheduleGrid.js"
     },
     "./data-display/SectionOnboarding": {
       "types": "./dist/types/components/data-display/SectionOnboarding/index.d.ts",

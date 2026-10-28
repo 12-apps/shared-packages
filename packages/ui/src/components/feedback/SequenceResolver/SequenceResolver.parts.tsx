@@ -28,12 +28,22 @@ import {
   headerStartSx,
   headerSx,
   introListSx,
+  overviewFooterSx,
+  overviewRowSx,
+  overviewTitleSx,
+  seeAllButtonSx,
   stepLabelSx,
   startAllSx,
   tertiarySx,
   titleSx,
 } from './SequenceResolver.styles';
-import type { SequenceAction, SequenceDone, SequenceIntro, SequenceStep } from './SequenceResolver.types';
+import type {
+  SequenceAction,
+  SequenceDone,
+  SequenceIntro,
+  SequenceOverviewCategory,
+  SequenceStep,
+} from './SequenceResolver.types';
 
 interface HeaderProps {
   touch: boolean;
@@ -45,11 +55,15 @@ interface HeaderProps {
   progress: number;
   progressLabel: string;
   testId: string;
+  /** "Ver todos (N)": a text button between the label and close. */
+  seeAll?: { label: string; onClick: () => void; disabled: boolean };
+  /** The overview's title, drawn in the label's place and naming the dialog. */
+  title?: { id: string; text: string; ref: React.RefObject<HTMLHeadingElement | null> };
 }
 
 /** The drag handle (phone), the header row and the progress bar. */
 export function SequenceHeader(props: HeaderProps): React.JSX.Element {
-  const { touch, label, back, closeLabel, onClose, progress, progressLabel, testId } = props;
+  const { touch, label, back, closeLabel, onClose, progress, progressLabel, testId, seeAll, title } = props;
   return (
     <>
       {touch ? <Box aria-hidden sx={handleSx} data-testid={`${testId}-handle`} /> : null}
@@ -70,10 +84,29 @@ export function SequenceHeader(props: HeaderProps): React.JSX.Element {
               {back.label}
             </Button>
           ) : null}
-          <Typography component="span" sx={stepLabelSx} data-testid={`${testId}-step-label`}>
-            {label}
-          </Typography>
+          {title ? (
+            <Typography component="h2" id={title.id} tabIndex={-1} ref={title.ref} sx={overviewTitleSx}>
+              {title.text}
+            </Typography>
+          ) : (
+            <Typography component="span" sx={stepLabelSx} data-testid={`${testId}-step-label`}>
+              {label}
+            </Typography>
+          )}
         </Box>
+        {seeAll ? (
+          <Button
+            variant="text"
+            color="primary"
+            size="md"
+            onClick={seeAll.onClick}
+            disabled={seeAll.disabled}
+            sx={seeAllButtonSx(touch)}
+            dataTestId={`${testId}-see-all`}
+          >
+            {seeAll.label}
+          </Button>
+        ) : null}
         <IconButton aria-label={closeLabel} onClick={onClose} sx={closeButtonSx(touch)} data-testid={`${testId}-close`}>
           <CloseIcon />
         </IconButton>
@@ -187,6 +220,66 @@ export function SequenceIntroBody({ intro, titleId, testId, screenKey }: IntroPr
         {intro.startAllLabel}
       </Button>
     </>
+  );
+}
+
+interface OverviewProps {
+  categories: SequenceOverviewCategory[];
+  /** Per category: false when none of its problems is left unanswered. */
+  canPick: (category: SequenceOverviewCategory) => boolean;
+  onPick: (category: SequenceOverviewCategory) => void;
+  pickLabel: string;
+  continueLabel: string;
+  onContinue: () => void;
+  titleRef: React.RefObject<HTMLHeadingElement | null>;
+  touch: boolean;
+  testId: string;
+}
+
+/**
+ * "Ver todos" inside the run: each kind with its count and a pick that jumps
+ * there, then "continue in sequence" back to the step it left. The title is
+ * in the header row (it names the dialog); focus goes to it on open.
+ */
+export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
+  const { categories, canPick, onPick, pickLabel, continueLabel, onContinue, titleRef, touch, testId } = props;
+  useFocusOnScreen('overview', titleRef, titleRef);
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column' }} data-testid={`${testId}-overview`}>
+      <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+        {categories.map((category, index) => (
+          <Box component="li" key={`${index}-${category.label}`} sx={overviewRowSx}>
+            <Box sx={categoryTextSx}>
+              <Typography component="span" variant="body2" fontWeight={500}>
+                {category.label}
+              </Typography>
+              {category.description ? (
+                <Typography component="span" sx={categoryDescriptionSx}>
+                  {category.description}
+                </Typography>
+              ) : null}
+            </Box>
+            <Button
+              variant="outline"
+              color="primary"
+              size="md"
+              onClick={() => onPick(category)}
+              disabled={!canPick(category)}
+              aria-label={`${pickLabel}: ${category.label}`}
+              sx={actionSx(touch)}
+              dataTestId={`${testId}-overview-pick-${index}`}
+            >
+              {pickLabel}
+            </Button>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={overviewFooterSx}>
+        <Button variant="solid" color="primary" size="md" onClick={onContinue} sx={actionSx(touch)} dataTestId={`${testId}-continue`}>
+          {continueLabel}
+        </Button>
+      </Box>
+    </Box>
   );
 }
 

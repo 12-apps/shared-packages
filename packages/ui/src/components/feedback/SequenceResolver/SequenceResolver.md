@@ -43,12 +43,14 @@ data-sized and shrinks while you go.
 | `onClose` | `(summary) => void` | Close button, Esc and the end screen's button. Gets `{ resolved, skipped, total, alsoResolved }`; a close toast counts `resolved + alsoResolved` (and shows only when that is above 0). Clicking the veil does nothing (as approved). |
 | `intro` | `SequenceIntro?` | While given, the intro shows instead of the run: `title`, `description`, `categories` (`label`, `description`, `count`, `onPick`), `startAllLabel`, `onStartAll`. The host drops it and sets `queue` in the same update as a pick. |
 | `queue` | `readonly I[]` (`I extends { key; kindLabel }`) | The problems, in order. Live data: it may shrink (siblings answered together) or grow mid-run. |
-| `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`, `footer?` (`'end'` default — right-aligned over a hairline; `'split'` — two equal columns, no hairline; on a phone the actions always share the row without a hairline). |
+| `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`, `footer?` (`'end'` default — right-aligned over a hairline; `'split'` — two equal columns, no hairline; on a phone the actions always share the row without a hairline), `canGoBack?` (`false`: this answer has no inverse — once it is answered, Back is not offered from the next step). |
 | `onBack` | `(item, result) => Promise<void> \| void` | The host's server inverse, awaited before Back shows the previous step again. Called only when that step was RESOLVED. |
 | `canGoBack` | `boolean` (default `true`) | Offer Back at all. It shows only once a previous step exists — on steps and on the end screen, never on the intro. |
+| `overview` | `SequenceOverview?` | "Ver todos (N)" inside the run (FUT-3825): `label(total)`, `title`, `categories` (`label`, `description?`, `count`, `keys`, `onPick?`), `pickLabel`, `continueLabel`. See "Ver todos". |
+| `initialKey` | `string?` | Open the run at this problem (a click on its block). The ones before it follow it; nothing is passed over. |
 | `done` | `SequenceDone \| (summary) => SequenceDone` | The end screen: `title`, `description?`, `confirmLabel`. |
 | `labels` | `SequenceResolverLabels` | Every chrome word: `back`, `backAccessible?`, `close`, `skip`, `step(position, total, item)`, `introStep`, `doneStep`, `progress`, `failed`. **Required — the package ships no copy.** |
-| `dataTestId` | `string` (default `sequence-resolver`) | Parts: `-back`, `-close`, `-step-label`, `-progress`, `-handle`, `-category-<n>`, `-start-all`, `-primary`, `-secondary`, `-tertiary`, `-footer`, `-error`, `-done`, `-done-confirm`. |
+| `dataTestId` | `string` (default `sequence-resolver`) | Parts: `-back`, `-close`, `-step-label`, `-progress`, `-handle`, `-category-<n>`, `-start-all`, `-primary`, `-secondary`, `-tertiary`, `-footer`, `-error`, `-done`, `-done-confirm`, `-see-all`, `-overview`, `-overview-pick-<n>`, `-continue`. |
 
 ### The step API
 
@@ -57,6 +59,7 @@ data-sized and shrinks while you go.
 | `resolve(result \| promise, { alsoResolved? })` | Answer and move on. `alsoResolved` counts OTHER problems this answer resolved too ("apply to every sibling") for the close summary; Back over the step takes them off again. Given the PROMISE of the host's write, the step stays on screen and `busy` until it settles (even if the host's refetch drops the entry first); a rejection keeps it and shows the rejection's message. |
 | `skip()` | Leave it unanswered and move on. |
 | `back()` | Same as the header's Back. |
+| `jumpTo(key)` | Jump to that problem, as an overview pick does: the step on screen is passed over and the target shows. An answered or unknown key does nothing. |
 | `busy` | True while a `resolve` promise or an `onBack` is pending. The footer, tertiary and Back are disabled by the component; disable the step's own answers with it. |
 | `titleProps` | **Spread on the step's title** (the item's name). It names the dialog and takes focus on every advance. |
 
@@ -85,6 +88,34 @@ data-sized and shrinks while you go.
 - **Labelling.** `role="dialog"`, `aria-modal`, `aria-labelledby` = the intro title, the
   step title (`api.titleProps`) or the end title. The progress bar is named by
   `labels.progress`.
+
+## Ver todos (N) — the list inside the run
+
+With `overview`, every step's header shows a text button `overview.label(total)` ("Ver todos (2)")
+between the step label and close, while the run has more than one problem (never on the intro or
+the end screen). It shows the overview **in the same dialog without ending the run**:
+
+```
+┌──────────────────────────────────────────────┐
+│ 2 problemas a resolver                    ×  │  overview.title (names the dialog, takes focus)
+│ ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+│ Atrasado · 1                     [Resolver]  │  a category: label, description, pickLabel
+│ Luiz entrega ainda não começou               │
+│ Avisou que não vai · 1           [Resolver]  │
+│ ──────────────────────────────────────────── │
+│ [Continuar em sequência]                     │  continueLabel: back to the step it left
+└──────────────────────────────────────────────┘
+```
+
+- **A pick jumps** to the category's first UNANSWERED problem — the first of its `keys` still ahead
+  in the run, else one passed over — then calls its `onPick`. A category with none left has its
+  pick disabled.
+- **A jump passes over the step on screen**: Back from the target returns to it at once (nothing
+  to undo), and Back again keeps today's meaning (over an answered step it awaits `onBack`). A
+  host that never jumps (the Estoque resolver) sees no change.
+- **Continue** returns to the step it left, nothing changed. Close from the overview closes the
+  run with its summary.
+- Every opening of the resolver starts with the overview closed.
 
 ## Writing a step
 

@@ -224,6 +224,20 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/Table`
 **Docs**: `src/components/data-display/Table/Table.md`
 
+### ScheduleGrid
+**Purpose**: A week grid of people (or resources) × days with blocks that have a start and an end
+**Use Cases**: Staff schedules (turnos), rosters, resource booking by day
+**Features**: Click an empty cell to create, drag across a row to create on each day, drag a block's edge grip to copy it along the row, drag its middle to move it, click to open; blocked (hatched) days refuse drops; five tones that each carry their note text; sticky header row; keyboard twins (Shift+←/→ copy, Alt+←/→ move, arrows move focus) with a live region; touch never drags; read-only, loading, error, empty; container queries
+**Location**: `src/components/data-display/ScheduleGrid`
+**Docs**: `src/components/data-display/ScheduleGrid/ScheduleGrid.md`
+
+### DayRuler
+**Purpose**: One day as an hour ruler per row — scheduled blocks, the real shift under them, a now line and people per hour
+**Use Cases**: A schedule's day view, on-shift vs scheduled, a phone's day list of who works when
+**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, HH:MM axis past midnight, row chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
+**Location**: `src/components/data-display/DayRuler`
+**Docs**: `src/components/data-display/DayRuler/DayRuler.md`
+
 ### Timeline
 **Purpose**: Display chronological events
 **Use Cases**: Activity feeds, event history, project milestones
@@ -275,8 +289,8 @@ Components for providing feedback to users about system state and actions.
 ### SequenceResolver
 **Purpose**: Resolve a queue of problems one at a time, in one dialog whose body is replaced step by step
 **Use Cases**: A screen's "N problems to solve" (stock limits, purchases, restock, unexplained write-offs), a product's subproducts to restock — any data-sized list of decisions taken in order, where Back must undo the previous answer (not `StackedModal`: no layers; not `Stepper`: the queue is data-sized and shrinks)
-**Features**: Centred `Dialog` from 600px, inset `bottom-sheet` variant below (95% max height, scrolls inside, decorative handle, 44px+ targets); header with Back (awaits the host's `onBack` inverse over a resolved step), the host's step label and close; `Progress` bar; optional intro listing kinds with counts + "all in sequence"; host-rendered step with `primary` / `secondary` (skip by default) / one `tertiary`; end screen from the run's summary; `resolve(promise)` keeps the step busy until the write returns, a rejection shows its message; a live queue that shrinks mid-run never runs past the end; focus to the title on every advance, Esc closes; all copy from the caller
-**Types**: `SequenceResolverProps`, `SequenceItem`, `SequenceStep`, `SequenceStepApi`, `SequenceIntro`, `SequenceDone`, `SequenceSummary`, `SequenceResolverLabels`
+**Features**: Centred `Dialog` from 600px, inset `bottom-sheet` variant below (95% max height, scrolls inside, decorative handle, 44px+ targets); header with Back (awaits the host's `onBack` inverse over a resolved step), the host's step label and close; `Progress` bar; optional intro listing kinds with counts + "all in sequence"; host-rendered step with `primary` / `secondary` (skip by default) / one `tertiary`; end screen from the run's summary; `resolve(promise)` keeps the step busy until the write returns, a rejection shows its message; a live queue that shrinks mid-run never runs past the end; focus to the title on every advance, Esc closes; "Ver todos (N)" inside the run (`overview`: the kinds with counts, a pick that jumps to the kind's first unanswered problem, continue back to the step left), `initialKey`, `api.jumpTo`, per-step `canGoBack`; all copy from the caller
+**Types**: `SequenceResolverProps`, `SequenceItem`, `SequenceStep`, `SequenceStepApi`, `SequenceIntro`, `SequenceOverview`, `SequenceOverviewCategory`, `SequenceDone`, `SequenceSummary`, `SequenceResolverLabels`
 **Location**: `src/components/feedback/SequenceResolver`
 **Docs**: `src/components/feedback/SequenceResolver/SequenceResolver.md`
 

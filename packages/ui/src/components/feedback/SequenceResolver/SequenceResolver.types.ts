@@ -58,6 +58,12 @@ export interface SequenceStepApi<R> {
   skip: () => void;
   /** Return to the previous step (the header's back button does the same). */
   back: () => void;
+  /**
+   * Jump to the problem with this key, as the overview's "Resolver" does: the
+   * step on screen is passed over (Back from the target returns to it at once)
+   * and the target shows. An answered or unknown key does nothing.
+   */
+  jumpTo: (key: string) => void;
   /** True while a `resolve` promise or an `onBack` is pending — disable the step's own answers. */
   busy: boolean;
   /**
@@ -92,6 +98,12 @@ export interface SequenceStep {
    * phone the actions always share the row, with no hairline.
    */
   footer?: 'end' | 'split';
+  /**
+   * `false` marks this step's answer as having NO inverse: once it is answered,
+   * Back is not offered from the next step (default `true`). The resolver's own
+   * `canGoBack` still turns Back off everywhere.
+   */
+  canGoBack?: boolean;
 }
 
 /** One kind on the intro screen. */
@@ -112,6 +124,39 @@ export interface SequenceIntro {
   startAllLabel: string;
   /** Resolve every kind: set the queue to all of them and drop `intro`. */
   onStartAll: () => void;
+}
+
+/** One kind in the overview "Ver todos" opens inside the run. */
+export interface SequenceOverviewCategory {
+  label: string;
+  description?: string;
+  /** How many problems of this kind are still open. */
+  count: number;
+  /**
+   * The keys of this kind's problems. Its pick jumps to the first one still
+   * unanswered (ahead in the run, else one passed over); with none left the
+   * pick is disabled.
+   */
+  keys: readonly string[];
+  /** Called after the jump, for the host's own bookkeeping. */
+  onPick?: () => void;
+}
+
+/**
+ * "Ver todos (N)" inside the run: a header text button that shows every kind
+ * of problem with its count, a pick per kind that jumps there, and a button back
+ * to the step it left. The run is never ended or restarted by it.
+ */
+export interface SequenceOverview {
+  /** The header button's text, from the run's total ("Ver todos (2)"). */
+  label: (total: number) => string;
+  /** The overview's title ("2 problemas a resolver"). */
+  title: string;
+  categories: SequenceOverviewCategory[];
+  /** Each category's button ("Resolver"). */
+  pickLabel: string;
+  /** Back to the step the overview was opened from ("Continuar em sequência"). */
+  continueLabel: string;
 }
 
 /** The end screen's words. */
@@ -172,6 +217,13 @@ export interface SequenceResolverProps<I extends SequenceItem = SequenceItem, R 
   onBack?: (item: I, result: R) => Promise<void> | void;
   /** Offer the back button at all (default `true`). It shows only once a previous step exists. */
   canGoBack?: boolean;
+  /**
+   * "Ver todos (N)" in the header of every step while the run has more than
+   * one problem: shows the kinds inside the dialog without ending the run.
+   */
+  overview?: SequenceOverview;
+  /** Open the run at this problem (a click on its block); the ones before it follow it. */
+  initialKey?: string;
   /** The end screen's words, from the run's summary. */
   done: SequenceDone | ((summary: SequenceSummary) => SequenceDone);
   labels: SequenceResolverLabels;
@@ -179,7 +231,8 @@ export interface SequenceResolverProps<I extends SequenceItem = SequenceItem, R 
    * Base test id (default `sequence-resolver`). Parts get `${id}-back`,
    * `${id}-close`, `${id}-step-label`, `${id}-progress`, `${id}-category-${index}`,
    * `${id}-start-all`, `${id}-primary`, `${id}-secondary`, `${id}-tertiary`,
-   * `${id}-error`, `${id}-done`, `${id}-done-confirm`.
+   * `${id}-error`, `${id}-done`, `${id}-done-confirm`, `${id}-see-all`,
+   * `${id}-overview`, `${id}-overview-pick-${index}`, `${id}-continue`.
    */
   dataTestId?: string;
 }

@@ -236,3 +236,39 @@ export const doneTitleSx: SxProps<Theme> = {
   fontWeight: 500,
   outline: 'none',
 };
+
+/** "Ver todos (N)": a text button that keeps its one line and its size beside the label. */
+export function seeAllButtonSx(touch: boolean): SxProps<Theme> {
+  const base = { flex: 'none', whiteSpace: 'nowrap', ml: 'auto' } as const;
+  return touch ? { ...base, minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : base;
+}
+
+/** The overview's title, in the header row where a step shows its label. */
+export const overviewTitleSx: SxProps<Theme> = {
+  fontSize: sxRem(SEQUENCE_METRICS.overviewTitle),
+  fontWeight: 500,
+  lineHeight: 1.3,
+  outline: 'none',
+  minWidth: 0,
+};
+
+/** One kind: its words take the width, its pick keeps its size on the right, a hairline under it. */
+export const overviewRowSx: SxProps<Theme> = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1.5,
+  py: 1.5,
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+  '& > button': { flex: 'none' },
+};
+
+/** "Continue in sequence": start-aligned under a hairline, as the prototype draws it. */
+export const overviewFooterSx: SxProps<Theme> = {
+  display: 'flex',
+  justifyContent: 'flex-start',
+  pt: 2,
+  mt: 2,
+  borderTop: '1px solid',
+  borderColor: 'divider',
+};

@@ -214,6 +214,36 @@ export interface DateRangePickerLabels {
   calendar: string;
 }
 
+/** `ScheduleGrid`'s cell names and the sentences its live region reads after a keyboard copy or move. */
+export interface ScheduleGridLabels {
+  /** An empty cell's button: schedule this row on this day. */
+  createCell(row: string, column: string): string;
+  /** A blocked cell with no label of its own. */
+  blockedCell(row: string, column: string): string;
+  /** After Shift+←/→ copied a block to the next or previous day. */
+  copied(block: string, column: string): string;
+  /** After Alt+←/→ moved a block to the next or previous day. */
+  moved(block: string, row: string, column: string): string;
+  /** A keyboard copy or move whose day is taken, closed or outside the grid. */
+  refused: string;
+  /** The grid's busy state. */
+  loading: string;
+}
+
+/** `DayRuler`'s track names and the sentences its live region reads after a keyboard move or resize. */
+export interface DayRulerLabels {
+  /** A row's empty track: Enter schedules this row. */
+  createTrack(row: string): string;
+  /** After Alt+←/→ moved a block; `range` is "20:45–00:45". */
+  moved(block: string, range: string): string;
+  /** After Shift(+Alt)+←/→ changed a block's end or start. */
+  resized(block: string, range: string): string;
+  /** A keyboard move or resize past the ruler's ends or under the shortest length. */
+  refused: string;
+  /** The ruler's busy state. */
+  loading: string;
+}
+
 /** Every family above, keyed by the component that renders it. */
 export interface UiLabels {
   common: CommonLabels;
@@ -246,4 +276,6 @@ export interface UiLabels {
   infiniteScroll: InfiniteScrollLabels;
   socialLogin: SocialLoginLabels;
   dateRangePicker: DateRangePickerLabels;
+  scheduleGrid: ScheduleGridLabels;
+  dayRuler: DayRulerLabels;
 }

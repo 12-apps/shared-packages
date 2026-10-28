@@ -23,4 +23,6 @@ export const SEQUENCE_METRICS = {
   listRadius: 12,
   doneIcon: 44,
   doneTitle: 20,
+  /** The overview's title in the header row. */
+  overviewTitle: 18,
 } as const;
