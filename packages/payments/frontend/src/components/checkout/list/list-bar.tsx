@@ -164,12 +164,15 @@ export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, 
 }
 
 /** "Pagar" on the left, "R$ 22,00" on the right — the prototype's 52px bar of a button. */
-export function ActionButton({ label, total, disabled, loading, onClick, focusOnMount = false }: {
+export function ActionButton({ label, total, disabled, loading, onClick, focusOnMount = false, look = "solid", testId = "list-pay" }: {
   label: string;
   total: string | null;
   disabled: boolean;
   loading?: boolean;
   onClick: () => void;
+  /** `outline` for an action that is not the next step — the Pix's "Copiar de novo" (ADR 0129: no primary after the copy). */
+  look?: "solid" | "outline";
+  testId?: string;
   /** Take the focus as it appears — back from a cancelled charge, where the focus was on Cancelar. */
   focusOnMount?: boolean;
 }): JSX.Element {
@@ -182,7 +185,7 @@ export function ActionButton({ label, total, disabled, loading, onClick, focusOn
   }, [focusOnMount]);
   return (
     <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600, letterSpacing: "normal" } }}>
-      <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
+      <Button variant={look} color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId={testId}>
         {/* Neither the amount ("R$ / 27,00") nor the label breaks: a label too wide for the bar at
             320px is cut with an ellipsis rather than wrapped onto a second line, and is plain (the rule above
             gives label and amount one tracking). An action with no amount ("Copiar

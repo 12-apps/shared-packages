@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 
 import type { PaymentListCredit, PaymentListCreditCopy, PaymentListSummary } from "./credit-types";
 import type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy, PaymentListDebitInputs } from "./debit-copy";
+import type { PixFaceCopy } from "./pix-face-copy";
 
 export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
 
@@ -383,18 +384,8 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
    */
   chargingCovered?: string;
   cancel: string;
-  pixFace: {
-    /** "Pague R$ 22,00 com Pix". */
-    title: (total: string) => string;
-    /** "Válido até 18:42. Copie o código e cole no app do seu banco, em Pix copia e cola." */
-    validUntil: (time: string) => string;
-    showQr: string;
-    hideQr: string;
-    changeMethod: string;
-    /** The bar's action, and the accessible name of the tappable code. */
-    copyCode: string;
-    waiting: string;
-  };
+  /** The raised Pix's face (`list-pix.tsx`). */
+  pixFace: PixFaceCopy;
   /** "Aguardando a InfinitePay…" */
   handOffWaiting: (provider: string | null) => string;
 }
