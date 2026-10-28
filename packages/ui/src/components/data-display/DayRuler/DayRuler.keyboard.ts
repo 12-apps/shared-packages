@@ -55,9 +55,14 @@ interface BlockKeyContext {
  * that cannot go further, or that the block does not allow, is refused aloud
  * and changes nothing.
  */
+/** Shift and/or Alt with ← or →, and no Ctrl or Meta: a key the ruler answers for a block. */
+function isBlockKey(event: React.KeyboardEvent): boolean {
+  const arrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+  return arrow && (event.altKey || event.shiftKey) && !event.ctrlKey && !event.metaKey;
+}
+
 export function handleBlockKey(event: React.KeyboardEvent, block: DayRulerBlock, ctx: BlockKeyContext): void {
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-  if ((!event.altKey && !event.shiftKey) || event.ctrlKey || event.metaKey) return;
+  if (!isBlockKey(event)) return;
   // The key is the ruler's either way: Alt+← would otherwise be the browser's Back.
   event.preventDefault();
   const gesture = gestureOf(event, block, ctx.can);

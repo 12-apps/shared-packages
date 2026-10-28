@@ -28,8 +28,6 @@ import {
   headerStartSx,
   headerSx,
   introListSx,
-  overviewFooterSx,
-  overviewRowSx,
   overviewTitleSx,
   seeAllButtonSx,
   seeAllLabelSx,
@@ -43,7 +41,6 @@ import type {
   SequenceAction,
   SequenceDone,
   SequenceIntro,
-  SequenceOverviewCategory,
   SequenceStep,
 } from './SequenceResolver.types';
 
@@ -229,69 +226,6 @@ export function SequenceIntroBody({ intro, titleId, testId, screenKey }: IntroPr
   );
 }
 
-interface OverviewProps {
-  categories: SequenceOverviewCategory[];
-  /** Per category: false when none of its problems is left unanswered. */
-  canPick: (category: SequenceOverviewCategory) => boolean;
-  onPick: (category: SequenceOverviewCategory) => void;
-  pickLabel: string;
-  continueLabel: string;
-  onContinue: () => void;
-  titleRef: React.RefObject<HTMLHeadingElement | null>;
-  touch: boolean;
-  testId: string;
-}
-
-/**
- * "Ver todos" inside the run: each kind with its count (the intro's badge) and a pick that jumps
- * there, then "continue in sequence" back to the step it left. The title is
- * in the header row (it names the dialog); focus goes to it on open.
- */
-export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
-  const { categories, canPick, onPick, pickLabel, continueLabel, onContinue, titleRef, touch, testId } = props;
-  useFocusOnScreen('overview', titleRef, titleRef);
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column' }} data-testid={`${testId}-overview`}>
-      <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
-        {categories.map((category, index) => (
-          <Box component="li" key={`${index}-${category.label}`} sx={overviewRowSx}>
-            <Box component="span" sx={countBadgeSx} data-testid={`${testId}-overview-count-${index}`}>
-              {category.count}
-            </Box>
-            <Box sx={categoryTextSx}>
-              <Typography component="span" variant="body2" fontWeight={500}>
-                {category.label}
-              </Typography>
-              {category.description ? (
-                <Typography component="span" sx={categoryDescriptionSx}>
-                  {category.description}
-                </Typography>
-              ) : null}
-            </Box>
-            <Button
-              variant="outline"
-              color="primary"
-              size="md"
-              onClick={() => onPick(category)}
-              disabled={!canPick(category)}
-              aria-label={`${pickLabel}: ${category.label}`}
-              sx={actionSx(touch)}
-              dataTestId={`${testId}-overview-pick-${index}`}
-            >
-              {pickLabel}
-            </Button>
-          </Box>
-        ))}
-      </Box>
-      <Box sx={overviewFooterSx}>
-        <Button variant="solid" color="primary" size="md" onClick={onContinue} sx={actionSx(touch)} dataTestId={`${testId}-continue`}>
-          {continueLabel}
-        </Button>
-      </Box>
-    </Box>
-  );
-}
-
 interface StepProps {
   step: SequenceStep;
   /**
@@ -338,14 +272,28 @@ function ActionButton({
   );
 }
 
+/** The step's footer: its secondary (skip by default; `false` for none) and its primary. */
+function StepFooter({ step, skip, busy, touch, testId }: Pick<StepProps, 'step' | 'skip' | 'busy' | 'touch' | 'testId'>) {
+  const secondary = step.secondary === false ? undefined : (step.secondary ?? skip);
+  if (!secondary && !step.primary) return null;
+  return (
+    <Box sx={footerSx(touch, step.footer ?? 'end')} data-testid={`${testId}-footer`}>
+      {secondary ? (
+        <ActionButton action={secondary} busy={busy} touch={touch} variant="outline" testId={`${testId}-secondary`} />
+      ) : null}
+      {step.primary ? (
+        <ActionButton action={step.primary} busy={busy} touch={touch} variant="solid" testId={`${testId}-primary`} />
+      ) : null}
+    </Box>
+  );
+}
+
 /** The host's body, its error, the tertiary text button and the footer. */
 export function SequenceStepBody(props: StepProps): React.JSX.Element {
   const { step, skip, busy, error, touch, testId, screenKey, titleRef, hidden = false } = props;
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useFocusOnScreen(hidden ? '' : screenKey, titleRef, bodyRef);
   useKeepFocusWhileBusy(busy && !hidden, bodyRef);
-  const secondary = step.secondary === false ? undefined : (step.secondary ?? skip);
-  const hasFooter = Boolean(secondary || step.primary);
   return (
     <Box hidden={hidden} sx={stepScreenSx(hidden)} data-testid={`${testId}-step`}>
       <Box ref={bodyRef} tabIndex={-1} aria-busy={busy} sx={{ outline: 'none', minWidth: 0 }}>
@@ -357,16 +305,7 @@ export function SequenceStepBody(props: StepProps): React.JSX.Element {
       {step.tertiary ? (
         <ActionButton action={step.tertiary} busy={busy} touch={touch} variant="text" testId={`${testId}-tertiary`} />
       ) : null}
-      {hasFooter ? (
-        <Box sx={footerSx(touch, step.footer ?? 'end')} data-testid={`${testId}-footer`}>
-          {secondary ? (
-            <ActionButton action={secondary} busy={busy} touch={touch} variant="outline" testId={`${testId}-secondary`} />
-          ) : null}
-          {step.primary ? (
-            <ActionButton action={step.primary} busy={busy} touch={touch} variant="solid" testId={`${testId}-primary`} />
-          ) : null}
-        </Box>
-      ) : null}
+      <StepFooter step={step} skip={skip} busy={busy} touch={touch} testId={testId} />
     </Box>
   );
 }

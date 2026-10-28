@@ -11,9 +11,9 @@ import {
   SequenceDoneBody,
   SequenceHeader,
   SequenceIntroBody,
-  SequenceOverviewBody,
   SequenceStepBody,
 } from './SequenceResolver.parts';
+import { SequenceOverviewBody } from './SequenceResolver.overview';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
 import { chromeSx, columnSx, paperSx, scrollBodySx } from './SequenceResolver.styles';
 import type {
@@ -95,6 +95,14 @@ function useOverview<I extends SequenceItem, R>(
     hide,
     titleRef,
   };
+}
+
+/** What the host's `renderStep` gets: the run's verbs, `busy`, and the props for its title. */
+function stepApiOf<I extends SequenceItem, R>(
+  state: SequenceRun<I, R>,
+  titleProps: SequenceStepApi<R>['titleProps'],
+): SequenceStepApi<R> {
+  return { resolve: state.resolve, skip: state.skip, back: state.back, jumpTo: state.jumpTo, busy: state.busy, titleProps };
 }
 
 interface HeaderInputs<I extends SequenceItem, R> {
@@ -236,20 +244,13 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     failed: labels.failed,
     stepAllowsBack: () => stepAllowsBack.current,
   });
-  const { run, busy } = state;
+  const { run } = state;
   const current = intro ? undefined : currentOf(run);
   const close = (): void => onClose(summaryOf(run));
   const overview = useOverview(props, state, current, open);
-  const api: SequenceStepApi<R> = {
-    resolve: state.resolve,
-    skip: state.skip,
-    back: state.back,
-    jumpTo: state.jumpTo,
-    busy,
-    // Under the overview the step is kept but hidden, and the overview's title names the dialog.
-    titleProps: { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef },
-  };
-  const step = current ? props.renderStep(current, api) : undefined;
+  // Under the overview the step is kept but hidden, and the overview's title names the dialog.
+  const titleProps = { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef } as const;
+  const step = current ? props.renderStep(current, stepApiOf(state, titleProps)) : undefined;
   stepAllowsBack.current = step?.canGoBack !== false;
 
   return (
