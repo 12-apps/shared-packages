@@ -34,9 +34,11 @@ data-sized and shrinks while you go.
 - **< 600px**: the `Dialog` inset `bottom-sheet` variant, at most 95% of the dynamic
   viewport, scrolling inside; a drag handle on top is decoration only (the sheet does not
   drag). Every header and footer target is at least 44px tall there.
-- **The header is one line at every width, 320 included**: Back and close keep their size;
-  "Ver todos (N)" takes only the room left (its text cut with an ellipsis when short, its
-  accessible name whole), and the step label is cut only after it.
+- **The header is one line at every width, 320 included, and nothing on it is cut**: Back,
+  "Ver todos (N)" and close keep their size. On a chrome under 300px (a phone under 375px)
+  Back is its chevron alone — a 44px target named by `backAccessible`, else `back` — and the
+  step label moves to the end of the progress row. Only a long host label on a wider chrome
+  is cut, with an ellipsis.
 
 ## Props
 
@@ -49,7 +51,7 @@ data-sized and shrinks while you go.
 | `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`, `footer?` (`'end'` default — right-aligned over a hairline; `'split'` — two equal columns, no hairline; on a phone the actions always share the row without a hairline), `canGoBack?` (`false`: this answer has no inverse — once it is answered, Back is not offered from the next step). |
 | `onBack` | `(item, result) => Promise<void> \| void` | The host's server inverse, awaited before Back shows the previous step again. Called only when that step was RESOLVED. |
 | `canGoBack` | `boolean` (default `true`) | Offer Back at all. It shows only once a previous step exists — on steps and on the end screen, never on the intro. |
-| `overview` | `SequenceOverview?` | "Ver todos (N)" inside the run (FUT-3825): `label(total)`, `title`, `categories` (`label`, `description?`, `count` — drawn as the kind's badge, as on the intro, so the `label` is the kind alone — `keys`, `onPick?`), `pickLabel`, `continueLabel`. See "Ver todos". |
+| `overview` | `SequenceOverview?` | "Ver todos (N)" inside the run (FUT-3825): `label(total)`, `title`, `categories` (`label`, `description?`, `count?` — the host's bookkeeping, not drawn: the `label` says the number, "Atrasado · 1" — `keys`, `onPick?`), `pickLabel`, `continueLabel`. See "Ver todos". |
 | `initialKey` | `string?` | Open the run at this problem (a click on its block). The ones before it follow it; nothing is passed over. |
 | `done` | `SequenceDone \| (summary) => SequenceDone` | The end screen: `title`, `description?`, `confirmLabel`. |
 | `labels` | `SequenceResolverLabels` | Every chrome word: `back`, `backAccessible?`, `close`, `skip`, `step(position, total, item)`, `introStep`, `doneStep`, `progress`, `failed`. **Required — the package ships no copy.** |
@@ -102,9 +104,9 @@ the end screen). It shows the overview **in the same dialog without ending the r
 ┌──────────────────────────────────────────────┐
 │ 2 problemas a resolver                    ×  │  overview.title (names the dialog, takes focus)
 │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-│ (1) Atrasado                     [Resolver]  │  a category: count badge, label, description, pickLabel
-│     Luiz entrega ainda não começou           │
-│ (1) Avisou que não vai           [Resolver]  │
+│ Atrasado · 1                     [Resolver]  │  a category: label, description, pickLabel
+│ Luiz entrega ainda não começou               │
+│ Avisou que não vai · 1           [Resolver]  │
 │ ──────────────────────────────────────────── │
 │ [Continuar em sequência]                     │  continueLabel: back to the step it left
 └──────────────────────────────────────────────┘

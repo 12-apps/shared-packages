@@ -8,7 +8,6 @@ import {
   actionSx,
   categoryDescriptionSx,
   categoryTextSx,
-  countBadgeSx,
   overviewFooterSx,
   overviewRowSx,
 } from './SequenceResolver.styles';
@@ -28,7 +27,7 @@ interface OverviewProps {
 }
 
 /**
- * "Ver todos" inside the run: each kind with its count (the intro's badge) and a pick that jumps
+ * "Ver todos" inside the run: each kind (its label says how many, as the host writes it) and a pick that jumps
  * there, then "continue in sequence" back to the step it left. The title is
  * in the header row (it names the dialog); focus goes to it on open.
  */
@@ -40,9 +39,6 @@ export function SequenceOverviewBody(props: OverviewProps): React.JSX.Element {
       <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
         {categories.map((category, index) => (
           <Box component="li" key={`${index}-${category.label}`} sx={overviewRowSx}>
-            <Box component="span" sx={countBadgeSx} data-testid={`${testId}-overview-count-${index}`}>
-              {category.count}
-            </Box>
             <Box sx={categoryTextSx}>
               <Typography component="span" variant="body2" fontWeight={500}>
                 {category.label}

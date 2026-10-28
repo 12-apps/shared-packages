@@ -149,6 +149,7 @@ export const PT_BR_UI_LABELS: UiLabels = {
     copied: (block, column) => `${block} copiado para ${column}`,
     moved: (block, row, column) => `${block} movido para ${row}, ${column}`,
     refused: "Não dá para pôr aí: o dia está ocupado ou fechado",
+    notMovable: "Este turno não muda por aqui",
     loading: "Carregando a escala",
   },
   dayRuler: {
@@ -156,6 +157,7 @@ export const PT_BR_UI_LABELS: UiLabels = {
     moved: (block, range) => `${block} agora ${range}`,
     resized: (block, range) => `${block} agora ${range}`,
     refused: "Não dá para ir além",
+    notMovable: "Este turno não muda por aqui",
     loading: "Carregando o dia",
   },
   calendar: {

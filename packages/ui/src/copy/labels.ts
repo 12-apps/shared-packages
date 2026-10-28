@@ -226,6 +226,8 @@ export interface ScheduleGridLabels {
   moved(block: string, row: string, column: string): string;
   /** A keyboard copy or move whose day is taken, closed or outside the grid. */
   refused: string;
+  /** Shift/Alt+←/→ on a block that is not `copyable` / `movable`: the block is fixed, not the day. */
+  notMovable: string;
   /** The grid's busy state. */
   loading: string;
 }
@@ -240,6 +242,8 @@ export interface DayRulerLabels {
   resized(block: string, range: string): string;
   /** A keyboard move or resize past the ruler's ends or under the shortest length. */
   refused: string;
+  /** Shift/Alt+←/→ on a block that is not `movable` / `resizable`: the block is fixed. */
+  notMovable: string;
   /** The ruler's busy state. */
   loading: string;
 }

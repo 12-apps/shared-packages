@@ -67,8 +67,8 @@ const overviewOf = (open: Problem[]): SequenceOverview => {
     label: (total) => `Ver todos (${total})`,
     title: open.length === 1 ? '1 problema a resolver' : `${open.length} problemas a resolver`,
     categories: [
-      { label: 'Atrasado', description: `${late.map((p) => p.who).join(', ')} ainda não começou`, count: late.length, keys: late.map((p) => p.key) },
-      { label: 'Avisou que não vai', description: away.map((p) => `${p.who}, ter`).join(' · '), count: away.length, keys: away.map((p) => p.key) },
+      { label: `Atrasado · ${late.length}`, description: `${late.map((p) => p.who).join(', ')} ainda não começou`, count: late.length, keys: late.map((p) => p.key) },
+      { label: `Avisou que não vai · ${away.length}`, description: away.map((p) => `${p.who}, ter`).join(' · '), count: away.length, keys: away.map((p) => p.key) },
     ].filter((category) => category.count > 0),
     pickLabel: 'Resolver',
     continueLabel: 'Continuar em sequência',

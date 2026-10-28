@@ -29,8 +29,9 @@ import {
   headerSx,
   introListSx,
   overviewTitleSx,
+  progressLabelSx,
+  progressRowSx,
   seeAllButtonSx,
-  seeAllLabelSx,
   stepLabelSx,
   startAllSx,
   stepScreenSx,
@@ -74,13 +75,13 @@ export function SequenceHeader(props: HeaderProps): React.JSX.Element {
               color="primary"
               size="md"
               icon={<ChevronLeftIcon />}
-              aria-label={back.accessible}
+              aria-label={back.accessible ?? back.label}
               onClick={back.onClick}
               disabled={back.disabled}
               sx={backButtonSx(touch)}
               dataTestId={`${testId}-back`}
             >
-              {back.label}
+              <span data-back-word="">{back.label}</span>
             </Button>
           ) : null}
           {title ? (
@@ -103,23 +104,30 @@ export function SequenceHeader(props: HeaderProps): React.JSX.Element {
             sx={seeAllButtonSx(touch)}
             dataTestId={`${testId}-see-all`}
           >
-            <Box component="span" sx={seeAllLabelSx}>
-              {seeAll.label}
-            </Box>
+            {seeAll.label}
           </Button>
         ) : null}
         <IconButton aria-label={closeLabel} onClick={onClose} sx={closeButtonSx(touch)} data-testid={`${testId}-close`}>
           <CloseIcon />
         </IconButton>
       </Box>
-      <Progress
-        variant="linear"
-        size="md"
-        color="warning"
-        value={progress}
-        aria-label={progressLabel}
-        dataTestId={`${testId}-progress`}
-      />
+      <Box sx={progressRowSx}>
+        <Box>
+          <Progress
+            variant="linear"
+            size="md"
+            color="warning"
+            value={progress}
+            aria-label={progressLabel}
+            dataTestId={`${testId}-progress`}
+          />
+        </Box>
+        {title ? null : (
+          <Typography component="span" sx={progressLabelSx} data-testid={`${testId}-step-label-end`}>
+            {label}
+          </Typography>
+        )}
+      </Box>
     </>
   );
 }

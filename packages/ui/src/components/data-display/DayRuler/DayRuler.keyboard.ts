@@ -67,7 +67,7 @@ export function handleBlockKey(event: React.KeyboardEvent, block: DayRulerBlock,
   event.preventDefault();
   const gesture = gestureOf(event, block, ctx.can);
   if (!gesture) {
-    ctx.say(ctx.labels.refused);
+    ctx.say(ctx.labels.notMovable);
     return;
   }
   const [start, end] = stepped(block, gesture, event.key === 'ArrowLeft' ? -1 : 1, ctx.scale);

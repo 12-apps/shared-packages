@@ -130,8 +130,12 @@ export interface SequenceIntro {
 export interface SequenceOverviewCategory {
   label: string;
   description?: string;
-  /** How many problems of this kind are still open. */
-  count: number;
+  /**
+   * How many problems of this kind are still open — the host's bookkeeping
+   * (to drop a kind at zero, to write the label's "· N"). The overview does not
+   * draw it: the prototype says the number in the label ("Atrasado · 1").
+   */
+  count?: number;
   /**
    * The keys of this kind's problems. Its pick jumps to the first one still
    * unanswered (ahead in the run, else one passed over); with none left the

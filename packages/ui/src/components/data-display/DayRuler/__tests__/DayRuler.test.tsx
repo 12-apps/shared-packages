@@ -379,12 +379,12 @@ describe("keyboard", () => {
     await waitFor(() => expect(live()).toBe("Não dá para ir além"));
   });
 
-  it("Shift or Alt+arrow on a block that cannot move or resize is refused aloud and goes no further", async () => {
+  it("Shift or Alt+arrow on a block that cannot move or resize says the block is fixed, and goes no further", async () => {
     const props = renderRuler({
       rows: [{ id: "d", label: "Dina", blocks: [{ id: "e1", start: 8, end: 12, label: "Em turno", tone: "onduty" }] }],
     });
     expect(fireEvent.keyDown(block("e1"), { key: "ArrowLeft", altKey: true })).toBe(false);
-    await waitFor(() => expect(live()).toBe("Não dá para ir além"));
+    await waitFor(() => expect(live()).toBe("Este turno não muda por aqui"));
     expect(fireEvent.keyDown(block("e1"), { key: "ArrowRight", shiftKey: true })).toBe(false);
     expect(fireEvent.keyDown(block("e1"), { key: "ArrowRight" })).toBe(true);
     expect(props.onMove).not.toHaveBeenCalled();

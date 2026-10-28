@@ -11,8 +11,9 @@ import type { ScheduleGridBlock, ScheduleGridCell, ScheduleGridColumn, ScheduleG
  * - arrows move focus to the nearest focusable cell that way;
  * - Shift+←/→ on a copyable block copies it one day;
  * - Alt+←/→ on a movable block moves it one day (focus follows it);
- * either on a block that cannot do it is refused; each copy, move or refusal
- * is read by the live region.
+ * either on a block that cannot do it says so (`notMovable`), a taken or
+ * closed day is refused; each is read by the live region. With Ctrl or Meta
+ * the key is not the grid's.
  */
 export interface GridKeyContext {
   root: HTMLElement;
@@ -102,7 +103,9 @@ function blockKey(ctx: GridKeyContext, el: HTMLElement, event: React.KeyboardEve
   const gesture = gestureOf(event, under.block, ctx.can);
   const { block, row, day } = under;
   const target = gesture ? openNeighbour(ctx, row.id, day, step) : null;
-  if (!target) {
+  if (!gesture) {
+    ctx.say(ctx.labels.notMovable);
+  } else if (!target) {
     ctx.say(ctx.labels.refused);
   } else if (gesture === 'copy') {
     ctx.onCopy?.(block.id, [target.day]);
@@ -115,6 +118,10 @@ function blockKey(ctx: GridKeyContext, el: HTMLElement, event: React.KeyboardEve
   return true;
 }
 
+/** Shift OR Alt (not both) and no Ctrl or Meta: a key the grid answers for a block, as the ruler does. */
+const isBlockGesture = (event: React.KeyboardEvent): boolean =>
+  event.shiftKey !== event.altKey && !event.ctrlKey && !event.metaKey;
+
 const hasModifier = (event: React.KeyboardEvent): boolean => event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
 
 /** The grid's `onKeyDown`. */
@@ -123,7 +130,7 @@ export function handleGridKey(event: React.KeyboardEvent, ctx: GridKeyContext): 
   const arrow = arrowOf(event.key);
   if (!el || !arrow) return;
   const onBlock = el.dataset.sgBlock !== undefined;
-  if (onBlock && arrow.horizontal && (event.shiftKey || event.altKey)) {
+  if (onBlock && arrow.horizontal && isBlockGesture(event)) {
     if (blockKey(ctx, el, event, arrow.step)) event.preventDefault();
     return;
   }

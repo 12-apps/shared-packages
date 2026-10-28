@@ -4,7 +4,7 @@
  * the step it left, Back after a jump, `initialKey`, and a step whose answer
  * has no inverse (`canGoBack: false`).
  */
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -138,14 +138,21 @@ describe("the overview", () => {
     expect(props.onClose).toHaveBeenCalledWith({ resolved: 1, skipped: 0, total: 3, alsoResolved: 0 });
   });
 
-  it("draws each kind's count as a badge, as the intro does", async () => {
+  it("draws no count of its own: the host's label says it, as the prototype writes it", async () => {
     renderResolver();
     press("Ver todos (3)");
-    expect(screen.getByTestId("sr-overview-count-0")).toHaveTextContent("2");
-    expect(screen.getByTestId("sr-overview-count-1")).toHaveTextContent("1");
-    const row = screen.getByTestId("sr-overview-count-0").closest("li");
+    const row = screen.getByText("Atrasado · 2").closest("li");
     expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText("Atrasado · 2")).toBeInTheDocument();
+    expect((row as HTMLElement).textContent).toBe("Atrasado · 2Pessoa late-a, Pessoa late-bResolver");
+    await waitFor(() => expect(screen.queryByTestId("sr-overview-count-0")).toBeNull());
+  });
+
+  it("takes a category without a count (it is the host's bookkeeping)", async () => {
+    renderResolver({
+      overview: { ...overview(), categories: [{ label: "Atrasado · 2", keys: ["late-a", "late-b"] }] },
+    });
+    press("Ver todos (3)");
+    expect(screen.getByRole("button", { name: "Resolver: Atrasado · 2" })).toBeEnabled();
   });
 
   it("keeps a half-filled step through Ver todos → Continuar em sequência, and gives it focus back", async () => {

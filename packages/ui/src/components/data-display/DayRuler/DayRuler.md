@@ -34,8 +34,8 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 - A release anywhere commits the drag. **Escape**, the window losing focus, or a move with no
   button down abandons it: nothing is reported, the block goes back to its hours (a create's
   preview goes), and only the click that release leaves behind is ignored.
-- Keyboard moves, resizes and refusals (past the ruler, or a block that is not `movable` /
-  `resizable`) are read by a polite live region that stays mounted; the same sentence twice is
+- Keyboard moves, resizes and refusals (past the ruler; `labels.notMovable` on a block that is
+  not `movable` / `resizable`) are read by a polite live region that stays mounted; the same sentence twice is
   read twice.
 
 ## Props

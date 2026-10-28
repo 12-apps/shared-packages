@@ -25,4 +25,11 @@ export const SEQUENCE_METRICS = {
   doneTitle: 20,
   /** The overview's title in the header row. */
   overviewTitle: 18,
+  /**
+   * The chrome's width below which the header is narrow: Back is its chevron
+   * alone and the step label moves to the end of the progress row. A 360px
+   * phone's sheet leaves the chrome 280px, a 390px one 310px — where Back's
+   * word, the label, "Ver todos (N)" and close all fit whole (about 294px).
+   */
+  narrowChrome: 300,
 } as const;

@@ -37,8 +37,9 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
   window losing focus, or a move with no button down (released where the page could not see it)
   abandons it: nothing is reported, the ghost and the highlight go, and the click that release
   leaves behind is ignored. Only that click is: the next click on any block opens it.
-- A keyboard copy or move, and a refusal (taken, closed, past either end, or a block that is not
-  `copyable` / `movable`), are read by a polite live region. After a keyboard move, focus follows the block to its new cell once the host
+- A keyboard copy or move, and a refusal (taken, closed, past either end), are read by a polite
+  live region; on a block that is not `copyable` / `movable` it reads `labels.notMovable` ("Este
+  turno não muda por aqui"). With Ctrl or Meta held the keys are not the grid's. After a keyboard move, focus follows the block to its new cell once the host
   re-renders it there.
 
 ## Props

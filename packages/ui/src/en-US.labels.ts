@@ -150,6 +150,7 @@ export const EN_US_UI_LABELS: UiLabels = {
     copied: (block, column) => `${block} copied to ${column}`,
     moved: (block, row, column) => `${block} moved to ${row}, ${column}`,
     refused: "Not there: that day is taken or closed",
+    notMovable: "This shift cannot be changed here",
     loading: "Loading the schedule",
   },
   dayRuler: {
@@ -157,6 +158,7 @@ export const EN_US_UI_LABELS: UiLabels = {
     moved: (block, range) => `${block} now ${range}`,
     resized: (block, range) => `${block} now ${range}`,
     refused: "It cannot go further",
+    notMovable: "This shift cannot be changed here",
     loading: "Loading the day",
   },
   calendar: {

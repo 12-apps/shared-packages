@@ -450,15 +450,26 @@ describe("keyboard", () => {
     await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
   });
 
-  it("Shift or Alt+arrow on a block that cannot copy or move is refused aloud and goes no further", async () => {
+  it("Shift or Alt+arrow on a block that cannot copy or move says the block is fixed, and goes no further", async () => {
     const { props } = renderGrid();
     const shift = fireEvent.keyDown(block("d1"), { key: "ArrowRight", shiftKey: true });
     expect(shift).toBe(false);
-    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
+    await waitFor(() => expect(live()).toBe("Este turno não muda por aqui"));
     const alt = fireEvent.keyDown(block("d1"), { key: "ArrowLeft", altKey: true });
     expect(alt).toBe(false);
     expect(props.onCopy).not.toHaveBeenCalled();
     expect(props.onMove).not.toHaveBeenCalled();
+  });
+
+  it("with Ctrl or Meta, Shift/Alt+arrow on a block is not the grid's key", async () => {
+    const { props } = renderGrid();
+    expect(fireEvent.keyDown(block("k1"), { key: "ArrowRight", shiftKey: true, ctrlKey: true })).toBe(true);
+    expect(fireEvent.keyDown(block("k1"), { key: "ArrowLeft", altKey: true, metaKey: true })).toBe(true);
+    expect(fireEvent.keyDown(block("k1"), { key: "ArrowLeft", altKey: true, shiftKey: true })).toBe(true);
+    expect(props.onCopy).not.toHaveBeenCalled();
+    expect(props.onMove).not.toHaveBeenCalled();
+    fireEvent.keyDown(block("k1"), { key: "ArrowRight", shiftKey: true });
+    expect(props.onCopy).toHaveBeenCalledWith("k1", [3]);
   });
 
   it("the same sentence twice is read twice, from one region that stays mounted", async () => {
