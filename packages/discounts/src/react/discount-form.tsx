@@ -20,7 +20,6 @@ import type { DiscountsWebCopy } from "./copy";
 import {
   ComboCapField,
   DiscountSwitches,
-  KindField,
   LimitFields,
   RewardFields,
   ScopeField,
@@ -29,6 +28,7 @@ import {
   type CurrencyFieldComponent,
 } from "./discount-form-fields";
 import { DiscountTargetPicker } from "./discount-target-picker";
+import { KindField } from "./kind-field";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
 import { initialValues, type DiscountFormValues } from "./discount-form-values";

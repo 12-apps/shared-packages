@@ -250,7 +250,11 @@ export function ScheduleBuilder({
         )}
         <Text variant="caption">{fill(copy.schedule.timezoneNote, { timezone })}</Text>
         <Text variant="caption">{copy.schedule.guaranteeNote}</Text>
-        {error != null && error !== "" && <FormMessage error>{error}</FormMessage>}
+        {error != null && error !== "" && (
+          <FormMessage error dataTestId="schedule-builder-message">
+            {error}
+          </FormMessage>
+        )}
       </Stack>
     </FormControl>
   );

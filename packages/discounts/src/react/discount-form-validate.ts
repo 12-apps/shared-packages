@@ -5,6 +5,7 @@ import type { ComboRequirement } from "../engine/types";
 
 import { comboUnits } from "./combo-slot-builder";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { isIsoDay } from "./date-field";
 import type { DiscountFormValues } from "./discount-form-values";
 import { isComboKind, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
@@ -164,6 +165,23 @@ function checkCombo(
   return errors;
 }
 
+/**
+ * Início and Término. Each is blank or a whole real ISO day — the date box
+ * holds its typed text until it is one (FUT-4156) — and only two real days are
+ * compared. The window is half-open [start, end): equal dates are an EMPTY
+ * window, so the rule is "after", not "not before".
+ */
+function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const name of ["startsAt", "endsAt"] as const) {
+    if (values[name] !== "" && !isIsoDay(values[name])) errors[name] = copy.form.invalidDate;
+  }
+  if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt <= values.startsAt) {
+    errors.endsAt = copy.form.endsBeforeStarts;
+  }
+  return errors;
+}
+
 /** What the pickers and the builder currently hold, in one argument. */
 export interface FormTargets {
   categoryIds: string[];
@@ -237,11 +255,7 @@ export function validate(
   if (scope === "ITEM" && targets.menuItemIds.length === 0) {
     errors.scope = copy.form.itemTargetRequired;
   }
-  // The window is half-open [start, end): equal dates are an EMPTY window, so
-  // the rule is "after", not "not before".
-  if (values.startsAt !== "" && values.endsAt !== "" && values.endsAt <= values.startsAt) {
-    errors.endsAt = copy.form.endsBeforeStarts;
-  }
+  Object.assign(errors, checkPeriod(values, copy));
   return errors;
 }
 

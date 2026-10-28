@@ -168,6 +168,8 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     saveFailed: "Não foi possível salvar o desconto",
     nameRequired: "Informe o nome da promoção.",
     nameTooShort: "O nome precisa ter pelo menos 2 letras.",
+    datePlaceholder: "DD/MM/AAAA",
+    invalidDate: "Data inexistente. Use DD/MM/AAAA, como 25/12/2026.",
     invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
     invalidAmount: "Informe um valor de desconto maior que zero.",
     invalidBundlePrice: "Informe o preço do combo, maior que zero.",

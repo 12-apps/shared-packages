@@ -132,6 +132,8 @@ export interface DiscountsFormCopy {
   readonly scope: string;
   readonly startsAt: string;
   readonly endsAt: string;
+  /** Inside an empty Início / Término: the day-first order the box reads (FUT-4156). */
+  readonly datePlaceholder: string;
   readonly minSubtotal: string;
   readonly usageLimit: string;
   readonly perBuyerLimit: string;
@@ -196,6 +198,8 @@ export interface DiscountsFormCopy {
    */
   readonly wholeNumberOnly: string;
   readonly endsBeforeStarts: string;
+  /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
+  readonly invalidDate: string;
 }
 
 /**
