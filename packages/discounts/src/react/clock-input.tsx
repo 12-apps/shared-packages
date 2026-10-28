@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 import { FormMessage } from "@12-apps/ui/form/Form";
 import { Input } from "@12-apps/ui/form/Input";
@@ -55,6 +55,7 @@ export function ClockInput({
   value,
   label,
   invalidMessage,
+  incompleteMessage,
   dataTestId,
   onChange,
 }: {
@@ -63,10 +64,15 @@ export function ClockInput({
   label: string;
   /** Under a time that does not exist. */
   invalidMessage: string;
+  /** Under a half-typed time once the box is left — never while typing. */
+  incompleteMessage: string;
   dataTestId: string;
   onChange: (next: string) => void;
 }): JSX.Element {
+  const [left, setLeft] = useState(false);
   const impossible = isImpossibleTime(value);
+  const unfinished = left && value !== "" && !/^\d{2}:\d{2}$/u.test(value);
+  const message = impossible ? invalidMessage : unfinished ? incompleteMessage : undefined;
   return (
     <Stack spacing={0.5}>
       <Input
@@ -74,15 +80,19 @@ export function ClockInput({
         size="sm"
         placeholder="00:00"
         value={value}
-        error={impossible}
+        error={message !== undefined}
         aria-label={label}
         inputProps={{ inputMode: "numeric", maxLength: 5, autoComplete: "off" }}
-        onChange={(event) => onChange(maskTime(event.target.value, value))}
+        onBlur={() => setLeft(true)}
+        onChange={(event) => {
+          setLeft(false);
+          onChange(maskTime(event.target.value, value));
+        }}
         data-testid={dataTestId}
       />
-      {impossible && (
+      {message !== undefined && (
         <FormMessage error dataTestId={`${dataTestId}-message`}>
-          {invalidMessage}
+          {message}
         </FormMessage>
       )}
     </Stack>

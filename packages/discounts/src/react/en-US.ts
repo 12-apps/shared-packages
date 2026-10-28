@@ -133,6 +133,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     daysRequired: "Pick at least one day.",
     timesRequired: "Enter a start and end time that differ.",
     invalidTime: "That time does not exist. Use 00:00 to 23:59.",
+    timeIncomplete: "Finish the time: HH:MM.",
     windowsRequired: "Add at least one time.",
   },
   form: {
@@ -180,6 +181,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameTooShort: "The name needs at least 2 characters.",
     datePlaceholder: "DD/MM/YYYY",
     invalidDate: "That date does not exist. Use DD/MM/YYYY, such as 25/12/2026.",
+    dateIncomplete: "Finish the date: DD/MM/YYYY.",
     invalidPercent: "Enter a percentage greater than 0 and at most 100.",
     invalidAmount: "Enter a discount amount greater than zero.",
     invalidBundlePrice: "Enter the bundle price, greater than zero.",

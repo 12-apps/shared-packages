@@ -232,6 +232,7 @@ function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
           label={copy.form[name]}
           placeholder={copy.form.datePlaceholder}
           invalidMessage={copy.form.invalidDate}
+          incompleteMessage={copy.form.dateIncomplete}
         />
       ))}
     </Box>

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
+import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
@@ -258,14 +259,14 @@ describe("FUT-4156: Início and Término are DD/MM/AAAA on every browser", () =>
     expect(sent).toHaveLength(0);
   });
 
-  it("D4: a half-typed date is quiet while typed, and refused at Criar", async () => {
+  it("D4: a half-typed date is quiet while typed, and refused at Criar as unfinished", async () => {
     const { sent } = renderForm();
     fillValid();
     type("total-form-field-endsAt", "120");
     await waitFor(() => expect(input("total-form-field-endsAt").value).toBe("12/0"));
     expect(input("total-form-field-endsAt").getAttribute("aria-invalid")).toBe("false");
     submit();
-    await waitFor(() => expect(fieldMessage("endsAt")).toBe(copy.form.invalidDate));
+    await waitFor(() => expect(fieldMessage("endsAt")).toBe(copy.form.dateIncomplete));
     expect(sent).toHaveLength(0);
   });
 
@@ -312,5 +313,66 @@ describe("FUT-4156: Início and Término are DD/MM/AAAA on every browser", () =>
     submit();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ startsAt: null, endsAt: null });
+  });
+});
+
+describe("an unfinished value is told to finish, not that it is wrong", () => {
+  it("I1: '25/10/202' is quiet while typed and says 'Termine a data' once left", async () => {
+    renderForm();
+    type("total-form-field-startsAt", "2510202");
+    await waitFor(() => expect(input("total-form-field-startsAt").value).toBe("25/10/202"));
+    expect(fieldMessage("startsAt")).toBeNull();
+    fireEvent.blur(input("total-form-field-startsAt"));
+    await waitFor(() => expect(fieldMessage("startsAt")).toBe("Termine a data: DD/MM/AAAA."));
+    type("total-form-field-startsAt", "25102026");
+    await waitFor(() => expect(screen.queryAllByTestId("total-form-field-startsAt-message")).toHaveLength(0));
+  });
+
+  it("I2: at Criar an unfinished date is unfinished and an impossible one does not exist", async () => {
+    const { sent } = renderForm();
+    fillValid();
+    type("total-form-field-startsAt", "2510202");
+    type("total-form-field-endsAt", "31022027");
+    submit();
+    await waitFor(() => expect(fieldMessage("startsAt")).toBe(copy.form.dateIncomplete));
+    expect(fieldMessage("endsAt")).toBe(copy.form.invalidDate);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("I3: a clock left at '1:00' says 'Termine o horário' on blur, never while typed", async () => {
+    renderForm();
+    fireEvent.click(screen.getByTestId("repetition-specific"));
+    type("schedule-from-0", "0900");
+    type("schedule-from-0", "1:00");
+    await waitFor(() => expect(input("schedule-from-0").value).toBe("1:00"));
+    expect(screen.queryAllByTestId("schedule-from-0-message")).toHaveLength(0);
+    fireEvent.blur(input("schedule-from-0"));
+    await waitFor(() =>
+      expect(screen.getByTestId("schedule-from-0-message").textContent).toBe(
+        "Termine o horário: HH:MM.",
+      ),
+    );
+    type("schedule-from-0", "15:00");
+    await waitFor(() => expect(screen.queryAllByTestId("schedule-from-0-message")).toHaveLength(0));
+  });
+
+  it("I4: at Criar the schedule says the time is unfinished, not that the ends must differ", async () => {
+    const { sent } = renderForm();
+    fillValid();
+    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
+    type("schedule-from-0", "1:00");
+    submit();
+    await waitFor(() =>
+      expect(screen.getByTestId("schedule-builder-message").textContent).toBe(
+        copy.schedule.timeIncomplete,
+      ),
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it("I5: the en-US pack says both in English", () => {
+    expect(EN_US_DISCOUNTS_WEB_COPY.form.dateIncomplete).toBe("Finish the date: DD/MM/YYYY.");
+    expect(EN_US_DISCOUNTS_WEB_COPY.schedule.timeIncomplete).toBe("Finish the time: HH:MM.");
   });
 });

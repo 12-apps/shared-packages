@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
 import { Input } from "@12-apps/ui/form/Input";
@@ -34,6 +34,11 @@ export function isIsoDay(value: string): boolean {
   return (
     date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   );
+}
+
+/** A whole `DD/MM/AAAA`, real or not. */
+export function isCompleteMaskedDay(value: string): boolean {
+  return MASKED_DAY.test(value);
 }
 
 /** `DD/MM/AAAA` → `YYYY-MM-DD`, or `null` when it is not a complete real day. */
@@ -84,19 +89,26 @@ export function DateField({
   label,
   placeholder,
   invalidMessage,
+  incompleteMessage,
 }: {
   name: string;
   label: string;
   placeholder: string;
   invalidMessage: string;
+  /** Under a half-typed date once the box is left — never while typing. */
+  incompleteMessage: string;
 }): JSX.Element {
   const { values, errors, setFieldValue } = useFormContext();
+  const [left, setLeft] = useState(false);
   const value = values[name] ?? "";
   const shown = isIsoDay(value) ? isoToMasked(value) : value;
   // A complete day that no calendar has is marked while typed; anything still
   // being typed waits for Criar, like every other field.
   const impossible = MASKED_DAY.test(shown) && maskedToIso(shown) === null;
-  const message = errors[name] ?? (impossible ? invalidMessage : undefined);
+  const unfinished = left && shown !== "" && !MASKED_DAY.test(shown);
+  const message =
+    errors[name] ??
+    (impossible ? invalidMessage : unfinished ? incompleteMessage : undefined);
   const testId = `total-form-field-${name}`;
   return (
     <FormControl fullWidth>
@@ -112,7 +124,9 @@ export function DateField({
         error={message !== undefined}
         inputProps={{ inputMode: "numeric", maxLength: 10, autoComplete: "off", "data-testid": testId }}
         data-testid={testId}
+        onBlur={() => setLeft(true)}
         onChange={(event) => {
+          setLeft(false);
           const masked = maskDate(event.target.value, shown);
           setFieldValue(name, maskedToIso(masked) ?? masked);
         }}

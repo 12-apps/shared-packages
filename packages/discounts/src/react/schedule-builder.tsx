@@ -135,6 +135,7 @@ function WindowRow({
           value={window.from}
           label={copy.schedule.fromLabel}
           invalidMessage={copy.schedule.invalidTime}
+          incompleteMessage={copy.schedule.timeIncomplete}
           onChange={(from) => onChange({ ...window, from })}
           dataTestId={`schedule-from-${index}`}
         />
@@ -145,6 +146,7 @@ function WindowRow({
           value={window.to}
           label={copy.schedule.toLabel}
           invalidMessage={copy.schedule.invalidTime}
+          incompleteMessage={copy.schedule.timeIncomplete}
           onChange={(to) => onChange({ ...window, to })}
           dataTestId={`schedule-to-${index}`}
         />

@@ -5,7 +5,7 @@ import type { ComboRequirement } from "../engine/types";
 
 import { comboUnits } from "./combo-slot-builder";
 import { fill, type DiscountsWebCopy } from "./copy";
-import { isIsoDay } from "./date-field";
+import { isCompleteMaskedDay, isIsoDay } from "./date-field";
 import type { DiscountFormValues } from "./discount-form-values";
 import { isComboKind, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
@@ -174,7 +174,12 @@ function checkCombo(
 function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const name of ["startsAt", "endsAt"] as const) {
-    if (values[name] !== "" && !isIsoDay(values[name])) errors[name] = copy.form.invalidDate;
+    if (values[name] === "" || isIsoDay(values[name])) continue;
+    // A whole DD/MM/AAAA that is no day does not exist; anything shorter is
+    // simply not finished, and is told so.
+    errors[name] = isCompleteMaskedDay(values[name])
+      ? copy.form.invalidDate
+      : copy.form.dateIncomplete;
   }
   if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt <= values.startsAt) {
     errors.endsAt = copy.form.endsBeforeStarts;
@@ -211,6 +216,12 @@ function checkSchedule(
   if (windows.length === 0) return { schedule: copy.schedule.windowsRequired };
   if (windows.some((window) => window.days.length === 0)) {
     return { schedule: copy.schedule.daysRequired };
+  }
+  const ends = windows.flatMap((window) => [window.from, window.to]);
+  // Unfinished first: "1:00" mid-edit is not a pair of equal ends, it is a
+  // time nobody has finished typing.
+  if (ends.some((end) => !/^\d{2}:\d{2}$/u.test(end))) {
+    return { schedule: copy.schedule.timeIncomplete };
   }
   const badTime = windows.some(
     (window) =>

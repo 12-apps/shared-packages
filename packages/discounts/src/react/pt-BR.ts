@@ -124,6 +124,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     daysRequired: "Escolha ao menos um dia.",
     timesRequired: "Informe um horário de início e de fim diferentes.",
     invalidTime: "Horário inexistente. Use de 00:00 a 23:59.",
+    timeIncomplete: "Termine o horário: HH:MM.",
     windowsRequired: "Adicione ao menos um horário.",
   },
   form: {
@@ -170,6 +171,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameTooShort: "O nome precisa ter pelo menos 2 letras.",
     datePlaceholder: "DD/MM/AAAA",
     invalidDate: "Data inexistente. Use DD/MM/AAAA, como 25/12/2026.",
+    dateIncomplete: "Termine a data: DD/MM/AAAA.",
     invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
     invalidAmount: "Informe um valor de desconto maior que zero.",
     invalidBundlePrice: "Informe o preço do combo, maior que zero.",

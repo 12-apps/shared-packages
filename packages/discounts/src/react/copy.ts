@@ -200,6 +200,8 @@ export interface DiscountsFormCopy {
   readonly endsBeforeStarts: string;
   /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
   readonly invalidDate: string;
+  /** A date left half-typed ("25/10/202"): shown once the box is left, or at Criar. */
+  readonly dateIncomplete: string;
 }
 
 /**
