@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box/index.js';
 import type * as React from 'react';
 
+import { ScheduleNameCell } from '../ScheduleGrid/ScheduleNameCell';
 import type { RulerAbilities, RulerScale } from './DayRuler.keyboard';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { formatHour, formatRange, percentOf, ticksOf } from './day-ruler-model';
@@ -11,16 +12,11 @@ import {
   axisSx,
   blockSx,
   breakSx,
-  chipsSx,
   coverageCellSx,
   coverageLabelSx,
   coverageSx,
   handleSx,
   lineSx,
-  metaSx,
-  nameButtonSx,
-  nameLineSx,
-  nameSx,
   nowSx,
   rowSx,
   trackSx,
@@ -216,38 +212,9 @@ function Track({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.E
 
 /** One person: name, meta and chips · the track · the row's actions. */
 export function RulerRow({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.Element {
-  const name = (
-    <Box component="span" sx={nameSx}>
-      {row.label}
-    </Box>
-  );
-  const named = row.onLabelClick ? (
-    <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
-      {name}
-    </Box>
-  ) : (
-    name
-  );
   return (
     <Box sx={rowSx} data-testid={`${ctx.testId}-row-${row.id}`} role="listitem">
-      <Box sx={whoSx}>
-        {row.nameAdornment ? (
-          <Box sx={nameLineSx}>
-            {named}
-            <Box component="span" data-dr-adornment="">
-              {row.nameAdornment}
-            </Box>
-          </Box>
-        ) : (
-          named
-        )}
-        {row.meta ? (
-          <Box component="span" sx={metaSx(row.metaTone ?? 'default')}>
-            {row.meta}
-          </Box>
-        ) : null}
-        {row.chips ? <Box sx={chipsSx}>{row.chips}</Box> : null}
-      </Box>
+      <ScheduleNameCell row={row} sx={whoSx} sizes={{ name: M.name, meta: M.meta, chipsTop: 0.75 }} />
       <Track row={row} ctx={ctx} />
       <Box sx={actionsSx}>{row.actions}</Box>
     </Box>

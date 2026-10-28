@@ -113,42 +113,6 @@ export const nameCellSx: SxProps<Theme> = {
   minWidth: 0,
 };
 
-/** The name as a button: it reads as text, underlines under the pointer. */
-export const nameButtonSx: SxProps<Theme> = (theme: Theme) => ({
-  font: 'inherit',
-  background: 'transparent',
-  border: 0,
-  color: 'inherit',
-  p: 0,
-  textAlign: 'left',
-  cursor: 'pointer',
-  minHeight: rem(theme, 24),
-  borderRadius: rem(theme, 4),
-  '&:hover > span': { textDecoration: 'underline' },
-  '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 2) },
-});
-
-export const nameTextSx: SxProps<Theme> = {
-  fontSize: sxRem(M.rowName),
-  fontWeight: 500,
-  overflowWrap: 'anywhere',
-  display: 'block',
-};
-
-export function metaSx(tone: 'default' | 'warning'): SxProps<Theme> {
-  return (theme: Theme) => ({
-    fontSize: rem(theme, M.rowMeta),
-    color:
-      tone === 'warning'
-        ? theme.palette.mode === 'dark'
-          ? theme.palette.warning.light
-          : theme.palette.warning.dark
-        : theme.palette.text.secondary,
-    mt: 0.25,
-    overflowWrap: 'anywhere',
-  });
-}
-
 export const totalCellSx: SxProps<Theme> = {
   fontSize: sxRem(M.total),
   color: 'text.secondary',
@@ -199,7 +163,7 @@ export function cellSx(look: CellLook): SxProps<Theme> {
     if (look.target) {
       return {
         ...base,
-        border: `${rem(theme, 1.5)} dashed ${theme.palette.primary.main}`,
+        border: `${rem(theme, M.targetBorder)} dashed ${theme.palette.primary.main}`,
         backgroundColor: theme.palette.action.selected,
       };
     }
@@ -270,7 +234,7 @@ export function blockSx(tone: ScheduleBlockTone, opts: { selected: boolean; mova
     cursor: opts.movable ? 'grab' : 'pointer',
     margin: 0,
     boxShadow: opts.selected ? `0 0 0 ${rem(theme, M.ring)} ${theme.palette.primary.main}` : 'none',
-    '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 1) },
+    '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, M.ringOffset) },
     '& > [data-sg-line]': { position: 'relative', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
     '& > [data-sg-line="note"]': { fontWeight: 400 },
   });
@@ -289,29 +253,6 @@ export function breakSx(span: { start: number; end: number }): SxProps<Theme> {
   });
 }
 
-/** The name and its adornment: one line while both fit, the adornment under the name when not. */
-export const nameLineSx: SxProps<Theme> = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  columnGap: 0.75,
-  rowGap: 0.25,
-  minWidth: 0,
-  '& > :first-of-type': { minWidth: 0 },
-  '& > [data-sg-adornment]': { flexShrink: 0, display: 'inline-flex' },
-};
-
-/** The host's chips under the meta: ONE line; a chip that does not fit shrinks and cuts its label. */
-export const chipsSx: SxProps<Theme> = {
-  display: 'flex',
-  flexWrap: 'nowrap',
-  gap: 0.75,
-  mt: 0.5,
-  minWidth: 0,
-  overflow: 'hidden',
-  '& > *': { minWidth: 0, flexShrink: 1, maxWidth: '100%' },
-};
-
 export function gripSx(side: 'l' | 'r'): SxProps<Theme> {
   return (theme: Theme) => ({
     position: 'absolute',
@@ -328,7 +269,7 @@ export function gripSx(side: 'l' | 'r'): SxProps<Theme> {
       display: 'block',
       width: rem(theme, M.grip.barWidth),
       height: rem(theme, M.grip.barHeight),
-      borderRadius: rem(theme, 2),
+      borderRadius: rem(theme, M.grip.barRadius),
       backgroundColor: 'currentColor',
       opacity: 0.5,
     },

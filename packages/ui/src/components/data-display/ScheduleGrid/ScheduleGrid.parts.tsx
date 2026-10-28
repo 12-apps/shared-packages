@@ -11,18 +11,13 @@ import {
   blockSx,
   breakSx,
   cellSx,
-  chipsSx,
   ghostSx,
   gripSx,
   groupTitleSx,
   headerCellSx,
   headerSublabelSx,
   headerSx,
-  metaSx,
-  nameButtonSx,
   nameCellSx,
-  nameLineSx,
-  nameTextSx,
   personRowSx,
   plusButtonSx,
   skeletonCellSx,
@@ -36,6 +31,7 @@ import type {
   ScheduleGridProps,
   ScheduleGridRow,
 } from './ScheduleGrid.types';
+import { ScheduleNameCell } from './ScheduleNameCell';
 import type { GridDrag, GridDragApi } from './useGridDrag';
 
 /** What the grid lets a cell do, resolved once per render. */
@@ -222,40 +218,10 @@ export function GridCell(props: CellProps): React.JSX.Element {
   );
 }
 
-/** The first column: the name (a button when the host acts on it), its adornment, its meta line and chips. */
-export function NameCell({ row }: { row: ScheduleGridRow }): React.JSX.Element {
-  const name = (
-    <Box component="span" sx={nameTextSx}>
-      {row.label}
-    </Box>
-  );
-  const named = row.onLabelClick ? (
-    <Box component="button" type="button" sx={nameButtonSx} onClick={row.onLabelClick} aria-label={row.labelAccessible}>
-      {name}
-    </Box>
-  ) : (
-    name
-  );
-  return (
-    <Box role="rowheader" sx={nameCellSx}>
-      {row.nameAdornment ? (
-        <Box sx={nameLineSx}>
-          {named}
-          <Box component="span" data-sg-adornment="">
-            {row.nameAdornment}
-          </Box>
-        </Box>
-      ) : (
-        named
-      )}
-      {row.meta ? (
-        <Box component="span" sx={metaSx(row.metaTone ?? 'default')}>
-          {row.meta}
-        </Box>
-      ) : null}
-      {row.chips ? <Box sx={chipsSx}>{row.chips}</Box> : null}
-    </Box>
-  );
+/** The first column: the person, as both views draw it. */
+function NameCell({ row }: { row: ScheduleGridRow }): React.JSX.Element {
+  const sizes = { name: SCHEDULE_GRID_METRICS.rowName, meta: SCHEDULE_GRID_METRICS.rowMeta, chipsTop: 0.5 };
+  return <ScheduleNameCell row={row} role="rowheader" sx={nameCellSx} sizes={sizes} />;
 }
 
 interface HeaderProps {

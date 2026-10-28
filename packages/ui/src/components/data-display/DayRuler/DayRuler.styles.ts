@@ -102,60 +102,6 @@ export const actionsSx: SxProps<Theme> = {
   minWidth: 0,
 };
 
-export const nameButtonSx: SxProps<Theme> = (theme: Theme) => ({
-  font: 'inherit',
-  background: 'transparent',
-  border: 0,
-  color: 'inherit',
-  p: 0,
-  textAlign: 'left',
-  cursor: 'pointer',
-  minHeight: rem(theme, 24),
-  borderRadius: rem(theme, 4),
-  '&:hover > span': { textDecoration: 'underline' },
-  '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 2) },
-});
-
-export const nameSx: SxProps<Theme> = { fontSize: sxRem(M.name), fontWeight: 500, overflowWrap: 'anywhere', display: 'block' };
-
-export function metaSx(tone: 'default' | 'warning'): SxProps<Theme> {
-  return (theme: Theme) => ({
-    display: 'block',
-    fontSize: rem(theme, M.meta),
-    mt: 0.25,
-    overflowWrap: 'anywhere',
-    color:
-      tone === 'warning'
-        ? theme.palette.mode === 'dark'
-          ? theme.palette.warning.light
-          : theme.palette.warning.dark
-        : theme.palette.text.secondary,
-  });
-}
-
-/** The host's chips under the meta: ONE line; a chip that does not fit shrinks and cuts its label. */
-export const chipsSx: SxProps<Theme> = {
-  display: 'flex',
-  gap: 0.75,
-  flexWrap: 'nowrap',
-  mt: 0.75,
-  minWidth: 0,
-  overflow: 'hidden',
-  '& > *': { minWidth: 0, flexShrink: 1, maxWidth: '100%' },
-};
-
-/** The name and its adornment: one line while both fit, the adornment under the name when not. */
-export const nameLineSx: SxProps<Theme> = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  columnGap: 0.75,
-  rowGap: 0.25,
-  minWidth: 0,
-  '& > :first-of-type': { minWidth: 0 },
-  '& > [data-dr-adornment]': { flexShrink: 0, display: 'inline-flex' },
-};
-
 /** A break inside a block: a hatched band across its height, under its text. `span` is in % of the block. */
 export function breakSx(span: Span): SxProps<Theme> {
   return (theme: Theme) => ({
@@ -225,7 +171,7 @@ export function blockSx(tone: ScheduleBlockTone, span: Span, opts: { selected: b
     overflow: 'hidden',
     cursor: opts.movable ? 'grab' : 'pointer',
     boxShadow: opts.selected ? `0 0 0 ${rem(theme, M.ring)} ${theme.palette.primary.main}` : 'none',
-    '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, 1) },
+    '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, M.ringOffset) },
     '& [data-dr-text]': { position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
     '& [data-dr-text="short"]': { display: 'none' },
     [compact(theme)]: {
@@ -298,6 +244,6 @@ export const skeletonNameSx: SxProps<Theme> = (theme: Theme) => ({
   gridArea: 'who',
   height: rem(theme, M.name),
   width: '60%',
-  borderRadius: rem(theme, 4),
+  borderRadius: rem(theme, M.skeletonNameRadius),
   backgroundColor: theme.palette.action.hover,
 });

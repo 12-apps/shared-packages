@@ -22,9 +22,13 @@ export const SCHEDULE_GRID_METRICS = {
   blockPadding: { y: 4, start: 10, end: 14 },
   blockFont: 12,
   /** The edge grip's hit area and its bar. */
-  grip: { width: 12, barWidth: 3, barHeight: 16 },
-  /** The selected block's ring. */
+  grip: { width: 12, barWidth: 3, barHeight: 16, barRadius: 2 },
+  /** The selected block's ring, and every focus ring. */
   ring: 2,
+  /** How far a block's focus ring stands off it. */
+  ringOffset: 1,
+  /** The dashed outline of a cell a create or copy will land on. */
+  targetBorder: 1.5,
   headerLabel: 13,
   headerSublabel: 13,
   rowName: 14,
@@ -38,4 +42,13 @@ export const SCHEDULE_GRID_METRICS = {
   hatch: 6,
   /** The hatch of a break inside a block: stripe width. */
   breakStripe: { ink: 2, gap: 3 },
+} as const;
+
+/**
+ * THE NAME COLUMN'S NUMBERS, shared by the week grid and the day ruler
+ * (`ScheduleNameCell`): the name as a button. In px.
+ */
+export const SCHEDULE_NAME_METRICS = {
+  button: { minHeight: 24, radius: 4, ringOffset: 2 },
+  ring: 2,
 } as const;
