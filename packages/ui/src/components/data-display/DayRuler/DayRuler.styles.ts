@@ -156,14 +156,14 @@ export const nameLineSx: SxProps<Theme> = {
   '& > [data-dr-adornment]': { flexShrink: 0, display: 'inline-flex' },
 };
 
-/** A break inside a block: a hatched band across its height, under its text. `left`/`width` are % of the block. */
-export function breakSx(left: number, width: number): SxProps<Theme> {
+/** A break inside a block: a hatched band across its height, under its text. `span` is in % of the block. */
+export function breakSx(span: Span): SxProps<Theme> {
   return (theme: Theme) => ({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: `${left}%`,
-    width: `${width}%`,
+    left: `${span.at}%`,
+    width: `${span.share}%`,
     background: breakHatch(theme, rem(theme, M.breakStripe), rem(theme, M.breakStripe * 2)),
     opacity: 0.7,
     pointerEvents: 'none',
