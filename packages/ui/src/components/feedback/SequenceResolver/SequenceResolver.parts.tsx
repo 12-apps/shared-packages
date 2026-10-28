@@ -1,38 +1,24 @@
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CloseIcon from '@mui/icons-material/Close';
 import Box from '@mui/material/Box/index.js';
 import ButtonBase from '@mui/material/ButtonBase/index.js';
-import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import React, { useEffect, useRef } from 'react';
 
 import { Alert } from '../../data-display/Alert';
-import { Progress } from '../../data-display/Progress';
 import { Button } from '../../form/Button';
 import {
   actionSx,
-  backButtonSx,
   categoryDescriptionSx,
   categoryRowSx,
   categoryTextSx,
-  closeButtonSx,
   countBadgeSx,
   doneConfirmSx,
   doneIconSx,
   doneSx,
   doneTitleSx,
   footerSx,
-  handleSx,
-  headerStartSx,
-  headerSx,
   introListSx,
-  overviewTitleSx,
-  progressLabelSx,
-  progressRowSx,
-  seeAllButtonSx,
-  stepLabelSx,
   startAllSx,
   stepScreenSx,
   tertiarySx,
@@ -44,93 +30,6 @@ import type {
   SequenceIntro,
   SequenceStep,
 } from './SequenceResolver.types';
-
-interface HeaderProps {
-  touch: boolean;
-  label: string;
-  /** Absent: no back button (intro, first step, or the host turned it off). */
-  back?: { label: string; accessible?: string; onClick: () => void; disabled: boolean };
-  closeLabel: string;
-  onClose: () => void;
-  progress: number;
-  progressLabel: string;
-  testId: string;
-  /** "Ver todos (N)": a text button between the label and close. */
-  seeAll?: { label: string; onClick: () => void; disabled: boolean };
-  /** The overview's title, drawn in the label's place and naming the dialog. */
-  title?: { id: string; text: string; ref: React.RefObject<HTMLHeadingElement | null> };
-}
-
-/** The drag handle (phone), the header row and the progress bar. */
-export function SequenceHeader(props: HeaderProps): React.JSX.Element {
-  const { touch, label, back, closeLabel, onClose, progress, progressLabel, testId, seeAll, title } = props;
-  return (
-    <>
-      {touch ? <Box aria-hidden sx={handleSx} data-testid={`${testId}-handle`} /> : null}
-      <Box sx={headerSx}>
-        <Box sx={headerStartSx}>
-          {back ? (
-            <Button
-              variant="text"
-              color="primary"
-              size="md"
-              icon={<ChevronLeftIcon />}
-              aria-label={back.accessible ?? back.label}
-              onClick={back.onClick}
-              disabled={back.disabled}
-              sx={backButtonSx(touch)}
-              dataTestId={`${testId}-back`}
-            >
-              <span data-back-word="">{back.label}</span>
-            </Button>
-          ) : null}
-          {title ? (
-            <Typography component="h2" id={title.id} tabIndex={-1} ref={title.ref} sx={overviewTitleSx}>
-              {title.text}
-            </Typography>
-          ) : (
-            <Typography component="span" sx={stepLabelSx} data-testid={`${testId}-step-label`}>
-              {label}
-            </Typography>
-          )}
-        </Box>
-        {seeAll ? (
-          <Button
-            variant="text"
-            color="primary"
-            size="md"
-            onClick={seeAll.onClick}
-            disabled={seeAll.disabled}
-            sx={seeAllButtonSx(touch)}
-            dataTestId={`${testId}-see-all`}
-          >
-            {seeAll.label}
-          </Button>
-        ) : null}
-        <IconButton aria-label={closeLabel} onClick={onClose} sx={closeButtonSx(touch)} data-testid={`${testId}-close`}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <Box sx={progressRowSx}>
-        <Box>
-          <Progress
-            variant="linear"
-            size="md"
-            color="warning"
-            value={progress}
-            aria-label={progressLabel}
-            dataTestId={`${testId}-progress`}
-          />
-        </Box>
-        {title ? null : (
-          <Typography component="span" sx={progressLabelSx} data-testid={`${testId}-step-label-end`}>
-            {label}
-          </Typography>
-        )}
-      </Box>
-    </>
-  );
-}
 
 /**
  * Moves focus to `target` (else `fallback`) whenever `screenKey` changes — and

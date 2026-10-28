@@ -20,19 +20,8 @@ export const columnSx: SxProps<Theme> = {
   '& [tabindex="-1"]:focus': { outline: 0 },
 };
 
-/** The chrome above the body: never shrinks, never scrolls; the container the header's narrow layout answers to. */
-export const chromeSx: SxProps<Theme> = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2.25,
-  flex: 'none',
-  containerType: 'inline-size',
-};
-
-/** `@container` below which the header is narrow (container queries, never media queries). */
-function narrow(theme: Theme): string {
-  return `@container (max-width: ${rem(theme, SEQUENCE_METRICS.narrowChrome)})`;
-}
+/** The chrome above the body: never shrinks, never scrolls. */
+export const chromeSx: SxProps<Theme> = { display: 'flex', flexDirection: 'column', gap: 2.25, flex: 'none' };
 
 /** The screen's body: takes what the paper has left and scrolls inside it. */
 export const scrollBodySx: SxProps<Theme> = {
@@ -102,86 +91,36 @@ export const handleSx: SxProps<Theme> = {
   flex: 'none',
 };
 
-/**
- * ONE line at every width, 320 included (S-L1), and nothing on it cut: Back,
- * "Ver todos (N)" and close keep their size. On a narrow chrome Back is its
- * chevron alone and the step label sits at the end of the progress row; only
- * a long host label on a wider one is cut, with an ellipsis.
- */
 export const headerSx: SxProps<Theme> = {
   display: 'flex',
-  flexWrap: 'nowrap',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 1.5,
-  minWidth: 0,
 };
 
-/** Back and the label, on the header's one line. */
+/** Back and the label; on a narrow sheet the label takes its own row rather than squeeze. */
 export const headerStartSx: SxProps<Theme> = {
   display: 'inline-flex',
-  flexWrap: 'nowrap',
+  flexWrap: 'wrap',
   alignItems: 'center',
   columnGap: 0.75,
-  flex: '0 1 auto',
   minWidth: 0,
 };
 
-const labelTextSx = {
+export const stepLabelSx: SxProps<Theme> = {
   fontSize: sxRem(SEQUENCE_METRICS.stepLabel),
   fontWeight: 500,
   color: 'text.secondary',
-  whiteSpace: 'nowrap',
-} as const;
-
-/** The step label in the header: cut with an ellipsis when a long one has no room; gone on a narrow chrome. */
-export const stepLabelSx: SxProps<Theme> = (theme: Theme) => ({
-  ...labelTextSx,
-  display: 'block',
   minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  [narrow(theme)]: { display: 'none' },
-});
-
-/** The progress bar, and the step label at its end on a narrow chrome. */
-export const progressRowSx: SxProps<Theme> = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 1.5,
-  '& > :first-of-type': { flex: '1 1 auto', minWidth: 0 },
 };
-
-/** The step label at the end of the progress row: only on a narrow chrome, whole. */
-export const progressLabelSx: SxProps<Theme> = (theme: Theme) => ({
-  ...labelTextSx,
-  display: 'none',
-  flex: 'none',
-  [narrow(theme)]: { display: 'block' },
-});
 
 export function closeButtonSx(touch: boolean): SxProps<Theme> {
   const size = touch ? SEQUENCE_METRICS.closeSize.touch : SEQUENCE_METRICS.closeSize.pointer;
   return { width: sxRem(size), height: sxRem(size), color: 'text.secondary', flex: 'none' };
 }
 
-/** Back: the chevron and its word; on a narrow chrome the chevron alone, a 44px target. */
 export function backButtonSx(touch: boolean): SxProps<Theme> {
-  return (theme: Theme) => ({
-    flex: 'none',
-    ...(touch ? { minHeight: rem(theme, SEQUENCE_METRICS.touchTarget) } : {}),
-    // `&&`: over the Button's own size rules (MUI's 64px minimum width among them).
-    [narrow(theme)]: {
-      '&&': {
-        width: rem(theme, SEQUENCE_METRICS.touchTarget),
-        minWidth: rem(theme, SEQUENCE_METRICS.touchTarget),
-        height: rem(theme, SEQUENCE_METRICS.touchTarget),
-        px: 0,
-      },
-      '& [data-back-word]': { display: 'none' },
-      '& .MuiButton-startIcon': { m: 0 },
-    },
-  });
+  return touch ? { flex: 'none', minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : { flex: 'none' };
 }
 
 export const titleSx: SxProps<Theme> = {
@@ -297,12 +236,6 @@ export const doneTitleSx: SxProps<Theme> = {
   fontWeight: 500,
   outline: 'none',
 };
-
-/** "Ver todos (N)": a text button on the header's line, always whole. */
-export function seeAllButtonSx(touch: boolean): SxProps<Theme> {
-  const base = { flex: 'none', whiteSpace: 'nowrap', ml: 'auto' } as const;
-  return touch ? { ...base, minHeight: sxRem(SEQUENCE_METRICS.touchTarget) } : base;
-}
 
 /** The overview's title, in the header row where a step shows its label. */
 export const overviewTitleSx: SxProps<Theme> = {

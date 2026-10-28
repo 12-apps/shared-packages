@@ -9,10 +9,10 @@ import { Dialog } from '../Dialog';
 import { canReturn, currentOf, jumpTargetOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
 import {
   SequenceDoneBody,
-  SequenceHeader,
   SequenceIntroBody,
   SequenceStepBody,
 } from './SequenceResolver.parts';
+import { SequenceHeader } from './SequenceResolver.header';
 import { SequenceOverviewBody } from './SequenceResolver.overview';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
 import { chromeSx, columnSx, paperSx, scrollBodySx } from './SequenceResolver.styles';
