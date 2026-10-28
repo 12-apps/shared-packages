@@ -114,7 +114,7 @@ export async function reusablePixCharge(
 /** The instrument fields a checkout request may carry. */
 export type CheckoutCard = Pick<
   CardDetails,
-  'token' | 'savedCardToken' | 'tokensByProvider' | 'wallet' | 'funding' | 'authenticationId'
+  'token' | 'savedCardToken' | 'tokenProvider' | 'tokensByProvider' | 'wallet' | 'funding' | 'authenticationId'
 >;
 
 /** A still-payable charge left behind by a reprice. */

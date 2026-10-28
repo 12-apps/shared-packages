@@ -1,9 +1,9 @@
 import type { SettlementHints } from '../core/settlement-hints';
 import type { StoredCharge } from '../core/ports';
 import type { MerchantRef } from '../core/types';
-import { cardProviderFor } from '../core/method-head';
 import { reportProviderFailure } from '../core/provider-failure';
 
+import { checkoutCardProvider } from './card-provider';
 import { buyerCheckoutConfig } from './config';
 import {
   attachedChargeOf,
@@ -61,7 +61,7 @@ export async function listInstruments<C, V extends object, D>(
 ): Promise<Response> {
   const instruments = runtime.config.instruments;
   if (!instruments || !merchant) return runtime.respond.ok([]);
-  const provider = await cardProviderFor(runtime.config, merchant);
+  const provider = await checkoutCardProvider(runtime, merchant);
   if (!provider) return runtime.respond.ok([]);
   return runtime.respond.ok(await instruments.list(caller, { merchant, provider }));
 }
