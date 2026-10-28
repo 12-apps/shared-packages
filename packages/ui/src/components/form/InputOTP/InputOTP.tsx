@@ -34,6 +34,16 @@ function keypadProps(variant: InputOTPProps['variant'], index: number): Record<s
   };
 }
 
+/**
+ * One character per slot — except the numeric FIRST slot, which carries
+ * `one-time-code`: the phone's SMS fill writes the whole code there in one
+ * change, and a `maxLength` of 1 would cut it to one digit before the hook
+ * could spread it. That slot takes the code's own length; a keystroke into it
+ * once filled is still refused, by the hook, as the attribute refused it.
+ */
+const slotMaxLength = (variant: InputOTPProps['variant'], index: number, length: number): number =>
+  variant === 'numeric' && index === 0 ? length : 1;
+
 const DEFAULTS = {
   variant: 'numeric',
   color: 'primary',
@@ -94,7 +104,7 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
           error={error}
           disabled={disabled}
           inputProps={{
-            maxLength: 1,
+            maxLength: slotMaxLength(variant, index, length),
             style: { textAlign: 'center' },
             'data-testid': dataTestId ? `${dataTestId}-slot-${index}` : undefined,
             ...keypadProps(variant, index),

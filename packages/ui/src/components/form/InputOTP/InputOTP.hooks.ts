@@ -17,6 +17,27 @@ const isAllowed = (variant: string, text: string) => (PATTERNS[variant] ?? /.*/)
 const padTo = (digits: string[], length: number) =>
   Array.from({ length }, (_, i) => digits[i] ?? '');
 
+/**
+ * What a change to the numeric FIRST slot is, now that its `maxLength` is the
+ * code's length rather than 1 (FUT-4144).
+ *
+ * That slot carries `one-time-code`, and the phone's SMS fill (or a password
+ * manager) writes the WHOLE code into it as one change, not a paste — kept to
+ * one character, the code lost every digit but the last. So:
+ *
+ * - `overtype`: a keystroke into the already-filled slot (its old character
+ *   plus the new one). Ignored, exactly as `maxLength={1}` refused it before.
+ * - `code`: anything else longer than one character, written in one go.
+ *   Spread across the slots like a paste.
+ *
+ * Every other slot and variant keeps `maxLength={1}` and never gets here.
+ */
+function firstSlotFill(variant: string, index: number, inputValue: string, current: string) {
+  if (variant !== 'numeric' || index !== 0 || inputValue.length < 2) return null;
+  const overtype = inputValue.length === 2 && current !== '' && inputValue.includes(current);
+  return overtype ? 'overtype' : 'code';
+}
+
 interface OtpInput {
   variant: string;
   length: number;
@@ -55,8 +76,23 @@ export const useOtpDigits = ({ variant, length, value, onChange, onComplete }: O
     [length, onChange, onComplete],
   );
 
+  /** Lays a whole code across the slots from the first: a paste, or an OS/SMS fill. */
+  const spread = useCallback(
+    (text: string) => {
+      const code = text.slice(0, length);
+      // An empty code is not a rejection, but it is nothing to apply either.
+      if (!code || !isAllowed(variant, code)) return;
+
+      setDigits(padTo(code.split(''), length));
+      publish(code);
+    },
+    [variant, length, publish],
+  );
+
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
+      const fill = firstSlotFill(variant, index, inputValue, digits[0] ?? '');
+      if (fill) return fill === 'code' ? spread(inputValue) : undefined;
       if (!isAllowed(variant, inputValue)) return;
 
       const next = [...digits];
@@ -68,7 +104,7 @@ export const useOtpDigits = ({ variant, length, value, onChange, onComplete }: O
         focusSlot(index + 1);
       }
     },
-    [variant, digits, length, publish, focusSlot],
+    [variant, digits, length, publish, focusSlot, spread],
   );
 
   const handleKeyDown = useCallback(
@@ -89,15 +125,9 @@ export const useOtpDigits = ({ variant, length, value, onChange, onComplete }: O
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       e.preventDefault();
-      const pasted = e.clipboardData.getData('text').slice(0, length);
-
-      // An empty paste is not a rejection, but it is nothing to apply either.
-      if (!pasted || !isAllowed(variant, pasted)) return;
-
-      setDigits(padTo(pasted.split(''), length));
-      publish(pasted);
+      spread(e.clipboardData.getData('text'));
     },
-    [variant, length, publish],
+    [spread],
   );
 
   return { digits, inputRefs, handleInputChange, handleKeyDown, handlePaste };

@@ -175,9 +175,10 @@ export const ScreenReader: Story = {
     const inputs = canvas.getAllByRole('textbox');
 
     // Check that inputs are accessible
-    for (const input of inputs) {
+    for (const [index, input] of inputs.entries()) {
       expect(input).toBeInTheDocument();
-      expect(input).toHaveAttribute('maxLength', '1');
+      // The numeric first slot takes a whole SMS-filled code (FUT-4144).
+      expect(input).toHaveAttribute('maxLength', index === 0 ? '4' : '1');
 
       // Verify inputs can receive focus
       await userEvent.click(input);
@@ -496,7 +497,8 @@ export const TestIDImplementation: Story = {
       const slot = canvas.getByTestId(`otp-input-slot-${i}`);
       expect(slot).toBeInTheDocument();
       expect(slot).toBeVisible();
-      expect(slot).toHaveAttribute('maxLength', '1');
+      // The numeric first slot takes a whole SMS-filled code (FUT-4144).
+      expect(slot).toHaveAttribute('maxLength', i === 0 ? '6' : '1');
     }
 
     // Test interaction with testIds

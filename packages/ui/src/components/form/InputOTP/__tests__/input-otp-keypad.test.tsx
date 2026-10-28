@@ -6,8 +6,8 @@
  * nothing that names a keypad. The hook refusing letters is invisible to the
  * phone. These read the six `<input>` elements themselves.
  */
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { InputOTP } from '../InputOTP';
 import type { InputOTPProps } from '../InputOTP.types';
@@ -26,7 +26,6 @@ describe('InputOTP: numeric keypad on every slot', () => {
       expect(slot.tagName).toBe('INPUT');
       expect(slot).toHaveAttribute('inputmode', 'numeric');
       expect(slot).toHaveAttribute('pattern', '[0-9]*');
-      expect(slot).toHaveAttribute('maxlength', '1');
     }
   });
 
@@ -70,5 +69,78 @@ describe('InputOTP: the code is named as a group', () => {
     const group = screen.getByRole('group', { name: 'Código de entrada' });
 
     expect(within(group).getAllByRole('textbox')).toHaveLength(6);
+  });
+});
+
+describe('InputOTP: a whole code filled into the first slot (SMS, password manager)', () => {
+  it('lets the numeric first slot take the whole code, and keeps the others at one', () => {
+    const [first, ...others] = slotsOf({ variant: 'numeric' });
+
+    expect(first).toHaveAttribute('maxlength', '6');
+    for (const slot of others) expect(slot).toHaveAttribute('maxlength', '1');
+  });
+
+  it('spreads a code written into the first slot in one change across every slot', () => {
+    const onChange = vi.fn();
+    const onComplete = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange, onComplete });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '482913' } });
+
+    expect(slots.map((slot) => (slot as HTMLInputElement).value)).toEqual(['4', '8', '2', '9', '1', '3']);
+    expect(onChange).toHaveBeenLastCalledWith('482913');
+    expect(onComplete).toHaveBeenCalledWith('482913');
+  });
+
+  it('cuts a longer fill at the code length', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '12345678' } });
+
+    expect(onChange).toHaveBeenLastCalledWith('123456');
+  });
+
+  it('refuses a fill with letters, as a paste would', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '48a913' } });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(slots[0]).toHaveValue('');
+  });
+
+  it('still refuses a second keystroke into the filled first slot, as maxLength 1 did', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '4' } });
+    expect(slots[0]).toHaveValue('4');
+    // A second key in the filled slot: the old digit plus the new one.
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '47' } });
+
+    expect(slots[0]).toHaveValue('4');
+    expect(slots[1]).toHaveValue('');
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('spreads a two-digit fill that is not a keystroke onto the old digit', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'numeric', length: 4, onChange });
+
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '4' } });
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: '8291' } });
+
+    expect(slots.map((slot) => (slot as HTMLInputElement).value)).toEqual(['8', '2', '9', '1']);
+  });
+
+  it('does not spread on the alphanumeric variant, whose slots stay one character', () => {
+    const onChange = vi.fn();
+    const slots = slotsOf({ variant: 'alphanumeric', onChange });
+
+    expect(slots[0]).toHaveAttribute('maxlength', '1');
+    fireEvent.change(slots[0] as HTMLElement, { target: { value: 'AB12' } });
+    expect(slots[1]).toHaveValue('');
   });
 });
