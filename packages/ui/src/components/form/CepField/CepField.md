@@ -48,6 +48,10 @@ serves a supplier form, a store-location form or a delivery checkout.
   stands level with `sm` `Input`s
 - `labelPlacement`: `above` (default) stacks the label over the box; `inside` draws it
   in the box and floats it up on focus or a value, exactly as `Input`'s label does
+- `autoComplete`: the `<input>`'s `autocomplete` (default `postal-code`). Pass `off` on a
+  form for somebody else's address (a supplier), or the browser offers the signed-in
+  person's own CEP and the lookup then fills their street (FUT-4140). Same prop on
+  `Fields.CepField`
 
 ### State Props
 
@@ -154,7 +158,8 @@ the lookup. The pure helpers (`formatCep`, `isValidCep`) live in
   "Buscando endereço…" / "Endereço preenchido pelo CEP" without stealing focus
 - `aria-busy` reflects the in-flight lookup
 - `aria-describedby` links the input to its status region
-- `inputMode="numeric"` brings up the numeric keypad on mobile
+- `inputMode="numeric"` sits on the `<input>` (through `inputProps`), so it brings up the
+  numeric keypad on mobile; at the top level it landed on the wrapper `div` and did nothing
 - With `labelPlacement="inside"` the label is the `Input`'s own, associated to the input
   by `for`/`id`, so `getByLabelText` and screen readers name the field the same way
-- `autoComplete="postal-code"` lets the browser's own autofill participate
+- `autoComplete="postal-code"` (the default) lets the browser's own autofill participate
