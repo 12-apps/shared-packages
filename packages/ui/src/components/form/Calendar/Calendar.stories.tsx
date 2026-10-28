@@ -138,6 +138,13 @@ export const RangeSelection: Story = {
     await expect(month.getByTestId('calendar-date-20')).toHaveClass('range-end');
     await expect(month.getByTestId('calendar-date-18')).toHaveClass('in-range');
     await expect(canvas.getByRole('heading', { name: /^Range: / })).not.toHaveTextContent('None');
+
+    // One band: every two neighbouring days of the range in a row touch.
+    const days = [16, 17, 18, 19, 20].map((n) => month.getByTestId(`calendar-date-${n}`).getBoundingClientRect());
+    for (let index = 1; index < days.length; index += 1) {
+      const [left, right] = [days[index - 1], days[index]];
+      if (left && right && left.top === right.top) await expect(right.left).toBeCloseTo(left.right, 1);
+    }
   },
 };
 

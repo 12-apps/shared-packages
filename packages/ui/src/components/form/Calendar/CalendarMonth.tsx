@@ -19,9 +19,11 @@ const SPACER_WIDTH = sxRem(32);
 // `minmax(0, 1fr)`, not `1fr`: a bare `1fr` keeps each column at least its
 // content's width, which is what held the grid at 304px (FUT-3861). No column
 // gap: a selected range is one band across the days, and a gap cut it into
-// tiles (FUT-4162). Rows keep theirs.
+// tiles (FUT-4162). Rows keep theirs. Items centre in their column: the built-in
+// day stretches across it, a host's `renderDay` cell sits in its middle.
 const GRID_SX = {
   display: 'grid',
+  justifyItems: 'center',
   gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
   columnGap: 0,
   rowGap: 0.5,

@@ -1,6 +1,6 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
-import { alpha, darken, getContrastRatio, lighten } from '../../../tokens/color';
+import { alpha, blend, darken, decomposeColor, getContrastRatio, lighten } from '../../../tokens/color';
 
 import { isSameDay } from './Calendar.dates';
 import type { DateRange, DayRenderArgs, SelectionMode } from './Calendar.types';
@@ -62,6 +62,13 @@ export const bandColor = (theme: Theme): string => alpha(theme.palette.primary.m
 const ENDPOINT_MIN_CONTRAST = 4.55;
 const STEP = 0.01;
 
+// The ink as it reads ON the fill: MUI's dark ink is 87% black, so it is laid
+// over the fill before it is measured, rather than taken as solid black.
+const readsAt = (ink: string, fill: string): number => {
+  const [, , , opacity = 1] = decomposeColor(ink).values;
+  return getContrastRatio(opacity < 1 ? blend(fill, ink, opacity) : ink, fill);
+};
+
 // White ink wants a darker fill; dark ink a lighter one.
 const awayFromInk = (ink: string): ((color: string, coefficient: number) => string) =>
   getContrastRatio(ink, '#000') > getContrastRatio(ink, '#fff') ? darken : lighten;
@@ -80,11 +87,11 @@ const awayFromInk = (ink: string): ((color: string, coefficient: number) => stri
 export const endpointFill = (theme: Theme): string => {
   const { main, contrastText } = theme.palette.primary;
   try {
-    if (getContrastRatio(contrastText, main) >= ENDPOINT_MIN_CONTRAST) return main;
+    if (readsAt(contrastText, main) >= ENDPOINT_MIN_CONTRAST) return main;
     const move = awayFromInk(contrastText);
     for (let coefficient = STEP; coefficient < 1; coefficient += STEP) {
       const fill = move(main, coefficient);
-      if (getContrastRatio(contrastText, fill) >= ENDPOINT_MIN_CONTRAST) return fill;
+      if (readsAt(contrastText, fill) >= ENDPOINT_MIN_CONTRAST) return fill;
     }
     return move(main, 1);
   } catch {

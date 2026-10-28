@@ -56,6 +56,13 @@ const BAND_IMAGE: Record<Exclude<DayBand, 'none'>, (band: string) => string> = {
   before: (band) => `linear-gradient(to left, transparent 50%, ${band} 50%)`,
 };
 
+// A gradient's `to right` is physical; a right-to-left grid starts a range on
+// its right, so the two halves trade places there.
+const inDirection = (band: Exclude<DayBand, 'none'>, theme: Theme): Exclude<DayBand, 'none'> => {
+  if (theme.direction !== 'rtl' || band === 'full') return band;
+  return band === 'after' ? 'before' : 'after';
+};
+
 const faceBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | string =>
   isEndpoint(day) ? endpointFill : 'transparent';
 
@@ -101,8 +108,7 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
   padding: 0,
   border: 'none',
   background: 'none',
-  backgroundImage: band === 'none' ? 'none' : (theme: Theme) => BAND_IMAGE[band](bandColor(theme)),
-  font: 'inherit',
+  backgroundImage: band === 'none' ? 'none' : (theme: Theme) => BAND_IMAGE[inDirection(band, theme)](bandColor(theme)),
   cursor: day.disabled ? 'not-allowed' : 'pointer',
   color: colorFor(day, visible),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,

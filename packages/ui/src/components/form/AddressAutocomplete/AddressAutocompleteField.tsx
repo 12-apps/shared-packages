@@ -43,7 +43,13 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
 }) => {
   const text = resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, copy);
   const paperProps: AddressSuggestionsPaperProps = {
-    emptyText: inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound,
+    // A failed lookup is not an empty answer: the field's helper text and the
+    // alert below already say what went wrong.
+    emptyText: apiError
+      ? undefined
+      : inputValue.length <= MIN_QUERY_LENGTH
+        ? text.typeToSearch
+        : text.noAddressesFound,
   };
   return (
   <Box data-testid="address-autocomplete-container">
