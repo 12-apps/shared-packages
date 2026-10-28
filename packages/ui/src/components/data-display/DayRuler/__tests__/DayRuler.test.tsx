@@ -315,6 +315,14 @@ describe("states", () => {
   });
 });
 
+describe("selection", () => {
+  it("rings the selected block and marks it pressed", async () => {
+    renderRuler({ rows: [{ id: "a", label: "Ana", blocks: [{ id: "s1", start: 8, end: 12, label: "08:00–12:00", tone: "plan", selected: true }] }] });
+    expect(block("s1")).toHaveAttribute("aria-pressed", "true");
+    expect(getComputedStyle(block("s1")).boxShadow).toMatch(/^0 0 0 /);
+  });
+});
+
 describe("the slots a later story fills (FUT-3881)", () => {
   const rows: DayRulerProps["rows"] = [
     {

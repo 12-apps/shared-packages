@@ -390,6 +390,23 @@ describe("states", () => {
   });
 });
 
+describe("selection and the sticky header", () => {
+  it("rings the selected block and marks it pressed", async () => {
+    const selected: ScheduleGridCell = { blocks: [{ id: "s1", label: "08:00–14:00", tone: "plan", selected: true }] };
+    renderGrid({ cell: (rowId, day) => (rowId === "caio" && day === 3 ? selected : cell(rowId, day)) });
+    expect(block("s1")).toHaveAttribute("aria-pressed", "true");
+    expect(getComputedStyle(block("s1")).boxShadow).toMatch(/^0 0 0 /);
+    expect(block("k1")).not.toHaveAttribute("aria-pressed");
+  });
+
+  it("pins the header row at stickyTop", async () => {
+    renderGrid({ stickyTop: 64 });
+    const header = screen.getByTestId("sg-header");
+    expect(getComputedStyle(header).position).toBe("sticky");
+    expect(getComputedStyle(header).top).toBe("4rem");
+  });
+});
+
 describe("the slots a later story fills (FUT-3881)", () => {
   const withBreak: ScheduleGridCell = {
     blocks: [{ id: "p1", label: "11:00–19:00", note: "pausa 14:00–15:00", tone: "plan", breakSpan: { start: 0.375, end: 0.5 } }],
