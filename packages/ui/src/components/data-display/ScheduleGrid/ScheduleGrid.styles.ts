@@ -36,11 +36,11 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
       minWidth: `calc(${terms.join(' + ')})`,
       [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
         '--sg-name': rem(theme, M.nameColumn.medium),
+        '--sg-total': rem(theme, M.totalColumn.narrow),
+      },
+      [`@container (max-width: ${rem(theme, M.containerBreak.scroll)})`]: {
+        '--sg-name': rem(theme, M.nameColumn.scrolled),
         '--sg-day': rem(theme, M.dayMin.scrolled),
-        // A tablet's grid is read and tapped more than dragged: the grips would
-        // eat the room the hours need (Shift+arrows still copy, the middle still moves).
-        '& [data-sg-grip]': { display: 'none' },
-        '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {
@@ -55,7 +55,11 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
       },
       [`@container (max-width: ${rem(theme, M.containerBreak.narrow)})`]: {
         '--sg-name': rem(theme, M.nameColumn.narrow),
-        '--sg-total': rem(theme, M.totalColumn.narrow),
+        '--sg-day': rem(theme, M.dayMin.narrow),
+        // A phone-sized pane is read and tapped, not dragged (a phone renders
+        // DayRuler per day): the grips would eat the block (Shift+arrows still copy).
+        '& [data-sg-grip]': { display: 'none' },
+        '& [data-sg-block]': { paddingLeft: rem(theme, M.cellPadding), paddingRight: rem(theme, M.cellPadding) },
       },
       display: 'flex',
       flexDirection: 'column',
@@ -65,12 +69,12 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
 }
 
 /**
- * Around the table: under the medium break it scrolls sideways when the days'
+ * Around the table: under the scroll break it scrolls sideways when the days'
  * minimums do not fit (the header row then sticks within it, not the page).
  */
 export const scrollSx: SxProps<Theme> = (theme: Theme) => ({
   minWidth: 0,
-  [`@container (max-width: ${rem(theme, M.containerBreak.medium)})`]: {
+  [`@container (max-width: ${rem(theme, M.containerBreak.scroll)})`]: {
     overflowX: 'auto',
     overscrollBehaviorX: 'contain',
   },

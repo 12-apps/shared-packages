@@ -254,3 +254,58 @@ export const TabletPane768: Story = { args: tabletArgs, decorators: pane(704), p
 
 /** A 900px window: the grid's container is 836px. */
 export const TabletPane900: Story = { args: tabletArgs, decorators: pane(836), play: async ({ canvasElement }) => tabletPane(canvasElement) };
+
+/** A pane `width` wide with room under it, so the page itself can scroll. */
+const laptop = (width: number) => [
+  (Story: () => React.JSX.Element) => (
+    <div style={{ width, maxWidth: '100%', paddingBottom: 2000 }}>
+      <Story />
+    </div>
+  ),
+];
+
+/** Grips that are drawn: a copyable block's edge copy is there. */
+const visibleGrips = (root: HTMLElement): number =>
+  Array.from(root.querySelectorAll('[data-sg-grip]')).filter((el) => getComputedStyle(el).display !== 'none').length;
+
+/**
+ * R3-1 (G-C3, G-E4, G-L2): a laptop's grid beside the admin's rail and panel
+ * (a 930–1030px container) is the computer frame: from 940 up it does not
+ * scroll sideways, keeps its edge grips and its header sticks to the page;
+ * every hours line is whole. Just below (930) the days scroll, grips kept.
+ */
+async function laptopPane(canvasElement: HTMLElement, scrolls: boolean): Promise<void> {
+  const canvas = within(canvasElement);
+  const scroll = canvas.getByTestId('sg-scroll');
+  const table = canvas.getByRole('table');
+  await waitFor(() => expect(getComputedStyle(scroll).overflowX).toBe(scrolls ? 'auto' : 'visible'));
+  if (!scrolls) await expect(table.getBoundingClientRect().width).toBeLessThanOrEqual(scroll.getBoundingClientRect().width + 0.5);
+  await expect(visibleGrips(canvasElement)).toBeGreaterThan(0);
+  for (const line of Array.from(canvasElement.querySelectorAll('[data-sg-line="label"]'))) {
+    await expect({ text: line.textContent, cut: cut(line) }).toEqual({ text: line.textContent, cut: false });
+  }
+  if (scrolls) return;
+  const header = canvas.getByTestId('sg-header');
+  const view = canvasElement.ownerDocument.defaultView;
+  if (!view) throw new Error('no window');
+  const before = header.getBoundingClientRect().top;
+  view.scrollTo(0, before + 40);
+  await waitFor(() => expect(Math.abs(header.getBoundingClientRect().top)).toBeLessThanOrEqual(1));
+  await expect(table.getBoundingClientRect().top).toBeLessThan(-30);
+  view.scrollTo(0, 0);
+}
+
+export const LaptopPane930: Story = { args: tabletArgs, decorators: laptop(930), play: async ({ canvasElement }) => laptopPane(canvasElement, true) };
+export const LaptopPane960: Story = { args: tabletArgs, decorators: laptop(960), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
+export const LaptopPane990: Story = { args: tabletArgs, decorators: laptop(990), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
+export const LaptopPane1030: Story = { args: tabletArgs, decorators: laptop(1030), play: async ({ canvasElement }) => laptopPane(canvasElement, false) };
+
+/** In the scrolled range (a 900px pane) edge copy is still there. */
+export const ScrolledPaneKeepsGrips: Story = {
+  args: tabletArgs,
+  decorators: pane(836),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(getComputedStyle(within(canvasElement).getByTestId('sg-scroll')).overflowX).toBe('auto'));
+    await expect(visibleGrips(canvasElement)).toBeGreaterThan(0);
+  },
+};

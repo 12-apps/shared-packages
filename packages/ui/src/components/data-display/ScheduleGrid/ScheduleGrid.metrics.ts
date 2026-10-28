@@ -4,25 +4,37 @@
  * scales them.
  */
 export const SCHEDULE_GRID_METRICS = {
-  /** The name column on a computer; it narrows with the container (see `nameColumn`). */
-  nameColumn: { wide: 200, medium: 140, narrow: 120 },
   /**
-   * The narrowest a day column gets. On a computer (grips on both sides of a
-   * block) `wide` keeps the hours whole ("20:39–00:00" is 67px). Under the
-   * medium break the grips go and `scrolled` keeps every hours and note line
-   * whole (the longest, "↻ a cada 2 semanas", is 113px). Past it the days
-   * scroll sideways under a pinned name column — never slivers, never cut hours.
+   * The name column: 200px on a wide computer; 120px on a narrow one (it
+   * clamps a name at two lines, whole in `title`); 140px while the days
+   * scroll sideways; 120px on a phone-sized pane.
    */
-  dayMin: { wide: 104, scrolled: 136 },
+  nameColumn: { wide: 200, medium: 120, scrolled: 140, narrow: 120 },
+  /**
+   * The narrowest a day column gets. With its edge grips `wide` keeps the
+   * hours whole ("20:39–00:00" is 67px; long notes ellipsize, whole in
+   * `title`, as the prototype's 1280 frame does). While the days scroll,
+   * `scrolled` keeps every hours and note line whole beside the grips (the
+   * longest note, "↻ a cada 2 semanas", is 113px; 152 − 24 grips − 12 is 116);
+   * below the narrow break the grips go and `narrow` does the same. Never
+   * slivers, never cut hours.
+   */
+  dayMin: { wide: 104, scrolled: 152, narrow: 136 },
   /** The total column ("18h"). */
   totalColumn: { wide: 56, narrow: 40 },
-  /** Container widths below which the name column narrows and the days get their minimum. */
   /**
-   * `medium`: where seven days at `dayMin.wide` beside a 200px name column
-   * and the total stop fitting (200 + 7 × 104 + 56 + 8 gaps of 6 = 1032,
-   * rounded up). Below it the grid scrolls rather than cut the hours.
+   * Container widths, from wide to narrow:
+   * - `medium` (1040): seven 104px days stop fitting beside a 200px name and a
+   *   56px total (200 + 728 + 56 + 48 = 1032): the name narrows to 120px and
+   *   the total to 40px (120 + 728 + 40 + 48 = 936);
+   * - `scroll` (939, so a 940px container is the first that never scrolls): those stop fitting too, so the days get `dayMin.scrolled`
+   *   and scroll sideways under the pinned names — grips kept, so edge copy
+   *   works at every computer width;
+   * - `narrow` (600): a phone-sized pane, no grips.
+   * The grid never scrolls sideways, and its header row sticks to the page,
+   * from a 940px container up — a 1280 laptop beside the admin's rail and panel.
    */
-  containerBreak: { medium: 1040, narrow: 600 },
+  containerBreak: { medium: 1040, scroll: 939, narrow: 600 },
   /** Between columns and between rows. */
   gap: 6,
   cellMinHeight: 56,
