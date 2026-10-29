@@ -21,6 +21,12 @@ export interface ScheduleGridColumn {
   sublabel?: string;
   /** Today's column: its label in the primary colour and its cells framed. */
   today?: boolean;
+  /**
+   * The day has gone: its label in the secondary ink (`today` wins). The
+   * header only — the cells that can take no new turno say so themselves
+   * (`ScheduleGridCell.closed`).
+   */
+  past?: boolean;
 }
 
 /** A row: one person (or resource) across the days. */
@@ -100,9 +106,15 @@ export interface ScheduleGridCell {
    * focus stop, a create or copy drag skips it and a move or keyboard
    * copy/move onto it is refused — as on a `blocked` day — but with no hatch
    * and no label: the cell just looks empty. Blocks already there still show
-   * and still open.
+   * and still open. Drawn with no fill, only the divider border.
    */
   closed?: boolean;
+  /**
+   * A closed cell's words for a screen reader ("Já passou"), visually hidden;
+   * nothing on screen. Without it the cell stays unnamed. Ignored on a
+   * `blocked` cell, which has its own name.
+   */
+  closedLabel?: string;
 }
 
 export interface ScheduleGridProps {

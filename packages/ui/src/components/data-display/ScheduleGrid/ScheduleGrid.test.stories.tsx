@@ -595,13 +595,13 @@ export const KeyboardCreateFocusesTheNewBlock: Story = {
  * (`closed`): Ana's Monday turno is still there, everything else on them is
  * empty and takes no new turno. Wednesday is today.
  */
-const CLOSED_COLUMNS = COLUMNS.map((column, day) => ({ label: column.label, today: day === 2 }));
+const CLOSED_COLUMNS = COLUMNS.map((column, day) => ({ label: column.label, sublabel: 'ninguém', today: day === 2, past: day < 2 }));
 const CLOSED_CELLS: Record<string, ScheduleGridCell> = {
   'ana:0': { blocks: [{ id: 'p1', label: '08:00–14:00', tone: 'plan', movable: true, copyable: true }], closed: true },
   'ana:1': { blocks: [], closed: true },
   'ana:3': { blocks: [{ id: 'k1', label: '11:00–19:00', tone: 'plan', movable: true, copyable: true }] },
-  'bia:0': { blocks: [], closed: true },
-  'bia:1': { blocks: [], closed: true },
+  'bia:0': { blocks: [], closed: true, closedLabel: 'Já passou' },
+  'bia:1': { blocks: [], closed: true, closedLabel: 'Já passou' },
 };
 const closedArgs = {
   columns: CLOSED_COLUMNS,
@@ -644,7 +644,7 @@ export const DragSkipsAClosedDay: Story = {
     over(canvas.getByTestId('sg-cell-bia-0'));
     await settle();
     await waitFor(() => expect(canvas.getByTestId('sg-cell-bia-2')).toHaveTextContent('08:00–14:00'));
-    await expect(canvas.getByTestId('sg-cell-bia-1').textContent).toBe('');
+    await expect(canvas.getByTestId('sg-cell-bia-1')).not.toHaveTextContent('08:00–14:00');
     lift(canvas.getByTestId('sg-cell-bia-0'));
     await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('bia', [2, 3]));
     await expect(args.onCreate).toHaveBeenCalledTimes(1);
@@ -688,5 +688,52 @@ export const BlockOnAClosedDayStillOpens: Story = {
     await expect(canvas.getByTestId('sg-block-p1')).toHaveTextContent('08:00–14:00');
     await userEvent.click(canvas.getByTestId('sg-block-p1'));
     await waitFor(() => expect(args.onBlockClick).toHaveBeenCalledWith('p1'));
+  },
+};
+
+/** A block on a gone day still copies and moves OUT of it: only the days it lands on must be open. */
+export const MoveAndCopyOutOfAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(canvas.getByTestId('sg-grip-r-p1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-ana-2'));
+    await waitFor(() => expect(args.onCopy).toHaveBeenCalledWith('p1', [2]));
+    press(canvas.getByTestId('sg-block-p1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-2'));
+    await waitFor(() => expect(args.onMove).toHaveBeenCalledWith('p1', 'bia', 2));
+    await expect(args.onBlockClick).not.toHaveBeenCalled();
+  },
+};
+
+/** A gone day draws no fill (only the divider border), its header reads in the secondary ink, and its words are for a screen reader only. */
+export const ClosedDayLooksQuietAndIsNamedForScreenReaders: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const closed = canvas.getByTestId('sg-cell-bia-1');
+    const open = canvas.getByTestId('sg-cell-bia-3');
+    await expect(getComputedStyle(closed).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    await expect(getComputedStyle(open).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(getComputedStyle(closed).borderTopColor).toBe(getComputedStyle(open).borderTopColor);
+    const headers = canvas.getAllByRole('columnheader');
+    const ink = (el: Element): string => getComputedStyle(el).color;
+    const sublabel = within(headers[0] as HTMLElement).getByText('ninguém');
+    await expect(ink(headers[0] as HTMLElement)).toBe(ink(sublabel));
+    await expect(ink(headers[3] as HTMLElement)).not.toBe(ink(headers[0] as HTMLElement));
+    await expect(ink(headers[2] as HTMLElement)).not.toBe(ink(headers[3] as HTMLElement));
+    const words = within(closed).getByText('Já passou');
+    const box = words.getBoundingClientRect();
+    await expect(box.width * box.height).toBeLessThanOrEqual(1);
+    await expect(getComputedStyle(words).clip).toBe('rect(0px, 0px, 0px, 0px)');
+    await expect(canvas.getByTestId('sg-cell-ana-1').textContent).toBe('');
   },
 };
