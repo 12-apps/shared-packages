@@ -6,6 +6,7 @@ import type { JSX, ReactNode } from 'react';
 import type { ProviderSetupGuide as Guide, SetupSection } from '@12-apps/payments-backend';
 
 import { DoneRow } from './CredentialFields';
+import { INSET_FORM_SX } from './panel-tokens';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
@@ -194,14 +195,7 @@ export function SetupGuideSection({
       // The save bar and the saved-details row carry their own inset for the
       // guided layout; here the wrapper already supplies it, so theirs is zeroed
       // and their rule, text and button line up with the fields.
-      <Box
-        data-testid="payments-setup-unguided"
-        sx={{
-          px: '20px',
-          '& [data-testid="payments-form-bar"]': { px: 0 },
-          '& [data-testid="payments-credential-summary"]': { mx: 0 },
-        }}
-      >
+      <Box data-testid="payments-setup-unguided" sx={INSET_FORM_SX}>
         {rows}
         {sectionFooter}
       </Box>
