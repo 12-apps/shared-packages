@@ -86,10 +86,16 @@ export function ProbeAlert({
  * which is not a dependency of this package — one style object is not worth a
  * new one on a package that ships to every host.
  */
+// Pixels spelled out: `sx` reads a bare `1` as 100%, which made this an
+// absolutely positioned box as wide as its container — the settings page then
+// scrolled sideways on any probe with a check left unplaced (FUT-4144).
 const SCREEN_READER_ONLY = {
   position: 'absolute',
-  width: 1,
-  height: 1,
+  width: '1px',
+  height: '1px',
+  margin: '-1px',
+  padding: 0,
+  border: 0,
   overflow: 'hidden',
   clip: 'rect(0 0 0 0)',
   whiteSpace: 'nowrap',

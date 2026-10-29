@@ -88,3 +88,22 @@ describe('the probe checklist', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+/**
+ * The verdict's name, read aloud and kept off screen, takes one pixel (FUT-4144).
+ *
+ * MUI's `sx` reads `width: 1` as 100%, so the "hidden" label was an absolutely
+ * positioned box as wide as its container. It widened the settings page by the
+ * card's inset at every width — a sideways scroll at 320 on any probe that left
+ * a check the form could not place at a box (FUT-4144 run gate).
+ */
+describe('the off-screen verdict name', () => {
+  it('is one pixel square, not as wide as its container', () => {
+    render(<ProbeChecklist probe={probeWith(CHECKS)} />);
+    const row = screen.getByTestId('payments-probe-check-webhookSecret');
+    const hidden = [...row.querySelectorAll('span')].find((span) => getComputedStyle(span).position === 'absolute');
+    if (!hidden) throw new Error('no off-screen verdict name');
+    expect(getComputedStyle(hidden).width).toBe('1px');
+    expect(getComputedStyle(hidden).height).toBe('1px');
+  });
+});
