@@ -311,6 +311,19 @@ the keystrokes it did.
   while nothing is applied, so the first tap does not grow the panel under the
   finger; the panel is as tall as the screen allows instead of a fixed 320px,
   so a range's boxes, its month caption and its weeks are on screen together.
+- The presets' fit is measured on their LAYOUT width (padding and border in,
+  never a box read while the popover grows in from 75%), for a number range's
+  presets too: "Acima de R$ 10" goes to the select rather than to "Acima de …".
+- In a panel (the "Mais" sheet, the slide-in panel) a number pair splits the
+  row equally, like a day pair; in the pill's popover it keeps its own width.
+- The pill's popover and the "Mais" panel hold STILL while open: they hang from
+  where their trigger was when they opened, so a "Limpar" or a badge appearing
+  on the bar after the first tap does not drag them sideways. They are
+  re-placed only when their own height changes (a refused day's message), so
+  they never leave the screen. A day popover keeps its summary/"Limpar" row's
+  height while nothing is applied, so the first tap does not grow it.
+- While a panel is open the bar is frozen; if the "Limpar" that a first filter
+  brings in does not fit the row it shows as its icon until the panel closes.
 - A second tap before the first swaps them — the boxes never show a period
   backwards. A tap on or before a lone `Até` keeps that `Até`.
 - The slide-in panel and the "Mais" sheet use the same pair, so they get the

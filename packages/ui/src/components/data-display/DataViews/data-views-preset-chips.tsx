@@ -110,13 +110,33 @@ function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {
   return width;
 }
 
-/** The widest label at the chip's own type and padding, read off the hidden measuring row. */
-function useWidestLabel(ref: RefObject<HTMLElement | null>, labels: string): number {
+/**
+ * The widest label at the chip's own type, padding and border, read off the
+ * hidden measuring row.
+ *
+ * `offsetWidth`, the LAYOUT width, never the bounding box: a popover grows in
+ * from 75% scale, and a box read during that transition is a quarter short —
+ * which judged "Acima de R$ 10" to fit a third of the "Mais" panel and cut it
+ * to "Acima de …" (FUT-4144 UI review round 2). Measured again when the row's
+ * width changes and once the web fonts have loaded, since a fallback face is
+ * narrower than the one the parts will be drawn in.
+ */
+function useWidestLabel(ref: RefObject<HTMLElement | null>, labels: string, width: number | null): number {
   const [widest, setWidest] = useState(0);
   useLayoutEffect(() => {
-    const spans = ref.current?.querySelectorAll<HTMLElement>("[data-preset-measure]") ?? [];
-    setWidest(Math.max(0, ...Array.from(spans, (span) => Math.ceil(span.getBoundingClientRect().width))));
-  }, [ref, labels]);
+    const measure = (): void => {
+      const spans = ref.current?.querySelectorAll<HTMLElement>("[data-preset-measure]") ?? [];
+      setWidest(Math.max(0, ...Array.from(spans, (span) => span.offsetWidth)));
+    };
+    measure();
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (live) measure();
+    });
+    return () => {
+      live = false;
+    };
+  }, [ref, labels, width]);
   return widest;
 }
 
@@ -185,7 +205,7 @@ export function RangePresets({
   const theme = useTheme();
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(box);
-  const widest = useWidestLabel(box, presets.map((preset) => preset.label).join("|"));
+  const widest = useWidestLabel(box, presets.map((preset) => preset.label).join("|"), width);
   if (presets.length === 0) return null;
   const fits = presetsFitOneLine(width, widest, presets.length, parseFloat(theme.spacing(0.75)));
   return (

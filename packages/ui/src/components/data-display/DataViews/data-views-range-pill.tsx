@@ -19,13 +19,15 @@ import Popover from '@mui/material/Popover/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useTheme, type Theme } from '@mui/material/styles/index.js';
-import React, { useContext, useState } from 'react';
+import React, { useContext } from 'react';
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { TableFilter } from '../../layout/TableFilter';
 import { TableFilterContext } from '../../layout/TableFilter/TableFilterContext';
 import { RangePresets } from './data-views-preset-chips';
 import { RangeBounds } from './data-views-range-bounds';
+import { RangeSummary } from './data-views-range-summary';
+import { useStillAnchor } from './data-views-still-anchor';
 import { presetsFor } from './data-views-range-presets';
 import {
   isRangeInverted,
@@ -196,9 +198,7 @@ export function RangePill<T extends Record<string, unknown>>({
   onOpenChange?: (open: boolean) => void;
   testIdPrefix: string;
 }): React.JSX.Element {
-  const copy = useDataViewsCopy();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const active = isRangeSet(value);
+  const still = useStillAnchor();
   const testId = `${testIdPrefix}-range-${field.id}`;
   const calendarMonths = useCalendarMonths();
   const theme = useTheme();
@@ -210,23 +210,21 @@ export function RangePill<T extends Record<string, unknown>>({
         value={value}
         onChange={onChange}
         onOpen={(element) => {
-          setAnchor(element);
+          still.open(element);
           onOpenChange?.(true);
         }}
-        open={Boolean(anchor)}
+        open={Boolean(still.anchor)}
         testId={testId}
       />
       <Popover
-        open={Boolean(anchor)}
-        anchorEl={anchor}
+        {...still.popoverProps}
         onClose={() => {
-          setAnchor(null);
+          still.close();
           onOpenChange?.(false);
         }}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         // Below `sm` a day popover keeps 8px from the screen's edges instead of 16.
         marginThreshold={field.kind === 'day' && phone ? remPx(theme, 8) : undefined}
-        slotProps={{ paper: { sx: [{ p: 2, mt: 0.5 }, field.kind === 'day' && DAY_PAPER_SX] } }}
+        slotProps={{ paper: { ref: still.paperRef, sx: [{ p: 2, mt: 0.5 }, field.kind === 'day' && DAY_PAPER_SX] } }}
       >
         <RangeBounds
           field={field}
@@ -235,25 +233,7 @@ export function RangePill<T extends Record<string, unknown>>({
           testId={testId}
           calendarMonths={calendarMonths}
         />
-        {/* An inverted window is not an error the merchant must fix before the
-            list responds — it simply matches nothing, and saying so beats an
-            empty grid with no explanation (FUT-668). */}
-        {active && (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: 1.5 }}>
-            <Typography component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
-              {rangeChipLabel(field, value)}
-            </Typography>
-            <Button
-              variant="text"
-              size="small"
-              onClick={() => onChange({})}
-              data-testid={`${testId}-clear`}
-              sx={{ textTransform: 'none' }}
-            >
-              {copy.filters.clear}
-            </Button>
-          </Box>
-        )}
+        <RangeSummary field={field} value={value} onClear={() => onChange({})} testId={testId} />
       </Popover>
     </>
   );

@@ -34,12 +34,15 @@ function BoundField<T extends Record<string, unknown>>({
   value,
   onChange,
   testId,
+  fill,
 }: {
   field: RangeFieldConfig<T>;
   label: string;
   value: number | string | undefined;
   onChange: (bound: number | string | undefined) => void;
   testId: string;
+  /** A number box takes its cell's width; a day box always does. */
+  fill: boolean;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
   if (field.kind === 'day') {
@@ -57,6 +60,7 @@ function BoundField<T extends Record<string, unknown>>({
   }
   return (
     <NumberBoundInput
+      fill={fill}
       label={label}
       value={value}
       unit={field.unit}
@@ -107,7 +111,7 @@ function RangeNote({
       data-testid={`${testId}-inclusive`}
       // `text.secondary`, not `disabled`: the note is read, and disabled grey
       // at 12px is 2.68:1 (FUT-4144 UI review).
-      sx={{ mt: 0.75, fontSize: sxRem(12), color: 'text.secondary' }}
+      sx={{ mt: { xs: 0.25, sm: 0.75 }, fontSize: sxRem(12), color: 'text.secondary' }}
     >
       {copy.filters.rangeInclusiveNote}
     </Typography>
@@ -132,6 +136,12 @@ interface RangeBoundsProps<T extends Record<string, unknown>> {
    * holds no calendar of its own.
    */
   showCalendar?: boolean;
+  /**
+   * A NUMBER pair splits the row equally too, as a day pair always does. Set
+   * by the panels, whose width is the row's; the pill's popover sizes itself to
+   * its content and keeps the boxes' own width.
+   */
+  fillRow?: boolean;
 }
 
 /**
@@ -146,6 +156,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
   testId,
   calendarMonths = 1,
   showCalendar = true,
+  fillRow = false,
 }: RangeBoundsProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
   const { key, emitted } = useOutsideResetKey(value);
@@ -162,7 +173,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
     <Box data-testid={`${testId}-panel`}>
       {/* Above the inputs, not below: the presets are the answer for most
           merchants, and the two date pickers are the escape hatch. */}
-      <Box sx={{ '&:not(:empty)': { mb: 1.5 } }}>
+      <Box sx={{ '&:not(:empty)': { mb: { xs: 1, sm: 1.5 } } }}>
         <RangePresets presets={presetsFor(field, copy)} value={value} onChange={onChange} testId={testId} />
       </Box>
       {/* Top-aligned: a day that does not exist grows ITS field by a message
@@ -171,7 +182,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
         {/* A day pair shares the row equally, so it spans the calendar under
             it; a number pair keeps its own widths. */}
-        <BoundCell grow={day}>
+        <BoundCell grow={day || fillRow}>
           <BoundField
             key={`min-${key}`}
             field={field}
@@ -179,9 +190,10 @@ export function RangeBounds<T extends Record<string, unknown>>({
             value={value.min}
             onChange={(min) => typedChange({ ...value, min })}
             testId={`${testId}-min`}
+            fill={fillRow}
           />
         </BoundCell>
-        <BoundCell grow={day}>
+        <BoundCell grow={day || fillRow}>
           <BoundField
             key={`max-${key}`}
             field={field}
@@ -189,6 +201,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
             value={value.max}
             onChange={(max) => typedChange({ ...value, max })}
             testId={`${testId}-max`}
+            fill={fillRow}
           />
         </BoundCell>
       </Box>

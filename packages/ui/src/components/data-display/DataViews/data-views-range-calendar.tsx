@@ -39,8 +39,13 @@ const CALENDAR_CLASS = 'data-views-range-calendar';
  * is flattened through the class hook the component offers for this — the
  * same thing `DateRangePicker` does.
  */
-const ROOT_SX = {
-  mt: 1.5,
+const ROOT_SX = (theme: Theme) => ({
+  mt: { xs: 1, sm: 1.5 },
+  // Below `sm` the caption and the weekday row give up their bottom margins,
+  // so the whole popover fits a 320×568 screen under its pill (FUT-4144).
+  '& :has(> * > [data-testid="calendar-month-select"])': { mb: { xs: 0.5, sm: 2 } },
+  '& :has(> [role="columnheader"])': { mb: { xs: 0, sm: 1 } },
+  '& [role="columnheader"]': { height: { xs: rem(theme, 24), sm: rem(theme, 32) } },
   // No gaps between days: the seven columns are what a day's 40px target is
   // carved from, and at 320 the 4px column gaps were the difference between
   // 40 and 37; the row gaps were the 20px that pushed the last week under the
@@ -68,7 +73,7 @@ const ROOT_SX = {
       outlineOffset: sxRem(2),
     },
   },
-} as const;
+});
 
 /** The two ends of a range, as `Calendar` reads them. */
 function rangeOf(value: RangeValue): DateRange {
@@ -177,7 +182,7 @@ export function DayRangeCalendar({
         component="p"
         aria-live="polite"
         data-testid={`${testId}-calendar-hint`}
-        sx={{ mt: 1, fontSize: sxRem(12), color: 'text.secondary' }}
+        sx={{ mt: { xs: 0.25, sm: 1 }, fontSize: sxRem(12), color: 'text.secondary' }}
       >
         {waitingForEnd ? copy.pickEnd : copy.pickStart}
       </Typography>

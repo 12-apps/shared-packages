@@ -30,6 +30,15 @@ const PRESETS: RangePreset[] = [
 /** The widest label ("Esta semana") with its padding, as Chromium lays it out. */
 const NATURAL = 96;
 
+/** Valor's labels with their padding and border, as Chromium lays them out at 12px/600. */
+const MEASURED: Readonly<Record<string, number>> = { "Até R$ 5": 68, "R$ 5–10": 66, "Acima de R$ 10": 107 };
+
+const VALOR: RangePreset[] = [
+  { id: "ate-5", label: "Até R$ 5", range: { max: 5 } },
+  { id: "5-10", label: "R$ 5–10", range: { min: 5, max: 10 } },
+  { id: "acima-10", label: "Acima de R$ 10", range: { min: 10 } },
+];
+
 /** A ResizeObserver that reports one fixed width for whatever it observes. */
 function stubWidth(width: number): void {
   vi.stubGlobal(
@@ -49,10 +58,14 @@ function stubWidth(width: number): void {
 }
 
 beforeEach(() => {
-  // jsdom lays nothing out: each measured label reports its natural width.
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    const width = this.dataset.presetMeasure === undefined ? 0 : NATURAL;
-    return { width, height: 0, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 0, toJSON: () => ({}) };
+  // jsdom lays nothing out: each measured label reports its natural LAYOUT
+  // width, padding and border included. `offsetWidth`, not the bounding box:
+  // the popover grows in from 75% scale, and a box read mid-transition is a
+  // quarter short — which is how "Acima de R$ 10" was judged to fit and was
+  // cut to "Acima de …" (FUT-4144 UI review round 2).
+  vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.presetMeasure === undefined) return 0;
+    return MEASURED[this.textContent ?? ""] ?? NATURAL;
   });
 });
 
@@ -132,6 +145,39 @@ describe("RangePresets — one line (ADR 0190)", () => {
     stubWidth(288);
     render(<Harness initial={{ min: "2026-10-03", max: "2026-10-09" }} />);
     expect(screen.getByTestId("p-presets-select")).toHaveValue("");
+  });
+});
+
+describe("RangePresets — a number range's presets (FUT-4144 UI review round 2)", () => {
+  function Valor(): React.JSX.Element {
+    const [value, setValue] = useState<RangeValue>({});
+    return (
+      <>
+        <RangePresets presets={VALOR} value={value} onChange={setValue} testId="v" />
+        <output data-testid="value">{JSON.stringify(value)}</output>
+      </>
+    );
+  }
+
+  it("is a select where its widest label does not fit a third of the row", () => {
+    // 3 × 107 + 2 × 6 = 333 > 288: "Acima de R$ 10" would be cut.
+    stubWidth(288);
+    render(<Valor />);
+    const select = screen.getByTestId("v-presets-select") as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      "Nenhum",
+      "Até R$ 5",
+      "R$ 5–10",
+      "Acima de R$ 10",
+    ]);
+    fireEvent.change(select, { target: { value: "acima-10" } });
+    expect(value()).toBe('{"min":10}');
+  });
+
+  it("is three equal parts where the row holds them", () => {
+    stubWidth(333);
+    render(<Valor />);
+    expect(within(screen.getByTestId("v-presets")).getAllByRole("button")).toHaveLength(3);
   });
 });
 

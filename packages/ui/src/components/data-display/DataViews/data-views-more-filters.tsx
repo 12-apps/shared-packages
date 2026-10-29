@@ -10,7 +10,7 @@ import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
 import Popover from "@mui/material/Popover/index.js";
 import { useTheme, type Theme } from "@mui/material/styles/index.js";
 import useMediaQuery from "@mui/material/useMediaQuery/index.js";
-import { useState } from "react";
+
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
@@ -18,6 +18,7 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import { fieldClearing, MoreGroup, MoreQuick, type MoreFieldProps } from "./data-views-more-fields";
+import { useStillAnchor } from "./data-views-still-anchor";
 import type { OverflowField } from "./data-views-overflow";
 import { rem, remPx, sxRem } from "../../../tokens/relative";
 
@@ -168,7 +169,9 @@ function MoreFooter({
   return (
     <Box
       aria-hidden={reserved || undefined}
-      sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: "divider", visibility: reserved ? "hidden" : undefined }}
+      // Held, the row is blank — no rule over it either, or it reads as an
+      // empty bordered row.
+      sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: reserved ? "transparent" : "divider", visibility: reserved ? "hidden" : undefined }}
     >
       <Box
         component="button"
@@ -275,7 +278,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
   clearKey,
   ...rest
 }: MoreFiltersPanelProps<T>): React.JSX.Element | null {
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const still = useStillAnchor();
   const theme = useTheme();
   const phone = useMediaQuery(theme.breakpoints.down("sm"));
   if (fields.length === 0) return null;
@@ -298,22 +301,20 @@ export function MoreFilters<T extends Record<string, unknown>>({
         }
         compact={compact}
         onOpen={(element) => {
-          setAnchor(element);
+          still.open(element);
           onOpenChange?.(true);
         }}
         testIdPrefix={rest.testIdPrefix}
       />
       <Popover
-        open={Boolean(anchor)}
-        anchorEl={anchor}
+        {...still.popoverProps}
         onClose={() => {
-          setAnchor(null);
+          still.close();
           onOpenChange?.(false);
         }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         // Below `sm`, 8px from the screen's edges instead of 16.
         marginThreshold={phone ? remPx(theme, 8) : undefined}
-        slotProps={{ paper: { sx: phone ? PHONE_PAPER_SX : PAPER_SX } }}
+        slotProps={{ paper: { ref: still.paperRef, sx: phone ? PHONE_PAPER_SX : PAPER_SX } }}
       >
         <Box data-testid={`${rest.testIdPrefix}-more-panel`} sx={{ ...COLUMN_SX, flex: "1 1 auto", minHeight: 0 }}>
           <MoreHeading />
