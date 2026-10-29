@@ -19,11 +19,12 @@ describe("AddressSuggestionsPaper", () => {
         </ul>
       </AddressSuggestionsPaper>,
     );
-    expect(screen.queryByTestId("address-suggestions-empty")).toBeNull();
+    // Rendered synchronously: the paper holds the suggestion and nothing else.
+    expect(screen.getByTestId("address-suggestions-dropdown")).toHaveTextContent(/^Rua A$/);
   });
 
   it("says nothing without an empty text, as after a failed lookup", () => {
     render(<AddressSuggestionsPaper />);
-    expect(screen.queryByTestId("address-suggestions-empty")).toBeNull();
+    expect(screen.getByTestId("address-suggestions-dropdown")).toBeEmptyDOMElement();
   });
 });

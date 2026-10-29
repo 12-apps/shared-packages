@@ -81,8 +81,9 @@ const hoverBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | st
 };
 
 // The band reaches the cell's edges so neighbouring days join; where a week
-// row ends, it rounds off instead of stopping square.
-const BAND_RADIUS = '9999px';
+// row ends, it rounds off instead of stopping square: half the cell each way
+// is a half-round cap on a cell as tall as it is wide.
+const BAND_RADIUS = '50%';
 
 /**
  * One cell: the band, painted on the button across its whole column, and the

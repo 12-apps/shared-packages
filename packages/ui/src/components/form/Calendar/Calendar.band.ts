@@ -1,6 +1,6 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
-import { alpha, blend, darken, decomposeColor, getContrastRatio, lighten } from '../../../tokens/color';
+import { alpha, blend, darken, decomposeColor, getContrastRatio, getLuminance, lighten } from '../../../tokens/color';
 
 import { isSameDay } from './Calendar.dates';
 import type { DateRange, DayRenderArgs, SelectionMode } from './Calendar.types';
@@ -20,6 +20,19 @@ import type { DateRange, DayRenderArgs, SelectionMode } from './Calendar.types';
  */
 export type DayBand = 'none' | 'full' | 'after' | 'before';
 
+// The other end of the range: its end, or while only the start is chosen, the
+// hovered day standing in for it.
+const otherEnd = (range: DateRange, hoveredDate: Date | null, isDisabled: (date: Date) => boolean) =>
+  range.end ?? (hoveredDate && !isDisabled(hoveredDate) ? hoveredDate : null);
+
+// The half an endpoint paints: towards the rest of the range.
+const endpointBand = (date: Date, start: Date, other: Date): DayBand => {
+  const [first, last] = start < other ? [start, other] : [other, start];
+  if (isSameDay(date, first)) return 'after';
+  if (isSameDay(date, last)) return 'before';
+  return 'none';
+};
+
 export const bandFor = ({
   args,
   selectionMode,
@@ -36,15 +49,9 @@ export const bandFor = ({
   if (selectionMode !== 'range') return 'none';
   if (args.inRange) return 'full';
 
-  const { start, end } = range;
-  const preview = hoveredDate && !isDisabled(hoveredDate) ? hoveredDate : null;
-  const other = end ?? preview;
-  if (!start || !other || isSameDay(start, other)) return 'none';
-
-  const [first, last] = start < other ? [start, other] : [other, start];
-  if (isSameDay(args.date, first)) return 'after';
-  if (isSameDay(args.date, last)) return 'before';
-  return 'none';
+  const other = otherEnd(range, hoveredDate, isDisabled);
+  if (!range.start || !other || isSameDay(range.start, other)) return 'none';
+  return endpointBand(args.date, range.start, other);
 };
 
 /**
@@ -69,9 +76,9 @@ const readsAt = (ink: string, fill: string): number => {
   return getContrastRatio(opacity < 1 ? blend(fill, ink, opacity) : ink, fill);
 };
 
-// White ink wants a darker fill; dark ink a lighter one.
+// Light ink (white) wants a darker fill; dark ink a lighter one.
 const awayFromInk = (ink: string): ((color: string, coefficient: number) => string) =>
-  getContrastRatio(ink, '#000') > getContrastRatio(ink, '#fff') ? darken : lighten;
+  getLuminance(ink) > 0.5 ? darken : lighten;
 
 /**
  * An endpoint's fill: the brand, moved away from its own ink JUST far enough
