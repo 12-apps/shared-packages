@@ -21,6 +21,20 @@ export interface RbacSubjectGrants {
    * question filters by the moment it is asked, not by the moment of the load.
    */
   readonly resources: readonly RbacResourceGrant[];
+  /**
+   * Every membership of the subject, active or not, with its own `role`
+   * column — the role a host stamps on an audit entry. Optional so a host's
+   * hand-written snapshot from before it existed still type-checks; the
+   * package's own load always fills it.
+   */
+  readonly memberships?: readonly RbacMembershipGrant[];
+}
+
+/** One membership, as {@link RbacSubjectGrants.memberships} carries it. */
+export interface RbacMembershipGrant {
+  readonly clientId: string;
+  readonly role: string;
+  readonly active: boolean;
 }
 
 /** One resource assignment, as the reach question filters it. */
@@ -69,7 +83,7 @@ export function activeResourceIds(
   now: Date,
 ): string[] {
   const at = now.getTime();
-  return grants.resources
+  const ids = grants.resources
     .filter(
       (grant) =>
         grant.resourceType === resourceType &&
@@ -78,6 +92,16 @@ export function activeResourceIds(
         (grant.validTo === null || Date.parse(grant.validTo) > at),
     )
     .map((grant) => grant.resourceId);
+  // One id held twice (a direct claim and one a host derived) is one id.
+  return [...new Set(ids)];
+}
+
+/**
+ * The membership role of a subject at a tenant, from loaded grants — `null`
+ * when the subject has no membership there (or the grants predate the field).
+ */
+export function membershipRoleAt(grants: RbacSubjectGrants, clientId: string): string | null {
+  return grants.memberships?.find((membership) => membership.clientId === clientId)?.role ?? null;
 }
 
 /**
