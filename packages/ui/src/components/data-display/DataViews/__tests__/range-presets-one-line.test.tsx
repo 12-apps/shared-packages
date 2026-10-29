@@ -175,7 +175,8 @@ describe("RangePresets — a number range's presets (FUT-4144 UI review round 2)
   });
 
   it("is three equal parts where the row holds them", () => {
-    stubWidth(333);
+    // 3 × (107 + 1, the margin for offsetWidth's rounding) + 2 × 6 = 336.
+    stubWidth(336);
     render(<Valor />);
     expect(within(screen.getByTestId("v-presets")).getAllByRole("button")).toHaveLength(3);
   });

@@ -66,7 +66,11 @@ export function useStillAnchor(): {
 
   useEffect(() => {
     if (!anchor) return undefined;
-    const follow = (): void => setStill(stillOf(anchor));
+    // A trigger unmounted while its panel is open reads a zero box: keep the
+    // frozen one rather than send the panel to the corner.
+    const follow = (): void => {
+      if (anchor.isConnected) setStill(stillOf(anchor));
+    };
     window.addEventListener('resize', follow);
     return () => window.removeEventListener('resize', follow);
   }, [anchor]);

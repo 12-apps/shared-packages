@@ -126,7 +126,9 @@ function useWidestLabel(ref: RefObject<HTMLElement | null>, labels: string, widt
   useLayoutEffect(() => {
     const measure = (): void => {
       const spans = ref.current?.querySelectorAll<HTMLElement>("[data-preset-measure]") ?? [];
-      setWidest(Math.max(0, ...Array.from(spans, (span) => span.offsetWidth)));
+      // +1: `offsetWidth` rounds, so a label laid out at 80.4px reads 80 and
+      // would be judged to fit half a pixel short, behind an ellipsis.
+      setWidest(Math.max(0, ...Array.from(spans, (span) => span.offsetWidth + 1)));
     };
     measure();
     let live = true;
