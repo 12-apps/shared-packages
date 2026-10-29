@@ -236,3 +236,50 @@ export const doneTitleSx: SxProps<Theme> = {
   fontWeight: 500,
   outline: 'none',
 };
+
+/** The overview's title, in the header row where a step shows its label. */
+export const overviewTitleSx: SxProps<Theme> = {
+  fontSize: sxRem(SEQUENCE_METRICS.overviewTitle),
+  fontWeight: 500,
+  lineHeight: 1.3,
+  outline: 'none',
+  minWidth: 0,
+};
+
+/**
+ * One kind: its words take the width and its pick keeps its size on the right,
+ * a hairline under it. Where the words would have less than `overviewTextMin`
+ * beside the pick (a 320px phone), the pick drops under them, still at its
+ * content width, instead of the label breaking word by word.
+ */
+export const overviewRowSx: SxProps<Theme> = (theme: Theme) => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  columnGap: 1.5,
+  rowGap: 1,
+  py: 1.5,
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+  '& > :not(button)': { flex: `1 1 ${rem(theme, SEQUENCE_METRICS.overviewTextMin)}`, minWidth: 0 },
+  '& > button': { flex: 'none' },
+});
+
+/** "Continue in sequence": start-aligned under a hairline, as the prototype draws it. */
+export const overviewFooterSx: SxProps<Theme> = {
+  display: 'flex',
+  justifyContent: 'flex-start',
+  pt: 2,
+  mt: 2,
+  borderTop: '1px solid',
+  borderColor: 'divider',
+};
+
+/**
+ * The step's own wrapper: no box of its own while it shows (its parts stay the
+ * body's flex items, keeping the body's gap and their height), nothing at all
+ * while the overview covers it.
+ */
+export function stepScreenSx(hidden: boolean): SxProps<Theme> {
+  return hidden ? { display: 'none' } : { display: 'contents', '& > *': { flexShrink: 0 } };
+}

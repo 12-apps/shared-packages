@@ -142,5 +142,9 @@
   "packages/ui/src/components/utility/Overflow/overflow.ts — raw-number-length ×1": {
     "kind": "exempt",
     "why": "useMeasuredWidth returns the ResizeObserver contentRect width, the live container measurement the fit algorithm prices against"
+  },
+  "packages/ui/src/components/data-display/DayRuler/useRulerDrag.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "boxSize is the track's getBoundingClientRect() width, read in screen px when a drag starts so the pointer's clientX maps to an hour; a runtime measurement, not a design size"
   }
 }
