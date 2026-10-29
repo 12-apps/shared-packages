@@ -62,6 +62,39 @@ function PathSwitch({
 }
 
 /**
+ * The OAuth card on an installation with no connect button: the notice saying
+ * so, the manual form, the probe and the host's activation step.
+ *
+ * Every block sets the card's inset itself, as on the connect branch: this one
+ * had none, and its notice, probe and activation step ran into the card's
+ * edges (FUT-4144). The form insets its own blocks.
+ */
+function ConnectUnavailableCard({
+  statusBar,
+  notice,
+  probe,
+  verification,
+  children,
+}: {
+  statusBar: ReactNode;
+  notice: ReactNode;
+  probe: ReactNode;
+  verification: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <ProviderCard header={statusBar}>
+      <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP }}>
+        <Alert severity="info">{notice}</Alert>
+      </Box>
+      {children}
+      <Box sx={{ px: CARD_INSET, py: BLOCK_GAP, '&:empty': { display: 'none' } }}>{probe}</Box>
+      <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+    </ProviderCard>
+  );
+}
+
+/**
  * The OAuth path: a connect button as the happy path, with the credential form
  * kept behind a disclosure.
  *
@@ -120,12 +153,9 @@ export function OAuthPanel({
   );
   if (!prepareConnect) {
     return (
-      <ProviderCard header={statusBar}>
-        <Alert severity="info">{copy.connectUnavailable}</Alert>
+      <ConnectUnavailableCard statusBar={statusBar} notice={copy.connectUnavailable} probe={probe} verification={verification}>
         {form}
-        {probe}
-        {verification}
-      </ProviderCard>
+      </ConnectUnavailableCard>
     );
   }
 
