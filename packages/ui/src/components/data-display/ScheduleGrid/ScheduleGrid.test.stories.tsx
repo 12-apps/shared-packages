@@ -589,3 +589,104 @@ export const KeyboardCreateFocusesTheNewBlock: Story = {
     await waitFor(() => expect(canvas.getByTestId('sg-block-new-ana-3')).toHaveFocus());
   },
 };
+
+/**
+ * FUT-3831: a week that started before today. Monday and Tuesday have gone
+ * (`closed`): Ana's Monday turno is still there, everything else on them is
+ * empty and takes no new turno. Wednesday is today.
+ */
+const CLOSED_COLUMNS = COLUMNS.map((column, day) => ({ label: column.label, today: day === 2 }));
+const CLOSED_CELLS: Record<string, ScheduleGridCell> = {
+  'ana:0': { blocks: [{ id: 'p1', label: '08:00–14:00', tone: 'plan', movable: true, copyable: true }], closed: true },
+  'ana:1': { blocks: [], closed: true },
+  'ana:3': { blocks: [{ id: 'k1', label: '11:00–19:00', tone: 'plan', movable: true, copyable: true }] },
+  'bia:0': { blocks: [], closed: true },
+  'bia:1': { blocks: [], closed: true },
+};
+const closedArgs = {
+  columns: CLOSED_COLUMNS,
+  cell: (rowId: string, day: number): ScheduleGridCell => CLOSED_CELLS[`${rowId}:${day}`] ?? { blocks: [] },
+};
+
+/** A closed day draws no "+", no hatch and no label, and Tab and the arrows pass over it. */
+export const ClosedDayHasNoPlusAndNoTabStop: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const closed = canvas.getByTestId('sg-cell-ana-1');
+    await waitFor(() => expect(within(closed).queryByRole('button')).toBeNull());
+    await expect(closed.textContent).toBe('');
+    await expect(closed).not.toHaveAttribute('aria-label');
+    await expect(getComputedStyle(closed).backgroundImage).toBe('none');
+    await expect(within(canvas.getByTestId('sg-cell-ana-2')).getByRole('button')).toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId('sg-block-p1'));
+    await waitFor(() => expect(canvas.getByTestId('sg-block-p1')).toHaveFocus());
+    await userEvent.tab();
+    const afterTab = canvasElement.ownerDocument.activeElement as HTMLElement;
+    await expect(afterTab.dataset.sgRow).toBe('ana');
+    await expect(afterTab.dataset.sgDay).toBe('2');
+    await userEvent.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(canvas.getByTestId('sg-block-p1')).toHaveFocus());
+  },
+};
+
+/** A create drag across the gone days lands only on the open ones, and draws no ghost on a closed day. */
+export const DragSkipsAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(within(canvas.getByTestId('sg-cell-bia-3')).getByRole('button'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-0'));
+    await settle();
+    await waitFor(() => expect(canvas.getByTestId('sg-cell-bia-2')).toHaveTextContent('08:00–14:00'));
+    await expect(canvas.getByTestId('sg-cell-bia-1').textContent).toBe('');
+    lift(canvas.getByTestId('sg-cell-bia-0'));
+    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('bia', [2, 3]));
+    await expect(args.onCreate).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** A move dropped on a closed day does nothing; a copy dragged across one skips it; an open day still takes both. */
+export const MoveAndCopyRefuseAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(canvas.getByTestId('sg-block-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-1'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-1'));
+    await waitFor(() => expect(args.onMove).not.toHaveBeenCalled());
+    press(canvas.getByTestId('sg-grip-l-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-2'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-1'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-ana-1'));
+    await waitFor(() => expect(args.onCopy).toHaveBeenCalledWith('k1', [2]));
+    press(canvas.getByTestId('sg-block-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-2'));
+    await waitFor(() => expect(args.onMove).toHaveBeenCalledWith('k1', 'bia', 2));
+    await expect(args.onMove).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** A turno on a gone day still shows and still opens. */
+export const BlockOnAClosedDayStillOpens: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('sg-block-p1')).toHaveTextContent('08:00–14:00');
+    await userEvent.click(canvas.getByTestId('sg-block-p1'));
+    await waitFor(() => expect(args.onBlockClick).toHaveBeenCalledWith('p1'));
+  },
+};

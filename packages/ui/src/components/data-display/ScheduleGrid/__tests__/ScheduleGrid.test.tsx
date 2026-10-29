@@ -630,3 +630,51 @@ describe("the slots a later story fills (FUT-3881)", () => {
     expect(within(header).getByRole("button", { name: "2 regras ›" })).toBeInTheDocument();
   });
 });
+
+describe("closed days (gone: no new turno)", () => {
+  /** Monday and Tuesday have gone for everyone; Caio's Monday turno is still there. */
+  const closedCell = (rowId: string, day: number): ScheduleGridCell => (day <= 1 ? { ...cell(rowId, day), closed: true } : cell(rowId, day));
+
+  it("draws no '+' and no label on an empty closed day, and leaves it out of the tab order", async () => {
+    renderGrid({ cell: closedCell });
+    await waitFor(() => expect(within(cellEl("caio", 1)).queryByRole("button")).toBeNull());
+    expect(cellEl("caio", 1).textContent).toBe("");
+    expect(cellEl("caio", 1)).not.toHaveAttribute("aria-label");
+    await waitFor(() => expect(cellEl("caio", 1).querySelector("[data-sg-focus]")).toBeNull());
+    expect(plusOf("caio", 2)).toBeInTheDocument();
+  });
+
+  it("a create drag skips the closed days", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(plusOf("caio", 3), [cellEl("caio", 2), cellEl("caio", 1), cellEl("caio", 0)]);
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [2, 3]);
+  });
+
+  it("a grip drag copies onto none of them", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(screen.getByTestId("sg-grip-l-k1"), [cellEl("ana", 1), cellEl("ana", 0)]);
+    expect(props.onCopy).not.toHaveBeenCalled();
+  });
+
+  it("a move drop onto a closed day is refused", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(block("k1"), [cellEl("caio", 1)]);
+    expect(props.onMove).not.toHaveBeenCalled();
+  });
+
+  it("Alt+← and Shift+← into a closed day are refused aloud", async () => {
+    const closedTuesday = (rowId: string, day: number): ScheduleGridCell => (day === 1 ? { ...cell(rowId, day), closed: true } : cell(rowId, day));
+    const { props } = renderGrid({ cell: closedTuesday });
+    fireEvent.keyDown(block("k1"), { key: "ArrowLeft", shiftKey: true });
+    fireEvent.keyDown(block("k1"), { key: "ArrowLeft", altKey: true });
+    expect(props.onCopy).not.toHaveBeenCalled();
+    expect(props.onMove).not.toHaveBeenCalled();
+    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
+  });
+
+  it("a block on a closed day still shows and opens", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    fireEvent.click(block("d1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("d1");
+  });
+});

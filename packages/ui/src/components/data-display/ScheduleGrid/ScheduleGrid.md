@@ -23,8 +23,8 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | gesture | pointer (mouse, pen) | keyboard | reports |
 |---|---|---|---|
 | create one day | click an empty cell | Enter on its "+" | `onCreate(rowId, [day])` |
-| create several | drag across cells of ONE row | — | `onCreate(rowId, days)` — the crossed days that are empty and not blocked |
-| copy | drag a block's left or right edge grip along its row | Shift+← / Shift+→ | `onCopy(blockId, days)` — never its own day, a taken or a blocked one |
+| create several | drag across cells of ONE row | — | `onCreate(rowId, days)` — the crossed days that are empty, not blocked and not closed |
+| copy | drag a block's left or right edge grip along its row | Shift+← / Shift+→ | `onCopy(blockId, days)` — never its own day, a taken, a blocked or a closed one |
 | move | drag a block's middle to another cell (any row) | Alt+← / Alt+→ | `onMove(blockId, toRowId, toDay)` — only onto an empty, open cell |
 | open | click a block | Enter | `onBlockClick(blockId)` |
 | focus | — | ← → ↑ ↓ to the nearest cell with something to focus | — |
@@ -50,7 +50,7 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 |---|---|---|
 | `columns` | `ScheduleGridColumn[]` | `label` (wraps to a second line when its column is short, never cut, and never between a word and the number after it: "Seg 19/10" stays whole; also in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
 | `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when the column has no room for both), `chips?` (node under the meta — "2 regras ›"; one line, a chip that does not fit shrinks and cuts its label). |
-| `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
+| `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`, `closed?` (the day can take no new turno — it has gone: see [Closed days](#closed-days)). Called for every cell on each render: keep it cheap. |
 | `totalLabel` | `string?` | The last column's header ("horas"). |
 | `readOnly` | `boolean?` | No "+", no grips, no drag; empty cells are not focusable. Block clicks still reach `onBlockClick`. |
 | `onCreate` / `onCopy` / `onMove` / `onBlockClick` | see Gestures | Each gesture is offered only when its handler is given. |
@@ -81,6 +81,22 @@ block's height, under its text, so the block reads as cut there in every tone; i
 0…1 are clamped to the block; a span that is empty or reversed (`end <= start`) draws nothing. A row's
 `nameAdornment` and `chips` are the host's nodes (an `@12-apps/ui` `Chip` fits): the grid only
 places them.
+
+## Closed days
+
+A week runs Monday to Sunday, so the one shown often holds days already gone, and the server
+refuses a turno on them. The host marks such a cell `closed: true`, and the grid offers nothing
+there that could never work:
+
+- no "+": the empty cell is not a focus stop (Tab and the arrows pass over it);
+- a create or copy drag across it skips it, and a move or a keyboard copy/move onto it is
+  refused (read aloud as for a taken day) — the same rules as a `blocked` day;
+- the blocks already there still show, and still open (`onBlockClick`) and drag as before;
+- no hatch and no label: the cell keeps the ordinary cell ground and just looks empty. The
+  design system has no token for a past day, so none is drawn.
+
+`blocked` is the other closed cell: an afastamento, hatched and named. A cell may be both; the
+hatch wins.
 
 ## Layout
 
