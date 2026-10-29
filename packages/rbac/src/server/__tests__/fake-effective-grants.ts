@@ -16,7 +16,7 @@ interface StoredRow extends EffectiveGrantRow {
   computedAt: Date | null;
 }
 
-export interface FakeEffectiveGrants {
+interface FakeEffectiveGrants {
   delegate: RbacEffectiveGrantDelegate;
   rows: Map<string, StoredRow>;
   /** Statements issued, by method. */
