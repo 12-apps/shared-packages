@@ -55,7 +55,7 @@ interface Marked {
 const rowsOf = async (db: PGlite): Promise<Marked[]> =>
   (
     await db.query<Marked>(
-      'SELECT user_id, scope, stale, version FROM rbac_effective_grants ORDER BY user_id, scope',
+      'SELECT user_id, scope, stale, version::int AS version FROM rbac_effective_grants ORDER BY user_id, scope',
     )
   ).rows;
 
@@ -101,7 +101,7 @@ function sqlTable(db: PGlite): RbacEffectiveGrantDelegate {
     async findMany({ where }) {
       const { rows } = await db.query<EffectiveGrantRow>(
         `SELECT scope, membership_role AS "membershipRole", membership_active AS "membershipActive",
-                assignments, resources, stale, version
+                assignments, resources, stale, version, computed_at AS "computedAt"
            FROM rbac_effective_grants WHERE user_id = $1`,
         [where.userId],
       );
@@ -121,22 +121,12 @@ function sqlTable(db: PGlite): RbacEffectiveGrantDelegate {
       const inserted: number[] = [];
       for (const entry of data) {
         const result = await db.query(
-          `INSERT INTO rbac_effective_grants
-             (user_id, scope, membership_role, membership_active, assignments, resources, computed_at, stale)
-           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, false)
-           ON CONFLICT DO NOTHING`,
-          [entry.userId, entry.scope, ...values(entry)],
+          'INSERT INTO rbac_effective_grants (user_id, scope) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [entry.userId, entry.scope],
         );
         inserted.push(result.affectedRows ?? 0);
       }
       return { count: inserted.reduce((sum, rows) => sum + rows, 0) };
-    },
-    async deleteMany({ where }) {
-      const result = await db.query(
-        'DELETE FROM rbac_effective_grants WHERE user_id = $1 AND scope = $2 AND version = $3',
-        [where.userId, where.scope, where.version],
-      );
-      return { count: result.affectedRows ?? 0 };
     },
   };
 }
@@ -156,9 +146,9 @@ describe('the migration', () => {
       `);
       await db.exec(sqlOf(NEW_MIGRATION));
       expect(await rowsOf(db)).toEqual([
-        { user_id: 'ana', scope: 'store-a', stale: true, version: 0 },
-        { user_id: 'bia', scope: 'GLOBAL', stale: true, version: 0 },
-        { user_id: 'caio', scope: 'store-b', stale: true, version: 0 },
+        { user_id: 'ana', scope: 'store-a', stale: true, version: expect.any(Number) },
+        { user_id: 'bia', scope: 'GLOBAL', stale: true, version: expect.any(Number) },
+        { user_id: 'caio', scope: 'store-b', stale: true, version: expect.any(Number) },
       ]);
     } finally {
       await db.close();
@@ -186,7 +176,10 @@ describe('the triggers mark and notify', () => {
       const before = (await rowsOf(db))[0]!.version;
 
       await db.exec(`UPDATE memberships SET active = false WHERE id = 'm-ana-store-a'`);
-      expect(await rowsOf(db)).toEqual([{ user_id: 'ana', scope: 'store-a', stale: true, version: before + 1 }]);
+      const [after] = await rowsOf(db);
+      expect(after).toMatchObject({ user_id: 'ana', scope: 'store-a', stale: true });
+      // The next value of the sequence: greater than any version handed out before.
+      expect(after!.version).toBeGreaterThan(before);
       await heardUpTo(heard, 'ana');
     } finally {
       await db.close();
@@ -254,7 +247,7 @@ describe('the triggers mark and notify', () => {
     const db = await migrated();
     try {
       await db.exec(`INSERT INTO role_assignments (id, user_id, role_name, scope, updated_at) VALUES ('g', 'ana', 'SUPPORT', 'org:north', NOW())`);
-      expect(await rowsOf(db)).toEqual([{ user_id: 'ana', scope: 'org:north', stale: true, version: 0 }]);
+      expect(await rowsOf(db)).toEqual([{ user_id: 'ana', scope: 'org:north', stale: true, version: expect.any(Number) }]);
     } finally {
       await db.close();
     }
@@ -340,6 +333,110 @@ describe('a recompute over the real table', () => {
       };
       await readEffectiveGrants(options, 'ana');
       expect((await rowsOf(db))[0]?.stale).toBe(true);
+    } finally {
+      await db.close();
+    }
+  });
+});
+
+describe('a recompute a slower request overtook', () => {
+  /** A resolver over the source tables: role assignments and live resource assignments. */
+  const sourceResolve = (db: PGlite) => async (subject: string): Promise<RbacSubjectGrants> => {
+    const roles = await db.query<{ role_name: string; scope: string }>(
+      'SELECT role_name, scope FROM role_assignments WHERE user_id = $1',
+      [subject],
+    );
+    const live = await db.query<{ resource_type: string; resource_id: string; client_id: string; valid_from: Date }>(
+      `SELECT resource_type, resource_id, client_id, valid_from FROM resource_assignments
+        WHERE user_id = $1 AND (valid_to IS NULL OR valid_to > now())`,
+      [subject],
+    );
+    return {
+      assignments: roles.rows.map((row) => ({ role: row.role_name, scope: row.scope })),
+      memberships: [],
+      resources: live.rows.map((row) => ({
+        resourceType: row.resource_type,
+        resourceId: row.resource_id,
+        clientId: row.client_id,
+        validFrom: new Date(row.valid_from).toISOString(),
+        validTo: null,
+      })),
+    };
+  };
+
+  /** A request that stalls after resolving until released; `resolved` says it got that far. */
+  const gated = () => {
+    const gate: { open: (() => void) | null; resolved: boolean } = { open: null, resolved: false };
+    const wait = new Promise<void>((resolve) => (gate.open = resolve));
+    return {
+      stall: async () => {
+        gate.resolved = true;
+        await wait;
+      },
+      resolved: () => gate.resolved,
+      release: () => gate.open?.(),
+    };
+  };
+
+  const noRecompute = async (): Promise<RbacSubjectGrants> => {
+    throw new Error('a current row must not recompute');
+  };
+
+  it('never writes a revoked role back over a row deleted and re-created meanwhile', async () => {
+    const db = await migrated();
+    try {
+      const resolve = sourceResolve(db);
+      const table = async () => sqlTable(db);
+      await db.exec(`INSERT INTO role_assignments (id, user_id, role_name, scope, updated_at) VALUES ('ra-g', 'ana', 'GERENTE', 'store-a', NOW())`);
+      // R2 reads the stale row and resolves GERENTE, then stalls.
+      const slow = gated();
+      const r2 = readEffectiveGrants({ table, resolve: async (subject) => {
+        const answer = await resolve(subject);
+        await slow.stall();
+        return answer;
+      } }, 'ana');
+      await vi.waitFor(() => expect(slow.resolved()).toBe(true));
+      // The role is revoked; R3 recomputes the now-empty scope.
+      await db.exec(`DELETE FROM role_assignments WHERE id = 'ra-g'`);
+      await readEffectiveGrants({ table, resolve }, 'ana');
+      // A mesa is granted at the same scope, which marks the row again.
+      await db.exec(`INSERT INTO resource_assignments (id, user_id, client_id, resource_type, resource_id) VALUES ('mesa', 'ana', 'store-a', 'tables', 't-1')`);
+      slow.release();
+      await r2;
+
+      const later = await readEffectiveGrants({ table, resolve }, 'ana');
+      expect(later.assignments).toEqual([]);
+      expect(later.resources.map((grant) => grant.resourceId)).toEqual(['t-1']);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it('never creates a scope as current from an answer older than its latest mark', async () => {
+    const db = await migrated();
+    try {
+      const resolve = sourceResolve(db);
+      const table = async () => sqlTable(db);
+      await db.exec(`INSERT INTO role_assignments (id, user_id, role_name, scope, updated_at) VALUES ('ra-s', 'ana', 'SUPPORT', 'GLOBAL', NOW())`);
+      // R1 reads only the GLOBAL row; GERENTE is granted at store-a before it resolves.
+      const slow = gated();
+      const r1 = readEffectiveGrants({ table, resolve: async (subject) => {
+        await db.exec(`INSERT INTO role_assignments (id, user_id, role_name, scope, updated_at) VALUES ('ra-g', 'ana', 'GERENTE', 'store-a', NOW())`);
+        const answer = await resolve(subject);
+        await slow.stall();
+        return answer;
+      } }, 'ana');
+      await vi.waitFor(() => expect(slow.resolved()).toBe(true));
+      // The role is revoked, and R2 recomputes.
+      await db.exec(`DELETE FROM role_assignments WHERE id = 'ra-g'`);
+      await readEffectiveGrants({ table, resolve }, 'ana');
+      slow.release();
+      await r1;
+
+      const later = await readEffectiveGrants({ table, resolve }, 'ana');
+      expect(later.assignments.map((assignment) => assignment.role)).toEqual(['SUPPORT']);
+      // And once current, a read is the single statement again.
+      expect((await readEffectiveGrants({ table, resolve: noRecompute }, 'ana')).assignments).toHaveLength(1);
     } finally {
       await db.close();
     }

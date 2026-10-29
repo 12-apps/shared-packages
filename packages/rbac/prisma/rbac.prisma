@@ -164,8 +164,9 @@ model ResourceAssignment {
 // above only mark a row `stale` (inserting it stale when missing), bump its
 // `version` and `pg_notify('rbac_changed', <user id>)`; the TypeScript resolver
 // recomputes a stale row on the next read and writes it back only while
-// `version` still matches what it read. So the role rule lives once, in
-// `loadSubjectGrants` (ADOPTING.md, "Effective grants").
+// `version` still matches what it read. It never deletes a row, never inserts
+// one as current, and trusts a computed row for 24 hours at most. So the role
+// rule lives once, in `loadSubjectGrants` (ADOPTING.md, "Effective grants").
 //
 //   - `membershipRole` / `membershipActive` mirror the person's membership at
 //     a tenant scope (NULL when there is none) — the audit's role stamp.
@@ -183,7 +184,10 @@ model RbacEffectiveGrant {
   assignments      Json      @default("[]")
   resources        Json      @default("[]")
   stale            Boolean   @default(true)
-  version          Int       @default(0)
+  // Every mark takes the next value of ONE sequence, so a version is never
+  // seen twice — not even by a row deleted and created again. A BIGINT: a
+  // Prisma client reads it as a `bigint`, which the package passes back as is.
+  version          BigInt    @default(dbgenerated("nextval('rbac_effective_grants_version_seq'::regclass)"))
   computedAt       DateTime? @map("computed_at")
 
   @@id([userId, scope])

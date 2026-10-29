@@ -7,18 +7,22 @@ import type {
 /**
  * An in-memory `rbac_effective_grants`, interpreting the closed argument
  * shapes `./effective-grants` passes. `mark` is what the package's triggers do
- * in SQL (`rbac_grants_mark`): insert the row stale, or mark it stale and bump
- * its version.
+ * in SQL (`rbac_grants_mark`): insert the row stale, or mark it stale — each
+ * time with the next value of one sequence, as the migration's
+ * `rbac_effective_grants_version_seq`.
  */
 
 interface StoredRow extends EffectiveGrantRow {
   userId: string;
+  version: number;
   computedAt: Date | null;
 }
 
 interface FakeEffectiveGrants {
   delegate: RbacEffectiveGrantDelegate;
   rows: Map<string, StoredRow>;
+  /** Age every computed row, as the clock would. */
+  age: (ms: number) => void;
   /** Statements issued, by method. */
   calls: string[];
   mark: (userId: string, scope: string) => void;
@@ -28,7 +32,7 @@ interface FakeEffectiveGrants {
 
 const keyOf = (userId: string, scope: string): string => `${userId}\u0000${scope}`;
 
-const blank = (userId: string, scope: string): StoredRow => ({
+const blank = (userId: string, scope: string, version: number): StoredRow => ({
   userId,
   scope,
   membershipRole: null,
@@ -36,7 +40,7 @@ const blank = (userId: string, scope: string): StoredRow => ({
   assignments: [],
   resources: [],
   stale: true,
-  version: 0,
+  version,
   computedAt: null,
 });
 
@@ -55,6 +59,11 @@ function write(row: StoredRow, data: EffectiveGrantData): void {
 export function createFakeEffectiveGrants(): FakeEffectiveGrants {
   const rows = new Map<string, StoredRow>();
   const calls: string[] = [];
+  const sequence = { last: 0 };
+  const nextVersion = (): number => {
+    sequence.last += 1;
+    return sequence.last;
+  };
   const failure: { error: Error | null } = { error: null };
   const guard = (): void => {
     if (failure.error) throw failure.error;
@@ -72,6 +81,7 @@ export function createFakeEffectiveGrants(): FakeEffectiveGrants {
           resources: asJson(row.resources),
           stale: row.stale,
           version: row.version,
+          computedAt: row.computedAt,
         }));
     },
     async updateMany({ where, data }) {
@@ -86,21 +96,8 @@ export function createFakeEffectiveGrants(): FakeEffectiveGrants {
       calls.push('createMany');
       guard();
       const fresh = data.filter((entry) => !rows.has(keyOf(entry.userId, entry.scope)));
-      for (const entry of fresh) {
-        const row = blank(entry.userId, entry.scope);
-        write(row, entry);
-        rows.set(keyOf(entry.userId, entry.scope), row);
-      }
+      for (const entry of fresh) rows.set(keyOf(entry.userId, entry.scope), blank(entry.userId, entry.scope, nextVersion()));
       return { count: fresh.length };
-    },
-    async deleteMany({ where }) {
-      calls.push('deleteMany');
-      guard();
-      const key = keyOf(where.userId, where.scope);
-      const row = rows.get(key);
-      if (!row || row.version !== where.version) return { count: 0 };
-      rows.delete(key);
-      return { count: 1 };
     },
   };
   return {
@@ -111,11 +108,16 @@ export function createFakeEffectiveGrants(): FakeEffectiveGrants {
       const key = keyOf(userId, scope);
       const row = rows.get(key);
       if (!row) {
-        rows.set(key, blank(userId, scope));
+        rows.set(key, blank(userId, scope, nextVersion()));
         return;
       }
       row.stale = true;
-      row.version += 1;
+      row.version = nextVersion();
+    },
+    age: (ms) => {
+      for (const row of rows.values()) {
+        if (row.computedAt) row.computedAt = new Date(row.computedAt.getTime() - ms);
+      }
     },
     failWrites: (error) => {
       failure.error = error;

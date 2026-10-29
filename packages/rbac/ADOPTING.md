@@ -233,7 +233,19 @@ and every resource grant not yet ended, with its window.
   `WHERE user_id = $1`. When a row is stale it runs `loadSubjectGrants` — the
   same rule the engine uses — and writes each row back only
   `WHERE version = <the version it read>`, so a change that commits during the
-  recompute leaves the row stale for the next read.
+  recompute leaves the row stale for the next read. Three rules make that hold
+  for every interleaving of requests:
+  - every mark takes the next value of one sequence
+    (`rbac_effective_grants_version_seq`), so a version is never seen twice,
+    not even by a row deleted and created again;
+  - the reader never deletes a row: a scope that now holds nothing is written
+    back empty, under the same check;
+  - the reader never inserts a row as current: a scope it did not read is
+    inserted stale, for the next read to compute.
+- **A computed row is trusted for 24 hours at most**
+  (`EFFECTIVE_GRANT_MAX_AGE_MS`, `maxAgeMs` to change it). That is what bounds
+  a mark that never came: a trigger disabled, a restore without triggers, a
+  host table `derive` reads with no trigger of its own.
 - **The table is complete.** The migration backfills a stale row for every
   person and scope holding anything, and every trigger inserts the row it
   marks, so a person with no rows holds nothing — answered by the same read.
@@ -258,10 +270,13 @@ export const rbacGrants = createEffectiveGrantsStore({
 ```
 
 The store keeps each person in process memory after the first question, and
-drops them on their notification, everyone on `*` or on a listener reconnect,
-and anyone at the backstop (10 minutes) or the next window boundary. Nothing is
-kept while the listener is down; a listener that cannot start is retried after
-30 seconds. A load a notification overtook is not kept.
+drops them on their notification, everyone on `*`, a listener drop or a
+reconnect, and anyone at the backstop (10 minutes) or the next window boundary.
+Nothing is kept while the listener is down — before it first starts, and from a
+reported drop until the reconnect; a listener that cannot start is retried
+after 30 seconds. A load a notification overtook is not kept. The backstop only
+bounds one process's copy without a notification; a mark that never reached
+the table is bounded by the 24-hour row age above.
 
 **Derived grants.** `derive` adds resource grants computed from the host's OWN
 tables while a person is recomputed (the origin host derives a waiter's tables
@@ -274,7 +289,7 @@ CREATE TRIGGER shifts_rbac_grants_stale AFTER INSERT OR UPDATE OR DELETE ON shif
   FOR EACH ROW EXECUTE FUNCTION my_mark_shift_owner();  -- calls rbac_grants_mark(user_id, client_id)
 ```
 
-Otherwise a derived grant outlives its source until the backstop.
+Otherwise a derived grant outlives its source until the 24-hour row age.
 `rbac_grants_mark(user, scope)` and `rbac_grants_mark_scope(scope)` are the two
 functions a host trigger may call.
 

@@ -12,15 +12,29 @@ import type { RbacMembershipGrant, RbacResourceGrant, RbacSubjectGrants } from '
  * it stale when missing), bump its `version` and notify. This module is the
  * other half: it reads the rows, and when any is stale it recomputes the
  * person through the resolver the engine uses anyway (`loadSubjectGrants`), so
- * the role rule lives in one place. The result is written back only where the
- * row's `version` still matches what was read, so a change committed during
- * the recompute leaves the row stale for the next read instead of being
- * overwritten by an answer that predates it.
+ * the role rule lives in one place.
+ *
+ * No interleaving of requests may store an answer older than a row's latest
+ * mark, which three rules guarantee together:
+ *
+ * - a result is written back only where the row's `version` is still the one
+ *   read, and every mark takes the next value of one database sequence, so a
+ *   version is never seen twice — not even by a row deleted and created again;
+ * - the reader never deletes a row: a scope that resolves to nothing is written
+ *   back EMPTY, under the same version check;
+ * - the reader never inserts a row as current: a scope the answer names and
+ *   the read did not see is inserted STALE, for the next read to compute.
  *
  * The table is complete by construction — every trigger inserts the row it
  * marks, and the migration backfills the rest — so a person with no rows holds
- * nothing, and that answer costs the same single read.
+ * nothing, and that answer costs the same single read. A row computed more than
+ * {@link EFFECTIVE_GRANT_MAX_AGE_MS} ago counts as stale anyway: that bounds a
+ * mark that never came (a trigger disabled, a restore without triggers, a host
+ * table `derive` reads with no trigger of its own).
  */
+
+/** How long a computed row is trusted without a mark: 24 hours. */
+export const EFFECTIVE_GRANT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** The columns the read selects. */
 export const EFFECTIVE_GRANT_SELECT = {
@@ -31,7 +45,14 @@ export const EFFECTIVE_GRANT_SELECT = {
   resources: true,
   stale: true,
   version: true,
+  computedAt: true,
 } as const;
+
+/**
+ * A row's version, passed back exactly as read: a `BIGINT`, which a Prisma
+ * client reads as a `bigint` and a raw driver may read as a string.
+ */
+export type EffectiveGrantVersion = number | bigint | string;
 
 /** One row, as the read returns it. The JSON columns are checked, not trusted. */
 export interface EffectiveGrantRow {
@@ -41,7 +62,8 @@ export interface EffectiveGrantRow {
   assignments: unknown;
   resources: unknown;
   stale: boolean;
-  version: number;
+  version: EffectiveGrantVersion;
+  computedAt: Date | string | null;
 }
 
 /** One role assignment as a row stores it: its scope is the row's. */
@@ -70,15 +92,13 @@ export interface RbacEffectiveGrantDelegate {
     select: typeof EFFECTIVE_GRANT_SELECT;
   }): Promise<EffectiveGrantRow[]>;
   updateMany(args: {
-    where: { userId: string; scope: string; version: number };
+    where: { userId: string; scope: string; version: EffectiveGrantVersion };
     data: EffectiveGrantData;
   }): Promise<{ count: number }>;
+  /** Placeholders only: every column but the key takes its default, `stale` included. */
   createMany(args: {
-    data: (EffectiveGrantData & { userId: string; scope: string })[];
+    data: { userId: string; scope: string }[];
     skipDuplicates: true;
-  }): Promise<{ count: number }>;
-  deleteMany(args: {
-    where: { userId: string; scope: string; version: number };
   }): Promise<{ count: number }>;
 }
 
@@ -91,7 +111,7 @@ export type RbacEffectiveGrantTable = () => Promise<RbacEffectiveGrantDelegate>;
  * say. They are stored with the person's rows and judged against the clock
  * like any other grant. The host's own triggers must mark the person stale
  * (`rbac_grants_mark(user_id, scope)`) whenever a table they read changes, or
- * a derived grant outlives its source until the backstop.
+ * a derived grant outlives its source until the row's maximum age.
  */
 export type RbacDeriveGrants = (
   subject: string,
@@ -106,6 +126,8 @@ export interface EffectiveGrantsReadOptions {
   derive?: RbacDeriveGrants;
   /** A write-back that failed: the answer is still returned, the row stays stale. */
   onError?: (message: string) => void;
+  /** Default {@link EFFECTIVE_GRANT_MAX_AGE_MS}. */
+  maxAgeMs?: number;
 }
 
 /** The scope a resource grant's row is kept under. */
@@ -154,9 +176,11 @@ interface ParsedRow {
   resources: RbacResourceGrant[];
 }
 
-/** A current row, parsed — or `null` when it is stale or does not parse. */
-function parseRow(row: EffectiveGrantRow): ParsedRow | null {
-  if (row.stale) return null;
+/** A current row, parsed — or `null` when it is stale, too old or does not parse. */
+function parseRow(row: EffectiveGrantRow, now: Date, maxAgeMs: number): ParsedRow | null {
+  if (row.stale || row.computedAt === null) return null;
+  const computedAt = new Date(row.computedAt).getTime();
+  if (Number.isNaN(computedAt) || now.getTime() - computedAt > maxAgeMs) return null;
   const assignments = parseAssignments(row.assignments);
   const resources = parseResources(row.resources);
   if (assignments === null || resources === null) return null;
@@ -218,35 +242,49 @@ function dataOf(row: ParsedRow, now: Date): EffectiveGrantData {
   };
 }
 
+const EMPTY = (scope: string): ParsedRow => ({ scope, membership: null, assignments: [], resources: [] });
+
+/** The writes a recompute makes: every stale row read, back under its version; unseen scopes, stale. */
+function writeBack(
+  table: RbacEffectiveGrantDelegate,
+  subject: string,
+  stale: readonly EffectiveGrantRow[],
+  seen: ReadonlySet<string>,
+  fresh: Map<string, ParsedRow>,
+  now: Date,
+): Promise<unknown>[] {
+  const writes: Promise<unknown>[] = stale.map((row) =>
+    table.updateMany({
+      where: { userId: subject, scope: row.scope, version: row.version },
+      // A scope that holds nothing now is kept, empty: deleting it would let a
+      // later insert start a row this answer's version check cannot see.
+      data: dataOf(fresh.get(row.scope) ?? EMPTY(row.scope), now),
+    }),
+  );
+  const unseen = [...fresh.keys()].filter((scope) => !seen.has(scope));
+  if (unseen.length > 0) {
+    // Inserted STALE, never with this answer: a mark may already have reached
+    // the scope, and only a row read before resolving can prove it did not.
+    writes.push(table.createMany({ data: unseen.map((scope) => ({ userId: subject, scope })), skipDuplicates: true }));
+  }
+  return writes;
+}
+
 /** Recompute a subject and write the rows back where their version still holds. */
 async function recompute(
   options: EffectiveGrantsReadOptions,
   table: RbacEffectiveGrantDelegate,
   subject: string,
   read: readonly EffectiveGrantRow[],
+  current: readonly (ParsedRow | null)[],
   now: Date,
 ): Promise<RbacSubjectGrants> {
   const resolved = await options.resolve(subject, now);
   const derived = options.derive ? await options.derive(subject, resolved, now) : [];
   const grants: RbacSubjectGrants = { ...resolved, resources: [...resolved.resources, ...derived] };
-  const fresh = rowsFromGrants(grants);
-  const known = new Set(read.map((row) => row.scope));
-  const writes: Promise<unknown>[] = [];
-  for (const row of read) {
-    if (!row.stale && parseRow(row) !== null) continue;
-    const next = fresh.get(row.scope);
-    const where = { userId: subject, scope: row.scope, version: row.version };
-    writes.push(next ? table.updateMany({ where, data: dataOf(next, now) }) : table.deleteMany({ where }));
-  }
-  const created = [...fresh.values()].filter((row) => !known.has(row.scope));
-  if (created.length > 0) {
-    writes.push(
-      table.createMany({
-        data: created.map((row) => ({ userId: subject, scope: row.scope, ...dataOf(row, now) })),
-        skipDuplicates: true,
-      }),
-    );
-  }
+  const stale = read.filter((_, index) => current[index] === null);
+  const seen = new Set(read.map((row) => row.scope));
+  const writes = writeBack(table, subject, stale, seen, rowsFromGrants(grants), now);
   const failed = (await Promise.allSettled(writes)).filter((result) => result.status === 'rejected');
   if (failed.length > 0) {
     options.onError?.(
@@ -269,7 +307,8 @@ export async function readEffectiveGrants(
 ): Promise<RbacSubjectGrants> {
   const table = await options.table();
   const read = await table.findMany({ where: { userId: subject }, select: EFFECTIVE_GRANT_SELECT });
-  const parsed = read.map(parseRow);
+  const maxAgeMs = options.maxAgeMs ?? EFFECTIVE_GRANT_MAX_AGE_MS;
+  const parsed = read.map((row) => parseRow(row, now, maxAgeMs));
   if (parsed.every((row): row is ParsedRow => row !== null)) return grantsFromRows(parsed);
-  return recompute(options, table, subject, read, now);
+  return recompute(options, table, subject, read, parsed, now);
 }

@@ -23,15 +23,19 @@ import { membershipRoleAt, nextGrantBoundary, type RbacGrantsPort, type RbacSubj
  *
  * ## Correct before fast
  *
- * - **Nothing is kept until the listener is up.** Without it no change could
- *   reach the copy, so every question loads. A listener that cannot start is
- *   tried again after {@link KeptGrantsOptions.retryMs}, not on every question.
- * - **A reconnect drops everything**, because a notification sent while the
- *   listener was down is lost.
+ * - **Nothing is kept while the listener is down** — before it first starts,
+ *   and from the moment it reports a drop (`onError`) until it reports a
+ *   reconnect (`onConnected`). Without it no change could reach the copy, so
+ *   every question loads. A listener that cannot start is tried again after
+ *   {@link KeptGrantsOptions.retryMs}, not on every question.
+ * - **A drop and a reconnect each drop everything**, because a notification
+ *   sent while the listener was down is lost.
  * - **A load a notification overtakes is not kept.** A generation per person,
  *   and an epoch for the whole map, are read before the load and compared
  *   after it, so a change committed during the load is never kept as current.
- * - **A backstop lifetime** bounds a delivery that never arrives. A resource
+ * - **A backstop lifetime** bounds how long one process trusts its copy without
+ *   a notification. (A mark that never reached the table at all is bounded by
+ *   the table's own maximum row age, `EFFECTIVE_GRANT_MAX_AGE_MS`.) A resource
  *   grant whose window opens or closes sooner shortens it to that instant
  *   (`nextGrantBoundary`): the window passing is a change no write announces.
  *   The window itself is judged against the clock on every question, so an
@@ -98,6 +102,8 @@ class KeptGrantsMemory {
   private readonly inFlight = new Map<string, Promise<RbacSubjectGrants>>();
   private epoch = 0;
   private listening: Promise<boolean> | null = null;
+  /** False from a reported drop until the reconnect: then nothing is kept. */
+  private connected = false;
   private retryAfter = 0;
 
   constructor(private readonly options: KeptGrantsOptions) {}
@@ -129,11 +135,26 @@ class KeptGrantsMemory {
     const channel = this.options.channel ?? RBAC_CHANGED_CHANNEL;
     let started: Promise<unknown>;
     try {
-      started = this.options.listen(channel, {
-        onNotify: (payload) => this.forget(payload),
-        onConnected: () => this.forgetEveryone(),
-        onError: (error) => this.report(`[rbac-grants] listener dropped, reconnecting: ${errorText(error)}`),
-      });
+      const dropped = { since: false };
+      started = this.options
+        .listen(channel, {
+          onNotify: (payload) => this.forget(payload),
+          onConnected: () => {
+            this.connected = true;
+            this.forgetEveryone();
+          },
+          onError: (error) => {
+            dropped.since = true;
+            this.connected = false;
+            this.forgetEveryone();
+            this.report(`[rbac-grants] listener dropped, reconnecting: ${errorText(error)}`);
+          },
+        })
+        .then((listener) => {
+          // Up once the first LISTEN is issued, unless it already dropped again.
+          if (!dropped.since) this.connected = true;
+          return listener;
+        });
     } catch (error) {
       started = Promise.reject(error);
     }
@@ -175,7 +196,7 @@ class KeptGrantsMemory {
   }
 
   async grantsOf(subject: string): Promise<RbacSubjectGrants> {
-    if (!(await this.ensureListening())) return this.options.load(subject);
+    if (!(await this.ensureListening()) || !this.connected) return this.options.load(subject);
     const hit = this.kept.get(subject);
     if (hit && hit.until > Date.now()) return hit.grants;
     // One load for a burst of questions about the same person.
@@ -194,6 +215,7 @@ class KeptGrantsMemory {
     this.inFlight.clear();
     this.epoch += 1;
     this.listening = null;
+    this.connected = false;
     this.retryAfter = 0;
   }
 }

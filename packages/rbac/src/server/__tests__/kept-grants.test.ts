@@ -179,6 +179,23 @@ describe('a notification', () => {
   });
 });
 
+describe('a listener that dropped', () => {
+  it('keeps nothing from the drop until it reconnects', async () => {
+    const host = harness();
+    await host.store.grantsOf('ana');
+    host.handlers().onError(new Error('connection reset'));
+    await host.store.grantsOf('ana');
+    await host.store.grantsOf('ana');
+    expect(host.loads()).toBe(3);
+    expect(host.errors.join('\n')).toContain('connection reset');
+
+    host.handlers().onConnected();
+    await host.store.grantsOf('ana');
+    await host.store.grantsOf('ana');
+    expect(host.loads()).toBe(4);
+  });
+});
+
 describe('without a listener', () => {
   it('keeps nothing, and asks the database again only after the retry wait', async () => {
     const attempts = { count: 0 };

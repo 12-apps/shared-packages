@@ -19,12 +19,19 @@
 --
 -- `version` is what keeps a recompute honest. The reader writes its result
 -- back only `WHERE version = <the version it read>`, so a change that commits
--- while it computes leaves the row stale for the next read.
+-- while it computes leaves the row stale for the next read. Every mark takes
+-- the next value of ONE sequence rather than adding one: a version is then
+-- never seen twice, not even by a row deleted and created again, so an answer
+-- resolved before a mark can never match a row marked after it. The reader
+-- never deletes a row and never inserts one as current: a scope it has no row
+-- for is inserted stale, for the next read to compute.
 --
 -- Additive: a table, functions and triggers. The backfill at the end marks
 -- every person and scope that holds anything, so the first read recomputes.
 -- A host whose own triggers already notify `rbac_changed` keeps working: the
 -- payloads are the same.
+
+CREATE SEQUENCE IF NOT EXISTS "rbac_effective_grants_version_seq";
 
 CREATE TABLE IF NOT EXISTS "rbac_effective_grants" (
     "user_id" TEXT NOT NULL,
@@ -34,7 +41,7 @@ CREATE TABLE IF NOT EXISTS "rbac_effective_grants" (
     "assignments" JSONB NOT NULL DEFAULT '[]',
     "resources" JSONB NOT NULL DEFAULT '[]',
     "stale" BOOLEAN NOT NULL DEFAULT true,
-    "version" INTEGER NOT NULL DEFAULT 0,
+    "version" BIGINT NOT NULL DEFAULT nextval('rbac_effective_grants_version_seq'),
     "computed_at" TIMESTAMP(3),
 
     CONSTRAINT "rbac_effective_grants_pkey" PRIMARY KEY ("user_id", "scope")
@@ -53,8 +60,16 @@ BEGIN
   END IF;
   INSERT INTO rbac_effective_grants (user_id, scope) VALUES (p_user, p_scope)
   ON CONFLICT (user_id, scope)
-  DO UPDATE SET stale = true, version = rbac_effective_grants.version + 1;
+  DO UPDATE SET stale = true, version = nextval('rbac_effective_grants_version_seq');
   PERFORM pg_notify('rbac_changed', p_user);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Mark every row stale and tell everyone (`*`): a template role, a TRUNCATE.
+CREATE OR REPLACE FUNCTION rbac_grants_mark_all() RETURNS VOID AS $$
+BEGIN
+  UPDATE rbac_effective_grants SET stale = true, version = nextval('rbac_effective_grants_version_seq');
+  PERFORM pg_notify('rbac_changed', '*');
 END;
 $$ LANGUAGE plpgsql;
 
@@ -65,14 +80,19 @@ DECLARE
   marked RECORD;
 BEGIN
   IF p_scope IS NULL THEN
-    UPDATE rbac_effective_grants SET stale = true, version = version + 1;
-    PERFORM pg_notify('rbac_changed', '*');
+    PERFORM rbac_grants_mark_all();
     RETURN;
   END IF;
+  -- Rows are locked in one order, so two marks of one scope cannot deadlock.
   FOR marked IN
-    UPDATE rbac_effective_grants SET stale = true, version = version + 1
-     WHERE scope = p_scope
-    RETURNING user_id
+    WITH locked AS (
+      SELECT user_id FROM rbac_effective_grants WHERE scope = p_scope ORDER BY user_id FOR UPDATE
+    )
+    UPDATE rbac_effective_grants g
+       SET stale = true, version = nextval('rbac_effective_grants_version_seq')
+      FROM locked
+     WHERE g.scope = p_scope AND g.user_id = locked.user_id
+    RETURNING g.user_id
   LOOP
     PERFORM pg_notify('rbac_changed', marked.user_id);
   END LOOP;
@@ -139,8 +159,7 @@ $$ LANGUAGE plpgsql;
 -- TRUNCATE fires no row trigger, and "any change" includes it.
 CREATE OR REPLACE FUNCTION rbac_grants_stale_everyone() RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE rbac_effective_grants SET stale = true, version = version + 1;
-  PERFORM pg_notify('rbac_changed', '*');
+  PERFORM rbac_grants_mark_all();
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;

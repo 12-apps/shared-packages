@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GLOBAL_SCOPE } from '../context';
-import { readEffectiveGrants, rowsFromGrants, grantsFromRows } from '../effective-grants';
+import {
+  EFFECTIVE_GRANT_MAX_AGE_MS,
+  readEffectiveGrants,
+  rowsFromGrants,
+  grantsFromRows,
+} from '../effective-grants';
 import { loadSubjectGrants } from '../engine';
 import type { RbacResourceGrant, RbacSubjectGrants } from '../grants';
 import { createEffectiveGrantsStore } from '../kept-grants';
@@ -121,7 +126,7 @@ describe('a stale row', () => {
     expect([...table.rows.values()][0]?.stale).toBe(true);
   });
 
-  it('is deleted when the person no longer holds anything at its scope', async () => {
+  it('is kept EMPTY, never deleted, when the person no longer holds anything at its scope', async () => {
     const host = await seededHost();
     enrolMember(host.state, TENANT_A, 'lead-1', 'BRANCH_LEAD');
     const { table, read } = readerFor(host);
@@ -132,17 +137,42 @@ describe('a stale row', () => {
     host.state.membershipRoles.length = 0;
     table.mark('lead-1', TENANT_A);
     expect(await read()).toEqual({ assignments: [], resources: [], memberships: [] });
-    expect(table.rows.size).toBe(0);
+    expect([...table.rows.values()]).toMatchObject([{ scope: TENANT_A, stale: false, assignments: [], resources: [] }]);
+    expect(table.calls).not.toContain('deleteMany');
   });
 
-  it('adds a row for a scope the resolver answers that had none', async () => {
+  it('is recomputed once it is older than the maximum age, with no mark at all', async () => {
+    const host = await seededHost();
+    enrolMember(host.state, TENANT_A, 'lead-1', 'BRANCH_LEAD');
+    const { table, resolves, read } = readerFor(host);
+    table.mark('lead-1', TENANT_A);
+    await read();
+    await read();
+    expect(resolves.count).toBe(1);
+
+    table.age(EFFECTIVE_GRANT_MAX_AGE_MS + 1);
+    await read();
+    expect(resolves.count).toBe(2);
+  });
+
+  it('adds a STALE row for a scope the resolver answers that had none, current only after its next read', async () => {
     const host = await seededHost();
     enrolMember(host.state, TENANT_A, 'lead-1', 'BRANCH_LEAD');
     assignRole(host.state, 'lead-1', 'NETWORK_OPS', GLOBAL_SCOPE);
-    const { table, read } = readerFor(host);
+    const { table, resolves, read } = readerFor(host);
     table.mark('lead-1', TENANT_A);
     await read();
-    expect([...table.rows.values()].map((row) => row.scope).sort()).toEqual([GLOBAL_SCOPE, TENANT_A]);
+    const rows = () => [...table.rows.values()].map((row) => [row.scope, row.stale]).sort();
+    expect(rows()).toEqual([
+      [GLOBAL_SCOPE, true],
+      [TENANT_A, false],
+    ]);
+    await read();
+    expect(rows()).toEqual([
+      [GLOBAL_SCOPE, false],
+      [TENANT_A, false],
+    ]);
+    expect(resolves.count).toBe(2);
   });
 
   it('is recomputed when its JSON does not parse', async () => {
