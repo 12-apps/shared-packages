@@ -93,7 +93,7 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
     // `brandName` is the HOST's own name, interpolated: the sentence is about
     // who verifies the notification, and that is the adopter, not this package.
     credentials: (brandName) =>
-      `When you register it, the dashboard asks for a username and a password to authenticate the notifications. Set both and enter exactly the same values in the form above — that is how ${brandName} confirms a notification really came from Stone.`,
+      `When you register it, the dashboard asks for a username and a password to authenticate the notifications. Set both and enter exactly the same values in the form below — that is how ${brandName} confirms a notification really came from Stone.`,
     // Event names are the vendor's own identifiers, not words.
     events: (eventList) => `Subscribe to at least these charge events: ${eventList}.`,
     testConnection:

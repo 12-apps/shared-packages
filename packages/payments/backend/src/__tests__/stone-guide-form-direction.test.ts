@@ -27,3 +27,23 @@ describe('the Stone guide points at the credential form', () => {
     expect(text).not.toMatch(above);
   });
 });
+
+/**
+ * The webhook step (step 2) has the same footer: the guide only reaches it with
+ * keys stored, the boxes stay open under its instructions, and the owner is
+ * asked to type the webhook user and password into them. It said "acima" too.
+ */
+describe('the Stone webhook step points at the credential form', () => {
+  it.each([
+    ['pt-BR', PT_BR_STONE_COPY, /formulário abaixo/, /formulário acima/],
+    ['en-US', EN_US_STONE_COPY, /form below/, /form above/],
+  ])('%s says the form is below the webhook step', (_locale, copy, below, above) => {
+    const guide = stoneProvider(copy).setupGuide?.({ webhookUrl: 'https://example.test/hook', brandName: 'Loja' });
+    const webhook = guide?.sections.find((section) => section.id === 'webhook');
+    if (!webhook) throw new Error('stone ships a webhook step');
+    const text = webhook.steps.map((step) => step.text ?? '').join('\n');
+
+    expect(text).toMatch(below);
+    expect(text).not.toMatch(above);
+  });
+});
