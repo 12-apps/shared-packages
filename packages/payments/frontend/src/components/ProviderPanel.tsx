@@ -10,7 +10,7 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { CARD_INSET, CARD_SX, INSET_FORM_SX } from './panel-tokens';
+import { CARD_INSET, CARD_SX } from './panel-tokens';
 import { OAuthPanel } from './OAuthPanel';
 import { EnvironmentNotice, EnvironmentSelector, soleEnvironment } from './EnvironmentTabs';
 import { ProviderForm } from './ProviderCredentialForm';
@@ -262,23 +262,19 @@ function environmentChrome(
  *
  * The open path is a bare box (`PathSwitch`), so every block in it sets the
  * card's inset itself, as in the rest of the unpadded body. The walkthrough
- * carries its own; the switch, its notice and — with no step panel around it
- * on the connect branch — the form did not, and ran into the card's edges
- * (FUT-4144). Off the connect branch the guide holds the form and insets it
- * already.
+ * and the form (`ProviderForm`) carry their own; the switch and its notice did
+ * not, and ran into the card's edges (FUT-4144).
  */
 function manualPathForm({
   selector,
   notice,
   walkthrough,
   credentials,
-  oauthConnect,
 }: {
   selector: ReactNode;
   notice: ReactNode;
   walkthrough: ReactNode;
   credentials: ReactNode;
-  oauthConnect: boolean;
 }): ReactNode {
   return (
     <Stack spacing={2}>
@@ -289,7 +285,7 @@ function manualPathForm({
         </Stack>
       ) : null}
       {walkthrough}
-      {oauthConnect ? <Box sx={INSET_FORM_SX}>{credentials}</Box> : credentials}
+      {credentials}
     </Stack>
   );
 }
@@ -344,7 +340,7 @@ export function ActivePanel(props: ActivePanelProps) {
       {...props}
       statusBar={statusBar}
       walkthrough={(path: 'oauth' | 'credentials') => oauthWalkthrough(props, path)}
-      form={manualPathForm({ selector, notice, walkthrough: oauthWalkthrough(props, 'credentials'), credentials, oauthConnect })}
+      form={manualPathForm({ selector, notice, walkthrough: oauthWalkthrough(props, 'credentials'), credentials })}
     />
   );
 }

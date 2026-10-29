@@ -23,6 +23,7 @@ import {
   summaryOf,
 } from './credential-rules';
 import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
+import { CARD_INSET, INSET_FORM_SX } from './panel-tokens';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy } from './settings-copy-context';
 
@@ -343,23 +344,13 @@ export function ProviderForm(props: ProviderFormProps) {
 
   const fields = summary ? null : <CredentialFields descriptor={descriptor} environment={props.environment} form={form} proven={Boolean(config?.chargeVerifiedAt)} />;
 
-  return (
-    <Stack spacing={2}>
-      {/* No guide (the host supplied none): the form stands on its own, which
-          is what every caller saw before the walkthrough could hold it. */}
-      {renderGuide
-        ? renderGuide({
-            rows,
-            sectionFooter: fields,
-            editing: form.editing && !summary,
-            stored: storedHere(descriptor, form.masked),
-            // This branch IS the credentials path: it renders only when the
-            // provider has no working connect button, so pasted keys are the
-            // only way in.
-            path: 'credentials',
-          })
-        : (rows ?? fields)}
-
+  // The card's body has no padding (`ProviderCard`), so this form sets the
+  // card's inset on what it draws itself. A guide holds the boxes and insets
+  // them; the alerts below it are the form's, and ran into the card's edges on
+  // every branch that passes one (FUT-4144). With no guide the boxes are the
+  // form's too, and take the inset with the save bar lined up under them.
+  const alerts = (
+    <>
       {form.error ? <Alert severity="error">{form.error}</Alert> : null}
       {form.probe ? (
         <ProbeAlert probe={form.probe} busy={form.busy !== null} onRetry={form.verify} />
@@ -368,6 +359,35 @@ export function ProviderForm(props: ProviderFormProps) {
           key is rendered at that field now; this keeps the leftovers, which is
           where the UNCHECKED rows live — the half a green result would deny. */}
       {form.probe ? <ProbeChecklist probe={form.probe} only={unkeyed(descriptor)} /> : null}
+    </>
+  );
+
+  return (
+    <Stack spacing={2}>
+      {renderGuide ? (
+        <>
+          {renderGuide({
+            rows,
+            sectionFooter: fields,
+            editing: form.editing && !summary,
+            stored: storedHere(descriptor, form.masked),
+            // This branch IS the credentials path: it renders only when the
+            // provider has no working connect button, so pasted keys are the
+            // only way in.
+            path: 'credentials',
+          })}
+          <Stack spacing={2} sx={{ px: CARD_INSET, '&:empty': { display: 'none' } }}>
+            {alerts}
+          </Stack>
+        </>
+      ) : (
+        // No guide (the host supplied none): the form stands on its own, which
+        // is what every caller saw before the walkthrough could hold it.
+        <Stack spacing={2} sx={INSET_FORM_SX}>
+          {rows ?? fields}
+          {alerts}
+        </Stack>
+      )}
 
       <ConfirmCredentialSave
         pending={form.pending}
