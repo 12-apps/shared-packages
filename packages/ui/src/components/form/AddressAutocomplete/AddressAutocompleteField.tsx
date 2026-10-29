@@ -15,9 +15,21 @@ import {
 import type { AddressAutocompleteState } from './AddressAutocomplete.hooks';
 import { AddressInputField } from './AddressInputField';
 import { AddressOption } from './AddressOption';
-import { AddressSuggestionsPaper } from './AddressSuggestionsPaper';
+import { AddressSuggestionsPaper, type AddressSuggestionsPaperProps } from './AddressSuggestionsPaper';
 
 export type AddressAutocompleteFieldProps = ResolvedAddressProps & AddressAutocompleteState;
+
+// What the open list says when it is empty. A failed lookup is not an empty
+// answer: the field's helper text and the alert below already say what went
+// wrong.
+const emptyTextFor = (
+  text: { typeToSearch: string; noAddressesFound: string },
+  inputValue: string,
+  apiError: string | null | undefined,
+): string | undefined => {
+  if (apiError) return undefined;
+  return inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound;
+};
 
 // The live field, rendered once Google Maps (or the mock stand-in) is ready.
 export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
@@ -42,6 +54,9 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
   handleGetCurrentLocation,
 }) => {
   const text = resolveLabels(EN_US_ADDRESS_AUTOCOMPLETE_COPY, copy);
+  const paperProps: AddressSuggestionsPaperProps = {
+    emptyText: emptyTextFor(text, inputValue, apiError),
+  };
   return (
   <Box data-testid="address-autocomplete-container">
     <Autocomplete
@@ -57,9 +72,7 @@ export const AddressAutocompleteField: FC<AddressAutocompleteFieldProps> = ({
       getOptionLabel={addressOptionLabel}
       isOptionEqualToValue={isSameAddressOption}
       PaperComponent={AddressSuggestionsPaper}
-      noOptionsText={
-        inputValue.length <= MIN_QUERY_LENGTH ? text.typeToSearch : text.noAddressesFound
-      }
+      slotProps={{ paper: paperProps }}
       renderOption={({ key, ...optionProps }, option, state) => (
         <AddressOption
           key={key}

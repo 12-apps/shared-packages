@@ -88,6 +88,7 @@ function App() {
 | `showRecent`       | `boolean`                    | `false`               | Whether to show recent commands section                       |
 | `recentCommands`   | `string[]`                   | -                     | Array of recent command IDs                                   |
 | `onCommandExecute` | `(command: Command) => void` | -                     | Callback fired when a command is executed                     |
+| `copy`             | `CommandPaletteCopy`         | -                     | **Required.** The palette's words (`PT_BR_COMMAND_PALETTE_COPY`, `EN_US_COMMAND_PALETTE_COPY`). `closeSearch` names the search row's ✕ for a screen reader; a pack without it falls back to "Close search" |
 
 ### Command Interface
 
