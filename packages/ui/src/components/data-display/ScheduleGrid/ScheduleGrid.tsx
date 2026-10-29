@@ -116,8 +116,6 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={sideways.follow}
           onFocus={sideways.bringOut}
           onPointerDownCapture={sideways.press}
-          onPointerUpCapture={sideways.release}
-          onPointerCancelCapture={sideways.release}
         >
           <GridBody grid={props} rows={rows} rowSx={rowSx} hasTotal={hasTotal} can={can} dragApi={dragApi} labels={labels} testId={testId} />
         </Box>
