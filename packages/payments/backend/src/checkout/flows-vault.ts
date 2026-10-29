@@ -2,6 +2,7 @@ import { CredentialsError, UnsupportedOperationError } from '../core/errors';
 import type { MerchantRef } from '../core/types';
 import type { VaultBeginInput, VaultCompleteInput, VaultedInstrument, VaultSession } from '../core/vault-types';
 
+import { checkoutCardProvider } from './card-provider';
 import { checkoutRefusalFor } from './failure';
 import {
   failureContext,
@@ -41,10 +42,13 @@ import type { BuyerVaultSession, VaultedCardDisplay } from './vault-port';
  * file stays a merchant/host concern, on the admin surface's named-provider
  * `vault/:provider/forget` row.
  *
- * The provider is the chain HEAD, resolved by the same rule the gateway's
- * `activeVault()` pins (`core/gateway-vault.ts`): no failover, because an
+ * The provider is the chain's CARD provider — its first link that takes a
+ * card, not its head (FUT-3138) — resolved ONCE (`card-provider.ts`) and named
+ * to the gateway, whose `activeVault()` then pins it: no failover, because an
  * instrument minted at provider #2 is garbage input to the provider the
- * merchant actually charges through.
+ * merchant actually charges cards through. The ownership facts, the vault
+ * call and the saved row all carry that one name, and an answer naming any
+ * other provider is refused rather than stored.
  */
 
 type Runtime<C, V extends object, D> = CheckoutRuntime<C, V, D>;
@@ -79,7 +83,7 @@ async function vaultContext<C, V extends object, D>(
   if (!runtime.config.vault || !runtime.config.instruments?.save) {
     return { response: vaultNotEnabled(runtime) };
   }
-  const provider = await runtime.config.credentials.defaultProvider(merchant);
+  const provider = await checkoutCardProvider(runtime, merchant);
   // No provider at all is the merchant-cannot-charge state the surface already
   // words (409), not a vault-specific gap.
   if (!provider) return { response: notConfigured(runtime) };
@@ -106,6 +110,25 @@ function vaultRefusal<C, V extends object, D>(
   }
   // Vaulting is a CARD fact — the method the wording pipeline names.
   return sendRefusal(runtime, checkoutRefusalFor(failureContext(runtime, reference, 'CARD'), error));
+}
+
+/**
+ * An adapter answered for a provider other than the one this request scoped
+ * the buyer's ownership facts to. Never stored: a card saved under one name
+ * and owned under another is a card nothing can find or charge. Worded like
+ * the save failure, with the names only in the log.
+ */
+function foreignVaultAnswer<C, V extends object, D>(
+  runtime: Runtime<C, V, D>,
+  reference: string,
+  expected: string,
+  answered: string,
+): Response {
+  runtime.log.error(`[checkout] vault for ${reference} asked ${expected} and was answered by ${answered}`);
+  return runtime.respond.fail(
+    { code: 'VAULT_NOT_SAVED', message: runtime.copy.genericProviderRefusal, field: null },
+    502,
+  );
 }
 
 /** The browser-safe half of a `VaultSession` — see {@link BuyerVaultSession}. */
@@ -151,7 +174,11 @@ export async function beginVault<C, V extends object, D>(
   if ('response' in resolved) return resolved.response;
   try {
     const gateway = await runtime.gateway();
-    return runtime.respond.ok(browserSession(await gateway.beginVault(merchant, resolved.ownership)));
+    const session = await gateway.beginVault(merchant, resolved.ownership, resolved.scope.provider);
+    if (session.provider !== resolved.scope.provider) {
+      return foreignVaultAnswer(runtime, resolved.ownership.reference, resolved.scope.provider, session.provider);
+    }
+    return runtime.respond.ok(browserSession(session));
   } catch (error) {
     return vaultRefusal(runtime, resolved.ownership.reference, error);
   }
@@ -205,15 +232,22 @@ export async function completeVault<C, V extends object, D>(
   let instrument: VaultedInstrument;
   try {
     const gateway = await runtime.gateway();
-    instrument = await gateway.completeVault(merchant, {
-      // The ownership half comes from the HOST's answer; the browser's two
-      // fields ride beside it and can override neither.
-      reference,
-      customerRef,
-      ...browserVaultFacts(await readJsonBody(request)),
-    });
+    instrument = await gateway.completeVault(
+      merchant,
+      {
+        // The ownership half comes from the HOST's answer; the browser's two
+        // fields ride beside it and can override neither.
+        reference,
+        customerRef,
+        ...browserVaultFacts(await readJsonBody(request)),
+      },
+      resolved.scope.provider,
+    );
   } catch (error) {
     return vaultRefusal(runtime, reference, error);
+  }
+  if (instrument.provider !== resolved.scope.provider) {
+    return foreignVaultAnswer(runtime, reference, resolved.scope.provider, instrument.provider);
   }
   return persistInstrument(runtime, caller, merchant, instrument, reference);
 }
