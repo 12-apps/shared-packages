@@ -1,0 +1,29 @@
+import { describe, expect, it } from 'vitest';
+
+import { EN_US_STONE_COPY } from '../providers/en-US';
+import { PT_BR_STONE_COPY } from '../providers/pt-BR';
+import { stoneProvider } from '../providers/stone';
+
+/**
+ * Where the credential boxes are, said the way the screen draws them (FUT-4144).
+ *
+ * The form is the open step's footer: the boxes come AFTER the step's
+ * instructions, as Stripe's and Itaú's guides already say ("formulário
+ * abaixo"). Stone's first step told the owner to paste the keys into the form
+ * "acima", sending them up the screen, past the button they had just used, to
+ * look for boxes that are below. Seen in the FUT-4144 run gate at every width.
+ */
+describe('the Stone guide points at the credential form', () => {
+  it.each([
+    ['pt-BR', PT_BR_STONE_COPY, /formulário abaixo/, /formulário acima/],
+    ['en-US', EN_US_STONE_COPY, /form below/, /form above/],
+  ])('%s says the form is below the key step', (_locale, copy, below, above) => {
+    const guide = stoneProvider(copy).setupGuide?.({ webhookUrl: 'https://example.test/hook', brandName: 'Loja' });
+    const first = guide?.sections[0];
+    if (!first) throw new Error('stone ships a key step');
+    const text = first.steps.map((step) => step.text ?? '').join('\n');
+
+    expect(text).toMatch(below);
+    expect(text).not.toMatch(above);
+  });
+});

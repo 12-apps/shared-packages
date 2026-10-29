@@ -82,7 +82,7 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
       'Open the dashboard and go to “Settings › Keys”. Copy the public key (pk_...) and generate the secret key (sk_...).',
     dashboardButton: 'Open the dashboard',
     paste:
-      'Paste both keys into the form above. Use the test keys while you are in the Sandbox environment, and the production ones only once you have validated it.',
+      'Paste both keys into the form below. Use the test keys while you are in the Sandbox environment, and the production ones only once you have validated it.',
     authDocsLink: 'Authentication documentation',
   },
   webhook: {

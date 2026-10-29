@@ -79,7 +79,7 @@ export const PT_BR_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
       'Abra o painel e vá em “Configurações › Chaves”. Copie a chave pública (pk_...) e gere a chave secreta (sk_...).',
     dashboardButton: 'Abrir o painel',
     paste:
-      'Cole as duas chaves no formulário acima. Use as chaves de teste enquanto estiver no ambiente Sandbox e as de produção só depois de validar.',
+      'Cole as duas chaves no formulário abaixo. Use as chaves de teste enquanto estiver no ambiente Sandbox e as de produção só depois de validar.',
     authDocsLink: 'Documentação de autenticação',
   },
   webhook: {
