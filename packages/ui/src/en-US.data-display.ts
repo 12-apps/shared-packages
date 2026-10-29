@@ -233,6 +233,8 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     clearAllFilters: "Clear all filters",
     // The KEYS are the package's own preset ids and stay as they are — the
     // surface matches on them. Only the labels beside them are words.
+    // The presets as one select where they do not fit one line (ADR 0190).
+    presetSelect: { label: "Shortcut", none: "None" },
     rangePresets: {
       hoje: "Today",
       ontem: "Yesterday",

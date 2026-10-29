@@ -41,6 +41,18 @@ const CALENDAR_CLASS = 'data-views-range-calendar';
  */
 const ROOT_SX = {
   mt: 1.5,
+  // No gaps between days: the seven columns are what a day's 40px target is
+  // carved from, and at 320 the 4px column gaps were the difference between
+  // 40 and 37; the row gaps were the 20px that pushed the last week under the
+  // "Mais" panel's edge at 320×568 (FUT-4144 UI review). A period then reads
+  // as one unbroken band.
+  '& [role="grid"], & :has(> [role="columnheader"])': { gap: 0 },
+  // With no gaps a rounded day in the middle of a period leaves a notch of
+  // background at every corner; the middle is square, the two ends keep theirs.
+  '& .calendar-day.in-range': { borderRadius: 0 },
+  // The month/year caption on ONE row at 320: the selectors give up the slack
+  // around their text before the arrows are pushed onto a second row.
+  '& [data-testid="calendar-month-select"], & [data-testid="calendar-year-select"]': { px: 0.5, minWidth: 0 },
   [`& .${CALENDAR_CLASS}`]: {
     p: 0,
     boxShadow: 'none',

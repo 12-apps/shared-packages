@@ -105,7 +105,9 @@ function RangeNote({
     <Typography
       component="p"
       data-testid={`${testId}-inclusive`}
-      sx={{ mt: 0.75, fontSize: sxRem(12), color: 'text.disabled' }}
+      // `text.secondary`, not `disabled`: the note is read, and disabled grey
+      // at 12px is 2.68:1 (FUT-4144 UI review).
+      sx={{ mt: 0.75, fontSize: sxRem(12), color: 'text.secondary' }}
     >
       {copy.filters.rangeInclusiveNote}
     </Typography>

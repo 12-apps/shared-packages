@@ -239,6 +239,17 @@ export interface DataViewsFiltersCopy {
   dayCalendar?: DataViewsDayCalendarCopy;
   /** Drop every applied filter, spelled out in the panel where there is room. */
   clearAllFilters: string;
+  /**
+   * The presets asked as a select, where the row is too narrow for them as
+   * one line of equal parts (ADR 0190, FUT-4144). Optional: a host copy
+   * without it gets the en-US pack's words.
+   */
+  presetSelect?: {
+    /** The select's label. */
+    label: string;
+    /** The empty option: no preset — picking it clears an applied one. */
+    none: string;
+  };
   /** The day-range presets' labels, keyed by preset id. */
   rangePresets: Readonly<Record<string, string>>;
   scopesLabel: string;

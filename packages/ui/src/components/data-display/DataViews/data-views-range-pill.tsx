@@ -37,7 +37,7 @@ import type { RangeFieldConfig, RangeValue } from './data-views-types';
 import { fieldRadiusPx } from '../../../tokens/field-radius';
 import { fieldHeight } from '../../../tokens/field-height';
 import { fieldEdge } from '../../../tokens/field-edge';
-import { rem, sxRem } from '../../../tokens/relative';
+import { rem, remPx, sxRem } from '../../../tokens/relative';
 
 // Re-exported: the pair moved to its own file, and its importers keep their path.
 export { RangeBounds };
@@ -172,7 +172,15 @@ function useCalendarMonths(): 1 | 2 {
  * a band of nothing beside it; 400 keeps the month and the boxes one width.
  * From `md` its content — two months — sets it.
  */
-const DAY_PAPER_SX = (theme: Theme) => ({ width: { xs: '100%', sm: rem(theme, 400), md: 'auto' } });
+const DAY_PAPER_SX = (theme: Theme) => ({
+  width: { xs: '100%', sm: rem(theme, 400), md: 'auto' },
+  // Below `sm` 8px from each edge and 8px of padding, so the month gets the
+  // 280px seven 40px day columns need: at 320 it had 256 and every day was a
+  // 33px target (FUT-4144 UI review).
+  maxWidth: { xs: `calc(100% - ${rem(theme, 16)})`, sm: `calc(100% - ${rem(theme, 32)})` },
+  p: { xs: 1, sm: 2 },
+});
+
 
 export function RangePill<T extends Record<string, unknown>>({
   field,
@@ -193,6 +201,8 @@ export function RangePill<T extends Record<string, unknown>>({
   const active = isRangeSet(value);
   const testId = `${testIdPrefix}-range-${field.id}`;
   const calendarMonths = useCalendarMonths();
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down('sm'));
   return (
     <>
       <RangeTrigger
@@ -214,6 +224,8 @@ export function RangePill<T extends Record<string, unknown>>({
           onOpenChange?.(false);
         }}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        // Below `sm` a day popover keeps 8px from the screen's edges instead of 16.
+        marginThreshold={field.kind === 'day' && phone ? remPx(theme, 8) : undefined}
         slotProps={{ paper: { sx: [{ p: 2, mt: 0.5 }, field.kind === 'day' && DAY_PAPER_SX] } }}
       >
         <RangeBounds

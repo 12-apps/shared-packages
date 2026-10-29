@@ -225,6 +225,8 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
       caption: PT_BR_UI_LABELS.calendar,
     },
     clearAllFilters: "Limpar todos os filtros",
+    // The presets as one select where they do not fit one line (ADR 0190).
+    presetSelect: { label: "Atalho", none: "Nenhum" },
     rangePresets: {
       hoje: "Hoje",
       ontem: "Ontem",

@@ -286,7 +286,9 @@ the keystrokes it did.
 
 | | below `sm` (320, 390) | `sm` to `md` (600) | from `md` (900, 1280, 1920) |
 | --- | --- | --- | --- |
-| popover width | the screen's, less 16px each side | 400px | its content's (~670px) |
+| popover width | the screen's, less 8px each side, 8px padding (so seven 40px day columns fit at 320) | 400px | its content's (~670px) |
+| presets | one select ("Atalho") | one select | one row of five equal parts |
+| "Mais" panel | the screen's width less 8px each side, as tall as the screen allows | 320px wide, as tall as the screen allows | — (the pill is on the bar) |
 | months | one, `<Month> ▾ <Year> ▾ ‹ ›` caption | one, same caption | two side by side, `‹ setembro` · `outubro ›`, the current month on the right |
 
 - Order in the popover: preset chips, the `De`/`Até` boxes (sharing the row
@@ -298,6 +300,17 @@ the keystrokes it did.
   is refused in its box and the calendar does not move; "Limpar", a preset or a
   saved view re-opens the calendar on the new range. A tap never moves the
   calendar under the finger.
+- The presets are the options of ONE question, so they sit on one line at
+  every width (ADR 0190 in the host): equal parts where the row is wide enough
+  for the widest label in each part, measured on the row itself; otherwise the
+  same options as a select, where "Nenhum" stands for tapping the active one
+  again.
+- Days are at least 40px below `sm`, with no gaps between them; the middle of a
+  period is one square band and its two ends keep their round corners.
+- A "Mais" panel holding a day range keeps the "Limpar filtros" row's height
+  while nothing is applied, so the first tap does not grow the panel under the
+  finger; the panel is as tall as the screen allows instead of a fixed 320px,
+  so a range's boxes, its month caption and its weeks are on screen together.
 - A second tap before the first swaps them — the boxes never show a period
   backwards. A tap on or before a lone `Até` keeps that `Até`.
 - The slide-in panel and the "Mais" sheet use the same pair, so they get the
