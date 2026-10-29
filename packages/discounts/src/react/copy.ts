@@ -132,6 +132,8 @@ export interface DiscountsFormCopy {
   readonly scope: string;
   readonly startsAt: string;
   readonly endsAt: string;
+  /** Inside an empty Início / Término: the day-first order the box reads (FUT-4156). */
+  readonly datePlaceholder: string;
   readonly minSubtotal: string;
   readonly usageLimit: string;
   readonly perBuyerLimit: string;
@@ -147,12 +149,24 @@ export interface DiscountsFormCopy {
   /** The first-purchase condition (FUT-2825), and what it does to the menu. */
   readonly firstOrderOnly: string;
   readonly firstOrderOnlyHint: string;
-  /** The banner over a form the operator must fix before it will send. */
+  /**
+   * The banner over a form the operator must fix before it will send. No
+   * longer rendered (FUT-4143): a client refusal says it once, in the toast
+   * (`errorSnackbar`). Kept so a host's own pack still type-checks.
+   */
   readonly reviewFields: string;
+  /**
+   * The toast a failed submit raises over the whole form (FUT-4143). The packs
+   * take it from `@12-apps/ui`'s own labels; `FormErrorSnackbar`'s fallback is
+   * English, so a form that does not pass one shows English on any screen.
+   */
+  readonly errorSnackbar: string;
   /** The banner over a write the SERVER refused. */
   readonly saveFailed: string;
   /** Per-input refusals, each attached to the input it names. */
   readonly nameRequired: string;
+  /** A name of one character — the two-character floor this form has always held. */
+  readonly nameTooShort: string;
   readonly invalidPercent: string;
   readonly invalidAmount: string;
   readonly invalidBundlePrice: string;
@@ -174,7 +188,20 @@ export interface DiscountsFormCopy {
   readonly comboSlotTargetRequired: string;
   readonly invalidComboQuantity: string;
   readonly invalidMaxComboApplications: string;
+  /** The two redemption caps: whole numbers from 1, or blank for "no cap". */
+  readonly invalidUsageLimit: string;
+  readonly invalidPerBuyerLimit: string;
+  /**
+   * Under a unit count typed with anything but digits ("2,5"), said while it is
+   * typed: a count of units has no decimals, and a browser that read the comma
+   * away stored 25.
+   */
+  readonly wholeNumberOnly: string;
   readonly endsBeforeStarts: string;
+  /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
+  readonly invalidDate: string;
+  /** A date left half-typed ("25/10/202"): shown once the box is left, or at Criar. */
+  readonly dateIncomplete: string;
 }
 
 /**
@@ -205,9 +232,17 @@ export interface DiscountsComboCopy {
   readonly empty: string;
   /**
    * The offer read back in the operator's own numbers, so a combo can be
-   * checked without saving it. `{units}` and `{groups}`.
+   * checked without saving it. `{units}` and `{groups}` are the two counted
+   * nouns below, already filled — "4 itens", "1 grupo" (FUT-4143: the sentence
+   * used to say "1 grupos").
    */
   readonly summary: string;
+  /** "1 item" / "{count} itens": one for exactly 1, the other for every other count. */
+  readonly unitsOne: string;
+  readonly unitsOther: string;
+  /** "1 grupo" / "{count} grupos", the same rule. */
+  readonly groupsOne: string;
+  readonly groupsOther: string;
   /**
    * The "leve 3, pague 2" builder (`./free-units-builder`), which is the same
    * stored shape wearing the sentence an operator would actually say. Its own

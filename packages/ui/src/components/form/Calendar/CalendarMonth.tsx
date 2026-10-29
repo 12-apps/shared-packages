@@ -17,12 +17,22 @@ import { CalendarDayCell } from './CalendarDayCell';
 const SPACER_WIDTH = sxRem(32);
 
 // `minmax(0, 1fr)`, not `1fr`: a bare `1fr` keeps each column at least its
-// content's width, which is what held the grid at 304px (FUT-3861).
-const GRID_SX = { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 0.5 } as const;
+// content's width, which is what held the grid at 304px (FUT-3861). No column
+// gap: a selected range is one band across the days, and a gap cut it into
+// tiles (FUT-4162). Rows keep theirs. Items centre in their column: the built-in
+// day stretches across it, a host's `renderDay` cell sits in its middle.
+const GRID_SX = {
+  display: 'grid',
+  justifyItems: 'center',
+  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+  columnGap: 0,
+  rowGap: 0.5,
+} as const;
 
 /**
- * A month takes the room it is given, from nothing up to seven full cells and
- * their gaps (7 × 40 + 6 × 4 design px). Months side by side keep a 280 basis,
+ * A month takes the room it is given, from nothing up to seven full columns
+ * (304 design px: what 7 × 40 cells and 6 × 4 gaps came to before the gaps
+ * went, FUT-4162). Months side by side keep a 280 basis,
  * so a multi-month calendar still wraps rather than squeezing every month.
  */
 export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;

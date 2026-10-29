@@ -16,10 +16,11 @@ describe("Calendar under a non-default type scale", () => {
       </ThemeProvider>,
     );
     const day = screen.getByTestId("calendar-date-5");
-    // A square that fills its column up to 40 design px (FUT-3861).
-    expect(getComputedStyle(day).width).toBe(r(40));
+    // A cell that fills its column up to 304/7 design px, 40 tall at full
+    // size (FUT-3861; the columns touch since FUT-4162).
+    expect(getComputedStyle(day).width).toBe(r(304 / 7));
     expect(getComputedStyle(day).maxWidth).toBe("100%");
-    expect(getComputedStyle(day).aspectRatio.replace(/\s/g, "")).toBe("1/1");
+    expect(getComputedStyle(day).aspectRatio.replace(/\s/g, "")).toBe("38/35");
 
     const weekday = screen.getByTestId("calendar-weekday-0");
     expect(getComputedStyle(weekday).height).toBe(r(32));

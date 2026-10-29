@@ -244,10 +244,13 @@ describe("a stale Pix in the list", () => {
     // The first copy, before the cart moved, is the only one there may be.
     expect(writeText).toHaveBeenCalledTimes(1);
 
+    // "Copiar de novo" is the bar's now (ADR 0129, FUT-1181): over a code the
+    // cart outgrew the bar offers "Atualizar pagamento" in its place, and the
+    // card has no copy of its own to press.
+    expect(screen.getByTestId("pix-copy-again").textContent).toMatch(/Copiar de novo|Copiado!/);
     rerender(listFlow({ ...host, basket: "l1x3" }));
-    const again = screen.getByTestId("pix-copy-again") as HTMLButtonElement;
-    await waitFor(() => expect(again.disabled).toBe(true));
-    fireEvent.click(again);
+    await waitFor(() => expect(screen.getByTestId("list-pay").textContent).toBe("Atualizar pagamento"));
+    expect(screen.getByTestId("pix-after-copy").textContent).not.toContain("Copiar de novo");
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(screen.getAllByTestId("pix-stale-veil").length).toBeGreaterThan(0);
   });

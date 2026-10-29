@@ -207,8 +207,11 @@ export function MoreFilters<T extends Record<string, unknown>>({
   onClearAll,
   anyApplied,
   compact = false,
+  clearKey,
   ...rest
 }: MoreFiltersProps<T> & {
+  /** Changes on every clear-all; the fields here are keyed on it (FUT-4144). */
+  clearKey?: number;
   /** Icon only — the same rung that strips Exibir/Exportar. */
   compact?: boolean;
   /** Clears every filter, not just the ones in here. */
@@ -267,7 +270,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
               means something refused to, which is a bug to fix rather than a
               scrollbar to live with. */}
           <Box sx={{ maxHeight: sxRem(320), overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
-            <MoreFields fields={fields} {...rest} />
+            <MoreFields key={clearKey} fields={fields} {...rest} />
           </Box>
           {anyApplied && (
             <MoreFooter onClearAll={onClearAll} testIdPrefix={rest.testIdPrefix} />

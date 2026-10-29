@@ -130,6 +130,30 @@ interface PixAfterCopyProps {
    * column then sits as tight as the prototype's (8px).
    */
   banks?: { node: ReactNode; replacesChecklist: boolean };
+  /**
+   * Inside the one list (FUT-1181, FUT-592; ADR 0129 kept by the owner,
+   * 2026-10-28): "Copiar de novo" is the bar's, so the face keeps only the QR
+   * button, labelled by the list ("Mostrar QR code (para outro aparelho)"), and
+   * on a computer — the list's own container query — the QR stands beside the
+   * steps instead.
+   */
+  inList?: { qrLabel: string };
+}
+
+/** The list pane's computer width: the QR beside the steps (the list's 512px column never reaches {@link PIX_WIDE}). */
+const LIST_WIDE = "@container pixaftercopy (min-width: 460px)";
+
+/** The list's one in-card action: the QR, as an outlined secondary (ADR 0129), on a phone only. */
+function ListActions({ qrLabel, onShowQr }: { qrLabel: string; onShowQr: () => void }): JSX.Element {
+  const { Button } = useCheckoutComponents();
+  return (
+    // Small type, so the owner's whole label holds one line on a 390px phone; a 320px one wraps it tidily.
+    <Box sx={{ "& button": { minHeight: 48, lineHeight: 1.25 }, "& button, & button *": { fontWeight: 700 }, [`@container pixaftercopy (max-width: 359.95px)`]: { [ICON_SLOT]: { display: "none" } }, [LIST_WIDE]: { display: "none" } }}>
+      <Button variant="outline" color="neutral" size="sm" fullWidth icon={<QrCodeIcon fontSize="small" />} onClick={onShowQr} dataTestId="pix-show-qr">
+        {qrLabel}
+      </Button>
+    </Box>
+  );
 }
 
 /**
@@ -181,8 +205,9 @@ function Actions({ justCopied, onCopyAgain, onShowQr, onPreferCard }: Pick<PixAf
 export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.pix;
-  const { pix, words, totalLabel, deadline, onPreferCard, footer } = props;
+  const { pix, words, totalLabel, deadline, onPreferCard, footer, inList } = props;
   const stale = usePaymentStale();
+  if (inList) return <ListAfterCopy {...props} inList={inList} />;
   return (
     <Box data-testid="pix-after-copy" sx={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
       <Box sx={{ flex: "999 1 420px", minWidth: 0, display: "flex", flexDirection: "column", gap: props.banks?.replacesChecklist ? 1 : 2.5 }}>
@@ -198,7 +223,9 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
           </Box>
         ) : null}
       </Box>
-      <Box sx={{ display: "none", [PIX_WIDE]: { display: "flex" }, flex: "1 1 240px", minWidth: 0, flexDirection: "column", alignItems: "center", gap: 1.5, p: 2.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
+      <Box
+        sx={{ display: "none", [PIX_WIDE]: { display: "flex" }, flex: "1 1 240px", minWidth: 0, flexDirection: "column", alignItems: "center", gap: 1.5, p: 2.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}
+      >
         <Text variant="body" size="xs" weight="bold" color="secondary" as="p" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {copy.notPaidYet}
         </Text>
@@ -209,6 +236,61 @@ export function PixAfterCopy(props: PixAfterCopyProps): JSX.Element {
           {copy.scanFromPhone}
         </Text>
       </Box>
+    </Box>
+  );
+}
+
+/** The card link to pay by card instead, on every width of the list (its column never reaches {@link PIX_WIDE}). */
+function PreferCardLink({ onPreferCard }: { onPreferCard: () => void }): JSX.Element {
+  const { Button } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.pix;
+  return (
+    <Box sx={{ ...LINK_SX, display: "flex", justifyContent: "center" }}>
+      <Button variant="text" color="primary" size="md" icon={<CreditCardIcon fontSize="small" />} onClick={onPreferCard} dataTestId="pix-prefer-card">
+        {copy.preferCardAction}
+      </Button>
+    </Box>
+  );
+}
+
+/**
+ * The face inside the one list: the heading (or the bank flow) across the
+ * pane, then the steps with the QR beside them on a computer — a 512px column
+ * has no room for the QR beside the heading too — and, on a phone, the QR
+ * button under the steps.
+ */
+function ListAfterCopy(props: PixAfterCopyProps & { inList: { qrLabel: string } }): JSX.Element {
+  const { Text } = useCheckoutComponents();
+  const copy = useCheckoutCopy().screens.pix;
+  const stale = usePaymentStale();
+  const { pix, words, totalLabel, deadline, onPreferCard, footer, banks, inList } = props;
+  return (
+    <Box
+      data-testid="pix-after-copy"
+      sx={{ containerType: "inline-size", containerName: "pixaftercopy", display: "flex", flexDirection: "column", gap: banks?.replacesChecklist ? 1 : 2.5 }}
+    >
+      {banks ? banks.node : <Heading words={words} totalLabel={totalLabel} />}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+        <Box sx={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column", gap: 2.5 }}>
+          {banks?.replacesChecklist ? null : <Checklist words={words} deadline={deadline} />}
+          <ListActions qrLabel={inList.qrLabel} onShowQr={props.onShowQr} />
+        </Box>
+        <Box
+          data-testid="pix-after-copy-qr"
+          sx={{ display: "none", [LIST_WIDE]: { display: "flex" }, flex: "none", flexDirection: "column", alignItems: "center", gap: 1, p: 1.5, borderRadius: 1.75, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}
+        >
+          <StaleVeil stale={stale}>
+            <PixQr payload={pix.copyPaste} size={120} alt={copy.qrAlt} />
+          </StaleVeil>
+          <Box sx={{ width: (t) => t.spacing(19) }}>
+            <Text variant="body" size="xs" color="secondary" as="p" style={{ margin: 0, textAlign: "center" }}>
+              {copy.scanFromPhone}
+            </Text>
+          </Box>
+        </Box>
+      </Box>
+      {footer}
+      {onPreferCard ? <PreferCardLink onPreferCard={onPreferCard} /> : null}
     </Box>
   );
 }

@@ -19,16 +19,25 @@ describe("phoneOs", () => {
   });
 });
 
-describe("bankAppUrl", () => {
-  it("names the package on Android and the scheme on iOS", () => {
-    expect(bankAppUrl("nubank", "android")).toContain("package=com.nu.production");
-    expect(bankAppUrl("nubank", "android").startsWith("intent://")).toBe(true);
-    expect(bankAppUrl("nubank", "ios")).toBe("nuapp://");
+describe("bankAppUrl (FUT-4081)", () => {
+  it("sends every bank to its own App Store page on iOS", () => {
+    expect(bankAppUrl("nubank", "ios")).toBe("https://apps.apple.com/br/app/id814456780");
+    expect(bankAppUrl("itau", "ios")).toBe("https://apps.apple.com/br/app/id474505665");
+    expect(bankAppUrl("bradesco", "ios")).toBe("https://apps.apple.com/br/app/id336954985");
+    expect(bankAppUrl("bb", "ios")).toBe("https://apps.apple.com/br/app/id330984271");
+    expect(bankAppUrl("caixa", "ios")).toBe("https://apps.apple.com/br/app/id490813624");
+    expect(bankAppUrl("santander", "ios")).toBe("https://apps.apple.com/br/app/id613365711");
   });
 
-  it("opens a bank with no known scheme by its launcher, naming the Play Store package", () => {
-    expect(bankAppUrl("itau", "android")).toBe("intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.itau;end");
-    expect(bankAppUrl("caixa", "android")).toContain("package=br.gov.caixa.CAIXA");
+  it("sends every bank to its own Play Store page on Android", () => {
+    const play = (pkg: string) => `https://play.google.com/store/apps/details?id=${pkg}`;
+    expect(bankAppUrl("nubank", "android")).toBe(play("com.nu.production"));
+    expect(bankAppUrl("itau", "android")).toBe(play("com.itau"));
+    expect(bankAppUrl("bradesco", "android")).toBe(play("com.bradesco"));
+    expect(bankAppUrl("bb", "android")).toBe(play("br.com.bb.android"));
+    // The old package, br.gov.caixa.CAIXA, has no Play Store page.
+    expect(bankAppUrl("caixa", "android")).toBe(play("br.com.gabba.Caixa"));
+    expect(bankAppUrl("santander", "android")).toBe(play("com.santander.app"));
   });
 });
 

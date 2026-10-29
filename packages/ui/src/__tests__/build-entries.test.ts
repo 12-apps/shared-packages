@@ -93,9 +93,10 @@ describe("the build emits one module per component", () => {
     // 146 → 147 adds the cross-platform `layout/Screen` viewport; 147 → 148
     // adds `form/PickerSheet` (FUT-3239); 148 → 149 adds the pinned
     // `form/Input/outlined` (FUT-1054); 149 → 150 adds
-    // `feedback/SequenceResolver` (FUT-3671); 150 → 152 adds
+    // `feedback/SequenceResolver` (FUT-3671); 150 → 151 adds
+    // `data-display/RegionMap` (FUT-2729); 151 → 153 adds
     // `data-display/ScheduleGrid` and `data-display/DayRuler` (FUT-3825).
-    expect(Object.keys(entries).length - internal.length).toBe(152);
+    expect(Object.keys(entries).length - internal.length).toBe(153);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {

@@ -182,6 +182,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/MapPreview`
 **Docs**: `src/components/data-display/MapPreview/MapPreview.md`
 
+### RegionMap
+**Purpose**: Show named areas (polygons with holes) around a point, and let a tap toggle each one in or out
+**Use Cases**: Bairros a store does not deliver to, delivery or sales zones, sectors switched on and off, a read-only in/out picture
+**Features**: Inline SVG with no tile server, hatched AND named excluded areas (never only colour, never red), dashed circles, highlighted area, several highlighted areas at once, a touch hit test that takes the smallest area within a few pixels (slivers reachable), memoised geometry so a toggle is cheap, accessible list of toggle buttons with state in words (shown, collapsed behind a count, or none; outside areas drawn faded but unlisted; sortable by name), Google polyline decoder, every word injected
+**Location**: `src/components/data-display/RegionMap`
+**Docs**: `src/components/data-display/RegionMap/RegionMap.md`
+
 ### Popover
 **Purpose**: Display floating content anchored to an element
 **Use Cases**: Context menus, tooltips with complex content, dropdown panels
@@ -364,6 +371,13 @@ Components for user input and form interactions.
 **Types**: `DateRangeDraft`, `DayWindow`, `DateRangeStatus`, `QuickRange`
 **Location**: `src/components/form/DateRangePicker`
 **Docs**: `src/components/form/DateRangePicker/DateRangePicker.md`
+
+### CepField
+**Purpose**: CEP input that masks, looks the address up and hands it back to fill the form
+**Use Cases**: Delivery/checkout address forms, supplier and store-location forms
+**Features**: `#####-###` mask, debounced race-safe lookup injected via `onLookup`, live-region status, degrades to a plain input, `size` (the `Input` scale) and `labelPlacement` (`above` | `inside`) to sit level with `Input`s
+**Location**: `src/components/form/CepField`
+**Docs**: `src/components/form/CepField/CepField.md`
 
 ### Checkbox
 **Purpose**: Toggle selection checkbox

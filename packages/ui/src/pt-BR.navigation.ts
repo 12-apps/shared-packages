@@ -18,6 +18,7 @@ export const PT_BR_COMMAND_PALETTE_COPY: Required<CommandPaletteCopy> = {
   commandCount: (count) => (count === 1 ? "1 comando" : `${count} comandos`),
   noCommandsFound: (query) => `Nenhum comando encontrado para "${query}"`,
   general: "Geral",
+  closeSearch: "Fechar busca",
 };
 
 export const PT_BR_BREADCRUMB_COPY: BreadcrumbCopy = {

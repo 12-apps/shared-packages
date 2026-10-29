@@ -1,6 +1,6 @@
 import { useState, type JSX } from 'react';
 
-import { required } from '@12-apps/forms-core';
+import { email, required } from '@12-apps/forms-core';
 import { Alert } from '@12-apps/ui/data-display/Alert';
 import { Checkbox } from '@12-apps/ui/form/Checkbox';
 import {
@@ -73,6 +73,9 @@ interface InviteFormBodyProps {
  * the same gesture. Holding the checkbox state a level up would leave last
  * invite's roles ticked on the next one, which is the dangerous direction: the
  * address changes and the grant silently does not.
+ *
+ * The e-mail box is `type="email"` with `autocomplete="off"`: the address is
+ * somebody else's, so the browser must not offer the inviter's own (FUT-4144).
  */
 function InviteFormBody({
   copy,
@@ -121,7 +124,7 @@ function InviteFormBody({
   return (
     <FormContainer<InviteFormValues>
       initialValues={{ email: '' }}
-      schema={{ email: [required()] }}
+      schema={{ email: [required(copy.inviteEmailRequired), email(copy.inviteEmailInvalid)] }}
       onSubmit={async (values) => {
         // An invite that grants nothing is refused on screen, where the warning
         // above already says why — never posted and turned down by the server.
@@ -130,7 +133,12 @@ function InviteFormBody({
       }}
       dataTestId="invite-form"
     >
-      <Fields.TextField name="email" label={copy.inviteEmailLabel} />
+      <Fields.TextField
+        name="email"
+        type="email"
+        autoComplete="off"
+        label={copy.inviteEmailLabel}
+      />
       {group(copy.inviteRoleLabel, systemRoles, labels.roleLabel)}
       {customRoles.length > 0 &&
         group(copy.inviteCustomRolesTitle, customRoles, (name) => name)}
@@ -145,7 +153,7 @@ function InviteFormBody({
         {copy.inviteHint}
       </Text>
       <SubmitButton>{copy.inviteAction}</SubmitButton>
-      <FormErrorSnackbar />
+      <FormErrorSnackbar message={copy.inviteFormError} />
     </FormContainer>
   );
 }

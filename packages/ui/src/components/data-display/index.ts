@@ -22,6 +22,7 @@ export * from './FleetMap';
 export * from './MapPreview';
 export * from './Popover';
 export * from './Progress';
+export * from './RegionMap';
 export * from './ScheduleGrid';
 export * from './SectionOnboarding/SectionOnboarding';
 export * from './Sheet';

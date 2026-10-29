@@ -3,6 +3,7 @@
 import type { CepFieldCopy } from "../../../../copy";
 import React, { useCallback, useMemo, useRef } from 'react';
 
+import type { InputSize } from '../../Input/Input.base';
 import { CepField as BaseCepField, type CepAddress } from '../../CepField';
 import { useFormContext } from '../FormContext';
 
@@ -29,6 +30,15 @@ export interface CepFieldProps {
   fills?: CepFills;
   /** Milliseconds to wait after the last keystroke before looking up. */
   debounceMs?: number;
+  /** The input's size — the same scale, and box heights, as `Input`. Defaults to `md`. */
+  size?: InputSize;
+  /** `above` (default) stacks the label over the box; `inside` floats it in the box like `Input`. */
+  labelPlacement?: 'above' | 'inside';
+  /**
+   * The `<input>`'s `autocomplete`. Defaults to `postal-code`; pass `off` when
+   * the form holds somebody else's address (FUT-4140).
+   */
+  autoComplete?: string;
 }
 
 const PARTS: readonly CepPart[] = ['street', 'neighborhood', 'city', 'state'];
@@ -107,6 +117,9 @@ export function CepField({
   fills,
   debounceMs,
   copy,
+  size,
+  labelPlacement,
+  autoComplete,
 }: CepFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   const { write, clearOwned } = useOwnedAutofill();
@@ -142,6 +155,9 @@ export function CepField({
       onResolved={handleResolved}
       onNotFound={clearOwned}
       debounceMs={debounceMs}
+      size={size}
+      labelPlacement={labelPlacement}
+      autoComplete={autoComplete}
       dataTestId={`total-form-field-${name}`}
     />
   );

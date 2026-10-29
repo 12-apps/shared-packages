@@ -213,6 +213,7 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     rangeInclusiveNote: "Ambas as datas entram no resultado.",
     rangeStart: "De",
     dayMask: "dd/mm/aaaa",
+    dayInvalid: "Essa data não existe.",
     clearAllFilters: "Limpar todos os filtros",
     rangePresets: {
       hoje: "Hoje",

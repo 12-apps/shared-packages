@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 
 import type { PaymentListCredit, PaymentListCreditCopy, PaymentListSummary } from "./credit-types";
 import type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy, PaymentListDebitInputs } from "./debit-copy";
+import type { PixFaceCopy } from "./pix-face-copy";
 
 export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
 
@@ -216,6 +217,9 @@ export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSumma
    * than flash. Leave it OUT (undefined) on a phone, or to keep the list's own
    * layout — the step and the column side by side once the flow's frame is
    * wide, the bar otherwise. The Pix screen and the hand-off keep their bar.
+   * On a phone the bar's line opens the same summary as a sheet (FUT-589); a
+   * host whose `cart.discountLines` carry a control reads `useInSummarySheet()`
+   * to leave it out there, as it does inside its own column.
    */
   summaryTarget?: HTMLElement | null;
 }
@@ -380,18 +384,8 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
    */
   chargingCovered?: string;
   cancel: string;
-  pixFace: {
-    /** "Pague R$ 22,00 com Pix". */
-    title: (total: string) => string;
-    /** "Válido até 18:42. Copie o código e cole no app do seu banco, em Pix copia e cola." */
-    validUntil: (time: string) => string;
-    showQr: string;
-    hideQr: string;
-    changeMethod: string;
-    /** The bar's action, and the accessible name of the tappable code. */
-    copyCode: string;
-    waiting: string;
-  };
+  /** The raised Pix's face (`list-pix.tsx`). */
+  pixFace: PixFaceCopy;
   /** "Aguardando a InfinitePay…" */
   handOffWaiting: (provider: string | null) => string;
 }

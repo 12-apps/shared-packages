@@ -16,7 +16,7 @@ import { computeActiveFilterCount, defaultSortFields } from "./data-views-grid-h
 import { resolveScope, useScopeConfigChecks, type ScopeConfig } from "./data-views-scopes";
 import { serverDerived, useServerQuery } from "./data-views-server-query";
 import { useSelection } from "./data-views-selection";
-import { useStateWriters } from "./data-views-writers";
+import { useClearFilters, useStateWriters } from "./data-views-writers";
 import {
   emptyViewState,
   type DataViewColumn,
@@ -85,6 +85,10 @@ export interface DataViewsController<T extends Record<string, unknown>> {
    * its patch from the same render-scoped snapshot and the last write would win.
    */
   patch: (next: DataViewStatePatch) => void;
+  /** Drop every filter — search, pills, ranges — from any surface that offers it. */
+  clearFilters: () => void;
+  /** Changes on every {@link clearFilters}; the filter controls are keyed on it. */
+  clearKey: number;
   matched: T[];
   gridColumns: GridColumn<T>[];
   /** Columns eligible for the show/hide menu (hideable, with a text header). */
@@ -355,6 +359,7 @@ export function useDataViewsState<T extends Record<string, unknown>>({
     state,
     ranges: state.ranges ?? {},
     patch,
+    ...useClearFilters(patch),
     matched,
     gridColumns,
     hideableColumns,

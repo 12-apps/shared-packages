@@ -218,7 +218,10 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
   activeFilterCount,
   onControlOpenChange,
   onToggleQuick,
+  clearKey,
 }: Omit<InlineFilterBarProps<T>, "fields" | "rangeFields"> & {
+  /** Changes on every clear-all; the "Mais" fields are keyed on it (FUT-4144). */
+  clearKey?: number;
   /** Presses or releases a quick chip — see `QuickFilterConfig`. */
   onToggleQuick?: (quick: QuickFilterConfig) => void;
   /** How many filters are applied — decides whether "Limpar" is on the bar at all. */
@@ -275,6 +278,7 @@ export function InlineFilterControls<T extends Record<string, unknown>>({
         compactControls={compactControls}
         clearAllHidden={clearAllHidden}
         testIdPrefix={testIdPrefix}
+        clearKey={clearKey}
       />
       )}
     </Box>
@@ -302,7 +306,9 @@ function FilterSlots<T extends Record<string, unknown>>({
   compactControls,
   clearAllHidden,
   testIdPrefix,
+  clearKey,
 }: {
+  clearKey?: number;
   onToggleQuick?: (quick: QuickFilterConfig) => void;
   inline: OverflowField<T>[];
   overflow: OverflowField<T>[];
@@ -335,6 +341,7 @@ function FilterSlots<T extends Record<string, unknown>>({
         />
       ))}
       <MoreFilters
+        clearKey={clearKey}
         onOpenChange={onControlOpenChange}
         onClearAll={onClearAll}
         anyApplied={activeFilterCount > 0}

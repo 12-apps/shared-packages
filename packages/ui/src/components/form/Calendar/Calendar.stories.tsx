@@ -3,6 +3,7 @@ import Button from '@mui/material/Button/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
 
 import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 
@@ -110,7 +111,10 @@ const RangeSelectionComponent = () => {
         selectionMode="range"
         range={selectedRange}
         onRangeChange={(range) => setSelectedRange(range)}
-        onIntermediateRangeChange={(partial) => void partial}
+        // A controlled range calendar keeps the first click only if the host
+        // stores it: without this the start was dropped and the second click
+        // began a new range (FUT-4162).
+        onIntermediateRangeChange={(partial) => setSelectedRange(partial)}
       />
       <Button onClick={() => setSelectedRange({ start: null, end: null })} variant="outlined">
         Clear
@@ -121,6 +125,27 @@ const RangeSelectionComponent = () => {
 
 export const RangeSelection: Story = {
   render: () => <RangeSelectionComponent />,
+  play: async ({ canvasElement }) => {
+    // The range calendar shows two months, so the days are found inside the
+    // first. 16-20: no leading or trailing outside days reach them, so each test
+    // id names one cell there whatever month the story opens on.
+    const canvas = within(canvasElement);
+    const month = within(canvas.getByTestId('calendar-month-0'));
+    await userEvent.click(month.getByTestId('calendar-date-16'));
+    await userEvent.click(month.getByTestId('calendar-date-20'));
+
+    await expect(month.getByTestId('calendar-date-16')).toHaveClass('range-start');
+    await expect(month.getByTestId('calendar-date-20')).toHaveClass('range-end');
+    await expect(month.getByTestId('calendar-date-18')).toHaveClass('in-range');
+    await expect(canvas.getByRole('heading', { name: /^Range: / })).not.toHaveTextContent('None');
+
+    // One band: every two neighbouring days of the range in a row touch.
+    const days = [16, 17, 18, 19, 20].map((n) => month.getByTestId(`calendar-date-${n}`).getBoundingClientRect());
+    for (let index = 1; index < days.length; index += 1) {
+      const [left, right] = [days[index - 1], days[index]];
+      if (left && right && left.top === right.top) await expect(right.left).toBeCloseTo(left.right, 1);
+    }
+  },
 };
 
 export const DualMonth: Story = {

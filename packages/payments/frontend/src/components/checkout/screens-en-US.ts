@@ -103,6 +103,8 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
   layout: {
     payHeading: 'How would you like to pay?',
     summaryTitle: 'Order summary',
+    summaryOpen: 'View summary',
+    summaryClose: 'Close the summary',
     total: 'Total',
     totalDueCaption: (items) => `Total due · ${items} ${items === 1 ? 'item' : 'items'}`,
     lineLabel: (quantity, name) => `${quantity}× ${name}`,
