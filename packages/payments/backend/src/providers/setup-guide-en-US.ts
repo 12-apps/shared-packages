@@ -97,7 +97,7 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
     // Event names are the vendor's own identifiers, not words.
     events: (eventList) => `Subscribe to at least these charge events: ${eventList}.`,
     testConnection:
-      'Once that is done, click “Test connection” above: the test makes a real authenticated call and tells you if the key is wrong.',
+      'Once that is done, click “Save and test connection” below: the test makes a real authenticated call and tells you if the key is wrong.',
     doneLabel: 'Webhook',
     doneValue: 'Registered in the Pagar.me dashboard',
     confirmLabel: 'I have registered the URL in the dashboard',
