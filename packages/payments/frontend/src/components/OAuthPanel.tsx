@@ -4,6 +4,7 @@ import { Alert, Box, Button } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import { ConnectionProbe } from './ConnectionProbe';
+import { isConnected } from './connection-state';
 import { BLOCK_GAP, CARD_INSET, LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
@@ -88,8 +89,10 @@ function ConnectUnavailableCard({
         <Alert severity="info">{notice}</Alert>
       </Box>
       {children}
-      <Box sx={{ px: CARD_INSET, py: BLOCK_GAP, '&:empty': { display: 'none' } }}>{probe}</Box>
-      <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      {probe ? <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box> : null}
+      {verification ? (
+        <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      ) : null}
     </ProviderCard>
   );
 }
@@ -148,9 +151,11 @@ export function OAuthPanel({
   const [manual, setManual] = useState(false);
   // The connection probe, for a store whose connection is a grant: the form's
   // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
-  const probe = (
+  // Nothing to test before a connection, and then no box either: its padding
+  // alone left a ~32px hole under the path switch (FUT-4144).
+  const probe = isConnected(config) ? (
     <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
-  );
+  ) : null;
   if (!prepareConnect) {
     return (
       <ConnectUnavailableCard statusBar={statusBar} notice={copy.connectUnavailable} probe={probe} verification={verification}>
@@ -184,9 +189,11 @@ export function OAuthPanel({
           box above it and the manual link below it (FUT-4084). A host step
           that renders nothing leaves its box empty, and an empty box takes no
           gap. */}
-      <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      {verification ? (
+        <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      ) : null}
       {manual ? null : walkthrough('oauth')}
-      <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box>
+      {probe ? <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box> : null}
       {descriptor.credentialSchema.length > 0 ? (
         <PathSwitch
           label={copy.preferCredentials}
