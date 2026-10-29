@@ -3,7 +3,7 @@ import type { AuthzContext, RoleAssignment } from '../core/types';
 
 import { GLOBAL_SCOPE, type RbacServerConfig } from './context';
 import { RESOURCE_ASSIGNMENT_GRANT_SELECT, type RbacDbProvider } from './db';
-import { activeResourceIds, type RbacSubjectGrants } from './grants';
+import { activeResourceIds, type RbacMembershipGrant, type RbacSubjectGrants } from './grants';
 import { parseRolePermissions, tenantRoleKey } from './permissions-format';
 
 /**
@@ -79,6 +79,14 @@ async function resolveAssignments(
   config: Pick<RbacServerConfig, 'db'>,
   actorId: string,
 ): Promise<RoleAssignment[]> {
+  return (await resolveSubject(config, actorId)).assignments;
+}
+
+/** {@link resolveAssignments}, with the memberships it read beside it. */
+async function resolveSubject(
+  config: Pick<RbacServerConfig, 'db'>,
+  actorId: string,
+): Promise<{ assignments: RoleAssignment[]; memberships: RbacMembershipGrant[] }> {
   const client = await config.db();
   const [memberships, joinRows, roleAssignments] = await Promise.all([
     client.membership.findMany({
@@ -137,7 +145,10 @@ async function resolveAssignments(
       ? { role: r.roleName, scope: r.scope }
       : { role: r.roleName, scope: r.scope, permissions };
   });
-  return [...fromMemberships, ...fromAssignments];
+  return {
+    assignments: [...fromMemberships, ...fromAssignments],
+    memberships: memberships.map((m) => ({ clientId: m.clientId, role: m.role, active: m.active })),
+  };
 }
 
 /** The tenant narrowing for the assignment relation: a bare tenant scope IS
@@ -185,8 +196,8 @@ export async function loadSubjectGrants(
   now: Date = new Date(),
 ): Promise<RbacSubjectGrants> {
   const client = await config.db();
-  const [assignments, rows] = await Promise.all([
-    resolveAssignments(config, subject),
+  const [{ assignments, memberships }, rows] = await Promise.all([
+    resolveSubject(config, subject),
     client.resourceAssignment.findMany({
       where: { userId: subject, OR: [{ validTo: null }, { validTo: { gt: now } }] },
       select: RESOURCE_ASSIGNMENT_GRANT_SELECT,
@@ -194,6 +205,7 @@ export async function loadSubjectGrants(
   ]);
   return {
     assignments,
+    memberships,
     resources: rows.map((row) => ({
       resourceType: row.resourceType,
       resourceId: row.resourceId,
