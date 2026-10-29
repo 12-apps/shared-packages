@@ -14,7 +14,7 @@ import { AddressAutocomplete } from './AddressAutocomplete';
  * suggestions paper now says them itself.
  */
 const meta: Meta<typeof AddressAutocomplete> = {
-  title: 'Form/AddressAutocomplete/Tests/Empty list',
+  title: 'Form/AddressAutocomplete/Empty list/Tests',
   component: AddressAutocomplete,
   args: {
     copy: PT_BR_ADDRESS_AUTOCOMPLETE_COPY,

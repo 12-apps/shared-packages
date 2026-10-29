@@ -14,7 +14,7 @@ import { CommandPalette } from './CommandPalette';
  * English word for a host pack written before the key existed.
  */
 const meta: Meta<typeof CommandPalette> = {
-  title: 'Navigation/CommandPalette/Tests/Close label',
+  title: 'Navigation/CommandPalette/Close label/Tests',
   component: CommandPalette,
   args: { open: true, commands: [], copy: PT_BR_COMMAND_PALETTE_COPY },
   parameters: { layout: 'centered' },
