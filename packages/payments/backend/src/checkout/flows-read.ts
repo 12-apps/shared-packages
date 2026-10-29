@@ -3,6 +3,7 @@ import type { StoredCharge } from '../core/ports';
 import type { MerchantRef } from '../core/types';
 import { reportProviderFailure } from '../core/provider-failure';
 
+import { checkoutCardProvider } from './card-provider';
 import { buyerCheckoutConfig } from './config';
 import {
   attachedChargeOf,
@@ -49,6 +50,9 @@ export async function getCheckoutConfig<C, V extends object, D>(
  * A merchant with no chain answers `[]` rather than the unscoped list: nothing
  * is chargeable there, so no instrument is reusable there, and offering one
  * would only produce a decline that blames the buyer's card.
+ *
+ * Scoped to the chain's CARD provider, not its head (FUT-3138): a PIX-only
+ * head would otherwise hide every card the provider behind it vaulted.
  */
 export async function listInstruments<C, V extends object, D>(
   runtime: Runtime<C, V, D>,
@@ -57,7 +61,7 @@ export async function listInstruments<C, V extends object, D>(
 ): Promise<Response> {
   const instruments = runtime.config.instruments;
   if (!instruments || !merchant) return runtime.respond.ok([]);
-  const provider = await runtime.config.credentials.defaultProvider(merchant);
+  const provider = await checkoutCardProvider(runtime, merchant);
   if (!provider) return runtime.respond.ok([]);
   return runtime.respond.ok(await instruments.list(caller, { merchant, provider }));
 }

@@ -1,6 +1,7 @@
 import { chargeSnapshotMismatch } from '../core/charge-identity';
 import type { ChargeSnapshot, PaymentMethodKind } from '../core/types';
 
+import { checkoutCardProvider } from './card-provider';
 import { buyerCheckoutConfig, usesHostedCheckout } from './config';
 import { cardOutcomeOf, declineOf } from './decline-wire';
 import { chargeDraftOf } from './draft';
@@ -192,7 +193,12 @@ async function resolveInstrument<C, V extends object, D>(
     { merchant: payable.merchant, provider },
     instrumentId,
   );
-  if (resolved.token !== null) return { card: { savedCardToken: resolved.token }, vaulted: true };
+  // The token NAMES its provider (FUT-3138): unattributed, the walk treats a
+  // vault token's owner as unknown and offers it to every card provider in the
+  // chain — a failover would hand one acquirer's saved card to another.
+  if (resolved.token !== null) {
+    return { card: { savedCardToken: resolved.token, tokenProvider: provider }, vaulted: true };
+  }
   // A handle the vault does not OWN, sent on the wire that conflates the two
   // kinds, is a fresh browser-minted token — which is the only reading that
   // leaves a first-time card payable at all. An owned one is a real scope
@@ -315,7 +321,9 @@ export async function chargeInstrument<C, V extends object, D>(
     return runtime.respond.ok({ status: runtime.config.payables.stateToken(payable) });
   }
 
-  const provider = await runtime.config.credentials.defaultProvider(payable.merchant);
+  // The saved card is looked up where cards are charged — the first link that
+  // takes one, not a PIX-only head (FUT-3138) — and charged THERE only.
+  const provider = await checkoutCardProvider(runtime, payable.merchant);
   if (!provider) return notConfigured(runtime);
 
   const instrument = await resolveInstrument(runtime, caller, payable, provider, draft);

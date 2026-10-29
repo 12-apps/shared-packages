@@ -187,7 +187,9 @@ describe('the flat body\'s one instrument field', () => {
     });
 
     expect(charged.status).toBe(200);
-    expect(seen[0]?.card).toEqual({ savedCardToken: 'vault_tok_1' });
+    // Named to the provider it was looked up under (FUT-3138), so a failover
+    // can never hand it to another acquirer.
+    expect(seen[0]?.card).toEqual({ savedCardToken: 'vault_tok_1', tokenProvider: 'alpha' });
     // Already vaulted — re-saving it would duplicate the buyer's own card.
     expect(world.vault.saved).toEqual([]);
   });

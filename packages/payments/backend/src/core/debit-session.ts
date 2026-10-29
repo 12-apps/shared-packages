@@ -1,4 +1,5 @@
 import type { CredentialStore } from './credential-store';
+import { firstTaking } from './method-head';
 import type { ProviderRegistry } from './registry';
 import type { MerchantRef, ThreeDSecureSession } from './types';
 
@@ -23,7 +24,7 @@ export async function debitSessionFor(
   merchant: MerchantRef,
 ): Promise<{ provider: string; session: ThreeDSecureSession } | null> {
   const chain = await deps.credentials.providerChain(merchant);
-  const provider = chain.find((name) => deps.providers.has(name) && deps.providers.get(name).capabilities.methods.includes('CARD'));
+  const provider = firstTaking(deps.providers, chain, 'CARD');
   if (!provider) return null;
   const adapter = deps.providers.get(provider);
   if (!adapter.capabilities.debit || !adapter.debit) return null;
