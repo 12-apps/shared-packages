@@ -287,6 +287,7 @@ export function FormAlerts({
   busy,
   onRetry,
   only,
+  gapAbove = false,
 }: {
   error: string | null;
   probe: VerifyProbe | null;
@@ -294,9 +295,14 @@ export function FormAlerts({
   onRetry: () => void;
   /** Keep only the checks no box shows — see `ProbeChecklist`. */
   only: (key: string) => boolean;
+  /** The stack gap above, where the alerts follow the save bar directly (no guide). */
+  gapAbove?: boolean;
 }) {
   return (
-    <Stack spacing={2} sx={{ px: CARD_INSET, pb: CARD_INSET, '&:empty': { display: 'none' } }}>
+    <Stack
+      spacing={2}
+      sx={{ px: CARD_INSET, pb: CARD_INSET, pt: gapAbove ? 2 : 0, '&:empty': { display: 'none' } }}
+    >
       {error ? <Alert severity="error">{error}</Alert> : null}
       {probe ? <ProbeAlert probe={probe} busy={busy} onRetry={onRetry} /> : null}
       {/* Only what could NOT be tied to a box. Every verdict carrying a field

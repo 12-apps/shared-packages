@@ -68,6 +68,13 @@ describe('the save bar on an incomplete form', () => {
     expect(barText(configWith({}), EN_US_PAYMENTS_SETTINGS_COPY)).toBe('Complete the fields to test.');
   });
 
+  it("keeps the old sentence for a host's copy pack without the fresh one", () => {
+    const credentials = { ...PT_BR_PAYMENTS_SETTINGS_COPY.credentials };
+    delete credentials.probeIncompleteFreshNote;
+    const pack = { ...PT_BR_PAYMENTS_SETTINGS_COPY, credentials };
+    expect(barText(configWith({}), pack)).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.credentials.probeIncompleteNote);
+  });
+
   it('still says what it kept once something is stored', () => {
     const partial = configWith({ token: { configured: true, hint: '••••42' } });
     expect(barText(partial)).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.credentials.probeIncompleteNote);

@@ -143,7 +143,7 @@ describe('the credential boxes', () => {
 });
 
 /** Total padding of a side on the way from `stop` down to `element`. */
-function paddingWithin(element: Element, stop: Element, side: 'paddingBottom' | 'paddingRight'): number {
+function paddingWithin(element: Element, stop: Element, side: 'paddingBottom' | 'paddingRight' | 'paddingTop'): number {
   const ancestors: Element[] = [];
   for (let node = element.parentElement; node && node !== stop; node = node.parentElement) ancestors.push(node);
   return ancestors.reduce((total, node) => total + (Number.parseFloat(getComputedStyle(node)[side]) || 0), 0);
@@ -164,6 +164,19 @@ describe.each([
     const alert = await errorAlert();
     expect(paddingWithin(alert, container, 'paddingBottom')).toBe(20);
     expect(paddingWithin(alert, container, 'paddingRight')).toBe(20);
+  });
+});
+
+/**
+ * With no guide the alerts follow the save bar directly. They used to share the
+ * fields' stack, which spaced the first one 16px below the bar; on their own
+ * stack they sat on the bar's bottom edge (FUT-4144 code review round 2).
+ */
+describe("the credential form's alerts with no guide", () => {
+  it('keep the stack gap below the save bar', async () => {
+    const container = renderForm('fails', false);
+    const alert = await errorAlert();
+    expect(paddingWithin(alert, container, 'paddingTop')).toBe(16);
   });
 });
 

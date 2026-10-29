@@ -348,13 +348,14 @@ export function ProviderForm(props: ProviderFormProps) {
   // card's inset on what it draws itself: a guide insets the boxes it holds;
   // with none the boxes are the form's too. The alerts are always the form's
   // (`FormAlerts`), and ran into the card's edges (FUT-4144).
-  const alertBox = (
+  const alertBox = (gapAbove = false) => (
     <FormAlerts
       error={form.error}
       probe={form.probe}
       busy={form.busy !== null}
       onRetry={form.verify}
       only={unkeyed(descriptor)}
+      gapAbove={gapAbove}
     />
   );
 
@@ -372,14 +373,14 @@ export function ProviderForm(props: ProviderFormProps) {
             // only way in.
             path: 'credentials',
           })}
-          {alertBox}
+          {alertBox()}
         </>
       ) : (
         // No guide (the host supplied none): the form stands on its own, which
         // is what every caller saw before the walkthrough could hold it.
         <>
           <Box sx={INSET_FORM_SX}>{rows ?? fields}</Box>
-          {alertBox}
+          {alertBox(true)}
         </>
       )}
 
