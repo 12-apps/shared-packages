@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Stack } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import type {
@@ -22,8 +22,8 @@ import {
   needsConfirmation,
   summaryOf,
 } from './credential-rules';
-import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
-import { CARD_INSET, INSET_FORM_SX } from './panel-tokens';
+import { FormAlerts, type VerifyProbe } from './CredentialFormAlerts';
+import { INSET_FORM_SX } from './panel-tokens';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy } from './settings-copy-context';
 
@@ -345,21 +345,17 @@ export function ProviderForm(props: ProviderFormProps) {
   const fields = summary ? null : <CredentialFields descriptor={descriptor} environment={props.environment} form={form} proven={Boolean(config?.chargeVerifiedAt)} />;
 
   // The card's body has no padding (`ProviderCard`), so this form sets the
-  // card's inset on what it draws itself. A guide holds the boxes and insets
-  // them; the alerts below it are the form's, and ran into the card's edges on
-  // every branch that passes one (FUT-4144). With no guide the boxes are the
-  // form's too, and take the inset with the save bar lined up under them.
-  const alerts = (
-    <>
-      {form.error ? <Alert severity="error">{form.error}</Alert> : null}
-      {form.probe ? (
-        <ProbeAlert probe={form.probe} busy={form.busy !== null} onRetry={form.verify} />
-      ) : null}
-      {/* Only what could NOT be tied to a box. Every verdict carrying a field
-          key is rendered at that field now; this keeps the leftovers, which is
-          where the UNCHECKED rows live — the half a green result would deny. */}
-      {form.probe ? <ProbeChecklist probe={form.probe} only={unkeyed(descriptor)} /> : null}
-    </>
+  // card's inset on what it draws itself: a guide insets the boxes it holds;
+  // with none the boxes are the form's too. The alerts are always the form's
+  // (`FormAlerts`), and ran into the card's edges (FUT-4144).
+  const alertBox = (
+    <FormAlerts
+      error={form.error}
+      probe={form.probe}
+      busy={form.busy !== null}
+      onRetry={form.verify}
+      only={unkeyed(descriptor)}
+    />
   );
 
   return (
@@ -376,17 +372,15 @@ export function ProviderForm(props: ProviderFormProps) {
             // only way in.
             path: 'credentials',
           })}
-          <Stack spacing={2} sx={{ px: CARD_INSET, '&:empty': { display: 'none' } }}>
-            {alerts}
-          </Stack>
+          {alertBox}
         </>
       ) : (
         // No guide (the host supplied none): the form stands on its own, which
         // is what every caller saw before the walkthrough could hold it.
-        <Stack spacing={2} sx={INSET_FORM_SX}>
-          {rows ?? fields}
-          {alerts}
-        </Stack>
+        <>
+          <Box sx={INSET_FORM_SX}>{rows ?? fields}</Box>
+          {alertBox}
+        </>
       )}
 
       <ConfirmCredentialSave

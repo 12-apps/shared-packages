@@ -141,3 +141,57 @@ describe('the credential boxes', () => {
     expect(insetWithin(screen.getByTestId('guide'), container)).toBe(0);
   });
 });
+
+/** Total padding of a side on the way from `stop` down to `element`. */
+function paddingWithin(element: Element, stop: Element, side: 'paddingBottom' | 'paddingRight'): number {
+  const ancestors: Element[] = [];
+  for (let node = element.parentElement; node && node !== stop; node = node.parentElement) ancestors.push(node);
+  return ancestors.reduce((total, node) => total + (Number.parseFloat(getComputedStyle(node)[side]) || 0), 0);
+}
+
+/**
+ * The alerts are the last thing in the card, and its body has no padding of its
+ * own: with only a side inset the red box sat on the card's bottom edge, its
+ * corners against the card's (FUT-4144 UI review). They end the card the way
+ * they start it — by the card inset.
+ */
+describe.each([
+  ['inside a guide', true],
+  ['with no guide', false],
+])("the credential form's alerts, %s, at the bottom of the card", (_case, guided) => {
+  it('keep the card inset below them', async () => {
+    const container = renderForm('fails', guided);
+    const alert = await errorAlert();
+    expect(paddingWithin(alert, container, 'paddingBottom')).toBe(20);
+    expect(paddingWithin(alert, container, 'paddingRight')).toBe(20);
+  });
+});
+
+/**
+ * The save bar's sentence and button line up with the boxes above them.
+ *
+ * The bar carried 18px of its own on top of whatever held it — a step panel
+ * already padded by 18, or the form's card inset — so its text and button sat
+ * 18px inside the boxes and the rule it draws (FUT-4144 UI review). The boxes'
+ * container is the bar's container too; the bar adds nothing.
+ */
+describe.each([
+  ['inside a guide', true],
+  ['with no guide', false],
+])('the save bar, %s', (_case, guided) => {
+  afterEach(() => cleanup());
+
+  it('adds no side padding of its own', () => {
+    renderForm('probes', guided);
+    const bar = screen.getByTestId('payments-form-bar');
+    expect(Number.parseFloat(getComputedStyle(bar).paddingLeft) || 0).toBe(0);
+    expect(Number.parseFloat(getComputedStyle(bar).paddingRight) || 0).toBe(0);
+  });
+
+  it('starts its sentence where the boxes start', () => {
+    const container = renderForm('probes', guided);
+    const box = screen.getByLabelText(/^Token/).closest('.MuiTextField-root') as Element;
+    const sentence = screen.getByTestId('payments-form-bar').firstElementChild as Element;
+    expect(insetWithin(sentence, container)).toBe(insetWithin(box, container));
+  });
+});

@@ -7,7 +7,7 @@ import type { VerifiedProviderConfig } from '@12-apps/payments-backend';
 import { environmentLabels } from './EnvironmentTabs';
 import type { CredentialFormCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
-import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX } from './panel-tokens';
+import { BAR_MSG_SX, BAR_SX, BTN_PRIMARY_SX, CARD_INSET } from './panel-tokens';
 import { richText } from './rich-text';
 
 /**
@@ -202,6 +202,16 @@ function barMessage(copy: CredentialFormCopy, verifying: boolean, willTest: bool
   return (local ? copy.probeLocalSaveNote : undefined) ?? copy.probeSaveNote;
 }
 
+/**
+ * The credential form's bar: `BAR_SX` without its own side padding.
+ *
+ * BAR_SX's 18px is for a bar that spans a step panel edge to edge (the confirm
+ * bar). This one always sits inside whatever holds the boxes — a step panel's
+ * padded body, or the form's card inset — so its own 18px put the sentence and
+ * the button 18px inside the boxes and the rule it draws (FUT-4144).
+ */
+const FORM_BAR_SX = { ...BAR_SX, px: 0 } as const;
+
 export function FormActions({
   busy,
   label,
@@ -226,7 +236,7 @@ export function FormActions({
   const message = barMessage(copy, busy === 'verify', willTest, local);
 
   return (
-    <Box sx={BAR_SX} data-testid="payments-form-bar">
+    <Box sx={FORM_BAR_SX} data-testid="payments-form-bar">
       <Typography sx={BAR_MSG_SX} data-testid={busy === 'verify' ? 'payments-verifying' : undefined}>
         {busy === 'verify' ? (
           <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
@@ -248,5 +258,40 @@ export function FormActions({
         {busy === 'save' ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : label}
       </Button>
     </Box>
+  );
+}
+
+/**
+ * What the form says after a save: the error, the probe's verdict, and the
+ * checks the form could not place at a box.
+ *
+ * The last thing in the provider card, whose body has no padding: set in by
+ * the card inset on its sides AND below — with the side inset alone the red
+ * box sat on the card's bottom edge, its corners against the card's (FUT-4144).
+ * Nothing to say, no box.
+ */
+export function FormAlerts({
+  error,
+  probe,
+  busy,
+  onRetry,
+  only,
+}: {
+  error: string | null;
+  probe: VerifyProbe | null;
+  busy: boolean;
+  onRetry: () => void;
+  /** Keep only the checks no box shows — see `ProbeChecklist`. */
+  only: (key: string) => boolean;
+}) {
+  return (
+    <Stack spacing={2} sx={{ px: CARD_INSET, pb: CARD_INSET, '&:empty': { display: 'none' } }}>
+      {error ? <Alert severity="error">{error}</Alert> : null}
+      {probe ? <ProbeAlert probe={probe} busy={busy} onRetry={onRetry} /> : null}
+      {/* Only what could NOT be tied to a box. Every verdict carrying a field
+          key is rendered at that field now; this keeps the leftovers, which is
+          where the UNCHECKED rows live — the half a green result would deny. */}
+      {probe ? <ProbeChecklist probe={probe} only={only} /> : null}
+    </Stack>
   );
 }
