@@ -4,7 +4,7 @@ import Box from '@mui/material/Box/index.js';
 import React, { useEffect, useRef } from 'react';
 
 import { resolveLabels } from '../../../utils/resolve-labels';
-import { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
+import { EN_US_SCHEDULE_GRID_LABELS } from './ScheduleGrid.en-US';
 import { focusables, handleGridKey } from './ScheduleGrid.keyboard';
 import { GridBody, GridHeader, type CellAbilities } from './ScheduleGrid.parts';
 import { frameSx, headerSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './ScheduleGrid.styles';
@@ -88,7 +88,7 @@ function abilitiesOf(props: ScheduleGridProps): CellAbilities {
 export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const { columns, groups, cell, onCreate, onCopy, onMove } = props;
   const testId = props.dataTestId ?? 'schedule-grid';
-  const labels = resolveLabels(SCHEDULE_GRID_LABELS['en-US'], props.labels);
+  const labels = resolveLabels(EN_US_SCHEDULE_GRID_LABELS, props.labels);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { text: announcement, say } = useAnnouncer();
   const focus = useFollowFocus(rootRef);

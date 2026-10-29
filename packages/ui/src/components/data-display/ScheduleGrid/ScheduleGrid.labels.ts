@@ -4,9 +4,12 @@
  * `PT_BR_UI_LABELS` are imported by eagerly loaded components (`Avatar`), and
  * every family in them ships to every host that renders any of those (FUT-3831).
  *
- * A pt-BR host passes `SCHEDULE_GRID_LABELS['pt-BR']` to `labels`; the grid
- * falls back to `'en-US'` on its own.
+ * Each language is a named pack beside the component (`ScheduleGrid.pt-BR.ts`,
+ * `ScheduleGrid.en-US.ts`). A pt-BR host passes `SCHEDULE_GRID_LABELS['pt-BR']` to
+ * `labels`; the grid falls back to `'en-US'` on its own.
  */
+import { EN_US_SCHEDULE_GRID_LABELS } from './ScheduleGrid.en-US';
+import { PT_BR_SCHEDULE_GRID_LABELS } from './ScheduleGrid.pt-BR';
 
 /** `ScheduleGrid`'s cell names and the sentences its live region reads after a keyboard copy or move. */
 export interface ScheduleGridLabels {
@@ -26,24 +29,11 @@ export interface ScheduleGridLabels {
   loading: string;
 }
 
-/** The same shape `locales.ts`'s `pack(...)` yields. */
+/**
+ * Both packs, in the shape `locales.ts`'s `pack(...)` yields. The component
+ * itself imports only the en-US file, its fallback.
+ */
 export const SCHEDULE_GRID_LABELS: { readonly 'pt-BR': ScheduleGridLabels; readonly 'en-US': ScheduleGridLabels } = {
-  'pt-BR': {
-    createCell: (row, column) => `Agendar ${row}, ${column}`,
-    blockedCell: (row, column) => `${row}, ${column}: fechado`,
-    copied: (block, column) => `${block} copiado para ${column}`,
-    moved: (block, row, column) => `${block} movido para ${row}, ${column}`,
-    refused: "Não dá para pôr aí: o dia está ocupado ou fechado",
-    notMovable: "Este turno não muda por aqui",
-    loading: "Carregando a escala",
-  },
-  'en-US': {
-    createCell: (row, column) => `Schedule ${row}, ${column}`,
-    blockedCell: (row, column) => `${row}, ${column}: closed`,
-    copied: (block, column) => `${block} copied to ${column}`,
-    moved: (block, row, column) => `${block} moved to ${row}, ${column}`,
-    refused: "Not there: that day is taken or closed",
-    notMovable: "This shift cannot be changed here",
-    loading: "Loading the schedule",
-  },
+  'pt-BR': PT_BR_SCHEDULE_GRID_LABELS,
+  'en-US': EN_US_SCHEDULE_GRID_LABELS,
 };

@@ -4,9 +4,12 @@
  * `PT_BR_UI_LABELS` are imported by eagerly loaded components (`Avatar`), and
  * every family in them ships to every host that renders any of those (FUT-3831).
  *
- * A pt-BR host passes `DAY_RULER_LABELS['pt-BR']` to `labels`; the ruler falls
- * back to `'en-US'` on its own.
+ * Each language is a named pack beside the component (`DayRuler.pt-BR.ts`,
+ * `DayRuler.en-US.ts`). A pt-BR host passes `DAY_RULER_LABELS['pt-BR']` to
+ * `labels`; the ruler falls back to `'en-US'` on its own.
  */
+import { EN_US_DAY_RULER_LABELS } from './DayRuler.en-US';
+import { PT_BR_DAY_RULER_LABELS } from './DayRuler.pt-BR';
 
 /** `DayRuler`'s track names and the sentences its live region reads after a keyboard move or resize. */
 export interface DayRulerLabels {
@@ -24,22 +27,11 @@ export interface DayRulerLabels {
   loading: string;
 }
 
-/** The same shape `locales.ts`'s `pack(...)` yields. */
+/**
+ * Both packs, in the shape `locales.ts`'s `pack(...)` yields. The component
+ * itself imports only the en-US file, its fallback.
+ */
 export const DAY_RULER_LABELS: { readonly 'pt-BR': DayRulerLabels; readonly 'en-US': DayRulerLabels } = {
-  'pt-BR': {
-    createTrack: (row) => `Agendar ${row}`,
-    moved: (block, range) => `${block} agora ${range}`,
-    resized: (block, range) => `${block} agora ${range}`,
-    refused: "Não dá para ir além",
-    notMovable: "Este turno não muda por aqui",
-    loading: "Carregando o dia",
-  },
-  'en-US': {
-    createTrack: (row) => `Schedule ${row}`,
-    moved: (block, range) => `${block} now ${range}`,
-    resized: (block, range) => `${block} now ${range}`,
-    refused: "It cannot go further",
-    notMovable: "This shift cannot be changed here",
-    loading: "Loading the day",
-  },
+  'pt-BR': PT_BR_DAY_RULER_LABELS,
+  'en-US': EN_US_DAY_RULER_LABELS,
 };

@@ -7,7 +7,7 @@ import { resolveLabels } from '../../../utils/resolve-labels';
 import { SR_ONLY_SX } from '../ScheduleGrid/ScheduleGrid.styles';
 import { useAnnouncer } from '../ScheduleGrid/useAnnouncer';
 import { handleBlockKey, keyCreateSpan, type RulerAbilities, type RulerScale } from './DayRuler.keyboard';
-import { DAY_RULER_LABELS } from './DayRuler.labels';
+import { EN_US_DAY_RULER_LABELS } from './DayRuler.en-US';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { Axis, Coverage, RulerRow, type RowContext } from './DayRuler.parts';
 import { groupTitleSx, rootSx, rowSx, skeletonNameSx, skeletonTrackSx } from './DayRuler.styles';
@@ -86,7 +86,7 @@ function RulerBody({ props, ctx }: { props: DayRulerProps; ctx: RowContext }): R
 export function DayRuler(props: DayRulerProps): React.JSX.Element {
   const { now, onCreate, onMove, onResize } = props;
   const testId = props.dataTestId ?? 'day-ruler';
-  const labels = resolveLabels(DAY_RULER_LABELS['en-US'], props.labels);
+  const labels = resolveLabels(EN_US_DAY_RULER_LABELS, props.labels);
   const scale = scaleOf(props);
   const can = abilitiesOf(props);
   const dragApi = useRulerDrag(scale, { onCreate, onMove, onResize });
