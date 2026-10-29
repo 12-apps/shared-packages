@@ -27,6 +27,15 @@ import type { RbacSubjectGrants } from '../grants';
  * The version is what refuses a recompute that a change overtook.
  */
 
+/**
+ * Each case boots its own PGlite and applies every migration: 1–2.5s alone,
+ * and 5–8s when `main`'s push run tests all 56 packages at once, which timed
+ * eight cases out at vitest's 5s default and kept 4.28.0 unpublished. The
+ * boot is inside each case on purpose (see `discounts`' migration test), so
+ * the test budget is the one that moves.
+ */
+vi.setConfig({ testTimeout: 60_000 });
+
 const migrationsDir = fileURLToPath(new URL('../../../prisma/migrations', import.meta.url));
 const migrationNames = readdirSync(migrationsDir, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
