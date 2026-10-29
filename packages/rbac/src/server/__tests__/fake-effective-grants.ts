@@ -85,16 +85,13 @@ export function createFakeEffectiveGrants(): FakeEffectiveGrants {
     async createMany({ data }) {
       calls.push('createMany');
       guard();
-      let count = 0;
-      for (const entry of data) {
-        const key = keyOf(entry.userId, entry.scope);
-        if (rows.has(key)) continue;
+      const fresh = data.filter((entry) => !rows.has(keyOf(entry.userId, entry.scope)));
+      for (const entry of fresh) {
         const row = blank(entry.userId, entry.scope);
         write(row, entry);
-        rows.set(key, row);
-        count += 1;
+        rows.set(keyOf(entry.userId, entry.scope), row);
       }
-      return { count };
+      return { count: fresh.length };
     },
     async deleteMany({ where }) {
       calls.push('deleteMany');

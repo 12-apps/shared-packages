@@ -176,7 +176,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `scopeParent` / `warmScope` | no | flat scopes | `org:` chains (see rule 9) |
 | `ownership` | no | none | entity-gate owner map for INSTANCE permissions |
 | `expandAssignments` | no | identity | e.g. the origin host's sector → mesas expansion |
-| `grants` | no | every decision reads the database | a host-kept copy of each subject's grants (`loadSubjectGrants`); the host owns invalidation — see `src/server/grants.ts` |
+| `grants` | no | every decision reads the database | a host-kept copy of each subject's grants; pass `createEffectiveGrantsStore(...)` — see "Effective grants" below |
 | `permissionsExtras` | no | `{}` | merged into `GET /permissions` (e.g. an entitlement snapshot) |
 | `messages` | yes | — | every refusal the surface answers with — the host's words (pt-BR hosts pass `PT_BR_RBAC_MESSAGES` from `/server`), or `localeCopy(RBAC_MESSAGES)` to answer each caller in their own |
 | `useLocale` (react) | no | none | your locale hook, so the permission and role LABELS follow the reader — see "If your readers do not share a language" |
@@ -213,6 +213,74 @@ the host resolved as `isSuper: true` with no `permissionCeiling`
 (`platformActorOf`), and the flag alone is what recognises it: the package never
 compares a membership role against a magic string, so a host may have a role
 literally called `SUPERADMIN` meaning whatever it likes.
+
+## Effective grants — one read per login, none after it
+
+A person's whole RBAC is kept in `rbac_effective_grants` (migration
+`20261029120000_rbac_effective_grants`, model `RbacEffectiveGrant`), one row
+per person and scope (a tenant id, `GLOBAL` or `org:<id>`): the membership's
+role and `active` flag, the role assignments with their permissions inline,
+and every resource grant not yet ended, with its window.
+
+- **The triggers decide nothing.** Every write to the five RBAC tables that can
+  change a person's grants marks their row `stale` (inserting it stale when it
+  is missing), bumps its `version` and calls
+  `pg_notify('rbac_changed', <user id>)`. A role marks every row at its store; a
+  template role or a `TRUNCATE` marks every row and notifies `*`. An UPDATE that
+  moves no column the resolver reads (a membership's `updated_at`, a role's
+  `published_version`) marks nothing.
+- **The resolver recomputes.** `readEffectiveGrants` is one statement,
+  `WHERE user_id = $1`. When a row is stale it runs `loadSubjectGrants` — the
+  same rule the engine uses — and writes each row back only
+  `WHERE version = <the version it read>`, so a change that commits during the
+  recompute leaves the row stale for the next read.
+- **The table is complete.** The migration backfills a stale row for every
+  person and scope holding anything, and every trigger inserts the row it
+  marks, so a person with no rows holds nothing — answered by the same read.
+- **Windows are judged by the clock**, on every question
+  (`activeResourceIds`), never when the row was written: an expired grant is
+  not honoured. The in-memory copy is also dropped at the next window boundary
+  (`nextGrantBoundary`).
+
+Wire it as the engine's `grants` port:
+
+```ts
+import { createEffectiveGrantsStore } from '@12-apps/rbac/server';
+
+export const rbacGrants = createEffectiveGrantsStore({
+  db: rbacDb,                                            // the same RbacDbProvider as config.db
+  table: async () => (await getClient()).rbacEffectiveGrant,
+  listen: (channel, handlers) => listenOnItsOwnConnection(channel, handlers),
+  derive: async (subject, grants, now) => [],            // optional: host-derived resource grants
+  onError: (message) => log.error(message),
+});
+// config.grants = rbacGrants; the audit role stamp: rbacGrants.membershipRole(userId, tenantId)
+```
+
+The store keeps each person in process memory after the first question, and
+drops them on their notification, everyone on `*` or on a listener reconnect,
+and anyone at the backstop (10 minutes) or the next window boundary. Nothing is
+kept while the listener is down; a listener that cannot start is retried after
+30 seconds. A load a notification overtook is not kept.
+
+**Derived grants.** `derive` adds resource grants computed from the host's OWN
+tables while a person is recomputed (the origin host derives a waiter's tables
+from the sectors their open shift covers). They are stored and windowed like
+any other grant. The host's migration must mark the person stale from each
+table `derive` reads, with the package's function:
+
+```sql
+CREATE TRIGGER shifts_rbac_grants_stale AFTER INSERT OR UPDATE OR DELETE ON shifts
+  FOR EACH ROW EXECUTE FUNCTION my_mark_shift_owner();  -- calls rbac_grants_mark(user_id, client_id)
+```
+
+Otherwise a derived grant outlives its source until the backstop.
+`rbac_grants_mark(user, scope)` and `rbac_grants_mark_scope(scope)` are the two
+functions a host trigger may call.
+
+**A host that already notifies `rbac_changed` from its own triggers** keeps
+working through the upgrade (the payloads are the same) and drops its own
+triggers once the package's are in.
 
 ## Phase B — adopting into a host that ALREADY has these tables (the origin host)
 

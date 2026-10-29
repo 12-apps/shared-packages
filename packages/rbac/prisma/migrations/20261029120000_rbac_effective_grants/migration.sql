@@ -1,5 +1,5 @@
 -- @12-apps/rbac: a person's resolved RBAC, one row per person and scope, kept
--- current by marking it stale (`rbac_effective_grants`, RBAC.md "Effective
+-- current by marking it stale (`rbac_effective_grants`, ADOPTING.md "Effective
 -- grants").
 --
 -- A row holds what the package's resolver (`loadSubjectGrants`) answered for
@@ -79,13 +79,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- memberships and resource_assignments name their person and tenant.
+-- memberships and resource_assignments name their person and tenant. An
+-- UPDATE that keeps both marks the row once.
 CREATE OR REPLACE FUNCTION rbac_grants_stale_by_client() RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP <> 'INSERT' THEN
     PERFORM rbac_grants_mark(OLD.user_id, OLD.client_id);
   END IF;
-  IF TG_OP <> 'DELETE' THEN
+  IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE'
+      AND (OLD.user_id IS DISTINCT FROM NEW.user_id OR OLD.client_id IS DISTINCT FROM NEW.client_id)) THEN
     PERFORM rbac_grants_mark(NEW.user_id, NEW.client_id);
   END IF;
   RETURN NULL;
@@ -98,7 +100,8 @@ BEGIN
   IF TG_OP <> 'INSERT' THEN
     PERFORM rbac_grants_mark(OLD.user_id, OLD.scope);
   END IF;
-  IF TG_OP <> 'DELETE' THEN
+  IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE'
+      AND (OLD.user_id IS DISTINCT FROM NEW.user_id OR OLD.scope IS DISTINCT FROM NEW.scope)) THEN
     PERFORM rbac_grants_mark(NEW.user_id, NEW.scope);
   END IF;
   RETURN NULL;
@@ -113,7 +116,7 @@ BEGIN
   IF TG_OP <> 'INSERT' THEN
     PERFORM rbac_grants_mark(m.user_id, m.client_id) FROM memberships m WHERE m.id = OLD.membership_id;
   END IF;
-  IF TG_OP <> 'DELETE' THEN
+  IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.membership_id IS DISTINCT FROM NEW.membership_id) THEN
     PERFORM rbac_grants_mark(m.user_id, m.client_id) FROM memberships m WHERE m.id = NEW.membership_id;
   END IF;
   RETURN NULL;

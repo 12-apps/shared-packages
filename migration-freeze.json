@@ -85,7 +85,7 @@
   "packages/product-research/prisma/migrations/20260730130000_research_runs_created_at_index/migration.sql": "d8b5e596f2fd3008cf8f4eb7588cb69edb3c8ae066516148ce35968bbcb0f2a5",
   "packages/product-research/prisma/migrations/20260731000000_offer_shipping_unknown/migration.sql": "1ac59824bdb7712350d35a9bd5d598da7ba14976087f44d9b9abdc8f0a50d113",
   "packages/rbac/prisma/migrations/20260812120000_add_rbac_tables/migration.sql": "562a691db48cdaef4ee5f3de4bd4daaf0b5300f6d646b27c26f46cff4beed484",
-  "packages/rbac/prisma/migrations/20261029120000_rbac_effective_grants/migration.sql": "3aae45fc93a2e7474372608c6fa5077150f4497b7cd4a52ec7bf12d6956ea0f4",
+  "packages/rbac/prisma/migrations/20261029120000_rbac_effective_grants/migration.sql": "36562e9880eafed9722723d79102ef5cf136b629190a803da6dccb35692b439a",
   "packages/realtime/prisma/migrations/20260813180000_add_realtime_outbox/migration.sql": "a2da5ad7028eb0d64bdb9c84c87621cad1889bf2c1700358b2baf5d4923eda40",
   "packages/report-builder/prisma/migrations/20260725170000_add_saved_reports/migration.sql": "d99f4f73f30dd4a9caa178b930bf0e7e0aeab95c107ce04e3367a5c6fa3b71f6",
   "packages/report-builder/prisma/migrations/20260726130000_add_report_lifecycle/migration.sql": "53001e93b56b604453d565facfc1a1fa1b92186ffe9b4656e463f89cbeabbe71",

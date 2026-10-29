@@ -165,7 +165,7 @@ model ResourceAssignment {
 // `version` and `pg_notify('rbac_changed', <user id>)`; the TypeScript resolver
 // recomputes a stale row on the next read and writes it back only while
 // `version` still matches what it read. So the role rule lives once, in
-// `loadSubjectGrants` (RBAC.md, "Effective grants").
+// `loadSubjectGrants` (ADOPTING.md, "Effective grants").
 //
 //   - `membershipRole` / `membershipActive` mirror the person's membership at
 //     a tenant scope (NULL when there is none) — the audit's role stamp.

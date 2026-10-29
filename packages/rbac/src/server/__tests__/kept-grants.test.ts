@@ -14,7 +14,8 @@ import {
  * trigger sends, and never trusted past its backstop or a grant's window.
  */
 
-const NOON = new Date('2026-10-29T12:00:00.000Z');
+const NOON_ISO = '2026-10-29T12:00:00.000Z';
+const noon = (): Date => new Date(NOON_ISO);
 const MINUTE = 60 * 1000;
 
 const grantsFor = (role: string, extra: Partial<RbacSubjectGrants> = {}): RbacSubjectGrants => ({
@@ -60,9 +61,55 @@ function harness(overrides: Partial<KeptGrantsOptions> = {}): Harness {
   };
 }
 
+/** A store whose FIRST load waits until released, so a notification can overtake it. */
+function gatedHarness() {
+  const gate: { open: (() => void) | null; loads: number; handlers: RbacChangeHandlers | null } = {
+    open: null,
+    loads: 0,
+    handlers: null,
+  };
+  const store = createKeptGrants({
+    load: async () => {
+      gate.loads += 1;
+      if (gate.loads === 1) await new Promise<void>((resolve) => (gate.open = resolve));
+      return grantsFor(gate.loads === 1 ? 'OWNER' : 'WAITER');
+    },
+    listen: async (_channel, handlers) => {
+      gate.handlers = handlers;
+    },
+  });
+  return {
+    store,
+    loading: () => gate.open !== null,
+    release: () => gate.open?.(),
+    loads: () => gate.loads,
+    handlers: () => {
+      if (!gate.handlers) throw new Error('the listener never started');
+      return gate.handlers;
+    },
+  };
+}
+
+/** A store whose one person holds a mesa until `endsAt`. */
+function windowedHarness(endsAt: string) {
+  const counted = { loads: 0 };
+  const store = createKeptGrants({
+    load: async () => {
+      counted.loads += 1;
+      return grantsFor('WAITER', {
+        resources: [
+          { resourceType: 'tables', resourceId: 'mesa-1', clientId: 'tenant-a', validFrom: NOON_ISO, validTo: endsAt },
+        ],
+      });
+    },
+    listen: async () => undefined,
+  });
+  return { store, loads: () => counted.loads };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(NOON);
+  vi.setSystemTime(noon());
 });
 
 afterEach(() => {
@@ -121,25 +168,14 @@ describe('a notification', () => {
   });
 
   it('keeps nothing a notification overtook while it loaded', async () => {
-    const release: { resolve: (() => void) | null } = { resolve: null };
-    const state = { loads: 0, handlers: null as RbacChangeHandlers | null };
-    const store = createKeptGrants({
-      load: async () => {
-        state.loads += 1;
-        if (state.loads === 1) await new Promise<void>((resolve) => (release.resolve = resolve));
-        return grantsFor(state.loads === 1 ? 'OWNER' : 'WAITER');
-      },
-      listen: async (_channel, handlers) => {
-        state.handlers = handlers;
-      },
-    });
-    const first = store.grantsOf('ana');
-    await vi.waitFor(() => expect(release.resolve).not.toBeNull());
-    state.handlers?.onNotify('ana');
-    release.resolve?.();
+    const gated = gatedHarness();
+    const first = gated.store.grantsOf('ana');
+    await vi.waitFor(() => expect(gated.loading()).toBe(true));
+    gated.handlers().onNotify('ana');
+    gated.release();
     expect((await first).assignments[0]?.role).toBe('OWNER');
-    expect((await store.grantsOf('ana')).assignments[0]?.role).toBe('WAITER');
-    expect(state.loads).toBe(2);
+    expect((await gated.store.grantsOf('ana')).assignments[0]?.role).toBe('WAITER');
+    expect(gated.loads()).toBe(2);
   });
 });
 
@@ -189,25 +225,14 @@ describe('the lifetime of a kept copy', () => {
   });
 
   it('ends when a grant window closes, and the closed grant is never honoured', async () => {
-    const endsAt = new Date(NOON.getTime() + MINUTE).toISOString();
-    const loads = { count: 0 };
-    const store = createKeptGrants({
-      load: async () => {
-        loads.count += 1;
-        return grantsFor('WAITER', {
-          resources: [
-            { resourceType: 'tables', resourceId: 'mesa-1', clientId: 'tenant-a', validFrom: NOON.toISOString(), validTo: endsAt },
-          ],
-        });
-      },
-      listen: async () => undefined,
-    });
-    const reach = async () =>
-      activeResourceIds(await store.grantsOf('ana'), 'tables', { clientId: 'tenant-a' }, new Date(Date.now()));
-    expect(await reach()).toEqual(['mesa-1']);
+    const endsAt = new Date(noon().getTime() + MINUTE).toISOString();
+    const windowed = windowedHarness(endsAt);
+    const before = await windowed.store.grantsOf('ana');
+    expect(activeResourceIds(before, 'tables', { clientId: 'tenant-a' }, noon())).toEqual(['mesa-1']);
     vi.advanceTimersByTime(MINUTE);
-    expect(await reach()).toEqual([]);
-    expect(loads.count).toBe(2);
+    const after = await windowed.store.grantsOf('ana');
+    expect(activeResourceIds(after, 'tables', { clientId: 'tenant-a' }, new Date(endsAt))).toEqual([]);
+    expect(windowed.loads()).toBe(2);
   });
 
   it('drops the oldest person past the bound', async () => {

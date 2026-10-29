@@ -19,11 +19,12 @@ import { createTestHost } from './server-fixtures';
 
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
-const NOON = new Date('2026-10-29T12:00:00.000Z');
+const NOON_ISO = '2026-10-29T12:00:00.000Z';
+const noon = (): Date => new Date(NOON_ISO);
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(NOON);
+  vi.setSystemTime(noon());
 });
 
 afterEach(() => {
@@ -49,7 +50,7 @@ function readerFor(host: Awaited<ReturnType<typeof seededHost>>, table = createF
         },
       },
       'lead-1',
-      NOON,
+      noon(),
     );
   return { table, resolves, read };
 }
@@ -114,7 +115,7 @@ describe('a stale row', () => {
         },
       },
       'lead-1',
-      NOON,
+      noon(),
     );
     expect(answer.assignments.map((a) => a.role)).toEqual(['BRANCH_LEAD']);
     expect([...table.rows.values()][0]?.stale).toBe(true);
@@ -170,7 +171,7 @@ describe('a stale row', () => {
         onError: (message) => errors.push(message),
       },
       'lead-1',
-      NOON,
+      noon(),
     );
     expect(answer.assignments.map((a) => a.role)).toEqual(['BRANCH_LEAD']);
     expect([...table.rows.values()][0]?.stale).toBe(true);
@@ -188,7 +189,7 @@ describe('derived grants', () => {
       resourceType: 'loans',
       resourceId: 'loan-9',
       clientId: TENANT_A,
-      validFrom: NOON.toISOString(),
+      validFrom: NOON_ISO,
       validTo: null,
     };
     const options = {
@@ -196,8 +197,8 @@ describe('derived grants', () => {
       resolve: (subject: string, now: Date) => loadSubjectGrants({ db: async () => host.db }, subject, now),
       derive: async () => [derived],
     };
-    expect((await readEffectiveGrants(options, 'lead-1', NOON)).resources).toEqual([derived]);
-    expect((await readEffectiveGrants({ ...options, derive: async () => [] }, 'lead-1', NOON)).resources).toEqual([
+    expect((await readEffectiveGrants(options, 'lead-1', noon())).resources).toEqual([derived]);
+    expect((await readEffectiveGrants({ ...options, derive: async () => [] }, 'lead-1', noon())).resources).toEqual([
       derived,
     ]);
   });
@@ -212,7 +213,7 @@ describe('rows and grants', () => {
         { role: 'AUDITOR', scope: 'org:north' },
       ],
       resources: [
-        { resourceType: 'loans', resourceId: 'l-1', clientId: TENANT_B, validFrom: NOON.toISOString(), validTo: null },
+        { resourceType: 'loans', resourceId: 'l-1', clientId: TENANT_B, validFrom: NOON_ISO, validTo: null },
       ],
       memberships: [{ clientId: TENANT_A, role: 'BRANCH_LEAD', active: true }],
     };
