@@ -106,7 +106,7 @@ function world(chain: { name: string; adapter: PaymentProviderAdapter }[], optio
   return { ...built, scopes };
 }
 
-/** The Itáu-first shape: a PIX-only head, then the provider that takes cards. */
+/** The PIX-first shape: a PIX-only head, then the provider that takes cards. */
 function pixHeadThenCards(sent: Sent) {
   return [
     { name: 'pixonly', adapter: pixOnly('pixonly') },
