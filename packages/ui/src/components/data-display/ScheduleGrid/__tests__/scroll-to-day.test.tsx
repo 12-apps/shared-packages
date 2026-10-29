@@ -27,11 +27,35 @@ const scrolls = new WeakMap<Element, number>();
 const offset = (el: Element): number => scrolls.get(el) ?? 0;
 /** The property the stand-in replaces; named once so no assertion reads the real one. */
 const SCROLL_X = "scroll" + "Left";
-const scrollTo = vi.fn(function (this: HTMLElement, x: number) {
-  scrolls.set(this, x);
+const scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) {
+  scrolls.set(this, options.left ?? 0);
 });
 
+
+/** The ResizeObservers the grid made, so a test can deliver the first width. */
+class FakeResizeObserver {
+  static made: FakeResizeObserver[] = [];
+  readonly observed: Element[] = [];
+  disconnected = false;
+  constructor(private readonly callback: ResizeObserverCallback) {
+    FakeResizeObserver.made.push(this);
+  }
+  observe(target: Element): void {
+    this.observed.push(target);
+  }
+  unobserve(): void {}
+  disconnect(): void {
+    this.disconnected = true;
+  }
+  /** The browser reporting a size change. */
+  deliver(): void {
+    if (!this.disconnected) this.callback([], this as unknown as ResizeObserver);
+  }
+}
+
 function rectOf(el: Element): DOMRect {
+  // Inside a `hidden` host: no box, as under `display: none` or in a container with no width yet.
+  if (el.closest("[hidden]")) return new DOMRect(0, 0, 0, 0);
   const head = el.closest("[data-sg-head]");
   const shift = head ? (scrolls.get(head) ?? 0) : 0;
   if (el.hasAttribute("data-sg-corner")) return new DOMRect(0, 0, NAMES_RIGHT, 40);
@@ -44,6 +68,8 @@ function rectOf(el: Element): DOMRect {
 
 beforeEach(() => {
   scrollTo.mockClear();
+  FakeResizeObserver.made = [];
+  vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
     return rectOf(this);
   });
@@ -68,11 +94,20 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   Reflect.deleteProperty(HTMLElement.prototype, SCROLL_X);
 });
 
-function renderGrid(overrides: Partial<ScheduleGridProps> = {}) {
+/** A host element with no box yet; `show()` gives it one. */
+function hiddenHost(): { container: HTMLElement; show: () => void } {
+  const container = document.createElement("div");
+  container.hidden = true;
+  document.body.append(container);
+  return { container, show: () => container.removeAttribute("hidden") };
+}
+
+function renderGrid(overrides: Partial<ScheduleGridProps> = {}, container?: HTMLElement) {
   const props: ScheduleGridProps = {
     columns: COLUMNS,
     groups: [{ title: "Cozinha", rows: [{ id: "ana", label: "Ana Lima" }] }],
@@ -80,7 +115,7 @@ function renderGrid(overrides: Partial<ScheduleGridProps> = {}) {
     dataTestId: "sg",
     ...overrides,
   };
-  const view = render(<ScheduleGrid {...props} />);
+  const view = render(<ScheduleGrid {...props} />, container ? { container } : undefined);
   return { rerender: (next: Partial<ScheduleGridProps>) => view.rerender(<ScheduleGrid {...props} {...next} />) };
 }
 
@@ -91,7 +126,7 @@ describe("scrollToDay", () => {
   it("opens the days on that day, first after the names, at once, and the header follows", () => {
     renderGrid({ scrollToDay: 3 });
     expect(scrollTo).toHaveBeenCalledTimes(1);
-    expect(scrollTo).toHaveBeenCalledWith(3 * DAY_PITCH, 0);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 3 * DAY_PITCH, behavior: "instant" });
     expect(scrollTo.mock.contexts[0]).toBe(body());
     expect(offset(body())).toBe(3 * DAY_PITCH);
     expect(offset(head())).toBe(3 * DAY_PITCH);
@@ -103,7 +138,7 @@ describe("scrollToDay", () => {
     const { rerender } = renderGrid();
     expect(scrollTo).not.toHaveBeenCalled();
     rerender({ scrollToDay: 0 });
-    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 0, behavior: "instant" });
   });
 
   it("keeps the person's own scroll on a re-render with the same day", () => {
@@ -118,10 +153,10 @@ describe("scrollToDay", () => {
   it("scrolls again each time the day changes, from wherever the days are", () => {
     const { rerender } = renderGrid({ scrollToDay: 3 });
     rerender({ scrollToDay: 1 });
-    expect(scrollTo).toHaveBeenLastCalledWith(DAY_PITCH, 0);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: DAY_PITCH, behavior: "instant" });
     expect(offset(head())).toBe(DAY_PITCH);
     rerender({ scrollToDay: 5 });
-    expect(scrollTo).toHaveBeenLastCalledWith(5 * DAY_PITCH, 0);
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 5 * DAY_PITCH, behavior: "instant" });
   });
 
   it("ignores a day that is not a column", () => {
@@ -151,9 +186,63 @@ describe("scrollToDay", () => {
     outside.remove();
   });
 
-  it("still opens on the day while the rows load", () => {
-    renderGrid({ scrollToDay: 2, loading: true });
-    expect(scrollTo).toHaveBeenCalledWith(2 * DAY_PITCH, 0);
+  it("waits for the rows while they load, anchors once they are drawn, and not again on a refetch", () => {
+    const { rerender } = renderGrid({ scrollToDay: 2, loading: true });
+    expect(scrollTo).not.toHaveBeenCalled();
+    rerender({ scrollToDay: 2, loading: false });
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 2 * DAY_PITCH, behavior: "instant" });
+    Reflect.set(body(), SCROLL_X, 40); // the person's own sideways scroll
+    rerender({ scrollToDay: 2, loading: true });
+    rerender({ scrollToDay: 2, loading: false });
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(offset(body())).toBe(40);
+  });
+
+  it("waits while there are no rows or an error, then anchors on the drawn days", () => {
+    const { rerender } = renderGrid({ scrollToDay: 4, groups: [], empty: "Ninguém" });
+    const kitchen = [{ title: "Cozinha", rows: [{ id: "ana", label: "Ana Lima" }] }];
+    rerender({ scrollToDay: 4, groups: kitchen, error: "Falhou" });
+    expect(scrollTo).not.toHaveBeenCalled();
+    rerender({ scrollToDay: 4, groups: kitchen, error: undefined });
+    expect(scrollTo).toHaveBeenCalledWith({ left: 4 * DAY_PITCH, behavior: "instant" });
+  });
+
+  it("with no box yet (hidden, or a container sized after mount) waits for the first width, once", () => {
+    const host = hiddenHost();
+    renderGrid({ scrollToDay: 3 }, host.container);
+    expect(scrollTo).not.toHaveBeenCalled();
+    const [observer] = FakeResizeObserver.made;
+    if (!observer) throw new Error("no ResizeObserver");
+    expect(observer.observed).toEqual([head()]);
+    observer.deliver(); // a resize that still has no width
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(observer.disconnected).toBe(false);
+    host.show();
+    act(() => observer.deliver());
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 3 * DAY_PITCH, behavior: "instant" });
+    expect(offset(head())).toBe(3 * DAY_PITCH);
+    expect(observer.disconnected).toBe(true);
+  });
+
+  it("stops waiting for a width when the day changes or the grid goes away", () => {
+    const { rerender } = renderGrid({ scrollToDay: 3 }, hiddenHost().container);
+    const [first] = FakeResizeObserver.made;
+    rerender({ scrollToDay: 5 });
+    expect(first?.disconnected).toBe(true);
+    cleanup();
+    expect(FakeResizeObserver.made[1]?.disconnected).toBe(true);
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("measures from the header's own scroll, not a body the header has not caught up with yet", () => {
+    const { rerender } = renderGrid({ scrollToDay: 1 });
+    expect(offset(head())).toBe(DAY_PITCH);
+    // The person scrolled the days; the scroll event that syncs the header has not run yet.
+    Reflect.set(body(), SCROLL_X, 50);
+    rerender({ scrollToDay: 3 });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 3 * DAY_PITCH, behavior: "instant" });
   });
 });
 

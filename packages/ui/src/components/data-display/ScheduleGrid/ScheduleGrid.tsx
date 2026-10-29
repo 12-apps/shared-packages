@@ -70,6 +70,11 @@ function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
   };
 }
 
+/** The body shows the days' rows: not the skeleton, the host's error or its empty state. */
+function daysDrawn(props: ScheduleGridProps, rowCount: number): boolean {
+  return !props.loading && !props.error && rowCount > 0;
+}
+
 function abilitiesOf(props: ScheduleGridProps): CellAbilities {
   const open = !props.readOnly && !props.loading;
   return { create: open && Boolean(props.onCreate), copy: open && Boolean(props.onCopy), move: open && Boolean(props.onMove) };
@@ -102,7 +107,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const sideways = useSidewaysScroll(headRef, bodyRef);
-  useScrollToDay(headRef, bodyRef, props.scrollToDay, columns.length, sideways.follow);
+  useScrollToDay(headRef, bodyRef, { day: props.scrollToDay, dayCount: columns.length, drawn: daysDrawn(props, rows.length) }, sideways.follow);
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     sideways.release();
