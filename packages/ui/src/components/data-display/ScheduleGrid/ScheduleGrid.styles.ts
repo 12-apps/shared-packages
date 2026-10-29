@@ -75,7 +75,9 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
         },
         // The header row follows the days sideways (the grid sets its scroll). It is no scroller of
         // its own: a scroller with nothing focusable inside is a tab stop of its own.
-        '& > [data-sg-head]': { overflowX: 'hidden' },
+        // `contain` still holds on a hidden overflow: a sideways swipe over the header is never the
+        // browser's back / forward gesture.
+        '& > [data-sg-head]': { overflowX: 'hidden', overscrollBehaviorX: 'contain' },
         // The pinned column: the names (and the cell above them, and the group
         // titles) stay while the days scroll under them.
         '& [role="rowheader"], & [data-sg-corner]': {

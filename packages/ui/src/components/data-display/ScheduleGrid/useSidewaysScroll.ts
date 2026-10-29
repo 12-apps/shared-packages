@@ -1,5 +1,5 @@
 import type * as React from 'react';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { SCHEDULE_GRID_METRICS as M } from './ScheduleGrid.metrics';
 
@@ -12,7 +12,7 @@ export interface SidewaysScroll {
   /** On the days' focus: a cell the keyboard reaches is brought fully into view. */
   bringOut: (event: React.FocusEvent<HTMLElement>) => void;
   /** A press began: the focus it starts is the pointer's, and is left where it is. */
-  press: (event: React.PointerEvent<HTMLElement>) => void;
+  press: () => void;
   /** The press ended, or the keyboard took over. */
   release: () => void;
 }
@@ -102,15 +102,25 @@ export function useSidewaysScroll(
     if (scroller) scroller.scrollTop -= underHeader;
     else window.scrollBy(0, -underHeader);
   };
+  // A press released outside the days (a drag that ends past them) still ends: the window hears
+  // it. One pair of listeners for the grid's lifetime, gone with it — never one per press.
+  useEffect(() => {
+    const view = bodyRef.current?.ownerDocument.defaultView ?? window;
+    const end = (): void => {
+      pressing.current = false;
+    };
+    view.addEventListener('pointerup', end, true);
+    view.addEventListener('pointercancel', end, true);
+    return () => {
+      view.removeEventListener('pointerup', end, true);
+      view.removeEventListener('pointercancel', end, true);
+    };
+  }, [bodyRef]);
+  const press = (): void => {
+    pressing.current = true;
+  };
   const release = (): void => {
     pressing.current = false;
-  };
-  // A press released outside the days (a drag that ends past them) still ends: the window hears it.
-  const press = (event: React.PointerEvent<HTMLElement>): void => {
-    pressing.current = true;
-    const view = event.currentTarget.ownerDocument.defaultView;
-    view?.addEventListener('pointerup', release, { once: true, capture: true });
-    view?.addEventListener('pointercancel', release, { once: true, capture: true });
   };
   return { follow, forwardWheel, bringOut, press, release };
 }
