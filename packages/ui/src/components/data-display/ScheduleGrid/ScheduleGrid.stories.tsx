@@ -6,12 +6,12 @@ import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles/index
 import type * as React from 'react';
 import { useState } from 'react';
 
-import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { densityThemeOptions } from '../../../tokens/density';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
 import { ScheduleGrid } from './ScheduleGrid';
+import { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
 import type { ScheduleGridBlock, ScheduleGridCell, ScheduleGridColumn, ScheduleGridGroup } from './ScheduleGrid.types';
 
 /**
@@ -236,7 +236,7 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
           setSelected(id);
           setLog(`Abrir ${id}`);
         }}
-        labels={PT_BR_UI_LABELS.scheduleGrid}
+        labels={SCHEDULE_GRID_LABELS['pt-BR']}
         aria-label="Escala da semana"
         dataTestId="grid"
       />

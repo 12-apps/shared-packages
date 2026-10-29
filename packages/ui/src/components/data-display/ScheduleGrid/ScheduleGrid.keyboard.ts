@@ -1,6 +1,6 @@
 import type * as React from 'react';
 
-import type { ScheduleGridLabels } from '../../../copy/labels';
+import type { ScheduleGridLabels } from './ScheduleGrid.labels';
 import { isOpen, stepDay } from './schedule-grid-model';
 import type { CellAbilities } from './ScheduleGrid.parts';
 import type { ScheduleGridBlock, ScheduleGridCell, ScheduleGridColumn, ScheduleGridRow } from './ScheduleGrid.types';

@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { ScheduleGrid } from './ScheduleGrid';
+import { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
 import type { ScheduleGridCell } from './ScheduleGrid.types';
 
 /**
@@ -54,7 +54,7 @@ const meta: Meta<typeof ScheduleGrid> = {
     cell,
     totalLabel: 'horas',
     createPreview: () => '08:00–14:00',
-    labels: PT_BR_UI_LABELS.scheduleGrid,
+    labels: SCHEDULE_GRID_LABELS['pt-BR'],
     'aria-label': 'Escala da semana',
     dataTestId: 'sg',
     onCreate: fn(),

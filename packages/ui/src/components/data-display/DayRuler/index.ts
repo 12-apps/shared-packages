@@ -6,4 +6,5 @@ export type {
   DayRulerRow,
   RulerHour,
 } from './DayRuler.types';
-export type { DayRulerLabels } from '../../../copy/labels';
+export { DAY_RULER_LABELS } from './DayRuler.labels';
+export type { DayRulerLabels } from './DayRuler.labels';

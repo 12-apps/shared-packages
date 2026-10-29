@@ -60,7 +60,7 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | `empty` | `ReactNode?` | Shown when there are no rows at all. |
 | `stickyTop` | `number?` (px, default 0) | Offset of the sticky header row under a pinned page bar. |
 | `aria-label` | `string?` | The grid's name. |
-| `labels` | `Partial<ScheduleGridLabels>` | `createCell(row, column)`, `blockedCell(row, column)`, `copied(block, column)`, `moved(block, row, column)`, `refused`, `loading`. Default: the English pack; a pt-BR host passes `UI_LABELS['pt-BR'].scheduleGrid`. |
+| `labels` | `Partial<ScheduleGridLabels>` | `createCell(row, column)`, `blockedCell(row, column)`, `copied(block, column)`, `moved(block, row, column)`, `refused`, `loading`. Default: the English pack; a pt-BR host passes `SCHEDULE_GRID_LABELS['pt-BR']` from `@12-apps/ui/data-display/ScheduleGrid`. |
 | `dataTestId` | `string?` (default `schedule-grid`) | Parts: `-header`, `-row-${rowId}`, `-cell-${rowId}-${day}`, `-block-${blockId}`, `-grip-l-${blockId}`, `-grip-r-${blockId}`, `-break-${blockId}`, `-live`, `-loading`. |
 
 ### Tones — never colour alone

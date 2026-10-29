@@ -1,6 +1,6 @@
 import type * as React from 'react';
 
-import type { ScheduleGridLabels } from '../../../copy/labels';
+import type { ScheduleGridLabels } from './ScheduleGrid.labels';
 
 /**
  * How a block reads. Each tone is drawn differently AND carries its `note`
