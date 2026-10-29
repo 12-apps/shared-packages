@@ -40,14 +40,15 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 - A keyboard copy or move, and a refusal (taken, closed, past either end), are read by a polite
   live region; on a block that is not `copyable` / `movable` it reads `labels.notMovable` ("Este
   turno não muda por aqui"). With Ctrl or Meta held the keys are not the grid's. After a keyboard move, focus follows the block to its new cell once the host
-  re-renders it there; after a keyboard create (Enter or Space on a "+"), focus moves to the
-  block the host renders in that cell. A host that renders nothing there keeps focus on the "+".
+  re-renders it there; after a create on a "+" (Enter, Space or a click), focus moves to the
+  block the host renders in that cell, so the arrows go on from there (after a click, without
+  scrolling). A host that renders nothing there keeps focus where it was.
 
 ## Props
 
 | Prop | Type | Description |
 |---|---|---|
-| `columns` | `ScheduleGridColumn[]` | `label` (wraps to a second line when its column is short, never cut; also in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
+| `columns` | `ScheduleGridColumn[]` | `label` (wraps to a second line when its column is short, never cut, and never between a word and the number after it: "Seg 19/10" stays whole; also in `title`), `sublabel?`, `today?` (label in the primary colour, cells framed). A day is its index here. |
 | `groups` | `ScheduleGridGroup[]` | `title?` (upper-case heading, names the row group), `rows`: `id`, `label`, `meta?`, `metaTone?` (`'warning'` for "acima de 40h"), `total?`, `onLabelClick?` (makes the name a button), `labelAccessible?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when the column has no room for both), `chips?` (node under the meta — "2 regras ›"; one line, a chip that does not fit shrinks and cuts its label). |
 | `cell` | `(rowId, day) => ScheduleGridCell` | `blocks` (`id`, `label`, `note?`, `tone`, `movable?`, `copyable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` as fractions 0…1 of the block, a meal break drawn as a hatched gap; its words go in `note`), `blocked?` (hatched, refuses create and drop), `blockedLabel?`. Called for every cell on each render: keep it cheap. |
 | `totalLabel` | `string?` | The last column's header ("horas"). |

@@ -233,6 +233,12 @@ interface HeaderProps {
 }
 
 /** The days, their counts and the total column's header — pinned while the grid scrolls. */
+
+/** A label wraps between words, never inside "Seg 19/10": the space before a number holds. */
+function keepDatesWhole(label: string): string {
+  return label.replace(/ (?=\d)/g, '\u00a0');
+}
+
 export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps): React.JSX.Element {
   return (
     <Box role="row" sx={[rowSx, headerRowSx]} data-testid={`${testId}-header`}>
@@ -241,7 +247,7 @@ export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps):
       {columns.map((column, day) => (
         <Box role="columnheader" key={`${day}-${column.label}`} sx={headerCellSx(Boolean(column.today))}>
           <span data-sg-col="full" title={column.label}>
-            {column.label}
+            {keepDatesWhole(column.label)}
           </span>
           {column.sublabel ? (
             <Box component="span" sx={headerSublabelSx} data-sg-col="sub">

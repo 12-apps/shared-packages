@@ -15,12 +15,20 @@ import { useSidewaysScroll } from './useSidewaysScroll';
 
 /**
  * After a keyboard move the host re-renders the block in its new cell (a new
- * element): focus follows it there. After a keyboard create (Enter or Space on
- * an empty day's "+") the "+" gives way to the host's new block: focus moves
- * to it. A host that refused keeps focus where it was; the next key or pointer
- * press forgets the wait.
+ * element): focus follows it there. After a create on an empty day's "+" (Enter,
+ * Space or a click) the "+" gives way to the host's new block: focus moves to
+ * it, so the arrows go on from there — after a click without scrolling. A host
+ * that refused keeps focus where it was; the next key or pointer press forgets
+ * the wait.
  */
-type FollowTarget = { kind: 'move'; id: string; day: number } | { kind: 'create'; row: string; day: number };
+type FollowTarget = { kind: 'move'; id: string; day: number } | { kind: 'create'; row: string; day: number; pointer: boolean };
+
+/** The empty day's "+" an event landed on, if any. */
+function plusOf(target: EventTarget): HTMLElement | null {
+  if (!(target instanceof HTMLElement)) return null;
+  const plus = target.closest<HTMLElement>('button[data-sg-focus]');
+  return plus && plus.dataset.sgBlock === undefined && plus.dataset.sgRow !== undefined ? plus : null;
+}
 
 function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
   const pending = useRef<FollowTarget | null>(null);
@@ -35,7 +43,8 @@ function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
           : el.dataset.sgRow === follow.row,
     );
     if (!block) return;
-    block.focus();
+    // After a click the cell stays where the pointer left it: no scroll at all (FUT-3825 R1).
+    block.focus(follow.kind === 'create' && follow.pointer ? { preventScroll: true } : undefined);
     pending.current = null;
   });
   return {
@@ -44,11 +53,15 @@ function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
     },
     /** A key that presses an empty day's "+" (its click creates there). */
     followCreate: (event: React.KeyboardEvent): void => {
-      const plus = event.target;
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      if (!(plus instanceof HTMLElement) || plus.dataset.sgBlock !== undefined || plus.dataset.sgRow === undefined) return;
-      if (!plus.matches('button[data-sg-focus]')) return;
-      pending.current = { kind: 'create', row: plus.dataset.sgRow, day: Number(plus.dataset.sgDay) };
+      const plus = plusOf(event.target);
+      if ((event.key !== 'Enter' && event.key !== ' ') || !plus?.dataset.sgRow) return;
+      pending.current = { kind: 'create', row: plus.dataset.sgRow, day: Number(plus.dataset.sgDay), pointer: false };
+    },
+    /** A pointer click on an empty day's "+" (a key's click, `detail` 0, is the key's). */
+    followClickCreate: (event: React.MouseEvent): void => {
+      const plus = plusOf(event.target);
+      if (event.detail === 0 || !plus?.dataset.sgRow) return;
+      pending.current = { kind: 'create', row: plus.dataset.sgRow, day: Number(plus.dataset.sgDay), pointer: true };
     },
     forget: (): void => {
       pending.current = null;
@@ -108,6 +121,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
         sx={frameSx(columns.length, hasTotal)}
         onKeyDown={onKeyDown}
         onPointerDownCapture={focus.forget}
+        onClickCapture={can.create ? focus.followClickCreate : undefined}
       >
         {/* The header row sits outside the sideways scroller, so it sticks to the page; it follows the days sideways. */}
         <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onWheel={sideways.forwardWheel}>
