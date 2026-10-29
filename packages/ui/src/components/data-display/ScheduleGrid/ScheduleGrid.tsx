@@ -3,14 +3,15 @@
 import Box from '@mui/material/Box/index.js';
 import React, { useEffect, useRef } from 'react';
 
-import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { resolveLabels } from '../../../utils/resolve-labels';
+import { EN_US_SCHEDULE_GRID_LABELS } from './ScheduleGrid.en-US';
 import { focusables, handleGridKey } from './ScheduleGrid.keyboard';
 import { GridBody, GridHeader, type CellAbilities } from './ScheduleGrid.parts';
 import { frameSx, headerSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './ScheduleGrid.styles';
 import type { ScheduleGridProps } from './ScheduleGrid.types';
 import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
+import { useScrollToDay } from './useScrollToDay';
 import { useSidewaysScroll } from './useSidewaysScroll';
 
 /**
@@ -69,6 +70,11 @@ function useFollowFocus(rootRef: React.RefObject<HTMLElement | null>) {
   };
 }
 
+/** The body shows the days' rows: not the skeleton, the host's error or its empty state. */
+function daysDrawn(props: ScheduleGridProps, rowCount: number): boolean {
+  return !props.loading && !props.error && rowCount > 0;
+}
+
 function abilitiesOf(props: ScheduleGridProps): CellAbilities {
   const open = !props.readOnly && !props.loading;
   return { create: open && Boolean(props.onCreate), copy: open && Boolean(props.onCopy), move: open && Boolean(props.onMove) };
@@ -88,7 +94,7 @@ function abilitiesOf(props: ScheduleGridProps): CellAbilities {
 export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const { columns, groups, cell, onCreate, onCopy, onMove } = props;
   const testId = props.dataTestId ?? 'schedule-grid';
-  const labels = resolveLabels(EN_US_UI_LABELS.scheduleGrid, props.labels);
+  const labels = resolveLabels(EN_US_SCHEDULE_GRID_LABELS, props.labels);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const { text: announcement, say } = useAnnouncer();
   const focus = useFollowFocus(rootRef);
@@ -101,6 +107,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const sideways = useSidewaysScroll(headRef, bodyRef);
+  useScrollToDay(headRef, bodyRef, { day: props.scrollToDay, dayCount: columns.length, drawn: daysDrawn(props, rows.length) }, sideways.follow);
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     sideways.release();

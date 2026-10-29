@@ -88,6 +88,10 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
           // Covers the gap after it too, so nothing scrolling shows between the name and the days.
           boxShadow: `${rem(theme, M.gap)} 0 0 ${theme.palette.background.default}`,
         },
+        // A group's title is pinned with the names. A sticky box stays inside its containing block,
+        // and a group as wide as the visible days ran out of room long before the days did: past
+        // that it slid off under the names ("COZINHA" read "IA"). The group is as wide as its rows.
+        '& [role="rowgroup"]': { minWidth: 'var(--sg-min)' },
         '& [data-sg-group-title]': { position: 'sticky', left: 0, width: 'fit-content' },
       },
       [below(theme, M.narrowBelow)]: {
@@ -106,8 +110,11 @@ export function frameSx(dayCount: number, hasTotal: boolean): SxProps<Theme> {
   };
 }
 
-/** The body: scrolls sideways (under the compact bound) when the days' minimums do not fit. */
-export const scrollSx: SxProps<Theme> = { minWidth: 0 };
+/**
+ * The body: scrolls sideways (under the compact bound) when the days' minimums do not fit.
+ * `scrollToDay` jumps there at once: never a smooth scroll, whatever the host's page sets.
+ */
+export const scrollSx: SxProps<Theme> = { minWidth: 0, scrollBehavior: 'auto' };
 
 /** One line of the grid — the header or a person — as the shared columns. */
 /** A style that may sit in an `sx` array next to another. */

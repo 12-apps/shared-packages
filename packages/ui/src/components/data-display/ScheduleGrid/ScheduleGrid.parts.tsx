@@ -3,7 +3,7 @@ import Box from '@mui/material/Box/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import type * as React from 'react';
 
-import type { ScheduleGridLabels } from '../../../copy/labels';
+import type { ScheduleGridLabels } from './ScheduleGrid.labels';
 import { daysBetween, isOpen } from './schedule-grid-model';
 import { SCHEDULE_GRID_METRICS } from './ScheduleGrid.metrics';
 import {

@@ -1,6 +1,6 @@
 import type * as React from 'react';
 
-import type { DayRulerLabels } from '../../../copy/labels';
+import type { DayRulerLabels } from './DayRuler.labels';
 import type { ScheduleBlockTone } from '../ScheduleGrid/ScheduleGrid.types';
 
 /**

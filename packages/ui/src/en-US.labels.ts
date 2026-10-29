@@ -144,23 +144,6 @@ export const EN_US_UI_LABELS: UiLabels = {
   dateRangePicker: {
     calendar: "Calendar",
   },
-  scheduleGrid: {
-    createCell: (row, column) => `Schedule ${row}, ${column}`,
-    blockedCell: (row, column) => `${row}, ${column}: closed`,
-    copied: (block, column) => `${block} copied to ${column}`,
-    moved: (block, row, column) => `${block} moved to ${row}, ${column}`,
-    refused: "Not there: that day is taken or closed",
-    notMovable: "This shift cannot be changed here",
-    loading: "Loading the schedule",
-  },
-  dayRuler: {
-    createTrack: (row) => `Schedule ${row}`,
-    moved: (block, range) => `${block} now ${range}`,
-    resized: (block, range) => `${block} now ${range}`,
-    refused: "It cannot go further",
-    notMovable: "This shift cannot be changed here",
-    loading: "Loading the day",
-  },
   calendar: {
     chooseMonth: (month) => `${month}, choose month`,
     chooseYear: (year) => `${year}, choose year`,

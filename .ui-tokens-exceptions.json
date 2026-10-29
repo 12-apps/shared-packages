@@ -146,5 +146,9 @@
   "packages/ui/src/components/data-display/DayRuler/useRulerDrag.ts — raw-number-length ×1": {
     "kind": "exempt",
     "why": "boxSize is the track's getBoundingClientRect() width, read in screen px when a drag starts so the pointer's clientX maps to an hour; a runtime measurement, not a design size"
+  },
+  "packages/ui/src/components/data-display/ScheduleGrid/useScrollToDay.ts — raw-number-length ×1": {
+    "kind": "exempt",
+    "why": "scrollTo({ left: target, behavior: 'instant' }) — `left` is a SCROLL OFFSET measured at runtime (the header's scrollLeft plus a column's getBoundingClientRect distance from the pinned names), not a drawn length; it is already in the page's px, so routing it through the theme's rem scale would misplace the column (FUT-3831)"
   }
 }

@@ -1,6 +1,6 @@
 import type * as React from 'react';
 
-import type { DayRulerLabels } from '../../../copy/labels';
+import type { DayRulerLabels } from './DayRuler.labels';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { clamp, formatRange, moved, resized, snapTo } from './day-ruler-model';
 import type { DayRulerBlock, RulerHour } from './DayRuler.types';

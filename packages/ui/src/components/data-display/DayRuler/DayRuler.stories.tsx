@@ -6,13 +6,13 @@ import { createTheme, ThemeProvider, useTheme } from '@mui/material/styles/index
 import type * as React from 'react';
 import { useState } from 'react';
 
-import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { densityThemeOptions } from '../../../tokens/density';
 import { Button } from '../../form/Button';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
 import { DayRuler } from './DayRuler';
+import { DAY_RULER_LABELS } from './DayRuler.labels';
 import { formatRange } from './day-ruler-model';
 import type { DayRulerBlock, DayRulerRow } from './DayRuler.types';
 
@@ -171,7 +171,7 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
           setLog(`Horário: ${formatRange(start, end)}`);
         }}
         onBlockClick={(id) => setLog(`Abrir ${id}`)}
-        labels={PT_BR_UI_LABELS.dayRuler}
+        labels={DAY_RULER_LABELS['pt-BR']}
         aria-label="Escala do dia"
         dataTestId="ruler"
       />

@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, fn, waitFor, within } from 'storybook/test';
 
-import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { DayRuler } from './DayRuler';
+import { DAY_RULER_LABELS } from './DayRuler.labels';
 
 /**
  * The day ruler's gestures in a real browser (FUT-3825): the hour under the
@@ -27,7 +27,7 @@ const meta: Meta<typeof DayRuler> = {
       { id: 'kelly', label: 'Kelly Fontoura', blocks: [] },
     ],
     now: 20.75,
-    labels: PT_BR_UI_LABELS.dayRuler,
+    labels: DAY_RULER_LABELS['pt-BR'],
     'aria-label': 'Escala do dia',
     dataTestId: 'dr',
     onCreate: fn(),
