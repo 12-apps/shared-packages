@@ -578,11 +578,14 @@ export const KeyboardCreateFocusesTheNewBlock: Story = {
   render: (args) => <CreatingHost {...args} />,
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const plus = canvasElement.querySelector<HTMLElement>('button[data-sg-focus][data-sg-row="ana"][data-sg-day="4"]');
+    // Ana's Wednesday turno, then the arrow to her empty Thursday's "+".
+    await userEvent.click(canvas.getByTestId('sg-block-k1'));
+    await userEvent.keyboard('{ArrowRight}');
+    const plus = canvasElement.querySelector<HTMLElement>('button[data-sg-focus][data-sg-row="ana"][data-sg-day="3"]');
     if (!plus) throw new Error('no empty day');
-    plus.focus();
+    await waitFor(() => expect(plus).toHaveFocus());
     await userEvent.keyboard('{Enter}');
-    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('ana', [4]));
-    await waitFor(() => expect(canvas.getByTestId('sg-block-new-ana-4')).toHaveFocus());
+    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('ana', [3]));
+    await waitFor(() => expect(canvas.getByTestId('sg-block-new-ana-3')).toHaveFocus());
   },
 };
