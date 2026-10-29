@@ -66,8 +66,10 @@ export function coverageCellSx(count: number): SxProps<Theme> {
     fontSize: rem(theme, M.coverage.font),
     borderRadius: rem(theme, M.coverage.radius),
     color: theme.palette.text.primary,
+    // A tonal fill, as the prototype's coverage line draws it — never an outline (FUT-3831): a staffed
+    // hour reads by its fill alone; the hairline stays transparent so a count never shifts its cell.
     backgroundColor: count > 0 ? softSignal(theme, 'success') : theme.palette.action.hover,
-    border: count > 0 ? `1px solid ${theme.palette.success.main}` : '1px solid transparent',
+    border: '1px solid transparent',
     minWidth: 0,
     overflow: 'hidden',
   });
