@@ -60,6 +60,7 @@ export function CredentialFields({
         disabled={form.nothingEdited || !form.valid}
         onSave={form.requestSave}
         local={checksLocally(descriptor)}
+        stored={Object.values(form.masked).some((field) => field?.configured === true)}
       />
     </Stack>
   );
