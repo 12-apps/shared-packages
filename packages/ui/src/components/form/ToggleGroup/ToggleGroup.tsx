@@ -134,6 +134,25 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
                   background: `linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.dark})`,
                 }),
               },
+              // MUI's own `.Mui-selected:hover` (and its focus-visible) out-rank the rule above and paint
+              // the selected option a translucent grey under white text: hovered, or focused after a
+              // click, the chosen option stopped reading as chosen (FUT-3831). It keeps its colour's
+              // fill — the darker step on hover — and a keyboard focus adds a ring, never a new fill.
+              '&.Mui-selected:hover': {
+                backgroundColor: colorPalette.dark,
+                color: colorPalette.contrastText,
+                ...(gradient && {
+                  background: `linear-gradient(135deg, ${colorPalette.dark}, ${colorPalette.dark})`,
+                }),
+              },
+              '&.Mui-selected.Mui-focusVisible': {
+                backgroundColor: colorPalette.main,
+                color: colorPalette.contrastText,
+              },
+              '&.Mui-focusVisible': {
+                outline: `${FIELD_BORDER_WIDTH * 2}px solid ${colorPalette.main}`,
+                outlineOffset: FIELD_BORDER_WIDTH * 2,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
