@@ -59,7 +59,7 @@ function credentialSchema(fields: PixManualCopy['fields']): CredentialFieldSpec[
     { key: 'pixKey', label: fields.pixKey, secret: false, required: true, mono: true, confirmOnSave: true, helperText: fields.pixKeyHelp },
     { key: 'merchantName', label: fields.merchantName, secret: false, required: true, helperText: fields.merchantNameHelp, pattern: `^.{1,${MERCHANT_NAME_MAX}}$` },
     { key: 'merchantCity', label: fields.merchantCity, secret: false, required: true, helperText: fields.merchantCityHelp, pattern: `^.{1,${MERCHANT_CITY_MAX}}$` },
-    { key: 'confirmWithinMinutes', label: fields.confirmWithinMinutes, secret: false, required: false, optional: true, placeholder: '30', helperText: fields.confirmWithinMinutesHelp, pattern: '^\\d{0,4}$' },
+    { key: 'confirmWithinMinutes', label: fields.confirmWithinMinutes, secret: false, required: false, optional: true, placeholder: '30', helperText: fields.confirmWithinMinutesHelp, pattern: '^\\d{0,4}$', inputMode: 'numeric' },
   ];
 }
 

@@ -64,6 +64,19 @@ export const CARD_INSET = '20px';
  */
 export const BLOCK_GAP = 2;
 
+/**
+ * A credential form standing on its own inside the card, with no step panel
+ * around it to carry the inset. The wrapper takes the card's inset, and the
+ * saved-details row — which carries its own inset for the guided layout, where
+ * it sits at the card's level — has it zeroed, so it lines up with the boxes
+ * instead of indenting a second time. The save bar carries none of its own
+ * (`FormActions`).
+ */
+export const INSET_FORM_SX = {
+  px: CARD_INSET,
+  '& [data-testid="payments-credential-summary"]': { mx: 0 },
+} as const;
+
 /** The card that bounds one provider: hairline, 12px, nothing clipped. */
 export const CARD_SX = {
   border: `1px solid ${T.line}`,

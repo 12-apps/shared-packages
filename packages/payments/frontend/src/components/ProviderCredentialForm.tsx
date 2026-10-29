@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Stack } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import type {
@@ -22,7 +22,8 @@ import {
   needsConfirmation,
   summaryOf,
 } from './credential-rules';
-import { ProbeAlert, ProbeChecklist, type VerifyProbe } from './CredentialFormAlerts';
+import { FormAlerts, type VerifyProbe } from './CredentialFormAlerts';
+import { INSET_FORM_SX } from './panel-tokens';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy } from './settings-copy-context';
 
@@ -343,12 +344,26 @@ export function ProviderForm(props: ProviderFormProps) {
 
   const fields = summary ? null : <CredentialFields descriptor={descriptor} environment={props.environment} form={form} proven={Boolean(config?.chargeVerifiedAt)} />;
 
+  // The card's body has no padding (`ProviderCard`), so this form sets the
+  // card's inset on what it draws itself: a guide insets the boxes it holds;
+  // with none the boxes are the form's too. The alerts are always the form's
+  // (`FormAlerts`), and ran into the card's edges (FUT-4144).
+  const alertBox = (gapAbove = false) => (
+    <FormAlerts
+      error={form.error}
+      probe={form.probe}
+      busy={form.busy !== null}
+      onRetry={form.verify}
+      only={unkeyed(descriptor)}
+      gapAbove={gapAbove}
+    />
+  );
+
   return (
     <Stack spacing={2}>
-      {/* No guide (the host supplied none): the form stands on its own, which
-          is what every caller saw before the walkthrough could hold it. */}
-      {renderGuide
-        ? renderGuide({
+      {renderGuide ? (
+        <>
+          {renderGuide({
             rows,
             sectionFooter: fields,
             editing: form.editing && !summary,
@@ -357,17 +372,17 @@ export function ProviderForm(props: ProviderFormProps) {
             // provider has no working connect button, so pasted keys are the
             // only way in.
             path: 'credentials',
-          })
-        : (rows ?? fields)}
-
-      {form.error ? <Alert severity="error">{form.error}</Alert> : null}
-      {form.probe ? (
-        <ProbeAlert probe={form.probe} busy={form.busy !== null} onRetry={form.verify} />
-      ) : null}
-      {/* Only what could NOT be tied to a box. Every verdict carrying a field
-          key is rendered at that field now; this keeps the leftovers, which is
-          where the UNCHECKED rows live — the half a green result would deny. */}
-      {form.probe ? <ProbeChecklist probe={form.probe} only={unkeyed(descriptor)} /> : null}
+          })}
+          {alertBox()}
+        </>
+      ) : (
+        // No guide (the host supplied none): the form stands on its own, which
+        // is what every caller saw before the walkthrough could hold it.
+        <>
+          <Box sx={INSET_FORM_SX}>{rows ?? fields}</Box>
+          {alertBox(true)}
+        </>
+      )}
 
       <ConfirmCredentialSave
         pending={form.pending}

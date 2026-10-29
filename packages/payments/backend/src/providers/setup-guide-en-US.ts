@@ -82,7 +82,7 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
       'Open the dashboard and go to “Settings › Keys”. Copy the public key (pk_...) and generate the secret key (sk_...).',
     dashboardButton: 'Open the dashboard',
     paste:
-      'Paste both keys into the form above. Use the test keys while you are in the Sandbox environment, and the production ones only once you have validated it.',
+      'Paste both keys into the form below. Use the test keys while you are in the Sandbox environment, and the production ones only once you have validated it.',
     authDocsLink: 'Authentication documentation',
   },
   webhook: {
@@ -93,11 +93,11 @@ export const EN_US_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
     // `brandName` is the HOST's own name, interpolated: the sentence is about
     // who verifies the notification, and that is the adopter, not this package.
     credentials: (brandName) =>
-      `When you register it, the dashboard asks for a username and a password to authenticate the notifications. Set both and enter exactly the same values in the form above — that is how ${brandName} confirms a notification really came from Stone.`,
+      `When you register it, the dashboard asks for a username and a password to authenticate the notifications. Set both and enter exactly the same values in the form below — that is how ${brandName} confirms a notification really came from Stone.`,
     // Event names are the vendor's own identifiers, not words.
     events: (eventList) => `Subscribe to at least these charge events: ${eventList}.`,
     testConnection:
-      'Once that is done, click “Test connection” above: the test makes a real authenticated call and tells you if the key is wrong.',
+      'Once that is done, click “Save and test connection” below: the test makes a real authenticated call and tells you if the key is wrong.',
     doneLabel: 'Webhook',
     doneValue: 'Registered in the Pagar.me dashboard',
     confirmLabel: 'I have registered the URL in the dashboard',
