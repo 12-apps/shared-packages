@@ -143,11 +143,15 @@ export const headerRowSx: SxPart = (theme: Theme) => ({
   paddingBottom: theme.spacing(0.75),
 });
 
-export function headerCellSx(today: boolean): SxProps<Theme> {
+/** A day's header: today's label in the primary colour, a gone day's in the secondary ink (today wins). */
+export function headerCellSx(today: boolean, past = false): SxProps<Theme> {
+  let color = 'text.primary';
+  if (past) color = 'text.secondary';
+  if (today) color = 'primary.main';
   return {
     fontSize: sxRem(M.headerLabel),
     fontWeight: 500,
-    color: today ? 'primary.main' : 'text.primary',
+    color,
     p: 0.5,
     minWidth: 0,
     // A long label ("Hoje · Seg 19/10") wraps to a second line, as the prototype's: never cut.
@@ -204,6 +208,8 @@ export const totalCellSx: SxProps<Theme> = {
 export interface CellLook {
   today: boolean;
   blocked: boolean;
+  /** The day has gone (`closed`): no fill, the divider border; never a drop target. */
+  closed: boolean;
   /** A create or copy will land here: dashed, with the hours as ghost text. */
   target: boolean;
   /** The pointer is over it while a block moves. */
@@ -239,6 +245,7 @@ export function cellSx(look: CellLook): SxProps<Theme> {
     if (look.blocked) {
       return { ...base, background: hatch(theme), borderColor: theme.palette.divider, cursor: 'not-allowed' };
     }
+    if (look.closed) return { ...base, backgroundColor: 'transparent', borderColor: theme.palette.divider };
     if (look.target) {
       return {
         ...base,

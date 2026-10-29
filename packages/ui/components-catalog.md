@@ -234,7 +234,7 @@ Components for displaying data, visualizations, and information to users.
 ### ScheduleGrid
 **Purpose**: A week grid of people (or resources) × days with blocks that have a start and an end
 **Use Cases**: Staff schedules (turnos), rosters, resource booking by day
-**Features**: Click an empty cell to create, drag across a row to create on each day, drag a block's edge grip to copy it along the row, drag its middle to move it, click to open; blocked (hatched) days refuse drops; a block's break drawn as a hatched gap; a name adornment and a chips slot per row; five tones that each carry their note text; sticky header row; keyboard twins (Shift+←/→ copy, Alt+←/→ move, arrows move focus) with a live region; touch never drags; read-only, loading, error, empty; container queries
+**Features**: Click an empty cell to create, drag across a row to create on each day, drag a block's edge grip to copy it along the row, drag its middle to move it, click to open; blocked (hatched) days refuse drops; closed (gone) days offer no "+", refuse a create or a drop, draw no fill and carry a screen-reader-only label; past day headers in the secondary ink; a block's break drawn as a hatched gap; a name adornment and a chips slot per row; five tones that each carry their note text; sticky header row; keyboard twins (Shift+←/→ copy, Alt+←/→ move, arrows move focus) with a live region; touch never drags; read-only, loading, error, empty; container queries
 **Location**: `src/components/data-display/ScheduleGrid`
 **Docs**: `src/components/data-display/ScheduleGrid/ScheduleGrid.md`
 

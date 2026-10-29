@@ -630,3 +630,91 @@ describe("the slots a later story fills (FUT-3881)", () => {
     expect(within(header).getByRole("button", { name: "2 regras ›" })).toBeInTheDocument();
   });
 });
+
+describe("closed days (gone: no new turno)", () => {
+  /** Monday and Tuesday have gone for everyone; Caio's Monday turno is still there. */
+  const closedCell = (rowId: string, day: number): ScheduleGridCell => (day <= 1 ? { ...cell(rowId, day), closed: true } : cell(rowId, day));
+
+  it("draws no '+' and no label on an empty closed day, and leaves it out of the tab order", async () => {
+    renderGrid({ cell: closedCell });
+    await waitFor(() => expect(within(cellEl("caio", 1)).queryByRole("button")).toBeNull());
+    expect(cellEl("caio", 1).textContent).toBe("");
+    expect(cellEl("caio", 1)).not.toHaveAttribute("aria-label");
+    await waitFor(() => expect(cellEl("caio", 1).querySelector("[data-sg-focus]")).toBeNull());
+    expect(plusOf("caio", 2)).toBeInTheDocument();
+  });
+
+  it("a create drag skips the closed days", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(plusOf("caio", 3), [cellEl("caio", 2), cellEl("caio", 1), cellEl("caio", 0)]);
+    expect(props.onCreate).toHaveBeenCalledWith("caio", [2, 3]);
+  });
+
+  it("a grip drag copies onto none of them", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(screen.getByTestId("sg-grip-l-k1"), [cellEl("ana", 1), cellEl("ana", 0)]);
+    expect(props.onCopy).not.toHaveBeenCalled();
+  });
+
+  it("a move drop onto a closed day is refused", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    drag(block("k1"), [cellEl("caio", 1)]);
+    expect(props.onMove).not.toHaveBeenCalled();
+  });
+
+  it("Alt+← and Shift+← into a closed day are refused aloud", async () => {
+    const closedTuesday = (rowId: string, day: number): ScheduleGridCell => (day === 1 ? { ...cell(rowId, day), closed: true } : cell(rowId, day));
+    const { props } = renderGrid({ cell: closedTuesday });
+    fireEvent.keyDown(block("k1"), { key: "ArrowLeft", shiftKey: true });
+    fireEvent.keyDown(block("k1"), { key: "ArrowLeft", altKey: true });
+    expect(props.onCopy).not.toHaveBeenCalled();
+    expect(props.onMove).not.toHaveBeenCalled();
+    await waitFor(() => expect(live()).toBe("Não dá para pôr aí: o dia está ocupado ou fechado"));
+  });
+
+  it("a block on a closed day copies and moves out of it", async () => {
+    const k1OnClosed = (rowId: string, day: number): ScheduleGridCell =>
+      rowId === "ana" && day === 2 ? { ...cell(rowId, day), closed: true } : cell(rowId, day);
+    const { props } = renderGrid({ cell: k1OnClosed });
+    drag(screen.getByTestId("sg-grip-r-k1"), [cellEl("ana", 3)]);
+    expect(props.onCopy).toHaveBeenCalledWith("k1", [3]);
+    drag(block("k1"), [cellEl("caio", 5)]);
+    expect(props.onMove).toHaveBeenCalledWith("k1", "caio", 5);
+    fireEvent.keyDown(block("k1"), { key: "ArrowRight", shiftKey: true });
+    expect(props.onCopy).toHaveBeenLastCalledWith("k1", [3]);
+  });
+
+  it("a closed cell draws no fill and keeps the divider border", async () => {
+    renderGrid({ cell: closedCell });
+    expect(getComputedStyle(cellEl("caio", 1)).backgroundColor).toMatch(/transparent|rgba\(0, 0, 0, 0\)/);
+    expect(getComputedStyle(cellEl("caio", 3)).backgroundColor).not.toMatch(/transparent|rgba\(0, 0, 0, 0\)/);
+    expect(getComputedStyle(cellEl("caio", 1)).borderColor).toBe(getComputedStyle(cellEl("caio", 3)).borderColor);
+  });
+
+  it("names a closed cell for a screen reader only when the host gives the words, never a blocked one", async () => {
+    const labelled = (rowId: string, day: number): ScheduleGridCell =>
+      day <= 1 ? { ...cell(rowId, day), closed: true, closedLabel: "Já passou" } : cell(rowId, day);
+    renderGrid({ cell: labelled });
+    expect(within(cellEl("caio", 1)).getByText("Já passou")).toBeInTheDocument();
+    expect(cellEl("bia", 1)).toHaveAttribute("aria-label", "Afastamento");
+    expect(cellEl("bia", 1)).not.toHaveTextContent("Já passou");
+  });
+
+  it("draws a past day's header in the secondary ink, today's still in the primary", async () => {
+    const columns = ["Seg 19/10", "Ter 20/10", "Qua 21/10", "Qui 22/10", "Sex 23/10", "Sáb 24/10", "Dom 25/10"].map((label, day) => ({ label, today: day === 2, past: day < 2 }));
+    renderGrid({ columns });
+    const headers = screen.getAllByRole("columnheader");
+    const ink = (index: number): string => getComputedStyle(headers[index] as HTMLElement).color;
+    expect(headers[0]).toHaveAttribute("data-sg-past", "");
+    expect(headers[3]).not.toHaveAttribute("data-sg-past");
+    expect(ink(0)).toBe(ink(1));
+    expect(ink(0)).not.toBe(ink(3));
+    expect(ink(2)).not.toBe(ink(3));
+  });
+
+  it("a block on a closed day still shows and opens", async () => {
+    const { props } = renderGrid({ cell: closedCell });
+    fireEvent.click(block("d1"));
+    expect(props.onBlockClick).toHaveBeenCalledWith("d1");
+  });
+});

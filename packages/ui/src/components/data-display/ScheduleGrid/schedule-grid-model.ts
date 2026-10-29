@@ -5,9 +5,9 @@ import type { ScheduleGridCell } from './ScheduleGrid.types';
  * on. The host decides everything else — hours, limits, refusals.
  */
 
-/** A cell that can take a new turno: nothing in it and not closed to the row. */
+/** A cell that can take a new turno: nothing in it, not closed to the row (`blocked`) and not gone (`closed`). */
 export function isOpen(cell: ScheduleGridCell): boolean {
-  return !cell.blocked && cell.blocks.length === 0;
+  return !cell.blocked && !cell.closed && cell.blocks.length === 0;
 }
 
 /** Every day from `a` to `b` inclusive, in order, whichever is larger. */
