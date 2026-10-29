@@ -737,3 +737,121 @@ export const ClosedDayLooksQuietAndIsNamedForScreenReaders: Story = {
     await expect(canvas.getByTestId('sg-cell-ana-1').textContent).toBe('');
   },
 };
+
+/**
+ * Day `day`'s left edge sits right after the pinned names (and the gap), and its header is over it —
+ * or, when the days cannot scroll that far, they are at the end of their reach with the day whole.
+ */
+async function opensOn(canvasElement: HTMLElement, day: number): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const names = canvas.getAllByRole('rowheader')[0] as HTMLElement;
+  const gap = Number.parseFloat(getComputedStyle(canvas.getByTestId('sg-row-ana')).columnGap) || 0;
+  const target = canvas.getByTestId(`sg-cell-ana-${day}`);
+  const header = canvas.getAllByRole('columnheader')[day] as HTMLElement;
+  const firstAfterNames = (): number => target.getBoundingClientRect().left - (names.getBoundingClientRect().right + gap);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  const atTheEnd = (): boolean => body.scrollLeft >= body.scrollWidth - body.clientWidth - 1;
+  await waitFor(() => expect(Math.abs(firstAfterNames()) <= 1 || (atTheEnd() && firstAfterNames() > 0)).toBe(true));
+  await expect(target.getBoundingClientRect().right).toBeLessThanOrEqual(body.getBoundingClientRect().right + 0.5);
+  await expect(Math.abs(header.getBoundingClientRect().left - target.getBoundingClientRect().left)).toBeLessThanOrEqual(1);
+}
+
+/** A host that re-renders with the same day, and moves to another one. */
+function ScrollToDayHost(args: React.ComponentProps<typeof ScheduleGrid>): React.JSX.Element {
+  const [day, setDay] = useState(3);
+  const [renders, setRenders] = useState(0);
+  return (
+    <div>
+      <button type="button" onClick={() => setRenders(renders + 1)}>
+        Redesenhar ({renders})
+      </button>
+      <button type="button" onClick={() => setDay(1)}>
+        Ir para terça
+      </button>
+      <ScheduleGrid {...args} totalLabel={renders % 2 ? 'horas' : 'h'} scrollToDay={day} />
+    </div>
+  );
+}
+
+/**
+ * The Turnos review (FUT-3831): at a 900px and a 768px window the days scroll
+ * sideways and a week opened on a Thursday showed three gone days and today as
+ * a sliver. `scrollToDay` opens it on Thursday, first after the names, at
+ * once, without taking focus or moving the page; the person's own scroll then
+ * survives a re-render with the same day, and a new day scrolls again.
+ */
+async function scrollToDay(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const head = canvas.getByTestId('sg-head');
+  const page = canvasElement.ownerDocument.defaultView;
+  if (!page) throw new Error('no window');
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  await opensOn(canvasElement, 3);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(head.scrollLeft).toBe(body.scrollLeft);
+  await expect(canvasElement.contains(canvasElement.ownerDocument.activeElement)).toBe(false);
+  await expect(page.scrollY).toBe(0);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  body.scrollLeft = 20;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await waitFor(() => expect(head.scrollLeft).toBe(20));
+  const redraw = canvas.getByRole('button', { name: /Redesenhar/ });
+  await userEvent.click(redraw);
+  await waitFor(() => expect(redraw).toHaveTextContent('Redesenhar (1)'));
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(body.scrollLeft).toBe(20);
+  const tuesday = canvas.getByRole('button', { name: 'Ir para terça' });
+  await userEvent.click(tuesday);
+  await opensOn(canvasElement, 1);
+  await waitFor(() => expect(tuesday).toHaveFocus());
+}
+
+export const ScrollToDay836: Story = {
+  args: tabletArgs,
+  decorators: pane(836),
+  render: (args) => <ScrollToDayHost {...args} />,
+  play: async ({ canvasElement }) => scrollToDay(canvasElement),
+};
+export const ScrollToDay704: Story = {
+  args: tabletArgs,
+  decorators: pane(704),
+  render: (args) => <ScrollToDayHost {...args} />,
+  play: async ({ canvasElement }) => scrollToDay(canvasElement),
+};
+
+/**
+ * The Turnos review (FUT-3831): scrolled sideways, a group's title ("COZINHA")
+ * slid off under the pinned names and read "IA". It is pinned with the names:
+ * whole and at the days' left edge at every scroll, the far end included.
+ */
+async function groupTitleStays(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const title = canvasElement.querySelector<HTMLElement>('[data-sg-group-title]');
+  if (!title) throw new Error('no group title');
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  const width = title.getBoundingClientRect().width;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  for (const left of [0, 200, body.scrollWidth]) {
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    body.scrollLeft = left;
+    await waitFor(() => expect(Math.abs(title.getBoundingClientRect().left - body.getBoundingClientRect().left)).toBeLessThanOrEqual(0.5));
+    await expect(title.getBoundingClientRect().width).toBe(width);
+  }
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(body.scrollLeft).toBeGreaterThan(0);
+}
+
+const kitchenArgs = {
+  ...tabletArgs,
+  groups: [{ title: 'Cozinha', rows: [{ id: 'ana', label: 'Ana Lima', total: '8h' }, { id: 'bia', label: 'Bia Souza', total: '—' }] }],
+};
+
+export const GroupTitleStaysPinned836: Story = { args: kitchenArgs, decorators: pane(836), play: async ({ canvasElement }) => groupTitleStays(canvasElement) };
+export const GroupTitleStaysPinnedFourteenDays: Story = {
+  args: { ...kitchenArgs, columns: FORTNIGHT },
+  decorators: laptop(1216),
+  play: async ({ canvasElement }) => groupTitleStays(canvasElement),
+};

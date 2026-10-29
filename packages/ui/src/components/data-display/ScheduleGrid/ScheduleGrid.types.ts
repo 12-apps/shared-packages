@@ -149,6 +149,15 @@ export interface ScheduleGridProps {
   error?: React.ReactNode;
   /** Shown when there are no rows at all. */
   empty?: React.ReactNode;
+  /**
+   * A day (its index in `columns`) to open the days on: when it is set, and
+   * each time it changes, the days scroll sideways so that day is the first
+   * column after the pinned names (or as far as they reach) — today, on a week
+   * opened mid-week. At once, never smoothly; focus and the page's own scroll
+   * are left alone, and the header row follows. The same value on a later
+   * render keeps the person's own scroll. Nothing happens while the days fit.
+   */
+  scrollToDay?: number;
   /** The header row sticks this far from the top of the scroll container (a sticky page bar above). Default 0. */
   stickyTop?: number;
   /** The grid's accessible name ("Escala da semana"). */

@@ -59,6 +59,7 @@ lists events on one axis). For one day by the hour, or for a phone, use `DayRule
 | `error` | `ReactNode?` | Replaces the body (an `ErrorState` with its retry). |
 | `empty` | `ReactNode?` | Shown when there are no rows at all. |
 | `stickyTop` | `number?` (px, default 0) | Offset of the sticky header row under a pinned page bar. |
+| `scrollToDay` | `number?` (an index into `columns`) | While the days scroll sideways, the day they open on: on mount, and each time the value changes, the days scroll at once (never smoothly, so reduced motion needs nothing else) until that day is the first column after the pinned names — or to the end of their reach, when the day is that close to the end. The header row follows; focus and the page's vertical scroll are untouched. A re-render with the same value keeps the person's own scroll. A value outside the columns, and a grid whose days fit, do nothing. Pass today's index (`3` on a Thursday) so a week opened mid-week does not start on the gone days. |
 | `aria-label` | `string?` | The grid's name. |
 | `labels` | `Partial<ScheduleGridLabels>` | `createCell(row, column)`, `blockedCell(row, column)`, `copied(block, column)`, `moved(block, row, column)`, `refused`, `loading`. Default: the English pack; a pt-BR host passes `SCHEDULE_GRID_LABELS['pt-BR']` from `@12-apps/ui/data-display/ScheduleGrid`. |
 | `dataTestId` | `string?` (default `schedule-grid`) | Parts: `-header`, `-row-${rowId}`, `-cell-${rowId}-${day}`, `-block-${blockId}`, `-grip-l-${blockId}`, `-grip-r-${blockId}`, `-break-${blockId}`, `-live`, `-loading`. |
@@ -135,6 +136,9 @@ hatch wins.
     sticks to the page and follows the days sideways. The header row is no scroller of its own
     (`overflow-x: hidden`, so it is never a tab stop): the grid sets its scroll from the days',
     and a sideways wheel or trackpad swipe over it scrolls the days;
+    a group's title is pinned with the names, whole at any scroll (each group is as wide as its
+    rows, so the title's sticky room never runs out before the days do); `scrollToDay` picks the
+    day they open on;
   - below 600px: 120px names, days of at least 136px, no grips (Shift+arrows still copy; the
     middle still moves).
   Never a coloured sliver, never cut hours, and the page itself never scrolls sideways — whatever

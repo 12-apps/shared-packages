@@ -11,6 +11,7 @@ import { frameSx, headerSx, rootSx, rowGridSx, scrollSx, SR_ONLY_SX } from './Sc
 import type { ScheduleGridProps } from './ScheduleGrid.types';
 import { useAnnouncer } from './useAnnouncer';
 import { useGridDrag } from './useGridDrag';
+import { useScrollToDay } from './useScrollToDay';
 import { useSidewaysScroll } from './useSidewaysScroll';
 
 /**
@@ -101,6 +102,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
   const headRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const sideways = useSidewaysScroll(headRef, bodyRef);
+  useScrollToDay(headRef, bodyRef, props.scrollToDay, columns.length, sideways.follow);
 
   const onKeyDown = (event: React.KeyboardEvent): void => {
     sideways.release();
