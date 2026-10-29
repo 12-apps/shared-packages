@@ -107,6 +107,15 @@ export interface CredentialFieldSpec {
    * platform-only extra — most stores using it should see it, and may change it.
    */
   optional?: boolean;
+  /**
+   * The on-screen keyboard a phone opens for this field, rendered as the
+   * input's `inputmode`. Omitted means the ordinary text keyboard.
+   *
+   * A hint, not a validator — `pattern` is still what refuses a wrong value.
+   * It exists because Pix manual's confirmation window is minutes, digits only,
+   * and with no way to say so the box opened the letter keyboard (FUT-4144).
+   */
+  inputMode?: 'text' | 'numeric' | 'decimal' | 'tel' | 'email' | 'url';
 }
 
 /** A labelled external link rendered inline within a setup step. */
