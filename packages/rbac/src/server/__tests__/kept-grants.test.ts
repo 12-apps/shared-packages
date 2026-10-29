@@ -189,10 +189,13 @@ describe('a listener that dropped', () => {
     expect(host.loads()).toBe(3);
     expect(host.errors.join('\n')).toContain('connection reset');
 
+    await Promise.all([host.store.grantsOf('ana'), host.store.grantsOf('ana')]);
+    expect(host.loads()).toBe(4);
+
     host.handlers().onConnected();
     await host.store.grantsOf('ana');
     await host.store.grantsOf('ana');
-    expect(host.loads()).toBe(4);
+    expect(host.loads()).toBe(5);
   });
 });
 
@@ -215,6 +218,18 @@ describe('without a listener', () => {
     vi.advanceTimersByTime(30_001);
     await host.store.grantsOf('ana');
     expect(attempts.count).toBe(2);
+  });
+
+  it('still shares one load between questions asked side by side', async () => {
+    const host = harness({
+      listen: async () => {
+        throw new Error('LISTEN refused');
+      },
+    });
+    await Promise.all([host.store.grantsOf('ana'), host.store.grantsOf('ana'), host.store.grantsOf('ana')]);
+    expect(host.loads()).toBe(1);
+    await host.store.grantsOf('ana');
+    expect(host.loads()).toBe(2);
   });
 
   it('treats a listener that throws synchronously as one that failed to start', async () => {

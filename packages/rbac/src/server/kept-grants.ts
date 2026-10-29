@@ -100,6 +100,8 @@ class KeptGrantsMemory {
   private readonly kept = new Map<string, Kept>();
   private readonly generations = new Map<string, number>();
   private readonly inFlight = new Map<string, Promise<RbacSubjectGrants>>();
+  /** Loads shared while nothing may be kept: one read for a burst, kept by nobody. */
+  private readonly unkeptInFlight = new Map<string, Promise<RbacSubjectGrants>>();
   private epoch = 0;
   private listening: Promise<boolean> | null = null;
   /** False from a reported drop until the reconnect: then nothing is kept. */
@@ -195,8 +197,19 @@ class KeptGrantsMemory {
     return grants;
   }
 
+  /** A load nothing keeps, shared by the questions asked while it runs. */
+  private loadUnkept(subject: string): Promise<RbacSubjectGrants> {
+    const pending = this.unkeptInFlight.get(subject);
+    if (pending) return pending;
+    const loading = this.options.load(subject).finally(() => {
+      if (this.unkeptInFlight.get(subject) === loading) this.unkeptInFlight.delete(subject);
+    });
+    this.unkeptInFlight.set(subject, loading);
+    return loading;
+  }
+
   async grantsOf(subject: string): Promise<RbacSubjectGrants> {
-    if (!(await this.ensureListening()) || !this.connected) return this.options.load(subject);
+    if (!(await this.ensureListening()) || !this.connected) return this.loadUnkept(subject);
     const hit = this.kept.get(subject);
     if (hit && hit.until > Date.now()) return hit.grants;
     // One load for a burst of questions about the same person.
@@ -213,6 +226,7 @@ class KeptGrantsMemory {
     this.kept.clear();
     this.generations.clear();
     this.inFlight.clear();
+    this.unkeptInFlight.clear();
     this.epoch += 1;
     this.listening = null;
     this.connected = false;
