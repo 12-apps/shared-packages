@@ -46,6 +46,8 @@ export const SCHEDULE_GRID_METRICS = {
   ring: 2,
   /** How far a block's focus ring stands off it. */
   ringOffset: 1,
+  /** A wheel that counts in lines (`deltaMode` 1), forwarded from the header: px per line. */
+  wheelLine: 16,
   /** The dashed outline of a cell a create or copy will land on. */
   targetBorder: 1.5,
   headerLabel: 13,

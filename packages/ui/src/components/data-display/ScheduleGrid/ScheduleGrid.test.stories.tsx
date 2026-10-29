@@ -527,7 +527,7 @@ export const KeyboardReachesTheRightEdge836: Story = { args: tabletArgs, decorat
 /** U4: six people, so a row can sit under the sticky header while the page scrolls. */
 const SIX = ['Ana Lima', 'Bia Souza', 'Carla Mendes', 'Diego Reis', 'Eva Prado', 'Fábio Dias'];
 const sixArgs = {
-  groups: [{ title: 'Entregas', rows: SIX.map((label) => ({ id: label.split(' ')[0].toLowerCase(), label, total: '—' })) }],
+  groups: [{ title: 'Entregas', rows: SIX.map((label) => ({ id: (label.split(' ')[0] ?? label).toLowerCase(), label, total: '—' })) }],
   cell: (): ScheduleGridCell => ({ blocks: [] }),
 };
 

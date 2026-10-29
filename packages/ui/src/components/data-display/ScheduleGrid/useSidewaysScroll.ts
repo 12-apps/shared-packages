@@ -1,6 +1,8 @@
 import type * as React from 'react';
 import { useRef } from 'react';
 
+import { SCHEDULE_GRID_METRICS as M } from './ScheduleGrid.metrics';
+
 /** What the grid wires onto its header frame and its days. */
 export interface SidewaysScroll {
   /** On the days' scroll: the header row follows. */
@@ -14,9 +16,6 @@ export interface SidewaysScroll {
   /** The press ended, or the keyboard took over. */
   release: () => void;
 }
-
-/** A wheel's line, in px, for a wheel that counts in lines. */
-const LINE_PX = 16;
 
 /** How far a focused element's ring reaches outside it. */
 function ringOf(element: HTMLElement): number {
@@ -86,7 +85,7 @@ export function useSidewaysScroll(
     const body = bodyRef.current;
     if (!body) return;
     const sideways = event.deltaX || (event.shiftKey ? event.deltaY : 0);
-    if (sideways) body.scrollLeft += event.deltaMode === 1 ? sideways * LINE_PX : sideways;
+    if (sideways) body.scrollLeft += event.deltaMode === 1 ? sideways * M.wheelLine : sideways;
   };
   const bringOut = (event: React.FocusEvent<HTMLElement>): void => {
     const body = bodyRef.current;
