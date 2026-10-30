@@ -20,6 +20,7 @@ export const EN_US_COMMAND_PALETTE_COPY: Required<CommandPaletteCopy> = {
   commandCount: (count) => `${count} commands`,
   noCommandsFound: (query) => `No commands found for "${query}"`,
   general: "General",
+  closeSearch: "Close search",
 };
 
 export const EN_US_BREADCRUMB_COPY: BreadcrumbCopy = {

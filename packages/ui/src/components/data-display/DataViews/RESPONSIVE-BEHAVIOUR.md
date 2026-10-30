@@ -305,8 +305,8 @@ the keystrokes it did.
   for the widest label in each part, measured on the row itself; otherwise the
   same options as a select, where "Nenhum" stands for tapping the active one
   again.
-- Days are at least 40px below `sm`, with no gaps between them; the middle of a
-  period is one square band and its two ends keep their round corners.
+- Day columns are at least 40px wide below `sm`. The range is the Calendar's
+  own band (FUT-4162): one tint behind the days, round AA endpoints.
 - A "Mais" panel holding a day range keeps the "Limpar filtros" row's height
   while nothing is applied, so the first tap does not grow the panel under the
   finger; the panel is as tall as the screen allows instead of a fixed 320px,

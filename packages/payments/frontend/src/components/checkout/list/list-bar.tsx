@@ -7,6 +7,7 @@ import { useCheckoutCopy } from "../copy-context";
 import { useCheckoutComponents } from "../ui";
 
 import { useSummaryColumnTarget } from "./summary-column";
+import { SummaryToggleLine } from "./summary-sheet";
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
 
 /** The prototype's 52px action and 44px secondary, on the theme's spacing scale. */
@@ -118,8 +119,15 @@ function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string |
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal, live, children }: {
+export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, actionLabel, heldTotal, live, children }: {
   summary?: ReactNode;
+  /** A charge is under way: the phone's summary sheet closes and stays closed (FUT-589). */
+  sheetHeld?: boolean;
+  /**
+   * The bar sent the buyer up into the steps (the payer line opened the CPF at
+   * the top): the sheet closes when this turns true, and the line stays usable.
+   */
+  sheetShut?: boolean;
   extras?: ReactNode;
   payer?: ReactNode;
   /** Why the action is held, under it. */
@@ -140,7 +148,9 @@ export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal
     <LabelCutContext.Provider value={setLabelCut}>
     <Box data-testid={column ? "list-pay-bar" : undefined} sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%", minWidth: 0 }}>
       {/* The context line in the secondary ink in the column, as in the bar — the column inherits whatever the host's element is inked in. */}
-      {summary ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, ...(column ? { color: "text.secondary" } : {}) }}>{summary}</Box> : null}
+      {summary && column ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, color: "text.secondary" }}>{summary}</Box> : null}
+      {/* On a phone the line opens the "Resumo do pedido" sheet when the layout has one to show (FUT-589). */}
+      {summary && !column ? <SummaryToggleLine summary={summary} testId="list-bar-summary" held={sheetHeld} shut={sheetShut} /> : null}
       {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
       {payer}
       <HeldTotal total={column ? null : heldTotal} />
@@ -154,12 +164,15 @@ export function ListBar({ summary, extras, payer, reason, actionLabel, heldTotal
 }
 
 /** "Pagar" on the left, "R$ 22,00" on the right — the prototype's 52px bar of a button. */
-export function ActionButton({ label, total, disabled, loading, onClick, focusOnMount = false }: {
+export function ActionButton({ label, total, disabled, loading, onClick, focusOnMount = false, look = "solid", testId = "list-pay" }: {
   label: string;
   total: string | null;
   disabled: boolean;
   loading?: boolean;
   onClick: () => void;
+  /** `outline` for an action that is not the next step — the Pix's "Copiar de novo" (ADR 0129: no primary after the copy). */
+  look?: "solid" | "outline";
+  testId?: string;
   /** Take the focus as it appears — back from a cancelled charge, where the focus was on Cancelar. */
   focusOnMount?: boolean;
 }): JSX.Element {
@@ -172,7 +185,7 @@ export function ActionButton({ label, total, disabled, loading, onClick, focusOn
   }, [focusOnMount]);
   return (
     <Box ref={scope} sx={{ "& button": { minHeight: (t) => t.spacing(ACTION_HEIGHT) }, "& button, & button *": { fontWeight: 600, letterSpacing: "normal" } }}>
-      <Button variant="solid" color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId="list-pay">
+      <Button variant={look} color="primary" size="lg" fullWidth disabled={disabled} loading={loading} onClick={onClick} dataTestId={testId}>
         {/* Neither the amount ("R$ / 27,00") nor the label breaks: a label too wide for the bar at
             320px is cut with an ellipsis rather than wrapped onto a second line, and is plain (the rule above
             gives label and amount one tracking). An action with no amount ("Copiar

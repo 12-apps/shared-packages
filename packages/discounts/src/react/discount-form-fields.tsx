@@ -13,7 +13,9 @@ import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 import type { DiscountSchedule } from "../engine/schedule";
 
 import type { DiscountsWebCopy } from "./copy";
-import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES, type DiscountKind } from "./form-kind";
+import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
+import { DateField } from "./date-field";
+import { PercentField, WholeNumberField } from "./number-fields";
 import { ScheduleBuilder } from "./schedule-builder";
 
 /**
@@ -49,14 +51,14 @@ function HintedField({
 }): JSX.Element {
   return (
     <Stack spacing={0.5}>
-      <Fields.TextField name={name} label={label} type="number" />
+      <WholeNumberField name={name} label={label} />
       <Text variant="caption">{hint}</Text>
     </Stack>
   );
 }
 
 /** One closed set as a toggle's options, labelled by the pack. */
-function optionsFor<TKey extends string>(
+export function optionsFor<TKey extends string>(
   values: readonly TKey[],
   labels: Readonly<Record<TKey, string>>,
 ): { value: string; label: string }[] {
@@ -72,29 +74,6 @@ function optionsFor<TKey extends string>(
  * special passes a plain text field.
  */
 export type CurrencyFieldComponent = (props: { name: string; label: string }) => JSX.Element;
-
-/**
- * What kind of promotion this is — the form's first and most consequential
- * question, and the only one that decides what the rest of it looks like.
- *
- * The option list comes from the caller rather than from the constant, because
- * it is one longer when a legacy `BUNDLE_PRICE` rule is being edited.
- */
-export function KindField({
-  copy,
-  kinds,
-}: {
-  copy: DiscountsWebCopy;
-  kinds: readonly DiscountKind[];
-}): JSX.Element {
-  return (
-    <Fields.ToggleField
-      name="kind"
-      label={copy.form.kind}
-      options={optionsFor(kinds, copy.labels.kind)}
-    />
-  );
-}
 
 /**
  * A combo's reward: which of the two, and how much.
@@ -125,11 +104,7 @@ function ComboRewardFields({
         {values.comboReward === "FIXED_AMOUNT" ? (
           <Currency name="amountOff" label={copy.form.amountOff} />
         ) : (
-          <Fields.TextField
-            name="percentOff"
-            label={copy.form.percentOff}
-            placeholder={copy.form.percentPlaceholder}
-          />
+          <PercentField copy={copy} />
         )}
       </Box>
       <Text variant="caption">{copy.form.comboRewardHint}</Text>
@@ -164,13 +139,7 @@ export function RewardFields({
   if (kind === "FREE_UNITS") return null;
   if (kind === "BUNDLE_PRICE") return <Currency name="bundlePrice" label={copy.form.bundlePrice} />;
   if (kind === "FIXED_AMOUNT") return <Currency name="amountOff" label={copy.form.amountOff} />;
-  return (
-    <Fields.TextField
-      name="percentOff"
-      label={copy.form.percentOff}
-      placeholder={copy.form.percentPlaceholder}
-    />
-  );
+  return <PercentField copy={copy} />;
 }
 
 /** The coupon input, shown only for a CODE-triggered rule. */
@@ -252,6 +221,24 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
   );
 }
 
+/** Início and Término, day-first on every browser (FUT-4156). */
+function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+  return (
+    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+      {(["startsAt", "endsAt"] as const).map((name) => (
+        <DateField
+          key={name}
+          name={name}
+          label={copy.form[name]}
+          placeholder={copy.form.datePlaceholder}
+          invalidMessage={copy.form.invalidDate}
+          incompleteMessage={copy.form.dateIncomplete}
+        />
+      ))}
+    </Box>
+  );
+}
+
 /**
  * "Quando vale" — the campaign PERIOD, and the weekly schedule inside it
  * (FUT-996).
@@ -281,14 +268,19 @@ export function WindowFields({
   onScheduleChange: (next: DiscountSchedule) => void;
   onScheduleEnabledChange: (next: boolean) => void;
 }): JSX.Element {
+  // The schedule is not a form value, so nothing paints `errors.schedule` for
+  // it: it is handed to the builder, and cleared on the next edit the way a
+  // field's own error is (FUT-4155).
+  const { errors, setFieldValue } = useFormContext();
+  const scheduleError = errors.schedule;
+  const clearScheduleError = (): void => {
+    if (scheduleError !== undefined) setFieldValue("schedule", "");
+  };
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
       <Stack spacing={0.5}>
-        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-          <Fields.TextField name="startsAt" label={copy.form.startsAt} type="date" />
-          <Fields.TextField name="endsAt" label={copy.form.endsAt} type="date" />
-        </Box>
+        <PeriodFields copy={copy} />
         <Text variant="caption">{copy.schedule.periodHint}</Text>
       </Stack>
       <FormControl>
@@ -303,7 +295,10 @@ export function WindowFields({
                 type="radio"
                 name="discount-repetition"
                 checked={scheduleEnabled === value}
-                onChange={() => onScheduleEnabledChange(value)}
+                onChange={() => {
+                  clearScheduleError();
+                  onScheduleEnabledChange(value);
+                }}
                 data-testid={value ? "repetition-specific" : "repetition-always"}
               />
               <Text variant="body">{label}</Text>
@@ -317,7 +312,11 @@ export function WindowFields({
             schedule={schedule}
             copy={copy}
             timezone={timezoneLabel ?? ""}
-            onChange={onScheduleChange}
+            error={scheduleError}
+            onChange={(next) => {
+              clearScheduleError();
+              onScheduleChange(next);
+            }}
           />
           <OrderScopeScheduleNote copy={copy} />
         </>
@@ -355,8 +354,8 @@ export function LimitFields({
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
       <Currency name="minSubtotal" label={copy.form.minSubtotal} />
-      <Fields.TextField name="usageLimit" label={copy.form.usageLimit} type="number" />
-      <Fields.TextField name="perBuyerLimit" label={copy.form.perBuyerLimit} type="number" />
+      <WholeNumberField name="usageLimit" label={copy.form.usageLimit} />
+      <WholeNumberField name="perBuyerLimit" label={copy.form.perBuyerLimit} />
     </Box>
   );
 }

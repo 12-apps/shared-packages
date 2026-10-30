@@ -80,9 +80,10 @@ const PaletteSearch: React.FC<{
   placeholder?: string;
   value: string;
   dataTestId?: string;
+  closeLabel: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onClose: () => void;
-}> = ({ inputRef, placeholder, value, dataTestId, onChange, onClose }) => (
+}> = ({ inputRef, placeholder, value, dataTestId, closeLabel, onChange, onClose }) => (
   <SearchContainer>
     <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
     <SearchInput
@@ -96,7 +97,7 @@ const PaletteSearch: React.FC<{
       spellCheck="false"
       inputProps={{ 'data-testid': `${dataTestId}-input` }}
     />
-    <IconButton size="small" onClick={onClose} sx={{ ml: 1 }}>
+    <IconButton size="small" onClick={onClose} aria-label={closeLabel} sx={{ ml: 1 }}>
       <CloseIcon fontSize="small" />
     </IconButton>
   </SearchContainer>
@@ -190,6 +191,7 @@ export const CommandPalette: FC<CommandPaletteProps> = ({
             placeholder={placeholder ?? text.placeholder}
             value={searchQuery}
             dataTestId={dataTestId}
+            closeLabel={text.closeSearch}
             onChange={handleSearchChange}
             onClose={onClose}
           />

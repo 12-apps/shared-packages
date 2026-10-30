@@ -278,7 +278,7 @@ describe("what it refuses", () => {
     renderForm(comboRecord({ comboRequirements: [] }));
     fireEvent.click(screen.getByTestId("discount-form-submit"));
     await waitFor(() => {
-      expect(screen.getByTestId("discount-form-error")).toBeTruthy();
+      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
     });
     expect(screen.getByText(copy.form.comboSlotsRequired)).toBeTruthy();
   });
@@ -289,7 +289,7 @@ describe("what it refuses", () => {
     );
     fireEvent.click(screen.getByTestId("discount-form-submit"));
     await waitFor(() => {
-      expect(screen.getByTestId("discount-form-error")).toBeTruthy();
+      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
     });
     expect(screen.getAllByText(copy.form.freeUnitsTargetRequired).length).toBeGreaterThan(0);
   });

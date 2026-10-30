@@ -23,4 +23,16 @@ export const SEQUENCE_METRICS = {
   listRadius: 12,
   doneIcon: 44,
   doneTitle: 20,
+  /** The overview's title in the header row. */
+  overviewTitle: 18,
+  /** The least an overview row's words get beside its "Resolver"; under that, the button drops below them. */
+  overviewTextMin: 192,
+  /**
+   * With "Ver todos", the chrome's width below which the header is narrow:
+   * Back is its chevron alone and the step label takes its own line under
+   * the bar. A resolver without an overview never changes its header. A 360px
+   * phone's sheet leaves the chrome 280px, a 390px one 310px — where Back's
+   * word, the label, "Ver todos (N)" and close all fit whole (about 294px).
+   */
+  narrowChrome: 300,
 } as const;

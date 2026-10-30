@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutCopy } from "./copy-context";
@@ -24,6 +24,15 @@ interface PaymentPollingState {
    * the order has settled — there is nothing left to ask about.
    */
   checkAgain: () => void;
+  /**
+   * Ask NOW, keeping the clock and the counters — what the re-arm events do
+   * (`poll-rearm.ts`). The Pix countdown's lapse uses it (FUT-1181): the code's
+   * deadline is the moment the answer changes, so the pane asks then rather
+   * than at its next, possibly decayed, poll, without granting the wait a
+   * second bound the way {@link checkAgain} would. A no-op once settled or
+   * stopped.
+   */
+  askNow: () => void;
 }
 
 /**
@@ -181,9 +190,7 @@ export function usePaymentPolling(
     isLive, liveIntervalMs,
   ]);
 
-  const checkAgain = useCallback(() => {
-    loop.current?.restart();
-  }, []);
+  const actions = useMemo(() => pollActions(loop), []);
 
   // The answer is this order's, or there is no answer yet. Read here rather
   // than reset in an effect: an effect runs after paint, so the render that
@@ -193,7 +200,15 @@ export function usePaymentPolling(
     status: current.status,
     error: current.error,
     timedOut: current.timedOut,
-    checkAgain,
+    ...actions,
+  };
+}
+
+/** The wait's two asks, stable across renders while reaching whichever loop the effect owns. */
+function pollActions(loop: { current: PollLoop | null }): Pick<PaymentPollingState, "checkAgain" | "askNow"> {
+  return {
+    checkAgain: () => loop.current?.restart(),
+    askNow: () => void loop.current?.poke(),
   };
 }
 

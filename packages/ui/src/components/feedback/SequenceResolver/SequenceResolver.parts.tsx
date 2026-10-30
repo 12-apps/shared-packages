@@ -1,94 +1,35 @@
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CloseIcon from '@mui/icons-material/Close';
 import Box from '@mui/material/Box/index.js';
 import ButtonBase from '@mui/material/ButtonBase/index.js';
-import IconButton from '@mui/material/IconButton/index.js';
 import Typography from '@mui/material/Typography/index.js';
 import React, { useEffect, useRef } from 'react';
 
 import { Alert } from '../../data-display/Alert';
-import { Progress } from '../../data-display/Progress';
 import { Button } from '../../form/Button';
 import {
   actionSx,
-  backButtonSx,
   categoryDescriptionSx,
   categoryRowSx,
   categoryTextSx,
-  closeButtonSx,
   countBadgeSx,
   doneConfirmSx,
   doneIconSx,
   doneSx,
   doneTitleSx,
   footerSx,
-  handleSx,
-  headerStartSx,
-  headerSx,
   introListSx,
-  stepLabelSx,
   startAllSx,
+  stepScreenSx,
   tertiarySx,
   titleSx,
 } from './SequenceResolver.styles';
-import type { SequenceAction, SequenceDone, SequenceIntro, SequenceStep } from './SequenceResolver.types';
-
-interface HeaderProps {
-  touch: boolean;
-  label: string;
-  /** Absent: no back button (intro, first step, or the host turned it off). */
-  back?: { label: string; accessible?: string; onClick: () => void; disabled: boolean };
-  closeLabel: string;
-  onClose: () => void;
-  progress: number;
-  progressLabel: string;
-  testId: string;
-}
-
-/** The drag handle (phone), the header row and the progress bar. */
-export function SequenceHeader(props: HeaderProps): React.JSX.Element {
-  const { touch, label, back, closeLabel, onClose, progress, progressLabel, testId } = props;
-  return (
-    <>
-      {touch ? <Box aria-hidden sx={handleSx} data-testid={`${testId}-handle`} /> : null}
-      <Box sx={headerSx}>
-        <Box sx={headerStartSx}>
-          {back ? (
-            <Button
-              variant="text"
-              color="primary"
-              size="md"
-              icon={<ChevronLeftIcon />}
-              aria-label={back.accessible}
-              onClick={back.onClick}
-              disabled={back.disabled}
-              sx={backButtonSx(touch)}
-              dataTestId={`${testId}-back`}
-            >
-              {back.label}
-            </Button>
-          ) : null}
-          <Typography component="span" sx={stepLabelSx} data-testid={`${testId}-step-label`}>
-            {label}
-          </Typography>
-        </Box>
-        <IconButton aria-label={closeLabel} onClick={onClose} sx={closeButtonSx(touch)} data-testid={`${testId}-close`}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <Progress
-        variant="linear"
-        size="md"
-        color="warning"
-        value={progress}
-        aria-label={progressLabel}
-        dataTestId={`${testId}-progress`}
-      />
-    </>
-  );
-}
+import type {
+  SequenceAction,
+  SequenceDone,
+  SequenceIntro,
+  SequenceStep,
+} from './SequenceResolver.types';
 
 /**
  * Moves focus to `target` (else `fallback`) whenever `screenKey` changes — and
@@ -102,6 +43,8 @@ export function useFocusOnScreen(
   fallback: React.RefObject<HTMLElement | null>,
 ): void {
   useEffect(() => {
+    // An empty key: the screen is kept but not showing, so it takes no focus.
+    if (!screenKey) return;
     (target.current ?? fallback.current)?.focus();
   }, [screenKey, target, fallback]);
 }
@@ -192,6 +135,12 @@ export function SequenceIntroBody({ intro, titleId, testId, screenKey }: IntroPr
 
 interface StepProps {
   step: SequenceStep;
+  /**
+   * Kept mounted under the overview, out of sight and out of the
+   * accessibility tree, so what the person half-filled in the host's step is
+   * still there when they continue. Focus returns to it when it shows again.
+   */
+  hidden?: boolean;
   /** The default secondary: skip. */
   skip: SequenceAction;
   busy: boolean;
@@ -230,16 +179,30 @@ function ActionButton({
   );
 }
 
+/** The step's footer: its secondary (skip by default; `false` for none) and its primary. */
+function StepFooter({ step, skip, busy, touch, testId }: Pick<StepProps, 'step' | 'skip' | 'busy' | 'touch' | 'testId'>) {
+  const secondary = step.secondary === false ? undefined : (step.secondary ?? skip);
+  if (!secondary && !step.primary) return null;
+  return (
+    <Box sx={footerSx(touch, step.footer ?? 'end')} data-testid={`${testId}-footer`}>
+      {secondary ? (
+        <ActionButton action={secondary} busy={busy} touch={touch} variant="outline" testId={`${testId}-secondary`} />
+      ) : null}
+      {step.primary ? (
+        <ActionButton action={step.primary} busy={busy} touch={touch} variant="solid" testId={`${testId}-primary`} />
+      ) : null}
+    </Box>
+  );
+}
+
 /** The host's body, its error, the tertiary text button and the footer. */
 export function SequenceStepBody(props: StepProps): React.JSX.Element {
-  const { step, skip, busy, error, touch, testId, screenKey, titleRef } = props;
+  const { step, skip, busy, error, touch, testId, screenKey, titleRef, hidden = false } = props;
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  useFocusOnScreen(screenKey, titleRef, bodyRef);
-  useKeepFocusWhileBusy(busy, bodyRef);
-  const secondary = step.secondary === false ? undefined : (step.secondary ?? skip);
-  const hasFooter = Boolean(secondary || step.primary);
+  useFocusOnScreen(hidden ? '' : screenKey, titleRef, bodyRef);
+  useKeepFocusWhileBusy(busy && !hidden, bodyRef);
   return (
-    <>
+    <Box hidden={hidden} sx={stepScreenSx(hidden)} data-testid={`${testId}-step`}>
       <Box ref={bodyRef} tabIndex={-1} aria-busy={busy} sx={{ outline: 'none', minWidth: 0 }}>
         {step.content}
       </Box>
@@ -249,17 +212,8 @@ export function SequenceStepBody(props: StepProps): React.JSX.Element {
       {step.tertiary ? (
         <ActionButton action={step.tertiary} busy={busy} touch={touch} variant="text" testId={`${testId}-tertiary`} />
       ) : null}
-      {hasFooter ? (
-        <Box sx={footerSx(touch, step.footer ?? 'end')} data-testid={`${testId}-footer`}>
-          {secondary ? (
-            <ActionButton action={secondary} busy={busy} touch={touch} variant="outline" testId={`${testId}-secondary`} />
-          ) : null}
-          {step.primary ? (
-            <ActionButton action={step.primary} busy={busy} touch={touch} variant="solid" testId={`${testId}-primary`} />
-          ) : null}
-        </Box>
-      ) : null}
-    </>
+      <StepFooter step={step} skip={skip} busy={busy} touch={touch} testId={testId} />
+    </Box>
   );
 }
 

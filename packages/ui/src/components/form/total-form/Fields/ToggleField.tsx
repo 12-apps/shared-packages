@@ -44,6 +44,9 @@ export function ToggleField({ name, options, label }: ToggleFieldProps): React.R
         options={options}
         value={values[name] ?? ''}
         fullWidth
+        // A `role="group"` div is not labelable, so the `<label htmlFor>`
+        // above names nothing; the group carries the question itself (FUT-4157).
+        aria-label={label}
         dataTestId={testId}
         onChange={(_event, next) => {
           if (typeof next === 'string') setFieldValue(name, next);

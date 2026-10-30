@@ -762,7 +762,20 @@ What changes for the buyer:
   sits beside a "Resumo do pedido" column: `cart.lines` (or, settling a ready
   total, your `paymentList.lines`), `cart.discountLines` (your fee and discount
   rows), "Total", then `summary`, the extras and the pay button — no bar at the
-  bottom. On a phone the bar stays, and draws no lines.
+  bottom. On a phone the bar stays, and its first line (your `summary`)
+  carries "Ver resumo": it opens a sheet above the bar with the same body as
+  the column — the lines, `cart.discountLines`, "Total" and the credit rows —
+  fetched on the first tap (FUT-589). The bar stays usable under it; Escape,
+  the ✕, the scrim and the line close it, and any charge the bar starts (the
+  card's 5-second bar, a wallet) closes it, as does the payer line's
+  "Alterar", which opens the CPF at the top. Only the list face has it: the Pix
+  screen and the hand-off keep their plain line. Your money rows are drawn
+  there READ-ONLY: a control among them reads `useInSummarySheet()` (exported
+  from the package root) to leave itself out, as it does in your own column.
+  Because the whole line is ONE button on a phone, `summary` is drawn inside
+  a `<button>`: pass non-interactive content only (text, an icon) — a link or
+  a button in it would nest one control in another, which is invalid HTML and
+  breaks screen readers.
 - No `orderNote`, and no step header anywhere in the flow: the host's own
   stepper is the chrome around it. The list's `copy.title` names the list
   for a screen reader only.
@@ -772,12 +785,12 @@ What changes for the buyer:
 | field | what it is |
 | --- | --- |
 | `copy` | the list's words — `PAYMENT_LIST_COPY[locale]`; required |
-| `summary?`, `onlineExtras?` | the bar's first line; what joins it while an online option is chosen |
+| `summary?`, `onlineExtras?` | the bar's first line — non-interactive text, since on a phone it is drawn inside the "Ver resumo" button; what joins it while an online option is chosen |
 | `door?` | your pay-at-the-door options — the slot below |
 | `hold?` | `{ action, reason }`: the button reads `action` and is held, `reason` under it |
 | `totalCents?` | integer cents — the AMOUNT DUE online: the cart's total, less a balance you hold (store credit). Both wallets' sheets are priced with it, and a key is charged only when the order raised behind the sheet asks the provider for the same amount — `order.amountDueCents ?? order.totalCents`. **A host without it, or at `0`, gets no wallet buttons.** Once given, a moment without it (you are re-pricing) keeps the buttons' place, held plainly with `copy.reasons.repricing`, until it returns |
 | `amountDueLabel?` | the amount due, formatted, when a balance pays part of the cart. The card's button, the 5-second bar and the Pix face name it while an online option is chosen; a door option keeps the cart's total. With nothing chosen the held button names no amount (its words take the width), so on a phone the bar draws "Total" and the cart's total above it; the computer's column already does. Absent ⇒ the cart's total |
-| `lines?` | `{ key, quantity, name, totalLabel }[]` — your own lines for the computer's "Resumo do pedido" column, drawn above "Total" **in place of `cart.lines`**, for a checkout that settles a READY total (`settlement` / `totalOverride`: a comanda's conta), where the cart is not what is being paid (FUT-3692). Read only then: a cart checkout keeps `cart.lines` and ignores this. The computer's column only — a phone draws no lines. **"Total" is never computed from them**: it is the ready total, whatever the lines add to. A gap between the two (a taxa de serviço) is yours to show through `cart.discountLines`, which a ready total still draws beside "Total"; make those rows describe the conta, because nothing reconciles them with the lines. Absent ⇒ "Total" alone, as before |
+| `lines?` | `{ key, quantity, name, totalLabel }[]` — your own lines for the computer's "Resumo do pedido" column, drawn above "Total" **in place of `cart.lines`**, for a checkout that settles a READY total (`settlement` / `totalOverride`: a comanda's conta), where the cart is not what is being paid (FUT-3692). Read only then: a cart checkout keeps `cart.lines` and ignores this. The computer's column, and on a phone the "Resumo do pedido" sheet the bar's line opens (FUT-589), draw them. **"Total" is never computed from them**: it is the ready total, whatever the lines add to. A gap between the two (a taxa de serviço) is yours to show through `cart.discountLines`, which a ready total still draws beside "Total"; make those rows describe the conta, because nothing reconciles them with the lines. Absent ⇒ "Total" alone, as before |
 | `credit?` | `{ label, amountLabel }` — the balance paying part of the cart, worded and formatted by you (`{ label: "Crédito da loja", amountLabel: "− R$ 5,00" }`, FUT-3711). With `amountDueLabel`, the computer's "Resumo do pedido" column draws it under "Total", then "A pagar" (`copy.amountDue`) and the amount due — Total − credit reads as what the button charges — while an ONLINE option is chosen. A door option or no choice charges the cart's total, so "Total" stands alone; without either field, "Total" alone |
 | `lastMethod?` | `"PIX"` or `"CARD"` — the buyer's last ONLINE way to pay, as the host remembers it (FUT-3611). Chosen before the buyer touches anything when the store offers it: Pix as Pix, a card as the saved card used last. Never a door tender. Absent ⇒ the saved-card rule alone |
 | `armedCharge?` | the host's own consent screen already took the tap ("Pedir em 1 toque", FUT-3611): the card's 5-second bar starts by itself, once, as soon as a SAVED card is chosen and nothing holds the button. Without a saved card it does nothing; Cancelar still sends nothing |

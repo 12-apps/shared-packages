@@ -46,15 +46,9 @@ const ROOT_SX = (theme: Theme) => ({
   '& :has(> * > [data-testid="calendar-month-select"])': { mb: { xs: 0.5, sm: 2 } },
   '& :has(> [role="columnheader"])': { mb: { xs: 0, sm: 1 } },
   '& [role="columnheader"]': { height: { xs: rem(theme, 24), sm: rem(theme, 32) } },
-  // No gaps between days: the seven columns are what a day's 40px target is
-  // carved from, and at 320 the 4px column gaps were the difference between
-  // 40 and 37; the row gaps were the 20px that pushed the last week under the
-  // "Mais" panel's edge at 320×568 (FUT-4144 UI review). A period then reads
-  // as one unbroken band.
-  '& [role="grid"], & :has(> [role="columnheader"])': { gap: 0 },
-  // With no gaps a rounded day in the middle of a period leaves a notch of
-  // background at every corner; the middle is square, the two ends keep theirs.
-  '& .calendar-day.in-range': { borderRadius: 0 },
+  // The days carry no column gap of their own (`Calendar`, FUT-4162), so the
+  // seven columns are what a day's 40px target is carved from below `sm`; the
+  // range band and its round endpoints are the Calendar's, untouched here.
   // The month/year caption on ONE row at 320: the selectors give up the slack
   // around their text before the arrows are pushed onto a second row.
   '& [data-testid="calendar-month-select"], & [data-testid="calendar-year-select"]': { px: 0.5, minWidth: 0 },

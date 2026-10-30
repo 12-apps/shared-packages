@@ -3,7 +3,6 @@
 import type { JSX } from "react";
 
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
-import { Input } from "@12-apps/ui/form/Input";
 import { Box } from "@12-apps/ui/mui/Box";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -13,6 +12,7 @@ import type { ComboRequirement } from "../engine/types";
 import type { WireTargetGroup } from "./api";
 import { blankSlot } from "./combo-slot-builder";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { CountInput, WholeNumberInput } from "./number-fields";
 import { TargetPickerField } from "./target-picker-field";
 
 /**
@@ -39,6 +39,11 @@ import { TargetPickerField } from "./target-picker-field";
 /** The one group this kind edits, or a blank one when nothing is chosen yet. */
 function onlySlot(slots: readonly ComboRequirement[]): ComboRequirement {
   return slots[0] ?? blankSlot();
+}
+
+/** Typed with something besides digits: marked as it is typed, like the other counts. */
+function notDigits(typed: string): boolean {
+  return typed.trim() !== "" && !/^\d+$/u.test(typed.trim());
 }
 
 /** How many the customer pays for: what they take, minus what is free. */
@@ -84,20 +89,22 @@ function FreeUnitsCounts({
 }): JSX.Element {
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-      <Input
-        type="number"
+      <CountInput
         label={copy.combo.buyQuantity}
-        value={String(quantity)}
-        onChange={(event) => onQuantity(Number(event.target.value))}
-        data-testid="free-units-quantity"
+        value={quantity}
+        copy={copy}
+        invalidMessage={copy.form.invalidComboQuantity}
+        dataTestId="free-units-quantity"
+        onChange={onQuantity}
       />
-      <Input
-        type="number"
+      {/* Held as the form's string, so "2,5" stays as typed and the validator
+          refuses it with `invalidFreeUnits` below the builder. */}
+      <WholeNumberInput
         label={copy.form.freeUnits}
         value={freeUnits}
-        onChange={(event) => onFreeUnits(event.target.value)}
-        error={error !== undefined}
-        data-testid="free-units-free"
+        error={error !== undefined || notDigits(freeUnits)}
+        dataTestId="free-units-free"
+        onChange={onFreeUnits}
       />
     </Box>
   );
@@ -160,9 +167,9 @@ export function FreeUnitsBuilder({
           autocompleteCopy={copy.autocomplete}
           dataTestId="free-units-items"
         />
-        {error !== undefined && (
+        {(error !== undefined || notDigits(freeUnits)) && (
           <FormMessage error dataTestId="free-units-free-message">
-            {error}
+            {error ?? copy.form.wholeNumberOnly}
           </FormMessage>
         )}
         {empty ? (

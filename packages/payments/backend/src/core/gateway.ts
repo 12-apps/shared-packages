@@ -52,12 +52,12 @@ function vaultMethods(config: PaymentsGatewayConfig): Pick<
   'beginVault' | 'completeVault' | 'forgetVault'
 > {
   return {
-    async beginVault(merchant, input) {
-      const { adapter, creds } = await activeVault(config, merchant);
+    async beginVault(merchant, input, provider) {
+      const { adapter, creds } = await activeVault(config, merchant, provider);
       return adapter.vault.begin(input, creds);
     },
-    async completeVault(merchant, input) {
-      const { adapter, creds } = await activeVault(config, merchant);
+    async completeVault(merchant, input, provider) {
+      const { adapter, creds } = await activeVault(config, merchant, provider);
       return adapter.vault.complete(input, creds);
     },
     async forgetVault(merchant, provider, input) {
@@ -181,7 +181,9 @@ export interface PaymentsGateway<P extends string = string>
    * VAULT a card for later off-session use, on the merchant's ACTIVE provider
    * (FUT-340). Two steps, because the middle one happens in the browser.
    *
-   * Pinned to the chain HEAD on purpose, with no failover. An instrument is
+   * Pinned to ONE provider on purpose, with no failover: the chain HEAD (what
+   * billing collects at), or the `provider` a caller NAMES — the buyer checkout
+   * names its card provider (FUT-3138). An instrument is
    * bound to the provider that minted it, so "vault it wherever works" would
    * produce a card the acquirer we actually collect through cannot read —
    * failing later, on a timer, with the tenant long gone from the screen.
@@ -191,8 +193,8 @@ export interface PaymentsGateway<P extends string = string>
    * charging somebody to store their card is not a substitution to make
    * silently.
    */
-  beginVault(merchant: MerchantRef, input: VaultBeginInput): Promise<VaultSession>;
-  completeVault(merchant: MerchantRef, input: VaultCompleteInput): Promise<VaultedInstrument>;
+  beginVault(merchant: MerchantRef, input: VaultBeginInput, provider?: ProviderName): Promise<VaultSession>;
+  completeVault(merchant: MerchantRef, input: VaultCompleteInput, provider?: ProviderName): Promise<VaultedInstrument>;
   /**
    * Take a vaulted card back off file at the provider that holds it.
    *
