@@ -193,7 +193,7 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
     );
   }
   if (stepBody) return <>{stepBody}</>;
-  // `done: null`: no end screen — the resolver is closing (see `useCloseAtEnd`).
+  // `done: null`: no end screen — the resolver is closing over its last step (see `useExitScreen`).
   if (props.done === null) return <></>;
   const summary = summaryOf(state.run);
   return (
@@ -213,17 +213,61 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
  * With `done: null`, the run's end closes the resolver: `onClose(summary)`
  * once, when the queue runs out while it is open and past the intro. Returns
  * whether the run has ended that way, so the dialog starts closing in the same
- * render instead of showing an empty body for a frame.
+ * render (and keeps its last screen for the exit, see `useExitScreen`).
+ *
+ * `fired` makes it once per ending: StrictMode replays a mount's effects, and
+ * a resolver mounted open over an empty queue would otherwise close twice. It
+ * resets when the run is live again (a reopening, a queue that grew back).
  */
 function useCloseAtEnd(ended: boolean, close: () => void): boolean {
   const closeRef = useRef(close);
+  const fired = useRef(false);
   useEffect(() => {
     closeRef.current = close;
   });
   useEffect(() => {
-    if (ended) closeRef.current();
+    if (!ended) {
+      fired.current = false;
+      return;
+    }
+    if (fired.current) return;
+    fired.current = true;
+    closeRef.current();
   }, [ended]);
   return ended;
+}
+
+interface Screen {
+  header: ReturnType<typeof headerOf>;
+  body: React.JSX.Element;
+}
+
+/**
+ * What the dialog shows. While a step is on screen, that screen — and it is
+ * kept: when the run ends with `done: null` the dialog closes in that same
+ * render, and its exit transition (a fade, the sheet sliding down) plays over
+ * the LAST step as it was — its label, Back, progress and body — rather than
+ * an empty, collapsed "done" paper — also once the host turns `open` off from
+ * `onClose`. Back is inert during the exit.
+ */
+function useExitScreen(live: Screen, input: { open: boolean; hasStep: boolean; closesAtEnd: boolean }): Screen {
+  const { open, hasStep, closesAtEnd } = input;
+  const last = useRef<Screen | null>(null);
+  const wasOpen = useRef(open);
+  // A new opening is a new run: the last one's screen is not kept into it.
+  if (open && !wasOpen.current) last.current = null;
+  wasOpen.current = open;
+  if (!closesAtEnd) return live;
+  if (open && hasStep) {
+    last.current = live;
+    return live;
+  }
+  // Ended (or closed by the host after `onClose`): the exit plays over the last step.
+  const kept = last.current;
+  if (!kept) return live;
+  const { header } = kept;
+  if (!('back' in header) || !header.back) return kept;
+  return { ...kept, header: { ...header, back: { ...header.back, onClick: () => undefined } } };
 }
 
 /**
@@ -273,6 +317,26 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
   const titleProps = { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef } as const;
   const step = current ? props.renderStep(current, stepApiOf(state, titleProps)) : undefined;
   stepAllowsBack.current = step?.canGoBack !== false;
+  const screen = useExitScreen(
+    {
+      header: headerOf({ props, state, current, overview, titleId }),
+      body: (
+        <SequenceBody
+          props={props}
+          state={state}
+          current={current}
+          step={step}
+          overview={overview}
+          titleId={titleId}
+          stepTitleRef={stepTitleRef}
+          touch={touch}
+          testId={testId}
+          close={close}
+        />
+      ),
+    },
+    { open, hasStep: current !== undefined && step !== undefined, closesAtEnd: props.done === null && !intro },
+  );
 
   return (
     <Dialog
@@ -290,7 +354,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
         <Box sx={chromeSx}>
           <SequenceHeader
             touch={touch}
-            {...headerOf({ props, state, current, overview, titleId })}
+            {...screen.header}
             closeLabel={labels.close}
             onClose={close}
             progressLabel={labels.progress}
@@ -298,18 +362,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
           />
         </Box>
         <Box sx={scrollBodySx} data-testid={`${testId}-body`}>
-          <SequenceBody
-            props={props}
-            state={state}
-            current={current}
-            step={step}
-            overview={overview}
-            titleId={titleId}
-            stepTitleRef={stepTitleRef}
-            touch={touch}
-            testId={testId}
-            close={close}
-          />
+          {screen.body}
         </Box>
       </Box>
     </Dialog>

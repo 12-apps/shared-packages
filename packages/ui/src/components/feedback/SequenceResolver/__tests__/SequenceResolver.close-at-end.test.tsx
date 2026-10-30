@@ -3,6 +3,7 @@
  * the last step was answered or passed over, the resolver calls
  * `onClose(summary)` once and the host's toast is the run's last word.
  */
+import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -189,6 +190,68 @@ describe("done: null", () => {
     rerender({ onClose, open: false, queue: [P("b")] });
     rerender({ onClose, open: true, queue: [P("b")] });
     expect(screen.getByTestId("sr-step-label")).toHaveTextContent("Problem 1 of 1");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("plays its exit over the last step as it was: label, Back, progress and body do not change", async () => {
+    const onClose = vi.fn();
+    const { rerender } = renderResolver({ onClose });
+    click("sr-secondary");
+    const seen = () => ({
+      label: screen.getByTestId("sr-step-label").textContent,
+      back: screen.getByTestId("sr-back").textContent,
+      progress: screen.getByTestId("sr-progress").outerHTML,
+      body: screen.getByTestId("sr-body").textContent,
+      height: screen.getByTestId("sr-body").childElementCount,
+    });
+    const before = seen();
+    expect(before.label).toBe("Problem 2 of 2");
+    expect(before.body).toContain("Item b");
+    click("sr-primary");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    // The closing render: the dialog is on its way out, still showing step 2.
+    expect(seen()).toEqual(before);
+    expect(screen.queryByText("Done")).toBeNull();
+    // The host turns it off from onClose: still the same screen for the rest of the exit.
+    rerender({ onClose, open: false });
+    expect(seen()).toEqual(before);
+    // Back is inert during the exit.
+    click("sr-back");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onClose once under StrictMode when it mounts open over an empty queue", async () => {
+    const onClose = vi.fn();
+    render(
+      <StrictMode>
+        <SequenceResolver<Problem, string> open onClose={onClose} queue={[]} renderStep={saveStep} done={null} labels={LABELS} dataTestId="sr" />
+      </StrictMode>,
+    );
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    await act(async () => {
+      await new Promise((settle) => setTimeout(settle, 50));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onClose once under StrictMode when the last step is answered", async () => {
+    const onClose = vi.fn();
+    render(
+      <StrictMode>
+        <SequenceResolver<Problem, string> open onClose={onClose} queue={[P("a")]} renderStep={saveStep} done={null} labels={LABELS} dataTestId="sr" />
+      </StrictMode>,
+    );
+    click("sr-primary");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    await act(async () => {
+      await new Promise((settle) => setTimeout(settle, 50));
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
