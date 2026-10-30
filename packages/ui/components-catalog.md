@@ -185,7 +185,7 @@ Components for displaying data, visualizations, and information to users.
 ### RegionMap
 **Purpose**: Show named areas (polygons with holes) around a point, and let a tap toggle each one in or out
 **Use Cases**: Bairros a store does not deliver to, delivery or sales zones, sectors switched on and off, a read-only in/out picture
-**Features**: Inline SVG with no tile server, hatched AND named excluded areas (never only colour, never red), dashed circles, highlighted area, several highlighted areas at once, a touch hit test that takes the smallest area within a few pixels (slivers reachable), memoised geometry so a toggle is cheap, accessible list of toggle buttons with state in words (shown, collapsed behind a count, or none; outside areas drawn faded but unlisted; sortable by name), Google polyline decoder, every word injected
+**Features**: Inline SVG with no tile server, hatched AND named excluded areas (never only colour, never red), dashed circles, highlighted area, several highlighted areas at once, a touch hit test that takes the smallest area within a few pixels (slivers reachable), memoised geometry so a toggle is cheap, a `reach` (radius or bounds) the view also fits and a tap-transparent `overlay` slot inside the SVG with the map's view and projection (`regionMapView` for HTML laid over it), accessible list of toggle buttons with state in words (shown, collapsed behind a count, or none; outside areas drawn faded but unlisted; sortable by name), Google polyline decoder, every word injected
 **Location**: `src/components/data-display/RegionMap`
 **Docs**: `src/components/data-display/RegionMap/RegionMap.md`
 
