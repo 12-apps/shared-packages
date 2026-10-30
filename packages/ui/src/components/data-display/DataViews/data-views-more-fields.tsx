@@ -13,6 +13,7 @@
  * a search — it is the bar's own {@link PillControl}; see `sharesBarControl`.
  */
 import Checkbox from "@mui/material/Checkbox/index.js";
+import type { Theme } from "@mui/material/styles/index.js";
 
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
@@ -28,7 +29,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { fieldHeight } from "../../../tokens/field-height";
 import { fieldEdge } from "../../../tokens/field-edge";
-import { sxRem } from "../../../tokens/relative";
+import { rem, sxRem } from "../../../tokens/relative";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -252,6 +253,34 @@ export function MoreQuick({
 }
 
 /** One labelled group in the panel: the field's name, then its control. */
+/**
+ * The header row's bottom margin while its "Limpar" shows: 10px below `sm`
+ * instead of 4px, the room the button's 40px target needs under it. Written
+ * as a base value with an `sm` override (not `{ xs, sm }`), so the phone value
+ * is the one that applies with no media query at all.
+ */
+const CLEAR_ROW_SX = (theme: Theme) => ({ mb: 1.25, [theme.breakpoints.up("sm")]: { mb: 0.5 } });
+
+/**
+ * "Limpar" is 12px text, a 37×18 button: on a phone that was the whole target
+ * (FUT-4144, measured in the admin at 320–900). Below `sm` an overlay makes it
+ * 40px tall without moving the text: 12px up, into the 12px the group above
+ * leaves, and 10px down, into the 10px the header now keeps. It covers nothing
+ * else. From `sm` up there is no overlay and nothing moves.
+ */
+const CLEAR_TARGET_SX = (theme: Theme) => ({
+  position: "relative",
+  "&::before": {
+    content: '""',
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: `-${rem(theme, 12)}`,
+    bottom: `-${rem(theme, 10)}`,
+    [theme.breakpoints.up("sm")]: { display: "none" },
+  },
+});
+
 export function MoreGroup<T extends Record<string, unknown>>({
   field,
   pills,
@@ -266,7 +295,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
   const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
   return (
     <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+      <Box sx={[{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }, applied && CLEAR_ROW_SX]}>
         <Text variant="caption" as="span">
           <Box component="span" sx={{ color: "text.secondary" }}>
             {field.label}
@@ -283,17 +312,20 @@ export function MoreGroup<T extends Record<string, unknown>>({
             type="button"
             onClick={clear}
             data-testid={`${testIdPrefix}-more-${field.id}-clear`}
-            sx={{
-              ml: "auto",
-              border: 0,
-              p: 0,
-              bgcolor: "transparent",
-              cursor: "pointer",
-              font: "inherit",
-              fontSize: sxRem(12),
-              color: "primary.main",
-              "&:hover": { textDecoration: "underline" },
-            }}
+            sx={[
+              {
+                ml: "auto",
+                border: 0,
+                p: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                font: "inherit",
+                fontSize: sxRem(12),
+                color: "primary.main",
+                "&:hover": { textDecoration: "underline" },
+              },
+              CLEAR_TARGET_SX,
+            ]}
           >
             {copy.filters.clear}
           </Box>
