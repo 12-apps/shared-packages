@@ -166,11 +166,23 @@ interface DemoProps {
   extraLines?: number;
   /** Replaces every step's primary label — a host word longer than a phone row. */
   primaryLabel?: string;
+  /** `done: null` (FUT-3833): no end screen — the run's end closes the resolver, and the host says what happened. */
+  closeAtEnd?: boolean;
+}
+
+/** The host's stand-in for its "N resolvidos · Desfazer" toast: what `onClose` reported, nothing when nothing was answered. */
+function closedLine(summary: SequenceSummary | null): string | null {
+  if (!summary) return null;
+  const count = summary.resolved + summary.alsoResolved;
+  if (count === 0) return null;
+  return count === 1 ? '1 problema resolvido' : `${count} problemas resolvidos`;
 }
 
 /** A host: the intro's picks set the queue; Back calls the host's (fake) inverse. */
-function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 0, extraLines = 0, primaryLabel }: DemoProps) {
+function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 0, extraLines = 0, primaryLabel, closeAtEnd = false }: DemoProps) {
   const [open, setOpen] = useState(true);
+  const [closed, setClosed] = useState<SequenceSummary | null>(null);
+  const line = closedLine(closed);
   const [showIntro, setShowIntro] = useState(withIntro);
   const [queue, setQueue] = useState<Problem[]>(initial);
   const kinds = new Set(queue.map((item) => item.kind));
@@ -216,19 +228,28 @@ function Demo({ withIntro = false, queue: initial = PROBLEMS, onBack, writeMs = 
         onClick={() => {
           setShowIntro(withIntro);
           setQueue(initial);
+          setClosed(null);
           setOpen(true);
         }}
       >
         Abrir
       </Button>
+      {line ? (
+        <Typography role="status" data-testid="resolver-closed" sx={{ mt: 2 }}>
+          {line}
+        </Typography>
+      ) : null}
       <SequenceResolver<Problem, string>
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={(summary) => {
+          setClosed(summary);
+          setOpen(false);
+        }}
         intro={showIntro ? intro : undefined}
         queue={queue}
         renderStep={renderStep}
         onBack={onBack}
-        done={doneFor(single)}
+        done={closeAtEnd ? null : doneFor(single)}
         labels={labelsFor(single)}
         dataTestId="resolver"
       />
@@ -375,3 +396,36 @@ export const DoneBackFailed: Story = {
     await waitFor(() => expect(body.getByTestId('resolver-error')).toBeInTheDocument());
   },
 };
+
+/**
+ * `done: null` (FUT-3833): answering the last step closes the resolver at
+ * once — no end screen — and the host's toast says what was resolved.
+ */
+export const CloseAtEnd: Story = {
+  globals: DESKTOP,
+  args: { queue: PROBLEMS.slice(0, 2), closeAtEnd: true },
+  play: async ({ canvasElement }) => {
+    const body = resolverIn(canvasElement);
+    await userEvent.click(await body.findByTestId('resolver-secondary'));
+    await waitFor(() => expect(body.getByTestId('resolver-step-label')).toHaveTextContent('2 de 2'));
+    await userEvent.click(body.getByTestId('resolver-primary'));
+    await waitFor(() => expect(body.getByTestId('resolver-closed')).toHaveTextContent('1 problema resolvido'));
+    await waitFor(() => expect(body.queryByTestId('resolver-done')).not.toBeInTheDocument());
+    await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
+  },
+};
+
+/** `done: null` with every step passed over: it closes, and the host has nothing to say. */
+export const CloseAtEndAllSkipped: Story = {
+  globals: DESKTOP,
+  args: { queue: PROBLEMS.slice(0, 1), closeAtEnd: true },
+  play: async ({ canvasElement }) => {
+    const body = resolverIn(canvasElement);
+    await userEvent.click(await body.findByTestId('resolver-secondary'));
+    await waitFor(() => expect(body.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(body.queryByTestId('resolver-closed')).not.toBeInTheDocument());
+  },
+};
+
+/** `done: null` on the phone sheet: the sheet leaves after the last answer. */
+export const PhoneCloseAtEnd: Story = { ...CloseAtEnd, globals: PHONE };

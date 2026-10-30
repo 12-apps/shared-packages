@@ -3,7 +3,7 @@
 import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
-import React, { useCallback, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { Dialog } from '../Dialog';
 import { canReturn, currentOf, jumpTargetOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
@@ -193,6 +193,8 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
     );
   }
   if (stepBody) return <>{stepBody}</>;
+  // `done: null`: no end screen — the resolver is closing (see `useCloseAtEnd`).
+  if (props.done === null) return <></>;
   const summary = summaryOf(state.run);
   return (
     <SequenceDoneBody
@@ -208,9 +210,27 @@ function SequenceBody<I extends SequenceItem, R>(body: BodyProps<I, R>): React.J
 }
 
 /**
+ * With `done: null`, the run's end closes the resolver: `onClose(summary)`
+ * once, when the queue runs out while it is open and past the intro. Returns
+ * whether the run has ended that way, so the dialog starts closing in the same
+ * render instead of showing an empty body for a frame.
+ */
+function useCloseAtEnd(ended: boolean, close: () => void): boolean {
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  });
+  useEffect(() => {
+    if (ended) closeRef.current();
+  }, [ended]);
+  return ended;
+}
+
+/**
  * Resolve a queue of problems one at a time, in ONE dialog whose body is
  * replaced step by step: a header with "‹ Back", the step's label and close,
- * a progress bar, the host's step, and an end screen (FUT-3671).
+ * a progress bar, the host's step, and an end screen (FUT-3671) — or none,
+ * with `done: null`: the run's end closes it (FUT-3833).
  *
  * A centred `Dialog` from the `sm` breakpoint up; the `Dialog` inset
  * bottom-sheet variant below it, never taller than 95% of the viewport. Either
@@ -247,6 +267,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
   const { run } = state;
   const current = intro ? undefined : currentOf(run);
   const close = (): void => onClose(summaryOf(run));
+  const ended = useCloseAtEnd(open && !intro && !current && props.done === null, close);
   const overview = useOverview(props, state, current, open);
   // Under the overview the step is kept but hidden, and the overview's title names the dialog.
   const titleProps = { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef } as const;
@@ -255,7 +276,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
 
   return (
     <Dialog
-      open={open}
+      open={open && !ended}
       onClose={close}
       persistent
       variant={touch ? 'bottom-sheet' : 'default'}

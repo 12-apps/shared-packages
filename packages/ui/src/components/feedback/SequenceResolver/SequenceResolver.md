@@ -47,7 +47,7 @@ data-sized and shrinks while you go.
 | Prop | Type | Description |
 |---|---|---|
 | `open` | `boolean` | Shows the resolver. Every opening — with an intro or without — starts a fresh run. |
-| `onClose` | `(summary) => void` | Close button, Esc and the end screen's button. Gets `{ resolved, skipped, total, alsoResolved }`; a close toast counts `resolved + alsoResolved` (and shows only when that is above 0). Clicking the veil does nothing (as approved). |
+| `onClose` | `(summary) => void` | Close button, Esc and the end screen's button — or, with `done: null`, the queue running out. Gets `{ resolved, skipped, total, alsoResolved }`; a close toast counts `resolved + alsoResolved` (and shows only when that is above 0). Clicking the veil does nothing (as approved). |
 | `intro` | `SequenceIntro?` | While given, the intro shows instead of the run: `title`, `description`, `categories` (`label`, `description`, `count`, `onPick`), `startAllLabel`, `onStartAll`. The host drops it and sets `queue` in the same update as a pick. |
 | `queue` | `readonly I[]` (`I extends { key; kindLabel }`) | The problems, in order. Live data: it may shrink (siblings answered together) or grow mid-run. |
 | `renderStep` | `(item, api) => SequenceStep` | The current step: `content`, `primary?`, `secondary?` (default: skip with `labels.skip`; `false` removes it), `tertiary?`, `footer?` (`'end'` default — right-aligned over a hairline; `'split'` — two equal columns, no hairline; on a phone the actions always share the row without a hairline), `canGoBack?` (`false`: this answer has no inverse — once it is answered, Back is not offered from the next step). |
@@ -55,7 +55,7 @@ data-sized and shrinks while you go.
 | `canGoBack` | `boolean` (default `true`) | Offer Back at all. It shows only once a previous step exists — on steps and on the end screen, never on the intro. |
 | `overview` | `SequenceOverview?` | "Ver todos (N)" inside the run (FUT-3825): `label(total)`, `title`, `categories` (`label`, `description?`, `count?` — the host's bookkeeping, not drawn: the `label` says the number, "Atrasado · 1" — `keys`, `onPick?`), `pickLabel`, `continueLabel`. See "Ver todos". |
 | `initialKey` | `string?` | Open the run at this problem (a click on its block). The ones before it follow it; nothing is passed over. |
-| `done` | `SequenceDone \| (summary) => SequenceDone` | The end screen: `title`, `description?`, `confirmLabel`. |
+| `done` | `SequenceDone \| (summary) => SequenceDone \| null` | The end screen: `title`, `description?`, `confirmLabel`. **`null` drops it** (FUT-3833): when the queue runs out — the last step answered or passed over, or the host's queue emptied under the run — the resolver calls `onClose(summary)` once and starts closing; the host's toast is the run's last word. A pending last write keeps the step until it returns; a refused one keeps it with its message and does not close. Never fires from the intro. |
 | `labels` | `SequenceResolverLabels` | Every chrome word: `back`, `backAccessible?`, `close`, `skip`, `step(position, total, item)`, `introStep`, `doneStep`, `progress`, `failed`. **Required — the package ships no copy.** |
 | `dataTestId` | `string` (default `sequence-resolver`) | Parts: `-back`, `-close`, `-step-label`, `-progress`, `-handle`, `-category-<n>`, `-start-all`, `-primary`, `-secondary`, `-tertiary`, `-footer`, `-error`, `-done`, `-done-confirm`, `-see-all`, `-overview`, `-overview-pick-<n>`, `-continue`. |
 
