@@ -8,7 +8,7 @@
  */
 import Box from '@mui/material/Box/index.js';
 import Typography from '@mui/material/Typography/index.js';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useDataViewsCopy } from './data-views-copy-context';
 import { DayBoundInput } from './data-views-day-input';
@@ -70,6 +70,44 @@ function BoundField<T extends Record<string, unknown>>({
   );
 }
 
+
+/**
+ * After the line's "Limpar", focus goes to the cleared "De" — the next thing
+ * to type — instead of falling to the page with the button that held it.
+ * The boxes remount on a clear, so focus waits for the reset key to move.
+ */
+function useFocusDeAfterClear(
+  key: number,
+  testId: string,
+): { rootRef: React.RefObject<HTMLDivElement | null>; clearToDe: (clear: () => void) => void } {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pending = useRef(false);
+  useEffect(() => {
+    if (!pending.current) return;
+    pending.current = false;
+    rootRef.current?.querySelector<HTMLInputElement>(`[data-testid="${testId}-min"]`)?.focus();
+  }, [key, testId]);
+  return {
+    rootRef,
+    clearToDe: (clear) => {
+      pending.current = true;
+      clear();
+    },
+  };
+}
+
+/**
+ * The window and "Limpar" for the hint line, where the host asks for them.
+ * `clear` goes straight to the host, not through `emitted`: it is an outside
+ * write, so the boxes and the calendar re-open on the empty range.
+ */
+function hintLineProps<T extends Record<string, unknown>>(
+  field: RangeFieldConfig<T>,
+  value: RangeValue,
+  clear: () => void,
+): { summary: string | undefined; onClear: () => void } {
+  return { summary: appliedWindow(field, value), onClear: clear };
+}
 
 /** The applied window in words ("Data: 01/10–15/10"), or nothing while none is. */
 function appliedWindow<T extends Record<string, unknown>>(field: RangeFieldConfig<T>, value: RangeValue): string | undefined {
@@ -171,6 +209,8 @@ export function RangeBounds<T extends Record<string, unknown>>({
 }: RangeBoundsProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
   const { key, emitted } = useOutsideResetKey(value);
+  const { rootRef, clearToDe } = useFocusDeAfterClear(key, testId);
+  const hintLine = summaryOnHint ? hintLineProps(field, value, () => clearToDe(() => onChange({}))) : {};
   // Moves the calendar to a TYPED day. A typed write is the fields' own, so
   // the outside key above does not see it; a tap on the calendar moves
   // neither, which is what keeps it still under the finger.
@@ -181,7 +221,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
   };
   const day = field.kind === 'day';
   return (
-    <Box data-testid={`${testId}-panel`}>
+    <Box ref={rootRef} data-testid={`${testId}-panel`}>
       {/* Above the inputs, not below: the presets are the answer for most
           merchants, and the two date pickers are the escape hatch. */}
       <Box sx={{ '&:not(:empty)': { mb: { xs: 1, sm: 1.5 } } }}>
@@ -227,10 +267,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
           months={calendarMonths}
           viewKey={`${key}-${typed}`}
           testId={testId}
-          summary={summaryOnHint ? appliedWindow(field, value) : undefined}
-          // Straight to the host, not through `emitted`: a clear is an outside
-          // write, so the boxes and the calendar re-open on the empty range.
-          onClear={() => onChange({})}
+          {...hintLine}
         />
       )}
     </Box>

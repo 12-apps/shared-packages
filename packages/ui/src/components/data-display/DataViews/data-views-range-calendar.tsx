@@ -123,8 +123,12 @@ function openingMonth(value: RangeValue, months: number): Date | undefined {
  * follow-up): #932 kept an invisible summary row under the hint so the first
  * tap would not grow the popover, and at 1280 that was 59px of white.
  *
- * The line is always as tall as "Limpar"'s 40px target, so it keeps one height
- * with the button and without it, and the popover does not move. The target
+ * Where the line can hold "Limpar" (the pill's popover) it is always as tall as
+ * its 40px target, so it keeps one height with the button and without it, and
+ * the popover does not move. Where it cannot (a panel, whose header has
+ * "Limpar") it stays a plain line of text: no row reserved for a button that
+ * never comes. The text keeps to one line, cut with an ellipsis and whole in
+ * its title, so a long label never grows the line on the closing tap. The target
  * is its own box, not padding pushed out with a negative margin: that version
  * ran under the calendar's last week, which took its top 10px at 320 (FUT-4144
  * UI review). The window is said in the primary ink, the steps in the
@@ -133,12 +137,16 @@ function openingMonth(value: RangeValue, months: number): Date | undefined {
 function HintLine({
   text,
   isWindow,
+  canClear,
   onClear,
   testId,
 }: {
   text: string;
   /** `text` is the applied window, not a step. */
   isWindow: boolean;
+  /** The line can hold "Limpar" at all — fixed per surface, not per state. */
+  canClear: boolean;
+  /** Shown now: "Limpar" empties the range. */
   onClear: (() => void) | undefined;
   testId: string;
 }): React.JSX.Element {
@@ -152,7 +160,7 @@ function HintLine({
         justifyContent: 'space-between',
         gap: 2,
         mt: { xs: 0.25, sm: 1 },
-        minHeight: sxRem(40),
+        minHeight: canClear ? sxRem(40) : undefined,
         fontSize: sxRem(12),
         lineHeight: 1.5,
       }}
@@ -161,7 +169,9 @@ function HintLine({
         component="p"
         aria-live="polite"
         data-testid={`${testId}-calendar-hint`}
-        sx={{ m: 0, font: 'inherit', color: isWindow ? 'text.primary' : 'text.secondary' }}
+        title={text}
+        noWrap
+        sx={{ m: 0, minWidth: 0, font: 'inherit', color: isWindow ? 'text.primary' : 'text.secondary' }}
       >
         {text}
       </Typography>
@@ -189,6 +199,13 @@ function HintLine({
             mr: -1,
             borderRadius: 1,
             '&:hover': { bgcolor: 'action.hover' },
+            // The theme's focus ring for a keyboard, none for a tap.
+            '&:focus': { outline: 'none' },
+            '&:focus-visible': {
+              outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+              outlineColor: 'primary.main',
+              outlineOffset: sxRem(1),
+            },
           }}
         >
           {clear}
@@ -223,7 +240,10 @@ export interface DayRangeCalendarProps {
    * place for them; a panel says them in its own header and leaves this unset.
    */
   summary?: string;
-  /** Empties the range: the line's "Limpar", shown while `summary` is set. */
+  /**
+   * Empties the range: the line's "Limpar", shown while `summary` is set. Set
+   * only where the line may hold it; the line reserves its 40px only then.
+   */
   onClear?: () => void;
 }
 
@@ -269,7 +289,8 @@ export function DayRangeCalendar({
       <HintLine
         text={waitingForEnd ? copy.pickEnd : (summary ?? copy.pickStart)}
         isWindow={!waitingForEnd && summary !== undefined}
-        onClear={summary !== undefined ? onClear : undefined}
+        canClear={onClear !== undefined}
+        onClear={summary === undefined ? undefined : onClear}
         testId={testId}
       />
     </Box>

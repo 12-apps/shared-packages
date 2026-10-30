@@ -11,7 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import React, { useState } from "react";
 
-import { fireEvent, render, screen, within } from "./test-utils";
+import { fireEvent, render, screen, waitFor, within } from "./test-utils";
 import { RangeBounds } from "../data-views-range-bounds";
 import { RangePill } from "../data-views-range-pill";
 import type { RangeFieldConfig, RangeValue } from "../data-views-types";
@@ -127,6 +127,45 @@ describe("RangePill — the line's ink (FUT-4144 UI review)", () => {
     fireEvent.click(day("15 de outubro de 2026"));
     expect(hint()).toHaveTextContent("Data: 01/10–15/10");
     expect(getComputedStyle(hint()).color).toBe(PRIMARY);
+  });
+});
+
+describe("the hint line's room, wrap and focus (FUT-4144 code review)", () => {
+  it("reserves Limpar's 40px only where the line can hold Limpar", () => {
+    function Panel(): React.JSX.Element {
+      const [value, setValue] = useState<RangeValue>({});
+      return <RangeBounds field={PERIOD} value={value} onChange={setValue} testId="panel-period" />;
+    }
+    render(
+      <>
+        <Pill />
+        <Panel />
+      </>,
+    );
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    // The pill's line holds a 40px row from the start, so it never grows.
+    expect(getComputedStyle(line()).minHeight).not.toBe("");
+    expect(getComputedStyle(line()).minHeight).not.toBe("0px");
+    // A panel's line never shows Limpar (its header has it): no reserved row.
+    const panelLine = screen.getByTestId("panel-period-calendar-line");
+    expect(["", "0px", "auto"]).toContain(getComputedStyle(panelLine).minHeight);
+  });
+
+  it("keeps a long window on one line, cut with an ellipsis and whole in its title", () => {
+    const LONG: RangeFieldConfig<Row> = { ...PERIOD, label: "Data de criação" };
+    render(<Pill field={LONG} initial={{ min: "2026-10-01", max: "2026-10-15" }} />);
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    expect(hint()).toHaveTextContent("Data de criação: 01/10–15/10");
+    expect(hint()).toHaveAttribute("title", "Data de criação: 01/10–15/10");
+    expect(getComputedStyle(hint()).whiteSpace).toBe("nowrap");
+    expect(getComputedStyle(hint()).textOverflow).toBe("ellipsis");
+  });
+
+  it("puts focus in De after Limpar, not on the page", async () => {
+    render(<Pill initial={{ min: "2026-10-01", max: "2026-10-15" }} />);
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`));
+    await waitFor(() => expect(screen.getByTestId(`${TEST_ID}-min`)).toHaveFocus());
   });
 });
 
