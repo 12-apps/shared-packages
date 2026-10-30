@@ -17,12 +17,19 @@ export const headerAdornmentSx: SxProps<Theme> = {
   color: 'text.secondary',
 };
 
-/** The cell above the names: the host's words, at the foot of the header row like the days' adornments. */
+/**
+ * The cell above the names. It is the pinned mask over the names column (the
+ * grid's sticky rule): it must stay a stretched grid item, the header row's
+ * full height, or a day scrolled sideways shows above the names. Its words sit
+ * inside it on the days' label line (the prototype's "Movimento, 11h–23h").
+ */
 export const cornerSx: SxProps<Theme> = {
-  alignSelf: 'end',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'flex-start',
   fontSize: sxRem(M.headerSublabel),
   color: 'text.secondary',
-  p: 0.5,
-  pl: 0,
+  pt: 0.5,
+  pr: 0.5,
   minWidth: 0,
 };

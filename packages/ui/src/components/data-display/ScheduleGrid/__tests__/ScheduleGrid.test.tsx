@@ -730,7 +730,8 @@ describe("the header's host figures (FUT-3882)", () => {
     // The day beside it draws none: its header is there, its adornment is not.
     const friday = within(header).getByRole("columnheader", { name: /^Sex\s23\/10/ });
     expect(within(friday).queryAllByTestId(/sg-adornment-/)).toHaveLength(0);
-    expect(within(header).getByTestId("sg-corner").textContent).toBe("Movimento, 11h–23h");
+    // The range never breaks at its dash: word joiners hold it whole.
+    expect(within(header).getByTestId("sg-corner").textContent).toBe("Movimento, 11h\u2060–\u206023h");
   });
 
   it("keeps the corner empty and draws no adornment when the host gives none", () => {

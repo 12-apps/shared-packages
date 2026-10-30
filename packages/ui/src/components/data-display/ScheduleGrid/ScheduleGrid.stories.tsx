@@ -13,6 +13,7 @@ import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
 import { ScheduleGrid } from './ScheduleGrid';
 import { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
+import { signalInk } from './schedule-tones';
 import type { ScheduleGridBlock, ScheduleGridCell, ScheduleGridColumn, ScheduleGridGroup } from './ScheduleGrid.types';
 
 /**
@@ -158,7 +159,15 @@ function DayBand({ day }: { day: number }) {
           />
         ))}
       </Box>
-      <Box component="span" sx={{ display: 'block', color: short.length ? 'warning.main' : 'transparent', whiteSpace: 'nowrap' }}>
+      {/* The words in the warning ink deepened to read at 4.5:1 on the page (the outline keeps warning.main). */}
+      <Box
+        component="span"
+        sx={(theme) => ({
+          display: 'block',
+          color: short.length ? signalInk(theme, 'warning', theme.palette.background.default) : 'transparent',
+          whiteSpace: 'nowrap',
+        })}
+      >
         {short.length ? `falta 2 · ${11 + (short[0] ?? 0)}–${12 + (short[short.length - 1] ?? 0)}h` : '\u00a0'}
       </Box>
     </Box>

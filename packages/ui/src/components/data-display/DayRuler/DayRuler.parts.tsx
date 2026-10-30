@@ -7,6 +7,7 @@ import type { RulerAbilities, RulerScale } from './DayRuler.keyboard';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 import { useTextFits } from './useTextFits';
 import { formatHour, formatRange, percentOf, ticksOf } from './day-ruler-model';
+import { SR_ONLY_SX } from '../ScheduleGrid/ScheduleGrid.styles';
 import {
   actionsSx,
   actualLabelSx,
@@ -272,20 +273,46 @@ export function trendPoints(values: readonly (number | null)[], hours: number): 
     .join(' ');
 }
 
-function FooterCells({ cells, hours, from }: { cells: readonly DayRulerFooterCell[]; hours: number; from: RulerHour }): React.JSX.Element {
+/** One hour's default words: "20:00 · 4"; just the hour when it says nothing. */
+const hourWords = (hour: RulerHour, text: string): string => (text ? `${formatHour(hour)} · ${text}` : formatHour(hour));
+
+/** What a reader hears for a marked hour: the host's `title`, else the hour, its count and that it is short. */
+function markedWords(cell: DayRulerFooterCell, hour: RulerHour, marked: string): string {
+  return cell.title ?? `${hourWords(hour, cell.text)} · ${marked}`;
+}
+
+interface FooterContext {
+  hours: number;
+  from: RulerHour;
+  /** `labels.footerMarked`. */
+  marked: string;
+}
+
+function FooterCells({ cells, ctx }: { cells: readonly DayRulerFooterCell[]; ctx: FooterContext }): React.JSX.Element {
   return (
-    <Box sx={coverageSx(hours)}>
-      {Array.from({ length: hours }, (_, index) => {
+    <Box sx={coverageSx(ctx.hours)}>
+      {Array.from({ length: ctx.hours }, (_, index) => {
         const cell = cells[index] ?? { text: '' };
+        const hour = ctx.from + index;
         return (
           <Box
             key={index}
             component="span"
             sx={footerCellSx(Boolean(cell.marked))}
-            title={cell.title ?? `${formatHour(from + index)} · ${cell.text}`}
+            title={cell.marked ? markedWords(cell, hour, ctx.marked) : (cell.title ?? hourWords(hour, cell.text))}
             data-marked={cell.marked ? '' : undefined}
           >
-            {cell.text}
+            {/* A marked hour is said in words too, not only by its outline and a tooltip touch never shows. */}
+            {cell.marked ? (
+              <>
+                <span aria-hidden>{cell.text}</span>
+                <Box component="span" sx={SR_ONLY_SX}>
+                  {markedWords(cell, hour, ctx.marked)}
+                </Box>
+              </>
+            ) : (
+              cell.text
+            )}
           </Box>
         );
       })}
@@ -293,11 +320,24 @@ function FooterCells({ cells, hours, from }: { cells: readonly DayRulerFooterCel
   );
 }
 
-function FooterFigures({ row, hours, from }: { row: DayRulerFooterRow; hours: number; from: RulerHour }): React.JSX.Element {
+/** A trend's figures in words, for the reader the drawn line does not reach: "11:00 4 · 12:00 6". */
+function trendWords(values: readonly (number | null)[], ctx: FooterContext): string {
+  return values
+    .slice(0, ctx.hours)
+    .flatMap((value, index) => (value === null ? [] : [`${formatHour(ctx.from + index)} ${Math.round(value * 10) / 10}`]))
+    .join(' · ');
+}
+
+function FooterFigures({ row, ctx }: { row: DayRulerFooterRow; ctx: FooterContext }): React.JSX.Element {
   if (row.trend) {
     return (
-      <Box component="svg" viewBox="0 0 100 40" preserveAspectRatio="none" sx={trendSx} role="img" aria-label={row.label}>
-        <polyline fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" points={trendPoints(row.trend, hours)} />
+      <Box component="span" sx={{ display: 'block', minWidth: 0 }}>
+        <Box component="svg" viewBox="0 0 100 40" preserveAspectRatio="none" sx={trendSx} aria-hidden>
+          <polyline fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" points={trendPoints(row.trend, ctx.hours)} />
+        </Box>
+        <Box component="span" sx={SR_ONLY_SX}>
+          {trendWords(row.trend, ctx)}
+        </Box>
       </Box>
     );
   }
@@ -308,13 +348,16 @@ function FooterFigures({ row, hours, from }: { row: DayRulerFooterRow; hours: nu
       </Box>
     );
   }
-  return <FooterCells cells={row.cells ?? []} hours={hours} from={from} />;
+  return <FooterCells cells={row.cells ?? []} ctx={ctx} />;
 }
 
-/** A group's lines under its rows (FUT-3882): counts per hour, a trend, or a sentence, on the tracks' columns. */
-export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: RulerScale; testId: string }): React.JSX.Element {
+/**
+ * A group's lines under its rows (FUT-3882): counts per hour, a trend, or a
+ * sentence, on the tracks' columns. `marked` is `labels.footerMarked`.
+ */
+export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: RulerScale; testId: string; marked: string }): React.JSX.Element {
   const { rows, scale, testId } = props;
-  const hours = scale.to - scale.from;
+  const ctx: FooterContext = { hours: scale.to - scale.from, from: scale.from, marked: props.marked };
   return (
     <>
       {rows.map((row) => (
@@ -322,7 +365,7 @@ export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: 
           <Box component="span" sx={coverageLabelSx}>
             {row.label}
           </Box>
-          <FooterFigures row={row} hours={hours} from={scale.from} />
+          <FooterFigures row={row} ctx={ctx} />
           <span />
         </Box>
       ))}

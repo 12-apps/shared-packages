@@ -44,7 +44,8 @@ function abilitiesOf(props: DayRulerProps): RulerAbilities {
 function FooterOf({ props, group, ctx }: { props: DayRulerProps; group: string | undefined; ctx: RowContext }): React.JSX.Element | null {
   const rows = props.groupFooter?.(group);
   if (!rows || rows.length === 0) return null;
-  return <GroupFooter rows={rows} scale={ctx.scale} testId={ctx.testId} />;
+  const marked = resolveLabels(EN_US_DAY_RULER_LABELS, props.labels).footerMarked;
+  return <GroupFooter rows={rows} scale={ctx.scale} testId={ctx.testId} marked={marked} />;
 }
 
 /** The groups and their rows — or the skeleton, the host's error, or the host's empty state. */

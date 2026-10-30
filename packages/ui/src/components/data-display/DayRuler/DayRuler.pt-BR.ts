@@ -8,4 +8,5 @@ export const PT_BR_DAY_RULER_LABELS: DayRulerLabels = {
   refused: "Não dá para ir além",
   notMovable: "Este turno não muda por aqui",
   loading: "Carregando o dia",
+  footerMarked: "falta gente",
 };

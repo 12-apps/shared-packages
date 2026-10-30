@@ -505,7 +505,12 @@ describe("a group's footer lines (FUT-3882)", () => {
     const marked = need.querySelectorAll("[data-marked]");
     expect(marked).toHaveLength(1);
     expect(marked[0]?.getAttribute("title")).toBe("20h · pede 2, tem 1");
-    expect(screen.getByRole("img", { name: "Média de entregas/hora" })).toBeTruthy();
+    // Said in words, not only by the outline and a tooltip.
+    expect(within(marked[0] as HTMLElement).getByText("20h · pede 2, tem 1")).toBeTruthy();
+    // The drawn trend is hidden from readers; its figures are said instead, the gap left out.
+    const trend = screen.getByTestId("dr-footer-trend");
+    expect(trend.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(within(trend).getByText(/^06:00 0 · 07:00 1 · 08:00 2 · 10:00 4/)).toBeTruthy();
     // The footer follows its group's rows.
     const row = screen.getByTestId("dr-row-luiz");
     expect(row.compareDocumentPosition(need) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -525,6 +530,16 @@ describe("a group's footer lines (FUT-3882)", () => {
   it("leaves an unmarked note unflagged", () => {
     renderRuler({ groupFooter: () => [{ id: "thin", label: "O movimento pede", note: "Pouco histórico." }] });
     expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico.").hasAttribute("data-marked")).toBe(false);
+  });
+
+  it("says a marked hour with no title as its hour, its count and that it is short; an empty hour has no dangling separator", () => {
+    renderRuler({
+      groupFooter: () => [{ id: "have", label: "Na escala", cells: [{ text: "1", marked: true }, { text: "" }] }],
+      labels: DAY_RULER_LABELS["pt-BR"],
+    });
+    const cells = (screen.getAllByTestId("dr-footer-have")[0] as HTMLElement).querySelectorAll("[title]");
+    expect(cells[0]?.getAttribute("title")).toBe(`${formatHour(6)} · 1 · falta gente`);
+    expect(cells[1]?.getAttribute("title")).toBe(formatHour(7));
   });
 
   it("draws nothing for a group the host gives no lines", () => {

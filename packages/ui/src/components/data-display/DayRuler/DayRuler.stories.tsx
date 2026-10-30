@@ -106,7 +106,12 @@ function footerOf(area: string | undefined, people: Person[], slots: Slot[], cou
       {
         id: `${area}-have`,
         label: 'Na escala, por hora',
-        cells: scheduled.map((count, index) => ({ text: count ? String(count) : '', marked: short[index] ?? false })),
+        // A short hour always shows its count, "0" included, and says why in its title.
+        cells: scheduled.map((count, index) =>
+          short[index]
+            ? { text: String(count), marked: true, title: `${hh(6 + index)} · o movimento pede ${need[index] ?? 0}, a escala tem ${count}` }
+            : { text: count ? String(count) : '' },
+        ),
       },
       ...(first >= 0 ? [{ id: `${area}-short`, label: '', note: `Faltam ${missing}, ${hh(6 + first)}–${hh(7 + last)}`, marked: true }] : []),
     ];
@@ -188,8 +193,8 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
       <DayRuler
         rows={rows}
         now={NOW}
-        coverage={coverage}
-        coverageLabel="Na escala, por hora"
+        // With the areas' own lines, no whole-day row: the same counts would show twice (the prototype has none).
+        {...(footers ? {} : { coverage, coverageLabel: 'Na escala, por hora' })}
         {...(footers ? { groupFooter: (area: string | undefined) => footerOf(area, people, slots, countsOnly) } : {})}
         readOnly={readOnly}
         loading={loading}
@@ -323,11 +328,15 @@ export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOT
 /** The same on a phone. */
 export const BreakAndMarkersPhone: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };
 
+/** Three areas (FUT-3882): each group's lines, and the space before the next group's title. */
+const AREAS: Person[] = [...KITCHEN, { id: 'joana', name: 'Joana Prado', area: 'Salão' }, ...PEOPLE.slice(0, 2)];
+const AREAS_SLOTS: Slot[] = [...KITCHEN_SLOTS, { id: 'j1', who: 'joana', start: 11, end: 17 }, ...SLOTS];
+
 /** FUT-3882: under each area its trend ("Média de pedidos/hora"), who is on the escala and what the movement asks, short hours outlined. */
-export const GroupFooters: Story = { args: { footers: true }, globals: DESKTOP };
+export const GroupFooters: Story = { args: { footers: true, people: AREAS, slots: AREAS_SLOTS }, globals: DESKTOP };
 
 /** The same in the dark theme. */
-export const GroupFootersDark: Story = { args: { footers: true }, globals: { ...DESKTOP, theme: 'dark' } };
+export const GroupFootersDark: Story = { args: { footers: true, people: AREAS, slots: AREAS_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
 
 /** FUT-3882, a reader without sales: only who is on the escala, the short hours outlined, and the run said in the warning ink. */
-export const GroupFootersCountsOnly: Story = { args: { footers: true, countsOnly: true }, globals: DESKTOP };
+export const GroupFootersCountsOnly: Story = { args: { footers: true, countsOnly: true, people: AREAS, slots: AREAS_SLOTS }, globals: DESKTOP };

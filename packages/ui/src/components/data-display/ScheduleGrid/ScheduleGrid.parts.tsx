@@ -258,6 +258,11 @@ interface HeaderProps {
 /** The days, their counts and the total column's header — pinned while the grid scrolls. */
 
 /** A label wraps between words, never inside "Seg 19/10": the space before a number holds. */
+/** A range ("11h–23h") breaks before or after it, never at its dash. */
+function keepRangesWhole(node: React.ReactNode): React.ReactNode {
+  return typeof node === 'string' ? node.replace(/\s*–\s*/g, (dash) => `\u2060${dash.trim()}\u2060`) : node;
+}
+
 function keepDatesWhole(label: string): string {
   return label.replace(/ (?=\d)/g, '\u00a0');
 }
@@ -267,7 +272,7 @@ export function GridHeader({ columns, totalLabel, corner, rowSx, testId }: Heade
     <Box role="row" sx={[rowSx, headerRowSx]} data-testid={`${testId}-header`}>
       {/* Above the names: a cell of the header row, with nothing to head but the host's corner words. */}
       <Box component="span" role="cell" data-sg-corner="" sx={cornerSx} data-testid={`${testId}-corner`}>
-        {corner}
+        {keepRangesWhole(corner)}
       </Box>
       {columns.map((column, day) => (
         <Box
