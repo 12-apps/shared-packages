@@ -204,3 +204,84 @@ describe('createActivationRouteExtensions — the GET read', () => {
     expect(healStrandedActivation).not.toHaveBeenCalled();
   });
 });
+
+describe('createActivationRouteExtensions — the payer e-mail (FUT-4050)', () => {
+  it('the GET opens the field with the e-mail the host resolved', async () => {
+    vi.mocked(verificationCardPublicKey).mockResolvedValue(null);
+    vi.mocked(getPendingVerification).mockResolvedValue(null);
+    const body = (await (await get().handler(argsFor(undefined))).json()) as { payerEmail: unknown };
+    expect(body.payerEmail).toBe('ana@example.com');
+  });
+
+  it('the card charge sends the TYPED e-mail, not the host one', async () => {
+    vi.mocked(verifyProviderCharge).mockResolvedValue({ ok: true, refunded: true });
+    await post().handler(
+      argsFor({ token: 'tok_1', taxId: '12345678909', holderName: 'Ana', email: '  pagador@example.com ' }),
+    );
+    expect(verifyProviderCharge).toHaveBeenCalledWith(expect.anything(), ACME, 'pagbank', {
+      token: 'tok_1',
+      taxId: '12345678909',
+      holderName: 'Ana',
+      email: 'pagador@example.com',
+    });
+  });
+
+  it('a card body with no e-mail falls back to the host payer', async () => {
+    vi.mocked(verifyProviderCharge).mockResolvedValue({ ok: true, refunded: true });
+    await post().handler(argsFor({ token: 'tok_1', taxId: '12345678909', email: '   ' }));
+    expect(verifyProviderCharge).toHaveBeenCalledWith(
+      expect.anything(),
+      ACME,
+      'pagbank',
+      expect.objectContaining({ email: 'ana@example.com' }),
+    );
+  });
+
+  it('the link is minted for the TYPED e-mail, keeping the host name', async () => {
+    vi.mocked(startRedirectVerification).mockResolvedValue({ ok: true, checkoutUrl: 'https://p.example' });
+    await post().handler(argsFor({ action: 'start', email: 'pagador@example.com' }));
+    expect(startRedirectVerification).toHaveBeenCalledWith(expect.anything(), ACME, 'pagbank', {
+      name: 'Ana',
+      email: 'pagador@example.com',
+    });
+  });
+
+  it('a refused payer e-mail is flagged so the screen can send the owner to the field', async () => {
+    vi.mocked(verifyProviderCharge).mockResolvedValue({
+      ok: false,
+      reason: 'buyer email must not be equals to merchant email',
+      providerMessage: 'raw',
+      payerEmailRefused: true,
+    });
+    const response = await post().handler(argsFor({ token: 'tok_1', taxId: '12345678909' }));
+    expect(await response.json()).toEqual({
+      ok: false,
+      reason: 'buyer email must not be equals to merchant email',
+      providerMessage: 'raw',
+      payerEmailRefused: true,
+    });
+    expect(applyChargeVerification).toHaveBeenCalledWith(ACME, 'pagbank', false);
+  });
+});
+
+describe('createActivationRouteExtensions — the GET survives its payer (FUT-4050)', () => {
+  it('a host payer that throws costs the suggestion, never the key or the heal', async () => {
+    vi.mocked(verificationCardPublicKey).mockResolvedValue('PUB_KEY');
+    vi.mocked(getPendingVerification).mockResolvedValue({ reference: 'ref--a1' } as never);
+    vi.mocked(healStrandedActivation).mockResolvedValue(false);
+    const read = createActivationRouteExtensions<{ tenantId: string }>({
+      context: routesContext,
+      payer: async () => {
+        throw new Error('session store down');
+      },
+      copy: { missingCardFields: MISSING_CARD },
+    }).find((extension) => extension.method === 'GET')!;
+
+    const response = await read.handler(argsFor(undefined));
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { publicKey: string; payerEmail: unknown };
+    expect(body.publicKey).toBe('PUB_KEY');
+    expect(body.payerEmail).toBeNull();
+    expect(healStrandedActivation).toHaveBeenCalledTimes(1);
+  });
+});

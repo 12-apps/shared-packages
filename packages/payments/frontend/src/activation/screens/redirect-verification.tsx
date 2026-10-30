@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Stack, Typography } from '@mui/material';
-import { useCallback, type JSX } from 'react';
+import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useRedirectActivation } from '../use-redirect-activation';
@@ -10,6 +10,7 @@ import type { RedirectActivationState } from '../redirect-state';
 import { AwaitingPayment } from './awaiting-payment';
 import { useActivationCopy } from './copy-context';
 import { Notice, StepPanel } from './notice';
+import { PayerEmailField, useLinkPayerEmail } from './payer-email-field';
 import { useVerificationAmount } from './use-verification-amount';
 import { ExpiredState, FailedState, SetupIncompleteState, UnreachableState } from './states';
 
@@ -42,11 +43,14 @@ function StartCharge({
   blocked,
   creating,
   onStart,
+  emailField,
 }: {
   amountLabel: string;
   blocked: boolean;
   creating: boolean;
   onStart: () => void;
+  /** Who pays (FUT-4050) — asked with the button, withheld with it. */
+  emailField: ReactNode;
 }): JSX.Element {
   const { outcome, actions } = useActivationCopy();
   if (blocked) {
@@ -60,14 +64,17 @@ function StartCharge({
     );
   }
   return (
-    <Button
-      sx={{ ...BTN_PRIMARY_SX, width: '100%' }}
-      disabled={creating}
-      onClick={onStart}
-      data-testid="verify-charge-start-redirect"
-    >
-      {actions.payAndActivate(amountLabel)}
-    </Button>
+    <Stack spacing={2}>
+      {emailField}
+      <Button
+        sx={{ ...BTN_PRIMARY_SX, width: '100%' }}
+        disabled={creating}
+        onClick={onStart}
+        data-testid="verify-charge-start-redirect"
+      >
+        {actions.payAndActivate(amountLabel)}
+      </Button>
+    </Stack>
   );
 }
 
@@ -181,6 +188,7 @@ export function RedirectVerification({
   formatAmount,
   onVerified,
   onSetupIncomplete,
+  ownerEmail,
 }: {
   verifyChargeUrl: string;
   /** The provider's human name, for the sentences that must say who refused. */
@@ -192,6 +200,8 @@ export function RedirectVerification({
   formatAmount: (cents: number) => string;
   onVerified: () => void;
   onSetupIncomplete: () => void;
+  /** The e-mail field's opening value until the endpoint suggests one (FUT-4050). */
+  ownerEmail: string;
 }): JSX.Element | null {
   const copy = useActivationCopy();
   // Still memoized: the hook reads its callbacks through a ref inside the
@@ -209,8 +219,9 @@ export function RedirectVerification({
   // `useVerificationAmount`. A button promising one figure while charging
   // another is the kind of lie this whole flow exists to remove, and an
   // unpriced charge says so rather than guessing.
-  const cents = useVerificationAmount(verifyChargeUrl);
+  const { amountCents: cents, payerEmail: suggestedEmail } = useVerificationAmount(verifyChargeUrl);
   const amountLabel = cents === null ? copy.outcome.someAmount : formatAmount(cents);
+  const payer = useLinkPayerEmail(ownerEmail, suggestedEmail, start);
 
   // Off the current step and with nothing outstanding: the walkthrough is
   // showing something earlier and this panel has nothing to add.
@@ -241,7 +252,8 @@ export function RedirectVerification({
           amountLabel={amountLabel}
           blocked={blocked}
           creating={state.kind === 'creating'}
-          onStart={() => void start()}
+          onStart={payer.startWithEmail}
+          emailField={<PayerEmailField {...payer.field} displayName={displayName} />}
         />
       ) : null}
     </StepPanel>

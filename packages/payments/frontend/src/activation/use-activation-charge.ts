@@ -18,6 +18,7 @@ import {
 } from '../card';
 
 import type { ActivationChargeCopy } from './charge-copy';
+import { usePayerEmail } from './use-payer-email';
 import type { CardCopy } from '../card/copy';
 
 /**
@@ -50,7 +51,13 @@ export type ActivationChargeState =
    * act on. `providerMessage` carries the provider's RAW refusal when `reason`
    * is a rewording of it, so the screen can show both.
    */
-  | { kind: 'failed'; reason: string; providerMessage?: string }
+  | {
+      kind: 'failed';
+      reason: string;
+      providerMessage?: string;
+      /** The provider refused the payer's e-mail itself (FUT-4050). */
+      payerEmailRefused?: boolean;
+    }
   /** Money moved. The server has already enabled the provider. */
   | { kind: 'passed'; refunded: boolean };
 
@@ -72,8 +79,17 @@ export interface ActivationChargeOptions {
    * key and report the second's rejection as though the card were bad.
    */
   provider: string;
-  /** The signed-in owner's e-mail — the charge's customer record. */
+  /**
+   * What the payer e-mail field opens with until the endpoint answers its own
+   * (FUT-4050) — usually the signed-in owner's. The OWNER decides what is sent:
+   * the field is theirs to change, and the charge goes out with what it holds.
+   */
   email: string;
+  /**
+   * Judges the payer e-mail on blur and on submit. Omitted, nothing is judged
+   * here: a blank one is sent blank and the server falls back to the host's.
+   */
+  validateEmail?: (value: string) => string | undefined;
   /** The charge landed; the caller refreshes so the provider shows as active. */
   onVerified: () => void;
   /**
@@ -95,6 +111,11 @@ export interface ActivationCharge {
   cpfError: string | undefined;
   /** Show (or clear) the holder document's error — the field's blur sets it (FUT-4048). */
   setCpfError: (error: string | undefined) => void;
+  /** The payer e-mail the charge will be sent with (FUT-4050). */
+  email: string;
+  setEmail: (value: string) => void;
+  emailError: string | undefined;
+  setEmailError: (error: string | undefined) => void;
   /**
    * What this charge will COST, in cents — `null` until the endpoint answers.
    *
@@ -131,21 +152,25 @@ export interface ActivationCharge {
 interface ActivationProbe {
   publicKey: string | null;
   amountCents: number | null;
+  /** Who the host thinks is paying — the e-mail field's opening value. */
+  payerEmail: string | null;
 }
 
-/** Before the endpoint has answered, both facts are simply unknown. */
-const UNKNOWN_PROBE: ActivationProbe = { publicKey: null, amountCents: null };
+/** Before the endpoint has answered, every fact is simply unknown. */
+const UNKNOWN_PROBE: ActivationProbe = { publicKey: null, amountCents: null, payerEmail: null };
 
-/** The endpoint's `GET` body — every field optional; a host may answer neither. */
+/** The endpoint's `GET` body — every field optional; a host may answer none. */
 interface ProbeBody {
   publicKey?: string | null;
   amountCents?: number | null;
+  payerEmail?: string | null;
 }
 
 function readProbe(body: ProbeBody | null): ActivationProbe {
   return {
     publicKey: body?.publicKey ? body.publicKey : null,
     amountCents: typeof body?.amountCents === 'number' ? body.amountCents : null,
+    payerEmail: typeof body?.payerEmail === 'string' && body.payerEmail ? body.payerEmail : null,
   };
 }
 
@@ -194,6 +219,10 @@ function validateAll(
   };
 }
 
+function hasAnyError(validation: ReturnType<typeof validateAll>): boolean {
+  return Object.values(validation.fieldErrors).some(Boolean) || Boolean(validation.cpfError);
+}
+
 interface ChargeRequest {
   verifyChargeUrl: string;
   provider: string;
@@ -231,24 +260,33 @@ async function runCharge(request: ChargeRequest): Promise<ActivationChargeState>
         token: tokenized.data.token,
         taxId: onlyDigits(request.cpf),
         holderName: request.card.holder.trim(),
-        email: request.email,
+        email: request.email.trim(),
       }),
     });
-    const body = (await response.json().catch(() => null)) as
-      | { ok?: boolean; refunded?: boolean; reason?: string; providerMessage?: string }
-      | null;
-
-    if (!body?.ok) {
-      return {
-        kind: 'failed',
-        reason: body?.reason ?? request.copy.chargeFailed,
-        providerMessage: body?.providerMessage,
-      };
-    }
-    return { kind: 'passed', refunded: body.refunded === true };
+    return readChargeAnswer((await response.json().catch(() => null)) as ChargeAnswer | null, request.copy);
   } catch {
     return { kind: 'failed', reason: request.copy.unreachable };
   }
+}
+
+/** The verify-charge `POST` body — every field optional, as a host may send less. */
+interface ChargeAnswer {
+  ok?: boolean;
+  refunded?: boolean;
+  reason?: string;
+  providerMessage?: string;
+  payerEmailRefused?: boolean;
+}
+
+/** Only the server's own `ok` passes; anything else is the refusal it gave, or ours. */
+function readChargeAnswer(body: ChargeAnswer | null, copy: ActivationChargeCopy): ActivationChargeState {
+  if (body?.ok) return { kind: 'passed', refunded: body.refunded === true };
+  return {
+    kind: 'failed',
+    reason: body?.reason ?? copy.chargeFailed,
+    providerMessage: body?.providerMessage,
+    ...(body?.payerEmailRefused === true ? { payerEmailRefused: true } : {}),
+  };
 }
 
 /** The typed-in card + CPF and their validation messages. */
@@ -265,13 +303,15 @@ function useCardForm() {
 
   return { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, setCpfError, clear };
 }
-
 export function useActivationCharge(options: ActivationChargeOptions): ActivationCharge {
-  const { verifyChargeUrl, provider, email, onVerified, validateTaxId, copy } = options;
+  const { verifyChargeUrl, provider, onVerified, validateTaxId, validateEmail, copy } = options;
   const probe = useActivationProbe(verifyChargeUrl);
   const form = useCardForm();
+  const payer = usePayerEmail(options.email, probe.payerEmail);
+  const { email, setEmailError } = payer;
   const [state, setState] = useState<ActivationChargeState>({ kind: 'idle' });
-  const { card, cpf, setFieldErrors, setCpfError, clear } = form;
+  const { clear, ...fields } = form;
+  const { card, cpf, setFieldErrors, setCpfError } = fields;
 
   const submit = useCallback(async () => {
     const validation = validateAll(
@@ -280,9 +320,11 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
       options.copy.card,
       validateTaxId ?? ((value) => validateCpfOrCnpj(value, options.copy.card.fields)),
     );
+    const emailError = validateEmail?.(email);
     setFieldErrors(validation.fieldErrors);
     setCpfError(validation.cpfError);
-    if (Object.values(validation.fieldErrors).some(Boolean) || validation.cpfError) return;
+    setEmailError(emailError);
+    if (hasAnyError(validation) || emailError) return;
 
     setState({ kind: 'submitting' });
     const next = await runCharge({
@@ -310,8 +352,10 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     copy,
     onVerified,
     validateTaxId,
+    validateEmail,
     setFieldErrors,
     setCpfError,
+    setEmailError,
     clear,
   ]);
 
@@ -319,17 +363,12 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     setState({ kind: 'idle' });
     setFieldErrors({});
     setCpfError(undefined);
-  }, [setFieldErrors, setCpfError]);
+    setEmailError(undefined);
+  }, [setFieldErrors, setCpfError, setEmailError]);
 
   return {
-    card: form.card,
-    setCard: form.setCard,
-    fieldErrors: form.fieldErrors,
-    setFieldErrors: form.setFieldErrors,
-    cpf: form.cpf,
-    setCpf: form.setCpf,
-    cpfError: form.cpfError,
-    setCpfError: form.setCpfError,
+    ...fields,
+    ...payer,
     amountCents: probe.amountCents,
     state,
     submit,

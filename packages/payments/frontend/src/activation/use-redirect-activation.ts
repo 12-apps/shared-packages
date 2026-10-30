@@ -97,8 +97,11 @@ export interface RedirectActivation {
    * stops them pressing a pay button again to be sure.
    */
   lastCheckedAt: number;
-  /** Mint the link and begin asking. */
-  start: () => Promise<void>;
+  /**
+   * Mint the link and begin asking. `payer.email` is the e-mail the owner
+   * confirmed on the step (FUT-4050); without it the host's own is used.
+   */
+  start: (payer?: { email: string }) => Promise<void>;
   /** Ask right now, instead of waiting for the next tick. */
   checkNow: () => Promise<void>;
   /** Abandon the outstanding charge and offer a fresh one. */
@@ -339,7 +342,8 @@ export function useRedirectActivation(options: RedirectActivationOptions): Redir
   usePollTimer(state.kind === 'awaiting', url, live, latest, setState, pollMs, pollTimeoutMs);
 
   const start = useCallback(
-    () => mintCharge({ url, live, setState, copy, onCreateFailed }),
+    (payer?: { email: string }) =>
+      mintCharge({ url, live, setState, copy, onCreateFailed, ...(payer ? { payer } : {}) }),
     [url, copy, onCreateFailed],
   );
 

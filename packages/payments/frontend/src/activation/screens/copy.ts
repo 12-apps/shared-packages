@@ -138,6 +138,34 @@ export interface ActivationTaxIdCopy {
 }
 
 /**
+ * The payer e-mail field both flows ask for under the card (FUT-4050).
+ *
+ * Asked HERE, on the step, because the e-mail a charge is sent with is the
+ * owner's call: PagBank refuses a customer e-mail equal to its own account's,
+ * and that account is usually opened with the very e-mail the owner signs in
+ * with. Prefilled with the host's best guess; the owner can always type another.
+ */
+export interface ActivationPayerEmailCopy {
+  readonly label: string;
+  /** Why the owner may need a different one — the provider named, not assumed. */
+  readonly hint: (displayName: string) => string;
+  readonly placeholder: string;
+  /** Submitted empty. */
+  readonly required: string;
+  /** Submitted with something that is not an e-mail address. */
+  readonly invalid: string;
+  /**
+   * Under the field after the provider refused it as its own account's — the
+   * error the owner returns to from the refusal panel.
+   */
+  readonly refusedField: (displayName: string) => string;
+  /** The refusal panel's sentence: what the provider refused, and the next step. */
+  readonly refusedBody: (displayName: string) => string;
+  /** The refusal panel's button: back to the form, to the e-mail field. */
+  readonly change: string;
+}
+
+/**
  * Everything step 3 says.
  *
  * `charge` and `redirect` are the two protocol packs the hooks already
@@ -150,6 +178,7 @@ export interface ActivationStepCopy {
   readonly awaiting: ActivationAwaitingCopy;
   readonly outcome: ActivationOutcomeCopy;
   readonly taxId: ActivationTaxIdCopy;
+  readonly payerEmail: ActivationPayerEmailCopy;
   /** The card protocol's three sentences, plus the card form's own words. */
   readonly charge: ActivationChargeCopy;
   /** The redirect protocol's four. */

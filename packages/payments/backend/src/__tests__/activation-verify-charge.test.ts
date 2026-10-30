@@ -298,6 +298,57 @@ describe('failureFor transport classification', () => {
   });
 });
 
+describe('failureFor — the refused payer e-mail (FUT-4050)', () => {
+  function pagBankRefusal(reasons: Array<Record<string, string>>): ProviderRequestError {
+    return new ProviderRequestError('pagbank', 'PagBank 400 Bad Request', {
+      httpStatus: 400,
+      body: { error_messages: reasons },
+    });
+  }
+
+  it('flags a refusal naming customer.email, keeping the raw exchange', () => {
+    const failure = failureFor(
+      pagBankRefusal([
+        {
+          code: '40002',
+          description: 'buyer email must not be equals to merchant email',
+          parameter_name: 'customer.email',
+        },
+      ]),
+      PT_BR_ACTIVATION_COPY,
+    );
+    expect(failure.payerEmailRefused).toBe(true);
+    expect(failure.providerMessage).toContain('PagBank 400 Bad Request');
+  });
+
+  it('does NOT flag a 40002 about another parameter — the code alone is generic', () => {
+    const failure = failureFor(
+      pagBankRefusal([{ code: '40002', description: 'invalid amount', parameter_name: 'charges[0].amount.value' }]),
+      PT_BR_ACTIVATION_COPY,
+    );
+    expect(failure.payerEmailRefused).toBeUndefined();
+  });
+
+  it('does NOT flag a transport failure, whatever its body says', () => {
+    const failure = failureFor(
+      new ProviderRequestError('pagbank', 'socket hang up', {
+        body: { error_messages: [{ code: '40002', parameter_name: 'customer.email' }] },
+      }),
+      PT_BR_ACTIVATION_COPY,
+    );
+    expect(failure.transport).toBe(true);
+    expect(failure.payerEmailRefused).toBeUndefined();
+  });
+
+  it('does NOT flag a refusal with no structured body', () => {
+    const failure = failureFor(
+      new ProviderRequestError('pagbank', 'buyer email must not be equals to merchant email', { httpStatus: 400 }),
+      PT_BR_ACTIVATION_COPY,
+    );
+    expect(failure.payerEmailRefused).toBeUndefined();
+  });
+});
+
 /**
  * FUT-679 — every card-phase attempt gets its own reference. The adapters
  * fall back to the reference as the provider idempotency key and PagBank

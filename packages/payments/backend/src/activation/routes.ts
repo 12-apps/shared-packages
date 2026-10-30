@@ -92,6 +92,40 @@ interface VerifyChargeBody {
   slug?: string;
 }
 
+/**
+ * The e-mail the owner typed on the step, trimmed — `undefined` when none.
+ *
+ * The payer is the OWNER'S call, not the session's (FUT-4050): PagBank refuses
+ * a charge whose customer e-mail is the receiving account's own, and that
+ * account is usually opened with the very e-mail the owner signs in with.
+ */
+function typedEmail(body: VerifyChargeBody | null): string | undefined {
+  const email = typeof body?.email === 'string' ? body.email.trim() : '';
+  return email || undefined;
+}
+
+/**
+ * The payer the GET suggests — best-effort, because this read also heals a
+ * stranded activation and hands back the card key: a host whose payer lookup
+ * fails must not take either of those down with it (FUT-4050).
+ */
+async function suggestedPayer<A>(
+  config: ActivationRoutesConfig<A>,
+  args: PaymentsRouteExtensionArgs<A>,
+): Promise<ActivationPayer> {
+  try {
+    return await config.payer(args);
+  } catch {
+    return {};
+  }
+}
+
+/** The host's payer, with the typed e-mail in place of its own. */
+function withTypedEmail(payer: ActivationPayer, body: VerifyChargeBody | null): ActivationPayer {
+  const email = typedEmail(body);
+  return email ? { ...payer, email } : payer;
+}
+
 /** The settlement halves the caller brought back, absent ones omitted. */
 function returnedFrom(body: VerifyChargeBody | null): { transactionNsu?: string; slug?: string } {
   return {
@@ -115,6 +149,7 @@ async function verifyChargeRead(
   ctx: ActivationRoutesContext,
   merchant: MerchantRef,
   provider: string,
+  payer: ActivationPayer,
 ): Promise<Response> {
   const publicKey = await verificationCardPublicKey(ctx.activation, merchant, provider);
   // The outstanding charge, if there is one. The attempt used to live only in
@@ -134,6 +169,10 @@ async function verifyChargeRead(
     // confirmation loop for a payment already applied.
     pending: proven ? null : pending,
     proven,
+    // What the payer e-mail field opens with (FUT-4050): the host's best
+    // answer for who is paying. Only a starting value — the owner can type
+    // another, and what they type is what the charge sends.
+    payerEmail: payer.email ?? null,
   });
 }
 
@@ -184,7 +223,12 @@ async function runCardPhase(
   await ctx.settings.applyChargeVerification(merchant, provider, result.ok);
   return result.ok
     ? { ok: true, refunded: result.refunded }
-    : { ok: false, reason: result.reason, providerMessage: result.providerMessage };
+    : {
+        ok: false,
+        reason: result.reason,
+        providerMessage: result.providerMessage,
+        ...(result.payerEmailRefused ? { payerEmailRefused: true } : {}),
+      };
 }
 
 /**
@@ -203,7 +247,12 @@ export function createActivationRouteExtensions<A>(
       method: 'GET',
       pattern: ['settings', 'providers', ':provider', 'verify-charge'],
       handler: async (args) =>
-        verifyChargeRead(await config.context(), args.merchant, args.intent.provider ?? ''),
+        verifyChargeRead(
+          await config.context(),
+          args.merchant,
+          args.intent.provider ?? '',
+          await suggestedPayer(config, args),
+        ),
     },
     {
       kind: 'runVerifyCharge',
@@ -227,7 +276,7 @@ export function createActivationRouteExtensions<A>(
               provider,
               redirectAction,
               returnedFrom(body),
-              await config.payer(args),
+              withTypedEmail(await config.payer(args), body),
             ),
           );
         }
@@ -241,7 +290,7 @@ export function createActivationRouteExtensions<A>(
             token: body.token,
             taxId: body.taxId,
             holderName: body.holderName ?? '',
-            email: body.email ?? '',
+            email: typedEmail(body) ?? (await config.payer(args)).email ?? '',
           }),
         );
       },

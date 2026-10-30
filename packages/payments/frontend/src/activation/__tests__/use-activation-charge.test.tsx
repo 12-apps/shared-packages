@@ -62,6 +62,7 @@ interface Call {
 interface ProbeAnswers {
   publicKey?: string | null;
   amountCents?: number | null;
+  payerEmail?: string | null;
 }
 
 /** Records every ask; answers the probe GET and a queue of POST bodies. */
@@ -85,7 +86,7 @@ function stubFetch(answers: ProbeAnswers & { post?: unknown[] } = {}) {
       const amountCents = 'amountCents' in answers ? answers.amountCents : 1;
       const payload =
         method === 'GET'
-          ? { publicKey, amountCents }
+          ? { publicKey, amountCents, ...('payerEmail' in answers ? { payerEmail: answers.payerEmail } : {}) }
           : (posts.shift() ?? { ok: true, refunded: true });
       return { ok: true, json: async () => payload } as unknown as Response;
     }),
@@ -561,5 +562,81 @@ describe('useActivationCharge — moving between providers', () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+});
+
+describe('useActivationCharge — the payer e-mail (FUT-4050)', () => {
+  const validateEmail = (value: string) => (value.includes('@') ? undefined : 'copy:email-invalid');
+
+  it('opens with the caller’s e-mail, then takes the one the endpoint suggests', async () => {
+    stubFetch({ payerEmail: 'pagamento@dona.example' });
+    const { result } = renderHook(usingOptions(options()));
+    expect(result.current.email).toBe('dona@loja.example');
+    await waitFor(() => expect(result.current.email).toBe('pagamento@dona.example'));
+  });
+
+  it('never overwrites what the owner already typed with a late suggestion', async () => {
+    const release = { answer: (): void => undefined };
+    const gate = new Promise<void>((resolve) => {
+      release.answer = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        await gate;
+        return { ok: true, json: async () => ({ publicKey: 'PUBKEY', amountCents: 5, payerEmail: 'late@x.example' }) } as unknown as Response;
+      }),
+    );
+    const { result } = renderHook(usingOptions(options()));
+    act(() => result.current.setEmail('outro@pagador.example'));
+    await act(async () => {
+      release.answer();
+      await gate;
+    });
+    // The answer has landed (its amount is on screen) and the typing survived it.
+    await waitFor(() => expect(result.current.amountCents).toBe(5));
+    expect(result.current.email).toBe('outro@pagador.example');
+  });
+
+  it('charges with the e-mail on screen, trimmed', async () => {
+    const { posted } = stubFetch();
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options({ validateEmail })));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    fillIn(result);
+    act(() => result.current.setEmail('  outro@pagador.example '));
+    await act(() => result.current.submit());
+    expect(posted()[0]?.body?.email).toBe('outro@pagador.example');
+  });
+
+  it('refuses to charge an invalid e-mail, and says so on the field', async () => {
+    const { posted } = stubFetch();
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options({ validateEmail })));
+    fillIn(result);
+    act(() => result.current.setEmail('sem-arroba'));
+    await act(() => result.current.submit());
+    expect(result.current.emailError).toBe('copy:email-invalid');
+    expect(posted()).toHaveLength(0);
+    expect(tokenizeCard).not.toHaveBeenCalled();
+  });
+
+  it('carries a refused payer e-mail into the failed state, keeping card and e-mail', async () => {
+    stubFetch({
+      post: [{ ok: false, reason: 'buyer email', providerMessage: 'raw', payerEmailRefused: true }],
+    });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options({ validateEmail })));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    fillIn(result);
+    await act(() => result.current.submit());
+    expect(result.current.state).toEqual({
+      kind: 'failed',
+      reason: 'buyer email',
+      providerMessage: 'raw',
+      payerEmailRefused: true,
+    });
+    expect(result.current.card).toEqual(GOOD_CARD);
+    expect(result.current.email).toBe('dona@loja.example');
   });
 });

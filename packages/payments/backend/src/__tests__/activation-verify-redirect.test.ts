@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pollRedirectVerification, startRedirectVerification } from '../activation/verify-redirect';
 import type { ActivationContext } from '../activation/context';
-import { UnknownProviderError } from '../core/errors';
+import { ProviderRequestError, UnknownProviderError } from '../core/errors';
 import {
   ACME,
   activationAdapter,
@@ -200,5 +200,20 @@ describe('startRedirectVerification', () => {
     );
     expect(h.createCharge).not.toHaveBeenCalled();
     expect(world.pendingOf(ACME, 'not-a-provider')).toBeNull();
+  });
+});
+
+describe('startRedirectVerification — a refused payer e-mail (FUT-4050)', () => {
+  it('answers the refusal without the card-form flag the link screen cannot act on', async () => {
+    const { ctx } = redirectContext();
+    h.createCharge.mockRejectedValue(
+      new ProviderRequestError('infinitepay', 'refused', {
+        httpStatus: 400,
+        body: { error_messages: [{ code: '40002', parameter_name: 'customer.email' }] },
+      }),
+    );
+    const started = await startRedirectVerification(ctx, ACME, 'infinitepay', { email: 'dona@x.example' });
+    expect(started.ok).toBe(false);
+    expect(started).not.toHaveProperty('payerEmailRefused');
   });
 });

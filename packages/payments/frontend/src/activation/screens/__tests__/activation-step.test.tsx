@@ -46,6 +46,10 @@ const IDLE_CHARGE = {
   setCpf: vi.fn(),
   cpfError: undefined,
   setCpfError: vi.fn(),
+  email: 'owner@example.test',
+  setEmail: vi.fn(),
+  emailError: undefined,
+  setEmailError: vi.fn(),
   amountCents: null,
   state: { kind: 'idle' } as const,
   submit: vi.fn(),
@@ -298,5 +302,84 @@ describe('the copy port', () => {
       /ActivationCopyProvider/,
     );
     error.mockRestore();
+  });
+});
+
+/** The `<input>` behind a field's test id, wherever the slot binding puts it. */
+function inputOf(testId: string): HTMLInputElement {
+  const host = screen.getByTestId(testId);
+  return (host.querySelector('input') ?? host) as HTMLInputElement;
+}
+
+describe('the payer e-mail (FUT-4050)', () => {
+  it('sits in the card form with the hook’s e-mail and the provider named in its hint', () => {
+    hooks.charge.mockReturnValue({ ...IDLE_CHARGE, email: 'pagador@example.test' });
+    mountStep({ provider: 'pagbank', displayName: 'PagBank' });
+    expect(inputOf('verify-charge-email').value).toBe('pagador@example.test');
+    expect(screen.getByText('Not your PagBank account e-mail')).not.toBeNull();
+  });
+
+  it('hands the card hook a validator built from the host’s words', () => {
+    hooks.charge.mockReturnValue(IDLE_CHARGE);
+    mountStep({ provider: 'pagbank' });
+    const { validateEmail } = hooks.charge.mock.calls[0]?.[0] as {
+      validateEmail: (value: string) => string | undefined;
+    };
+    expect(validateEmail('')).toBe('E-mail required');
+    expect(validateEmail('sem-arroba')).toBe('E-mail invalid');
+    expect(validateEmail(' ok@example.test ')).toBeUndefined();
+  });
+
+  it('a refused payer e-mail gets its own panel, and its button goes back to the field', async () => {
+    const reset = vi.fn();
+    const setEmailError = vi.fn();
+    hooks.charge.mockReturnValue({
+      ...IDLE_CHARGE,
+      reset,
+      setEmailError,
+      state: { kind: 'failed', reason: 'buyer email', providerMessage: 'raw', payerEmailRefused: true },
+    });
+    mountStep({ provider: 'pagbank', displayName: 'PagBank' });
+
+    expect(screen.getByText('PagBank refused the payer e-mail')).not.toBeNull();
+    // Not the generic refusal, whose "try again" would send the same e-mail.
+    await waitFor(() => expect(screen.queryByTestId('verify-charge-failed')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('verify-charge-change-email'));
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(setEmailError).toHaveBeenLastCalledWith('PagBank refuses its own account e-mail');
+  });
+
+  it('the link flow asks for the e-mail too, and mints the link for it', () => {
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    expect(inputOf('verify-charge-email').value).toBe('owner@example.test');
+    fireEvent.change(inputOf('verify-charge-email'), { target: { value: 'outro@example.test' } });
+    fireEvent.click(screen.getByTestId('verify-charge-start-redirect'));
+    expect(start).toHaveBeenCalledWith({ email: 'outro@example.test' });
+  });
+
+  it('the link flow opens with the e-mail the endpoint suggests', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ amountCents: 100, payerEmail: 'pagamento@example.test' }) })),
+    );
+    hooks.redirect.mockReturnValue(IDLE_REDIRECT);
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+    await waitFor(() => expect(inputOf('verify-charge-email').value).toBe('pagamento@example.test'));
+    vi.unstubAllGlobals();
+  });
+
+  it('the link flow mints nothing for an empty e-mail, and says why on the field', async () => {
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    fireEvent.change(inputOf('verify-charge-email'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('verify-charge-start-redirect'));
+    expect(start).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('E-mail required')).not.toBeNull());
   });
 });
