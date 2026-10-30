@@ -17,7 +17,7 @@ import { Button } from "../../form/Button";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
-import { fieldClearing, MoreGroup, MoreQuick, type MoreFieldProps } from "./data-views-more-fields";
+import { fieldClearing, MORE_SPACING, MoreGroup, MoreQuick, type MoreFieldProps } from "./data-views-more-fields";
 import { useStillAnchor } from "./data-views-still-anchor";
 import type { OverflowField } from "./data-views-overflow";
 import { rem, remPx, sxRem } from "../../../tokens/relative";
@@ -322,7 +322,7 @@ export function MoreFilters<T extends Record<string, unknown>>({
               contents are told to shrink into it. A horizontal scrollbar here
               means something refused to, which is a bug to fix rather than a
               scrollbar to live with. */}
-          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", p: { xs: 1, sm: 1.5 }, minWidth: 0 }}>
+          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", px: { xs: 1, sm: 1.5 }, pb: { xs: 1, sm: 1.5 }, pt: MORE_SPACING.aboveFirst, minWidth: 0 }}>
             <MoreFields key={clearKey} fields={fields} {...rest} />
           </Box>
           {(anyApplied || holdsDayRange) && (
