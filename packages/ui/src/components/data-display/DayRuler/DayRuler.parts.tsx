@@ -18,6 +18,7 @@ import {
   coverageLabelSx,
   coverageSx,
   footerCellSx,
+  footerNoteSx,
   handleSx,
   lineSx,
   nowSx,
@@ -302,7 +303,7 @@ function FooterFigures({ row, hours, from }: { row: DayRulerFooterRow; hours: nu
   }
   if (row.note !== undefined) {
     return (
-      <Box component="span" sx={coverageLabelSx}>
+      <Box component="span" sx={footerNoteSx(Boolean(row.marked))} data-marked={row.marked ? '' : undefined}>
         {row.note}
       </Box>
     );

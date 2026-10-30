@@ -516,8 +516,20 @@ describe("a group's footer lines (FUT-3882)", () => {
     expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico: menos de 4 semanas com pedidos.")).toBeTruthy();
   });
 
+  it("says a marked note in the warning ink, flagged for a reader", () => {
+    renderRuler({ groupFooter: () => [{ id: "short", label: "", note: "Faltam 2, 20h–22h", marked: true }] });
+    const note = within(screen.getAllByTestId("dr-footer-short")[0] as HTMLElement).getByText("Faltam 2, 20h–22h");
+    expect(note.hasAttribute("data-marked")).toBe(true);
+  });
+
+  it("leaves an unmarked note unflagged", () => {
+    renderRuler({ groupFooter: () => [{ id: "thin", label: "O movimento pede", note: "Pouco histórico." }] });
+    expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico.").hasAttribute("data-marked")).toBe(false);
+  });
+
   it("draws nothing for a group the host gives no lines", () => {
     renderRuler({ groupFooter: () => undefined });
-    expect(screen.queryByTestId("dr-footer-need")).toBeNull();
+    expect(screen.getByTestId("dr-row-luiz")).toBeTruthy();
+    expect(screen.queryAllByTestId(/dr-footer-/)).toHaveLength(0);
   });
 });

@@ -11,11 +11,9 @@ import {
   blockSx,
   breakSx,
   cellSx,
-  cornerSx,
   ghostSx,
   gripSx,
   groupTitleSx,
-  headerAdornmentSx,
   headerCellSx,
   headerSublabelSx,
   headerRowSx,
@@ -27,6 +25,7 @@ import {
   totalCellSx,
   totalHeaderSx,
 } from './ScheduleGrid.styles';
+import { cornerSx, headerAdornmentSx } from './schedule-header-host.styles';
 import type { CellLook } from './ScheduleGrid.styles';
 import type {
   ScheduleGridBlock,

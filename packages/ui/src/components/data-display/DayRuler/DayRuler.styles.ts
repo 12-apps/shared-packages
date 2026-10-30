@@ -320,6 +320,15 @@ export function footerCellSx(marked: boolean): SxProps<Theme> {
 }
 
 /** A group's trend line: as tall as the coverage row, drawn in the primary colour. */
+/** A footer line's sentence; in the warning ink when the host marks it ("Faltam 2, 20h–22h"). */
+export function footerNoteSx(marked: boolean): SxProps<Theme> {
+  return (theme: Theme) => ({
+    fontSize: rem(theme, M.meta),
+    color: marked ? theme.palette.warning.main : theme.palette.text.secondary,
+    fontWeight: marked ? 500 : 400,
+  });
+}
+
 export const trendSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'block',
   width: '100%',

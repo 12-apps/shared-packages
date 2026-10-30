@@ -80,10 +80,12 @@ interface DemoProps {
   paneWidth?: number;
   /** Under each area: how busy it gets, who is on the escala and what the movement asks, short hours marked (FUT-3882). */
   footers?: boolean;
+  /** With `footers`: no sales figures — only who is on the escala, short hours marked, and the run said (FUT-3882). */
+  countsOnly?: boolean;
 }
 
 /** Each area's average units per hour on the 06→02 ruler, and the people its movement asks for — a host's own figures. */
-function footerOf(area: string | undefined, people: Person[], slots: Slot[]): DayRulerFooterRow[] | undefined {
+function footerOf(area: string | undefined, people: Person[], slots: Slot[], countsOnly = false): DayRulerFooterRow[] | undefined {
   if (!area) return undefined;
   const mine = people.filter((p) => p.area === area);
   const hourMid = (index: number): number => 6 + index + 0.5;
@@ -95,6 +97,20 @@ function footerOf(area: string | undefined, people: Person[], slots: Slot[]): Da
     mine.filter((p) => slots.some((slot) => slot.who === p.id && slot.tone !== 'away' && slot.start <= hourMid(index) && slot.end > hourMid(index))).length,
   );
   const need = busy.map((units) => (units === null ? 0 : Math.ceil(units / 8)));
+  if (countsOnly) {
+    const short = need.map((count, index) => count > (scheduled[index] ?? 0));
+    const first = short.indexOf(true);
+    const last = short.lastIndexOf(true);
+    const missing = Math.max(0, ...need.map((count, index) => count - (scheduled[index] ?? 0)));
+    return [
+      {
+        id: `${area}-have`,
+        label: 'Na escala, por hora',
+        cells: scheduled.map((count, index) => ({ text: count ? String(count) : '', marked: short[index] ?? false })),
+      },
+      ...(first >= 0 ? [{ id: `${area}-short`, label: '', note: `Faltam ${missing}, ${hh(6 + first)}–${hh(7 + last)}`, marked: true }] : []),
+    ];
+  }
   return [
     { id: `${area}-trend`, label: 'Média de pedidos/hora', trend: busy },
     { id: `${area}-have`, label: 'Na escala, por hora', cells: scheduled.map((count) => ({ text: count ? String(count) : '' })) },
@@ -109,7 +125,7 @@ function footerOf(area: string | undefined, people: Person[], slots: Slot[]): Da
   ];
 }
 
-function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth, footers }: DemoProps) {
+function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth, footers, countsOnly }: DemoProps) {
   const [slots, setSlots] = useState<Slot[]>(initial);
   const [log, setLog] = useState('');
   const compact = paneWidth !== undefined && paneWidth < 600;
@@ -174,7 +190,7 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
         now={NOW}
         coverage={coverage}
         coverageLabel="Na escala, por hora"
-        {...(footers ? { groupFooter: (area: string | undefined) => footerOf(area, people, slots) } : {})}
+        {...(footers ? { groupFooter: (area: string | undefined) => footerOf(area, people, slots, countsOnly) } : {})}
         readOnly={readOnly}
         loading={loading}
         error={
@@ -313,3 +329,5 @@ export const GroupFooters: Story = { args: { footers: true }, globals: DESKTOP }
 /** The same in the dark theme. */
 export const GroupFootersDark: Story = { args: { footers: true }, globals: { ...DESKTOP, theme: 'dark' } };
 
+/** FUT-3882, a reader without sales: only who is on the escala, the short hours outlined, and the run said in the warning ink. */
+export const GroupFootersCountsOnly: Story = { args: { footers: true, countsOnly: true }, globals: DESKTOP };

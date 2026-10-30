@@ -172,24 +172,6 @@ export const headerSublabelSx: SxProps<Theme> = {
   color: 'text.secondary',
 };
 
-/** A day's adornment: under its label, the column's full width, in the secondary ink unless the host says otherwise. */
-export const headerAdornmentSx: SxProps<Theme> = {
-  mt: 0.5,
-  fontSize: sxRem(M.headerSublabel),
-  fontWeight: 400,
-  color: 'text.secondary',
-};
-
-/** The cell above the names: the host's words, at the foot of the header row like the days' adornments. */
-export const cornerSx: SxProps<Theme> = {
-  alignSelf: 'end',
-  fontSize: sxRem(M.headerSublabel),
-  color: 'text.secondary',
-  p: 0.5,
-  pl: 0,
-  minWidth: 0,
-};
-
 export const totalHeaderSx: SxProps<Theme> = {
   fontSize: sxRem(M.total),
   color: 'text.secondary',

@@ -81,12 +81,13 @@ export interface DayRulerFooterCell {
  * per hour (`cells`, index 0 = `from…from+1`) — "Na escala, por hora",
  * "O movimento pede" —, a trend drawn as a line (`trend`, one value per hour,
  * `null` for none) — "Média de pedidos/hora" —, or a sentence across the
- * track where the figures would be (`note`) — "Pouco histórico: …".
+ * track where the figures would be (`note`) — "Pouco histórico: …", or,
+ * `marked`, in the warning ink: "Faltam 2, 20h–22h".
  */
 export type DayRulerFooterRow =
   | { id: string; label: string; cells: readonly DayRulerFooterCell[]; trend?: undefined; note?: undefined }
   | { id: string; label: string; trend: readonly (number | null)[]; cells?: undefined; note?: undefined }
-  | { id: string; label: string; note: string; cells?: undefined; trend?: undefined };
+  | { id: string; label: string; note: string; marked?: boolean; cells?: undefined; trend?: undefined };
 
 export interface DayRulerProps {
   rows: readonly DayRulerRow[];
