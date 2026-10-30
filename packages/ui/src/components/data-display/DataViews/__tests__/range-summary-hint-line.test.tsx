@@ -172,8 +172,10 @@ describe("the hint line's room, wrap and focus (FUT-4144 code review)", () => {
     render(<Pill initial={{ min: "2026-10-01", max: "2026-10-15" }} />);
     fireEvent.click(screen.getByTestId(TEST_ID));
     fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`), { detail: 1 });
-    await waitFor(() => expect(hint()).toHaveTextContent("Toque no primeiro e no último dia."));
-    expect(screen.getByTestId(`${TEST_ID}-min`)).not.toHaveFocus();
+    await waitFor(() => {
+      expect(hint()).toHaveTextContent("Toque no primeiro e no último dia.");
+      expect(screen.getByTestId(`${TEST_ID}-min`)).not.toHaveFocus();
+    });
   });
 });
 

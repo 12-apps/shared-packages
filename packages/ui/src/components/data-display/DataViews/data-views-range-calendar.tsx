@@ -146,7 +146,7 @@ function HintLine({
   isWindow: boolean;
   /** The line can hold "Limpar" at all — fixed per surface, not per state. */
   canClear: boolean;
-  /** Shown now: "Limpar" empties the range; `fromKeyboard` says how it was pressed. */
+  /** Shown now: "Limpar" empties the range; `fromKeyboard` is a click with `detail` 0 (Enter or Space). */
   onClear: ((fromKeyboard: boolean) => void) | undefined;
   testId: string;
 }): React.JSX.Element {
@@ -179,7 +179,6 @@ function HintLine({
         <Box
           component="button"
           type="button"
-          // A keyboard press reports no clicks (`detail` 0); a tap reports one.
           onClick={(event) => onClear(event.detail === 0)}
           data-testid={`${testId}-clear`}
           sx={{
