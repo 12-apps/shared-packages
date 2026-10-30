@@ -292,7 +292,25 @@ function FooterCells({ cells, hours, from }: { cells: readonly DayRulerFooterCel
   );
 }
 
-/** A group's lines under its rows (FUT-3882): counts per hour, or a trend, on the tracks' columns. */
+function FooterFigures({ row, hours, from }: { row: DayRulerFooterRow; hours: number; from: RulerHour }): React.JSX.Element {
+  if (row.trend) {
+    return (
+      <Box component="svg" viewBox="0 0 100 40" preserveAspectRatio="none" sx={trendSx} role="img" aria-label={row.label}>
+        <polyline fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" points={trendPoints(row.trend, hours)} />
+      </Box>
+    );
+  }
+  if (row.note !== undefined) {
+    return (
+      <Box component="span" sx={coverageLabelSx}>
+        {row.note}
+      </Box>
+    );
+  }
+  return <FooterCells cells={row.cells ?? []} hours={hours} from={from} />;
+}
+
+/** A group's lines under its rows (FUT-3882): counts per hour, a trend, or a sentence, on the tracks' columns. */
 export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: RulerScale; testId: string }): React.JSX.Element {
   const { rows, scale, testId } = props;
   const hours = scale.to - scale.from;
@@ -303,13 +321,7 @@ export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: 
           <Box component="span" sx={coverageLabelSx}>
             {row.label}
           </Box>
-          {row.trend ? (
-            <Box component="svg" viewBox="0 0 100 40" preserveAspectRatio="none" sx={trendSx} role="img" aria-label={row.label}>
-              <polyline fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" points={trendPoints(row.trend, hours)} />
-            </Box>
-          ) : (
-            <FooterCells cells={row.cells ?? []} hours={hours} from={scale.from} />
-          )}
+          <FooterFigures row={row} hours={hours} from={scale.from} />
           <span />
         </Box>
       ))}

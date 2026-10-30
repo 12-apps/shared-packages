@@ -511,6 +511,11 @@ describe("a group's footer lines (FUT-3882)", () => {
     expect(row.compareDocumentPosition(need) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("says a note across the track where the figures would be", () => {
+    renderRuler({ groupFooter: () => [{ id: "thin", label: "O movimento pede", note: "Pouco histórico: menos de 4 semanas com pedidos." }] });
+    expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico: menos de 4 semanas com pedidos.")).toBeTruthy();
+  });
+
   it("draws nothing for a group the host gives no lines", () => {
     renderRuler({ groupFooter: () => undefined });
     expect(screen.queryByTestId("dr-footer-need")).toBeNull();
