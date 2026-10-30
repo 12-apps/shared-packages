@@ -114,6 +114,107 @@ function openingMonth(value: RangeValue, months: number): Date | undefined {
   return new Date(anchor.getFullYear(), anchor.getMonth() - (months > 1 ? 1 : 0), 1);
 }
 
+/**
+ * The line under the calendar: the next step ("Toque no primeiro e no último
+ * dia." / "Agora toque no último dia.") or, once a period is applied, the
+ * window, with "Limpar" at its end.
+ *
+ * ONE line whose words change, never a row held empty for later (FUT-4144
+ * follow-up): #932 kept an invisible summary row under the hint so the first
+ * tap would not grow the popover, and at 1280 that was 59px of white.
+ *
+ * Where the line can hold "Limpar" (the pill's popover) it is always as tall as
+ * its 40px target, so it keeps one height with the button and without it, and
+ * the popover does not move. Where it cannot (a panel, whose header has
+ * "Limpar") it stays a plain line of text: no row reserved for a button that
+ * never comes. The text keeps to one line, cut with an ellipsis and whole in
+ * its title, so a long label never grows the line on the closing tap. The target
+ * is its own box, not padding pushed out with a negative margin: that version
+ * ran under the calendar's last week, which took its top 10px at 320 (FUT-4144
+ * UI review). The window is said in the primary ink, the steps in the
+ * secondary one, so the result does not read as one more instruction.
+ */
+function HintLine({
+  text,
+  isWindow,
+  canClear,
+  onClear,
+  testId,
+}: {
+  text: string;
+  /** `text` is the applied window, not a step. */
+  isWindow: boolean;
+  /** The line can hold "Limpar" at all — fixed per surface, not per state. */
+  canClear: boolean;
+  /** Shown now: "Limpar" empties the range; `fromKeyboard` is a click with `detail` 0 (Enter or Space). */
+  onClear: ((fromKeyboard: boolean) => void) | undefined;
+  testId: string;
+}): React.JSX.Element {
+  const clear = useDataViewsCopy().filters.clear;
+  return (
+    <Box
+      data-testid={`${testId}-calendar-line`}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 2,
+        mt: { xs: 0.25, sm: 1 },
+        minHeight: canClear ? sxRem(40) : undefined,
+        fontSize: sxRem(12),
+        lineHeight: 1.5,
+      }}
+    >
+      <Typography
+        component="p"
+        aria-live="polite"
+        data-testid={`${testId}-calendar-hint`}
+        title={text}
+        noWrap
+        sx={{ m: 0, minWidth: 0, font: 'inherit', color: isWindow ? 'text.primary' : 'text.secondary' }}
+      >
+        {text}
+      </Typography>
+      {onClear && (
+        <Box
+          component="button"
+          type="button"
+          onClick={(event) => onClear(event.detail === 0)}
+          data-testid={`${testId}-clear`}
+          sx={{
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: sxRem(40),
+            border: 0,
+            bgcolor: 'transparent',
+            cursor: 'pointer',
+            font: 'inherit',
+            fontWeight: 600,
+            color: 'primary.main',
+            px: 1,
+            py: 0,
+            // Its text lines up with the boxes' right edge; the side padding
+            // reaches into the popover's own.
+            mr: -1,
+            borderRadius: 1,
+            '&:hover': { bgcolor: 'action.hover' },
+            // The theme's focus ring for a keyboard, none for a tap.
+            '&:focus': { outline: 'none' },
+            '&:focus-visible': {
+              outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+              outlineColor: 'primary.main',
+              outlineOffset: sxRem(1),
+            },
+          }}
+        >
+          {clear}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 /** Props of {@link DayRangeCalendar}. */
 export interface DayRangeCalendarProps {
   /** The filter's own label ("Data"), which names the calendar. */
@@ -133,6 +234,18 @@ export interface DayRangeCalendarProps {
    */
   viewKey: string;
   testId: string;
+  /**
+   * The applied window in words ("Data: 01/10–15/10"), said on the hint's own
+   * line with "Limpar" at its end. Set by the pill, whose popover has no other
+   * place for them; a panel says them in its own header and leaves this unset.
+   */
+  summary?: string;
+  /**
+   * Empties the range: the line's "Limpar", shown while `summary` is set. Set
+   * only where the line may hold it; the line reserves its 40px only then.
+   * `fromKeyboard` is true when it was pressed from the keyboard.
+   */
+  onClear?: (fromKeyboard: boolean) => void;
 }
 
 export function DayRangeCalendar({
@@ -142,6 +255,8 @@ export function DayRangeCalendar({
   months,
   viewKey,
   testId,
+  summary,
+  onClear,
 }: DayRangeCalendarProps): React.JSX.Element {
   const copy: DataViewsDayCalendarCopy =
     useDataViewsCopy().filters.dayCalendar ?? (EN_US_DATA_VIEWS_COPY.filters.dayCalendar as DataViewsDayCalendarCopy);
@@ -172,14 +287,13 @@ export function DayRangeCalendar({
         // tap that CLOSES a period, so the first tap would write nothing.
         onIntermediateRangeChange={pick}
       />
-      <Typography
-        component="p"
-        aria-live="polite"
-        data-testid={`${testId}-calendar-hint`}
-        sx={{ mt: { xs: 0.25, sm: 1 }, fontSize: sxRem(12), color: 'text.secondary' }}
-      >
-        {waitingForEnd ? copy.pickEnd : copy.pickStart}
-      </Typography>
+      <HintLine
+        text={waitingForEnd ? copy.pickEnd : (summary ?? copy.pickStart)}
+        isWindow={!waitingForEnd && summary !== undefined}
+        canClear={onClear !== undefined}
+        onClear={summary === undefined ? undefined : onClear}
+        testId={testId}
+      />
     </Box>
   );
 }

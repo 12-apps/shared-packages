@@ -292,9 +292,11 @@ the keystrokes it did.
 | months | one, `<Month> ▾ <Year> ▾ ‹ ›` caption | one, same caption | two side by side, `‹ setembro` · `outubro ›`, the current month on the right |
 
 - Order in the popover: preset chips, the `De`/`Até` boxes (sharing the row
-  equally), the inclusive/inverted note, the calendar, then the line saying
+  equally), the inclusive/inverted note, the calendar, then ONE line under it:
   which tap comes next ("Toque no primeiro e no último dia." / "Agora toque no
-  último dia."), then the pill's summary and "Limpar".
+  último dia."), and once a period is applied the window itself ("Data:
+  01/10–15/10"), with "Limpar" at the line's end from the first tap on. In the
+  panels the line says only the step; their header carries "Limpar".
 - One view of ONE range: a tap writes the boxes; a typed whole day writes the
   bound and moves the calendar to it; an impossible typed day (`31/02/2026`)
   is refused in its box and the calendar does not move; "Limpar", a preset or a
@@ -320,8 +322,10 @@ the keystrokes it did.
   where their trigger was when they opened, so a "Limpar" or a badge appearing
   on the bar after the first tap does not drag them sideways. They are
   re-placed only when their own height changes (a refused day's message), so
-  they never leave the screen. A day popover keeps its summary/"Limpar" row's
-  height while nothing is applied, so the first tap does not grow it.
+  they never leave the screen. A day popover has no summary row of its own:
+  the window and "Limpar" are on the hint's line, whose height does not change
+  as its words do, so no row is held empty and the first tap does not grow it
+  (an empty held row left 59px of white under the hint at 1280).
 - While a panel is open the bar is frozen; if the "Limpar" that a first filter
   brings in does not fit the row it shows as its icon until the panel closes.
 - A second tap before the first swaps them — the boxes never show a period

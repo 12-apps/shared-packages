@@ -180,6 +180,10 @@ const DAY_PAPER_SX = (theme: Theme) => ({
   // 280px seven 40px day columns need: at 320 it had 256 and every day was a
   // 33px target (FUT-4144 UI review).
   maxWidth: { xs: `calc(100% - ${rem(theme, 16)})`, sm: `calc(100% - ${rem(theme, 32)})` },
+  // And as tall as those same margins allow: MUI's default keeps 16px off the
+  // top and bottom, so a refused day's message at 320×568 made the popover
+  // 1px taller than its cap and it scrolled (FUT-4144 code review).
+  maxHeight: { xs: `calc(100% - ${rem(theme, 16)})`, sm: `calc(100% - ${rem(theme, 32)})` },
   p: { xs: 1, sm: 2 },
 });
 
@@ -232,6 +236,7 @@ export function RangePill<T extends Record<string, unknown>>({
           onChange={onChange}
           testId={testId}
           calendarMonths={calendarMonths}
+          summaryOnHint
         />
         <RangeSummary field={field} value={value} onClear={() => onChange({})} testId={testId} />
       </Popover>
