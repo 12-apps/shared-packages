@@ -25,6 +25,7 @@ import {
   totalCellSx,
   totalHeaderSx,
 } from './ScheduleGrid.styles';
+import { cornerSx, headerAdornmentSx } from './schedule-header-host.styles';
 import type { CellLook } from './ScheduleGrid.styles';
 import type {
   ScheduleGridBlock,
@@ -248,22 +249,31 @@ interface HeaderProps {
   columns: readonly ScheduleGridColumn[];
   /** Present when the grid has a last column. */
   totalLabel?: string;
+  /** Above the names (`ScheduleGridProps.corner`). */
+  corner?: React.ReactNode;
   rowSx: RowSx;
   testId: string;
 }
 
 /** The days, their counts and the total column's header — pinned while the grid scrolls. */
 
+/** A range ("11h–23h") breaks before or after it, never at its dash; a spaced dash ("11h – 23h") keeps its spaces. */
+function keepRangesWhole(node: React.ReactNode): React.ReactNode {
+  return typeof node === 'string' ? node.replace(/(\S)–(\S)/g, '$1\u2060–\u2060$2') : node;
+}
+
 /** A label wraps between words, never inside "Seg 19/10": the space before a number holds. */
 function keepDatesWhole(label: string): string {
   return label.replace(/ (?=\d)/g, '\u00a0');
 }
 
-export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps): React.JSX.Element {
+export function GridHeader({ columns, totalLabel, corner, rowSx, testId }: HeaderProps): React.JSX.Element {
   return (
     <Box role="row" sx={[rowSx, headerRowSx]} data-testid={`${testId}-header`}>
-      {/* Above the names: a cell of the header row, with nothing to head. */}
-      <span role="cell" data-sg-corner="" />
+      {/* Above the names: a cell of the header row, with nothing to head but the host's corner words. */}
+      <Box component="span" role="cell" data-sg-corner="" sx={cornerSx} data-testid={`${testId}-corner`}>
+        {keepRangesWhole(corner)}
+      </Box>
       {columns.map((column, day) => (
         <Box
           role="columnheader"
@@ -277,6 +287,11 @@ export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps):
           {column.sublabel ? (
             <Box component="span" sx={headerSublabelSx} data-sg-col="sub">
               {column.sublabel}
+            </Box>
+          ) : null}
+          {column.adornment ? (
+            <Box component="span" sx={headerAdornmentSx} data-sg-col="adornment" data-testid={`${testId}-adornment-${day}`}>
+              {column.adornment}
             </Box>
           ) : null}
         </Box>

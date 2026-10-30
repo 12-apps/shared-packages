@@ -718,3 +718,32 @@ describe("closed days (gone: no new turno)", () => {
     expect(props.onBlockClick).toHaveBeenCalledWith("d1");
   });
 });
+
+describe("the header's host figures (FUT-3882)", () => {
+  it("draws a day's adornment under its label, inside its column header, and the corner above the names", () => {
+    const saturday = { label: "Sáb 24/10", adornment: <span>falta 2 · 20–22h</span> };
+    renderGrid({ columns: [{ label: "Sex 23/10" }, saturday], corner: "Movimento, 11h–23h" });
+    const header = screen.getByTestId("sg-header");
+    const column = within(header).getByRole("columnheader", { name: /^Sáb\s24\/10/ });
+    expect(within(column).getByText("falta 2 · 20–22h")).toBeTruthy();
+    expect(within(column).getByTestId("sg-adornment-1")).toBeTruthy();
+    // The day beside it draws none: its header is there, its adornment is not.
+    const friday = within(header).getByRole("columnheader", { name: /^Sex\s23\/10/ });
+    expect(within(friday).queryAllByTestId(/sg-adornment-/)).toHaveLength(0);
+    // The range never breaks at its dash: word joiners hold it whole.
+    expect(within(header).getByTestId("sg-corner").textContent).toBe("Movimento, 11h\u2060–\u206023h");
+  });
+
+  it("joins only an unspaced range's dash, and keeps a spaced dash's spaces", () => {
+    renderGrid({ corner: "Movimento – 11h–23h" });
+    expect(screen.getByTestId("sg-corner").textContent).toBe("Movimento – 11h\u2060–\u206023h");
+  });
+
+  it("keeps the corner empty and draws no adornment when the host gives none", () => {
+    renderGrid();
+    const corner = screen.getByTestId("sg-corner");
+    expect(corner.textContent).toBe("");
+    expect(within(screen.getByTestId("sg-header")).getAllByRole("columnheader").length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("sg-header")).queryAllByTestId(/sg-adornment-/)).toHaveLength(0);
+  });
+});

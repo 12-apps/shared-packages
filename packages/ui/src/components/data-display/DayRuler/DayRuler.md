@@ -47,6 +47,7 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 | `now` | `number?` | The "agora" line, when on the ruler. |
 | `coverage` | `number[]?` | People per hour, index 0 = `from…from+1`. |
 | `coverageLabel` | `string?` | Beside the counts ("Na escala, por hora"). |
+| `groupFooter` | `(group) => DayRulerFooterRow[]?` | Lines under a group's rows, on the tracks' columns (FUT-3882), for the group titled `group` (`undefined` for rows with no group). A row is `{ id, label, cells }` — one `{ text, marked?, title? }` per hour from `from`, a `marked` hour drawn in the warning ink (deepened to read at 4.5:1 on the page) inside a `warning.main` outline ("O movimento pede", an hour short of people). A marked hour's `title` is also said as visually hidden text; without one, it reads "20:00 · 2 · " + `labels.footerMarked`. An unmarked hour's default title is "20:00 · 2", or just the hour when it says nothing — or `{ id, label, trend }`, one value (or `null`) per hour drawn as a line in the primary colour, the highest near the top ("Média de pedidos/hora"; the drawing is `aria-hidden` and its figures are said as visually hidden text, "11:00 4 · 12:00 6"). A row `{ id, label, note, marked? }` says a sentence across the track instead ("Pouco histórico: menos de 4 semanas com pedidos na cozinha."); `marked` draws it in the readable warning ink behind a warning bar (a shape, not colour alone) and flags it `data-marked` ("Faltam 2, 20h–22h"). Not drawn in a phone-sized pane, like the coverage row. Called for every group on each render: keep it cheap (derive the rows once, outside, and look them up). A host drawing these usually leaves out `coverage`: the same counts would show twice. |
 | `tickHours` | `number` (default 4) | An axis label every this many hours (HH:MM). |
 | `snapMinutes` | `number` (default 15) | |
 | `createHours` | `number` (default 4) | What a click alone creates. |
@@ -55,8 +56,8 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 | `onCreate` / `onMove` / `onResize` / `onBlockClick` | see Gestures | Each is offered only when its handler is given. |
 | `loading` / `error` / `empty` | `boolean` / node / node | Skeleton rows with `aria-busy`; the host's error; the host's empty sentence. |
 | `aria-label` | `string?` | The region's name. |
-| `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`. Default: the English pack; pt-BR: `DAY_RULER_LABELS['pt-BR']` from `@12-apps/ui/data-display/DayRuler`. |
-| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
+| `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`, `footerMarked`. Default: the English pack; pt-BR: `DAY_RULER_LABELS['pt-BR']` from `@12-apps/ui/data-display/DayRuler`. |
+| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-footer-${footerRowId}`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
 
 Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over a faint ground.
 

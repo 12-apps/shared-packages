@@ -2,6 +2,8 @@ export { DayRuler } from './DayRuler';
 export type {
   DayRulerActual,
   DayRulerBlock,
+  DayRulerFooterCell,
+  DayRulerFooterRow,
   DayRulerProps,
   DayRulerRow,
   RulerHour,
