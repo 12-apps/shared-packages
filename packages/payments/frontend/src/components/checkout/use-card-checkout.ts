@@ -26,6 +26,7 @@ import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card
 import { useCardPublicKey, useSavedCards } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
+import { useHostedParking } from "./hosted-parking";
 import type { CardChainLink } from "./method-capability";
 import type { BuyerInfo, ChargeCardInput, CheckoutOrder, OnCheckoutResolved, OrderStatus } from "./types";
 import { authenticateDebit, type DebitAuthentication } from "./debit-charge";
@@ -228,6 +229,7 @@ export function useCardSubmit(
   const { publicKey, setPublicKey, keyPending } = useCardPublicKey(order.orderId, providerConfig);
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
+  const park = useHostedParking();
   const cardCopy = useCheckoutCopy().card;
 
   const { status, ...wait } = useCardWait(order.orderId, submitted, pollIntervalMs);
@@ -269,7 +271,7 @@ export function useCardSubmit(
     // 3-D Secure (FUT-698): the buyer must finish on the provider's page.
     // `submitting` stays true on purpose — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate, scope);
+      return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate, { ...scope, park });
     }
     // A business outcome shows the status screen, carrying the refusal the
     // server classified (FUT-1145); an accepted charge begins polling.

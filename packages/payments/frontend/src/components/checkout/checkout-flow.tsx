@@ -6,6 +6,7 @@ import { PaymentStatus } from "./payment-status";
 import type { BackActionEmphasis } from "./payment-status-parts";
 import type { BuyerInfo, CheckoutProviderConfig, SettlementCheckout } from "./types";
 import { CheckoutCopyProvider } from "./copy-context";
+import { HostedParkingContext } from "./hosted-parking";
 import { CheckoutComponentsProvider, type CheckoutComponents } from "./ui";
 import type { CheckoutViewCopy } from "./view-copy";
 import { CheckoutFrame } from "./checkout-frame";
@@ -115,6 +116,14 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
    * above the wallet buttons (FUT-3685). See `./list/types.ts`.
    */
   paymentList: CheckoutPaymentList;
+  /**
+   * `false` keeps this mount out of the tab's parked-payment slot: it neither
+   * parks what it raises, nor resumes, nor forgets what the host's checkout
+   * parked. For a second mount that pays something the host tracks itself (a
+   * pedido paid again from its own page). Default `true`. See
+   * `./hosted-parking.ts`.
+   */
+  parkHostedOrders?: boolean;
 }
 
 /**
@@ -284,11 +293,13 @@ function CheckoutFlowBody(props: Omit<CheckoutFlowProps, "components">): JSX.Ele
  * `<CheckoutFlow cart={...} createOrder={...} onExitToMenu={...} />` is a
  * complete buyer checkout; everything else is optional.
  */
-export function CheckoutFlow({ components, ...props }: CheckoutFlowProps): JSX.Element {
+export function CheckoutFlow({ components, parkHostedOrders = true, ...props }: CheckoutFlowProps): JSX.Element {
   return (
     <CheckoutComponentsProvider components={components}>
       <CheckoutCopyProvider copy={props.copy.screens}>
-        <CheckoutFlowBody {...props} />
+        <HostedParkingContext.Provider value={parkHostedOrders}>
+          <CheckoutFlowBody {...props} />
+        </HostedParkingContext.Provider>
       </CheckoutCopyProvider>
     </CheckoutComponentsProvider>
   );

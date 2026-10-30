@@ -17,6 +17,8 @@ import type { ChargeOutcome, CheckoutOrder, OnCheckoutResolved } from "./types";
 export interface ChallengeScope {
   tenantSlug?: string;
   basket?: CheckoutBasketIdentity;
+  /** `false`: a mount that keeps out of the parked slot (`./hosted-parking`). */
+  park?: boolean;
 }
 
 /**
@@ -43,11 +45,13 @@ export function handOverToChallenge(
   // return trip that finds nothing parked lands the buyer on a blank
   // confirmation after they have paid.
   const basket = parkedBasket(scope.basket);
-  rememberHostedOrder(order, {
-    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
-    ...(basket === undefined ? {} : { basket }),
-    handoff: true,
-  });
+  if (scope.park !== false) {
+    rememberHostedOrder(order, {
+      ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+      ...(basket === undefined ? {} : { basket }),
+      handoff: true,
+    });
+  }
   navigate(url);
 }
 

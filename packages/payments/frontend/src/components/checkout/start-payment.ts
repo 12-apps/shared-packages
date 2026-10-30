@@ -3,6 +3,7 @@ import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { parkedBasket, type CheckoutBasketIdentity } from "./basket";
 import type { Step } from "./checkout-actions";
 import type { CheckoutDecline } from "./decline";
+import { useHostedParking } from "./hosted-parking";
 import { rememberHostedOrder } from "./hosted-return";
 import type { CheckoutNavigate } from "./navigate-context";
 import type {
@@ -44,8 +45,13 @@ function handOverToProvider(
   navigate: CheckoutNavigate,
   tenantSlug?: string,
   basket?: CheckoutBasketIdentity,
+  park = true,
 ): boolean {
   if (!order.hostedCheckoutUrl) return false;
+  if (!park) {
+    navigate(order.hostedCheckoutUrl);
+    return true;
+  }
   // PARK FIRST, navigate second. The order is the only thing the return trip
   // has to rehydrate from, and the navigation may tear this SPA down before
   // any later write lands.
@@ -99,6 +105,7 @@ export function useStartPayment(input: {
 }): (chosen: PaymentMethod, override?: BuyerInfo) => Promise<void> {
   const { buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure } = input;
   const { setCreating, setDecline, setOrder, setFinalStatus, setStep } = input;
+  const park = useHostedParking();
   return useCallback(
     async (chosen: PaymentMethod, override?: BuyerInfo) => {
       failure.clear();
@@ -124,10 +131,10 @@ export function useStartPayment(input: {
         failure.fail(result.error);
         return;
       }
-      routeRaisedOrder(result.data, { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep });
+      routeRaisedOrder(result.data, { navigate, tenantSlug, basket, park, setOrder, setFinalStatus, setStep });
     },
     [
-      buyer, saveProfile, createOrder, failure, navigate, tenantSlug, basket,
+      buyer, saveProfile, createOrder, failure, navigate, tenantSlug, basket, park,
       setCreating, setDecline, setOrder, setFinalStatus, setStep,
     ],
   );
@@ -144,37 +151,44 @@ export function routeRaisedOrder(
     navigate: CheckoutNavigate;
     tenantSlug: string | undefined;
     basket: CheckoutBasketIdentity | undefined;
+    /** `false`: a mount that keeps out of the parked slot (`./hosted-parking`). */
+    park?: boolean;
     setOrder: Dispatch<SetStateAction<CheckoutOrder | null>>;
     setFinalStatus: Dispatch<SetStateAction<OrderStatus | null>>;
     setStep: Dispatch<SetStateAction<Step>>;
   },
 ): void {
   const { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep } = ctx;
+  const park = ctx.park !== false;
+  const remember = (): void => {
+    if (park) rememberHostedOrder(order, { tenantSlug, basket: parkedBasket(basket) });
+  };
   // NOTHING LEFT TO PAY — see the docblock. Parked first for the same
   // reason every other raised order is: the confirmation this is about to
   // show has to survive a tab the phone discards on the way to it.
   if (order.status !== "AWAITING_PAYMENT") {
-    rememberHostedOrder(order, { tenantSlug, basket: parkedBasket(basket) });
+    remember();
     setOrder(order);
     setFinalStatus(order.status);
     setStep("status");
     return;
   }
-  if (handOverToProvider(order, navigate, tenantSlug, basket)) return;
+  if (handOverToProvider(order, navigate, tenantSlug, basket, park)) return;
   // PARKED EVEN THOUGH NOBODY IS LEAVING (FUT-1140). A low-memory phone
   // discards this tab while the shopper is in their bank app, and the SPA
   // that comes back has never heard of the order it raised — so the buyer
   // meets an empty cart and a retry button instead of the confirmation for
   // the payment they just made.
-  rememberHostedOrder(order, { tenantSlug, basket: parkedBasket(basket) });
+  remember();
   setOrder(order);
 }
 
 /** {@link routeRaisedOrder}, bound to one checkout and stable while its inputs are. */
 export function useRaisedOrderRoute(ctx: Parameters<typeof routeRaisedOrder>[1]): (order: CheckoutOrder) => void {
   const { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep } = ctx;
+  const park = useHostedParking();
   return useCallback(
-    (order: CheckoutOrder) => routeRaisedOrder(order, { navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep }),
-    [navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep],
+    (order: CheckoutOrder) => routeRaisedOrder(order, { navigate, tenantSlug, basket, park, setOrder, setFinalStatus, setStep }),
+    [navigate, tenantSlug, basket, park, setOrder, setFinalStatus, setStep],
   );
 }

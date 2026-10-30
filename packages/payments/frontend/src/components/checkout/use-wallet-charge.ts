@@ -8,6 +8,7 @@ import { useCheckoutClientApi } from "./client-context";
 import { UNRESOLVED_CODE } from "./failure-codes";
 import { rememberHostedOrder } from "./hosted-return";
 import { useCheckoutNavigate } from "./navigate-context";
+import { useHostedParking } from "./hosted-parking";
 import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OrderStatus } from "./types";
 import { usePaymentPolling } from "./use-payment-polling";
 
@@ -77,6 +78,7 @@ const WALLET_AWAITING_WAIT_MS = 90_000;
  * since FUT-1213; this call site is the one that did not.
  */
 function parkForHandover(order: CheckoutOrder, scope: ChallengeScope): void {
+  if (scope.park === false) return;
   const basket = parkedBasket(scope.basket);
   rememberHostedOrder(order, {
     ...(scope.tenantSlug === undefined ? {} : { tenantSlug: scope.tenantSlug }),
@@ -99,7 +101,7 @@ export function useWalletCharge(
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
-
+  const park = useHostedParking();
   const {
     status,
     error: pollError,
@@ -141,7 +143,7 @@ export function useWalletCharge(
     // FUT-698): park the order and hand the buyer over, exactly as the card
     // path does. `phase` stays as-is — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
-      parkForHandover(order, scope);
+      parkForHandover(order, { ...scope, park });
       navigate(charged.data.hostedCheckoutUrl);
       return true;
     }
