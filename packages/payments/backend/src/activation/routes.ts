@@ -104,6 +104,22 @@ function typedEmail(body: VerifyChargeBody | null): string | undefined {
   return email || undefined;
 }
 
+/**
+ * The payer the GET suggests — best-effort, because this read also heals a
+ * stranded activation and hands back the card key: a host whose payer lookup
+ * fails must not take either of those down with it (FUT-4050).
+ */
+async function suggestedPayer<A>(
+  config: ActivationRoutesConfig<A>,
+  args: PaymentsRouteExtensionArgs<A>,
+): Promise<ActivationPayer> {
+  try {
+    return await config.payer(args);
+  } catch {
+    return {};
+  }
+}
+
 /** The host's payer, with the typed e-mail in place of its own. */
 function withTypedEmail(payer: ActivationPayer, body: VerifyChargeBody | null): ActivationPayer {
   const email = typedEmail(body);
@@ -235,7 +251,7 @@ export function createActivationRouteExtensions<A>(
           await config.context(),
           args.merchant,
           args.intent.provider ?? '',
-          await config.payer(args),
+          await suggestedPayer(config, args),
         ),
     },
     {

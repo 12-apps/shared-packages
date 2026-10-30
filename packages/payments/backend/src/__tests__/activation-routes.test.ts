@@ -263,3 +263,25 @@ describe('createActivationRouteExtensions — the payer e-mail (FUT-4050)', () =
     expect(applyChargeVerification).toHaveBeenCalledWith(ACME, 'pagbank', false);
   });
 });
+
+describe('createActivationRouteExtensions — the GET survives its payer (FUT-4050)', () => {
+  it('a host payer that throws costs the suggestion, never the key or the heal', async () => {
+    vi.mocked(verificationCardPublicKey).mockResolvedValue('PUB_KEY');
+    vi.mocked(getPendingVerification).mockResolvedValue({ reference: 'ref--a1' } as never);
+    vi.mocked(healStrandedActivation).mockResolvedValue(false);
+    const read = createActivationRouteExtensions<{ tenantId: string }>({
+      context: routesContext,
+      payer: async () => {
+        throw new Error('session store down');
+      },
+      copy: { missingCardFields: MISSING_CARD },
+    }).find((extension) => extension.method === 'GET')!;
+
+    const response = await read.handler(argsFor(undefined));
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { publicKey: string; payerEmail: unknown };
+    expect(body.publicKey).toBe('PUB_KEY');
+    expect(body.payerEmail).toBeNull();
+    expect(healStrandedActivation).toHaveBeenCalledTimes(1);
+  });
+});

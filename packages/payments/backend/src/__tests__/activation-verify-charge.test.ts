@@ -329,6 +329,17 @@ describe('failureFor — the refused payer e-mail (FUT-4050)', () => {
     expect(failure.payerEmailRefused).toBeUndefined();
   });
 
+  it('does NOT flag a transport failure, whatever its body says', () => {
+    const failure = failureFor(
+      new ProviderRequestError('pagbank', 'socket hang up', {
+        body: { error_messages: [{ code: '40002', parameter_name: 'customer.email' }] },
+      }),
+      PT_BR_ACTIVATION_COPY,
+    );
+    expect(failure.transport).toBe(true);
+    expect(failure.payerEmailRefused).toBeUndefined();
+  });
+
   it('does NOT flag a refusal with no structured body', () => {
     const failure = failureFor(
       new ProviderRequestError('pagbank', 'buyer email must not be equals to merchant email', { httpStatus: 400 }),

@@ -361,6 +361,17 @@ describe('the payer e-mail (FUT-4050)', () => {
     expect(start).toHaveBeenCalledWith({ email: 'outro@example.test' });
   });
 
+  it('the link flow opens with the e-mail the endpoint suggests', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ amountCents: 100, payerEmail: 'pagamento@example.test' }) })),
+    );
+    hooks.redirect.mockReturnValue(IDLE_REDIRECT);
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+    await waitFor(() => expect(inputOf('verify-charge-email').value).toBe('pagamento@example.test'));
+    vi.unstubAllGlobals();
+  });
+
   it('the link flow mints nothing for an empty e-mail, and says why on the field', async () => {
     const start = vi.fn();
     hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });

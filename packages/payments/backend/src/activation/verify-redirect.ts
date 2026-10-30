@@ -157,10 +157,15 @@ function startFailure(
   displayName: string,
   error: unknown,
 ): RedirectStart {
+  // The link flow has no card form to send the owner back to, so a refused
+  // payer e-mail is told as the refusal it is — never as a flag the screen
+  // would read as "the provider-side switch is off" (FUT-4050).
   const failure = failureFor(error, copy);
   return {
     ok: false,
-    ...failure,
+    reason: failure.reason,
+    ...(failure.providerMessage === undefined ? {} : { providerMessage: failure.providerMessage }),
+    ...(failure.transport ? { transport: true } : {}),
     // Named here rather than in `failureFor`, which has no adapter and could
     // only ever say "o provedor".
     ...(failure.transport ? { reason: copy.unreachable(displayName) } : {}),
