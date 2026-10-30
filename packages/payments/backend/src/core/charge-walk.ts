@@ -10,6 +10,7 @@ import {
 } from './charge-attempt';
 import { AmbiguousChargeError, CredentialsError, NoProviderSucceededError } from './errors';
 import type { StoredCharge } from './ports';
+import { firstTaking } from './method-head';
 import { isTerminal } from './status';
 import type { ChargeInput, MerchantRef, ProviderName } from './types';
 import type { WalkFailure } from './walk-failure';
@@ -282,11 +283,6 @@ function automaticOnly(deps: ChargeWalkDeps, chain: ProviderName[], options: Cha
   return chain.filter((name) => !deps.providers.has(name) || deps.providers.get(name).capabilities.confirmation !== 'MANUAL');
 }
 
-/** The adapter declares this method; a provider this deployment does not route to never does. */
-function takesMethod(deps: ChargeWalkDeps, name: ProviderName, method: ChargeInput['method']): boolean {
-  return deps.providers.has(name) && deps.providers.get(name).capabilities.methods.includes(method);
-}
-
 /** Attempt number carried across the resume step and the chain loop. */
 interface Cursor {
   attemptNo: number;
@@ -351,7 +347,7 @@ export async function walkChargeChain(
   // Otherwise it is the first provider that takes this METHOD — the one the
   // browser tokenized a debit card or a wallet for (FUT-4109): a head that
   // takes no card (the store's own Pix key) is never who a card belongs to.
-  const chainHead = pinned ? options.provider : (chain.find((name) => takesMethod(deps, name, input.method)) ?? chain[0]);
+  const chainHead = pinned ? options.provider : (firstTaking(deps.providers, chain, input.method) ?? chain[0]);
   const policy = await resolvePolicy(deps, merchant, options);
 
   // History is loaded whether or not the call is pinned. Pinning narrows

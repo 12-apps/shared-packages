@@ -78,6 +78,28 @@ function multilineProps(spec: CredentialFieldSpec) {
   return spec.multiline ? { multiline: true, minRows: 4, maxRows: 10, type: undefined } : {};
 }
 
+/**
+ * What the `<input>` itself tells the browser (FUT-4144).
+ *
+ * A password box with no `autocomplete` is what a password manager fills with
+ * the SAVED LOGIN, so the owner's own panel password was offered in a
+ * provider's secret-key box — and the text credential above it read as the
+ * username half. Chrome ignores `off` on a password field, so a secret says
+ * `new-password`; everything else, the pasted PEM textarea included (it is
+ * never a password field), says `off`. The `name` is the spec key: stable,
+ * unique within the form, and nothing an autofill heuristic can mistake for
+ * "username". The keypad is whatever the spec declares, and nothing when it
+ * declares none.
+ */
+function htmlInputProps(spec: CredentialFieldSpec, type: string | undefined) {
+  return {
+    name: spec.key,
+    autoComplete: type === 'password' ? 'new-password' : 'off',
+    ...(spec.inputMode ? { inputMode: spec.inputMode } : {}),
+    ...(spec.mono || spec.multiline ? { sx: MONO_INPUT, spellCheck: false } : {}),
+  };
+}
+
 interface CredentialFieldProps {
   spec: CredentialFieldSpec;
   state: MaskedFieldState | undefined;
@@ -108,6 +130,7 @@ export function CredentialField({ spec, state, value, onChange, check }: Credent
   // label is merely ABOVE it is unlabelled to a screen reader and unfindable by
   // `getByLabelText`. The association has to be restated by hand.
   const inputId = `payments-credential-${spec.key}`;
+  const field = { ...presentation, ...multilineProps(spec) };
   return (
     <Box>
       <Typography
@@ -128,14 +151,9 @@ export function CredentialField({ spec, state, value, onChange, check }: Credent
         size="small"
         fullWidth
         id={inputId}
-        {...presentation}
-        {...multilineProps(spec)}
+        {...field}
         helperText={undefined}
-        slotProps={
-          spec.mono || spec.multiline
-            ? { htmlInput: { sx: MONO_INPUT, spellCheck: false } }
-            : { htmlInput: {} }
-        }
+        slotProps={{ htmlInput: htmlInputProps(spec, field.type) }}
         sx={fieldSx(check?.status)}
         onChange={(e) => onChange(e.target.value)}
       />

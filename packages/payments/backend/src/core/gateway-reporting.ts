@@ -87,11 +87,11 @@ export function withProviderFailureReports<P extends string>(
     refund: guarded(reporter, 'REFUND', 'error', gateway.refund, (merchant, provider, input) => ({
       merchant, provider, reference: input.providerChargeId,
     })),
-    beginVault: guarded(reporter, 'VAULT', 'error', gateway.beginVault, (merchant, input) => ({
-      merchant, provider: null, reference: input.reference,
+    beginVault: guarded(reporter, 'VAULT', 'error', gateway.beginVault, (merchant, input, provider) => ({
+      merchant, provider: provider ?? null, reference: input.reference,
     })),
-    completeVault: guarded(reporter, 'VAULT', 'error', gateway.completeVault, (merchant, input) => ({
-      merchant, provider: null, reference: input.reference,
+    completeVault: guarded(reporter, 'VAULT', 'error', gateway.completeVault, (merchant, input, provider) => ({
+      merchant, provider: provider ?? null, reference: input.reference,
     })),
     forgetVault: guarded(reporter, 'VAULT', 'warning', gateway.forgetVault, (merchant, provider) => ({
       merchant, provider, reference: null,

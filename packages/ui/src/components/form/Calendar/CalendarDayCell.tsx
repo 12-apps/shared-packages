@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import React from 'react';
 
+import { bandFor } from './Calendar.band';
 import { isSameDay } from './Calendar.dates';
 import { buildDayArgs } from './Calendar.selection';
 import type { CalendarProps, DateRange, MonthMatrixDay, SelectionMode } from './Calendar.types';
@@ -41,6 +42,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   return (
     <CalendarDay
       day={args}
+      band={bandFor({ args, ...context })}
       focused={isSameDay(args.date, focusedDate)}
       showOutsideDays={showOutsideDays}
       dayClassName={dayClassName}

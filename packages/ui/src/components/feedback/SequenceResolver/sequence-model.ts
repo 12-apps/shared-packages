@@ -13,7 +13,14 @@ import type { SequenceItem, SequenceSummary } from './SequenceResolver.types';
 
 /** How a visited step was left. */
 export type Visit<I extends SequenceItem, R> =
-  | { item: I; outcome: 'resolved'; result: R; alsoResolved?: number }
+  | {
+      item: I;
+      outcome: 'resolved';
+      result: R;
+      alsoResolved?: number;
+      /** The step said `canGoBack: false` when it was answered: the answer has no inverse, so Back stops here. */
+      final?: true;
+    }
   | { item: I; outcome: 'skipped' };
 
 export interface RunState<I extends SequenceItem, R> {
@@ -47,9 +54,17 @@ function dedupe<I extends SequenceItem>(items: readonly I[], skip: ReadonlySet<s
   return out;
 }
 
-/** A fresh run over `queue` (a repeated key counts once). */
-export function startRun<I extends SequenceItem, R>(queue: readonly I[]): RunState<I, R> {
-  return { visits: [], ahead: dedupe(queue, new Set()), held: [] };
+/**
+ * A fresh run over `queue` (a repeated key counts once). With `initialKey` the
+ * run opens at that entry; the entries before it follow it, in queue order —
+ * nothing is passed over (a click on one problem's block opens the run there).
+ */
+export function startRun<I extends SequenceItem, R>(queue: readonly I[], initialKey?: string): RunState<I, R> {
+  const ahead = dedupe(queue, new Set());
+  const at = initialKey === undefined ? -1 : ahead.findIndex((item) => item.key === initialKey);
+  const first = ahead[at];
+  if (at <= 0 || !first) return { visits: [], ahead, held: [] };
+  return { visits: [], ahead: [first, ...ahead.slice(0, at), ...ahead.slice(at + 1)], held: [] };
 }
 
 /**
@@ -106,9 +121,12 @@ export function resolveRun<I extends SequenceItem, R>(
   result: R,
   item: I | undefined = state.ahead[0],
   alsoResolved = 0,
+  final = false,
 ): RunState<I, R> {
   if (!item || !state.ahead.some((entry) => entry.key === item.key)) return state;
-  const visit: Visit<I, R> = alsoResolved > 0 ? { item, outcome: 'resolved', result, alsoResolved } : { item, outcome: 'resolved', result };
+  const visit: Visit<I, R> = { item, outcome: 'resolved', result };
+  if (alsoResolved > 0) visit.alsoResolved = alsoResolved;
+  if (final) visit.final = true;
   return {
     visits: [...state.visits, visit],
     ahead: state.ahead.filter((entry) => entry.key !== item.key),
@@ -151,6 +169,49 @@ export function backRun<I extends SequenceItem, R>(state: RunState<I, R>, key?: 
     visits: state.visits.slice(0, -1),
     ahead: [last.item, ...ahead],
     held: [...state.held.filter((held) => held !== last.item.key), last.item.key],
+  };
+}
+
+/** True when Back may return from the step on screen: a previous step exists and its answer has an inverse. */
+export function canReturn<I extends SequenceItem, R>(state: RunState<I, R>): boolean {
+  const last = previousOf(state);
+  return last !== undefined && !(last.outcome === 'resolved' && last.final);
+}
+
+/**
+ * The step a jump to `keys` (one category of the overview) lands on: the
+ * first of them still AHEAD, in run order; else the first one passed over
+ * (skipped, or left by an earlier jump). An answered key is never a target.
+ */
+export function jumpTargetOf<I extends SequenceItem, R>(state: RunState<I, R>, keys: readonly string[]): string | undefined {
+  const wanted = new Set(keys);
+  const ahead = state.ahead.find((item) => wanted.has(item.key));
+  if (ahead) return ahead.key;
+  return state.visits.find((visit) => visit.outcome === 'skipped' && wanted.has(visit.item.key))?.item.key;
+}
+
+/**
+ * Jump to `key` ("Ver todos" → a category's Resolver, or `api.jumpTo`).
+ *
+ * The step on screen is recorded as PASSED OVER — Back from the target returns
+ * to it at once, with nothing to undo — and the target goes first; the rest
+ * stays in run order. A target that was passed over before is taken back out
+ * of the history. The step already on screen, an answered key or an unknown
+ * one leaves the run as it is.
+ */
+export function jumpRun<I extends SequenceItem, R>(state: RunState<I, R>, key: string): RunState<I, R> {
+  const [current] = state.ahead;
+  if (current?.key === key) return state;
+  const passed = state.visits.findIndex((visit) => visit.outcome === 'skipped' && visit.item.key === key);
+  const target = state.ahead.find((item) => item.key === key) ?? state.visits[passed]?.item;
+  if (!target) return state;
+  const visits = passed >= 0 ? state.visits.filter((_, index) => index !== passed) : [...state.visits];
+  const rest = state.ahead.filter((item) => item.key !== key && item.key !== current?.key);
+  const pins = current ? leaving(state, current.key) : { pinned: state.pinned, held: state.held };
+  return {
+    visits: current ? [...visits, { item: current, outcome: 'skipped' }] : visits,
+    ahead: [target, ...rest],
+    ...pins,
   };
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CredentialsError, UnsupportedOperationError } from '../../core/errors';
 import type { ResolvedCredentials } from '../../core/types';
+import { credentialSchemaOf } from '../../core/credential-schema';
 import { allProviderAdapters } from '../catalog';
 import { crc16Ccitt } from '../pix-manual/br-code';
 import { normalizePixKey, confirmWindowMinutes } from '../pix-manual/fields';
@@ -194,5 +195,23 @@ describe('confirmWindowMinutes', () => {
     expect(confirmWindowMinutes('4')).toBeNull();
     expect(confirmWindowMinutes('1441')).toBeNull();
     expect(confirmWindowMinutes('30.5')).toBeNull();
+  });
+});
+
+/**
+ * The confirmation window is minutes, digits only (`^\d{0,4}$`). A phone that
+ * opens the letter keyboard for it makes the owner hunt for the number row on
+ * a field that can hold nothing else (FUT-4144).
+ */
+describe('pixmanual credential form', () => {
+  it('asks for the numeric keypad on the confirmation window', () => {
+    const schema = credentialSchemaOf(adapter());
+    expect(schema.find((field) => field.key === 'confirmWithinMinutes')?.inputMode).toBe('numeric');
+  });
+
+  it('asks for no keypad on the fields that take letters', () => {
+    const schema = credentialSchemaOf(adapter());
+    const keyed = schema.filter((field) => field.inputMode !== undefined).map((field) => field.key);
+    expect(keyed).toEqual(['confirmWithinMinutes']);
   });
 });

@@ -28,6 +28,8 @@ export interface CommandPaletteCopy {
   noCommandsFound?: (query: string) => string;
   /** The group header of a command that names no `category`. */
   general?: string;
+  /** The search row's ✕, as a screen reader names it (FUT-4162). */
+  closeSearch?: string;
 }
 
 /**

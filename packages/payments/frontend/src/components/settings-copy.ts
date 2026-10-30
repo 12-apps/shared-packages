@@ -226,6 +226,12 @@ export interface CredentialFormCopy {
   probeLocalRunning?: string;
   probeLocalSaveNote?: string;
   probeIncompleteNote: string;
+  /**
+   * `probeIncompleteNote` for an environment with nothing stored yet, where
+   * "we kept what you filled in" is not true. Optional: a pack without it
+   * keeps `probeIncompleteNote`.
+   */
+  probeIncompleteFreshNote?: string;
   probeFailed(environmentName: string): string;
   /** The per-credential marks beside each field. */
   checkPass: string;

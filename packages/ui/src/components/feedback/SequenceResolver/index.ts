@@ -5,6 +5,8 @@ export type {
   SequenceDone,
   SequenceIntro,
   SequenceItem,
+  SequenceOverview,
+  SequenceOverviewCategory,
   SequenceResolverLabels,
   SequenceResolveOptions,
   SequenceResolverProps,

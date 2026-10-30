@@ -1,14 +1,15 @@
 import { CredentialsError, UnsupportedOperationError } from './errors';
 import { isPermanentProviderRefusal } from './error-readers';
 import type { PaymentProviderAdapter } from './provider';
-import type { MerchantRef, ResolvedCredentials } from './types';
+import type { MerchantRef, ProviderName, ResolvedCredentials } from './types';
 
 /**
  * The gateway's card-vaulting methods.
  *
  * Split out of `gateway.ts`, which had already factored this block into its own
  * function "to keep the gateway builder in budget" and has since reached the
- * same ceiling as a FILE. Nothing here changed in the move.
+ * same ceiling as a FILE. Nothing changed in the move; since then `activeVault`
+ * also takes a NAMED provider (FUT-3138).
  */
 
 /** The slice of the gateway config this module needs. */
@@ -28,19 +29,28 @@ type VaultingAdapter = PaymentProviderAdapter & {
 };
 
 /**
- * Resolve the merchant's ACTIVE provider and prove it can vault.
+ * Resolve the provider to vault at and prove it can vault: the one the caller
+ * NAMED, or else the merchant's ACTIVE provider, the chain head.
  *
- * Pinned to the chain head with no failover, and the reason is the same one
+ * Pinned to ONE provider with no failover, and the reason is the same one
  * `core/card-instrument.ts` documents: an instrument minted at provider #2 is
  * garbage input to the provider we actually collect through. Vaulting
  * "wherever works" would succeed on the screen and fail months later on a
  * timer, with the tenant long gone.
+ *
+ * Who names one: the buyer checkout, with the chain's CARD provider (FUT-3138)
+ * — a head that takes no card (a PIX-only acquirer, the store's own Pix key)
+ * never charges one. The head stays the default because the head is what
+ * every other vault caller pairs it with: subscription billing loads the
+ * head's customer and collects at the head, so vaulting elsewhere would leave
+ * a card no cycle can charge.
  */
 export async function activeVault(
   config: VaultConfig,
   merchant: MerchantRef,
+  provider?: ProviderName,
 ): Promise<{ adapter: VaultingAdapter; creds: ResolvedCredentials }> {
-  const name = await config.credentials.defaultProvider(merchant);
+  const name = provider ?? (await config.credentials.defaultProvider(merchant));
   if (!name || !config.providers.has(name)) {
     throw new CredentialsError(
       name ?? 'none',

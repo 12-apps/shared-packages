@@ -203,3 +203,30 @@ export {
 export { PT_BR_TEAM_INVITED_COPY } from './pt-BR';
 export { EN_US_TEAM_INVITED_COPY } from './en-US';
 export { TEAM_INVITED_COPY } from './locales';
+
+// The effective-grants table and the in-memory store over it (FUT-3985): a
+// person's RBAC is one read per login, and nothing on every later question
+// until a trigger says it changed.
+export {
+  EFFECTIVE_GRANT_SELECT,
+  readEffectiveGrants,
+  type EffectiveGrantData,
+  type EffectiveGrantRow,
+  type EffectiveGrantsReadOptions,
+  type RbacDeriveGrants,
+  type RbacEffectiveGrantDelegate,
+  type RbacEffectiveGrantTable,
+  type StoredAssignment,
+} from './effective-grants';
+export {
+  RBAC_CHANGED_CHANNEL,
+  RBAC_CHANGED_EVERYONE,
+  createEffectiveGrantsStore,
+  createKeptGrants,
+  type EffectiveGrantsStoreOptions,
+  type KeptGrants,
+  type KeptGrantsOptions,
+  type RbacChangeHandlers,
+  type RbacChangeListener,
+} from './kept-grants';
+export { membershipRoleAt, type RbacMembershipGrant } from './grants';

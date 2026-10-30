@@ -27,8 +27,9 @@ export interface PaymentListSummary {
    *
    * Read ONLY beside a READY total (`settlement`, a comanda's conta), where
    * the cart is not what is being paid and its lines are not drawn; a cart
-   * checkout keeps `cart.lines` and ignores this. The computer's column only —
-   * the phone draws no lines. "Total" is never computed from them: it is the
+   * checkout keeps `cart.lines` and ignores this. The computer's column, and on
+   * a phone the "Resumo do pedido" sheet the bar's line opens (FUT-589), draw
+   * them. "Total" is never computed from them: it is the
    * ready total. A gap between the two (a taxa de serviço) is the host's to
    * show through `cart.discountLines`, which a ready total still draws.
    */

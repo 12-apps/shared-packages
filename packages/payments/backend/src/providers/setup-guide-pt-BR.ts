@@ -79,7 +79,7 @@ export const PT_BR_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
       'Abra o painel e vá em “Configurações › Chaves”. Copie a chave pública (pk_...) e gere a chave secreta (sk_...).',
     dashboardButton: 'Abrir o painel',
     paste:
-      'Cole as duas chaves no formulário acima. Use as chaves de teste enquanto estiver no ambiente Sandbox e as de produção só depois de validar.',
+      'Cole as duas chaves no formulário abaixo. Use as chaves de teste enquanto estiver no ambiente Sandbox e as de produção só depois de validar.',
     authDocsLink: 'Documentação de autenticação',
   },
   webhook: {
@@ -88,10 +88,10 @@ export const PT_BR_STONE_SETUP_GUIDE_COPY: StoneSetupGuideCopy = {
       'Sem webhook, um PIX pago só é detectado quando a tela consulta o status — o pedido pode demorar a confirmar.',
     register: 'No painel, abra “Configurações › Webhooks” e cadastre a URL desta loja:',
     credentials: (brandName) =>
-      `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário acima — é assim que ${brandName} confirma que a notificação veio mesmo da Stone.`,
+      `Ao cadastrar, o painel pede um usuário e uma senha para autenticar as notificações. Defina os dois e informe exatamente os mesmos valores no formulário abaixo — é assim que ${brandName} confirma que a notificação veio mesmo da Stone.`,
     events: (eventList) => `Assine ao menos estes eventos de cobrança: ${eventList}.`,
     testConnection:
-      'Feito isso, clique em “Testar conexão” acima: o teste faz uma chamada autenticada real e avisa se a chave estiver errada.',
+      'Feito isso, clique em “Salvar e testar conexão” abaixo: o teste faz uma chamada autenticada real e avisa se a chave estiver errada.',
     doneLabel: 'Webhook',
     doneValue: 'Cadastrado no painel Pagar.me',
     confirmLabel: 'Já cadastrei a URL no painel',
