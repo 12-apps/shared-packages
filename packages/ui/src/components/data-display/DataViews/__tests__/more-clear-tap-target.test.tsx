@@ -12,7 +12,9 @@
 import { render, screen } from "./test-utils";
 import { describe, expect, it } from "vitest";
 
-import { MoreGroup } from "../data-views-more-fields";
+import { createTheme } from "@mui/material/styles/index.js";
+
+import { MORE_SPACING, MoreGroup, clearTargetSx, moreHeaderSx } from "../data-views-more-fields";
 import { toOverflowFields } from "../data-views-overflow";
 import type { FilterFieldConfig, RangeFieldConfig } from "../data-views-types";
 
@@ -45,6 +47,52 @@ function renderApplied(kind: "enum" | "day" | "number"): HTMLElement {
   );
   return screen.getByTestId(`t-more-${field.id}-clear`);
 }
+
+describe("the Mais panel's spacing holds the target (FUT-4144 review)", () => {
+  it("leaves 10px under EVERY group header on a phone, applied or not, so nothing moves on apply", () => {
+    const [field] = toOverflowFields<Row>([METODO], []);
+    if (!field) throw new Error("no overflow field");
+    render(
+      <MoreGroup
+        field={field}
+        pills={{}}
+        ranges={{}}
+        onTogglePill={() => undefined}
+        onChangeRange={() => undefined}
+        testIdPrefix="t"
+      />,
+    );
+    const header = screen.getByText("Método").closest("div") as HTMLElement;
+    expect(getComputedStyle(header).marginBottom).toBe("10px");
+  });
+
+  it("keeps 4px under the header from sm up", () => {
+    const theme = createTheme();
+    const sx = moreHeaderSx(theme) as Record<string, unknown>;
+    expect(sx[theme.breakpoints.up("sm")]).toEqual({ mb: MORE_SPACING.underHeaderFromSm });
+    expect(MORE_SPACING.underHeaderFromSm).toBe(0.5);
+  });
+
+  it("never lets the target reach further than the gap above or below it", () => {
+    // Everything that can precede a group: another group, a shed quick chip,
+    // or the scroller's own top inset (the first group).
+    expect(MORE_SPACING.reachUp).toBeLessThanOrEqual(MORE_SPACING.underGroup);
+    expect(MORE_SPACING.reachUp).toBeLessThanOrEqual(MORE_SPACING.underQuick);
+    expect(MORE_SPACING.reachUp).toBeLessThanOrEqual(MORE_SPACING.aboveFirst);
+    expect(MORE_SPACING.reachDown).toBeLessThanOrEqual(MORE_SPACING.underHeader);
+    // 18px of text and 22px of reach is 40 at the default type scale.
+    expect(MORE_SPACING.reachUp + MORE_SPACING.reachDown).toBeGreaterThanOrEqual(22 / 8);
+  });
+
+  it("measures the reach in the theme's spacing, the unit the gaps are in", () => {
+    const theme = createTheme({ spacing: 10 });
+    const before = (clearTargetSx(theme) as Record<string, Record<string, unknown>>)["&::before"];
+    expect(before?.top).toBe(`-${theme.spacing(MORE_SPACING.reachUp)}`);
+    expect(before?.bottom).toBe(`-${theme.spacing(MORE_SPACING.reachDown)}`);
+    expect(before?.left).toBe(`-${theme.spacing(MORE_SPACING.reachSide)}`);
+    expect(before?.right).toBe(`-${theme.spacing(MORE_SPACING.reachSide)}`);
+  });
+});
 
 describe("the Mais header's Limpar on a phone", () => {
   it.each(["enum", "day", "number"] as const)("leaves 10px under a %s field's header for its target", (kind) => {

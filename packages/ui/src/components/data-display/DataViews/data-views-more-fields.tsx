@@ -29,7 +29,7 @@ import { useDataViewsCopy } from "./data-views-copy-context";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
 import { fieldHeight } from "../../../tokens/field-height";
 import { fieldEdge } from "../../../tokens/field-edge";
-import { rem, sxRem } from "../../../tokens/relative";
+import { sxRem } from "../../../tokens/relative";
 
 /** What each field's control needs, minus the panel's own chrome. */
 export interface MoreFieldProps {
@@ -229,6 +229,17 @@ export function fieldClearing<T extends Record<string, unknown>>({
 
 
 /**
+ * Under a shed quick chip: 12px below `sm`, the gap a following group's
+ * "Limpar" target reaches into (its 8px let the target cover the chip's
+ * label); 8px from `sm` up, as before.
+ */
+const quickSx = (theme: Theme) => ({
+  mb: MORE_SPACING.underQuick,
+  [theme.breakpoints.up("sm")]: { mb: 1 },
+  "&:last-of-type": { mb: 0 },
+});
+
+/**
  * A quick chip shed into the panel: its own line, because label and count are
  * already the whole control — no heading above it, no "Limpar" beside it.
  */
@@ -241,7 +252,7 @@ export function MoreQuick({
   quick: QuickFilterConfig;
 } & Pick<MoreFieldProps, "pills" | "onToggleQuick" | "testIdPrefix">): React.JSX.Element {
   return (
-    <Box sx={{ mb: 1, "&:last-of-type": { mb: 0 } }}>
+    <Box sx={quickSx}>
       <QuickRow
         quick={quick}
         active={isQuickActive(quick, pills)}
@@ -252,35 +263,68 @@ export function MoreQuick({
   );
 }
 
-/** One labelled group in the panel: the field's name, then its control. */
 /**
- * The header row's bottom margin while its "Limpar" shows: 10px below `sm`
- * instead of 4px, the room the button's 40px target needs under it. Written
- * as a base value with an `sm` override (not `{ xs, sm }`), so the phone value
- * is the one that applies with no media query at all.
+ * The "Mais" panel's vertical rhythm, in the theme's spacing units: the unit
+ * the header "Limpar"'s phone target reaches into (FUT-4144). The target is
+ * the button's 18px of text plus `reachUp` and `reachDown`, 40px at the
+ * default type scale, and it may never reach further than the gap that is
+ * there: under the group or quick chip above it (or the scroller's own top
+ * inset, for the first group) and under its own header. Sideways it reaches
+ * into the header row's empty gap and the scroller's padding, so a 37px
+ * "Limpar" is 41px wide.
  */
-const CLEAR_ROW_SX = (theme: Theme) => ({ mb: 1.25, [theme.breakpoints.up("sm")]: { mb: 0.5 } });
+export const MORE_SPACING = {
+  /** Under a group. */
+  underGroup: 1.5,
+  /** Under a shed quick chip, below `sm` (8px from `sm` up, as before). */
+  underQuick: 1.5,
+  /**
+   * The scroller's top inset (`data-views-more-filters.tsx`), at every width:
+   * the first group's overlay reaches into it. Not part of a responsive `p`,
+   * whose `xs` value is emitted as a media query and would win over it.
+   */
+  aboveFirst: 1.5,
+  /** Under a group's header, below `sm`, applied or not, so nothing moves on apply. */
+  underHeader: 1.25,
+  /** Under a group's header from `sm` up, as it always was. */
+  underHeaderFromSm: 0.5,
+  reachUp: 1.5,
+  reachDown: 1.25,
+  reachSide: 0.25,
+} as const;
+
+/** A group's header row: the field's name, and "Limpar" while it is applied. */
+export const moreHeaderSx = (theme: Theme) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 1,
+  mb: MORE_SPACING.underHeader,
+  [theme.breakpoints.up("sm")]: { mb: MORE_SPACING.underHeaderFromSm },
+});
 
 /**
  * "Limpar" is 12px text, a 37×18 button: on a phone that was the whole target
  * (FUT-4144, measured in the admin at 320–900). Below `sm` an overlay makes it
- * 40px tall without moving the text: 12px up, into the 12px the group above
- * leaves, and 10px down, into the 10px the header now keeps. It covers nothing
- * else. From `sm` up there is no overlay and nothing moves.
+ * at least 40×40 without moving the text, reaching only into gaps
+ * {@link MORE_SPACING} guarantees, in the same unit, so it grows and shrinks
+ * with them and covers nothing else. From `sm` up there is no overlay and the
+ * button is exactly as it was.
  */
-const CLEAR_TARGET_SX = (theme: Theme) => ({
-  position: "relative",
+export const clearTargetSx = (theme: Theme) => ({
+  position: "relative" as const,
+  [theme.breakpoints.up("sm")]: { position: "static" as const },
   "&::before": {
     content: '""',
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: `-${rem(theme, 12)}`,
-    bottom: `-${rem(theme, 10)}`,
+    position: "absolute" as const,
+    top: `-${theme.spacing(MORE_SPACING.reachUp)}`,
+    bottom: `-${theme.spacing(MORE_SPACING.reachDown)}`,
+    left: `-${theme.spacing(MORE_SPACING.reachSide)}`,
+    right: `-${theme.spacing(MORE_SPACING.reachSide)}`,
     [theme.breakpoints.up("sm")]: { display: "none" },
   },
 });
 
+/** One labelled group in the panel: the field's name, then its control. */
 export function MoreGroup<T extends Record<string, unknown>>({
   field,
   pills,
@@ -295,7 +339,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
   const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
   return (
     <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
-      <Box sx={[{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }, applied && CLEAR_ROW_SX]}>
+      <Box sx={moreHeaderSx}>
         <Text variant="caption" as="span">
           <Box component="span" sx={{ color: "text.secondary" }}>
             {field.label}
@@ -324,7 +368,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
                 color: "primary.main",
                 "&:hover": { textDecoration: "underline" },
               },
-              CLEAR_TARGET_SX,
+              clearTargetSx,
             ]}
           >
             {copy.filters.clear}
