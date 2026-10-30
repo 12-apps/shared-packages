@@ -126,6 +126,22 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
     hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
     placeholder: 'Só os números',
   },
+  payerEmail: {
+    label: 'E-mail do pagador',
+    hint: (displayName) => `Precisa ser diferente do e-mail da sua conta ${displayName}.`,
+    placeholder: 'nome@exemplo.com',
+    required: 'Informe o e-mail do pagador.',
+    invalid: 'Confira o e-mail: ele precisa ter o formato nome@exemplo.com.',
+    // The article is the approved prototype's (FUT-4050). Unlike the tax-id
+    // hint, these two only render for a refusal that names the customer
+    // e-mail, which today is PagBank's alone — where "o" is the right one.
+    refusedField: (displayName) =>
+      `É o e-mail da sua conta ${displayName}, e o ${displayName} recusa. Use outro.`,
+    refusedBody: (displayName) =>
+      `O ${displayName} não aceita uma cobrança paga com o mesmo e-mail da conta que recebe. ` +
+      'Troque o e-mail do pagador: o cartão continua preenchido.',
+    change: 'Trocar o e-mail',
+  },
   charge: {
     card: PT_BR_CARD_COPY,
     noTokenizer:

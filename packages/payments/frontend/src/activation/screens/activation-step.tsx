@@ -147,6 +147,7 @@ function ActivationBody({
         formatAmount={config.formatAmount}
         onVerified={onVerified}
         onSetupIncomplete={onSetupIncomplete}
+        ownerEmail={ownerEmail}
       />
     );
   }

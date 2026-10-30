@@ -20,15 +20,24 @@ import { useEffect, useState } from 'react';
  * host's. The CARD flow does not need this at all: `useActivationCharge` reads
  * the amount out of the same body it reads the store's card key from.
  */
-export function useVerificationAmount(verifyChargeUrl: string): number | null {
+export function useVerificationAmount(verifyChargeUrl: string): {
+  amountCents: number | null;
+  /** The payer e-mail the host suggests, from the same body (FUT-4050). */
+  payerEmail: string | null;
+} {
   const [amountCents, setAmountCents] = useState<number | null>(null);
+  const [payerEmail, setPayerEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     void fetch(verifyChargeUrl)
-      .then((res) => (res.ok ? (res.json() as Promise<{ amountCents?: number }>) : null))
+      .then((res) =>
+        res.ok ? (res.json() as Promise<{ amountCents?: number; payerEmail?: string | null }>) : null,
+      )
       .then((body) => {
-        if (active && typeof body?.amountCents === 'number') setAmountCents(body.amountCents);
+        if (!active) return;
+        if (typeof body?.amountCents === 'number') setAmountCents(body.amountCents);
+        if (typeof body?.payerEmail === 'string' && body.payerEmail) setPayerEmail(body.payerEmail);
       })
       // A failed read leaves the amount unnamed rather than guessed — the
       // screen still renders, and it is corrected the moment an answer lands.
@@ -38,5 +47,5 @@ export function useVerificationAmount(verifyChargeUrl: string): number | null {
     };
   }, [verifyChargeUrl]);
 
-  return amountCents;
+  return { amountCents, payerEmail };
 }
