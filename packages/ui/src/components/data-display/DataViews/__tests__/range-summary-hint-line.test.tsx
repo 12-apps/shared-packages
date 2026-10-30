@@ -161,11 +161,19 @@ describe("the hint line's room, wrap and focus (FUT-4144 code review)", () => {
     expect(getComputedStyle(hint()).textOverflow).toBe("ellipsis");
   });
 
-  it("puts focus in De after Limpar, not on the page", async () => {
+  it("puts focus in De after Limpar pressed from the keyboard, not on the page", async () => {
     render(<Pill initial={{ min: "2026-10-01", max: "2026-10-15" }} />);
     fireEvent.click(screen.getByTestId(TEST_ID));
-    fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`));
+    fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`), { detail: 0 });
     await waitFor(() => expect(screen.getByTestId(`${TEST_ID}-min`)).toHaveFocus());
+  });
+
+  it("leaves De unfocused after a tapped Limpar, so no phone keyboard covers the calendar", async () => {
+    render(<Pill initial={{ min: "2026-10-01", max: "2026-10-15" }} />);
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`), { detail: 1 });
+    await waitFor(() => expect(hint()).toHaveTextContent("Toque no primeiro e no último dia."));
+    expect(screen.getByTestId(`${TEST_ID}-min`)).not.toHaveFocus();
   });
 });
 

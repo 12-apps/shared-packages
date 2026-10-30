@@ -146,8 +146,8 @@ function HintLine({
   isWindow: boolean;
   /** The line can hold "Limpar" at all — fixed per surface, not per state. */
   canClear: boolean;
-  /** Shown now: "Limpar" empties the range. */
-  onClear: (() => void) | undefined;
+  /** Shown now: "Limpar" empties the range; `fromKeyboard` says how it was pressed. */
+  onClear: ((fromKeyboard: boolean) => void) | undefined;
   testId: string;
 }): React.JSX.Element {
   const clear = useDataViewsCopy().filters.clear;
@@ -179,7 +179,8 @@ function HintLine({
         <Box
           component="button"
           type="button"
-          onClick={onClear}
+          // A keyboard press reports no clicks (`detail` 0); a tap reports one.
+          onClick={(event) => onClear(event.detail === 0)}
           data-testid={`${testId}-clear`}
           sx={{
             flexShrink: 0,
@@ -243,8 +244,9 @@ export interface DayRangeCalendarProps {
   /**
    * Empties the range: the line's "Limpar", shown while `summary` is set. Set
    * only where the line may hold it; the line reserves its 40px only then.
+   * `fromKeyboard` is true when it was pressed from the keyboard.
    */
-  onClear?: () => void;
+  onClear?: (fromKeyboard: boolean) => void;
 }
 
 export function DayRangeCalendar({

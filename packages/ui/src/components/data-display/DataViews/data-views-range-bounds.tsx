@@ -72,14 +72,16 @@ function BoundField<T extends Record<string, unknown>>({
 
 
 /**
- * After the line's "Limpar", focus goes to the cleared "De" — the next thing
- * to type — instead of falling to the page with the button that held it.
+ * After the line's "Limpar" pressed from the keyboard, focus goes to the
+ * cleared "De" — the next thing to type — instead of falling to the page with
+ * the button that held it. A tap leaves focus alone: focusing "De" there would
+ * open the phone's keyboard over the calendar the next tap is for.
  * The boxes remount on a clear, so focus waits for the reset key to move.
  */
 function useFocusDeAfterClear(
   key: number,
   testId: string,
-): { rootRef: React.RefObject<HTMLDivElement | null>; clearToDe: (clear: () => void) => void } {
+): { rootRef: React.RefObject<HTMLDivElement | null>; clearToDe: (clear: () => void, fromKeyboard: boolean) => void } {
   const rootRef = useRef<HTMLDivElement>(null);
   const pending = useRef(false);
   useEffect(() => {
@@ -89,8 +91,8 @@ function useFocusDeAfterClear(
   }, [key, testId]);
   return {
     rootRef,
-    clearToDe: (clear) => {
-      pending.current = true;
+    clearToDe: (clear, fromKeyboard) => {
+      pending.current = fromKeyboard;
       clear();
     },
   };
@@ -104,8 +106,8 @@ function useFocusDeAfterClear(
 function hintLineProps<T extends Record<string, unknown>>(
   field: RangeFieldConfig<T>,
   value: RangeValue,
-  clear: () => void,
-): { summary: string | undefined; onClear: () => void } {
+  clear: (fromKeyboard: boolean) => void,
+): { summary: string | undefined; onClear: (fromKeyboard: boolean) => void } {
   return { summary: appliedWindow(field, value), onClear: clear };
 }
 
@@ -210,7 +212,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
   const copy = useDataViewsCopy();
   const { key, emitted } = useOutsideResetKey(value);
   const { rootRef, clearToDe } = useFocusDeAfterClear(key, testId);
-  const hintLine = summaryOnHint ? hintLineProps(field, value, () => clearToDe(() => onChange({}))) : {};
+  const hintLine = summaryOnHint ? hintLineProps(field, value, (fromKeyboard) => clearToDe(() => onChange({}), fromKeyboard)) : {};
   // Moves the calendar to a TYPED day. A typed write is the fields' own, so
   // the outside key above does not see it; a tap on the calendar moves
   // neither, which is what keeps it still under the finger.
