@@ -14,7 +14,7 @@ import { useOrderRefresh } from "./cart-changed";
 import { useRaisedOrderRoute, useStartPayment } from "./start-payment";
 import { useConfirmationWait } from "./confirmation-wait";
 
-import { forgetHostedOrder } from "./hosted-return";
+import { useForgetHostedOrder } from "./hosted-parking";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CheckoutDecline } from "./decline";
 import type {
@@ -92,6 +92,7 @@ export function useCheckoutController(
   const [decline, setDecline] = useState<CheckoutDecline | null>(null);
   const [freshInstrument, setFreshInstrument] = useState(false);
   const [creating, setCreating] = useState(false);
+  const forgetHostedOrder = useForgetHostedOrder();
   const failure = useCreateFailure();
   useResumedCheckout(resume, setOrder, setStep, setFinalStatus, setMethodState);
 
@@ -106,7 +107,7 @@ export function useCheckoutController(
       if (prev !== next) { setOrder(null); forgetHostedOrder(tenantSlug); clearError(); }
       return next;
     });
-  }, [clearError, tenantSlug]);
+  }, [clearError, tenantSlug, forgetHostedOrder]);
   const dropOrder = useDropOrder(setOrder, tenantSlug, clearError);
   const startPayment = useStartPayment({
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
