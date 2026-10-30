@@ -11,9 +11,11 @@ import {
   blockSx,
   breakSx,
   cellSx,
+  cornerSx,
   ghostSx,
   gripSx,
   groupTitleSx,
+  headerAdornmentSx,
   headerCellSx,
   headerSublabelSx,
   headerRowSx,
@@ -248,6 +250,8 @@ interface HeaderProps {
   columns: readonly ScheduleGridColumn[];
   /** Present when the grid has a last column. */
   totalLabel?: string;
+  /** Above the names (`ScheduleGridProps.corner`). */
+  corner?: React.ReactNode;
   rowSx: RowSx;
   testId: string;
 }
@@ -259,11 +263,13 @@ function keepDatesWhole(label: string): string {
   return label.replace(/ (?=\d)/g, '\u00a0');
 }
 
-export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps): React.JSX.Element {
+export function GridHeader({ columns, totalLabel, corner, rowSx, testId }: HeaderProps): React.JSX.Element {
   return (
     <Box role="row" sx={[rowSx, headerRowSx]} data-testid={`${testId}-header`}>
-      {/* Above the names: a cell of the header row, with nothing to head. */}
-      <span role="cell" data-sg-corner="" />
+      {/* Above the names: a cell of the header row, with nothing to head but the host's corner words. */}
+      <Box component="span" role="cell" data-sg-corner="" sx={cornerSx} data-testid={`${testId}-corner`}>
+        {corner}
+      </Box>
       {columns.map((column, day) => (
         <Box
           role="columnheader"
@@ -277,6 +283,11 @@ export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps):
           {column.sublabel ? (
             <Box component="span" sx={headerSublabelSx} data-sg-col="sub">
               {column.sublabel}
+            </Box>
+          ) : null}
+          {column.adornment ? (
+            <Box component="span" sx={headerAdornmentSx} data-sg-col="adornment" data-testid={`${testId}-adornment-${day}`}>
+              {column.adornment}
             </Box>
           ) : null}
         </Box>

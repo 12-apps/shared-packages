@@ -7,6 +7,7 @@ import type * as React from 'react';
 import { useState } from 'react';
 
 import { densityThemeOptions } from '../../../tokens/density';
+import { rem, sxRem } from '../../../tokens/relative';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ErrorState } from '../ErrorState';
@@ -129,10 +130,43 @@ interface DemoProps {
   error?: boolean;
   /** Draw it in a pane this wide (px), to see the grid fit a narrow container. */
   paneWidth?: number;
+  /** A host's figure under each day and words above the names (FUT-3882's movement band). */
+  adornments?: boolean;
+}
+
+/** How busy each hour 11h–23h gets, 0…1, and the hours short of people — a host's own band, drawn by the host. */
+const BUSY = [0.3, 0.6, 0.7, 0.5, 0.3, 0.2, 0.2, 0.3, 0.5, 0.9, 1, 0.7, 0.4];
+const SHORT_ON: Record<number, number[]> = { 4: [9, 10], 5: [9, 10] };
+
+function DayBand({ day }: { day: number }) {
+  const short = SHORT_ON[day] ?? [];
+  return (
+    <Box component="span" sx={{ display: 'block' }}>
+      <Box component="span" sx={{ display: 'flex', gap: '1px', height: sxRem(12) }} aria-hidden>
+        {BUSY.map((busy, hour) => (
+          <Box
+            component="span"
+            key={hour}
+            sx={(theme) => ({
+              flex: 1,
+              borderRadius: rem(theme, 2),
+              backgroundColor: theme.palette.primary.main,
+              opacity: 0.15 + busy * 0.75,
+              outline: short.includes(hour) ? `${rem(theme, 1.5)} solid ${theme.palette.warning.main}` : undefined,
+              outlineOffset: '-1px',
+            })}
+          />
+        ))}
+      </Box>
+      <Box component="span" sx={{ display: 'block', color: short.length ? 'warning.main' : 'transparent', whiteSpace: 'nowrap' }}>
+        {short.length ? `falta 2 · ${11 + (short[0] ?? 0)}–${12 + (short[short.length - 1] ?? 0)}h` : '\u00a0'}
+      </Box>
+    </Box>
+  );
 }
 
 /** A host: holds the turnos, applies every gesture at once (the real one writes to the server and offers Desfazer). */
-function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, error, paneWidth }: DemoProps) {
+function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, error, paneWidth, adornments }: DemoProps) {
   const [slots, setSlots] = useState<Slot[]>(initial);
   const [selected, setSelected] = useState<string | null>(null);
   const [log, setLog] = useState('');
@@ -169,7 +203,7 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
 
   const columns: ScheduleGridColumn[] = DAYS.map((label, day) => {
     const n = slots.filter((slot) => slot.day === day && slot.tone !== 'away').length;
-    return { label: day === 0 ? `Hoje · ${label}` : label, sublabel: n === 0 ? 'ninguém' : `${n} ${n === 1 ? 'turno' : 'turnos'}`, today: day === 0 };
+    return { label: day === 0 ? `Hoje · ${label}` : label, sublabel: n === 0 ? 'ninguém' : `${n} ${n === 1 ? 'turno' : 'turnos'}`, today: day === 0, ...(adornments ? { adornment: <DayBand day={day} /> } : {}) };
   });
 
   const areas = ['Cozinha', 'Salão', 'Entregas'] as const;
@@ -203,6 +237,7 @@ function Demo({ people = TELA, slots: initial = TELA_SLOTS, readOnly, loading, e
         groups={groups}
         cell={cell}
         totalLabel="horas"
+        {...(adornments ? { corner: 'Movimento, 11h–23h' } : {})}
         readOnly={readOnly}
         loading={loading}
         error={
@@ -379,3 +414,9 @@ export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOT
 
 /** The same, in a narrow pane: the tag moves under a long name, the chip stays on one line. */
 export const BreakAndMarkersNarrow: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: DESKTOP };
+
+/** FUT-3882: under each day the host's own band (how busy each hour gets, the hours short of people outlined) and "falta 2 · 20–22h"; above the names, what the band shows. */
+export const DayAdornments: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS, adornments: true }, globals: DESKTOP };
+
+/** The same in a phone-wide pane: the adornments travel with the header while the days scroll sideways. */
+export const DayAdornmentsNarrow: Story = { args: { people: CHEIA, slots: CHEIA_SLOTS, adornments: true, paneWidth: 390 }, globals: DESKTOP };

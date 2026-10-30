@@ -19,6 +19,13 @@ export interface ScheduleGridColumn {
   label: string;
   /** Under the label ("3 turnos", "ninguém"). */
   sublabel?: string;
+  /**
+   * Under the label and the sublabel, inside the pinned header row: the host's
+   * own figure for that day (an hour band of how busy it gets, a "falta 2 ·
+   * 20–22h" line). It takes the column's width and travels with the header,
+   * sideways too. Keep it short: every header cell grows to the tallest.
+   */
+  adornment?: React.ReactNode;
   /** Today's column: its label in the primary colour and its cells framed. */
   today?: boolean;
   /**
@@ -125,6 +132,11 @@ export interface ScheduleGridProps {
   cell: (rowId: string, day: number) => ScheduleGridCell;
   /** The last column's header ("horas"). Without it and without row totals, there is no last column. */
   totalLabel?: string;
+  /**
+   * The header row's cell above the names, pinned with it ("Movimento,
+   * 11h–23h" — what the days' adornments show). Empty by default.
+   */
+  corner?: React.ReactNode;
   /**
    * No create, copy or move: no "+", no grips, empty cells are not focusable.
    * Block clicks still reach `onBlockClick` (a read-only window).

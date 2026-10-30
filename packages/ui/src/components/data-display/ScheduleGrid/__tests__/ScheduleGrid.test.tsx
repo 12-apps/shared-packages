@@ -718,3 +718,24 @@ describe("closed days (gone: no new turno)", () => {
     expect(props.onBlockClick).toHaveBeenCalledWith("d1");
   });
 });
+
+describe("the header's host figures (FUT-3882)", () => {
+  it("draws a day's adornment under its label, inside its column header, and the corner above the names", () => {
+    renderGrid({
+      columns: COLUMNS.map((column, index) => (index === 5 ? { ...column, adornment: <span>falta 2 · 20–22h</span> } : column)),
+      corner: "Movimento, 11h–23h",
+    });
+    const header = screen.getByTestId("sg-header");
+    const saturday = within(header).getAllByRole("columnheader")[5];
+    expect(within(saturday as HTMLElement).getByText("falta 2 · 20–22h")).toBeTruthy();
+    expect(screen.getByTestId("sg-adornment-5")).toBeTruthy();
+    expect(screen.queryByTestId("sg-adornment-4")).toBeNull();
+    expect(within(header).getByTestId("sg-corner").textContent).toBe("Movimento, 11h–23h");
+  });
+
+  it("keeps the corner empty and draws no adornment when the host gives none", () => {
+    renderGrid();
+    expect(screen.getByTestId("sg-corner").textContent).toBe("");
+    expect(screen.queryByTestId("sg-adornment-0")).toBeNull();
+  });
+});
