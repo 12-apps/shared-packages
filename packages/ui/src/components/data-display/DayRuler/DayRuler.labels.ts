@@ -26,7 +26,7 @@ export interface DayRulerLabels {
   /** The ruler's busy state. */
   loading: string;
   /** Said after a group footer's marked hour when the host gives it no `title` (FUT-3882). */
-  footerMarked: string;
+  footerMarked?: string;
 }
 
 /**

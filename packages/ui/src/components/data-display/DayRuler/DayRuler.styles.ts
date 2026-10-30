@@ -343,7 +343,6 @@ export function footerNoteSx(marked: boolean): SxProps<Theme> {
 }
 
 /** A group's trend line: as tall as the coverage row, drawn in the primary colour. */
-
 export const trendSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'block',
   width: '100%',
