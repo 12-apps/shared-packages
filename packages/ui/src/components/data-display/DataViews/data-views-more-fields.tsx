@@ -338,7 +338,7 @@ export function MoreGroup<T extends Record<string, unknown>>({
   const copy = useDataViewsCopy();
   const { applied, clear } = fieldClearing({ field, pills, ranges, onTogglePill, onChangeRange });
   return (
-    <Box sx={{ mb: 1.5, "&:last-of-type": { mb: 0 } }}>
+    <Box sx={{ mb: MORE_SPACING.underGroup, "&:last-of-type": { mb: 0 } }}>
       <Box sx={moreHeaderSx}>
         <Text variant="caption" as="span">
           <Box component="span" sx={{ color: "text.secondary" }}>
