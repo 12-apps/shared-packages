@@ -14,6 +14,7 @@ import {
   type PlanePoint,
 } from '../RegionMap.helpers';
 import { clampCentre, labelOrder, placeLabels } from '../RegionMap.labels';
+import { boundsOfRings, reachBox, regionMapView } from '../RegionMap.view';
 
 /** A square of `side` metres with its corner at (x, y). */
 const square = (x: number, y: number, side: number): PlanePoint[] => [
@@ -100,6 +101,75 @@ describe('the view', () => {
 
   it('is nothing with neither', () => {
     expect(viewBoxFor(null, null)).toBeNull();
+  });
+});
+
+describe('the view with a reach', () => {
+  const center = { latitude: -19.8136, longitude: -43.9619 };
+  const { project } = projectionAt(center);
+  const kmEast = 1000 / (111_195 * Math.cos((center.latitude * Math.PI) / 180));
+  const kmNorth = 1000 / 111_195;
+
+  it('is the circles\' view when no reach is given', () => {
+    expect(regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }] })).toEqual(viewBoxFor(5000, null));
+  });
+
+  it('grows, still centred, to a radius past the largest circle — margin on top', () => {
+    const view = regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }], reach: { radiusMetres: 6000 } });
+    expect(view?.minX).toBeCloseTo(-6720);
+    expect(view?.minY).toBeCloseTo(-6720);
+    expect(view?.spanX).toBeCloseTo(13_440);
+  });
+
+  it('never shrinks below the largest circle', () => {
+    expect(
+      regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }], reach: { radiusMetres: 4000 } }),
+    ).toEqual(viewBoxFor(5000, null));
+  });
+
+  it('fits a box off to one side by its farthest edge, staying centred on the centre', () => {
+    const bounds = {
+      south: center.latitude - 1 * kmNorth,
+      north: center.latitude + 2 * kmNorth,
+      west: center.longitude + 3 * kmEast,
+      east: center.longitude + 7 * kmEast,
+    };
+    const view = regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }], reach: { bounds } });
+    expect(view?.minX).toBeCloseTo(-7000 * 1.12, 0);
+    expect(view?.minY).toBe(view?.minX);
+    expect(view?.spanX).toBeCloseTo(14_000 * 1.12, 0);
+  });
+
+  it('fits the areas and the reach together when there is no circle', () => {
+    const view = regionMapView({ regions: [], center, reach: { radiusMetres: 1000 } });
+    expect(view?.minX).toBeCloseTo(-1120);
+    expect(view?.spanX).toBeCloseTo(2240);
+  });
+
+  it('ignores a radius that is not a positive number', () => {
+    expect(reachBox({ radiusMetres: 0 }, { project })).toBeNull();
+    expect(reachBox({ radiusMetres: Number.NaN }, { project })).toBeNull();
+    expect(regionMapView({ regions: [], center, circles: [{ radiusMetres: 5000 }], reach: { radiusMetres: -1 } })).toEqual(
+      viewBoxFor(5000, null),
+    );
+  });
+
+  it('takes a box from outlines, or none from no points', () => {
+    expect(
+      boundsOfRings([
+        [
+          [-19.8, -43.9],
+          [-19.7, -43.95],
+        ],
+        [[-19.9, -43.8]],
+      ]),
+    ).toEqual({ south: -19.9, west: -43.95, north: -19.7, east: -43.8 });
+    expect(boundsOfRings([])).toBeNull();
+    expect(boundsOfRings([[]])).toBeNull();
+  });
+
+  it('is nothing with no centre and no areas', () => {
+    expect(regionMapView({ regions: [], center: null, reach: { radiusMetres: 1000 } })).toBeNull();
   });
 
   it('puts a label at the centroid, pulled back inside the view', () => {
