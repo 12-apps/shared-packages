@@ -185,6 +185,7 @@ function OverflowRange<T extends Record<string, unknown>>({
       value={value}
       onChange={onChange}
       testId={`${testIdPrefix}-more-${field.id}`}
+      fillRow
     />
   );
 }

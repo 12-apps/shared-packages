@@ -8,8 +8,9 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 // which. On a phone, where both are icon-only, they were indistinguishable.
 import FilterAltRoundedIcon from "@mui/icons-material/FilterAltRounded";
 import Popover from "@mui/material/Popover/index.js";
-import type { Theme } from "@mui/material/styles/index.js";
-import { useState } from "react";
+import { useTheme, type Theme } from "@mui/material/styles/index.js";
+import useMediaQuery from "@mui/material/useMediaQuery/index.js";
+
 
 import { useDataViewsCopy } from "./data-views-copy-context";
 import { Button } from "../../form/Button";
@@ -17,8 +18,9 @@ import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
 import { fieldClearing, MoreGroup, MoreQuick, type MoreFieldProps } from "./data-views-more-fields";
+import { useStillAnchor } from "./data-views-still-anchor";
 import type { OverflowField } from "./data-views-overflow";
-import { rem, sxRem } from "../../../tokens/relative";
+import { rem, remPx, sxRem } from "../../../tokens/relative";
 
 /**
  * "MAIS" — the filter overflow: its trigger, its panel and its footer. What
@@ -151,18 +153,32 @@ function MoreHeading(): React.JSX.Element {
 function MoreFooter({
   onClearAll,
   testIdPrefix,
+  reserved = false,
 }: {
   onClearAll: () => void;
   testIdPrefix: string;
+  /**
+   * Hold the footer's height with nothing in it. A panel holding a day range
+   * keeps the row while nothing is applied, so the first tap on its calendar
+   * does not grow the panel by a row and move its top under the finger
+   * (FUT-4144 UI review).
+   */
+  reserved?: boolean;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
   return (
-    <Box sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: "divider" }}>
+    <Box
+      aria-hidden={reserved || undefined}
+      // Held, the row is blank — no rule over it either, or it reads as an
+      // empty bordered row.
+      sx={{ px: 1.5, py: 1, borderTop: 1, borderColor: reserved ? "transparent" : "divider", visibility: reserved ? "hidden" : undefined }}
+    >
       <Box
         component="button"
         type="button"
-        onClick={onClearAll}
-        data-testid={`${testIdPrefix}-more-clear-all`}
+        onClick={reserved ? undefined : onClearAll}
+        tabIndex={reserved ? -1 : undefined}
+        data-testid={reserved ? undefined : `${testIdPrefix}-more-clear-all`}
         sx={{
           width: "100%",
           border: 0,
@@ -200,16 +216,39 @@ function MoreFields<T extends Record<string, unknown>>({
   );
 }
 
-/** The overflow trigger + panel. Renders nothing when everything fits. */
-export function MoreFilters<T extends Record<string, unknown>>({
-  fields,
-  onOpenChange,
-  onClearAll,
-  anyApplied,
-  compact = false,
-  clearKey,
-  ...rest
-}: MoreFiltersProps<T> & {
+/**
+ * The panel is a column: heading, the fields' scroller, footer. Its height is
+ * the screen's, not a fixed 320px — at 390×844 that cap scrolled a day range's
+ * month caption and weekday row out of view after the first tap, and a typed
+ * day's refusal out of sight of its box (FUT-4144 UI review). MUI moves the
+ * panel up when it is taller than the room under its trigger.
+ */
+const COLUMN_SX = { display: "flex", flexDirection: "column" } as const;
+
+/**
+ * 320, not 300: inside 12px of padding a day range's month then has the 280px
+ * its seven 40px columns need and its month/year caption one row (FUT-4144).
+ */
+const PAPER_SX = (theme: Theme) => ({
+  ...COLUMN_SX,
+  width: rem(theme, 320),
+  maxWidth: `calc(100vw - ${rem(theme, 32)})`,
+});
+
+/**
+ * Below `sm` the panel takes the screen's width less 8px each side, so a day
+ * range's calendar gets the 280px its seven 40px columns need (it had 264 at
+ * 320 and 276 at 390, so every day was a 34-36px target).
+ */
+const PHONE_PAPER_SX = (theme: Theme) => ({
+  ...COLUMN_SX,
+  width: `calc(100vw - ${rem(theme, 16)})`,
+  maxWidth: `calc(100vw - ${rem(theme, 16)})`,
+  maxHeight: `calc(100% - ${rem(theme, 16)})`,
+});
+
+/** Props of {@link MoreFilters}. */
+interface MoreFiltersPanelProps<T extends Record<string, unknown>> extends MoreFiltersProps<T> {
   /** Changes on every clear-all; the fields here are keyed on it (FUT-4144). */
   clearKey?: number;
   /** Icon only — the same rung that strips Exibir/Exportar. */
@@ -227,9 +266,23 @@ export function MoreFilters<T extends Record<string, unknown>>({
    * got as far as "1" and then had nowhere to go.
    */
   onOpenChange?: (open: boolean) => void;
-}): React.JSX.Element | null {
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+}
+
+/** The overflow trigger + panel. Renders nothing when everything fits. */
+export function MoreFilters<T extends Record<string, unknown>>({
+  fields,
+  onOpenChange,
+  onClearAll,
+  anyApplied,
+  compact = false,
+  clearKey,
+  ...rest
+}: MoreFiltersPanelProps<T>): React.JSX.Element | null {
+  const still = useStillAnchor();
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down("sm"));
   if (fields.length === 0) return null;
+  const holdsDayRange = fields.some((field) => field.range?.kind === "day");
   return (
     <>
       <MoreTrigger
@@ -248,32 +301,32 @@ export function MoreFilters<T extends Record<string, unknown>>({
         }
         compact={compact}
         onOpen={(element) => {
-          setAnchor(element);
+          still.open(element);
           onOpenChange?.(true);
         }}
         testIdPrefix={rest.testIdPrefix}
       />
       <Popover
-        open={Boolean(anchor)}
-        anchorEl={anchor}
+        {...still.popoverProps}
         onClose={() => {
-          setAnchor(null);
+          still.close();
           onOpenChange?.(false);
         }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        slotProps={{ paper: { sx: { width: sxRem(300), maxWidth: (theme: Theme) => `calc(100vw - ${rem(theme, 32)})` } } }}
+        // Below `sm`, 8px from the screen's edges instead of 16.
+        marginThreshold={phone ? remPx(theme, 8) : undefined}
+        slotProps={{ paper: { ref: still.paperRef, sx: phone ? PHONE_PAPER_SX : PAPER_SX } }}
       >
-        <Box data-testid={`${rest.testIdPrefix}-more-panel`}>
+        <Box data-testid={`${rest.testIdPrefix}-more-panel`} sx={{ ...COLUMN_SX, flex: "1 1 auto", minHeight: 0 }}>
           <MoreHeading />
-          {/* overflowX hidden, not auto: this panel is a fixed 300px and its
+          {/* overflowX hidden, not auto: this panel is a fixed width and its
               contents are told to shrink into it. A horizontal scrollbar here
               means something refused to, which is a bug to fix rather than a
               scrollbar to live with. */}
-          <Box sx={{ maxHeight: sxRem(320), overflowY: "auto", overflowX: "hidden", p: 1.5, minWidth: 0 }}>
+          <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", p: { xs: 1, sm: 1.5 }, minWidth: 0 }}>
             <MoreFields key={clearKey} fields={fields} {...rest} />
           </Box>
-          {anyApplied && (
-            <MoreFooter onClearAll={onClearAll} testIdPrefix={rest.testIdPrefix} />
+          {(anyApplied || holdsDayRange) && (
+            <MoreFooter onClearAll={onClearAll} testIdPrefix={rest.testIdPrefix} reserved={!anyApplied} />
           )}
         </Box>
       </Popover>

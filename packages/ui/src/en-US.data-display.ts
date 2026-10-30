@@ -12,6 +12,7 @@ import type {
   TimingDiagramCopy,
 } from './copy';
 import { EN_US_TABLE_FILTER_COPY } from './en-US.layout';
+import { EN_US_UI_LABELS } from './en-US.labels';
 import {
   EN_US_CATEGORY_SELECT_COPY,
   EN_US_CONFIRM_ACTION_COPY,
@@ -220,9 +221,20 @@ export const EN_US_DATA_VIEWS_COPY: DataViewsCopy = {
     // mask is the shape that gets a date entered backwards.
     dayMask: "mm/dd/yyyy",
     dayInvalid: "That date does not exist.",
+    // The calendar under the boxes (FUT-4144): one tap is the first day, the
+    // next the last, so the sentence under it says which one comes next.
+    dayCalendar: {
+      locale: "en-US",
+      label: (fieldLabel) => `${fieldLabel}, calendar`,
+      pickStart: "Tap the first and the last day.",
+      pickEnd: "Now tap the last day.",
+      caption: EN_US_UI_LABELS.calendar,
+    },
     clearAllFilters: "Clear all filters",
     // The KEYS are the package's own preset ids and stay as they are — the
     // surface matches on them. Only the labels beside them are words.
+    // The presets as one select where they do not fit one line (ADR 0190).
+    presetSelect: { label: "Shortcut", none: "None" },
     rangePresets: {
       hoje: "Today",
       ontem: "Yesterday",

@@ -13,6 +13,7 @@
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import FilterAltOffRoundedIcon from "@mui/icons-material/FilterAltOffRounded";
 import Tooltip from "@mui/material/Tooltip/index.js";
+import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { Box } from "../../../mui/Box";
 import { fieldRadiusPx } from "../../../tokens/field-radius";
@@ -33,16 +34,65 @@ import { sxRem } from "../../../tokens/relative";
  * tooltip when it does: it is one of the two controls (with the search) whose
  * icon has to carry the whole meaning on a phone.
  */
+/**
+ * Whether a filter control's panel is open — the stretch during which the bar
+ * is measured once and then FROZEN, so the field being edited is not promoted
+ * out from under the hand (FUT-4144 UI review round 2).
+ *
+ * Wraps the controls' `onOpenChange` to count the open panels.
+ */
+export function useBarFrozen(report?: (open: boolean) => void): {
+  frozen: boolean;
+  onOpenChange: (open: boolean) => void;
+} {
+  const [openCount, setOpenCount] = useState(0);
+  return {
+    frozen: openCount > 0,
+    onOpenChange: (open) => {
+      setOpenCount((count) => Math.max(0, count + (open ? 1 : -1)));
+      report?.(open);
+    },
+  };
+}
+
+/**
+ * Whether the button runs past the edge of the row that holds it. Only asked
+ * while the bar is frozen: a first filter applied from inside an open panel
+ * brings "Limpar" in with no room budgeted for its label, and at 900 the row
+ * cut it to "Lin". It then shows as its icon (the tooltip and accessible name
+ * keep the word) until the panel closes and the row is measured again.
+ */
+function useCutByRow(ref: React.RefObject<HTMLElement | null>, frozen: boolean): boolean {
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    if (!frozen) {
+      setCut(false);
+      return;
+    }
+    const button = ref.current;
+    let row = button?.parentElement ?? null;
+    while (row && getComputedStyle(row).overflowX === "visible") row = row.parentElement;
+    if (button && row && button.getBoundingClientRect().right > row.getBoundingClientRect().right + 0.5) setCut(true);
+  });
+  return cut;
+}
+
 export function ClearAllControl({
   onClearAll,
-  compact,
+  compact: compactRung,
   testIdPrefix,
+  frozen = false,
 }: {
   onClearAll: () => void;
   compact: boolean;
   testIdPrefix: string;
+  /** The bar is frozen while a panel is open; see {@link useCutByRow}. */
+  frozen?: boolean;
 }): React.JSX.Element {
   const copy = useDataViewsCopy();
+  const ref = useRef<HTMLButtonElement>(null);
+  const cut = useCutByRow(ref, frozen && !compactRung);
+  const compact = compactRung || cut;
   // No border, no fill. Every other control on this row is an outlined field
   // because it OPENS something; this one is an escape hatch, and giving it the
   // same weight made it read as a sixth filter. Quiet until hovered.
@@ -50,6 +100,7 @@ export function ClearAllControl({
     <Box
       component="button"
       type="button"
+      ref={ref}
       onClick={onClearAll}
       data-testid={`${testIdPrefix}-clear-all`}
       aria-label={copy.filters.clearAll}
@@ -66,6 +117,10 @@ export function ClearAllControl({
         font: "inherit",
         fontSize: sxRem(13),
         whiteSpace: "nowrap",
+        // Never squeezed: the bar is frozen while a panel is open, and when a
+        // first filter applied from inside one brought this in, the row had
+        // no room budgeted for it and cut "Limpar" to "Lin" (FUT-4144).
+        flexShrink: 0,
         color: "text.secondary",
         "&:hover": { color: "text.primary", bgcolor: "action.hover" },
       }}

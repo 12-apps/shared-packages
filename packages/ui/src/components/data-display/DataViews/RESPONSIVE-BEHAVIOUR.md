@@ -276,6 +276,65 @@ leaves the board with a single populated column, which reads as data loss.
 
 ---
 
+### A day filter's popover: the range calendar (FUT-4144)
+
+A `kind: "day"` range ("Data" on Pedidos, Auditoria, Agendados) opens with a
+range calendar ALWAYS visible under its typed `De`/`Até` boxes — the owner's
+option B. A period is three taps: open the filter, tap the first day, tap the
+last. Nothing was added in front of the boxes, so typing a date costs exactly
+the keystrokes it did.
+
+| | below `sm` (320, 390) | `sm` to `md` (600) | from `md` (900, 1280, 1920) |
+| --- | --- | --- | --- |
+| popover width | the screen's, less 8px each side, 8px padding (so seven 40px day columns fit at 320) | 400px | its content's (~670px) |
+| presets | one select ("Atalho") | one select | one row of five equal parts |
+| "Mais" panel | the screen's width less 8px each side, as tall as the screen allows | 320px wide, as tall as the screen allows | — (the pill is on the bar) |
+| months | one, `<Month> ▾ <Year> ▾ ‹ ›` caption | one, same caption | two side by side, `‹ setembro` · `outubro ›`, the current month on the right |
+
+- Order in the popover: preset chips, the `De`/`Até` boxes (sharing the row
+  equally), the inclusive/inverted note, the calendar, then the line saying
+  which tap comes next ("Toque no primeiro e no último dia." / "Agora toque no
+  último dia."), then the pill's summary and "Limpar".
+- One view of ONE range: a tap writes the boxes; a typed whole day writes the
+  bound and moves the calendar to it; an impossible typed day (`31/02/2026`)
+  is refused in its box and the calendar does not move; "Limpar", a preset or a
+  saved view re-opens the calendar on the new range. A tap never moves the
+  calendar under the finger.
+- The presets are the options of ONE question, so they sit on one line at
+  every width (ADR 0190 in the host): equal parts where the row is wide enough
+  for the widest label in each part, measured on the row itself; otherwise the
+  same options as a select, where "Nenhum" stands for tapping the active one
+  again.
+- Day columns are at least 40px wide below `sm`. The range is the Calendar's
+  own band (FUT-4162): one tint behind the days, round AA endpoints.
+- A "Mais" panel holding a day range keeps the "Limpar filtros" row's height
+  while nothing is applied, so the first tap does not grow the panel under the
+  finger; the panel is as tall as the screen allows instead of a fixed 320px,
+  so a range's boxes, its month caption and its weeks are on screen together.
+- The presets' fit is measured on their LAYOUT width (padding and border in,
+  never a box read while the popover grows in from 75%), for a number range's
+  presets too: "Acima de R$ 10" goes to the select rather than to "Acima de …".
+- In a panel (the "Mais" sheet, the slide-in panel) a number pair splits the
+  row equally, like a day pair; in the pill's popover it keeps its own width.
+- The pill's popover and the "Mais" panel hold STILL while open: they hang from
+  where their trigger was when they opened, so a "Limpar" or a badge appearing
+  on the bar after the first tap does not drag them sideways. They are
+  re-placed only when their own height changes (a refused day's message), so
+  they never leave the screen. A day popover keeps its summary/"Limpar" row's
+  height while nothing is applied, so the first tap does not grow it.
+- While a panel is open the bar is frozen; if the "Limpar" that a first filter
+  brings in does not fit the row it shows as its icon until the panel closes.
+- A second tap before the first swaps them — the boxes never show a period
+  backwards. A tap on or before a lone `Até` keeps that `Até`.
+- The slide-in panel and the "Mais" sheet use the same pair, so they get the
+  same calendar, one month wide.
+- The calendar is `Calendar` in `selectionMode="range"`, the one
+  `DateRangePicker` mounts; its words are `copy.filters.dayCalendar` (optional:
+  a host copy without it gets the en-US pack's).
+
+Tested in `__tests__/range-calendar.test.tsx` and
+`data-views-range-calendar.test.stories.tsx`.
+
 ## Where this is tested
 
 `__tests__/data-views-responsive.test.tsx` drives a fake `ResizeObserver` at each

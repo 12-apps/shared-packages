@@ -114,8 +114,11 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
   color: colorFor(day, visible),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,
   fontWeight: day.today || isEndpoint(day) ? 'bold' : 'normal',
-  '&:nth-of-type(7n + 1)': { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
-  '&:nth-of-type(7n)': { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
+  // `nth-child`, counting every cell of the week: a hidden outside day is an
+  // inert `span` placeholder (FUT-4144), and `nth-of-type` counted only the
+  // buttons, so the caps landed mid-week in a month with hidden outside days.
+  '&:nth-child(7n + 1)': { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
+  '&:nth-child(7n)': { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -140,8 +143,18 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
   },
 });
 
+/**
+ * A day's spoken name, whole: "1 de outubro de 2026". The cell's text is the
+ * bare number, which a screen reader would read as "1" — in a two-month range
+ * calendar that is two different days.
+ */
+const dayName = (date: Date, locale: string): string =>
+  date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+
 export interface CalendarDayProps {
   day: DayRenderArgs;
+  /** BCP-47 tag the day's accessible name is written in. Default: en-US. */
+  locale?: string;
   band: DayBand;
   focused: boolean;
   showOutsideDays: boolean;
@@ -153,6 +166,7 @@ export interface CalendarDayProps {
 
 export const CalendarDay: FC<CalendarDayProps> = ({
   day,
+  locale = 'en-US',
   band,
   focused,
   showOutsideDays,
@@ -164,6 +178,20 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   const visible = day.inCurrentMonth || showOutsideDays;
   const state: DayState = { ...day, outside: !day.inCurrentMonth, focused };
 
+  // A day hidden by `showOutsideDays={false}` keeps its place in the grid and
+  // nothing else: no button to click in a blank, no name, no tab stop that
+  // cannot be seen (FUT-4144).
+  if (!visible) {
+    return (
+      <Box
+        component="span"
+        aria-hidden="true"
+        data-testid="calendar-outside-placeholder"
+        sx={{ width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' }}
+      />
+    );
+  }
+
   return (
     <Box
       component="button"
@@ -172,6 +200,8 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       aria-selected={day.selected}
       aria-disabled={day.disabled}
       aria-current={day.today ? 'date' : undefined}
+      aria-label={dayName(day.date, locale)}
+      data-in-month={day.inCurrentMonth}
       className={dayClassNames(state, dayClassName?.(day))}
       data-testid={`calendar-date-${day.date.getDate()}`}
       onClick={() => onSelect(day.date)}
@@ -185,7 +215,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       {day.today && (
         <Box component="span" data-testid="calendar-today" sx={{ display: 'none' }} />
       )}
-      {visible ? day.date.getDate() : ''}
+      {day.date.getDate()}
     </Box>
   );
 };

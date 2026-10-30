@@ -19,7 +19,7 @@ import Box from "@mui/material/Box/index.js";
 import { useState } from "react";
 
 
-import { ClearAllControl, CloseSearchControl } from "./data-views-bar-controls";
+import { ClearAllControl, CloseSearchControl, useBarFrozen } from "./data-views-bar-controls";
 import type { GridFilterPanelProps } from "./data-views-filter-panel";
 import { MoreFilters } from "./data-views-more-filters";
 import type { OverflowField, OverflowSplit } from "./data-views-overflow";
@@ -324,13 +324,14 @@ function FilterSlots<T extends Record<string, unknown>>({
   clearAllHidden: boolean;
   testIdPrefix: string;
 }): React.JSX.Element {
+  const clear = useBarFrozen(onControlOpenChange);
   return (
     <>
       {inline.map((field) => (
         <InlineControl
           key={field.id}
           field={field}
-          onOpenChange={onControlOpenChange}
+          onOpenChange={clear.onOpenChange}
           pills={pills}
           ranges={ranges}
           onTogglePill={onTogglePill}
@@ -342,7 +343,7 @@ function FilterSlots<T extends Record<string, unknown>>({
       ))}
       <MoreFilters
         clearKey={clearKey}
-        onOpenChange={onControlOpenChange}
+        onOpenChange={clear.onOpenChange}
         onClearAll={onClearAll}
         anyApplied={activeFilterCount > 0}
         compact={compactControls}
@@ -358,6 +359,7 @@ function FilterSlots<T extends Record<string, unknown>>({
         <ClearAllControl
           onClearAll={onClearAll}
           compact={compactControls}
+          frozen={clear.frozen}
           testIdPrefix={testIdPrefix}
         />
       )}

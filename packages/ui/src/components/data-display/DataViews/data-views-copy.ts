@@ -1,4 +1,5 @@
 import type { CategorySelectCopy, ConfirmActionCopy, DataGridCopy, TableFilterCopy } from "../../../copy";
+import type { CalendarLabels } from "../../../copy/labels";
 import type { SavedViewsLabels } from "../../layout/ContentToolbar/ContentToolbar.types";
 /**
  * Every word the DataViews family renders, as REQUIRED host config (FUT-760).
@@ -180,6 +181,24 @@ export interface DataViewsGridCopy extends DataGridCopy {
   sortDescending: string;
 }
 
+/**
+ * The words of the range calendar a day filter shows under its typed boxes.
+ * Month names, weekday initials and each day's spoken name come from `Intl` in
+ * `locale`; only the sentences below are copy.
+ */
+export interface DataViewsDayCalendarCopy {
+  /** BCP-47 tag the calendar names its months and days in. */
+  locale: string;
+  /** The calendar's accessible name, from the filter's own label ("Data"). */
+  label(fieldLabel: string): string;
+  /** Under the calendar while no day, or a whole period, is chosen. */
+  pickStart: string;
+  /** Under the calendar once the first day is chosen and the last is not. */
+  pickEnd: string;
+  /** The month/year caption's names — `UI_LABELS[locale].calendar`. */
+  caption: CalendarLabels;
+}
+
 export interface DataViewsFiltersCopy {
   moreFilters(count: number): string;
   moreFiltersApplied(count: number, appliedCount: number): string;
@@ -212,8 +231,25 @@ export interface DataViewsFiltersCopy {
    * list read like an answer to a date nobody could have meant (FUT-4144).
    */
   dayInvalid: string;
+  /**
+   * The range calendar under a day range's `De`/`Até` boxes (FUT-4144). Optional
+   * so a host that builds its own copy keeps compiling; without it the calendar
+   * speaks the en-US pack's words.
+   */
+  dayCalendar?: DataViewsDayCalendarCopy;
   /** Drop every applied filter, spelled out in the panel where there is room. */
   clearAllFilters: string;
+  /**
+   * The presets asked as a select, where the row is too narrow for them as
+   * one line of equal parts (ADR 0190, FUT-4144). Optional: a host copy
+   * without it gets the en-US pack's words.
+   */
+  presetSelect?: {
+    /** The select's label. */
+    label: string;
+    /** The empty option: no preset — picking it clears an applied one. */
+    none: string;
+  };
   /** The day-range presets' labels, keyed by preset id. */
   rangePresets: Readonly<Record<string, string>>;
   scopesLabel: string;
