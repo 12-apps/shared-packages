@@ -44,7 +44,7 @@ function abilitiesOf(props: DayRulerProps): RulerAbilities {
 function FooterOf({ props, group, ctx }: { props: DayRulerProps; group: string | undefined; ctx: RowContext }): React.JSX.Element | null {
   const rows = props.groupFooter?.(group);
   if (!rows || rows.length === 0) return null;
-  const marked = props.labels?.footerMarked ?? EN_US_DAY_RULER_LABELS.footerMarked ?? '';
+  const marked = props.labels?.footerMarked ?? EN_US_DAY_RULER_LABELS.footerMarked;
   return <GroupFooter rows={rows} scale={ctx.scale} testId={ctx.testId} marked={marked} />;
 }
 

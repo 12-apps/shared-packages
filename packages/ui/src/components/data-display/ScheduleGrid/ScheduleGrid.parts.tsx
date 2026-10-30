@@ -257,9 +257,9 @@ interface HeaderProps {
 
 /** The days, their counts and the total column's header — pinned while the grid scrolls. */
 
-/** A range ("11h–23h") breaks before or after it, never at its dash. */
+/** A range ("11h–23h") breaks before or after it, never at its dash; a spaced dash ("11h – 23h") keeps its spaces. */
 function keepRangesWhole(node: React.ReactNode): React.ReactNode {
-  return typeof node === 'string' ? node.replace(/\s*–\s*/g, (dash) => `\u2060${dash.trim()}\u2060`) : node;
+  return typeof node === 'string' ? node.replace(/(\S)–(\S)/g, '$1\u2060–\u2060$2') : node;
 }
 
 /** A label wraps between words, never inside "Seg 19/10": the space before a number holds. */

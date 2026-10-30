@@ -98,10 +98,21 @@ function footerOf(area: string | undefined, people: Person[], slots: Slot[], cou
   );
   const need = busy.map((units) => (units === null ? 0 : Math.ceil(units / 8)));
   if (countsOnly) {
-    const short = need.map((count, index) => count > (scheduled[index] ?? 0));
-    const first = short.indexOf(true);
-    const last = short.lastIndexOf(true);
-    const missing = Math.max(0, ...need.map((count, index) => count - (scheduled[index] ?? 0)));
+    // A short hour counts only inside a run of two or more, as a host's short runs do: the cells and the note agree.
+    const below = need.map((count, index) => count > (scheduled[index] ?? 0));
+    const short = below.map((isBelow, index) => isBelow && (below[index - 1] === true || below[index + 1] === true));
+    // Each run of short hours, said as the cells show it: "Faltam 2, 11:00–13:00 · Faltam 1, 20:00–22:00".
+    const runs: { from: number; to: number; missing: number }[] = [];
+    short.forEach((isShort, index) => {
+      if (!isShort) return;
+      const gap = (need[index] ?? 0) - (scheduled[index] ?? 0);
+      const open = runs[runs.length - 1];
+      if (open && open.to === index) {
+        open.to = index + 1;
+        open.missing = Math.max(open.missing, gap);
+      } else runs.push({ from: index, to: index + 1, missing: gap });
+    });
+    const said = runs.map((run) => `Faltam ${run.missing}, ${hh(6 + run.from)}–${hh(6 + run.to)}`).join(' · ');
     return [
       {
         id: `${area}-have`,
@@ -113,7 +124,7 @@ function footerOf(area: string | undefined, people: Person[], slots: Slot[], cou
             : { text: count ? String(count) : '' },
         ),
       },
-      ...(first >= 0 ? [{ id: `${area}-short`, label: '', note: `Faltam ${missing}, ${hh(6 + first)}–${hh(7 + last)}`, marked: true }] : []),
+      ...(runs.length > 0 ? [{ id: `${area}-short`, label: '', note: said, marked: true }] : []),
     ];
   }
   return [

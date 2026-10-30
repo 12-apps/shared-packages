@@ -734,6 +734,11 @@ describe("the header's host figures (FUT-3882)", () => {
     expect(within(header).getByTestId("sg-corner").textContent).toBe("Movimento, 11h\u2060–\u206023h");
   });
 
+  it("joins only an unspaced range's dash, and keeps a spaced dash's spaces", () => {
+    renderGrid({ corner: "Movimento – 11h–23h" });
+    expect(screen.getByTestId("sg-corner").textContent).toBe("Movimento – 11h\u2060–\u206023h");
+  });
+
   it("keeps the corner empty and draws no adornment when the host gives none", () => {
     renderGrid();
     const corner = screen.getByTestId("sg-corner");
