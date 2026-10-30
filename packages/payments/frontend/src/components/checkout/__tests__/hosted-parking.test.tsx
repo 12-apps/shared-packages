@@ -196,6 +196,8 @@ describe("a mount that keeps out of the parked-payment slot", () => {
     const back = await returnTrip(client);
     expect(back.current.order?.orderId).toBe("pedido-paid-again");
     expect(back.current.step).toBe("status");
+    // Consumed by the very return that resumed it: no later mount meets it again.
+    expect(parked()).toBeNull();
   });
 
   it("still parks a wallet's 3-D Secure hand-off, and the host's checkout resumes it on the way back", async () => {
@@ -214,6 +216,8 @@ describe("a mount that keeps out of the parked-payment slot", () => {
     const back = await returnTrip(client);
     expect(back.current.order?.orderId).toBe("pedido-paid-again");
     expect(back.current.step).toBe("status");
+    // Consumed by the very return that resumed it: no later mount meets it again.
+    expect(parked()).toBeNull();
   });
 
   it("still parks by default: the host's one checkout keeps its recovery", async () => {

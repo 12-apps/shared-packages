@@ -626,7 +626,10 @@ checkout's parked payment as its own.
 What it KEEPS is the hand-off: a provider's redirect, a card's or a wallet's
 3-D Secure still parks. The mount's page is gone after the redirect, the
 provider returns to your checkout route, and that entry is what lets the route
-open the confirmation for the payment the buyer just made.
+open the confirmation for the payment the buyer just made. A hand-off the buyer
+ABANDONS (never comes back from) stays parked, with no basket, for up to
+`MAX_PARKED_AGE_MS` (30 minutes), and can resume over your checkout in that
+window — exactly as any basket-less hand-off did before this prop existed.
 
 **Pass the same basket to `hostedCheckoutReturnPending(slug, basket)`.** That
 predicate is what a host gate in front of the checkout route asks — a
