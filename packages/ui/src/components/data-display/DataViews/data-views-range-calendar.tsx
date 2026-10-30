@@ -114,6 +114,78 @@ function openingMonth(value: RangeValue, months: number): Date | undefined {
   return new Date(anchor.getFullYear(), anchor.getMonth() - (months > 1 ? 1 : 0), 1);
 }
 
+/**
+ * The line under the calendar: the next step ("Toque no primeiro e no último
+ * dia." / "Agora toque no último dia.") or, once a period is applied, the
+ * window, with "Limpar" at its end.
+ *
+ * ONE line whose words change, never a row held empty for later (FUT-4144
+ * follow-up): #932 kept an invisible summary row under the hint so the first
+ * tap would not grow the popover, and at 1280 that was 59px of white. "Limpar"
+ * is a text button the height of the line — its padding reaches out with a
+ * negative margin for the finger — so the line is as tall with it as without,
+ * and the popover still does not move.
+ */
+function HintLine({
+  text,
+  onClear,
+  testId,
+}: {
+  text: string;
+  onClear: (() => void) | undefined;
+  testId: string;
+}): React.JSX.Element {
+  const clear = useDataViewsCopy().filters.clear;
+  return (
+    <Box
+      data-testid={`${testId}-calendar-line`}
+      sx={{
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: 2,
+        mt: { xs: 0.25, sm: 1 },
+        fontSize: sxRem(12),
+        lineHeight: 1.5,
+      }}
+    >
+      <Typography
+        component="p"
+        aria-live="polite"
+        data-testid={`${testId}-calendar-hint`}
+        sx={{ m: 0, font: 'inherit', color: 'text.secondary' }}
+      >
+        {text}
+      </Typography>
+      {onClear && (
+        <Box
+          component="button"
+          type="button"
+          onClick={onClear}
+          data-testid={`${testId}-clear`}
+          sx={{
+            flexShrink: 0,
+            border: 0,
+            bgcolor: 'transparent',
+            cursor: 'pointer',
+            font: 'inherit',
+            fontWeight: 600,
+            color: 'primary.main',
+            px: 1,
+            mx: -1,
+            py: 1.25,
+            my: -1.25,
+            borderRadius: 1,
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          {clear}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 /** Props of {@link DayRangeCalendar}. */
 export interface DayRangeCalendarProps {
   /** The filter's own label ("Data"), which names the calendar. */
@@ -133,6 +205,14 @@ export interface DayRangeCalendarProps {
    */
   viewKey: string;
   testId: string;
+  /**
+   * The applied window in words ("Data: 01/10–15/10"), said on the hint's own
+   * line with "Limpar" at its end. Set by the pill, whose popover has no other
+   * place for them; a panel says them in its own header and leaves this unset.
+   */
+  summary?: string;
+  /** Empties the range: the line's "Limpar", shown while `summary` is set. */
+  onClear?: () => void;
 }
 
 export function DayRangeCalendar({
@@ -142,6 +222,8 @@ export function DayRangeCalendar({
   months,
   viewKey,
   testId,
+  summary,
+  onClear,
 }: DayRangeCalendarProps): React.JSX.Element {
   const copy: DataViewsDayCalendarCopy =
     useDataViewsCopy().filters.dayCalendar ?? (EN_US_DATA_VIEWS_COPY.filters.dayCalendar as DataViewsDayCalendarCopy);
@@ -172,14 +254,11 @@ export function DayRangeCalendar({
         // tap that CLOSES a period, so the first tap would write nothing.
         onIntermediateRangeChange={pick}
       />
-      <Typography
-        component="p"
-        aria-live="polite"
-        data-testid={`${testId}-calendar-hint`}
-        sx={{ mt: { xs: 0.25, sm: 1 }, fontSize: sxRem(12), color: 'text.secondary' }}
-      >
-        {waitingForEnd ? copy.pickEnd : copy.pickStart}
-      </Typography>
+      <HintLine
+        text={waitingForEnd ? copy.pickEnd : (summary ?? copy.pickStart)}
+        onClear={summary !== undefined ? onClear : undefined}
+        testId={testId}
+      />
     </Box>
   );
 }

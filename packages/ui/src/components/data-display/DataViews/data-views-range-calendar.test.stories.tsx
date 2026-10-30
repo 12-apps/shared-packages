@@ -78,9 +78,10 @@ export const PicksAPeriodInThreeTaps: Story = {
   args: { initial: { min: "2026-10-20", max: "2026-10-22" } },
   play: async ({ canvasElement }) => {
     const calendar = await openFilter(canvasElement);
-    await expect(body().getByTestId(`${TEST_ID}-calendar-hint`)).toHaveTextContent(
-      "Toque no primeiro e no último dia.",
-    );
+    // The hint's line says the applied window while one is set (FUT-4144
+    // follow-up: the summary moved onto this line), and the step once the
+    // first tap starts a new period.
+    await expect(body().getByTestId(`${TEST_ID}-calendar-hint`)).toHaveTextContent("Data: 20/10–22/10");
 
     await userEvent.click(calendar.getByRole("gridcell", { name: "1 de outubro de 2026" }));
     await expect(body().getByTestId(`${TEST_ID}-calendar-hint`)).toHaveTextContent("Agora toque no último dia.");
@@ -88,6 +89,7 @@ export const PicksAPeriodInThreeTaps: Story = {
 
     await waitFor(() => expect(body().getByTestId(`${TEST_ID}-min`)).toHaveValue("01/10/2026"));
     await expect(body().getByTestId(`${TEST_ID}-max`)).toHaveValue("15/10/2026");
+    await expect(body().getByTestId(`${TEST_ID}-calendar-hint`)).toHaveTextContent("Data: 01/10–15/10");
   },
 };
 

@@ -232,6 +232,7 @@ export function RangePill<T extends Record<string, unknown>>({
           onChange={onChange}
           testId={testId}
           calendarMonths={calendarMonths}
+          summaryOnHint
         />
         <RangeSummary field={field} value={value} onClear={() => onChange({})} testId={testId} />
       </Popover>

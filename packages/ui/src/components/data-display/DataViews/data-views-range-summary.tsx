@@ -11,16 +11,15 @@ import type { RangeFieldConfig, RangeValue } from './data-views-types';
 import { sxRem } from '../../../tokens/relative';
 
 /**
- * The applied window in words, and "Limpar".
+ * The applied window in words, and "Limpar", under a NUMBER range's boxes.
  *
  * An inverted window is not an error the merchant must fix before the list
  * responds — it simply matches nothing, and saying so beats an empty grid with
  * no explanation (FUT-668).
  *
- * A DAY filter keeps the row's height while nothing is applied: its first tap
- * on the calendar applies a bound, and a row appearing then grew the popover
- * 26px and moved it 32px up at 320×568, the day under the finger with it
- * (FUT-4144 UI review round 2). The held row is invisible and inert.
+ * A DAY range says these on its calendar's hint line instead (FUT-4144): a row
+ * of its own, held empty until the first tap so the popover would not grow,
+ * left 59px of white under the hint at 1280.
  */
 export function RangeSummary<T extends Record<string, unknown>>({
   field,
@@ -34,29 +33,17 @@ export function RangeSummary<T extends Record<string, unknown>>({
   testId: string;
 }): React.JSX.Element | null {
   const copy = useDataViewsCopy();
-  const active = isRangeSet(value);
-  if (!active && field.kind !== 'day') return null;
+  if (field.kind === 'day' || !isRangeSet(value)) return null;
   return (
-    <Box
-      aria-hidden={active ? undefined : true}
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 2,
-        mt: { xs: 0.5, sm: 1.5 },
-        visibility: active ? undefined : 'hidden',
-      }}
-    >
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: 1.5 }}>
       <Typography component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
-        {active ? rangeChipLabel(field, value) : field.label}
+        {rangeChipLabel(field, value)}
       </Typography>
       <Button
         variant="text"
         size="small"
-        onClick={active ? onClear : undefined}
-        tabIndex={active ? undefined : -1}
-        data-testid={active ? `${testId}-clear` : undefined}
+        onClick={onClear}
+        data-testid={`${testId}-clear`}
         sx={{ textTransform: 'none' }}
       >
         {copy.filters.clear}

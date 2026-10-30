@@ -17,7 +17,7 @@ import { RangePresets } from './data-views-preset-chips';
 import { DayRangeCalendar } from './data-views-range-calendar';
 import { presetsFor } from './data-views-range-presets';
 import { useOutsideResetKey } from './data-views-range-reset';
-import { isRangeInverted } from './data-views-range-values';
+import { isRangeInverted, isRangeSet, rangeChipLabel } from './data-views-range-values';
 import type { RangeFieldConfig, RangeValue } from './data-views-types';
 import { sxRem } from '../../../tokens/relative';
 
@@ -70,6 +70,11 @@ function BoundField<T extends Record<string, unknown>>({
   );
 }
 
+
+/** The applied window in words ("Data: 01/10–15/10"), or nothing while none is. */
+function appliedWindow<T extends Record<string, unknown>>(field: RangeFieldConfig<T>, value: RangeValue): string | undefined {
+  return isRangeSet(value) ? rangeChipLabel(field, value) : undefined;
+}
 
 /** One box of the pair: an equal share of the row for a day, as it was for a number. */
 function BoundCell({ grow, children }: { grow: boolean; children: React.ReactNode }): React.JSX.Element {
@@ -142,6 +147,11 @@ interface RangeBoundsProps<T extends Record<string, unknown>> {
    * its content and keeps the boxes' own width.
    */
   fillRow?: boolean;
+  /**
+   * Say the applied window, and its "Limpar", on the day calendar's hint line.
+   * The pill's popover sets it; a panel has them in its own header.
+   */
+  summaryOnHint?: boolean;
 }
 
 /**
@@ -157,6 +167,7 @@ export function RangeBounds<T extends Record<string, unknown>>({
   calendarMonths = 1,
   showCalendar = true,
   fillRow = false,
+  summaryOnHint = false,
 }: RangeBoundsProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
   const { key, emitted } = useOutsideResetKey(value);
@@ -216,6 +227,10 @@ export function RangeBounds<T extends Record<string, unknown>>({
           months={calendarMonths}
           viewKey={`${key}-${typed}`}
           testId={testId}
+          summary={summaryOnHint ? appliedWindow(field, value) : undefined}
+          // Straight to the host, not through `emitted`: a clear is an outside
+          // write, so the boxes and the calendar re-open on the empty range.
+          onClear={() => onChange({})}
         />
       )}
     </Box>
