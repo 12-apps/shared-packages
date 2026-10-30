@@ -82,6 +82,20 @@ describe("RangePill — the summary on the hint line", () => {
     expect(within(line()).queryAllByRole("button")).toHaveLength(0);
   });
 
+  it("starts a new period from the next tap after Limpar mid-pick", () => {
+    render(<Pill />);
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    fireEvent.click(day("1 de outubro de 2026"));
+    fireEvent.click(within(line()).getByTestId(`${TEST_ID}-clear`));
+    expect(hint()).toHaveTextContent("Toque no primeiro e no último dia.");
+
+    fireEvent.click(day("9 de outubro de 2026"));
+
+    expect(screen.getByTestId(`${TEST_ID}-min`)).toHaveValue("09/10/2026");
+    expect(screen.getByTestId(`${TEST_ID}-max`)).toHaveValue("");
+    expect(hint()).toHaveTextContent("Agora toque no último dia.");
+  });
+
   it("says a preset's window on the line too", () => {
     render(<Pill initial={{ min: "2026-10-01", max: "2026-10-31" }} />);
     fireEvent.click(screen.getByTestId(TEST_ID));
@@ -94,6 +108,25 @@ describe("RangePill — the summary on the hint line", () => {
     fireEvent.click(screen.getByTestId("grid-range-total"));
     expect(screen.getByTestId("grid-range-total-clear")).toHaveTextContent("Limpar");
     expect(within(screen.getByRole("presentation")).getByText("Valor: ≥ R$ 20")).toBeInTheDocument();
+  });
+});
+
+describe("RangePill — the line's ink (FUT-4144 UI review)", () => {
+  // The default theme's two text inks, as jsdom computes them.
+  const SECONDARY = "rgba(0, 0, 0, 0.6)";
+  const PRIMARY = "rgba(0, 0, 0, 0.87)";
+
+  it("says the steps in the secondary ink and the applied window in the primary one", () => {
+    render(<Pill />);
+    fireEvent.click(screen.getByTestId(TEST_ID));
+    expect(getComputedStyle(hint()).color).toBe(SECONDARY);
+
+    fireEvent.click(day("1 de outubro de 2026"));
+    expect(getComputedStyle(hint()).color).toBe(SECONDARY);
+
+    fireEvent.click(day("15 de outubro de 2026"));
+    expect(hint()).toHaveTextContent("Data: 01/10–15/10");
+    expect(getComputedStyle(hint()).color).toBe(PRIMARY);
   });
 });
 

@@ -121,17 +121,24 @@ function openingMonth(value: RangeValue, months: number): Date | undefined {
  *
  * ONE line whose words change, never a row held empty for later (FUT-4144
  * follow-up): #932 kept an invisible summary row under the hint so the first
- * tap would not grow the popover, and at 1280 that was 59px of white. "Limpar"
- * is a text button the height of the line — its padding reaches out with a
- * negative margin for the finger — so the line is as tall with it as without,
- * and the popover still does not move.
+ * tap would not grow the popover, and at 1280 that was 59px of white.
+ *
+ * The line is always as tall as "Limpar"'s 40px target, so it keeps one height
+ * with the button and without it, and the popover does not move. The target
+ * is its own box, not padding pushed out with a negative margin: that version
+ * ran under the calendar's last week, which took its top 10px at 320 (FUT-4144
+ * UI review). The window is said in the primary ink, the steps in the
+ * secondary one, so the result does not read as one more instruction.
  */
 function HintLine({
   text,
+  isWindow,
   onClear,
   testId,
 }: {
   text: string;
+  /** `text` is the applied window, not a step. */
+  isWindow: boolean;
   onClear: (() => void) | undefined;
   testId: string;
 }): React.JSX.Element {
@@ -141,10 +148,11 @@ function HintLine({
       data-testid={`${testId}-calendar-line`}
       sx={{
         display: 'flex',
-        alignItems: 'baseline',
+        alignItems: 'center',
         justifyContent: 'space-between',
         gap: 2,
         mt: { xs: 0.25, sm: 1 },
+        minHeight: sxRem(40),
         fontSize: sxRem(12),
         lineHeight: 1.5,
       }}
@@ -153,7 +161,7 @@ function HintLine({
         component="p"
         aria-live="polite"
         data-testid={`${testId}-calendar-hint`}
-        sx={{ m: 0, font: 'inherit', color: 'text.secondary' }}
+        sx={{ m: 0, font: 'inherit', color: isWindow ? 'text.primary' : 'text.secondary' }}
       >
         {text}
       </Typography>
@@ -165,6 +173,9 @@ function HintLine({
           data-testid={`${testId}-clear`}
           sx={{
             flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: sxRem(40),
             border: 0,
             bgcolor: 'transparent',
             cursor: 'pointer',
@@ -172,9 +183,10 @@ function HintLine({
             fontWeight: 600,
             color: 'primary.main',
             px: 1,
-            mx: -1,
-            py: 1.25,
-            my: -1.25,
+            py: 0,
+            // Its text lines up with the boxes' right edge; the side padding
+            // reaches into the popover's own.
+            mr: -1,
             borderRadius: 1,
             '&:hover': { bgcolor: 'action.hover' },
           }}
@@ -256,6 +268,7 @@ export function DayRangeCalendar({
       />
       <HintLine
         text={waitingForEnd ? copy.pickEnd : (summary ?? copy.pickStart)}
+        isWindow={!waitingForEnd && summary !== undefined}
         onClear={summary !== undefined ? onClear : undefined}
         testId={testId}
       />

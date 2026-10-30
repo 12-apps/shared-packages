@@ -35,7 +35,7 @@ export function RangeSummary<T extends Record<string, unknown>>({
   const copy = useDataViewsCopy();
   if (field.kind === 'day' || !isRangeSet(value)) return null;
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: 1.5 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mt: { xs: 0.5, sm: 1.5 } }}>
       <Typography component="span" sx={{ fontSize: sxRem(12), color: 'text.secondary' }}>
         {rangeChipLabel(field, value)}
       </Typography>
