@@ -53,3 +53,11 @@ describe("the staffed hour against the empty one", () => {
     }
   });
 });
+
+describe("trendPoints (FUT-3882)", () => {
+  it("puts each value over its hour's centre, the highest near the top, skipping an hour with none", async () => {
+    const { trendPoints } = await import("../DayRuler.parts");
+    expect(trendPoints([0, 2, null, 4], 4)).toBe("12.50,38.00 37.50,21.00 87.50,4.00");
+    expect(trendPoints([0, 0], 2)).toBe("25.00,38.00 75.00,38.00");
+  });
+});

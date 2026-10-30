@@ -241,7 +241,7 @@ Components for displaying data, visualizations, and information to users.
 ### DayRuler
 **Purpose**: One day as an hour ruler per row — scheduled blocks, the real shift under them, a now line and people per hour
 **Use Cases**: A schedule's day view, on-shift vs scheduled, a phone's day list of who works when
-**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, HH:MM axis past midnight, a block's break as a hatched gap, row name-adornment, chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
+**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, per-group footer lines (counts with marked hours, or a trend line), HH:MM axis past midnight, a block's break as a hatched gap, row name-adornment, chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
 **Location**: `src/components/data-display/DayRuler`
 **Docs**: `src/components/data-display/DayRuler/DayRuler.md`
 

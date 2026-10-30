@@ -17,15 +17,17 @@ import {
   coverageCellSx,
   coverageLabelSx,
   coverageSx,
+  footerCellSx,
   handleSx,
   lineSx,
   nowSx,
   rowSx,
   trackSx,
+  trendSx,
   whoSx,
   type Span,
 } from './DayRuler.styles';
-import type { DayRulerBlock, DayRulerRow, RulerHour } from './DayRuler.types';
+import type { DayRulerBlock, DayRulerFooterCell, DayRulerFooterRow, DayRulerRow, RulerHour } from './DayRuler.types';
 import type { RulerDrag, RulerDragApi } from './useRulerDrag';
 
 export const spanOf = (start: RulerHour, end: RulerHour, scale: RulerScale): Span => {
@@ -251,6 +253,67 @@ export function Coverage(props: { coverage: readonly number[]; label?: string; s
       </Box>
       <span />
     </Box>
+  );
+}
+
+/** The points of a trend over the hours' centres, in a 100 × 40 box: the highest value near the top, `null` breaks nothing (it is skipped). */
+export function trendPoints(values: readonly (number | null)[], hours: number): string {
+  const present = values.slice(0, hours).filter((value): value is number => value !== null);
+  const max = Math.max(0, ...present);
+  return values
+    .slice(0, hours)
+    .flatMap((value, index) => {
+      if (value === null) return [];
+      const x = ((index + 0.5) * 100) / hours;
+      const y = max > 0 ? 38 - (value / max) * 34 : 38;
+      return [`${x.toFixed(2)},${y.toFixed(2)}`];
+    })
+    .join(' ');
+}
+
+function FooterCells({ cells, hours, from }: { cells: readonly DayRulerFooterCell[]; hours: number; from: RulerHour }): React.JSX.Element {
+  return (
+    <Box sx={coverageSx(hours)}>
+      {Array.from({ length: hours }, (_, index) => {
+        const cell = cells[index] ?? { text: '' };
+        return (
+          <Box
+            key={index}
+            component="span"
+            sx={footerCellSx(Boolean(cell.marked))}
+            title={cell.title ?? `${formatHour(from + index)} · ${cell.text}`}
+            data-marked={cell.marked ? '' : undefined}
+          >
+            {cell.text}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** A group's lines under its rows (FUT-3882): counts per hour, or a trend, on the tracks' columns. */
+export function GroupFooter(props: { rows: readonly DayRulerFooterRow[]; scale: RulerScale; testId: string }): React.JSX.Element {
+  const { rows, scale, testId } = props;
+  const hours = scale.to - scale.from;
+  return (
+    <>
+      {rows.map((row) => (
+        <Box key={row.id} sx={lineSx} data-testid={`${testId}-footer-${row.id}`}>
+          <Box component="span" sx={coverageLabelSx}>
+            {row.label}
+          </Box>
+          {row.trend ? (
+            <Box component="svg" viewBox="0 0 100 40" preserveAspectRatio="none" sx={trendSx} role="img" aria-label={row.label}>
+              <polyline fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" points={trendPoints(row.trend, hours)} />
+            </Box>
+          ) : (
+            <FooterCells cells={row.cells ?? []} hours={hours} from={scale.from} />
+          )}
+          <span />
+        </Box>
+      ))}
+    </>
   );
 }
 

@@ -66,6 +66,26 @@ export interface DayRulerRow {
   labelAccessible?: string;
 }
 
+/** One hour of a group's count line: what it says, and whether the host marks it (an hour short of people). */
+export interface DayRulerFooterCell {
+  /** What the hour says ("4", "—"). Empty draws nothing. */
+  text: string;
+  /** Drawn in the warning ink inside a warning outline. Never the only signal: say it in `title` too. */
+  marked?: boolean;
+  /** The hour's tooltip and accessible words ("20h · o movimento pede 4, a escala tem 2"). Default: the hour and `text`. */
+  title?: string;
+}
+
+/**
+ * A line under a group's rows, on the tracks' columns (FUT-3882): either one
+ * count per hour (`cells`, index 0 = `from…from+1`) — "Na escala, por hora",
+ * "O movimento pede" — or a trend drawn as a line (`trend`, one value per
+ * hour, `null` for none) — "Média de pedidos/hora".
+ */
+export type DayRulerFooterRow =
+  | { id: string; label: string; cells: readonly DayRulerFooterCell[]; trend?: undefined }
+  | { id: string; label: string; trend: readonly (number | null)[]; cells?: undefined };
+
 export interface DayRulerProps {
   rows: readonly DayRulerRow[];
   /** The ruler's first hour (default 6, 06:00). */
@@ -78,6 +98,12 @@ export interface DayRulerProps {
   coverage?: readonly number[];
   /** Beside the coverage row ("Na escala, por hora"). */
   coverageLabel?: string;
+  /**
+   * Lines under a group's rows, on the tracks' columns, for the group titled
+   * `group` (`undefined` for rows with no group). Like the coverage row they
+   * are not drawn in a phone-sized pane, where the host says it its own way.
+   */
+  groupFooter?: (group: string | undefined) => readonly DayRulerFooterRow[] | undefined;
   /** An axis label every this many hours (default 4). */
   tickHours?: number;
   /** Every gesture snaps to this (default 15 minutes). */
@@ -99,7 +125,7 @@ export interface DayRulerProps {
   /** The component's own words. Default: the English pack. */
   labels?: Partial<DayRulerLabels>;
   /**
-   * Base test id (default `day-ruler`). Parts: `-coverage`, `-axis`, `-row-${rowId}`,
+   * Base test id (default `day-ruler`). Parts: `-coverage`, `-axis`, `-footer-${footerRowId}`, `-row-${rowId}`,
    * `-track-${rowId}`, `-block-${blockId}`, `-handle-l-${blockId}`, `-handle-r-${blockId}`, `-break-${blockId}`,
    * `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`.
    */

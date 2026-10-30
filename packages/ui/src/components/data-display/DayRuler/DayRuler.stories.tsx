@@ -14,7 +14,7 @@ import { ErrorState } from '../ErrorState';
 import { DayRuler } from './DayRuler';
 import { DAY_RULER_LABELS } from './DayRuler.labels';
 import { formatRange } from './day-ruler-model';
-import type { DayRulerBlock, DayRulerRow } from './DayRuler.types';
+import type { DayRulerBlock, DayRulerFooterRow, DayRulerRow } from './DayRuler.types';
 
 /**
  * A Turnos host's Dia view (FUT-3823, prototype D, frames d02 and the phone's
@@ -78,9 +78,38 @@ interface DemoProps {
   error?: boolean;
   /** Draw it in a pane this wide (px) — the phone's day list is the same component in a narrow pane. */
   paneWidth?: number;
+  /** Under each area: how busy it gets, who is on the escala and what the movement asks, short hours marked (FUT-3882). */
+  footers?: boolean;
 }
 
-function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth }: DemoProps) {
+/** Each area's average units per hour on the 06→02 ruler, and the people its movement asks for — a host's own figures. */
+function footerOf(area: string | undefined, people: Person[], slots: Slot[]): DayRulerFooterRow[] | undefined {
+  if (!area) return undefined;
+  const mine = people.filter((p) => p.area === area);
+  const hourMid = (index: number): number => 6 + index + 0.5;
+  const busy = Array.from({ length: 20 }, (_, index) => {
+    const h = hourMid(index);
+    return h < 11 || h > 24 ? null : Math.round(4 + 10 * Math.exp(-((h - 12.8) ** 2) / 1.6) + 16 * Math.exp(-((h - 20.8) ** 2) / 2.2));
+  });
+  const scheduled = Array.from({ length: 20 }, (_, index) =>
+    mine.filter((p) => slots.some((slot) => slot.who === p.id && slot.tone !== 'away' && slot.start <= hourMid(index) && slot.end > hourMid(index))).length,
+  );
+  const need = busy.map((units) => (units === null ? 0 : Math.ceil(units / 8)));
+  return [
+    { id: `${area}-trend`, label: 'Média de pedidos/hora', trend: busy },
+    { id: `${area}-have`, label: 'Na escala, por hora', cells: scheduled.map((count) => ({ text: count ? String(count) : '' })) },
+    {
+      id: `${area}-need`,
+      label: 'O movimento pede',
+      cells: need.map((count, index) => {
+        const short = count > (scheduled[index] ?? 0);
+        return { text: count ? String(count) : '', marked: short, ...(short ? { title: `${hh(6 + index)} · pede ${count}, tem ${scheduled[index] ?? 0}` } : {}) };
+      }),
+    },
+  ];
+}
+
+function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth, footers }: DemoProps) {
   const [slots, setSlots] = useState<Slot[]>(initial);
   const [log, setLog] = useState('');
   const compact = paneWidth !== undefined && paneWidth < 600;
@@ -145,6 +174,7 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
         now={NOW}
         coverage={coverage}
         coverageLabel="Na escala, por hora"
+        {...(footers ? { groupFooter: (area: string | undefined) => footerOf(area, people, slots) } : {})}
         readOnly={readOnly}
         loading={loading}
         error={
@@ -276,3 +306,10 @@ export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOT
 
 /** The same on a phone. */
 export const BreakAndMarkersPhone: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };
+
+/** FUT-3882: under each area its trend ("Média de pedidos/hora"), who is on the escala and what the movement asks, short hours outlined. */
+export const GroupFooters: Story = { args: { footers: true }, globals: DESKTOP };
+
+/** The same in the dark theme. */
+export const GroupFootersDark: Story = { args: { footers: true }, globals: { ...DESKTOP, theme: 'dark' } };
+

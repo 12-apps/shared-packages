@@ -301,3 +301,30 @@ export const skeletonNameSx: SxProps<Theme> = (theme: Theme) => ({
   borderRadius: rem(theme, M.skeletonNameRadius),
   backgroundColor: theme.palette.action.hover,
 });
+
+/** A group's count line (FUT-3882): plain counts on the hours' columns, a marked hour outlined in the warning ink. */
+export function footerCellSx(marked: boolean): SxProps<Theme> {
+  return (theme: Theme) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: rem(theme, M.coverage.font),
+    borderRadius: rem(theme, M.coverage.radius),
+    color: marked ? theme.palette.warning.main : theme.palette.text.primary,
+    fontWeight: marked ? 500 : 400,
+    // The hairline is always there, transparent when unmarked, so a mark never shifts a count.
+    border: `1px solid ${marked ? theme.palette.warning.main : 'transparent'}`,
+    minWidth: 0,
+    overflow: 'hidden',
+  });
+}
+
+/** A group's trend line: as tall as the coverage row, drawn in the primary colour. */
+export const trendSx: SxProps<Theme> = (theme: Theme) => ({
+  display: 'block',
+  width: '100%',
+  height: rem(theme, M.coverage.height + M.coverage.height / 2),
+  color: theme.palette.primary.main,
+  overflow: 'visible',
+});
+

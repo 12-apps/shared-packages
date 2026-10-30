@@ -484,3 +484,35 @@ describe("the slots a later story fills (FUT-3881)", () => {
     expect(screen.getByTestId("dr-row-bruno")).toHaveTextContent(/^Bruno LimaFreela/);
   });
 });
+
+describe("a group's footer lines (FUT-3882)", () => {
+  const footer: DayRulerProps["groupFooter"] = (group) =>
+    group === "Entregas"
+      ? [
+          { id: "trend", label: "Média de entregas/hora", trend: Array.from({ length: 20 }, (_, index) => (index === 3 ? null : index)) },
+          {
+            id: "need",
+            label: "O movimento pede",
+            cells: Array.from({ length: 20 }, (_, index) => ({ text: String(index % 3), marked: index === 14, ...(index === 14 ? { title: "20h · pede 2, tem 1" } : {}) })),
+          },
+        ]
+      : undefined;
+
+  it("draws the host's lines under the group's rows, one cell per hour, the marked hour flagged with its words", () => {
+    renderRuler({ groupFooter: footer });
+    const need = screen.getByTestId("dr-footer-need");
+    expect(within(need).getByText("O movimento pede")).toBeTruthy();
+    const marked = need.querySelectorAll("[data-marked]");
+    expect(marked).toHaveLength(1);
+    expect(marked[0]?.getAttribute("title")).toBe("20h · pede 2, tem 1");
+    expect(screen.getByRole("img", { name: "Média de entregas/hora" })).toBeTruthy();
+    // The footer follows its group's rows.
+    const row = screen.getByTestId("dr-row-luiz");
+    expect(row.compareDocumentPosition(need) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("draws nothing for a group the host gives no lines", () => {
+    renderRuler({ groupFooter: () => undefined });
+    expect(screen.queryByTestId("dr-footer-need")).toBeNull();
+  });
+});
