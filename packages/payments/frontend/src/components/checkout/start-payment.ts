@@ -45,13 +45,12 @@ function handOverToProvider(
   navigate: CheckoutNavigate,
   tenantSlug?: string,
   basket?: CheckoutBasketIdentity,
-  park = true,
 ): boolean {
   if (!order.hostedCheckoutUrl) return false;
-  if (!park) {
-    navigate(order.hostedCheckoutUrl);
-    return true;
-  }
+  // PARKED EVEN ON A MOUNT THAT KEEPS OUT OF THE SLOT (`./hosted-parking`):
+  // the page this mount lives on is gone after the redirect, and the provider
+  // returns to the host's checkout route, whose resume is the only thing that
+  // can show the buyer the payment they just made.
   // PARK FIRST, navigate second. The order is the only thing the return trip
   // has to rehydrate from, and the navigation may tear this SPA down before
   // any later write lands.
@@ -151,7 +150,10 @@ export function routeRaisedOrder(
     navigate: CheckoutNavigate;
     tenantSlug: string | undefined;
     basket: CheckoutBasketIdentity | undefined;
-    /** `false`: a mount that keeps out of the parked slot (`./hosted-parking`). */
+    /**
+     * `false`: a mount that keeps out of the parked slot (`./hosted-parking`)
+     * — the on-page parks are skipped; a hand-off still parks.
+     */
     park?: boolean;
     setOrder: Dispatch<SetStateAction<CheckoutOrder | null>>;
     setFinalStatus: Dispatch<SetStateAction<OrderStatus | null>>;
@@ -173,7 +175,7 @@ export function routeRaisedOrder(
     setStep("status");
     return;
   }
-  if (handOverToProvider(order, navigate, tenantSlug, basket, park)) return;
+  if (handOverToProvider(order, navigate, tenantSlug, basket)) return;
   // PARKED EVEN THOUGH NOBODY IS LEAVING (FUT-1140). A low-memory phone
   // discards this tab while the shopper is in their bank app, and the SPA
   // that comes back has never heard of the order it raised — so the buyer

@@ -223,6 +223,8 @@ interface ListHost {
   settlement?: SettlementCheckout;
   /** The host's "the order settled PAID" port. */
   onPaid?: () => void;
+  /** `CheckoutFlow`'s `parkHostedOrders`; absent ⇒ the prop is not passed at all. */
+  parkHostedOrders?: boolean;
 }
 
 export function listFlow(host: ListHost): JSX.Element {
@@ -255,6 +257,7 @@ export function listFlow(host: ListHost): JSX.Element {
           paymentList={{ copy: PT_BR_PAYMENT_LIST_COPY, ...host.list }}
           components={host.components}
           settlement={host.settlement}
+          {...(host.parkHostedOrders === undefined ? {} : { parkHostedOrders: host.parkHostedOrders })}
         />
       </CheckoutNavigateProvider>
     </CheckoutClientProvider>

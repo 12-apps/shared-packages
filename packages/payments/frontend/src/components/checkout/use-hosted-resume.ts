@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
-import { useHostedParking } from "./hosted-parking";
+import { useForgetHostedOrder, useHostedParking } from "./hosted-parking";
 import { useCheckoutClientApi } from "./client-context";
 import {
-  forgetHostedOrder,
   takeHostedOrder,
   type HostedResumeStep,
 } from "./hosted-return";
@@ -189,6 +188,7 @@ function useAskBeforeResuming(
   onDrop: () => void,
 ): void {
   const client = useCheckoutClientApi();
+  const forgetHostedOrder = useForgetHostedOrder();
   useEffect(() => {
     if (!asking) return undefined;
     let live = true;
@@ -205,7 +205,7 @@ function useAskBeforeResuming(
     return () => {
       live = false;
     };
-  }, [asking, client, onDrop, onResume]);
+  }, [asking, client, onDrop, onResume, forgetHostedOrder]);
 }
 
 /** Whether the wait for the host's cart has run out — see {@link BASKET_WAIT_MS}. */
@@ -236,6 +236,7 @@ function useRelease(
   onReleased: () => void,
 ): { run: () => void; releasing: boolean } {
   const client = useCheckoutClientApi();
+  const forgetHostedOrder = useForgetHostedOrder();
   const [releasing, setReleasing] = useState(false);
   const run = useCallback(() => {
     if (!order || releasing) return;
@@ -255,7 +256,7 @@ function useRelease(
       forgetHostedOrder();
       onReleased();
     });
-  }, [client, order, releasing, onSettled, onReleased]);
+  }, [client, order, releasing, onSettled, onReleased, forgetHostedOrder]);
   return { run, releasing };
 }
 

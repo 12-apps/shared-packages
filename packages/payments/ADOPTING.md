@@ -572,6 +572,7 @@ order CREATION never enter the package; they arrive as explicit props:
 | `confirmationFooter` | no | host content on the PAID confirmation, BELOW the action row — put what is merely OFFERED here (an install invite, an ask to turn alerts on), so a panel never lands between two controls |
 | `backActionEmphasis` | no | `"secondary"` when the host renders its own lead action in `confirmationExtra`, so the flow's "back to the menu" stands down instead of being a second primary. Read on PAID only; defaults to `"primary"` |
 | `paymentList` | **yes** | the Pagamento step — see "The Pagamento step as ONE list" below |
+| `parkHostedOrders` | no | `false` for a SECOND mount of the flow that pays something you already track yourself (a pedido paid again from its own page): it keeps out of the parked-payment slot your one checkout uses — see the parking paragraph below. Defaults to `true`; `createPaymentFlows`' Checkout screen does not pass it |
 
 **Three copy keys are new and REQUIRED on this bump**, and a hand-written pack
 that misses one fails at RUNTIME rather than at compile time if the host does
@@ -612,6 +613,20 @@ not only a hand-off (FUT-1140), so a discarded tab comes back to the payment it
 raised rather than to an empty cart; and a resumed order lands on the
 confirmation for a hand-off and back on the PAYMENT step for a code raised on
 our own page, because that code is still what the buyer needs to look at.
+
+**A second mount keeps out of the slot: `parkHostedOrders={false}`.** The slot
+is one per tab, shared by every mount of the flow. A host that mounts the flow
+again to pay something it already tracks (a pedido paid again from its own
+page) passes `false` there. That mount then does not park an order it raises
+on the page, including one that comes back already settled. It does not resume
+the slot on mount, and it forgets nothing. So the next checkout never resumes
+that mount's Pix over a basket nobody ordered, and the mount never takes the
+checkout's parked payment as its own.
+
+What it KEEPS is the hand-off: a provider's redirect, a card's or a wallet's
+3-D Secure still parks. The mount's page is gone after the redirect, the
+provider returns to your checkout route, and that entry is what lets the route
+open the confirmation for the payment the buyer just made.
 
 **Pass the same basket to `hostedCheckoutReturnPending(slug, basket)`.** That
 predicate is what a host gate in front of the checkout route asks — a

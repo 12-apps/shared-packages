@@ -117,11 +117,12 @@ export interface CheckoutFlowProps extends CheckoutHostPorts {
    */
   paymentList: CheckoutPaymentList;
   /**
-   * `false` keeps this mount out of the tab's parked-payment slot: it neither
-   * parks what it raises, nor resumes, nor forgets what the host's checkout
-   * parked. For a second mount that pays something the host tracks itself (a
-   * pedido paid again from its own page). Default `true`. See
-   * `./hosted-parking.ts`.
+   * `false` keeps this mount out of the tab's parked-payment slot: it does not
+   * park what it raises on the page, does not resume, and does not forget what
+   * the host's checkout parked. A hand-off (provider redirect, 3-D Secure)
+   * still parks, because the return trip lands on the host's checkout route.
+   * For a second mount that pays something the host tracks itself (a pedido
+   * paid again from its own page). Default `true`. See `./hosted-parking.ts`.
    */
   parkHostedOrders?: boolean;
 }

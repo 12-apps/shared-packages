@@ -15,9 +15,17 @@ import { forgetHostedOrder } from "./hosted-store";
  * own mount took the checkout's parked Pix, polled that order and closed as
  * paid.
  *
- * `false` (`CheckoutFlow`'s `parkHostedOrders`) makes the mount neither park,
- * nor resume, nor forget: the slot stays exactly as the host's checkout left
- * it. Default `true`, which is every mount before this existed.
+ * `false` (`CheckoutFlow`'s `parkHostedOrders`) skips what happens ON THE
+ * PAGE: the park of an order raised here (and of one that came back already
+ * settled), the resume on mount, and every forget — so the slot stays as the
+ * host's checkout left it. A HAND-OFF still parks (the provider's redirect,
+ * a card's or a wallet's 3-D Secure): the page this mount lives on is gone
+ * after it, the provider returns to the host's checkout route, and the entry
+ * is what lets that route show the buyer the payment they made. Default
+ * `true`, which is every mount before this existed.
+ *
+ * `createPaymentFlows`' Checkout screen does not pass this: it is the host's
+ * one checkout, and always parks.
  */
 export const HostedParkingContext = createContext(true);
 
