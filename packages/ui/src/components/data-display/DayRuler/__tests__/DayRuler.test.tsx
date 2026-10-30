@@ -6,8 +6,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { PT_BR_UI_LABELS } from "../../../../pt-BR.labels";
 import { DayRuler } from "../DayRuler";
+import { DAY_RULER_LABELS } from "../DayRuler.labels";
 import { createdSpan, formatHour, formatRange, hourAt, moved, percentOf, resized, ticksOf } from "../day-ruler-model";
 import type { DayRulerProps } from "../DayRuler.types";
 
@@ -66,7 +66,7 @@ function renderRuler(overrides: Partial<DayRulerProps> = {}) {
     onMove: vi.fn(),
     onResize: vi.fn(),
     onBlockClick: vi.fn(),
-    labels: PT_BR_UI_LABELS.dayRuler,
+    labels: DAY_RULER_LABELS['pt-BR'],
     "aria-label": "Escala do dia",
     dataTestId: "dr",
     ...overrides,

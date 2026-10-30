@@ -1,8 +1,7 @@
-import type { CSSObject, SxProps, Theme } from '@mui/material/styles/index.js';
+import { alpha, type CSSObject, type SxProps, type Theme } from '@mui/material/styles/index.js';
 
 import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height.core';
 import { rem, sxRem } from '../../../tokens/relative';
-import { softSignal } from '../../../tokens/surfaces';
 import { actualBarColor, blockToneStyles, breakHatch } from '../ScheduleGrid/schedule-tones';
 import type { ScheduleBlockTone } from '../ScheduleGrid/ScheduleGrid.types';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
@@ -58,19 +57,35 @@ export function coverageSx(hours: number): SxProps<Theme> {
   });
 }
 
+/**
+ * How strongly a staffed hour is filled: the prototype's tonal success step, deeper with each
+ * person on the escala (0.18 + 0.09 per person, at most 0.85). An empty hour has none.
+ */
+export function coverageStrength(count: number): number {
+  if (count <= 0) return 0;
+  return Math.min(0.85, 0.18 + count * 0.09);
+}
+
 export function coverageCellSx(count: number): SxProps<Theme> {
-  return (theme: Theme) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: rem(theme, M.coverage.font),
-    borderRadius: rem(theme, M.coverage.radius),
-    color: theme.palette.text.primary,
-    backgroundColor: count > 0 ? softSignal(theme, 'success') : theme.palette.action.hover,
-    border: count > 0 ? `1px solid ${theme.palette.success.main}` : '1px solid transparent',
-    minWidth: 0,
-    overflow: 'hidden',
-  });
+  return (theme: Theme) => {
+    const strength = coverageStrength(count);
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: rem(theme, M.coverage.font),
+      borderRadius: rem(theme, M.coverage.radius),
+      color: theme.palette.text.primary,
+      // A tonal fill, as the prototype's coverage line draws it — never an outline (FUT-3831). It is
+      // the success colour over the page, so a staffed hour is LIGHTER than an empty one in dark mode
+      // and plainly green in light, where the soft-signal blend read as the empty grey. The hairline
+      // stays transparent so a count never shifts its cell.
+      backgroundColor: strength > 0 ? alpha(theme.palette.success.main, strength) : theme.palette.action.hover,
+      border: '1px solid transparent',
+      minWidth: 0,
+      overflow: 'hidden',
+    };
+  };
 }
 
 export const axisSx: SxProps<Theme> = (theme: Theme) => ({

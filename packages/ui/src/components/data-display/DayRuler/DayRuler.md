@@ -55,7 +55,7 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 | `onCreate` / `onMove` / `onResize` / `onBlockClick` | see Gestures | Each is offered only when its handler is given. |
 | `loading` / `error` / `empty` | `boolean` / node / node | Skeleton rows with `aria-busy`; the host's error; the host's empty sentence. |
 | `aria-label` | `string?` | The region's name. |
-| `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`. Default: the English pack; pt-BR: `UI_LABELS['pt-BR'].dayRuler`. |
+| `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`. Default: the English pack; pt-BR: `DAY_RULER_LABELS['pt-BR']` from `@12-apps/ui/data-display/DayRuler`. |
 | `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
 
 Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over a faint ground.

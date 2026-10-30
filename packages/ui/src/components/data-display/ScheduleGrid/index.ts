@@ -9,4 +9,5 @@ export type {
   ScheduleGridProps,
   ScheduleGridRow,
 } from './ScheduleGrid.types';
-export type { ScheduleGridLabels } from '../../../copy/labels';
+export { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
+export type { ScheduleGridLabels } from './ScheduleGrid.labels';

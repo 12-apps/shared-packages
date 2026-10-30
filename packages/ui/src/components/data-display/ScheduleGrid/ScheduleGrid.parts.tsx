@@ -3,7 +3,7 @@ import Box from '@mui/material/Box/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import type * as React from 'react';
 
-import type { ScheduleGridLabels } from '../../../copy/labels';
+import type { ScheduleGridLabels } from './ScheduleGrid.labels';
 import { daysBetween, isOpen } from './schedule-grid-model';
 import { SCHEDULE_GRID_METRICS } from './ScheduleGrid.metrics';
 import {
@@ -21,9 +21,11 @@ import {
   personRowSx,
   plusButtonSx,
   skeletonCellSx,
+  SR_ONLY_SX,
   totalCellSx,
   totalHeaderSx,
 } from './ScheduleGrid.styles';
+import type { CellLook } from './ScheduleGrid.styles';
 import type {
   ScheduleGridBlock,
   ScheduleGridCell,
@@ -178,18 +180,35 @@ function CellFill({ props, ghost }: { props: CellProps; ghost: string | null }):
   );
 }
 
-/** One day of one row: its blocks, a "+" when it is empty, the hatch when it is closed. */
-export function GridCell(props: CellProps): React.JSX.Element {
-  const { row, day, column, cell, drag, can, labels, testId } = props;
-  const ghost = ghostFor(props);
-  const blocked = Boolean(cell.blocked);
-  const look = {
+/** A gone day's words for a screen reader ("Já passou"): visually hidden, and only when the host gives them. */
+function ClosedWords({ cell }: { cell: ScheduleGridCell }): React.JSX.Element | null {
+  if (!cell.closed || cell.blocked || !cell.closedLabel) return null;
+  return (
+    <Box component="span" sx={SR_ONLY_SX}>
+      {cell.closedLabel}
+    </Box>
+  );
+}
+
+/** How the cell is drawn right now. */
+function lookOf(props: CellProps, ghost: string | null): CellLook {
+  const { row, day, column, cell, drag, can } = props;
+  return {
     today: Boolean(column.today),
-    blocked,
+    blocked: Boolean(cell.blocked),
+    closed: Boolean(cell.closed),
     target: ghost !== null,
     over: drag?.mode === 'move' && drag.moved && drag.rowId === row.id && drag.day === day,
     interactive: can.create && isOpen(cell),
   };
+}
+
+/** One day of one row: its blocks, a "+" when it is empty, the hatch when it is closed. */
+export function GridCell(props: CellProps): React.JSX.Element {
+  const { row, day, column, cell, can, labels, testId } = props;
+  const ghost = ghostFor(props);
+  const look = lookOf(props, ghost);
+  const blocked = look.blocked;
   const closedName = blocked && cell.blocks.length === 0 ? (cell.blockedLabel ?? labels.blockedCell(row.label, column.label)) : undefined;
   return (
     <Box
@@ -214,6 +233,7 @@ export function GridCell(props: CellProps): React.JSX.Element {
         />
       ))}
       <CellFill props={props} ghost={ghost} />
+      <ClosedWords cell={cell} />
     </Box>
   );
 }
@@ -245,7 +265,12 @@ export function GridHeader({ columns, totalLabel, rowSx, testId }: HeaderProps):
       {/* Above the names: a cell of the header row, with nothing to head. */}
       <span role="cell" data-sg-corner="" />
       {columns.map((column, day) => (
-        <Box role="columnheader" key={`${day}-${column.label}`} sx={headerCellSx(Boolean(column.today))}>
+        <Box
+          role="columnheader"
+          key={`${day}-${column.label}`}
+          sx={headerCellSx(Boolean(column.today), Boolean(column.past))}
+          data-sg-past={column.past ? '' : undefined}
+        >
           <span data-sg-col="full" title={column.label}>
             {keepDatesWhole(column.label)}
           </span>

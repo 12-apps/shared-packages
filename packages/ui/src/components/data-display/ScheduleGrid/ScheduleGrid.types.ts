@@ -1,6 +1,6 @@
 import type * as React from 'react';
 
-import type { ScheduleGridLabels } from '../../../copy/labels';
+import type { ScheduleGridLabels } from './ScheduleGrid.labels';
 
 /**
  * How a block reads. Each tone is drawn differently AND carries its `note`
@@ -21,6 +21,12 @@ export interface ScheduleGridColumn {
   sublabel?: string;
   /** Today's column: its label in the primary colour and its cells framed. */
   today?: boolean;
+  /**
+   * The day has gone: its label in the secondary ink (`today` wins). The
+   * header only — the cells that can take no new turno say so themselves
+   * (`ScheduleGridCell.closed`).
+   */
+  past?: boolean;
 }
 
 /** A row: one person (or resource) across the days. */
@@ -95,6 +101,20 @@ export interface ScheduleGridCell {
   blocked?: boolean;
   /** Written in a blocked cell with no blocks ("Afastamento"). */
   blockedLabel?: string;
+  /**
+   * The day can take no new turno (it has gone). No "+", the empty cell is no
+   * focus stop, a create or copy drag skips it and a move or keyboard
+   * copy/move onto it is refused — as on a `blocked` day — but with no hatch
+   * and no label: the cell just looks empty. Blocks already there still show
+   * and still open. Drawn with no fill, only the divider border.
+   */
+  closed?: boolean;
+  /**
+   * A closed cell's words for a screen reader ("Já passou"), visually hidden;
+   * nothing on screen. Without it the cell stays unnamed. Ignored on a
+   * `blocked` cell, which has its own name.
+   */
+  closedLabel?: string;
 }
 
 export interface ScheduleGridProps {
@@ -112,12 +132,12 @@ export interface ScheduleGridProps {
   readOnly?: boolean;
   /**
    * A click on an empty cell (one day), or a drag across empty cells of one
-   * row (every crossed day that is empty and not blocked).
+   * row (every crossed day that is empty, not blocked and not closed).
    */
   onCreate?: (rowId: string, days: number[]) => void;
-  /** A block's edge grip dragged along its row: the crossed days that are empty and not blocked. */
+  /** A block's edge grip dragged along its row: the crossed days that are empty, not blocked and not closed. */
   onCopy?: (blockId: string, days: number[]) => void;
-  /** A block's middle dropped on an empty, open cell of any row. */
+  /** A block's middle dropped on an empty, open cell of any row (never a blocked or closed one). */
   onMove?: (blockId: string, toRowId: string, toDay: number) => void;
   /** A block clicked, tapped or Entered. */
   onBlockClick?: (blockId: string) => void;
@@ -129,6 +149,17 @@ export interface ScheduleGridProps {
   error?: React.ReactNode;
   /** Shown when there are no rows at all. */
   empty?: React.ReactNode;
+  /**
+   * A day (its index in `columns`) to open the days on, once per value: as
+   * soon as the days are drawn (after `loading`, and once the grid has a
+   * width), they scroll sideways so that day is the first column after the
+   * pinned names (or as far as they reach) — today, on a week opened
+   * mid-week. At once, never smoothly; focus and the page's own scroll are
+   * left alone, and the header row follows. The same value on a later render
+   * keeps the person's own scroll, and a resize does not re-anchor. Nothing
+   * happens while the days fit. Assumes LTR.
+   */
+  scrollToDay?: number;
   /** The header row sticks this far from the top of the scroll container (a sticky page bar above). Default 0. */
   stickyTop?: number;
   /** The grid's accessible name ("Escala da semana"). */

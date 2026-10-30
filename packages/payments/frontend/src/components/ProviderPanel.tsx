@@ -257,6 +257,39 @@ function environmentChrome(
   };
 }
 
+/**
+ * The OAuth panel's manual path, assembled.
+ *
+ * The open path is a bare box (`PathSwitch`), so every block in it sets the
+ * card's inset itself, as in the rest of the unpadded body. The walkthrough
+ * and the form (`ProviderForm`) carry their own; the switch and its notice did
+ * not, and ran into the card's edges (FUT-4144).
+ */
+function manualPathForm({
+  selector,
+  notice,
+  walkthrough,
+  credentials,
+}: {
+  selector: ReactNode;
+  notice: ReactNode;
+  walkthrough: ReactNode;
+  credentials: ReactNode;
+}): ReactNode {
+  return (
+    <Stack spacing={2}>
+      {selector || notice ? (
+        <Stack spacing={2} sx={{ px: CARD_INSET }}>
+          {selector}
+          {notice}
+        </Stack>
+      ) : null}
+      {walkthrough}
+      {credentials}
+    </Stack>
+  );
+}
+
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
@@ -307,14 +340,7 @@ export function ActivePanel(props: ActivePanelProps) {
       {...props}
       statusBar={statusBar}
       walkthrough={(path: 'oauth' | 'credentials') => oauthWalkthrough(props, path)}
-      form={
-        <Stack spacing={2}>
-          {selector}
-          {notice}
-          {oauthWalkthrough(props, 'credentials')}
-          {credentials}
-        </Stack>
-      }
+      form={manualPathForm({ selector, notice, walkthrough: oauthWalkthrough(props, 'credentials'), credentials })}
     />
   );
 }

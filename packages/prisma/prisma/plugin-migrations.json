@@ -49,6 +49,7 @@
     "20261003120000_add_chat_thread_activity_index",
     "20261006120000_shift_slots",
     "20261009200000_auth_sign_in_grant",
-    "20261027120000_shift_slot_series"
+    "20261027120000_shift_slot_series",
+    "20261029120000_rbac_effective_grants"
   ]
 }

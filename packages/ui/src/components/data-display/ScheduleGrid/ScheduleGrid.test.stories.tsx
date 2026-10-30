@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { PT_BR_UI_LABELS } from '../../../pt-BR.labels';
 import { ScheduleGrid } from './ScheduleGrid';
+import { SCHEDULE_GRID_LABELS } from './ScheduleGrid.labels';
 import type { ScheduleGridCell } from './ScheduleGrid.types';
 
 /**
@@ -54,7 +54,7 @@ const meta: Meta<typeof ScheduleGrid> = {
     cell,
     totalLabel: 'horas',
     createPreview: () => '08:00–14:00',
-    labels: PT_BR_UI_LABELS.scheduleGrid,
+    labels: SCHEDULE_GRID_LABELS['pt-BR'],
     'aria-label': 'Escala da semana',
     dataTestId: 'sg',
     onCreate: fn(),
@@ -588,4 +588,270 @@ export const KeyboardCreateFocusesTheNewBlock: Story = {
     await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('ana', [3]));
     await waitFor(() => expect(canvas.getByTestId('sg-block-new-ana-3')).toHaveFocus());
   },
+};
+
+/**
+ * FUT-3831: a week that started before today. Monday and Tuesday have gone
+ * (`closed`): Ana's Monday turno is still there, everything else on them is
+ * empty and takes no new turno. Wednesday is today.
+ */
+const CLOSED_COLUMNS = COLUMNS.map((column, day) => ({ label: column.label, sublabel: 'ninguém', today: day === 2, past: day < 2 }));
+const CLOSED_CELLS: Record<string, ScheduleGridCell> = {
+  'ana:0': { blocks: [{ id: 'p1', label: '08:00–14:00', tone: 'plan', movable: true, copyable: true }], closed: true },
+  'ana:1': { blocks: [], closed: true },
+  'ana:3': { blocks: [{ id: 'k1', label: '11:00–19:00', tone: 'plan', movable: true, copyable: true }] },
+  'bia:0': { blocks: [], closed: true, closedLabel: 'Já passou' },
+  'bia:1': { blocks: [], closed: true, closedLabel: 'Já passou' },
+};
+const closedArgs = {
+  columns: CLOSED_COLUMNS,
+  cell: (rowId: string, day: number): ScheduleGridCell => CLOSED_CELLS[`${rowId}:${day}`] ?? { blocks: [] },
+};
+
+/** A closed day draws no "+", no hatch and no label, and Tab and the arrows pass over it. */
+export const ClosedDayHasNoPlusAndNoTabStop: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const closed = canvas.getByTestId('sg-cell-ana-1');
+    await waitFor(() => expect(within(closed).queryByRole('button')).toBeNull());
+    await expect(closed.textContent).toBe('');
+    await expect(closed).not.toHaveAttribute('aria-label');
+    await expect(getComputedStyle(closed).backgroundImage).toBe('none');
+    await expect(within(canvas.getByTestId('sg-cell-ana-2')).getByRole('button')).toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId('sg-block-p1'));
+    await waitFor(() => expect(canvas.getByTestId('sg-block-p1')).toHaveFocus());
+    await userEvent.tab();
+    const afterTab = canvasElement.ownerDocument.activeElement as HTMLElement;
+    await expect(afterTab.dataset.sgRow).toBe('ana');
+    await expect(afterTab.dataset.sgDay).toBe('2');
+    await userEvent.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(canvas.getByTestId('sg-block-p1')).toHaveFocus());
+  },
+};
+
+/** A create drag across the gone days lands only on the open ones, and draws no ghost on a closed day. */
+export const DragSkipsAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(within(canvas.getByTestId('sg-cell-bia-3')).getByRole('button'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-0'));
+    await settle();
+    await waitFor(() => expect(canvas.getByTestId('sg-cell-bia-2')).toHaveTextContent('08:00–14:00'));
+    await expect(canvas.getByTestId('sg-cell-bia-1')).not.toHaveTextContent('08:00–14:00');
+    lift(canvas.getByTestId('sg-cell-bia-0'));
+    await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith('bia', [2, 3]));
+    await expect(args.onCreate).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** A move dropped on a closed day does nothing; a copy dragged across one skips it; an open day still takes both. */
+export const MoveAndCopyRefuseAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(canvas.getByTestId('sg-block-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-1'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-1'));
+    await waitFor(() => expect(args.onMove).not.toHaveBeenCalled());
+    press(canvas.getByTestId('sg-grip-l-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-2'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-1'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-ana-1'));
+    await waitFor(() => expect(args.onCopy).toHaveBeenCalledWith('k1', [2]));
+    press(canvas.getByTestId('sg-block-k1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-2'));
+    await waitFor(() => expect(args.onMove).toHaveBeenCalledWith('k1', 'bia', 2));
+    await expect(args.onMove).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** A turno on a gone day still shows and still opens. */
+export const BlockOnAClosedDayStillOpens: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('sg-block-p1')).toHaveTextContent('08:00–14:00');
+    await userEvent.click(canvas.getByTestId('sg-block-p1'));
+    await waitFor(() => expect(args.onBlockClick).toHaveBeenCalledWith('p1'));
+  },
+};
+
+/** A block on a gone day still copies and moves OUT of it: only the days it lands on must be open. */
+export const MoveAndCopyOutOfAClosedDay: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    press(canvas.getByTestId('sg-grip-r-p1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-ana-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-ana-2'));
+    await waitFor(() => expect(args.onCopy).toHaveBeenCalledWith('p1', [2]));
+    press(canvas.getByTestId('sg-block-p1'));
+    await settle();
+    over(canvas.getByTestId('sg-cell-bia-2'));
+    await settle();
+    lift(canvas.getByTestId('sg-cell-bia-2'));
+    await waitFor(() => expect(args.onMove).toHaveBeenCalledWith('p1', 'bia', 2));
+    await expect(args.onBlockClick).not.toHaveBeenCalled();
+  },
+};
+
+/** A gone day draws no fill (only the divider border), its header reads in the secondary ink, and its words are for a screen reader only. */
+export const ClosedDayLooksQuietAndIsNamedForScreenReaders: Story = {
+  args: closedArgs,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const closed = canvas.getByTestId('sg-cell-bia-1');
+    const open = canvas.getByTestId('sg-cell-bia-3');
+    await expect(getComputedStyle(closed).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    await expect(getComputedStyle(open).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(getComputedStyle(closed).borderTopColor).toBe(getComputedStyle(open).borderTopColor);
+    const headers = canvas.getAllByRole('columnheader');
+    const ink = (el: Element): string => getComputedStyle(el).color;
+    const sublabel = within(headers[0] as HTMLElement).getByText('ninguém');
+    await expect(ink(headers[0] as HTMLElement)).toBe(ink(sublabel));
+    await expect(ink(headers[3] as HTMLElement)).not.toBe(ink(headers[0] as HTMLElement));
+    await expect(ink(headers[2] as HTMLElement)).not.toBe(ink(headers[3] as HTMLElement));
+    const words = within(closed).getByText('Já passou');
+    const box = words.getBoundingClientRect();
+    await expect(box.width * box.height).toBeLessThanOrEqual(1);
+    await expect(getComputedStyle(words).clip).toBe('rect(0px, 0px, 0px, 0px)');
+    await expect(canvas.getByTestId('sg-cell-ana-1').textContent).toBe('');
+  },
+};
+
+/**
+ * Day `day`'s left edge sits right after the pinned names (and the gap), and its header is over it —
+ * or, when the days cannot scroll that far, they are at the end of their reach with the day whole.
+ */
+async function opensOn(canvasElement: HTMLElement, day: number): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const names = canvas.getAllByRole('rowheader')[0] as HTMLElement;
+  const gap = Number.parseFloat(getComputedStyle(canvas.getByTestId('sg-row-ana')).columnGap) || 0;
+  const target = canvas.getByTestId(`sg-cell-ana-${day}`);
+  const header = canvas.getAllByRole('columnheader')[day] as HTMLElement;
+  const firstAfterNames = (): number => target.getBoundingClientRect().left - (names.getBoundingClientRect().right + gap);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  const atTheEnd = (): boolean => body.scrollLeft >= body.scrollWidth - body.clientWidth - 1;
+  await waitFor(() => expect(Math.abs(firstAfterNames()) <= 1 || (atTheEnd() && firstAfterNames() > 0)).toBe(true));
+  await expect(target.getBoundingClientRect().right).toBeLessThanOrEqual(body.getBoundingClientRect().right + 0.5);
+  await expect(Math.abs(header.getBoundingClientRect().left - target.getBoundingClientRect().left)).toBeLessThanOrEqual(1);
+}
+
+/** A host that re-renders with the same day, and moves to another one. */
+function ScrollToDayHost(args: React.ComponentProps<typeof ScheduleGrid>): React.JSX.Element {
+  const [day, setDay] = useState(3);
+  const [renders, setRenders] = useState(0);
+  return (
+    <div>
+      <button type="button" onClick={() => setRenders(renders + 1)}>
+        Redesenhar ({renders})
+      </button>
+      <button type="button" onClick={() => setDay(1)}>
+        Ir para terça
+      </button>
+      <ScheduleGrid {...args} totalLabel={renders % 2 ? 'horas' : 'h'} scrollToDay={day} />
+    </div>
+  );
+}
+
+/**
+ * The Turnos review (FUT-3831): at a 900px and a 768px window the days scroll
+ * sideways and a week opened on a Thursday showed three gone days and today as
+ * a sliver. `scrollToDay` opens it on Thursday, first after the names, at
+ * once, without taking focus or moving the page; the person's own scroll then
+ * survives a re-render with the same day, and a new day scrolls again.
+ */
+async function scrollToDay(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const head = canvas.getByTestId('sg-head');
+  const page = canvasElement.ownerDocument.defaultView;
+  if (!page) throw new Error('no window');
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  await opensOn(canvasElement, 3);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(head.scrollLeft).toBe(body.scrollLeft);
+  await expect(canvasElement.contains(canvasElement.ownerDocument.activeElement)).toBe(false);
+  await expect(page.scrollY).toBe(0);
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  body.scrollLeft = 20;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await waitFor(() => expect(head.scrollLeft).toBe(20));
+  const redraw = canvas.getByRole('button', { name: /Redesenhar/ });
+  await userEvent.click(redraw);
+  await waitFor(() => expect(redraw).toHaveTextContent('Redesenhar (1)'));
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(body.scrollLeft).toBe(20);
+  const tuesday = canvas.getByRole('button', { name: 'Ir para terça' });
+  await userEvent.click(tuesday);
+  await opensOn(canvasElement, 1);
+  await waitFor(() => expect(tuesday).toHaveFocus());
+}
+
+export const ScrollToDay836: Story = {
+  args: tabletArgs,
+  decorators: pane(836),
+  render: (args) => <ScrollToDayHost {...args} />,
+  play: async ({ canvasElement }) => scrollToDay(canvasElement),
+};
+export const ScrollToDay704: Story = {
+  args: tabletArgs,
+  decorators: pane(704),
+  render: (args) => <ScrollToDayHost {...args} />,
+  play: async ({ canvasElement }) => scrollToDay(canvasElement),
+};
+
+/**
+ * The Turnos review (FUT-3831): scrolled sideways, a group's title ("COZINHA")
+ * slid off under the pinned names and read "IA". It is pinned with the names:
+ * whole and at the days' left edge at every scroll, the far end included.
+ */
+async function groupTitleStays(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const body = canvas.getByTestId('sg-scroll');
+  const title = canvasElement.querySelector<HTMLElement>('[data-sg-group-title]');
+  if (!title) throw new Error('no group title');
+  await waitFor(() => expect(getComputedStyle(body).overflowX).toBe('auto'));
+  const width = title.getBoundingClientRect().width;
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  for (const left of [0, 200, body.scrollWidth]) {
+    // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+    body.scrollLeft = left;
+    await waitFor(() => expect(Math.abs(title.getBoundingClientRect().left - body.getBoundingClientRect().left)).toBeLessThanOrEqual(0.5));
+    await expect(title.getBoundingClientRect().width).toBe(width);
+  }
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is scrolling itself: the pane's width is pinned by the story's wrapper
+  await expect(body.scrollLeft).toBeGreaterThan(0);
+}
+
+const kitchenArgs = {
+  ...tabletArgs,
+  groups: [{ title: 'Cozinha', rows: [{ id: 'ana', label: 'Ana Lima', total: '8h' }, { id: 'bia', label: 'Bia Souza', total: '—' }] }],
+};
+
+export const GroupTitleStaysPinned836: Story = { args: kitchenArgs, decorators: pane(836), play: async ({ canvasElement }) => groupTitleStays(canvasElement) };
+export const GroupTitleStaysPinnedFourteenDays: Story = {
+  args: { ...kitchenArgs, columns: FORTNIGHT },
+  decorators: laptop(1216),
+  play: async ({ canvasElement }) => groupTitleStays(canvasElement),
 };

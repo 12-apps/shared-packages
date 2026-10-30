@@ -6,6 +6,7 @@ import type { JSX, ReactNode } from 'react';
 import type { ProviderSetupGuide as Guide, SetupSection } from '@12-apps/payments-backend';
 
 import { DoneRow } from './CredentialFields';
+import { INSET_FORM_SX } from './panel-tokens';
 import { ProviderSetupGuide } from './ProviderSetupGuide';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
@@ -180,7 +181,7 @@ export function SetupGuideSection({
   sectionFooter,
   editing = false,
   stored = true,
-}: SetupGuideSectionProps): JSX.Element {
+}: SetupGuideSectionProps): JSX.Element | null {
   // No walkthrough — PagBank ships none, because under Connect the platform is
   // reviewed centrally and the owner has nothing to follow. The SLOTS still
   // have to render: they are the credential form, and swallowing them left a
@@ -190,18 +191,14 @@ export function SetupGuideSection({
   // unpadded body does (`ProviderCard`) — a guide's step panel carries it for
   // them, and without one the boxes ran into the card's edges.
   if (!guide) {
+    // Nothing to place (the walkthrough slot on an OAuth manual path, with the
+    // form elsewhere): no box, so the stack around it spaces nothing (FUT-4144).
+    if (!rows && !sectionFooter) return null;
     return (
       // The save bar and the saved-details row carry their own inset for the
       // guided layout; here the wrapper already supplies it, so theirs is zeroed
       // and their rule, text and button line up with the fields.
-      <Box
-        data-testid="payments-setup-unguided"
-        sx={{
-          px: '20px',
-          '& [data-testid="payments-form-bar"]': { px: 0 },
-          '& [data-testid="payments-credential-summary"]': { mx: 0 },
-        }}
-      >
+      <Box data-testid="payments-setup-unguided" sx={INSET_FORM_SX}>
         {rows}
         {sectionFooter}
       </Box>

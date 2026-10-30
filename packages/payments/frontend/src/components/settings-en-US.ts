@@ -143,6 +143,7 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     probeLocalRunning: 'Checking the details…',
     probeLocalSaveNote: 'We check the details before saving.',
     probeIncompleteNote: 'We kept what you have filled in. Complete the fields to test.',
+    probeIncompleteFreshNote: 'Complete the fields to test.',
     probeFailed: (environmentName) =>
       `Could not connect in ${environmentName}. Check the credentials for this environment.`,
     checkPass: 'Verified',

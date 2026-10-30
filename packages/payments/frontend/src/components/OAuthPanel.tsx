@@ -4,6 +4,7 @@ import { Alert, Box, Button } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import { ConnectionProbe } from './ConnectionProbe';
+import { isConnected } from './connection-state';
 import { BLOCK_GAP, CARD_INSET, LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
@@ -62,6 +63,41 @@ function PathSwitch({
 }
 
 /**
+ * The OAuth card on an installation with no connect button: the notice saying
+ * so, the manual form, the probe and the host's activation step.
+ *
+ * Every block sets the card's inset itself, as on the connect branch: this one
+ * had none, and its notice, probe and activation step ran into the card's
+ * edges (FUT-4144). The form insets its own blocks.
+ */
+function ConnectUnavailableCard({
+  statusBar,
+  notice,
+  probe,
+  verification,
+  children,
+}: {
+  statusBar: ReactNode;
+  notice: ReactNode;
+  probe: ReactNode;
+  verification: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <ProviderCard header={statusBar}>
+      <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP }}>
+        <Alert severity="info">{notice}</Alert>
+      </Box>
+      {children}
+      {probe ? <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box> : null}
+      {verification ? (
+        <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      ) : null}
+    </ProviderCard>
+  );
+}
+
+/**
  * The OAuth path: a connect button as the happy path, with the credential form
  * kept behind a disclosure.
  *
@@ -115,17 +151,16 @@ export function OAuthPanel({
   const [manual, setManual] = useState(false);
   // The connection probe, for a store whose connection is a grant: the form's
   // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
-  const probe = (
+  // Nothing to test before a connection, and then no box either: its padding
+  // alone left a ~32px hole under the path switch (FUT-4144).
+  const probe = isConnected(config) ? (
     <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
-  );
+  ) : null;
   if (!prepareConnect) {
     return (
-      <ProviderCard header={statusBar}>
-        <Alert severity="info">{copy.connectUnavailable}</Alert>
+      <ConnectUnavailableCard statusBar={statusBar} notice={copy.connectUnavailable} probe={probe} verification={verification}>
         {form}
-        {probe}
-        {verification}
-      </ProviderCard>
+      </ConnectUnavailableCard>
     );
   }
 
@@ -154,9 +189,11 @@ export function OAuthPanel({
           box above it and the manual link below it (FUT-4084). A host step
           that renders nothing leaves its box empty, and an empty box takes no
           gap. */}
-      <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      {verification ? (
+        <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      ) : null}
       {manual ? null : walkthrough('oauth')}
-      <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box>
+      {probe ? <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box> : null}
       {descriptor.credentialSchema.length > 0 ? (
         <PathSwitch
           label={copy.preferCredentials}
