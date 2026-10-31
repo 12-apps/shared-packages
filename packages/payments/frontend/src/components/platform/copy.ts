@@ -186,6 +186,8 @@ export interface HomologacaoEvidenceWalletsCopy {
   applePayCannotComplete: string;
   /** Why Apple Pay has no button here: the platform has no Apple Pay identity yet, or this browser has no sheet. */
   applePayAbsent: Record<AppleAbsence, string>;
+  /** Why Google Pay has no button: the host carries no Google Pay configuration for this seller. */
+  googlePayAbsent: string;
   /** A wallet holds its token: `card` is the network and last four the wallet showed — never the token. */
   ready: (wallet: string, card: string) => string;
   /** The sheet answered no token; pressing again retries. */
@@ -231,6 +233,19 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
   debitBlankHint: string;
   /** Why the charge button is not pressable yet. */
   incompleteData: string;
+  /** Why it is not pressable while the run's Pix may still move money. */
+  pixBlocksCharge: string;
+  /**
+   * Beside the form after a run: each scenario, recorded (its outcome is in
+   * the file, never guessed here), pending, or where the Pix stands.
+   */
+  scenarios: {
+    label: string;
+    names: { credit: string; debit: string; pix: string; googlePay: string; applePay: string };
+    recorded: string;
+    pending: string;
+    pix: Record<'AWAITING_PAYMENT' | 'REFUND_PENDING' | 'REFUNDED' | 'SKIPPED', string>;
+  };
   /** The primary action: charge R$ 1,00 per scenario and refund it. */
   charge: string;
   confirm: {

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { BrowserCardResult, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
+import type { BrowserCardResult, BrowserWalletResult, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
 import type { HomologacaoProductionEvidenceCardProps } from './HomologacaoProductionEvidenceCard';
 import type { ProductionPixView } from './ProductionPixPanel';
+import type { ProductionScenariosSent } from './ProductionScenarioList';
 import {
   authenticateRealDebit,
   buyerOf,
@@ -149,6 +150,16 @@ function useDownload(
   };
 }
 
+/** Which scenarios this browser had something to send for: a debit card that authenticated, a wallet's token. */
+function sentOf(cards: BrowserCardResult[], walletResults: BrowserWalletResult[]): ProductionScenariosSent {
+  const token = (type: BrowserWalletResult['type']) => walletResults.some((result) => result.type === type && Boolean(result.token));
+  return {
+    debit: cards.some((card) => card.scenario === 'debit' && !card.failure),
+    googlePay: token('GOOGLE_PAY'),
+    applePay: token('APPLE_PAY'),
+  };
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -159,7 +170,7 @@ export function useProductionRun(
   const [section, setSection] = useState<EvidenceRunSection | null>(null);
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
-  const [ran, setRan] = useState(false);
+  const [sent, setSent] = useState<ProductionScenariosSent | null>(null);
   const { pix, setPix, skip, skipping, pixOpen } = useProductionPix(props);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
@@ -190,7 +201,7 @@ export function useProductionRun(
       const cards = await browserCards(prepared, buyer.name, form.credit, form.debit);
       enter('running');
       setPix(await props.onRun(prepared.runId, cards, walletResults, setSection, buyer));
-      setRan(true);
+      setSent(sentOf(cards, walletResults));
       form.clearCards();
     } catch {
       setFailed(current);
@@ -215,7 +226,8 @@ export function useProductionRun(
     skipping,
     busy: phase !== 'idle',
     pixOpen,
-    charged: ran && !pixOpen,
+    sent,
+    charged: sent !== null && !pixOpen,
     run,
     download,
     skip,

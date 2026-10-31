@@ -22,6 +22,7 @@ import { EvidenceProgress } from './HomologacaoEvidenceProgress';
 import { EvidenceWalletBlock, useEvidenceWallets } from './HomologacaoEvidenceWallets';
 import { ProductionEvidenceForm } from './ProductionEvidenceForm';
 import { ProductionPixPanel, type ProductionPixView } from './ProductionPixPanel';
+import { ProductionScenarioList } from './ProductionScenarioList';
 import { useProductionForm, useProductionRun } from './use-production-run';
 
 /**
@@ -72,6 +73,16 @@ export interface HomologacaoProductionEvidenceCardProps {
   pixPollMs?: number;
 }
 
+/** Off a phone's screen but still read out: the one line above says the same to the eye. */
+const PHONE_HIDDEN_SX = {
+  position: { xs: 'absolute', sm: 'static' },
+  width: { xs: '1px', sm: 'auto' },
+  height: { xs: '1px', sm: 'auto' },
+  overflow: { xs: 'hidden', sm: 'visible' },
+  clip: { xs: 'rect(0 0 0 0)', sm: 'auto' },
+  whiteSpace: { xs: 'nowrap', sm: 'normal' },
+} as const;
+
 function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['stepper']; done: readonly boolean[] }): ReactNode {
   const labels = [copy.connect, copy.data, copy.charge, copy.download];
   const found = done.findIndex((isDone) => !isDone);
@@ -79,7 +90,7 @@ function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['step
   return (
     <Stack spacing={0.75}>
       {/* A phone has no room for four labels side by side: one line says where the operator is. */}
-      <Typography variant="caption" sx={{ display: { xs: 'block', sm: 'none' } }} data-testid="production-step-progress">
+      <Typography variant="caption" aria-hidden sx={{ display: { xs: 'block', sm: 'none' } }} data-testid="production-step-progress">
         {copy.progress(current + 1, labels.length, labels[current]!)}
       </Typography>
       <Box
@@ -100,7 +111,7 @@ function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['step
               variant="caption"
               fontWeight={index === current ? 600 : 400}
               color={done[index] || index === current ? 'text.primary' : 'text.secondary'}
-              sx={{ display: { xs: 'none', sm: 'block' } }}
+              sx={{ display: 'block', ...PHONE_HIDDEN_SX }}
             >
               {done[index] ? '✓ ' : ''}
               {index + 1} · {label}
@@ -143,7 +154,7 @@ function ConfirmDialog({
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ justifyContent: 'flex-start', px: 3, pb: 2 }}>
+      <DialogActions sx={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 1.5, px: 3, pb: 2, '& > :not(:first-of-type)': { ml: 0 } }}>
         <Button
           variant="contained"
           disabled={typed.trim().toLowerCase() !== copy.word}
@@ -202,13 +213,16 @@ type ProductionFlow = ReturnType<typeof useProductionRun>;
 
 /** Beside the form while it matters: the run's progress, then the Pix a person pays. */
 function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoProductionEvidenceCopy }): ReactNode {
-  if (!flow.busy && !flow.pix) return null;
+  if (!flow.busy && !flow.pix && !flow.sent) return null;
   return (
-    <Stack spacing={2} sx={{ flex: '1 1 320px', minWidth: 0 }}>
+    <Stack spacing={2.5} sx={{ flex: '1 1 320px', minWidth: 0 }}>
       {flow.phase !== 'idle' ? (
         <EvidenceProgress phase={flow.phase} section={flow.section} full={flow.phase !== 'downloading'} walletResults={null} />
       ) : null}
       {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} skipping={flow.skipping} /> : null}
+      {flow.phase === 'idle' || flow.phase === 'downloading' ? (
+        <ProductionScenarioList sent={flow.sent} pix={flow.pix} copy={copy.scenarios} />
+      ) : null}
     </Stack>
   );
 }
@@ -218,9 +232,21 @@ function walletsConfigOf(seller: HomologacaoProductionSellerView | null) {
   return seller?.connected ? (seller.wallets ?? null) : null;
 }
 
-/** Which of the four steps are done: connected, data in, charged and settled, file downloaded. */
+/**
+ * Which of the four steps are done: connected, data in, charged and settled,
+ * file downloaded. A run going or a Pix still open is step 3, whatever the
+ * cleared card fields say.
+ */
 function stepsDone(connected: boolean, ready: boolean, flow: ProductionFlow): boolean[] {
-  return [connected, ready || flow.charged, flow.charged, flow.summary !== null];
+  const charging = flow.busy || flow.pixOpen || flow.sent !== null;
+  return [connected, ready || charging, flow.charged, flow.summary !== null];
+}
+
+/** Why the charge cannot be pressed, when it cannot: the open Pix first, then the missing data. */
+function chargeBlockedBy(connected: boolean, ready: boolean, flow: ProductionFlow, copy: HomologacaoProductionEvidenceCopy): string | null {
+  if (!connected || flow.busy) return null;
+  if (flow.pixOpen) return copy.pixBlocksCharge;
+  return !ready && !flow.charged ? copy.incompleteData : null;
 }
 
 function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNode {
@@ -233,7 +259,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
   });
   const flow = useProductionRun(props, form, wallets);
   const connected = props.seller?.connected === true;
-  const showIncomplete = connected && !form.ready && !flow.charged;
+  const blockedBy = chargeBlockedBy(connected, form.ready, flow, copy);
   return (
     <Stack spacing={2.5} data-testid="homologacao-production-evidence-card" sx={CARD_SX}>
       <Stack spacing={0.75}>
@@ -257,9 +283,9 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
             onCharge={() => flow.setConfirming(true)}
             onDownload={() => void flow.download()}
           />
-          {showIncomplete ? (
+          {blockedBy ? (
             <Typography variant="caption" color="text.secondary" data-testid="production-incomplete-data">
-              {copy.incompleteData}
+              {blockedBy}
             </Typography>
           ) : null}
           <EvidenceResult summary={flow.summary} failed={flow.failed} />

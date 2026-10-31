@@ -1,7 +1,7 @@
 'use client';
 
 import { Alert, Button, Stack, Typography } from '@mui/material';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { PixQr, useClipboardCopy } from '../checkout/pix-parts';
 import { TAP_SX } from './ConnectEnvironmentCard';
@@ -35,6 +35,14 @@ function useTimeLeft(expiresAt: string | null): string | null {
   return `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
 }
 
+/** A Pix with no QR to pay: paid and refunded, refunding, skipped — or nothing to say. */
+function PixSettled({ state, copy }: { state: ProductionPixView['state']; copy: HomologacaoProductionEvidenceCopy['pix'] }): ReactNode {
+  if (state === 'REFUNDED') return <Alert severity="success" data-testid="production-pix-done">{copy.paid}</Alert>;
+  if (state === 'SKIPPED') return <Alert severity="info" data-testid="production-pix-done">{copy.skipped}</Alert>;
+  if (state === 'REFUND_PENDING') return <Alert severity="info" data-testid="production-pix-refunding">{copy.refunding}</Alert>;
+  return null;
+}
+
 export function ProductionPixPanel({
   pix,
   copy,
@@ -48,14 +56,16 @@ export function ProductionPixPanel({
 }): ReactNode {
   const timeLeft = useTimeLeft(pix.state === 'AWAITING_PAYMENT' ? pix.expiresAt : null);
   const clipboard = useClipboardCopy(pix.qrText ?? '');
-  if (pix.state === 'REFUNDED') return <Alert severity="success" data-testid="production-pix-done">{copy.paid}</Alert>;
-  if (pix.state === 'SKIPPED') return <Alert severity="info" data-testid="production-pix-done">{copy.skipped}</Alert>;
-  if (pix.state === 'REFUND_PENDING') {
-    return <Alert severity="info" data-testid="production-pix-refunding">{copy.refunding}</Alert>;
-  }
-  if (pix.state !== 'AWAITING_PAYMENT' || !pix.qrText) return null;
+  const panel = useRef<HTMLDivElement | null>(null);
+  const awaiting = pix.state === 'AWAITING_PAYMENT' && Boolean(pix.qrText);
+  // On a phone the QR lands under the whole form: bring it to the person, once per Pix.
+  useEffect(() => {
+    if (awaiting) panel.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [awaiting, pix.runId]);
+  if (!awaiting || !pix.qrText) return <PixSettled state={pix.state} copy={copy} />;
   return (
     <Stack
+      ref={panel}
       spacing={1.5}
       data-testid="production-pix"
       sx={{ alignItems: 'center', border: 1, borderColor: 'divider', borderRadius: 2.5, p: 2.5 }}

@@ -150,6 +150,26 @@ describe('HomologacaoProductionEvidenceCard', () => {
     expect((screen.getByTestId('production-credit-number') as HTMLInputElement).value).toBe('');
   });
 
+  it('given the run returned with its Pix open, then step 3 is current and each scenario says what was sent, never an outcome', async () => {
+    mount({ onConfirmPix: vi.fn(async () => AWAITING), pixPollMs: 60_000 });
+    fillBuyer();
+    fillCredit();
+    confirm();
+
+    await waitFor(() => expect(screen.getByTestId('production-scenarios')).toBeTruthy());
+    expect(screen.getByTestId('production-step-progress').textContent).toBe(PROD.stepper.progress(3, 4, PROD.stepper.charge));
+    expect(screen.getByTestId('production-scenario-credit').textContent).toContain(PROD.scenarios.recorded);
+    expect(screen.getByTestId('production-scenario-debit').textContent).toContain(PROD.scenarios.pending);
+    expect(screen.getByTestId('production-scenario-pix').textContent).toContain(PROD.scenarios.pix.AWAITING_PAYMENT);
+    expect(screen.getByTestId('production-incomplete-data').textContent).toBe(PROD.pixBlocksCharge);
+  });
+
+  it('given a seller with wallets but no Google Pay, then the card says why instead of asking for a tap', () => {
+    mount({ seller: { ...SELLER, wallets: { amountCents: 100, googlePay: null, applePay: { configured: false } } } });
+
+    expect(screen.getByTestId('evidence-google-pay-absent').textContent).toBe(PROD.wallets.googlePayAbsent);
+  });
+
   it('given the operator skips the Pix, then the server is told and its answer is shown', async () => {
     const onConfirmPix = vi.fn(async (_runId: string, action: 'CHECK' | 'SKIP'): Promise<ProductionPixView> =>
       action === 'SKIP' ? { ...AWAITING, state: 'SKIPPED', qrText: null } : AWAITING,

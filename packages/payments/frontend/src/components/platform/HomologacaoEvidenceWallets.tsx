@@ -198,6 +198,8 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
     apple: apple ? { press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
     /** Why Apple Pay has no button here, or null when it has one. */
     appleAbsent: appleAbsence(input, apple !== null),
+    /** The host carries wallets but no Google Pay for this seller: say so, rather than draw nothing. */
+    googleAbsent: input.config !== null && !google,
     /** What phase 2 gets: each wallet's answer, or why it could not be offered here. */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
@@ -267,10 +269,25 @@ function WalletLine({ result, copy }: { result: BrowserWalletResult; copy: Homol
   );
 }
 
+/** A button to tap, or a line saying why a wallet has none. */
+function hasWalletStep(wallets: EvidenceWallets): boolean {
+  return Boolean(wallets.google || wallets.apple || wallets.appleAbsent || wallets.googleAbsent);
+}
+
+/** Why a wallet has no button here, or nothing. */
+function AbsentLine({ testId, text }: { testId: string; text: string | null }): ReactNode {
+  if (!text) return null;
+  return (
+    <Typography variant="caption" component="p" color="text.secondary" data-testid={testId}>
+      {text}
+    </Typography>
+  );
+}
+
 /** The wallet step: nothing at all when the host's seller view carries no wallets. */
 export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): ReactNode {
   const copy = usePlatformCopy().evidence.wallets;
-  if (!wallets.google && !wallets.apple && !wallets.appleAbsent) return null;
+  if (!hasWalletStep(wallets)) return null;
   const lines = WALLETS.flatMap((wallet) => {
     const result = wallets.results[wallet];
     return result ? [result] : [];
@@ -291,11 +308,8 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
         ) : null}
         {wallets.apple ? <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} /> : null}
       </Stack>
-      {wallets.appleAbsent ? (
-        <Typography variant="caption" component="p" color="text.secondary" data-testid="evidence-apple-pay-absent">
-          {copy.applePayAbsent[wallets.appleAbsent]}
-        </Typography>
-      ) : null}
+      <AbsentLine testId="evidence-google-pay-absent" text={wallets.googleAbsent ? copy.googlePayAbsent : null} />
+      <AbsentLine testId="evidence-apple-pay-absent" text={wallets.appleAbsent ? copy.applePayAbsent[wallets.appleAbsent] : null} />
       {lines.map((result) => (
         <WalletLine key={result.type} result={result} copy={copy} />
       ))}

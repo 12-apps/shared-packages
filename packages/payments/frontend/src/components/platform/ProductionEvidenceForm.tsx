@@ -12,17 +12,24 @@ import type { BuyerForm, CardForm } from './production-evidence-data';
  * `production-evidence-data.ts` does — so this stays the drawing only.
  */
 
-/** Ten fields: 2 or 5 per row, so no row is left half empty. */
+/**
+ * Ten fields: 1, 2 or 5 per row, so no row is left half empty. By the FORM's
+ * width, not the window's: with the Pix beside it a 1280 window leaves the
+ * form too narrow for five labels.
+ */
 const GRID_SX = {
   display: 'grid',
-  gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' },
+  gridTemplateColumns: 'minmax(0, 1fr)',
   gap: 1.5,
+  '@container production-form (min-width: 440px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+  '@container production-form (min-width: 860px)': { gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' },
 } as const;
 
 const CARDS_SX = {
   display: 'grid',
-  gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' },
+  gridTemplateColumns: 'minmax(0, 1fr)',
   gap: 2,
+  '@container production-form (min-width: 440px)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
 } as const;
 
 const BOX_SX = { border: 1, borderColor: 'divider', borderRadius: 2.5, p: 1.75 } as const;
@@ -102,7 +109,7 @@ function CardFields({
 export function ProductionEvidenceForm(props: ProductionEvidenceFormProps): ReactNode {
   const { copy, buyer, onBuyer, disabled } = props;
   return (
-    <Stack spacing={1.5} data-testid="production-evidence-form">
+    <Stack spacing={1.5} data-testid="production-evidence-form" sx={{ containerType: 'inline-size', containerName: 'production-form' }}>
       <Typography variant="body2" fontWeight={600}>
         {copy.buyerHeading}
       </Typography>
