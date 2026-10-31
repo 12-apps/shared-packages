@@ -24,20 +24,28 @@ export function useVerificationAmount(verifyChargeUrl: string): {
   amountCents: number | null;
   /** The payer e-mail the host suggests, from the same body (FUT-4050). */
   payerEmail: string | null;
+  /** The provider judges that e-mail, so the step asks for it (FUT-4200). */
+  payerEmailRequired: boolean;
 } {
   const [amountCents, setAmountCents] = useState<number | null>(null);
   const [payerEmail, setPayerEmail] = useState<string | null>(null);
+  const [payerEmailRequired, setPayerEmailRequired] = useState(false);
 
   useEffect(() => {
     let active = true;
     void fetch(verifyChargeUrl)
       .then((res) =>
-        res.ok ? (res.json() as Promise<{ amountCents?: number; payerEmail?: string | null }>) : null,
+        res.ok ? (res.json() as Promise<{
+              amountCents?: number;
+              payerEmail?: string | null;
+              payerEmailRequired?: boolean;
+            }>) : null,
       )
       .then((body) => {
         if (!active) return;
         if (typeof body?.amountCents === 'number') setAmountCents(body.amountCents);
         if (typeof body?.payerEmail === 'string' && body.payerEmail) setPayerEmail(body.payerEmail);
+        setPayerEmailRequired(body?.payerEmailRequired === true);
       })
       // A failed read leaves the amount unnamed rather than guessed — the
       // screen still renders, and it is corrected the moment an answer lands.
@@ -47,5 +55,5 @@ export function useVerificationAmount(verifyChargeUrl: string): {
     };
   }, [verifyChargeUrl]);
 
-  return { amountCents, payerEmail };
+  return { amountCents, payerEmail, payerEmailRequired };
 }

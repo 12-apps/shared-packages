@@ -69,3 +69,18 @@ describe('capabilities contract — no capability true without an implementation
     });
   }
 });
+
+/**
+ * FUT-4200 — the activation step asks the payer e-mail only where the
+ * provider judges it. PagBank does (it refuses its own account's e-mail as a
+ * buyer's, 40002); a new adapter claiming it has to be added here on purpose,
+ * because every claim puts a required field in front of a store owner.
+ */
+describe('capabilities contract — who asks for the payer e-mail', () => {
+  it('only PagBank declares payerEmail', () => {
+    const asking = allProviderAdapters(PT_BR_PROVIDER_COPY)
+      .filter((adapter) => adapter.capabilities.payerEmail === true)
+      .map((adapter) => adapter.name);
+    expect(asking).toEqual(['pagbank']);
+  });
+});

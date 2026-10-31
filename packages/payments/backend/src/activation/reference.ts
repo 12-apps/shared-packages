@@ -29,6 +29,11 @@ export function verificationAmountCents(providers: ProviderRegistry, provider: s
   return Math.max(VERIFY_AMOUNT_CENTS, floor ?? 0);
 }
 
+/** The provider judges the payer e-mail, so the step asks for it (FUT-4200). */
+export function verificationNeedsPayerEmail(providers: ProviderRegistry, provider: string): boolean {
+  return providers.has(provider) && providers.get(provider).capabilities.payerEmail === true;
+}
+
 /**
  * One reference for both phases: `verify-<provider>-<merchantId>`, with an
  * optional `--<attempt>` suffix (FUT-679/FUT-541 — the adapters fall back to

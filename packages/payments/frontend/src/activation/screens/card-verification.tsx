@@ -37,6 +37,35 @@ import { FailedState, PassedState, PayerEmailRefusedState } from './states';
 /** The host's card-entry providers — its design system and its card words. */
 export type CardSurface = ComponentType<{ children: ReactNode }>;
 
+/**
+ * The payer e-mail, for a provider that judges it (FUT-4050, FUT-4200). The
+ * same rule as the document: editing clears a shown error, blur judges again.
+ */
+function ChargeEmail({
+  verification,
+  displayName,
+}: {
+  verification: ActivationCharge;
+  displayName: string;
+}): JSX.Element {
+  const { payerEmail } = useActivationCopy();
+  const { email, setEmail, emailError, setEmailError } = verification;
+  return (
+    <PayerEmailField
+      value={email}
+      error={emailError}
+      displayName={displayName}
+      onChange={(value) => {
+        setEmail(value);
+        if (emailError) setEmailError(undefined);
+      }}
+      onBlur={() => {
+        if (email) setEmailError(validatePayerEmail(email, payerEmail));
+      }}
+    />
+  );
+}
+
 /** The card + tax-id fields and the one button that runs the charge. */
 function ChargeForm({
   verification,
@@ -50,11 +79,10 @@ function ChargeForm({
   displayName: string;
   validateTaxId: (value: string) => string | undefined;
 }): JSX.Element {
-  const { taxId, actions, payerEmail } = useActivationCopy();
+  const { taxId, actions } = useActivationCopy();
   const { Input } = useCheckoutComponents();
   const { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, setCpfError, state } =
     verification;
-  const { email, setEmail, emailError, setEmailError } = verification;
   const submitting = state.kind === 'submitting';
 
   return (
@@ -90,19 +118,9 @@ function ChargeForm({
         }}
         data-testid="verify-charge-cpf"
       />
-      <PayerEmailField
-        value={email}
-        error={emailError}
-        displayName={displayName}
-        onChange={(value) => {
-          setEmail(value);
-          // The same rule as the document: editing clears, blur judges again.
-          if (emailError) setEmailError(undefined);
-        }}
-        onBlur={() => {
-          if (email) setEmailError(validatePayerEmail(email, payerEmail));
-        }}
-      />
+      {verification.payerEmailRequired ? (
+        <ChargeEmail verification={verification} displayName={displayName} />
+      ) : null}
       <Button
         sx={{ ...BTN_PRIMARY_SX, width: '100%' }}
         disabled={submitting}
