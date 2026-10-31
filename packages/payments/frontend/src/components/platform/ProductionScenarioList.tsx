@@ -24,19 +24,24 @@ export interface ProductionScenariosSent {
 
 type Mark = 'done' | 'current' | 'pending';
 
-function pixMark(state: ProductionPixView['state']): Mark {
+/** A spinner only while the card is still checking on its own: once it stopped, nothing is moving. */
+function pixMark(state: ProductionPixView['state'], checking: boolean): Mark {
   if (state === 'REFUNDED') return 'done';
-  return state === 'AWAITING_PAYMENT' || state === 'REFUND_PENDING' ? 'current' : 'pending';
+  const open = state === 'AWAITING_PAYMENT' || state === 'REFUND_PENDING';
+  return open && checking ? 'current' : 'pending';
 }
 
 export function ProductionScenarioList({
   sent,
   pix,
+  checking,
   copy,
 }: {
   /** Null after a reload: only the Pix is known then. */
   sent: ProductionScenariosSent | null;
   pix: ProductionPixView | null;
+  /** False once the card stopped checking the Pix on its own. */
+  checking: boolean;
   copy: HomologacaoProductionEvidenceCopy['scenarios'];
 }): ReactNode {
   const sentLine = (key: 'credit' | 'debit' | 'googlePay' | 'applePay', was: boolean) => ({
@@ -44,7 +49,7 @@ export function ProductionScenarioList({
     mark: (was ? 'done' : 'pending') as Mark,
     status: was ? copy.recorded : copy.pending,
   });
-  const pixLine = pix && pix.state !== 'NONE' ? [{ key: 'pix' as const, mark: pixMark(pix.state), status: copy.pix[pix.state] }] : [];
+  const pixLine = pix && pix.state !== 'NONE' ? [{ key: 'pix' as const, mark: pixMark(pix.state, checking), status: copy.pix[pix.state] }] : [];
   const lines = sent
     ? [sentLine('credit', true), sentLine('debit', sent.debit), ...pixLine, sentLine('googlePay', sent.googlePay), sentLine('applePay', sent.applePay)]
     : pixLine;

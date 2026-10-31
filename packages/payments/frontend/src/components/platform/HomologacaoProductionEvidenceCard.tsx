@@ -223,7 +223,7 @@ function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: Homol
       ) : null}
       {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} onCheck={flow.check} skipping={flow.skipping} /> : null}
       {flow.phase === 'idle' || flow.phase === 'downloading' ? (
-        <ProductionScenarioList sent={flow.sent} pix={flow.pix} copy={copy.scenarios} />
+        <ProductionScenarioList sent={flow.sent} pix={flow.pix} checking={flow.check === null} copy={copy.scenarios} />
       ) : null}
     </Stack>
   );

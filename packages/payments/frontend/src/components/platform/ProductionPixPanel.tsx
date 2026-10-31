@@ -81,7 +81,13 @@ export function ProductionPixPanel({
         {copy.hint}
         {timeLeft ? ` · ${copy.expires(timeLeft)}` : ''}
       </Typography>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+      {onCheck ? (
+        <Typography variant="body2" textAlign="center" data-testid="production-pix-stopped">
+          {copy.stopped}
+        </Typography>
+      ) : null}
+      {/* useFlexGap: a wrapped row keeps the same gap as the buttons side by side. */}
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
         {onCheck ? (
           <Button variant="contained" onClick={onCheck} disabled={skipping} sx={TAP_SX} data-testid="production-pix-check">
             {copy.check}

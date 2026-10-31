@@ -270,6 +270,7 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       copied: 'Código copiado',
       skip: 'Pular o Pix',
       check: 'Verificar o Pix',
+      stopped: 'Paramos de verificar sozinhos. Depois de pagar, toque em Verificar o Pix.',
       qrAlt: 'QR Code do Pix de R$ 1,00',
       paid: 'Pix pago e estornado.',
       skipped: 'Pix pulado: fica pendente no arquivo.',

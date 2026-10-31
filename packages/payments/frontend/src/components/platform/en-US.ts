@@ -282,6 +282,7 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       copied: 'Code copied',
       skip: 'Skip the Pix',
       check: 'Check the Pix',
+      stopped: 'We stopped checking on our own. Once paid, tap Check the Pix.',
       qrAlt: 'R$ 1.00 Pix QR code',
       paid: 'Pix paid and refunded.',
       skipped: 'Pix skipped: it stays pending in the file.',

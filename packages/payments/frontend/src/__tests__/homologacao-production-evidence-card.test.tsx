@@ -229,6 +229,7 @@ describe('HomologacaoProductionEvidenceCard', () => {
     mount({ seller: { ...SELLER, pix: AWAITING }, onConfirmPix, pixPollMs: 60_000, pixPollWindowMs: 20 });
 
     fireEvent.click(await screen.findByTestId('production-pix-check'));
+    expect(screen.getByTestId('production-pix-stopped').textContent).toBe(PROD.pix.stopped);
 
     await waitFor(() => expect(screen.getByTestId('production-pix-done').textContent).toBe(PROD.pix.paid));
     expect(onConfirmPix).toHaveBeenCalledWith('run-1', 'CHECK');
