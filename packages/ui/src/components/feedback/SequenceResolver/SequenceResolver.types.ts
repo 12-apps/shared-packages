@@ -196,8 +196,9 @@ export interface SequenceResolverLabels {
 export interface SequenceResolverProps<I extends SequenceItem = SequenceItem, R = unknown> {
   open: boolean;
   /**
-   * The close button, Esc, and the end screen's button. Gets where the run
-   * stood, for the host's "N resolved · Undo" toast.
+   * The close button, Esc, and the end screen's button — or, with `done:
+   * null`, the queue running out. Gets where the run stood, for the host's
+   * "N resolved · Undo" toast.
    */
   onClose: (summary: SequenceSummary) => void;
   /**
@@ -228,8 +229,13 @@ export interface SequenceResolverProps<I extends SequenceItem = SequenceItem, R 
   overview?: SequenceOverview;
   /** Open the run at this problem (a click on its block); the ones before it follow it. */
   initialKey?: string;
-  /** The end screen's words, from the run's summary. */
-  done: SequenceDone | ((summary: SequenceSummary) => SequenceDone);
+  /**
+   * The end screen's words, from the run's summary. `null` drops the end
+   * screen: when the queue runs out — the last step answered or passed over —
+   * the resolver calls `onClose(summary)` at once, and the host's toast is the
+   * run's last word (FUT-3833).
+   */
+  done: SequenceDone | ((summary: SequenceSummary) => SequenceDone) | null;
   labels: SequenceResolverLabels;
   /**
    * Base test id (default `sequence-resolver`). Parts get `${id}-back`,
