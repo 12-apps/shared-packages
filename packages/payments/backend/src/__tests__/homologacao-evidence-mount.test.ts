@@ -27,7 +27,14 @@ const mountFor = () =>
     callbackPath: '/api/payments/oauth/callback',
     webhookPath: '/api/webhooks/platform-homologacao',
     baseUrl: () => 'https://host.test',
-    deps: async () => ({ identification: { name: 'Host', site: 'https://host.test' } }) as never,
+    deps: async () =>
+      ({
+        identification: { name: 'Host', site: 'https://host.test' },
+        applePayConfigured: () => true,
+        // Whatever the deps carry, the environment's own parts win.
+        merchant: { kind: 'TENANT', id: 'not-the-seller' },
+        webhookUrl: 'https://wrong.test',
+      }) as never,
   });
 
 describe('createHomologacaoEvidenceMount', () => {
@@ -36,7 +43,11 @@ describe('createHomologacaoEvidenceMount', () => {
     expect(mount.seller('SANDBOX')).toEqual({ kind: 'PLATFORM', id: 'homologacao-seller' });
     expect(mount.seller('PRODUCTION')).toEqual({ kind: 'PLATFORM', id: 'homologacao-seller-production' });
     expect(mount.connectState('SANDBOX').stateCookieName('pagbank')).toBe('host_homolog_oauth_pagbank');
-    expect(mount.connectState('PRODUCTION').stateCookieName('pagbank')).toBe('host_homolog_oauth_prod_pagbank');
+    expect(mount.connectState('PRODUCTION').stateCookieName('pagbank')).toBe('host_homolog_oauth-prod_pagbank');
+    // No provider name makes a sandbox cookie the production one.
+    expect(mount.connectState('SANDBOX').stateCookieName('prod_pagbank')).not.toBe(
+      mount.connectState('PRODUCTION').stateCookieName('pagbank'),
+    );
     expect(mount.connectState('PRODUCTION').redirectUri('pagbank')).toBe(mount.connectState('SANDBOX').redirectUri('pagbank'));
   });
 
@@ -59,6 +70,10 @@ describe('createHomologacaoEvidenceMount', () => {
     ]);
     expect(built[0]?.copy).toBe(PT_BR_HOMOLOGACAO_EVIDENCE_COPY);
     expect(built[1]?.copy).toBe(PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY);
-    expect(built[1]?.identification.name).toBe('Host');
+    for (const cfg of built) {
+      expect(cfg.identification.name).toBe('Host');
+      expect(cfg.applePayConfigured?.()).toBe(true);
+    }
+    expect(Object.isFrozen(mount.seller('SANDBOX'))).toBe(true);
   });
 });

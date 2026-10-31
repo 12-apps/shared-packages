@@ -23,14 +23,18 @@ import type { EvidenceEnvironment } from './types';
  * PagBank's reviewer.
  */
 
-const SELLERS: Record<EvidenceEnvironment, MerchantRef> = {
-  SANDBOX: { kind: 'PLATFORM', id: 'homologacao-seller' },
-  PRODUCTION: { kind: 'PLATFORM', id: 'homologacao-seller-production' },
-};
+const SELLERS: Readonly<Record<EvidenceEnvironment, Readonly<MerchantRef>>> = Object.freeze({
+  SANDBOX: Object.freeze({ kind: 'PLATFORM', id: 'homologacao-seller' }),
+  PRODUCTION: Object.freeze({ kind: 'PLATFORM', id: 'homologacao-seller-production' }),
+});
 
 /** What a host hands over: the per-environment parts are derived from these. */
 export interface HomologacaoEvidenceMountOptions {
-  /** The sandbox seller's state cookie prefix; production's is the same plus `_prod`. */
+  /**
+   * The sandbox seller's state cookie prefix; production's is the same plus
+   * `-prod`. A dash, never an underscore: every sandbox cookie has `_` right
+   * after the prefix, so no provider name can make the two collide.
+   */
   cookiePrefix: string;
   /** The host's registered OAuth callback, shared with its stores. */
   callbackPath: string;
@@ -42,7 +46,7 @@ export interface HomologacaoEvidenceMountOptions {
 }
 
 export interface HomologacaoEvidenceMount {
-  seller: (environment: EvidenceEnvironment) => MerchantRef;
+  seller: (environment: EvidenceEnvironment) => Readonly<MerchantRef>;
   connectState: (environment: EvidenceEnvironment) => ConnectState;
   environmentOf: (request: Request) => EvidenceEnvironment;
   evidence: (environment?: EvidenceEnvironment) => Promise<HomologacaoEvidenceService>;
@@ -53,7 +57,7 @@ export function createHomologacaoEvidenceMount(options: HomologacaoEvidenceMount
     createConnectState({ cookiePrefix, callbackPath: options.callbackPath, baseUrl: options.baseUrl });
   const states: Record<EvidenceEnvironment, ConnectState> = {
     SANDBOX: state(options.cookiePrefix),
-    PRODUCTION: state(`${options.cookiePrefix}_prod`),
+    PRODUCTION: state(`${options.cookiePrefix}-prod`),
   };
   return {
     seller: (environment) => SELLERS[environment],
