@@ -340,6 +340,41 @@ identity still answers 409. Only `buyerCheckoutConfig` and the
 route on `mountPayments` (`getClientConfig`) still publishes the raw
 capability table, so a host should not draw an Apple Pay button from it.
 
+### Homologação evidence in production (`@12-apps/payments-backend/homologacao-evidence`, FUT-4198)
+
+`createHomologacaoEvidence` takes an `environment` (`'SANDBOX'` when absent).
+A host that needs PagBank's production evidence mounts a SECOND service:
+
+```ts
+const production = createHomologacaoEvidence({
+  ...sandboxConfig,
+  environment: 'PRODUCTION',
+  // Its own PLATFORM merchant: a provider row holds ONE active environment,
+  // so connecting the sandbox seller to production would break the sandbox run.
+  merchant: { kind: 'PLATFORM', id: 'homologacao-seller-production' },
+  webhookUrl: `${base}/api/webhooks/platform-homologacao-producao/pagbank`,
+  copy: PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
+});
+```
+
+- **Behaviour change — the evidence table needs `environment`.** The Prisma
+  store now writes `environment` on create and filters every read by it, for
+  BOTH services. Add the column before taking this version: text, `NOT NULL
+  DEFAULT 'SANDBOX'`, CHECK `IN ('SANDBOX','PRODUCTION')`. Existing rows then
+  read as sandbox, which is what they are.
+- **Every order is R$ 1,00 of real money**, and the run refunds each one.
+  `prepare(buyer)` and `run(..., buyer)` take the real cardholder
+  (`EvidenceBuyer`); phase 1 echoes their 3DS data back as `debitTest`. Their
+  CPF/CNPJ and phone are masked by the traffic recorder (last 2 and last 4
+  digits) in every recorded call, sandbox included.
+- **The Pix waits for a person.** Phase 2 raises the QR and leaves
+  `pix.consult`, `pix.paid` and the production-only `pix.refund` PENDING; mount
+  a route for `confirmPix(runId, 'CHECK' | 'SKIP')`. `CHECK` consults once and,
+  when PAID, refunds and records it; `SKIP` records that it was never paid.
+- No declined card in production: `card.declined` stays PENDING and says why.
+- The file is named `pagbank-homologacao-evidencias-producao-<stamp>`, so it is
+  never confused with the sandbox one.
+
 ## 3. Frontend wiring
 
 - Settings page: render `<PaymentProviderSettings client={...} />` where the

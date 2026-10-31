@@ -4,14 +4,17 @@ import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
+import { pixConfirmSteps } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
 import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
+import { environmentOf } from './environment';
 import { PAGBANK_SANDBOX_DEBIT_TEST, type DebitTestData } from './sandbox-buyer';
 import { recordTraffic, tokenFingerprint } from './record';
 import { answered, clockOf, failureOf, isSuccess, lastStatus, pendingStep, stepOf, withStep } from './steps';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
+  EvidenceEnvironment,
   EvidenceOutcomeCopy,
   EvidenceRecord,
   EvidenceRunSection,
@@ -39,8 +42,12 @@ import type {
  * authenticates the 3DS test card with the session; {@link completeEvidenceRun}
  * raises the orders.
  *
- * Sandbox only: both calls refuse unless the seller's stored connection is a
- * SANDBOX one, and refusing is recorded as such rather than skipped silently.
+ * One environment per run (FUT-4198): both calls refuse unless the seller's
+ * stored connection is in the deps' `environment` (SANDBOX when absent), and
+ * refusing is recorded as such rather than skipped silently. In PRODUCTION
+ * every order is R$ 1,00 of real money and is refunded by the run, and the Pix
+ * waits for a person: phase 2 raises its QR and {@link confirmEvidencePix}
+ * completes it later.
  */
 
 const PROVIDER = 'pagbank';
@@ -49,6 +56,8 @@ const PROVIDER = 'pagbank';
 export interface EvidenceRunDeps {
   /** The test seller — the merchant the Connect half authorized. */
   merchant: MerchantRef;
+  /** Which PagBank environment the run is in (FUT-4198). SANDBOX when absent. */
+  environment?: EvidenceEnvironment;
   store: HomologacaoEvidenceStore;
   copy: EvidenceOutcomeCopy;
   newId: () => string;
@@ -67,8 +76,11 @@ export interface EvidenceRunDeps {
     error: string | null;
     redirectUriMismatch: boolean | null;
   }>;
-  /** The buyer on the test orders — official sandbox test data only. */
-  customer: CustomerInfo;
+  /**
+   * The buyer on the orders: official sandbox test data in SANDBOX, the real
+   * cardholder the operator typed in PRODUCTION (null until one is sent).
+   */
+  customer: CustomerInfo | null;
   /**
    * Whether the host has an Apple Pay identity (FUT-3755) — for the platform
    * identity, whether `platformApplePayIdentity(process.env)` is non-null.
@@ -84,13 +96,17 @@ export interface EvidenceRunDeps {
 }
 
 
-/** The seller's connection, provided it is a sandbox one. */
+/**
+ * The seller's connection, provided it is in the run's environment.
+ * `NOT_SANDBOX` keeps its name for the copy key it maps to; it means "not in
+ * this run's environment".
+ */
 async function sandboxSeller(
   deps: EvidenceRunDeps,
 ): Promise<{ token: string; accountId: string | null } | 'NOT_CONNECTED' | 'NOT_SANDBOX'> {
   const seller = await deps.seller();
   if (!seller?.token) return 'NOT_CONNECTED';
-  if (seller.environment !== 'SANDBOX') return 'NOT_SANDBOX';
+  if (seller.environment !== environmentOf(deps)) return 'NOT_SANDBOX';
   return { token: seller.token, accountId: seller.accountId ?? null };
 }
 
@@ -130,6 +146,7 @@ const SELLER_CALL_KEYS: ReadonlySet<EvidenceStepKey> = new Set<EvidenceStepKey>(
   'debit.session',
   'pix.create',
   'pix.consult',
+  'pix.refund',
   'card.approved',
   'card.approvedConsult',
   'card.declined',
@@ -148,6 +165,7 @@ const ORDER_KEYS: readonly EvidenceStepKey[] = [
   'pix.create',
   'pix.consult',
   'pix.paid',
+  'pix.refund',
   'card.encrypt',
   'card.approved',
   'card.approvedConsult',
@@ -194,8 +212,23 @@ export interface PreparedEvidenceRun {
 }
 
 /** A phase 1 that stopped before minting anything for the browser. */
-function unminted(record: EvidenceRecord): Omit<PreparedEvidenceRun, 'wallets'> {
-  return { runId: record.id, publicKey: null, threeDSSession: null, debitTest: PAGBANK_SANDBOX_DEBIT_TEST };
+function unminted(record: EvidenceRecord, debitTest: DebitTestData): Omit<PreparedEvidenceRun, 'wallets'> {
+  return { runId: record.id, publicKey: null, threeDSSession: null, debitTest };
+}
+
+/** The seller's card public key, minted in the run's environment and recorded. */
+async function mintPublicKey(deps: EvidenceRunDeps, token: string): Promise<{ publicKey: string | null; step: EvidenceStep }> {
+  const minted = await recordTraffic(() =>
+    fetchPagbankCardPublicKey({ apiBase: pagbankApiBase(environmentOf(deps)), token }),
+  );
+  const publicKey = minted.ok ? minted.value : null;
+  return {
+    publicKey,
+    step: stepOf('card.publicKey', publicKey ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
+      calls: minted.calls,
+      observed: publicKey ? deps.copy.publicKeyMinted : deps.copy.publicKeyMissing,
+    }),
+  };
 }
 
 /**
@@ -204,7 +237,10 @@ function unminted(record: EvidenceRecord): Omit<PreparedEvidenceRun, 'wallets'> 
  * could not be minted, in which case the card and debit steps will record why
  * instead of running.
  */
-export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<PreparedEvidenceRun> {
+export async function prepareEvidenceRun(
+  deps: EvidenceRunDeps,
+  debitTest: DebitTestData = PAGBANK_SANDBOX_DEBIT_TEST,
+): Promise<PreparedEvidenceRun> {
   const now = clockOf(deps)();
   const record: EvidenceRecord = {
     id: deps.newId(),
@@ -219,7 +255,7 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
     const why = seller === 'NOT_SANDBOX' ? deps.copy.notSandbox : deps.copy.usageNotConnected;
     record.steps = [stepOf('connect.usage', seller === 'NOT_SANDBOX' ? 'FAILED' : 'PENDING', now, { observed: why })];
     await deps.store.save(record);
-    return { ...unminted(record), wallets: await walletsConfig(deps, null) };
+    return { ...unminted(record, debitTest), wallets: await walletsConfig(deps, null) };
   }
 
   record.steps.push(await applicationStep(deps));
@@ -232,19 +268,11 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
   if (token === (await deps.platformToken())) {
     record.steps.push(stepOf('connect.usage', 'FAILED', clockOf(deps)(), { observed: deps.copy.usageSameAsPlatform }));
     await deps.store.save(record);
-    return { ...unminted(record), wallets: await walletsConfig(deps, seller.accountId) };
+    return { ...unminted(record, debitTest), wallets: await walletsConfig(deps, seller.accountId) };
   }
 
-  const minted = await recordTraffic(() =>
-    fetchPagbankCardPublicKey({ apiBase: pagbankApiBase('SANDBOX'), token }),
-  );
-  const publicKey = minted.ok ? minted.value : null;
-  record.steps.push(
-    stepOf('card.publicKey', publicKey ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
-      calls: minted.calls,
-      observed: publicKey ? deps.copy.publicKeyMinted : deps.copy.publicKeyMissing,
-    }),
-  );
+  const { publicKey, step: publicKeyStep } = await mintPublicKey(deps, token);
+  record.steps.push(publicKeyStep);
   const threeDS = await threeDSSessionStep(deps, token);
   record.steps.push(threeDS.step);
   record.updatedAt = clockOf(deps)().toISOString();
@@ -253,7 +281,7 @@ export async function prepareEvidenceRun(deps: EvidenceRunDeps): Promise<Prepare
     runId: record.id,
     publicKey,
     threeDSSession: threeDS.session,
-    debitTest: PAGBANK_SANDBOX_DEBIT_TEST,
+    debitTest,
     wallets: await walletsConfig(deps, seller.accountId),
   };
 }
@@ -286,6 +314,7 @@ function blockedBecause(
 ): string | null {
   if (seller === 'NOT_SANDBOX') return deps.copy.notSandbox;
   if (seller === 'NOT_CONNECTED') return deps.copy.usageNotConnected;
+  if (!deps.customer) return deps.copy.buyerMissing;
   return record.steps.find((step) => step.key === 'connect.usage' && step.status === 'FAILED')?.observed ?? null;
 }
 
@@ -324,5 +353,36 @@ export async function completeEvidenceRun(
     }
     steps = withStep(steps, await usageStep(deps, steps, seller.token));
   }
+  return deps.store.save({ ...record, steps, updatedAt: clockOf(deps)().toISOString() });
+}
+
+/** What the operator answered about a production Pix (FUT-4198). */
+export type PixConfirmAction = 'CHECK' | 'SKIP';
+
+/**
+ * PRODUCTION phase 3 (FUT-4198): the Pix a person has to pay. `CHECK`
+ * consults the order once; when it is PAID the charge is refunded and both are
+ * recorded. `SKIP` records that the QR was never paid. Each call saves the run
+ * and re-proves whose token its calls carried, so the file is right after any
+ * of them. Answers the run as it stands, so the screen can stop asking once
+ * `pix.paid` is no longer PENDING.
+ */
+export async function confirmEvidencePix(
+  deps: EvidenceRunDeps,
+  runId: string,
+  action: PixConfirmAction,
+): Promise<EvidenceRecord> {
+  const record = await deps.store.latest(PROVIDER, 'RUN');
+  if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
+  const paid = record.steps.find((step) => step.key === 'pix.paid');
+  // Nothing to do once the Pix is settled either way, or when it never ran.
+  if (!paid || paid.status !== 'PENDING' || record.steps.find((step) => step.key === 'pix.refund')?.status !== 'PENDING') {
+    return record;
+  }
+  const seller = await sandboxSeller(deps);
+  if (typeof seller !== 'object') return record;
+  let steps = record.steps;
+  for (const step of await pixConfirmSteps(deps, record.steps, action)) steps = withStep(steps, step);
+  steps = withStep(steps, await usageStep(deps, steps, seller.token));
   return deps.store.save({ ...record, steps, updatedAt: clockOf(deps)().toISOString() });
 }

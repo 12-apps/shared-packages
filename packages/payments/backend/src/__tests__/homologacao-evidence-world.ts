@@ -137,6 +137,10 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
       const status = pixPolls.length > 1 ? 'PAID' : 'WAITING';
       return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [{ id: 'CHAR_PIX', status, amount: { value: 1000 } }] });
     }
+    // The production Pix refund (FUT-4198): a paid Pix canceled.
+    if (route === 'POST /charges/CHAR_PIX/cancel') {
+      return json({ id: 'CHAR_PIX', status: 'CANCELED', amount: { value: 100, summary: { refunded: 100 } } }, 201, 'Created');
+    }
     if (route === 'POST /orders') {
       const charges = body['charges'] as { payment_method: { card: { encrypted: string } } }[];
       const approved = charges[0]!.payment_method.card.encrypted === 'enc-approved-blob';
@@ -185,14 +189,17 @@ export function world(
     sessionStatus?: number;
     sellerEnvironment?: 'SANDBOX' | 'PRODUCTION';
     applePayConfigured?: boolean;
+    /** The evidence's own environment (FUT-4198). SANDBOX when absent. */
+    environment?: 'SANDBOX' | 'PRODUCTION';
   } = {},
 ) {
+  const environment = options.environment ?? 'SANDBOX';
   const pagbank = fakePagbank(options);
   vi.stubGlobal('fetch', vi.fn(pagbank.handler));
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
   const configs = createMemoryProviderConfigStore();
-  const appCreds = () => ({
-    environment: 'SANDBOX' as const,
+  const appCreds = (_provider: string, env: 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => ({
+    environment: env,
     fields: { clientId: 'cid', clientSecret: 'csecret-value', accountToken: 'platform-account-token' },
   });
   const oauth = createOAuthConnectService(providers, configs, appCreds);
@@ -215,10 +222,12 @@ export function world(
     store,
     copy: copy.outcome,
     newId,
+    environment,
     webhookUrl: 'https://example.test/api/webhooks/platform-homologacao/pagbank',
   };
   const runDeps = {
     merchant: SELLER,
+    environment,
     store,
     copy: copy.outcome,
     newId,
@@ -238,9 +247,12 @@ export function world(
     consultApplication: () =>
       consultConnectApplication(
         { appCredentials: appCreds, expectedRedirectUri: 'https://example.test/cb', copy: PT_BR_CONNECT_APPLICATION_COPY },
-        'SANDBOX',
+        environment,
       ),
-    customer: { name: 'Jose da Silva', email: 'cliente@sandbox.pagseguro.com.br', taxId: '12345678909' },
+    customer:
+      environment === 'PRODUCTION'
+        ? { name: BUYER.name, email: BUYER.email, taxId: BUYER.taxId, phone: BUYER.phone }
+        : { name: 'Jose da Silva', email: 'cliente@sandbox.pagseguro.com.br', taxId: '12345678909' },
     sleep: async () => undefined,
     pixPolls: 3,
     ...(options.applePayConfigured === undefined ? {} : { applePayConfigured: () => options.applePayConfigured === true }),
@@ -249,6 +261,7 @@ export function world(
   const fileDeps = {
     store,
     copy,
+    environment,
     identification: { name: 'Paladira', site: 'https://paladira.com', clientId: 'cid', callbackUrl: 'https://example.test/cb' },
     webhookEvents: async (wanted: readonly string[]) =>
       events.filter((event) => wanted.some((id) => JSON.stringify(event.payload).includes(id))),
@@ -256,6 +269,22 @@ export function world(
   };
   return { pagbank, configs, connectDeps, runDeps, fileDeps, events };
 }
+
+/** A real cardholder, as the production screen sends it (FUT-4198). */
+export const BUYER = {
+  name: 'Thompson Moreira Filgueiras',
+  email: 'thom@paladira.com',
+  taxId: '46556477000159',
+  phone: '+5531994494408',
+  billingAddress: {
+    street: 'Rua Padre Pedro Pinto',
+    number: '424',
+    complement: 'sala 601',
+    regionCode: 'MG',
+    city: 'Belo Horizonte',
+    postalCode: '31610000',
+  },
+};
 
 export function cards(): BrowserCardResult[] {
   return [

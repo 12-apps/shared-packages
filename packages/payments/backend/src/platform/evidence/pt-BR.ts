@@ -59,6 +59,10 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Confirmação de pagamento Pix no sandbox',
       expected: 'O simulador do sandbox paga pedidos Pix de até R$ 100,00; a consulta retorna a cobrança com status PAID.',
     },
+    'pix.refund': {
+      scenario: 'Estorno do Pix pago — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 com a cobrança Pix estornada (status CANCELED).',
+    },
     'pix.webhook': {
       scenario: 'Notificação de pagamento Pix recebida e processada pela integração',
       expected: 'O PagBank envia POST para a notification_url do pedido; a integração verifica a assinatura, armazena o evento e atualiza o status da cobrança.',
@@ -246,6 +250,11 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     consultStatus: (status, polls) => `Pedido consultado ${plural(polls, 'vez', 'vezes')}; status final ${status}.`,
     paid: 'Pagamento confirmado: a cobrança Pix está PAID na consulta.',
     notPaidYet: (seconds) => `Pagamento não confirmado em ${seconds} s de consultas.`,
+    pixAwaitingPayment: 'QR Code exibido ao operador; aguardando o pagamento.',
+    pixSkipped: 'O operador pulou o Pix: o QR Code não foi pago, então nada foi estornado.',
+    declinedNotInProduction:
+      'Não executado em produção: não há cartão real que seja recusado sob demanda. A recusa está coberta no arquivo de sandbox.',
+    buyerMissing: 'Os dados do titular do cartão não foram enviados; nenhum pedido foi criado.',
     publicKeyMinted: 'Chave pública gerada com o token do lojista.',
     publicKeyMissing: 'A chave pública não foi gerada.',
     encrypted: (cards) => `Cartões criptografados no navegador: ${cards}.`,

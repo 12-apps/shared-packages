@@ -47,6 +47,33 @@ export const PAGBANK_SANDBOX_DEBIT_CENTS = 2701;
 export const PAGBANK_SANDBOX_WALLET_CENTS = 1200;
 
 /**
+ * The amount each order of a run charges, in cents. Sandbox picks the amounts
+ * its simulator answers to (Pix ≤ R$ 100,00, the 3DS card by amount); in
+ * PRODUCTION every scenario charges R$ 1,00 of real money and is refunded
+ * right after (FUT-4198).
+ */
+export interface EvidenceAmounts {
+  pix: number;
+  card: number;
+  debit: number;
+  wallet: number;
+}
+
+const SANDBOX_AMOUNTS: EvidenceAmounts = {
+  pix: 1000,
+  card: 1500,
+  debit: PAGBANK_SANDBOX_DEBIT_CENTS,
+  wallet: PAGBANK_SANDBOX_WALLET_CENTS,
+};
+
+/** R$ 1,00 everywhere: the smallest real charge, refunded by the run itself. */
+const PRODUCTION_AMOUNTS: EvidenceAmounts = { pix: 100, card: 100, debit: 100, wallet: 100 };
+
+export function evidenceAmounts(environment: 'SANDBOX' | 'PRODUCTION'): EvidenceAmounts {
+  return environment === 'PRODUCTION' ? PRODUCTION_AMOUNTS : SANDBOX_AMOUNTS;
+}
+
+/**
  * What the browser authenticates the debit test card with — handed over by
  * phase 1 rather than restated in the frontend, so the amount the browser
  * authenticates is, by construction, the amount the server charges.
@@ -61,6 +88,20 @@ export interface DebitTestData {
     regionCode: string;
     city: string;
     postalCode: string;
+  };
+}
+
+/** The production debit authentication (FUT-4198): the operator's own cardholder, R$ 1,00. */
+export function productionDebitTest(buyer: {
+  name: string;
+  email: string;
+  phone: string;
+  billingAddress: DebitTestData['billingAddress'];
+}): DebitTestData {
+  return {
+    amountCents: evidenceAmounts('PRODUCTION').debit,
+    customer: { name: buyer.name, email: buyer.email, phone: buyer.phone },
+    billingAddress: buyer.billingAddress,
   };
 }
 

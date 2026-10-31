@@ -54,6 +54,10 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
       scenario: 'Pix payment confirmed in the sandbox',
       expected: "The sandbox simulator pays Pix orders up to R$ 100.00; the consult returns the charge as PAID.",
     },
+    'pix.refund': {
+      scenario: 'Refund of the paid Pix — POST /charges/{charge_id}/cancel',
+      expected: 'HTTP 201 with the Pix charge refunded (status CANCELED).',
+    },
     'pix.webhook': {
       scenario: 'Pix payment notification received and processed by the integration',
       expected: "PagBank POSTs to the order's notification_url; the integration verifies the signature, stores the event and updates the charge's status.",
@@ -237,6 +241,11 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     consultStatus: (status, polls) => `Order consulted ${polls} ${polls === 1 ? 'time' : 'times'}; final status ${status}.`,
     paid: 'Payment confirmed: the Pix charge is PAID in the consult.',
     notPaidYet: (seconds) => `Payment not confirmed within ${seconds} s of consults.`,
+    pixAwaitingPayment: 'QR code shown to the operator; waiting for the payment.',
+    pixSkipped: 'The operator skipped the Pix: the QR code was not paid, so nothing was refunded.',
+    declinedNotInProduction:
+      'Not run in production: no real card declines on demand. The decline is covered by the sandbox file.',
+    buyerMissing: "The cardholder's data was not sent; no order was created.",
     publicKeyMinted: "Public key minted with the seller's token.",
     publicKeyMissing: 'The public key was not minted.',
     encrypted: (cards) => `Cards encrypted in the browser: ${cards}.`,

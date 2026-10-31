@@ -6,7 +6,13 @@ import type { MerchantRef } from '../../core/types';
 import { redactUrl } from '../../core/traffic-recorder';
 import { recordTraffic } from './record';
 import { errorDetail, pendingStep, stepOf, withStep } from './steps';
-import type { EvidenceOutcomeCopy, EvidenceRecord, EvidenceStep, HomologacaoEvidenceStore } from './types';
+import type {
+  EvidenceEnvironment,
+  EvidenceOutcomeCopy,
+  EvidenceRecord,
+  EvidenceStep,
+  HomologacaoEvidenceStore,
+} from './types';
 
 /**
  * The CONNECT half of the evidence (FUT-3696): a sandbox TEST SELLER
@@ -19,8 +25,10 @@ import type { EvidenceOutcomeCopy, EvidenceRecord, EvidenceStep, HomologacaoEvid
  * answer are kept with every token, code and secret removed as they are
  * written down.
  *
- * Sandbox only by construction: both calls pin `environment: 'SANDBOX'`, so
- * this flow cannot produce a production grant whatever the host passes.
+ * One environment per seller, fixed by the host (FUT-4198): both calls pin
+ * the deps' `environment` (SANDBOX unless the host names PRODUCTION), so a
+ * sandbox seller can never be granted a production connection, nor the
+ * production seller a sandbox one.
  */
 
 const PROVIDER = 'pagbank';
@@ -36,6 +44,8 @@ export interface SellerConnectDeps {
   webhookUrl?: string;
   /** The test seller — a merchant no real store can write to. */
   merchant: MerchantRef;
+  /** Which PagBank environment this seller connects to (FUT-4198). SANDBOX when absent. */
+  environment?: EvidenceEnvironment;
   store: HomologacaoEvidenceStore;
   copy: EvidenceOutcomeCopy;
   newId: () => string;
@@ -60,7 +70,7 @@ export async function beginSellerConnect(
   const { url } = await deps.oauth.begin(deps.merchant, PROVIDER, {
     state: ctx.state,
     redirectUri: ctx.redirectUri,
-    environment: 'SANDBOX',
+    environment: deps.environment ?? 'SANDBOX',
   });
   const record: EvidenceRecord = {
     id: recordIdOf(ctx.state),
@@ -87,17 +97,18 @@ export async function beginSellerConnect(
  * charge may do that (FUT-463), because a buyer would otherwise be routed to
  * a provider nobody has seen charge. Neither reason applies here: the seller
  * is a PLATFORM merchant no storefront resolves to, so no buyer can reach it,
- * and its connection is a sandbox one by construction. Its charges ARE the
+ * and its connection is pinned to the host's environment. Its charges ARE the
  * proof the activation gate exists to demand.
  */
 async function enableSeller(
   deps: SellerConnectDeps,
   connection: Awaited<ReturnType<OAuthConnectService['complete']>>,
 ): Promise<void> {
+  const environment = deps.environment ?? 'SANDBOX';
   const environments = deps.webhookUrl
     ? {
         ...connection.environments,
-        SANDBOX: { ...connection.environments.SANDBOX, notificationUrl: deps.webhookUrl },
+        [environment]: { ...connection.environments[environment], notificationUrl: deps.webhookUrl },
       }
     : connection.environments;
   await deps.config.save(deps.merchant, { ...connection, environments, enabled: true, priority: 0 });
@@ -146,7 +157,11 @@ async function exchangeStep(
   const code = callback.code;
   if (!code || !callback.stateMatched) return { step: pendingStep('connect.exchange', deps.copy), ok: false };
   const exchanged = await recordTraffic(() =>
-    deps.oauth.complete(deps.merchant, PROVIDER, { code, redirectUri: callback.redirectUri, environment: 'SANDBOX' }),
+    deps.oauth.complete(deps.merchant, PROVIDER, {
+      code,
+      redirectUri: callback.redirectUri,
+      environment: deps.environment ?? 'SANDBOX',
+    }),
   );
   if (!exchanged.ok) {
     return {
@@ -164,7 +179,7 @@ async function exchangeStep(
     () => null,
     (error: unknown) => deps.copy.enableFailed(errorDetail(error)),
   );
-  const accountId = exchanged.value.environments.SANDBOX?.accountId ?? null;
+  const accountId = exchanged.value.environments[deps.environment ?? 'SANDBOX']?.accountId ?? null;
   return {
     ok: enabled === null,
     step: stepOf('connect.exchange', 'EXECUTED', clock(), {
