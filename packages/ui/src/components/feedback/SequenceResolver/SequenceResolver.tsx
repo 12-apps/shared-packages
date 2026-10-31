@@ -1,21 +1,18 @@
 'use client';
 
-import Box from '@mui/material/Box/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { Dialog } from '../Dialog';
 import { canReturn, currentOf, jumpTargetOf, positionOf, progressOf, summaryOf, type RunState } from './sequence-model';
 import {
   SequenceDoneBody,
   SequenceIntroBody,
   SequenceStepBody,
 } from './SequenceResolver.parts';
-import { SequenceHeader } from './SequenceResolver.header';
 import { SequenceOverviewBody } from './SequenceResolver.overview';
+import { ResolverFrame } from './SequenceResolver.frame';
 import { SEQUENCE_METRICS } from './SequenceResolver.metrics';
-import { chromeSx, columnSx, paperSx, scrollBodySx } from './SequenceResolver.styles';
 import type {
   SequenceItem,
   SequenceOverviewCategory,
@@ -124,19 +121,6 @@ function headerOf<I extends SequenceItem, R>(inputs: HeaderInputs<I, R>) {
   return { ...base, back: backOf(props, state), seeAll: overview.button };
 }
 
-/**
- * Esc closes. `persistent` turns MUI's own Esc off together with the veil's
- * click (the prototype's veil does nothing), so Esc is put back here; a popup
- * inside a step that handles its own Esc stops it before it gets here.
- */
-function escapeCloses(close: () => void) {
-  return (event: React.KeyboardEvent): void => {
-    if (event.key !== 'Escape' || event.defaultPrevented) return;
-    event.stopPropagation();
-    close();
-  };
-}
-
 interface BodyProps<I extends SequenceItem, R> {
   props: SequenceResolverProps<I, R>;
   state: SequenceRun<I, R>;
@@ -237,7 +221,7 @@ function useCloseAtEnd(ended: boolean, close: () => void): boolean {
   return ended;
 }
 
-interface Screen {
+export interface Screen {
   header: ReturnType<typeof headerOf>;
   body: React.JSX.Element;
 }
@@ -270,6 +254,28 @@ function useExitScreen(live: Screen, input: { open: boolean; hasStep: boolean; c
   return { ...kept, header: { ...header, back: { ...header.back, onClick: () => undefined } } };
 }
 
+interface RunEnding<I extends SequenceItem> {
+  current: I | undefined;
+  close: () => void;
+  /** The run ended with `done: null`: the dialog is closing. */
+  ended: boolean;
+  /** The kept last step is playing its exit. */
+  exiting: boolean;
+}
+
+function useRunEnding<I extends SequenceItem, R>(
+  props: SequenceResolverProps<I, R>,
+  state: SequenceRun<I, R>,
+): RunEnding<I> {
+  const { open, onClose, intro } = props;
+  const { run } = state;
+  const current = intro ? undefined : currentOf(run);
+  const close = (): void => onClose(summaryOf(run));
+  const closesAtEnd = props.done === null && !intro;
+  const ended = useCloseAtEnd(open && closesAtEnd && !current, close);
+  return { current, close, ended, exiting: ended || (!open && closesAtEnd) };
+}
+
 /**
  * Resolve a queue of problems one at a time, in ONE dialog whose body is
  * replaced step by step: a header with "‹ Back", the step's label and close,
@@ -287,7 +293,7 @@ function useExitScreen(live: Screen, input: { open: boolean; hasStep: boolean; c
 export function SequenceResolver<I extends SequenceItem, R = unknown>(
   props: SequenceResolverProps<I, R>,
 ): React.JSX.Element {
-  const { open, onClose, intro, labels } = props;
+  const { open, intro, labels } = props;
   const testId = props.dataTestId ?? 'sequence-resolver';
   const theme = useTheme();
   const touch = useMediaQuery(theme.breakpoints.down(SEQUENCE_METRICS.sheetBreakpoint));
@@ -308,10 +314,8 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     failed: labels.failed,
     stepAllowsBack: () => stepAllowsBack.current,
   });
-  const { run } = state;
-  const current = intro ? undefined : currentOf(run);
-  const close = (): void => onClose(summaryOf(run));
-  const ended = useCloseAtEnd(open && !intro && !current && props.done === null, close);
+  const ending = useRunEnding(props, state);
+  const { current, close } = ending;
   const overview = useOverview(props, state, current, open);
   // Under the overview the step is kept but hidden, and the overview's title names the dialog.
   const titleProps = { id: overview.shown ? `${titleId}-kept` : titleId, tabIndex: -1, ref: titleRef } as const;
@@ -338,42 +342,16 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     { open, hasStep: current !== undefined && step !== undefined, closesAtEnd: props.done === null && !intro },
   );
 
-  // The kept screen is a picture of the last step, not a live one: nothing on it acts during the exit.
-  const exiting = ended || (!open && props.done === null && !intro);
-  const swallow = exiting
-    ? (event: React.SyntheticEvent): void => {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    : undefined;
-
   return (
-    <Dialog
-      open={open && !ended}
-      onClose={close}
-      persistent
-      variant={touch ? 'bottom-sheet' : 'default'}
-      size="sm"
-      aria-labelledby={titleId}
-      onKeyDown={escapeCloses(close)}
-      slotProps={{ paper: { sx: paperSx(touch) } }}
-      dataTestId={testId}
-    >
-      <Box sx={columnSx} inert={exiting} aria-hidden={exiting || undefined} onClickCapture={swallow}>
-        <Box sx={chromeSx}>
-          <SequenceHeader
-            touch={touch}
-            {...screen.header}
-            closeLabel={labels.close}
-            onClose={close}
-            progressLabel={labels.progress}
-            testId={testId}
-          />
-        </Box>
-        <Box sx={scrollBodySx} data-testid={`${testId}-body`}>
-          {screen.body}
-        </Box>
-      </Box>
-    </Dialog>
+    <ResolverFrame
+      shown={open && !ending.ended}
+      exiting={ending.exiting}
+      touch={touch}
+      titleId={titleId}
+      testId={testId}
+      labels={labels}
+      screen={screen}
+      close={close}
+    />
   );
 }

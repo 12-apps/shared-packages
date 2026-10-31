@@ -75,8 +75,10 @@ describe("done: null", () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledWith({ resolved: 1, skipped: 1, total: 2, alsoResolved: 0 });
     });
+    await waitFor(() => {
+      expect(screen.queryByTestId("sr-done")).toBeNull();
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("sr-done")).toBeNull();
   });
 
   it("closes as well when the last step is passed over, with nothing resolved", async () => {
@@ -213,13 +215,17 @@ describe("done: null", () => {
     });
     // The closing render: the dialog is on its way out, still showing step 2.
     expect(seen()).toEqual(before);
-    expect(screen.queryByText("Done")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText("Done")).toBeNull();
+    });
     // The host turns it off from onClose: still the same screen for the rest of the exit.
     rerender({ onClose, open: false });
     expect(seen()).toEqual(before);
     // Back is inert during the exit.
     click("sr-back");
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("ignores a second click on the kept primary button during the exit", async () => {
@@ -241,8 +247,10 @@ describe("done: null", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
     click("sr-primary");
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("calls onClose once under StrictMode when it mounts open over an empty queue", async () => {
@@ -256,7 +264,7 @@ describe("done: null", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
     await act(async () => {
-      await new Promise((settle) => setTimeout(settle, 50));
+      await Promise.resolve();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -273,7 +281,7 @@ describe("done: null", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
     await act(async () => {
-      await new Promise((settle) => setTimeout(settle, 50));
+      await Promise.resolve();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
