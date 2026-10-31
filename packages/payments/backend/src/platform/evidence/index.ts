@@ -38,6 +38,11 @@ export {
   type HomologacaoEvidenceService,
   type HomologacaoSellerConnection,
 } from './service';
+export {
+  createHomologacaoEvidenceMount,
+  type HomologacaoEvidenceMount,
+  type HomologacaoEvidenceMountOptions,
+} from './mount';
 export { recordTraffic, type RecordedOutcome } from './record';
 export { pixStateOf, pixViewOf, type EvidencePixState, type EvidencePixView } from './orders-pix-production';
 export { PT_BR_HOMOLOGACAO_EVIDENCE_COPY } from './pt-BR';
