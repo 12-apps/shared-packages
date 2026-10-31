@@ -98,7 +98,7 @@ async function createPix(deps: EvidenceRunDeps, runId: string): Promise<CreatedP
   };
 }
 
-export interface PixPolls {
+interface PixPolls {
   calls: EvidenceStep['calls'];
   status: string | null;
   chargeId: string;
@@ -148,7 +148,7 @@ export function pixConsultStep(
 }
 
 /** Phase 2's Pix steps in production: the QR, then three steps waiting on a person. */
-export function awaitingPixSteps(deps: EvidenceRunDeps, create: EvidenceStep, created: boolean): EvidenceStep[] {
+function awaitingPixSteps(deps: EvidenceRunDeps, create: EvidenceStep, created: boolean): EvidenceStep[] {
   // A person pays it: nothing to poll yet. `pixConfirmSteps` completes it.
   const waiting = created ? deps.copy.pixAwaitingPayment : undefined;
   return [

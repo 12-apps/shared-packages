@@ -305,7 +305,7 @@ export async function loadEvidence(deps: EvidenceFileDeps): Promise<LoadedEviden
 }
 
 /** The file name's timestamp — shared so a TXT and a JSON of one moment pair up. */
-export function evidenceStamp(generatedAt: Date): string {
+function evidenceStamp(generatedAt: Date): string {
   return generatedAt.toISOString().slice(0, 19).replace(/[:T]/g, '-');
 }
 

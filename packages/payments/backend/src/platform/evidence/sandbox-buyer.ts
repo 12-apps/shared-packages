@@ -37,14 +37,14 @@ const PAGBANK_SANDBOX_3DS_CONTACT = {
  * by AMOUNT: Visa 4000 0000 0000 2701 authenticated for R$ 27,01 is PAID and
  * AUTHENTICATED with no challenge — which is what lets the run go unattended.
  */
-export const PAGBANK_SANDBOX_DEBIT_CENTS = 2701;
+const PAGBANK_SANDBOX_DEBIT_CENTS = 2701;
 
 /**
  * The wallet orders' amount, in cents (FUT-3755): Google Pay's and Apple Pay's
  * sheets show it and the server raises the wallet orders for it, so the
  * browser is handed it rather than restating it.
  */
-export const PAGBANK_SANDBOX_WALLET_CENTS = 1200;
+const PAGBANK_SANDBOX_WALLET_CENTS = 1200;
 
 /**
  * The amount each order of a run charges, in cents. Sandbox picks the amounts

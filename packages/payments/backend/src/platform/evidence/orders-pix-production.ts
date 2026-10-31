@@ -37,7 +37,7 @@ export function pixStateOf(record: EvidenceRecord, skippedNote: string): Evidenc
   return stepIn(record.steps, 'pix.paid')?.observed === skippedNote ? 'SKIPPED' : 'AWAITING_PAYMENT';
 }
 
-export const isPixOpen = (state: EvidencePixState): boolean => state === 'AWAITING_PAYMENT' || state === 'REFUND_PENDING';
+const isPixOpen = (state: EvidencePixState): boolean => state === 'AWAITING_PAYMENT' || state === 'REFUND_PENDING';
 
 /**
  * Whether a run's Pix may still move real money: open, or SKIPPED while its
