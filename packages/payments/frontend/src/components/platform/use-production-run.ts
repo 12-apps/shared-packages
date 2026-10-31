@@ -80,10 +80,10 @@ async function browserCards(
 /**
  * Keep checking an open Pix, one call at a time, until the server says it is
  * settled — for at most `windowMs` per Pix. Each check asks PagBank
- * whether a person paid it, which no webhook of ours settles yet: a bounded
- * third-party wait (future-pay ADR 0168). Past the window the screen stops
- * asking on its own and offers "Verificar o Pix" instead. Answers whether the
- * window ran out.
+ * whether a person paid it, which no webhook of ours settles yet: a
+ * third-party wait, the one kind of screen poll the origin host admits, and
+ * only when bounded. Past the window the screen stops asking on its own and
+ * offers "Verificar o Pix" instead. Answers whether the window ran out.
  */
 function usePixPolling(
   pix: ProductionPixView | null,
