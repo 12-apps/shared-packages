@@ -120,9 +120,12 @@ async function webhookStep(
 
 /**
  * "Received AND processed": every delivery processed, and the charge row it
- * moved in the state the scenario ends in (a Pix one PAID). A delivery still
- * waiting in the inbox is PENDING — never counted as processed.
+ * moved in the state the scenario ends in — a Pix one PAID, or REFUNDED once
+ * a production run gave the money back (FUT-4198). A delivery still waiting
+ * in the inbox is PENDING — never counted as processed.
  */
+const PIX_SETTLED: ReadonlySet<string> = new Set(['PAID', 'REFUNDED']);
+
 function webhookVerdict(
   outcome: HomologacaoEvidenceCopy['outcome'],
   key: 'pix.webhook' | 'card.webhook',
@@ -133,7 +136,7 @@ function webhookVerdict(
   const statuses = [...new Set(events.map((event) => event.status))].join(', ');
   const rowStatus = row?.status ?? null;
   const processed =
-    events.every((event) => event.status === 'PROCESSED') && row !== null && (key !== 'pix.webhook' || row.status === 'PAID');
+    events.every((event) => event.status === 'PROCESSED') && row !== null && (key !== 'pix.webhook' || PIX_SETTLED.has(row.status));
   return processed
     ? { status: 'EXECUTED', observed: outcome.webhookReceived(events.length, statuses, rowStatus) }
     : { status: 'PENDING', observed: outcome.webhookNotProcessed(statuses, rowStatus) };

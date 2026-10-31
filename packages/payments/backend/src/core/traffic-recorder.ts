@@ -236,6 +236,8 @@ export function redactValue(value: unknown, within: Within = 'NONE'): unknown {
       }
       if (PERSONAL_KEYS.has(lower)) return [key, maskDigits(child, KEEP_LAST.taxId)];
       if (within === 'PHONE' && PHONE_KEYS.has(lower)) return [key, maskDigits(child, KEEP_LAST.phone)];
+      // A phone sent as one string, not as `phones[]` objects, is masked the same way.
+      if (lower === 'phone' && typeof child !== 'object') return [key, maskDigits(child, KEEP_LAST.phone)];
       return [key, redactValue(child, childWithin(within, lower))];
     }),
   );

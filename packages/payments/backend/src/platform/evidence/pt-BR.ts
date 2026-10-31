@@ -197,7 +197,7 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     'Segurança: Authorization, access_token, refresh_token, client_secret, códigos OAuth, cookies, ' +
     'CVV, número completo e dados criptografados do cartão e o token das carteiras digitais (Google Pay e ' +
     'Apple Pay, card.wallet.key) foram removidos e aparecem como ' +
-    '***REDACTED***. Todas as chamadas abaixo foram registradas pelo próprio código da integração no ' +
+    '***REDACTED***; CPF/CNPJ e telefone aparecem mascarados. Todas as chamadas abaixo foram registradas pelo próprio código da integração no ' +
     'momento em que foram feitas; nenhuma resposta foi escrita à mão. Dados e cartões usados são os ' +
     'de teste oficiais do PagBank.',
   pendencies: {
@@ -252,8 +252,6 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     notPaidYet: (seconds) => `Pagamento não confirmado em ${seconds} s de consultas.`,
     pixAwaitingPayment: 'QR Code exibido ao operador; aguardando o pagamento.',
     pixSkipped: 'O operador pulou o Pix: o QR Code não foi pago, então nada foi estornado.',
-    declinedNotInProduction:
-      'Não executado em produção: não há cartão real que seja recusado sob demanda. A recusa está coberta no arquivo de sandbox.',
     buyerMissing: 'Os dados do titular do cartão não foram enviados; nenhum pedido foi criado.',
     publicKeyMinted: 'Chave pública gerada com o token do lojista.',
     publicKeyMissing: 'A chave pública não foi gerada.',

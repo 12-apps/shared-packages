@@ -369,9 +369,16 @@ const production = createHomologacaoEvidence({
   digits) in every recorded call, sandbox included.
 - **The Pix waits for a person.** Phase 2 raises the QR and leaves
   `pix.consult`, `pix.paid` and the production-only `pix.refund` PENDING; mount
-  a route for `confirmPix(runId, 'CHECK' | 'SKIP')`. `CHECK` consults once and,
-  when PAID, refunds and records it; `SKIP` records that it was never paid.
-- No declined card in production: `card.declined` stays PENDING and says why.
+  a route for `confirmPix(runId, 'CHECK' | 'SKIP')`, which answers an
+  `EvidencePixView` (`state`, `qrText`, `expiresAt`). Both consult once; PAID is
+  refunded whatever was pressed, a refund that failed is retried on the next
+  call, and `SKIP` on an unpaid QR records it as skipped. `seller()` carries the
+  latest run's `pix`, so a reloaded screen shows the open QR again.
+- **One open Pix at a time.** A production `prepare` throws
+  `EvidencePixOpenError` while the latest run's Pix is unpaid or unrefunded
+  (answer 409), and `EvidenceBuyerRequiredError` without a cardholder (400).
+- No declined card in production: `card.declined` is a sandbox-only step; the
+  production file lists the gap under Pendências.
 - The file is named `pagbank-homologacao-evidencias-producao-<stamp>`, so it is
   never confused with the sandbox one.
 

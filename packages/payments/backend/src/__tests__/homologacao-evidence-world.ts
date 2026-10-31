@@ -99,7 +99,15 @@ function walletAnswer(route: string, body: Record<string, unknown>): Response | 
 }
 
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
-function fakePagbank(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number; sessionStatus?: number } = {}) {
+function fakePagbank(
+  options: {
+    refreshStatus?: number;
+    consultOutages?: number;
+    cancelNotYet?: number;
+    sessionStatus?: number;
+    pixRefundFailures?: number;
+  } = {},
+) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -139,6 +147,9 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
     }
     // The production Pix refund (FUT-4198): a paid Pix canceled.
     if (route === 'POST /charges/CHAR_PIX/cancel') {
+      if (seen.filter((call) => call.path === route).length <= (options.pixRefundFailures ?? 0)) {
+        return json({ error_messages: [{ code: 'INTERNAL_ERROR' }] }, 500, 'Internal Server Error');
+      }
       return json({ id: 'CHAR_PIX', status: 'CANCELED', amount: { value: 100, summary: { refunded: 100 } } }, 201, 'Created');
     }
     if (route === 'POST /orders') {
@@ -191,6 +202,8 @@ export function world(
     applePayConfigured?: boolean;
     /** The evidence's own environment (FUT-4198). SANDBOX when absent. */
     environment?: 'SANDBOX' | 'PRODUCTION';
+    /** How many production Pix refunds PagBank answers 500 before one passes. */
+    pixRefundFailures?: number;
   } = {},
 ) {
   const environment = options.environment ?? 'SANDBOX';
@@ -258,6 +271,8 @@ export function world(
     ...(options.applePayConfigured === undefined ? {} : { applePayConfigured: () => options.applePayConfigured === true }),
   };
   const events: EvidenceWebhookEvent[] = [];
+  /** What the host's charge row says now — PAID, or REFUNDED after a production refund. */
+  const chargeStatus = { value: 'PAID' };
   const fileDeps = {
     store,
     copy,
@@ -265,9 +280,9 @@ export function world(
     identification: { name: 'Paladira', site: 'https://paladira.com', clientId: 'cid', callbackUrl: 'https://example.test/cb' },
     webhookEvents: async (wanted: readonly string[]) =>
       events.filter((event) => wanted.some((id) => JSON.stringify(event.payload).includes(id))),
-    chargeRow: async () => ({ providerChargeId: 'CHAR_PIX', status: 'PAID', updatedAt: new Date('2026-10-17T15:00:02Z') }),
+    chargeRow: async () => ({ providerChargeId: 'CHAR_PIX', status: chargeStatus.value, updatedAt: new Date('2026-10-17T15:00:02Z') }),
   };
-  return { pagbank, configs, connectDeps, runDeps, fileDeps, events };
+  return { pagbank, configs, connectDeps, runDeps, fileDeps, events, chargeStatus };
 }
 
 /** A real cardholder, as the production screen sends it (FUT-4198). */

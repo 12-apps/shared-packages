@@ -69,6 +69,10 @@ describe('redactValue', () => {
     ).toEqual({ customer: { name: 'Ana', tax_id: '*********09' }, card: { holder: { tax_id: '************59' } } });
   });
 
+  it('given a phone sent as one string, then it is masked the same way', () => {
+    expect(redactValue({ customer: { phone: '+5531994494408' } })).toEqual({ customer: { phone: '**********4408' } });
+  });
+
   it('given a number that is not a phone, then it is kept — an address or an order number is not masked', () => {
     const body = { address: { number: '424' }, items: [{ number: 2 }] };
 

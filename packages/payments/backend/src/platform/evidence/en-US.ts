@@ -190,7 +190,7 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
   redactionNote:
     'Security: Authorization, access_token, refresh_token, client_secret, OAuth codes, cookies, ' +
     "CVV, the full card number, the encrypted card data and the digital wallets' token (Google Pay and Apple Pay, " +
-    'card.wallet.key) were removed and show as ***REDACTED***. ' +
+    'card.wallet.key) were removed and show as ***REDACTED***; CPF/CNPJ and phone are masked. ' +
     "Every call below was recorded by the integration's own code as it was made; no response was " +
     "written by hand. Data and cards are PagBank's official test ones.",
   pendencies: {
@@ -243,8 +243,6 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_COPY: HomologacaoEvidenceCopy = {
     notPaidYet: (seconds) => `Payment not confirmed within ${seconds} s of consults.`,
     pixAwaitingPayment: 'QR code shown to the operator; waiting for the payment.',
     pixSkipped: 'The operator skipped the Pix: the QR code was not paid, so nothing was refunded.',
-    declinedNotInProduction:
-      'Not run in production: no real card declines on demand. The decline is covered by the sandbox file.',
     buyerMissing: "The cardholder's data was not sent; no order was created.",
     publicKeyMinted: "Public key minted with the seller's token.",
     publicKeyMissing: 'The public key was not minted.',

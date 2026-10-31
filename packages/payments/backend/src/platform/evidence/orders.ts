@@ -201,9 +201,6 @@ export function encryptFailure(deps: EvidenceRunDeps, card: BrowserCardResult): 
 async function cardCharge(deps: EvidenceRunDeps, runId: string, card: BrowserCardResult): Promise<RaisedCardOrder> {
   const key = card.scenario === 'approved' ? 'card.approved' : 'card.declined';
   const notes = [`${card.brand} ${card.masked}`];
-  if (key === 'card.declined' && environmentOf(deps) === 'PRODUCTION') {
-    return { step: pendingStep(key, deps.copy, deps.copy.declinedNotInProduction), charge: null, orderId: null };
-  }
   if (!card.encrypted) {
     return { step: { ...pendingStep(key, deps.copy, encryptFailure(deps, card)), notes }, charge: null, orderId: null };
   }
@@ -378,11 +375,9 @@ export async function cardSteps(deps: EvidenceRunDeps, runId: string, cards: rea
   const consult = chargeId
     ? await consultCharge(deps, 'card.approvedConsult', chargeId, orderId)
     : pendingStep('card.approvedConsult', deps.copy);
-  // Production has no card that declines on demand: the step says so.
-  const declined =
-    environmentOf(deps) === 'PRODUCTION'
-      ? { step: pendingStep('card.declined', deps.copy, deps.copy.declinedNotInProduction) }
-      : await scenario('declined');
+  // Production has no card that declines on demand: no declined order is
+  // raised there, and its file does not list the step (`evidenceStepKeys`).
+  const declined = environmentOf(deps) === 'PRODUCTION' ? null : await scenario('declined');
   const cancel = chargeId ? await cancelCharge(deps, 'card.cancel', chargeId, orderId) : pendingStep('card.cancel', deps.copy);
   return [
     encrypt,

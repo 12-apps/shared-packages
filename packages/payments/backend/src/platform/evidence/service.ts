@@ -15,14 +15,15 @@ import {
   type EvidenceWebhookDelegate,
 } from './prisma';
 import { walletsConfig } from './orders-wallet';
+import { confirmEvidencePix } from './confirm-pix';
 import {
   completeEvidenceRun,
-  confirmEvidencePix,
   prepareEvidenceRun,
   type EvidenceRunDeps,
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
+import { pixViewOf, type EvidencePixView } from './orders-pix-production';
 import { PAGBANK_SANDBOX_DEBIT_TEST, PAGBANK_SANDBOX_TEST_BUYER, productionDebitTest } from './sandbox-buyer';
 import type {
   BrowserCardResult,
@@ -111,6 +112,12 @@ export interface HomologacaoSellerConnection {
    * inside the operator's tap, so the screen reads it here, not from phase 1.
    */
   wallets: EvidenceWalletsConfig;
+  /**
+   * PRODUCTION (FUT-4198): the latest run's Pix, so a screen opened (or
+   * reloaded) while it is open shows its QR again and keeps settling it.
+   * Null in sandbox and before any production run.
+   */
+  pix: EvidencePixView | null;
 }
 
 export interface HomologacaoEvidenceService {
@@ -130,10 +137,21 @@ export interface HomologacaoEvidenceService {
     onSection?: (section: EvidenceRunSection) => void,
     buyer?: EvidenceBuyer,
   ): Promise<EvidenceRecord>;
-  /** PRODUCTION phase 3 (FUT-4198): check the Pix a person paid, or record that it was skipped. */
-  confirmPix(runId: string, action: PixConfirmAction): Promise<EvidenceRecord>;
+  /**
+   * PRODUCTION phase 3 (FUT-4198): check the Pix a person paid, or record that
+   * it was skipped; answers where it stands now.
+   */
+  confirmPix(runId: string, action: PixConfirmAction): Promise<EvidencePixView>;
   /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
   file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
+}
+
+/** Thrown by a PRODUCTION `prepare` without the cardholder (FUT-4198). */
+export class EvidenceBuyerRequiredError extends Error {
+  constructor() {
+    super('A production homologation evidence run needs the cardholder');
+    this.name = 'EvidenceBuyerRequiredError';
+  }
 }
 
 async function storedSeller(cfg: HomologacaoEvidenceConfig) {
@@ -157,6 +175,7 @@ function sellerView(
   { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
   connect: EvidenceRecord | null,
   wallets: EvidenceWalletsConfig,
+  pix: EvidencePixView | null,
 ): HomologacaoSellerConnection {
   const field = (key: string): string | null => fields?.[key] ?? null;
   return {
@@ -167,6 +186,7 @@ function sellerView(
     accountId: field('accountId'),
     lastConnectProblem: connectProblem(connect),
     wallets,
+    pix,
   };
 }
 
@@ -208,22 +228,28 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
   return {
     async seller() {
       const seller = await storedSeller(cfg);
+      const run = environment === 'PRODUCTION' ? await store.latest(PROVIDER, 'RUN') : null;
       return sellerView(
         seller,
         await store.latest(PROVIDER, 'CONNECT'),
         await walletsConfig(runDeps, sellerAccountId(seller, environment)),
+        run ? pixViewOf(run, cfg.copy.outcome.pixSkipped) : null,
       );
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
-    prepare: (buyer) =>
-      prepareEvidenceRun(
+    prepare: (buyer) => {
+      // Production charges a real cardholder: there is no test buyer to fall back on.
+      if (environment === 'PRODUCTION' && !buyer) throw new EvidenceBuyerRequiredError();
+      return prepareEvidenceRun(
         { ...runDeps, customer: customerFor(environment, buyer) },
-        environment === 'PRODUCTION' && buyer ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
-      ),
+        buyer && environment === 'PRODUCTION' ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
+      );
+    },
     run: (runId, cards, wallets, onSection, buyer) =>
       completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection),
-    confirmPix: (runId, action) => confirmEvidencePix(runDeps, runId, action),
+    confirmPix: async (runId, action) =>
+      pixViewOf(await confirmEvidencePix(runDeps, runId, action), cfg.copy.outcome.pixSkipped),
     file: (format = 'TXT') =>
       (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,

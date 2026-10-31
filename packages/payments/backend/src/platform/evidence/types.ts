@@ -70,9 +70,15 @@ export type EvidenceEnvironment = 'SANDBOX' | 'PRODUCTION';
 /**
  * Scenarios only one environment has. The sandbox simulator pays a Pix that
  * nobody refunds, so `pix.refund` is a PRODUCTION step: real money a person
- * paid comes back. A sandbox file never lists it, so it reads as it always did.
+ * paid comes back. A declined card needs a card that declines on demand, which
+ * only the sandbox has, so `card.declined` is SANDBOX-only and the production
+ * file lists the gap under Pendências instead of carrying a step that could
+ * never run. A sandbox file reads as it always did.
  */
-const ONLY_IN: Readonly<Partial<Record<EvidenceStepKey, EvidenceEnvironment>>> = { 'pix.refund': 'PRODUCTION' };
+const ONLY_IN: Readonly<Partial<Record<EvidenceStepKey, EvidenceEnvironment>>> = {
+  'pix.refund': 'PRODUCTION',
+  'card.declined': 'SANDBOX',
+};
 
 /** Every scenario a file in this environment reports, in order. */
 export function evidenceStepKeys(environment: EvidenceEnvironment): readonly EvidenceStepKey[] {
@@ -344,8 +350,6 @@ export interface EvidenceOutcomeCopy {
   pixAwaitingPayment: string;
   /** PRODUCTION: the operator skipped the Pix, so it was never paid and nothing is refunded. */
   pixSkipped: string;
-  /** PRODUCTION: a declined charge needs a card that declines on demand, which real money has not. */
-  declinedNotInProduction: string;
   /** PRODUCTION: the run needs the cardholder's data, and none was sent. */
   buyerMissing: string;
   publicKeyMinted: string;

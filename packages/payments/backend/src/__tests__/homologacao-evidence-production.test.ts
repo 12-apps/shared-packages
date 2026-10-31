@@ -5,7 +5,9 @@ import {
   buildHomologacaoEvidenceJson,
   completeEvidenceRun,
   confirmEvidencePix,
+  EvidencePixOpenError,
   EvidenceRunNotFoundError,
+  pixViewOf,
   evidenceStepKeys,
   prepareEvidenceRun,
   PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
@@ -76,7 +78,9 @@ describe('homologação evidence in production', () => {
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
     expect(file.content).toContain('— PRODUÇÃO');
     expect(file.content).toContain('Ambiente: PRODUCTION (https://api.pagseguro.com)');
-    expect(file.content).toContain(PROD.outcome.declinedNotInProduction);
+    // No declined card in production: the step is not listed, the gap is under Pendências.
+    expect(file.content).not.toContain('cartão de crédito recusado — POST');
+    expect(file.content).toContain('Não executado em produção: cartão recusado');
     expect(file.filename).toMatch(/^pagbank-homologacao-evidencias-producao-.*\.txt$/);
   });
 
@@ -126,7 +130,7 @@ describe('homologação evidence in production', () => {
     expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(1);
   });
 
-  it('given the operator skips the Pix, then it is recorded as never paid and nothing is refunded', async () => {
+  it('given the operator skips an unpaid Pix, then one consult proves it unpaid, it is recorded as skipped and nothing is refunded', async () => {
     const w = production();
     const prepared = await raised(w);
 
@@ -134,7 +138,8 @@ describe('homologação evidence in production', () => {
 
     expect(skipped.steps.find((step) => step.key === 'pix.paid')?.observed).toBe(PROD.outcome.pixSkipped);
     expect(skipped.steps.find((step) => step.key === 'pix.refund')?.observed).toBe(PROD.outcome.pixSkipped);
-    expect(w.pagbank.seen.filter((call) => call.path.startsWith('GET /orders/ORDE_PIX'))).toHaveLength(0);
+    expect(w.pagbank.seen.filter((call) => call.path === 'GET /orders/ORDE_PIX')).toHaveLength(1);
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(0);
   });
 
   it('given a run id that is not the latest, then confirming the Pix is refused', async () => {
@@ -169,9 +174,79 @@ describe('homologação evidence in production', () => {
     expect(json.scenarios.find((scenario) => scenario.key === 'connect.usage')?.observed).toBe(PROD.outcome.notSandbox);
   });
 
-  it('given the two environments, then only production lists the Pix refund', () => {
+  it('given the two environments, then only production lists the Pix refund and only sandbox the declined card', () => {
     expect(evidenceStepKeys('PRODUCTION')).toContain('pix.refund');
+    expect(evidenceStepKeys('PRODUCTION')).not.toContain('card.declined');
+    expect(evidenceStepKeys('SANDBOX')).toContain('card.declined');
     expect(evidenceStepKeys('SANDBOX')).not.toContain('pix.refund');
-    expect(evidenceStepKeys('SANDBOX')).toHaveLength(evidenceStepKeys('PRODUCTION').length - 1);
+  });
+
+  it('given the Pix refund fails, then the next check refunds it again instead of leaving the real money charged', async () => {
+    const w = production({ pixRefundFailures: 1 });
+    const prepared = await raised(w);
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+
+    const failed = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    expect(failed.steps.find((step) => step.key === 'pix.refund')?.status).toBe('FAILED');
+    expect(pixViewOf(failed, PROD.outcome.pixSkipped).state).toBe('REFUND_PENDING');
+
+    const retried = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    expect(retried.steps.find((step) => step.key === 'pix.refund')?.status).toBe('EXECUTED');
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(2);
+  });
+
+  it('given the operator skips a Pix that was paid meanwhile, then it is refunded, not skipped', async () => {
+    const w = production();
+    const prepared = await raised(w);
+    // The first consult answers WAITING, the next one PAID.
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+
+    const skipped = await confirmEvidencePix(w.runDeps, prepared.runId, 'SKIP');
+
+    expect(pixViewOf(skipped, PROD.outcome.pixSkipped).state).toBe('REFUNDED');
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(1);
+  });
+
+  it('given a Pix still open, then a new production run is refused until it is settled', async () => {
+    const w = production();
+    const prepared = await raised(w);
+
+    await expect(prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER))).rejects.toBeInstanceOf(EvidencePixOpenError);
+
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'SKIP');
+    await expect(prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER))).resolves.toMatchObject({ publicKey: 'PUBKEY' });
+  });
+
+  it('given the open Pix, then the view carries its QR text, and nothing payable once it is settled', async () => {
+    const w = production();
+    const prepared = await raised(w);
+    const record = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+
+    expect(pixViewOf(record, PROD.outcome.pixSkipped)).toEqual({
+      runId: prepared.runId,
+      state: 'AWAITING_PAYMENT',
+      qrText: '00020101pix',
+      expiresAt: '2026-10-17T12:15:00-03:00',
+    });
+    const refunded = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    expect(pixViewOf(refunded, PROD.outcome.pixSkipped)).toMatchObject({ state: 'REFUNDED', qrText: null });
+  });
+
+  it('given the Pix notification processed and the charge refunded by the run, then the webhook step passes', async () => {
+    const w = production();
+    const prepared = await raised(w);
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    w.events.push({
+      receivedAt: new Date('2026-10-30T15:00:00Z'),
+      processedAt: new Date('2026-10-30T15:00:01Z'),
+      status: 'PROCESSED',
+      payload: { id: 'ORDE_PIX', charges: [{ id: 'CHAR_PIX', status: 'PAID' }] },
+    });
+    w.chargeStatus.value = 'REFUNDED';
+
+    const file = await buildHomologacaoEvidenceFile(w.fileDeps);
+
+    expect(file.content).toMatch(/\[3\.5\][^\n]*— EXECUTADO/);
   });
 });

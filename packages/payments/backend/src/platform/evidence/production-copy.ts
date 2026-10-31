@@ -33,10 +33,6 @@ export const PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY: HomologacaoEvidenceCopy
       scenario: 'Preparação dos dados do cartão — criptografia no navegador (PagSeguro.encryptCard)',
       expected: 'O cartão real digitado pelo operador é criptografado no navegador com a chave pública do lojista; apenas o valor criptografado chega ao servidor.',
     },
-    'card.declined': {
-      scenario: 'Pedido com cartão de crédito recusado — POST /orders',
-      expected: 'Não executado em produção: a recusa está coberta no arquivo de sandbox.',
-    },
     'debit.authenticate': {
       scenario: 'Autenticação 3DS do cartão de débito real',
       expected: 'O SDK do PagBank (PagSeguro.authenticate3DS) autentica no navegador o cartão de débito criptografado, no valor de R$ 1,00, com o desafio do banco quando ele pedir: status AUTH_FLOW_COMPLETED, AUTHENTICATED, com o id da autenticação.',
@@ -97,10 +93,6 @@ export const EN_US_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY: HomologacaoEvidenceCopy
     'card.encrypt': {
       scenario: 'Card data preparation — encryption in the browser (PagSeguro.encryptCard)',
       expected: "The real card the operator typed is encrypted in the browser with the seller's public key; only the encrypted value reaches the server.",
-    },
-    'card.declined': {
-      scenario: 'Declined credit card order — POST /orders',
-      expected: 'Not run in production: the decline is covered by the sandbox file.',
     },
     'debit.authenticate': {
       scenario: '3DS authentication of the real debit card',

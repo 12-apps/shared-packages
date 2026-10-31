@@ -4,7 +4,7 @@ import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
-import { pixConfirmSteps } from './orders-pix-production';
+import { isPixOpen, pixStateOf } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
 import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
 import { environmentOf } from './environment';
@@ -101,7 +101,7 @@ export interface EvidenceRunDeps {
  * `NOT_SANDBOX` keeps its name for the copy key it maps to; it means "not in
  * this run's environment".
  */
-async function sandboxSeller(
+export async function sandboxSeller(
   deps: EvidenceRunDeps,
 ): Promise<{ token: string; accountId: string | null } | 'NOT_CONNECTED' | 'NOT_SANDBOX'> {
   const seller = await deps.seller();
@@ -181,7 +181,7 @@ const ORDER_KEYS: readonly EvidenceStepKey[] = [
  * orders must all carry the seller's current token, and nothing may carry the
  * platform's — the claim is about the calls made, not about two stored strings.
  */
-async function usageStep(deps: EvidenceRunDeps, steps: readonly EvidenceStep[], sellerToken: string): Promise<EvidenceStep> {
+export async function usageStep(deps: EvidenceRunDeps, steps: readonly EvidenceStep[], sellerToken: string): Promise<EvidenceStep> {
   const calls = steps.filter((step) => SELLER_CALL_KEYS.has(step.key)).flatMap((step) => step.calls);
   const prints = calls.map((call) => call.bearerFingerprint).filter((print): print is string => Boolean(print));
   if (prints.length === 0) return pendingStep('connect.usage', deps.copy);
@@ -241,6 +241,7 @@ export async function prepareEvidenceRun(
   deps: EvidenceRunDeps,
   debitTest: DebitTestData = PAGBANK_SANDBOX_DEBIT_TEST,
 ): Promise<PreparedEvidenceRun> {
+  await refuseOverOpenPix(deps);
   const now = clockOf(deps)();
   const record: EvidenceRecord = {
     id: deps.newId(),
@@ -284,6 +285,25 @@ export async function prepareEvidenceRun(
     debitTest,
     wallets: await walletsConfig(deps, seller.accountId),
   };
+}
+
+/**
+ * Thrown by a PRODUCTION phase 1 while the latest run's Pix is still open — its
+ * QR payable, or paid and not refunded yet (FUT-4198). A new run would become
+ * the latest, and the open one could then never be confirmed or refunded.
+ */
+export class EvidencePixOpenError extends Error {
+  constructor(readonly runId: string) {
+    super(`The Pix of homologation evidence run ${runId} is still open`);
+    this.name = 'EvidencePixOpenError';
+  }
+}
+
+/** Refuse a new production run while the latest one still holds a Pix to settle. */
+async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
+  if (environmentOf(deps) !== 'PRODUCTION') return;
+  const latest = await deps.store.latest(PROVIDER, 'RUN');
+  if (latest && isPixOpen(pixStateOf(latest, deps.copy.pixSkipped))) throw new EvidencePixOpenError(latest.id);
 }
 
 /**
@@ -358,31 +378,3 @@ export async function completeEvidenceRun(
 
 /** What the operator answered about a production Pix (FUT-4198). */
 export type PixConfirmAction = 'CHECK' | 'SKIP';
-
-/**
- * PRODUCTION phase 3 (FUT-4198): the Pix a person has to pay. `CHECK`
- * consults the order once; when it is PAID the charge is refunded and both are
- * recorded. `SKIP` records that the QR was never paid. Each call saves the run
- * and re-proves whose token its calls carried, so the file is right after any
- * of them. Answers the run as it stands, so the screen can stop asking once
- * `pix.paid` is no longer PENDING.
- */
-export async function confirmEvidencePix(
-  deps: EvidenceRunDeps,
-  runId: string,
-  action: PixConfirmAction,
-): Promise<EvidenceRecord> {
-  const record = await deps.store.latest(PROVIDER, 'RUN');
-  if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
-  const paid = record.steps.find((step) => step.key === 'pix.paid');
-  // Nothing to do once the Pix is settled either way, or when it never ran.
-  if (!paid || paid.status !== 'PENDING' || record.steps.find((step) => step.key === 'pix.refund')?.status !== 'PENDING') {
-    return record;
-  }
-  const seller = await sandboxSeller(deps);
-  if (typeof seller !== 'object') return record;
-  let steps = record.steps;
-  for (const step of await pixConfirmSteps(deps, record.steps, action)) steps = withStep(steps, step);
-  steps = withStep(steps, await usageStep(deps, steps, seller.token));
-  return deps.store.save({ ...record, steps, updatedAt: clockOf(deps)().toISOString() });
-}

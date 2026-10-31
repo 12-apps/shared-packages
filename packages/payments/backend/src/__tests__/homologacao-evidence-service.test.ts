@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMemoryProviderConfigStore } from '../memory';
 import {
   createHomologacaoEvidence,
+  EvidenceBuyerRequiredError,
   EvidenceRunNotFoundError,
   PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
   PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
@@ -101,6 +102,8 @@ describe('createHomologacaoEvidence', () => {
         googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'TEST' },
         applePay: { configured: false },
       },
+      // Sandbox has no Pix a person pays (FUT-4198).
+      pix: null,
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
@@ -184,6 +187,17 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
       customer: { name: 'Ana Souza', email: 'ana@x.test', phone: '+5531999990000' },
       billingAddress: BUYER.billingAddress,
     });
+  });
+
+  it('given no cardholder, then a production phase 1 is refused before anything is called', async () => {
+    const { svc, d } = productionService();
+
+    expect(() => svc.prepare()).toThrow(EvidenceBuyerRequiredError);
+    expect(d.evidence.upsert).not.toHaveBeenCalled();
+  });
+
+  it('given no production run yet, then the seller view has no Pix to show', async () => {
+    expect((await productionService(await connectedConfig('PRODUCTION')).svc.seller()).pix).toBeNull();
   });
 
   it('given no run, then confirming a Pix is refused', async () => {
