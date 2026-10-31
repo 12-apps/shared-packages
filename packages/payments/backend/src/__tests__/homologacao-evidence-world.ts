@@ -106,10 +106,12 @@ function fakePagbank(
     cancelNotYet?: number;
     sessionStatus?: number;
     pixRefundFailures?: number;
+    pixRefundAnswerLost?: boolean;
   } = {},
 ) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
+  const pixRefunded = { value: false };
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
@@ -142,11 +144,21 @@ function fakePagbank(
     }
     if (route === 'GET /orders/ORDE_PIX') {
       pixPolls.push(1);
+      if (pixRefunded.value) {
+        const refunded = { id: 'CHAR_PIX', status: 'CANCELED', amount: { value: 100, summary: { refunded: 100 } } };
+        return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [refunded] });
+      }
       const status = pixPolls.length > 1 ? 'PAID' : 'WAITING';
       return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [{ id: 'CHAR_PIX', status, amount: { value: 1000 } }] });
     }
     // The production Pix refund (FUT-4198): a paid Pix canceled.
     if (route === 'POST /charges/CHAR_PIX/cancel') {
+      if (options.pixRefundAnswerLost && !pixRefunded.value) {
+        // PagBank refunded it, but the answer never came back.
+        pixRefunded.value = true;
+        return json({ error_messages: [{ code: 'GATEWAY_TIMEOUT' }] }, 504, 'Gateway Timeout');
+      }
+      if (pixRefunded.value) return json({ error_messages: [{ code: 'CHARGE_ALREADY_CANCELED' }] }, 409, 'Conflict');
       if (seen.filter((call) => call.path === route).length <= (options.pixRefundFailures ?? 0)) {
         return json({ error_messages: [{ code: 'INTERNAL_ERROR' }] }, 500, 'Internal Server Error');
       }
@@ -204,6 +216,8 @@ export function world(
     environment?: 'SANDBOX' | 'PRODUCTION';
     /** How many production Pix refunds PagBank answers 500 before one passes. */
     pixRefundFailures?: number;
+    /** PagBank refunds the Pix but its answer to the cancel is lost. */
+    pixRefundAnswerLost?: boolean;
   } = {},
 ) {
   const environment = options.environment ?? 'SANDBOX';

@@ -249,4 +249,35 @@ describe('homologação evidence in production', () => {
 
     expect(file.content).toMatch(/\[3\.5\][^\n]*— EXECUTADO/);
   });
+
+  it('given the refund answer was lost but PagBank refunded, then the next check reads it refunded and cancels nothing twice', async () => {
+    const w = production({ pixRefundAnswerLost: true });
+    const prepared = await raised(w);
+    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    const lost = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    expect(lost.steps.find((step) => step.key === 'pix.refund')?.status).toBe('FAILED');
+
+    const settled = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+
+    expect(pixViewOf(settled, PROD.outcome.pixSkipped).state).toBe('REFUNDED');
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(1);
+    await expect(prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER))).resolves.toMatchObject({ publicKey: 'PUBKEY' });
+  });
+
+  it('given a skipped QR still payable, then a later payment is still refunded and no new run starts meanwhile', async () => {
+    const w = production();
+    // Before the fake QR's expiry (2026-10-17 12:15 -03:00).
+    const runDeps = { ...w.runDeps, now: () => new Date('2026-10-17T15:05:00Z') };
+    await connected(w);
+    const prepared = await prepareEvidenceRun(runDeps, productionDebitTest(BUYER));
+    await completeEvidenceRun(runDeps, prepared.runId, cards(), wallets());
+
+    const skipped = await confirmEvidencePix(runDeps, prepared.runId, 'SKIP');
+    expect(pixViewOf(skipped, PROD.outcome.pixSkipped).state).toBe('SKIPPED');
+    await expect(prepareEvidenceRun(runDeps, productionDebitTest(BUYER))).rejects.toBeInstanceOf(EvidencePixOpenError);
+
+    // The person pays it anyway: the next check refunds it.
+    const paid = await confirmEvidencePix(runDeps, prepared.runId, 'CHECK');
+    expect(pixViewOf(paid, PROD.outcome.pixSkipped).state).toBe('REFUNDED');
+  });
 });

@@ -1,4 +1,4 @@
-import { isPixOpen, pixConfirmSteps, pixStateOf } from './orders-pix-production';
+import { pixConfirmSteps, pixHoldsMoney } from './orders-pix-production';
 import { EvidenceRunNotFoundError, sandboxSeller, usageStep, type EvidenceRunDeps, type PixConfirmAction } from './run';
 import { clockOf, withStep } from './steps';
 import type { EvidenceRecord } from './types';
@@ -20,9 +20,9 @@ export async function confirmEvidencePix(
 ): Promise<EvidenceRecord> {
   const record = await deps.store.latest(PROVIDER, 'RUN');
   if (!record || record.id !== runId) throw new EvidenceRunNotFoundError(runId);
-  // Nothing to do once the Pix is refunded or skipped, or when it never ran.
-  // A refund that FAILED leaves it open: the next check refunds again.
-  if (!isPixOpen(pixStateOf(record, deps.copy.pixSkipped))) return record;
+  // Nothing to do once the Pix is refunded, or skipped and expired, or when it
+  // never ran. A refund that FAILED leaves it open: the next check settles it.
+  if (!pixHoldsMoney(record, deps.copy.pixSkipped, clockOf(deps)())) return record;
   const seller = await sandboxSeller(deps);
   if (typeof seller !== 'object') return record;
   let steps = record.steps;

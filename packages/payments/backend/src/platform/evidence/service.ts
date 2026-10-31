@@ -238,7 +238,7 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
-    prepare: (buyer) => {
+    prepare: async (buyer) => {
       // Production charges a real cardholder: there is no test buyer to fall back on.
       if (environment === 'PRODUCTION' && !buyer) throw new EvidenceBuyerRequiredError();
       return prepareEvidenceRun(

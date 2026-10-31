@@ -39,6 +39,19 @@ export function pixStateOf(record: EvidenceRecord, skippedNote: string): Evidenc
 
 export const isPixOpen = (state: EvidencePixState): boolean => state === 'AWAITING_PAYMENT' || state === 'REFUND_PENDING';
 
+/**
+ * Whether a run's Pix may still move real money: open, or SKIPPED while its
+ * QR is still payable — a person can pay a skipped QR until it expires, and
+ * that money must still come back. A run like that is still settled here and
+ * may not be replaced.
+ */
+export function pixHoldsMoney(record: EvidenceRecord, skippedNote: string, now: Date): boolean {
+  const state = pixStateOf(record, skippedNote);
+  if (isPixOpen(state)) return true;
+  const expiresAt = state === 'SKIPPED' ? pixExpiresAt(record) : null;
+  return expiresAt !== null && new Date(expiresAt).getTime() > now.getTime();
+}
+
 /** The first string under any of these keys, depth-first (an array's items included). */
 function findString(value: unknown, keys: readonly string[]): string | null {
   if (value === null || typeof value !== 'object') return null;
@@ -52,16 +65,29 @@ function findString(value: unknown, keys: readonly string[]): string | null {
   return null;
 }
 
+/**
+ * The recorded `pix.create` answer's QR part: PagBank's `qr_codes`, or the
+ * charges a QR rides on (the charge form, FUT-3928).
+ */
+function qrPartOf(record: EvidenceRecord): unknown {
+  const answer = stepIn(record.steps, 'pix.create')?.calls.at(-1)?.responseBody as
+    | { qr_codes?: unknown; charges?: unknown }
+    | undefined;
+  return answer?.qr_codes ?? answer?.charges ?? null;
+}
+
+function pixExpiresAt(record: EvidenceRecord): string | null {
+  return findString(qrPartOf(record), ['expiration_date']);
+}
+
 /** The run's Pix as a screen shows it, read back from the recorded `pix.create` answer. */
 export function pixViewOf(record: EvidenceRecord, skippedNote: string): EvidencePixView {
   const state = pixStateOf(record, skippedNote);
-  const answer = stepIn(record.steps, 'pix.create')?.calls.at(-1)?.responseBody;
-  const qrCodes = (answer as { qr_codes?: unknown; charges?: unknown } | undefined) ?? {};
   return {
     runId: record.id,
     state,
-    qrText: state === 'AWAITING_PAYMENT' ? findString(qrCodes, ['text']) : null,
-    expiresAt: state === 'AWAITING_PAYMENT' ? findString(qrCodes, ['expiration_date']) : null,
+    qrText: state === 'AWAITING_PAYMENT' ? findString(qrPartOf(record), ['text']) : null,
+    expiresAt: state === 'AWAITING_PAYMENT' ? pixExpiresAt(record) : null,
   };
 }
 
@@ -73,6 +99,30 @@ function createdPixIds(steps: readonly EvidenceStep[]): { chargeId: string; orde
   return { chargeId: created.ids['charge_id'] ?? orderId, orderId };
 }
 
+/**
+ * A refund that failed before, tried again safely: the charge is consulted
+ * first, and a charge PagBank already reports REFUNDED is recorded as
+ * refunded from that consult instead of being canceled twice.
+ */
+async function refundAgain(
+  deps: EvidenceRunDeps,
+  steps: readonly EvidenceStep[],
+  ids: { chargeId: string; orderId: string },
+): Promise<EvidenceStep[]> {
+  const chargeId = paidChargeId(steps, ids);
+  const polled = await pollPix({ ...deps, pixPolls: 1 }, chargeId);
+  if (polled.status === 'REFUNDED') {
+    return [
+      stepOf('pix.refund', 'EXECUTED', clockOf(deps)(), {
+        calls: polled.calls,
+        ids: { order_id: ids.orderId, charge_id: polled.chargeId },
+        observed: deps.copy.canceled('REFUNDED'),
+      }),
+    ];
+  }
+  return [await cancelCharge(deps, 'pix.refund', chargeId, ids.orderId)];
+}
+
 /** The charge to refund: the one the PAID consult named, or the created one. */
 function paidChargeId(steps: readonly EvidenceStep[], ids: { chargeId: string }): string {
   return stepIn(steps, 'pix.consult')?.ids['charge_id'] ?? stepIn(steps, 'pix.paid')?.ids['charge_id'] ?? ids.chargeId;
@@ -82,7 +132,9 @@ function paidChargeId(steps: readonly EvidenceStep[], ids: { chargeId: string })
  * PRODUCTION (FUT-4198): settle the Pix a person was asked to pay. Returns
  * only the steps it settled.
  *
- * - Paid already, refund not done (it failed before): refund again.
+ * - Paid already, refund not done (it failed before): consult first — a
+ *   cancel whose answer was lost may have refunded it already — and cancel
+ *   only while PagBank still says PAID.
  * - Otherwise consult it once. PAID → refund it, whatever the operator
  *   pressed: a skipped QR that was paid anyway still gets its money back.
  * - Not paid: `CHECK` records the consult; `SKIP` records it was skipped.
@@ -94,9 +146,7 @@ export async function pixConfirmSteps(
 ): Promise<EvidenceStep[]> {
   const ids = createdPixIds(steps);
   if (!ids) return [];
-  if (stepIn(steps, 'pix.paid')?.status === 'EXECUTED') {
-    return [await cancelCharge(deps, 'pix.refund', paidChargeId(steps, ids), ids.orderId)];
-  }
+  if (stepIn(steps, 'pix.paid')?.status === 'EXECUTED') return refundAgain(deps, steps, ids);
   const polled = await pollPix({ ...deps, pixPolls: 1 }, ids.chargeId);
   const { step: consult, ids: idsOfPix } = pixConsultStep(deps, polled, ids.orderId);
   if (polled.status === 'PAID') {

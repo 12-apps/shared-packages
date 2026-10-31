@@ -374,9 +374,12 @@ const production = createHomologacaoEvidence({
   refunded whatever was pressed, a refund that failed is retried on the next
   call, and `SKIP` on an unpaid QR records it as skipped. `seller()` carries the
   latest run's `pix`, so a reloaded screen shows the open QR again.
-- **One open Pix at a time.** A production `prepare` throws
-  `EvidencePixOpenError` while the latest run's Pix is unpaid or unrefunded
-  (answer 409), and `EvidenceBuyerRequiredError` without a cardholder (400).
+- **One open Pix at a time.** A production `prepare` rejects with
+  `EvidencePixOpenError` while the latest run's Pix may still move money —
+  unpaid, paid and not refunded, or skipped while its QR is still payable
+  (answer 409) — and with `EvidenceBuyerRequiredError` without a cardholder
+  (400). A refund retried after a lost answer consults first, so a Pix PagBank
+  already refunded is recorded, never canceled twice.
 - No declined card in production: `card.declined` is a sandbox-only step; the
   production file lists the gap under Pendências.
 - The file is named `pagbank-homologacao-evidencias-producao-<stamp>`, so it is

@@ -192,7 +192,7 @@ describe('createHomologacaoEvidence in production (FUT-4198)', () => {
   it('given no cardholder, then a production phase 1 is refused before anything is called', async () => {
     const { svc, d } = productionService();
 
-    expect(() => svc.prepare()).toThrow(EvidenceBuyerRequiredError);
+    await expect(svc.prepare()).rejects.toBeInstanceOf(EvidenceBuyerRequiredError);
     expect(d.evidence.upsert).not.toHaveBeenCalled();
   });
 

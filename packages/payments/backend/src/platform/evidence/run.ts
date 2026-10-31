@@ -4,7 +4,7 @@ import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
 import { pixSteps, cardSteps } from './orders';
-import { isPixOpen, pixStateOf } from './orders-pix-production';
+import { pixHoldsMoney } from './orders-pix-production';
 import { DEBIT_ORDER_KEYS, debitSteps, threeDSSessionStep } from './orders-debit';
 import { WALLET_ORDER_KEYS, walletSectionSteps, walletsConfig } from './orders-wallet';
 import { environmentOf } from './environment';
@@ -288,8 +288,9 @@ export async function prepareEvidenceRun(
 }
 
 /**
- * Thrown by a PRODUCTION phase 1 while the latest run's Pix is still open — its
- * QR payable, or paid and not refunded yet (FUT-4198). A new run would become
+ * Thrown by a PRODUCTION phase 1 while the latest run's Pix may still move
+ * money — its QR payable (skipped or not), or paid and not refunded yet
+ * (FUT-4198). A new run would become
  * the latest, and the open one could then never be confirmed or refunded.
  */
 export class EvidencePixOpenError extends Error {
@@ -303,7 +304,7 @@ export class EvidencePixOpenError extends Error {
 async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
   if (environmentOf(deps) !== 'PRODUCTION') return;
   const latest = await deps.store.latest(PROVIDER, 'RUN');
-  if (latest && isPixOpen(pixStateOf(latest, deps.copy.pixSkipped))) throw new EvidencePixOpenError(latest.id);
+  if (latest && pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)())) throw new EvidencePixOpenError(latest.id);
 }
 
 /**
