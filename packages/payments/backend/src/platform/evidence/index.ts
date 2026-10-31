@@ -42,9 +42,7 @@ export { recordTraffic, type RecordedOutcome } from './record';
 export { pixStateOf, pixViewOf, type EvidencePixState, type EvidencePixView } from './orders-pix-production';
 export { PT_BR_HOMOLOGACAO_EVIDENCE_COPY } from './pt-BR';
 export { EN_US_HOMOLOGACAO_EVIDENCE_COPY } from './en-US';
-export {
-  EN_US_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
-  PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
-} from './production-copy';
+export { PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY } from './production-pt-BR';
+export { EN_US_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY } from './production-en-US';
 export * from './types';
 export type { RecordedHttpCall } from '../../core/traffic-recorder';
