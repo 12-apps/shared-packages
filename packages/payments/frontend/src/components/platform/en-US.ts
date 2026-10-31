@@ -24,7 +24,7 @@ import type { PlatformHomologacaoCopy } from './copy';
  * and stay Portuguese, because a PagBank reviewer reads them and several are
  * multiple-choice options on the form itself.
  */
-export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
+const BASE: Omit<PlatformHomologacaoCopy, 'productionEvidence'> = {
   outcome: {
     heading: 'Homologação status',
     statusLabel: 'Status',
@@ -178,8 +178,114 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
         NOT_AVAILABLE: 'Apple Pay: open this screen in Safari on an iPhone or Mac to test it.',
         MERCHANT_VALIDATION_FAILED: "Apple Pay: the merchant validation is not set up. Its section stays pending.",
       },
+      googlePayAbsent: 'Google Pay: not configured for this seller. Its section stays pending.',
       ready: (wallet, card) => `${wallet} ready${card ? ` — ${card}` : ''}. It will be used when the file is generated.`,
       failed: (wallet) => `${wallet} returned no token. Tap again to retry.`,
     },
+  },
+};
+
+/** The production evidence card (FUT-4198). */
+export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
+  ...BASE,
+  productionEvidence: {
+    ...BASE.evidence,
+    heading: 'Homologation evidence (production)',
+    lede:
+      "The same scenarios in PagBank's production, with real money: R$ 1.00 each, refunded right after. Nothing is charged before step 3. The file is separate from the sandbox one.",
+    sellerHeading: '1. Production seller',
+    sellerNotConnected: "No seller connected in production. Connect the platform's PagBank account to generate the production evidence.",
+    sellerReconnect: "The production seller's connection needs to be authorized again.",
+    connectHint: "You will log in to PagBank's production with the platform's account and approve the consent.",
+    connect: 'Connect the production seller',
+    reconnect: 'Reconnect the production seller',
+    connectFailed: 'Could not start connecting the production seller.',
+    returnedConnected: 'Production seller connected. The callback and the code exchange were recorded in the evidence.',
+    returnedFailed: "The production seller's connection did not complete. Try connecting again.",
+    phases: {
+      preparing: 'Consulting the application, renewing the token and minting the public key and the 3DS session…',
+      encrypting: "Encrypting the cards and authenticating the debit card (3DS) — follow the bank's challenge if it shows…",
+      running: 'Charging R$ 1.00 per scenario and refunding — this can take a few minutes…',
+      downloading: 'Building the file…',
+    },
+    generateFailed: (phase) =>
+      `${
+        {
+          preparing: 'Failed to consult the application and prepare the production seller.',
+          encrypting: 'Failed to encrypt the cards or to authenticate the debit card in the browser.',
+          running: 'Failed to raise the orders in production.',
+          downloading: 'Failed to build the file.',
+        }[phase]
+      } Try again; "Download the latest recorded" still brings what was recorded.`,
+    wallets: {
+      ...BASE.evidence.wallets,
+      heading: 'Digital wallets',
+      hint: 'Tap each wallet before charging; without it, its section stays pending.',
+      googlePayAbsent: "Google Pay: waiting for Google's production access. Its section stays pending.",
+      applePaySheetTotal: 'PagBank homologation',
+    },
+    stepper: {
+      label: 'Production homologation steps',
+      connect: 'Connect the seller',
+      data: 'Cardholder and cards',
+      charge: 'Charge and refund',
+      download: 'Download the file',
+      progress: (step, total, label) => `Step ${step} of ${total} · ${label}`,
+    },
+    buyerHeading: '2. Cardholder and cards',
+    buyerHint: 'Sent with the orders and masked in the file. Filled with the last one used in this browser.',
+    fields: {
+      name: 'Full name',
+      taxId: 'CPF or CNPJ',
+      email: 'E-mail',
+      phone: 'Mobile',
+      postalCode: 'Postal code',
+      street: 'Street',
+      number: 'Number',
+      complement: 'Complement',
+      city: 'City',
+      regionCode: 'State',
+    },
+    cardsHeading: 'Real cards — encrypted in the browser; the number never reaches the server',
+    credit: 'Credit',
+    debit: 'Debit (with 3DS)',
+    cardFields: { number: 'Card number', expiry: 'MM/YY', securityCode: 'CVV' },
+    debitBlankHint: 'Left blank: the debit stays pending in the file.',
+    incompleteData: 'Fill in the cardholder and the credit card to charge.',
+    pixBlocksCharge: 'Pay or skip the Pix before charging again.',
+    scenarios: {
+      label: 'Scenarios in this charge',
+      names: { credit: 'Credit', debit: 'Debit (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
+      recorded: 'recorded in the file',
+      pending: 'pending',
+      pix: {
+        AWAITING_PAYMENT: 'awaiting payment',
+        REFUND_PENDING: 'paid, refunding',
+        REFUNDED: 'paid and refunded',
+        SKIPPED: 'skipped, pending',
+      },
+    },
+    charge: '3. Charge R$ 1.00 per scenario and refund',
+    confirm: {
+      title: 'Charge in production?',
+      body: 'Up to R$ 5.00 (R$ 1.00 per scenario) will be charged on the cards, the Pix and each wallet tapped, and each refunded right after.',
+      typeLabel: 'Type confirmar',
+      word: 'confirmar',
+      submit: 'Charge and refund',
+      cancel: 'Cancel',
+    },
+    pix: {
+      title: 'Pay the R$ 1.00 Pix',
+      hint: "Pay it from your bank's app. Once confirmed, it is refunded.",
+      expires: (timeLeft) => `Expires in ${timeLeft}`,
+      copy: 'Copy code',
+      copied: 'Code copied',
+      skip: 'Skip the Pix',
+      qrAlt: 'R$ 1.00 Pix QR code',
+      paid: 'Pix paid and refunded.',
+      skipped: 'Pix skipped: it stays pending in the file.',
+      refunding: 'Pix paid. Refunding the R$ 1.00…',
+    },
+    download: '4. Download the production file (TXT and JSON)',
   },
 };

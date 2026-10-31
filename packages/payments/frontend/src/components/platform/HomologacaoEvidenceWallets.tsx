@@ -38,9 +38,9 @@ import { usePlatformCopy } from './copy-context';
  *
  * The sheets are the checkout's own: the same `PaymentsClient` probe and
  * payment request (`google-pay-button.tsx`), the same `ApplePaySession`
- * (`apple-pay-button.tsx`). Google Pay is ALWAYS `TEST` here — the evidence is
- * sandbox-only — and mints against the test seller's PagBank account, as the
- * host's seller view says; Apple Pay is offered only where the device has an
+ * (`apple-pay-button.tsx`). Google Pay runs in the environment the host's
+ * seller view names (`TEST` for the sandbox evidence, `PRODUCTION` for the
+ * production one, FUT-4198) and mints against the seller's PagBank account; Apple Pay is offered only where the device has an
  * `ApplePaySession`, the host has an Apple Pay identity, and the host validates
  * the merchant.
  */
@@ -178,12 +178,17 @@ function appleAbsence(input: EvidenceWalletsInput, offered: boolean): AppleAbsen
 }
 
 /** The wallet step's state: the sheets' answers, the presses that open them, and what phase 2 gets. */
+/** The server names the environment: TEST for the sandbox evidence, PRODUCTION for the production one (FUT-4198). */
+function googleEnvironment(google: EvidenceWalletsConfig['googlePay'] | null): 'TEST' | 'PRODUCTION' {
+  return google?.environment ?? 'TEST';
+}
+
 export function useEvidenceWallets(input: EvidenceWalletsInput) {
   const copy = usePlatformCopy().evidence.wallets;
   const [results, setResults] = useState<Results>({});
   const google = input.config?.googlePay ?? null;
   // `null` tells the client hook not to load pay.js at all.
-  const client = useGooglePayClient(google ? input.googlePayApi : null, 'TEST');
+  const client = useGooglePayClient(google ? input.googlePayApi : null, googleEnvironment(google));
   const apple = appleOffer(input);
   const cents = input.config?.amountCents ?? 0;
   const record = (result: BrowserWalletResult): void => setResults((previous) => ({ ...previous, [result.type]: result }));
@@ -193,6 +198,8 @@ export function useEvidenceWallets(input: EvidenceWalletsInput) {
     apple: apple ? { press: () => runApplePay(apple.Session, cents, { copy, validate: apple.validate }, record) } : null,
     /** Why Apple Pay has no button here, or null when it has one. */
     appleAbsent: appleAbsence(input, apple !== null),
+    /** The host carries wallets but no Google Pay for this seller: say so, rather than draw nothing. */
+    googleAbsent: input.config !== null && !google,
     /** What phase 2 gets: each wallet's answer, or why it could not be offered here. */
     collect: (): BrowserWalletResult[] =>
       WALLETS.flatMap((wallet) => {
@@ -262,10 +269,25 @@ function WalletLine({ result, copy }: { result: BrowserWalletResult; copy: Homol
   );
 }
 
+/** A button to tap, or a line saying why a wallet has none. */
+function hasWalletStep(wallets: EvidenceWallets): boolean {
+  return Boolean(wallets.google || wallets.apple || wallets.appleAbsent || wallets.googleAbsent);
+}
+
+/** Why a wallet has no button here, or nothing. */
+function AbsentLine({ testId, text }: { testId: string; text: string | null }): ReactNode {
+  if (!text) return null;
+  return (
+    <Typography variant="caption" component="p" color="text.secondary" data-testid={testId}>
+      {text}
+    </Typography>
+  );
+}
+
 /** The wallet step: nothing at all when the host's seller view carries no wallets. */
 export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): ReactNode {
   const copy = usePlatformCopy().evidence.wallets;
-  if (!wallets.google && !wallets.apple && !wallets.appleAbsent) return null;
+  if (!hasWalletStep(wallets)) return null;
   const lines = WALLETS.flatMap((wallet) => {
     const result = wallets.results[wallet];
     return result ? [result] : [];
@@ -286,11 +308,8 @@ export function EvidenceWalletBlock({ wallets }: { wallets: EvidenceWallets }): 
         ) : null}
         {wallets.apple ? <ApplePayPress label={copy.applePayButton} onPress={wallets.apple.press} /> : null}
       </Stack>
-      {wallets.appleAbsent ? (
-        <Typography variant="caption" component="p" color="text.secondary" data-testid="evidence-apple-pay-absent">
-          {copy.applePayAbsent[wallets.appleAbsent]}
-        </Typography>
-      ) : null}
+      <AbsentLine testId="evidence-google-pay-absent" text={wallets.googleAbsent ? copy.googlePayAbsent : null} />
+      <AbsentLine testId="evidence-apple-pay-absent" text={wallets.appleAbsent ? copy.applePayAbsent[wallets.appleAbsent] : null} />
       {lines.map((result) => (
         <WalletLine key={result.type} result={result} copy={copy} />
       ))}

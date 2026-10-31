@@ -55,7 +55,7 @@ const PENDING_PATH =
  * bar take the ink, never the theme's primary: on a staff screen whose primary
  * is red they would read as a failure beside the green checks.
  */
-function StepMark({ state }: { state: 'done' | 'current' | 'pending' }): ReactNode {
+export function StepMark({ state }: { state: 'done' | 'current' | 'pending' }): ReactNode {
   return (
     <Box sx={{ width: 20, height: 20, flexShrink: 0, display: 'grid', placeItems: 'center' }}>
       {state === 'current' ? (
