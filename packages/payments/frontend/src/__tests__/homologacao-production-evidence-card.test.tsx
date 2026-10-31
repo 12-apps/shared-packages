@@ -224,6 +224,17 @@ describe('HomologacaoProductionEvidenceCard', () => {
     await waitFor(() => expect(screen.getByTestId('production-pix-qr')).toBeTruthy());
   });
 
+  it('given an open Pix past the checking window, then the card stops asking on its own and offers to check', async () => {
+    const onConfirmPix = vi.fn(async (): Promise<ProductionPixView> => ({ ...AWAITING, state: 'REFUNDED', qrText: null }));
+    mount({ seller: { ...SELLER, pix: AWAITING }, onConfirmPix, pixPollMs: 60_000, pixPollWindowMs: 20 });
+
+    fireEvent.click(await screen.findByTestId('production-pix-check'));
+    expect(screen.getByTestId('production-pix-stopped').textContent).toBe(PROD.pix.stopped);
+
+    await waitFor(() => expect(screen.getByTestId('production-pix-done').textContent).toBe(PROD.pix.paid));
+    expect(onConfirmPix).toHaveBeenCalledWith('run-1', 'CHECK');
+  });
+
   it('given a paid Pix whose refund is not done, then the card says it is refunding', () => {
     mount({ seller: { ...SELLER, pix: { ...AWAITING, state: 'REFUND_PENDING', qrText: null } }, pixPollMs: 60_000 });
 

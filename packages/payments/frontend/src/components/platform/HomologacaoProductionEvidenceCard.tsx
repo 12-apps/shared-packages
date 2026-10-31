@@ -71,6 +71,8 @@ export interface HomologacaoProductionEvidenceCardProps {
   googlePayApi?: GooglePayApi | null;
   /** How often an open Pix is checked; tests pass a short one. */
   pixPollMs?: number;
+  /** How long one Pix is checked on its own before "Verificar o Pix" takes over; tests pass a short one. */
+  pixPollWindowMs?: number;
 }
 
 /** Off a phone's screen but still read out: the one line above says the same to the eye. */
@@ -219,9 +221,9 @@ function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: Homol
       {flow.phase !== 'idle' ? (
         <EvidenceProgress phase={flow.phase} section={flow.section} full={flow.phase !== 'downloading'} walletResults={null} />
       ) : null}
-      {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} skipping={flow.skipping} /> : null}
+      {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} onCheck={flow.check} skipping={flow.skipping} /> : null}
       {flow.phase === 'idle' || flow.phase === 'downloading' ? (
-        <ProductionScenarioList sent={flow.sent} pix={flow.pix} copy={copy.scenarios} />
+        <ProductionScenarioList sent={flow.sent} pix={flow.pix} checking={flow.check === null} copy={copy.scenarios} />
       ) : null}
     </Stack>
   );

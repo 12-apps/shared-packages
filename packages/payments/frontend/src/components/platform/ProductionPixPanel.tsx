@@ -47,11 +47,14 @@ export function ProductionPixPanel({
   pix,
   copy,
   onSkip,
+  onCheck,
   skipping,
 }: {
   pix: ProductionPixView;
   copy: HomologacaoProductionEvidenceCopy['pix'];
   onSkip: () => void;
+  /** Present once the screen stopped checking on its own: the person asks instead. */
+  onCheck: (() => void) | null;
   skipping: boolean;
 }): ReactNode {
   const timeLeft = useTimeLeft(pix.state === 'AWAITING_PAYMENT' ? pix.expiresAt : null);
@@ -78,7 +81,18 @@ export function ProductionPixPanel({
         {copy.hint}
         {timeLeft ? ` · ${copy.expires(timeLeft)}` : ''}
       </Typography>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+      {onCheck ? (
+        <Typography variant="body2" textAlign="center" data-testid="production-pix-stopped">
+          {copy.stopped}
+        </Typography>
+      ) : null}
+      {/* useFlexGap: a wrapped row keeps the same gap as the buttons side by side. */}
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+        {onCheck ? (
+          <Button variant="contained" onClick={onCheck} disabled={skipping} sx={TAP_SX} data-testid="production-pix-check">
+            {copy.check}
+          </Button>
+        ) : null}
         <Button variant="outlined" onClick={() => void clipboard.copy()} sx={TAP_SX} data-testid="production-pix-copy">
           {clipboard.justCopied ? copy.copied : copy.copy}
         </Button>

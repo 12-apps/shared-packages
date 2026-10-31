@@ -29,6 +29,8 @@ import {
 type Phase = 'idle' | EvidencePhase;
 
 const PIX_POLL_MS = 5000;
+/** How long one Pix is checked on its own: past the QR's own expiry, so a late payment is still refunded. */
+const PIX_POLL_WINDOW_MS = 15 * 60_000;
 
 const isPixOpen = (pix: ProductionPixView | null | undefined): boolean =>
   pix?.state === 'AWAITING_PAYMENT' || pix?.state === 'REFUND_PENDING';
@@ -75,14 +77,23 @@ async function browserCards(
   return cards;
 }
 
-/** Keep checking an open Pix, one call at a time, until the server says it is settled. */
+/**
+ * Keep checking an open Pix, one call at a time, until the server says it is
+ * settled — for at most `windowMs` per Pix. Each check asks PagBank
+ * whether a person paid it, which no webhook of ours settles yet: a
+ * third-party wait, the one kind of screen poll the origin host admits, and
+ * only when bounded. Past the window the screen stops asking on its own and
+ * offers "Verificar o Pix" instead. Answers whether the window ran out.
+ */
 function usePixPolling(
   pix: ProductionPixView | null,
   setPix: (next: ProductionPixView) => void,
   onConfirmPix: HomologacaoProductionEvidenceCardProps['onConfirmPix'],
   everyMs: number,
-): void {
+  windowMs: number,
+): boolean {
   const busy = useRef(false);
+  const [expiredFor, setExpiredFor] = useState<string | null>(null);
   // The host's callback through a ref: an inline one, new on every render,
   // must not restart the timer before it ever fires.
   const confirm = useRef(onConfirmPix);
@@ -101,8 +112,16 @@ function usePixPolling(
           busy.current = false;
         });
     }, everyMs);
-    return () => clearInterval(timer);
-  }, [runId, setPix, everyMs]);
+    const window = setTimeout(() => {
+      clearInterval(timer);
+      setExpiredFor(runId);
+    }, windowMs);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(window);
+    };
+  }, [runId, setPix, everyMs, windowMs]);
+  return runId !== null && expiredFor === runId;
 }
 
 /** The run's Pix: picked up from the server on load, checked while open, skippable. */
@@ -117,17 +136,30 @@ function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
     if (!serverPix || !isPixOpen(serverPix)) return;
     setPix((current) => (current && isPixOpen(current) && current.runId === serverPix.runId ? current : serverPix));
   }, [serverPix]);
-  usePixPolling(pix, setPix, props.onConfirmPix, props.pixPollMs ?? PIX_POLL_MS);
-  const skip = (): void => {
+  const pollStopped = usePixPolling(
+    pix,
+    setPix,
+    props.onConfirmPix,
+    props.pixPollMs ?? PIX_POLL_MS,
+    props.pixPollWindowMs ?? PIX_POLL_WINDOW_MS,
+  );
+  const act = (action: 'CHECK' | 'SKIP'): void => {
     if (!pix) return;
     setSkipping(true);
     props
-      .onConfirmPix(pix.runId, 'SKIP')
+      .onConfirmPix(pix.runId, action)
       .then(setPix)
       .catch(() => undefined)
       .finally(() => setSkipping(false));
   };
-  return { pix, setPix, skip, skipping, pixOpen: isPixOpen(pix) };
+  return {
+    pix,
+    setPix,
+    skip: () => act('SKIP'),
+    check: pollStopped ? () => act('CHECK') : null,
+    skipping,
+    pixOpen: isPixOpen(pix),
+  };
 }
 
 /** Step 4: build and save the file, answering its counts — or where it failed. */
@@ -171,7 +203,7 @@ export function useProductionRun(
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const [sent, setSent] = useState<ProductionScenariosSent | null>(null);
-  const { pix, setPix, skip, skipping, pixOpen } = useProductionPix(props);
+  const { pix, setPix, skip, check, skipping, pixOpen } = useProductionPix(props);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
 
@@ -231,5 +263,6 @@ export function useProductionRun(
     run,
     download,
     skip,
+    check,
   };
 }
