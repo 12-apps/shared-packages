@@ -1,5 +1,5 @@
 import { cancelCharge, consultCharge, paidRefs, raiseCardOrder } from './orders';
-import { PAGBANK_SANDBOX_WALLET_CENTS } from './sandbox-buyer';
+import { amountsOf, environmentOf } from './environment';
 import { clockOf, pendingStep, stepOf } from './steps';
 import type { BrowserWalletResult, EvidenceStep, EvidenceStepKey, EvidenceWallet, EvidenceWalletsConfig } from './types';
 import type { EvidenceRunDeps } from './run';
@@ -42,8 +42,14 @@ export const WALLET_ORDER_KEYS: readonly EvidenceStepKey[] = (['GOOGLE_PAY', 'AP
 /** What the browser needs to open each sheet — Google's against the seller's PagBank account. */
 export async function walletsConfig(deps: EvidenceRunDeps, accountId: string | null): Promise<EvidenceWalletsConfig> {
   return {
-    amountCents: PAGBANK_SANDBOX_WALLET_CENTS,
-    googlePay: accountId ? { gateway: 'pagbank', gatewayMerchantId: accountId, environment: 'TEST' } : null,
+    amountCents: amountsOf(deps).wallet,
+    googlePay: accountId
+      ? {
+          gateway: 'pagbank',
+          gatewayMerchantId: accountId,
+          environment: environmentOf(deps) === 'PRODUCTION' ? 'PRODUCTION' : 'TEST',
+        }
+      : null,
     applePay: { configured: (await deps.applePayConfigured?.()) === true },
   };
 }
@@ -93,7 +99,7 @@ async function walletSteps(
     key: keys.approved,
     expected: 'PAID',
     reference: `homolog-${runId.slice(0, 8)}-${PREFIX[wallet]}`,
-    amountCents: PAGBANK_SANDBOX_WALLET_CENTS,
+    amountCents: amountsOf(deps).wallet,
     card: { wallet: { type: wallet, key: result.token }, installments: 1 },
     notes,
   });

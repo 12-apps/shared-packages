@@ -15,11 +15,21 @@ import {
   type EvidenceWebhookDelegate,
 } from './prisma';
 import { walletsConfig } from './orders-wallet';
-import { completeEvidenceRun, prepareEvidenceRun, type EvidenceRunDeps, type PreparedEvidenceRun } from './run';
-import { PAGBANK_SANDBOX_TEST_BUYER } from './sandbox-buyer';
+import { confirmEvidencePix } from './confirm-pix';
+import {
+  completeEvidenceRun,
+  prepareEvidenceRun,
+  type EvidenceRunDeps,
+  type PixConfirmAction,
+  type PreparedEvidenceRun,
+} from './run';
+import { pixViewOf, type EvidencePixView } from './orders-pix-production';
+import { PAGBANK_SANDBOX_DEBIT_TEST, PAGBANK_SANDBOX_TEST_BUYER, productionDebitTest } from './sandbox-buyer';
 import type {
   BrowserCardResult,
   BrowserWalletResult,
+  EvidenceBuyer,
+  EvidenceEnvironment,
   EvidenceRecord,
   EvidenceRunSection,
   EvidenceWalletsConfig,
@@ -50,6 +60,13 @@ export interface HomologacaoEvidenceConfig {
   config: Pick<ProviderConfigStore, 'get' | 'save'>;
   /** The sandbox test seller — a merchant no storefront resolves to. */
   merchant: MerchantRef;
+  /**
+   * Which PagBank environment this evidence is about (FUT-4198). SANDBOX when
+   * absent. A host runs one service per environment, each with its own
+   * PLATFORM merchant, webhook URL and copy pack — a provider row holds one
+   * active environment, so the two sellers can never share one.
+   */
+  environment?: EvidenceEnvironment;
   /** The host's Prisma client, duck-typed on the three tables the evidence reads. */
   prisma: HomologacaoEvidencePrisma;
   /** The platform's application credentials — the consult, and `connect.usage`'s comparison. */
@@ -95,23 +112,46 @@ export interface HomologacaoSellerConnection {
    * inside the operator's tap, so the screen reads it here, not from phase 1.
    */
   wallets: EvidenceWalletsConfig;
+  /**
+   * PRODUCTION (FUT-4198): the latest run's Pix, so a screen opened (or
+   * reloaded) while it is open shows its QR again and keeps settling it.
+   * Null in sandbox and before any production run.
+   */
+  pix: EvidencePixView | null;
 }
 
 export interface HomologacaoEvidenceService {
   seller(): Promise<HomologacaoSellerConnection>;
   beginConnect(ctx: { state: string; redirectUri: string }): Promise<{ url: string }>;
   completeConnect(callback: SellerCallback): Promise<{ ok: boolean; record: EvidenceRecord }>;
-  /** Phase 1: the seller's public key and the debit card's 3DS session, each null when not minted. */
-  prepare(): Promise<PreparedEvidenceRun>;
-  /** Phase 2, with the browser's test cards and — when their buttons were pressed — wallet tokens. */
+  /**
+   * Phase 1: the seller's public key and the debit card's 3DS session, each
+   * null when not minted. PRODUCTION takes the real cardholder (FUT-4198).
+   */
+  prepare(buyer?: EvidenceBuyer): Promise<PreparedEvidenceRun>;
+  /** Phase 2, with the browser's cards and — when their buttons were pressed — wallet tokens. */
   run(
     runId: string,
     cards: readonly BrowserCardResult[],
     wallets?: readonly BrowserWalletResult[],
     onSection?: (section: EvidenceRunSection) => void,
+    buyer?: EvidenceBuyer,
   ): Promise<EvidenceRecord>;
+  /**
+   * PRODUCTION phase 3 (FUT-4198): check the Pix a person paid, or record that
+   * it was skipped; answers where it stands now.
+   */
+  confirmPix(runId: string, action: PixConfirmAction): Promise<EvidencePixView>;
   /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
   file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
+}
+
+/** Thrown by a PRODUCTION `prepare` without the cardholder (FUT-4198). */
+export class EvidenceBuyerRequiredError extends Error {
+  constructor() {
+    super('A production homologation evidence run needs the cardholder');
+    this.name = 'EvidenceBuyerRequiredError';
+  }
 }
 
 async function storedSeller(cfg: HomologacaoEvidenceConfig) {
@@ -135,6 +175,7 @@ function sellerView(
   { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
   connect: EvidenceRecord | null,
   wallets: EvidenceWalletsConfig,
+  pix: EvidencePixView | null,
 ): HomologacaoSellerConnection {
   const field = (key: string): string | null => fields?.[key] ?? null;
   return {
@@ -145,18 +186,29 @@ function sellerView(
     accountId: field('accountId'),
     lastConnectProblem: connectProblem(connect),
     wallets,
+    pix,
   };
 }
 
-/** Google Pay mints against a SANDBOX seller's PagBank account only — the evidence is sandbox-only. */
-function sandboxAccountId({ stored, fields }: Awaited<ReturnType<typeof storedSeller>>): string | null {
-  return stored?.environment === 'SANDBOX' && fields?.['token'] ? (fields['accountId'] ?? null) : null;
+/** Google Pay mints against the seller's PagBank account in the evidence's own environment. */
+function sellerAccountId(
+  { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
+  environment: EvidenceEnvironment,
+): string | null {
+  return stored?.environment === environment && fields?.['token'] ? (fields['accountId'] ?? null) : null;
+}
+
+/** The order's customer: the official test buyer in sandbox, the real cardholder in production. */
+function customerFor(environment: EvidenceEnvironment, buyer: EvidenceBuyer | undefined): EvidenceRunDeps['customer'] {
+  if (environment === 'SANDBOX') return { ...PAGBANK_SANDBOX_TEST_BUYER };
+  return buyer ? { name: buyer.name, email: buyer.email, taxId: buyer.taxId, phone: buyer.phone } : null;
 }
 
 export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): HomologacaoEvidenceService {
-  const store = createPrismaHomologacaoEvidenceStore(cfg.prisma.platformHomologationEvidence);
+  const environment = cfg.environment ?? 'SANDBOX';
+  const store = createPrismaHomologacaoEvidenceStore(cfg.prisma.platformHomologationEvidence, environment);
   const newId = cfg.newId ?? (() => crypto.randomUUID());
-  const base = { merchant: cfg.merchant, store, copy: cfg.copy.outcome, newId };
+  const base = { merchant: cfg.merchant, environment, store, copy: cfg.copy.outcome, newId };
   const connectDeps = { ...base, oauth: cfg.oauth, config: cfg.config, webhookUrl: cfg.webhookUrl };
   const runDeps: EvidenceRunDeps = {
     ...base,
@@ -168,28 +220,45 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
         ? { environment: stored.environment, token: fields?.['token'] ?? null, accountId: fields?.['accountId'] ?? null }
         : null;
     },
-    platformToken: async () => cfg.appCredentials(PROVIDER, 'SANDBOX')?.fields['accountToken'] ?? null,
-    consultApplication: () => consultConnectApplication(cfg.consult, 'SANDBOX'),
-    customer: { ...PAGBANK_SANDBOX_TEST_BUYER },
+    platformToken: async () => cfg.appCredentials(PROVIDER, environment)?.fields['accountToken'] ?? null,
+    consultApplication: () => consultConnectApplication(cfg.consult, environment),
+    customer: customerFor(environment, undefined),
     ...(cfg.applePayConfigured ? { applePayConfigured: cfg.applePayConfigured } : {}),
   };
   return {
     async seller() {
       const seller = await storedSeller(cfg);
-      return sellerView(seller, await store.latest(PROVIDER, 'CONNECT'), await walletsConfig(runDeps, sandboxAccountId(seller)));
+      const run = environment === 'PRODUCTION' ? await store.latest(PROVIDER, 'RUN') : null;
+      return sellerView(
+        seller,
+        await store.latest(PROVIDER, 'CONNECT'),
+        await walletsConfig(runDeps, sellerAccountId(seller, environment)),
+        run ? pixViewOf(run, cfg.copy.outcome.pixSkipped) : null,
+      );
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
     completeConnect: (callback) => completeSellerConnect(connectDeps, callback),
-    prepare: () => prepareEvidenceRun(runDeps),
-    run: (runId, cards, wallets, onSection) => completeEvidenceRun(runDeps, runId, cards, wallets, onSection),
+    prepare: async (buyer) => {
+      // Production charges a real cardholder: there is no test buyer to fall back on.
+      if (environment === 'PRODUCTION' && !buyer) throw new EvidenceBuyerRequiredError();
+      return prepareEvidenceRun(
+        { ...runDeps, customer: customerFor(environment, buyer) },
+        buyer && environment === 'PRODUCTION' ? productionDebitTest(buyer) : PAGBANK_SANDBOX_DEBIT_TEST,
+      );
+    },
+    run: (runId, cards, wallets, onSection, buyer) =>
+      completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection),
+    confirmPix: async (runId, action) =>
+      pixViewOf(await confirmEvidencePix(runDeps, runId, action), cfg.copy.outcome.pixSkipped),
     file: (format = 'TXT') =>
       (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,
         copy: cfg.copy,
+        environment,
         identification: {
           ...cfg.identification,
           callbackUrl: cfg.consult.expectedRedirectUri,
-          clientId: cfg.appCredentials(PROVIDER, 'SANDBOX')?.fields['clientId'] ?? null,
+          clientId: cfg.appCredentials(PROVIDER, environment)?.fields['clientId'] ?? null,
         },
         webhookEvents: prismaEvidenceWebhooks(cfg.prisma.paymentWebhookEvent, cfg.merchant, PROVIDER),
         chargeRow: prismaEvidenceCharge(cfg.prisma.paymentCharge, cfg.merchant),

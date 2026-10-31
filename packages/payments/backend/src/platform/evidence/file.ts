@@ -3,9 +3,10 @@ import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { pendingStep, stepOf, summarize as summary } from './steps';
 import {
   EVIDENCE_SECTIONS,
-  EVIDENCE_STEP_KEYS,
   SECTION_OF,
+  evidenceStepKeys,
   type EvidenceChargeRow,
+  type EvidenceEnvironment,
   type EvidenceRecord,
   type EvidenceStep,
   type EvidenceStepKey,
@@ -38,10 +39,12 @@ const THIN = '-'.repeat(72);
 export interface EvidenceFileDeps {
   store: HomologacaoEvidenceStore;
   copy: HomologacaoEvidenceCopy;
+  /** Which environment the file reports (FUT-4198). SANDBOX when absent. */
+  environment?: EvidenceEnvironment;
   identification: {
     name: string;
     site: string;
-    /** The sandbox application's client id — public, and the reviewer needs it. */
+    /** The application's client id in the file's environment — public, and the reviewer needs it. */
     clientId: string | null;
     callbackUrl: string;
   };
@@ -117,9 +120,12 @@ async function webhookStep(
 
 /**
  * "Received AND processed": every delivery processed, and the charge row it
- * moved in the state the scenario ends in (a Pix one PAID). A delivery still
- * waiting in the inbox is PENDING — never counted as processed.
+ * moved in the state the scenario ends in — a Pix one PAID, or REFUNDED once
+ * a production run gave the money back (FUT-4198). A delivery still waiting
+ * in the inbox is PENDING — never counted as processed.
  */
+const PIX_SETTLED: ReadonlySet<string> = new Set(['PAID', 'REFUNDED']);
+
 function webhookVerdict(
   outcome: HomologacaoEvidenceCopy['outcome'],
   key: 'pix.webhook' | 'card.webhook',
@@ -130,7 +136,7 @@ function webhookVerdict(
   const statuses = [...new Set(events.map((event) => event.status))].join(', ');
   const rowStatus = row?.status ?? null;
   const processed =
-    events.every((event) => event.status === 'PROCESSED') && row !== null && (key !== 'pix.webhook' || row.status === 'PAID');
+    events.every((event) => event.status === 'PROCESSED') && row !== null && (key !== 'pix.webhook' || PIX_SETTLED.has(row.status));
   return processed
     ? { status: 'EXECUTED', observed: outcome.webhookReceived(events.length, statuses, rowStatus) }
     : { status: 'PENDING', observed: outcome.webhookNotProcessed(statuses, rowStatus) };
@@ -150,7 +156,9 @@ async function allSteps(
     'card.webhook',
     await webhookStep(deps, 'card.webhook', stepIds(runSteps, ['card.approved', 'card.declined'])),
   );
-  return EVIDENCE_STEP_KEYS.map((key) => recorded.get(key) ?? pendingStep(key, deps.copy.outcome));
+  return evidenceStepKeys(deps.environment ?? 'SANDBOX').map(
+    (key) => recorded.get(key) ?? pendingStep(key, deps.copy.outcome),
+  );
 }
 
 function numbering(steps: readonly EvidenceStep[]): Map<EvidenceStepKey, string> {
@@ -238,7 +246,7 @@ function renderIdentification(
     RULE,
     `${copy.identification.name}: ${id.name}`,
     `${copy.identification.site}: ${id.site}`,
-    `${copy.identification.environment}: SANDBOX (${pagbankApiBase('SANDBOX')})`,
+    `${copy.identification.environment}: ${deps.environment ?? 'SANDBOX'} (${pagbankApiBase(deps.environment ?? 'SANDBOX')})`,
     `${copy.identification.testsAt} — ${copy.identification.testsAtConnect}: ${when(connect)} · ` +
       `${copy.identification.testsAtRun}: ${when(run)}`,
     `${copy.identification.clientId}: ${id.clientId ?? '—'}`,
@@ -297,8 +305,17 @@ export async function loadEvidence(deps: EvidenceFileDeps): Promise<LoadedEviden
 }
 
 /** The file name's timestamp — shared so a TXT and a JSON of one moment pair up. */
-export function evidenceStamp(generatedAt: Date): string {
+function evidenceStamp(generatedAt: Date): string {
   return generatedAt.toISOString().slice(0, 19).replace(/[:T]/g, '-');
+}
+
+/**
+ * The download's name, without extension: the sandbox file keeps the name it
+ * always had; the production one says so, so the two are never confused.
+ */
+export function evidenceFilename(environment: EvidenceEnvironment | undefined, generatedAt: Date): string {
+  const which = environment === 'PRODUCTION' ? 'producao-' : '';
+  return `pagbank-homologacao-evidencias-${which}${evidenceStamp(generatedAt)}`;
 }
 
 /** Build the file from what is stored and what has arrived since. */
@@ -335,7 +352,7 @@ export async function buildHomologacaoEvidenceFile(deps: EvidenceFileDeps): Prom
     ...renderPendencies(copy, steps, numbers),
   ].join('\n');
   return {
-    filename: `pagbank-homologacao-evidencias-${evidenceStamp(generatedAt)}.txt`,
+    filename: `${evidenceFilename(deps.environment, generatedAt)}.txt`,
     content,
     summary: summary(steps),
   };

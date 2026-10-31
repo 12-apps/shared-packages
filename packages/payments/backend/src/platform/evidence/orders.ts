@@ -3,6 +3,7 @@ import type { StoredCharge } from '../../core/ports';
 import { recordTraffic } from './record';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf } from './steps';
 import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
+import { amountsOf, environmentOf } from './environment';
 import type { EvidenceRunDeps } from './run';
 
 /**
@@ -16,9 +17,10 @@ import type { EvidenceRunDeps } from './run';
 
 const PROVIDER = 'pagbank';
 
-/** ≤ R$ 100,00: the sandbox simulator pays a Pix order seconds after creation. */
-const PIX_CENTS = 1000;
-const CARD_CENTS = 1500;
+/**
+ * The amounts come from `evidenceAmounts` (sandbox: ≤ R$ 100,00, which the
+ * simulator pays seconds after creation; production: R$ 1,00).
+ */
 const PIX_POLLS = 8;
 const PIX_POLL_MS = 3000;
 
@@ -62,9 +64,9 @@ async function createPix(deps: EvidenceRunDeps, runId: string): Promise<CreatedP
       {
         reference,
         idempotencyKey: reference,
-        amount: { amountCents: PIX_CENTS, currency: 'BRL' },
+        amount: { amountCents: amountsOf(deps).pix, currency: 'BRL' },
         method: 'PIX',
-        customer: deps.customer,
+        customer: deps.customer ?? {},
       },
       { provider: PROVIDER },
     ),
@@ -105,7 +107,7 @@ interface PixPolls {
 }
 
 /** Consult the order until the simulator has paid it, or the polls run out. */
-async function pollPix(deps: EvidenceRunDeps, storedId: string): Promise<PixPolls> {
+export async function pollPix(deps: EvidenceRunDeps, storedId: string): Promise<PixPolls> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const result: PixPolls = { calls: [], status: null, chargeId: storedId, lastError: null, made: 0 };
   while (result.made < (deps.pixPolls ?? PIX_POLLS) && result.status !== 'PAID') {
@@ -123,17 +125,18 @@ async function pollPix(deps: EvidenceRunDeps, storedId: string): Promise<PixPoll
   return result;
 }
 
-export async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<EvidenceStep[]> {
-  const clock = clockOf(deps);
-  const created = await createPix(deps, runId);
-  if (!created.ids) return [created.step, pendingStep('pix.consult', deps.copy), pendingStep('pix.paid', deps.copy)];
-  const { chargeId, orderId } = created.ids;
-
-  const polled = await pollPix(deps, chargeId);
+/**
+ * The `pix.consult` step a set of polls makes, and the ids it names. The
+ * first and the last poll are kept: the move from "waiting" to "paid" is the
+ * evidence, and the polls in between are the same call again.
+ */
+export function pixConsultStep(
+  deps: EvidenceRunDeps,
+  polled: PixPolls,
+  orderId: string,
+): { step: EvidenceStep; ids: Record<string, string> } {
   const ids = { order_id: orderId, ...(polled.chargeId !== orderId ? { charge_id: polled.chargeId } : {}) };
-  const consult = stepOf('pix.consult', polled.status !== null && answered(polled.calls) ? 'EXECUTED' : 'FAILED', clock(), {
-    // The first and the last poll: the move from "waiting" to "paid" is the
-    // evidence, and the polls in between are the same call again.
+  const step = stepOf('pix.consult', polled.status !== null && answered(polled.calls) ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
     calls: polled.calls.length > 2 ? [polled.calls[0]!, polled.calls.at(-1)!] : polled.calls,
     ids,
     observed:
@@ -141,6 +144,30 @@ export async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<Ev
         ? deps.copy.consultStatus(polled.status, polled.made)
         : deps.copy.callError(errorDetail(polled.lastError)),
   });
+  return { step, ids };
+}
+
+/** Phase 2's Pix steps in production: the QR, then three steps waiting on a person. */
+function awaitingPixSteps(deps: EvidenceRunDeps, create: EvidenceStep, created: boolean): EvidenceStep[] {
+  // A person pays it: nothing to poll yet. `pixConfirmSteps` completes it.
+  const waiting = created ? deps.copy.pixAwaitingPayment : undefined;
+  return [
+    create,
+    pendingStep('pix.consult', deps.copy, waiting),
+    pendingStep('pix.paid', deps.copy, waiting),
+    pendingStep('pix.refund', deps.copy, waiting),
+  ];
+}
+
+export async function pixSteps(deps: EvidenceRunDeps, runId: string): Promise<EvidenceStep[]> {
+  const clock = clockOf(deps);
+  const created = await createPix(deps, runId);
+  if (environmentOf(deps) === 'PRODUCTION') return awaitingPixSteps(deps, created.step, created.ids !== null);
+  if (!created.ids) return [created.step, pendingStep('pix.consult', deps.copy), pendingStep('pix.paid', deps.copy)];
+  const { chargeId, orderId } = created.ids;
+
+  const polled = await pollPix(deps, chargeId);
+  const { step: consult, ids } = pixConsultStep(deps, polled, orderId);
   const waited = Math.round(((deps.pixPolls ?? PIX_POLLS) * (deps.pixPollMs ?? PIX_POLL_MS)) / 1000);
   const paid =
     polled.status === 'PAID'
@@ -181,7 +208,7 @@ async function cardCharge(deps: EvidenceRunDeps, runId: string, card: BrowserCar
     key,
     expected: card.scenario === 'approved' ? 'PAID' : 'DECLINED',
     reference: `homolog-${runId.slice(0, 8)}-card-${card.scenario}`,
-    amountCents: CARD_CENTS,
+    amountCents: amountsOf(deps).card,
     card: { token: card.encrypted, installments: 1 },
     notes,
   });
@@ -198,7 +225,7 @@ export async function raiseCardOrder(deps: EvidenceRunDeps, order: CardOrder): P
         idempotencyKey: reference,
         amount: { amountCents: order.amountCents, currency: 'BRL' },
         method: 'CARD',
-        customer: deps.customer,
+        customer: deps.customer ?? {},
         card: order.card,
       },
       { provider: PROVIDER },
@@ -312,7 +339,7 @@ async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
 
 export async function cancelCharge(
   deps: EvidenceRunDeps,
-  key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel',
+  key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel' | 'pix.refund',
   chargeId: string,
   orderId: string | null,
 ): Promise<EvidenceStep> {
@@ -348,7 +375,9 @@ export async function cardSteps(deps: EvidenceRunDeps, runId: string, cards: rea
   const consult = chargeId
     ? await consultCharge(deps, 'card.approvedConsult', chargeId, orderId)
     : pendingStep('card.approvedConsult', deps.copy);
-  const declined = await scenario('declined');
+  // Production has no card that declines on demand: no declined order is
+  // raised there, and its file does not list the step (`evidenceStepKeys`).
+  const declined = environmentOf(deps) === 'PRODUCTION' ? null : await scenario('declined');
   const cancel = chargeId ? await cancelCharge(deps, 'card.cancel', chargeId, orderId) : pendingStep('card.cancel', deps.copy);
   return [
     encrypt,

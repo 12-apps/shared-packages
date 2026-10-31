@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMemoryProviderConfigStore } from '../memory';
 import {
   createHomologacaoEvidence,
+  EvidenceBuyerRequiredError,
+  EvidenceRunNotFoundError,
   PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
+  PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
   type EvidenceChargeDelegate,
   type EvidenceDelegate,
   type EvidenceWebhookDelegate,
@@ -22,7 +25,9 @@ function delegates() {
   const rows = new Map<string, Parameters<EvidenceDelegate['upsert']>[0]['create'] & { updatedAt: Date }>();
   const evidence: EvidenceDelegate = {
     findFirst: vi.fn(async ({ where }) => {
-      const matching = [...rows.values()].filter((row) => row.provider === where.provider && row.kind === where.kind);
+      const matching = [...rows.values()].filter(
+        (row) => row.provider === where.provider && row.kind === where.kind && row.environment === where.environment,
+      );
       return matching.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
     }),
     upsert: vi.fn(async ({ create, update }) => {
@@ -36,8 +41,11 @@ function delegates() {
   return { evidence, webhookEvents, charges };
 }
 
-function service(config = createMemoryProviderConfigStore(), extra: { applePayConfigured?: () => boolean } = {}) {
-  const d = delegates();
+function service(
+  config = createMemoryProviderConfigStore(),
+  extra: { applePayConfigured?: () => boolean; environment?: 'SANDBOX' | 'PRODUCTION' } = {},
+  d = delegates(),
+) {
   const appCredentials = () => ({ environment: 'SANDBOX' as const, fields: { clientId: 'cid', accountToken: 'platform-token' } });
   return {
     d,
@@ -51,27 +59,28 @@ function service(config = createMemoryProviderConfigStore(), extra: { applePayCo
       consult: { appCredentials, expectedRedirectUri: 'https://x.test/cb', copy: PT_BR_CONNECT_APPLICATION_COPY },
       webhookUrl: 'https://x.test/api/webhooks/platform-homologacao/pagbank',
       identification: { name: 'Brand', site: 'https://x.test' },
-      copy: PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
+      copy: extra.environment === 'PRODUCTION' ? PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY : PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
       newId: () => 'run-0000-0000',
       ...extra,
     }),
   };
 }
 
-async function connectedConfig() {
+async function connectedConfig(environment: 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') {
   const config = createMemoryProviderConfigStore();
+  const fields = { token: 'seller-secret', accountId: 'ACCO_1', connectedAt: '2026-10-17T15:00:00Z' };
   await config.save(SELLER, {
     provider: 'pagbank',
     enabled: true,
     priority: 0,
-    environment: 'SANDBOX',
+    environment,
     status: 'VERIFIED',
     lastVerifiedAt: null,
     chargeVerifiedAt: null,
     pendingVerification: null,
     expiresAt: null,
     stub: false,
-    environments: { SANDBOX: { token: 'seller-secret', accountId: 'ACCO_1', connectedAt: '2026-10-17T15:00:00Z' }, PRODUCTION: {} },
+    environments: environment === 'SANDBOX' ? { SANDBOX: fields, PRODUCTION: {} } : { SANDBOX: {}, PRODUCTION: fields },
   });
   return config;
 }
@@ -93,6 +102,8 @@ describe('createHomologacaoEvidence', () => {
         googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'TEST' },
         applePay: { configured: false },
       },
+      // Sandbox has no Pix a person pays (FUT-4198).
+      pix: null,
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });
@@ -119,5 +130,77 @@ describe('createHomologacaoEvidence', () => {
     expect(file.content).toContain('client_id da aplicação: cid');
     expect(file.content).toContain('Callback (redirect_uri): https://x.test/cb');
     expect(file.content).toMatch(/Autorização da conta do lojista de teste .* — PENDENTE/);
+  });
+
+  it('given the sandbox evidence, then its rows are written and read as SANDBOX (FUT-4198)', async () => {
+    const { svc, d } = service();
+
+    await svc.beginConnect({ state: 's', redirectUri: 'https://x.test/cb' });
+    await svc.file();
+
+    expect(vi.mocked(d.evidence.upsert).mock.calls[0]![0].create.environment).toBe('SANDBOX');
+    expect(vi.mocked(d.evidence.findFirst).mock.calls.every(([args]) => args.where.environment === 'SANDBOX')).toBe(true);
+  });
+});
+
+describe('createHomologacaoEvidence in production (FUT-4198)', () => {
+  const BUYER = {
+    name: 'Ana Souza',
+    email: 'ana@x.test',
+    taxId: '12345678909',
+    phone: '+5531999990000',
+    billingAddress: { street: 'Rua A', number: '1', regionCode: 'MG', city: 'Belo Horizonte', postalCode: '30000000' },
+  };
+
+  function productionService(config = createMemoryProviderConfigStore(), d = delegates()) {
+    return service(config, { environment: 'PRODUCTION', applePayConfigured: () => true }, d);
+  }
+
+  it('when connecting, then the authorization asks for PRODUCTION and its record is kept apart from the sandbox one', async () => {
+    const d = delegates();
+    const prod = productionService(undefined, d);
+    const sandbox = service(undefined, {}, d);
+
+    await prod.svc.beginConnect({ state: 's', redirectUri: 'https://x.test/cb' });
+
+    expect(vi.mocked(d.evidence.upsert).mock.calls[0]![0].create.environment).toBe('PRODUCTION');
+    expect((await sandbox.svc.file()).content).toMatch(/Autorização da conta do lojista de teste .* — PENDENTE/);
+    expect((await sandbox.svc.file()).content).not.toContain('aguardando login e consentimento');
+    expect((await prod.svc.file()).content).toContain('aguardando login e consentimento');
+  });
+
+  it('given a production seller, then its wallets charge R$ 1,00 and Google Pay runs in PRODUCTION', async () => {
+    const view = await productionService(await connectedConfig('PRODUCTION')).svc.seller();
+
+    expect(view.wallets).toEqual({
+      amountCents: 100,
+      googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_1', environment: 'PRODUCTION' },
+      applePay: { configured: true },
+    });
+  });
+
+  it('given the cardholder, then phase 1 hands the browser their 3DS data for R$ 1,00', async () => {
+    const prepared = await productionService().svc.prepare(BUYER);
+
+    expect(prepared.debitTest).toEqual({
+      amountCents: 100,
+      customer: { name: 'Ana Souza', email: 'ana@x.test', phone: '+5531999990000' },
+      billingAddress: BUYER.billingAddress,
+    });
+  });
+
+  it('given no cardholder, then a production phase 1 is refused before anything is called', async () => {
+    const { svc, d } = productionService();
+
+    await expect(svc.prepare()).rejects.toBeInstanceOf(EvidenceBuyerRequiredError);
+    expect(d.evidence.upsert).not.toHaveBeenCalled();
+  });
+
+  it('given no production run yet, then the seller view has no Pix to show', async () => {
+    expect((await productionService(await connectedConfig('PRODUCTION')).svc.seller()).pix).toBeNull();
+  });
+
+  it('given no run, then confirming a Pix is refused', async () => {
+    await expect(productionService().svc.confirmPix('run-0000-0000', 'CHECK')).rejects.toBeInstanceOf(EvidenceRunNotFoundError);
   });
 });
