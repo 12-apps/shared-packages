@@ -338,6 +338,15 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
     { open, hasStep: current !== undefined && step !== undefined, closesAtEnd: props.done === null && !intro },
   );
 
+  // The kept screen is a picture of the last step, not a live one: nothing on it acts during the exit.
+  const exiting = ended || (!open && props.done === null && !intro);
+  const swallow = exiting
+    ? (event: React.SyntheticEvent): void => {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    : undefined;
+
   return (
     <Dialog
       open={open && !ended}
@@ -350,7 +359,7 @@ export function SequenceResolver<I extends SequenceItem, R = unknown>(
       slotProps={{ paper: { sx: paperSx(touch) } }}
       dataTestId={testId}
     >
-      <Box sx={columnSx}>
+      <Box sx={columnSx} inert={exiting} aria-hidden={exiting || undefined} onClickCapture={swallow}>
         <Box sx={chromeSx}>
           <SequenceHeader
             touch={touch}

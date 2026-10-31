@@ -222,6 +222,29 @@ describe("done: null", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores a second click on the kept primary button during the exit", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const step = (item: Problem, api: SequenceStepApi<string>): SequenceStep => ({
+      content: <h3 {...api.titleProps}>{item.name}</h3>,
+      primary: {
+        label: "Save",
+        onClick: () => {
+          onSave();
+          api.resolve(`saved ${item.key}`);
+        },
+      },
+    });
+    renderResolver({ onClose, queue: [P("a")], renderStep: step });
+    click("sr-primary");
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    click("sr-primary");
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onClose once under StrictMode when it mounts open over an empty queue", async () => {
     const onClose = vi.fn();
     render(
