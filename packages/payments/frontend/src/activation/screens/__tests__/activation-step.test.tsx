@@ -406,6 +406,18 @@ describe('the payer e-mail (FUT-4050)', () => {
 });
 
 describe('the link flow where the e-mail is not required (FUT-4200)', () => {
+  it('holds the pay button until the endpoint says whether to ask', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    const button = screen.getByTestId('verify-charge-start-redirect') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(start).not.toHaveBeenCalled();
+  });
+
   it('shows no field and mints the link with no typed e-mail', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ amountCents: 100 }) })));
     const start = vi.fn();

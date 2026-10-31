@@ -20,27 +20,37 @@ import { useEffect, useState } from 'react';
  * host's. The CARD flow does not need this at all: `useActivationCharge` reads
  * the amount out of the same body it reads the store's card key from.
  */
+/** The endpoint's `GET` body, every field optional. */
+interface ProbeBody {
+  amountCents?: number;
+  payerEmail?: string | null;
+  payerEmailRequired?: boolean;
+}
+
 export function useVerificationAmount(verifyChargeUrl: string): {
   amountCents: number | null;
   /** The payer e-mail the host suggests, from the same body (FUT-4050). */
   payerEmail: string | null;
-  /** The provider judges that e-mail, so the step asks for it (FUT-4200). */
-  payerEmailRequired: boolean;
+  /**
+   * The provider judges that e-mail, so the step asks for it (FUT-4200).
+   * `null` until the endpoint answers: the pay button waits for it, so no link
+   * is minted for an e-mail nobody was asked for. A failed read is `false`.
+   */
+  payerEmailRequired: boolean | null;
 } {
   const [amountCents, setAmountCents] = useState<number | null>(null);
   const [payerEmail, setPayerEmail] = useState<string | null>(null);
-  const [payerEmailRequired, setPayerEmailRequired] = useState(false);
+  const [payerEmailRequired, setPayerEmailRequired] = useState<boolean | null>(null);
 
   useEffect(() => {
     let active = true;
+    // Forgotten first, as the card probe does: a screen moving between
+    // providers must not keep the previous one's answers.
+    setAmountCents(null);
+    setPayerEmail(null);
+    setPayerEmailRequired(null);
     void fetch(verifyChargeUrl)
-      .then((res) =>
-        res.ok ? (res.json() as Promise<{
-              amountCents?: number;
-              payerEmail?: string | null;
-              payerEmailRequired?: boolean;
-            }>) : null,
-      )
+      .then((res) => (res.ok ? (res.json() as Promise<ProbeBody>) : null))
       .then((body) => {
         if (!active) return;
         if (typeof body?.amountCents === 'number') setAmountCents(body.amountCents);
@@ -49,7 +59,9 @@ export function useVerificationAmount(verifyChargeUrl: string): {
       })
       // A failed read leaves the amount unnamed rather than guessed — the
       // screen still renders, and it is corrected the moment an answer lands.
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setPayerEmailRequired(false);
+      });
     return () => {
       active = false;
     };

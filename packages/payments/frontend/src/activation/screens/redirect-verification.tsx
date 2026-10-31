@@ -251,7 +251,7 @@ export function RedirectVerification({
         <StartCharge
           amountLabel={amountLabel}
           blocked={blocked}
-          creating={state.kind === 'creating'}
+          creating={state.kind === 'creating' || payer.required === null}
           onStart={payer.startWithEmail}
           emailField={<LinkPayerEmail payer={payer} displayName={displayName} />}
         />
