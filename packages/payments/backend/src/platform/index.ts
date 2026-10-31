@@ -56,6 +56,8 @@ export {
   type BrowserCardScenario,
   type BrowserWalletFailure,
   type BrowserWalletResult,
+  type EvidenceBuyer,
+  type EvidenceEnvironment,
   type EvidenceRunSection,
   type EvidenceWallet,
   type EvidenceWalletsConfig,
