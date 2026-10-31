@@ -10,7 +10,7 @@ import type { RedirectActivationState } from '../redirect-state';
 import { AwaitingPayment } from './awaiting-payment';
 import { useActivationCopy } from './copy-context';
 import { Notice, StepPanel } from './notice';
-import { PayerEmailField, useLinkPayerEmail } from './payer-email-field';
+import { LinkPayerEmail, useLinkPayerEmail } from './payer-email-field';
 import { useVerificationAmount } from './use-verification-amount';
 import { ExpiredState, FailedState, SetupIncompleteState, UnreachableState } from './states';
 
@@ -219,9 +219,9 @@ export function RedirectVerification({
   // `useVerificationAmount`. A button promising one figure while charging
   // another is the kind of lie this whole flow exists to remove, and an
   // unpriced charge says so rather than guessing.
-  const { amountCents: cents, payerEmail: suggestedEmail } = useVerificationAmount(verifyChargeUrl);
+  const { amountCents: cents, ...probe } = useVerificationAmount(verifyChargeUrl);
   const amountLabel = cents === null ? copy.outcome.someAmount : formatAmount(cents);
-  const payer = useLinkPayerEmail(ownerEmail, suggestedEmail, start);
+  const payer = useLinkPayerEmail(ownerEmail, probe.payerEmail, probe.payerEmailRequired, start);
 
   // Off the current step and with nothing outstanding: the walkthrough is
   // showing something earlier and this panel has nothing to add.
@@ -251,9 +251,9 @@ export function RedirectVerification({
         <StartCharge
           amountLabel={amountLabel}
           blocked={blocked}
-          creating={state.kind === 'creating'}
+          creating={state.kind === 'creating' || payer.required === null}
           onStart={payer.startWithEmail}
-          emailField={<PayerEmailField {...payer.field} displayName={displayName} />}
+          emailField={<LinkPayerEmail payer={payer} displayName={displayName} />}
         />
       ) : null}
     </StepPanel>

@@ -325,6 +325,8 @@ export interface ProviderCapabilities {
    * environment it does not have is refused.
    */
   environments?: readonly PaymentEnvironment[];
+  /** It judges `customer.email`, so the activation step asks for it (FUT-4200). Default false. */
+  payerEmail?: boolean;
 }
 
 /** Who confirms a charge was paid — see `ProviderCapabilities.confirmation`. */

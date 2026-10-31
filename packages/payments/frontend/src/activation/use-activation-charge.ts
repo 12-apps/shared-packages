@@ -115,6 +115,11 @@ export interface ActivationCharge {
   email: string;
   setEmail: (value: string) => void;
   emailError: string | undefined;
+  /**
+   * Whether this provider judges the payer e-mail (FUT-4200). Only then is the
+   * field shown and validated; elsewhere the suggestion is sent as it is.
+   */
+  payerEmailRequired: boolean;
   setEmailError: (error: string | undefined) => void;
   /**
    * What this charge will COST, in cents — `null` until the endpoint answers.
@@ -154,16 +159,24 @@ interface ActivationProbe {
   amountCents: number | null;
   /** Who the host thinks is paying — the e-mail field's opening value. */
   payerEmail: string | null;
+  /** The provider judges the payer e-mail, so the owner is asked (FUT-4200). */
+  payerEmailRequired: boolean;
 }
 
 /** Before the endpoint has answered, every fact is simply unknown. */
-const UNKNOWN_PROBE: ActivationProbe = { publicKey: null, amountCents: null, payerEmail: null };
+const UNKNOWN_PROBE: ActivationProbe = {
+  publicKey: null,
+  amountCents: null,
+  payerEmail: null,
+  payerEmailRequired: false,
+};
 
 /** The endpoint's `GET` body — every field optional; a host may answer none. */
 interface ProbeBody {
   publicKey?: string | null;
   amountCents?: number | null;
   payerEmail?: string | null;
+  payerEmailRequired?: boolean;
 }
 
 function readProbe(body: ProbeBody | null): ActivationProbe {
@@ -171,6 +184,7 @@ function readProbe(body: ProbeBody | null): ActivationProbe {
     publicKey: body?.publicKey ? body.publicKey : null,
     amountCents: typeof body?.amountCents === 'number' ? body.amountCents : null,
     payerEmail: typeof body?.payerEmail === 'string' && body.payerEmail ? body.payerEmail : null,
+    payerEmailRequired: body?.payerEmailRequired === true,
   };
 }
 
@@ -320,7 +334,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
       options.copy.card,
       validateTaxId ?? ((value) => validateCpfOrCnpj(value, options.copy.card.fields)),
     );
-    const emailError = validateEmail?.(email);
+    const emailError = probe.payerEmailRequired ? validateEmail?.(email) : undefined;
     setFieldErrors(validation.fieldErrors);
     setCpfError(validation.cpfError);
     setEmailError(emailError);
@@ -346,6 +360,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
     card,
     cpf,
     probe.publicKey,
+    probe.payerEmailRequired,
     verifyChargeUrl,
     provider,
     email,
@@ -369,6 +384,7 @@ export function useActivationCharge(options: ActivationChargeOptions): Activatio
   return {
     ...fields,
     ...payer,
+    payerEmailRequired: probe.payerEmailRequired,
     amountCents: probe.amountCents,
     state,
     submit,

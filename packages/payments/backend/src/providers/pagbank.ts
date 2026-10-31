@@ -294,6 +294,8 @@ const capabilities: ProviderCapabilities = {
   webhooks: true,
   tokenization: 'PUBLIC_KEY',
   activationCharge: true,
+  // Refuses `customer.email` equal to the receiving account's (40002).
+  payerEmail: true,
 };
 
 /**

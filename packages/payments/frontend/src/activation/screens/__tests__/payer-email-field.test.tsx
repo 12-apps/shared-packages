@@ -51,3 +51,17 @@ describe('useChangePayerEmail', () => {
     input.remove();
   });
 });
+
+describe('useChangePayerEmail where the provider requires the e-mail (FUT-4200)', () => {
+  it('keeps the field asked for after the reset, so it comes back on the form', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ publicKey: 'PUBKEY', payerEmailRequired: true }) })),
+    );
+    const { result } = renderHook(useStepUnderTest, { wrapper });
+    await waitFor(() => expect(result.current.charge.payerEmailRequired).toBe(true));
+    act(() => result.current.changeEmail());
+    expect(result.current.charge.payerEmailRequired).toBe(true);
+    expect(result.current.charge.emailError).toBe('PagBank refuses its own account e-mail');
+  });
+});

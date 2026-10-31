@@ -72,7 +72,9 @@ export function useChangePayerEmail(
 export function useLinkPayerEmail(
   ownerEmail: string,
   suggested: string | null,
-  start: (payer: { email: string }) => unknown,
+  /** The provider judges the e-mail (FUT-4200); `null` until the endpoint says. */
+  required: boolean | null,
+  start: (payer?: { email: string }) => unknown,
 ) {
   const validate = usePayerEmailValidator();
   const { email, setEmail } = usePayerEmail(ownerEmail, suggested);
@@ -89,11 +91,27 @@ export function useLinkPayerEmail(
     },
   };
   const startWithEmail = () => {
+    if (required === null) return;
+    if (!required) {
+      void start();
+      return;
+    }
     const refused = validate(email);
     setError(refused);
     if (!refused) void start({ email });
   };
-  return { field, startWithEmail };
+  return { field, startWithEmail, required };
+}
+
+/** The link flow's field, drawn only where the provider requires it (FUT-4200). */
+export function LinkPayerEmail({
+  payer,
+  displayName,
+}: {
+  payer: ReturnType<typeof useLinkPayerEmail>;
+  displayName: string;
+}): JSX.Element | null {
+  return payer.required === true ? <PayerEmailField {...payer.field} displayName={displayName} /> : null;
 }
 
 export function PayerEmailField({

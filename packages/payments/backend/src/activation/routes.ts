@@ -4,7 +4,7 @@ import type { PaymentsRouteExtension, PaymentsRouteExtensionArgs } from '../http
 
 import type { ActivationContext } from './context';
 import { healStrandedActivation, type ActivationReconcileContext } from './reconcile';
-import { verificationAmountCents } from './reference';
+import { verificationAmountCents, verificationNeedsPayerEmail } from './reference';
 import { getPendingVerification, discardPendingVerification, startRedirectVerification, pollRedirectVerification } from './verify-redirect';
 import { verificationCardPublicKey, verifyProviderCharge } from './verify-charge';
 
@@ -173,6 +173,9 @@ async function verifyChargeRead(
     // answer for who is paying. Only a starting value — the owner can type
     // another, and what they type is what the charge sends.
     payerEmail: payer.email ?? null,
+    // Whether this provider judges that e-mail at all (FUT-4200). Only then
+    // does the step ask the owner for it; elsewhere the suggestion is sent.
+    payerEmailRequired: verificationNeedsPayerEmail(ctx.activation.providers, provider),
   });
 }
 

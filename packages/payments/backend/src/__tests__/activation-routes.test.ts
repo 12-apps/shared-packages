@@ -285,3 +285,37 @@ describe('createActivationRouteExtensions — the GET survives its payer (FUT-40
     expect(healStrandedActivation).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('createActivationRouteExtensions — who is asked for the payer e-mail (FUT-4200)', () => {
+  function readFor(capabilities: { payerEmail?: boolean }) {
+    return createActivationRouteExtensions<{ tenantId: string }>({
+      context: () => ({
+        ...routesContext(),
+        activation: {
+          providers: { has: () => true, get: () => ({ capabilities }), names: () => ['pagbank'] },
+        } as never,
+      }),
+      payer: async () => ({ email: 'ana@example.com' }),
+      copy: { missingCardFields: MISSING_CARD },
+    }).find((extension) => extension.method === 'GET')!;
+  }
+
+  beforeEach(() => {
+    vi.mocked(verificationCardPublicKey).mockResolvedValue(null);
+    vi.mocked(getPendingVerification).mockResolvedValue(null);
+  });
+
+  it('a provider that judges the payer e-mail asks for it', async () => {
+    const body = (await (await readFor({ payerEmail: true }).handler(argsFor(undefined))).json()) as {
+      payerEmailRequired: boolean;
+    };
+    expect(body.payerEmailRequired).toBe(true);
+  });
+
+  it('a provider that does not declare it is not asked', async () => {
+    const body = (await (await readFor({}).handler(argsFor(undefined))).json()) as {
+      payerEmailRequired: boolean;
+    };
+    expect(body.payerEmailRequired).toBe(false);
+  });
+});

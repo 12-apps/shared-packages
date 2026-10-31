@@ -63,6 +63,7 @@ interface ProbeAnswers {
   publicKey?: string | null;
   amountCents?: number | null;
   payerEmail?: string | null;
+  payerEmailRequired?: boolean;
 }
 
 /** Records every ask; answers the probe GET and a queue of POST bodies. */
@@ -86,7 +87,12 @@ function stubFetch(answers: ProbeAnswers & { post?: unknown[] } = {}) {
       const amountCents = 'amountCents' in answers ? answers.amountCents : 1;
       const payload =
         method === 'GET'
-          ? { publicKey, amountCents, ...('payerEmail' in answers ? { payerEmail: answers.payerEmail } : {}) }
+          ? {
+              publicKey,
+              amountCents,
+              ...('payerEmail' in answers ? { payerEmail: answers.payerEmail } : {}),
+              ...('payerEmailRequired' in answers ? { payerEmailRequired: answers.payerEmailRequired } : {}),
+            }
           : (posts.shift() ?? { ok: true, refunded: true });
       return { ok: true, json: async () => payload } as unknown as Response;
     }),
@@ -610,15 +616,29 @@ describe('useActivationCharge — the payer e-mail (FUT-4050)', () => {
   });
 
   it('refuses to charge an invalid e-mail, and says so on the field', async () => {
-    const { posted } = stubFetch();
+    const { posted } = stubFetch({ payerEmailRequired: true });
     stubTokenizer();
     const { result } = renderHook(usingOptions(options({ validateEmail })));
+    await waitFor(() => expect(result.current.payerEmailRequired).toBe(true));
     fillIn(result);
     act(() => result.current.setEmail('sem-arroba'));
     await act(() => result.current.submit());
     expect(result.current.emailError).toBe('copy:email-invalid');
     expect(posted()).toHaveLength(0);
     expect(tokenizeCard).not.toHaveBeenCalled();
+  });
+
+  it('judges nothing where the provider does not require the e-mail (FUT-4200)', async () => {
+    const { posted } = stubFetch();
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options({ validateEmail })));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    fillIn(result);
+    act(() => result.current.setEmail('sem-arroba'));
+    await act(() => result.current.submit());
+    expect(result.current.payerEmailRequired).toBe(false);
+    expect(result.current.emailError).toBeUndefined();
+    expect(posted()).toHaveLength(1);
   });
 
   it('carries a refused payer e-mail into the failed state, keeping card and e-mail', async () => {
