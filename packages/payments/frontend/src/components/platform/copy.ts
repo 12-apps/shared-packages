@@ -266,6 +266,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
     copy: string;
     copied: string;
     skip: string;
+    /** Once the screen stopped checking on its own (15 minutes): ask PagBank now. */
+    check: string;
     /** The QR's accessible name. */
     qrAlt: string;
     paid: string;
