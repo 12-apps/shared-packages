@@ -124,7 +124,7 @@ async function encryptTestCard(card: TestCard, publicKey: string | null): Promis
 }
 
 /** The SDK's 3DS failure, as the code the evidence copy words. */
-const THREEDS_FAILURES: Readonly<Record<ThreeDSFailure, BrowserCardFailure>> = {
+export const THREEDS_FAILURES: Readonly<Record<ThreeDSFailure, BrowserCardFailure>> = {
   SDK_UNAVAILABLE: 'SDK_UNAVAILABLE',
   NOT_SUPPORTED: 'THREEDS_NOT_SUPPORTED',
   REFUSED: 'THREEDS_REFUSED',
@@ -185,7 +185,7 @@ function sellerLine(copy: PlatformHomologacaoCopy['evidence'], seller: Homologac
   return seller.connected ? copy.sellerConnected(seller.connectedAt, seller.accountId) : copy.sellerNotConnected;
 }
 
-function SellerBlock({
+export function SellerBlock({
   seller,
   onConnect,
 }: Pick<HomologacaoEvidenceCardProps, 'seller' | 'onConnect'>): ReactNode {
@@ -286,7 +286,7 @@ function useEvidenceRun(
 }
 
 /** How the last return from PagBank ended — with the recorded reason when it failed. */
-function ConnectOutcome({ seller, connectOutcome }: Pick<HomologacaoEvidenceCardProps, 'seller' | 'connectOutcome'>): ReactNode {
+export function ConnectOutcome({ seller, connectOutcome }: Pick<HomologacaoEvidenceCardProps, 'seller' | 'connectOutcome'>): ReactNode {
   const copy = usePlatformCopy().evidence;
   // The URL only says PagBank came back; the seller's own row says whether it
   // connected. A "connected" the row does not confirm is not announced.
@@ -350,7 +350,7 @@ function EvidenceBody(props: HomologacaoEvidenceCardProps): ReactNode {
 }
 
 /** The server's counts — never inferred here — or the failure line. */
-function EvidenceResult({
+export function EvidenceResult({
   summary,
   failed,
 }: {

@@ -12,7 +12,7 @@ import type { PlatformHomologacaoCopy } from './copy';
  * these are written for the operator filling PagBank's form, which is the
  * register the surface is actually in.
  */
-export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
+const BASE: Omit<PlatformHomologacaoCopy, 'productionEvidence'> = {
   outcome: {
     heading: 'Situação da homologação',
     statusLabel: 'Situação',
@@ -165,5 +165,98 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
       ready: (wallet, card) => `${wallet} pronto${card ? ` — ${card}` : ''}. Será usado ao gerar o arquivo.`,
       failed: (wallet) => `O ${wallet} não devolveu o token. Toque de novo para tentar.`,
     },
+  },
+};
+
+/**
+ * The production evidence card (FUT-4198): the sandbox card's lines where
+ * they still hold, and production's own wherever money is real.
+ */
+export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
+  ...BASE,
+  productionEvidence: {
+    ...BASE.evidence,
+    heading: 'Evidências para homologação (produção)',
+    lede:
+      'Os mesmos cenários na produção do PagBank, com dinheiro real: R$ 1,00 em cada um, estornado logo depois. Nada é cobrado antes do passo 3. O arquivo é separado do de sandbox.',
+    sellerHeading: '1. Lojista de produção',
+    sellerNotConnected:
+      'Nenhum lojista conectado em produção. Conecte a conta PagBank da plataforma para gerar as evidências de produção.',
+    sellerReconnect: 'A conexão do lojista de produção precisa ser autorizada de novo.',
+    connectHint: 'Você fará login na produção do PagBank com a conta da plataforma e aprovará o consentimento.',
+    connect: 'Conectar lojista de produção',
+    reconnect: 'Reconectar lojista de produção',
+    connectFailed: 'Não foi possível iniciar a conexão do lojista de produção.',
+    returnedConnected: 'Lojista de produção conectado. O callback e a troca do código foram registrados nas evidências.',
+    returnedFailed: 'A conexão do lojista de produção não foi concluída. Tente conectar de novo.',
+    phases: {
+      preparing: 'Consultando a aplicação, renovando o token e gerando a chave pública e a sessão 3DS…',
+      encrypting: 'Criptografando os cartões e autenticando o cartão de débito (3DS) — siga o desafio do banco se ele aparecer…',
+      running: 'Cobrando R$ 1,00 por cenário e estornando — pode levar alguns minutos…',
+      downloading: 'Montando o arquivo…',
+    },
+    generateFailed: (phase) =>
+      `${
+        {
+          preparing: 'Falhou ao consultar a aplicação e preparar o lojista de produção.',
+          encrypting: 'Falhou ao criptografar os cartões ou autenticar o cartão de débito no navegador.',
+          running: 'Falhou ao criar os pedidos em produção.',
+          downloading: 'Falhou ao montar o arquivo.',
+        }[phase]
+      } Tente de novo; "Baixar o último registrado" ainda traz o que já foi registrado.`,
+    wallets: {
+      ...BASE.evidence.wallets,
+      heading: 'Carteiras (toque antes de cobrar)',
+      hint: 'Toque em cada carteira antes de cobrar; sem isso, a seção dela fica pendente. O Google Pay precisa do acesso de produção aprovado pelo Google.',
+      applePaySheetTotal: 'Homologação PagBank',
+    },
+    stepper: {
+      label: 'Passos da homologação em produção',
+      connect: 'Conectar lojista',
+      data: 'Titular e cartões',
+      charge: 'Cobrar e estornar',
+      download: 'Baixar o arquivo',
+    },
+    buyerHeading: '2. Titular e cartões',
+    buyerHint: 'Vai nos pedidos e aparece mascarado no arquivo. Preenchido com o último usado neste navegador.',
+    fields: {
+      name: 'Nome completo',
+      taxId: 'CPF ou CNPJ',
+      email: 'E-mail',
+      phone: 'Celular',
+      postalCode: 'CEP',
+      street: 'Rua',
+      number: 'Número',
+      complement: 'Complemento',
+      city: 'Cidade',
+      regionCode: 'UF',
+    },
+    cardsHeading: 'Cartões reais — criptografados no navegador; o número nunca chega ao servidor',
+    credit: 'Crédito',
+    debit: 'Débito (com 3DS)',
+    cardFields: { number: 'Número do cartão', expiry: 'MM/AA', securityCode: 'CVV' },
+    debitBlankHint: 'Em branco: o débito fica pendente no arquivo.',
+    incompleteData: 'Preencha o titular e o cartão de crédito para cobrar.',
+    charge: '3. Cobrar R$ 1,00 por cenário e estornar',
+    confirm: {
+      title: 'Cobrar em produção?',
+      body: 'Vai cobrar até R$ 5,00 (R$ 1,00 por cenário) nos cartões, nas carteiras e no Pix, e estornar cada um logo em seguida.',
+      typeLabel: 'Digite confirmar',
+      word: 'confirmar',
+      submit: 'Cobrar e estornar',
+      cancel: 'Cancelar',
+    },
+    pix: {
+      title: 'Pague o Pix de R$ 1,00',
+      hint: 'Pague pelo app do seu banco. Ao confirmar, ele é estornado.',
+      expires: (timeLeft) => `Expira em ${timeLeft}`,
+      copy: 'Copiar código',
+      copied: 'Código copiado',
+      skip: 'Pular o Pix',
+      qrAlt: 'QR Code do Pix de R$ 1,00',
+      paid: 'Pix pago e estornado.',
+      skipped: 'Pix pulado: fica pendente no arquivo.',
+    },
+    download: '4. Baixar o arquivo de produção (TXT e JSON)',
   },
 };

@@ -322,6 +322,8 @@ export {
 } from './components/platform/ConnectApplicationPanel';
 export { PlatformHomologacao, type PlatformHomologacaoProps } from './components/platform/PlatformHomologacao';
 export * from './components/platform/HomologacaoEvidenceCard';
+export * from './components/platform/HomologacaoProductionEvidenceCard';
+export type { ProductionPixView } from './components/platform/ProductionPixPanel';
 export {
   type HomologacaoSaveInput,
   type HomologacaoSaveState,

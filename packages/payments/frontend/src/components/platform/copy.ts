@@ -192,6 +192,66 @@ export interface HomologacaoEvidenceWalletsCopy {
   failed: (wallet: string) => string;
 }
 
+/**
+ * The PRODUCTION evidence card (FUT-4198): the sandbox card's sentences for the
+ * parts it shares (the seller, the progress, the counts, the wallets), plus
+ * the four steps, the cardholder, the real cards, the confirmation before real
+ * money is charged and the Pix a person pays.
+ */
+export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCardCopy {
+  /** The four steps above the card, and the bar's accessible name. */
+  stepper: { label: string; connect: string; data: string; charge: string; download: string };
+  buyerHeading: string;
+  buyerHint: string;
+  fields: {
+    name: string;
+    taxId: string;
+    email: string;
+    phone: string;
+    postalCode: string;
+    street: string;
+    number: string;
+    complement: string;
+    city: string;
+    regionCode: string;
+  };
+  cardsHeading: string;
+  credit: string;
+  debit: string;
+  cardFields: { number: string; expiry: string; securityCode: string };
+  /** The debit card may be left blank: its section stays pending. */
+  debitBlankHint: string;
+  /** Why the charge button is not pressable yet. */
+  incompleteData: string;
+  /** The primary action: charge R$ 1,00 per scenario and refund it. */
+  charge: string;
+  confirm: {
+    title: string;
+    body: string;
+    /** The label of the field where "confirmar" is typed. */
+    typeLabel: string;
+    /** The word to type. */
+    word: string;
+    submit: string;
+    cancel: string;
+  };
+  pix: {
+    title: string;
+    hint: string;
+    /** `minutesLeft` already formatted, e.g. `09:41`. */
+    expires: (timeLeft: string) => string;
+    copy: string;
+    copied: string;
+    skip: string;
+    /** The QR's accessible name. */
+    qrAlt: string;
+    paid: string;
+    skipped: string;
+  };
+  /** Step 4's button. */
+  download: string;
+}
+
 /** The whole platform surface, in one object a host passes at the mount. */
 export interface PlatformHomologacaoCopy {
   outcome: HomologacaoOutcomeCopy;
@@ -199,4 +259,6 @@ export interface PlatformHomologacaoCopy {
   anexo: HomologacaoAnexoCopy;
   connect: ConnectApplicationCopy;
   evidence: HomologacaoEvidenceCardCopy;
+  /** The production evidence card (FUT-4198). */
+  productionEvidence: HomologacaoProductionEvidenceCopy;
 }

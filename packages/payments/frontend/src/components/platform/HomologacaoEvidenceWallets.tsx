@@ -38,9 +38,9 @@ import { usePlatformCopy } from './copy-context';
  *
  * The sheets are the checkout's own: the same `PaymentsClient` probe and
  * payment request (`google-pay-button.tsx`), the same `ApplePaySession`
- * (`apple-pay-button.tsx`). Google Pay is ALWAYS `TEST` here — the evidence is
- * sandbox-only — and mints against the test seller's PagBank account, as the
- * host's seller view says; Apple Pay is offered only where the device has an
+ * (`apple-pay-button.tsx`). Google Pay runs in the environment the host's
+ * seller view names (`TEST` for the sandbox evidence, `PRODUCTION` for the
+ * production one, FUT-4198) and mints against the seller's PagBank account; Apple Pay is offered only where the device has an
  * `ApplePaySession`, the host has an Apple Pay identity, and the host validates
  * the merchant.
  */
@@ -178,12 +178,17 @@ function appleAbsence(input: EvidenceWalletsInput, offered: boolean): AppleAbsen
 }
 
 /** The wallet step's state: the sheets' answers, the presses that open them, and what phase 2 gets. */
+/** The server names the environment: TEST for the sandbox evidence, PRODUCTION for the production one (FUT-4198). */
+function googleEnvironment(google: EvidenceWalletsConfig['googlePay'] | null): 'TEST' | 'PRODUCTION' {
+  return google?.environment ?? 'TEST';
+}
+
 export function useEvidenceWallets(input: EvidenceWalletsInput) {
   const copy = usePlatformCopy().evidence.wallets;
   const [results, setResults] = useState<Results>({});
   const google = input.config?.googlePay ?? null;
   // `null` tells the client hook not to load pay.js at all.
-  const client = useGooglePayClient(google ? input.googlePayApi : null, 'TEST');
+  const client = useGooglePayClient(google ? input.googlePayApi : null, googleEnvironment(google));
   const apple = appleOffer(input);
   const cents = input.config?.amountCents ?? 0;
   const record = (result: BrowserWalletResult): void => setResults((previous) => ({ ...previous, [result.type]: result }));
