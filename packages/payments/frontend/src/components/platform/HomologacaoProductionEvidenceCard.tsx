@@ -74,27 +74,41 @@ export interface HomologacaoProductionEvidenceCardProps {
 
 function Stepper({ copy, done }: { copy: HomologacaoProductionEvidenceCopy['stepper']; done: readonly boolean[] }): ReactNode {
   const labels = [copy.connect, copy.data, copy.charge, copy.download];
-  const current = done.findIndex((isDone) => !isDone);
+  const found = done.findIndex((isDone) => !isDone);
+  const current = found === -1 ? labels.length - 1 : found;
   return (
-    <Box
-      component="ol"
-      aria-label={copy.label}
-      sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 1, m: 0, p: 0, listStyle: 'none' }}
-    >
-      {labels.map((label, index) => (
-        <Box
-          component="li"
-          key={label}
-          aria-current={index === current ? 'step' : undefined}
-          sx={{ borderTop: 4, borderColor: done[index] || index === current ? 'primary.main' : 'divider', pt: 1 }}
-        >
-          <Typography variant="caption" fontWeight={index === current ? 600 : 400} color={done[index] ? 'primary.main' : 'text.primary'}>
-            {done[index] ? '✓ ' : ''}
-            {index + 1} · {label}
-          </Typography>
-        </Box>
-      ))}
-    </Box>
+    <Stack spacing={0.75}>
+      {/* A phone has no room for four labels side by side: one line says where the operator is. */}
+      <Typography variant="caption" sx={{ display: { xs: 'block', sm: 'none' } }} data-testid="production-step-progress">
+        {copy.progress(current + 1, labels.length, labels[current]!)}
+      </Typography>
+      <Box
+        component="ol"
+        aria-label={copy.label}
+        sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 1, m: 0, p: 0, listStyle: 'none' }}
+      >
+        {labels.map((label, index) => (
+          <Box
+            component="li"
+            key={label}
+            aria-current={index === current ? 'step' : undefined}
+            // The ink, never the theme's primary: on a staff screen whose primary is
+            // red, a red bar reads as a failure (as the run's progress bar argues).
+            sx={{ borderTop: 4, borderColor: done[index] || index === current ? 'text.primary' : 'divider', pt: { xs: 0, sm: 1 } }}
+          >
+            <Typography
+              variant="caption"
+              fontWeight={index === current ? 600 : 400}
+              color={done[index] || index === current ? 'text.primary' : 'text.secondary'}
+              sx={{ display: { xs: 'none', sm: 'block' } }}
+            >
+              {done[index] ? '✓ ' : ''}
+              {index + 1} · {label}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Stack>
   );
 }
 
@@ -190,7 +204,7 @@ type ProductionFlow = ReturnType<typeof useProductionRun>;
 function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoProductionEvidenceCopy }): ReactNode {
   if (!flow.busy && !flow.pix) return null;
   return (
-    <Stack spacing={2} sx={{ flex: '1 1 360px', minWidth: 0 }}>
+    <Stack spacing={2} sx={{ flex: '1 1 320px', minWidth: 0 }}>
       {flow.phase !== 'idle' ? (
         <EvidenceProgress phase={flow.phase} section={flow.section} full={flow.phase !== 'downloading'} walletResults={null} />
       ) : null}
@@ -231,7 +245,7 @@ function ProductionBody(props: HomologacaoProductionEvidenceCardProps): ReactNod
       <Stepper copy={copy.stepper} done={stepsDone(connected, form.ready, flow)} />
       <ConnectOutcome seller={props.seller} connectOutcome={props.connectOutcome} />
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3.5, alignItems: 'flex-start' }}>
-        <Stack spacing={2.5} sx={{ flex: '999 1 560px', minWidth: 0 }}>
+        <Stack spacing={2.5} sx={{ flex: '999 1 480px', minWidth: 0 }}>
           <SellerBlock seller={props.seller} onConnect={props.onConnect} />
           <ProductionEvidenceForm copy={copy} {...form.fields} disabled={flow.busy} />
           <EvidenceWalletBlock wallets={wallets} />

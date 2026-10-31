@@ -50,6 +50,9 @@ export function ProductionPixPanel({
   const clipboard = useClipboardCopy(pix.qrText ?? '');
   if (pix.state === 'REFUNDED') return <Alert severity="success" data-testid="production-pix-done">{copy.paid}</Alert>;
   if (pix.state === 'SKIPPED') return <Alert severity="info" data-testid="production-pix-done">{copy.skipped}</Alert>;
+  if (pix.state === 'REFUND_PENDING') {
+    return <Alert severity="info" data-testid="production-pix-refunding">{copy.refunding}</Alert>;
+  }
   if (pix.state !== 'AWAITING_PAYMENT' || !pix.qrText) return null;
   return (
     <Stack

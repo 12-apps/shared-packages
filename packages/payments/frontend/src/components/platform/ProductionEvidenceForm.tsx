@@ -12,9 +12,10 @@ import type { BuyerForm, CardForm } from './production-evidence-data';
  * `production-evidence-data.ts` does — so this stays the drawing only.
  */
 
+/** Ten fields: 2 or 5 per row, so no row is left half empty. */
 const GRID_SX = {
   display: 'grid',
-  gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' },
+  gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' },
   gap: 1.5,
 } as const;
 

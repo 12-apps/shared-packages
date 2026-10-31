@@ -38,7 +38,7 @@ export function useProductionForm() {
   const [credit, setCredit] = useState<CardForm>(EMPTY_CARD);
   const [debit, setDebit] = useState<CardForm>(EMPTY_CARD);
   const ready = buyerOf(buyer) !== null && cardOf(credit) !== null && (isBlank(debit) || cardOf(debit) !== null);
-  // The real card numbers are not kept a moment longer than the run needs them.
+  // Cleared once a run is through: the real card numbers are not kept past it (a failed run keeps them for the retry).
   const clearCards = (): void => {
     setCredit(EMPTY_CARD);
     setDebit(EMPTY_CARD);
@@ -82,12 +82,18 @@ function usePixPolling(
   everyMs: number,
 ): void {
   const busy = useRef(false);
+  // The host's callback through a ref: an inline one, new on every render,
+  // must not restart the timer before it ever fires.
+  const confirm = useRef(onConfirmPix);
+  confirm.current = onConfirmPix;
+  const runId = pix && isPixOpen(pix) ? pix.runId : null;
   useEffect(() => {
-    if (!pix || !isPixOpen(pix)) return undefined;
+    if (!runId) return undefined;
     const timer = setInterval(() => {
       if (busy.current) return;
       busy.current = true;
-      onConfirmPix(pix.runId, 'CHECK')
+      confirm
+        .current(runId, 'CHECK')
         .then(setPix)
         .catch(() => undefined)
         .finally(() => {
@@ -95,17 +101,20 @@ function usePixPolling(
         });
     }, everyMs);
     return () => clearInterval(timer);
-  }, [pix, setPix, onConfirmPix, everyMs]);
+  }, [runId, setPix, everyMs]);
 }
 
 /** The run's Pix: picked up from the server on load, checked while open, skippable. */
 function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
   const [pix, setPix] = useState<ProductionPixView | null>(null);
   const [skipping, setSkipping] = useState(false);
-  // A reloaded screen picks up the open Pix the server still holds.
+  // A reloaded screen picks up the open Pix the server still holds — and so
+  // does one whose run answer was lost after the server raised its Pix: the
+  // server's open Pix wins over anything but the same run, still open here.
   const serverPix = props.seller?.pix ?? null;
   useEffect(() => {
-    if (isPixOpen(serverPix)) setPix((current) => current ?? serverPix);
+    if (!serverPix || !isPixOpen(serverPix)) return;
+    setPix((current) => (current && isPixOpen(current) && current.runId === serverPix.runId ? current : serverPix));
   }, [serverPix]);
   usePixPolling(pix, setPix, props.onConfirmPix, props.pixPollMs ?? PIX_POLL_MS);
   const skip = (): void => {
@@ -120,6 +129,26 @@ function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
   return { pix, setPix, skip, skipping, pixOpen: isPixOpen(pix) };
 }
 
+/** Step 4: build and save the file, answering its counts — or where it failed. */
+function useDownload(
+  onDownload: HomologacaoProductionEvidenceCardProps['onDownload'],
+  setPhase: (phase: Phase) => void,
+  setFailed: (phase: EvidencePhase | null) => void,
+  setSummary: (summary: EvidenceSummary) => void,
+): () => Promise<void> {
+  return async () => {
+    setFailed(null);
+    setPhase('downloading');
+    try {
+      setSummary(await onDownload());
+    } catch {
+      setFailed('downloading');
+    } finally {
+      setPhase('idle');
+    }
+  };
+}
+
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -132,16 +161,20 @@ export function useProductionRun(
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
   const [ran, setRan] = useState(false);
   const { pix, setPix, skip, skipping, pixOpen } = useProductionPix(props);
+  // One run at a time, whatever a double click on the confirmation does.
+  const inFlight = useRef(false);
 
   const run = async (): Promise<void> => {
     const buyer = buyerOf(form.buyer);
-    if (!buyer) return;
+    if (!buyer || inFlight.current) return;
+    inFlight.current = true;
     setConfirming(false);
     setFailed(null);
     setSummary(null);
     setSection(null);
     rememberBuyer(form.buyer);
     let current: EvidencePhase = 'preparing';
+    let runId: string | null = null;
     const enter = (next: EvidencePhase): void => {
       current = next;
       setPhase(next);
@@ -149,8 +182,10 @@ export function useProductionRun(
     try {
       enter('preparing');
       const walletResults = wallets.collect();
-      wallets.reset();
       const prepared = await props.onPrepare(buyer);
+      runId = prepared.runId;
+      // The wallets' tokens are spent only once a run exists to spend them on.
+      wallets.reset();
       enter('encrypting');
       const cards = await browserCards(prepared, buyer.name, form.credit, form.debit);
       enter('running');
@@ -159,22 +194,15 @@ export function useProductionRun(
       form.clearCards();
     } catch {
       setFailed(current);
+      // The run may have raised its Pix before its answer was lost: ask.
+      if (runId) await props.onConfirmPix(runId, 'CHECK').then(setPix, () => undefined);
     } finally {
       setPhase('idle');
+      inFlight.current = false;
     }
   };
 
-  const download = async (): Promise<void> => {
-    setFailed(null);
-    setPhase('downloading');
-    try {
-      setSummary(await props.onDownload());
-    } catch {
-      setFailed('downloading');
-    } finally {
-      setPhase('idle');
-    }
-  };
+  const download = useDownload(props.onDownload, setPhase, setFailed, setSummary);
 
   return {
     confirming,

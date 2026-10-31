@@ -171,6 +171,45 @@ describe('HomologacaoProductionEvidenceCard', () => {
     expect(charge().disabled).toBe(true);
   });
 
+  it("given the run's answer is lost after the server raised its Pix, then the card asks and shows that Pix's QR", async () => {
+    const onConfirmPix = vi.fn(async (): Promise<ProductionPixView> => AWAITING);
+    const { props } = mount({ onRun: vi.fn(async () => Promise.reject(new Error('lost'))), onConfirmPix, pixPollMs: 60_000 });
+    fillBuyer();
+    fillCredit();
+
+    confirm();
+
+    await waitFor(() => expect(screen.getByTestId('production-pix-qr')).toBeTruthy());
+    expect(onConfirmPix).toHaveBeenCalledWith('run-1', 'CHECK');
+    expect(props.onPrepare).toHaveBeenCalledTimes(1);
+    expect(charge().disabled).toBe(true);
+  });
+
+  it('given a settled Pix here and an open one on the server, then the open one is shown', async () => {
+    const settled: ProductionPixView = { runId: 'run-0', state: 'REFUNDED', qrText: null, expiresAt: null };
+    const open: ProductionPixView = { ...AWAITING, runId: 'run-2' };
+    const props = {
+      copy: COPY,
+      onConnect: vi.fn(async () => undefined),
+      onPrepare: vi.fn(async () => ({ runId: 'run-1', publicKey: 'PUBKEY' })),
+      onRun: vi.fn(async () => settled),
+      onConfirmPix: vi.fn(async () => settled),
+      onDownload: vi.fn(async () => ({ executed: 0, failed: 0, pending: 0 })),
+      pixPollMs: 60_000,
+    };
+    const { rerender } = render(<HomologacaoProductionEvidenceCard {...props} seller={{ ...SELLER, pix: settled }} />);
+
+    rerender(<HomologacaoProductionEvidenceCard {...props} seller={{ ...SELLER, pix: open }} />);
+
+    await waitFor(() => expect(screen.getByTestId('production-pix-qr')).toBeTruthy());
+  });
+
+  it('given a paid Pix whose refund is not done, then the card says it is refunding', () => {
+    mount({ seller: { ...SELLER, pix: { ...AWAITING, state: 'REFUND_PENDING', qrText: null } }, pixPollMs: 60_000 });
+
+    expect(screen.getByTestId('production-pix-refunding').textContent).toBe(PROD.pix.refunding);
+  });
+
   it('given a debit card but no 3DS session, then it is sent with why instead of being charged', async () => {
     const { sent } = mount();
     fillBuyer();

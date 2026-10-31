@@ -200,7 +200,15 @@ export interface HomologacaoEvidenceWalletsCopy {
  */
 export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCardCopy {
   /** The four steps above the card, and the bar's accessible name. */
-  stepper: { label: string; connect: string; data: string; charge: string; download: string };
+  stepper: {
+    label: string;
+    connect: string;
+    data: string;
+    charge: string;
+    download: string;
+    /** The phone's one line in place of four narrow labels: `Passo 2 de 4 · Titular e cartões`. */
+    progress: (step: number, total: number, label: string) => string;
+  };
   buyerHeading: string;
   buyerHint: string;
   fields: {
@@ -247,6 +255,8 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
     qrAlt: string;
     paid: string;
     skipped: string;
+    /** Paid, the refund not done yet: the card keeps asking until it is. */
+    refunding: string;
   };
   /** Step 4's button. */
   download: string;
