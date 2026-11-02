@@ -348,6 +348,13 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     taxIdPlaceholder?: string;
     /** "Manter o documento salvo" under a field "Alterar" opened over one on file (FUT-3685, FUT-4080); absent ⇒ no link. */
     keepSavedCpf?: string;
+    /**
+     * The phone's link under the document field that opens the letters keyboard
+     * (FUT-590) — "Seu CNPJ tem letras? Usar teclado com letras" — and the one
+     * that brings the number keyboard back. Absent ⇒ no link, the number keyboard only.
+     */
+    lettersKeyboard?: string;
+    numbersKeyboard?: string;
     cpfIncomplete: string;
     phoneIncomplete: string;
   };

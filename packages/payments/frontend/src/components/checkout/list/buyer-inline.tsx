@@ -8,6 +8,7 @@ import type { BuyerInfo, CheckoutCustomerField } from "../types";
 import { useCheckoutComponents } from "../ui";
 
 import { usePaymentListMode } from "./context";
+import { keyboardProps, TaxIdKeyboardLink, useTaxIdKeyboard, type TaxIdKeyboard } from "./tax-id-keyboard";
 import type { PaymentListCopy } from "./types";
 
 /**
@@ -111,6 +112,51 @@ export function useOnComplete(complete: boolean, onComplete: (() => void) | unde
   }, [complete]);
 }
 
+/**
+ * One asked field: its name and the provider's reason ABOVE it, whole — "CPF
+ * (o PagBank pede para pagar pelo app)" (FN:182) — inside a native <label>
+ * that names the input with both; a floating label would cut the reason short.
+ */
+function BuyerField({ field, buyer, onBuyerChange, copy, provider, keyboard }: {
+  field: CheckoutCustomerField;
+  buyer: BuyerInfo;
+  onBuyerChange: (buyer: BuyerInfo) => void;
+  copy: Copy;
+  provider: string | null;
+  keyboard: TaxIdKeyboard;
+}): JSX.Element {
+  const { Input, Text } = useCheckoutComponents();
+  const cardCopy = useCheckoutCopy().card;
+  const taxId = field.key === "taxId";
+  const kept = buyer[field.key] ?? "";
+  const value = taxId ? taxIdField.shown(kept) : kept;
+  const complaint = complaintOf(field, value, copy, (v) => validateCpfOrCnpj(v, cardCopy.fields));
+  return (
+    <Box component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+      <Text variant="body" size="sm" as="span">
+        {nameOf(field, copy)}{" "}
+        <Text variant="body" size="sm" color="secondary" as="span">
+          {copy.why(provider)}
+        </Text>
+      </Text>
+      <Input
+        {...inputAttributesOf(field.key)}
+        {...(taxId ? keyboardProps(keyboard) : {})}
+        variant="outlined"
+        size="md"
+        fullWidth
+        required
+        placeholder={placeholderOf(field.key, copy)}
+        value={value}
+        error={Boolean(complaint)}
+        helperText={complaint}
+        onChange={(event) => onBuyerChange({ ...buyer, [field.key]: taxId ? taxIdField.kept(event.target.value) : event.target.value })}
+        data-testid={`list-buyer-${field.key}`}
+      />
+    </Box>
+  );
+}
+
 export function BuyerInline({
   asked,
   buyer,
@@ -130,50 +176,21 @@ export function BuyerInline({
   /** Offer "Salvar meus dados…" here — not when the top of Pagamento already does (FUT-3685). */
   withConsent?: boolean;
 }): JSX.Element | null {
-  const { Checkbox, Input, Text } = useCheckoutComponents();
+  const { Checkbox } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
-  const cardCopy = useCheckoutCopy().card;
+  const scope = useRef<HTMLDivElement | null>(null);
+  const keyboard = useTaxIdKeyboard(scope, copy);
   useOnComplete(asked.every((field) => fieldSatisfied(field, buyer[field.key])), onComplete);
   if (asked.length === 0) return null;
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-      {asked.map((field) => {
-        const kept = buyer[field.key] ?? "";
-        const value = field.key === "taxId" ? taxIdField.shown(kept) : kept;
-        const complaint = complaintOf(field, value, copy, (v) => validateCpfOrCnpj(v, cardCopy.fields));
-        // The label sits ABOVE the field, whole — "CPF (o PagBank pede para
-        // pagar pelo app)" (FN:182) — and a native <label> around both names
-        // the input with it; a floating label would cut the reason short.
-        return (
-          <Box key={field.key} component="label" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Text variant="body" size="sm" as="span">
-              {nameOf(field, copy)}{" "}
-              <Text variant="body" size="sm" color="secondary" as="span">
-                {copy.why(provider)}
-              </Text>
-            </Text>
-          <Input
-            {...inputAttributesOf(field.key)}
-            inputMode={field.key === "taxId" ? "numeric" : undefined}
-            variant="outlined"
-            size="md"
-            fullWidth
-            required
-            placeholder={placeholderOf(field.key, copy)}
-            value={value}
-            error={Boolean(complaint)}
-            helperText={complaint}
-            onChange={(event) =>
-              onBuyerChange({
-                ...buyer,
-                [field.key]: field.key === "taxId" ? taxIdField.kept(event.target.value) : event.target.value,
-              })
-            }
-            data-testid={`list-buyer-${field.key}`}
-          />
-          </Box>
-        );
-      })}
+    <Box ref={scope} sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+      {asked.map((field) => (
+        // The document's keyboard link sits under its field, outside the label (FUT-590).
+        <Box key={field.key} sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+          <BuyerField field={field} buyer={buyer} onBuyerChange={onBuyerChange} copy={copy} provider={provider} keyboard={keyboard.mode} />
+          {field.key === "taxId" && keyboard.offered ? <TaxIdKeyboardLink mode={keyboard.mode} copy={copy} onSwitch={keyboard.onSwitch} /> : null}
+        </Box>
+      ))}
       {consent && withConsent ? (
         <Checkbox
           label={consent.label}

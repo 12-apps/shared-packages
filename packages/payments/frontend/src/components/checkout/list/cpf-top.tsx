@@ -9,6 +9,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { complaintOf, inputAttributesOf, placeholderOf, taxIdField, useOnComplete } from "./buyer-inline";
 import { usePaymentListMode } from "./context";
+import { keyboardProps, TaxIdKeyboardLink, useTaxIdKeyboard } from "./tax-id-keyboard";
 import type { PaymentListCopy } from "./types";
 
 /** The prototype's 280px CPF field on a computer (L7), on the theme's spacing scale. */
@@ -102,9 +103,31 @@ function useDocumentVerdict(
 }
 
 /**
+ * "Salvar meus dados para a próxima compra", when the host offers it. Flush with
+ * the field: the box's own 9px ring and the label's negative inset (MUI's, under
+ * every kit built on it) pushed the words right until they wrapped on a phone.
+ */
+function SaveProfileRow(): JSX.Element | null {
+  const { Checkbox } = useCheckoutComponents();
+  const consent = usePaymentListMode()?.consent;
+  if (!consent) return null;
+  return (
+    <Box data-testid="list-save-profile-row" sx={{ "& .MuiFormControlLabel-root": { ml: 0, mr: 0 }, "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 } }}>
+      <Checkbox
+        label={consent.label}
+        checked={consent.checked}
+        onChange={(_event, checked) => consent.onChange(checked)}
+        data-testid="list-save-profile"
+      />
+    </Box>
+  );
+}
+
+/**
  * The document at the TOP of Pagamento, above the wallets (FUT-3685, C3, C4,
  * E1, L7): "CPF ou CNPJ" (FUT-4080), the provider's reason under it ("o PagBank pede para pagar pelo
- * app"), the field — masked, checked by its digits — and "Salvar meus dados
+ * app"), the field — masked, checked by its digits, on the number keyboard
+ * with a phone's link to the letters one (FUT-590) — and "Salvar meus dados
  * para a próxima compra". Asked once, for every online way to pay the list
  * offers (R2); full width on a phone, ~280px on a computer.
  *
@@ -126,13 +149,13 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   /** Opened over a document on file: "Manter o documento salvo" closes it and keeps that one. */
   onKeepSaved?: () => void;
 }): JSX.Element {
-  const { Button, Checkbox, Input, Text } = useCheckoutComponents();
-  const consent = usePaymentListMode()?.consent;
+  const { Button, Input, Text } = useCheckoutComponents();
   // The document the store already holds, when the host passed it, shown
   // masked — as a CNPJ when it is one — and editable.
   const value = taxIdField.shown(buyer.taxId ?? "");
   const { complaint, onTyped, onFocus, onBlur } = useDocumentVerdict(field, value, copy, onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
+  const keyboard = useTaxIdKeyboard(scope, copy);
   useEffect(() => {
     if (focusOnMount) scope.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [focusOnMount]);
@@ -151,7 +174,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
         <Box data-testid="list-cpf-field" sx={(t) => ({ width: "100%", [`@container (min-width: ${FIELD_CAP_FROM_PX}px)`]: { maxWidth: t.spacing(FIELD_WIDE_MAX) } })}>
           <Input
             {...inputAttributesOf("taxId")}
-            inputMode="numeric"
+            {...keyboardProps(keyboard.mode)}
             variant="outlined"
             size="md"
             fullWidth
@@ -170,6 +193,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
           />
         </Box>
       </Box>
+      {keyboard.offered ? <TaxIdKeyboardLink mode={keyboard.mode} copy={copy} onSwitch={keyboard.onSwitch} /> : null}
       {onKeepSaved && copy.keepSavedCpf ? (
         // Flush with the field's left edge, in the neutral ink of a link that keeps
         // what is on file — the brand's primary read as an error on a red-brown theme.
@@ -179,18 +203,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
           </Button>
         </Box>
       ) : null}
-      {consent ? (
-        // Flush with the field: the box's own 9px ring and the label's negative inset
-        // (MUI's, under every kit built on it) pushed the words right until they wrapped on a phone.
-        <Box data-testid="list-save-profile-row" sx={{ "& .MuiFormControlLabel-root": { ml: 0, mr: 0 }, "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 } }}>
-          <Checkbox
-            label={consent.label}
-            checked={consent.checked}
-            onChange={(_event, checked) => consent.onChange(checked)}
-            data-testid="list-save-profile"
-          />
-        </Box>
-      ) : null}
+      <SaveProfileRow />
     </Box>
   );
 }

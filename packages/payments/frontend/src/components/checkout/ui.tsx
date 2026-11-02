@@ -57,7 +57,8 @@ export interface CheckoutInputProps {
   id?: string;
   name?: string;
   type?: 'text' | 'email' | 'tel';
-  inputMode?: 'numeric';
+  /** The phone keyboard: digits, or letters too (FUT-590, the alphanumeric CNPJ). */
+  inputMode?: 'numeric' | 'text';
   variant?: 'outlined';
   size?: 'md';
   fullWidth?: boolean;
@@ -74,16 +75,19 @@ export interface CheckoutInputProps {
   onFocus?: () => void;
   onBlur?: () => void;
   /**
-   * Typing hints for the `<input>` itself (FUT-4107). Here rather than at the
-   * top level because a top-level prop does not reach the `<input>` in a
-   * `@12-apps/ui` binding: its `Input` merges `inputProps` onto the element.
+   * Typing hints for the `<input>` itself (FUT-4107), the keyboard included
+   * (FUT-590). Here as well as at the top level because a top-level prop does
+   * not reach the `<input>` in a `@12-apps/ui` binding older than FUT-1440's
+   * fix: its `Input` merges `inputProps` onto the element.
    */
   inputProps?: CheckoutInputHints;
   'data-testid'?: string;
 }
 
-/** What a field may ask of the phone's keyboard: capitals, no autocorrect, no spellcheck. */
-export type CheckoutInputHints = Pick<InputHTMLAttributes<HTMLInputElement>, 'autoCapitalize' | 'autoCorrect' | 'spellCheck'>;
+/** What a field may ask of the phone's keyboard: which one, capitals, no autocorrect, no spellcheck. */
+export type CheckoutInputHints = Pick<InputHTMLAttributes<HTMLInputElement>, 'autoCapitalize' | 'autoCorrect' | 'spellCheck'> & {
+  inputMode?: CheckoutInputProps['inputMode'];
+};
 
 export interface CheckoutCheckboxProps {
   checked: boolean;

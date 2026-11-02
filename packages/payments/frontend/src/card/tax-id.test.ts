@@ -96,7 +96,7 @@ describe('the payer document check: a CPF’s or a CNPJ’s own check digits', (
     ['a CNPJ with a swapped body digit', '11.222.333/0010-81'],
   ])('refuses %s', (_case, value) => {
     expect(isValidCpfOrCnpj(value)).toBe(false);
-    expect(validateCpfOrCnpj(value, fields)).toBe('Informe um CPF ou CNPJ válido.');
+    expect(validateCpfOrCnpj(value, fields)).toBe('Esse CPF ou CNPJ não é válido. Confira os números.');
   });
 
   it.each([...'0123456789'].flatMap((d) => [d.repeat(11), d.repeat(14)]))(
@@ -113,7 +113,7 @@ describe('the payer document check: a CPF’s or a CNPJ’s own check digits', (
     ['a valid CPF with a stray digit', '529982247251'],
   ])('refuses a length that is neither: %s', (_case, value) => {
     expect(isValidCpfOrCnpj(value)).toBe(false);
-    expect(validateCpfOrCnpj(value, fields)).toBe('Informe um CPF ou CNPJ válido.');
+    expect(validateCpfOrCnpj(value, fields)).toBe('Esse CPF ou CNPJ não é válido. Confira os números.');
   });
 
   it('asks for the document when nothing, or only punctuation, was typed', () => {
@@ -122,7 +122,7 @@ describe('the payer document check: a CPF’s or a CNPJ’s own check digits', (
   });
 
   it('says the same in en-US, keeping both documents’ names', () => {
-    expect(validateCpfOrCnpj('11222333000182', EN_US_CARD_COPY.fields)).toBe('Enter a valid CPF or CNPJ.');
+    expect(validateCpfOrCnpj('11222333000182', EN_US_CARD_COPY.fields)).toBe('That CPF or CNPJ is not valid. Check the numbers.');
   });
 });
 
