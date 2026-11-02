@@ -33,10 +33,11 @@ function narrowRulesFor(el: HTMLElement): string {
     .join('\n');
 }
 
-function renderDialog(icon?: null): void {
+function renderDialog(icon?: null, showCancel = true): void {
   render(
     <AlertDialog
       open
+      showCancel={showCancel}
       variant="destructive"
       title="Encerrar o turno de Cláudia Rangel?"
       confirmText="Encerrar"
@@ -65,7 +66,7 @@ describe('AlertDialog on a narrow container', () => {
 
   it('grows the buttons so a stacked pair spans the row, Cancel first in the tab order', () => {
     renderDialog();
-    expect(narrowRulesFor(screen.getByTestId('ask-actions'))).toMatch(/>\.MuiButton-root\{[^}]*flex-grow:1/);
+    expect(narrowRulesFor(screen.getByTestId('ask-actions'))).toMatch(/>\.MuiButton-root:not\(:only-child\)\{[^}]*flex-grow:1/);
     const order = Array.from(screen.getByTestId('ask-actions').children).map((el) => el.getAttribute('data-testid'));
     expect(order).toEqual(['ask-cancel-button', 'ask-confirm-button']);
   });
@@ -75,5 +76,15 @@ describe('AlertDialog on a narrow container', () => {
     // The title alone, no icon beside or above it.
     expect(screen.getByTestId('ask-title').children).toHaveLength(1);
     expect(narrowRulesFor(screen.getByTestId('ask-title'))).toBe('');
+  });
+
+  it('leaves a lone button its own width: only a pair grows', () => {
+    renderDialog(undefined, false);
+    const actions = screen.getByTestId('ask-actions');
+    expect(Array.from(actions.children).map((el) => el.getAttribute('data-testid'))).toEqual(['ask-confirm-button']);
+    const rules = narrowRulesFor(actions);
+    // Every grow rule the narrow query gives this row is scoped to a button with a sibling.
+    expect(rules).toContain('flex-grow:1');
+    expect(rules).not.toMatch(/>\.MuiButton-root\{[^}]*flex-grow/);
   });
 });

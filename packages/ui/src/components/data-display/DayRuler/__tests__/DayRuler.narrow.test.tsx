@@ -4,12 +4,13 @@
  * label cut inside a short bar.
  */
 import { createTheme, decomposeColor } from "@mui/material/styles/index.js";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DayRuler } from "../DayRuler";
 import { DAY_RULER_LABELS } from "../DayRuler.labels";
 import { hitBoundsOf, textFitOf } from "../day-ruler-model";
+import { hasContent } from "../DayRuler.parts";
 import type { DayRulerProps } from "../DayRuler.types";
 import { dashedLabelGround } from "../../ScheduleGrid/schedule-tones";
 
@@ -138,5 +139,66 @@ describe("the now line never cuts a label", () => {
     }
     expect(dashedLabelGround(theme, "late")).toBeUndefined();
     expect(dashedLabelGround(theme, "onduty")).toBeUndefined();
+  });
+});
+
+describe("the actions slot is drawn only for content", () => {
+  it("knows an empty node from a real one", () => {
+    for (const empty of [undefined, null, false, true, "", [], [null, ""], <></>, <>{[]}</>]) expect(hasContent(empty)).toBe(false);
+    for (const full of ["Iniciar", 0, <button type="button" key="b">Iniciar</button>, <>{"x"}</>, [null, <span key="s" />]]) {
+      expect(hasContent(full)).toBe(true);
+    }
+  });
+
+  it("renders no slot, and so no 8px gap, for an empty fragment or an empty array", () => {
+    renderRuler({
+      rows: [
+        { id: "f", label: "Fragment", blocks: [], actions: <></> },
+        { id: "a", label: "Array", blocks: [], actions: [] },
+        { id: "s", label: "Empty text", blocks: [], actions: "" },
+      ],
+    });
+    for (const id of ["f", "a", "s"]) expect(screen.getByTestId(`dr-row-${id}`).children).toHaveLength(2);
+  });
+});
+
+describe("a late webfont re-measures the fit", () => {
+  it("measures again once document.fonts is ready", async () => {
+    const fonts = { load: (): void => undefined };
+    const ready = new Promise<void>((resolve) => {
+      fonts.load = resolve;
+    });
+    class Observer {
+      observe(): void {}
+      disconnect(): void {}
+    }
+    vi.stubGlobal("ResizeObserver", Observer);
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    Object.defineProperty(document, "fonts", { value: { ready }, configurable: true });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(80);
+    if (!("getBoundingClientRect" in Range.prototype)) {
+      Object.defineProperty(Range.prototype, "getBoundingClientRect", { value: () => ({}) as DOMRect, configurable: true, writable: true });
+    }
+    // In the fallback font the range fits the 80px bar…
+    const widths = { full: 60 };
+    vi.spyOn(Range.prototype, "getBoundingClientRect").mockImplementation(function rect(this: Range) {
+      return { width: this.startContainer.textContent === "12:00" ? 30 : widths.full } as DOMRect;
+    });
+    renderRuler({
+      rows: [{ id: "c", label: "Caio", blocks: [{ id: "s", start: 12, end: 16, label: "12:00–16:00", shortLabel: "12:00", tone: "plan" }] }],
+    });
+    const bar = screen.getByTestId("dr-block-s");
+    expect(bar).not.toHaveAttribute("data-fit");
+    // …and the webfont that arrives later is wider: the bar says its start instead of a cut range.
+    widths.full = 120;
+    await act(async () => {
+      fonts.load();
+      await ready;
+    });
+    expect(bar).toHaveAttribute("data-fit", "short");
+    Reflect.deleteProperty(document, "fonts");
   });
 });

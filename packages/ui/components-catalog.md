@@ -35,7 +35,7 @@ Components for displaying data, visualizations, and information to users.
 ### AlertDialog
 **Purpose**: Display critical alerts requiring user acknowledgment
 **Use Cases**: Confirmation dialogs, critical warnings, blocking notifications
-**Features**: Modal dialog, customizable actions, accessibility support; a container query (never a media query) lays it out for a dialog given under 480px: the icon above the title, and the buttons growing so a stacked pair spans the row, primary on top and Cancel at the bottom (Cancel first in the tab order). `ConfirmAction`'s popup is this dialog
+**Features**: Modal dialog, customizable actions, accessibility support; a container query (never a media query) lays it out for a dialog given under 480px: the icon above the title, and a pair of buttons growing so stacked it spans the row (a lone button keeps its width), primary on top and Cancel at the bottom (Cancel first in the tab order). `ConfirmAction`'s popup is this dialog
 **Location**: `src/components/data-display/AlertDialog`
 **Docs**: `src/components/data-display/AlertDialog/AlertDialog.md`
 

@@ -104,6 +104,46 @@ export const ResizeEnd: Story = {
   },
 };
 
+/**
+ * FUT-3831 review: on a narrow (compact) ruler a bar's hit band covers the
+ * whole bar. The end handles sit above it, so a press on the right end still
+ * resizes — it does not start a move — and the middle still moves.
+ */
+export const ResizeEndOnACompactRuler: Story = {
+  decorators: [
+    (Story) => (
+      <div style={{ width: 600 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const track = canvas.getByTestId('dr-track-bruno');
+    const handle = canvas.getByTestId('dr-handle-r-p1').getBoundingClientRect();
+    const y = handle.top + handle.height / 2;
+    // What a real press at the bar's end lands on is the handle, not the band.
+    const target = document.elementFromPoint(handle.left + handle.width / 2, y) as Element;
+    await expect(target).toBe(canvas.getByTestId('dr-handle-r-p1'));
+    fireEvent.pointerDown(target, { ...mouse, button: 0, clientX: xOf(track, 19) });
+    await settle();
+    fireEvent.pointerMove(window, { ...mouse, buttons: 1, clientX: xOf(track, 20) });
+    await settle();
+    fireEvent.pointerUp(window, mouse);
+    await waitFor(() => expect(args.onResize).toHaveBeenCalledWith('p1', 11, 20));
+    await expect(args.onMove).not.toHaveBeenCalled();
+    // The middle of the bar is still a move.
+    const bar = canvas.getByTestId('dr-block-p1').getBoundingClientRect();
+    const middle = document.elementFromPoint(bar.left + bar.width / 2, y) as Element;
+    fireEvent.pointerDown(middle, { ...mouse, button: 0, clientX: xOf(track, 15) });
+    await settle();
+    fireEvent.pointerMove(window, { ...mouse, buttons: 1, clientX: xOf(track, 16) });
+    await settle();
+    fireEvent.pointerUp(window, mouse);
+    await waitFor(() => expect(args.onMove).toHaveBeenCalledWith('p1', 12, 20));
+  },
+};
+
 /** D-C8: Alt+→ moves by one snap, read aloud. */
 export const KeyboardMove: Story = {
   play: async ({ canvasElement, args }) => {

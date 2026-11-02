@@ -172,9 +172,10 @@ portalled into a narrow pane answers to the pane — lays out for a phone:
   takes the paper's whole width. At 320 the icon column and the close button's
   clearance had left a long question about two words a line. A title with no
   icon (`icon={null}`) keeps the close button's clearance.
-- **The buttons always grow**: a pair that still fits shares the row in two
-  equal halves, and a pair that stacks is two buttons each across the row, in
-  the stacked order above — never two ragged widths pushed to the right.
+- **A pair of buttons always grows**: a pair that still fits shares the row in
+  two equal halves, and a pair that stacks is two buttons each across the row,
+  in the stacked order above — never two ragged widths pushed to the right. A
+  lone button (`showCancel={false}`) keeps its own width, pushed to the right.
 
 Over 480px nothing changes.
 

@@ -46,7 +46,7 @@ export function narrowDialog(theme: Theme): string {
  * redraw every existing dialog's footer.
  *
  * Narrow (a dialog given less than {@link ALERT_DIALOG_NARROW_BELOW}, a
- * phone) the buttons always grow, so a pair that stacks is two buttons each
+ * phone) a PAIR of buttons always grows (a lone one keeps its width), so a pair that stacks is two buttons each
  * across the row rather than two ragged widths pushed to the right
  * (FUT-3831). The stacked ORDER is the library's rule, the platforms' too
  * (Material's stacked dialog actions, Apple's stacked alert buttons): the
@@ -70,7 +70,8 @@ const StyledDialogActions = styled(DialogActions, {
   // medium button is 37px, short of it on a phone.
   '& > .MuiButton-root': { minHeight: rem(theme, 40) },
   ...(fill && { '& > .MuiButton-root': { flexGrow: 1, minHeight: rem(theme, 40) } }),
-  [narrowDialog(theme)]: { '& > .MuiButton-root': { flexGrow: 1 } },
+  // A PAIR only: a lone button (`showCancel={false}`) keeps its own width.
+  [narrowDialog(theme)]: { '& > .MuiButton-root:not(:only-child)': { flexGrow: 1 } },
 }));
 
 const confirmButtonColor = (variant: AlertDialogProps['variant']): 'error' | 'primary' =>

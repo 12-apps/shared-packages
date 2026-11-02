@@ -290,6 +290,10 @@ export function handleSx(side: 'l' | 'r'): SxProps<Theme> {
     [side === 'l' ? 'left' : 'right']: 0,
     width: rem(theme, M.handle),
     cursor: 'ew-resize',
+    // Above the block's hit band (its `::after`, painted last): on a narrow
+    // ruler the band covers the whole bar, and a press on an end must still
+    // resize rather than move (FUT-3831).
+    zIndex: 1,
   });
 }
 

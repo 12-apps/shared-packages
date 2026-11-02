@@ -94,7 +94,9 @@ Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over
   stops at the **midpoint of the gap** between them, so neither takes a tap meant for the other;
   bars that touch or overlap give each other nothing past their own edges, and no band reaches
   past the track's ends. A press in the band is a press on the block: a tap opens it, a mouse drag
-  moves it (a drag-create starts only on track the bands leave free).
+  moves it (a drag-create starts only on track the bands leave free). The end handles sit above
+  the band, so a press on a bar's end still resizes it.
+
 ## Accessibility
 
 Rows are a `list` per group. Blocks are native buttons with `aria-keyshortcuts`; the `selected`

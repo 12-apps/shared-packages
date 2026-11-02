@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box/index.js';
 import type * as React from 'react';
-import { useRef } from 'react';
+import { Fragment, isValidElement, useRef } from 'react';
 
 import { ScheduleNameCell } from '../ScheduleGrid/ScheduleNameCell';
 import type { RulerAbilities, RulerScale } from './DayRuler.keyboard';
@@ -250,13 +250,25 @@ function Track({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.E
 }
 
 /**
+ * Whether a node draws anything: nothing, a boolean, an empty string, an empty
+ * array and an empty fragment do not — the actions slot (and its 8px above)
+ * is rendered only for content.
+ */
+export function hasContent(node: React.ReactNode): boolean {
+  if (node === null || node === undefined || typeof node === 'boolean' || node === '') return false;
+  if (Array.isArray(node)) return node.some((child) => hasContent(child as React.ReactNode));
+  if (isValidElement<{ children?: React.ReactNode }>(node) && node.type === Fragment) return hasContent(node.props.children);
+  return true;
+}
+
+/**
  * One person: name, meta and chips, the row's actions under them · the track.
  * The actions live in the name's column, never a column of their own: a
  * column reserved for one row's "Iniciar agora" left every other row a blank
  * band, and a per-row one would have cut the hours out of line (FUT-3831).
  */
 export function RulerRow({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.Element {
-  const hasActions = row.actions !== undefined && row.actions !== null && row.actions !== false;
+  const hasActions = hasContent(row.actions);
   return (
     <Box sx={rowSx} data-testid={`${ctx.testId}-row-${row.id}`} role="listitem">
       <ScheduleNameCell row={row} sx={whoSx} sizes={{ name: M.name, meta: M.meta, chipsTop: 0.75 }} />
