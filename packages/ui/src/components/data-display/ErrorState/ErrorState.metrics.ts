@@ -28,6 +28,11 @@ export const ERROR_MESSAGE_LINE_HEIGHT = 1.6;
 export const RETRY_MARGIN_TOP_UNITS = 1;
 export const RETRY_MIN_WIDTH = 120;
 /**
+ * The web retry is never shorter than the 40px tap floor. MUI's medium outlined
+ * button is 37px tall on its own (FUT-1310), so the floor is stated, not inherited.
+ */
+export const RETRY_MIN_HEIGHT = 40;
+/**
  * The web retry IS MUI's medium outlined `Button`: 5px 15px inside its 1px
  * border, 14px type, the theme's radius, a 20px start icon. The native side
  * sizes the house `Button` to these.
