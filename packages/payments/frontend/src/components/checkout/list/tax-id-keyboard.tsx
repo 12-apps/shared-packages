@@ -127,11 +127,12 @@ export function useTaxIdKeyboard(
     if (!toLetters && !toNumbers) return;
     lettersByArrival.current = toLetters;
     setMode(toLetters ? "text" : "numeric");
-    if (focusedField(scope, input)) {
+    // On a computer the field always shows numbers (no link): nothing to re-read.
+    if (offered && focusedField(scope, input)) {
       reason.current = "letters";
       setReentries((count) => count + 1);
     }
-  }, [lettered, mode, scope, input]);
+  }, [lettered, mode, offered, scope, input]);
 
   const firstRender = useRef(true);
   useEffect(() => {

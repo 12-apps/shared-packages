@@ -13,17 +13,19 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { taxIdInput } from "../../../card";
+import { formatCpfOrCnpj, taxIdInput } from "../../../card";
 import { BuyerInline } from "../list/buyer-inline";
 import { CpfTop } from "../list/cpf-top";
 import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 
+import { PASTE_CORPUS } from "./tax-id-paste-corpus";
 import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const COPY = PT_BR_PAYMENT_LIST_COPY.buyer;
@@ -67,29 +69,8 @@ describe("the quiet links under the document field", () => {
 });
 
 describe("a document pasted with its label", () => {
-  it.each([
-    ["CPF 529.982.247-25", "529.982.247-25", "52998224725"],
-    ["CNPJ: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["cnpj:12.abc.345/01de-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
-    // A run of label words, as company papers and receipts write it (re-review).
-    ["CPF/CNPJ: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CNPJ/MF 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CNPJ nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CPF.: 529.982.247-25", "529.982.247-25", "52998224725"],
-    // Round 3: the check digits, not a word list, decide where the label ends.
-    ["CNPJ: MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
-    ["CNPJ MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
-    ["CNPJ/MF: MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
-    ["CNPJ/MF: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CNPJ No 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CNPJ Nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
-    ["CPF n.º 529.982.247-25", "529.982.247-25", "52998224725"],
-    ["CPF N.º 529.982.247-25", "529.982.247-25", "52998224725"],
-    // Round 4: text after the document, and a document cut short.
-    ["CNPJ: 11.222.333/0001-81 - Empresa X LTDA", "11.222.333/0001-81", "11222333000181"],
-    ["CNPJ: 11.222.333/0001-8", "11.222.333/0001-8", "1122233300018"],
-    ["12.ABC.345/01DE-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
-  ])("%j keeps the document, not the label", (pasted, shown, kept) => {
+  it.each(PASTE_CORPUS)("%j keeps %j", (pasted, kept) => {
+    const shown = formatCpfOrCnpj(kept);
     const buyers: BuyerInfo[] = [];
     render(<Field kept={buyers} />);
     fireEvent.change(input(), { target: { value: pasted } });
@@ -259,5 +240,24 @@ describe("when the letters leave the document again", () => {
     fireEvent.change(input(), { target: { value: NUMERIC } });
     await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric text numeric"));
     await waitFor(() => expect(input()).toBe(document.activeElement));
+  });
+
+  it("leaves a focused field alone on a computer, where the keyboard has letters anyway", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("pointer: fine"),
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }));
+    recordInputModeAtFocus();
+    render(<FocusedOnOpen taxId="" />);
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric"));
+    fireEvent.change(input(), { target: { value: ALPHANUMERIC } });
+    expect(input().getAttribute("inputmode")).toBe("numeric");
+    expect(input().getAttribute("data-focused-with")).toBe("numeric");
   });
 });

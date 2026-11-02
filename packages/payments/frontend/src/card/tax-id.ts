@@ -57,63 +57,69 @@ const RUN_START = /^(?:CPF|CNPJ)/i;
 const LABEL_WORD = /^(?:CPF|CNPJ|MF|N\.?[º°]|NO\.|NO(?=\s)|N\.)/i;
 const LABEL_JOIN = /^[\s/.:-]*/;
 
+/** A leading label run: where it could end, and whether it names a CPF at all. */
+interface LabelRun {
+  ends: number[];
+  namesCpf: boolean;
+}
+
 /**
- * The offsets at which a leading label run could end: after each label word
- * and the separators that follow it. A word followed by nothing that separates
- * it (`CPF12ABC…`) ends the scan — those letters may be the document's own.
+ * The offsets at which a leading label run could end — after each label word
+ * and the separators that follow it — and whether any of its words is CPF. A
+ * word followed by nothing that separates it (`CPF12ABC…`) ends the scan:
+ * those letters may be the document's own.
  */
-function labelEnds(value: string): number[] {
-  const ends: number[] = [];
+function labelRun(value: string): LabelRun {
+  const run: LabelRun = { ends: [], namesCpf: false };
   let at = value.length - value.trimStart().length;
   for (let pattern = RUN_START; ; pattern = LABEL_WORD) {
     const word = pattern.exec(value.slice(at));
-    if (!word) return ends;
+    if (!word) return run;
     const join = LABEL_JOIN.exec(value.slice(at + word[0].length))?.[0] ?? "";
-    const separated = join.length > 0 || /[.º°]$/.test(word[0]);
-    if (!separated) return ends;
+    if (join.length === 0 && !/[.º°]$/.test(word[0])) return run;
     at += word[0].length + join.length;
-    if (at >= value.length) return ends;
-    ends.push(at);
+    if (at >= value.length) return run;
+    if (/^CPF$/i.test(word[0])) run.namesCpf = true;
+    run.ends.push(at);
   }
 }
 
 /**
- * The document at the head of a labelled candidate: its first 14 kept
- * characters when they are a valid CNPJ, else its first 11 when they are a
- * valid CPF, else `null`. Judged by the HEAD, not the whole string, because a
- * paste often carries text after the document ("… - Empresa X LTDA").
+ * The first DOCUMENT TOKEN at the head of `text`: letters and digits joined by
+ * the mask's own `. / -`, with no space inside. Whatever follows a space or
+ * any other mark (" - Empresa X LTDA", ", nascido em…") is never part of it,
+ * and the token is never cut to a document's length — a 14-character typo
+ * must stay a typo, not become the valid CPF its first eleven happen to be.
  */
-function documentAtHead(candidate: string): string | null {
-  const kept = taxIdCharacters(candidate);
-  const cnpj = kept.slice(0, CNPJ_LENGTH);
-  if (cnpj.length === CNPJ_LENGTH && isValidCpfOrCnpj(cnpj)) return cnpj;
-  const cpf = kept.slice(0, CPF_LENGTH);
-  return /^\d{11}$/.test(cpf) && isValidCpfOrCnpj(cpf) ? cpf : null;
+const DOCUMENT_TOKEN = /^[0-9A-Za-z]+(?:[./-][0-9A-Za-z]+)*/;
+
+function documentToken(text: string): string {
+  return taxIdCharacters(DOCUMENT_TOKEN.exec(text)?.[0] ?? "");
 }
 
 /**
- * The characters of a pasted value with its label removed, decided by the
- * check digits:
- *  1. the deepest label cut whose head is a valid CNPJ or CPF
- *     (`CNPJ: MF.ABC…` keeps MF, `CNPJ/MF: 11.222…` drops it);
- *  2. the value as given, when it is itself valid;
- *  3. when a label run was found, the SHALLOWEST cut — only the leading
- *     CPF/CNPJ word dropped — as a mistyped or half-pasted document is still
- *     one ("CNPJ: 11.222.333/0001-8" keeps its digits);
- *  4. the value as given.
- * A value with no label is never cut at its head: typing a CNPJ whose first
- * eleven digits happen to be a valid CPF must keep the twelfth.
+ * The characters of a value pasted with a label run, decided by one rule
+ * (FUT-590 UI review, round 5). Each place the run could end gives the
+ * document token after it; the field keeps, deepest cut first:
+ *  a. a token that is a valid CNPJ — or a valid CPF, unless the run names
+ *     only CNPJ ("CNPJ: 11.222.355/0001-42" is a CNPJ with a typo, never the
+ *     CPF hiding in it);
+ *  b. else a token of a document's length (11 or 14): a typo stays visible;
+ *  c. else the deepest cut's token.
+ * A value with no label run is kept as it is typed.
  */
 function pastedDocument(value: string): string {
-  const cuts = labelEnds(value).map((end) => value.slice(end));
-  for (const cut of [...cuts].reverse()) {
-    const document = documentAtHead(cut);
-    if (document !== null) return document;
-  }
-  const kept = taxIdCharacters(value);
-  if (isValidCpfOrCnpj(kept)) return kept;
-  const [shallowest] = cuts;
-  return shallowest === undefined ? kept : taxIdCharacters(shallowest);
+  const run = labelRun(value);
+  if (run.ends.length === 0) return taxIdCharacters(value);
+  const tokens = run.ends.map((end) => documentToken(value.slice(end))).reverse();
+  const [deepest = ""] = tokens;
+  const accepted = (token: string): boolean =>
+    isValidCpfOrCnpj(token) && (token.length === CNPJ_LENGTH || run.namesCpf);
+  return (
+    tokens.find(accepted) ??
+    tokens.find((token) => token.length === CPF_LENGTH || token.length === CNPJ_LENGTH) ??
+    deepest
+  );
 }
 
 /**
