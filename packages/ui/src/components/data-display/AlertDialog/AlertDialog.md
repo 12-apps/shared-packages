@@ -155,6 +155,29 @@ that fits keeps its natural widths, pushed to the right; a pair that does not
 stacks, with the primary on top. With `emphasis="cancel"` the two buttons also
 grow to share the row, so stacked they take its full width.
 
+**Stacked order** is the library's rule ([guidelines › Stacked
+buttons](../../../../components-guidelines.md#stacked-buttons)): the primary on
+top, the dismissive button at the bottom — so on a destructive question the
+verb sits above Cancel, and Cancel takes the bottom slot, the one a thumb
+reaches first. Cancel stays FIRST in the DOM, so it is also the first to tab
+to.
+
+### Narrow Layout (FUT-3831)
+
+A dialog given less than **480px** — read with a container query on its
+`.MuiDialog-container` (named `alert-dialog`), never a media query, so a dialog
+portalled into a narrow pane answers to the pane — lays out for a phone:
+
+- **The icon sits above the title**, beside the close button, and the title
+  takes the paper's whole width. At 320 the icon column and the close button's
+  clearance had left a long question about two words a line. A title with no
+  icon (`icon={null}`) keeps the close button's clearance.
+- **The buttons always grow**: a pair that still fits shares the row in two
+  equal halves, and a pair that stacks is two buttons each across the row, in
+  the stacked order above — never two ragged widths pushed to the right.
+
+Over 480px nothing changes.
+
 ### Without Cancel Button
 
 ```tsx
@@ -306,7 +329,7 @@ The AlertDialog component includes `data-testid` attributes for reliable testing
 | `alert-dialog`                   | Dialog container  | Root Dialog element (can be customized via prop)  |
 | `{dataTestId}-close-button`      | Close button      | X button in top-right corner                      |
 | `{dataTestId}-title`             | Title section     | Dialog title container                            |
-| `{dataTestId}-icon`              | Icon wrapper      | Wrapper around icon element (when icon is shown)  |
+| `{dataTestId}-icon`              | Icon wrapper      | Wrapper around icon element (when icon is shown); carries `data-alert-icon` |
 | `{dataTestId}-content`           | Content section   | Dialog content container                          |
 | `{dataTestId}-description`       | Description text  | Main description text element                     |
 | `{dataTestId}-actions`           | Actions section   | Dialog actions footer container                   |

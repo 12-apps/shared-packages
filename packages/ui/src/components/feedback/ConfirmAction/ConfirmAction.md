@@ -29,6 +29,16 @@ Whichever of the three entry points you use, you get the same contract:
 - **The popup names the thing.** `entityName` is echoed into the body, so it
   reads "Bebidas", not "este item".
 
+## On a phone
+
+The popup is an `AlertDialog`, so it takes that dialog's narrow layout
+(FUT-3831): given less than 480px — a container query, never a media query —
+the icon moves above the title so the question has the paper's whole width, and
+the buttons stack each across the row, **the verb on top and Cancel at the
+bottom**, the library's stacked order (`components-guidelines.md`, "Stacked
+buttons"). The keyboard contract is unchanged: a destructive popup still opens
+with focus on Cancel, and Cancel is still the first button to tab to.
+
 ## Three entry points
 
 ### `withConfirmation(Component, defaults?)` — the HOC

@@ -5,8 +5,8 @@ import { useRef } from 'react';
 import { ScheduleNameCell } from '../ScheduleGrid/ScheduleNameCell';
 import type { RulerAbilities, RulerScale } from './DayRuler.keyboard';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
-import { useTextFits } from './useTextFits';
-import { formatHour, formatRange, percentOf, ticksOf } from './day-ruler-model';
+import { useTextFit } from './useTextFits';
+import { formatHour, formatRange, hitBoundsOf, percentOf, ticksOf, type BlockTextFit } from './day-ruler-model';
 import {
   actionsSx,
   actualLabelSx,
@@ -23,6 +23,7 @@ import {
   rowSx,
   trackSx,
   whoSx,
+  type HitBounds,
   type Span,
 } from './DayRuler.styles';
 import type { DayRulerBlock, DayRulerRow, RulerHour } from './DayRuler.types';
@@ -67,6 +68,8 @@ interface BlockProps {
   span: Span;
   /** The hours it is drawn at (its own, or a drag's). */
   at: { start: RulerHour; end: RulerHour };
+  /** How far its hit band may reach on a narrow ruler, in % of the track (the midpoints to its neighbours). */
+  hit: HitBounds;
   text: string;
   ctx: RowContext;
   testId: string;
@@ -94,25 +97,39 @@ function BreakBand({ block, at, testId }: { block: DayRulerBlock; at: BlockProps
   return <Box component="span" aria-hidden sx={breakSx(gap)} data-dr-break="" data-testid={testId} />;
 }
 
-function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): React.JSX.Element {
+/** Where nothing can be measured, a block shorter than the prototype's 30% of the ruler says its start. */
+function fallbackFit(block: DayRulerBlock, scale: RulerScale): BlockTextFit {
+  return (block.end - block.start) / (scale.to - scale.from) >= M.narrowShare ? 'full' : 'short';
+}
+
+/**
+ * What the bar's fit puts on it: `data-fit` for the styles, and — while the bar
+ * shows less than its full text — that full text as its name, so the name still
+ * says all of it.
+ */
+function fitProps(fit: BlockTextFit, text: string): { 'aria-label'?: string; 'data-fit'?: BlockTextFit } {
+  return fit === 'full' ? {} : { 'aria-label': text, 'data-fit': fit };
+}
+
+function RulerBlock({ row, block, span, at, hit, text, ctx, testId }: BlockProps): React.JSX.Element {
   const { can, dragApi, scale } = ctx;
   const movable = can.move && Boolean(block.movable);
   const resizable = can.resize && Boolean(block.resizable);
   const ref = useRef<HTMLButtonElement | null>(null);
-  // Short by pixels; where nothing can be measured, by the prototype's 30% rule.
-  const fits = useTextFits(ref, text, (block.end - block.start) / (scale.to - scale.from) >= M.narrowShare);
+  const short = block.shortLabel ?? text;
+  const fit = useTextFit(ref, text, short, fallbackFit(block, scale));
   const press = (mode: 'move' | 'start' | 'end') => (event: React.PointerEvent<HTMLElement>) =>
     dragApi.startBlock(event, row.id, block, mode);
   return (
     <Box
       component="button"
       type="button"
-      sx={blockSx(block.tone, span, { selected: Boolean(block.selected), movable })}
+      sx={blockSx(block.tone, span, { selected: Boolean(block.selected), movable, hit })}
       title={block.title ?? block.label}
+      {...fitProps(fit, text)}
       aria-keyshortcuts={shortcutsOf(movable, resizable)}
       aria-current={block.selected ? 'true' : undefined}
       ref={ref}
-      data-narrow={fits ? undefined : ''}
       data-tone={block.tone}
       data-testid={testId}
       onPointerDown={movable ? press('move') : undefined}
@@ -127,7 +144,7 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
         {text}
       </span>
       <span data-dr-text="short" title={text}>
-        {block.shortLabel ?? text}
+        {short}
       </span>
       {resizable ? <Handle side="r" onPointerDown={press('end')} testId={`${ctx.testId}-handle-r-${block.id}`} /> : null}
     </Box>
@@ -137,39 +154,51 @@ function RulerBlock({ row, block, span, at, text, ctx, testId }: BlockProps): Re
 /** A row's blocks, each where a drag has it now (with its live hours) or where it is. */
 function Blocks({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.Element {
   const mine = ctx.drag && ctx.drag.rowId === row.id ? ctx.drag : null;
+  const drawn = row.blocks.map((block) => {
+    const live = mine?.blockId === block.id ? mine : null;
+    const start = live ? live.start : block.start;
+    const end = live ? live.end : block.end;
+    return { block, live, start, end, span: spanOf(start, end, ctx.scale) };
+  });
+  const preview = mine && mine.mode === 'create' ? previewSpan(mine, ctx.scale) : null;
+  // Every bar drawn on the row, the create's preview included, bounds its neighbours' hit bands.
+  const hits = hitBoundsOf([...drawn.map((d) => d.span), ...(preview ? [preview] : [])]);
   return (
     <>
-      {row.blocks.map((block) => {
-        const live = mine?.blockId === block.id ? mine : null;
-        const start = live ? live.start : block.start;
-        const end = live ? live.end : block.end;
-        return (
-          <RulerBlock
-            key={block.id}
-            row={row}
-            block={block}
-            span={spanOf(start, end, ctx.scale)}
-            at={{ start, end }}
-            text={live?.moved ? formatRange(start, end) : block.label}
-            ctx={ctx}
-            testId={`${ctx.testId}-block-${block.id}`}
-          />
-        );
-      })}
-      {mine && mine.mode === 'create' ? <CreatePreview row={row} drag={mine} ctx={ctx} /> : null}
+      {drawn.map(({ block, live, start, end, span }, index) => (
+        <RulerBlock
+          key={block.id}
+          row={row}
+          block={block}
+          span={span}
+          at={{ start, end }}
+          hit={hits[index]!}
+          text={live?.moved ? formatRange(start, end) : block.label}
+          ctx={ctx}
+          testId={`${ctx.testId}-block-${block.id}`}
+        />
+      ))}
+      {mine && preview ? <CreatePreview row={row} drag={mine} span={preview} hit={hits[drawn.length]!} ctx={ctx} /> : null}
     </>
   );
 }
 
+/** Where a create drag's preview is drawn: at least one snap long. */
+function previewSpan(drag: RulerDrag, scale: RulerScale): Span {
+  return spanOf(drag.start, Math.max(drag.end, drag.start + scale.snap), scale);
+}
+
 /** The block a create drag is drawing, with its live hours. */
-function CreatePreview({ row, drag, ctx }: { row: DayRulerRow; drag: RulerDrag; ctx: RowContext }): React.JSX.Element {
+function CreatePreview(props: { row: DayRulerRow; drag: RulerDrag; span: Span; hit: HitBounds; ctx: RowContext }): React.JSX.Element {
+  const { row, drag, span, hit, ctx } = props;
   const range = formatRange(drag.start, drag.end);
   return (
     <RulerBlock
       row={row}
       block={{ id: '\u0000new', start: drag.start, end: drag.end, label: range, tone: 'plan' }}
-      span={spanOf(drag.start, Math.max(drag.end, drag.start + ctx.scale.snap), ctx.scale)}
+      span={span}
       at={{ start: drag.start, end: drag.end }}
+      hit={hit}
       text={range}
       ctx={ctx}
       testId={`${ctx.testId}-preview`}
@@ -193,7 +222,7 @@ function Actual({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.
   );
 }
 
-/** A row's track: the actual bar, its blocks (or the one being dragged, live) and the now line. */
+/** A row's track: the actual bar, the now line under its blocks (or the one being dragged, live). */
 function Track({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.Element {
   const { scale, now, can, dragApi } = ctx;
   const showNow = now !== undefined && now >= scale.from && now <= scale.to;
@@ -213,19 +242,30 @@ function Track({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.E
       }}
     >
       <Actual row={row} ctx={ctx} />
-      <Blocks row={row} ctx={ctx} />
+      {/* Before the blocks, so it paints under them and never through a label. */}
       {showNow ? <Box sx={nowSx(percentOf(now, scale.from, scale.to))} data-testid={`${ctx.testId}-now`} /> : null}
+      <Blocks row={row} ctx={ctx} />
     </Box>
   );
 }
 
-/** One person: name, meta and chips · the track · the row's actions. */
+/**
+ * One person: name, meta and chips, the row's actions under them · the track.
+ * The actions live in the name's column, never a column of their own: a
+ * column reserved for one row's "Iniciar agora" left every other row a blank
+ * band, and a per-row one would have cut the hours out of line (FUT-3831).
+ */
 export function RulerRow({ row, ctx }: { row: DayRulerRow; ctx: RowContext }): React.JSX.Element {
+  const hasActions = row.actions !== undefined && row.actions !== null && row.actions !== false;
   return (
     <Box sx={rowSx} data-testid={`${ctx.testId}-row-${row.id}`} role="listitem">
       <ScheduleNameCell row={row} sx={whoSx} sizes={{ name: M.name, meta: M.meta, chipsTop: 0.75 }} />
       <Track row={row} ctx={ctx} />
-      <Box sx={actionsSx}>{row.actions}</Box>
+      {hasActions ? (
+        <Box sx={actionsSx} data-testid={`${ctx.testId}-actions-${row.id}`}>
+          {row.actions}
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -249,7 +289,6 @@ export function Coverage(props: { coverage: readonly number[]; label?: string; s
           );
         })}
       </Box>
-      <span />
     </Box>
   );
 }
@@ -266,7 +305,6 @@ export function Axis({ scale, testId }: { scale: RulerScale; testId: string }): 
           </span>
         ))}
       </Box>
-      <span />
     </Box>
   );
 }
