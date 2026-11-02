@@ -29,6 +29,9 @@ const NO_IDS: readonly string[] = [];
  *   is that path. A finger's tap takes the SMALLEST area within a few pixels'
  *   worth of metres (`hitRegion`), so a sliver beside a big area can be hit
  *   from the map; one too thin even for that is still on the list.
+ * - **The host can draw inside it.** `reach` widens the view past the largest
+ *   circle and `overlay` draws a layer in the SVG at the map's own projection,
+ *   tap-transparent; `regionMapView` gives the same view to HTML laid over it.
  * - **A toggle is cheap.** Geometry is projected once per `rings` identity,
  *   and the base layer is memoised, so a tap re-renders the hatch and labels.
  */
@@ -36,6 +39,8 @@ export function RegionMap({
   regions,
   center,
   circles,
+  reach,
+  overlay,
   onToggle,
   highlightedIds = NO_IDS,
   copy,
@@ -46,7 +51,7 @@ export function RegionMap({
   dataTestId = 'region-map',
 }: RegionMapProps): React.JSX.Element | null {
   const theme = useTheme();
-  const model = useRegionMap({ regions, center, circles, onToggle });
+  const model = useRegionMap({ regions, center, circles, reach, onToggle });
   const { view } = model;
   if (view === null && regions.length === 0) return null;
   return (
@@ -55,6 +60,7 @@ export function RegionMap({
         <>
           <RegionMapDrawing
             model={{ ...model, view }}
+            overlay={overlay}
             showCenter={center !== null}
             highlightedIds={highlightedIds}
             maxHeight={maxHeight}

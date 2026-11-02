@@ -2,7 +2,7 @@ import type { ThreeDSecureSession } from '../../core/types';
 import { createPagbankThreeDSecureSession } from '../../providers/pagbank-3ds';
 import { cancelCharge, consultCharge, encryptFailure, paidRefs, raiseCardOrder } from './orders';
 import { recordTraffic } from './record';
-import { PAGBANK_SANDBOX_DEBIT_CENTS } from './sandbox-buyer';
+import { amountsOf, environmentOf } from './environment';
 import { answered, clockOf, failureOf, pendingStep, stepOf } from './steps';
 import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
 import type { EvidenceRunDeps } from './run';
@@ -30,7 +30,7 @@ export async function threeDSSessionStep(
   token: string,
 ): Promise<{ step: EvidenceStep; session: ThreeDSecureSession | null }> {
   const minted = await recordTraffic(() =>
-    createPagbankThreeDSecureSession({ environment: 'SANDBOX', fields: { token } }),
+    createPagbankThreeDSecureSession({ environment: environmentOf(deps), fields: { token } }),
   );
   const session = minted.ok && answered(minted.calls) ? minted.value : null;
   const observed = session
@@ -80,7 +80,7 @@ export async function debitSteps(
     key: 'debit.approved',
     expected: 'PAID',
     reference: `homolog-${runId.slice(0, 8)}-card-debit`,
-    amountCents: PAGBANK_SANDBOX_DEBIT_CENTS,
+    amountCents: amountsOf(deps).debit,
     card: { token: card.encrypted, funding: 'DEBIT', authenticationId: card.authenticationId, installments: 1 },
     notes,
   });

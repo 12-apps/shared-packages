@@ -12,7 +12,13 @@ import { useActivationCharge, type ActivationCharge } from '../use-activation-ch
 
 import { useActivationCopy } from './copy-context';
 import { StepPanel } from './notice';
-import { FailedState, PassedState } from './states';
+import {
+  PayerEmailField,
+  useChangePayerEmail,
+  usePayerEmailValidator,
+  validatePayerEmail,
+} from './payer-email-field';
+import { FailedState, PassedState, PayerEmailRefusedState } from './states';
 
 /**
  * Step 3 for a provider whose payer pays HERE: tokenize, charge, settle.
@@ -30,6 +36,35 @@ import { FailedState, PassedState } from './states';
 
 /** The host's card-entry providers — its design system and its card words. */
 export type CardSurface = ComponentType<{ children: ReactNode }>;
+
+/**
+ * The payer e-mail, for a provider that judges it (FUT-4050, FUT-4200). The
+ * same rule as the document: editing clears a shown error, blur judges again.
+ */
+function ChargeEmail({
+  verification,
+  displayName,
+}: {
+  verification: ActivationCharge;
+  displayName: string;
+}): JSX.Element {
+  const { payerEmail } = useActivationCopy();
+  const { email, setEmail, emailError, setEmailError } = verification;
+  return (
+    <PayerEmailField
+      value={email}
+      error={emailError}
+      displayName={displayName}
+      onChange={(value) => {
+        setEmail(value);
+        if (emailError) setEmailError(undefined);
+      }}
+      onBlur={() => {
+        if (email) setEmailError(validatePayerEmail(email, payerEmail));
+      }}
+    />
+  );
+}
 
 /** The card + tax-id fields and the one button that runs the charge. */
 function ChargeForm({
@@ -83,6 +118,9 @@ function ChargeForm({
         }}
         data-testid="verify-charge-cpf"
       />
+      {verification.payerEmailRequired ? (
+        <ChargeEmail verification={verification} displayName={displayName} />
+      ) : null}
       <Button
         sx={{ ...BTN_PRIMARY_SX, width: '100%' }}
         disabled={submitting}
@@ -99,14 +137,28 @@ function ChargeForm({
 function CardOutcome({
   state,
   amountLabel,
+  displayName,
   onRetry,
+  onChangeEmail,
 }: {
   state: ActivationCharge['state'];
   amountLabel: string | null;
+  displayName: string;
   onRetry: () => void;
+  /** Back to the form with the e-mail field in error and focused (FUT-4050). */
+  onChangeEmail: () => void;
 }): JSX.Element | null {
   if (state.kind === 'passed') {
     return <PassedState amountLabel={amountLabel} refunded={state.refunded} onRetry={onRetry} />;
+  }
+  if (state.kind === 'failed' && state.payerEmailRefused) {
+    return (
+      <PayerEmailRefusedState
+        displayName={displayName}
+        providerMessage={state.providerMessage}
+        onChangeEmail={onChangeEmail}
+      />
+    );
   }
   if (state.kind === 'failed') {
     return (
@@ -118,6 +170,21 @@ function CardOutcome({
     );
   }
   return null;
+}
+
+/** The step's heading and what the card charge will do. */
+function CardIntro({ amountLabel }: { amountLabel: string | null }): JSX.Element {
+  const { intro } = useActivationCopy();
+  return (
+    <Stack spacing={0.5}>
+      <Typography sx={{ fontSize: '14px', fontWeight: 650, color: T.ink }} component="h2">
+        {intro.title}
+      </Typography>
+      <Typography sx={{ fontSize: '12.5px', color: T.ink3, lineHeight: 1.5 }}>
+        {intro.cardBody(amountLabel)}
+      </Typography>
+    </Stack>
+  );
 }
 
 export function CardVerification({
@@ -134,7 +201,7 @@ export function CardVerification({
   provider: string;
   /** The name the OWNER reads; `provider` beside it is the machine key. */
   displayName: string;
-  /** Who is paying — the signed-in owner. The host reads its own session. */
+  /** The payer e-mail field's opening value until the endpoint suggests one (FUT-4050). */
   ownerEmail: string;
   onVerified: () => void;
   CardSurface: CardSurface;
@@ -142,14 +209,17 @@ export function CardVerification({
   formatAmount: (cents: number) => string;
 }): JSX.Element {
   const copy = useActivationCopy();
+  const validateEmail = usePayerEmailValidator();
   const verification = useActivationCharge({
     verifyChargeUrl,
     provider,
     email: ownerEmail,
     onVerified,
     validateTaxId,
+    validateEmail,
     copy: copy.charge,
   });
+  const changeEmail = useChangePayerEmail(verification, displayName);
   // The verification endpoint answers the amount alongside the store's card
   // key, and `useActivationCharge` reads both out of that one body — where this
   // screen's origin asked the same URL a second time for the amount alone.
@@ -163,16 +233,15 @@ export function CardVerification({
 
   return (
     <StepPanel dataTestId="verify-charge">
-      <Stack spacing={0.5}>
-        <Typography sx={{ fontSize: '14px', fontWeight: 650, color: T.ink }} component="h2">
-          {copy.intro.title}
-        </Typography>
-        <Typography sx={{ fontSize: '12.5px', color: T.ink3, lineHeight: 1.5 }}>
-          {copy.intro.cardBody(amountLabel)}
-        </Typography>
-      </Stack>
+      <CardIntro amountLabel={amountLabel} />
 
-      <CardOutcome state={verification.state} amountLabel={amountLabel} onRetry={verification.reset} />
+      <CardOutcome
+        state={verification.state}
+        amountLabel={amountLabel}
+        displayName={displayName}
+        onRetry={verification.reset}
+        onChangeEmail={changeEmail}
+      />
 
       {/*
         No standing "provider is active" banner here.

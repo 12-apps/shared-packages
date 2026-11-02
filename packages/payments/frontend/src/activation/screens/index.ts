@@ -7,4 +7,5 @@ export {
   type ActivationOutcomeCopy,
   type ActivationStepCopy,
   type ActivationTaxIdCopy,
+  type ActivationPayerEmailCopy,
 } from './copy';

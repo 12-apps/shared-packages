@@ -9,7 +9,7 @@ import { useAnnouncer } from '../ScheduleGrid/useAnnouncer';
 import { handleBlockKey, keyCreateSpan, type RulerAbilities, type RulerScale } from './DayRuler.keyboard';
 import { EN_US_DAY_RULER_LABELS } from './DayRuler.en-US';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
-import { Axis, Coverage, RulerRow, type RowContext } from './DayRuler.parts';
+import { Axis, Coverage, GroupFooter, RulerRow, type RowContext } from './DayRuler.parts';
 import { groupTitleSx, rootSx, rowSx, skeletonNameSx, skeletonTrackSx } from './DayRuler.styles';
 import type { DayRulerProps, DayRulerRow } from './DayRuler.types';
 import { useRulerDrag } from './useRulerDrag';
@@ -40,6 +40,14 @@ function abilitiesOf(props: DayRulerProps): RulerAbilities {
   return { create: open && Boolean(props.onCreate), move: open && Boolean(props.onMove), resize: open && Boolean(props.onResize) };
 }
 
+/** A group's lines under its rows, when the host gives any (`groupFooter`). */
+function FooterOf({ props, group, ctx }: { props: DayRulerProps; group: string | undefined; ctx: RowContext }): React.JSX.Element | null {
+  const rows = props.groupFooter?.(group);
+  if (!rows || rows.length === 0) return null;
+  const marked = props.labels?.footerMarked ?? EN_US_DAY_RULER_LABELS.footerMarked;
+  return <GroupFooter rows={rows} scale={ctx.scale} testId={ctx.testId} marked={marked} />;
+}
+
 /** The groups and their rows — or the skeleton, the host's error, or the host's empty state. */
 function RulerBody({ props, ctx }: { props: DayRulerProps; ctx: RowContext }): React.JSX.Element {
   if (props.error) return <>{props.error}</>;
@@ -68,6 +76,7 @@ function RulerBody({ props, ctx }: { props: DayRulerProps; ctx: RowContext }): R
           {group.rows.map((row) => (
             <RulerRow key={row.id} row={row} ctx={ctx} />
           ))}
+          <FooterOf props={props} group={group.title} ctx={ctx} />
         </Box>
       ))}
     </>

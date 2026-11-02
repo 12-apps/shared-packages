@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JSX } from "react";
 
+import { HostedParkingContext } from "../hosted-parking";
 import { HOSTED_ORDER_STORAGE_KEY } from "../hosted-return";
 
 const client = vi.hoisted(() => ({
@@ -76,8 +77,12 @@ function Harness({ onResolved }: { onResolved: (status: OrderStatus) => void }):
 }
 
 /** Render, wait for the saved card to be SELECTED, and tap Pagar. */
-async function pay(onResolved = vi.fn()): Promise<void> {
-  render(<Harness onResolved={onResolved} />);
+async function pay(onResolved = vi.fn(), parks = true): Promise<void> {
+  render(
+    <HostedParkingContext.Provider value={parks}>
+      <Harness onResolved={onResolved} />
+    </HostedParkingContext.Provider>,
+  );
   // Selection — not merely the fetch — is what routes handlePay past the
   // empty new-card form; clicking earlier validates that form and stops.
   await waitFor(() => {
@@ -148,6 +153,24 @@ describe("card charge → 3DS handover (FUT-698)", () => {
     expect(onResolved).not.toHaveBeenCalled();
     expect(client.pollOrderStatus).not.toHaveBeenCalled();
     expect(screen.getByTestId("submitted").textContent).toBe("false");
+  });
+
+  it("still parks the challenge on a mount that keeps out of the slot: the return trip lands on the host's checkout", async () => {
+    client.chargeCard.mockResolvedValue({
+      ok: true,
+      data: { status: "AWAITING_PAYMENT", hostedCheckoutUrl: "https://hooks.stripe.com/3ds/x" },
+    });
+
+    await pay(vi.fn(), false);
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith("https://hooks.stripe.com/3ds/x");
+    });
+    const envelope = JSON.parse(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY) ?? "null") as {
+      order: { orderId: string };
+      handoff?: boolean;
+    } | null;
+    expect(envelope).toMatchObject({ order: { orderId: "o1" }, handoff: true });
   });
 
   it("an accepted charge WITHOUT a challenge begins polling instead of navigating", async () => {

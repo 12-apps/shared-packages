@@ -38,6 +38,7 @@ export const EVIDENCE_STEP_KEYS = [
   'pix.create',
   'pix.consult',
   'pix.paid',
+  'pix.refund',
   'pix.webhook',
   'card.publicKey',
   'card.encrypt',
@@ -62,6 +63,27 @@ export const EVIDENCE_STEP_KEYS = [
 ] as const;
 
 export type EvidenceStepKey = (typeof EVIDENCE_STEP_KEYS)[number];
+
+/** Which PagBank environment a record, a run and its file are about (FUT-4198). */
+export type EvidenceEnvironment = 'SANDBOX' | 'PRODUCTION';
+
+/**
+ * Scenarios only one environment has. The sandbox simulator pays a Pix that
+ * nobody refunds, so `pix.refund` is a PRODUCTION step: real money a person
+ * paid comes back. A declined card needs a card that declines on demand, which
+ * only the sandbox has, so `card.declined` is SANDBOX-only and the production
+ * file lists the gap under Pendências instead of carrying a step that could
+ * never run. A sandbox file reads as it always did.
+ */
+const ONLY_IN: Readonly<Partial<Record<EvidenceStepKey, EvidenceEnvironment>>> = {
+  'pix.refund': 'PRODUCTION',
+  'card.declined': 'SANDBOX',
+};
+
+/** Every scenario a file in this environment reports, in order. */
+export function evidenceStepKeys(environment: EvidenceEnvironment): readonly EvidenceStepKey[] {
+  return EVIDENCE_STEP_KEYS.filter((key) => (ONLY_IN[key] ?? environment) === environment);
+}
 
 /** A key's prefix names its section: `debit.session` is DEBIT. */
 const SECTION_BY_PREFIX: Readonly<Record<string, EvidenceSection>> = {
@@ -219,16 +241,19 @@ export interface BrowserWalletResult {
 
 /**
  * What the browser needs to open each wallet's sheet for the evidence —
- * computed server-side (FUT-3755). Google Pay is always `TEST` (the evidence is
- * sandbox-only) and is minted against the test seller's PagBank account id;
+ * computed server-side (FUT-3755). Google Pay runs in the evidence's own
+ * environment and is minted against the seller's PagBank account id;
  * Apple Pay only says whether the host has an Apple Pay identity at all.
  */
 export interface EvidenceWalletsConfig {
   /** The amount the sheets show — the amount the wallet orders are raised for. */
   amountCents: number;
-  googlePay: { gateway: string; gatewayMerchantId: string; environment: 'TEST' } | null;
+  /** `TEST` for the sandbox evidence, `PRODUCTION` for the production one (FUT-4198). */
+  googlePay: { gateway: string; gatewayMerchantId: string; environment: 'TEST' | 'PRODUCTION' } | null;
   applePay: { configured: boolean };
 }
+
+export type { EvidenceBuyer } from './buyer';
 
 /** The ✓/✗/⧗ counts the screen shows beside the button. */
 export interface EvidenceSummary {
@@ -321,6 +346,12 @@ export interface EvidenceOutcomeCopy {
   consultStatus: (status: string, polls: number) => string;
   paid: string;
   notPaidYet: (seconds: number) => string;
+  /** PRODUCTION: the QR is up and a person has to pay it; the run goes on meanwhile (FUT-4198). */
+  pixAwaitingPayment: string;
+  /** PRODUCTION: the operator skipped the Pix, so it was never paid and nothing is refunded. */
+  pixSkipped: string;
+  /** PRODUCTION: the run needs the cardholder's data, and none was sent. */
+  buyerMissing: string;
   publicKeyMinted: string;
   publicKeyMissing: string;
   encrypted: (cards: string) => string;

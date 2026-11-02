@@ -7,6 +7,10 @@
  * every word arrives through `copy`.
  */
 
+import type React from 'react';
+
+import type { PlaneBox, Projection } from './RegionMap.helpers';
+
 /** A latitude/longitude pair, in that order. */
 export type RegionMapPoint = readonly [latitude: number, longitude: number];
 
@@ -48,6 +52,29 @@ export interface RegionMapRegion {
 /** A circle drawn around the centre, e.g. a delivery ring. */
 export interface RegionMapCircle {
   radiusMetres: number;
+}
+
+/** A latitude/longitude box, by its four edges in degrees. */
+export interface RegionMapBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+/**
+ * An extent the view must fit besides its circles: a radius around the centre,
+ * or a box — e.g. the bounds of some outlines (`boundsOfRings`), for a reach
+ * no single radius describes.
+ */
+export type RegionMapReach = { radiusMetres: number } | { bounds: RegionMapBounds };
+
+/** What a host overlay is drawn with: the map's own view and projection. */
+export interface RegionMapLayer {
+  /** The SVG viewBox, in projected metres. */
+  view: PlaneBox;
+  /** The projection the map draws with — `projectionAt(center)`. */
+  projection: Projection;
 }
 
 /** Every word the map prints or announces. */
@@ -95,6 +122,20 @@ export interface RegionMapProps {
   center: { latitude: number; longitude: number } | null;
   /** Circles around the centre; the view fits the largest. */
   circles?: readonly RegionMapCircle[];
+  /**
+   * An extent the view must ALSO fit, before its margin — something the host
+   * draws past the largest circle. With circles the view stays centred on the
+   * centre and grows to the reach's farthest edge; without, it fits the areas
+   * and the reach together. Omit it and the view is the circles' (or areas').
+   */
+  reach?: RegionMapReach;
+  /**
+   * A host layer drawn INSIDE the drawing's SVG, over the excluded hatch and
+   * under the circles, highlights and centre, so it shares the map's view,
+   * projection and frame. It is wrapped in `pointer-events: none`: taps go
+   * through it to the areas. Return SVG elements, in projected metres.
+   */
+  overlay?: (layer: RegionMapLayer) => React.ReactNode;
   /**
    * A tap on an area, or a press of its list button. Omit it and the map is
    * read-only: nothing is tappable and the list rows are not buttons.

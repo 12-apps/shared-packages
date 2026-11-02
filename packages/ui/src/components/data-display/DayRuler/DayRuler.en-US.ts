@@ -8,4 +8,5 @@ export const EN_US_DAY_RULER_LABELS: DayRulerLabels = {
   refused: "It cannot go further",
   notMovable: "This shift cannot be changed here",
   loading: "Loading the day",
+  footerMarked: "short of people",
 };

@@ -12,6 +12,7 @@ import type {
   TimingDiagramCopy,
 } from './copy';
 import { PT_BR_TABLE_FILTER_COPY } from './pt-BR.layout';
+import { PT_BR_UI_LABELS } from './pt-BR.labels';
 import {
   PT_BR_CATEGORY_SELECT_COPY,
   PT_BR_CONFIRM_ACTION_COPY,
@@ -214,7 +215,18 @@ export const PT_BR_DATA_VIEWS_COPY: DataViewsCopy = {
     rangeStart: "De",
     dayMask: "dd/mm/aaaa",
     dayInvalid: "Essa data não existe.",
+    // The calendar under the boxes (FUT-4144): one tap is the first day, the
+    // next the last, so the sentence under it says which one comes next.
+    dayCalendar: {
+      locale: "pt-BR",
+      label: (fieldLabel) => `${fieldLabel}, calendário`,
+      pickStart: "Toque no primeiro e no último dia.",
+      pickEnd: "Agora toque no último dia.",
+      caption: PT_BR_UI_LABELS.calendar,
+    },
     clearAllFilters: "Limpar todos os filtros",
+    // The presets as one select where they do not fit one line (ADR 0190).
+    presetSelect: { label: "Atalho", none: "Nenhum" },
     rangePresets: {
       hoje: "Hoje",
       ontem: "Ontem",

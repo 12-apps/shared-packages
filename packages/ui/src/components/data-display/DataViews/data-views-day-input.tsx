@@ -239,6 +239,12 @@ interface DayBoundInputProps {
    * impossible day is still never written, and blur still snaps back.
    */
   invalidMessage?: string;
+  /**
+   * Take the width of the box it sits in rather than its own 165px. Set where
+   * the pair stands over the range calendar, so the two boxes span the
+   * calendar's width instead of leaving a gap beside them (FUT-4144).
+   */
+  fill?: boolean;
 }
 
 /** What {@link useDayText} hands the field: its text, its verdict and its handlers. */
@@ -326,6 +332,7 @@ export function DayBoundInput({
   describedBy,
   mask,
   invalidMessage,
+  fill = false,
 }: DayBoundInputProps): React.JSX.Element {
   const id = useId();
   const { text, impossible, handleChange, handlePaste, handleBlur } = useDayText(
@@ -351,7 +358,8 @@ export function DayBoundInput({
       // The placeholder occupies the space an un-shrunk label would render into.
       InputLabelProps={{ shrink: true }}
       inputProps={dayInputProps(testId, [impossible ? `${id}-helper-text` : undefined, describedBy])}
-      sx={[{ width: sxRem(165) }, fieldTextFieldStyles]}
+      fullWidth={fill}
+      sx={[{ width: fill ? '100%' : sxRem(165) }, fieldTextFieldStyles]}
     />
   );
 }

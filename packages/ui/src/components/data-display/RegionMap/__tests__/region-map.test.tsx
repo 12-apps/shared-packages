@@ -3,6 +3,8 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RegionMap } from '../RegionMap';
+import { regionMapView } from '../RegionMap.view';
+import type { RegionMapLayer } from '../RegionMap.types';
 import {
   REGION_MAP_AREAS,
   REGION_MAP_CENTER,
@@ -103,6 +105,57 @@ describe('the drawing', () => {
 
     expect(screen.getByRole('img')).toBeInTheDocument();
     expect(testIdsStartingWith('map-center')).toEqual([]);
+  });
+});
+
+describe('the reach and the overlay', () => {
+  const viewBox = (): string | null => screen.getByRole('img').getAttribute('viewBox');
+
+  it('keeps today\'s view when no reach is given', () => {
+    renderMap();
+
+    const [minX, , spanX] = (viewBox() ?? '').split(' ').map(Number);
+    expect(minX).toBeCloseTo(-3360);
+    expect(spanX).toBeCloseTo(6720);
+  });
+
+  it('widens the view to a reach past the largest circle, as regionMapView says', () => {
+    renderMap({ reach: { radiusMetres: 4000 } });
+
+    const view = regionMapView({
+      regions: REGION_MAP_WITH_EXCLUSIONS,
+      center: REGION_MAP_CENTER,
+      circles: [{ radiusMetres: 3000 }],
+      reach: { radiusMetres: 4000 },
+    });
+    expect(view?.spanX).toBeCloseTo(8960);
+    expect(viewBox()).toBe(`${view?.minX} ${view?.minY} ${view?.spanX} ${view?.spanY}`);
+  });
+
+  it('draws the host layer inside the SVG, tap-transparent, with the map\'s view and projection', () => {
+    const overlay = vi.fn((_layer: RegionMapLayer): React.ReactNode => <circle r={100} data-testid="host-circle" />);
+    const { onToggle } = renderMap({ overlay });
+
+    const group = screen.getByTestId('map-overlay');
+    expect(screen.getByRole('img').contains(group)).toBe(true);
+    expect(group).toHaveAttribute('pointer-events', 'none');
+    expect(group).toContainElement(screen.getByTestId('host-circle'));
+    const seen = overlay.mock.calls.at(-1)?.[0];
+    const view = seen?.view;
+    expect(`${view?.minX} ${view?.minY} ${view?.spanX} ${view?.spanY}`).toBe(viewBox());
+    const origin = seen?.projection.project([REGION_MAP_CENTER.latitude, REGION_MAP_CENTER.longitude]);
+    expect(origin?.x).toBeCloseTo(0);
+    expect(origin?.y).toBeCloseTo(0);
+
+    // The areas beneath still take the tap.
+    fireEvent.click(screen.getByTestId(`map-area-${VENDA_NOVA}`));
+    expect(onToggle).toHaveBeenCalledWith(VENDA_NOVA);
+  });
+
+  it('renders no layer without an overlay', () => {
+    renderMap();
+
+    expect(testIdsStartingWith('map-overlay')).toEqual([]);
   });
 });
 

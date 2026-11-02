@@ -274,4 +274,4 @@ function aboutThisBasket(
   return basket.signature === null || basket.signature === parked.basket;
 }
 
-export { HOSTED_ORDER_STORAGE_KEY, forgetHostedOrder, rememberHostedOrder } from "./hosted-store";
+export { HOSTED_ORDER_STORAGE_KEY, rememberHostedOrder } from "./hosted-store";

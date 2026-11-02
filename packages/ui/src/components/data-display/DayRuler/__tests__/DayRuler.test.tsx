@@ -484,3 +484,67 @@ describe("the slots a later story fills (FUT-3881)", () => {
     expect(screen.getByTestId("dr-row-bruno")).toHaveTextContent(/^Bruno LimaFreela/);
   });
 });
+
+describe("a group's footer lines (FUT-3882)", () => {
+  const footer: DayRulerProps["groupFooter"] = (group) =>
+    group === "Entregas"
+      ? [
+          { id: "trend", label: "Média de entregas/hora", trend: Array.from({ length: 20 }, (_, index) => (index === 3 ? null : index)) },
+          {
+            id: "need",
+            label: "O movimento pede",
+            cells: Array.from({ length: 20 }, (_, index) => ({ text: String(index % 3), marked: index === 14, ...(index === 14 ? { title: "20h · pede 2, tem 1" } : {}) })),
+          },
+        ]
+      : undefined;
+
+  it("draws the host's lines under the group's rows, one cell per hour, the marked hour flagged with its words", () => {
+    renderRuler({ groupFooter: footer });
+    const need = screen.getByTestId("dr-footer-need");
+    expect(within(need).getByText("O movimento pede")).toBeTruthy();
+    const marked = need.querySelectorAll("[data-marked]");
+    expect(marked).toHaveLength(1);
+    expect(marked[0]?.getAttribute("title")).toBe("20h · pede 2, tem 1");
+    // Said in words, not only by the outline and a tooltip.
+    expect(within(marked[0] as HTMLElement).getByText("20h · pede 2, tem 1")).toBeTruthy();
+    // The drawn trend is hidden from readers; its figures are said instead, the gap left out.
+    const trend = screen.getByTestId("dr-footer-trend");
+    expect(trend.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(within(trend).getByText(/^06:00 0 · 07:00 1 · 08:00 2 · 10:00 4/)).toBeTruthy();
+    // The footer follows its group's rows.
+    const row = screen.getByTestId("dr-row-luiz");
+    expect(row.compareDocumentPosition(need) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says a note across the track where the figures would be", () => {
+    renderRuler({ groupFooter: () => [{ id: "thin", label: "O movimento pede", note: "Pouco histórico: menos de 4 semanas com pedidos." }] });
+    expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico: menos de 4 semanas com pedidos.")).toBeTruthy();
+  });
+
+  it("says a marked note in the warning ink, flagged for a reader", () => {
+    renderRuler({ groupFooter: () => [{ id: "short", label: "", note: "Faltam 2, 20h–22h", marked: true }] });
+    const note = within(screen.getAllByTestId("dr-footer-short")[0] as HTMLElement).getByText("Faltam 2, 20h–22h");
+    expect(note.hasAttribute("data-marked")).toBe(true);
+  });
+
+  it("leaves an unmarked note unflagged", () => {
+    renderRuler({ groupFooter: () => [{ id: "thin", label: "O movimento pede", note: "Pouco histórico." }] });
+    expect(within(screen.getAllByTestId("dr-footer-thin")[0] as HTMLElement).getByText("Pouco histórico.").hasAttribute("data-marked")).toBe(false);
+  });
+
+  it("says a marked hour with no title as its hour, its count and that it is short; an empty hour has no dangling separator", () => {
+    renderRuler({
+      groupFooter: () => [{ id: "have", label: "Na escala", cells: [{ text: "1", marked: true }, { text: "" }] }],
+      labels: DAY_RULER_LABELS["pt-BR"],
+    });
+    const cells = (screen.getAllByTestId("dr-footer-have")[0] as HTMLElement).querySelectorAll("[title]");
+    expect(cells[0]?.getAttribute("title")).toBe(`${formatHour(6)} · 1 · falta gente`);
+    expect(cells[1]?.getAttribute("title")).toBe(formatHour(7));
+  });
+
+  it("draws nothing for a group the host gives no lines", () => {
+    renderRuler({ groupFooter: () => undefined });
+    expect(screen.getByTestId("dr-row-luiz")).toBeTruthy();
+    expect(screen.queryAllByTestId(/dr-footer-/)).toHaveLength(0);
+  });
+});

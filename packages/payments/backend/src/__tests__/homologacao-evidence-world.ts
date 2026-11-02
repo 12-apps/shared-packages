@@ -99,9 +99,19 @@ function walletAnswer(route: string, body: Record<string, unknown>): Response | 
 }
 
 /** PagBank's sandbox, scripted per path — and every Authorization it was sent. */
-function fakePagbank(options: { refreshStatus?: number; consultOutages?: number; cancelNotYet?: number; sessionStatus?: number } = {}) {
+function fakePagbank(
+  options: {
+    refreshStatus?: number;
+    consultOutages?: number;
+    cancelNotYet?: number;
+    sessionStatus?: number;
+    pixRefundFailures?: number;
+    pixRefundAnswerLost?: boolean;
+  } = {},
+) {
   const seen: { path: string; authorization: string | null; body?: Record<string, unknown> }[] = [];
   const pixPolls: number[] = [];
+  const pixRefunded = { value: false };
   const handler = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? 'GET';
@@ -134,8 +144,25 @@ function fakePagbank(options: { refreshStatus?: number; consultOutages?: number;
     }
     if (route === 'GET /orders/ORDE_PIX') {
       pixPolls.push(1);
+      if (pixRefunded.value) {
+        const refunded = { id: 'CHAR_PIX', status: 'CANCELED', amount: { value: 100, summary: { refunded: 100 } } };
+        return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [refunded] });
+      }
       const status = pixPolls.length > 1 ? 'PAID' : 'WAITING';
       return json({ id: 'ORDE_PIX', reference_id: 'r', charges: [{ id: 'CHAR_PIX', status, amount: { value: 1000 } }] });
+    }
+    // The production Pix refund (FUT-4198): a paid Pix canceled.
+    if (route === 'POST /charges/CHAR_PIX/cancel') {
+      if (options.pixRefundAnswerLost && !pixRefunded.value) {
+        // PagBank refunded it, but the answer never came back.
+        pixRefunded.value = true;
+        return json({ error_messages: [{ code: 'GATEWAY_TIMEOUT' }] }, 504, 'Gateway Timeout');
+      }
+      if (pixRefunded.value) return json({ error_messages: [{ code: 'CHARGE_ALREADY_CANCELED' }] }, 409, 'Conflict');
+      if (seen.filter((call) => call.path === route).length <= (options.pixRefundFailures ?? 0)) {
+        return json({ error_messages: [{ code: 'INTERNAL_ERROR' }] }, 500, 'Internal Server Error');
+      }
+      return json({ id: 'CHAR_PIX', status: 'CANCELED', amount: { value: 100, summary: { refunded: 100 } } }, 201, 'Created');
     }
     if (route === 'POST /orders') {
       const charges = body['charges'] as { payment_method: { card: { encrypted: string } } }[];
@@ -185,14 +212,21 @@ export function world(
     sessionStatus?: number;
     sellerEnvironment?: 'SANDBOX' | 'PRODUCTION';
     applePayConfigured?: boolean;
+    /** The evidence's own environment (FUT-4198). SANDBOX when absent. */
+    environment?: 'SANDBOX' | 'PRODUCTION';
+    /** How many production Pix refunds PagBank answers 500 before one passes. */
+    pixRefundFailures?: number;
+    /** PagBank refunds the Pix but its answer to the cancel is lost. */
+    pixRefundAnswerLost?: boolean;
   } = {},
 ) {
+  const environment = options.environment ?? 'SANDBOX';
   const pagbank = fakePagbank(options);
   vi.stubGlobal('fetch', vi.fn(pagbank.handler));
   const providers = defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) });
   const configs = createMemoryProviderConfigStore();
-  const appCreds = () => ({
-    environment: 'SANDBOX' as const,
+  const appCreds = (_provider: string, env: 'SANDBOX' | 'PRODUCTION' = 'SANDBOX') => ({
+    environment: env,
     fields: { clientId: 'cid', clientSecret: 'csecret-value', accountToken: 'platform-account-token' },
   });
   const oauth = createOAuthConnectService(providers, configs, appCreds);
@@ -215,10 +249,12 @@ export function world(
     store,
     copy: copy.outcome,
     newId,
+    environment,
     webhookUrl: 'https://example.test/api/webhooks/platform-homologacao/pagbank',
   };
   const runDeps = {
     merchant: SELLER,
+    environment,
     store,
     copy: copy.outcome,
     newId,
@@ -238,24 +274,46 @@ export function world(
     consultApplication: () =>
       consultConnectApplication(
         { appCredentials: appCreds, expectedRedirectUri: 'https://example.test/cb', copy: PT_BR_CONNECT_APPLICATION_COPY },
-        'SANDBOX',
+        environment,
       ),
-    customer: { name: 'Jose da Silva', email: 'cliente@sandbox.pagseguro.com.br', taxId: '12345678909' },
+    customer:
+      environment === 'PRODUCTION'
+        ? { name: BUYER.name, email: BUYER.email, taxId: BUYER.taxId, phone: BUYER.phone }
+        : { name: 'Jose da Silva', email: 'cliente@sandbox.pagseguro.com.br', taxId: '12345678909' },
     sleep: async () => undefined,
     pixPolls: 3,
     ...(options.applePayConfigured === undefined ? {} : { applePayConfigured: () => options.applePayConfigured === true }),
   };
   const events: EvidenceWebhookEvent[] = [];
+  /** What the host's charge row says now — PAID, or REFUNDED after a production refund. */
+  const chargeStatus = { value: 'PAID' };
   const fileDeps = {
     store,
     copy,
+    environment,
     identification: { name: 'Paladira', site: 'https://paladira.com', clientId: 'cid', callbackUrl: 'https://example.test/cb' },
     webhookEvents: async (wanted: readonly string[]) =>
       events.filter((event) => wanted.some((id) => JSON.stringify(event.payload).includes(id))),
-    chargeRow: async () => ({ providerChargeId: 'CHAR_PIX', status: 'PAID', updatedAt: new Date('2026-10-17T15:00:02Z') }),
+    chargeRow: async () => ({ providerChargeId: 'CHAR_PIX', status: chargeStatus.value, updatedAt: new Date('2026-10-17T15:00:02Z') }),
   };
-  return { pagbank, configs, connectDeps, runDeps, fileDeps, events };
+  return { pagbank, configs, connectDeps, runDeps, fileDeps, events, chargeStatus };
 }
+
+/** A real cardholder, as the production screen sends it (FUT-4198). */
+export const BUYER = {
+  name: 'Thompson Moreira Filgueiras',
+  email: 'thom@paladira.com',
+  taxId: '46556477000159',
+  phone: '+5531994494408',
+  billingAddress: {
+    street: 'Rua Padre Pedro Pinto',
+    number: '424',
+    complement: 'sala 601',
+    regionCode: 'MG',
+    city: 'Belo Horizonte',
+    postalCode: '31610000',
+  },
+};
 
 export function cards(): BrowserCardResult[] {
   return [

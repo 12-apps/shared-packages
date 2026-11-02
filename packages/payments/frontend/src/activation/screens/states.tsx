@@ -79,6 +79,41 @@ export function FailedState({
 }
 
 /**
+ * Settled-and-refused because of the PAYER'S E-MAIL (FUT-4050) — PagBank's
+ * "the buyer is the merchant". Its own state because its next action is not
+ * "try again": the same e-mail would be refused the same way. The button takes
+ * the owner back to the form, to the one field to change, card still typed in.
+ */
+export function PayerEmailRefusedState({
+  displayName,
+  providerMessage,
+  onChangeEmail,
+}: {
+  displayName: string;
+  providerMessage?: string;
+  onChangeEmail: () => void;
+}): JSX.Element {
+  const { outcome, payerEmail } = useActivationCopy();
+  return (
+    <Stack spacing={1} data-testid="verify-charge-email-refused">
+      <Notice
+        tone="bad"
+        title={outcome.authenticatedNotActive}
+        description={payerEmail.refusedBody(displayName)}
+      />
+      {providerMessage ? (
+        <ProviderMessage message={providerMessage} label={outcome.providerSaid} />
+      ) : null}
+      <Stack direction="row">
+        <Button sx={BTN_PRIMARY_SX} onClick={onChangeEmail} data-testid="verify-charge-change-email">
+          {payerEmail.change}
+        </Button>
+      </Stack>
+    </Stack>
+  );
+}
+
+/**
  * The provider would not CREATE the link. A different failure with a different
  * owner, and it had been wearing the wrong one's clothes.
  *

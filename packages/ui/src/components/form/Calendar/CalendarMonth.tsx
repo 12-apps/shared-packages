@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography/index.js';
 import type { FC } from 'react';
 import React from 'react';
 
+import type { CalendarLabels } from '../../../copy/labels';
 import { sxRem } from '../../../tokens/relative';
 
 import { getMonthName } from './Calendar.dates';
@@ -37,21 +38,30 @@ const GRID_SX = {
  */
 export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
 
+/** The two arrows' accessible names; an icon alone names nothing. */
+export type MonthArrowLabels = Pick<CalendarLabels, 'previousMonth' | 'nextMonth'>;
+
 // Only the outermost months carry arrows; the ones between get a spacer so their
 // titles stay centred.
 const MonthNavHeader: FC<{
   title: React.ReactNode;
   showPrevious: boolean;
   showNext: boolean;
+  labels?: MonthArrowLabels;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
-}> = ({ title, showPrevious, showNext, onPreviousMonth, onNextMonth }) => (
+}> = ({ title, showPrevious, showNext, labels, onPreviousMonth, onNextMonth }) => (
   <Box
     sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
     data-testid="calendar-header"
   >
     {showPrevious && (
-      <IconButton onClick={onPreviousMonth} size="small" data-testid="calendar-prev-month">
+      <IconButton
+        onClick={onPreviousMonth}
+        size="small"
+        aria-label={labels?.previousMonth}
+        data-testid="calendar-prev-month"
+      >
         <ChevronLeft />
       </IconButton>
     )}
@@ -65,7 +75,12 @@ const MonthNavHeader: FC<{
     </Typography>
 
     {showNext && (
-      <IconButton onClick={onNextMonth} size="small" data-testid="calendar-next-month">
+      <IconButton
+        onClick={onNextMonth}
+        size="small"
+        aria-label={labels?.nextMonth}
+        data-testid="calendar-next-month"
+      >
         <ChevronRight />
       </IconButton>
     )}
@@ -105,13 +120,16 @@ export const MonthDays: FC<{
   monthIndex: number;
   weekdayNames: string[];
   dayContext: DayCellContext;
-}> = ({ matrix, monthIndex, weekdayNames, dayContext }) => (
+}> = ({ matrix, weekdayNames, dayContext }) => (
   <>
     <WeekdayHeader weekdayNames={weekdayNames} />
 
     <Box
       role="grid"
-      aria-labelledby={`month-${monthIndex}`}
+      // Named by its month in words. It pointed at an id nothing carried, so
+      // the grid had no name at all and a two-month calendar read as two
+      // anonymous grids.
+      aria-label={getMonthName(matrix.month, matrix.year, dayContext.locale)}
       data-testid="calendar-grid"
       sx={GRID_SX}
     >
@@ -129,6 +147,8 @@ export interface CalendarMonthProps {
   locale: string;
   weekdayNames: string[];
   renderHeader?: CalendarProps['renderHeader'];
+  /** The arrows' accessible names. */
+  labels?: MonthArrowLabels;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   dayContext: DayCellContext;
@@ -141,6 +161,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
   locale,
   weekdayNames,
   renderHeader,
+  labels,
   onPreviousMonth,
   onNextMonth,
   dayContext,
@@ -159,6 +180,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
         title={title}
         showPrevious={monthIndex === 0}
         showNext={monthIndex === monthsToShow - 1}
+        labels={labels}
         onPreviousMonth={onPreviousMonth}
         onNextMonth={onNextMonth}
       />

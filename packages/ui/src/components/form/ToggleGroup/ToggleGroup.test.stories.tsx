@@ -934,3 +934,45 @@ export const TestIdSpecialCharacters: Story = {
     expect(canvas.getByTestId('special-chars-toggle-item-option123')).toBeInTheDocument();
   },
 };
+
+// 16. The selected option keeps its colour hovered and focused (FUT-3831)
+function SelectedFillComponent(): React.JSX.Element {
+  const [value, setValue] = React.useState<string | null>('week');
+  return (
+    <ToggleGroup
+      options={[
+        { value: 'week', label: 'Semana' },
+        { value: 'day', label: 'Dia' },
+      ]}
+      value={value}
+      onChange={(_event, next: string | null) => setValue(next)}
+      dataTestId="selected-fill"
+    />
+  );
+}
+
+/** "rgb(r, g, b)" / "rgba(r, g, b, a)" → its alpha (1 when opaque). */
+const alphaOf = (colour: string): number => {
+  const parts = colour.match(/[\d.]+/g) ?? [];
+  return parts.length === 4 ? Number(parts[3]) : 1;
+};
+
+export const SelectedKeepsItsFill: Story = {
+  render: () => <SelectedFillComponent />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const day = canvas.getByTestId('selected-fill-item-day');
+    await userEvent.click(day);
+    await waitFor(() => expect(day).toHaveAttribute('aria-pressed', 'true'));
+    const resting = getComputedStyle(day);
+    // Clicked, the option is focused AND under the pointer: before the fix MUI's selected-hover
+    // grey (a translucent fill) replaced the colour's own opaque fill.
+    await userEvent.hover(day);
+    await waitFor(() => expect(alphaOf(getComputedStyle(day).backgroundColor)).toBe(1));
+    expect(getComputedStyle(day).color).toBe(resting.color);
+    await userEvent.unhover(day);
+    await userEvent.tab();
+    await userEvent.tab({ shift: true });
+    await waitFor(() => expect(alphaOf(getComputedStyle(day).backgroundColor)).toBe(1));
+  },
+};

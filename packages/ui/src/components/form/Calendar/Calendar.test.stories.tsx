@@ -568,6 +568,24 @@ export const SelectorsFitA320Sheet: Story = {
 };
 
 /**
+ * A button's ripple still running when the next step swaps the caption or the
+ * grid under it is cancelled, and Storybook, which awaits every running
+ * animation after a step, reports that cancelled one as an uncaught
+ * `AbortError` on every load (FUT-4164). The next step waits for them instead.
+ */
+const ripplesSettled = () =>
+  waitFor(() =>
+    expect(
+      document
+        .getAnimations()
+        // The focused button's pulse is infinite: it never finishes, and
+        // Storybook does not wait for it either.
+        .filter((animation) => animation.playState === 'running')
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity),
+    ).toHaveLength(0),
+  );
+
+/**
  * Nothing moves under the thumb: stepping through a year leaves the arrows and
  * the caption where they were whatever the month's name, and opening the month
  * or year grid keeps the calendar's size. 343 is a 375 phone less its gutters,
@@ -596,11 +614,14 @@ export const SelectorsHoldStill: Story = {
     }
 
     for (const toggle of ['calendar-month-select', 'calendar-year-select']) {
+      await ripplesSettled();
       await userEvent.click(canvas.getByTestId(toggle));
       const open = container.getBoundingClientRect();
       await expect(open.width).toBe(startSize.width);
       await expect(open.height).toBe(startSize.height);
+      await ripplesSettled();
       await userEvent.keyboard('{Escape}');
     }
+    await ripplesSettled();
   },
 };

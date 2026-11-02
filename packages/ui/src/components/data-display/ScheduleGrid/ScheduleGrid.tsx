@@ -132,7 +132,7 @@ export function ScheduleGrid(props: ScheduleGridProps): React.JSX.Element {
       >
         {/* The header row sits outside the sideways scroller, so it sticks to the page; it follows the days sideways. */}
         <Box ref={headRef} role="none" sx={headerSx(props.stickyTop ?? 0)} data-sg-head="" data-testid={`${testId}-head`} onWheel={sideways.forwardWheel}>
-          <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} rowSx={rowSx} testId={testId} />
+          <GridHeader columns={columns} totalLabel={hasTotal ? (props.totalLabel ?? '') : undefined} corner={props.corner} rowSx={rowSx} testId={testId} />
         </Box>
         <Box ref={bodyRef} role="none" sx={scrollSx} data-sg-scroll="" data-testid={`${testId}-scroll`} onScroll={sideways.follow}
           onFocus={sideways.bringOut}

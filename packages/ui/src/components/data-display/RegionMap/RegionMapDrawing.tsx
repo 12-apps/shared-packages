@@ -8,9 +8,12 @@ import { rem, remPx } from '../../../tokens/relative';
 import { labelPosition, type AreaGeometry, type DrawnRegion, type PlaneBox } from './RegionMap.helpers';
 import type { RegionMapModel } from './RegionMap.hooks';
 import { labelOrder, placeLabels } from './RegionMap.labels';
+import type { RegionMapLayer } from './RegionMap.types';
 
 export interface RegionMapDrawingProps {
   model: RegionMapModel & { view: PlaneBox };
+  /** The host's layer, drawn inside the SVG under the circles (`RegionMapProps.overlay`). */
+  overlay?: (layer: RegionMapLayer) => React.ReactNode;
   showCenter: boolean;
   highlightedIds: readonly string[];
   maxHeight: string | undefined;
@@ -32,6 +35,7 @@ export interface RegionMapDrawingProps {
  */
 export function RegionMapDrawing({
   model,
+  overlay,
   showCenter,
   highlightedIds,
   maxHeight,
@@ -78,6 +82,13 @@ export function RegionMapDrawing({
         <Hatch id={hatchId} pitch={view.spanX / 70} theme={theme} />
         <BaseAreas areas={base} testId={testId} theme={theme} />
         <ExcludedAreas drawn={drawn} hatchId={hatchId} testId={testId} theme={theme} />
+        {overlay && model.projection && (
+          // `pointer-events` is inherited in SVG: nothing the host draws here
+          // takes a tap from the areas beneath.
+          <g pointerEvents="none" data-testid={`${testId}-overlay`}>
+            {overlay({ view, projection: model.projection })}
+          </g>
+        )}
         <Circles radii={model.radii} theme={theme} />
         <Highlights areas={highlighted} testId={testId} theme={theme} />
         {showCenter && (

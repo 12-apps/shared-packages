@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { recordedFetch, redactUrl, redactValue } from '../core/traffic-recorder';
+import { maskDigits, recordedFetch, redactUrl, redactValue } from '../core/traffic-recorder';
 import { recordTraffic } from '../platform/evidence/record';
 
 /**
@@ -57,8 +57,36 @@ describe('redactValue', () => {
     expect(redactValue(body)).toEqual(body);
   });
 
-  it('given a phone number outside a card, then it is kept', () => {
-    expect(redactValue({ phones: [{ number: '999999999' }] })).toEqual({ phones: [{ number: '999999999' }] });
+  it('given a phone number outside a card, then it is masked to its last four, not removed as a card number (FUT-4198)', () => {
+    expect(redactValue({ phones: [{ country: '55', area: '31', number: '994494408', type: 'MOBILE' }] })).toEqual({
+      phones: [{ country: '55', area: '31', number: '*****4408', type: 'MOBILE' }],
+    });
+  });
+
+  it("given a customer's CPF or CNPJ anywhere, then only its last two digits are kept (FUT-4198)", () => {
+    expect(
+      redactValue({ customer: { name: 'Ana', tax_id: '12345678909' }, card: { holder: { tax_id: '46556477000159' } } }),
+    ).toEqual({ customer: { name: 'Ana', tax_id: '*********09' }, card: { holder: { tax_id: '************59' } } });
+  });
+
+  it('given a phone sent as one string, then it is masked the same way', () => {
+    expect(redactValue({ customer: { phone: '+5531994494408' } })).toEqual({ customer: { phone: '**********4408' } });
+  });
+
+  it('given a number that is not a phone, then it is kept — an address or an order number is not masked', () => {
+    const body = { address: { number: '424' }, items: [{ number: 2 }] };
+
+    expect(redactValue(body)).toEqual(body);
+  });
+});
+
+describe('maskDigits', () => {
+  it('given a value no longer than what is kept, then every character is hidden', () => {
+    expect(maskDigits('12', 2)).toBe('**');
+  });
+
+  it('given something that is not text or a number, then it is returned as it is', () => {
+    expect(maskDigits(null, 2)).toBeNull();
   });
 });
 

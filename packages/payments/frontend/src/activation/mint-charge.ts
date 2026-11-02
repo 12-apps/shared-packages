@@ -55,11 +55,14 @@ export async function mintCharge(io: {
   setState: (next: RedirectActivationState) => void;
   copy: RedirectActivationCopy;
   onCreateFailed?: () => void;
+  /** Who pays — the e-mail the owner confirmed on the step (FUT-4050). */
+  payer?: { email: string };
 }): Promise<void> {
   const tab = claimTab();
 
   io.setState({ kind: 'creating' });
-  const body = await postActivation(io.url, 'start');
+  const payerEmail = io.payer?.email.trim();
+  const body = await postActivation(io.url, 'start', payerEmail ? { email: payerEmail } : {});
   if (!body?.ok || !body.checkoutUrl) {
     // Never strand a blank tab on a failure the owner is about to read here.
     tab.discard();

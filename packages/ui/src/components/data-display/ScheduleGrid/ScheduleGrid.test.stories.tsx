@@ -855,3 +855,44 @@ export const GroupTitleStaysPinnedFourteenDays: Story = {
   decorators: laptop(1216),
   play: async ({ canvasElement }) => groupTitleStays(canvasElement),
 };
+
+/**
+ * FUT-3882: the corner is the pinned mask over the names, so it stays the
+ * header row's full height, with words or without, and a day scrolled
+ * sideways never shows above the names.
+ */
+async function cornerMasks(canvasElement: HTMLElement): Promise<void> {
+  const canvas = within(canvasElement);
+  const header = canvas.getByTestId('sg-header');
+  const row = header.getBoundingClientRect();
+  const style = getComputedStyle(header);
+  const padTop = parseFloat(style.paddingTop);
+  const padBottom = parseFloat(style.paddingBottom);
+  const corner = canvas.getByTestId('sg-corner').getBoundingClientRect();
+  // The row's whole content box: as tall as the tallest day header, never shrunk to its own words.
+  await expect(Math.abs(corner.height - (row.height - padTop - padBottom))).toBeLessThan(1);
+  await expect(Math.abs(corner.top - (row.top + padTop))).toBeLessThan(1);
+  const scroller = canvasElement.querySelector('[data-sg-scroll]');
+  if (!(scroller instanceof HTMLElement)) throw new Error('no scroller');
+  // eslint-disable-next-line test-flakiness/no-viewport-dependent -- the subject is the sideways scroll itself: the pane's width is pinned by the story's wrapper
+  scroller.scrollLeft = 250;
+  fireEvent.scroll(scroller);
+  const tuesday = canvas.getAllByRole('columnheader')[1] as HTMLElement;
+  await waitFor(() => expect(tuesday.getBoundingClientRect().left).toBeLessThan(corner.right));
+  // Whatever slid under the corner is covered by it: the topmost element at the corner's top is the corner.
+  const hit = canvasElement.ownerDocument.elementFromPoint(corner.left + corner.width / 2, corner.top + 2);
+  await expect(hit === canvas.getByTestId('sg-corner') || canvas.getByTestId('sg-corner').contains(hit)).toBe(true);
+}
+
+/** Without words: the corner is the row's full height and masks the scrolled days. */
+export const CornerMasksWithoutWords: Story = { decorators: pane(390), play: async ({ canvasElement }) => cornerMasks(canvasElement) };
+
+/** With words and adornments taller than the label: the same. */
+export const CornerMasksWithWords: Story = {
+  decorators: pane(390),
+  args: {
+    corner: 'Movimento, 11h–23h',
+    columns: COLUMNS.map((column) => ({ ...column, adornment: <span style={{ display: 'block', height: 30 }}>banda</span> })),
+  },
+  play: async ({ canvasElement }) => cornerMasks(canvasElement),
+};

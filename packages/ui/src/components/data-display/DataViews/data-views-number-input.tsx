@@ -91,13 +91,8 @@ function boundAsNumber(amount: number | string | undefined): number | undefined 
  * One end of a numeric range. The BOUND stays a plain `number` — nothing
  * downstream learns that the typing surface changed.
  */
-export function NumberBoundInput({
-  label,
-  value,
-  unit,
-  onChange,
-  testId,
-}: {
+/** Props of {@link NumberBoundInput}. */
+interface NumberBoundInputProps {
   label: string;
   /** The applied bound. A range restored from the URL hands this over as a string. */
   value: number | string | undefined;
@@ -105,7 +100,21 @@ export function NumberBoundInput({
   unit?: string;
   onChange: (bound: number | undefined) => void;
   testId: string;
-}): React.JSX.Element {
+  /**
+   * Take the width of the cell it sits in rather than its own 140px, so a
+   * pair in a panel splits the row equally (FUT-4144 UI review round 2).
+   */
+  fill?: boolean;
+}
+
+export function NumberBoundInput({
+  label,
+  value,
+  unit,
+  onChange,
+  testId,
+  fill = false,
+}: NumberBoundInputProps): React.JSX.Element {
   const applied = boundAsNumber(value);
   const [text, setText] = useState(() => formatPtBrNumber(value));
 
@@ -164,7 +173,8 @@ export function NumberBoundInput({
             }
           : undefined
       }
-      sx={[{ width: sxRem(140) }, fieldTextFieldStyles]}
+      fullWidth={fill}
+      sx={[{ width: fill ? '100%' : sxRem(140) }, fieldTextFieldStyles]}
     />
   );
 }

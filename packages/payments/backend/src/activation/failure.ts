@@ -1,4 +1,5 @@
 import { ProviderRequestError } from '../core/errors';
+import { providerRejectionReasons } from '../core/error-readers';
 import { isTransportError } from '../core/failover';
 import type { ActivationCopy } from './copy';
 
@@ -54,13 +55,40 @@ export type VerifyChargeResult =
    * card flow's failures ride this type back to the route, and a host that
    * revokes state on every failure needs the distinction (FUT-679/FUT-686).
    */
-  | { ok: false; reason: string; providerMessage?: string; transport?: boolean };
+  | {
+      ok: false;
+      reason: string;
+      providerMessage?: string;
+      transport?: boolean;
+      payerEmailRefused?: boolean;
+    };
 
 /** What {@link failureFor} classified — the reason plus the raw exchange. */
 export interface VerificationFailure {
   reason: string;
   providerMessage?: string;
   transport?: boolean;
+  /**
+   * The provider refused the PAYER'S E-MAIL, not the card or the connection
+   * (FUT-4050). PagBank answers `40002 buyer email must not be equals to
+   * merchant email` when the charge's customer e-mail is the e-mail of the
+   * account receiving it — the normal case on an owner's own activation
+   * charge. The screen's next action is the e-mail field, so it needs to know
+   * WHICH refusal this was rather than read it out of the provider's words.
+   */
+  payerEmailRefused?: boolean;
+}
+
+/**
+ * The provider named the charge's customer e-mail as the parameter it refused.
+ *
+ * Read from the STRUCTURED reasons, never from the message: PagBank's `40002`
+ * is its generic validation code (a too-small amount and a malformed
+ * reference answer it too), so only the parameter it names says which input
+ * was wrong.
+ */
+function refusesPayerEmail(error: unknown): boolean {
+  return providerRejectionReasons(error).some((reason) => reason.parameterName === 'customer.email');
 }
 
 /**
@@ -97,6 +125,9 @@ export function failureFor(
     isTransportError(error) ||
     (error instanceof ProviderRequestError && error.options.httpStatus === undefined);
 
+  if (!transport && refusesPayerEmail(error)) {
+    return { reason: message.slice(0, 300), providerMessage: raw, payerEmailRefused: true };
+  }
   if (message.includes('ACCESS_DENIED') || message.includes('whitelist')) {
     return {
       reason: copy.platformApproval,

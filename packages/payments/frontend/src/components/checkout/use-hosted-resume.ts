@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { CheckoutBasketIdentity } from "./basket";
+import { useForgetHostedOrder, useHostedParking } from "./hosted-parking";
 import { useCheckoutClientApi } from "./client-context";
 import {
-  forgetHostedOrder,
   takeHostedOrder,
   type HostedResumeStep,
 } from "./hosted-return";
@@ -146,9 +146,12 @@ function useResumeDecision(
   // mid-confirmation — which is what StrictMode's double-invoke does for free.
   const decided = useRef(false);
   const waitedLongEnough = useBasketDeadline();
+  // A mount that keeps out of the slot never takes it: the entry is the host
+  // checkout's, and consuming it here would lose it there (`./hosted-parking`).
+  const parks = useHostedParking();
 
   useResumeEffect(() => {
-    if (decided.current) return;
+    if (decided.current || !parks) return;
     // Past the deadline the basket is treated as unnamed rather than as
     // pending — see BASKET_WAIT_MS. A cart that never answered cannot be
     // compared with, and waiting forever is the worse of the two failures.
@@ -159,7 +162,7 @@ function useResumeDecision(
     decided.current = true;
     if (decision.verdict === "RESUME") setResumed({ order: decision.order, step: decision.step });
     if (decision.verdict === "ASK") setAsking(decision.order);
-  }, [tenantSlug, basket, waitedLongEnough]);
+  }, [tenantSlug, basket, waitedLongEnough, parks]);
 
   return { resumed, setResumed, asking, setAsking };
 }
@@ -185,6 +188,7 @@ function useAskBeforeResuming(
   onDrop: () => void,
 ): void {
   const client = useCheckoutClientApi();
+  const forgetHostedOrder = useForgetHostedOrder();
   useEffect(() => {
     if (!asking) return undefined;
     let live = true;
@@ -201,7 +205,7 @@ function useAskBeforeResuming(
     return () => {
       live = false;
     };
-  }, [asking, client, onDrop, onResume]);
+  }, [asking, client, onDrop, onResume, forgetHostedOrder]);
 }
 
 /** Whether the wait for the host's cart has run out — see {@link BASKET_WAIT_MS}. */
@@ -232,6 +236,7 @@ function useRelease(
   onReleased: () => void,
 ): { run: () => void; releasing: boolean } {
   const client = useCheckoutClientApi();
+  const forgetHostedOrder = useForgetHostedOrder();
   const [releasing, setReleasing] = useState(false);
   const run = useCallback(() => {
     if (!order || releasing) return;
@@ -251,7 +256,7 @@ function useRelease(
       forgetHostedOrder();
       onReleased();
     });
-  }, [client, order, releasing, onSettled, onReleased]);
+  }, [client, order, releasing, onSettled, onReleased, forgetHostedOrder]);
   return { run, releasing };
 }
 

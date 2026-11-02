@@ -71,6 +71,34 @@ const StyledToggleGroup = styled(ToggleButtonGroup, {
   };
 });
 
+type Palette = ReturnType<typeof getColorFromTheme>;
+
+/**
+ * The chosen option's fill, in every state. MUI's own `.Mui-selected:hover` (and
+ * its focus-visible) out-rank a plain `.Mui-selected` rule and paint the chosen
+ * option a translucent grey under white text: hovered — as it always is right
+ * after a click — or focused, it stopped reading as chosen (FUT-3831). It keeps
+ * its colour's fill, the darker step on hover, and keyboard focus adds a ring,
+ * never a new fill.
+ */
+function selectedSx(theme: Theme, palette: Palette, gradient: boolean) {
+  const ring = rem(theme, FIELD_BORDER_WIDTH * 2);
+  return {
+    '&.Mui-selected': {
+      backgroundColor: palette.main,
+      color: palette.contrastText,
+      ...(gradient && { background: `linear-gradient(135deg, ${palette.main}, ${palette.dark})` }),
+    },
+    '&.Mui-selected:hover': {
+      backgroundColor: palette.dark,
+      color: palette.contrastText,
+      ...(gradient && { background: `linear-gradient(135deg, ${palette.dark}, ${palette.dark})` }),
+    },
+    '&.Mui-selected.Mui-focusVisible': { backgroundColor: palette.main, color: palette.contrastText },
+    '&.Mui-focusVisible': { outline: `${ring} solid ${palette.main}`, outlineOffset: ring },
+  };
+}
+
 export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
   (
     {
@@ -126,14 +154,7 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(
               paddingTop: 0,
               paddingBottom: 0,
 
-              '&.Mui-selected': {
-                backgroundColor: colorPalette.main,
-                color: colorPalette.contrastText,
-
-                ...(gradient && {
-                  background: `linear-gradient(135deg, ${colorPalette.main}, ${colorPalette.dark})`,
-                }),
-              },
+              ...selectedSx(theme, colorPalette, gradient),
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

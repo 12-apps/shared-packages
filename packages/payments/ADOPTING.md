@@ -340,6 +340,51 @@ identity still answers 409. Only `buyerCheckoutConfig` and the
 route on `mountPayments` (`getClientConfig`) still publishes the raw
 capability table, so a host should not draw an Apple Pay button from it.
 
+### Homologação evidence in production (`@12-apps/payments-backend/homologacao-evidence`, FUT-4198)
+
+`createHomologacaoEvidence` takes an `environment` (`'SANDBOX'` when absent).
+A host that needs PagBank's production evidence mounts a SECOND service:
+
+```ts
+const production = createHomologacaoEvidence({
+  ...sandboxConfig,
+  environment: 'PRODUCTION',
+  // Its own PLATFORM merchant: a provider row holds ONE active environment,
+  // so connecting the sandbox seller to production would break the sandbox run.
+  merchant: { kind: 'PLATFORM', id: 'homologacao-seller-production' },
+  webhookUrl: `${base}/api/webhooks/platform-homologacao-producao/pagbank`,
+  copy: PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY,
+});
+```
+
+- **Behaviour change — the evidence table needs `environment`.** The Prisma
+  store now writes `environment` on create and filters every read by it, for
+  BOTH services. Add the column before taking this version: text, `NOT NULL
+  DEFAULT 'SANDBOX'`, CHECK `IN ('SANDBOX','PRODUCTION')`. Existing rows then
+  read as sandbox, which is what they are.
+- **Every order is R$ 1,00 of real money**, and the run refunds each one.
+  `prepare(buyer)` and `run(..., buyer)` take the real cardholder
+  (`EvidenceBuyer`); phase 1 echoes their 3DS data back as `debitTest`. Their
+  CPF/CNPJ and phone are masked by the traffic recorder (last 2 and last 4
+  digits) in every recorded call, sandbox included.
+- **The Pix waits for a person.** Phase 2 raises the QR and leaves
+  `pix.consult`, `pix.paid` and the production-only `pix.refund` PENDING; mount
+  a route for `confirmPix(runId, 'CHECK' | 'SKIP')`, which answers an
+  `EvidencePixView` (`state`, `qrText`, `expiresAt`). Both consult once; PAID is
+  refunded whatever was pressed, a refund that failed is retried on the next
+  call, and `SKIP` on an unpaid QR records it as skipped. `seller()` carries the
+  latest run's `pix`, so a reloaded screen shows the open QR again.
+- **One open Pix at a time.** A production `prepare` rejects with
+  `EvidencePixOpenError` while the latest run's Pix may still move money —
+  unpaid, paid and not refunded, or skipped while its QR is still payable
+  (answer 409) — and with `EvidenceBuyerRequiredError` without a cardholder
+  (400). A refund retried after a lost answer consults first, so a Pix PagBank
+  already refunded is recorded, never canceled twice.
+- No declined card in production: `card.declined` is a sandbox-only step; the
+  production file lists the gap under Pendências.
+- The file is named `pagbank-homologacao-evidencias-producao-<stamp>`, so it is
+  never confused with the sandbox one.
+
 ## 3. Frontend wiring
 
 - Settings page: render `<PaymentProviderSettings client={...} />` where the
@@ -572,6 +617,7 @@ order CREATION never enter the package; they arrive as explicit props:
 | `confirmationFooter` | no | host content on the PAID confirmation, BELOW the action row — put what is merely OFFERED here (an install invite, an ask to turn alerts on), so a panel never lands between two controls |
 | `backActionEmphasis` | no | `"secondary"` when the host renders its own lead action in `confirmationExtra`, so the flow's "back to the menu" stands down instead of being a second primary. Read on PAID only; defaults to `"primary"` |
 | `paymentList` | **yes** | the Pagamento step — see "The Pagamento step as ONE list" below |
+| `parkHostedOrders` | no | `false` for a SECOND mount of the flow that pays something you already track yourself (a pedido paid again from its own page): it keeps out of the parked-payment slot your one checkout uses — see the parking paragraph below. Defaults to `true`; `createPaymentFlows`' Checkout screen does not pass it |
 
 **Three copy keys are new and REQUIRED on this bump**, and a hand-written pack
 that misses one fails at RUNTIME rather than at compile time if the host does
@@ -612,6 +658,23 @@ not only a hand-off (FUT-1140), so a discarded tab comes back to the payment it
 raised rather than to an empty cart; and a resumed order lands on the
 confirmation for a hand-off and back on the PAYMENT step for a code raised on
 our own page, because that code is still what the buyer needs to look at.
+
+**A second mount keeps out of the slot: `parkHostedOrders={false}`.** The slot
+is one per tab, shared by every mount of the flow. A host that mounts the flow
+again to pay something it already tracks (a pedido paid again from its own
+page) passes `false` there. That mount then does not park an order it raises
+on the page, including one that comes back already settled. It does not resume
+the slot on mount, and it forgets nothing. So the next checkout never resumes
+that mount's Pix over a basket nobody ordered, and the mount never takes the
+checkout's parked payment as its own.
+
+What it KEEPS is the hand-off: a provider's redirect, a card's or a wallet's
+3-D Secure still parks. The mount's page is gone after the redirect, the
+provider returns to your checkout route, and that entry is what lets the route
+open the confirmation for the payment the buyer just made. A hand-off the buyer
+ABANDONS (never comes back from) stays parked, with no basket, for up to
+`MAX_PARKED_AGE_MS` (30 minutes), and can resume over your checkout in that
+window — exactly as any basket-less hand-off did before this prop existed.
 
 **Pass the same basket to `hostedCheckoutReturnPending(slug, basket)`.** That
 predicate is what a host gate in front of the checkout route asks — a

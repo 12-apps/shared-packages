@@ -42,6 +42,8 @@ export function handOverToChallenge(
   // PARK FIRST. The navigation may not come back to a live SPA at all, and a
   // return trip that finds nothing parked lands the buyer on a blank
   // confirmation after they have paid.
+  // Parked on EVERY mount, one that keeps out of the slot included
+  // (`./hosted-parking`): the return trip lands on the host's checkout route.
   const basket = parkedBasket(scope.basket);
   rememberHostedOrder(order, {
     ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),

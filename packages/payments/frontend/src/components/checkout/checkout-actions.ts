@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 
 import type { ConfirmationWait } from "./confirmation-wait";
 import type { CheckoutDecline } from "./decline";
-import { forgetHostedOrder } from "./hosted-return";
+import { useForgetHostedOrder } from "./hosted-parking";
 import type {
   BuyerField,
   CheckoutOrder,
@@ -132,11 +132,12 @@ export function useResumedCheckout(
  * resuming it could only re-show an outcome the buyer has already been given.
  */
 export function useSettledPort(settled: OrderStatus | null, onPaid: (() => void) | undefined): void {
+  const forgetHostedOrder = useForgetHostedOrder();
   useEffect(() => {
     if (!settled || settled === "AWAITING_PAYMENT") return;
     forgetHostedOrder();
     if (settled === "PAID") onPaid?.();
-  }, [settled, onPaid]);
+  }, [settled, onPaid, forgetHostedOrder]);
 }
 
 /**
@@ -189,6 +190,7 @@ export function useRetryAction(input: {
 }): () => void {
   const { decline, order, clearError, setOrder, setDecline } = input;
   const { setFinalStatus, setStep, setFreshInstrument } = input;
+  const forgetHostedOrder = useForgetHostedOrder();
   return useCallback(() => {
     setFinalStatus(null);
     clearError();
@@ -201,7 +203,7 @@ export function useRetryAction(input: {
     setDecline(null);
     forgetHostedOrder();
   }, [
-    clearError, decline, order, setDecline, setFinalStatus, setFreshInstrument, setOrder, setStep,
+    clearError, decline, order, setDecline, setFinalStatus, setFreshInstrument, setOrder, setStep, forgetHostedOrder,
   ]);
 }
 
@@ -216,9 +218,10 @@ export function useDropOrder(
   tenantSlug: string | undefined,
   clearError: () => void,
 ): () => void {
+  const forgetHostedOrder = useForgetHostedOrder();
   return useCallback(() => {
     setOrder(null);
     forgetHostedOrder(tenantSlug);
     clearError();
-  }, [setOrder, tenantSlug, clearError]);
+  }, [setOrder, tenantSlug, clearError, forgetHostedOrder]);
 }

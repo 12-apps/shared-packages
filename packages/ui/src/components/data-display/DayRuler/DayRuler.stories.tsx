@@ -14,7 +14,7 @@ import { ErrorState } from '../ErrorState';
 import { DayRuler } from './DayRuler';
 import { DAY_RULER_LABELS } from './DayRuler.labels';
 import { formatRange } from './day-ruler-model';
-import type { DayRulerBlock, DayRulerRow } from './DayRuler.types';
+import type { DayRulerBlock, DayRulerFooterRow, DayRulerRow } from './DayRuler.types';
 
 /**
  * A Turnos host's Dia view (FUT-3823, prototype D, frames d02 and the phone's
@@ -78,9 +78,70 @@ interface DemoProps {
   error?: boolean;
   /** Draw it in a pane this wide (px) — the phone's day list is the same component in a narrow pane. */
   paneWidth?: number;
+  /** Under each area: how busy it gets, who is on the escala and what the movement asks, short hours marked (FUT-3882). */
+  footers?: boolean;
+  /** With `footers`: no sales figures — only who is on the escala, short hours marked, and the run said (FUT-3882). */
+  countsOnly?: boolean;
 }
 
-function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth }: DemoProps) {
+/** Each area's average units per hour on the 06→02 ruler, and the people its movement asks for — a host's own figures. */
+function footerOf(area: string | undefined, people: Person[], slots: Slot[], countsOnly = false): DayRulerFooterRow[] | undefined {
+  if (!area) return undefined;
+  const mine = people.filter((p) => p.area === area);
+  const hourMid = (index: number): number => 6 + index + 0.5;
+  const busy = Array.from({ length: 20 }, (_, index) => {
+    const h = hourMid(index);
+    return h < 11 || h > 24 ? null : Math.round(4 + 10 * Math.exp(-((h - 12.8) ** 2) / 1.6) + 16 * Math.exp(-((h - 20.8) ** 2) / 2.2));
+  });
+  const scheduled = Array.from({ length: 20 }, (_, index) =>
+    mine.filter((p) => slots.some((slot) => slot.who === p.id && slot.tone !== 'away' && slot.start <= hourMid(index) && slot.end > hourMid(index))).length,
+  );
+  const need = busy.map((units) => (units === null ? 0 : Math.ceil(units / 8)));
+  if (countsOnly) {
+    // A short hour counts only inside a run of two or more, as a host's short runs do: the cells and the note agree.
+    const below = need.map((count, index) => count > (scheduled[index] ?? 0));
+    const short = below.map((isBelow, index) => isBelow && (below[index - 1] === true || below[index + 1] === true));
+    // Each run of short hours, said as the cells show it: "Faltam 2, 11:00–13:00 · Faltam 1, 20:00–22:00".
+    const runs: { from: number; to: number; missing: number }[] = [];
+    short.forEach((isShort, index) => {
+      if (!isShort) return;
+      const gap = (need[index] ?? 0) - (scheduled[index] ?? 0);
+      const open = runs[runs.length - 1];
+      if (open && open.to === index) {
+        open.to = index + 1;
+        open.missing = Math.max(open.missing, gap);
+      } else runs.push({ from: index, to: index + 1, missing: gap });
+    });
+    const said = runs.map((run) => `Faltam ${run.missing}, ${hh(6 + run.from)}–${hh(6 + run.to)}`).join(' · ');
+    return [
+      {
+        id: `${area}-have`,
+        label: 'Na escala, por hora',
+        // A short hour always shows its count, "0" included, and says why in its title.
+        cells: scheduled.map((count, index) =>
+          short[index]
+            ? { text: String(count), marked: true, title: `${hh(6 + index)} · o movimento pede ${need[index] ?? 0}, a escala tem ${count}` }
+            : { text: count ? String(count) : '' },
+        ),
+      },
+      ...(runs.length > 0 ? [{ id: `${area}-short`, label: '', note: said, marked: true }] : []),
+    ];
+  }
+  return [
+    { id: `${area}-trend`, label: 'Média de pedidos/hora', trend: busy },
+    { id: `${area}-have`, label: 'Na escala, por hora', cells: scheduled.map((count) => ({ text: count ? String(count) : '' })) },
+    {
+      id: `${area}-need`,
+      label: 'O movimento pede',
+      cells: need.map((count, index) => {
+        const short = count > (scheduled[index] ?? 0);
+        return { text: count ? String(count) : '', marked: short, ...(short ? { title: `${hh(6 + index)} · pede ${count}, tem ${scheduled[index] ?? 0}` } : {}) };
+      }),
+    },
+  ];
+}
+
+function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, error, paneWidth, footers, countsOnly }: DemoProps) {
   const [slots, setSlots] = useState<Slot[]>(initial);
   const [log, setLog] = useState('');
   const compact = paneWidth !== undefined && paneWidth < 600;
@@ -143,8 +204,9 @@ function Demo({ people = PEOPLE, slots: initial = SLOTS, readOnly, loading, erro
       <DayRuler
         rows={rows}
         now={NOW}
-        coverage={coverage}
-        coverageLabel="Na escala, por hora"
+        // With the areas' own lines, no whole-day row: the same counts would show twice (the prototype has none).
+        {...(footers ? {} : { coverage, coverageLabel: 'Na escala, por hora' })}
+        {...(footers ? { groupFooter: (area: string | undefined) => footerOf(area, people, slots, countsOnly) } : {})}
         readOnly={readOnly}
         loading={loading}
         error={
@@ -276,3 +338,16 @@ export const BreakAndMarkers: Story = { args: { people: PAUSA, slots: PAUSA_SLOT
 
 /** The same on a phone. */
 export const BreakAndMarkersPhone: Story = { args: { people: PAUSA, slots: PAUSA_SLOTS, paneWidth: 390 }, globals: PHONE };
+
+/** Three areas (FUT-3882): each group's lines, and the space before the next group's title. */
+const AREAS: Person[] = [...KITCHEN, { id: 'joana', name: 'Joana Prado', area: 'Salão' }, ...PEOPLE.slice(0, 2)];
+const AREAS_SLOTS: Slot[] = [...KITCHEN_SLOTS, { id: 'j1', who: 'joana', start: 11, end: 17 }, ...SLOTS];
+
+/** FUT-3882: under each area its trend ("Média de pedidos/hora"), who is on the escala and what the movement asks, short hours outlined. */
+export const GroupFooters: Story = { args: { footers: true, people: AREAS, slots: AREAS_SLOTS }, globals: DESKTOP };
+
+/** The same in the dark theme. */
+export const GroupFootersDark: Story = { args: { footers: true, people: AREAS, slots: AREAS_SLOTS }, globals: { ...DESKTOP, theme: 'dark' } };
+
+/** FUT-3882, a reader without sales: only who is on the escala, the short hours outlined, and the run said in the warning ink. */
+export const GroupFootersCountsOnly: Story = { args: { footers: true, countsOnly: true, people: AREAS, slots: AREAS_SLOTS }, globals: DESKTOP };

@@ -1,6 +1,6 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
-import { evidenceStamp, loadEvidence, type EvidenceFile, type EvidenceFileDeps } from './file';
+import { evidenceFilename, loadEvidence, type EvidenceFile, type EvidenceFileDeps } from './file';
 import { summarize } from './steps';
 import type { EvidenceStep } from './types';
 
@@ -62,13 +62,13 @@ export async function buildHomologacaoEvidenceJson(deps: EvidenceFileDeps): Prom
   const document = {
     title: deps.copy.title,
     generatedAt: generatedAt.toISOString(),
-    environment: { name: 'SANDBOX', apiBase: pagbankApiBase('SANDBOX') },
+    environment: { name: deps.environment ?? 'SANDBOX', apiBase: pagbankApiBase(deps.environment ?? 'SANDBOX') },
     identification: deps.identification,
     summary,
     scenarios: steps.map((step) => scenarioOf(deps, step, numbers.get(step.key) ?? '')),
   };
   return {
-    filename: `pagbank-homologacao-evidencias-${evidenceStamp(generatedAt)}.json`,
+    filename: `${evidenceFilename(deps.environment, generatedAt)}.json`,
     content: JSON.stringify(document, null, 2),
     summary,
   };

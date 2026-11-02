@@ -91,6 +91,19 @@ export const EN_US_ACTIVATION_STEP_COPY: ActivationStepCopy = {
     hint: (displayName) => `${displayName} requires it on every card charge.`,
     placeholder: 'Digits only',
   },
+  payerEmail: {
+    label: "Payer's e-mail",
+    hint: (displayName) => `It must differ from your ${displayName} account's e-mail.`,
+    placeholder: 'name@example.com',
+    required: "Enter the payer's e-mail.",
+    invalid: 'Check the e-mail: it needs the form name@example.com.',
+    refusedField: (displayName) =>
+      `This is your ${displayName} account's e-mail, and ${displayName} refuses it. Use another.`,
+    refusedBody: (displayName) =>
+      `${displayName} does not accept a charge paid with the e-mail of the account receiving it. ` +
+      "Change the payer's e-mail: the card stays filled in.",
+    change: 'Change the e-mail',
+  },
   charge: {
     card: EN_US_CARD_COPY,
     noTokenizer:

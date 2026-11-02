@@ -91,7 +91,9 @@ describe("store credit in the column", () => {
     renderList({ config: onPageStore(), client: stubClient([]), lines: LINES, list: WITH_CREDIT });
     const drawn = await column();
     await within(drawn).findByTestId("list-pay");
-    expect(screen.getByTestId("list-option-PIX-radio")).toHaveProperty("checked", false);
+    // The options land only after the saved-card lookup answers, later than the
+    // pay button; a loaded runner reached this line before them (FUT-4167).
+    expect(await screen.findByTestId("list-option-PIX-radio")).toHaveProperty("checked", false);
     await waitFor(() => expect(within(drawn).queryByTestId("list-summary-credit")).toBeNull());
     fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
     expect((await within(drawn).findByTestId("list-summary-due-row")).textContent).toBe("A pagarR$ 22,00");

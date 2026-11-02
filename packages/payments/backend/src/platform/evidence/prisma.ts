@@ -1,6 +1,7 @@
 import type { MerchantRef } from '../../core/types';
 import type {
   EvidenceChargeRow,
+  EvidenceEnvironment,
   EvidenceRecord,
   EvidenceWebhookEvent,
   HomologacaoEvidenceStore,
@@ -22,15 +23,26 @@ interface EvidenceRow {
   updatedAt: Date;
 }
 
-/** The host's evidence table: `id`, `provider`, `kind`, `steps` (JSON), timestamps. */
+/**
+ * The host's evidence table: `id`, `provider`, `kind`, `environment`, `steps`
+ * (JSON), timestamps. `environment` (FUT-4198) keeps the sandbox and the
+ * production files apart: each reads and writes only its own rows.
+ */
 export interface EvidenceDelegate {
   findFirst(args: {
-    where: { provider: string; kind: string };
+    where: { provider: string; kind: string; environment: EvidenceEnvironment };
     orderBy: { createdAt: 'desc' };
   }): Promise<EvidenceRow | null>;
   upsert(args: {
     where: { id: string };
-    create: { id: string; provider: string; kind: string; steps: unknown; createdAt: Date };
+    create: {
+      id: string;
+      provider: string;
+      kind: string;
+      environment: EvidenceEnvironment;
+      steps: unknown;
+      createdAt: Date;
+    };
     update: { provider: string; kind: string; steps: unknown };
   }): Promise<EvidenceRow>;
 }
@@ -68,17 +80,20 @@ function toRecord(row: EvidenceRow): EvidenceRecord {
   };
 }
 
-export function createPrismaHomologacaoEvidenceStore(delegate: EvidenceDelegate): HomologacaoEvidenceStore {
+export function createPrismaHomologacaoEvidenceStore(
+  delegate: EvidenceDelegate,
+  environment: EvidenceEnvironment = 'SANDBOX',
+): HomologacaoEvidenceStore {
   return {
     async latest(provider, kind) {
-      const row = await delegate.findFirst({ where: { provider, kind }, orderBy: { createdAt: 'desc' } });
+      const row = await delegate.findFirst({ where: { provider, kind, environment }, orderBy: { createdAt: 'desc' } });
       return row ? toRecord(row) : null;
     },
     async save(record) {
       const fields = { provider: record.provider, kind: record.kind, steps: record.steps };
       const row = await delegate.upsert({
         where: { id: record.id },
-        create: { id: record.id, ...fields, createdAt: new Date(record.createdAt) },
+        create: { id: record.id, ...fields, environment, createdAt: new Date(record.createdAt) },
         update: fields,
       });
       return toRecord(row);

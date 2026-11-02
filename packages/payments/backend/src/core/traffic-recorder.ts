@@ -141,11 +141,29 @@ const CARD_KEYS = new Set(['number', 'id']);
  */
 const WALLET_KEYS = new Set(['key']);
 
-/** Where a value sits, as far as the redaction rules care: a card, a card's wallet, or elsewhere. */
-type Within = 'NONE' | 'CARD' | 'CARD_WALLET';
+/**
+ * Personal data a production order carries for the real cardholder
+ * (FUT-4198): the CPF/CNPJ wherever it sits, and a phone's number. Not a
+ * credential, so it is MASKED, not removed: the reviewer still sees that the
+ * field was sent and its last digits, never the whole document or number.
+ */
+const PERSONAL_KEYS = new Set(['tax_id', 'taxid']);
+const PHONE_KEYS = new Set(['number']);
+const KEEP_LAST = { taxId: 2, phone: 4 } as const;
+
+/** `12345678909` → `*********09`: the shape stays, the digits do not. */
+export function maskDigits(value: unknown, keep: number): unknown {
+  if (typeof value !== 'string' && typeof value !== 'number') return value;
+  const text = String(value);
+  return text.length <= keep ? '*'.repeat(text.length) : '*'.repeat(text.length - keep) + text.slice(-keep);
+}
+
+/** Where a value sits, as far as the redaction rules care: a card, a card's wallet, a phone, or elsewhere. */
+type Within = 'NONE' | 'CARD' | 'CARD_WALLET' | 'PHONE';
 
 function childWithin(within: Within, lower: string): Within {
   if (lower === 'card') return 'CARD';
+  if (lower === 'phones' || lower === 'phone') return 'PHONE';
   return within === 'CARD' && lower === 'wallet' ? 'CARD_WALLET' : 'NONE';
 }
 
@@ -216,6 +234,10 @@ export function redactValue(value: unknown, within: Within = 'NONE'): unknown {
       if (SECRET_KEYS.has(lower) || (oauthBody && lower === 'code') || instrumentKey(within, lower)) {
         return [key, REDACTED];
       }
+      if (PERSONAL_KEYS.has(lower)) return [key, maskDigits(child, KEEP_LAST.taxId)];
+      if (within === 'PHONE' && PHONE_KEYS.has(lower)) return [key, maskDigits(child, KEEP_LAST.phone)];
+      // A phone sent as one string, not as `phones[]` objects, is masked the same way.
+      if (lower === 'phone' && typeof child !== 'object') return [key, maskDigits(child, KEEP_LAST.phone)];
       return [key, redactValue(child, childWithin(within, lower))];
     }),
   );

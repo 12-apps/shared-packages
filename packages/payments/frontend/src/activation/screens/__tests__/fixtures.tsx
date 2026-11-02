@@ -68,6 +68,16 @@ export const TEST_COPY: ActivationStepCopy = {
     hint: (displayName: string) => `${displayName} requires the card holder tax id`,
     placeholder: '000.000.000-00',
   },
+  payerEmail: {
+    label: 'Payer e-mail',
+    hint: (displayName: string) => `Not your ${displayName} account e-mail`,
+    placeholder: 'name@example.com',
+    required: 'E-mail required',
+    invalid: 'E-mail invalid',
+    refusedField: (displayName: string) => `${displayName} refuses its own account e-mail`,
+    refusedBody: (displayName: string) => `${displayName} refused the payer e-mail`,
+    change: 'Change the e-mail',
+  },
   charge: {
     card: EN_US_CARD_COPY,
     noTokenizer: 'No card path for {provider}',

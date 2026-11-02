@@ -46,6 +46,10 @@ const IDLE_CHARGE = {
   setCpf: vi.fn(),
   cpfError: undefined,
   setCpfError: vi.fn(),
+  email: 'owner@example.test',
+  setEmail: vi.fn(),
+  emailError: undefined,
+  setEmailError: vi.fn(),
   amountCents: null,
   state: { kind: 'idle' } as const,
   submit: vi.fn(),
@@ -79,6 +83,7 @@ function mountStep(overrides: Partial<ActivationStepProps> = {}) {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   hooks.redirect.mockReset();
   hooks.charge.mockReset();
 });
@@ -298,5 +303,130 @@ describe('the copy port', () => {
       /ActivationCopyProvider/,
     );
     error.mockRestore();
+  });
+});
+
+/** The link endpoint answers that this provider requires the payer e-mail. */
+function requireEmailOnTheLink(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ ok: true, json: async () => ({ amountCents: 100, payerEmailRequired: true }) })),
+  );
+}
+
+/** The `<input>` behind a field's test id, wherever the slot binding puts it. */
+function inputOf(testId: string): HTMLInputElement {
+  const host = screen.getByTestId(testId);
+  return (host.querySelector('input') ?? host) as HTMLInputElement;
+}
+
+describe('the payer e-mail (FUT-4050)', () => {
+  it('sits in the card form with the hook’s e-mail and the provider named in its hint', () => {
+    hooks.charge.mockReturnValue({ ...IDLE_CHARGE, payerEmailRequired: true, email: 'pagador@example.test' });
+    mountStep({ provider: 'pagbank', displayName: 'PagBank' });
+    expect(inputOf('verify-charge-email').value).toBe('pagador@example.test');
+    expect(screen.getByText('Not your PagBank account e-mail')).not.toBeNull();
+  });
+
+  it('hands the card hook a validator built from the host’s words', () => {
+    hooks.charge.mockReturnValue(IDLE_CHARGE);
+    mountStep({ provider: 'pagbank' });
+    const { validateEmail } = hooks.charge.mock.calls[0]?.[0] as {
+      validateEmail: (value: string) => string | undefined;
+    };
+    expect(validateEmail('')).toBe('E-mail required');
+    expect(validateEmail('sem-arroba')).toBe('E-mail invalid');
+    expect(validateEmail(' ok@example.test ')).toBeUndefined();
+  });
+
+  it('a refused payer e-mail gets its own panel, and its button goes back to the field', async () => {
+    const reset = vi.fn();
+    const setEmailError = vi.fn();
+    hooks.charge.mockReturnValue({
+      ...IDLE_CHARGE,
+      reset,
+      setEmailError,
+      state: { kind: 'failed', reason: 'buyer email', providerMessage: 'raw', payerEmailRefused: true },
+    });
+    mountStep({ provider: 'pagbank', displayName: 'PagBank' });
+
+    expect(screen.getByText('PagBank refused the payer e-mail')).not.toBeNull();
+    // Not the generic refusal, whose "try again" would send the same e-mail.
+    await waitFor(() => expect(screen.queryByTestId('verify-charge-failed')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('verify-charge-change-email'));
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(setEmailError).toHaveBeenLastCalledWith('PagBank refuses its own account e-mail');
+  });
+
+  it('is not asked in the card form where the provider does not require it (FUT-4200)', async () => {
+    hooks.charge.mockReturnValue({ ...IDLE_CHARGE, payerEmailRequired: false });
+    mountStep({ provider: 'stone', displayName: 'Stone' });
+    expect(screen.getByTestId('verify-charge-form')).not.toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('verify-charge-email')).toBeNull());
+  });
+
+  it('the link flow asks for it where the provider requires it, and mints the link for it', async () => {
+    requireEmailOnTheLink();
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    await waitFor(() => expect(inputOf('verify-charge-email').value).toBe('owner@example.test'));
+    fireEvent.change(inputOf('verify-charge-email'), { target: { value: 'outro@example.test' } });
+    fireEvent.click(screen.getByTestId('verify-charge-start-redirect'));
+    expect(start).toHaveBeenCalledWith({ email: 'outro@example.test' });
+  });
+
+  it('the link flow opens with the e-mail the endpoint suggests', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ amountCents: 100, payerEmail: 'pagamento@example.test', payerEmailRequired: true }),
+      })),
+    );
+    hooks.redirect.mockReturnValue(IDLE_REDIRECT);
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+    await waitFor(() => expect(inputOf('verify-charge-email').value).toBe('pagamento@example.test'));
+  });
+
+  it('the link flow mints nothing for an empty e-mail, and says why on the field', async () => {
+    requireEmailOnTheLink();
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+    await waitFor(() => expect(inputOf('verify-charge-email')).not.toBeNull());
+
+    fireEvent.change(inputOf('verify-charge-email'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('verify-charge-start-redirect'));
+    expect(start).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('E-mail required')).not.toBeNull());
+  });
+});
+
+describe('the link flow where the e-mail is not required (FUT-4200)', () => {
+  it('holds the pay button until the endpoint says whether to ask', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    const button = screen.getByTestId('verify-charge-start-redirect') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('shows no field and mints the link with no typed e-mail', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ amountCents: 100 }) })));
+    const start = vi.fn();
+    hooks.redirect.mockReturnValue({ ...IDLE_REDIRECT, start });
+    mountStep({ provider: 'infinitepay', displayName: 'InfinitePay' });
+
+    await waitFor(() => expect(screen.getByTestId('verify-charge-start-redirect').textContent).toContain('1'));
+    await waitFor(() => expect(screen.queryByTestId('verify-charge-email')).toBeNull());
+    fireEvent.click(screen.getByTestId('verify-charge-start-redirect'));
+    expect(start).toHaveBeenCalledWith();
   });
 });

@@ -387,7 +387,10 @@ describe('the filters', () => {
     await waitFor(() => expect(lastPath(h)).toContain('resourceType_in=lamp'));
   });
 
-  it('sends the period pill as the endpoint inclusive day bounds', async () => {
+  // Its own budget: the two masked day fields are typed through @12-apps/ui's
+  // day input, and on a loaded CI runner this case alone measured 4.4 s (green)
+  // and 5.5–6.2 s (red) against the 5 s default; locally it takes 0.6 s.
+  it('sends the period pill as the endpoint inclusive day bounds', { timeout: 20_000 }, async () => {
     const h = harness();
 
     mount(h);

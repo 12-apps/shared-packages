@@ -75,6 +75,27 @@ clipped at an edge — the map reads the same at 320 px and at 1600 px. The
 drawing is square; `maxHeight` caps it on a wide screen, and where it sits in a
 wider box is the host's call.
 
+### A host can draw inside it, at its scale
+
+A host often has something of its own to show over the areas — a band served
+past the largest circle, a route, a marker — and laying a second SVG over the
+drawing means copying its view math and losing its frame. So:
+
+- `reach` (`{ radiusMetres }` or `{ bounds }`) is an extent the view must ALSO
+  fit, before the 12% margin. With circles the view stays centred on the centre
+  and grows to the reach's farthest edge, so a ring stays a circle in the
+  middle; without circles the view fits the areas and the reach together. A
+  reach no radius describes — the outlines of some areas — is a box:
+  `boundsOfRings(rings)`. Omit it and the view is exactly what it was.
+- `overlay(layer)` draws inside the SVG with `layer.view` and
+  `layer.projection` (`projectionAt(center)`), over the excluded hatch and
+  under the circles, highlights and centre. It sits in a `pointer-events: none`
+  group, so a tap still reaches the area beneath.
+- `regionMapView(props)` returns the same view for HTML laid over the drawing
+  (a pill on a circle, a note): a point `p` sits at `(p.x - view.minX) /
+  view.spanX` across; with circles the view is centred and its half-side is
+  `view.spanX / 2`.
+
 ## Props
 
 | prop | type | default | what it does |
@@ -82,6 +103,8 @@ wider box is the host's call.
 | `regions` | `readonly RegionMapRegion[]` | — | the areas; drawn when any part is in view |
 | `center` | `{ latitude, longitude } \| null` | — | centre, dot and circles; `null` centres on the areas, no dot |
 | `circles` | `readonly { radiusMetres }[]` | `[]` | dashed circles; the view fits the largest |
+| `reach` | `{ radiusMetres } \| { bounds: { south, west, north, east } }` | — | an extent the view must also fit (margin on top) |
+| `overlay` | `(layer: { view, projection }) => ReactNode` | — | a host layer inside the SVG, under the circles, tap-transparent |
 | `onToggle` | `(id: string) => void` | — | a tap or a list press; omit for read-only |
 | `highlightedIds` | `readonly string[]` | `[]` | areas to point at (a search's hits), outlined and named |
 | `copy` | `RegionMapCopy` | — | every word |
@@ -117,6 +140,10 @@ wider box is the host's call.
   `[latitude, longitude]` points; outlines usually travel this way.
 - `hitRegion(regions, point, tolerance)` and `projectionAt(center)` — the hit
   test and projection the component uses, for a host that draws its own layer.
+- `regionMapView({ regions, center, circles, reach })` — the view the
+  component shows for those props, in projected metres, for HTML laid over it.
+- `boundsOfRings(rings)` — the latitude/longitude box around some outlines,
+  for a `reach` no radius describes.
 
 ## Example
 
