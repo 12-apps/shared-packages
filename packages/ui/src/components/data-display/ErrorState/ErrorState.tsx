@@ -20,6 +20,7 @@ import {
   ERROR_STATE_PADDING_UNITS,
   ERROR_TEXT_GAP_UNITS,
   RETRY_MARGIN_TOP_UNITS,
+  RETRY_MIN_HEIGHT,
   RETRY_MIN_WIDTH,
 } from './ErrorState.metrics';
 import type { ErrorStateProps, ErrorStateSeverity } from './ErrorState.types';
@@ -153,6 +154,7 @@ export const ErrorState: React.FC<ErrorStateProps> = React.memo((props) => {
           sx={{
             mt: theme.spacing(RETRY_MARGIN_TOP_UNITS),
             minWidth: rem(theme, RETRY_MIN_WIDTH),
+            minHeight: rem(theme, RETRY_MIN_HEIGHT),
           }}
         >
           {retryLabel}
