@@ -11,6 +11,12 @@
  * eleven digits are. A value with no label run is kept as typed, unless text
  * follows its first document token after a space: then only that token.
  *
+ * Round 6: separator look-alikes (dashes, minus, division and fullwidth
+ * slashes, comma) read as the mask's own first; a mark between the label and
+ * the document is skipped; and when no cut's token is a document by (a) or
+ * (b), a document written with spaces after the cut ("CNPJ: 11 222 333 0001
+ * 81") counts before (c), by the same two tests.
+ *
  * The generated documents of the reviewer's corpus are written out literally:
  * MF.ABC.345/01DE-31, NO.123.456/7890-15, CP.F12.345/6789-44 and
  * MF.120.001/0183-64 are valid CNPJs; 11.222.355/0001-42 is one with a wrong
@@ -73,4 +79,31 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CNPJ:", "CNPJ"],
   ["1122235500014", "1122235500014"],
   ["112223550001", "112223550001"],
+  // Round 6: a mark between the label and the document is no document.
+  ["CNPJ \u2014 11.222.333/0001-81", "11222333000181"],
+  ["CPF \u2013 529.982.247-25", "52998224725"],
+  ['CPF: "529.982.247-25"', "52998224725"],
+  ["CNPJ: (11.222.333/0001-81)", "11222333000181"],
+  ["CPF: *529.982.247-25", "52998224725"],
+  ["CNPJ: #11.222.333/0001-81", "11222333000181"],
+  ["CPF: \u2022 529.982.247-25", "52998224725"],
+  ["CPF: '529.982.247-25'", "52998224725"],
+  // Round 6: a labelled document written with spaces is still one.
+  ["CNPJ: 11 222 333 0001 81", "11222333000181"],
+  ["CNPJ 11 222 333/0001-81", "11222333000181"],
+  ["CPF: 529 982 247 25 Fulano", "52998224725"],
+  ["CNPJ: 11.222.333 / 0001-81", "11222333000181"],
+  ["CNPJ: 11.222.333/0001 - 81", "11222333000181"],
+  // Round 6: separator look-alikes read as the mask's own.
+  ["CPF: 529.982.247\u201125", "52998224725"],
+  ["CNPJ: 11,222,333/0001-81", "11222333000181"],
+  ["CNPJ: 11.222.333\u22150001-81", "11222333000181"],
+  ["CNPJ: 11.222.333\uff0f0001\u221281", "11222333000181"],
+  // Round 6: digits before a name keep only the digits; a glued label goes
+  // only when what is left is a valid document.
+  ["529.982.247 Fulano", "529982247"],
+  ["CPF529.982.247-25", "52998224725"],
+  ["CNPJ11.222.333/0001-81", "11222333000181"],
+  // A spaced CNPJ under a CNPJ-only label never yields a hidden CPF.
+  ["CNPJ: 11 222 355 0001 42", "11222355000142"],
 ];

@@ -85,6 +85,17 @@ function labelRun(value: string): LabelRun {
 }
 
 /**
+ * Separator look-alikes a paste carries in place of the mask's own (FUT-590
+ * UI review, round 6): dashes and minus signs (U+2010–2015, U+2212) for `-`,
+ * the division and fullwidth slashes (U+2215, U+FF0F) for `/`, a comma for
+ * `.`. Read as the mask's separators FIRST, so every rule below sees one
+ * alphabet: "CPF: 529.982.247‑25" (U+2011) is a CPF, "CNPJ — 11.222…" a label.
+ */
+function normaliseSeparators(value: string): string {
+  return value.replace(/[\u2010-\u2015\u2212]/g, "-").replace(/[\u2215\uFF0F]/g, "/").replace(/,/g, ".");
+}
+
+/**
  * The first DOCUMENT TOKEN at the head of `text`: letters and digits joined by
  * the mask's own `. / -`, with no space inside. Whatever follows a space or
  * any other mark (" - Empresa X LTDA", ", nascido em…") is never part of it,
@@ -98,47 +109,114 @@ function documentToken(text: string): string {
 }
 
 /**
+ * A document written WITH spaces ("11 222 333 0001 81", "11.222.333 / 0001-81",
+ * "… 0001 - 81"): its first token, then each further group that starts with a
+ * digit, after a space or a mask separator with a space around it. A name
+ * ("Fulano") starts with a letter, so it never joins. Returns the characters
+ * of every prefix that ends on a group, shortest first.
+ */
+const GROUP_GAP = /^(?:\s+[./-]?\s*|[./-]\s+)/;
+const DIGIT_GROUP = /^\d[0-9A-Za-z]*(?:[./-][0-9A-Za-z]+)*/;
+
+function groupedPrefixes(text: string): string[] {
+  const first = DOCUMENT_TOKEN.exec(text)?.[0] ?? "";
+  if (first === "") return [];
+  const prefixes = [taxIdCharacters(first)];
+  let rest = text.slice(first.length);
+  for (;;) {
+    const gap = GROUP_GAP.exec(rest)?.[0] ?? "";
+    const group = gap === "" ? null : DIGIT_GROUP.exec(rest.slice(gap.length));
+    if (!group) return prefixes;
+    prefixes.push(`${prefixes[prefixes.length - 1]}${taxIdCharacters(group[0])}`);
+    rest = rest.slice(gap.length + group[0].length);
+  }
+}
+
+/** Whether `kept` has a document's length: a CPF's 11 or a CNPJ's 14. */
+function hasDocumentLength(kept: string): boolean {
+  return kept.length === CPF_LENGTH || kept.length === CNPJ_LENGTH;
+}
+
+/**
+ * The document a spaced paste spells (FUT-590 UI review, round 6): the longest
+ * grouped prefix that `accepted` takes as a valid document, else the longest
+ * of a document's length — a typo stays visible — else `undefined`.
+ */
+function spacedDocument(text: string, accepted: (kept: string) => boolean): string | undefined {
+  const prefixes = groupedPrefixes(text).reverse();
+  return prefixes.find(accepted) ?? prefixes.find(hasDocumentLength);
+}
+
+/** A name after the digits: words that start with a letter, and no digit at all. */
+const TRAILING_NAME = /^\s+\p{L}[^0-9]*$/u;
+
+/**
  * A value with no label: as typed, its leading space aside — or, when a space
  * and more follow its first document token ("529.982.247-25 x", "… Loja X"),
- * that token alone. A document written WITH spaces ("529 982 247 25") is
- * still one: the token wins only when the whole value is no valid document
- * and the token is one, or has a document's length (a typo stays visible).
- * The field's own masked value never holds a space, so typing is untouched.
+ * the document it starts with. A document written WITH spaces ("529 982 247
+ * 25") is still one: the whole wins when it is a valid document; else the
+ * grouped digits that are one, or have a document's length (a typo stays
+ * visible); else, when only a name follows digits ("529.982.247 Fulano"),
+ * those digits. The field's own masked value never holds a space, so typing
+ * is untouched.
  */
 function unlabelledDocument(value: string): string {
   const whole = taxIdCharacters(value);
   const trimmed = value.trimStart();
   const first = DOCUMENT_TOKEN.exec(trimmed)?.[0] ?? "";
-  const token = taxIdCharacters(first);
   const followedBySpace = first !== "" && /\s/.test(trimmed.slice(first.length));
   if (!followedBySpace || isValidCpfOrCnpj(whole)) return whole;
-  const tokenIsDocument = isValidCpfOrCnpj(token) || token.length === CPF_LENGTH || token.length === CNPJ_LENGTH;
-  return tokenIsDocument ? token : whole;
+  const spaced = spacedDocument(trimmed, isValidCpfOrCnpj);
+  if (spaced !== undefined) return spaced;
+  const token = taxIdCharacters(first);
+  return /^\d+$/.test(token) && TRAILING_NAME.test(trimmed.slice(first.length)) ? token : whole;
 }
 
 /**
- * The characters of a value pasted with a label run, decided by one rule
- * (FUT-590 UI review, round 5). Each place the run could end gives the
- * document token after it; the field keeps, deepest cut first:
+ * A CPF or CNPJ word glued to the document ("CPF529.982.247-25"): dropped only
+ * when what is left is a VALID document — a CPF only under the CPF word — so
+ * an alphanumeric CNPJ that begins with those letters ("CPF12ABC…") keeps
+ * them. `undefined` when the value is no such paste.
+ */
+function gluedLabelDocument(value: string): string | undefined {
+  const trimmed = value.trimStart();
+  const word = RUN_START.exec(trimmed)?.[0];
+  if (word === undefined || isValidCpfOrCnpj(taxIdCharacters(trimmed))) return undefined;
+  const rest = unlabelledDocument(trimmed.slice(word.length));
+  const fits = rest.length === CNPJ_LENGTH || /^CPF$/i.test(word);
+  return fits && isValidCpfOrCnpj(rest) ? rest : undefined;
+}
+
+/**
+ * The characters of a pasted value, decided by one rule (FUT-590 UI review,
+ * rounds 5 and 6). Separator look-alikes are read as the mask's own first.
+ * Each place a leading label run could end gives the text after it — any mark
+ * before the document skipped (`CPF: "529…"`, `CNPJ — (11…)`) — and its
+ * document token. The field keeps, deepest cut first:
  *  a. a token that is a valid CNPJ — or a valid CPF, unless the run names
  *     only CNPJ ("CNPJ: 11.222.355/0001-42" is a CNPJ with a typo, never the
  *     CPF hiding in it);
  *  b. else a token of a document's length (11 or 14): a typo stays visible;
+ *  b'. else a document written with spaces after the cut ("CNPJ: 11 222 333
+ *     0001 81"): its grouped digits that are valid under (a), else of a
+ *     document's length;
  *  c. else the deepest cut's token.
- * A value with no label run is kept as it is typed — unless text follows its
- * first document token after a space ("529.982.247-25 x", "… Loja X"): then
- * only that token, as the field kept only the digits before letters counted.
+ * A value with no label run is read by {@link unlabelledDocument}, after a
+ * glued CPF/CNPJ word is dropped when that leaves a valid document.
  */
-function pastedDocument(value: string): string {
+function pastedDocument(pasted: string): string {
+  const value = normaliseSeparators(pasted);
   const run = labelRun(value);
-  if (run.ends.length === 0) return unlabelledDocument(value);
-  const tokens = run.ends.map((end) => documentToken(value.slice(end))).reverse();
+  if (run.ends.length === 0) return gluedLabelDocument(value) ?? unlabelledDocument(value);
+  const cuts = run.ends.map((end) => value.slice(end).replace(/^[^0-9A-Za-z]+/, "")).reverse();
+  const tokens = cuts.map(documentToken);
   const [deepest = ""] = tokens;
   const accepted = (token: string): boolean =>
     isValidCpfOrCnpj(token) && (token.length === CNPJ_LENGTH || run.namesCpf);
   return (
     tokens.find(accepted) ??
-    tokens.find((token) => token.length === CPF_LENGTH || token.length === CNPJ_LENGTH) ??
+    tokens.find(hasDocumentLength) ??
+    cuts.map((cut) => spacedDocument(cut, accepted)).find((spaced) => spaced !== undefined) ??
     deepest
   );
 }
