@@ -1,7 +1,7 @@
 import { brLocalNumber } from '../core/customer-schema';
-import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
+import { CustomerRequirementsError, ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
-import { taxIdCharacters } from '../core/tax-id';
+import { sendableTaxId, unsendableTaxId } from '../core/tax-id';
 import { recordedFetch } from '../core/traffic-recorder';
 import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/types';
 
@@ -39,8 +39,12 @@ function apiBaseFor(credentials: ResolvedCredentials): string {
  * document that was nobody's.
  */
 function taxIdOf(taxId: string | null | undefined): string | undefined {
-  const kept = taxIdCharacters(taxId ?? '');
-  return kept.length > 0 ? kept : undefined;
+  // PagBank requires the document; one of no document's length is refused
+  // here, never cut to fourteen characters (the gate refuses it first).
+  if (unsendableTaxId(taxId)) {
+    throw new CustomerRequirementsError(NAME, [{ field: 'taxId', reason: 'INVALID', required: true }]);
+  }
+  return sendableTaxId(taxId);
 }
 
 /** One entry of the order's `customer.phones` array. */

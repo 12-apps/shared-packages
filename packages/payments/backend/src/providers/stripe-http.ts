@@ -1,5 +1,5 @@
 import { CustomerRequirementsError, ProviderRequestError } from '../core/errors';
-import { taxIdCharacters, taxIdHasLetters } from '../core/tax-id';
+import { sendableTaxId, taxIdHasLetters, unsendableTaxId } from '../core/tax-id';
 import type { ChargeInput, ResolvedCredentials } from '../core/types';
 import { basicAuth, formEncode, providerFetch } from './http';
 
@@ -193,5 +193,9 @@ export function boletoTaxId(input: ChargeInput): string {
   if (taxIdHasLetters(taxId)) {
     throw new CustomerRequirementsError(NAME, [{ field: 'taxId', reason: 'INVALID', required: true, detail: 'LETTERS_UNSUPPORTED' }]);
   }
-  return taxIdCharacters(taxId);
+  // Nor is one of no document's length cut down to fit.
+  if (unsendableTaxId(taxId)) {
+    throw new CustomerRequirementsError(NAME, [{ field: 'taxId', reason: 'INVALID', required: true }]);
+  }
+  return sendableTaxId(taxId) ?? '';
 }

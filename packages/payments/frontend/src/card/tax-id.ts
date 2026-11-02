@@ -33,12 +33,21 @@ const ONE_CHARACTER_REPEATED = /^(.)\1+$/;
 const CHARACTER_ZERO = 48;
 
 /**
- * The characters a CPF-or-CNPJ field keeps: digits and uppercased letters, at
- * most a CNPJ's fourteen — what the buyer state, the charge and "Salvar meus
- * dados" carry.
+ * The document's characters: digits and uppercased letters, punctuation and
+ * spaces dropped — and NOTHING cut, so a value longer than a CNPJ's fourteen
+ * is measured, and refused, as what it is. Mirrors the server's.
  */
 export function taxIdCharacters(value: string): string {
-  return value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, CNPJ_LENGTH);
+  return value.toUpperCase().replace(/[^0-9A-Z]/g, "");
+}
+
+/**
+ * What the FIELD keeps as the buyer types: {@link taxIdCharacters}, capped at a
+ * CNPJ's fourteen, the most a document has. Only the input path caps; every
+ * check measures the value it is given.
+ */
+export function taxIdInput(value: string): string {
+  return taxIdCharacters(value).slice(0, CNPJ_LENGTH);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */
@@ -86,7 +95,7 @@ export function plainTaxId(value: string | undefined): string | undefined {
 
 /** The CPF mask while it is one, the CNPJ mask past eleven digits or from its first letter. */
 export function formatCpfOrCnpj(value: string): string {
-  const kept = taxIdCharacters(value);
+  const kept = taxIdInput(value);
   return isCpfShaped(kept) ? formatCpf(kept) : formatCnpj(kept);
 }
 

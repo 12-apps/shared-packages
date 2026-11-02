@@ -120,3 +120,31 @@ describe('what each adapter sends', () => {
     expect(() => stripeIntent(withDocument(SAMPLE, boleto))).toThrow('taxId (INVALID: LETTERS_UNSUPPORTED)');
   });
 });
+
+describe('a document longer than fourteen characters (FUT-590 review)', () => {
+  const LONG_NUMERIC = '11222333000181999';
+  const LONG_ALPHANUMERIC = '12.ABC.345/01DE-35999';
+
+  it('is no valid document, and keeps its length rather than being cut to fourteen', () => {
+    expect(taxIdCharacters(LONG_ALPHANUMERIC)).toBe('12ABC34501DE35999');
+    for (const value of [LONG_NUMERIC, LONG_ALPHANUMERIC, '529982247251']) {
+      expect(isValidCpfOrCnpj(value), value).toBe(false);
+      expect(isValidCnpj(value), value).toBe(false);
+      expect(taxIdKind(value), value).toBeNull();
+    }
+  });
+
+  it('is refused by the buyer gate', () => {
+    const schema = pagbankProvider(PT_BR_PAGBANK_COPY).customerSchema;
+    expect(validateCustomer(schema, 'PIX', { taxId: LONG_NUMERIC })).toEqual([{ field: 'taxId', reason: 'INVALID', required: true }]);
+  });
+
+  it('is refused by the adapters that require it, and left out by those that do not — never sent cut down', () => {
+    expect(() => pagbankCustomer({ taxId: LONG_NUMERIC })).toThrow(CustomerRequirementsError);
+    const stone = stoneOrder(withDocument(LONG_NUMERIC), PT_BR_STONE_COPY).customer as Record<string, unknown>;
+    expect(stone.document).toBeUndefined();
+    expect(devedorOf(withDocument(LONG_ALPHANUMERIC))).toBeUndefined();
+    const boleto: ChargeInput = { ...pixInput(), method: 'BOLETO' };
+    expect(() => stripeIntent(withDocument(LONG_NUMERIC, boleto))).toThrow(CustomerRequirementsError);
+  });
+});

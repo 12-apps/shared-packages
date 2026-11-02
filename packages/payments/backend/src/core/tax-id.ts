@@ -26,11 +26,28 @@ const ONE_CHARACTER_REPEATED = /^(.)\1+$/;
 const CHARACTER_ZERO = 48;
 
 /**
- * The document as it is kept and sent: its letters uppercased, every mark of
- * punctuation and space dropped, at most a CNPJ's fourteen characters.
+ * The document's characters: its letters uppercased, every mark of
+ * punctuation and space dropped — and NOTHING cut. A value longer than a
+ * CNPJ's fourteen stays long, so every check below measures what was given
+ * and refuses it, rather than validating (and sending) the first fourteen.
  */
 export function taxIdCharacters(value: string): string {
-  return value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, CNPJ_LENGTH);
+  return value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+}
+
+/**
+ * The document as an adapter may send it: its characters when they have a
+ * document's shape — eleven digits or fourteen characters — else `undefined`.
+ * A wrong length, an over-long value included, is never cut down to fit.
+ */
+export function sendableTaxId(value: string | null | undefined): string | undefined {
+  const kept = taxIdCharacters(value ?? '');
+  return taxIdKind(kept) === null ? undefined : kept;
+}
+
+/** Whether a document was given but has no document's shape, so must not be sent. */
+export function unsendableTaxId(value: string | null | undefined): boolean {
+  return taxIdCharacters(value ?? '') !== '' && sendableTaxId(value) === undefined;
 }
 
 /** Whether the document carries a letter — an alphanumeric CNPJ, or one on its way. */

@@ -325,7 +325,7 @@ export type {
 } from './core/charge-raise';
 export * from './core/supersede-public';
 export { isValidCpf } from './core/cpf';
-export { isValidCnpj, isValidCpfOrCnpj, taxIdCharacters, taxIdHasLetters, taxIdKind } from './core/tax-id';
+export { isValidCnpj, isValidCpfOrCnpj, sendableTaxId, taxIdCharacters, taxIdHasLetters, taxIdKind } from './core/tax-id';
 // Caller-side charge questions (FUT-760): what a reversal event reversed,
 // whether a charge already raised is still payable, and the two instrument
 // questions a checkout asks BEFORE any failover walk begins.

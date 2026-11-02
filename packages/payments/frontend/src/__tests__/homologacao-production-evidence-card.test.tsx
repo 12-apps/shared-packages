@@ -266,7 +266,7 @@ describe('HomologacaoProductionEvidenceCard', () => {
 });
 
 describe('production evidence data', () => {
-  it('given a CPF or CNPJ, then only their digits go; anything else is not a buyer yet', () => {
+  it('given a CPF or CNPJ, then only their characters go; anything else is not a buyer yet', () => {
     const base = {
       ...EMPTY_BUYER,
       name: 'Ana',
@@ -280,6 +280,9 @@ describe('production evidence data', () => {
     };
     expect(buyerOf({ ...base, taxId: '123.456.789-09' })?.taxId).toBe('12345678909');
     expect(buyerOf({ ...base, taxId: '123' })).toBeNull();
+    // FUT-590: an alphanumeric CNPJ keeps its letters, and nothing is cut to fit.
+    expect(buyerOf({ ...base, taxId: '12.abc.345/01de-35' })?.taxId).toBe('12ABC34501DE35');
+    expect(buyerOf({ ...base, taxId: '11222333000181999' })).toBeNull();
     expect(buyerOf({ ...base, taxId: '12345678909', email: 'ana' })).toBeNull();
   });
 

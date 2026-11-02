@@ -5,6 +5,7 @@ import type {
   ThreeDSecureSession,
 } from '@12-apps/payments-backend';
 
+import { taxIdCharacters, taxIdKind } from '../../card/tax-id';
 import { authenticatePagBankDebit } from '../../card/three-ds';
 import { encryptPagBankCard } from '../../card/tokenize';
 import { THREEDS_FAILURES } from './HomologacaoEvidenceCard';
@@ -56,17 +57,18 @@ const digits = (value: string): string => value.replace(/\D/g, '');
 
 /**
  * The buyer the server takes, or null while anything is missing or malformed.
- * A CPF has 11 digits and a CNPJ 14; the phone goes in E.164 with Brazil's code
+ * A CPF has 11 digits and a CNPJ 14 characters, an alphanumeric CNPJ's letters
+ * kept (FUT-590); the phone goes in E.164 with Brazil's code
  * when the operator typed only the national number.
  */
 export function buyerOf(form: BuyerForm): EvidenceBuyer | null {
-  const taxId = digits(form.taxId);
+  const taxId = taxIdCharacters(form.taxId);
   const phone = digits(form.phone);
   const postalCode = digits(form.postalCode);
   const regionCode = form.regionCode.trim().toUpperCase();
   const required = [form.name, form.email, form.street, form.number, form.city].map((value) => value.trim());
   if (required.some((value) => value === '')) return null;
-  if (![11, 14].includes(taxId.length) || phone.length < 10 || postalCode.length !== 8) return null;
+  if (taxIdKind(taxId) === null || phone.length < 10 || postalCode.length !== 8) return null;
   if (!/^[A-Z]{2}$/.test(regionCode) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return null;
   const complement = form.complement.trim();
   return {

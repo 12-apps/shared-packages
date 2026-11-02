@@ -8,6 +8,7 @@ import {
   isValidCpfOrCnpj,
   plainTaxId,
   taxIdCharacters,
+  taxIdInput,
   taxIdKind,
   validateCpfOrCnpj,
 } from './tax-id';
@@ -65,8 +66,9 @@ describe('the payer document mask: a CPF up to 11 digits, a CNPJ from the 12th (
     expect(formatCpfOrCnpj(pasted)).toBe(shown);
   });
 
-  it('keeps at most a CNPJ’s fourteen digits, whatever is pasted after them', () => {
-    expect(taxIdCharacters('11.222.333/0001-8199')).toBe('11222333000181');
+  it('keeps at most a CNPJ’s fourteen digits as the buyer types, whatever is pasted after them', () => {
+    // Only the field's input path caps (FUT-590): every check measures the whole value.
+    expect(taxIdInput('11.222.333/0001-8199')).toBe('11222333000181');
     expect(formatCpfOrCnpj('112223330001819999')).toBe('11.222.333/0001-81');
   });
 

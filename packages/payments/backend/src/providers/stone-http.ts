@@ -1,4 +1,4 @@
-import { taxIdCharacters } from '../core/tax-id';
+import { sendableTaxId } from '../core/tax-id';
 import type { ResolvedCredentials } from '../core/types';
 import { basicAuth, providerFetch } from './http';
 
@@ -37,8 +37,8 @@ const API_BASE = 'https://api.pagar.me/core/v5';
  * alphanumeric CNPJ's letters kept and uppercased (FUT-590).
  */
 export function documentOf(taxId: string | null | undefined): string | undefined {
-  const kept = taxIdCharacters(taxId ?? '');
-  return kept.length > 0 ? kept : undefined;
+  // Optional here: a value of no document's length is left out, never cut down.
+  return sendableTaxId(taxId);
 }
 
 /** A CPF is an individual; a CNPJ, numeric or alphanumeric, a company. */

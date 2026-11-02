@@ -34,6 +34,7 @@ export {
   isValidCpfOrCnpj,
   plainTaxId,
   taxIdCharacters,
+  taxIdInput,
   taxIdKind,
   validateCpfOrCnpj,
 } from "./tax-id";

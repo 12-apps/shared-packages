@@ -267,6 +267,24 @@ describe('useActivationCharge — the charge', () => {
     expect(io.posted()[0]?.body).toMatchObject({ taxId: '11222333000181' });
   });
 
+  it('sends an alphanumeric CNPJ with its letters, never cut to its digits (FUT-590)', async () => {
+    const io = stubFetch({ post: [{ ok: true, refunded: true }] });
+    stubTokenizer();
+    const { result } = renderHook(usingOptions(options()));
+    await waitFor(() => expect(io.calls.length).toBeGreaterThan(0));
+    act(() => {
+      result.current.setCard(GOOD_CARD);
+      result.current.setCpf('12.abc.345/01de-35');
+    });
+
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(result.current.cpfError).toBeUndefined();
+    expect(io.posted()[0]?.body).toMatchObject({ taxId: '12ABC34501DE35' });
+  });
+
   it('refuses a CNPJ whose check digits are wrong, before anything is charged', async () => {
     const io = stubFetch({ post: [{ ok: true, refunded: true }] });
     stubTokenizer();

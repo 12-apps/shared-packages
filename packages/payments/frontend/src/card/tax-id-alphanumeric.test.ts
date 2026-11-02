@@ -14,6 +14,7 @@ import {
   isValidCpfOrCnpj,
   plainTaxId,
   taxIdCharacters,
+  taxIdInput,
   taxIdKind,
   validateCpfOrCnpj,
 } from './tax-id';
@@ -59,5 +60,22 @@ describe('the alphanumeric CNPJ in the payer document field', () => {
     expect(formatCpfOrCnpj('11222333000181')).toBe('11.222.333/0001-81');
     expect(taxIdKind('52998224725')).toBe('CPF');
     expect(isValidCpfOrCnpj('11.222.333/0001-81')).toBe(true);
+  });
+});
+
+describe('a document longer than fourteen characters (FUT-590 review)', () => {
+  it('is measured as given: no valid document, no kind, nothing cut', () => {
+    for (const value of ['11222333000181999', '12.ABC.345/01DE-35999', '529982247251']) {
+      expect(isValidCpfOrCnpj(value), value).toBe(false);
+      expect(taxIdKind(value), value).toBeNull();
+      expect(validateCpfOrCnpj(value, fields), value).toBe(fields.taxIdInvalid);
+    }
+    expect(taxIdCharacters('12.ABC.345/01DE-35999')).toBe('12ABC34501DE35999');
+    expect(plainTaxId('11222333000181999')).toBe('11222333000181999');
+  });
+
+  it('is capped at fourteen only where the buyer types it', () => {
+    expect(taxIdInput('12.ABC.345/01DE-35999')).toBe('12ABC34501DE35');
+    expect(formatCpfOrCnpj('12ABC34501DE35999')).toBe('12.ABC.345/01DE-35');
   });
 });

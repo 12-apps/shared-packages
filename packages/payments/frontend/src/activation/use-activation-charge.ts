@@ -6,6 +6,7 @@ import type React from 'react';
 import {
   detectBrand,
   onlyDigits,
+  plainTaxId,
   tokenizeCard,
   tokenizerFor,
   validateCardNumber,
@@ -272,7 +273,8 @@ async function runCharge(request: ChargeRequest): Promise<ActivationChargeState>
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         token: tokenized.data.token,
-        taxId: onlyDigits(request.cpf),
+        // Without punctuation, an alphanumeric CNPJ's letters kept (FUT-590), as the checkout sends it.
+        taxId: plainTaxId(request.cpf) ?? '',
         holderName: request.card.holder.trim(),
         email: request.email.trim(),
       }),
