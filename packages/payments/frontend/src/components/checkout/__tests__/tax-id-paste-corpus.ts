@@ -8,7 +8,8 @@
  * the run names only CNPJ; else (b) a token of a document's length; else (c)
  * the deepest token. Nothing is ever cut to 11 or 14: "CNPJ:
  * 11.222.355/0001-42" is a CNPJ with a typo, never the valid CPF its first
- * eleven digits are. A value with no label run is kept as typed.
+ * eleven digits are. A value with no label run is kept as typed, unless text
+ * follows its first document token after a space: then only that token.
  *
  * The generated documents of the reviewer's corpus are written out literally:
  * MF.ABC.345/01DE-31, NO.123.456/7890-15, CP.F12.345/6789-44 and
@@ -59,7 +60,14 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CNPJ: MF.120.001/0183-64", "MF120001018364"],
   ["MF.120.001/0183-64", "MF120001018364"],
   ["11.222.333/0001-81 Empresa", "11222333000181"],
-  ["529.982.247-25 x", "52998224725X"],
+  ["529.982.247-25 x", "52998224725"],
+  ["12.ABC.345/01DE-35 Loja X", "12ABC34501DE35"],
+  [" 529.982.247-25", "52998224725"],
+  [" 529.982.247-25 Fulano", "52998224725"],
+  ["529.982.247-26 x", "52998224726"],
+  // A document written with spaces is still one (FUT-4080).
+  ["529 982 247 25", "52998224725"],
+  [" 11 222 333 0001 81 ", "11222333000181"],
   ["CNPJ 1", "1"],
   ["CPF ", "CPF"],
   ["CNPJ:", "CNPJ"],

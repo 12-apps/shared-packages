@@ -98,6 +98,25 @@ function documentToken(text: string): string {
 }
 
 /**
+ * A value with no label: as typed, its leading space aside — or, when a space
+ * and more follow its first document token ("529.982.247-25 x", "… Loja X"),
+ * that token alone. A document written WITH spaces ("529 982 247 25") is
+ * still one: the token wins only when the whole value is no valid document
+ * and the token is one, or has a document's length (a typo stays visible).
+ * The field's own masked value never holds a space, so typing is untouched.
+ */
+function unlabelledDocument(value: string): string {
+  const whole = taxIdCharacters(value);
+  const trimmed = value.trimStart();
+  const first = DOCUMENT_TOKEN.exec(trimmed)?.[0] ?? "";
+  const token = taxIdCharacters(first);
+  const followedBySpace = first !== "" && /\s/.test(trimmed.slice(first.length));
+  if (!followedBySpace || isValidCpfOrCnpj(whole)) return whole;
+  const tokenIsDocument = isValidCpfOrCnpj(token) || token.length === CPF_LENGTH || token.length === CNPJ_LENGTH;
+  return tokenIsDocument ? token : whole;
+}
+
+/**
  * The characters of a value pasted with a label run, decided by one rule
  * (FUT-590 UI review, round 5). Each place the run could end gives the
  * document token after it; the field keeps, deepest cut first:
@@ -106,11 +125,13 @@ function documentToken(text: string): string {
  *     CPF hiding in it);
  *  b. else a token of a document's length (11 or 14): a typo stays visible;
  *  c. else the deepest cut's token.
- * A value with no label run is kept as it is typed.
+ * A value with no label run is kept as it is typed — unless text follows its
+ * first document token after a space ("529.982.247-25 x", "… Loja X"): then
+ * only that token, as the field kept only the digits before letters counted.
  */
 function pastedDocument(value: string): string {
   const run = labelRun(value);
-  if (run.ends.length === 0) return taxIdCharacters(value);
+  if (run.ends.length === 0) return unlabelledDocument(value);
   const tokens = run.ends.map((end) => documentToken(value.slice(end))).reverse();
   const [deepest = ""] = tokens;
   const accepted = (token: string): boolean =>
