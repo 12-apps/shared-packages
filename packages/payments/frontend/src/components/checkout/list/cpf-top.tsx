@@ -155,7 +155,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   const value = taxIdField.shown(buyer.taxId ?? "");
   const { complaint, onTyped, onFocus, onBlur } = useDocumentVerdict(field, value, copy, onComplete);
   const scope = useRef<HTMLDivElement | null>(null);
-  const keyboard = useTaxIdKeyboard(scope, copy);
+  const keyboard = useTaxIdKeyboard(scope, copy, value);
   useEffect(() => {
     if (focusOnMount) scope.current?.querySelector<HTMLInputElement>("input")?.focus();
   }, [focusOnMount]);

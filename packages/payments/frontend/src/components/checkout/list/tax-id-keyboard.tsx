@@ -63,6 +63,22 @@ export function keyboardProps(mode: TaxIdKeyboard): {
 }
 
 /**
+ * A document that GAINS a letter — an alphanumeric CNPJ pasted or autofilled,
+ * or one on file the field opens on — moves the field to the letters keyboard
+ * by itself, so the link then offers the way back (FUT-590: one tap fewer).
+ * Only on the change: a buyer who then taps back to numbers keeps that choice
+ * while the letters stay.
+ */
+function useLettersOnceTheyArrive(value: string, setMode: (mode: TaxIdKeyboard) => void): void {
+  const hasLetters = /[A-Z]/i.test(value);
+  const had = useRef(false);
+  useEffect(() => {
+    if (hasLetters && !had.current) setMode("text");
+    had.current = hasLetters;
+  }, [hasLetters, setMode]);
+}
+
+/**
  * Which keyboard the document field opens, whether the switch is offered, and
  * the switch itself. After a switch the buyer is put back in the field — out
  * and in again, since a phone reads `inputmode` as the field takes the focus —
@@ -71,9 +87,11 @@ export function keyboardProps(mode: TaxIdKeyboard): {
 export function useTaxIdKeyboard(
   scope: RefObject<HTMLElement | null>,
   copy: KeyboardSwitchCopy,
+  value: string,
   input: string = TAX_ID_INPUT,
 ): { mode: TaxIdKeyboard; offered: boolean; onSwitch: () => void } {
   const [mode, setMode] = useState<TaxIdKeyboard>("numeric");
+  useLettersOnceTheyArrive(value, setMode);
   const [switches, setSwitches] = useState(0);
   const onAComputer = useMediaQuery(PHYSICAL_KEYBOARD_QUERY, { noSsr: true });
   const offered = !onAComputer && Boolean(copy.lettersKeyboard && copy.numbersKeyboard);

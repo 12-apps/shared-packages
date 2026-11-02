@@ -77,7 +77,7 @@ function TaxIdField({ verification, displayName, validateTaxId }: {
   const { Input } = useCheckoutComponents();
   const { cpf, setCpf, cpfError, setCpfError } = verification;
   const scope = useRef<HTMLDivElement | null>(null);
-  const keyboard = useTaxIdKeyboard(scope, taxId, '[data-testid="verify-charge-cpf"]');
+  const keyboard = useTaxIdKeyboard(scope, taxId, cpf, '[data-testid="verify-charge-cpf"]');
   return (
     // Its own column, so the Stack's spacing does not override the link's band.
     <Stack ref={scope} spacing={1.5} useFlexGap>

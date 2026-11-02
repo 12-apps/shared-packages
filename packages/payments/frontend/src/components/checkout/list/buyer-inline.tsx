@@ -180,7 +180,7 @@ export function BuyerInline({
   const { Checkbox } = useCheckoutComponents();
   const consent = usePaymentListMode()?.consent;
   const scope = useRef<HTMLDivElement | null>(null);
-  const keyboard = useTaxIdKeyboard(scope, copy);
+  const keyboard = useTaxIdKeyboard(scope, copy, buyer.taxId ?? "");
   useOnComplete(asked.every((field) => fieldSatisfied(field, buyer[field.key])), onComplete);
   if (asked.length === 0) return null;
   return (

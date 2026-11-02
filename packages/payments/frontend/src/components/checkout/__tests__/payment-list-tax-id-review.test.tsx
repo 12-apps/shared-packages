@@ -67,6 +67,11 @@ describe("a document pasted with its label", () => {
     ["CPF 529.982.247-25", "529.982.247-25", "52998224725"],
     ["CNPJ: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
     ["cnpj:12.abc.345/01de-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
+    // A run of label words, as company papers and receipts write it (re-review).
+    ["CPF/CNPJ: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CNPJ/MF 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CNPJ nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CPF.: 529.982.247-25", "529.982.247-25", "52998224725"],
     ["12.ABC.345/01DE-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
   ])("%j keeps the document, not the label", (pasted, shown, kept) => {
     const buyers: BuyerInfo[] = [];
@@ -80,6 +85,11 @@ describe("a document pasted with its label", () => {
     expect(taxIdInput("CPF 529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("  cpf :  529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("CPF12ABC34501")).toBe("CPF12ABC34501");
+    expect(taxIdInput("CNPJ n° 11.222.333/0001-81")).toBe("11222333000181");
+    expect(taxIdInput("CNPJ No. 11.222.333/0001-81")).toBe("11222333000181");
+    // A run must START with CPF or CNPJ: a masked alphanumeric CNPJ may begin MF. or NO.
+    expect(taxIdInput("MF.ABC.345/01DE-35")).toBe("MFABC34501DE35");
+    expect(taxIdInput("NO.ABC.345/01DE-35")).toBe("NOABC34501DE35");
   });
 });
 
@@ -89,5 +99,33 @@ describe("what the phone's keyboard is told about the document", () => {
     expect(input().getAttribute("spellcheck")).toBe("false");
     expect(input().getAttribute("autocorrect")).toBe("off");
     expect(input().getAttribute("autocapitalize")).toBe("characters");
+  });
+});
+
+describe("a document that arrives with a letter", () => {
+  it("moves the field to the letters keyboard by itself, and the link offers the way back", () => {
+    render(<Field />);
+    expect(input().getAttribute("inputmode")).toBe("numeric");
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-35" } });
+    expect(input().getAttribute("inputmode")).toBe("text");
+    expect(screen.getByTestId("list-cpf-keyboard").textContent).toContain("Voltar ao teclado de números");
+  });
+
+  it("keeps the buyer's own choice of numbers while the letters stay", () => {
+    render(<Field />);
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-35" } });
+    fireEvent.click(screen.getByTestId("list-cpf-keyboard"));
+    expect(input().getAttribute("inputmode")).toBe("numeric");
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-3" } });
+    expect(input().getAttribute("inputmode")).toBe("numeric");
+  });
+
+  it("opens on the letters keyboard over a document on file that carries a letter", () => {
+    function OnFile(): JSX.Element {
+      const [buyer, setBuyer] = useState<BuyerInfo>({ taxId: "12ABC34501DE35" });
+      return <CpfTop field={TAX_ID} buyer={buyer} onBuyerChange={setBuyer} copy={COPY} provider="PagBank" />;
+    }
+    render(<OnFile />);
+    expect(input().getAttribute("inputmode")).toBe("text");
   });
 });

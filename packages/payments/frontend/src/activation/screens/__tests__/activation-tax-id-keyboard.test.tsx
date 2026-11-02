@@ -26,13 +26,13 @@ vi.mock('../../use-activation-charge', () => ({
 const TO_LETTERS = 'Seu CNPJ tem letras? Usar teclado com letras';
 const TO_NUMBERS = 'Voltar ao teclado de números';
 
-function charge(setCpf = vi.fn()) {
+function charge(setCpf = vi.fn(), cpf = '') {
   return {
     card: { number: '', holder: '', expiry: '', cvv: '' },
     setCard: vi.fn(),
     fieldErrors: {},
     setFieldErrors: vi.fn(),
-    cpf: '',
+    cpf,
     setCpf,
     cpfError: undefined,
     setCpfError: vi.fn(),
@@ -115,12 +115,25 @@ describe("the activation form's document field", () => {
     expect(document.body.textContent ?? '').not.toContain(TO_LETTERS);
   });
 
-  it('keeps the document of a labelled paste, and its letters', () => {
+  it.each([
+    ['CNPJ: 11.222.333/0001-81', '11222333000181'],
+    ['CPF 529.982.247-25', '52998224725'],
+    ['CPF/CNPJ: 11.222.333/0001-81', '11222333000181'],
+    ['CNPJ/MF 11.222.333/0001-81', '11222333000181'],
+    ['CNPJ nº 11.222.333/0001-81', '11222333000181'],
+    ['CPF.: 529.982.247-25', '52998224725'],
+  ])('keeps only the document of the labelled paste %j', (pasted, kept) => {
     const setCpf = vi.fn();
     hooks.charge.mockReturnValue(charge(setCpf));
     mount();
-    fireEvent.change(input(), { target: { value: 'CNPJ: 11.222.333/0001-81' } });
-    expect(setCpf).toHaveBeenLastCalledWith('11222333000181');
+    fireEvent.change(input(), { target: { value: pasted } });
+    expect(setCpf).toHaveBeenLastCalledWith(kept);
+  });
+
+  it('keeps the letters of an alphanumeric CNPJ', () => {
+    const setCpf = vi.fn();
+    hooks.charge.mockReturnValue(charge(setCpf));
+    mount();
     fireEvent.change(input(), { target: { value: '12.abc.345/01de-35' } });
     expect(setCpf).toHaveBeenLastCalledWith('12ABC34501DE35');
   });
@@ -140,5 +153,12 @@ describe("the activation form's document field", () => {
     hooks.charge.mockReturnValue(charge());
     mount({ ...TEST_COPY, taxId: copy.taxId });
     expect(input().getAttribute('placeholder')).toBe(placeholder);
+  });
+
+  it('opens on the letters keyboard when the document already carries a letter', () => {
+    hooks.charge.mockReturnValue(charge(vi.fn(), '12ABC34501DE35'));
+    mount();
+    expect(input().getAttribute('inputmode')).toBe('text');
+    expect(screen.getByTestId('verify-charge-cpf-keyboard').textContent).toContain(TO_NUMBERS);
   });
 });

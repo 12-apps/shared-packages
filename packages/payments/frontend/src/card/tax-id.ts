@@ -42,12 +42,19 @@ export function taxIdCharacters(value: string): string {
 }
 
 /**
- * A label pasted in front of the document — "CPF 529.982.247-25", "cnpj:
- * 11.222.333/0001-81" — as it is copied from a receipt or a card statement.
- * It needs a colon or a space after it: without one, `CPF…` could be the start
- * of an alphanumeric CNPJ, whose first characters may be any letters.
+ * A label pasted in front of the document, as it is copied from a receipt, a
+ * card statement or a company's papers: "CPF 529.982.247-25", "CPF.: …",
+ * "CPF/CNPJ: …", "CNPJ/MF …", "CNPJ nº …" (FUT-590 UI review). A RUN of label
+ * words joined by `/ . : -` or spaces.
+ *
+ * It must START with CPF or CNPJ: an alphanumeric CNPJ masked as typed may
+ * begin `MF.` or `NO.`, and a run allowed to start there would eat its letters.
+ * And it must END on a separator: without one, `CPF…` may be the start of an
+ * alphanumeric CNPJ, whose first characters can be any letters.
  */
-const PASTED_LABEL = /^\s*(?:CPF|CNPJ)\s*(?::\s*|\s+)(?=\S)/i;
+const LABEL_WORD = String.raw`(?:CPF|CNPJ|MF|N[º°]|NO\.|N\.)`;
+const LABEL_JOIN = String.raw`[\s/.:\-]`;
+const PASTED_LABEL = new RegExp(String.raw`^\s*(?:CPF|CNPJ)(?:${LABEL_JOIN}*${LABEL_WORD})*${LABEL_JOIN}+(?=\S)`, "i");
 
 /**
  * What the FIELD keeps as the buyer types or pastes: a leading `CPF`/`CNPJ`
