@@ -89,6 +89,9 @@ function focusedField(scope: RefObject<HTMLElement | null>, input: string): HTML
  *    fewer), re-entering the field when it holds the focus, so the keypad
  *    and the link's words agree. A buyer who then taps back to numbers keeps
  *    that choice while the letters stay;
+ *  - when the letters LEAVE (a numeric document pasted over), a letters mode
+ *    the field chose by itself goes back to numbers, the same way; a letters
+ *    mode the buyer chose with the link stays theirs;
  *  - a document on file that already carries a letter OPENS on the letters
  *    keyboard: the mode is set before the first render, so a field focused
  *    as it appears ("Alterar") is focused with letters already in place.
@@ -110,16 +113,25 @@ export function useTaxIdKeyboard(
 
   const lettered = hasLetters(value);
   const hadLetters = useRef(lettered);
+  // Letters mode the FIELD chose (letters arrived), as opposed to the buyer's
+  // tap on the link: only the former is undone when the letters go.
+  const lettersByArrival = useRef(lettered);
   useEffect(() => {
-    if (lettered && !hadLetters.current) {
-      setMode("text");
-      if (focusedField(scope, input)) {
-        reason.current = "letters";
-        setReentries((count) => count + 1);
-      }
-    }
+    const arrived = lettered && !hadLetters.current;
+    const left = !lettered && hadLetters.current;
     hadLetters.current = lettered;
-  }, [lettered, scope, input]);
+    // Arriving letters claim the mode only when they change it: letters the
+    // buyer had already chosen with the link stay the buyer's.
+    const toLetters = arrived && mode === "numeric";
+    const toNumbers = left && lettersByArrival.current;
+    if (!toLetters && !toNumbers) return;
+    lettersByArrival.current = toLetters;
+    setMode(toLetters ? "text" : "numeric");
+    if (focusedField(scope, input)) {
+      reason.current = "letters";
+      setReentries((count) => count + 1);
+    }
+  }, [lettered, mode, scope, input]);
 
   const firstRender = useRef(true);
   useEffect(() => {
@@ -144,6 +156,7 @@ export function useTaxIdKeyboard(
     offered,
     onSwitch: () => {
       reason.current = "switch";
+      lettersByArrival.current = false;
       setMode((current) => (current === "numeric" ? "text" : "numeric"));
       setReentries((count) => count + 1);
     },

@@ -221,3 +221,43 @@ describe("the keyboard a phone reads as the field takes the focus", () => {
     expect(input().getAttribute("inputmode")).toBe("text");
   });
 });
+
+describe("when the letters leave the document again", () => {
+  const NUMERIC = "11.222.333/0001-81";
+  const ALPHANUMERIC = "12.ABC.345/01DE-35";
+
+  it("goes back to numbers when letters mode was the field's own switch", () => {
+    render(<Field />);
+    fireEvent.change(input(), { target: { value: ALPHANUMERIC } });
+    expect(input().getAttribute("inputmode")).toBe("text");
+    fireEvent.change(input(), { target: { value: NUMERIC } });
+    expect(input().getAttribute("inputmode")).toBe("numeric");
+    expect(screen.getByTestId("list-cpf-keyboard").textContent).toContain("Seu CNPJ tem letras? Usar teclado com letras");
+  });
+
+  it("keeps the letters the buyer chose with the link", () => {
+    render(<Field />);
+    fireEvent.click(screen.getByTestId("list-cpf-keyboard"));
+    fireEvent.change(input(), { target: { value: NUMERIC } });
+    expect(input().getAttribute("inputmode")).toBe("text");
+  });
+
+  it("keeps the letters the buyer chose with the link, even after an alphanumeric paste came and went", () => {
+    render(<Field />);
+    fireEvent.click(screen.getByTestId("list-cpf-keyboard"));
+    fireEvent.change(input(), { target: { value: ALPHANUMERIC } });
+    fireEvent.change(input(), { target: { value: NUMERIC } });
+    expect(input().getAttribute("inputmode")).toBe("text");
+  });
+
+  it("re-enters a focused field on the way back, so the keypad is the number one again", async () => {
+    recordInputModeAtFocus();
+    render(<FocusedOnOpen taxId="" />);
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric"));
+    fireEvent.change(input(), { target: { value: ALPHANUMERIC } });
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric text"));
+    fireEvent.change(input(), { target: { value: NUMERIC } });
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric text numeric"));
+    await waitFor(() => expect(input()).toBe(document.activeElement));
+  });
+});
