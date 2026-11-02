@@ -5,7 +5,7 @@
  * phone's link to the letters one (an alphanumeric CNPJ), no link on a
  * computer, a pasted label dropped, and no spell-check on the document.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createActivationStep } from '../activation-step';
@@ -49,13 +49,13 @@ function charge(setCpf = vi.fn(), cpf = '') {
 
 const WITH_LINK: ActivationStepCopy = { ...TEST_COPY, taxId: { ...TEST_COPY.taxId, lettersKeyboard: TO_LETTERS, numbersKeyboard: TO_NUMBERS } };
 
-function mount(copy: ActivationStepCopy = WITH_LINK): void {
+function mount(copy: ActivationStepCopy = WITH_LINK, validateTaxId: (value: string) => string | undefined = noopValidateTaxId): void {
   const Step = createActivationStep({
     verifyChargeUrl: (provider) => `/verify/${provider}`,
     copy,
     formatAmount,
     CardSurface: TestCardSurface,
-    validateTaxId: noopValidateTaxId,
+    validateTaxId,
   });
   render(
     <Step
@@ -130,6 +130,8 @@ describe("the activation form's document field", () => {
     ['CNPJ Nº 11.222.333/0001-81', '11222333000181'],
     ['CPF n.º 529.982.247-25', '52998224725'],
     ['CPF N.º 529.982.247-25', '52998224725'],
+    ['CNPJ: 11.222.333/0001-81 - Empresa X LTDA', '11222333000181'],
+    ['CNPJ: 11.222.333/0001-8', '1122233300018'],
   ])('keeps only the document of the labelled paste %j', (pasted, kept) => {
     const setCpf = vi.fn();
     hooks.charge.mockReturnValue(charge(setCpf));
@@ -168,5 +170,17 @@ describe("the activation form's document field", () => {
     mount();
     expect(input().getAttribute('inputmode')).toBe('text');
     expect(screen.getByTestId('verify-charge-cpf-keyboard').textContent).toContain(TO_NUMBERS);
+  });
+
+  it('does not judge a half-typed document when the keyboard leaves and re-enters the field', async () => {
+    const setCpfError = vi.fn();
+    hooks.charge.mockReturnValue({ ...charge(vi.fn(), '12ABC'), setCpfError });
+    mount(WITH_LINK, () => 'Esse CPF ou CNPJ não é válido. Confira os números.');
+    // The first switch enters the field; the second leaves and re-enters it.
+    fireEvent.click(screen.getByTestId('verify-charge-cpf-keyboard'));
+    await waitFor(() => expect(input()).toBe(document.activeElement));
+    fireEvent.click(screen.getByTestId('verify-charge-cpf-keyboard'));
+    await waitFor(() => expect(input().getAttribute('inputmode')).toBe('text'));
+    expect(setCpfError).not.toHaveBeenCalled();
   });
 });

@@ -51,7 +51,7 @@ export function taxIdCharacters(value: string): string {
  * is a label and an alphanumeric CNPJ that begins with MF, `CNPJ/MF: 11.222…`
  * is a two-word label: the same letters, two answers. So every place the run
  * could end is a candidate, and the document's own check digits choose
- * ({@link withoutPastedLabel}).
+ * ({@link pastedDocument}).
  */
 const RUN_START = /^(?:CPF|CNPJ)/i;
 const LABEL_WORD = /^(?:CPF|CNPJ|MF|N\.?[º°]|NO\.|NO(?=\s)|N\.)/i;
@@ -78,29 +78,53 @@ function labelEnds(value: string): number[] {
 }
 
 /**
- * The value with its pasted label removed, decided by the check digits: the
- * most-stripped candidate whose characters are a valid CPF or CNPJ; failing
- * that, the most-stripped one with a document's length (11 or 14), as a
- * mistyped document still is one; failing that, the value as given.
+ * The document at the head of a labelled candidate: its first 14 kept
+ * characters when they are a valid CNPJ, else its first 11 when they are a
+ * valid CPF, else `null`. Judged by the HEAD, not the whole string, because a
+ * paste often carries text after the document ("… - Empresa X LTDA").
  */
-function withoutPastedLabel(value: string): string {
-  const stripped = labelEnds(value).map((end) => value.slice(end)).reverse();
-  const valid = stripped.find((candidate) => isValidCpfOrCnpj(candidate));
-  if (valid !== undefined) return valid;
-  if (isValidCpfOrCnpj(value)) return value;
-  const shaped = stripped.find((candidate) => [CPF_LENGTH, CNPJ_LENGTH].includes(taxIdCharacters(candidate).length));
-  return shaped ?? value;
+function documentAtHead(candidate: string): string | null {
+  const kept = taxIdCharacters(candidate);
+  const cnpj = kept.slice(0, CNPJ_LENGTH);
+  if (cnpj.length === CNPJ_LENGTH && isValidCpfOrCnpj(cnpj)) return cnpj;
+  const cpf = kept.slice(0, CPF_LENGTH);
+  return /^\d{11}$/.test(cpf) && isValidCpfOrCnpj(cpf) ? cpf : null;
+}
+
+/**
+ * The characters of a pasted value with its label removed, decided by the
+ * check digits:
+ *  1. the deepest label cut whose head is a valid CNPJ or CPF
+ *     (`CNPJ: MF.ABC…` keeps MF, `CNPJ/MF: 11.222…` drops it);
+ *  2. the value as given, when it is itself valid;
+ *  3. when a label run was found, the SHALLOWEST cut — only the leading
+ *     CPF/CNPJ word dropped — as a mistyped or half-pasted document is still
+ *     one ("CNPJ: 11.222.333/0001-8" keeps its digits);
+ *  4. the value as given.
+ * A value with no label is never cut at its head: typing a CNPJ whose first
+ * eleven digits happen to be a valid CPF must keep the twelfth.
+ */
+function pastedDocument(value: string): string {
+  const cuts = labelEnds(value).map((end) => value.slice(end));
+  for (const cut of [...cuts].reverse()) {
+    const document = documentAtHead(cut);
+    if (document !== null) return document;
+  }
+  const kept = taxIdCharacters(value);
+  if (isValidCpfOrCnpj(kept)) return kept;
+  const [shallowest] = cuts;
+  return shallowest === undefined ? kept : taxIdCharacters(shallowest);
 }
 
 /**
  * What the FIELD keeps as the buyer types or pastes: a pasted label dropped —
  * once letters count, it would otherwise be read as the document's first
- * characters (FUT-590 UI review) — then {@link taxIdCharacters}, capped at a
- * CNPJ's fourteen, the most a document has. Only the input path drops and
- * caps; every check measures what it is given.
+ * characters (FUT-590 UI review) — then capped at a CNPJ's fourteen, the most
+ * a document has. Only the input path drops and caps; every check measures
+ * what it is given.
  */
 export function taxIdInput(value: string): string {
-  return taxIdCharacters(withoutPastedLabel(value)).slice(0, CNPJ_LENGTH);
+  return pastedDocument(value).slice(0, CNPJ_LENGTH);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */

@@ -101,7 +101,9 @@ function TaxIdField({ verification, displayName, validateTaxId }: {
         // document was only reported on submit (FUT-4048). An untouched empty
         // field stays quiet until then.
         onBlur={() => {
-          if (cpf) setCpfError(validateTaxId(cpf));
+          // The keyboard's own leave-and-enter is no blur: a half-typed CNPJ
+          // would flash "não é válido" while the buyer is still in the field.
+          if (cpf && !keyboard.reentering()) setCpfError(validateTaxId(cpf));
         }}
         data-testid="verify-charge-cpf"
       />

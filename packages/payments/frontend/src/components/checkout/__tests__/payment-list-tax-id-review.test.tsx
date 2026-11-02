@@ -10,10 +10,11 @@
  *  - The phone is told not to spell-check, autocorrect or lower-case it: a
  *    CNPJ's `01DE` is no word.
  */
-import { useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { taxIdInput } from "../../../card";
+import { BuyerInline } from "../list/buyer-inline";
 import { CpfTop } from "../list/cpf-top";
 import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -84,6 +85,9 @@ describe("a document pasted with its label", () => {
     ["CNPJ Nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
     ["CPF n.º 529.982.247-25", "529.982.247-25", "52998224725"],
     ["CPF N.º 529.982.247-25", "529.982.247-25", "52998224725"],
+    // Round 4: text after the document, and a document cut short.
+    ["CNPJ: 11.222.333/0001-81 - Empresa X LTDA", "11.222.333/0001-81", "11222333000181"],
+    ["CNPJ: 11.222.333/0001-8", "11.222.333/0001-8", "1122233300018"],
     ["12.ABC.345/01DE-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
   ])("%j keeps the document, not the label", (pasted, shown, kept) => {
     const buyers: BuyerInfo[] = [];
@@ -97,6 +101,9 @@ describe("a document pasted with its label", () => {
     expect(taxIdInput("CPF 529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("  cpf :  529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("CPF12ABC34501")).toBe("CPF12ABC34501");
+    expect(taxIdInput("CPF 529.982.247-25 Fulano de Tal")).toBe("52998224725");
+    // Typing, no label: a CNPJ whose first eleven digits are a valid CPF keeps its twelfth.
+    expect(taxIdInput("112.223.550-001")).toBe("112223550001");
     expect(taxIdInput("CNPJ n° 11.222.333/0001-81")).toBe("11222333000181");
     expect(taxIdInput("CNPJ No. 11.222.333/0001-81")).toBe("11222333000181");
     // A run must START with CPF or CNPJ: a masked alphanumeric CNPJ may begin MF. or NO.
@@ -163,6 +170,25 @@ function FocusedOnOpen({ taxId }: { taxId: string }): JSX.Element {
   return <CpfTop field={TAX_ID} buyer={buyer} onBuyerChange={setBuyer} copy={COPY} provider="PagBank" focusOnMount onKeepSaved={() => undefined} />;
 }
 
+/** Put the buyer in an element, as a host's own code does (not a test interaction). */
+function enter(element: HTMLElement | null | undefined): void {
+  if (element) HTMLElement.prototype.focus.call(element);
+}
+
+/** The card option of the list: the document is the last field before "Número do cartão". */
+function CardChosen(): JSX.Element {
+  const [buyer, setBuyer] = useState<BuyerInfo>({ taxId: "" });
+  const card = useRef<HTMLInputElement | null>(null);
+  const scope = useRef<HTMLDivElement | null>(null);
+  useEffect(() => enter(scope.current?.querySelector<HTMLInputElement>('[data-testid="list-buyer-taxId"]')), []);
+  return (
+    <div ref={scope}>
+      <BuyerInline asked={[TAX_ID]} buyer={buyer} onBuyerChange={setBuyer} copy={COPY} provider="PagBank" withConsent={false} onComplete={() => enter(card.current)} />
+      <input ref={card} data-testid="card-number" aria-label="Número do cartão" />
+    </div>
+  );
+}
+
 describe("the keyboard a phone reads as the field takes the focus", () => {
   it("re-enters a focused field when a pasted letter switches it, so the keypad is the letters one", async () => {
     recordInputModeAtFocus();
@@ -185,5 +211,13 @@ describe("the keyboard a phone reads as the field takes the focus", () => {
     recordInputModeAtFocus();
     render(<FocusedOnOpen taxId="12ABC34501DE35" />);
     await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("text"));
+  });
+
+  it("does not pull the buyer back once a completed document moved them on to the card number", async () => {
+    render(<CardChosen />);
+    await waitFor(() => expect(input()).toBe(document.activeElement));
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-35" } });
+    await waitFor(() => expect(screen.getByTestId("card-number")).toBe(document.activeElement));
+    expect(input().getAttribute("inputmode")).toBe("text");
   });
 });

@@ -98,9 +98,13 @@ export function useTaxIdKeyboard(
   copy: KeyboardSwitchCopy,
   value: string,
   input: string = TAX_ID_INPUT,
-): { mode: TaxIdKeyboard; offered: boolean; onSwitch: () => void } {
+): { mode: TaxIdKeyboard; offered: boolean; onSwitch: () => void; reentering: () => boolean } {
   const [mode, setMode] = useState<TaxIdKeyboard>(() => (hasLetters(value) ? "text" : "numeric"));
   const [reentries, setReentries] = useState(0);
+  // Why the next re-entry was asked for: the link ENTERS the field whatever
+  // holds the focus; letters arriving only refresh a field the buyer is still in.
+  const reason = useRef<"switch" | "letters">("switch");
+  const inReentry = useRef(false);
   const onAComputer = useMediaQuery(PHYSICAL_KEYBOARD_QUERY, { noSsr: true });
   const offered = !onAComputer && Boolean(copy.lettersKeyboard && copy.numbersKeyboard);
 
@@ -109,7 +113,10 @@ export function useTaxIdKeyboard(
   useEffect(() => {
     if (lettered && !hadLetters.current) {
       setMode("text");
-      if (focusedField(scope, input)) setReentries((count) => count + 1);
+      if (focusedField(scope, input)) {
+        reason.current = "letters";
+        setReentries((count) => count + 1);
+      }
     }
     hadLetters.current = lettered;
   }, [lettered, scope, input]);
@@ -120,18 +127,29 @@ export function useTaxIdKeyboard(
       firstRender.current = false;
       return;
     }
-    const field = scope.current?.querySelector<HTMLInputElement>(input);
-    field?.blur();
-    field?.focus();
+    // Judged NOW, not when it was asked for: a letter that completes the
+    // document may also have moved the focus on (to "Número do cartão"), and a
+    // re-entry then would pull the buyer back. Hook order cannot be relied on.
+    const field = reason.current === "letters" ? focusedField(scope, input) : scope.current?.querySelector<HTMLInputElement>(input);
+    reason.current = "switch";
+    if (!field) return;
+    inReentry.current = true;
+    field.blur();
+    field.focus();
+    inReentry.current = false;
   }, [reentries, scope, input]);
 
   return {
     mode: offered ? mode : "numeric",
     offered,
     onSwitch: () => {
+      reason.current = "switch";
       setMode((current) => (current === "numeric" ? "text" : "numeric"));
       setReentries((count) => count + 1);
     },
+    // True only inside the keyboard's own leave-and-enter: a field's blur
+    // handler skips judging the document then, as the buyer never left it.
+    reentering: () => inReentry.current,
   };
 }
 
