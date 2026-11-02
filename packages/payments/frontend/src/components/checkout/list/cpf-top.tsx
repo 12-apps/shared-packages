@@ -181,8 +181,9 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
       ) : null}
       {consent ? (
         // Flush with the field: the box's own 9px ring and the label's negative inset
-        // (MUI's, under every kit built on it) pushed the words right until they wrapped on a phone.
-        <Box data-testid="list-save-profile-row" sx={{ "& .MuiFormControlLabel-root": { ml: 0, mr: 0 }, "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 } }}>
+        // (MUI's, under every kit built on it) pushed the words right until they wrapped on a phone. Without the ring the row is 24px,
+        // so below `sm` the label states the 40px tap floor itself (FUT-4193).
+        <Box data-testid="list-save-profile-row" sx={(t) => ({ "& .MuiFormControlLabel-root": { ml: 0, mr: 0 }, "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 }, [t.breakpoints.down("sm")]: { "& .MuiFormControlLabel-root": { minHeight: 40 } } })}>
           <Checkbox
             label={consent.label}
             checked={consent.checked}
