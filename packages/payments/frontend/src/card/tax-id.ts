@@ -42,29 +42,65 @@ export function taxIdCharacters(value: string): string {
 }
 
 /**
- * A label pasted in front of the document, as it is copied from a receipt, a
- * card statement or a company's papers: "CPF 529.982.247-25", "CPF.: …",
- * "CPF/CNPJ: …", "CNPJ/MF …", "CNPJ nº …" (FUT-590 UI review). A RUN of label
- * words joined by `/ . : -` or spaces.
+ * A label pasted in front of the document, as receipts, card statements and a
+ * company's papers write it: "CPF 529.982.247-25", "CPF.: …", "CPF n.º …",
+ * "CPF/CNPJ: …", "CNPJ/MF …", "CNPJ No 11.222…" (FUT-590 UI review). A RUN of
+ * label words, joined by `/ . : -` or spaces, that starts with CPF or CNPJ.
  *
- * It must START with CPF or CNPJ: an alphanumeric CNPJ masked as typed may
- * begin `MF.` or `NO.`, and a run allowed to start there would eat its letters.
- * And it must END on a separator: without one, `CPF…` may be the start of an
- * alphanumeric CNPJ, whose first characters can be any letters.
+ * Which words are the label is NOT decided by the word list. `CNPJ: MF.ABC…`
+ * is a label and an alphanumeric CNPJ that begins with MF, `CNPJ/MF: 11.222…`
+ * is a two-word label: the same letters, two answers. So every place the run
+ * could end is a candidate, and the document's own check digits choose
+ * ({@link withoutPastedLabel}).
  */
-const LABEL_WORD = String.raw`(?:CPF|CNPJ|MF|N[º°]|NO\.|N\.)`;
-const LABEL_JOIN = String.raw`[\s/.:\-]`;
-const PASTED_LABEL = new RegExp(String.raw`^\s*(?:CPF|CNPJ)(?:${LABEL_JOIN}*${LABEL_WORD})*${LABEL_JOIN}+(?=\S)`, "i");
+const RUN_START = /^(?:CPF|CNPJ)/i;
+const LABEL_WORD = /^(?:CPF|CNPJ|MF|N\.?[º°]|NO\.|NO(?=\s)|N\.)/i;
+const LABEL_JOIN = /^[\s/.:-]*/;
 
 /**
- * What the FIELD keeps as the buyer types or pastes: a leading `CPF`/`CNPJ`
- * label dropped — once letters count, it would otherwise be read as the
- * document's first characters (FUT-590 UI review) — then
- * {@link taxIdCharacters}, capped at a CNPJ's fourteen, the most a document
- * has. Only the input path drops and caps; every check measures what it is given.
+ * The offsets at which a leading label run could end: after each label word
+ * and the separators that follow it. A word followed by nothing that separates
+ * it (`CPF12ABC…`) ends the scan — those letters may be the document's own.
+ */
+function labelEnds(value: string): number[] {
+  const ends: number[] = [];
+  let at = value.length - value.trimStart().length;
+  for (let pattern = RUN_START; ; pattern = LABEL_WORD) {
+    const word = pattern.exec(value.slice(at));
+    if (!word) return ends;
+    const join = LABEL_JOIN.exec(value.slice(at + word[0].length))?.[0] ?? "";
+    const separated = join.length > 0 || /[.º°]$/.test(word[0]);
+    if (!separated) return ends;
+    at += word[0].length + join.length;
+    if (at >= value.length) return ends;
+    ends.push(at);
+  }
+}
+
+/**
+ * The value with its pasted label removed, decided by the check digits: the
+ * most-stripped candidate whose characters are a valid CPF or CNPJ; failing
+ * that, the most-stripped one with a document's length (11 or 14), as a
+ * mistyped document still is one; failing that, the value as given.
+ */
+function withoutPastedLabel(value: string): string {
+  const stripped = labelEnds(value).map((end) => value.slice(end)).reverse();
+  const valid = stripped.find((candidate) => isValidCpfOrCnpj(candidate));
+  if (valid !== undefined) return valid;
+  if (isValidCpfOrCnpj(value)) return value;
+  const shaped = stripped.find((candidate) => [CPF_LENGTH, CNPJ_LENGTH].includes(taxIdCharacters(candidate).length));
+  return shaped ?? value;
+}
+
+/**
+ * What the FIELD keeps as the buyer types or pastes: a pasted label dropped —
+ * once letters count, it would otherwise be read as the document's first
+ * characters (FUT-590 UI review) — then {@link taxIdCharacters}, capped at a
+ * CNPJ's fourteen, the most a document has. Only the input path drops and
+ * caps; every check measures what it is given.
  */
 export function taxIdInput(value: string): string {
-  return taxIdCharacters(value.replace(PASTED_LABEL, "")).slice(0, CNPJ_LENGTH);
+  return taxIdCharacters(withoutPastedLabel(value)).slice(0, CNPJ_LENGTH);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */

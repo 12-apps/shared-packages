@@ -122,6 +122,14 @@ describe("the activation form's document field", () => {
     ['CNPJ/MF 11.222.333/0001-81', '11222333000181'],
     ['CNPJ nº 11.222.333/0001-81', '11222333000181'],
     ['CPF.: 529.982.247-25', '52998224725'],
+    ['CNPJ: MF.ABC.345/01DE-31', 'MFABC34501DE31'],
+    ['CNPJ MF.ABC.345/01DE-31', 'MFABC34501DE31'],
+    ['CNPJ/MF: MF.ABC.345/01DE-31', 'MFABC34501DE31'],
+    ['CNPJ/MF: 11.222.333/0001-81', '11222333000181'],
+    ['CNPJ No 11.222.333/0001-81', '11222333000181'],
+    ['CNPJ Nº 11.222.333/0001-81', '11222333000181'],
+    ['CPF n.º 529.982.247-25', '52998224725'],
+    ['CPF N.º 529.982.247-25', '52998224725'],
   ])('keeps only the document of the labelled paste %j', (pasted, kept) => {
     const setCpf = vi.fn();
     hooks.charge.mockReturnValue(charge(setCpf));

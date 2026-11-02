@@ -62,27 +62,36 @@ export function keyboardProps(mode: TaxIdKeyboard): {
   return { inputMode: mode, inputProps: { inputMode: mode, ...DOCUMENT_HINTS } };
 }
 
+/** Whether the field's value carries a letter: an alphanumeric CNPJ, whole or on its way. */
+function hasLetters(value: string): boolean {
+  return /[A-Z]/i.test(value);
+}
+
 /**
- * A document that GAINS a letter — an alphanumeric CNPJ pasted or autofilled,
- * or one on file the field opens on — moves the field to the letters keyboard
- * by itself, so the link then offers the way back (FUT-590: one tap fewer).
- * Only on the change: a buyer who then taps back to numbers keeps that choice
- * while the letters stay.
+ * The field's `<input>` when it holds the focus — the one case where a new
+ * `inputmode` needs the field left and re-entered before a phone reads it.
  */
-function useLettersOnceTheyArrive(value: string, setMode: (mode: TaxIdKeyboard) => void): void {
-  const hasLetters = /[A-Z]/i.test(value);
-  const had = useRef(false);
-  useEffect(() => {
-    if (hasLetters && !had.current) setMode("text");
-    had.current = hasLetters;
-  }, [hasLetters, setMode]);
+function focusedField(scope: RefObject<HTMLElement | null>, input: string): HTMLInputElement | null {
+  const field = scope.current?.querySelector<HTMLInputElement>(input) ?? null;
+  return field !== null && field === field.ownerDocument.activeElement ? field : null;
 }
 
 /**
  * Which keyboard the document field opens, whether the switch is offered, and
- * the switch itself. After a switch the buyer is put back in the field — out
- * and in again, since a phone reads `inputmode` as the field takes the focus —
- * so the new keyboard is the one that opens without another tap.
+ * the switch itself.
+ *
+ * A phone reads `inputmode` as the field TAKES the focus, so a keyboard change
+ * on a focused field means leaving it and entering it again (`reenter`):
+ *  - the link's switch always re-enters, so the new keyboard opens without
+ *    another tap;
+ *  - a document that GAINS a letter — an alphanumeric CNPJ pasted or
+ *    autofilled — moves to the letters keyboard by itself (FUT-590: one tap
+ *    fewer), re-entering the field when it holds the focus, so the keypad
+ *    and the link's words agree. A buyer who then taps back to numbers keeps
+ *    that choice while the letters stay;
+ *  - a document on file that already carries a letter OPENS on the letters
+ *    keyboard: the mode is set before the first render, so a field focused
+ *    as it appears ("Alterar") is focused with letters already in place.
  */
 export function useTaxIdKeyboard(
   scope: RefObject<HTMLElement | null>,
@@ -90,11 +99,21 @@ export function useTaxIdKeyboard(
   value: string,
   input: string = TAX_ID_INPUT,
 ): { mode: TaxIdKeyboard; offered: boolean; onSwitch: () => void } {
-  const [mode, setMode] = useState<TaxIdKeyboard>("numeric");
-  useLettersOnceTheyArrive(value, setMode);
-  const [switches, setSwitches] = useState(0);
+  const [mode, setMode] = useState<TaxIdKeyboard>(() => (hasLetters(value) ? "text" : "numeric"));
+  const [reentries, setReentries] = useState(0);
   const onAComputer = useMediaQuery(PHYSICAL_KEYBOARD_QUERY, { noSsr: true });
   const offered = !onAComputer && Boolean(copy.lettersKeyboard && copy.numbersKeyboard);
+
+  const lettered = hasLetters(value);
+  const hadLetters = useRef(lettered);
+  useEffect(() => {
+    if (lettered && !hadLetters.current) {
+      setMode("text");
+      if (focusedField(scope, input)) setReentries((count) => count + 1);
+    }
+    hadLetters.current = lettered;
+  }, [lettered, scope, input]);
+
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
@@ -104,13 +123,14 @@ export function useTaxIdKeyboard(
     const field = scope.current?.querySelector<HTMLInputElement>(input);
     field?.blur();
     field?.focus();
-  }, [switches, scope, input]);
+  }, [reentries, scope, input]);
+
   return {
     mode: offered ? mode : "numeric",
     offered,
     onSwitch: () => {
       setMode((current) => (current === "numeric" ? "text" : "numeric"));
-      setSwitches((count) => count + 1);
+      setReentries((count) => count + 1);
     },
   };
 }

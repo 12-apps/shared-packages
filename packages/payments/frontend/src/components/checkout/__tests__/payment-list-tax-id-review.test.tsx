@@ -11,16 +11,19 @@
  *    CNPJ's `01DE` is no word.
  */
 import { useState, type JSX } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { taxIdInput } from "../../../card";
 import { CpfTop } from "../list/cpf-top";
 import { PT_BR_PAYMENT_LIST_COPY } from "../list/pt-BR";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 
-import { cleanup, fireEvent, render, screen } from "./test-utils";
+import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const COPY = PT_BR_PAYMENT_LIST_COPY.buyer;
 const TAX_ID: CheckoutCustomerField = { key: "taxId", type: "CPF", required: true };
@@ -72,6 +75,15 @@ describe("a document pasted with its label", () => {
     ["CNPJ/MF 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
     ["CNPJ nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
     ["CPF.: 529.982.247-25", "529.982.247-25", "52998224725"],
+    // Round 3: the check digits, not a word list, decide where the label ends.
+    ["CNPJ: MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
+    ["CNPJ MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
+    ["CNPJ/MF: MF.ABC.345/01DE-31", "MF.ABC.345/01DE-31", "MFABC34501DE31"],
+    ["CNPJ/MF: 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CNPJ No 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CNPJ Nº 11.222.333/0001-81", "11.222.333/0001-81", "11222333000181"],
+    ["CPF n.º 529.982.247-25", "529.982.247-25", "52998224725"],
+    ["CPF N.º 529.982.247-25", "529.982.247-25", "52998224725"],
     ["12.ABC.345/01DE-35", "12.ABC.345/01DE-35", "12ABC34501DE35"],
   ])("%j keeps the document, not the label", (pasted, shown, kept) => {
     const buyers: BuyerInfo[] = [];
@@ -127,5 +139,51 @@ describe("a document that arrives with a letter", () => {
     }
     render(<OnFile />);
     expect(input().getAttribute("inputmode")).toBe("text");
+  });
+});
+
+/**
+ * Record, ON the document field, the `inputmode` it had each time it took the
+ * focus: `data-focused-with="numeric text"`. Kept on the element rather than
+ * in a test variable, so nothing is shared between cases.
+ */
+function recordInputModeAtFocus(): void {
+  const focus = HTMLElement.prototype.focus;
+  vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+    if (this.getAttribute("data-testid") === "list-buyer-taxId") {
+      const before = this.getAttribute("data-focused-with");
+      this.setAttribute("data-focused-with", [before, this.getAttribute("inputmode")].filter(Boolean).join(" "));
+    }
+    focus.call(this, options);
+  });
+}
+
+function FocusedOnOpen({ taxId }: { taxId: string }): JSX.Element {
+  const [buyer, setBuyer] = useState<BuyerInfo>({ taxId });
+  return <CpfTop field={TAX_ID} buyer={buyer} onBuyerChange={setBuyer} copy={COPY} provider="PagBank" focusOnMount onKeepSaved={() => undefined} />;
+}
+
+describe("the keyboard a phone reads as the field takes the focus", () => {
+  it("re-enters a focused field when a pasted letter switches it, so the keypad is the letters one", async () => {
+    recordInputModeAtFocus();
+    render(<FocusedOnOpen taxId="" />);
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric"));
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-35" } });
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("numeric text"));
+    await waitFor(() => expect(input()).toBe(document.activeElement));
+  });
+
+  it("does not grab the focus when the letter arrives in a field the buyer is not in", () => {
+    recordInputModeAtFocus();
+    render(<Field />);
+    fireEvent.change(input(), { target: { value: "12.ABC.345/01DE-35" } });
+    expect(input().getAttribute("inputmode")).toBe("text");
+    expect(input().getAttribute("data-focused-with")).toBeNull();
+  });
+
+  it("opened by Alterar over a document with letters, is focused with the letters keyboard already set", async () => {
+    recordInputModeAtFocus();
+    render(<FocusedOnOpen taxId="12ABC34501DE35" />);
+    await waitFor(() => expect(input().getAttribute("data-focused-with")).toBe("text"));
   });
 });
