@@ -9,6 +9,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createActivationStep } from '../activation-step';
+import type { ActivationStepCopy } from '../copy';
+import { EN_US_ACTIVATION_STEP_COPY } from '../copy-en-US';
+import { PT_BR_ACTIVATION_STEP_COPY } from '../copy-pt-BR';
 import { TEST_COPY, TestCardSurface, formatAmount, noopValidateTaxId } from './fixtures';
 
 const hooks = vi.hoisted(() => ({ charge: vi.fn(), redirect: vi.fn() }));
@@ -44,10 +47,12 @@ function charge(setCpf = vi.fn()) {
   };
 }
 
-function mount(): void {
+const WITH_LINK: ActivationStepCopy = { ...TEST_COPY, taxId: { ...TEST_COPY.taxId, lettersKeyboard: TO_LETTERS, numbersKeyboard: TO_NUMBERS } };
+
+function mount(copy: ActivationStepCopy = WITH_LINK): void {
   const Step = createActivationStep({
     verifyChargeUrl: (provider) => `/verify/${provider}`,
-    copy: { ...TEST_COPY, taxId: { ...TEST_COPY.taxId, lettersKeyboard: TO_LETTERS, numbersKeyboard: TO_NUMBERS } },
+    copy,
     formatAmount,
     CardSurface: TestCardSurface,
     validateTaxId: noopValidateTaxId,
@@ -126,5 +131,14 @@ describe("the activation form's document field", () => {
     expect(input().getAttribute('spellcheck')).toBe('false');
     expect(input().getAttribute('autocorrect')).toBe('off');
     expect(input().getAttribute('autocapitalize')).toBe('characters');
+  });
+
+  it.each([
+    ['pt-BR', PT_BR_ACTIVATION_STEP_COPY, 'CPF ou CNPJ'],
+    ['en-US', EN_US_ACTIVATION_STEP_COPY, 'CPF or CNPJ'],
+  ])('asks for a CPF or CNPJ in %s, never "digits only" — it takes letters now', (_locale, copy, placeholder) => {
+    hooks.charge.mockReturnValue(charge());
+    mount({ ...TEST_COPY, taxId: copy.taxId });
+    expect(input().getAttribute('placeholder')).toBe(placeholder);
   });
 });

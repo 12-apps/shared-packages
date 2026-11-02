@@ -89,7 +89,7 @@ export const EN_US_ACTIVATION_STEP_COPY: ActivationStepCopy = {
   taxId: {
     label: "Cardholder's CPF or CNPJ",
     hint: (displayName) => `${displayName} requires it on every card charge.`,
-    placeholder: 'Digits only',
+    placeholder: 'CPF or CNPJ',
     lettersKeyboard: 'Does your CNPJ have letters? Use the letters keyboard',
     numbersKeyboard: 'Back to the number keyboard',
   },
