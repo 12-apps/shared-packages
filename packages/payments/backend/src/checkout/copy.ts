@@ -52,6 +52,13 @@ export interface CheckoutCopy {
   /** A buyer field is present but the provider will not accept it. */
   buyerFieldInvalid(field: CustomerFieldKey): string;
   /**
+   * A VALID alphanumeric CNPJ for a payment whose provider documents a CNPJ of
+   * digits only (FUT-590, Stripe's boleto): "Este pagamento ainda não aceita
+   * CNPJ com letras." Never {@link buyerFieldInvalid} — the document is valid,
+   * and saying otherwise sends the buyer to re-type a correct one.
+   */
+  taxIdLettersUnsupported: string;
+  /**
    * The `field` value the CLIENT highlights for a buyer field — the wire name,
    * which is a host/client contract rather than a library one (`taxId` is
    * `cpf` in a Brazilian storefront).

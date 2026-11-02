@@ -106,6 +106,7 @@ const copy: CheckoutCopy = {
   payableNotFound: "payableNotFound",
   buyerFieldMissing: (fields) => `missing.${[...fields].join("+")}`,
   buyerFieldInvalid: (field) => `invalid.${field}`,
+  taxIdLettersUnsupported: "letters.taxId",
   fieldNameOf: (field) => (field === "taxId" ? "cpf" : field),
   genericProviderRefusal: "generic",
 };

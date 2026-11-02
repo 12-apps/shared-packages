@@ -37,6 +37,7 @@ const HARNESS_COPY: CheckoutCopy = {
   payableNotFound: 'copy.payableNotFound',
   buyerFieldMissing: (fields) => `copy.missing.${[...fields].join('+')}`,
   buyerFieldInvalid: (field) => `copy.invalid.${field}`,
+  taxIdLettersUnsupported: 'copy.letters.taxId',
   genericProviderRefusal: 'copy.generic',
 } as CheckoutCopy;
 

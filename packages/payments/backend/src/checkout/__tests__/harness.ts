@@ -181,6 +181,7 @@ const testCopy: CheckoutCopy = {
   payableNotFound: 'copy.payableNotFound',
   buyerFieldMissing: (fields) => `copy.missing.${[...fields].join('+')}`,
   buyerFieldInvalid: (field) => `copy.invalid.${field}`,
+  taxIdLettersUnsupported: 'copy.letters.taxId',
   fieldNameOf: (field) => (field === 'taxId' ? 'cpf' : field),
   genericProviderRefusal: 'copy.generic',
 };
