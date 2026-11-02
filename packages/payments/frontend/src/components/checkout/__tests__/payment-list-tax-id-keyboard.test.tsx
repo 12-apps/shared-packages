@@ -172,6 +172,31 @@ describe("the document's keyboard link and its words", () => {
   });
 });
 
+describe("an alphanumeric CNPJ (FUT-590)", () => {
+  it("keeps the letters typed on the letters keyboard, uppercased and masked", () => {
+    const kept: BuyerInfo[] = [];
+    function Spy(): JSX.Element {
+      const [buyer, setBuyer] = useState<BuyerInfo>({ taxId: "" });
+      return <CpfTop field={TAX_ID} buyer={buyer} onBuyerChange={(next) => { kept.push(next); setBuyer(next); }} copy={COPY} provider="PagBank" />;
+    }
+    render(<Spy />);
+    fireEvent.click(link());
+    fireEvent.change(input(), { target: { value: "12abc34501de35" } });
+    fireEvent.focusOut(input());
+    expect(input().value).toBe("12.ABC.345/01DE-35");
+    expect(kept.at(-1)?.taxId).toBe("12ABC34501DE35");
+    expect(screen.getByTestId("list-cpf").textContent).not.toContain(INVALID);
+    expect(input().getAttribute("aria-invalid")).not.toBe("true");
+  });
+
+  it("says one with wrong check digits is not valid", () => {
+    render(<Top />);
+    fireEvent.change(input(), { target: { value: "12ABC34501DE36" } });
+    fireEvent.focusOut(input());
+    expect(screen.getByTestId("list-cpf").textContent).toContain(INVALID);
+  });
+});
+
 describe("a document that fails its check digits", () => {
   it.each([
     ["the repeated-digit CPF", "11111111111"],

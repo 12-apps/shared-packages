@@ -1,5 +1,6 @@
-import { ProviderRequestError } from '../core/errors';
-import type { ResolvedCredentials } from '../core/types';
+import { CustomerRequirementsError, ProviderRequestError } from '../core/errors';
+import { taxIdCharacters, taxIdHasLetters } from '../core/tax-id';
+import type { ChargeInput, ResolvedCredentials } from '../core/types';
 import { basicAuth, formEncode, providerFetch } from './http';
 
 /**
@@ -178,4 +179,19 @@ export function tokensToFields(
   const webhookSecret = appCredentials.fields['webhookSecret'];
   if (webhookSecret) fields['webhookSecret'] = webhookSecret;
   return fields;
+}
+
+/**
+ * Boleto's `tax_id`: Stripe documents a CPF of 11 digits and a CNPJ of 14
+ * DIGITS. An alphanumeric CNPJ (FUT-590) is therefore refused here, before
+ * anything is sent — the buyer gate refuses it first (`numericOnly`), and this
+ * is the adapter's own word for a caller that bypassed the gate. Cutting it
+ * down to its digits, as this once did, sent a document that was nobody's.
+ */
+export function boletoTaxId(input: ChargeInput): string {
+  const taxId = input.customer.taxId ?? '';
+  if (taxIdHasLetters(taxId)) {
+    throw new CustomerRequirementsError(NAME, [{ field: 'taxId', reason: 'INVALID', required: true, detail: 'LETTERS_UNSUPPORTED' }]);
+  }
+  return taxIdCharacters(taxId);
 }

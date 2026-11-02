@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, useState, type JSX } from "react";
 
-import { taxIdDigits, taxIdKind, validateCpfOrCnpj } from "../../../card";
+import { taxIdCharacters, taxIdKind, validateCpfOrCnpj } from "../../../card";
 import { fieldSatisfied } from "../buyer-fields";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -47,7 +47,7 @@ function useTaxIdAdvance(
     // A change that leaves the digits as they were — a mask "." or "-" deleted —
     // keeps the verdict the last real change earned.
     onTyped: (next) => {
-      if (taxIdDigits(next) !== taxIdDigits(value)) setArrivedWhole(arrivedInOneGo(taxIdDigits(value), taxIdDigits(next)));
+      if (taxIdCharacters(next) !== taxIdCharacters(value)) setArrivedWhole(arrivedInOneGo(taxIdCharacters(value), taxIdCharacters(next)));
     },
   };
 }
@@ -97,7 +97,7 @@ function useDocumentVerdict(
   const fieldCopy = useCheckoutCopy().card.fields;
   const { arrivedWhole, onTyped } = useTaxIdAdvance(field, value, onComplete);
   const [focused, setFocused] = useState(false);
-  const judged = taxIdJudged({ focused, digits: taxIdDigits(value).length, arrivedWhole });
+  const judged = taxIdJudged({ focused, digits: taxIdCharacters(value).length, arrivedWhole });
   const complaint = judged ? complaintOf(field, value, copy, (typed) => validateCpfOrCnpj(typed, fieldCopy)) : undefined;
   return { complaint, onTyped, onFocus: () => setFocused(true), onBlur: () => setFocused(false) };
 }

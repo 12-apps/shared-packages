@@ -5,7 +5,7 @@ import type { ComponentType, JSX, ReactNode } from 'react';
 
 import { NewCardForm } from '../../card/fields';
 import { detectBrand, onlyDigits } from '../../card/format';
-import { formatCpfOrCnpj, taxIdDigits } from '../../card/tax-id';
+import { formatCpfOrCnpj, taxIdCharacters } from '../../card/tax-id';
 import { useCheckoutComponents } from '../../components/checkout/ui';
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useActivationCharge, type ActivationCharge } from '../use-activation-charge';
@@ -106,7 +106,7 @@ function ChargeForm({
         error={Boolean(cpfError)}
         helperText={cpfError ?? taxId.hint(displayName)}
         onChange={(event) => {
-          setCpf(taxIdDigits(event.target.value));
+          setCpf(taxIdCharacters(event.target.value));
           // A shown error goes as soon as the owner edits; blur judges again.
           if (cpfError) setCpfError(undefined);
         }}

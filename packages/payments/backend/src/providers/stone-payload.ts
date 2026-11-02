@@ -1,7 +1,7 @@
 import type { ChargeInput, PaymentMethodKind } from '../core/types';
 import type { StoneCopy } from './copy';
 import { chargeDescription } from './shared';
-import { customerType, documentDigits } from './stone-http';
+import { customerType, documentOf } from './stone-http';
 
 /**
  * The Pagar.me v5 order REQUEST this adapter builds — split from
@@ -14,7 +14,7 @@ function customerPayload(input: ChargeInput): Record<string, unknown> {
   return {
     name: input.customer.name || undefined,
     email: input.customer.email || undefined,
-    document: documentDigits(input.customer.taxId),
+    document: documentOf(input.customer.taxId),
     type: customerType(input.customer.taxId),
   };
 }

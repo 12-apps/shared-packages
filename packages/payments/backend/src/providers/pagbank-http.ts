@@ -1,6 +1,7 @@
 import { brLocalNumber } from '../core/customer-schema';
 import { ProviderRequestError, type ProviderRequestSnapshot } from '../core/errors';
 import { isPreSendNetworkError } from '../core/failover';
+import { taxIdCharacters } from '../core/tax-id';
 import { recordedFetch } from '../core/traffic-recorder';
 import type { CustomerInfo, CustomerSchema, ResolvedCredentials } from '../core/types';
 
@@ -31,10 +32,15 @@ function apiBaseFor(credentials: ResolvedCredentials): string {
   return pagbankApiBase(credentials.environment);
 }
 
-/** PagBank wants the CPF/CNPJ as bare digits. */
-function taxIdDigits(taxId: string | null | undefined): string | undefined {
-  const digits = (taxId ?? '').replace(/\D/g, '');
-  return digits.length > 0 ? digits : undefined;
+/**
+ * PagBank's `customer.tax_id`: "CPF (11 caracteres)" or "CNPJ (14 caracteres)"
+ * (criar-pedido). Sent without punctuation, an alphanumeric CNPJ's letters
+ * kept and uppercased (FUT-590) — cutting it to its digits sent a 9-digit
+ * document that was nobody's.
+ */
+function taxIdOf(taxId: string | null | undefined): string | undefined {
+  const kept = taxIdCharacters(taxId ?? '');
+  return kept.length > 0 ? kept : undefined;
 }
 
 /** One entry of the order's `customer.phones` array. */
@@ -93,7 +99,7 @@ export function customerPayload(customer: CustomerInfo) {
   return {
     name: customer.name || undefined,
     email: customer.email || undefined,
-    tax_id: taxIdDigits(customer.taxId),
+    tax_id: taxIdOf(customer.taxId),
     phones: customerPhones(customer.phone),
   };
 }

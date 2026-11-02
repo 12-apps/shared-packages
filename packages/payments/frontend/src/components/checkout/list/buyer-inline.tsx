@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, type JSX } from "react";
 
-import { formatCpfOrCnpj, isIncompleteCpfOrCnpj, taxIdDigits, validateCpfOrCnpj } from "../../../card";
+import { formatCpfOrCnpj, isIncompleteCpfOrCnpj, taxIdCharacters, validateCpfOrCnpj } from "../../../card";
 import { fieldSatisfied } from "../buyer-fields";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -96,10 +96,11 @@ export function placeholderOf(key: CheckoutCustomerField["key"], copy: Copy): st
 
 /**
  * The document as the field shows it — masked as a CPF or a CNPJ by its length
- * — and as the buyer state keeps it: plain digits (FUT-4080), which is what
- * the charge, the order and "Salvar meus dados" then carry.
+ * and shape — and as the buyer state keeps it: its characters without
+ * punctuation (FUT-4080), an alphanumeric CNPJ's letters uppercased (FUT-590),
+ * which is what the charge, the order and "Salvar meus dados" then carry.
  */
-export const taxIdField = { shown: formatCpfOrCnpj, kept: taxIdDigits } as const;
+export const taxIdField = { shown: formatCpfOrCnpj, kept: taxIdCharacters } as const;
 
 /** Call `onComplete` once each time `complete` turns true — the focus moves on to what is next. */
 export function useOnComplete(complete: boolean, onComplete: (() => void) | undefined): void {

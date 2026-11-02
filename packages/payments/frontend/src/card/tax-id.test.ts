@@ -7,7 +7,7 @@ import {
   isIncompleteCpfOrCnpj,
   isValidCpfOrCnpj,
   plainTaxId,
-  taxIdDigits,
+  taxIdCharacters,
   taxIdKind,
   validateCpfOrCnpj,
 } from './tax-id';
@@ -66,12 +66,12 @@ describe('the payer document mask: a CPF up to 11 digits, a CNPJ from the 12th (
   });
 
   it('keeps at most a CNPJ’s fourteen digits, whatever is pasted after them', () => {
-    expect(taxIdDigits('11.222.333/0001-8199')).toBe('11222333000181');
+    expect(taxIdCharacters('11.222.333/0001-8199')).toBe('11222333000181');
     expect(formatCpfOrCnpj('112223330001819999')).toBe('11.222.333/0001-81');
   });
 
-  it('drops letters: the alphanumeric CNPJ is not accepted yet', () => {
-    expect(taxIdDigits('12.ABC.345/01DE-35')).toBe('123450135');
+  it('keeps letters: the alphanumeric CNPJ is accepted (FUT-590, tax-id-alphanumeric.test.ts)', () => {
+    expect(taxIdCharacters('12.ABC.345/01DE-35')).toBe('12ABC34501DE35');
   });
 });
 

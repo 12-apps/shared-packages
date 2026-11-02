@@ -1,4 +1,5 @@
 import { isValidCpf } from '../core/cpf';
+import { taxIdCharacters } from '../core/tax-id';
 import type { ChargeInput, ChargeSnapshot, RefundSnapshot } from '../core/types';
 import { NAME } from './itau-http';
 import { sha256Hex } from './shared';
@@ -149,12 +150,13 @@ const DEVEDOR_NAME_MAX = 200;
  */
 export function devedorOf(input: ChargeInput): Record<string, string> | undefined {
   const nome = input.customer.name?.trim().slice(0, DEVEDOR_NAME_MAX);
-  const document = input.customer.taxId?.replace(/\D/g, '') ?? '';
+  // BACEN's devedor.cnpj is `^[0-9A-Z]{14}$` (API Pix): the letters go as they are (FUT-590).
+  const document = taxIdCharacters(input.customer.taxId ?? '');
   if (!nome) return undefined;
   // A CPF that fails its own check digits is left out rather than sent: Itau
   // refuses the whole cob for a malformed devedor, and the buyer would lose
   // the charge over a field nobody required.
-  if (document.length === 11) return isValidCpf(document) ? { cpf: document, nome } : undefined;
+  if (document.length === 11) return /^\d+$/.test(document) && isValidCpf(document) ? { cpf: document, nome } : undefined;
   if (document.length === 14) return { cnpj: document, nome };
   return undefined;
 }
