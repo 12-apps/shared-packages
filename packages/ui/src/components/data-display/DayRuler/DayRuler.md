@@ -9,10 +9,11 @@ gestures; hours, limits and refusals are the host's.
 Na escala, por hora   [  ][  ][5][5][5] … [1][1][1][  ][  ]
                       06:00     10:00     …     22:00     02:00
 ENTREGAS
-Luiz entrega          |··········[↻ 20:39–00:00]···|     [Iniciar agora]
-atrasado · era 20:39                        ┃ agora
-Anderson Paiva        |  sem escala · desde 08:26  |     [Encerrar turno]
-                      |  ━━━━━━━━━━━━━━━━━━━━━━━━━┃|
+Luiz entrega          |··········[↻ 20:39–00:00]···|
+atrasado · era 20:39  |                     ┃ agora|
+[Iniciar agora]
+Anderson Paiva        |  sem escala · desde 08:26  |
+[Encerrar turno]      |  ━━━━━━━━━━━━━━━━━━━━━━━━━┃|
 ```
 
 Times are **hours from the day's midnight**, fractions included: `20.75` is 20:45 and a value past
@@ -42,7 +43,7 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 
 | Prop | Type | Description |
 |---|---|---|
-| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when there is no room for both), `chips?` (node — one line, a chip that does not fit shrinks and cuts its label), `actions?` (node — "Encerrar turno", "Iniciar agora"), `blocks` (`id`, `start`, `end`, `label`, `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` in ruler hours, a meal break drawn as a hatched gap inside the block: it travels with a moved block and is cut to its ends while one is dragged; a span that falls outside the block, is empty or is reversed (`end <= start`) draws nothing; its words are the host's, in `label` / `title`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
+| `rows` | `DayRulerRow[]` | `id`, `label`, `meta?`, `metaTone?`, `nameAdornment?` (node beside the name — a "Freela" tag; it moves under the name when there is no room for both), `chips?` (node — one line, a chip that does not fit shrinks and cuts its label), `actions?` (node — "Encerrar turno", "Iniciar agora"; under the name on a computer, beside it when stacked — never a column of their own), `blocks` (`id`, `start`, `end`, `label` (drawn whole or not at all — see Layout), `shortLabel?`, `tone`, `movable?`, `resizable?`, `selected?`, `title?`, `breakSpan?` — `{ start, end }` in ruler hours, a meal break drawn as a hatched gap inside the block: it travels with a moved block and is cut to its ends while one is dragged; a span that falls outside the block, is empty or is reversed (`end <= start`) draws nothing; its words are the host's, in `label` / `title`), `actual?` (`start`, `end`), `actualLabel?`, `group?` (a new value starts a new heading), `onLabelClick?`, `labelAccessible?`. |
 | `from` / `to` | `number` (default 6 / 26) | The ruler's span. |
 | `now` | `number?` | The "agora" line, when on the ruler. |
 | `coverage` | `number[]?` | People per hour, index 0 = `from…from+1`. |
@@ -57,27 +58,50 @@ Times are **hours from the day's midnight**, fractions included: `20.75` is 20:4
 | `loading` / `error` / `empty` | `boolean` / node / node | Skeleton rows with `aria-busy`; the host's error; the host's empty sentence. |
 | `aria-label` | `string?` | The region's name. |
 | `labels` | `Partial<DayRulerLabels>` | `createTrack(row)`, `moved(block, range)`, `resized(block, range)`, `refused`, `loading`, `footerMarked`. Default: the English pack; pt-BR: `DAY_RULER_LABELS['pt-BR']` from `@12-apps/ui/data-display/DayRuler`. |
-| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-footer-${footerRowId}`, `-row-${rowId}`, `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
+| `dataTestId` | `string?` (default `day-ruler`) | Parts: `-coverage`, `-axis`, `-footer-${footerRowId}`, `-row-${rowId}`, `-actions-${rowId}` (only on a row with actions), `-track-${rowId}`, `-block-${blockId}`, `-handle-l/-r-${blockId}`, `-break-${blockId}`, `-actual-${rowId}`, `-now`, `-preview`, `-live`, `-loading`. |
 
 Tones are `ScheduleGrid`'s; on the ruler a `plan` block is a dashed outline over a faint ground.
 
 ## Layout
 
-- **Computer:** name 220px · track (`minmax(0, 1fr)`) · actions 220px (none when no row has
-  `actions`), 16px gap; a hairline between rows. Track 40px tall with a line every hour; blocks 24px at +4px; the actual bar 6px
-  at +31px; the now line the track's full height.
+- **Computer:** name 220px · track (`minmax(0, 1fr)`), 16px gap; a hairline between rows. A
+  row's `actions` sit in the name's column, under the name, meta and chips (8px above them) —
+  **never a column of their own** (FUT-3831). A column reserved for the one row with an "Iniciar
+  agora" used to leave every other row a blank 236px band; a column per row (or per group) would
+  have given those rows a wider track and put their hours out of line with the axis. So every
+  track, with actions or without, is the same width and the hours line up down the whole ruler.
+  Track 40px tall with a line every hour; blocks 24px at +4px; the actual bar 6px at +31px; the
+  now line the track's full height.
+- **The now line is drawn UNDER the blocks** (FUT-3831): it shows above and below each bar, where
+  it overhangs the track, and never through a block's label — it used to run through a late
+  block's "07:30–1|3:00". On a block whose fill is not opaque (the dashed `plan`, the `away` /
+  `uncovered` outline) the label takes an opaque ground of its own (the fill flattened over the
+  cell's ground), so the line may show through the bar but not through its text.
 - **Stacked (a container under 800px: a phone, a tablet in portrait)** — a container query, not a
   media query: name, meta, chips and the actions on top, the track under them at full width, 30px
   tall with a line every `tickHours`; the coverage row (its label above the counts) and the hour
   axis span the same full width. **Under 600px** (a phone-sized pane) there is no coverage row and
-  no axis. Every bound is "from that width up". A block whose range does not fit it, by pixels,
-  says only its `shortLabel` (its start), never a cut "20:39–00:". The 20px blocks and the 24px name buttons
-  answer a 40px finger (an invisible hit area), the look unchanged.
+  no axis. Every bound is "from that width up". The queries read the ruler's own named container
+  (`day-ruler`).
+- **A block's text is drawn whole or not at all, at every width** (FUT-3831). By pixels: the
+  `label` when it fits the bar; else the `shortLabel` (its start, "20:39"); else **nothing** — the
+  bar stays empty rather than showing a cut "20:" or "20:39–00:". 12px is the type's floor, so a
+  text is never drawn smaller to squeeze in. Whatever the bar shows, its tooltip (`title`, default
+  `label`) and its accessible name still carry the whole `label`.
+- **Hit band (stacked):** the 20px bars and the 24px name buttons answer a 40px finger, the look
+  unchanged. A bar's invisible band is 40px tall and **at least 40px wide, centred on the bar** —
+  a 1-hour turno at 320 is a 16px bar (FUT-3831). Where two bars are closer than that, each band
+  stops at the **midpoint of the gap** between them, so neither takes a tap meant for the other;
+  bars that touch or overlap give each other nothing past their own edges, and no band reaches
+  past the track's ends. A press in the band is a press on the block: a tap opens it, a mouse drag
+  moves it (a drag-create starts only on track the bands leave free). The end handles sit above
+  the band, so a press on a bar's end still resizes it.
 
 ## Accessibility
 
 Rows are a `list` per group. Blocks are native buttons with `aria-keyshortcuts`; the `selected`
-block is `aria-current="true"`. An interactive
+block is `aria-current="true"`. A block that shows less than its `label` (its start, or nothing)
+is named by the whole `label` (`aria-label`). An interactive
 track is a focusable `group` named `labels.createTrack(row)`; Enter or Space creates.
 
 ## Related

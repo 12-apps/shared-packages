@@ -35,7 +35,7 @@ Components for displaying data, visualizations, and information to users.
 ### AlertDialog
 **Purpose**: Display critical alerts requiring user acknowledgment
 **Use Cases**: Confirmation dialogs, critical warnings, blocking notifications
-**Features**: Modal dialog, customizable actions, accessibility support
+**Features**: Modal dialog, customizable actions, accessibility support; a container query (never a media query) lays it out for a dialog given under 480px: the icon above the title, and a pair of buttons growing so stacked it spans the row (a lone button keeps its width), primary on top and Cancel at the bottom (Cancel first in the tab order). `ConfirmAction`'s popup is this dialog
 **Location**: `src/components/data-display/AlertDialog`
 **Docs**: `src/components/data-display/AlertDialog/AlertDialog.md`
 
@@ -241,7 +241,7 @@ Components for displaying data, visualizations, and information to users.
 ### DayRuler
 **Purpose**: One day as an hour ruler per row — scheduled blocks, the real shift under them, a now line and people per hour
 **Use Cases**: A schedule's day view, on-shift vs scheduled, a phone's day list of who works when
-**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, per-group footer lines (counts with marked hours, or a trend line), HH:MM axis past midnight, a block's break as a hatched gap, row name-adornment, chips and actions slots; keyboard twins with a live region; stacks in a narrow container with short labels; touch never drags; read-only, loading, error, empty
+**Features**: Drag on a track to create (a click alone is 4h), drag a block to move it, drag its ends to resize, 15-minute snapping, coverage counts, per-group footer lines (counts with marked hours, or a trend line), HH:MM axis past midnight, a block's break as a hatched gap, row name-adornment, chips and actions slots (actions under the name, no reserved column, so every track keeps the same width and the hours stay aligned); keyboard twins with a live region; stacks in a narrow container; a block's text drawn whole, as its start, or not at all (never cut), its accessible name always the whole label; on a narrow ruler a 40px-tall hit band at least 40px wide round each bar, split at the midpoint with a neighbour; the now line drawn under the blocks, never through a label; touch never drags; read-only, loading, error, empty
 **Location**: `src/components/data-display/DayRuler`
 **Docs**: `src/components/data-display/DayRuler/DayRuler.md`
 
@@ -271,6 +271,13 @@ Components for displaying data, visualizations, and information to users.
 ## Feedback Components
 
 Components for providing feedback to users about system state and actions.
+
+### ConfirmAction
+**Purpose**: The one confirmation popup for destructive actions — nothing runs until the operator confirms
+**Use Cases**: Delete, cancel, end-of-shift and other acts with no or a costly undo; a guarded button (`withConfirmation`, `createConfirmButton`), a render-prop trigger, or the headless `useConfirmAction` + `ConfirmActionDialog`
+**Features**: One write per confirmation, the failure shown in the open popup, focus on Cancel when destructive, the entity named, optional type-to-confirm; drawn by `AlertDialog`, so a narrow popup (a phone) puts its icon above the title and stacks its buttons across the row, the verb on top and Cancel at the bottom
+**Location**: `src/components/feedback/ConfirmAction`
+**Docs**: `src/components/feedback/ConfirmAction/ConfirmAction.md`
 
 ### Dialog
 **Purpose**: Display modal dialogs

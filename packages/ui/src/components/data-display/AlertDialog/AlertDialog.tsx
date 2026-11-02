@@ -14,7 +14,7 @@ import React from 'react';
 import { EN_US_UI_LABELS } from '../../../en-US.labels';
 import { neutralTones } from '../../../tokens/ink';
 
-import { AlertDialogFooter } from './AlertDialog.parts';
+import { ALERT_DIALOG_CONTAINER, AlertDialogFooter, narrowDialog } from './AlertDialog.parts';
 import type { AlertDialogProps } from './AlertDialog.types';
 import { rem, rems } from '../../../tokens/relative';
 
@@ -34,6 +34,15 @@ const pulseAnimation = (theme: Theme) => keyframes`
   }
 `;
 
+/**
+ * The container the narrow layout answers to: the space the dialog is given
+ * (the viewport, or the element a host portals it into), read with a
+ * container query — never a media query (FUT-3831).
+ */
+const QUERY_CONTAINER = {
+  '& .MuiDialog-container': { containerType: 'inline-size', containerName: ALERT_DIALOG_CONTAINER },
+} as const;
+
 const StyledDialog = styled(Dialog, {
   shouldForwardProp: (prop) => 
     !['customVariant', 'glow', 'pulse'].includes(prop as string),
@@ -41,7 +50,7 @@ const StyledDialog = styled(Dialog, {
   customVariant?: string; 
   glow?: boolean; 
   pulse?: boolean; 
-}>(({ theme, customVariant, glow, pulse }) => ({
+}>(QUERY_CONTAINER, ({ theme, customVariant, glow, pulse }) => ({
   '& .MuiDialog-paper': {
     borderRadius: theme.spacing(2),
     transition: 'all 0.3s ease',
@@ -122,7 +131,17 @@ const StyledDialog = styled(Dialog, {
   },
 }));
 
-const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
+/**
+ * The title row. Wide: the icon beside the title, which keeps clear of the
+ * close button. Narrow (a dialog given less than `narrowBelow`, a phone): the
+ * icon ABOVE the title, beside the close button, so the question takes the
+ * paper's whole width — at 320 the icon column and the close button had left
+ * it about two words a line (FUT-3831). Without an icon the title keeps the
+ * close button's clearance at every width.
+ */
+const StyledDialogTitle = styled(DialogTitle, {
+  shouldForwardProp: (prop) => prop !== 'withIcon',
+})<{ withIcon: boolean }>(({ theme, withIcon }) => ({
   display: 'flex',
   alignItems: 'center',
   gap: theme.spacing(1.5),
@@ -131,6 +150,14 @@ const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
     fontWeight: 600,
     fontSize: rem(theme, 20),
   },
+  ...(withIcon && {
+    [narrowDialog(theme)]: {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      paddingRight: theme.spacing(3),
+      '& > [data-alert-icon]': { display: 'flex', minHeight: rem(theme, 24) },
+    },
+  }),
 }));
 
 const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
@@ -218,9 +245,11 @@ function AlertDialogHeader({
 }): React.ReactElement | null {
   if (!title) return null;
   return (
-    <StyledDialogTitle id={titleId(dataTestId)} data-testid={`${dataTestId}-title`}>
+    <StyledDialogTitle id={titleId(dataTestId)} data-testid={`${dataTestId}-title`} withIcon={icon !== null}>
       {icon !== null && (
-        <span data-testid={`${dataTestId}-icon`}>{variantIcon(variant, icon)}</span>
+        <span data-testid={`${dataTestId}-icon`} data-alert-icon="">
+          {variantIcon(variant, icon)}
+        </span>
       )}
       <Typography variant="h6" component="span">
         {title}

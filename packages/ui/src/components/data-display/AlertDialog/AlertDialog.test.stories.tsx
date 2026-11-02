@@ -762,3 +762,39 @@ export const Integration: Story = {
     });
   },
 };
+
+/** A 320 × 568 frame the dialog opens inside (not portalled): the space its container query reads. */
+const PhoneFrame = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ width: 320, height: 568, position: 'relative', transform: 'translateZ(0)', overflow: 'hidden' }}>{children}</div>
+);
+
+/**
+ * FUT-3831 review: under 480px only a PAIR of buttons grows across the row.
+ * A lone button (`showCancel={false}`, CardKit's notices) keeps its own width,
+ * pushed to the right as before.
+ */
+export const NarrowLoneButtonKeepsItsWidth: Story = {
+  render: () => (
+    <PhoneFrame>
+      <AlertDialog
+        open
+        disablePortal
+        showCancel={false}
+        title="Termos atualizados"
+        description="Leia e aceite para continuar."
+        confirmText="Aceitar"
+        data-testid="lone"
+      />
+    </PhoneFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const actions = await canvas.findByTestId('lone-actions');
+    const confirm = canvas.getByTestId('lone-confirm-button').getBoundingClientRect();
+    const box = actions.getBoundingClientRect();
+    const style = getComputedStyle(actions);
+    const inner = box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    await expect(confirm.width).toBeLessThan(inner - 40);
+    await expect(Math.abs(confirm.right - (box.right - parseFloat(style.paddingRight)))).toBeLessThanOrEqual(1);
+  },
+};

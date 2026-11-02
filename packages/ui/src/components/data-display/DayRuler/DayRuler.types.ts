@@ -14,9 +14,14 @@ export interface DayRulerBlock {
   id: string;
   start: RulerHour;
   end: RulerHour;
-  /** What the block says ("↻ 20:39–00:00", "Ausente"). One line, cut with an ellipsis. */
+  /**
+   * What the block says ("↻ 20:39–00:00", "Ausente"). One line, drawn whole or
+   * not at all: a bar too short for it says `shortLabel`, and one too short
+   * even for that says nothing — never a cut text (FUT-3831). Either way it
+   * stays the block's tooltip (unless `title`) and its accessible name.
+   */
   label: string;
-  /** What a NARROW block says on a narrow ruler (a phone) instead of a cut label — its start ("20:39"). */
+  /** What a block too short for its `label` says instead, at any width — its start ("20:39"). */
   shortLabel?: string;
   tone: ScheduleBlockTone;
   /** Its middle can be dragged along the row (and Alt+←/→ moves it). */
@@ -53,7 +58,12 @@ export interface DayRulerRow {
   nameAdornment?: React.ReactNode;
   /** Under the meta: the host's chips (praça, "Em pausa desde …"). One line; a chip that does not fit shrinks, its label cut. */
   chips?: React.ReactNode;
-  /** The row's own buttons ("Encerrar turno", "Iniciar agora"), at the end of the row. */
+  /**
+   * The row's own buttons ("Encerrar turno", "Iniciar agora"): under the name
+   * on a computer, beside it when the row stacks. They take no column of their
+   * own, so every track keeps the same width and the hours stay aligned
+   * (FUT-3831).
+   */
   actions?: React.ReactNode;
   blocks: readonly DayRulerBlock[];
   actual?: DayRulerActual;
