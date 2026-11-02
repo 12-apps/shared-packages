@@ -4,8 +4,8 @@
  *
  * The row is one target (the whole label is clickable), so its HEIGHT is the floor.
  * The top variant strips the box's 9px ring to sit flush with the field, which left
- * the row 24px tall; it now gives the label `min-height: 40px` below `sm`
- * (MUI's `down("sm")`, 599.95px) and leaves `sm` and up as they were.
+ * the row 24px tall; it now gives the label `min-height: 40px` while the list's own
+ * width is under `sm` (a container query, 599.95px) and leaves wider lists as they were.
  *
  * jsdom does not lay out, so the rules are read as written, like
  * `payment-list-cpf-look.test.tsx` reads its own.
@@ -54,10 +54,10 @@ function rowClass(): string {
 /** The 40px floor, written once, on the label, under the `sm` breakpoint and nowhere else. */
 function expectFloorBelowSm(): void {
   const rules = css();
-  const floor = ["@media(max-width:599.95px){", `.${rowClass()}`, ".MuiFormControlLabel-root{", "min-height:40px;}}"];
+  const floor = ["@container(max-width:599.95px){", `.${rowClass()}`, ".MuiFormControlLabel-root{", "min-height:40px;}}"];
   expect(rules.includes(floor.join(""))).toBe(true);
   // Not set outside the query: the desktop layout is untouched.
-  expect(rules.replace(/@media\(max-width:599\.95px\)\{[^}]*\}\}/g, "")).not.toMatch(/MuiFormControlLabel-root\{[^}]*min-height/);
+  expect(rules.replace(/@container\(max-width:599\.95px\)\{[^}]*\}\}/g, "")).not.toMatch(/MuiFormControlLabel-root\{[^}]*min-height/);
 }
 
 describe("the save-my-details row's tap floor (FUT-4193)", () => {

@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+import { Box, type Theme } from "@mui/material";
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import { taxIdDigits, taxIdKind, validateCpfOrCnpj } from "../../../card";
@@ -21,6 +21,18 @@ const FIELD_WIDE_MAX = 35;
  * column, under the frame's 900px "wide", and the field still has to stop.
  */
 const FIELD_CAP_FROM_PX = 560;
+
+/**
+ * The "Salvar meus dados" row, flush with the field: the box's own 9px ring and the
+ * label's negative inset (MUI's, under every kit built on it) pushed the words right
+ * until they wrapped on a phone. Without the ring the row is 24px, so under `sm` of the
+ * list's own width the label states the 40px tap floor itself (FUT-4193).
+ */
+const saveRowSx = (t: Theme) => ({
+  "& .MuiFormControlLabel-root": { ml: 0, mr: 0 },
+  "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 },
+  "@container (max-width: 599.95px)": { "& .MuiFormControlLabel-root": { minHeight: t.spacing(5) } },
+});
 
 /**
  * Whether the document is complete enough to move the buyer on (FUT-4080).
@@ -180,10 +192,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
         </Box>
       ) : null}
       {consent ? (
-        // Flush with the field: the box's own 9px ring and the label's negative inset
-        // (MUI's, under every kit built on it) pushed the words right until they wrapped on a phone. Without the ring the row is 24px,
-        // so below `sm` the label states the 40px tap floor itself (FUT-4193).
-        <Box data-testid="list-save-profile-row" sx={(t) => ({ "& .MuiFormControlLabel-root": { ml: 0, mr: 0 }, "& .MuiFormControlLabel-root .MuiCheckbox-root": { p: 0, mr: 1 }, [t.breakpoints.down("sm")]: { "& .MuiFormControlLabel-root": { minHeight: 40 } } })}>
+        <Box data-testid="list-save-profile-row" sx={saveRowSx}>
           <Checkbox
             label={consent.label}
             checked={consent.checked}
