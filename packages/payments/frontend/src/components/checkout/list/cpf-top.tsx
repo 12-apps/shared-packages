@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, useState, type JSX } from "react";
 
-import { taxIdCharacters, taxIdKind, validateCpfOrCnpj } from "../../../card";
+import { taxIdCharacters, taxIdInput, taxIdKind, validateCpfOrCnpj } from "../../../card";
 import { fieldSatisfied } from "../buyer-fields";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
@@ -9,7 +9,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { complaintOf, inputAttributesOf, placeholderOf, taxIdField, useOnComplete } from "./buyer-inline";
 import { usePaymentListMode } from "./context";
-import { keyboardProps, TaxIdKeyboardLink, useTaxIdKeyboard } from "./tax-id-keyboard";
+import { keyboardProps, QuietLink, TaxIdKeyboardLink, useTaxIdKeyboard } from "./tax-id-keyboard";
 import type { PaymentListCopy } from "./types";
 
 /** The prototype's 280px CPF field on a computer (L7), on the theme's spacing scale. */
@@ -47,7 +47,7 @@ function useTaxIdAdvance(
     // A change that leaves the digits as they were — a mask "." or "-" deleted —
     // keeps the verdict the last real change earned.
     onTyped: (next) => {
-      if (taxIdCharacters(next) !== taxIdCharacters(value)) setArrivedWhole(arrivedInOneGo(taxIdCharacters(value), taxIdCharacters(next)));
+      if (taxIdInput(next) !== taxIdInput(value)) setArrivedWhole(arrivedInOneGo(taxIdInput(value), taxIdInput(next)));
     },
   };
 }
@@ -149,7 +149,7 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
   /** Opened over a document on file: "Manter o documento salvo" closes it and keeps that one. */
   onKeepSaved?: () => void;
 }): JSX.Element {
-  const { Button, Input, Text } = useCheckoutComponents();
+  const { Input, Text } = useCheckoutComponents();
   // The document the store already holds, when the host passed it, shown
   // masked — as a CNPJ when it is one — and editable.
   const value = taxIdField.shown(buyer.taxId ?? "");
@@ -195,13 +195,9 @@ export function CpfTop({ field, buyer, onBuyerChange, copy, provider, onComplete
       </Box>
       {keyboard.offered ? <TaxIdKeyboardLink mode={keyboard.mode} copy={copy} onSwitch={keyboard.onSwitch} /> : null}
       {onKeepSaved && copy.keepSavedCpf ? (
-        // Flush with the field's left edge, in the neutral ink of a link that keeps
-        // what is on file — the brand's primary read as an error on a red-brown theme.
-        <Box sx={{ alignSelf: "flex-start", "& button": { textDecoration: "underline", px: 0, py: 0, minWidth: 0, minHeight: (t) => t.spacing(3) } }}>
-          <Button variant="text" color="neutral" size="sm" onClick={onKeepSaved} dataTestId="list-cpf-keep">
-            {copy.keepSavedCpf}
-          </Button>
-        </Box>
+        <QuietLink onClick={onKeepSaved} dataTestId="list-cpf-keep">
+          {copy.keepSavedCpf}
+        </QuietLink>
       ) : null}
       <SaveProfileRow />
     </Box>

@@ -135,6 +135,13 @@ export interface ActivationTaxIdCopy {
    */
   readonly hint: (displayName: string) => string;
   readonly placeholder: string;
+  /**
+   * The phone's link under the field that opens the letters keyboard for an
+   * alphanumeric CNPJ, and the one back (FUT-590, as at checkout). Absent ⇒ no
+   * link, the number keyboard only.
+   */
+  readonly lettersKeyboard?: string;
+  readonly numbersKeyboard?: string;
 }
 
 /**

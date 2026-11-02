@@ -42,12 +42,22 @@ export function taxIdCharacters(value: string): string {
 }
 
 /**
- * What the FIELD keeps as the buyer types: {@link taxIdCharacters}, capped at a
- * CNPJ's fourteen, the most a document has. Only the input path caps; every
- * check measures the value it is given.
+ * A label pasted in front of the document — "CPF 529.982.247-25", "cnpj:
+ * 11.222.333/0001-81" — as it is copied from a receipt or a card statement.
+ * It needs a colon or a space after it: without one, `CPF…` could be the start
+ * of an alphanumeric CNPJ, whose first characters may be any letters.
+ */
+const PASTED_LABEL = /^\s*(?:CPF|CNPJ)\s*(?::\s*|\s+)(?=\S)/i;
+
+/**
+ * What the FIELD keeps as the buyer types or pastes: a leading `CPF`/`CNPJ`
+ * label dropped — once letters count, it would otherwise be read as the
+ * document's first characters (FUT-590 UI review) — then
+ * {@link taxIdCharacters}, capped at a CNPJ's fourteen, the most a document
+ * has. Only the input path drops and caps; every check measures what it is given.
  */
 export function taxIdInput(value: string): string {
-  return taxIdCharacters(value).slice(0, CNPJ_LENGTH);
+  return taxIdCharacters(value.replace(PASTED_LABEL, "")).slice(0, CNPJ_LENGTH);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */

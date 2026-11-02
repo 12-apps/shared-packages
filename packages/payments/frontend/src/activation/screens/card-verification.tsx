@@ -1,11 +1,12 @@
 'use client';
 
 import { Button, Stack, Typography } from '@mui/material';
-import type { ComponentType, JSX, ReactNode } from 'react';
+import { useRef, type ComponentType, type JSX, type ReactNode } from 'react';
 
 import { NewCardForm } from '../../card/fields';
 import { detectBrand, onlyDigits } from '../../card/format';
 import { formatCpfOrCnpj, taxIdInput } from '../../card/tax-id';
+import { keyboardProps, TaxIdKeyboardLink, useTaxIdKeyboard } from '../../components/checkout/list/tax-id-keyboard';
 import { useCheckoutComponents } from '../../components/checkout/ui';
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useActivationCharge, type ActivationCharge } from '../use-activation-charge';
@@ -66,38 +67,24 @@ function ChargeEmail({
   );
 }
 
-/** The card + tax-id fields and the one button that runs the charge. */
-function ChargeForm({
-  verification,
-  amountLabel,
-  displayName,
-  validateTaxId,
-}: {
+/** The holder's document: masked, checked on blur, on the checkout's keyboard and link (FUT-590). */
+function TaxIdField({ verification, displayName, validateTaxId }: {
   verification: ActivationCharge;
-  amountLabel: string | null;
-  /** The provider being activated, as the owner knows it. */
   displayName: string;
   validateTaxId: (value: string) => string | undefined;
 }): JSX.Element {
-  const { taxId, actions } = useActivationCopy();
+  const { taxId } = useActivationCopy();
   const { Input } = useCheckoutComponents();
-  const { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, setCpfError, state } =
-    verification;
-  const submitting = state.kind === 'submitting';
-
+  const { cpf, setCpf, cpfError, setCpfError } = verification;
+  const scope = useRef<HTMLDivElement | null>(null);
+  const keyboard = useTaxIdKeyboard(scope, taxId, '[data-testid="verify-charge-cpf"]');
   return (
-    <Stack spacing={2} data-testid="verify-charge-form">
-      <NewCardForm
-        card={card}
-        fieldErrors={fieldErrors}
-        brand={detectBrand(onlyDigits(card.number))}
-        setCard={setCard}
-        setFieldErrors={setFieldErrors}
-      />
+    // Its own column, so the Stack's spacing does not override the link's band.
+    <Stack ref={scope} spacing={1.5} useFlexGap>
       <Input
         label={taxId.label}
         type="text"
-        inputMode="numeric"
+        {...keyboardProps(keyboard.mode)}
         variant="outlined"
         size="md"
         fullWidth
@@ -118,6 +105,40 @@ function ChargeForm({
         }}
         data-testid="verify-charge-cpf"
       />
+      {keyboard.offered ? (
+        <TaxIdKeyboardLink mode={keyboard.mode} copy={taxId} onSwitch={keyboard.onSwitch} dataTestId="verify-charge-cpf-keyboard" />
+      ) : null}
+    </Stack>
+  );
+}
+
+/** The card + tax-id fields and the one button that runs the charge. */
+function ChargeForm({
+  verification,
+  amountLabel,
+  displayName,
+  validateTaxId,
+}: {
+  verification: ActivationCharge;
+  amountLabel: string | null;
+  /** The provider being activated, as the owner knows it. */
+  displayName: string;
+  validateTaxId: (value: string) => string | undefined;
+}): JSX.Element {
+  const { actions } = useActivationCopy();
+  const { card, setCard, fieldErrors, setFieldErrors, state } = verification;
+  const submitting = state.kind === 'submitting';
+
+  return (
+    <Stack spacing={2} data-testid="verify-charge-form">
+      <NewCardForm
+        card={card}
+        fieldErrors={fieldErrors}
+        brand={detectBrand(onlyDigits(card.number))}
+        setCard={setCard}
+        setFieldErrors={setFieldErrors}
+      />
+      <TaxIdField verification={verification} displayName={displayName} validateTaxId={validateTaxId} />
       {verification.payerEmailRequired ? (
         <ChargeEmail verification={verification} displayName={displayName} />
       ) : null}

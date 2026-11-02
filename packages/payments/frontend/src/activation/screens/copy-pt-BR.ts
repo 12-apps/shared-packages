@@ -125,6 +125,8 @@ export const PT_BR_ACTIVATION_STEP_COPY: ActivationStepCopy = {
     // such provider's owner that refunds happen in InfinitePay's app.
     hint: (displayName) => `Exigido por ${displayName} em qualquer cobrança no cartão.`,
     placeholder: 'Só os números',
+    lettersKeyboard: 'Seu CNPJ tem letras? Usar teclado com letras',
+    numbersKeyboard: 'Voltar ao teclado de números',
   },
   payerEmail: {
     label: 'E-mail do pagador',

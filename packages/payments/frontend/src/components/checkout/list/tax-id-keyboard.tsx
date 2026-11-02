@@ -1,9 +1,27 @@
 import { Box, useMediaQuery } from "@mui/material";
-import { useEffect, useRef, useState, type JSX, type RefObject } from "react";
+import { useEffect, useRef, useState, type JSX, type ReactNode, type RefObject } from "react";
 
 import { useCheckoutComponents, type CheckoutInputProps } from "../ui";
 
-import type { PaymentListCopy } from "./types";
+/**
+ * The link's two sentences — the checkout's `buyer` pack and the activation's
+ * `taxId` pack both carry them. Absent ⇒ no link, the number keyboard only.
+ */
+interface KeyboardSwitchCopy {
+  lettersKeyboard?: string;
+  numbersKeyboard?: string;
+}
+
+/**
+ * A quiet link's geometry, in spacing units: the line it LOOKS (24px), the
+ * target a finger gets (40px), and what it gives back below. Half the extra
+ * height above keeps the text where it sat; giving back only a quarter below
+ * means that in a column 12px apart (1.5) the next link's band starts exactly
+ * where this one's ends: 1.5 − 0.5 − 1 = 0, touching, never overlapping.
+ */
+const LINK_LINE = 3;
+const LINK_HIT = 5;
+const LINK_BELOW = -0.5;
 
 /**
  * The CPF-or-CNPJ field's keyboard (FUT-590, the owner's option B).
@@ -23,8 +41,11 @@ export type TaxIdKeyboard = NonNullable<CheckoutInputProps["inputMode"]>;
 /** A pointer that hovers and aims finely: a mouse or a trackpad, so a physical keyboard. */
 const PHYSICAL_KEYBOARD_QUERY = "(hover: hover) and (pointer: fine)";
 
-/** The document field's `<input>`: its test id is the one the slot contract lands on it. */
+/** The checkout's document `<input>`: its test id is the one the slot contract lands on it. */
 const TAX_ID_INPUT = '[data-testid="list-buyer-taxId"]';
+
+/** What a phone's keyboard is told about a document: no spell-check, no autocorrect, capitals (FUT-590). */
+const DOCUMENT_HINTS = { spellCheck: false, autoCorrect: "off", autoCapitalize: "characters" } as const;
 
 /**
  * The keyboard as the field's `Input` takes it: at the top level, and again in
@@ -32,8 +53,13 @@ const TAX_ID_INPUT = '[data-testid="list-buyer-taxId"]';
  * root `<div>` until FUT-1440, where it raised no keyboard at all, while every
  * binding merges `inputProps` onto the `<input>`.
  */
-export function keyboardProps(mode: TaxIdKeyboard): { inputMode: TaxIdKeyboard; inputProps: { inputMode: TaxIdKeyboard } } {
-  return { inputMode: mode, inputProps: { inputMode: mode } };
+export function keyboardProps(mode: TaxIdKeyboard): {
+  inputMode: TaxIdKeyboard;
+  inputProps: { inputMode: TaxIdKeyboard } & typeof DOCUMENT_HINTS;
+} {
+  // A CNPJ's `01DE` is no word: without these the browser underlines a valid
+  // document in red and a phone "corrects" or lower-cases its letters.
+  return { inputMode: mode, inputProps: { inputMode: mode, ...DOCUMENT_HINTS } };
 }
 
 /**
@@ -44,7 +70,8 @@ export function keyboardProps(mode: TaxIdKeyboard): { inputMode: TaxIdKeyboard; 
  */
 export function useTaxIdKeyboard(
   scope: RefObject<HTMLElement | null>,
-  copy: PaymentListCopy["buyer"],
+  copy: KeyboardSwitchCopy,
+  input: string = TAX_ID_INPUT,
 ): { mode: TaxIdKeyboard; offered: boolean; onSwitch: () => void } {
   const [mode, setMode] = useState<TaxIdKeyboard>("numeric");
   const [switches, setSwitches] = useState(0);
@@ -56,10 +83,10 @@ export function useTaxIdKeyboard(
       firstRender.current = false;
       return;
     }
-    const input = scope.current?.querySelector<HTMLInputElement>(TAX_ID_INPUT);
-    input?.blur();
-    input?.focus();
-  }, [switches, scope]);
+    const field = scope.current?.querySelector<HTMLInputElement>(input);
+    field?.blur();
+    field?.focus();
+  }, [switches, scope, input]);
   return {
     mode: offered ? mode : "numeric",
     offered,
@@ -71,25 +98,51 @@ export function useTaxIdKeyboard(
 }
 
 /**
- * The quiet link under the document field. Flush with the field's left edge,
- * in the neutral ink of "Manter o documento salvo" beside it: the brand's
- * primary reads as part of the red complaint right above it. A press does not
- * take the focus off the field, so the buyer's place in it is kept.
+ * A quiet link under a field — "Seu CNPJ tem letras?", "Manter o documento
+ * salvo": flush with the field's left edge, underlined, in neutral ink (the
+ * brand's primary reads as part of a red complaint right above it).
+ *
+ * Its TEXT is one line tall; its TARGET is 40px, the least a finger can hit
+ * (FUT-590 UI review). The extra height is invisible, taken back by negative
+ * margins (see LINK_BELOW), so the text stays where it sat and two such links
+ * in a column 12px apart touch without overlapping. `keepFocus` stops a press from
+ * taking the focus off the field above, so the buyer's place in it is kept.
  */
-export function TaxIdKeyboardLink({ mode, copy, onSwitch }: {
-  mode: TaxIdKeyboard;
-  copy: PaymentListCopy["buyer"];
-  onSwitch: () => void;
+export function QuietLink({ onClick, dataTestId, keepFocus = false, children }: {
+  onClick: () => void;
+  dataTestId: string;
+  keepFocus?: boolean;
+  children: ReactNode;
 }): JSX.Element {
   const { Button } = useCheckoutComponents();
   return (
     <Box
-      onMouseDown={(event) => event.preventDefault()}
-      sx={{ alignSelf: "flex-start", "& button": { textDecoration: "underline", px: 0, py: 0, minWidth: 0, minHeight: (t) => t.spacing(3), textAlign: "left" } }}
+      data-testid={`${dataTestId}-band`}
+      onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
+      sx={(t) => ({
+        alignSelf: "flex-start",
+        mt: t.spacing((LINK_LINE - LINK_HIT) / 2),
+        mb: t.spacing(LINK_BELOW),
+        "& button": { textDecoration: "underline", px: 0, py: 0, minWidth: 0, minHeight: t.spacing(LINK_HIT), textAlign: "left" },
+      })}
     >
-      <Button variant="text" color="neutral" size="sm" onClick={onSwitch} dataTestId="list-cpf-keyboard">
-        {mode === "numeric" ? copy.lettersKeyboard : copy.numbersKeyboard}
+      <Button variant="text" color="neutral" size="sm" onClick={onClick} dataTestId={dataTestId}>
+        {children}
       </Button>
     </Box>
+  );
+}
+
+/** The document field's keyboard switch (FUT-590, option B). */
+export function TaxIdKeyboardLink({ mode, copy, onSwitch, dataTestId = "list-cpf-keyboard" }: {
+  mode: TaxIdKeyboard;
+  copy: KeyboardSwitchCopy;
+  onSwitch: () => void;
+  dataTestId?: string;
+}): JSX.Element {
+  return (
+    <QuietLink onClick={onSwitch} dataTestId={dataTestId} keepFocus>
+      {mode === "numeric" ? copy.lettersKeyboard : copy.numbersKeyboard}
+    </QuietLink>
   );
 }
