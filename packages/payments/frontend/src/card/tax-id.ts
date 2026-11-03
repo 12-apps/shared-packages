@@ -56,29 +56,51 @@ function normalise(value: string): string {
 const TYPED_SHAPE = /^[0-9A-Z./-]*$/;
 
 /**
- * A CPF/CNPJ label word GLUED in front of a document's digits
- * ("CPF529.982.247-25", "CNPJ11.222.333/0001-81"): after the word, only digits
- * and mask characters, eleven digits at least. Anything else led by the word
- * ("CPF1", "CPF12ABC…") is an alphanumeric CNPJ being typed.
+ * A CPF/CNPJ label GLUED in front of the rest of the value: "CPF", "CNPJ",
+ * "CPF/CNPJ" or "CNPJ/CPF". `undefined` when the value has no such label.
  */
-const GLUED_LABEL = /^(?:CNPJ|CPF)([0-9./-]*)$/;
+const LEADING_LABEL = /^(?:CNPJ|CPF)(?:\/(?:CNPJ|CPF))?/;
 
+function afterLabel(value: string): string | undefined {
+  const label = LEADING_LABEL.exec(value)?.[0];
+  return label === undefined ? undefined : value.slice(label.length);
+}
+
+/**
+ * A label glued to a document's digits ("CPF529.982.247-25",
+ * "CPF/CNPJ11.222.333/0001-81"): after it, only digits and mask characters,
+ * eleven digits at least — a paste. Anything else led by the word ("CPF1",
+ * "CPF12ABC…") is an alphanumeric CNPJ being typed.
+ */
 function isGluedLabel(value: string): boolean {
-  const rest = GLUED_LABEL.exec(value)?.[1];
-  return rest !== undefined && rest.replace(/\D/g, "").length >= CPF_LENGTH;
+  const rest = afterLabel(value);
+  return rest !== undefined && /^[0-9./-]*$/.test(rest) && digitsOnly(rest).length >= CPF_LENGTH;
+}
+
+/**
+ * A valid digits-only document with a word glued after it
+ * ("529.982.247-25Fulano"): its digits, then two letters or more. Eleven
+ * digits or more and then two letters can never begin a CNPJ — only its
+ * twelfth character may be a letter — so no typed CNPJ is cut.
+ */
+function documentBeforeWord(value: string): string | undefined {
+  const kept = taxIdCharacters(value);
+  const digits = digitsOnly(value);
+  const gluedWord = kept.startsWith(digits) && /^[A-Z]{2,}$/.test(kept.slice(digits.length));
+  return gluedWord && isValidCpfOrCnpj(digits) ? digits : undefined;
 }
 
 /**
  * The TYPING path's one reading: the characters as typed, except a valid
- * digits-only document with a word glued after it ("529.982.247-25Fulano").
- * Eleven digits or more and then two letters can never begin a CNPJ — only
- * its twelfth character may be a letter — so no typed CNPJ is cut.
+ * digits-only document with a word glued after it, a leading label glued
+ * before it or not ("CPF529.982.247-25RG"): then the document. After a label,
+ * such a rest is thirteen characters at least, so it never begins a CNPJ
+ * that starts with the label's letters either.
  */
 function typedDocument(value: string): string {
-  const kept = taxIdCharacters(value);
-  const digits = digitsOnly(value);
-  const gluedWord = kept.startsWith(digits) && /^[A-Z]{2,}$/.test(kept.slice(digits.length));
-  return gluedWord && isValidCpfOrCnpj(digits) ? digits : kept.slice(0, CNPJ_LENGTH);
+  const rest = afterLabel(value);
+  const document = documentBeforeWord(value) ?? (rest === undefined ? undefined : documentBeforeWord(rest));
+  return document ?? taxIdCharacters(value).slice(0, CNPJ_LENGTH);
 }
 
 /** One TOKEN of a paste: a maximal run of the mask's own characters. */

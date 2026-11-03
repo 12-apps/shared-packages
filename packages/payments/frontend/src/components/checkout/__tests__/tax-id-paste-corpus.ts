@@ -327,6 +327,10 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["IE 123.456.789.113 CPF 529.982.247-25", "12345678911352"],
   ["CPF 529.982.247-25 n\u00ba 108", "52998224725108"],
   ["CPF: 529.982.247-25\nCasa 108", "52998224725108"],
+  // A label glued before the digits and a word glued after them.
+  ["CPF529.982.247-25RG", "52998224725"],
+  ["CPF/CNPJ11.222.333/0001-81", "11222333000181"],
+  ["CPF/CNPJ529.982.247-25Fulano", "52998224725"],
   // Typing: partial alphanumeric input is kept as typed.
   ["12ABC", "12ABC"],
   ["12.ABC", "12ABC"],
