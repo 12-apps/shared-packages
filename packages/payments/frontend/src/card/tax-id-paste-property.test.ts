@@ -11,7 +11,8 @@
  *      the characters of one whole token of the paste;
  *  (B) whenever OLD is a valid document, the output is OLD;
  *  (C) a valid alphanumeric CNPJ, masked or not, labelled or not, comes back;
- *  (D) any document typed key by key into the masked field ends as itself.
+ *  (D) any document typed key by key into the masked field ends as itself,
+ *      one that begins with a CPF/CNPJ label word included.
  *
  * The randomness is a seeded generator, so a failure names a case that
  * reproduces.
@@ -246,19 +247,44 @@ describe('a valid alphanumeric CNPJ', () => {
   });
 });
 
+/** A valid alphanumeric CNPJ that begins with a CPF/CNPJ label word: "CPF…", "CNPJ…". */
+function labelLedCnpj(random: () => number): string {
+  for (;;) {
+    const word = pick(random, ['CPF', 'CNPJ']);
+    const base = word + characters(random, ALPHANUMERIC, 12 - word.length);
+    const first = base + cnpjCheckDigit(base);
+    const document = first + cnpjCheckDigit(first);
+    if (isValidCpfOrCnpj(document)) return document;
+  }
+}
+
+/** Every way `document` is typed — plain and masked, upper and lower case — that does not end as itself. */
+function typedWrong(document: string): string[] {
+  return [document, masked(document)]
+    .flatMap((keys) => [keys.toUpperCase(), keys.toLowerCase()])
+    .flatMap((typed) => {
+      const kept = [...typed].reduce((field, key) => taxIdInput(formatCpfOrCnpj(field) + key), '');
+      const shown = formatCpfOrCnpj(kept);
+      return kept === document && shown === masked(document) ? [] : [`${JSON.stringify(typed)} -> ${kept} (${shown})`];
+    });
+}
+
 describe('a document typed key by key into the masked field', () => {
   it('(D) ends as itself, for 3000 random CPFs, numeric and alphanumeric CNPJs, masked or not, in both cases', () => {
     const random = generator(4080);
-    const wrong: string[] = [];
-    for (let at = 0; at < 3000; at += 1) {
-      const document = validDocument(random, (['cpf', 'cnpj', 'alphanumeric'] as const)[at % 3] ?? 'cpf');
-      for (const keys of [document, masked(document)]) {
-        for (const cased of [keys.toUpperCase(), keys.toLowerCase()]) {
-          const kept = [...cased].reduce((field, key) => taxIdInput(formatCpfOrCnpj(field) + key), '');
-          if (kept !== document) wrong.push(`${JSON.stringify(cased)} -> ${kept}`);
-        }
-      }
-    }
+    const kinds = ['cpf', 'cnpj', 'alphanumeric'] as const;
+    const wrong = Array.from({ length: 3000 }, (_, at) => validDocument(random, kinds[at % 3] ?? 'cpf')).flatMap(typedWrong);
     expect(wrong).toEqual([]);
+  });
+
+  it('(D) ends as itself, for 200 random alphanumeric CNPJs that begin with CPF or CNPJ', () => {
+    const random = generator(3104);
+    // "CPF" and eleven digits that are a valid CPF is two valid documents at once;
+    // the glued label wins there, as a pasted "CPF529.982.247-25" must.
+    const documents = Array.from({ length: 200 }, () => labelLedCnpj(random)).filter(
+      (cnpj) => !(/^CPF\d{11}$/.test(cnpj) && isValidCpfOrCnpj(cnpj.slice(3))),
+    );
+    expect(documents.length).toBeGreaterThan(190);
+    expect(documents.flatMap(typedWrong)).toEqual([]);
   });
 });

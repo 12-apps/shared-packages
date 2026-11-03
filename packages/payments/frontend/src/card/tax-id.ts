@@ -55,8 +55,31 @@ function normalise(value: string): string {
 /** What a keystroke, or a paste of the field's own masked value, can hold. */
 const TYPED_SHAPE = /^[0-9A-Z./-]*$/;
 
-/** A CPF/CNPJ label word in front of more characters ("CPF529.982.247-25", "CNPJ/MF"). */
-const LEADING_LABEL = /^(CNPJ|CPF)(?=[0-9A-Z./-])/;
+/**
+ * A CPF/CNPJ label word GLUED in front of a document's digits
+ * ("CPF529.982.247-25", "CNPJ11.222.333/0001-81"): after the word, only digits
+ * and mask characters, eleven digits at least. Anything else led by the word
+ * ("CPF1", "CPF12ABC…") is an alphanumeric CNPJ being typed.
+ */
+const GLUED_LABEL = /^(?:CNPJ|CPF)([0-9./-]*)$/;
+
+function isGluedLabel(value: string): boolean {
+  const rest = GLUED_LABEL.exec(value)?.[1];
+  return rest !== undefined && rest.replace(/\D/g, "").length >= CPF_LENGTH;
+}
+
+/**
+ * The TYPING path's one reading: the characters as typed, except a valid
+ * digits-only document with a word glued after it ("529.982.247-25Fulano").
+ * Eleven digits or more and then two letters can never begin a CNPJ — only
+ * its twelfth character may be a letter — so no typed CNPJ is cut.
+ */
+function typedDocument(value: string): string {
+  const kept = taxIdCharacters(value);
+  const digits = digitsOnly(value);
+  const gluedWord = kept.startsWith(digits) && /^[A-Z]{2,}$/.test(kept.slice(digits.length));
+  return gluedWord && isValidCpfOrCnpj(digits) ? digits : kept.slice(0, CNPJ_LENGTH);
+}
 
 /** One TOKEN of a paste: a maximal run of the mask's own characters. */
 const TOKEN = /[0-9A-Z./-]+/g;
@@ -93,16 +116,17 @@ function pastedDocument(value: string): string {
 
 /**
  * What the FIELD keeps as the buyer types or pastes. TYPING — no space, only
- * the mask's own characters, not led by a label word — is kept as typed, so a
- * partial alphanumeric CNPJ ("12ABC") keeps its letters; anything else is a
- * paste, read by {@link pastedDocument}. Capped at a CNPJ's fourteen, the most
+ * the mask's own characters, no label glued to a document's digits — is read
+ * by {@link typedDocument}, so a partial alphanumeric CNPJ ("12ABC",
+ * "CPF12ABC") keeps its letters; anything else is a paste, read by
+ * {@link pastedDocument}. Capped at a CNPJ's fourteen, the most
  * a document has. Only the input path drops and caps; every check measures
  * what it is given.
  */
 export function taxIdInput(value: string): string {
   const normalised = normalise(value);
-  const typed = TYPED_SHAPE.test(normalised) && !LEADING_LABEL.test(normalised);
-  return typed ? taxIdCharacters(normalised).slice(0, CNPJ_LENGTH) : pastedDocument(normalised);
+  const typed = TYPED_SHAPE.test(normalised) && !isGluedLabel(normalised);
+  return typed ? typedDocument(normalised) : pastedDocument(normalised);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */

@@ -5,8 +5,11 @@
  *
  * The rule (`card/tax-id.ts`): after NFKC, combining marks dropped and
  * uppercasing, a value with no space and only the mask's own characters
- * (`A-Z0-9./-`), not led by a CPF/CNPJ label word, is TYPING and kept as
- * typed. Anything else is a paste, read as the field read it before letters
+ * (`A-Z0-9./-`) is TYPING and kept as typed — unless a CPF/CNPJ word is glued
+ * to a document's digits (only digits and mask characters after it, eleven
+ * digits at least: a paste), and except a valid digits-only document with two
+ * letters or more glued after it ("529.982.247-25Fulano"), read as that
+ * document. Anything else is a paste, read as the field read it before letters
  * counted — every digit, capped at fourteen — unless an alphanumeric CNPJ is
  * clearly there:
  *
@@ -38,7 +41,7 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CPF.: 529.982.247-25", "52998224725"],
   ["CNPJ n° 11.222.333/0001-81", "11222333000181"],
   ["CNPJ No. 11.222.333/0001-81", "11222333000181"],
-  ["CPF12ABC34501", "1234501"], // follows the digits-only field (was "CPF12ABC34501")
+  ["CPF12ABC34501", "CPF12ABC34501"],
   ["MF.ABC.345/01DE-35", "MFABC34501DE35"],
   ["NO.ABC.345/01DE-35", "NOABC34501DE35"],
   ["CNPJ: MF.ABC.345/01DE-31", "MFABC34501DE31"],
@@ -218,9 +221,7 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["Doc: 11.222.333/0001-81", "11222333000181"],
   ["CPF:529.982.247-25Fulano", "52998224725"],
   ["CNPJ 11.222.333/0001-81LTDA", "11222333000181"],
-  // No space and only the mask's characters: the typing path keeps it as typed,
-  // which is NOT the digits-only field (was "52998224725").
-  ["529.982.247-25Fulano", "52998224725FUL"],
+  ["529.982.247-25Fulano", "52998224725"],
   ["CNPJ: 11.222.333/0001-81 \u2014 Empresa", "11222333000181"],
   ["CPF: 529.982.247-25 \u2013 Fulano", "52998224725"],
   ["CNPJ: 11.222.333/0001-81 \u2215 filial", "11222333000181"],

@@ -78,13 +78,13 @@ describe("a document pasted with its label", () => {
     expect(buyers.at(-1)?.taxId).toBe(kept);
   });
 
-  it("reads a label-led paste by its digits, unless a whole alphanumeric CNPJ is there", () => {
+  it("drops a label only when something separates it or it is glued to digits, so a CNPJ beginning with CPF keeps its letters", () => {
     expect(taxIdInput("CPF 529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("  cpf :  529.982.247-25")).toBe("52998224725");
-    // A glued label is a paste: a valid alphanumeric CNPJ beginning CPF keeps its letters,
-    // anything less follows the digits-only field.
+    // A label is glued only to a document's digits: a CNPJ beginning CPF keeps its letters.
     expect(taxIdInput("CPF12345678944")).toBe("CPF12345678944");
-    expect(taxIdInput("CPF12ABC34501")).toBe("1234501");
+    expect(taxIdInput("CPF12ABC34501")).toBe("CPF12ABC34501");
+    expect(taxIdInput("CPF529.982.247-25")).toBe("52998224725");
     expect(taxIdInput("CPF 529.982.247-25 Fulano de Tal")).toBe("52998224725");
     // Typing, no label: a CNPJ whose first eleven digits are a valid CPF keeps its twelfth.
     expect(taxIdInput("112.223.550-001")).toBe("112223550001");
