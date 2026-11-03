@@ -1,3 +1,4 @@
+import { isValidCpfOrCnpj, taxIdHasLetters } from './tax-id';
 import type { PaymentMethodKind } from './types';
 
 /**
@@ -44,7 +45,11 @@ import type { PaymentMethodKind } from './types';
 export interface CustomerInfo {
   name?: string;
   email?: string;
-  /** CPF/CNPJ digits. Required only where a schema says so (e.g. PagBank). */
+  /**
+   * The CPF or CNPJ — a CNPJ may carry letters since July 2026 (FUT-590), so
+   * read it with `taxIdCharacters`, never by stripping it to digits. Required
+   * only where a schema says so (e.g. PagBank).
+   */
   taxId?: string;
   phone?: string;
 }
@@ -100,6 +105,14 @@ export interface CustomerFieldSpec {
    * required/optional flag cannot say. At most one spec per (key, method).
    */
   methods?: readonly PaymentMethodKind[];
+  /**
+   * `CPF` only: the provider documents a CNPJ of DIGITS only for this field,
+   * so an alphanumeric CNPJ (FUT-590) is refused for it here, before anything
+   * is sent, rather than cut down to its digits. Stripe's boleto `tax_id` is
+   * the one today. The browser's form does not narrow on it: the list asks the
+   * document once for every method, and a letter only blocks this one.
+   */
+  numericOnly?: boolean;
 }
 
 export type CustomerSchema = readonly CustomerFieldSpec[];
@@ -124,6 +137,11 @@ export interface CustomerFieldIssue {
   reason: 'MISSING' | 'INVALID';
   /** Carried so callers can tell a blocking issue from an advisory one. */
   required: boolean;
+  /**
+   * Why an INVALID value is invalid, when it is not malformed: a valid
+   * alphanumeric CNPJ for a provider that documents digits only (FUT-590).
+   */
+  detail?: 'LETTERS_UNSUPPORTED';
 }
 
 const WHITESPACE = /\s/;
@@ -147,38 +165,18 @@ function hasEmailShape(value: string): boolean {
   return dot > 0 && dot < domain.length - 1;
 }
 
-/** The standard CPF verifier digit: weighted sum mod 11, 10/11 read as 0. */
-function cpfDigit(digits: string, length: number): number {
-  let sum = 0;
-  for (let i = 0; i < length; i += 1) sum += Number(digits[i]) * (length + 1 - i);
-  return ((sum * 10) % 11) % 10;
-}
-
-/** CNPJ verifier digit: weights cycle 2..9 from the RIGHTMOST position. */
-function cnpjDigit(digits: string, length: number): number {
-  let sum = 0;
-  for (let i = 0; i < length; i += 1) sum += Number(digits[i]) * (((length - 1 - i) % 8) + 2);
-  const remainder = sum % 11;
-  return remainder < 2 ? 0 : 11 - remainder;
-}
-
 /**
- * CPF (11 digits) or CNPJ (14 digits) by check digits. A repeated-digit CPF
- * (`111.111.111-11`, …) passes the arithmetic but is on Receita's own reject
- * list, so it is refused explicitly.
+ * Whether a VALID document is still refused for this field: an alphanumeric
+ * CNPJ where the provider documents a CNPJ of digits only (`numericOnly`,
+ * FUT-590). The check digits themselves are `./tax-id`'s, the one validator.
  */
-function isValidTaxId(value: string): boolean {
-  const digits = value.replace(/\D/g, '');
-  if (/^(\d)\1+$/.test(digits)) return false;
-  if (digits.length === 11) {
-    return cpfDigit(digits, 9) === Number(digits[9]) && cpfDigit(digits, 10) === Number(digits[10]);
-  }
-  if (digits.length === 14) {
-    return (
-      cnpjDigit(digits, 12) === Number(digits[12]) && cnpjDigit(digits, 13) === Number(digits[13])
-    );
-  }
-  return false;
+/** One issue as an operator reads it: `taxId (INVALID: LETTERS_UNSUPPORTED)`. */
+export function describeCustomerIssue(issue: CustomerFieldIssue): string {
+  return `${issue.field} (${issue.reason}${issue.detail ? `: ${issue.detail}` : ''})`;
+}
+
+function lettersRefused(field: CustomerFieldSpec, value: string): boolean {
+  return field.type === 'CPF' && field.numericOnly === true && taxIdHasLetters(value);
 }
 
 /**
@@ -241,7 +239,7 @@ const VALIDATORS: Record<CustomerFieldType, (value: string) => boolean> = {
   EMAIL: (value) => hasEmailShape(value.trim()),
   PHONE: isValidBrPhone,
   MOBILE: isValidBrMobile,
-  CPF: isValidTaxId,
+  CPF: isValidCpfOrCnpj,
 };
 
 /**
@@ -270,6 +268,10 @@ export function validateCustomer(
     }
     if (!VALIDATORS[field.type](value)) {
       issues.push({ field: field.key, reason: 'INVALID', required: field.required });
+      continue;
+    }
+    if (lettersRefused(field, value)) {
+      issues.push({ field: field.key, reason: 'INVALID', required: field.required, detail: 'LETTERS_UNSUPPORTED' });
     }
   }
   return issues;

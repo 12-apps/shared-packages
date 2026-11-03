@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" /><title>shared-packages frontend harness</title>
     <!--
+      A real SPA's viewport (FUT-590 UI review). Without it, a phone — or a
+      Playwright context emulating one — lays the page out at 980px and shrinks
+      it, so no phone-width layout the packages ship is ever seen here.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
       @12-apps/pwa's manifest, linked the way a real SPA links it (12-23).
 
       The href is a path at THIS origin, and what answers it is the package's

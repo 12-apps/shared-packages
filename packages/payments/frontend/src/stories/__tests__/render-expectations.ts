@@ -55,7 +55,12 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // the CPF at its top for a new buyer, then the rows the chain can drive.
   // `/config` stalling holds the list on its loading face; failing fails OPEN
   // to the ordinary rows — no error is raised.
-  "Checkout/ConfigPending": { testIds: ["payment-list-loading", "list-pay"] },
+  // A pending `/config` refuses nothing early: the list is drawn and STAYS
+  // drawn while the read never answers — never stuck on its loading box.
+  "Checkout/ConfigPending": {
+    ...LIST_NEW_BUYER,
+    absentTestIds: [...(LIST_NEW_BUYER.absentTestIds ?? []), "payment-list-loading"],
+  },
   "Checkout/ConfigFailed": LIST_NEW_BUYER,
   "Checkout/NoProviderConnected": {
     testIds: ["checkout-payments-disabled"],

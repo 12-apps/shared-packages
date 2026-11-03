@@ -1,4 +1,4 @@
-import type { CustomerFieldIssue } from './customer-schema';
+import { describeCustomerIssue, type CustomerFieldIssue } from './customer-schema';
 import type { DeclineReason, ProviderName } from './types';
 import type { WalkFailure } from './walk-failure';
 
@@ -119,7 +119,7 @@ export class CustomerRequirementsError extends PaymentsError {
   ) {
     super('CustomerRequirementsError',
       `Provider ${provider} requires buyer fields this charge does not carry: ` +
-        issues.map((issue) => `${issue.field} (${issue.reason})`).join(', '),
+        issues.map(describeCustomerIssue).join(', '),
     );
   }
 }

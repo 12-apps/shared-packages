@@ -144,7 +144,9 @@ const customerSchema: CustomerSchema = [
   { key: 'email', type: 'EMAIL', required: false, methods: ['PIX', 'CARD'] },
   { key: 'name', type: 'NAME', required: true, methods: ['BOLETO'] },
   { key: 'email', type: 'EMAIL', required: true, methods: ['BOLETO'] },
-  { key: 'taxId', type: 'CPF', required: true, methods: ['BOLETO'] },
+  // Stripe documents boleto's CNPJ as "14 digits" (`00.000.000/0000-00`), so
+  // an alphanumeric CNPJ is refused for it before anything is sent (FUT-590).
+  { key: 'taxId', type: 'CPF', required: true, methods: ['BOLETO'], numericOnly: true },
 ];
 
 /** Connect OAuth: authorize → exchange → refresh → deauthorize. */

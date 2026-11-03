@@ -102,6 +102,8 @@ export const PT_BR_CHECKOUT_COPY: CheckoutCopy = {
     return `O ${BUYER_FIELDS[field].noun} informado não é válido. Confira e tente novamente.`;
   },
 
+  taxIdLettersUnsupported: 'Este pagamento ainda não aceita CNPJ com letras.',
+
   /**
    * The name the BROWSER's form field carries, which is a host/client contract
    * rather than copy — the package calls it `taxId` and a Brazilian storefront

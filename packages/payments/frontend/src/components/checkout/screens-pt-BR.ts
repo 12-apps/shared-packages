@@ -151,7 +151,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     pixVeil: 'Atualize para gerar um novo Pix',
   },
   validation: {
-    taxIdInvalid: 'Informe um CPF ou CNPJ válido.',
+    taxIdInvalid: 'Esse CPF ou CNPJ não é válido. Confira os números.',
     nameRequired: 'Informe seu nome.',
     emailInvalid: 'E-mail inválido.',
     phoneInvalid: 'Telefone inválido.',

@@ -1,11 +1,12 @@
 'use client';
 
 import { Button, Stack, Typography } from '@mui/material';
-import type { ComponentType, JSX, ReactNode } from 'react';
+import { useRef, type ComponentType, type JSX, type ReactNode } from 'react';
 
 import { NewCardForm } from '../../card/fields';
 import { detectBrand, onlyDigits } from '../../card/format';
-import { formatCpfOrCnpj, taxIdDigits } from '../../card/tax-id';
+import { formatCpfOrCnpj, taxIdInput } from '../../card/tax-id';
+import { keyboardProps, TaxIdKeyboardLink, useTaxIdKeyboard } from '../../components/checkout/list/tax-id-keyboard';
 import { useCheckoutComponents } from '../../components/checkout/ui';
 import { BTN_PRIMARY_SX, T } from '../../components/panel-tokens';
 import { useActivationCharge, type ActivationCharge } from '../use-activation-charge';
@@ -66,6 +67,53 @@ function ChargeEmail({
   );
 }
 
+/** The holder's document: masked, checked on blur, on the checkout's keyboard and link (FUT-590). */
+function TaxIdField({ verification, displayName, validateTaxId }: {
+  verification: ActivationCharge;
+  displayName: string;
+  validateTaxId: (value: string) => string | undefined;
+}): JSX.Element {
+  const { taxId } = useActivationCopy();
+  const { Input } = useCheckoutComponents();
+  const { cpf, setCpf, cpfError, setCpfError } = verification;
+  const scope = useRef<HTMLDivElement | null>(null);
+  const keyboard = useTaxIdKeyboard(scope, taxId, cpf, '[data-testid="verify-charge-cpf"]');
+  return (
+    // Its own column, so the Stack's spacing does not override the link's band.
+    <Stack ref={scope} spacing={1.5} useFlexGap>
+      <Input
+        label={taxId.label}
+        type="text"
+        {...keyboardProps(keyboard.mode)}
+        variant="outlined"
+        size="md"
+        fullWidth
+        placeholder={taxId.placeholder}
+        value={formatCpfOrCnpj(cpf)}
+        error={Boolean(cpfError)}
+        helperText={cpfError ?? taxId.hint(displayName)}
+        onChange={(event) => {
+          setCpf(taxIdInput(event.target.value));
+          // A shown error goes as soon as the owner edits; blur judges again.
+          if (cpfError) setCpfError(undefined);
+        }}
+        // The validator's answer used to be thrown away here, so a wrong
+        // document was only reported on submit (FUT-4048). An untouched empty
+        // field stays quiet until then.
+        onBlur={() => {
+          // The keyboard's own leave-and-enter is no blur: a half-typed CNPJ
+          // would flash "não é válido" while the buyer is still in the field.
+          if (cpf && !keyboard.reentering()) setCpfError(validateTaxId(cpf));
+        }}
+        data-testid="verify-charge-cpf"
+      />
+      {keyboard.offered ? (
+        <TaxIdKeyboardLink mode={keyboard.mode} copy={taxId} onSwitch={keyboard.onSwitch} dataTestId="verify-charge-cpf-keyboard" />
+      ) : null}
+    </Stack>
+  );
+}
+
 /** The card + tax-id fields and the one button that runs the charge. */
 function ChargeForm({
   verification,
@@ -79,10 +127,8 @@ function ChargeForm({
   displayName: string;
   validateTaxId: (value: string) => string | undefined;
 }): JSX.Element {
-  const { taxId, actions } = useActivationCopy();
-  const { Input } = useCheckoutComponents();
-  const { card, setCard, fieldErrors, setFieldErrors, cpf, setCpf, cpfError, setCpfError, state } =
-    verification;
+  const { actions } = useActivationCopy();
+  const { card, setCard, fieldErrors, setFieldErrors, state } = verification;
   const submitting = state.kind === 'submitting';
 
   return (
@@ -94,30 +140,7 @@ function ChargeForm({
         setCard={setCard}
         setFieldErrors={setFieldErrors}
       />
-      <Input
-        label={taxId.label}
-        type="text"
-        inputMode="numeric"
-        variant="outlined"
-        size="md"
-        fullWidth
-        placeholder={taxId.placeholder}
-        value={formatCpfOrCnpj(cpf)}
-        error={Boolean(cpfError)}
-        helperText={cpfError ?? taxId.hint(displayName)}
-        onChange={(event) => {
-          setCpf(taxIdDigits(event.target.value));
-          // A shown error goes as soon as the owner edits; blur judges again.
-          if (cpfError) setCpfError(undefined);
-        }}
-        // The validator's answer used to be thrown away here, so a wrong
-        // document was only reported on submit (FUT-4048). An untouched empty
-        // field stays quiet until then.
-        onBlur={() => {
-          if (cpf) setCpfError(validateTaxId(cpf));
-        }}
-        data-testid="verify-charge-cpf"
-      />
+      <TaxIdField verification={verification} displayName={displayName} validateTaxId={validateTaxId} />
       {verification.payerEmailRequired ? (
         <ChargeEmail verification={verification} displayName={displayName} />
       ) : null}

@@ -126,6 +126,14 @@ function inputAriaOf(a: {
   };
 }
 
+/**
+ * A top-level `inputMode`, for the `<input>` (FUT-1440). Left with the rest it
+ * landed on the text field's root `<div>`, where it raised no keypad at all.
+ */
+function keyboardOf(inputMode: InputProps['inputMode']): Pick<InputProps, 'inputMode'> {
+  return inputMode === undefined ? {} : { inputMode };
+}
+
 /** The render function `createInput` hands `forwardRef`, over a given styled field. */
 function inputRenderer(
   StyledTextField: ReturnType<typeof styledField>,
@@ -150,6 +158,7 @@ function inputRenderer(
       'aria-label': ariaLabel,
       'aria-describedby': ariaDescribedBy,
       'aria-busy': ariaBusy,
+      inputMode,
       inputProps,
       ...rest
     },
@@ -183,9 +192,12 @@ function inputRenderer(
          * disagreed with the DOM. The reports search box and the block-title
          * inputs were both named in source and anonymous to a screen reader.
          * `aria-describedby` and `aria-busy` are the same case: `inputAriaOf`.
+         * So is a top-level `inputMode` (FUT-1440, `keyboardOf`); a caller's
+         * `inputProps.inputMode` still wins.
          */
         inputProps={{
           'data-testid': dataTestId,
+          ...keyboardOf(inputMode),
           ...inputProps,
           ...inputAriaOf({ id, helperText, label: ariaLabel, describedBy: ariaDescribedBy, busy: ariaBusy }),
         }}

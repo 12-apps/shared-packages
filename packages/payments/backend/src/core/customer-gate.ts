@@ -3,7 +3,7 @@ import {
   type ChargeWalkDeps,
   recordAttempt,
 } from './charge-context';
-import { validateCustomer } from './customer-schema';
+import { describeCustomerIssue, validateCustomer } from './customer-schema';
 import type { CustomerFieldIssue } from './customer-schema';
 import { CustomerRequirementsError } from './errors';
 import type { PaymentProviderAdapter } from './provider';
@@ -98,6 +98,6 @@ function customerRequirementsMessage(
 ): string {
   return (
     `provider ${provider} requires buyer fields: ` +
-    issues.map((issue) => `${issue.field} (${issue.reason})`).join(', ')
+    issues.map(describeCustomerIssue).join(', ')
   );
 }

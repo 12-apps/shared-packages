@@ -86,7 +86,8 @@ function buyerFieldRefusal(
   if (!invalid) return null;
   return {
     code: 'INVALID_BUYER_FIELD',
-    message: copy.buyerFieldInvalid(invalid.field),
+    // A valid alphanumeric CNPJ the provider cannot take is not "invalid" (FUT-590).
+    message: invalid.detail === 'LETTERS_UNSUPPORTED' ? copy.taxIdLettersUnsupported : copy.buyerFieldInvalid(invalid.field),
     field: copy.fieldNameOf(invalid.field),
   };
 }

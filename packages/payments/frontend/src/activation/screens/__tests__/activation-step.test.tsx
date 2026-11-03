@@ -156,7 +156,7 @@ describe('the activation step router', () => {
       copy: TEST_COPY,
       formatAmount,
       CardSurface: TestCardSurface,
-      validateTaxId: (value) => (value === '11222333000182' ? 'Informe um CPF ou CNPJ válido.' : undefined),
+      validateTaxId: (value) => (value === '11222333000182' ? 'Esse CPF ou CNPJ não é válido. Confira os números.' : undefined),
     });
     const props = {
       provider: 'pagbank',
@@ -180,7 +180,7 @@ describe('the activation step router', () => {
     hooks.charge.mockReturnValue({ ...IDLE_CHARGE, cpf: '11222333000182', setCpfError });
     rerender(<Step {...props} />);
     fireEvent.blur(screen.getByTestId('verify-charge-cpf').querySelector('input') ?? screen.getByTestId('verify-charge-cpf'));
-    expect(setCpfError).toHaveBeenCalledWith('Informe um CPF ou CNPJ válido.');
+    expect(setCpfError).toHaveBeenCalledWith('Esse CPF ou CNPJ não é válido. Confira os números.');
   });
 
   it('hands each flow the host route for the provider that is open', () => {

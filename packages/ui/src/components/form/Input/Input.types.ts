@@ -34,8 +34,9 @@ export interface InputProps
   InputLabelProps?: Partial<MuiInputLabelProps>;
   /**
    * Attributes for the `<input>` element itself. Anything else this component
-   * does not recognise lands on the text field's ROOT `<div>`, where
-   * `inputMode`, `pattern`, `role` and `aria-value*` do nothing. Merged, not
+   * does not recognise lands on the text field's ROOT `<div>`, where `pattern`,
+   * `role` and `aria-value*` do nothing. A top-level `inputMode` is routed to
+   * the `<input>` (FUT-1440); one given here wins over it. Merged, not
    * spread over: the field's own `data-testid` stays the default a caller can
    * override, and the ARIA it builds from `aria-label` / `aria-describedby` /
    * `aria-busy` still lands last.

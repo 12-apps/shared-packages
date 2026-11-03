@@ -25,7 +25,7 @@
  *     and if one silently falls back to the ambient fetch this is where that
  *     is caught.
  */
-import { act, cleanup, render } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoryObj } from "@storybook/react-vite";
 
@@ -185,11 +185,6 @@ describe.each(MODULES)("%s stories", (moduleName, module) => {
     // `render` throws on a component that fails, so REACHING the assertion is
     // the "it mounts" half.
     expect(() => render(<Story />)).not.toThrow();
-    // Settle the microtask half of the mount inside act — in-page config
-    // reads, wallet readiness probes — so the state updates they cause are
-    // legal, and a fetch any of them issues still lands before the assertion.
-    await act(async () => {});
-    expect(escaped.calls).toEqual([]);
     // The story-specific marker: what THIS story pins, present only when the
     // in-page mount actually answered (or, for props-only stories, when the
     // pinned content rendered). A new story fails here until it declares one.
@@ -199,7 +194,13 @@ describe.each(MODULES)("%s stories", (moduleName, module) => {
       `${key}: no render expectation — add one to render-expectations.ts naming a testid ` +
       `or sentence that only exists when this story's pinned state is on screen`;
     expect(expectation, message).toBeDefined();
-    if (expectation) assertExpectation(key, expectation);
+    // WAIT for the pinned state rather than flushing once: the list's parts
+    // are chunks of their own, and a cold import in a busy full suite outlived
+    // a single act() flush (Checkout/ConfigFailed, FUT-590). Every marker of
+    // the expectation, present and absent, must hold at the same moment.
+    if (expectation) await waitFor(() => assertExpectation(key, expectation));
+    // Whatever the mount fetched on its way there landed in the tripwire.
+    expect(escaped.calls).toEqual([]);
   });
 });
 

@@ -96,7 +96,7 @@ describe("the document field takes a CNPJ (FUT-4080)", () => {
     await screen.findByTestId("list-cpf");
     fireEvent.click(radio("list-option-PIX"));
     type("11.222.333/0001-82");
-    await screen.findByText("Informe um CPF ou CNPJ válido.");
+    await screen.findByText("Esse CPF ou CNPJ não é válido. Confira os números.");
     expect(payButton().disabled).toBe(true);
   });
 
@@ -105,7 +105,7 @@ describe("the document field takes a CNPJ (FUT-4080)", () => {
     await screen.findByTestId("list-cpf");
     fireEvent.click(radio("list-option-PIX"));
     type("11111111111111");
-    await screen.findByText("Informe um CPF ou CNPJ válido.");
+    await screen.findByText("Esse CPF ou CNPJ não é válido. Confira os números.");
     expect(payButton().disabled).toBe(true);
   });
 });

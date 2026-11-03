@@ -6,7 +6,7 @@ import type {
   ResolvedCredentials,
 } from '../core/types';
 import { capturedAmountCents, chargeDescription } from './shared';
-import { NAME } from './stripe-http';
+import { boletoTaxId, NAME } from './stripe-http';
 
 /**
  * Stripe PaymentIntent ⇄ normalized snapshot mapping, kept apart from the
@@ -333,7 +333,7 @@ function boletoIntent(input: ChargeInput): Record<string, unknown> {
     payment_method_data: {
       type: 'boleto',
       // Stripe requires a CPF/CNPJ and a full billing address for boleto.
-      boleto: { tax_id: (input.customer.taxId ?? '').replace(/\D/g, '') },
+      boleto: { tax_id: boletoTaxId(input) },
       billing_details: billingDetails(input),
     },
     confirm: true,

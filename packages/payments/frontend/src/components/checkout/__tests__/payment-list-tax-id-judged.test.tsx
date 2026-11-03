@@ -30,7 +30,7 @@ const COPY = PT_BR_PAYMENT_LIST_COPY.buyer;
 const TAX_ID: CheckoutCustomerField = { key: "taxId", type: "CPF", required: true };
 
 const INCOMPLETE = "O CPF tem 11 dígitos, e o CNPJ, 14.";
-const INVALID = "Informe um CPF ou CNPJ válido.";
+const INVALID = "Esse CPF ou CNPJ não é válido. Confira os números.";
 
 const VALID_CPF = "52998224725";
 const INVALID_CPF = "52998224700";

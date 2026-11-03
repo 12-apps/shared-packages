@@ -347,6 +347,7 @@ export const harnessCopy: CheckoutCopy = {
   payableNotFound: 'Não encontramos este pedido.',
   buyerFieldMissing: (fields) => `Informe: ${[...fields].join(', ')}.`,
   buyerFieldInvalid: (field) => `O campo ${field} está inválido.`,
+  taxIdLettersUnsupported: 'Este pagamento ainda não aceita CNPJ com letras.',
   fieldNameOf: (field) => (field === 'taxId' ? 'cpf' : field),
   genericProviderRefusal: 'Não foi possível concluir o pagamento. Tente novamente.',
 };

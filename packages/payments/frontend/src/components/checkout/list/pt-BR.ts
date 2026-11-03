@@ -65,6 +65,8 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     cpfHint: (provider) => (provider ? `${the(provider)} pede para pagar pelo app` : "pedido para pagar pelo app"),
     taxIdPlaceholder: "CPF ou CNPJ",
     keepSavedCpf: "Manter o documento salvo",
+    lettersKeyboard: "Seu CNPJ tem letras? Usar teclado com letras",
+    numbersKeyboard: "Voltar ao teclado de números",
     cpfIncomplete: "O CPF tem 11 dígitos, e o CNPJ, 14.",
     phoneIncomplete: "O celular precisa de DDD e 9 dígitos.",
   },

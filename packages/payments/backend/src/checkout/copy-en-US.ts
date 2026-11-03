@@ -78,6 +78,8 @@ export const EN_US_CHECKOUT_COPY: CheckoutCopy = {
     return `The ${BUYER_FIELDS[field].noun} you entered is not valid. Check it and try again.`;
   },
 
+  taxIdLettersUnsupported: 'This payment does not accept a CNPJ with letters yet.',
+
   /** The same host/client contract the pt-BR half carries — see its note. */
   fieldNameOf: (field) => (field === 'taxId' ? 'cpf' : field),
 

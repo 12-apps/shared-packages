@@ -1,3 +1,4 @@
+import { sendableTaxId } from '../core/tax-id';
 import type { ResolvedCredentials } from '../core/types';
 import { basicAuth, providerFetch } from './http';
 
@@ -30,15 +31,19 @@ export const NAME = 'stone';
  */
 const API_BASE = 'https://api.pagar.me/core/v5';
 
-/** Pagar.me wants CPF/CNPJ as bare digits. */
-export function documentDigits(taxId: string | null | undefined): string | undefined {
-  const digits = (taxId ?? '').replace(/\D/g, '');
-  return digits.length > 0 ? digits : undefined;
+/**
+ * Pagar.me's `customer.document`: "CPF, CNPJ ou PASSPORT", up to 16 characters
+ * for a CPF or a CNPJ (v5 criar cliente). Sent without punctuation, an
+ * alphanumeric CNPJ's letters kept and uppercased (FUT-590).
+ */
+export function documentOf(taxId: string | null | undefined): string | undefined {
+  // Optional here: a value of no document's length is left out, never cut down.
+  return sendableTaxId(taxId);
 }
 
-/** CPF is 11 digits; anything longer is a company. */
+/** A CPF is an individual; a CNPJ, numeric or alphanumeric, a company. */
 export function customerType(taxId: string | null | undefined): 'individual' | 'company' {
-  return (documentDigits(taxId) ?? '').length > 11 ? 'company' : 'individual';
+  return (documentOf(taxId) ?? '').length > 11 ? 'company' : 'individual';
 }
 
 export async function stoneRequest<T>(

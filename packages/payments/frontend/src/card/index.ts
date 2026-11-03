@@ -33,7 +33,8 @@ export {
   isIncompleteCpfOrCnpj,
   isValidCpfOrCnpj,
   plainTaxId,
-  taxIdDigits,
+  taxIdCharacters,
+  taxIdInput,
   taxIdKind,
   validateCpfOrCnpj,
 } from "./tax-id";
