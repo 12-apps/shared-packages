@@ -25,7 +25,9 @@ import { installAppMenu, type AppMenu } from "./app-menu";
  * (`telemetry.installing`), so a restart that comes back as the old version is
  * reported (`../telemetry`).
  */
-export type WireUpdatesOptions = WireUpdatesBaseOptions & (WireUpdatesMenuOptions | WireUpdatesNoMenuOptions);
+export type WireUpdatesOptions = WireUpdatesBaseOptions &
+  (WireUpdatesMenuOptions | WireUpdatesNoMenuOptions) &
+  (WireUpdatesBannerOptions | WireUpdatesNoBannerOptions);
 
 /** What the host passes whether or not it has a menu bar. */
 export interface WireUpdatesBaseOptions {
@@ -42,6 +44,17 @@ export interface WireUpdatesBaseOptions {
   busy: () => boolean;
   /** The "update by itself" switch, read at the moment of the attempt. */
   autoUpdate: () => boolean;
+  /**
+   * Register a listener for "the host's window was just shown": this wiring
+   * asks for an update then. Shown, not loaded — a tray agent hides its window
+   * on close and raises the same one again, so a check hung on the load would
+   * run once per process.
+   */
+  onWindowShown?: (listener: () => void) => void;
+}
+
+/** The window strip: its words and the way it reaches the host's window, together. */
+export interface WireUpdatesBannerOptions {
   /** The window strip's words — see `updateBanner`. */
   bannerCopy: UpdateBannerCopy;
   /**
@@ -50,13 +63,12 @@ export interface WireUpdatesBaseOptions {
    * the host's.
    */
   showBanner: (banner: UpdateBanner | null) => void;
-  /**
-   * Register a listener for "the host's window was just shown": this wiring
-   * asks for an update then. Shown, not loaded — a tray agent hides its window
-   * on close and raises the same one again, so a check hung on the load would
-   * run once per process.
-   */
-  onWindowShown: (listener: () => void) => void;
+}
+
+/** No strip: neither the words nor the way to show them. */
+export interface WireUpdatesNoBannerOptions {
+  bannerCopy?: never;
+  showBanner?: never;
 }
 
 /** The default: the shell installs the application menu and keeps it current. */
@@ -74,7 +86,8 @@ export interface WireUpdatesMenuOptions {
  * page): `installAppMenu` is never called and nothing is rendered on a state
  * change. The install path, auto-install, breadcrumbs, banner and
  * `onWindowShown` behave as with a menu. Its words and entries have nowhere to
- * go, so the type refuses them.
+ * go, so the type refuses them. `menu: false` leaves the menu bar to the host;
+ * remove Electron's default with `Menu.setApplicationMenu(null)`.
  */
 export interface WireUpdatesNoMenuOptions {
   menu: false;
@@ -103,7 +116,7 @@ export function wireUpdates(options: WireUpdatesOptions): UpdateManager {
 
   const inner = options.create((state) => {
     menuRef.current?.render(state);
-    options.showBanner(updateBanner(state, options.bannerCopy));
+    if (options.showBanner) options.showBanner(updateBanner(state, options.bannerCopy));
     const crumb = updateCrumb(state);
     if (crumb !== last.crumb) telemetry.breadcrumb(crumb);
     last.crumb = crumb;
@@ -128,7 +141,7 @@ export function wireUpdates(options: WireUpdatesOptions): UpdateManager {
   }
   // Opening the window is the "every time I open it" half of a daily
   // cadence; the start-up half is the host's own check after sign-in.
-  options.onWindowShown(() => {
+  options.onWindowShown?.(() => {
     telemetry.breadcrumb("window shown");
     void updates.check();
   });

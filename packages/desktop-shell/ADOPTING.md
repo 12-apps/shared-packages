@@ -143,9 +143,13 @@ const updates = wireUpdates({
 A host with no application menu on purpose (every key belongs to its page)
 passes `menu: false` and leaves out `menuCopy`, `extraMenuItems`: the type
 refuses them. `installAppMenu` is then never called and nothing is rendered on
-a state change; the install path, auto-install, breadcrumbs, banner and
+a state change (`menu: false` leaves the menu bar to the host; remove Electron's
+default with `Menu.setApplicationMenu(null)`); the install path, auto-install, breadcrumbs, banner and
 `onWindowShown` behave exactly as with a menu. A host rule such as "never
 install while busy" stays the host's, around `updates.install()`.
+
+`bannerCopy` and `showBanner` are optional together, and so is `onWindowShown`:
+a host with no window strip leaves them out.
 
 The menu is never rebuilt while one of its popups is open, and only when what
 it says changes — both enforced in `installAppMenu`.
