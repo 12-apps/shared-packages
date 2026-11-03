@@ -40,7 +40,15 @@ export {
   type DesktopShellOptions,
   type ShellContext,
 } from "./shell";
-export { wireUpdates, type WireUpdatesOptions } from "./wire-updates";
+export {
+  wireUpdates,
+  type WireUpdatesBannerOptions,
+  type WireUpdatesBaseOptions,
+  type WireUpdatesMenuOptions,
+  type WireUpdatesNoBannerOptions,
+  type WireUpdatesNoMenuOptions,
+  type WireUpdatesOptions,
+} from "./wire-updates";
 
 /** What `ShellContext.openWindow` takes — part of the public surface. */
 export type { WindowSpec } from "./windows";
