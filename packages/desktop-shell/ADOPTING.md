@@ -140,6 +140,13 @@ const updates = wireUpdates({
 });
 ```
 
+A host with no application menu on purpose (every key belongs to its page)
+passes `menu: false` and leaves out `menuCopy`, `extraMenuItems`: the type
+refuses them. `installAppMenu` is then never called and nothing is rendered on
+a state change; the install path, auto-install, breadcrumbs, banner and
+`onWindowShown` behave exactly as with a menu. A host rule such as "never
+install while busy" stays the host's, around `updates.install()`.
+
 The menu is never rebuilt while one of its popups is open, and only when what
 it says changes — both enforced in `installAppMenu`.
 

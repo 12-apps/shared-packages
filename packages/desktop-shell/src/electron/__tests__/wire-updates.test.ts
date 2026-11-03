@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { INSTALL_GRACE_MS, type UpdateBanner, type UpdateManager, type UpdateState } from "../../updates";
 import { TEST_MENU_COPY } from "../../updates/__tests__/menu-copy";
-import { wireUpdates, type WireUpdatesOptions } from "../wire-updates";
+import { wireUpdates, type WireUpdatesNoMenuOptions, type WireUpdatesOptions } from "../wire-updates";
 import { entry, recorded } from "./fake-electron";
 
 vi.mock("electron", async () => (await import("./fake-electron")).electronModule);
@@ -40,7 +40,9 @@ interface Harness {
   check: ReturnType<typeof vi.fn>;
 }
 
-function harness(overrides: Partial<WireUpdatesOptions> = {}): Harness {
+type HarnessOverrides = Partial<Pick<WireUpdatesOptions, "busy" | "autoUpdate">> & { menu?: false };
+
+function harness(overrides: HarnessOverrides = {}): Harness {
   const order: string[] = [];
   const crumbs: string[] = [];
   const banners: (UpdateBanner | null)[] = [];
@@ -75,13 +77,14 @@ function harness(overrides: Partial<WireUpdatesOptions> = {}): Harness {
     },
     busy: () => false,
     autoUpdate: () => false,
-    menuCopy: TEST_MENU_COPY,
+    ...(overrides.menu === false ? { menu: false as const } : { menuCopy: TEST_MENU_COPY }),
     bannerCopy: BANNER_COPY,
     showBanner: (banner) => void banners.push(banner),
     onWindowShown: (listener) => {
       held.shown = listener;
     },
-    ...overrides,
+    ...(overrides.busy ? { busy: overrides.busy } : {}),
+    ...(overrides.autoUpdate ? { autoUpdate: overrides.autoUpdate } : {}),
   });
   return {
     updates,
@@ -193,5 +196,73 @@ describe("wireUpdates reports every state", () => {
 
     expect(wired.check).toHaveBeenCalledTimes(2);
     expect(wired.crumbs).toEqual(["window shown", "window shown"]);
+  });
+});
+
+describe("wireUpdates with menu: false", () => {
+  it("installs no application menu, and renders none across state changes", () => {
+    const wired = harness({ menu: false });
+
+    wired.emit({ kind: "downloading", version: "2.0.0", percent: 50 });
+    wired.emit(READY);
+    wired.emit({ kind: "none" });
+
+    expect(recorded.menus).toEqual([]);
+    expect(wired.banners.at(-1)).toBeNull();
+  });
+
+  it("still reports the banner, breadcrumbs and window shown", () => {
+    const wired = harness({ menu: false });
+
+    wired.emit(READY);
+    wired.shown();
+
+    expect(wired.banners.at(-1)).toEqual({ text: "ready 2.0.0", action: "install", hint: "restarts" });
+    expect(wired.crumbs).toEqual(["update ready 2.0.0", "window shown"]);
+    expect(wired.check).toHaveBeenCalledTimes(1);
+  });
+
+  it("records the version before installing, from the host's button", async () => {
+    const wired = harness({ menu: false });
+    wired.emit(READY);
+
+    wired.updates.install();
+
+    expect(wired.order).toEqual(["installing 2.0.0"]);
+    wired.release();
+    await vi.waitFor(() => expect(wired.order).toEqual(["installing 2.0.0", "install"]));
+    expect(wired.crumbs).toContain("installing 2.0.0");
+  });
+
+  it("records the version before installing, from the automatic restart", async () => {
+    vi.useFakeTimers();
+    const wired = harness({ menu: false, autoUpdate: () => true });
+
+    wired.emit(READY);
+    await vi.advanceTimersByTimeAsync(INSTALL_GRACE_MS);
+
+    expect(wired.order).toEqual(["installing 2.0.0"]);
+    wired.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(wired.order).toEqual(["installing 2.0.0", "install"]);
+  });
+
+  it("never restarts by itself while busy", async () => {
+    vi.useFakeTimers();
+    const wired = harness({ menu: false, autoUpdate: () => true, busy: () => true });
+
+    wired.emit(READY);
+    await vi.advanceTimersByTimeAsync(INSTALL_GRACE_MS * 3);
+
+    expect(wired.order).toEqual([]);
+  });
+
+  it("refuses menu words at the type level", () => {
+    const refused: Pick<WireUpdatesNoMenuOptions, "menu" | "menuCopy"> = {
+      menu: false,
+      // @ts-expect-error `menuCopy` has nowhere to go when `menu` is false.
+      menuCopy: TEST_MENU_COPY,
+    };
+    expect(refused.menu).toBe(false);
   });
 });
