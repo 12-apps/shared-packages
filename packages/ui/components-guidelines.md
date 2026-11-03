@@ -321,6 +321,36 @@ caller passes one or a viewer has one stored.
 `Pagination`, `Slider`, `Avatar`) do not move with `density` yet — that is
 FUT-2766–2768, tracked separately.
 
+### Stacked buttons
+
+A pair of actions that does not fit side by side STACKS — whole buttons, never
+a label broken inside one — and a stack has ONE order across the package
+(FUT-3831):
+
+- **The primary on top, the dismissive one (Cancel) at the bottom.** It is the
+  slot the primary holds on the right when the row fits, carried over, and it
+  is the platforms' own convention: Material stacks a dialog's confirming
+  action above its dismissive one, and Apple puts Cancel at the bottom of a
+  stacked alert. On a phone the bottom is where a thumb lands first, so on a
+  destructive question the near tap is the safe one.
+- **The DOM keeps the dismissive one first**, so it is also first in the tab
+  order; the visual order comes from `flex-wrap: wrap-reverse`, not from
+  reordering the markup.
+- **Stacked buttons span the row** where the container is narrow (a phone), so
+  the stack reads as one column rather than two ragged widths.
+- When the question steers toward keeping (`AlertDialog`'s
+  `emphasis="cancel"`), the PRIMARY is the cancel, and it takes the top slot
+  by the same rule.
+
+`AlertDialog` (and so `ConfirmAction`) is the reference implementation.
+
+### Narrow layouts read the container
+
+A component that lays out differently when it is narrow answers to the space it
+is GIVEN — a container query on a named container — never to the viewport: a
+media query cannot tell a phone from a narrow pane on a computer (`DayRuler`'s
+`day-ruler`, `AlertDialog`'s `alert-dialog`).
+
 ### TypeScript Requirements
 
 - All props properly typed

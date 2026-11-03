@@ -109,6 +109,19 @@ export function blockToneStyles(theme: Theme, tone: ScheduleBlockTone, dashedPla
 }
 
 /**
+ * An OPAQUE ground for a ruler block's label where the block's own fill is
+ * not opaque (the dashed plan's faint wash, the away / uncovered outline): the
+ * fill flattened over the cell's ground, so the label reads the same and
+ * whatever the track draws under the block — the "agora" line — never shows
+ * through the text (FUT-3831). An opaque fill needs none: `undefined`.
+ */
+export function dashedLabelGround(theme: Theme, tone: ScheduleBlockTone): string | undefined {
+  if (tone === 'away' || tone === 'uncovered') return cellGround(theme);
+  if (tone === 'plan') return flatten(cellGround(theme), theme.palette.action.hover);
+  return undefined;
+}
+
+/**
  * A break inside a block (a meal break): the page's own ground with diagonal
  * stripes of the disabled action colour, opaque, so the block reads as CUT there in any
  * tone, light or dark. `stripe` / `period` are CSS lengths (a stripe and the

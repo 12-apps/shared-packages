@@ -9,7 +9,7 @@ import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it } from 'vitest';
 
 import { getContrastRatio } from '../../../../tokens/color';
-import { footerInk } from '../DayRuler.styles';
+import { footerInk } from '../DayRuler.footer.styles';
 
 describe.each(['light', 'dark'] as const)('%s mode', (mode) => {
   const theme = createTheme({ palette: { mode } });

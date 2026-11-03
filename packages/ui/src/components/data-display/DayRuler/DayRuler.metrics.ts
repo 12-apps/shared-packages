@@ -3,14 +3,18 @@
  * 1280 and the phone rows), in px. The web reads them through `rem`/`sxRem`.
  */
 export const DAY_RULER_METRICS = {
-  /** The name and the actions columns on a computer. */
+  /** The name column on a computer; a row's actions sit in it, under the name (FUT-3831). */
   sideColumn: 220,
   gap: 16,
+  /** Between the name (with its meta and chips) and the row's actions under it, on a computer. */
+  actionsTop: 8,
   /**
    * Below this container width a row stacks: name and actions on top, the
-   * track under them. Two 220px side columns, their gaps and a track of at
-   * least 320px (where the hour labels every 4 hours do not collide): 792,
-   * rounded up.
+   * track under them. Measured when the actions had a 220px column of their
+   * own (two 220px side columns, their gaps and a track of at least 320px,
+   * where the hour labels every 4 hours do not collide: 792, rounded up); kept
+   * when they moved under the name (FUT-3831) so the bound every host was
+   * checked at did not move.
    */
   compactBelow: 800,
   /**
@@ -21,6 +25,12 @@ export const DAY_RULER_METRICS = {
   phoneBelow: 600,
   rowPaddingY: 8,
   track: { height: 40, compactHeight: 30, radius: 8, compactRadius: 6 },
+  /**
+   * `hitArea`: on a narrow ruler the invisible hit band round a bar is this
+   * tall and at least this wide, centred on the bar and cut at the midpoint to
+   * a neighbour (FUT-3831). `font` is the floor: a text that does not fit at
+   * it is not drawn, never drawn smaller.
+   */
   block: { top: 4, height: 24, compactTop: 3, compactHeight: 20, radius: 6, paddingX: 6, font: 12, hitArea: 40 },
   /** The end handles' hit area. */
   handle: 10,
@@ -37,7 +47,7 @@ export const DAY_RULER_METRICS = {
   ringOffset: 1,
   /** The loading row's name bar. */
   skeletonNameRadius: 4,
-  /** Where a block's text cannot be measured, one shorter than this share of the ruler says only its start on a narrow ruler. */
+  /** Where a block's text cannot be measured, one shorter than this share of the ruler says only its start. */
   narrowShare: 0.3,
   /** The shortest block a resize leaves, in hours. */
   minHours: 0.5,

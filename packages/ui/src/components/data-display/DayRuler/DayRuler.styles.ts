@@ -2,39 +2,39 @@ import { alpha, type CSSObject, type SxProps, type Theme } from '@mui/material/s
 
 import { FIELD_BORDER_WIDTH } from '../../../tokens/field-height.core';
 import { rem, sxRem } from '../../../tokens/relative';
-import { actualBarColor, blockToneStyles, breakHatch, signalInk } from '../ScheduleGrid/schedule-tones';
+import { actualBarColor, blockToneStyles, breakHatch, dashedLabelGround } from '../ScheduleGrid/schedule-tones';
 import type { ScheduleBlockTone } from '../ScheduleGrid/ScheduleGrid.types';
 import { DAY_RULER_METRICS as M } from './DayRuler.metrics';
 
-/** The container narrow rows answer to (container queries, never media queries). */
-/**
- * `--dr-actions`: the actions column, 220px when any row has actions and
- * nothing when none does (no empty column at the end of every row).
- */
-export function rootSx(hasActions: boolean): SxProps<Theme> {
-  return (theme: Theme) => ({
-    containerType: 'inline-size',
-    minWidth: 0,
-    width: '100%',
-    userSelect: 'none',
-    '--dr-actions': hasActions ? rem(theme, M.sideColumn) : '0%',
-  });
-}
+/** The container the ruler's layout answers to — named, so no other container between the root and a row can stand in for it. */
+const CONTAINER = 'day-ruler';
+
+/** The ruler's root: the named container every layout query reads. */
+export const rootSx: SxProps<Theme> = {
+  containerType: 'inline-size',
+  containerName: CONTAINER,
+  minWidth: 0,
+  width: '100%',
+  userSelect: 'none',
+};
 
 /** `@container` below which a row stacks (the coverage and axis rows go full width). Bounds are "from px up". */
 function compact(theme: Theme): string {
-  return `@container (width < ${rem(theme, M.compactBelow)})`;
+  return `@container ${CONTAINER} (width < ${rem(theme, M.compactBelow)})`;
 }
 
 /** `@container` below which the pane is phone-sized: no coverage row, no axis. Bounds are "from px up". */
 function phone(theme: Theme): string {
-  return `@container (width < ${rem(theme, M.phoneBelow)})`;
+  return `@container ${CONTAINER} (width < ${rem(theme, M.phoneBelow)})`;
 }
 
-/** Name · track · actions, the coverage row and the axis row share these columns on a computer. */
+/**
+ * Name · track: the coverage row and the axis row share these columns with
+ * every row on a computer, so the hours line up down the whole ruler.
+ */
 export const lineSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'grid',
-  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) var(--dr-actions)`,
+  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr)`,
   columnGap: rem(theme, M.gap),
   alignItems: 'center',
   // Stacked: across the full width, like the tracks; the label above the counts.
@@ -109,19 +109,23 @@ export const groupTitleSx: SxProps<Theme> = {
 };
 
 /**
- * One person's row. A computer: name · track · actions on one line. A narrow
- * ruler (a phone): name and actions on top, the track under them, full width.
+ * One person's row. A computer: name (its actions under it) · track, the
+ * track the same width on every row whether or not the row has actions. A
+ * narrow ruler (a phone): name and actions on top, the track under them, full
+ * width.
  */
 export const rowSx: SxProps<Theme> = (theme: Theme) => ({
   display: 'grid',
-  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr) var(--dr-actions)`,
-  gridTemplateAreas: '"who track actions"',
+  gridTemplateColumns: `${rem(theme, M.sideColumn)} minmax(0, 1fr)`,
+  gridTemplateRows: 'auto auto',
+  gridTemplateAreas: '"who track" "actions track"',
   columnGap: rem(theme, M.gap),
   alignItems: 'center',
   py: rem(theme, M.rowPaddingY),
   borderBottom: `1px solid ${theme.palette.divider}`,
   [compact(theme)]: {
     gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gridTemplateRows: 'none',
     gridTemplateAreas: '"who actions" "track track"',
     rowGap: theme.spacing(1),
     py: theme.spacing(1.5),
@@ -130,15 +134,17 @@ export const rowSx: SxProps<Theme> = (theme: Theme) => ({
 
 export const whoSx: SxProps<Theme> = { gridArea: 'who', minWidth: 0 };
 
-export const actionsSx: SxProps<Theme> = {
+export const actionsSx: SxProps<Theme> = (theme: Theme) => ({
   gridArea: 'actions',
   display: 'flex',
   gap: 1,
   alignItems: 'center',
-  justifyContent: 'flex-end',
+  justifyContent: 'flex-start',
   flexWrap: 'wrap',
   minWidth: 0,
-};
+  pt: rem(theme, M.actionsTop),
+  [compact(theme)]: { justifyContent: 'flex-end', pt: 0 },
+});
 
 /** A break inside a block: a hatched band across its height, under its text. `span` is in % of the block. */
 export function breakSx(span: Span): SxProps<Theme> {
@@ -191,7 +197,36 @@ export interface Span {
   share: number;
 }
 
-export function blockSx(tone: ScheduleBlockTone, span: Span, opts: { selected: boolean; movable: boolean }): SxProps<Theme> {
+/** How far a bar's hit band may reach, in % of the track: the midpoints to its neighbours, or the track's ends. */
+export interface HitBounds {
+  lo: number;
+  hi: number;
+}
+
+/**
+ * The hit band round a bar on a narrow ruler (FUT-3831): `hitArea` tall and
+ * at least `hitArea` wide, centred on the bar, then cut to `bounds` so it never
+ * reaches past the midpoint to a neighbour. Positioned in % of the bar's
+ * PADDING box (the pseudo-element's containing block, the bar less its
+ * border), so a point at `k` bar-widths from the bar's outer left edge is
+ * `k × (100% + 2 border) − border`; the px floor is the layout's to resolve.
+ */
+function hitBand(theme: Theme, span: Span, bounds: HitBounds): CSSObject {
+  // Every tone's border is the 1px hairline (`blockToneStyles`), the field border's width.
+  const border = `${FIELD_BORDER_WIDTH}px`;
+  const half = `max(calc(50% + ${border}), ${rem(theme, M.block.hitArea / 2)})`;
+  if (!(span.share > 0)) return { left: `calc(50% - ${half})`, width: `calc(2 * ${half})` };
+  const rel = (pct: number): string => `calc(${(pct - span.at) / span.share} * (100% + 2 * ${border}) - ${border})`;
+  const left = `max(${rel(bounds.lo)}, calc(50% - ${half}))`;
+  const right = `min(${rel(bounds.hi)}, calc(50% + ${half}))`;
+  return { left, width: `calc(${right} - ${left})` };
+}
+
+export function blockSx(
+  tone: ScheduleBlockTone,
+  span: Span,
+  opts: { selected: boolean; movable: boolean; hit: HitBounds },
+): SxProps<Theme> {
   return (theme: Theme): CSSObject => ({
     ...blockToneStyles(theme, tone, true),
     position: 'absolute',
@@ -214,25 +249,35 @@ export function blockSx(tone: ScheduleBlockTone, span: Span, opts: { selected: b
     cursor: opts.movable ? 'grab' : 'pointer',
     boxShadow: opts.selected ? `0 0 0 ${rem(theme, M.ring)} ${theme.palette.primary.main}` : 'none',
     '&:focus-visible': { outline: `${rem(theme, M.ring)} solid ${theme.palette.primary.main}`, outlineOffset: rem(theme, M.ringOffset) },
-    '& [data-dr-text]': { position: 'relative', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 },
+    // The label sits above the "agora" line (drawn under the blocks): on a fill
+    // that is not opaque it takes an opaque ground, so the line never cuts it.
+    '& [data-dr-text]': {
+      position: 'relative',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      minWidth: 0,
+      backgroundColor: dashedLabelGround(theme, tone),
+    },
     '& [data-dr-text="short"]': { display: 'none' },
+    // By pixels, at every width: the full text, else the start, else nothing — never a cut text.
+    '&[data-fit="short"] [data-dr-text="full"]': { display: 'none' },
+    '&[data-fit="short"] [data-dr-text="short"]': { display: 'inline' },
+    '&[data-fit="none"] [data-dr-text]': { display: 'none' },
     [compact(theme)]: {
       top: rem(theme, M.block.compactTop),
       height: rem(theme, M.block.compactHeight),
-      // A 40px hit area around the 20px bar, the look unchanged: the text cuts
-      // itself (its spans ellipsize), so the block need not clip.
+      // A 40px × 40px-or-wider hit area round the 20px bar, the look
+      // unchanged: the text never overflows (it fits or it is not shown), so
+      // the block need not clip.
       overflow: 'visible',
       '&::after': {
         content: '""',
         position: 'absolute',
-        left: 0,
-        right: 0,
         top: '50%',
         height: rem(theme, M.block.hitArea),
         transform: 'translateY(-50%)',
+        ...hitBand(theme, span, opts.hit),
       },
-      '&[data-narrow] [data-dr-text="full"]': { display: 'none' },
-      '&[data-narrow] [data-dr-text="short"]': { display: 'inline' },
     },
   });
 }
@@ -245,6 +290,10 @@ export function handleSx(side: 'l' | 'r'): SxProps<Theme> {
     [side === 'l' ? 'left' : 'right']: 0,
     width: rem(theme, M.handle),
     cursor: 'ew-resize',
+    // Above the block's hit band (its `::after`, painted last): on a narrow
+    // ruler the band covers the whole bar, and a press on an end must still
+    // resize rather than move (FUT-3831).
+    zIndex: 1,
   });
 }
 
@@ -275,6 +324,12 @@ export function actualLabelSx(left: number): SxProps<Theme> {
   });
 }
 
+/**
+ * "Agora": drawn UNDER the blocks (before them in the track), so it never
+ * crosses a block's label — "07:30–1|3:00" at 1280 (FUT-3831). It still shows
+ * above and below each bar, where it overhangs the track, and through a
+ * block's fill where that fill is not opaque — never through its text.
+ */
 export function nowSx(left: number): SxProps<Theme> {
   return (theme: Theme) => ({
     position: 'absolute',
@@ -300,53 +355,4 @@ export const skeletonNameSx: SxProps<Theme> = (theme: Theme) => ({
   width: '60%',
   borderRadius: rem(theme, M.skeletonNameRadius),
   backgroundColor: theme.palette.action.hover,
-});
-
-/**
- * A marked footer's words (FUT-3882): the warning ink deepened until it reads
- * at 4.5:1 on the page — `warning.main` is 3.1:1 on white. The outline keeps
- * `warning.main`: a non-text mark needs 3:1.
- */
-export function footerInk(theme: Theme, marked: boolean, plain: string): string {
-  return marked ? signalInk(theme, 'warning', theme.palette.background.default) : plain;
-}
-
-/** A group's count line (FUT-3882): plain counts on the hours' columns, a marked hour outlined in the warning ink. */
-export function footerCellSx(marked: boolean): SxProps<Theme> {
-  return (theme: Theme) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: rem(theme, M.coverage.font),
-    borderRadius: rem(theme, M.coverage.radius),
-    color: footerInk(theme, marked, theme.palette.text.primary),
-    fontWeight: marked ? 500 : 400,
-    // The hairline is always there, transparent when unmarked, so a mark never shifts a count.
-    border: `1px solid ${marked ? theme.palette.warning.main : 'transparent'}`,
-    minWidth: 0,
-    overflow: 'hidden',
-  });
-}
-
-/**
- * A footer line's sentence; when the host marks it ("Faltam 2, 20h–22h"), in
- * the readable warning ink with a warning bar before it — a shape, so colour
- * is never the only signal.
- */
-export function footerNoteSx(marked: boolean): SxProps<Theme> {
-  return (theme: Theme) => ({
-    fontSize: rem(theme, M.meta),
-    color: footerInk(theme, marked, theme.palette.text.secondary),
-    fontWeight: marked ? 500 : 400,
-    ...(marked ? { borderLeft: `${rem(theme, 3)} solid ${theme.palette.warning.main}`, paddingLeft: rem(theme, 6) } : {}),
-  });
-}
-
-/** A group's trend line: as tall as the coverage row, drawn in the primary colour. */
-export const trendSx: SxProps<Theme> = (theme: Theme) => ({
-  display: 'block',
-  width: '100%',
-  height: rem(theme, M.coverage.height + M.coverage.height / 2),
-  color: theme.palette.primary.main,
-  overflow: 'visible',
 });

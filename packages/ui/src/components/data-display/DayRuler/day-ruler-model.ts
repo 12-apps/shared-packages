@@ -81,3 +81,48 @@ export function ticksOf(from: RulerHour, to: RulerHour, step: number): RulerHour
   for (let h = from; h <= to + 1e-9; h += step) out.push(h);
   return out;
 }
+
+/** A bar along the track: where it starts and how long it is, both in % of the track. */
+export interface TrackSpan {
+  at: number;
+  share: number;
+}
+
+/**
+ * How far each bar's hit band may reach, in % of the track (FUT-3831): from
+ * `lo` to `hi`, never past the track's ends and never past the MIDPOINT of
+ * the gap to the bar beside it, so a band widened round a short bar cannot
+ * take a tap meant for its neighbour. Two bars that touch or overlap give each
+ * other nothing: the band stays on the bar's own edge on that side.
+ *
+ * The band itself is drawn in CSS — at least the hit area wide, centred on the
+ * bar, then cut to `lo…hi` — because the bar's width in px is the layout's.
+ */
+export function hitBoundsOf(spans: readonly TrackSpan[]): { lo: number; hi: number }[] {
+  const order = spans.map((_, index) => index).sort((a, b) => spans[a]!.at - spans[b]!.at);
+  const out = spans.map(() => ({ lo: 0, hi: 100 }));
+  for (let k = 1; k < order.length; k += 1) {
+    const left = spans[order[k - 1]!]!;
+    const right = spans[order[k]!]!;
+    const leftEnd = left.at + left.share;
+    const mid = leftEnd <= right.at ? (leftEnd + right.at) / 2 : null;
+    out[order[k - 1]!]!.hi = Math.min(out[order[k - 1]!]!.hi, mid ?? leftEnd);
+    out[order[k]!]!.lo = Math.max(out[order[k]!]!.lo, mid ?? right.at);
+  }
+  return out;
+}
+
+/** What a block can say in its bar: its full text, its start, or nothing. */
+export type BlockTextFit = 'full' | 'short' | 'none';
+
+/**
+ * Which of a block's texts fits the room it leaves inside the bar, by pixels
+ * (FUT-3831): the full one, else the short one, else NOTHING — a cut "12:"
+ * says less than an empty bar whose title and accessible name carry the text.
+ */
+export function textFitOf(fullWidth: number, shortWidth: number, room: number): BlockTextFit {
+  const slack = 0.5;
+  if (fullWidth <= room + slack) return 'full';
+  if (shortWidth <= room + slack) return 'short';
+  return 'none';
+}
