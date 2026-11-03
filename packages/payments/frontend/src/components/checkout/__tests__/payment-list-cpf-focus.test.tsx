@@ -227,7 +227,16 @@ describe("the focus stays where it was (FUT-3995)", () => {
     expect(scrolled).not.toHaveBeenCalled();
   });
 
-  it("for a sole option chosen at load", async () => {
+  it("for the card's fields opened at load by a last card the buyer did not save (FUT-4317)", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, list: { lastMethod: "CARD" } });
+    await screen.findByTestId("list-cpf");
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await screen.findByTestId("card-number");
+    await waitFor(() => expect(document.activeElement).toBe(document.body));
+    expect(scrolled).not.toHaveBeenCalled();
+  });
+
+    it("for a sole option chosen at load", async () => {
     renderList({ config: onPageStore({ methods: ["PIX"] }), client: stubClient([]), taxIdOnFile: false });
     await screen.findByTestId("list-cpf");
     await waitFor(() => expect(radio("list-option-PIX").checked).toBe(true));

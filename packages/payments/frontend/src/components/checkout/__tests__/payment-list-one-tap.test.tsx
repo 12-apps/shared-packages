@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
+import { NEW_CARD } from "../../../card";
 import { preselection } from "../list/choice";
 import { ARMED_WINDOW_MS } from "../list/list-memory";
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
@@ -20,6 +21,11 @@ import type { CreateOrderRequest, CreateOrderResult } from "../types";
 import { SAVED_VISA, handOffStore, listFlow, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
 const radio = (testId: string): HTMLInputElement => screen.getByTestId(`${testId}-radio`) as HTMLInputElement;
+/** "Salvar cartão" — the test id may sit on the checkbox or on its label. */
+const saveCardBox = (): HTMLInputElement => {
+  const box = screen.getByTestId("save-card");
+  return box.tagName === "INPUT" ? (box as HTMLInputElement) : (box.querySelector("input") as HTMLInputElement);
+};
 
 function recordingCreateOrder() {
   return vi.fn(async (input: CreateOrderRequest): Promise<CreateOrderResult> => ({ ok: true, data: orderFor(input.method) }));
@@ -44,7 +50,7 @@ describe("the last online method used comes preselected", () => {
   it("keeps the saved-card rule for a card, and for no history", () => {
     expect(preselection(rows, [SAVED_VISA], false, "CARD")?.selection).toBe("vault-1");
     expect(preselection(rows, [SAVED_VISA], false, null)?.selection).toBe("vault-1");
-    expect(preselection(rows, [], false, "CARD")).toBeNull();
+    expect(preselection(rows, [], false, null)).toBeNull();
   });
 
   it("does not choose Pix at a store that does not offer it, nor for a buyer back from a refused card", () => {
@@ -58,6 +64,46 @@ describe("the last online method used comes preselected", () => {
     await waitFor(() => expect(radio("list-option-PIX").checked).toBe(true));
     expect(screen.getByTestId("list-pay").textContent).toContain("Gerar Pix");
     expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("opens the card's fields for a buyer who paid by a card they did not save (FUT-4317)", () => {
+    expect(preselection(rows, [], false, "CARD")).toEqual({ choice: { kind: "online", method: "CARD" }, selection: NEW_CARD });
+  });
+
+  it("shows the card chosen with its fields open, nothing raised and 'Salvar cartão' unticked", async () => {
+    const createOrder = recordingCreateOrder();
+    renderList({ config: onPageStore(), client: stubClient([]), createOrder, list: { lastMethod: "CARD" } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    expect(radio("list-option-PIX").checked).toBe(false);
+    expect(screen.getByTestId("card-number")).toBeTruthy();
+    expect(saveCardBox().checked).toBe(false);
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("lets the buyer move to Pix with one tap, raising nothing", async () => {
+    const createOrder = recordingCreateOrder();
+    renderList({ config: onPageStore(), client: stubClient([]), createOrder, list: { lastMethod: "CARD" } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    fireEvent.click(radio("list-option-PIX"));
+    await waitFor(() => expect(radio("list-option-PIX").checked).toBe(true));
+    expect(radio("list-option-CARD").checked).toBe(false);
+    await waitFor(() => expect(screen.queryByTestId("card-number")).toBeNull());
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it("still chooses the saved card when one exists", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { lastMethod: "CARD" } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await waitFor(() => expect(screen.getByTestId(`list-card-${SAVED_VISA.id}`).getAttribute("aria-checked")).toBe("true"));
+    await waitFor(() => expect(screen.queryByTestId("card-number")).toBeNull());
+  });
+
+  it("chooses nothing for a buyer with no history and no saved card", async () => {
+    renderList({ config: onPageStore(), client: stubClient([]) });
+    // The rows are drawn only once the one preselection has run (FUT-3849).
+    await screen.findByTestId("list-option-CARD-radio");
+    expect(radio("list-option-PIX").checked).toBe(false);
+    expect(radio("list-option-CARD").checked).toBe(false);
   });
 });
 
@@ -85,7 +131,17 @@ describe("armedCharge — the checkout 1-tap opened", () => {
     expect(screen.getByTestId("list-pay").textContent).toContain("Pagar");
   });
 
-  it("never starts for a buyer with no saved card, nor at a hand-off store", async () => {
+  it("never starts for a card the buyer still has to type, even with the card chosen by their last method (FUT-4317)", async () => {
+    const createOrder = recordingCreateOrder();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderList({ config: onPageStore(), client: stubClient([]), createOrder, list: { armedCharge: true, lastMethod: "CARD" } });
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+    it("never starts for a buyer with no saved card, nor at a hand-off store", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderList({ config: onPageStore(), client: stubClient([]), list: { armedCharge: true } });
     await waitFor(() => expect(screen.getByTestId("list-pay")).toBeTruthy());

@@ -54,6 +54,34 @@ describe("what comes chosen", () => {
   it("is nothing at a store whose card this browser cannot take", () => {
     expect(preselection(onlineRows({ ...ALL, cardUnavailable: true }), [VISA], false)).toBeNull();
   });
+
+  describe("for a buyer who paid by card last (FUT-4317)", () => {
+    it("is the card with its fields open when no card is saved", () => {
+      expect(preselection(rows, [], false, "CARD")).toEqual({ choice: { kind: "online", method: "CARD" }, selection: NEW_CARD });
+    });
+
+    it("is still the saved card when one exists", () => {
+      expect(preselection(rows, [VISA], false, "CARD")).toEqual({ choice: { kind: "online", method: "CARD" }, selection: "v1" });
+    });
+
+    it("keeps the refused-card rule for a buyer back from a refusal", () => {
+      expect(preselection(rows, [], true, "CARD")).toEqual({ choice: { kind: "online", method: "CARD" }, selection: NEW_CARD });
+      expect(preselection(rows, [VISA], true, "CARD")).toEqual({ choice: { kind: "online", method: "CARD" }, selection: null });
+    });
+
+    it("is nothing at a store whose card this browser cannot take", () => {
+      expect(preselection(onlineRows({ ...ALL, cardUnavailable: true }), [], false, "CARD")).toBeNull();
+    });
+
+    it("is nothing at a store that does not offer the card", () => {
+      expect(preselection(onlineRows({ ...ALL, offered: ["PIX"] }), [], false, "CARD")).toBeNull();
+    });
+
+    it("leaves Pix last, and no history, as they were", () => {
+      expect(preselection(rows, [], false, "PIX")).toEqual({ choice: { kind: "online", method: "PIX" }, selection: null });
+      expect(preselection(rows, [], false, null)).toBeNull();
+    });
+  });
 });
 
 describe("a list's only option (FUT-3942)", () => {

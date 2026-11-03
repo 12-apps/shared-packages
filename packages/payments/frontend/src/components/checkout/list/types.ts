@@ -174,8 +174,8 @@ export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSumma
   /**
    * The buyer's last ONLINE way to pay, as the host remembers it (FUT-3611) —
    * chosen for them before they touch anything, when the store offers it: Pix
-   * as Pix; a card as the saved card used last. Absent or `null` ⇒ the saved
-   * card rule alone. A door tender is chosen only as the sole option (FUT-3942).
+   * as Pix; a card as the saved card used last, or the card's fields when none
+   * is saved (FUT-4317). Absent or `null` ⇒ the saved card rule alone. A door tender is chosen only as the sole option (FUT-3942).
    */
   lastMethod?: "PIX" | "CARD" | null;
   /**

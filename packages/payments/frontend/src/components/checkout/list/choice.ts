@@ -90,7 +90,9 @@ export function lastUsedCard(saved: readonly SavedCard[]): SavedCard | undefined
  * saved card makes "Cartão de crédito" the choice with that card selected —
  * the one used last ({@link lastUsedCard}). The buyer's LAST online method
  * (`lastMethod`, FUT-3611) wins when the store offers it: Pix as Pix, since
- * choosing creates nothing any more. Never a door tender by itself (FUT-1478):
+ * choosing creates nothing any more; a card as the saved card used last, or —
+ * with no card saved — the card with its fields open (FUT-4317). A saved card
+ * still wins over the fields. Never a door tender by itself (FUT-1478):
  * with nothing here to choose, {@link soleOption} has the last word.
  *
  * A buyer back here because a card was REFUSED (`fresh`) keeps the card
@@ -109,8 +111,10 @@ export function preselection(
   if (!card) return null;
   if (fresh) return { choice: { kind: "online", method: "CARD" }, selection: saved.length > 0 ? null : NEW_CARD };
   const head = lastUsedCard(saved);
-  if (!head) return null;
-  return { choice: { kind: "online", method: "CARD" }, selection: head.id };
+  if (head) return { choice: { kind: "online", method: "CARD" }, selection: head.id };
+  // Paid by a card they did not save (FUT-4317): the card, its fields open.
+  // Nothing is raised by choosing, and "Salvar cartão" keeps its own default.
+  return lastMethod === "CARD" ? { choice: { kind: "online", method: "CARD" }, selection: NEW_CARD } : null;
 }
 
 /**
