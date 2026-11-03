@@ -42,190 +42,67 @@ export function taxIdCharacters(value: string): string {
 }
 
 /**
- * How a value is READ before any rule sees it (FUT-590 UI review): Unicode
- * NFKC, so fullwidth digits are ASCII and `º` is `O`; uppercased; and every
- * separator look-alike a paste carries — dashes and minus signs (U+2010–2015,
- * U+2212), the middle dot, the division and fullwidth slashes, a comma, an
- * underscore, a pipe — read as a `.`, one alphabet for what follows.
+ * How a value is READ before any rule sees it (FUT-590): Unicode NFKC, so
+ * fullwidth digits and slashes are ASCII and `º` is `o`; then NFD with every
+ * combining mark dropped, so `É` is `E`; then uppercased.
  */
-const LOOK_ALIKE_SEPARATORS = /[‐-―−·∕／,_|]/g;
+const COMBINING_MARKS = /\p{M}/gu;
 
 function normalise(value: string): string {
-  return value.normalize("NFKC").toUpperCase().replace(LOOK_ALIKE_SEPARATORS, ".");
+  return value.normalize("NFKC").normalize("NFD").replace(COMBINING_MARKS, "").toUpperCase();
 }
 
 /** What a keystroke, or a paste of the field's own masked value, can hold. */
 const TYPED_SHAPE = /^[0-9A-Z./-]*$/;
 
-/** The words that name the document. Never a document's own characters when they stand alone. */
-const LABEL_WORDS: ReadonlySet<string> = new Set(["CPF", "CNPJ"]);
+/** A CPF/CNPJ label word in front of more characters ("CPF529.982.247-25", "CNPJ/MF"). */
+const LEADING_LABEL = /^(CNPJ|CPF)(?=[0-9A-Z./-])/;
 
-/** A label word glued in front of the document's digits ("CPF529.982.247-25"). */
-const GLUED_LABEL = /^(CPF|CNPJ)(?=\d)/;
+/** One TOKEN of a paste: a maximal run of the mask's own characters. */
+const TOKEN = /[0-9A-Z./-]+/g;
 
-/** A word glued after the document's digits ("…-25Fulano", "…-81LTDA"): three letters or more. */
-const GLUED_WORD = /^(.*\d)([A-Z]{3,})$/;
+/** An alphanumeric CNPJ's shape: fourteen characters, a letter among them, ending in two digits. */
+function isAlphanumericCnpjShaped(kept: string): boolean {
+  return kept.length === CNPJ_LENGTH && /[A-Z]/.test(kept) && /\d{2}$/.test(kept);
+}
 
 /**
- * The TYPING path: a value with no space and nothing but the mask's own
- * characters, not led by a label word — what keystrokes and an unlabelled
- * masked paste produce, partial alphanumeric input ("12ABC") included. Its
- * characters are kept as typed, except a glued label dropped when that leaves
- * a valid document the label names. `undefined` sends the value to the scan.
+ * What a CPF-or-CNPJ field kept before FUT-590: every digit, nothing else,
+ * capped at fourteen. Labels, names, phones, marks and spaces all fall away.
  */
-function typedDocument(value: string): string | undefined {
-  if (!TYPED_SHAPE.test(value)) return undefined;
-  const words = value.split(/[./-]+/).filter((word) => word !== "");
-  if (words.length > 1 && LABEL_WORDS.has(words[0] ?? "")) return undefined;
-  const kept = taxIdCharacters(value);
-  if (kept.length > CNPJ_LENGTH && GLUED_WORD.test(kept)) return undefined;
-  return withoutGluedLabel(kept);
-}
-
-/** `kept` without a glued CPF/CNPJ word, when it is no document and what is left is one the word names. */
-function withoutGluedLabel(kept: string): string {
-  const word = GLUED_LABEL.exec(kept)?.[1];
-  if (word === undefined || isValidCpfOrCnpj(kept)) return kept;
-  const rest = kept.slice(word.length);
-  return isValidCnpj(rest) || (word === "CPF" && isValidCpf(rest)) ? rest : kept;
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "").slice(0, CNPJ_LENGTH);
 }
 
 /**
- * One GROUP of the pasted text: a maximal run of `A-Z0-9`, a word glued after
- * digits split off as its own group. A label word is a group no window starts with.
- */
-interface Group {
-  text: string;
-  numeric: boolean;
-  lettersOnly: boolean;
-  label: boolean;
-}
-
-function groupsOf(value: string): Group[] {
-  return (value.match(/[0-9A-Z]+/g) ?? [])
-    .flatMap((run) => {
-      const glued = GLUED_WORD.exec(run);
-      return glued ? [glued[1] ?? "", glued[2] ?? ""] : [run];
-    })
-    .map((text) => ({
-      text,
-      numeric: /^\d+$/.test(text),
-      lettersOnly: /^[A-Z]+$/.test(text),
-      label: LABEL_WORDS.has(text),
-    }));
-}
-
-/** A run of consecutive groups, `start` to `end` exclusive, and its characters. */
-interface Window {
-  start: number;
-  end: number;
-  text: string;
-  /** Starts with a letters-only group: a word in front ("MF", "Nº") may be the label, not the document. */
-  weak: boolean;
-}
-
-/**
- * Every window of consecutive groups whose characters are exactly `length`
- * long, none led by a label word: "CPF 529.982.247-25" is never the CNPJ
- * "CPF52998224725". Inside a window a label word is just three letters — an
- * alphanumeric CNPJ may well hold them ("6C.CPF.T0W/SEXT-02").
- */
-function windowsOf(groups: readonly Group[], length: number): Window[] {
-  return groups.flatMap((group, start) => (group.label ? [] : windowFrom(groups, start, length)));
-}
-
-/** The window that starts at group `start` and is exactly `length` characters long, if the groups land there. */
-function windowFrom(groups: readonly Group[], start: number, length: number): Window[] {
-  let text = "";
-  let end = start;
-  while (end < groups.length && text.length < length) {
-    text += groups[end]?.text ?? "";
-    end += 1;
-  }
-  return text.length === length ? [{ start, end, text, weak: groups[start]?.lettersOnly ?? false }] : [];
-}
-
-/** The maximal runs of consecutive NUMERIC groups, as windows. */
-function numericRuns(groups: readonly Group[]): Window[] {
-  const runs: Window[] = [];
-  let start = -1;
-  for (let at = 0; at <= groups.length; at += 1) {
-    const numeric = groups[at]?.numeric ?? false;
-    if (numeric && start < 0) start = at;
-    if (!numeric && start >= 0) {
-      const text = groups.slice(start, at).map((group) => group.text).join("");
-      runs.push({ start, end: at, text, weak: false });
-      start = -1;
-    }
-  }
-  return runs;
-}
-
-/** A weak window that cuts a number in two — a word, then the document's first digits — is the label's. */
-function cutsANumber(groups: readonly Group[], window: Window): boolean {
-  return window.weak && (groups[window.end]?.numeric ?? false);
-}
-
-function overlaps(a: Window, b: Window): boolean {
-  return a.start < b.end && b.start < a.end;
-}
-
-/**
- * The PASTE path: ONE group-aligned scan (FUT-590 UI review, round 8).
+ * The PASTE path. The digits-only reading is kept unless an alphanumeric CNPJ
+ * is clearly there (FUT-590):
  *
- *  1. Valid documents. A CNPJ: a window of consecutive groups, exactly 14
- *     characters, that passes the check digits. A CPF: a maximal run of
- *     consecutive numeric groups totalling exactly 11 digits that passes the
- *     CPF check — the WHOLE run, so a 14-digit CNPJ typo split by spaces can
- *     never yield the CPF hiding in it — unless the label names only CNPJ. A
- *     CNPJ window led by a letters-only word ("CNPJ/MF 11.222…", "CNPJ Nº
- *     11.222…") is no document when it cuts a number in two, and yields to
- *     an overlapping valid document that is not word-led or starts after it:
- *     the word in front is the label. The first valid document, left to
- *     right, wins — a CPF named first beats a CNPJ named after it.
- *  2. Else the buyer must see their own typo: a window of 14 characters
- *     ending in two digits that carries a letter (an alphanumeric typo keeps
- *     its letters), else the digits of the longest numeric run, else — no
- *     digit at all — the characters as written.
+ *  a. the digits alone are a valid CPF or numeric CNPJ → those digits;
+ *  b. else the first token whose characters are a valid alphanumeric CNPJ;
+ *  c. else the first token shaped like one (fourteen characters, a letter,
+ *     two final digits) — a typo the buyer sees in their own letters;
+ *  d. else the digits alone, as the field always read them.
  */
-function scannedDocument(value: string): string {
-  const groups = groupsOf(value);
-  const cnpjOnly = groups.some((group) => group.text === "CNPJ") && !groups.some((group) => group.text === "CPF");
-  const runs = numericRuns(groups);
-  const cnpjs = windowsOf(groups, CNPJ_LENGTH).filter((window) => isValidCnpj(window.text));
-  const cpfs = cnpjOnly ? [] : runs.filter((run) => run.text.length === CPF_LENGTH && isValidCpf(run.text));
-  const candidates = [...cnpjs, ...cpfs];
-  const yields = (window: Window): boolean =>
-    window.weak &&
-    (cutsANumber(groups, window) ||
-      candidates.some((other) => other !== window && overlaps(window, other) && (!other.weak || other.start > window.start)));
-  const valid = candidates.filter((window) => !yields(window)).sort((a, b) => a.start - b.start);
-  const [document] = valid;
-  if (document !== undefined) return document.text;
-
-  const typos = windowsOf(groups, CNPJ_LENGTH).filter(
-    (window) => CNPJ_SHAPE.test(window.text) && /[A-Z]/.test(window.text) && !cutsANumber(groups, window),
-  );
-  const typo = typos.find((window) => !window.weak) ?? typos[0];
-  if (typo !== undefined) return typo.text;
-
-  const longest = runs.reduce<Window | undefined>(
-    (best, run) => (best === undefined || run.text.length > best.text.length ? run : best),
-    undefined,
-  );
-  return longest?.text ?? taxIdCharacters(value);
+function pastedDocument(value: string): string {
+  const digits = digitsOnly(value);
+  if (isValidCpfOrCnpj(digits)) return digits;
+  const shaped = (value.match(TOKEN) ?? []).map(taxIdCharacters).filter(isAlphanumericCnpjShaped);
+  return shaped.find(isValidCnpj) ?? shaped[0] ?? digits;
 }
 
 /**
- * What the FIELD keeps as the buyer types or pastes: typing kept as typed, a
- * paste read by {@link scannedDocument} — once letters count, a label would
- * otherwise be read as the document's first characters (FUT-590 UI review) —
- * then capped at a CNPJ's fourteen, the most a document has. Only the input
- * path drops and caps; every check measures what it is given.
+ * What the FIELD keeps as the buyer types or pastes. TYPING — no space, only
+ * the mask's own characters, not led by a label word — is kept as typed, so a
+ * partial alphanumeric CNPJ ("12ABC") keeps its letters; anything else is a
+ * paste, read by {@link pastedDocument}. Capped at a CNPJ's fourteen, the most
+ * a document has. Only the input path drops and caps; every check measures
+ * what it is given.
  */
 export function taxIdInput(value: string): string {
   const normalised = normalise(value);
-  return (typedDocument(normalised) ?? scannedDocument(normalised)).slice(0, CNPJ_LENGTH);
+  const typed = TYPED_SHAPE.test(normalised) && !LEADING_LABEL.test(normalised);
+  return typed ? taxIdCharacters(normalised).slice(0, CNPJ_LENGTH) : pastedDocument(normalised);
 }
 
 /** Whether the kept characters are a CPF on its way: digits only, at most eleven. */

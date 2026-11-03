@@ -3,27 +3,28 @@
  * keep — one table, read by the checkout's field and the activation form's
  * alike, so the two cannot answer the same paste differently.
  *
- * The rule (round 8, `card/tax-id.ts`): a value with no space and only the
- * mask's own characters, not led by a label word, is TYPING and kept as typed.
- * Anything else is read by ONE scan over its groups (maximal runs of `A-Z0-9`,
- * after NFKC, uppercasing and separator look-alikes read as `.`): the first
- * valid document — a 14-character window of consecutive groups that passes the
- * CNPJ check digits, or a whole run of numeric groups of exactly 11 digits that
- * passes the CPF check (never under a CNPJ-only label) — else the typo as the
- * buyer wrote it: a 14-character window with a letter, else the longest run of
- * numeric groups, else the characters. Nothing is ever cut to 11: "CNPJ:
- * 11.222.355/0001-42" and "11 222 355 000 142" are a CNPJ with a typo, never
- * the valid CPF their first eleven digits are.
+ * The rule (`card/tax-id.ts`): after NFKC, combining marks dropped and
+ * uppercasing, a value with no space and only the mask's own characters
+ * (`A-Z0-9./-`), not led by a CPF/CNPJ label word, is TYPING and kept as
+ * typed. Anything else is a paste, read as the field read it before letters
+ * counted — every digit, capped at fourteen — unless an alphanumeric CNPJ is
+ * clearly there:
  *
- * Rows whose expected value is not the round-7 reviewer's (the spec wins, the
- * value is no valid document and is what the digits-only field kept):
- * "CPF: 529 982 247 25 11 99999 9999" and "CPF: 529.982.247-25
- * 529.982.247-25" — the numeric run is longer than a CPF, so no CPF is read.
+ *  a. the digits alone are a valid CPF or numeric CNPJ → those digits;
+ *  b. else the first token (maximal run of `A-Z0-9./-`) whose characters are a
+ *     valid alphanumeric CNPJ;
+ *  c. else the first token of fourteen characters with a letter and two final
+ *     digits (an alphanumeric typo, in the buyer's own letters);
+ *  d. else the digits alone.
  *
- * The generated documents of the reviewer's corpus are written out literally:
- * MF.ABC.345/01DE-31, NO.123.456/7890-15, CP.F12.345/6789-44 and
- * MF.120.001/0183-64 are valid CNPJs; 11.222.355/0001-42 is one with a wrong
- * check digit whose first eleven digits are a valid CPF.
+ * Rows whose expectation changed with this rule are kept and marked: the
+ * value is what the digits-only field kept for the same paste.
+ *
+ * The generated documents of the reviewers' corpus are written out literally:
+ * MF.ABC.345/01DE-31, NO.123.456/7890-15, CP.F12.345/6789-44,
+ * MF.120.001/0183-64, CPF71614849934 and CPF11233630267 are valid CNPJs;
+ * 11.222.355/0001-42 is one with a wrong check digit whose first eleven
+ * digits are a valid CPF.
  */
 export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]> = [
   ["CPF 529.982.247-25", "52998224725"],
@@ -37,7 +38,7 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CPF.: 529.982.247-25", "52998224725"],
   ["CNPJ n° 11.222.333/0001-81", "11222333000181"],
   ["CNPJ No. 11.222.333/0001-81", "11222333000181"],
-  ["CPF12ABC34501", "CPF12ABC34501"],
+  ["CPF12ABC34501", "1234501"], // follows the digits-only field (was "CPF12ABC34501")
   ["MF.ABC.345/01DE-35", "MFABC34501DE35"],
   ["NO.ABC.345/01DE-35", "NOABC34501DE35"],
   ["CNPJ: MF.ABC.345/01DE-31", "MFABC34501DE31"],
@@ -60,7 +61,7 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CPF12345678944", "CPF12345678944"],
   ["MF.ABC.345/01DE-31", "MFABC34501DE31"],
   ["MFABC34501DE31", "MFABC34501DE31"],
-  ["CPF: 529.982.247-25, nascido em 1990", "52998224725"],
+  ["CPF: 529.982.247-25, nascido em 1990", "52998224725199"], // follows the digits-only field (was "52998224725")
   ["CNPJ: MF.ABC.345/01DE-31 Empresa", "MFABC34501DE31"],
   ["CNPJ: 11.222.355/0001-42", "11222355000142"],
   ["CNPJ 11222355000142", "11222355000142"],
@@ -78,8 +79,8 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["529 982 247 25", "52998224725"],
   [" 11 222 333 0001 81 ", "11222333000181"],
   ["CNPJ 1", "1"],
-  ["CPF ", "CPF"],
-  ["CNPJ:", "CNPJ"],
+  ["CPF ", ""], // follows the digits-only field (was "CPF")
+  ["CNPJ:", ""], // follows the digits-only field (was "CNPJ")
   ["1122235500014", "1122235500014"],
   ["112223550001", "112223550001"],
   // Round 6: a mark between the label and the document is no document.
@@ -127,7 +128,7 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CNPJ: 11,222,355/0001-42", "11222355000142"],
   ["NO.123.456/7890-15", "NO123456789015"],
   ["CNPJ: CP.F12.345/6789-44", "CPF12345678944"],
-  ["CNPJ: MF 120 001 0183 64", "MF120001018364"],
+  ["CNPJ: MF 120 001 0183 64", "120001018364"], // follows the digits-only field (was "MF120001018364")
   ["CNPJ: 11.222.333/0001-81, Rua X", "11222333000181"],
   ["CNPJ: 12.ABC.345/01DE-35 (matriz)", "12ABC34501DE35"],
   ["11.222.333/0001-81 - Empresa X LTDA", "11222333000181"],
@@ -151,10 +152,10 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["*CNPJ*: _11.222.333/0001-81_", "11222333000181"],
   ["CPF: `529.982.247-25`", "52998224725"],
   ["CPF 529.982.247-25 \u2705", "52998224725"],
-  ["CPF: 529.982.247-25 RG 12.345.678-9", "52998224725"],
+  ["CPF: 529.982.247-25 RG 12.345.678-9", "52998224725123"], // follows the digits-only field (was "52998224725")
   ["CNPJ: 11 222 333 0001 81 fone 11 99999 9999", "11222333000181"],
   ["CPF: 529 982 247 25 11 99999 9999", "52998224725119"],
-  ["CPF: 529.982.247-25, CNPJ: 11.222.333/0001-81", "52998224725"],
+  ["CPF: 529.982.247-25, CNPJ: 11.222.333/0001-81", "52998224725112"], // follows the digits-only field (was "52998224725")
   ["CNPJ: 11.222.333/0001-81 / 0002-62", "11222333000181"],
   ["CNPJ: 11.222.333.0001-81", "11222333000181"],
   ["CNPJ: 11.222.333-0001-81", "11222333000181"],
@@ -171,8 +172,8 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CNPJ: 11 222 333 0001 8", "1122233300018"],
   ["CNPJ: 11 222 333", "11222333"],
   ["CPF: 529 982 247", "529982247"],
-  ["CNPJ: 12 ABC 345 01DE 35", "12ABC34501DE35"],
-  ["12 ABC 345 01DE 35", "12ABC34501DE35"],
+  ["CNPJ: 12 ABC 345 01DE 35", "123450135"], // follows the digits-only field (was "12ABC34501DE35")
+  ["12 ABC 345 01DE 35", "123450135"], // follows the digits-only field (was "12ABC34501DE35")
   ["CPF: 529.982.247-25 529.982.247-25", "52998224725529"],
   ["Chave PIX CPF 529.982.247-25", "52998224725"],
   ["CPF do pagador: 52998224725", "52998224725"],
@@ -195,10 +196,10 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["CNPJ: 11.222.333 0001 8", "1122233300018"],
   ["CNPJ: 11.222.333/0001 8", "1122233300018"],
   ["CNPJ: 11.222.333/0001-8 Empresa", "1122233300018"],
-  ["CNPJ 12 abc 345 01de 35", "12ABC34501DE35"],
-  ["CNPJ: 12.ABC.345 / 01DE-35", "12ABC34501DE35"],
-  ["CNPJ: 12.ABC.345/01DE - 35", "12ABC34501DE35"],
-  ["CNPJ: MF ABC 345 01DE 31", "MFABC34501DE31"],
+  ["CNPJ 12 abc 345 01de 35", "123450135"], // follows the digits-only field (was "12ABC34501DE35")
+  ["CNPJ: 12.ABC.345 / 01DE-35", "123450135"], // follows the digits-only field (was "12ABC34501DE35")
+  ["CNPJ: 12.ABC.345/01DE - 35", "123450135"], // follows the digits-only field (was "12ABC34501DE35")
+  ["CNPJ: MF ABC 345 01DE 31", "3450131"], // follows the digits-only field (was "MFABC34501DE31")
   ["CPF do titular 529.982.247-25", "52998224725"],
   ["CNPJ da empresa: 11.222.333/0001-81", "11222333000181"],
   ["CNPJ do emitente 11.222.333/0001-81", "11222333000181"],
@@ -211,13 +212,15 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["~CPF~ 529.982.247-25", "52998224725"],
   ["\ud83d\udcc4 CPF: 529.982.247-25", "52998224725"],
   ["- CPF: 529.982.247-25", "52998224725"],
-  ["1. CPF: 529.982.247-25", "52998224725"],
+  ["1. CPF: 529.982.247-25", "152998224725"], // follows the digits-only field (was "52998224725")
   ["\u2022 CNPJ: 11.222.333/0001-81", "11222333000181"],
   ["Documento: 529.982.247-25", "52998224725"],
   ["Doc: 11.222.333/0001-81", "11222333000181"],
   ["CPF:529.982.247-25Fulano", "52998224725"],
   ["CNPJ 11.222.333/0001-81LTDA", "11222333000181"],
-  ["529.982.247-25Fulano", "52998224725"],
+  // No space and only the mask's characters: the typing path keeps it as typed,
+  // which is NOT the digits-only field (was "52998224725").
+  ["529.982.247-25Fulano", "52998224725FUL"],
   ["CNPJ: 11.222.333/0001-81 \u2014 Empresa", "11222333000181"],
   ["CPF: 529.982.247-25 \u2013 Fulano", "52998224725"],
   ["CNPJ: 11.222.333/0001-81 \u2215 filial", "11222333000181"],
@@ -271,6 +274,58 @@ export const PASTE_CORPUS: ReadonlyArray<readonly [pasted: string, kept: string]
   ["11.222.355 / 0001-42", "11222355000142"],
   ["11.222.355/0001 - 42", "11222355000142"],
   ["CNPJ: 11.222.355 / 0001-42 x", "11222355000142"],
+  // Round 8 reviewer: labels glued or not, MEI/EPP/Doc words, phones, order
+  // numbers, IE tails and dates around a document — the digits-only reading
+  // unless an alphanumeric CNPJ token is there.
+  ["CPF31701919508", "31701919508"],
+  ["CPF317.019.195-08", "31701919508"],
+  ["CPF 31701919508", "31701919508"],
+  ["CPF31385811102", "31385811102"],
+  ["CPF313.858.111-02", "31385811102"],
+  ["CPF 31385811102", "31385811102"],
+  ["CPF38680856100", "38680856100"],
+  ["CPF386.808.561-00", "38680856100"],
+  ["CPF 38680856100", "38680856100"],
+  ["CPF71614849934", "CPF71614849934"],
+  ["cpf:71614849934", "71614849934"],
+  ["CPF11233630267", "CPF11233630267"],
+  ["cpf:11233630267", "11233630267"],
+  ["CNPJ: MF.ABC.345/01DE-31 - 11 3333-4444", "MFABC34501DE31"],
+  ["CNPJ: MF.ABC.345/01DE-31\n(11) 3333-4444", "MFABC34501DE31"],
+  ["MF.ABC.345/01DE-31 12/03/2026", "MFABC34501DE31"],
+  ["CNPJ MF ABC 345 01DE 31 2026", "34501312026"],
+  ["529,982,247-25", "52998224725"],
+  ["529_982_247_25", "52998224725"],
+  ["Doc 529.982.247-35 Fulano", "52998224735"],
+  ["CNPJ MEI 529.982.247-25", "52998224725"],
+  ["CNPJ do MEI: 529.982.247-25", "52998224725"],
+  ["CNPJ (MEI): 529.982.247-25", "52998224725"],
+  ["CNPJ: EPP 529.982.247-25", "52998224725"],
+  ["CNPJ Doc 529.982.247-25", "52998224725"],
+  ["CPF MEI 529.982.247-25", "52998224725"],
+  ["cpf317.019.195-08", "31701919508"],
+  ["Tel: (11) 98765-0034\nCPF: 529.982.247-25", "11987650034529"],
+  ["Doc: 529.982.247-35", "52998224735"],
+  ["Pedido #10074 CPF 529.982.247-25", "10074529982247"],
+  ["CNPJ/MF 11.222.333/0002", "112223330002"],
+  ["IE 123.456.789.113; 529.982.247-25", "12345678911352"],
+  ["CNPJ: 11 222 333 0001 82 81 3333 4444", "11222333000182"],
+  ["Benefici\u00e1rio: 529.982.247-25 (CNPJ)", "52998224725"],
+  ["Benefici\u00e1rio 529.982.247-26", "52998224726"],
+  ["CPF do usu\u00e1rio: 529.982.247-26", "52998224726"],
+  ["Inscri\u00e7\u00e3o: 11.222.333/0001-8", "1122233300018"],
+  ["Doc 274 478 461 39\t20/03/1997", "27447846139200"],
+  ["CPF: 529.982.247-25, (11) 98765-4321", "52998224725119"],
+  ["Fulano (11) 98765-0034 CPF 529.982.247-25", "11987650034529"],
+  ["Fulano (11) 98765-0115 CPF 529.982.247-25", "11987650115529"],
+  ["Tel: (11) 98765-0115\nCPF: 529.982.247-25", "11987650115529"],
+  ["Doc 52998224735", "52998224735"],
+  ["Doc 52998224816", "52998224816"],
+  ["Doc: 529.982.248-16", "52998224816"],
+  ["CNPJ/MF 11.222.333/0185", "112223330185"],
+  ["IE 123.456.789.113 CPF 529.982.247-25", "12345678911352"],
+  ["CPF 529.982.247-25 n\u00ba 108", "52998224725108"],
+  ["CPF: 529.982.247-25\nCasa 108", "52998224725108"],
   // Typing: partial alphanumeric input is kept as typed.
   ["12ABC", "12ABC"],
   ["12.ABC", "12ABC"],
