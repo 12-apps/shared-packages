@@ -14,10 +14,10 @@ import {
 import { createTestHost, memberActor, superActor, type TestHost } from './server-fixtures';
 
 /**
- * The ownership rules (FUT-2435), on the three writes that can take an owner
- * role away: `DELETE /team/:userId/roles/:role`, `PATCH /team/:userId` and
- * `DELETE /team/:userId`. And what PATCH answers once it has written
- * (FUT-2441).
+ * The ownership rules (FUT-2435), on the two writes that can take an owner
+ * role away: `DELETE /team/:userId/roles/:role` and `DELETE /team/:userId`.
+ * There is no third: `PATCH /team/:userId`, the swap of a member's highest
+ * role, went in FUT-2440, and with it the demotion rules it ran.
  *
  * "Owner" in every assertion here is who COUNTS as one: an active member whose
  * role column names an owner role and who holds a link to a live owner-role
@@ -30,7 +30,6 @@ const TENANT = 'tenant-a';
 const OWNER_ROLES = new Set(['DIRECTOR', 'NETWORK_OPS']);
 
 const REVOKE = ['DELETE', '/team/:userId/roles/:role'] as const;
-const PATCH = ['PATCH', '/team/:userId'] as const;
 const REMOVE = ['DELETE', '/team/:userId'] as const;
 
 function route(h: TestHost, method: string, path: string): RbacRoute {
@@ -268,25 +267,23 @@ describe('revoking an owner role', () => {
     const h = await host(TWO_OWNERS);
     dropLink(h.state, 'owner-2', 'DIRECTOR');
     addLink(h.state, 'owner-2', 'HEAD_LIBRARIAN');
-    const selfDemotion = await call(h, PATCH, {
+    const selfRevoke = await call(h, REVOKE, {
       actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
+      params: { userId: 'owner-1', role: 'DIRECTOR' },
     });
-    expect(selfDemotion.status).toBe(409);
+    expect(selfRevoke.status).toBe(409);
     const removal = await call(h, REMOVE, {
       actor: memberActor(TENANT, 'owner-2'),
       params: { userId: 'owner-1' },
     });
     expect(removal.status).toBe(403);
     expect(refusal(removal)).toBe(PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner);
-    const demotion = await call(h, PATCH, {
+    const revoke = await call(h, REVOKE, {
       actor: memberActor(TENANT, 'owner-2'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
+      params: { userId: 'owner-1', role: 'DIRECTOR' },
     });
-    expect(demotion.status).toBe(403);
-    expect(refusal(demotion)).toBe(PT_BR_RBAC_MESSAGES.onlyOwnerDemotesOwner);
+    expect(revoke.status).toBe(403);
+    expect(refusal(revoke)).toBe(PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner);
     expect(countedOwners(h.state)).toEqual(['owner-1']);
   });
 
@@ -312,91 +309,14 @@ describe('revoking an owner role', () => {
       isPlatformActor: false,
       userId: 'owner-2',
     });
-    await expect(h.api.team.setMemberRole(TENANT, 'owner-2', 'CLERK')).rejects.toMatchObject({
-      status: 409,
-    });
+    await expect(
+      h.api.team.removeTenantMemberGuarded(TENANT, 'owner-2', {
+        role: 'DIRECTOR',
+        isPlatformActor: false,
+        userId: 'owner-2',
+      }),
+    ).rejects.toMatchObject({ status: 409 });
     expect(h.calls.some((c) => c.op === 'role.updateMany')).toBe(false);
-  });
-});
-
-describe('demoting an owner (PATCH /team/:userId)', () => {
-  it('p1: refuses a caller who is not an owner, in its own words', async () => {
-    const h = await host(TWO_OWNERS);
-    // TREASURER is a role HEAD_LIBRARIAN may grant, so governance lets the
-    // request through and the ownership rule is what answers.
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'admin-1'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
-    });
-    expect(response.status).toBe(403);
-    expect(refusal(response)).toBe('Apenas o proprietário pode mudar o papel de outro proprietário.');
-    expect(membershipOf(h.state, 'owner-1').role).toBe('DIRECTOR');
-    expect(holdsLink(h.state, 'owner-1', 'DIRECTOR')).toBe(true);
-  });
-
-  it('p2: lets an owner demote a co-owner', async () => {
-    const h = await host(TWO_OWNERS);
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'owner-2' },
-      body: { role: 'TREASURER' },
-    });
-    expect(response.status).toBe(200);
-    expect(data(response)).toEqual({ status: 'updated', role: 'TREASURER' });
-    expect(countedOwners(h.state)).toEqual(['owner-1']);
-  });
-
-  it('p3: never demotes the last owner', async () => {
-    const h = await host(ONE_OWNER);
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
-    });
-    expect(response.status).toBe(409);
-    expect(refusal(response)).toBe(PT_BR_RBAC_MESSAGES.lastOwner);
-  });
-
-  it('p4: a disabled co-owner does not count as the one who remains', async () => {
-    const h = await host(TWO_OWNERS);
-    disable(h.state, 'owner-2');
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
-    });
-    expect(response.status).toBe(409);
-  });
-
-  it('p5: a host without the demotion sentence answers with the removal one', async () => {
-    const h = createTestHost({
-      messages: { ...PT_BR_RBAC_MESSAGES, onlyOwnerDemotesOwner: undefined },
-    });
-    await h.api.seedTenantRoles(TENANT);
-    for (const [userId, role] of Object.entries(TWO_OWNERS)) {
-      enrolMember(h.state, TENANT, userId, role);
-    }
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'admin-1'),
-      params: { userId: 'owner-1' },
-      body: { role: 'TREASURER' },
-    });
-    expect(response.status).toBe(403);
-    expect(refusal(response)).toBe(PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner);
-  });
-
-  it('p6: a PATCH that takes no ownership answers as before, under the lock', async () => {
-    const h = await host(TWO_OWNERS);
-    h.calls.splice(0);
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'admin-1'),
-      params: { userId: 'admin-1' },
-      body: { role: 'SELECTOR' },
-    });
-    expect(response.status).toBe(200);
-    expect(data(response)).toEqual({ status: 'updated', role: 'SELECTOR' });
-    expect(opsOf(h.calls).slice(0, 2)).toEqual(['role.findMany', 'role.updateMany']);
   });
 });
 
@@ -485,71 +405,6 @@ function deriveByRank(state: FakeRbacState, membershipId: string): void {
   member.role = RANK.find((name) => held.has(name)) ?? 'PATRON';
 }
 
-/** A host whose column for `userId` never moves off `role`, whatever is written. */
-function pinColumn(userId: string, role: string) {
-  return (state: FakeRbacState, membershipId: string): void => {
-    const member = state.memberships.find((m) => m.id === membershipId);
-    if (member?.userId === userId) member.role = role;
-  };
-}
-
-describe('PATCH answers what it stored (FUT-2441)', () => {
-  it('b1: a deriving host answers and audits the derived role', async () => {
-    const h = await host({ 'owner-1': 'DIRECTOR', 'admin-1': 'HEAD_LIBRARIAN' }, {
-      deriveMembershipRole: deriveByRank,
-    });
-    addLink(h.state, 'admin-1', 'BRANCH_LEAD');
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'admin-1' },
-      body: { role: 'CONSERVATOR' },
-    });
-    expect(response.status).toBe(200);
-    expect(data(response)).toEqual({ status: 'updated', role: 'BRANCH_LEAD' });
-    expect(h.audits.filter((entry) => entry.action === 'team.role_set')).toEqual([
-      expect.objectContaining({
-        resourceId: 'admin-1',
-        before: { role: 'HEAD_LIBRARIAN' },
-        after: { role: 'BRANCH_LEAD' },
-      }),
-    ]);
-  });
-
-  it('b2: a verbatim host answers the requested role, as before', async () => {
-    const h = await host(ONE_OWNER);
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'admin-1' },
-      body: { role: 'CONSERVATOR' },
-    });
-    expect(data(response)).toEqual({ status: 'updated', role: 'CONSERVATOR' });
-  });
-
-  it('b3: an unchanged read-back writes no audit', async () => {
-    const h = await host(ONE_OWNER, { deriveMembershipRole: deriveByRank });
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'admin-1' },
-      body: { role: 'HEAD_LIBRARIAN' },
-    });
-    expect(data(response)).toEqual({ status: 'updated', role: 'HEAD_LIBRARIAN' });
-    expect(h.audits.some((entry) => entry.action === 'team.role_set')).toBe(false);
-  });
-
-  it('b4: a host that keeps the column where it was answers that, and audits nothing', async () => {
-    // The requested role differs from the stored one, so only a skip that
-    // compares what was STORED stays silent here.
-    const h = await host(ONE_OWNER, { deriveMembershipRole: pinColumn('admin-1', 'HEAD_LIBRARIAN') });
-    const response = await call(h, PATCH, {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'admin-1' },
-      body: { role: 'SELECTOR' },
-    });
-    expect(data(response)).toEqual({ status: 'updated', role: 'HEAD_LIBRARIAN' });
-    expect(h.audits.some((entry) => entry.action === 'team.role_set')).toBe(false);
-  });
-});
-
 describe('direct store calls', () => {
   it('s1: a revoke with no caller keeps the invariant only', async () => {
     const h = await host(TWO_OWNERS);
@@ -575,22 +430,6 @@ describe('direct store calls', () => {
     expect(countedOwners(h.state)).toEqual(['owner-2']);
   });
 
-  it('s4: a move to an owner role the tenant has no row for takes ownership', async () => {
-    // NETWORK_OPS is an owner role the demo catalog never seeds per tenant, so
-    // the swap would unlink DIRECTOR and link nothing: the owner stops counting.
-    const alone = await host(ONE_OWNER);
-    await expect(alone.api.team.setMemberRole(TENANT, 'owner-1', 'NETWORK_OPS')).rejects.toMatchObject({
-      status: 409,
-    });
-    expect(countedOwners(alone.state)).toEqual(['owner-1']);
-
-    const paired = await host(TWO_OWNERS);
-    await expect(paired.api.team.setMemberRole(TENANT, 'owner-1', 'NETWORK_OPS')).resolves.toBe(
-      'NETWORK_OPS',
-    );
-    expect(countedOwners(paired.state)).toEqual(['owner-2']);
-  });
-
   it('s5: a caller who is not the platform operator and names no user is refused', async () => {
     const h = await host(TWO_OWNERS);
     const nobody = { role: null, isPlatformActor: false, userId: null };
@@ -601,24 +440,6 @@ describe('direct store calls', () => {
       h.api.team.revokeCustomRoleFromMember(TENANT, 'owner-1', 'DIRECTOR', undefined, nobody),
     ).rejects.toMatchObject({ status: 403 });
     expect(countedOwners(h.state)).toEqual(['owner-1', 'owner-2']);
-  });
-
-  it('s3: setMemberRole resolves to the role read back', async () => {
-    const h = await host(ONE_OWNER, { deriveMembershipRole: deriveByRank });
-    addLink(h.state, 'admin-1', 'BRANCH_LEAD');
-    await expect(h.api.team.setMemberRole(TENANT, 'admin-1', 'CONSERVATOR')).resolves.toBe(
-      'BRANCH_LEAD',
-    );
-  });
-
-  it('s6: a PATCH to the owner role already held takes nothing, even with no row for it', async () => {
-    // NETWORK_OPS has no tenant row, so a MOVE to it would unlink DIRECTOR
-    // (s4); a member already on it swaps nothing, and nothing is refused.
-    const h = await host({ 'owner-1': 'DIRECTOR', 'ops-1': 'NETWORK_OPS', 'admin-1': 'HEAD_LIBRARIAN' });
-    const admin = { role: 'HEAD_LIBRARIAN', isPlatformActor: false, userId: 'admin-1' };
-    await expect(
-      h.api.team.setMemberRole(TENANT, 'ops-1', 'NETWORK_OPS', undefined, admin),
-    ).resolves.toBe('NETWORK_OPS');
   });
 
   it('s7: revoking one owner role from a member who keeps another runs no owner rule', async () => {
@@ -684,20 +505,6 @@ describe('the ownership lock', () => {
     expectLockedBeforeDeciding(revoke, 'membershipRole.deleteMany');
     expect(revoke.at(-1)).toBe('membershipRole.deleteMany');
 
-    const again = await host(TWO_OWNERS);
-    again.calls.splice(0);
-    await call(again, PATCH, {
-      actor: owner1,
-      params: { userId: 'owner-2' },
-      body: { role: 'TREASURER' },
-    });
-    const patch = opsOf(again.calls);
-    expectLockedBeforeDeciding(patch, 'membership.update');
-    // The target is read after the lock, and the stored role after the write.
-    expect(patch.indexOf('membership.findUnique')).toBeGreaterThan(1);
-    expect(patch.indexOf('membership.findUnique')).toBeLessThan(patch.indexOf('membership.update'));
-    expect(patch.at(-1)).toBe('membership.findUnique');
-
     const third = await host(TWO_OWNERS);
     third.calls.splice(0);
     await call(third, REMOVE, { actor: owner1, params: { userId: 'owner-2' } });
@@ -759,7 +566,7 @@ describe('the ownership lock', () => {
     expect(countedOwners(h.state)).toEqual(['heir']);
   });
 
-  it('l6: a PATCH waits for a host holding the lock, then sees its promotion', async () => {
+  it('l6: a revoke waits for a host holding the lock, then sees its promotion', async () => {
     const waiting = latch();
     const h = await host(
       { 'owner-1': 'DIRECTOR', 'admin-1': 'HEAD_LIBRARIAN', heir: 'CONSERVATOR' },
@@ -771,15 +578,16 @@ describe('the ownership lock', () => {
       await committed.opened;
       transferOwnership(h.state, 'owner-1', 'heir');
     });
-    const demotion = call(h, PATCH, {
+    // Before the transfer commits, `heir` holds no DIRECTOR link and the revoke
+    // would be a no-op (r7); after it, the revoke takes ownership and is judged.
+    const revoke = call(h, REVOKE, {
       actor: memberActor(TENANT, 'admin-1'),
-      params: { userId: 'heir' },
-      body: { role: 'TREASURER' },
+      params: { userId: 'heir', role: 'DIRECTOR' },
     }).finally(waiting.open);
     await waiting.opened;
     committed.open();
     await transfer;
-    const response = await demotion;
+    const response = await revoke;
     expect(response.status).toBe(403);
     expect(countedOwners(h.state)).toEqual(['heir']);
   });
@@ -883,14 +691,6 @@ async function interleave(
 const PAIRS: Record<string, (h: TestHost) => { first: () => Promise<RbacResponse>; second: () => Promise<RbacResponse> }> = {
   'revoke × revoke': (h) => ({
     first: () => call(h, REVOKE, { actor: memberActor(TENANT, 'owner-1'), params: { userId: 'owner-2', role: 'DIRECTOR' } }),
-    second: () => call(h, REVOKE, { actor: memberActor(TENANT, 'owner-2'), params: { userId: 'owner-1', role: 'DIRECTOR' } }),
-  }),
-  'PATCH × PATCH': (h) => ({
-    first: () => call(h, PATCH, { actor: memberActor(TENANT, 'owner-1'), params: { userId: 'owner-2' }, body: { role: 'TREASURER' } }),
-    second: () => call(h, PATCH, { actor: memberActor(TENANT, 'owner-2'), params: { userId: 'owner-1' }, body: { role: 'TREASURER' } }),
-  }),
-  'PATCH × revoke': (h) => ({
-    first: () => call(h, PATCH, { actor: memberActor(TENANT, 'owner-1'), params: { userId: 'owner-2' }, body: { role: 'TREASURER' } }),
     second: () => call(h, REVOKE, { actor: memberActor(TENANT, 'owner-2'), params: { userId: 'owner-1', role: 'DIRECTOR' } }),
   }),
   'two platform removals': (h) => ({

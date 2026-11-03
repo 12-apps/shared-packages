@@ -78,10 +78,10 @@ export const rbacManifest = {
    */
   observability: { namespace: 'rbac' },
   /**
-   * The eighteen tools this package's admin surface IS
+   * The seventeen tools this package's admin surface IS
    * (`../mcp/endpoints`), built from a host vocabulary the same way
    * `lifecycleMcpEndpoints` is: the shape here, the mount path, catalog,
-   * assignable roles, search queries and sentences from the host.
+   * search queries and sentences from the host.
    *
    * Declared as a CAPABILITY rather than shipped as a static array, because
    * the tools cannot exist without the host's answers — which is the carve-out

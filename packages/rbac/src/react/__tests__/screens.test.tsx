@@ -132,7 +132,6 @@ function apiStub(overrides: Partial<RbacApiClient> = {}): RbacApiClient {
       ok: true as const,
       data: { status: 'resent' as const, email: 'nova@example.com' },
     })),
-    setMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'updated' } })),
     grantMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'granted' } })),
     revokeMemberRole: vi.fn(async () => ({ ok: true as const, data: { status: 'revoked' } })),
     setMemberActive: vi.fn(async () => ({ ok: true as const, data: { status: 'updated' } })),

@@ -52,12 +52,6 @@ export interface RoleWireSchemas {
     description?: string | null | undefined;
     permissions: '*' | string[];
   }>;
-  /**
-   * Body for `PATCH /team/:userId`: replaces the member's HIGHEST system role
-   * with this one, leaving every other role they hold in place. Kept for API
-   * and MCP callers; the packaged screens grant and revoke per role instead.
-   */
-  setMemberRoleBody: z.ZodType<{ role: string }>;
   /** Body for granting a member one more role — system or custom, any number. */
   grantMemberRoleBody: z.ZodType<{ role: string }>;
   /** Body for enabling/disabling a member. */
@@ -92,7 +86,6 @@ export function buildWireSchemas<P extends string>(
       description: z.string().trim().nullable().optional(),
       permissions: permissionSet,
     }) as RoleWireSchemas['templateOverrideBody'],
-    setMemberRoleBody: z.object({ role: z.string().trim().min(1) }),
     grantMemberRoleBody: z.object({ role: z.string().trim().min(1) }),
     setMemberActiveBody: z.object({ active: z.boolean() }),
     inviteBody: z.object({

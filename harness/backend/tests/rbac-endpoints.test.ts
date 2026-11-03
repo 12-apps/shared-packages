@@ -301,24 +301,35 @@ describe('team — the roster over the directory seam', () => {
     expect(response.status).toBe(403);
   });
 
-  it('reassigns a base role and the member permissions follow', async () => {
+  it('serves no role set: PATCH /team/:userId is gone (FUT-2440)', async () => {
+    const response = await asUser('owner-1').send('PATCH', '/team/role-target', { role: 'BRANCH_LEAD' });
+    expect(response.status).toBe(404);
+  });
+
+  it('grants a role, the permissions follow, and the revoke leaves the other role', async () => {
     const owner = asUser('owner-1');
-    const updated = await owner.send('PATCH', '/team/role-target', { role: 'BRANCH_LEAD' });
-    expect(updated.status).toBe(200);
+    const granted = await owner.send('POST', '/team/role-target/roles', { role: 'BRANCH_LEAD' });
+    expect(granted.status).toBe(200);
 
     const permissions = await json<{ data: { permissions: string[] } }>(
       await asUser('role-target').get('/permissions'),
     );
     expect(permissions.data.permissions).toContain('titles:write');
 
-    // Restore, as the origin host spec did, so ordering never matters.
-    await owner.send('PATCH', '/team/role-target', { role: 'CONSERVATOR' });
+    // Restore, as the origin host spec did, so ordering never matters — and the
+    // revoke takes BRANCH_LEAD alone: the member still holds CONSERVATOR.
+    const revoked = await owner.send('DELETE', '/team/role-target/roles/BRANCH_LEAD');
+    expect(revoked.status).toBe(200);
+    const detail = await json<{ data: { role: string; customRoles: string[] } }>(
+      await owner.get('/team/role-target'),
+    );
+    expect([detail.data.role, ...detail.data.customRoles]).toEqual(['CONSERVATOR']);
   });
 
-  it('never demotes the last DIRECTOR (409) and never disables one (403)', async () => {
+  it('never revokes the last DIRECTOR (409) and never disables one (403)', async () => {
     const owner = asUser('owner-1');
-    const demoted = await owner.send('PATCH', '/team/owner-1', { role: 'HEAD_LIBRARIAN' });
-    expect(demoted.status).toBe(409);
+    const revoked = await owner.send('DELETE', '/team/owner-1/roles/DIRECTOR');
+    expect(revoked.status).toBe(409);
     const disabled = await owner.send('PATCH', '/team/owner-1/status', { active: false });
     expect(disabled.status).toBe(403);
   });

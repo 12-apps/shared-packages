@@ -29,7 +29,6 @@ const OPERATIONS = [
   "listTeamMembers",
   "inviteTenantAdmin",
   "removeTenantAdmin",
-  "setMemberRole",
   "grantMemberRole",
   "revokeMemberRole",
   "setMemberStatus",
@@ -49,7 +48,6 @@ const OPERATIONS = [
 const vocabulary: RbacMcpVocabulary = {
   collectionPath: "/api/admin/{tenantSlug}",
   catalogPermissions: ["team:read"],
-  assignableRoles: ["ADMIN"],
   listTeamQuery: z.object({ q: z.string().optional() }),
   listRolesQuery: z.object({ q: z.string().optional() }),
   summaries: Object.fromEntries(

@@ -8,7 +8,7 @@ import { inviteBody as mcpInviteBody } from '../schemas';
 import type { RbacMcpOperation, RbacMcpVocabulary } from '../vocabulary';
 
 /**
- * The eighteen tools, and the two under-declarations that motivated the move.
+ * The seventeen tools, and the two under-declarations that motivated the move.
  *
  * The origin host described these endpoints in two registry files, and both
  * documented that nothing checked them against what the routes returned. Two had
@@ -20,7 +20,6 @@ const OPERATIONS: RbacMcpOperation[] = [
   'listTeamMembers',
   'inviteTenantAdmin',
   'removeTenantAdmin',
-  'setMemberRole',
   'grantMemberRole',
   'revokeMemberRole',
   'setMemberStatus',
@@ -41,7 +40,6 @@ function vocabulary(overrides: Partial<RbacMcpVocabulary> = {}): RbacMcpVocabula
   return {
     collectionPath: '/api/admin/{tenantSlug}',
     catalogPermissions: ['team:read', 'team:manage', 'roles:manage'],
-    assignableRoles: ['ADMIN', 'MANAGER'],
     listTeamQuery: z.object({ q: z.string().optional() }),
     listRolesQuery: z.object({ q: z.string().optional() }),
     summaries: Object.fromEntries(

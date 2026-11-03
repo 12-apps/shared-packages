@@ -10,8 +10,9 @@ import { createHarnessBackend, type HarnessBackend } from '../src/app';
 import { RBAC_TENANT_ID } from '../src/rbac-host';
 
 /**
- * The owner rules of `@12-apps/rbac` (FUT-2435) and PATCH's read-back
- * (FUT-2441), end to end over the tarball: the lock is a real UPDATE of a real
+ * The owner rules of `@12-apps/rbac` (FUT-2435), end to end over the tarball,
+ * on the two writes that can take an owner role away — the revoke and the
+ * removal (the PATCH role set went in FUT-2440): the lock is a real UPDATE of a real
  * `roles` row, the reads are real SQL through the harness's seam, and the
  * outcomes are the routes' own. What PGlite cannot show is two connections at
  * once; the package's unit suite interleaves the writes against its fake.
@@ -128,26 +129,23 @@ describe('revoking an owner role, over real SQL', () => {
   });
 });
 
-describe('demoting and removing an owner, over real SQL', () => {
+describe('revoking and removing an owner, over real SQL', () => {
   it('h4: a disabled owner never counts as the one who remains', async () => {
     await addSecondOwner();
     await disable('owner-2');
-    const selfDemotion = await asUser('owner-1').send('PATCH', '/team/owner-1', {
-      role: 'TREASURER',
-    });
-    expect(selfDemotion.status).toBe(409);
+    const selfRevoke = await asUser('owner-1').send('DELETE', '/team/owner-1/roles/DIRECTOR');
+    expect(selfRevoke.status).toBe(409);
     const platformRemoval = await asUser('superadmin').send('DELETE', '/team/owner-1');
     expect(platformRemoval.status).toBe(409);
     const removeDisabled = await asUser('owner-1').send('DELETE', '/team/owner-2');
     expect(removeDisabled.status).toBe(200);
   });
 
-  it('h5: refuses an admin demoting an owner, in the demotion sentence', async () => {
-    // TREASURER is a role HEAD_LIBRARIAN may grant, so governance passes it on.
-    const response = await asUser('admin-1').send('PATCH', '/team/owner-1', { role: 'TREASURER' });
+  it('h5: refuses an admin removing an owner, in the removal sentence', async () => {
+    const response = await asUser('admin-1').send('DELETE', '/team/owner-1');
     expect(response.status).toBe(403);
     expect((await json<{ error: string }>(response)).error).toBe(
-      'Apenas o proprietário pode mudar o papel de outro proprietário.',
+      PT_BR_RBAC_MESSAGES.onlyOwnerRemovesOwner,
     );
     expect(await holdsDirector('owner-1')).toBe(true);
   });
@@ -191,34 +189,20 @@ describe('the ownership lock, over real SQL', () => {
   });
 });
 
-describe('PATCH answers what the row holds (FUT-2441)', () => {
-  it('h9: a host that writes the column verbatim gets the requested role back', async () => {
-    const response = await asUser('owner-1').send('PATCH', '/team/chef-1', { role: 'BRANCH_LEAD' });
-    expect(response.status).toBe(200);
-    expect(await json(response)).toEqual({ data: { status: 'updated', role: 'BRANCH_LEAD' } });
-  });
-
-  it('h7: a host that rewrites the column gets the stored value back', async () => {
-    // A test-local trigger standing in for a host that DERIVES the column:
-    // whatever PATCH writes, the row keeps what the trigger decides.
-    await backend.pg.exec(`
-      CREATE FUNCTION harness_pin_role() RETURNS trigger AS $$
-      BEGIN
-        IF NEW.role = 'SELECTOR' THEN NEW.role := 'CLERK'; END IF;
-        RETURN NEW;
-      END $$ LANGUAGE plpgsql;
-      CREATE TRIGGER harness_pin_role BEFORE UPDATE OF role ON memberships
-        FOR EACH ROW EXECUTE FUNCTION harness_pin_role();
-    `);
-    try {
-      const response = await asUser('owner-1').send('PATCH', '/team/chef-1', { role: 'SELECTOR' });
-      expect(response.status).toBe(200);
-      expect(await json(response)).toEqual({ data: { status: 'updated', role: 'CLERK' } });
-    } finally {
-      await backend.pg.exec(`
-        DROP TRIGGER harness_pin_role ON memberships;
-        DROP FUNCTION harness_pin_role();
-      `);
-    }
+describe('a grant adds, and a revoke takes only what it names (FUT-2440)', () => {
+  it('h9: a grant answers the role granted, and its revoke leaves the role held before', async () => {
+    const owner = asUser('owner-1');
+    const granted = await owner.send('POST', '/team/chef-1/roles', { role: 'BRANCH_LEAD' });
+    expect(granted.status).toBe(200);
+    expect(await json(granted)).toEqual({ data: { status: 'granted', role: 'BRANCH_LEAD' } });
+    expect((await owner.send('DELETE', '/team/chef-1/roles/BRANCH_LEAD')).status).toBe(200);
+    const { rows } = await backend.pg.query<{ name: string }>(
+      `SELECT r.name FROM membership_roles mr
+         JOIN memberships m ON m.id = mr.membership_id
+         JOIN roles r ON r.id = mr.role_id
+       WHERE m.user_id = 'chef-1' AND m.client_id = $1`,
+      [RBAC_TENANT_ID],
+    );
+    expect(rows.map((row) => row.name)).toEqual(['CONSERVATOR']);
   });
 });

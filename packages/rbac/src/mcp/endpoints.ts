@@ -8,7 +8,6 @@ import {
   roleSchemaOf,
   roleWriteBodyOf,
   setMemberActiveBody,
-  setMemberRoleBodyOf,
   teamContextSchema,
   teamMemberDetailSchema,
   teamMemberSchema,
@@ -18,7 +17,7 @@ import type { RbacHttpMethod, RbacMcpEndpoint } from "./twin";
 import type { RbacMcpVocabulary } from "./vocabulary";
 
 /**
- * The eighteen tools this package's admin surface IS.
+ * The seventeen tools this package's admin surface IS.
  *
  * ## Why they live here now
  *
@@ -37,9 +36,9 @@ import type { RbacMcpVocabulary } from "./vocabulary";
  *
  * The shape is this package's; the vocabulary and the sentences are the host's
  * — the same split `lifecycleMcpEndpoints` draws one package over. The mount
- * path, the permission catalog, which base roles a roster may assign, the two
- * search queries, the `permissionsExtras` widening and all eighteen summaries
- * arrive as {@link RbacMcpVocabulary}. None of them is derivable here.
+ * path, the permission catalog, the two search queries, the `permissionsExtras`
+ * widening and all seventeen summaries arrive as {@link RbacMcpVocabulary}.
+ * None of them is derivable here.
  *
  * ## The annotations
  *
@@ -88,7 +87,7 @@ const statusOf = <T extends string>(literal: T) =>
 /**
  * One endpoint, with the five keys every entry here shares assembled once.
  *
- * Written out per entry, the eighteen tools are ~170 lines of the same five
+ * Written out per entry, the seventeen tools are ~160 lines of the same five
  * keys — which is both over the size gate and the shape that lets one entry
  * quietly differ from its neighbours. The builder makes the DIFFERENCES the
  * only thing each line carries.
@@ -172,20 +171,6 @@ function teamEndpoints(
       { params: member, response: statusOf("removed") },
       { summary: summaries.removeTenantAdmin, tags },
     ),
-    endpoint(
-      "setMemberRole",
-      "patch",
-      `${collectionPath}/team/{userId}`,
-      ALTERS_ACCESS,
-      {
-        params: member,
-        body: setMemberRoleBodyOf(vocabulary.assignableRoles),
-        response: envelope(
-          z.object({ status: z.literal("updated"), role: z.string() }),
-        ),
-      },
-      { summary: summaries.setMemberRole, tags },
-    ),
   ];
 }
 
@@ -197,7 +182,7 @@ function teamEndpoints(
  * Split from {@link teamEndpoints} at the 80-line gate. The seam is real rather
  * than arbitrary — everything here acts on something ATTACHED to a membership
  * (a grant, a status flag, an invite) or reads ALONGSIDE the roster, where the
- * four above create, list and re-role the membership itself.
+ * three above create, list and remove the membership itself.
  */
 function memberGrantEndpoints(
   vocabulary: RbacMcpVocabulary,

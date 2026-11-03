@@ -5,13 +5,11 @@
  * is the roster's route descriptors and sits at the package's 400-line ceiling,
  * and this is a RULE those descriptors apply rather than a route.
  *
- * It also stops the rule being stated twice. `PATCH /team/:userId` has always
- * narrowed the base role to a closed set before governance runs, because the
+ * The base role is narrowed to a closed set before governance runs, because the
  * origin host carries a DB CHECK on `memberships.role` and a name outside it is
  * a 500 from Postgres where this layer answers a 400 at the wire. `POST /team`
- * now writes the same column through its port, so it needs the same gate — and
- * a second copy of it is a second thing to forget when a host narrows its
- * assignable set.
+ * writes that column through its port, so it is the write this gate guards.
+ * (`PATCH /team/:userId` applied it too, until that swap went in FUT-2440.)
  */
 
 import { RbacApiError, type RbacActor, type RbacMessages, type RbacServerConfig } from './context';
@@ -39,7 +37,7 @@ function assignableBaseRoles<P extends string>(
 }
 
 /** Narrow a base role to that set, or throw the 400 the wire promises. */
-export function assertAssignableBaseRole<P extends string>(
+function assertAssignableBaseRole<P extends string>(
   config: RbacServerConfig<P>,
   role: string,
   messages: RbacMessages,

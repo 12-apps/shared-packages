@@ -448,37 +448,48 @@ describe('team routes', () => {
     expect(response.status).toBe(403);
   });
 
-  it('reassigns a member base role and preserves additive custom roles', async () => {
+  it('serves no role-set write: PATCH /team/:userId is gone (FUT-2440)', () => {
+    // Roles are granted and revoked one at a time. The swap that answered here
+    // unlinked the member's HIGHEST role whatever else they held.
+    const h = createTestHost();
+    const patches = h.api.routes.filter((r) => r.method === 'PATCH').map((r) => r.path);
+    expect(patches).not.toContain('/team/:userId');
+    expect(patches).toContain('/team/:userId/status');
+  });
+
+  it('grants a system role beside a custom one, and a revoke takes only the role named', async () => {
     const h = await teamHost();
     const actor = memberActor(TENANT, 'owner-1');
     seedRole(h.state, { clientId: TENANT, name: 'Voluntário', permissions: ['titles:read:all'] });
-    const granted = await call(h, 'POST', '/team/:userId/roles', {
-      actor,
-      params: { userId: 'chef-1' },
-      body: { role: 'Voluntário' },
-    });
-    expect(granted.status).toBe(200);
-
-    const reassigned = await call(h, 'PATCH', '/team/:userId', {
-      actor,
-      params: { userId: 'chef-1' },
-      body: { role: 'BRANCH_LEAD' },
-    });
-    expect(reassigned.status).toBe(200);
-    expect(data(reassigned)).toEqual({ status: 'updated', role: 'BRANCH_LEAD' });
-
-    const detail = await call(h, 'GET', '/team/:userId', {
-      actor,
-      params: { userId: 'chef-1' },
-    });
-    expect(data(detail)).toMatchObject({ role: 'BRANCH_LEAD', customRoles: ['Voluntário'] });
-
-    // The member's effective permissions now come from BRANCH_LEAD + Voluntário.
+    for (const role of ['Voluntário', 'BRANCH_LEAD']) {
+      const granted = await call(h, 'POST', '/team/:userId/roles', {
+        actor,
+        params: { userId: 'chef-1' },
+        body: { role },
+      });
+      expect(granted.status, role).toBe(200);
+    }
+    const heldBy = async () => {
+      const detail = data(await call(h, 'GET', '/team/:userId', { actor, params: { userId: 'chef-1' } })) as {
+        role: string;
+        customRoles: string[];
+      };
+      return new Set([detail.role, ...detail.customRoles]);
+    };
+    expect(await heldBy()).toEqual(new Set(['CONSERVATOR', 'BRANCH_LEAD', 'Voluntário']));
+    // The member's effective permissions now include BRANCH_LEAD's.
     const perms = await h.api.guards.getActorPermissions(
       { userId: 'chef-1', isSuper: false },
       TENANT,
     );
     expect(perms.has('titles:write')).toBe(true);
+
+    const revoked = await call(h, 'DELETE', '/team/:userId/roles/:role', {
+      actor,
+      params: { userId: 'chef-1', role: 'BRANCH_LEAD' },
+    });
+    expect(revoked.status).toBe(200);
+    expect(await heldBy()).toEqual(new Set(['CONSERVATOR', 'Voluntário']));
   });
 
   it('grant is idempotent and revoke removes only the named role', async () => {
@@ -523,15 +534,14 @@ describe('team routes', () => {
     expect((response.body as { error: string }).error).toBe('Papel desconhecido.');
   });
 
-  it('never demotes the last DIRECTOR and never disables a DIRECTOR', async () => {
+  it('never revokes the last DIRECTOR and never disables a DIRECTOR', async () => {
     const h = await teamHost();
     const actor = memberActor(TENANT, 'owner-1');
-    const demoted = await call(h, 'PATCH', '/team/:userId', {
+    const revoked = await call(h, 'DELETE', '/team/:userId/roles/:role', {
       actor,
-      params: { userId: 'owner-1' },
-      body: { role: 'BRANCH_LEAD' },
+      params: { userId: 'owner-1', role: 'DIRECTOR' },
     });
-    expect(demoted.status).toBe(409);
+    expect(revoked.status).toBe(409);
 
     const disabled = await call(h, 'PATCH', '/team/:userId/status', {
       actor,
@@ -623,56 +633,6 @@ describe('team routes', () => {
     expect(response.status).toBe(403);
   });
 
-  it('a base role outside assignableBaseRoles is the wire 400, custom roles included', async () => {
-    // MAJOR-7: the base role is a CLOSED set. A tenant custom role is
-    // additive by design — on the origin host's DB this write would hit the
-    // memberships_role_check CHECK and 500; the package answers the wire's
-    // 400 before governance ever runs.
-    const h = await teamHost();
-    seedRole(h.state, { clientId: TENANT, name: 'Voluntário', permissions: ['copies:read'] });
-    const custom = await call(h, 'PATCH', '/team/:userId', {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'chef-1' },
-      body: { role: 'Voluntário' },
-    });
-    expect(custom.status).toBe(400);
-
-    const narrowed = createTestHost({ assignableBaseRoles: ['CLERK'] });
-    await narrowed.api.seedTenantRoles(TENANT);
-    enrolMember(narrowed.state, TENANT, 'owner-1', 'DIRECTOR');
-    enrolMember(narrowed.state, TENANT, 'chef-1', 'CONSERVATOR');
-    const outside = await call(narrowed, 'PATCH', '/team/:userId', {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'chef-1' },
-      body: { role: 'BRANCH_LEAD' },
-    });
-    expect(outside.status).toBe(400);
-    const inside = await call(narrowed, 'PATCH', '/team/:userId', {
-      actor: memberActor(TENANT, 'owner-1'),
-      params: { userId: 'chef-1' },
-      body: { role: 'CLERK' },
-    });
-    expect(inside.status).toBe(200);
-  });
-
-  it('the DEFAULT assignable set excludes every governance owner role', async () => {
-    // Delta re-review MINOR-A: the default must be derived from
-    // governance.ownerRoles (DIRECTOR + NETWORK_OPS), not the disable-invariant
-    // ownerRoles knob — this layer exists to refuse BEFORE governance, so the
-    // refusal must be the wire 400 with governance never reached (no
-    // governance.reject audit entry).
-    const h = await teamHost();
-    for (const role of ['DIRECTOR', 'NETWORK_OPS']) {
-      const response = await call(h, 'PATCH', '/team/:userId', {
-        actor: memberActor(TENANT, 'owner-1'),
-        params: { userId: 'chef-1' },
-        body: { role },
-      });
-      expect(response.status).toBe(400);
-    }
-    expect(h.audits).toEqual([]);
-  });
-
   it('a route-level permission ceiling narrows the whole surface', async () => {
     const h = await teamHost();
     const actor = {
@@ -731,11 +691,6 @@ describe('team routes', () => {
       params: { userId: 'chef-1', role: 'Voluntário' },
     });
     await call(audited, 'DELETE', '/roles/:id', { actor: auditedActor, params: { id } });
-    await call(audited, 'PATCH', '/team/:userId', {
-      actor: auditedActor,
-      params: { userId: 'chef-1' },
-      body: { role: 'BRANCH_LEAD' },
-    });
     await call(audited, 'PATCH', '/team/:userId/status', {
       actor: auditedActor,
       params: { userId: 'chef-1' },
@@ -760,7 +715,6 @@ describe('team routes', () => {
       'role.create',
       'role.update',
       'role.delete',
-      'team.role_set',
       'team.role_grant',
       'team.role_revoke',
       'team.member_status',
@@ -982,9 +936,12 @@ describe('team routes', () => {
 
 describe('person × role × tenant is N×M×J', () => {
   /** A host whose invites port records exactly what each invite asked for. */
-  async function invitingHost(): Promise<{ h: TestHost; asked: unknown[] }> {
+  async function invitingHost(
+    config: { assignableBaseRoles?: readonly string[] } = {},
+  ): Promise<{ h: TestHost; asked: unknown[] }> {
     const asked: unknown[] = [];
     const h = createTestHost({
+      ...config,
       invites: {
         invite: async (_tenantId, _email, roles) => {
           asked.push(roles);
@@ -1063,6 +1020,43 @@ describe('person × role × tenant is N×M×J', () => {
     expect(response.status).toBe(400);
     expect(asked).toEqual([]);
   });
+
+  it('a system role outside assignableBaseRoles is the wire 400 on the invite grant', async () => {
+    // `assignableBaseRoles` governs what an invite grants (FUT-2440: the
+    // PATCH swap it also guarded is gone). On the origin host's DB a name
+    // outside the set would hit the memberships_role_check CHECK and 500; the
+    // package answers the wire's 400 before the port runs.
+    const { h, asked } = await invitingHost({ assignableBaseRoles: ['CLERK'] });
+    const outside = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'fora@example.com', role: 'BRANCH_LEAD' },
+    });
+    expect(outside.status).toBe(400);
+    expect(asked).toEqual([]);
+    const inside = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'dentro@example.com', role: 'CLERK' },
+    });
+    expect(inside.status).toBe(200);
+    expect(asked).toEqual([{ role: 'CLERK', customRoles: [] }]);
+  });
+
+  it('the DEFAULT assignable set excludes every governance owner role', async () => {
+    // The default is derived from governance.ownerRoles (DIRECTOR +
+    // NETWORK_OPS), not the disable-invariant ownerRoles knob — this layer
+    // exists to refuse BEFORE governance, so the refusal is the wire 400 with
+    // governance never reached (no governance.reject audit entry).
+    const { h, asked } = await invitingHost();
+    for (const role of ['DIRECTOR', 'NETWORK_OPS']) {
+      const response = await call(h, 'POST', '/team', {
+        actor: memberActor(TENANT, 'owner-1'),
+        body: { email: 'dono@example.com', role },
+      });
+      expect(response.status, role).toBe(400);
+    }
+    expect(asked).toEqual([]);
+    expect(h.audits).toEqual([]);
+  });
 });
 
 describe('one mount, two languages', () => {
@@ -1097,7 +1091,7 @@ describe('one mount, two languages', () => {
   });
 
   it('carries the locale past the routes, into a store built at boot', async () => {
-    // Setting the role of somebody who is not a member. The actor IS permitted
+    // Granting a role to somebody who is not a member. The actor IS permitted
     // and the route's own checks all pass, so the refusal is thrown INSIDE
     // `createTeamStore` — a store constructed once per process, and therefore
     // the layer a routes-only adoption would leave answering the language the
@@ -1111,13 +1105,13 @@ describe('one mount, two languages', () => {
     const actor = memberActor(TENANT, 'owner-1');
     const body = { role: 'HEAD_LIBRARIAN' };
 
-    const pt = await call(h, 'PATCH', '/team/:userId', {
+    const pt = await call(h, 'POST', '/team/:userId/roles', {
       actor,
       params: { userId: 'nao-e-membro' },
       body,
       locale: 'pt-BR',
     });
-    const en = await call(h, 'PATCH', '/team/:userId', {
+    const en = await call(h, 'POST', '/team/:userId/roles', {
       actor,
       params: { userId: 'nao-e-membro' },
       body,
