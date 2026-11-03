@@ -117,9 +117,8 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 9. **Scope chains are config.** Flat tenants need nothing. An `org:` hierarchy
    passes `scopeParent` (synchronous) and `warmScope` (the async pre-load the
    sync walk reads from) — the origin host's client→org cache is the reference.
-10. **Ownership moves under one lock.** Every `PATCH /team/:userId`, every
-    `DELETE /team/:userId` and every revoke of an owner role decides INSIDE
-    its own transaction, which opens with `lockTenantOwnership`: a read of the
+10. **Ownership moves under one lock.** Every `DELETE /team/:userId` and
+    every revoke of an owner role decides INSIDE its own transaction, which opens with `lockTenantOwnership`: a read of the
     tenant's live owner-role rows, then a no-op UPDATE of each of them in id
     order (`kind` rewritten with its own value). Under READ COMMITTED a second
     such write waits for the first to commit, then reads what it wrote. An
@@ -130,8 +129,8 @@ reusable across repositories, exposing standardized surfaces. A host repo only
       unserialised and the active column owners decide, as before this rule.
       Seed the owner roles per tenant (rule 8) to get the guarantee.
     - Once a tenant has an owner-role row, an owner who holds only the column
-      (no link) counts as nobody: they cannot remove or demote an owner, and
-      they are not the owner who remains. Neither is a member who holds the
+      (no link) counts as nobody: they cannot remove an owner or revoke their
+      owner role, and they are not the owner who remains. Neither is a member who holds the
       link under a column naming another role. Before adopting, backfill a link
       to the owner-role row for every membership whose column names it.
     - Each of those writes updates the owner rows, so their `updated_at` moves
@@ -150,7 +149,7 @@ reusable across repositories, exposing standardized surfaces. A host repo only
       hanging on a single-connection database such as PGlite.
     - A waiting write is bounded by that same timeout (5 s by default in
       Prisma), so a host transaction that holds the lock for longer turns the
-      waiter into a 500. At REPEATABLE READ or SERIALIZABLE every PATCH or
+      waiter into a 500. At REPEATABLE READ or SERIALIZABLE every revoke or
       removal that waits fails with a serialization error (40001) instead;
       these writes expect READ COMMITTED.
     - An invites port that grants an EXISTING account (`POST /team`) must
@@ -166,10 +165,10 @@ reusable across repositories, exposing standardized surfaces. A host repo only
 | `catalog` | yes | — | `composePermissions(...).withRoles(...)` — the registry, the role templates, the governance catalog, the per-tenant seed rows and the label resolver, as ONE object |
 | `directory` | yes | — | `getUsers(ids)`; optional `searchUsers(q)` (without it the roster's `q` is ignored) |
 | `resolveActor` (hono) | yes | — | `{ tenantId, userId, isSuper }`; `null` → 401 |
-| `assignableBaseRoles` | no | non-owner `roleTemplates` names | ENFORCED on `PATCH /team/:userId` before governance |
+| `assignableBaseRoles` | no | non-owner `roleTemplates` names | the system roles an invite may grant: ENFORCED on `POST /team` (its `role` and every system name in `customRoles`) before governance. `POST /team/:userId/roles` is judged by governance alone. It no longer guards a role swap — there is none (FUT-2440) |
 | `adminRoles` | **yes** | — | the coarse roster tier; no catalog field can answer it, so the host states it |
 | `customerRole` | **yes** | — | the membership excluded from the roster and the staff tier — `null` if this host has none, written out |
-| `ownerRoles` | no | `catalog.governance.ownerRoles` | protected by the owner rules (disable, removal, revoke, demotion; see rule 10); set it only to NARROW that set |
+| `ownerRoles` | no | `catalog.governance.ownerRoles` | protected by the owner rules (disable, removal, revoke; see rule 10); set it only to NARROW that set |
 | `gatePermissions` | no | `roles:manage` / `team:read` / `team:manage` | the permission ids gating each surface |
 | `audit` | no | — | the fenced sink (see rule 6) |
 | `invites` | no | — | the optional port (see rule 5) |
@@ -341,7 +340,6 @@ exactly as their permissions already resolve to nothing.
 | POST | `/team` | admin tier + invites port | `{ data: { status: 'added' \| 'invited' } }`, 501 without the port. Any number of roles: `role` (first system role, optional) + `customRoles` (every other role, system or custom); each system role must be in `assignableBaseRoles`; the port grants ALL of them additively |
 | GET | `/team/context` | admin tier + `team:read` | custom roles by member, assignable roles, pending invites, `invitesEnabled`, `invitesResendable` |
 | GET | `/team/:userId` | admin tier + `team:read` | member detail, 404 reveals nothing |
-| PATCH | `/team/:userId` | admin tier + `team:manage` + governance | legacy swap of the member's highest system role for another — every other role held stays; the name must be in `assignableBaseRoles` (default: non-owner template names); demoting an owner is 403 unless the caller is an owner or the platform operator, and 409 when no other ACTIVE owner remains; `{ data: { status: 'updated', role } }` answers the role the row holds after the write. The packaged screens never call it: they grant and revoke per role |
 | DELETE | `/team/:userId` | admin tier (owner rules inside) | `{ data: { status: 'removed' } }` — an owner's removal counts ACTIVE owners only, decided inside the write |
 | PATCH | `/team/:userId/status` | admin tier + `team:manage` | enable/disable; owner never disabled (TOCTOU-safe) |
 | POST | `/team/:userId/roles` | `roles:manage` + governance | grant one more role — system or custom, any number per member (idempotent) |
@@ -437,6 +435,27 @@ enforce, and one assembly is the only arrangement in which they cannot drift.
   admin). `GET /team/:userId` returns all of its data; the screen itself did
   not move. Same for the loading/error/status test ids of the DataViews grids
   — the packaged screens render plain tables.
+
+## The role swap is gone — `PATCH /team/:userId` (FUT-2440)
+
+A member's roles are granted and revoked one at a time: `POST /team/:userId/roles`
+and `DELETE /team/:userId/roles/:role`. There is no "set the member's role" write
+any more. The swap that `PATCH /team/:userId { role }` ran unlinked the member's
+HIGHEST role whatever else they held, so a member holding two roles lost the one
+nobody asked to revoke. What went with it, and what a host does instead:
+
+| removed | instead |
+|---|---|
+| the `PATCH /team/:userId` route (no descriptor, so no adapter mounts it) | `POST /team/:userId/roles` to add a role, `DELETE /team/:userId/roles/:role` to take one |
+| `TeamStore.setMemberRole` | `grantCustomRoleToMember` / `revokeCustomRoleFromMember` |
+| `RoleWireSchemas.setMemberRoleBody` | `grantMemberRoleBody` |
+| the MCP tool `setMemberRole`, `setMemberRoleBodyOf` from `/mcp`, and `RbacMcpVocabulary.assignableRoles` (only that tool read it) | the `grantMemberRole` and `revokeMemberRole` tools |
+| `RbacApiClient.setMemberRole` (`/react`) | `grantMemberRole` / `revokeMemberRole` |
+| `RbacMessages.onlyOwnerDemotesOwner` | nothing: the owner rules on a revoke and a removal answer `onlyOwnerRemovesOwner` and `lastOwner`, unchanged |
+| the `team.role_set` audit action | `team.role_grant` / `team.role_revoke`; a host keeps its label only for historic rows |
+
+`assignableBaseRoles` stays, and now governs one write: the system roles an invite
+(`POST /team`) grants.
 
 ## Migrating from 2.x to 3.0.0 — the catalog left the package
 

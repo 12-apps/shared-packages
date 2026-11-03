@@ -214,15 +214,3 @@ export const rbacMcpParams = {
   /** One seeded template role, keyed by NAME — `/roles/templates/:name`. */
   template: z.object({ tenantSlug: z.string().min(1), name: z.string().min(1) }),
 } as const;
-
-/**
- * The body of `PATCH /team/:userId` — a member's BASE role.
- *
- * A factory over the host's assignable tier list, because the base role is a
- * CLOSED set and which of a host's roles a roster may assign is the host's
- * fact. An open `z.string()` here would advertise that any role name is
- * acceptable while the endpoint refuses everything outside the list.
- */
-export function setMemberRoleBodyOf(assignableRoles: readonly [string, ...string[]]) {
-  return z.object({ role: z.enum(assignableRoles) });
-}

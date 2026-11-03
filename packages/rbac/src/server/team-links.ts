@@ -1,52 +1,15 @@
 import { RbacApiError } from './context';
-import { MEMBERSHIP_SELECT, ROLE_SELECT, type RbacDbClient } from './db';
+import { MEMBERSHIP_SELECT, ROLE_SELECT } from './db';
 import { assertOwnershipMayMove, lockTenantOwnership, readOwnership } from './owner-guard';
 import type { RbacActorTier } from './roster-policy';
 import type { TeamStoreCtx } from './team-store';
 
 /**
- * The roster's writes to the membership ↔ role join: the PATCH swap of the highest system role, and
- * granting or revoking one role. Out of `./team-store` for the size gate, and
- * because they are one family: each writes `membership_roles` and nothing else.
+ * The roster's writes to the membership ↔ role join: granting or revoking ONE
+ * role. Out of `./team-store` for the size gate, and because they are one
+ * family: each writes `membership_roles` and nothing else. Neither unlinks a
+ * role it was not asked about (FUT-2440 took out the swap that did).
  */
-
-/**
- * Move a membership's PRIMARY role link from `oldRoleName` to `newRoleName`
- * in the n:m join, PRESERVING every other role the member holds — only the
- * OUTGOING primary's own link is removed, so changing the primary can never
- * silently drop a separately-granted role.
- */
-export async function swapPrimaryRoleLink(
-  tx: RbacDbClient,
-  membership: { id: string; clientId: string },
-  oldRoleName: string | null,
-  newRoleName: string,
-): Promise<void> {
-  if (oldRoleName && oldRoleName !== newRoleName) {
-    // `archivedAt: null` on both lookups, like every role read that grants:
-    // an archived outgoing primary has no live link worth unlinking, and an
-    // archived incoming name must never gain a fresh join row.
-    const old = await tx.role.findFirst({
-      where: { clientId: membership.clientId, name: oldRoleName, archivedAt: null },
-      select: ROLE_SELECT,
-    });
-    if (old) {
-      await tx.membershipRole.deleteMany({
-        where: { membershipId: membership.id, roleId: old.id },
-      });
-    }
-  }
-  const next = await tx.role.findFirst({
-    where: { clientId: membership.clientId, name: newRoleName, archivedAt: null },
-    select: ROLE_SELECT,
-  });
-  if (next) {
-    await tx.membershipRole.createMany({
-      data: [{ membershipId: membership.id, roleId: next.id }],
-      skipDuplicates: true,
-    });
-  }
-}
 
 export async function grantCustomRoleToMember(
   ctx: TeamStoreCtx,

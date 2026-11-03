@@ -170,7 +170,6 @@ export interface RbacApiClient {
    * not be sent — in which case nothing changed.
    */
   resendInvite(inviteId: string): Promise<RbacResult<{ status: 'resent'; email: string }>>;
-  setMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
   grantMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
   revokeMemberRole(userId: string, role: string): Promise<RbacResult<{ status: string }>>;
   setMemberActive(userId: string, active: boolean): Promise<RbacResult<{ status: string }>>;
@@ -235,8 +234,6 @@ export function createRbacApiClient(
       transport.send(`${base}/team/invites/${seg(inviteId)}`, 'DELETE'),
     resendInvite: (inviteId) =>
       transport.send(`${base}/team/invites/${seg(inviteId)}/resend`, 'POST'),
-    setMemberRole: (userId, role) =>
-      transport.send(`${base}/team/${seg(userId)}`, 'PATCH', { role }),
     grantMemberRole: (userId, role) =>
       transport.send(`${base}/team/${seg(userId)}/roles`, 'POST', { role }),
     revokeMemberRole: (userId, role) =>

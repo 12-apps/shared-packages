@@ -14,7 +14,6 @@ import {
   type MembershipRow,
   type RbacDbClient,
   type RbacDbProvider,
-  type RoleRow,
 } from './db';
 import {
   assertOwnershipMayMove,
@@ -22,11 +21,7 @@ import {
   lockTenantOwnership,
   readOwnership,
 } from './owner-guard';
-import {
-  grantCustomRoleToMember,
-  revokeCustomRoleFromMember,
-  swapPrimaryRoleLink,
-} from './team-links';
+import { grantCustomRoleToMember, revokeCustomRoleFromMember } from './team-links';
 import {
   extraRolesOf,
   getTenantMemberDetail,
@@ -69,11 +64,15 @@ export interface TeamStoreCtx {
  * (`listTenantMemberExtraRoles`, `getMemberRole`) do not take one, because a
  * parameter they never read would be a claim they do something they do not.
  *
- * The two writes that can take ownership WITHOUT a removal, `setMemberRole`
- * and `revokeCustomRoleFromMember`, take the caller after it, optional for the
+ * The one write that can take ownership WITHOUT a removal,
+ * `revokeCustomRoleFromMember`, takes the caller after it, optional for the
  * same reason: a host calling the store with nobody to name keeps the rule
  * that somebody else must remain an owner, and skips the one about who may
  * take it (`./owner-guard`).
+ *
+ * There is no "set the member's role" write. Roles are granted and revoked one
+ * at a time; the swap that `PATCH /team/:userId` used to run unlinked the
+ * member's HIGHEST role whatever else they held, so it went (FUT-2440).
  */
 export interface TeamStore {
   listTeamPage(
@@ -85,14 +84,6 @@ export interface TeamStore {
   listTenantMemberExtraRoles(tenantId: string): Promise<Map<string, string[]>>;
   /** The actor's own base role at the tenant, or null (not a member). */
   getMemberRole(tenantId: string, userId: string): Promise<string | null>;
-  /** Resolves to the role the row holds after the write, read back (FUT-2441). */
-  setMemberRole(
-    tenantId: string,
-    userId: string,
-    role: string,
-    locale?: string,
-    actor?: RbacActorTier,
-  ): Promise<string>;
   grantCustomRoleToMember(
     tenantId: string,
     userId: string,
@@ -125,94 +116,6 @@ async function membershipOf(db: RbacDbClient, tenantId: string, userId: string) 
     where: { userId_clientId: { userId, clientId: tenantId } },
     select: MEMBERSHIP_SELECT,
   });
-}
-
-/**
- * Whether moving the member's highest system role from `from` to `to` takes an owner role away.
- *
- * A move between two owner roles keeps ownership only when `to` has a live row
- * in the tenant to link: the swap unlinks `from` and links nothing otherwise
- * (a platform-only owner role is never seeded per tenant). With no live owner
- * row at all the column alone decides, and it still names an owner.
- */
-function demotesOwner(
-  ctx: TeamStoreCtx,
-  move: { from: string; to: string },
-  ownerRows: readonly RoleRow[],
-): boolean {
-  // A PATCH to the role already held swaps nothing, so it takes nothing away.
-  if (move.from === move.to || !ctx.ownerRoles.has(move.from)) return false;
-  if (!ctx.ownerRoles.has(move.to)) return true;
-  return ownerRows.length > 0 && !ownerRows.some((row) => row.name === move.to);
-}
-
-/**
- * The membership a role swap (PATCH) starts from, read AFTER the ownership lock.
- *
- * Every PATCH locks, not only one whose target owns: a host may promote a
- * member under the same lock (ADOPTING.md, rule 10), and a PATCH that read
- * the member before that promotion committed would demote the new owner with
- * no rule run. After the lock, the rules, what the swap unlinks and the
- * audit's `before` all come from what the lock holder committed.
- */
-async function roleSetTarget(
-  ctx: TeamStoreCtx,
-  tx: RbacDbClient,
-  target: { tenantId: string; userId: string; role: string },
-  actor: RbacActorTier | undefined,
-): Promise<MembershipRow> {
-  const { tenantId, userId, role } = target;
-  const ownerRows = await lockTenantOwnership(tx, tenantId, ctx.ownerRoles);
-  const existing = await membershipOf(tx, tenantId, userId);
-  if (!existing) throw new RbacApiError(404, ctx.messages.notAMember);
-  if (demotesOwner(ctx, { from: existing.role, to: role }, ownerRows)) {
-    const ownership = await readOwnership(tx, tenantId, ctx.ownerRoles, ownerRows);
-    assertOwnershipMayMove(ownership, userId, actor, ctx.ownerRoles, {
-      forbidden: ctx.messages.onlyOwnerDemotesOwner ?? ctx.messages.onlyOwnerRemovesOwner,
-      lastOwner: ctx.messages.lastOwner,
-    });
-  }
-  return existing;
-}
-
-async function setMemberRole(
-  ctx: TeamStoreCtx,
-  target: { tenantId: string; userId: string; role: string },
-  actor: RbacActorTier | undefined,
-): Promise<string> {
-  const { tenantId, userId, role } = target;
-  const db = await ctx.db();
-  // The read, the guards, the write and the join swap share ONE transaction
-  // so a concurrent role change can't slip between them.
-  const { previousRole, stored } = await db.$transaction(async (tx) => {
-    const existing = await roleSetTarget(ctx, tx, target, actor);
-    // Captured BEFORE the write: the outgoing primary is what the join swap
-    // must unlink, whatever the row object does afterwards.
-    const outgoing = existing.role;
-    await tx.membership.update({
-      where: { id: existing.id },
-      data: { role },
-      select: MEMBERSHIP_SELECT,
-    });
-    await swapPrimaryRoleLink(tx, { id: existing.id, clientId: tenantId }, outgoing, role);
-    // Read back rather than echoed: a host that derives the column from the
-    // links stores something other than `role`, and the answer and the audit
-    // must say what the row holds (FUT-2441).
-    const after = await membershipOf(tx, tenantId, userId);
-    return { previousRole: outgoing, stored: after?.role ?? role };
-  });
-  // A write that changed nothing is not a grant worth an audit entry.
-  if (previousRole !== stored) {
-    await ctx.audit?.({
-      clientId: tenantId,
-      action: 'team.role_set',
-      resourceType: 'membership',
-      resourceId: userId,
-      before: { role: previousRole },
-      after: { role: stored },
-    });
-  }
-  return stored;
 }
 
 async function setMembershipActive(
@@ -251,8 +154,9 @@ async function setMembershipActive(
 
 /**
  * The member a removal deletes, judged inside its transaction and after the
- * ownership lock, for every removal, for the reason {@link roleSetTarget}
- * gives. Only an owner removes an owner, or the host's platform operator,
+ * ownership lock, for every removal: a host may promote a member under the
+ * same lock (ADOPTING.md, rule 10), and a removal that read the member before
+ * that promotion committed would delete the new owner with no rule run. Only an owner removes an owner, or the host's platform operator,
  * recognised by the DISCRIMINATOR and never by a role name; and never the
  * last owner who counts. The target takes ownership when its column names an
  * owner role or it holds a live owner link (a transfer's residue).
@@ -356,8 +260,6 @@ export function createTeamStore<P extends string>(config: TeamStoreConfig<P>): T
       if (!row || !row.active) return null;
       return row.role;
     },
-    setMemberRole: (tenantId, userId, role, locale, actor) =>
-      setMemberRole(ctxFor(locale), { tenantId, userId, role }, actor),
     grantCustomRoleToMember: (tenantId, userId, roleName, locale) =>
       grantCustomRoleToMember(ctxFor(locale), tenantId, userId, roleName),
     revokeCustomRoleFromMember: (tenantId, userId, roleName, locale, actor) =>

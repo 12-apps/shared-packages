@@ -1,11 +1,10 @@
 import type { z } from 'zod';
 
-/** The eighteen tools this package's endpoints are, as summary keys. */
+/** The seventeen tools this package's endpoints are, as summary keys. */
 export type RbacMcpOperation =
   | 'listTeamMembers'
   | 'inviteTenantAdmin'
   | 'removeTenantAdmin'
-  | 'setMemberRole'
   | 'grantMemberRole'
   | 'revokeMemberRole'
   | 'setMemberStatus'
@@ -46,12 +45,6 @@ export interface RbacMcpVocabulary {
    */
   catalogPermissions: readonly string[];
   /**
-   * The staff base roles assignable from the roster. The host's own tier list,
-   * minus whatever it treats as non-staff — this package has no opinion about
-   * which of a host's roles are assignable by a roster.
-   */
-  assignableRoles: readonly [string, ...string[]];
-  /**
    * The roster's filter/sort/pagination query, built from the host's own search
    * config. Passed in whole rather than composed here: the config names the
    * sortable columns and the free-text fields, which are facts about the host's
@@ -72,7 +65,7 @@ export interface RbacMcpVocabulary {
    * advertises the permission list alone, which is exactly the bug.
    */
   permissionsExtras?: z.ZodType;
-  /** What each of the eighteen tools tells an agent it is for. */
+  /** What each of the seventeen tools tells an agent it is for. */
   summaries: Record<RbacMcpOperation, string>;
   /** Defaults to `['team']` / `['roles']` per half. */
   tags?: { team?: readonly string[]; roles?: readonly string[] };

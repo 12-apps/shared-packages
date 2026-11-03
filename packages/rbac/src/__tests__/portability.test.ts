@@ -373,11 +373,11 @@ describe('toy second host — the SERVER half, in the blog\'s vocabulary', () =>
     enrolMember(blog.state, blogSite, 'ada', 'SITE_OWNER');
     enrolMember(blog.state, blogSite, 'bo', 'STAFF_ADMIN');
 
-    // Last owner: neither demotable nor disableable nor removable. Under the
-    // old `ownerRoles ?? ['OWNER']` every one of these succeeded, because no
-    // membership in this host is ever spelled `OWNER`.
+    // Last owner: the owner role is neither revocable nor disableable nor
+    // removable. Under the old `ownerRoles ?? ['OWNER']` every one of these
+    // succeeded, because no membership in this host is ever spelled `OWNER`.
     await expect(
-      blog.api.team.setMemberRole(blogSite, 'ada', 'STAFF_ADMIN'),
+      blog.api.team.revokeCustomRoleFromMember(blogSite, 'ada', 'SITE_OWNER'),
     ).rejects.toMatchObject({ status: 409 });
     await expect(
       blog.api.team.setMembershipActive(blogSite, 'ada', false),

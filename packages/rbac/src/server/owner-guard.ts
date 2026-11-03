@@ -12,16 +12,15 @@ import type { RbacActorTier } from './roster-policy';
  * Who owns a tenant, decided INSIDE the write that could change it.
  *
  * A member holds any number of roles, so an owner role is one role among
- * several, and three roster writes can take it away: revoking it, demoting the
- * member from their highest system role, and removing the member. Each of them used to
- * count owners in one statement and write in another. Two co-owners taking it
- * from each other at the same moment both saw a second owner, both wrote, and
- * the tenant ended with none (FUT-2435).
+ * several, and two roster writes can take it away: revoking it and removing
+ * the member. Each of them used to count owners in one statement and write in
+ * another. Two co-owners taking it from each other at the same moment both saw
+ * a second owner, both wrote, and the tenant ended with none (FUT-2435).
  *
  * The rules and the write now share one transaction, and the transaction takes
  * a row lock on the tenant's owner-role rows before it reads anything it
- * decides on: every PATCH and every removal, and the revoke of an owner role.
- * A second such write waits on that lock, and then reads what the first one
+ * decides on: every removal, and the revoke of an owner role. A second such
+ * write waits on that lock, and then reads what the first one
  * committed. So does a host path that moves ownership under the same lock.
  */
 

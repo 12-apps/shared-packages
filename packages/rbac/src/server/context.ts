@@ -74,7 +74,11 @@ export interface RbacRoute {
   handle(request: RbacRequest): Promise<RbacResponse>;
 }
 
-/** An audit event this surface emits through the host's sink. */
+/**
+ * An audit event this surface emits through the host's sink. `team.role_set`
+ * is no longer one: the `PATCH /team/:userId` swap that wrote it went in
+ * FUT-2440, so a host that still labels it does so for its historic rows.
+ */
 export interface RbacAuditEntry {
   clientId: string;
   action:
@@ -82,7 +86,6 @@ export interface RbacAuditEntry {
     | 'role.create'
     | 'role.update'
     | 'role.delete'
-    | 'team.role_set'
     | 'team.role_grant'
     | 'team.role_revoke'
     | 'team.member_remove'
@@ -164,8 +167,6 @@ export interface RbacMessages {
   reservedRoleName: string;
   lastOwner: string;
   onlyOwnerRemovesOwner: string;
-  /** A non-owner demoting an owner through PATCH; absent, `onlyOwnerRemovesOwner` answers. */
-  onlyOwnerDemotesOwner?: string;
   ownerNotDisableable: string;
   templateNotEditable: string;
   invalidEmail: string;
@@ -228,10 +229,10 @@ export interface RbacServerConfig<
   /** The host's user directory (roster identity). */
   directory: RbacUserDirectory;
   /**
-   * The SYSTEM (template) roles the roster may hand out — through an invite,
-   * any number at once, and through the legacy `PATCH /team/:userId` swap.
-   * ENFORCED before governance: a system name outside the set is the wire's
-   * 400. Defaults to the non-owner template names. It is a set of roles that
+   * The SYSTEM (template) roles an invite (`POST /team`) may hand out, any
+   * number at once. ENFORCED before governance: a system name outside the set
+   * is the wire's 400. `POST /team/:userId/roles` is judged by governance
+   * alone. Defaults to the non-owner template names. It is a set of roles that
    * may be granted, never a cap on how many one member holds.
    */
   assignableBaseRoles?: readonly string[];

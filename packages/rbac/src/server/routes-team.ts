@@ -15,7 +15,7 @@ import type { GrantGovernance } from './grant-governance';
 import type { RbacGuards } from './guards';
 import type { MemberDetailPayload } from './payloads';
 import { announceInvite } from './invite-announce';
-import { assertAssignableBaseRole, resolveInviteRoles } from './invite-roles';
+import { resolveInviteRoles } from './invite-roles';
 import type { RolesStore } from './roles-store';
 import type { TeamStore } from './team-store';
 import { parseBody, parseTeamListQuery, requireParam, type RoleWireSchemas } from './wire';
@@ -246,40 +246,6 @@ function memberDetailRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute 
   };
 }
 
-function setMemberRoleRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
-  return {
-    method: 'PATCH',
-    path: '/team/:userId',
-    async handle({ actor, params, body, locale }) {
-      try {
-        const tier = await requireAdminTier(deps, actor, locale);
-        await requirePermission(deps, actor, gatesOf(deps.config).manageTeam);
-        const messages = messagesOf(deps.config, locale);
-        const input = parseBody(deps.wire.setMemberRoleBody, body, messages);
-        const userId = requireParam(params, 'userId', messages);
-        // The BASE role is a closed set, enforced BEFORE governance — the rule
-        // and its argument live in `./invite-roles`, which `POST /team` applies
-        // to the same column. Custom roles ride POST /team/:userId/roles.
-        assertAssignableBaseRole(deps.config, input.role, messages);
-        // The shared governance (escalation / scope-ceiling / SoD /
-        // owner-protected) runs BEFORE the write; the ownership rules run
-        // inside it. The answer is the role the row holds afterwards.
-        await deps.governance.assertCanGrantRole(actor, input.role, userId);
-        const role = await deps.team.setMemberRole(
-          actor.tenantId,
-          userId,
-          input.role,
-          locale,
-          tier,
-        );
-        return ok({ status: 'updated' as const, role });
-      } catch (error) {
-        return foldApiError(error);
-      }
-    },
-  };
-}
-
 function removeMemberRoute<P extends string>(deps: TeamRouteDeps<P>): RbacRoute {
   return {
     method: 'DELETE',
@@ -378,7 +344,6 @@ export function teamRoutes<P extends string>(deps: TeamRouteDeps<P>): RbacRoute[
     contextRoute(deps),
     cancelInviteRoute(deps),
     memberDetailRoute(deps),
-    setMemberRoleRoute(deps),
     removeMemberRoute(deps),
     memberStatusRoute(deps),
     grantMemberRoleRoute(deps),
