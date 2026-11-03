@@ -82,7 +82,7 @@ function useDemoDoor(): CheckoutDoorOption[] {
 /** The cart's two prices — the second after "Adicionar um item". */
 export const CART_CENTS = { before: 2700, after: 3400 };
 
-function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDueLabel: string | undefined): CheckoutPaymentList {
+function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDueLabel: string | undefined, lastMethod: "PIX" | "CARD" | undefined): CheckoutPaymentList {
   const door = useDemoDoor();
   const { held, bumped } = useContext(Controls);
   return useMemo(
@@ -98,8 +98,9 @@ function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDu
       hold: held ? { action: "Loja pausada", reason: "A loja pausou os pedidos por alguns minutos." } : null,
       ...(totalCents === undefined ? {} : { totalCents: bumped ? CART_CENTS.after : totalCents }),
       ...(amountDueLabel ? { amountDueLabel } : {}),
+      ...(lastMethod ? { lastMethod } : {}),
     }),
-    [door, withDoor, held, bumped, totalCents, amountDueLabel],
+    [door, withDoor, held, bumped, totalCents, amountDueLabel, lastMethod],
   );
 }
 
@@ -153,13 +154,15 @@ interface SceneOptions {
   amountDueLabel?: string;
   /** The computer's layout: the whole width, the "Resumo do pedido" column beside the step (L4). */
   desktop?: boolean;
+  /** The buyer's last online method, as the host remembers it (FUT-3611). */
+  lastMethod?: "PIX" | "CARD";
 }
 
 export function scene(spec: StorySpec, host: StoryHost, options: SceneOptions = {}): StoryObj {
   const { withDoor = true, totalCents, controls = false, desktop = false } = options;
   // The list is the host's HOOK, called inside the checkout on every render —
   // so the door options' own state (the troco answer) reaches the bar.
-  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents, options.amountDueLabel);
+  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents, options.amountDueLabel, options.lastMethod);
   const full: StoryHost = {
     ...host,
     usePaymentList,

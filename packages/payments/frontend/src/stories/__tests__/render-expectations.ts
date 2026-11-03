@@ -626,6 +626,18 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["Pagar agora, pelo app"],
     absentTestIds: ["list-door-cash"],
   },
+  // Paid by a card they did not save last time (FUT-4317): the card comes
+  // chosen with its fields open, and nothing saved is offered.
+  "PaymentList/LastCardNotSaved": {
+    testIds: ["payment-list", "card-number", "save-card", "list-door-cash"],
+    text: ["Preencha os dados do cartão."],
+    absentText: ["Escolha como pagar."],
+  },
+  "PaymentList/LastCardNotSavedDesktop": {
+    testIds: ["payment-list", "card-number", "save-card"],
+    text: ["Preencha os dados do cartão."],
+    absentText: ["Escolha como pagar."],
+  },
   // ------------------------------------------- PaymentListStates (FUT-3591/3592)
   // The starting points of the harder runs; the visual gate plays the clicks.
   "PaymentListStates/GooglePay": {

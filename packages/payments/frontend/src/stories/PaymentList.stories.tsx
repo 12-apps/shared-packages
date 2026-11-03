@@ -35,3 +35,9 @@ export const HandOffStore: StoryObj = scene(
 
 /** Online only — no door options: one heading, no "PAGAR NA ENTREGA". */
 export const OnlineOnly: StoryObj = scene({ chain: [ON_PAGE], instruments: SAVED, amountCents: 2700 }, { taxIdOnFile: true, buyer: ON_FILE }, { withDoor: false });
+
+/** Paid by a card they did not save last time: "Cartão de crédito" comes chosen, its fields open, "Salvar cartão" unticked (FUT-4317). */
+export const LastCardNotSaved: StoryObj = scene({ chain: [ON_PAGE], amountCents: 2700 }, { taxIdOnFile: true, buyer: ON_FILE }, { lastMethod: "CARD" });
+
+/** The same buyer on a computer: the whole width, the summary column beside the step (FUT-4317). */
+export const LastCardNotSavedDesktop: StoryObj = scene({ chain: [ON_PAGE], amountCents: 2700 }, { taxIdOnFile: true, buyer: ON_FILE }, { lastMethod: "CARD", desktop: true });
