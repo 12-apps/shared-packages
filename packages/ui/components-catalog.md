@@ -322,6 +322,13 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/StackedModal`
 **Docs**: `src/components/feedback/StackedModal/StackedModal.md`
 
+### UsableModal
+**Purpose**: One modal that is a `StackedModal` on a computer and a bottom `Sheet` on a phone
+**Use Cases**: A form, wizard or task opened over a screen on every device — instead of switching between `StackedModal` and a sheet by hand
+**Features**: Bottom `Sheet` below the theme's `sm`, `StackedModal` from `sm` up (`layout` fixes one); each surface its own lazily imported chunk, so a phone never loads `StackedModal` and a computer never loads `Sheet`, and a closed modal loads nothing; one API (title, scrolling body, pinned `footer` on both surfaces, close/back labels); joins a host's `ModalStackProvider` or brings a stack of one; `<id>-footer` on both surfaces
+**Location**: `src/components/feedback/UsableModal`
+**Docs**: `src/components/feedback/UsableModal/UsableModal.md`
+
 ### Toast
 **Purpose**: Display brief notifications
 **Use Cases**: Action confirmations, alerts, temporary messages

@@ -17,7 +17,8 @@ const noop = (): void => {
   /** do nothing */
 };
 
-const ModalStackContext = createContext<ModalStackContextValue>({
+/** What a `StackedModal` reads with no provider above it: an empty stack nothing can push onto. */
+const NO_STACK: ModalStackContextValue = {
   stack: [],
   pushModal: noop,
   popModal: noop,
@@ -25,7 +26,16 @@ const ModalStackContext = createContext<ModalStackContextValue>({
   currentDepth: 0,
   isModalInStack: () => false,
   getModalRole: () => null,
-});
+};
+
+const ModalStackContext = createContext<ModalStackContextValue>(NO_STACK);
+
+/**
+ * Whether a `ModalStackProvider` is above this point. A component that opens a
+ * `StackedModal` on its own (`UsableModal`) brings a provider only when the
+ * host has none, so its panel still joins a stack the host already keeps.
+ */
+export const useInModalStack = (): boolean => useContext(ModalStackContext) !== NO_STACK;
 
 export const useModalStack = (): ModalStackContextValue => {
   const context = useContext(ModalStackContext);

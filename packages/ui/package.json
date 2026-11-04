@@ -344,6 +344,10 @@
       "types": "./dist/types/components/feedback/Toast/index.d.ts",
       "default": "./dist/feedback/Toast.js"
     },
+    "./feedback/UsableModal": {
+      "types": "./dist/types/components/feedback/UsableModal/index.d.ts",
+      "default": "./dist/feedback/UsableModal.js"
+    },
     "./feedback/TutorialOverlay": {
       "types": "./dist/types/components/feedback/TutorialOverlay/index.d.ts",
       "default": "./dist/feedback/TutorialOverlay.js"
