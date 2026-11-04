@@ -81,3 +81,6 @@ harness/backend/prisma/assembled.json
 storybook-static/
 storybook-native-static/
 coverage-native/
+
+# synapsys plugin state (written by the plugin on session start)
+.workflow/synapsys/.version.json
