@@ -24,6 +24,8 @@ export interface SheetBodyProps extends Pick<
   | 'onBlur'
 > {
   testId: string;
+  /** The title's element id, which a dialog sheet's `aria-labelledby` names. */
+  titleId?: string;
   isDragging: boolean;
   isVerticalSheet: boolean;
   isDraggableVariant: boolean;
@@ -79,6 +81,7 @@ export const SheetBody: React.FC<SheetBodyProps> = (props) => {
     onFocus,
     onBlur,
     testId,
+    titleId,
     isDragging,
     isVerticalSheet,
     isDraggableVariant,
@@ -115,6 +118,7 @@ export const SheetBody: React.FC<SheetBodyProps> = (props) => {
           showHandle={showHandle && isVerticalSheet}
           isDraggable={isDraggableVariant && isVerticalSheet}
           onDragStart={onDragStart}
+          titleId={titleId}
           dataTestId={`${testId}-header`}
         >
           {header}

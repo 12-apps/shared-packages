@@ -16,8 +16,8 @@ export interface UsableModalProps {
   children?: ReactNode;
   /** The pinned action bar at the bottom of either surface — the screen's acts. */
   footer?: ReactNode;
-  /** The ✕'s accessible name — it carries a glyph only. REQUIRED. */
-  closeLabel: string;
+  /** The ✕'s accessible name — it carries a glyph only. Defaults to `common.close` (`EN_US_UI_LABELS`). */
+  closeLabel?: string;
   /** The stacked modal's back arrow, shown when it opens over another panel. REQUIRED. */
   backLabel: string;
   /**

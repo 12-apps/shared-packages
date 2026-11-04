@@ -1,8 +1,10 @@
 import Box from '@mui/material/Box/index.js';
 import type { ReactNode } from 'react';
 
+import { safeAreaBottom } from '../../../utils/viewport';
 import { StackedModal, StackedModalContent } from '../StackedModal/StackedModal';
 import { ModalStackProvider, useInModalStack } from '../StackedModal/modal-stack';
+import { hasFooter } from './has-footer';
 import type { UsableModalSurfaceProps } from './UsableModal.types';
 
 /**
@@ -46,7 +48,7 @@ function StackedPanel({
     >
       <StackedModalContent sx={{ p: 0, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
         <Box sx={{ flex: 1, p: 3 }}>{children}</Box>
-        {footer !== undefined && <PinnedFooter dataTestId={dataTestId}>{footer}</PinnedFooter>}
+        {hasFooter(footer) && <PinnedFooter dataTestId={dataTestId}>{footer}</PinnedFooter>}
       </StackedModalContent>
     </StackedModal>
   );
@@ -63,6 +65,8 @@ function PinnedFooter({ dataTestId, children }: { dataTestId?: string; children:
         py: 2,
         bgcolor: 'background.paper',
         borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+        // Full screen under `sm` (`layout="modal"` on a phone): clear of the iOS home indicator.
+        ...safeAreaBottom(16),
       }}
       data-testid={dataTestId ? `${dataTestId}-footer` : undefined}
     >
