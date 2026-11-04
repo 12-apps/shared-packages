@@ -4,9 +4,9 @@
  * memory refuses a command that runs a whole suite and lets through every
  * selective form and every command that only mentions one.
  *
- * The trigger is byte-identical to future-pay's, where the full table (60+ rows,
- * plus synapsys's own matcher) lives in scripts/__tests__/whole-suite-memory.test.mjs
- * and the trigger is generated from scripts/lib/whole-suite-trigger.mjs. This
+ * The trigger is byte-identical to the one the origin host's repository generates
+ * (its scripts/lib/whole-suite-trigger.mjs) and tests in full there, through
+ * synapsys's own matcher too. This
  * pins the rows that matter in THIS repository, through the regex as synapsys
  * reads it: each comma-separated `Bash:<regex>` spec, case-insensitive, against
  * JSON.stringify(tool_input).
