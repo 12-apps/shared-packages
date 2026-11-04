@@ -171,7 +171,7 @@ describe("UsableModal — a host's stack", () => {
     render(<UsableModal {...props()} />);
 
     const dialog = await screen.findByRole("dialog", { name: "New order" });
-    expect(getComputedStyle(dialog).maxHeight).toBe("calc(100% - 3rem)");
+    expect(getComputedStyle(dialog).maxHeight).toMatch(/^calc\(100% - 3rem\)$/u);
   });
 
   it("opens a sheet with no stack at MUI's modal level, so its body's menus open above it", async () => {

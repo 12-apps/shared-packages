@@ -1,7 +1,9 @@
 import Box from '@mui/material/Box/index.js';
+import { useTheme, type Theme } from '@mui/material/styles/index.js';
 
 import { Sheet } from '../../data-display/Sheet/Sheet';
 import { MODAL_STACK_BASE_Z_INDEX, MODAL_STACK_Z_INDEX_STEP } from '../../../tokens/layers';
+import { rem } from '../../../tokens/relative';
 import { safeAreaBottom } from '../../../utils/viewport';
 import { useModalStack } from '../StackedModal/modal-stack';
 import { hasFooter } from './has-footer';
@@ -13,12 +15,12 @@ import type { UsableModalSurfaceProps } from './UsableModal.types';
  * Sheet's own `xl` ceiling is 600px — a phone of 844 lost a quarter of the
  * screen to it, and a modal's body (a form, a cardápio) is what needs it.
  */
-const SHEET_CEILING = { maxHeight: 'calc(100% - 3rem)' } as const;
+const sheetCeiling = (theme: Theme) => ({ maxHeight: `calc(100% - ${rem(theme, 48)})` });
 
 /**
  * The phone's surface: a bottom `Sheet`, loaded only when this layout is the one
  * drawn (`./UsableModal`). Its height is a ceiling, not a height: a short body
- * gives a short sheet, and a long one grows to `SHEET_CEILING` and scrolls above
+ * gives a short sheet, and a long one grows to `sheetCeiling` and scrolls above
  * the pinned footer.
  *
  * It is a named modal dialog (`asDialog`), like the stacked surface. And it
@@ -39,6 +41,7 @@ export function UsableModalSheet({
   dataTestId,
 }: UsableModalSurfaceProps): React.JSX.Element {
   const { currentDepth } = useModalStack();
+  const theme = useTheme();
   return (
     <Sheet
       open={open}
@@ -47,7 +50,7 @@ export function UsableModalSheet({
       }}
       position="bottom"
       size="xl"
-      style={SHEET_CEILING}
+      style={sheetCeiling(theme)}
       title={title}
       closeLabel={closeLabel}
       asDialog
