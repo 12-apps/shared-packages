@@ -24,10 +24,20 @@ if (args.help) {
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
+// core.quotePath=false: a non-ASCII path comes back as itself, not as a quoted octal escape.
+const git = (...a) => execFileSync("git", ["-c", "core.quotePath=false", ...a], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
 const lines = (text) => text.split("\n").filter(Boolean);
 
-const base = args.uncommitted ? "HEAD" : git("merge-base", "origin/main", "HEAD").trim();
+function mergeBase() {
+  try {
+    return git("merge-base", "origin/main", "HEAD").trim();
+  } catch {
+    console.error("test:changed: no merge base with origin/main — run `git fetch origin main` and retry (or use --uncommitted).");
+    process.exit(2);
+  }
+}
+
+const base = args.uncommitted ? "HEAD" : mergeBase();
 const files = [
   ...new Set([
     ...lines(git("diff", "--name-only", "--diff-filter=d", base)),
