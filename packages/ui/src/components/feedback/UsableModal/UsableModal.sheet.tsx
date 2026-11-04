@@ -13,9 +13,12 @@ import type { UsableModalSurfaceProps } from './UsableModal.types';
  * gives a short sheet, and a long one scrolls above the pinned footer.
  *
  * It is a named modal dialog (`asDialog`), like the stacked surface. And it
- * opens ABOVE any `StackedModal` already open: a drawer's default level (1200)
- * is under the stack's (1300 and up), and a sheet opened from a panel would
- * otherwise slide in behind it, invisible, holding the focus.
+ * takes the level a panel pushed onto the stack would take (`BASE + depth *
+ * STEP`): above any `StackedModal` already open — a drawer's default (1200) is
+ * under the stack's 1300 and up, and a sheet opened from a panel would slide in
+ * behind it, invisible, holding the focus — and never above the menus its own
+ * body opens. With no stack that is 1300, MUI's `zIndex.modal`, the level a
+ * Select's or a Popover's menu opens at; portalled later, the menu is on top.
  */
 export function UsableModalSheet({
   open,
@@ -38,7 +41,7 @@ export function UsableModalSheet({
       title={title}
       closeLabel={closeLabel}
       asDialog
-      zIndex={MODAL_STACK_BASE_Z_INDEX + (currentDepth + 1) * MODAL_STACK_Z_INDEX_STEP}
+      zIndex={MODAL_STACK_BASE_Z_INDEX + currentDepth * MODAL_STACK_Z_INDEX_STEP}
       // The sheet marks its own footer `${dataTestId}-footer`, as the stacked surface does.
       footer={hasFooter(footer) ? <Box sx={safeAreaBottom(0)}>{footer}</Box> : undefined}
       dataTestId={dataTestId}

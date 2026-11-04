@@ -4,11 +4,12 @@
  * surface's module loads is `UsableModal.lazy.test.tsx`, in a registry of its own.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StackedModal, StackedModalProvider } from "../../StackedModal";
 import { MODAL_STACK_BASE_Z_INDEX } from "../../../../tokens/layers";
-import { UsableModal } from "../UsableModal";
+import { SURFACE_EXIT_MS, UsableModal } from "../UsableModal";
 import type { UsableModalProps } from "../UsableModal.types";
 
 /** `useMediaQuery(down('sm'))` asks a `max-width` query: true on a phone. */
@@ -163,5 +164,53 @@ describe("UsableModal — a host's stack", () => {
     const dialog = await screen.findByRole("dialog", { name: "New order" });
     const drawer = dialog.closest(".MuiDrawer-root") as HTMLElement;
     expect(Number(getComputedStyle(drawer).zIndex)).toBeGreaterThan(MODAL_STACK_BASE_Z_INDEX);
+  });
+
+  it("opens a sheet with no stack at MUI's modal level, so its body's menus open above it", async () => {
+    stubViewport(true);
+    render(<UsableModal {...props()} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    const drawer = dialog.closest(".MuiDrawer-root") as HTMLElement;
+    expect(Number(getComputedStyle(drawer).zIndex)).toBe(MODAL_STACK_BASE_Z_INDEX);
+  });
+});
+
+/** A body that remembers taps: whether a reopening starts it fresh. */
+function Counter(): React.JSX.Element {
+  const [count, setCount] = useState(0);
+  return (
+    <button type="button" onClick={() => setCount((n) => n + 1)}>
+      count {count}
+    </button>
+  );
+}
+
+describe.each([
+  ["phone", true],
+  ["computer", false],
+])("UsableModal on a %s — a closed surface lets go", (_name, phone) => {
+  it("unmounts its body once the way out ran, and reopens it fresh", async () => {
+    stubViewport(phone);
+    const view = render(<UsableModal {...props({ children: <Counter /> })} />);
+    fireEvent.click(await screen.findByRole("button", { name: "count 0" }));
+    expect(screen.getByRole("button", { name: "count 1" })).toBeInTheDocument();
+
+    view.rerender(<UsableModal {...props({ open: false, children: <Counter /> })} />);
+    await waitFor(() => expect(screen.queryByText(/count/)).toBeNull(), { timeout: SURFACE_EXIT_MS + 1000 });
+
+    view.rerender(<UsableModal {...props({ children: <Counter /> })} />);
+    expect(await screen.findByRole("button", { name: "count 0" })).toBeInTheDocument();
+  });
+
+  it("leaves nothing on the page once closed: no edge strip to swallow taps", async () => {
+    stubViewport(phone);
+    const view = render(<UsableModal {...props()} />);
+    await screen.findByRole("dialog", { name: "New order" });
+
+    view.rerender(<UsableModal {...props({ open: false })} />);
+    await waitFor(() => expect(document.querySelector(".MuiSwipeArea-root, .MuiDrawer-root, [role='dialog']")).toBeNull(), {
+      timeout: SURFACE_EXIT_MS + 1000,
+    });
   });
 });

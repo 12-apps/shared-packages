@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { recoverChunk } from "../recover-chunk";
+import { RELOAD_SPENT_MS, recoverChunk } from "../recover-chunk";
 
 const Surface = (): null => null;
 
@@ -15,11 +15,16 @@ function reloadSpy(): ReturnType<typeof vi.fn> {
   return reload;
 }
 
+/** The clock every case reads: the reload guard is a timestamp. */
+const NOW = new Date("2026-11-04T12:00:00Z").getTime();
+
 beforeEach(() => {
   window.sessionStorage.clear();
+  vi.spyOn(Date, "now").mockReturnValue(NOW);
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -49,12 +54,12 @@ describe("recoverChunk", () => {
 
     void recoverChunk(load)();
     await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
-    expect(window.sessionStorage.getItem("12-apps-ui:usable-modal-chunk-reload")).toBe("1");
+    expect(window.sessionStorage.getItem("12-apps-ui:usable-modal-chunk-reload")).toBe(String(NOW));
   });
 
-  it("renders nothing, with no second reload, when it already reloaded in this tab", async () => {
+  it("renders nothing, with no second reload, when it reloaded in this tab moments ago", async () => {
     const reload = reloadSpy();
-    window.sessionStorage.setItem("12-apps-ui:usable-modal-chunk-reload", "1");
+    window.sessionStorage.setItem("12-apps-ui:usable-modal-chunk-reload", String(NOW - 1000));
     const load = vi.fn(async () => {
       throw new Error("Failed to fetch dynamically imported module");
     });
@@ -63,5 +68,16 @@ describe("recoverChunk", () => {
 
     expect(reload).not.toHaveBeenCalled();
     expect((module.default as () => null)()).toBeNull();
+  });
+
+  it("reloads again for a later deploy: a reload long past is not spent", async () => {
+    const reload = reloadSpy();
+    window.sessionStorage.setItem("12-apps-ui:usable-modal-chunk-reload", String(NOW - RELOAD_SPENT_MS - 1));
+    const load = vi.fn(async () => {
+      throw new Error("Failed to fetch dynamically imported module");
+    });
+
+    void recoverChunk(load)();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
   });
 });

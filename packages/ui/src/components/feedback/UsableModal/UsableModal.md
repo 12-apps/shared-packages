@@ -42,13 +42,17 @@ open loads the one surface the viewport asks for. A phone never downloads
 `StackedModal`, a computer never downloads `Sheet`. While the chunk loads the
 screen shows nothing — no spinner before the content.
 
-After the first open the surface stays mounted and receives `open`, so it runs
-its own close: the slide-out, and the stacked modal leaving its stack.
+Closing hands the surface `open={false}`, so it runs its own way out (the
+slide-out, the stacked modal leaving its stack), and `SURFACE_EXIT_MS` (400 ms)
+later it unmounts. Every opening starts a fresh body on both surfaces, and a
+closed sheet leaves nothing on the page, not even the drawer's swipe strip
+along the bottom edge.
 
 **A chunk a deploy replaced** (a tab opened before it asks for a file that is
 gone) is retried once, then the page reloads once onto the current build; if
-that already happened in this tab the modal renders nothing rather than
-throwing to the host's error boundary (`recover-chunk.ts`).
+that already happened in this tab in the last five minutes the modal renders
+nothing rather than throwing to the host's error boundary (`recover-chunk.ts`).
+A later deploy earns its own reload.
 
 ## Props
 
@@ -71,8 +75,10 @@ On a computer the panel joins a `ModalStackProvider` the host already keeps
 it closes. A host with no provider gets a stack of one, so the component works
 on its own.
 
-On a phone the sheet opens **above** any open `StackedModal` (a drawer's own
-level, 1200, is under the stack's 1300 and up), and it is a named modal dialog
+On a phone the sheet takes the level a panel pushed onto the stack would take:
+**above** any open `StackedModal` (a drawer's own level, 1200, is under the
+stack's 1300 and up), and with no stack 1300, MUI's modal level, so the menus a
+Select or a Popover in its body opens still land on top. It is a named modal dialog
 (`role="dialog"`, `aria-modal`, `aria-labelledby` its title), like the stacked
 surface.
 

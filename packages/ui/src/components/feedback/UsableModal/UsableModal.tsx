@@ -1,6 +1,6 @@
 import { useTheme } from '@mui/material/styles/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
-import { lazy, Suspense, useState, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
 
 import { recoverChunk } from './recover-chunk';
 import type { UsableModalLayout, UsableModalProps, UsableModalSurfaceProps } from './UsableModal.types';
@@ -35,10 +35,23 @@ function useViewportSurface(layout: UsableModalLayout): Surface {
 }
 
 /**
+ * How long a closed surface stays mounted: longer than its own way out — the
+ * drawer's slide-down (225 ms) and the stacked modal's leaving its stack
+ * (300 ms) — so neither is cut off.
+ */
+export const SURFACE_EXIT_MS = 400;
+
+/**
  * The surface is chosen when the modal OPENS and kept until it closes: a phone
  * turned to landscape, or a window narrowed past `sm`, mid-task, does not swap
  * the surface and throw away what the person typed. The next opening asks the
  * viewport again.
+ *
+ * Once closed, and its way out run, the surface is let go of: every opening
+ * starts with a fresh body on both surfaces (the sheet would otherwise keep its
+ * content mounted, and the last half-written form, while the stacked modal
+ * drops its own), and a closed sheet leaves nothing on the page — not even the
+ * drawer's edge strip that swallows taps and swipes the sheet open.
  */
 function useOpenedSurface(open: boolean, layout: UsableModalLayout): Surface | null {
   const viewport = useViewportSurface(layout);
@@ -48,6 +61,11 @@ function useOpenedSurface(open: boolean, layout: UsableModalLayout): Surface | n
     setWasOpen(open);
     if (open) setSurface(viewport);
   }
+  useEffect(() => {
+    if (open || surface === null) return;
+    const timer = window.setTimeout(() => setSurface(null), SURFACE_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, surface]);
   return surface;
 }
 
@@ -56,8 +74,9 @@ function useOpenedSurface(open: boolean, layout: UsableModalLayout): Surface | n
  * phone, behind one API: title, body, a pinned footer, and the ways out.
  *
  * Nothing is fetched until the first open: until then it renders nothing.
- * After it, the surface stays mounted and is handed `open`, so it runs its own
- * close — the slide-out, and the stacked modal leaving its stack. While the
+ * Closing hands the surface `open={false}`, so it runs its own way out — the
+ * slide-out, and the stacked modal leaving its stack — and then it unmounts
+ * (`SURFACE_EXIT_MS`). While the
  * chunk loads the screen shows no placeholder: a modal that blinks a spinner
  * before its content is worse than one that appears a frame later.
  */
