@@ -13,7 +13,7 @@
     "test:all": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "quality": "pnpm quality:test-changed && pnpm quality:complexity && pnpm quality:flakiness && pnpm quality:portability && pnpm quality:ui-stories-types && pnpm quality:viewport-key && pnpm quality:release",
-    "quality:test-changed": "node scripts/test-changed-selftest.mjs",
+    "quality:test-changed": "node scripts/test-changed-selftest.mjs && node scripts/no-whole-suite-runs-selftest.mjs",
     "quality:complexity": "eslint --config eslint.complexity.config.mjs .",
     "quality:flakiness": "eslint --config eslint.flakiness.config.mjs .",
     "quality:side-effects": "node scripts/side-effects-selftest.mjs && node scripts/side-effects-gate.mjs",
