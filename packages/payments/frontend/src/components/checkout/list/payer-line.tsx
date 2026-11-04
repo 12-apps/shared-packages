@@ -6,27 +6,28 @@ import { useCheckoutComponents } from "../ui";
 import type { PaymentListCopy } from "./types";
 
 /**
- * How far the 40px "Alterar" target reaches past its own text line, above and
- * below, in theme spacing (FUT-3711): the row keeps that much room around it,
- * so no neighbour's box — the payer text above a wrapped "Alterar", the summary
- * toggle above the row — overlaps the target (FUT-4352).
+ * The row's room above and below its text line, in theme spacing. The 40px
+ * "Alterar" target (FUT-3711) is drawn by a pseudo-element centred on that
+ * line, so it takes no layout height; it reaches ~10px past a ~21px line, and
+ * this room — with the bar's own gap — keeps that reach clear of the summary
+ * toggle's box above (which reaches 6px into the gap) and of whatever sits
+ * below (FUT-4352).
  */
-const TARGET_REACH = 1;
+const ROOM_ABOVE = 1;
+const ROOM_BELOW = 0.25;
 
 /**
- * The payer sentence with its last two words kept on one line ("CPF ✓"), so the
- * mark never wraps alone. The words themselves are the copy's, unchanged.
+ * The payer sentence with its document tail — "· CPF ✓" — and "Alterar" kept on
+ * one line as one unit: the dot never dangles at a line's end, the mark never
+ * wraps alone, and "Alterar" always follows the last words rather than
+ * starting a line of its own. The characters are the copy's, unchanged.
  */
-function KeepTail({ text }: { text: string }): JSX.Element {
+function sentenceParts(text: string): { head: string; tail: string } {
   const words = text.split(" ");
-  if (words.length < 3) return <>{text}</>;
-  const tail = words.slice(-2).join(" ");
-  return (
-    <>
-      {`${words.slice(0, -2).join(" ")} `}
-      <Box component="span" sx={{ whiteSpace: "nowrap" }}>{tail}</Box>
-    </>
-  );
+  // The last two words ("CPF ✓"), and the separator before them when it is a lone mark ("·").
+  const cut = words.length > 2 && !/[\p{L}\p{N}]/u.test(words[words.length - 3] ?? "") ? 3 : 2;
+  if (words.length <= cut) return { head: "", tail: text };
+  return { head: `${words.slice(0, -cut).join(" ")} `, tail: words.slice(-cut).join(" ") };
 }
 
 /**
@@ -43,31 +44,52 @@ export function PayerLine({ copy, name, document = null, onChange }: {
   onChange: () => void;
 }): JSX.Element {
   const { Button, Text } = useCheckoutComponents();
+  const { head, tail } = sentenceParts(copy.payer(name, document));
   return (
-    // Two flex items on a wrapping row, aligned on their text's baseline: the
-    // sentence (which may wrap, and shrinks) and "Alterar" (which never shrinks,
-    // so it wraps whole, flush left under the sentence). The column gap is the
-    // ~4px between them; the row's padding and its line gap hold the target's reach.
-    <Box
-      data-testid="list-payer"
-      sx={{ display: "flex", alignItems: "baseline", justifyContent: "flex-start", flexWrap: "wrap", columnGap: 0.5, rowGap: TARGET_REACH, py: TARGET_REACH }}
-    >
-      <Text variant="body" size="sm" color="secondary" as="span" style={{ minWidth: 0 }}>
-        <KeepTail text={copy.payer(name, document)} />
+    // One run of text: the name wraps as text does, and "· CPF ✓ Alterar" moves
+    // to the next line together when it does not fit after it.
+    <Box data-testid="list-payer" sx={{ pt: ROOM_ABOVE, pb: ROOM_BELOW }}>
+      {/* A block of its own, so the line is as tall as the sentence's own line, not the bar's body text. */}
+      <Text variant="body" size="sm" color="secondary" as="span" style={{ display: "block" }}>
+        {head}
+        <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+          {tail}
+          <Box
+            component="span"
+            sx={{
+              display: "inline-flex",
+              ml: 0.25,
+              verticalAlign: "baseline",
+              // A link in the line, as tall as the line: the 40px target is the
+              // pseudo-element, centred on it, so it takes no layout height (FUT-3711).
+              "& button": {
+                textDecoration: "underline",
+                minHeight: 0,
+                minWidth: 0,
+                height: "auto",
+                p: 0,
+                lineHeight: "inherit",
+                verticalAlign: "baseline",
+                position: "relative",
+              },
+              "& button::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: "50%",
+                height: (t) => t.spacing(5),
+                transform: "translateY(-50%)",
+              },
+              "& button:focus-visible": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
+            }}
+          >
+            <Button variant="text" color="primary" size="sm" onClick={onChange} dataTestId="list-payer-change">
+              {copy.payerChange}
+            </Button>
+          </Box>
+        </Box>
       </Text>
-      <Box
-        sx={{
-          flexShrink: 0,
-          // The 40px target reaches into the room above and below rather than making the
-          // line 40px tall: a row of text in the bar, not a row of button (FUT-3711).
-          "& button": { textDecoration: "underline", minHeight: (t) => t.spacing(5), height: (t) => t.spacing(5), minWidth: 0, px: 0, py: 0, my: -TARGET_REACH },
-          "& button:focus-visible": { outline: (t) => `${t.spacing(0.25)} solid ${t.palette.primary.main}`, outlineOffset: (t) => t.spacing(0.25) },
-        }}
-      >
-        <Button variant="text" color="primary" size="sm" onClick={onChange} dataTestId="list-payer-change">
-          {copy.payerChange}
-        </Button>
-      </Box>
     </Box>
   );
 }
