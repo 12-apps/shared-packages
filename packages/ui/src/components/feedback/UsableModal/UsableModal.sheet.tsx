@@ -8,9 +8,18 @@ import { hasFooter } from './has-footer';
 import type { UsableModalSurfaceProps } from './UsableModal.types';
 
 /**
+ * How tall the sheet may grow: the whole screen but a strip of the dimmed page
+ * above it, so it still reads as a sheet over the screen it came from. The
+ * Sheet's own `xl` ceiling is 600px — a phone of 844 lost a quarter of the
+ * screen to it, and a modal's body (a form, a cardápio) is what needs it.
+ */
+const SHEET_CEILING = { maxHeight: 'calc(100% - 3rem)' } as const;
+
+/**
  * The phone's surface: a bottom `Sheet`, loaded only when this layout is the one
  * drawn (`./UsableModal`). Its height is a ceiling, not a height: a short body
- * gives a short sheet, and a long one scrolls above the pinned footer.
+ * gives a short sheet, and a long one grows to `SHEET_CEILING` and scrolls above
+ * the pinned footer.
  *
  * It is a named modal dialog (`asDialog`), like the stacked surface. And it
  * takes the level a panel pushed onto the stack would take (`BASE + depth *
@@ -38,6 +47,7 @@ export function UsableModalSheet({
       }}
       position="bottom"
       size="xl"
+      style={SHEET_CEILING}
       title={title}
       closeLabel={closeLabel}
       asDialog

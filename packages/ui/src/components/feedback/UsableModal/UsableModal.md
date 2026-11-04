@@ -25,7 +25,7 @@ import { UsableModal } from '@12-apps/ui/feedback/UsableModal';
 
 | viewport | surface | from |
 |---|---|---|
-| below the theme's `sm` | bottom `Sheet` (`size="xl"`: a height ceiling, not a height) | `UsableModal.sheet.tsx` |
+| below the theme's `sm` | bottom `Sheet`, as tall as its body up to the screen less a 3rem strip (a ceiling, not a height) | `UsableModal.sheet.tsx` |
 | `sm` and up | `StackedModal` (`size`, `panelWidth` pass through) | `UsableModal.modal.tsx` |
 
 `layout="modal"` or `layout="sheet"` fixes one surface for a host that already

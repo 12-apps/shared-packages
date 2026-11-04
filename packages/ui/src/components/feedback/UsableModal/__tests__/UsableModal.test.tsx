@@ -166,6 +166,14 @@ describe("UsableModal — a host's stack", () => {
     expect(Number(getComputedStyle(drawer).zIndex)).toBeGreaterThan(MODAL_STACK_BASE_Z_INDEX);
   });
 
+  it("lets the phone's sheet grow to the screen less a strip, not the Sheet's 600px preset", async () => {
+    stubViewport(true);
+    render(<UsableModal {...props()} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    expect(getComputedStyle(dialog).maxHeight).toBe("calc(100% - 3rem)");
+  });
+
   it("opens a sheet with no stack at MUI's modal level, so its body's menus open above it", async () => {
     stubViewport(true);
     render(<UsableModal {...props()} />);
