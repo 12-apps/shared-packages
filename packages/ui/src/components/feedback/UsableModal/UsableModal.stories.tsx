@@ -39,7 +39,7 @@ function Demo({ layout }: { layout: UsableModalLayout }): React.JSX.Element {
         dataTestId="usable-modal"
         footer={
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-            <Button variant="outlined" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
             <Button>Escolher itens</Button>
