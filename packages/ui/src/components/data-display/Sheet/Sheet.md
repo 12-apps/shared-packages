@@ -43,6 +43,11 @@ A vertical sheet's **width** is one rule rather than one per preset: `min(100%, 
 - **elevation** (number): Shadow depth level (0-24)
 - **animated** (boolean, default true): `false` opens and closes the panel at once, with no slide, and shows and hides its veil with no fade (`SheetOverlay` takes the same prop)
 
+### Stacking and announcing
+
+- **zIndex** (number): The drawer's stacking level, its veil one below. A sheet opened over a `StackedModal` stack (1300 and up) passes one above it; the drawer's default (1200) would slide in under the panels.
+- **asDialog** (boolean): Announce the panel as a modal dialog named by its `title` — `role="dialog"`, `aria-modal` and `aria-labelledby`. Off by default: a sheet used as a side panel or a menu is not a dialog.
+
 ### Interactive Behavior
 
 - **swipeable** (boolean): Enable swipe gestures for touch devices (default: true)

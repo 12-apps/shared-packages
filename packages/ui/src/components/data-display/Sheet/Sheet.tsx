@@ -2,7 +2,7 @@ import Drawer from '@mui/material/Drawer/index.js';
 import SwipeableDrawer from '@mui/material/SwipeableDrawer/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type { BackdropProps } from '@mui/material/Backdrop/index.js';
-import React from 'react';
+import React, { useId } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
@@ -102,9 +102,31 @@ const orientationOf = ({ position, variant }: ResolvedSheetProps) => {
   };
 };
 
+/** The paper's dialog attributes: named only when it is a dialog AND has a title to be named by. */
+const dialogAriaOf = ({ asDialog, title }: ResolvedSheetProps, titleId: string) =>
+  asDialog ? { role: 'dialog', 'aria-modal': true, ...(title ? { 'aria-labelledby': titleId } : {}) } : {};
+
+/** The drawer at a caller's stacking level, or MUI's own. */
+const stackedAt = (zIndex: number | undefined) => (zIndex === undefined ? {} : { sx: { zIndex } });
+
+/**
+ * The drawer's modal: kept mounted, its own Escape off (the hook's listener
+ * honours `closeOnEscape`), and an invisible backdrop that catches the tap.
+ */
+const modalPropsOf = (testId: string | undefined) => ({
+  keepMounted: true,
+  disableEscapeKeyDown: true,
+  BackdropComponent: ClickCatcher,
+  BackdropProps: { 'data-testid': testId ? `${testId}-click-catcher` : undefined } as Partial<BackdropProps>,
+});
+
+/** The veil one below the drawer it dims. */
+const veilStyleOf = (zIndex: number | undefined) => (zIndex === undefined ? undefined : { zIndex: zIndex - 1 });
+
 export const Sheet: React.FC<SheetProps> = (props) => {
   const resolved = withDefaults(props, DEFAULTS) as ResolvedSheetProps;
-  const { position, variant, showOverlay, swipeable, className, dataTestId } = resolved;
+  const { position, variant, showOverlay, swipeable, className, dataTestId, zIndex, asDialog } = resolved;
+  const titleId = useId();
 
   const theme = useTheme();
   const orientation = orientationOf(resolved);
@@ -125,6 +147,7 @@ export const Sheet: React.FC<SheetProps> = (props) => {
     anchor: position,
     open: isOpen,
     className,
+    ...stackedAt(zIndex),
     ...(resolved.animated === false ? { transitionDuration: 0 } : {}),
     // A tap outside obeys `closeOnOverlayClick`. A swipe-to-dismiss (no
     // reason: SwipeableDrawer calls `onClose()` bare) closes. Escape is the
@@ -134,14 +157,10 @@ export const Sheet: React.FC<SheetProps> = (props) => {
       reason === 'backdropClick' ? handleOverlayClick() : handleClose(),
     PaperProps: {
       ref: sheetRef,
+      ...dialogAriaOf(resolved, titleId),
       sx: panelSx({ ...resolved, ...orientation, theme, currentHeight, isDragging, isAnimating }),
     },
-    ModalProps: {
-      keepMounted: true,
-      disableEscapeKeyDown: true,
-      BackdropComponent: ClickCatcher,
-      BackdropProps: { 'data-testid': testId ? `${testId}-click-catcher` : undefined } as Partial<BackdropProps>,
-    },
+    ModalProps: modalPropsOf(testId),
   };
 
   const body = (
@@ -149,6 +168,7 @@ export const Sheet: React.FC<SheetProps> = (props) => {
       {...resolved}
       {...orientation}
       testId={testId}
+      titleId={asDialog ? titleId : undefined}
       isDragging={isDragging}
       onClose={handleClose}
       onDragStart={handleDragStart}
@@ -162,7 +182,7 @@ export const Sheet: React.FC<SheetProps> = (props) => {
   return (
     <>
       {showOverlay && isOpen && (
-        <SheetOverlay open={isOpen} onClick={handleOverlayClick} blur={variant === 'glass'} animated={resolved.animated} />
+        <SheetOverlay open onClick={handleOverlayClick} blur={variant === 'glass'} animated={resolved.animated} style={veilStyleOf(zIndex)} />
       )}
 
       {isSwipeable ? (

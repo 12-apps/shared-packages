@@ -91,6 +91,22 @@ const useStackRegistration = (open: boolean, modalId: string): void => {
     const timer = window.setTimeout(() => popModal(modalId), ROLE_TRANSITION_MS);
     return () => window.clearTimeout(timer);
   }, [open, modalId, popModal, isModalInStack]);
+
+  // A panel unmounted while open, or before its slide-out timer fired, still
+  // leaves the stack: otherwise its entry stays `primary` and the panel below
+  // is stuck as `secondary` (no Esc, no backdrop, a back arrow to nowhere).
+  // `popModal(id)` filters by id, so popping one already gone is a no-op, and
+  // it is a stable callback, so this runs on unmount (or an id change) only.
+  // The registration flag goes with the entry: StrictMode runs this cleanup and
+  // then the effects again on the SAME instance, and a flag left `true` would
+  // skip the re-push and leave an open panel out of its stack.
+  useEffect(
+    () => () => {
+      popModal(modalId);
+      hasRegisteredRef.current = false;
+    },
+    [modalId, popModal],
+  );
 };
 
 interface PanelChromeOptions {

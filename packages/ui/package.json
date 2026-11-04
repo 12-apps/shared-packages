@@ -348,6 +348,10 @@
       "types": "./dist/types/components/feedback/TutorialOverlay/index.d.ts",
       "default": "./dist/feedback/TutorialOverlay.js"
     },
+    "./feedback/UsableModal": {
+      "types": "./dist/types/components/feedback/UsableModal/index.d.ts",
+      "default": "./dist/feedback/UsableModal.js"
+    },
     "./form/AddressAutocomplete": {
       "types": "./dist/types/components/form/AddressAutocomplete/index.d.ts",
       "default": "./dist/form/AddressAutocomplete.js"

@@ -1,0 +1,224 @@
+/**
+ * UsableModal through the DOM: which surface each viewport gets, how it shares
+ * a host's stack, and the footer and ways out of both. That only the drawn
+ * surface's module loads is `UsableModal.lazy.test.tsx`, in a registry of its own.
+ */
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { StackedModal, StackedModalProvider } from "../../StackedModal";
+import { MODAL_STACK_BASE_Z_INDEX } from "../../../../tokens/layers";
+import { SURFACE_EXIT_MS, UsableModal } from "../UsableModal";
+import type { UsableModalProps } from "../UsableModal.types";
+
+/** `useMediaQuery(down('sm'))` asks a `max-width` query: true on a phone. */
+function stubViewport(phone: boolean): void {
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string): MediaQueryList =>
+      ({
+        matches: phone && query.includes("max-width"),
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  );
+}
+
+function props(overrides: Partial<UsableModalProps> = {}): UsableModalProps {
+  return {
+    open: true,
+    onClose: vi.fn(),
+    title: "New order",
+    closeLabel: "Close",
+    backLabel: "Back",
+    footer: <button type="button">Next</button>,
+    dataTestId: "um",
+    children: <p>Body</p>,
+    ...overrides,
+  };
+}
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe("UsableModal — the surface follows the viewport", () => {
+  it("draws a stacked modal on a computer: a named dialog with the footer at its foot", async () => {
+    stubViewport(false);
+    render(<UsableModal {...props()} />);
+
+    expect(await screen.findByTestId("um-title")).toHaveTextContent("New order");
+    expect(screen.getByRole("dialog", { name: "New order" })).toBeInTheDocument();
+    expect(screen.getByTestId("um-footer")).toHaveTextContent("Next");
+  });
+
+  it("draws a bottom sheet on a phone: a named dialog with the same title, body and footer", async () => {
+    stubViewport(true);
+    render(<UsableModal {...props()} />);
+
+    expect(await screen.findByRole("dialog", { name: "New order" })).toHaveTextContent("Body");
+    expect(screen.getByTestId("um-footer")).toHaveTextContent("Next");
+    // The stacked modal's title bar is never drawn on a phone.
+    await waitFor(() => expect(screen.queryByTestId("um-title")).toBeNull());
+  });
+
+  it("lets the host fix the surface whatever the viewport", async () => {
+    stubViewport(false);
+    render(<UsableModal {...props({ layout: "sheet" })} />);
+
+    expect(await screen.findByRole("dialog", { name: "New order" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("um-title")).toBeNull());
+  });
+
+  it("keeps the surface it opened with when the viewport crosses `sm` while open", async () => {
+    stubViewport(false);
+    const view = render(<UsableModal {...props()} />);
+    expect(await screen.findByTestId("um-title")).toBeInTheDocument();
+
+    stubViewport(true);
+    view.rerender(<UsableModal {...props({ children: <p>Still here</p> })} />);
+
+    expect(await screen.findByText("Still here")).toBeInTheDocument();
+    expect(screen.getByTestId("um-title")).toBeInTheDocument();
+  });
+
+  it("draws no footer bar for a footer of null, on either surface", async () => {
+    stubViewport(false);
+    const view = render(<UsableModal {...props({ footer: null })} />);
+    expect(await screen.findByTestId("um-title")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("um-footer")).toBeNull());
+    view.unmount();
+
+    stubViewport(true);
+    render(<UsableModal {...props({ footer: null })} />);
+    expect(await screen.findByRole("dialog", { name: "New order" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId("um-footer")).toBeNull());
+  });
+});
+
+describe("UsableModal — the ways out", () => {
+  it("closes from the stacked modal's ✕", async () => {
+    stubViewport(false);
+    const onClose = vi.fn();
+    render(<UsableModal {...props({ onClose })} />);
+
+    fireEvent.click(await screen.findByTestId("um-close-button"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes from the sheet's ✕", async () => {
+    stubViewport(true);
+    const onClose = vi.fn();
+    render(<UsableModal {...props({ onClose })} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("UsableModal — a host's stack", () => {
+  function Host({ open, onHostClose }: { open: boolean; onHostClose: () => void }): React.JSX.Element {
+    return (
+      <StackedModalProvider>
+        <StackedModal open onClose={onHostClose} navigationTitle="Board" backLabel="Back" dataTestId="host" />
+        <UsableModal {...props({ open })} />
+      </StackedModalProvider>
+    );
+  }
+
+  it("joins a stack the host already keeps, offering the way back to it", async () => {
+    stubViewport(false);
+    render(<Host open onHostClose={vi.fn()} />);
+
+    expect(await screen.findByTestId("um-back-button")).toBeInTheDocument();
+  });
+
+  it("hands the host's panel back once closed: its Esc works again", async () => {
+    stubViewport(false);
+    const onHostClose = vi.fn();
+    const view = render(<Host open onHostClose={onHostClose} />);
+    await screen.findByTestId("um-back-button");
+
+    view.rerender(<Host open={false} onHostClose={onHostClose} />);
+    // The host panel is primary again after the slide-out, so Esc reaches it.
+    await waitFor(
+      () => {
+        fireEvent.keyDown(window, { key: "Escape" });
+        expect(onHostClose).toHaveBeenCalled();
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it("opens the phone's sheet above the host's panels, never under them", async () => {
+    stubViewport(true);
+    render(<Host open onHostClose={vi.fn()} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    const drawer = dialog.closest(".MuiDrawer-root") as HTMLElement;
+    expect(Number(getComputedStyle(drawer).zIndex)).toBeGreaterThan(MODAL_STACK_BASE_Z_INDEX);
+  });
+
+  it("lets the phone's sheet grow to the screen less a strip, not the Sheet's 600px preset", async () => {
+    stubViewport(true);
+    render(<UsableModal {...props()} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    expect(getComputedStyle(dialog).maxHeight).toMatch(/^calc\(100% - 3rem\)$/u);
+  });
+
+  it("opens a sheet with no stack at MUI's modal level, so its body's menus open above it", async () => {
+    stubViewport(true);
+    render(<UsableModal {...props()} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    const drawer = dialog.closest(".MuiDrawer-root") as HTMLElement;
+    expect(Number(getComputedStyle(drawer).zIndex)).toBe(MODAL_STACK_BASE_Z_INDEX);
+  });
+});
+
+/** A body that remembers taps: whether a reopening starts it fresh. */
+function Counter(): React.JSX.Element {
+  const [count, setCount] = useState(0);
+  return (
+    <button type="button" onClick={() => setCount((n) => n + 1)}>
+      count {count}
+    </button>
+  );
+}
+
+describe.each([
+  ["phone", true],
+  ["computer", false],
+])("UsableModal on a %s — a closed surface lets go", (_name, phone) => {
+  it("unmounts its body once the way out ran, and reopens it fresh", async () => {
+    stubViewport(phone);
+    const view = render(<UsableModal {...props({ children: <Counter /> })} />);
+    fireEvent.click(await screen.findByRole("button", { name: "count 0" }));
+    expect(screen.getByRole("button", { name: "count 1" })).toBeInTheDocument();
+
+    view.rerender(<UsableModal {...props({ open: false, children: <Counter /> })} />);
+    await waitFor(() => expect(screen.queryByText(/count/)).toBeNull(), { timeout: SURFACE_EXIT_MS + 1000 });
+
+    view.rerender(<UsableModal {...props({ children: <Counter /> })} />);
+    expect(await screen.findByRole("button", { name: "count 0" })).toBeInTheDocument();
+  });
+
+  it("leaves nothing on the page once closed: no edge strip to swallow taps", async () => {
+    stubViewport(phone);
+    const view = render(<UsableModal {...props()} />);
+    await screen.findByRole("dialog", { name: "New order" });
+
+    view.rerender(<UsableModal {...props({ open: false })} />);
+    await waitFor(() => expect(document.querySelector(".MuiSwipeArea-root, .MuiDrawer-root, [role='dialog']")).toBeNull(), {
+      timeout: SURFACE_EXIT_MS + 1000,
+    });
+  });
+});

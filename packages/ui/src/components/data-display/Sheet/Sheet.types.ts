@@ -62,6 +62,18 @@ export interface SheetProps {
   elevation?: number;
   /** Slide in and out (default). `false` opens and closes at once. */
   animated?: boolean;
+  /**
+   * The drawer's stacking level, its veil one below. For a sheet opened over a
+   * `StackedModal` stack (1300 and up), which the drawer's default (1200) would
+   * slide under.
+   */
+  zIndex?: number;
+  /**
+   * Announce the panel as a modal dialog named by its `title`: `role="dialog"`,
+   * `aria-modal` and `aria-labelledby`. Off by default — a sheet used as a side
+   * panel or a menu is not a dialog.
+   */
+  asDialog?: boolean;
   dataTestId?: string;
 }
 
@@ -81,6 +93,8 @@ export interface SheetHeaderProps {
   className?: string;
   style?: CSSProperties;
   children?: ReactNode;
+  /** The title's element id, for a sheet that names itself as a dialog (`asDialog`). */
+  titleId?: string;
   dataTestId?: string;
 }
 

@@ -103,6 +103,7 @@ export const SheetHeader: React.FC<SheetHeaderProps> = (props) => {
     className,
     style,
     children,
+    titleId,
     dataTestId,
   } = withDefaults(props, HEADER_DEFAULTS);
 
@@ -125,7 +126,7 @@ export const SheetHeader: React.FC<SheetHeaderProps> = (props) => {
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <Box sx={{ flex: 1 }}>
           {title && (
-            <Typography variant="h6" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-title`}>
+            <Typography id={titleId} variant="h6" sx={{ fontWeight: 600 }} data-testid={`${dataTestId}-title`}>
               {title}
             </Typography>
           )}
