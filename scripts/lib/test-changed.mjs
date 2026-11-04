@@ -45,7 +45,7 @@ export function parseWorkspaceGlobs(yamlText) {
   return globs;
 }
 
-export function globToRegExp(glob) {
+function globToRegExp(glob) {
   const source = glob
     .replace(/\/+$/, "")
     .split("/")
@@ -55,7 +55,7 @@ export function globToRegExp(glob) {
 }
 
 /** Whether a directory (repo-relative, posix) is a workspace root per the globs. */
-export function isWorkspaceDir(dir, globs) {
+function isWorkspaceDir(dir, globs) {
   return globs.some((glob) => globToRegExp(glob).test(dir));
 }
 
