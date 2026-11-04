@@ -138,12 +138,13 @@ export const SheetHeader: React.FC<SheetHeaderProps> = (props) => {
           {children}
         </Box>
 
+        {/* MUI's medium IconButton: 40px, the tap floor. `small` was 34px (FUT-4394). */}
         {showCloseButton && (
           <IconButton
             onClick={onClose}
             aria-label={closeLabel}
-            size="small"
-            sx={{ ml: 1, mt: -0.5 }}
+            size="medium"
+            sx={{ ml: 1, mt: -1, mr: -1 }}
             data-testid={`${dataTestId}-close-button`}
           >
             <CloseIcon data-testid={`${dataTestId}-close-icon`} />

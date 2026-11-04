@@ -30,4 +30,13 @@ describe('the sheet close button', () => {
     );
     expect(screen.getByRole('button', { name: 'close' })).toBe(screen.getByTestId('s-header-close-button'));
   });
+
+  it('is a medium icon button: 40px, the tap floor, never the 34px small one', () => {
+    render(
+      <Sheet open position="bottom" title="Cart" dataTestId="s">
+        <p>body</p>
+      </Sheet>,
+    );
+    expect(screen.getByTestId('s-header-close-button')).toHaveClass('MuiIconButton-sizeMedium');
+  });
 });
