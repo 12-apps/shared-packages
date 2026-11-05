@@ -116,7 +116,7 @@ function loadGooglePayApi(): Promise<GooglePayApi | null> {
  * TEST answers `paymentMethodPresent: true` with
  * no account at all, so it keeps asking the bare question.
  */
-export function isReadyToPayRequest(environment: "TEST" | "PRODUCTION", requireExistingMethod = false): Record<string, unknown> {
+function isReadyToPayRequest(environment: "TEST" | "PRODUCTION", requireExistingMethod = false): Record<string, unknown> {
   return {
     apiVersion: 2,
     apiVersionMinor: 0,

@@ -11,7 +11,7 @@
  */
 
 /** The slice of `Navigator` this decision reads. */
-export interface DeviceSignals {
+interface DeviceSignals {
   userAgent: string;
   maxTouchPoints?: number;
   userAgentData?: { platform?: string };
