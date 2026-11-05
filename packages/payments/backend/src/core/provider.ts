@@ -130,6 +130,15 @@ export interface PaymentProviderAdapterBase {
    */
   readonly minimumChargeCents?: number;
   /**
+   * Its SANDBOX environment is the provider's own simulator: a charge there
+   * moves no money (PagBank's and Itaú's sandbox hosts). A provider that
+   * routes by its KEY, or has one host for both, leaves it out, because a row
+   * stored as SANDBOX can still be taking real money. Only a declaring
+   * adapter's SANDBOX connection leaves a live deployment's routing
+   * (`liveOnlyCredentials`, FUT-4432).
+   */
+  readonly simulatedSandbox?: boolean;
+  /**
    * Historical per-merchant webhook PATH this provider's merchants registered
    * in its dashboard before the host's generic payments webhook route existed.
    * Declared per adapter because it is a fact about that provider's install

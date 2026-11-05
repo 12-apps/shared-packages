@@ -181,13 +181,17 @@ host, which finds them structurally under `backend/prisma/migrations/`.
   from an unrelated variable — inferring it is what let an unsigned webhook
   authenticate itself (FUT-696).
 - **A sandbox connection takes no money on a live deployment**: wrap the
-  credential store with `liveOnlyCredentials(store, process.env)`. While
-  `PAYMENTS_LIVE_DEPLOYMENT=1`, every connection whose routed credentials are
-  SANDBOX leaves `providerChain` and `defaultProvider`, so the buyer config
-  carries no method from it and the charge walk never reaches it; a store
-  whose every connection is sandbox reads as one with none connected. Absent
-  means not live, so dev, e2e and review boxes keep sandbox. Not `NODE_ENV`:
-  review boxes run `production` too.
+  credential store with `liveOnlyCredentials(store, process.env, providers)`.
+  While `PAYMENTS_LIVE_DEPLOYMENT=1`, every connection whose routed credentials
+  are SANDBOX on an adapter declaring `simulatedSandbox` (PagBank, Itaú: their
+  sandbox moves no money) leaves `providerChain` and `defaultProvider`, so the
+  buyer config carries no method from it and the charge walk never reaches it;
+  a store whose every connection is such a sandbox reads as one with none
+  connected. A provider with one host for both modes, or whose key picks test
+  or live (InfinitePay, Stone, Stripe), is never dropped: a row stored as
+  SANDBOX there can take real money. A credential read that throws anything
+  but `CredentialsError` propagates. Absent means not live, so dev, e2e and
+  review boxes keep sandbox. Not `NODE_ENV`: review boxes run `production` too.
 - **One active provider, enforced end to end**: `ProviderConfigStore`
   requires an atomic `setActiveProvider` (no sequential fallback exists),
   the Prisma adapter implements it in a transaction, and a partial unique

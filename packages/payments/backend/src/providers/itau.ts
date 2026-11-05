@@ -314,6 +314,7 @@ export function itauProvider(source: PaymentsCopySource<ItauCopy>): PaymentProvi
     // From the copy pack, where the accent may live (shipped source is ASCII).
     displayName: copy().displayName,
     authMode: 'credentials',
+    simulatedSandbox: true, // `itauHosts('SANDBOX')` is Itaú's simulator (FUT-4432)
     capabilities: {
       methods: ['PIX'],
       savedCards: false,

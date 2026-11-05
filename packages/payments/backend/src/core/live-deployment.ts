@@ -1,8 +1,10 @@
 import type { CredentialStore } from './credential-store';
+import { CredentialsError } from './errors';
+import type { ProviderRegistry } from './registry';
 import type { MerchantRef, ProviderName } from './types';
 
 /**
- * A SANDBOX connection takes no buyer's money on a LIVE deployment.
+ * A SIMULATED-sandbox connection takes no buyer's money on a LIVE deployment.
  *
  * A connection starts in SANDBOX (`config/connect-state.ts` defaults every
  * unclear answer to it), and on a deployment that serves real buyers a store
@@ -38,37 +40,65 @@ export function readLiveDeployment(env: LiveDeploymentEnv): boolean {
   return TRUTHY.has((env.PAYMENTS_LIVE_DEPLOYMENT ?? '').trim().toLowerCase());
 }
 
-/** The chain entries whose ROUTED credentials are PRODUCTION; a read that throws keeps nothing. */
-async function productionOnly(
-  inner: CredentialStore,
-  merchant: MerchantRef,
-  chain: readonly ProviderName[],
-): Promise<ProviderName[]> {
-  const environments = await Promise.all(
-    chain.map((name) =>
-      inner.getCredentials(merchant, name).then(
-        (credentials) => credentials?.environment ?? null,
-        () => null,
-      ),
-    ),
-  );
-  return chain.filter((_, index) => environments[index] === 'PRODUCTION');
+/** Whether this provider's SANDBOX is a simulator (`PaymentProviderAdapterBase.simulatedSandbox`). */
+function sandboxIsSimulated(providers: ProviderRegistry, name: ProviderName): boolean {
+  return providers.has(name) && providers.get(name).simulatedSandbox === true;
 }
 
 /**
- * The credential store with every SANDBOX connection taken out of the
- * merchant's ROUTING while `env` marks the deployment live — read per call, so
- * the answer follows the environment rather than the moment the store was
- * built.
+ * Whether this chain entry routes to a SIMULATED sandbox. Asked only of an
+ * adapter that declares one, so no other entry pays a credential read. A row
+ * that is not connected (null) or refused as such (`CredentialsError`) cannot
+ * be routed to anyway and is left out; any other failure PROPAGATES, exactly
+ * as the gateway's own chain read lets it (FUT-4072) — a store whose
+ * credentials cannot be read must fail loudly, not quietly sell less.
+ */
+async function routesToSimulatedSandbox(
+  inner: CredentialStore,
+  providers: ProviderRegistry,
+  merchant: MerchantRef,
+  name: ProviderName,
+): Promise<boolean> {
+  if (!sandboxIsSimulated(providers, name)) return false;
+  try {
+    const credentials = await inner.getCredentials(merchant, name);
+    return credentials === null || credentials.environment === 'SANDBOX';
+  } catch (error) {
+    if (error instanceof CredentialsError) return true;
+    throw error;
+  }
+}
+
+/** The chain without the entries that route to a simulated sandbox, in order. */
+async function withoutSimulatedSandboxes(
+  inner: CredentialStore,
+  providers: ProviderRegistry,
+  merchant: MerchantRef,
+  chain: readonly ProviderName[],
+): Promise<ProviderName[]> {
+  const dropped = await Promise.all(chain.map((name) => routesToSimulatedSandbox(inner, providers, merchant, name)));
+  return chain.filter((_, index) => !dropped[index]);
+}
+
+/**
+ * The credential store with every connection that routes to a SIMULATED
+ * sandbox taken out of the merchant's ROUTING while the environment marks the
+ * deployment live — read per call, so the answer follows the environment
+ * rather than the moment the store was built.
+ *
+ * SIMULATED is the adapter's own declaration (`simulatedSandbox`), never the
+ * stored column alone: a provider with one host for both modes, or one whose
+ * key picks test or live, can hold a row stored as SANDBOX that takes real
+ * money, and that store must keep selling.
  *
  * Only routing moves: `providerChain`, and `defaultProvider` as its head. Those
  * are what the buyer's surfaces ask — the gateway's `clientConfigChain` (and so
  * `buyerCheckoutConfig`, which then carries no method, no key and no wallet
  * from that connection), the charge walk (which then never sends a charge to
  * it), and a host's "are payments configured at all" check. A store whose
- * every connection is sandbox therefore reads exactly like a store with none
- * connected, and gets the refusal and the empty state that already exist for
- * that.
+ * every connection is such a sandbox therefore reads exactly like a store with
+ * none connected, and gets the refusal and the empty state that already exist
+ * for that.
  *
  * Credential reads by NAME are untouched: inbound webhooks, reconciliation and
  * whatever a host resolves for a named provider keep working, because money
@@ -76,16 +106,21 @@ async function productionOnly(
  *
  * Not live: the store itself, unchanged.
  */
-export function liveOnlyCredentials(inner: CredentialStore, env: LiveDeploymentEnv): CredentialStore {
+export function liveOnlyCredentials(
+  inner: CredentialStore,
+  processEnv: LiveDeploymentEnv,
+  providers: ProviderRegistry,
+): CredentialStore {
+  const live = (): boolean => readLiveDeployment(processEnv);
   const providerChain = async (merchant: MerchantRef): Promise<ProviderName[]> => {
     const chain = await inner.providerChain(merchant);
-    return readLiveDeployment(env) ? productionOnly(inner, merchant, chain) : chain;
+    return live() ? withoutSimulatedSandboxes(inner, providers, merchant, chain) : chain;
   };
   return {
     ...inner,
     providerChain,
     defaultProvider: async (merchant) => {
-      if (!readLiveDeployment(env)) return inner.defaultProvider(merchant);
+      if (!live()) return inner.defaultProvider(merchant);
       return (await providerChain(merchant))[0] ?? null;
     },
   };
