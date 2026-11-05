@@ -100,6 +100,29 @@ describe("eventsRouter", () => {
     await events.stop();
   });
 
+  it("forwards a denial's Retry-After header with its status and body", async () => {
+    const { app, events } = await mounted({
+      denyWith: new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds: 30 }),
+    });
+    const response = await app.request("/api/admin/loja-a/realtime?topics=kitchen");
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(await response.json()).toEqual({ error: "Muitas tentativas." });
+    await events.stop();
+  });
+
+  it("sends no Retry-After on a denial that set none", async () => {
+    const { app, events } = await mounted({
+      denyWith: new EventsDenial(403, "Sem permissão para o tópico: kitchen."),
+    });
+    const response = await app.request("/api/admin/loja-a/realtime/ticket?topics=kitchen", {
+      method: "POST",
+    });
+    expect(response.status).toBe(403);
+    expect(response.headers.get("Retry-After")).toBeNull();
+    await events.stop();
+  });
+
   it("answers 404 for a path no surface claims", async () => {
     const { app, events } = await mounted();
     expect((await app.request("/api/admin/loja-a/realtime/nope")).status).toBe(404);

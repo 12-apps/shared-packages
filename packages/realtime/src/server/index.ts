@@ -73,6 +73,7 @@ export {
   isEventsDenial,
   type EventsAuthorization,
   type EventsAuthorizeContext,
+  type EventsDenialOptions,
   type EventsMessages,
   type EventsRequestContext,
   type EventsRoute,

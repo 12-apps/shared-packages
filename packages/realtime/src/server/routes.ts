@@ -30,7 +30,9 @@ import {
 
 function denialResult(error: unknown): EventsRouteResult {
   if (isEventsDenial(error)) {
-    return { status: error.status, body: { error: error.message } };
+    const result = { status: error.status, body: { error: error.message } };
+    if (error.retryAfterSeconds === undefined) return result;
+    return { ...result, headers: { "Retry-After": String(error.retryAfterSeconds) } };
   }
   throw error;
 }
