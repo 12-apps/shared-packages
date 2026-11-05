@@ -105,5 +105,11 @@ export const CHIP_TRANSITION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 export const SOFT_GROUND_ALPHA = 0.14;
 /** A soft chip's hover ground. */
 export const SOFT_HOVER_ALPHA = 0.22;
+/**
+ * How much a light-mode soft WARNING ink darkens its `dark` step (FUT-4464). With
+ * the default theme, `warning.dark` (#e65100) on its 14% tint is 3.25:1; darkened
+ * by 0.2 it is 4.77:1. The other five colours clear 4.5:1 on `dark` as it is.
+ */
+export const SOFT_WARNING_LIGHT_DARKEN = 0.2;
 /** A soft chip's keyboard-focus ring, in design px (read through `rem`). */
 export const SOFT_FOCUS_RING = { width: 2, offset: 2 } as const;

@@ -12,10 +12,11 @@ import {
   OUTLINED_HOVER_ALPHA,
   SOFT_GROUND_ALPHA,
   SOFT_HOVER_ALPHA,
+  SOFT_WARNING_LIGHT_DARKEN,
   type ChipMuiSize,
   type ChipSizeMetrics,
 } from './Chip.metrics';
-import { alpha } from '../../../tokens/color';
+import { alpha, darken } from '../../../tokens/color';
 import type { UiTheme } from '../../../tokens/theme';
 
 /** MUI's `action.selectedOpacity`; its hover wash adds `OUTLINED_HOVER_ALPHA` on top. */
@@ -64,8 +65,10 @@ function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
     };
   }
   const accent = theme.palette[color];
-  // The ink that reads on a 14% tint: `dark` over a light page, `light` over a dark one.
-  const ink = theme.mode === 'dark' ? accent.light : accent.dark;
+  // The ink that reads on a 14% tint: `dark` over a light page, `light` over a dark
+  // one; a light-mode warning darkens `dark` further, as the web does (FUT-4464).
+  const lightInk = color === 'warning' ? darken(accent.dark, SOFT_WARNING_LIGHT_DARKEN) : accent.dark;
+  const ink = theme.mode === 'dark' ? accent.light : lightInk;
   return {
     container: { backgroundColor: alpha(accent.main, SOFT_GROUND_ALPHA) },
     pressed: { backgroundColor: alpha(accent.main, SOFT_HOVER_ALPHA) },

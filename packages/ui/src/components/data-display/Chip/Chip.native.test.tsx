@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { chipPaint } from './Chip.look.native';
 import { Chip } from './Chip.native';
-import { CHIP_RADIUS, CHIP_SIZES } from './Chip.metrics';
+import { CHIP_RADIUS, CHIP_SIZES, SOFT_WARNING_LIGHT_DARKEN } from './Chip.metrics';
 import { UiProvider } from '../../../provider/UiProvider.native';
-import { alpha, hexToRgb } from '../../../tokens/color';
+import { alpha, darken, hexToRgb } from '../../../tokens/color';
 import { createUiTheme } from '../../../tokens/theme';
 
 /**
@@ -260,5 +260,14 @@ describe('Chip (native)', () => {
     // The delete glyph is the full ink in both modes, as on the web.
     expect(chipPaint(dark, 'soft', 'danger', false).deleteColor).toBe(dark.palette.danger.light);
     expect(chipPaint(theme, 'soft', 'danger', false).deleteColor).toBe(theme.palette.danger.dark);
+  });
+
+  it('darkens a light-mode soft warning ink as the web does, and nothing else (FUT-4464)', () => {
+    const ink = darken(theme.palette.warning.dark, SOFT_WARNING_LIGHT_DARKEN);
+    expect(chipPaint(theme, 'soft', 'warning', false).label.color).toBe(ink);
+    expect(chipPaint(theme, 'soft', 'warning', false).deleteColor).toBe(ink);
+    expect(chipPaint(theme, 'soft', 'success', false).label.color).toBe(theme.palette.success.dark);
+    const dark = createUiTheme({ mode: 'dark' });
+    expect(chipPaint(dark, 'soft', 'warning', false).label.color).toBe(dark.palette.warning.light);
   });
 });

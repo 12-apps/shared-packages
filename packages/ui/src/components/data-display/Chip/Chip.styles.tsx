@@ -4,7 +4,7 @@ import type { KeyboardEvent, ReactElement } from 'react';
 import React from 'react';
 
 import { chipKeyAction, type ChipKeyArgs } from './Chip.helpers';
-import { alpha } from '@mui/material/styles/index.js';
+import { alpha, darken } from '@mui/material/styles/index.js';
 
 import {
   CHIP_SIZES,
@@ -15,6 +15,7 @@ import {
   SOFT_FOCUS_RING,
   SOFT_GROUND_ALPHA,
   SOFT_HOVER_ALPHA,
+  SOFT_WARNING_LIGHT_DARKEN,
 } from './Chip.metrics';
 import type { ChipProps } from './Chip.types';
 import { shadowInk } from '../../../tokens/ink';
@@ -83,8 +84,10 @@ const paletteKey = (color: NonNullable<ChipProps['color']>): 'primary' | 'second
  * `soft`: the colour's tint for a ground, and for ink the step that reads on it:
  * the `dark` step in light mode, the `light` step in dark mode (FUT-4442). The
  * ground is a 14% tint over the page, so on a near-black page the ink has to be
- * lighter than `main`; `dark` there is 2.6 to 3.9:1, `light` clears 4.5:1. The
- * label, the icon and the delete glyph all take it.
+ * lighter than `main`; `dark` there is 2.6 to 3.9:1, `light` clears 4.5:1. In
+ * light mode warning's `dark` is 3.25:1 on its tint, so it is darkened by
+ * `SOFT_WARNING_LIGHT_DARKEN` (4.77:1, FUT-4464). The label, the icon and the
+ * delete glyph all take it.
  */
 const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
   const key = paletteKey(color);
@@ -92,7 +95,9 @@ const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
     key ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : theme.palette.action.selected;
   const ink = (theme: Theme): string => {
     if (!key) return theme.palette.text.secondary;
-    return theme.palette.mode === 'dark' ? theme.palette[key].light : theme.palette[key].dark;
+    if (theme.palette.mode === 'dark') return theme.palette[key].light;
+    // Warning's `dark` step is too light for its own tint (FUT-4464).
+    return key === 'warning' ? darken(theme.palette.warning.dark, SOFT_WARNING_LIGHT_DARKEN) : theme.palette[key].dark;
   };
   return {
     backgroundColor: ground,

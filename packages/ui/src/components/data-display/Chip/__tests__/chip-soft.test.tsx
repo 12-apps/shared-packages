@@ -5,10 +5,11 @@
  * would drop.
  */
 import { cleanup, render, screen } from "@testing-library/react";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { ThemeProvider, createTheme, darken } from "@mui/material/styles";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Chip } from "../Chip";
+import { SOFT_WARNING_LIGHT_DARKEN } from "../Chip.metrics";
 
 const theme = createTheme();
 
@@ -165,6 +166,30 @@ describe("Chip variant soft in dark mode", () => {
   it("keeps the dark step for light mode's ink (unchanged)", () => {
     const chip = soft("danger");
     expect(getComputedStyle(chip).color).toBe(rgbOf(theme.palette.error.dark));
+  });
+});
+
+describe("Chip variant soft in light mode, at rest (FUT-4464)", () => {
+  const light = createTheme();
+
+  it.each(COLOURS)("clears 4.5:1 for %s on the tint over the paper", (color) => {
+    render(
+      <ThemeProvider theme={light}>
+        <Chip label="Aguardando" variant="soft" color={color} dataTestId={`light-${color}`} />
+      </ThemeProvider>,
+    );
+    expect(inkContrast(light, screen.getByTestId(`light-${color}`))).toBeGreaterThanOrEqual(MIN_CONTRAST);
+  });
+
+  it("darkens only warning's dark step; the other colours keep theirs", () => {
+    render(
+      <ThemeProvider theme={light}>
+        <Chip label="Aguardando" variant="soft" color="warning" dataTestId="light-w" />
+        <Chip label="Ativo" variant="soft" color="success" dataTestId="light-s" />
+      </ThemeProvider>,
+    );
+    expect(getComputedStyle(screen.getByTestId("light-w")).color).toBe(darken(light.palette.warning.dark, SOFT_WARNING_LIGHT_DARKEN));
+    expect(getComputedStyle(screen.getByTestId("light-s")).color).toBe(rgbOf(light.palette.success.dark));
   });
 });
 
