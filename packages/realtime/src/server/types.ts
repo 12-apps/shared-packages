@@ -17,18 +17,51 @@ export interface EventsTopicSpec {
   qualifiers: string[];
 }
 
+/** What a denial may say beyond its status and message. */
+export interface EventsDenialOptions {
+  /**
+   * Seconds the caller should wait before trying again, answered as a
+   * `Retry-After` header — typically on a 429. A positive integer; a fraction
+   * is rounded UP (a header that says less than the real wait invites a retry
+   * that is refused again), and a non-finite or non-positive value, or one past
+   * 2^31-1 seconds, is ignored.
+   */
+  retryAfterSeconds?: number;
+}
+
+/** The largest `Retry-After` a denial sends: 2^31-1 seconds, the common delta-seconds cap. */
+const MAX_RETRY_AFTER_SECONDS = 2 ** 31 - 1;
+
+/** A usable `Retry-After` value in whole seconds, or undefined when there is none. */
+function retryAfterFrom(seconds: number | undefined): number | undefined {
+  if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) return undefined;
+  const whole = Math.ceil(seconds);
+  // A wait past 2^31-1 seconds is nonsense, and a huge one would stringify as
+  // `1e+21`, which no client parses as seconds: ignored rather than sent.
+  return Number.isSafeInteger(whole) && whole <= MAX_RETRY_AFTER_SECONDS ? whole : undefined;
+}
+
 /**
  * A refusal the surface answers as-is — status and message chosen by whoever
  * threw it. Denials are deliberately UNWRAPPED on the wire (`{ error }`, never
  * `{ data }`): the success envelope is for payloads, and a denial has none.
+ *
+ * `retryAfterSeconds` becomes a `Retry-After` header on the answer (see
+ * {@link EventsRouteResult}'s `headers`), so a rate-limited client knows when
+ * to come back instead of guessing.
  */
 export class EventsDenial extends Error {
+  /** The validated `Retry-After` seconds, or undefined when the denial set none. */
+  public readonly retryAfterSeconds: number | undefined;
+
   constructor(
     public readonly status: number,
     message: string,
+    options: EventsDenialOptions = {},
   ) {
     super(message);
     this.name = "EventsDenial";
+    this.retryAfterSeconds = retryAfterFrom(options.retryAfterSeconds);
   }
 }
 
@@ -212,8 +245,11 @@ export function resolveEventsCopy<T>(
 
 /** What a route handler answers. */
 export type EventsRouteResult =
-  /** An ordinary JSON answer; the adapter serializes body at that status. */
-  | { status: number; body: unknown }
+  /**
+   * An ordinary JSON answer; the adapter serializes body at that status and
+   * MUST send `headers` with it when present (a denial's `Retry-After`).
+   */
+  | { status: number; body: unknown; headers?: Record<string, string> }
   /** A live stream; the adapter returns the `Response` untouched. */
   | { response: Response };
 

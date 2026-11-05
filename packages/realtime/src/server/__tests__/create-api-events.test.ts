@@ -210,6 +210,66 @@ describe("createApiEvents — the host's authorization is the whole boundary", (
     });
   });
 
+  it("answers a denial's retryAfterSeconds as a Retry-After header", async () => {
+    const { stream, ticket } = await harness({
+      authorize: () => {
+        throw new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds: 42 });
+      },
+    });
+    const expected = {
+      status: 429,
+      body: { error: "Muitas tentativas." },
+      headers: { "Retry-After": "42" },
+    };
+    // Both transports share the denial path, so both carry the header.
+    await expect(stream({ topics: "kitchen" })).resolves.toEqual(expected);
+    await expect(ticket({ topics: "kitchen" })).resolves.toEqual(expected);
+  });
+
+  it("rounds a fractional retryAfterSeconds UP, never down to an early retry", async () => {
+    const { stream } = await harness({
+      authorize: () => {
+        throw new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds: 1.2 });
+      },
+    });
+    await expect(stream({ topics: "kitchen" })).resolves.toMatchObject({
+      headers: { "Retry-After": "2" },
+    });
+  });
+
+  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31, 1e21])(
+    "sends no Retry-After for an unusable retryAfterSeconds (%s)",
+    async (retryAfterSeconds) => {
+      const { stream } = await harness({
+        authorize: () => {
+          throw new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds });
+        },
+      });
+      const answer = await stream({ topics: "kitchen" });
+      expect(answer).not.toHaveProperty("headers");
+    },
+  );
+
+  it("still sends the largest accepted Retry-After, 2^31-1 seconds", async () => {
+    const { stream } = await harness({
+      authorize: () => {
+        throw new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds: 2 ** 31 - 1 });
+      },
+    });
+    await expect(stream({ topics: "kitchen" })).resolves.toMatchObject({
+      headers: { "Retry-After": "2147483647" },
+    });
+  });
+
+  it("sends no headers on a denial that set no retryAfterSeconds", async () => {
+    const { stream } = await harness({
+      authorize: () => {
+        throw new EventsDenial(403, "Sem permissão para o tópico: kitchen.");
+      },
+    });
+    expect(await stream({ topics: "kitchen" })).not.toHaveProperty("headers");
+  });
+
   it("passes 404 through for an unknown tenant slug", async () => {
     const { stream } = await harness({
       authorize: () => {

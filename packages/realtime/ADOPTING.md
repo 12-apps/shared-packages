@@ -143,6 +143,18 @@ Per surface, under the host's mount:
 Denials are deliberately **unwrapped** (`{ error }`, never `{ data }`): the success
 envelope is for payloads, and a denial has none.
 
+**A denial can say when to come back.** `new EventsDenial(429, message, {
+retryAfterSeconds })` answers a `Retry-After` header with the status and body: the
+route result is `{ status, body, headers: { "Retry-After": "<n>" } }`. The value is
+whole seconds, a fraction rounded up; a non-finite or non-positive value, or one
+past 2^31-1 seconds, sends no header, and a denial without the option answers
+exactly as before (no `headers` key). Both shipped mounts forward it with no host
+change: `@12-apps/realtime/manifest/server` (the wiring path, `wireEndpoint`) hands
+a JSON answer that carries headers to wiring as a raw `{ response }`, and
+`@12-apps/realtime/hono` passes them to `c.json`. **Only a host's own hand-written
+adapter over the `/server` descriptors must send a JSON result's `headers` itself**
+— drop them and a rate-limited client is left guessing.
+
 **"Realtime is off" is checked AFTER authorization.** An unauthorized caller learns
 nothing about whether the bus is configured.
 

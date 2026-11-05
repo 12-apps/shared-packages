@@ -70,7 +70,9 @@ export function eventsRouter(config: EventsServerConfig): EventsHono {
 
       // Verbatim. See the module docstring: touching this body breaks the stream.
       if (isStreamResult(result)) return result.response;
-      return c.json(result.body as Record<string, unknown>, result.status as 200);
+      // `headers` carries a denial's `Retry-After`; dropping it here would leave a
+      // rate-limited client guessing when to come back.
+      return c.json(result.body as Record<string, unknown>, result.status as 200, result.headers);
     };
 
     if (route.method === "GET") router.get(route.path, handler);

@@ -73,9 +73,34 @@ interface Window {
   resetsAt: number;
 }
 
+/**
+ * The in-process limiter: the {@link AuthRateLimiter} port, plus what only an
+ * implementation that owns its windows can answer.
+ *
+ * `AuthRateLimiter` keeps its one-method shape on purpose — it is the port
+ * `createEmailCredentials` consumes, and a host's shared-store implementation
+ * must not be made to grow a method the flow never calls. This type is what
+ * {@link createInProcessRateLimiter} returns, so a host holding its own
+ * instance can also say WHEN to come back.
+ */
+export interface InProcessRateLimiter extends AuthRateLimiter {
+  /**
+   * Milliseconds until `key`'s current window resets, when the key is at (or
+   * past) its limit — the number a `Retry-After` header is made from (round it
+   * UP to whole seconds; a header that says 0 invites an immediate retry that is
+   * refused again).
+   *
+   * `0` when the key is not limited: it has budget left, its window already
+   * expired, or it has never been seen. Read-only: asking never spends an
+   * attempt and never opens a window. Measured against the injected `now`, and
+   * always a whole number of milliseconds (rounded up).
+   */
+  retryAfterMs(key: string): number;
+}
+
 export function createInProcessRateLimiter(
   config: InProcessRateLimiterConfig = {},
-): AuthRateLimiter {
+): InProcessRateLimiter {
   const {
     limits = DEFAULT_RATE_LIMITS,
     defaultLimit = 5,
@@ -105,6 +130,14 @@ export function createInProcessRateLimiter(
       if (existing.count >= limit) return false;
       existing.count += 1;
       return true;
+    },
+    retryAfterMs(key) {
+      const at = now();
+      const existing = windows.get(key);
+      if (!existing || existing.resetsAt <= at) return 0;
+      const limit = limits[bucketOf(key)] ?? defaultLimit;
+      // Ceiled, so a fractional clock (`performance.now()`) still answers whole ms.
+      return existing.count >= limit ? Math.ceil(existing.resetsAt - at) : 0;
     },
   };
 }
