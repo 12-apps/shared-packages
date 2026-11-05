@@ -2,7 +2,7 @@ import { Box, Chip } from "@mui/material";
 import { useRef, type JSX, type KeyboardEvent } from "react";
 
 import { NEW_CARD, NewCardForm, detectBrand, onlyDigits } from "../../../card";
-import { ChargeFailure } from "../card-view";
+import { ChargeFailure } from "../charge-states";
 import { UNRESOLVED_CODE } from "../failure-codes";
 import type { BuyerInfo, CheckoutCustomerField } from "../types";
 

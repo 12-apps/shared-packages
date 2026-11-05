@@ -2,7 +2,7 @@ import { Box, Divider } from "@mui/material";
 import { useTheme, type Theme } from "@mui/material/styles";
 import { useEffect, useId, useRef, type JSX } from "react";
 
-import { ChargeFailure } from "../card-view";
+import { ChargeFailure } from "../charge-states";
 import { useCheckoutCopy } from "../copy-context";
 import { UNRESOLVED_CODE } from "../failure-codes";
 import type { GooglePaymentsClient } from "../google-pay-button";

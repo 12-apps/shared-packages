@@ -32,7 +32,7 @@ vi.mock("../client", () => client);
 import type { CardTokenizationConfig } from "../../../card";
 import type { CardChainLink } from "../method-capability";
 import type { CheckoutOrder } from "../types";
-import { useCardCheckout } from "../use-card-checkout";
+import { useSubmitHarness } from "./card-submit-harness";
 
 const ORDER: CheckoutOrder = {
   orderId: "o1",
@@ -100,7 +100,7 @@ function Harness({
   chain: CardChainLink[];
   config?: CardTokenizationConfig;
 }): JSX.Element {
-  const cc = useCardCheckout(ORDER, {}, config, vi.fn(), 10, undefined, chain);
+  const cc = useSubmitHarness({ order: ORDER, config, onResolved: vi.fn(), chain });
   return (
     <div>
       <button type="button" data-testid="fill" onClick={() => cc.setCard(CARD)}>

@@ -79,7 +79,7 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   // The chain-shape stories differ in the rows the list draws.
   "Checkout/PixOnly": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-PIX"], absentTestIds: ["list-option-CARD"] },
   "Checkout/CardOnly": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"], absentTestIds: ["list-option-PIX"] },
-  "Checkout/PixAndCard": LIST_NEW_BUYER,
+  "Checkout/PixOrCard": LIST_NEW_BUYER,
   "Checkout/StubTokenizationGranted": { ...LIST_NEW_BUYER, testIds: [...LIST_TOP, "list-option-CARD", "card-number"] },
   "Checkout/TokenizationNone": LIST_NEW_BUYER,
   "Checkout/RedirectChain": {
@@ -122,11 +122,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["Pague com Pix"],
   },
   "Screens/CardEntryNewCard": {
-    testIds: ["card-view", "card-number", "card-pay"],
+    testIds: ["card-entry", "card-number", "card-pay"],
     text: ["Pagar R$ 75,00"],
   },
   "Screens/CardEntryWithSavedCards": {
-    testIds: ["card-view", "saved-cards", "card-pay"],
+    testIds: ["card-entry", "saved-cards", "card-pay"],
     text: ["visa •••• 4242", "Novo cartão"],
   },
   "Screens/StatusPaid": {
@@ -219,28 +219,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
   },
 
   // ------------------------------------------------------- ProviderScreens
-  "ProviderScreens/PixCodeOnOurPage": {
-    testIds: ["pix-view", "pix-code"],
-    text: ["Pague com Pix"],
-  },
-  // Pinned EMPTINESS: no payable yet, so the screen deliberately stays out of
-  // the way — anything on screen here (an error alert included) is a failure.
-  "ProviderScreens/AwaitingTheMethodChoice": { empty: true },
   "ProviderScreens/HandoffNotice": {
     testIds: ["checkout-handoff-pending"],
     // The SAME sentence the invite made — see the story's own comment.
     text: ["Você será levado à página de pagamento da Boreal"],
   },
-  "ProviderScreens/DeclaresNothingAndStillWorks": {
-    testIds: ["pix-view", "pix-code"],
-    text: ["Pague com Pix"],
-  },
-  "ProviderScreens/UnknownIdFromANewerServer": {
-    testIds: ["pix-view", "pix-code"],
-    text: ["Pague com Pix"],
-  },
-  "ProviderScreens/UnknownIdOnAHandoffStore": { testIds: ["checkout-handoff-pending"] },
-  "ProviderScreens/CapabilityDefaultDirect": { testIds: ["checkout-handoff-pending"] },
 
   // ----------------------------------------------------------- PlatformOps
   // The platform screens take their words from the pack the stories mount, so
@@ -572,10 +555,6 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
       "cabeça anterior ao campo wallets (host antigo) → false",
       "canMakePayments() lança (tratado como não) → false",
     ],
-  },
-  "Wallets/WalletFastLaneAssembled": {
-    testIds: ["apple-pay-button", "google-pay-button", "card-view", "card-pay"],
-    text: ["ou pague com cartão", "Pagar R$ 75,00"],
   },
 
   // -------------------------------------------------------------- Headless

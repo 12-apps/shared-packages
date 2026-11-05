@@ -33,7 +33,7 @@ interface Envelope {
 }
 
 /** What the host reads back out of `POST /` and turns into a payable view. */
-export async function raisePayable(
+async function raisePayable(
   world: StoryWorld,
   input: CreateOrderRequest,
 ): Promise<CreateOrderResult> {

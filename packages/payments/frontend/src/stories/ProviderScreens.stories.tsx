@@ -1,32 +1,23 @@
 import type { JSX } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { CapabilityDefaultScreen } from "../components/checkout/providers/capability-default";
 import { HostedLinkScreen } from "../components/checkout/providers/hosted-link";
-import { PixAndCardScreen } from "../components/checkout/providers/pix-and-card";
-import { resolveCheckoutScreen } from "../components/checkout/providers/registry";
 import type {
   ProviderCheckoutScreen,
   ProviderCheckoutScreenProps,
 } from "../components/checkout/providers/types";
-import type { CheckoutOrder, CheckoutProviderConfig } from "../index";
+import type { CheckoutProviderConfig } from "../index";
 
 import { StoryFlow } from "./host";
 
 /**
- * The per-provider checkout screens, each on its own (FUT-596).
+ * The hand-off screen on its own (FUT-596).
  *
- * What is under review here is not "does the checkout work" — `Checkout.stories`
- * covers that — but the claim that a provider's flow gets ITS OWN screen, that
- * the two shipped screens carry no branch for each other, and that a provider
- * declaring nothing still lands on something renderable.
- *
- * Every store below is a FICTIONAL provider (`aurora`, `boreal`). That is
- * possible precisely because the id an adapter declares names the SHAPE of the
- * flow rather than the vendor: `aurora` declaring `'pix-and-card'` gets exactly
- * the component a real on-page acquirer would. A vendor-keyed registry would
- * have forced these stories to name a real vendor, which this story world
- * refuses to do (see `store-adapter.ts`).
+ * The one list collects Pix and the card on our page itself; what it mounts
+ * from `providers/` is the screen for a store that finishes on the PROVIDER's
+ * page — `hosted-link`. Every store below is a FICTIONAL provider (`boreal`):
+ * the id an adapter declares names the SHAPE of the flow rather than the
+ * vendor, so a story never has to name a real one (see `store-adapter.ts`).
  */
 const meta: Meta = {
   title: "Checkout/Provider screens",
@@ -34,51 +25,12 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          "Each screen mounted alone, with the store config that reaches it. The last " +
-          "two stories are the fallback path: a provider that declares nothing, and an " +
-          "id from a newer server that this bundle has never heard of.",
+          "The hand-off screen mounted alone, with the store config that reaches it.",
       },
     },
   },
 };
 export default meta;
-
-const PAYABLE_PIX: CheckoutOrder = {
-  orderId: "inv_2026_0043",
-  status: "AWAITING_PAYMENT",
-  method: "PIX",
-  totalCents: 7500,
-  subtotalCents: 7500,
-  discountTotalCents: 0,
-  appliedDiscounts: [],
-  totalLabel: "R$ 75,00",
-  pix: {
-    copyPaste:
-      "00020126580014BR.GOV.BCB.PIX0136inv_2026_00435204000053039865802BR6009SAO PAULO62070503***6304ABCD",
-    expiresAt: "2026-08-07T23:59:00.000Z",
-  },
-};
-
-/** An on-page store: it can mint a card instrument in this browser. */
-function onPageStore(screen: string | null): CheckoutProviderConfig {
-  return {
-    provider: "aurora",
-    tokenization: "PUBLIC_KEY",
-    publicKey: "pk_story_aurora",
-    mockTokenization: true,
-    methods: ["PIX", "CARD"],
-    chain: [
-      {
-        provider: "aurora",
-        tokenization: "PUBLIC_KEY",
-        publicKey: "pk_story_aurora",
-        mockTokenization: true,
-        methods: ["PIX", "CARD"],
-        checkoutScreen: screen,
-      },
-    ],
-  };
-}
 
 /** A hand-off store: it takes a card, but never on our page. */
 function handoffStore(screen: string | null): CheckoutProviderConfig {
@@ -132,13 +84,13 @@ function Mounted({
   config,
   ...rest
 }: {
-  screen?: ProviderCheckoutScreen;
+  screen: ProviderCheckoutScreen;
   config: CheckoutProviderConfig;
 } & Partial<ProviderCheckoutScreenProps>): JSX.Element {
   return (
     <StoryFlow spec={{ chain: [{ name: config.provider ?? "aurora", stub: true }] }}>
       {(flows) => {
-        const Screen = screen ?? resolveCheckoutScreen(config.chain?.[0]?.checkoutScreen);
+        const Screen = screen;
         return (
           <flows.Provider config={config}>
             <Screen {...props({ config, ...rest })} />
@@ -149,69 +101,11 @@ function Mounted({
   );
 }
 
-export const PixCodeOnOurPage: StoryObj = {
-  name: "pix-and-card — o código PIX",
-  render: () => (
-    <Mounted
-      screen={PixAndCardScreen}
-      config={onPageStore("pix-and-card")}
-      method="PIX"
-      order={PAYABLE_PIX}
-    />
-  ),
-};
-
-export const AwaitingTheMethodChoice: StoryObj = {
-  name: "pix-and-card — antes da escolha",
-  render: () => (
-    // No payable yet: the shell is still showing the picker, and the screen
-    // deliberately stays out of the way rather than reserving space.
-    <Mounted screen={PixAndCardScreen} config={onPageStore("pix-and-card")} method={null} />
-  ),
-};
-
 export const HandoffNotice: StoryObj = {
   name: "hosted-link — indo para a página do provedor",
   render: () => (
     // The moment after the press of the list's "Ir para …": the charge is
     // being raised and the buyer is about to leave.
     <Mounted screen={HostedLinkScreen} config={handoffStore("hosted-link")} method="CARD" />
-  ),
-};
-
-export const DeclaresNothingAndStillWorks: StoryObj = {
-  name: "fallback — provedor que não declara tela",
-  render: () => (
-    // Stone and Stripe today. No `screen` prop: this goes through the real
-    // resolution, which reads `tokenization` + `methods` and picks the same
-    // shape a declaration would have.
-    <Mounted config={onPageStore(null)} method="PIX" order={PAYABLE_PIX} />
-  ),
-};
-
-export const UnknownIdFromANewerServer: StoryObj = {
-  name: "fallback — id que este bundle não conhece",
-  render: () => (
-    // The version-skew case, and the reason the fallback is not decoration:
-    // the two packages ship independently, so a host running a newer backend
-    // publishes ids this bundle has never seen. Resolving to nothing would
-    // blank the pane for every buyer of that store.
-    <Mounted config={onPageStore("boleto-and-wallet")} method="PIX" order={PAYABLE_PIX} />
-  ),
-};
-
-export const UnknownIdOnAHandoffStore: StoryObj = {
-  name: "fallback — id desconhecido numa loja hosted",
-  render: () => (
-    // Same skew, other shape: the capability default must not send a hand-off
-    // store to the on-page screen just because the id was unrecognised.
-    <Mounted config={handoffStore("boleto-and-wallet")} method="CARD" />
-  ),
-};
-
-export const CapabilityDefaultDirect: StoryObj = {
-  name: "fallback — a tela de capacidade, direto",
-  render: () => (
-    <Mounted screen={CapabilityDefaultScreen} config={handoffStore(null)} method="CARD" />
   ),
 };

@@ -11,8 +11,9 @@ import type { CheckoutOrder } from "./types";
  * render the button Google's brand rules require via `createButton`, and turn
  * `loadPaymentData` into the wallet key
  * (`paymentData.paymentMethodData.tokenizationData.token`). What happens to
- * the key — the charge, the polling, the outcome — belongs to the pane above
- * (`wallet-pane.tsx`), so this file never talks to the wire.
+ * the key — the charge, the polling, the outcome — belongs to whoever mounts
+ * it (the one list runs its own sheet, `./list/wallet-press.ts`), so this file
+ * never talks to the wire.
  *
  * The `tokenizationSpecification` is `{ type: 'PAYMENT_GATEWAY', gateway,
  * gatewayMerchantId }`, both parameters published by the store's chain head

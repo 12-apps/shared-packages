@@ -97,7 +97,7 @@ export const CardOnly: StoryObj = scene({
 });
 
 /** Both. Switching method drops the raised order — no stale QR behind a form. */
-export const PixAndCard: StoryObj = scene({
+export const PixOrCard: StoryObj = scene({
   chain: [{ name: "aurora", methods: ["PIX", "CARD"], ...STUB }],
 });
 

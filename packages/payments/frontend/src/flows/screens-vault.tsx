@@ -121,7 +121,7 @@ function AddCardForm({
 }
 
 /** The add-card screen body, one branch per {@link AddCardController} phase. */
-export function AddCardView({
+export function AddCardPanel({
   controller,
   copy,
 }: {
@@ -166,7 +166,7 @@ function AddCardSection({
   onSaved?: (display: VaultedCardDisplay) => void;
 }): JSX.Element {
   const controller = useAddCard(runtime, onSaved);
-  return <AddCardView controller={controller} copy={runtime.copy} />;
+  return <AddCardPanel controller={controller} copy={runtime.copy} />;
 }
 
 /**

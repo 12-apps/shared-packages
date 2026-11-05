@@ -6,7 +6,7 @@ import { useCheckoutClientApi } from "./client-context";
 
 /**
  * Where the card path's two inputs come from: the buyer's saved cards and the
- * store's card key. Split out of `./use-card-checkout.ts` at its size gate when
+ * store's card key. Split out of the card submit hook at its size gate when
  * the one-list Pagamento step (FUT-3591) needed the saved cards BEFORE any
  * order exists — the list preselects one — and needed to know when the key is
  * still on its way, because its charge runs the moment the 5-second bar fills

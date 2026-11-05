@@ -13,9 +13,9 @@ type ApplePayCopy = WalletCopy["applePay"];
  * ships natively; there is no script to load. This component owns token
  * ACQUISITION: feature-detect, render Apple's button, run the session, and
  * turn an authorized payment into the wallet key (Apple's `token.paymentData`,
- * serialized verbatim). The charge itself belongs to the pane above
- * (`wallet-pane.tsx`), which reports back so the sheet can be completed with
- * the honest status.
+ * serialized verbatim). The charge itself belongs to whoever mounts it (the
+ * one list runs its own session, `./list/wallet-press.ts`), which reports back
+ * so the sheet can be completed with the honest status.
  *
  * ## Visa and Mastercard ONLY — a money rule, not a default
  *

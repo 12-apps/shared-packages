@@ -188,7 +188,8 @@ describe("a red card field is re-judged when its value changes (FUT-4102)", () =
 
 describe("the payment list's card form (the storefront's mount)", () => {
   it("clears the red its blurs left once autofill fills the card", async () => {
-    renderList({ config: onPageStore(), client: stubClient([]) });
+    // A buyer with no name on file: every field, the holder too, opens empty (FUT-3811).
+    renderList({ config: onPageStore(), client: stubClient([]), buyer: {} });
     await screen.findByTestId("payment-list");
     fireEvent.click(screen.getByTestId("list-option-CARD-radio"));
     await screen.findByTestId("card-number");
