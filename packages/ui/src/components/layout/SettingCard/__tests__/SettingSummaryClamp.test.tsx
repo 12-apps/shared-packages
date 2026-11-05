@@ -46,6 +46,23 @@ describe('the summary clamp', () => {
     expect(screen.getByTestId('toggle-summary')).toHaveTextContent(LONG);
   });
 
+  it('gives the [i] a 40px box, and takes the extra 24px back as margin (FUT-4443)', async () => {
+    stubLayout(true);
+    render(
+      <SettingToggle
+        title="Pay on delivery"
+        summary={LONG}
+        copy={EN_US_SETTING_SWITCH_COPY}
+        checked={false}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const info = await screen.findByRole('button', { name: 'Show the full text' });
+    expect(info).toHaveStyle({ minWidth: '2.5rem', minHeight: '2.5rem' });
+    expect(info).toHaveStyle({ margin: '-0.75rem' });
+  });
+
   it('draws no [i] when the summary fits', async () => {
     stubLayout(false);
     render(
