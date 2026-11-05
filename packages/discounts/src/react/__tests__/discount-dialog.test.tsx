@@ -1,4 +1,12 @@
 // @vitest-environment jsdom
+// The two surfaces `UsableModal` fetches on its first open, loaded here at
+// collection: each is its own chunk of `@12-apps/ui`, and its first open in a
+// cold worker spent about 2 s importing the stacked modal's or the sheet's
+// modules, inside the 1 s a `findBy` waits, so D1 and D2 failed on CI and on
+// main (a487ed73). Loaded up front, the open renders in a few hundred ms and
+// what is asserted is the dialog, not the module loader.
+import "@12-apps/ui/feedback/StackedModal";
+import "@12-apps/ui/data-display/Sheet";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState, type JSX } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
