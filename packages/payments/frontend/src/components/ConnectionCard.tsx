@@ -4,24 +4,24 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Drawer,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import type { ConnectedOAuthAccount, PaymentEnvironment } from '@12-apps/payments-backend';
 
-import { expiryProximity } from './connection-state';
 import { useLiveSandboxCopy } from './LiveSandboxBand';
 import { BTN_PRIMARY_SX, BTN_SECONDARY_SX, LINKISH_SX, T } from './panel-tokens';
-import type { OAuthConnectionCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
@@ -188,7 +188,7 @@ export function DisconnectDialog(props: {
   const { displayName } = props;
   const receiving = props.receiving && !toProduction;
   return (
-    <Dialog open={props.open} onClose={props.onCancel} data-testid="payments-disconnect-confirm">
+    <RemovalFrame open={props.open} sheet={toProduction} onClose={props.busy ? undefined : props.onCancel}>
       <DialogTitle sx={{ fontSize: '16.5px', fontWeight: 700, letterSpacing: '-.01em', pb: '8px' }}>
         {words.question}
       </DialogTitle>
@@ -226,6 +226,38 @@ export function DisconnectDialog(props: {
         onCancel={props.onCancel}
         onPauseInstead={receiving ? props.onPauseInstead : undefined}
       />
+    </RemovalFrame>
+  );
+}
+
+/**
+ * What the removal dialog sits in. Backdrop and Escape do nothing while the
+ * removal is in flight (`onClose` undefined): closing then would hide its
+ * outcome, a failure included (FUT-4432).
+ *
+ * The "to Produção" variant is a bottom SHEET on a phone and the system's
+ * centred dialog on a computer (UX13, "popup no computador e sheet no
+ * celular"); the plain removal dialog stays the centred dialog it is today.
+ */
+function RemovalFrame(props: { open: boolean; sheet: boolean; onClose?: () => void; children: ReactNode }) {
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down('sm'));
+  if (props.sheet && phone) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={props.open}
+        onClose={props.onClose}
+        data-testid="payments-disconnect-confirm"
+        PaperProps={{ role: 'dialog', 'aria-modal': true, sx: { borderRadius: '18px 18px 0 0', maxHeight: '90%' } }}
+      >
+        {props.children}
+      </Drawer>
+    );
+  }
+  return (
+    <Dialog open={props.open} onClose={props.onClose} data-testid="payments-disconnect-confirm">
+      {props.children}
     </Dialog>
   );
 }
@@ -307,78 +339,3 @@ function Consequence({ children, tone }: { children: ReactNode; tone?: 'bad' }) 
     </Stack>
   );
 }
-
-/**
- * The expiry caption, with PROXIMITY emphasis (FUT-683): the renewal sweep
- * normally refreshes a grant long before it lapses, so an expiry that is
- * actually close means renewal has been failing quietly — and this caption is
- * the only warning an owner gets before checkout starts refusing. A neutral
- * gray line read the same on the eve of an outage as a year out.
- */
-export function ExpiryNote(props: { expiresAt: string }) {
-  const copy = usePaymentsSettingsCopy().oauth;
-  const when = new Date(props.expiresAt).toLocaleString('pt-BR');
-  const proximity = expiryProximity(props.expiresAt);
-  if (proximity === 'SAFE' || proximity === null) {
-    return (
-      <Typography variant="caption" color="text.secondary">
-        {copy.validUntil(when)}
-      </Typography>
-    );
-  }
-  return (
-    <Typography
-      variant="caption"
-      color={proximity === 'PAST' ? 'error.main' : 'warning.main'}
-      sx={{ fontWeight: 600 }}
-      data-testid="payments-expiry-warning"
-    >
-      {proximity === 'PAST'
-        ? copy.expiredAt(when)
-        : copy.expiresAt(when)}
-    </Typography>
-  );
-}
-
-
-/**
- * pt-BR labels for the scopes a store owner actually sees. Unknown scopes fall
- * back to the provider's own spelling — wrong words are worse than raw ones.
- */
-function scopeLabels(copy: OAuthConnectionCopy): Record<string, string> {
-  return {
-    'payments.read': copy.scopes.read,
-    'payments.create': copy.scopes.create,
-    'payments.refund': copy.scopes.refund,
-    'accounts.read': copy.scopes.account,
-  };
-}
-
-/**
- * WHAT the connected grant may do (FUT-300): its granted scopes, in the
- * owner's words.
- *
- * The account and the connect date used to be repeated here, as sentences
- * under the facts grid that already states both (`ConnectionFacts`). One place
- * per thing: the grid answers "which account, since when"; this answers only
- * what the grid cannot.
- */
-export function GrantedScopes(props: { account: ConnectedOAuthAccount }) {
-  const copy = usePaymentsSettingsCopy().oauth;
-  const { grantedScopes } = props.account;
-  if (grantedScopes.length === 0) return null;
-  return (
-    <Stack
-      direction="row"
-      spacing={0.5}
-      useFlexGap
-      flexWrap="wrap"
-      data-testid="payments-connected-account"
-    >
-      {grantedScopes.map((scope) => (
-        <Chip key={scope} size="small" variant="outlined" label={scopeLabels(copy)[scope] ?? scope} />
-      ))}
-    </Stack>
-  );
-}
-

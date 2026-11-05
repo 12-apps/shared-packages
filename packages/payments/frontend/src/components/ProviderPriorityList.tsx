@@ -15,6 +15,7 @@ import { useCallback, useState } from 'react';
 import type { MerchantSettingsView, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
+import { sandboxRefused } from './connection-state';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy, usePaymentsSettingsCopy } from './settings-copy-context';
 import { richText } from './rich-text';
@@ -74,6 +75,8 @@ interface PriorityRowProps {
   label: string;
   provider: string;
   index: number;
+  /** Checkout tries this row first — the first one whose sandbox is not refused (FUT-4432). */
+  first: boolean;
   total: number;
   saving: boolean;
   dragging: boolean;
@@ -87,6 +90,7 @@ function PriorityRow({
   label,
   provider,
   index,
+  first,
   total,
   saving,
   dragging,
@@ -122,7 +126,7 @@ function PriorityRow({
         {index + 1}
       </Typography>
       <Typography sx={{ flexGrow: 1 }}>{label}</Typography>
-      {index === 0 ? (
+      {first ? (
         <Typography variant="caption" color="primary" data-testid="payments-priority-first">
           {copy.firstInChain}
         </Typography>
@@ -248,6 +252,9 @@ export function ProviderPriorityList({ view, client, onReordered }: ProviderPrio
   const copy = usePaymentsSettingsCopy().priority;
   const { chain, error, saving, move } = useChainReorder(view, client, onReordered);
   const [dragging, setDragging] = useState<number | null>(null);
+  // A refused sandbox keeps its rank and takes nothing (FUT-4432): "first" is
+  // the first row checkout actually routes to.
+  const firstSelling = chain.find((name) => !sandboxRefused(view.configs.find((c) => c.provider === name))) ?? chain[0];
 
   if (chain.length === 0) {
     return (
@@ -263,7 +270,7 @@ export function ProviderPriorityList({ view, client, onReordered }: ProviderPrio
         {copy.orderHeading}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        {richText(copy.chainExplainer(labelOf(view.providers, chain[0] ?? '')))}
+        {richText(copy.chainExplainer(labelOf(view.providers, firstSelling ?? '')))}
       </Typography>
 
       {error ? (
@@ -281,6 +288,7 @@ export function ProviderPriorityList({ view, client, onReordered }: ProviderPrio
             label={labelOf(view.providers, provider)}
             provider={provider}
             index={index}
+            first={provider === firstSelling}
             total={chain.length}
             saving={saving}
             dragging={dragging === index}

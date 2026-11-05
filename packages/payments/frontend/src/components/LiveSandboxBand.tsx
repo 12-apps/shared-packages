@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert, Box, Button, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 
 import { BTN_PRIMARY_SX, CARD_INSET, T } from './panel-tokens';
 import type { LiveSandboxCopy } from './settings-copy';
@@ -55,11 +55,17 @@ export function LiveSandboxBand({
   nextInLine,
   onAction,
   disabled = false,
+  busy = false,
+  error = null,
 }: {
   /** Another provider in the store's chain takes the money meanwhile. */
   nextInLine: boolean;
   onAction?: () => void;
   disabled?: boolean;
+  /** The button's action is in flight: it takes no second tap. */
+  busy?: boolean;
+  /** Why that action failed, said where the owner pressed. */
+  error?: string | null;
 }) {
   const copy = useLiveSandboxCopy();
   return (
@@ -83,7 +89,10 @@ export function LiveSandboxBand({
         borderTop: `1px solid ${T.warnLine}`,
         borderBottom: `1px solid ${T.warnLine}`,
         color: T.warnInk,
-        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: '1px' },
+        // The icon sits on the FIRST line, as in the prototype, whatever the
+        // theme says about centring an alert's icon against its whole message.
+        alignItems: 'flex-start',
+        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: '-1px', alignSelf: 'flex-start' },
         '& .MuiAlert-message': { py: 0, flex: '1 1 300px', minWidth: 0 },
       }}
     >
@@ -95,13 +104,18 @@ export function LiveSandboxBand({
           <Button
             variant="contained"
             disableElevation
-            disabled={disabled}
+            disabled={disabled || busy}
             onClick={onAction}
             data-testid="payments-live-sandbox-action"
             sx={{ ...BTN_PRIMARY_SX, minHeight: '44px' }}
           >
-            {copy.bandAction}
+            {busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : copy.bandAction}
           </Button>
+        ) : null}
+        {error ? (
+          <Typography role="alert" data-testid="payments-live-sandbox-error" sx={{ fontSize: '13px', color: T.badInk }}>
+            {error}
+          </Typography>
         ) : null}
       </Stack>
     </Alert>

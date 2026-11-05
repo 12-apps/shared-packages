@@ -11,7 +11,8 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { ConnectionFacts, ConnectSteps, DisconnectDialog, ExpiryNote, GrantedScopes } from './ConnectionCard';
+import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCard';
+import { ExpiryNote, GrantedScopes } from './GrantDetails';
 import { EnvironmentSelector } from './EnvironmentTabs';
 import { readConnection, useConnectEnvironment } from './connect-environment';
 import { ToProductionDialog, useToProduction } from './to-production';

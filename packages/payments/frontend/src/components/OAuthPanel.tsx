@@ -4,8 +4,8 @@ import { Alert, Box, Button } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import { ConnectionProbe } from './ConnectionProbe';
-import { isConnected, sandboxRefused } from './connection-state';
-import { LiveSandboxBand } from './LiveSandboxBand';
+import { isConnected } from './connection-state';
+import { useLiveSandbox } from './to-production';
 import { BLOCK_GAP, CARD_INSET, LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
@@ -98,34 +98,6 @@ function ConnectUnavailableCard({
       ) : null}
     </ProviderCard>
   );
-}
-
-/**
- * A refused sandbox on the OAuth panel (FUT-4432): the band under the header,
- * and what its button does. A GRANT is removed through the "to Produção"
- * dialog, which `ProviderConnection` owns; pasted keys are never removed — that
- * wipes both environments — so the button opens the manual path on Produção.
- * With no connect button on this installation the band offers nothing to press.
- * The activation step is withheld meanwhile (the caller), and returns once the
- * store is connected in Produção.
- */
-function useLiveSandbox(
-  io: Pick<ActivePanelProps, 'config' | 'prepareConnect' | 'nextInLine' | 'readOnly'> & { toProductionTab?: () => void },
-  setManual: (manual: boolean) => void,
-) {
-  const [open, setOpen] = useState(false);
-  const refused = sandboxRefused(io.config);
-  if (!refused) return { refused, band: undefined, toProduction: undefined };
-  const grant = io.config?.connectedAccount != null;
-  const action = () => {
-    setManual(!grant);
-    if (grant) setOpen(true);
-    else io.toProductionTab?.();
-  };
-  const band = (
-    <LiveSandboxBand nextInLine={io.nextInLine === true} disabled={io.readOnly === true} onAction={io.prepareConnect ? action : undefined} />
-  );
-  return { refused, band, toProduction: grant ? { open, onClose: () => setOpen(false) } : undefined };
 }
 
 /**

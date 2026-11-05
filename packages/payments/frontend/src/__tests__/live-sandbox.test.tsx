@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { MaskedProviderConfig, MerchantSettingsView, ProviderDescriptor } from '@12-apps/payments-backend';
@@ -8,6 +8,7 @@ import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { connectionBadge, sandboxRefused } from '../components/connection-state';
 import { withLiveSandboxWords } from '../locales';
+import { isGrant, productionStored } from '../components/to-production';
 import { EN_US_PAYMENTS_SETTINGS_COPY } from '../components/settings-en-US';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 import type { PaymentsSettingsCopy } from '../components/settings-copy';
@@ -78,6 +79,8 @@ function fakeClient(world: World): PaymentsSettingsClient {
     setEnabled: vi.fn(),
     saveCredentials: vi.fn(),
     disconnectOAuth,
+    setPriorities: vi.fn(),
+    setFailoverPolicy: vi.fn(),
     beginOAuth: vi.fn().mockResolvedValue({ url: 'https://provider.test/consent' }),
   } as unknown as PaymentsSettingsClient;
 }
@@ -107,6 +110,15 @@ function mount(world: World, options: Mount = {}) {
 }
 
 const live = () => PT_BR_PAYMENTS_SETTINGS_COPY.liveSandbox!;
+
+/** A promise the test fails by hand — the removal still in flight. */
+function pending(): { promise: Promise<never>; reject: (reason: Error) => void } {
+  const gate = new AbortController();
+  const promise = new Promise<never>((_, settle) => {
+    gate.signal.addEventListener('abort', () => settle(gate.signal.reason as Error));
+  });
+  return { promise, reject: (reason) => gate.abort(reason) };
+}
 const assign = vi.fn();
 
 beforeEach(() => {
@@ -346,5 +358,125 @@ describe('withLiveSandboxWords', () => {
     expect(packs['en-US'].liveSandbox?.bandNobodyPays).toBe('Shoppers see a closed checkout.');
     expect(packs['en-US'].liveSandbox?.headerSub).toBe(EN_US_PAYMENTS_SETTINGS_COPY.liveSandbox!.headerSub);
     expect(packs['pt-BR'].status).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.status);
+  });
+});
+
+describe('telling an OAuth grant from pasted keys', () => {
+  it('is a grant when the identity fields are present, the credentials path otherwise', () => {
+    expect(isGrant(config({ provider: 'aurora', connectedAccount: GRANT as never }))).toBe(true);
+    expect(isGrant(config({ provider: 'aurora', connectedAccount: null }))).toBe(false);
+  });
+
+  it('knows when PRODUCTION credentials are already on record', () => {
+    expect(productionStored(config({ provider: 'aurora' }))).toBe(false);
+    const both = config({ provider: 'aurora', environments: { SANDBOX: {}, PRODUCTION: { token: { configured: true, hint: '••••9999' } } } as never });
+    expect(productionStored(both)).toBe(true);
+  });
+});
+
+describe('a refused sandbox: the edges of "Conectar em Produção"', () => {
+  const grantWorld = (over: Partial<World> = {}): World => ({
+    descriptor: OAUTH,
+    configs: [config({ provider: 'aurora', connectedAccount: GRANT as never })],
+    after: [NOT_CONNECTED('aurora')],
+    ...over,
+  });
+
+  it('switches a grant that already holds PRODUCTION keys by saving PRODUCTION, and removes nothing', async () => {
+    const withKeys = config({
+      provider: 'aurora',
+      connectedAccount: GRANT as never,
+      environments: { SANDBOX: { token: { configured: true, hint: '••••1234' } }, PRODUCTION: { token: { configured: true, hint: '••••9999' } } } as never,
+    });
+    const { client } = mount(grantWorld({ configs: [withKeys] }));
+
+    const button = await screen.findByRole('button', { name: live().bandAction });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(client.saveCredentials).toHaveBeenCalledTimes(1));
+    expect(client.saveCredentials).toHaveBeenCalledWith('aurora', { environment: 'PRODUCTION', fields: {} });
+    expect(client.disconnectOAuth).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('removes the grant BEFORE it mints the PRODUCTION connect', async () => {
+    const { client, prepareConnect } = mount(grantWorld());
+
+    fireEvent.click(await screen.findByRole('button', { name: live().bandAction }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: live().toProductionConfirm }));
+
+    await waitFor(() => expect(prepareConnect).toHaveBeenCalledWith('aurora', 'PRODUCTION'));
+    const removed = vi.mocked(client.disconnectOAuth).mock.invocationCallOrder[0] ?? Infinity;
+    const minted = vi.mocked(prepareConnect as never as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0] ?? -Infinity;
+    expect(removed).toBeLessThan(minted);
+  });
+
+  it('removes once for a double tap on the confirm', async () => {
+    const { client } = mount(grantWorld());
+
+    fireEvent.click(await screen.findByRole('button', { name: live().bandAction }));
+    const confirm = within(await screen.findByRole('dialog')).getByRole('button', { name: live().toProductionConfirm });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(assign).toHaveBeenCalled());
+    expect(client.disconnectOAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Escape while a removal is in flight, and shows its failure in the dialog', async () => {
+    const { client } = mount(grantWorld());
+    const removal = pending();
+    vi.mocked(client.disconnectOAuth).mockImplementationOnce(() => removal.promise as never);
+
+    fireEvent.click(await screen.findByRole('button', { name: live().bandAction }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: live().toProductionConfirm }));
+    // MUI's Escape handler sits on the modal's root, not on the paper.
+    fireEvent.keyDown(dialog.closest('.MuiModal-root') ?? dialog, { key: 'Escape', code: 'Escape' });
+    // Longer than the dialog's exit transition, so a dismissal would have unmounted it.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    removal.reject(new Error('boom'));
+
+    const error = await screen.findByTestId('payments-disconnect-error');
+    expect(screen.getByRole('dialog').contains(error)).toBe(true);
+    expect(screen.getByRole('dialog').closest('.MuiModal-hidden')).toBeNull();
+  });
+
+  it('still offers pasted keys the Produção tab where this installation cannot connect', async () => {
+    mount({ descriptor: OAUTH, configs: [config({ provider: 'aurora' })] }, { prepareConnect: null });
+
+    fireEvent.click(await screen.findByRole('button', { name: live().bandAction }));
+
+    await waitFor(() => expect(screen.getByTestId('payments-environment-PRODUCTION').getAttribute('aria-selected')).toBe('true'));
+  });
+
+  it('draws the confirmation as a bottom sheet on a phone', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('max-width'), media: query, onchange: null,
+      addListener: () => undefined, removeListener: () => undefined,
+      addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => false,
+    }));
+    mount(grantWorld());
+
+    fireEvent.click(await screen.findByRole('button', { name: live().bandAction }));
+
+    const sheet = await screen.findByRole('dialog');
+    expect(sheet.className).toMatch(/MuiDrawer-paper/);
+    expect(sheet.textContent).toContain(live().toProductionConfirm);
+  });
+});
+
+describe('the failover order with a refused sandbox at its head', () => {
+  it('names the first provider that sells, not the refused one', async () => {
+    const OTHER = { ...OAUTH, name: 'boreal', displayName: 'Boreal', urlSlug: 'boreal' } as unknown as ProviderDescriptor;
+    const configs = [config({ provider: 'aurora', priority: 0 }), config({ provider: 'boreal', priority: 1, sandboxRefused: false })];
+    const client = fakeClient({ descriptor: OAUTH, configs });
+    vi.mocked(client.getSettings).mockResolvedValue({ providers: [OAUTH, OTHER], configs, activeProvider: 'boreal', providerChain: ['boreal'] } as never);
+    render(<PaymentProviderSettings copy={PT_BR_PAYMENTS_SETTINGS_COPY} client={client} />);
+
+    const first = await screen.findByTestId('payments-priority-first');
+    expect(screen.getByTestId('payments-priority-item-boreal').contains(first)).toBe(true);
+    await waitFor(() => expect(within(screen.getByTestId('payments-priority-item-aurora')).queryByTestId('payments-priority-first')).toBeNull());
   });
 });
