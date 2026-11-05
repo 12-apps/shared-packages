@@ -123,17 +123,17 @@ export function installGoogle(load: () => Promise<unknown> = async () => ({ paym
     return button;
   });
   const isReadyToPay = vi.fn<(request: Record<string, unknown>) => Promise<{ result: boolean; paymentMethodPresent?: boolean }>>(async () => ({ result: true }));
-  let built = 0;
+  const built = vi.fn();
   class PaymentsClient {
     constructor() {
-      built += 1;
+      built();
     }
     isReadyToPay = isReadyToPay;
     createButton = createButton;
     loadPaymentData = loadPaymentData;
   }
   (window as { google?: unknown }).google = { payments: { api: { PaymentsClient } } };
-  return { loadPaymentData, createButton, isReadyToPay, constructed: () => built };
+  return { loadPaymentData, createButton, isReadyToPay, constructed: () => built.mock.calls.length };
 }
 
 /** One `ApplePaySession` the button started, as the test drives it. */

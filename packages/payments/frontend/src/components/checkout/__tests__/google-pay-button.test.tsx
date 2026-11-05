@@ -240,13 +240,13 @@ describe("paymentDataRequest — Google's own merchant id", () => {
 describe("the homologação evidence keeps the bare probe in PRODUCTION (FUT-4399)", () => {
   it("sends no existingPaymentMethodRequired and draws without paymentMethodPresent", async () => {
     const calls = installFakeApi({});
-    let seen: GooglePaymentsClient | null = null;
+    const seen: (GooglePaymentsClient | null)[] = [];
     function Probe() {
-      seen = useGooglePayClient(undefined, "PRODUCTION");
+      seen.push(useGooglePayClient(undefined, "PRODUCTION"));
       return null;
     }
     render(<Probe />);
-    await waitFor(() => expect(seen).not.toBeNull());
+    await waitFor(() => expect(seen.some((client) => client !== null)).toBe(true));
     expect(calls.readyRequests[0]).not.toHaveProperty("existingPaymentMethodRequired");
   });
 });

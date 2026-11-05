@@ -25,24 +25,30 @@ const SAFARI_UA = /\bVersion\/[\d.]+.*\bSafari\//;
 
 const NON_APPLE_PLATFORMS = new Set(["Android", "Windows", "Linux", "Chrome OS", "Chromium OS"]);
 
+/** The UA or hint names an Apple mobile OS: every iOS browser is WebKit under Apple's rules. */
+function isIosDevice(device: DeviceSignals): boolean {
+  // Client Hints, when the engine sends them (Chromium). Safari and every real
+  // iOS browser send none, so they fall through to the UA.
+  const platform = device.userAgentData?.platform;
+  return platform === "iOS" || platform === "iPadOS" || IOS_UA.test(device.userAgent);
+}
+
+/** A "Macintosh" UA that is a touchscreen (iPadOS asking for the desktop site) or Safari proper. */
+function isMacSafariOrIpad(device: DeviceSignals): boolean {
+  if (!MAC_UA.test(device.userAgent)) return false;
+  if ((device.maxTouchPoints ?? 0) > 1) return true;
+  return SAFARI_UA.test(device.userAgent) && !NOT_SAFARI_UA.test(device.userAgent);
+}
+
 export function isAppleDevice(device: DeviceSignals): boolean {
   const platform = device.userAgentData?.platform;
-  // Client Hints, when the engine sends them (Chromium). Safari and every real
-  // iOS browser send none, so they fall through to the UA. "macOS" is not
-  // decided here: a Chromium on a Mac says so too, and only the UA tells it
-  // from Safari (an emulated Safari UA on Chromium reports "macOS" as well).
   if (platform === "iOS" || platform === "iPadOS") return true;
   // A known non-Apple platform is never Apple, whatever UA it was handed (an
   // Android tablet in desktop mode sends "Macintosh" and has a touchscreen).
+  // "macOS" is not decided here: a Chromium on a Mac says so too, and only the
+  // UA tells it from Safari (an emulated Safari UA reports "macOS" as well).
   if (platform !== undefined && NON_APPLE_PLATFORMS.has(platform)) return false;
-  const ua = device.userAgent;
-  // Every iOS browser (CriOS, FxiOS, EdgiOS…) is WebKit under Apple's rules.
-  if (IOS_UA.test(ua)) return true;
-  if (!MAC_UA.test(ua)) return false;
-  // iPadOS asks for the desktop site by default: "Macintosh", but with a
-  // touchscreen, which no Mac has.
-  if ((device.maxTouchPoints ?? 0) > 1) return true;
-  return SAFARI_UA.test(ua) && !NOT_SAFARI_UA.test(ua);
+  return isIosDevice(device) || isMacSafariOrIpad(device);
 }
 
 /** {@link isAppleDevice} for the page this runs in; `false` outside a browser. */
