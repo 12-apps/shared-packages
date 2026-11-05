@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
@@ -303,6 +303,106 @@ describe("what it refuses", () => {
       amountOffCents: null,
       bundlePriceCents: null,
       freeUnits: null,
+    });
+  });
+});
+
+describe("FUT-4441: when Itens grátis says a product is missing", () => {
+  const message = "free-units-message";
+
+  // jsdom has no scrollIntoView, which the picker's listbox calls; give it one
+  // for this block only and take it away again.
+  beforeAll(() => {
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: () => {},
+    });
+  });
+  afterAll(() => {
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+
+  async function pickFreeUnits(): Promise<void> {
+    fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
+    await screen.findByTestId("free-units-builder");
+  }
+
+  it("K26: picking the kind shows no product error before any submit", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    await waitFor(() => {
+      expect(screen.queryByTestId(message)).toBeNull();
+      expect(screen.queryByText(copy.form.freeUnitsTargetRequired)).toBeNull();
+    });
+  });
+
+  it("K27: submitting with no product shows it under the builder", async () => {
+    const { sent } = renderForm(null);
+    await pickFreeUnits();
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    expect(await screen.findByTestId(message)).toBeTruthy();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("K28: picking a product afterwards clears it", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await screen.findByTestId(message);
+    const input = within(screen.getByTestId("free-units-items")).getByRole("combobox");
+    await act(async () => {
+      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- a real focus, as the browser's pick keeps on the input
+      input.focus();
+    });
+    fireEvent.change(input, { target: { value: "Batata" } });
+    const option = within(await screen.findByRole("listbox")).getAllByRole("option")[0] as HTMLElement;
+    fireEvent.mouseDown(option);
+    fireEvent.click(option);
+    await waitFor(() => {
+      expect(screen.queryByTestId(message)).toBeNull();
+    });
+  });
+
+  it("K29: editing a saved rule that has its product shows no error", async () => {
+    renderForm(
+      comboRecord({
+        type: "FREE_UNITS",
+        percentOffBp: null,
+        freeUnits: 1,
+        comboRequirements: [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }],
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByTestId(message)).toBeNull();
+    });
+  });
+
+  it("K30: no product AND a bad quantity still shows the product line after submit", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "0" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    expect(await screen.findByTestId(message)).toBeTruthy();
+    expect(screen.getAllByText(copy.form.invalidComboQuantity).length).toBeGreaterThan(0);
+  });
+
+  it("K31: switching kind away and back after a refused submit shows no product line or toast", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    // A name and a valid reward, so the product is the ONLY refusal and the toast hangs on it.
+    fireEvent.change(screen.getByLabelText(copy.form.name), {
+      target: { value: "Leve 3" },
+    });
+    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "3" } });
+    fireEvent.change(screen.getByTestId("free-units-free"), { target: { value: "1" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await screen.findByTestId(message);
+    fireEvent.click(screen.getAllByText("Porcentagem")[0] as HTMLElement);
+    fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
+    await screen.findByTestId("free-units-builder");
+    await waitFor(() => {
+      expect(screen.queryByTestId(message)).toBeNull();
+      expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull();
     });
   });
 });
