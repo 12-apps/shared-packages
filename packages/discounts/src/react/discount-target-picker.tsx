@@ -102,7 +102,7 @@ export function DiscountTargetPicker({
     );
   }
 
-  if (kind === "COMBO" || kind === "BUNDLE_PRICE") {
+  if (kind === "COMBO") {
     return (
       <ComboSlotBuilder
         slots={selection.comboRequirements}

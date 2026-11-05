@@ -356,7 +356,7 @@ of promotion is this — and derives the pair (`src/react/form-kind.ts`):
 |---|---|---|---|
 | Porcentagem | `PERCENTAGE` | ORDER / CATEGORY / ITEM | the rate, and what it covers |
 | Valor fixo | `FIXED_AMOUNT` | ORDER / CATEGORY / ITEM | the amount, and what it covers |
-| Combo | `PERCENTAGE` or `FIXED_AMOUNT` | `COMBO` | the groups, and which of the two rewards |
+| Combo | `PERCENTAGE`, `FIXED_AMOUNT` or `BUNDLE_PRICE` | `COMBO` | the groups, and which of the three rewards |
 | Itens grátis | `FREE_UNITS` | `COMBO` | the products, how many, how many free |
 
 So the offers a merchant describes map one to one onto what they fill in:
@@ -366,6 +366,7 @@ So the offers a merchant describes map one to one onto what they fill in:
 | "leve 3, pague 2" | Itens grátis | 3 hambúrgueres, 1 free |
 | "2 refrigerantes, 2 hambúrgueres e 2 batatas com 20% de desconto" | Combo | three groups of 2, and the rate |
 | the same six items at R$ 5,00 off | Combo | three groups of 2, and the amount |
+| "5 marmitas por R$ 120" | Combo | one group of 5 (a category mixes flavours), and the closed price |
 
 Two consequences of asking the kind instead of the pair:
 
@@ -373,12 +374,20 @@ Two consequences of asking the kind instead of the pair:
   made of, so the scope toggle offers the three that are genuinely a choice.
   Offering the fourth is what let an operator build "preço de combo,
   abrangência: pedido" and have the write path refuse it.
-- **`BUNDLE_PRICE` is no longer offered.** A flat price for the group reprices
-  it, and goes silently wrong the first time one of its items changes price —
-  so a combo gives a percentage or an amount OFF what its items add up to. The
-  type is still legal in the engine and in the database, and the kind toggle
-  grows a fifth option on the form of a rule that already carries it, so an
-  older promotion opens, edits and saves as what it is.
+- **A closed price is a combo's third reward, "Preço fechado" (FUT-4417).**
+  `BUNDLE_PRICE` reprices the matched group whatever its items cost — which is
+  what "5 marmitas por R$ 120" asks for, so the form offers it beside the rate
+  and the amount, says so under the price, and previews it. It is a REWARD,
+  not a kind: a rule saved as `BUNDLE_PRICE` before FUT-4417 opens as a combo
+  with "Preço fechado" chosen, and the kind toggle is always the same four.
+- **"Como fica no carrinho"** previews one combo under the chosen reward: what
+  its items sum to (each group filled with its cheapest product, then its
+  dearest) and what the buyer pays and saves, with the engine's own
+  arithmetic (`src/react/combo-preview.ts`, one application, before the
+  cart-level clamps). It needs the host's ITEM targets to carry
+  `priceRangeCents` (the product's own price and its variations') and
+  `categoryId`; a host that sends neither simply gets no preview. In a form
+  at least 720 px wide it sits in its own column beside the form.
 
 Picking Combo swaps the single target picker for the **group builder**: each
 group is a quantity plus the rows that can fill it, and a group may name

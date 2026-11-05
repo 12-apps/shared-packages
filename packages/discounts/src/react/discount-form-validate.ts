@@ -108,8 +108,9 @@ function checkPercent(
 /**
  * The reward, checked against the input the chosen KIND actually mounted.
  *
- * `type` is derived rather than read: a combo's reward is a percentage or an
- * amount, and which one it is lives in `comboReward` — so the check runs off
+ * `type` is derived rather than read: a combo's reward is a percentage, an
+ * amount or a closed price (FUT-4417), and which one it is lives in
+ * `comboReward` — so the check runs off
  * the same mapping the submit does, and the two cannot disagree about which
  * input holds the number.
  */

@@ -18,7 +18,7 @@ export interface DiscountFormValues extends Record<string, string> {
   name: string;
   /** What kind of promotion this is. Decides `type` and `scope` — see `./form-kind`. */
   kind: string;
-  /** Which of the two rewards a COMBO gives. Ignored by every other kind. */
+  /** Which of the three rewards a COMBO gives (FUT-4417). Ignored by every other kind. */
   comboReward: string;
   percentOff: string;
   amountOff: string;

@@ -13,8 +13,9 @@ import type { DiscountKind } from "./form-kind";
  * What kind of promotion this is — the form's first and most consequential
  * question, and the only one that decides what the rest of it looks like.
  *
- * The option list comes from the caller rather than from the constant, because
- * it is one longer when a legacy `BUNDLE_PRICE` rule is being edited.
+ * The option list comes from the caller rather than from the constant. It used
+ * to be one longer on a legacy `BUNDLE_PRICE` rule's form; since FUT-4417 that
+ * rule is a combo with the "Preço fechado" reward, so it is always the four.
  *
  * **One line, at every width** (FUT-4157, ADR 0190 in the host). Four equal
  * parts need about 530 px before "Porcentagem" and "Itens grátis" wrap inside
@@ -29,7 +30,7 @@ import type { DiscountKind } from "./form-kind";
 const PART_MIN_PX = 136;
 
 /** The element's own width as it changes; `null` until measured, or where nothing can measure. */
-function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {
+export function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
