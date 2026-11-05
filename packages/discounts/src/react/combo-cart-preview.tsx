@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useRef, type JSX, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useRef,
+  type JSX,
+  type ReactNode,
+} from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { useFormContext } from "@12-apps/ui/form/total-form";
@@ -12,8 +18,15 @@ import type { ComboRequirement } from "../engine/types";
 
 import { toBasisPoints, toCents, type WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
-import { comboPreviewOf, type ComboRewardValue } from "./combo-preview";
-import { comboPreviewLines, type ComboPreviewLayout } from "./combo-preview-lines";
+import {
+  comboPreviewOf,
+  type ComboPreview,
+  type ComboRewardValue,
+} from "./combo-preview";
+import {
+  comboPreviewLines,
+  type ComboPreviewLayout,
+} from "./combo-preview-lines";
 import { comboRewardOf } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 import { KIND_TOGGLE_MIN_PX, useElementWidth } from "./kind-field";
@@ -24,8 +37,10 @@ import { KIND_TOGGLE_MIN_PX, useElementWidth } from "./kind-field";
  * Under the reward's field on a phone or a narrow form; in its own column
  * beside the form when the form has the room, as the approved prototype draws
  * it on a computer. What decides is the FORM's own width, measured the way
- * `KindField` measures it, because the form also lives in a dialog narrower
- * than the screen.
+ * `KindField` measures it, because the form also lives in a modal narrower
+ * than the screen. In the wide stacked modal the screens open it in
+ * (`DiscountDialog`), a 1280 window gives the form well over the threshold;
+ * a tablet's or a phone's does not, and the preview sits under the field.
  */
 
 /** The side column's share and gap: `minmax(0, 3fr) minmax(0, 2fr)`, `gap: 3`. */
@@ -38,15 +53,27 @@ const FORM_SHARE = 3 / 5;
  * squeezed it into a select would trade a control the operator already knows
  * for a box of text — the preview has room only when nothing else pays for it.
  */
-export const PREVIEW_ASIDE_MIN_PX = Math.ceil(KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX);
+export const PREVIEW_ASIDE_MIN_PX = Math.ceil(
+  KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX,
+);
 
-/** What the preview needs that is not a form value, and where it was placed. */
-interface PreviewWorld {
-  layout: ComboPreviewLayout;
+/** What the preview reads that is not a form value. */
+interface PreviewInputs {
   copy: DiscountsWebCopy;
   formatters: DiscountsFormatters;
   groups: readonly WireTargetGroup[];
   slots: readonly ComboRequirement[];
+}
+
+/**
+ * The preview, worked out ONCE per render of the layout and handed down: the
+ * inline box under the reward's field reads it from here rather than summing
+ * the combo a second time.
+ */
+interface PreviewWorld extends PreviewInputs {
+  layout: ComboPreviewLayout;
+  reward: ComboRewardValue;
+  preview: ComboPreview | null;
 }
 
 const PreviewContext = createContext<PreviewWorld | null>(null);
@@ -65,32 +92,57 @@ function rewardFrom(
 }
 
 /** The preview the form currently describes, or null when there is nothing honest to sum. */
-function useComboPreview(world: Omit<PreviewWorld, "layout">) {
+function useComboPreview(world: PreviewInputs): {
+  reward: ComboRewardValue;
+  preview: ComboPreview | null;
+} {
   const { values } = useFormContext();
   const reward = rewardFrom(values, world.formatters);
-  const preview = values.kind === "COMBO" ? comboPreviewOf(world.slots, world.groups, reward) : null;
+  const preview =
+    values.kind === "COMBO"
+      ? comboPreviewOf(world.slots, world.groups, reward)
+      : null;
   return { reward, preview };
 }
 
 function PreviewBox({ world }: { world: PreviewWorld }): JSX.Element | null {
-  const { reward, preview } = useComboPreview(world);
+  const { reward, preview } = world;
   if (preview === null) return null;
-  const lines = comboPreviewLines(preview, reward, world.layout, world.copy, world.formatters);
+  const lines = comboPreviewLines(
+    preview,
+    reward,
+    world.layout,
+    world.copy,
+    world.formatters,
+  );
   const aside = world.layout === "aside";
   return (
     <Alert
       variant="info"
       showIcon={false}
       animate={false}
-      title={world.copy.comboRewards.preview.title}
       data-testid="combo-cart-preview"
     >
       <Stack spacing={aside ? 1 : 0.5}>
-        <Text variant="body" data-testid="combo-cart-preview-items">
+        {/* A small label over the figures, as the prototype draws it — not the
+            Alert's own title, which is larger than the lines it heads. */}
+        <Text
+          as="p"
+          variant="caption"
+          weight="semibold"
+          data-testid="combo-cart-preview-heading"
+        >
+          {world.copy.comboRewards.preview.title}
+        </Text>
+        <Text variant="body" size="sm" data-testid="combo-cart-preview-items">
           {lines.items}
         </Text>
         {lines.pays !== null && (
-          <Text variant={aside ? "heading" : "body"} data-testid="combo-cart-preview-pays">
+          <Text
+            variant={aside ? "heading" : "body"}
+            {...(aside ? {} : { size: "sm" as const })}
+            data-testid="combo-cart-preview-pays"
+          >
             {lines.pays}
           </Text>
         )}
@@ -122,16 +174,31 @@ export function ComboPreviewLayout({
   groups,
   slots,
   children,
-}: Omit<PreviewWorld, "layout"> & { children: ReactNode }): JSX.Element {
+}: PreviewInputs & { children: ReactNode }): JSX.Element {
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(box);
   // The column exists only while there is a preview to put in it: an empty
   // column beside a combo with no priced group yet is empty space, and the form
   // would be squeezed for nothing.
-  const { preview } = useComboPreview({ copy, formatters, groups, slots });
+  const { reward, preview } = useComboPreview({
+    copy,
+    formatters,
+    groups,
+    slots,
+  });
   const layout: ComboPreviewLayout =
-    preview !== null && width !== null && width >= PREVIEW_ASIDE_MIN_PX ? "aside" : "inline";
-  const world: PreviewWorld = { layout, copy, formatters, groups, slots };
+    preview !== null && width !== null && width >= PREVIEW_ASIDE_MIN_PX
+      ? "aside"
+      : "inline";
+  const world: PreviewWorld = {
+    layout,
+    copy,
+    formatters,
+    groups,
+    slots,
+    reward,
+    preview,
+  };
   return (
     <PreviewContext.Provider value={world}>
       <Box

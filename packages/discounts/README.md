@@ -386,8 +386,15 @@ Two consequences of asking the kind instead of the pair:
   arithmetic (`src/react/combo-preview.ts`, one application, before the
   cart-level clamps). It needs the host's ITEM targets to carry
   `priceRangeCents` (the product's own price and its variations') and
-  `categoryId`; a host that sends neither simply gets no preview. In a form
-  at least 720 px wide it sits in its own column beside the form.
+  `categoryId` (only for products a buyer can add: listed, not paused); a
+  host that sends neither simply gets no preview. In a form at least
+  `PREVIEW_ASIDE_MIN_PX` wide (931 px: the narrowest form whose left column
+  still holds the four-part kind toggle) it sits in its own column beside
+  the form; narrower, it sits under the reward's field.
+- **The create and edit forms open in `UsableModal`** (`size="wide"`): a
+  stacked modal on a computer, which at 1280 gives the form the room for
+  that column, and a bottom sheet on a phone. Every opening mounts a fresh
+  form.
 
 Picking Combo swaps the single target picker for the **group builder**: each
 group is a quantity plus the rows that can fill it, and a group may name

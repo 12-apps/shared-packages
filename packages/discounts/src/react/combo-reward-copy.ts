@@ -33,6 +33,11 @@ export interface DiscountsComboPreviewCopy {
   readonly paysPriceSaving: string;
   /** The same with one saving figure: `{price}`, `{saving}`. */
   readonly paysPriceSavingExact: string;
+  /**
+   * Closed price EQUAL to the cheapest sum: the cheapest combo saves nothing,
+   * so the saving reads "up to" rather than "from R$ 0,00 to": `{price}`, `{max}`.
+   */
+  readonly paysPriceSavingUpTo: string;
   /** Closed price between the cheapest and dearest sums: `{min}`, `{price}`, `{max}` (most saved). */
   readonly paysUpToPrice: string;
   /** Closed price at or above the dearest sum: nothing is saved. */

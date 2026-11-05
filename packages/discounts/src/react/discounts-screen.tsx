@@ -18,7 +18,6 @@ import {
 import type { RowAction } from "@12-apps/ui/data-display/DataViews";
 import { ErrorState } from "@12-apps/ui/data-display/ErrorState";
 import { LoadingState } from "@12-apps/ui/data-display/LoadingState";
-import { Dialog, DialogContent } from "@12-apps/ui/feedback/Dialog";
 import { HeaderButton } from "@12-apps/ui/form/HeaderButton";
 import { Dashboard } from "@12-apps/ui/layout/Dashboard";
 import { Text } from "@12-apps/ui/typography/Text";
@@ -28,6 +27,7 @@ import type { DiscountsApiClient } from "./api";
 import { fill, type DiscountsWebCopy } from "./copy";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
+import { DiscountDialog } from "./discount-dialog";
 import { DiscountForm } from "./discount-form";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import { DiscountListCard, discountCells } from "./discount-list-card";
@@ -214,7 +214,7 @@ function DiscountsGrid({
   );
 }
 
-/** The create dialog, mounted only while open so the next open re-seeds empty. */
+/** The create dialog; each opening mounts a fresh form, so it re-seeds empty. */
 function CreateDialog({
   open,
   onClose,
@@ -227,25 +227,19 @@ function CreateDialog({
   menu: MenuBinding;
 }): JSX.Element {
   return (
-    <Dialog
+    <DiscountDialog
       open={open}
       onClose={onClose}
       title={menu.copy.form.createTitle}
-      size="md"
-      showCloseButton
-      dataTestId="discount-dialog"
+      copy={menu.copy}
     >
-      {open && (
-        <DialogContent>
-          <DiscountForm
-            {...menu}
-            groups={menu.groups ?? []}
-            editing={null}
-            onSaved={onSaved}
-          />
-        </DialogContent>
-      )}
-    </Dialog>
+      <DiscountForm
+        {...menu}
+        groups={menu.groups ?? []}
+        editing={null}
+        onSaved={onSaved}
+      />
+    </DiscountDialog>
   );
 }
 

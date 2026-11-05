@@ -130,6 +130,8 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   form: {
     createTitle: "Novo desconto",
     editTitle: "Editar desconto",
+    dialogClose: PT_BR_UI_LABELS.common.close,
+    dialogBack: "Voltar",
     submitCreate: "Criar desconto",
     submitEdit: "Salvar alterações",
     name: "Nome da promoção",
@@ -209,6 +211,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
       paysOff: "Cliente paga {off} a menos",
       paysPriceSaving: "Cliente paga {price} — economiza de {min} a {max}",
       paysPriceSavingExact: "Cliente paga {price} — economiza {saving}",
+      paysPriceSavingUpTo: "Cliente paga {price} — economiza até {max}",
       paysUpToPrice: "Cliente paga de {min} a {price} — economiza até {max}",
       noSaving: "Cliente paga o preço dos itens: o preço do combo não é menor que eles.",
       examples: "Exemplos: {cheapest} · {dearest}",

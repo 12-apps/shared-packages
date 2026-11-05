@@ -107,6 +107,13 @@ export interface DiscountsWindowCopy {
 export interface DiscountsFormCopy {
   readonly createTitle: string;
   readonly editTitle: string;
+  /**
+   * The create/edit modal's ✕ and back arrow (FUT-4417): each carries a glyph
+   * only, so each needs an accessible name. The back arrow shows when the
+   * modal opens over another stacked panel.
+   */
+  readonly dialogClose: string;
+  readonly dialogBack: string;
   readonly submitCreate: string;
   readonly submitEdit: string;
   readonly name: string;

@@ -98,6 +98,12 @@ function pricePays(
   if (dearest.savingCents === 0) return words.noSaving;
   if (cheapest.savingCents > 0 || cheapest.groupCents === price) {
     if (layout === "aside") return fill(words.paysExact, { pays: priced });
+    if (cheapest.savingCents === 0) {
+      return fill(words.paysPriceSavingUpTo, {
+        price: priced,
+        max: say.money(dearest.savingCents),
+      });
+    }
     return cheapest.savingCents === dearest.savingCents
       ? fill(words.paysPriceSavingExact, {
           price: priced,
