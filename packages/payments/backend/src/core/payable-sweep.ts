@@ -123,13 +123,14 @@ export async function reconcilePendingCharges(
   const askable = pending.filter((charge) => !charge.providerChargeId.startsWith('stub_'));
 
   const report: PendingSweepReport = { checked: askable.length, settled: 0, failed: 0, ...(deps.decline ? { declined: 0 } : {}) };
-  for (const charge of askable) {
-    const outcome = await reconcileOne(deps, charge);
-    if (outcome === 'settled') report.settled += 1;
-    if (outcome === 'failed') report.failed += 1;
-    if (outcome === 'declined') report.declined = (report.declined ?? 0) + 1;
-  }
+  for (const charge of askable) tally(report, await reconcileOne(deps, charge));
   return report;
+}
+
+/** Count one charge's outcome; `waiting` counts nothing. */
+function tally(report: PendingSweepReport, outcome: 'settled' | 'declined' | 'waiting' | 'failed'): void {
+  if (outcome === 'waiting') return;
+  report[outcome] = (report[outcome] ?? 0) + 1;
 }
 
 /** Re-read ONE charge; settle it if the provider says PAID, end it if DECLINED. Never throws. */

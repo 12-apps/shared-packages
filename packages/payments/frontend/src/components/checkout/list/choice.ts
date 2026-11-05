@@ -196,7 +196,7 @@ function buyerReason(
  * card lacks only its CVV, and whether Pix is on offer — what the button's
  * reason then says instead of asking for the card from scratch.
  */
-export interface CardAfterRefusal {
+interface CardAfterRefusal {
   decline: CheckoutDecline;
   cvvOnly: boolean;
   pixOffered: boolean;
