@@ -46,3 +46,27 @@ export interface CheckoutDecline {
   reason?: CheckoutDeclineReason;
   retriable?: boolean;
 }
+
+/** Refusals about the card DATA the buyer typed — corrected in place (FUT-4401). */
+const CARD_DATA_REASONS: readonly CheckoutDeclineReason[] = ["INVALID_CARD", "EXPIRED_CARD"];
+
+/** The refusal is about the card's number, expiry or code — the CVV is flagged. */
+export function isCardDataDecline(decline: CheckoutDecline | null | undefined): boolean {
+  return decline?.reason !== undefined && CARD_DATA_REASONS.includes(decline.reason);
+}
+
+/**
+ * Whether the order a refused card was charged against is still chargeable
+ * (FUT-4401) — a MIRROR of `@12-apps/payments-backend`'s
+ * `declineLeavesPayableOpen`, which the server applies when it books the
+ * refusal: the same card may be retried (`retriable: true`), or the refusal is
+ * about card data the buyer corrects. `retriable` means "the same instrument"
+ * and nothing else, so `false` on a mistyped CVV does not close the order.
+ *
+ * Anything else closed it server-side, so the buyer's next attempt must go on
+ * a fresh order: charging the closed one answers its own status and nothing
+ * more.
+ */
+export function declineKeepsOrder(decline: CheckoutDecline | null | undefined): boolean {
+  return decline?.retriable === true || isCardDataDecline(decline);
+}

@@ -26,7 +26,7 @@ import type {
   OrderStatus,
   PaymentMethod,
 } from "./types";
-import { useResolutionActions } from "./resolution-actions";
+import { useResolutionActions, withElapsedWait } from "./resolution-actions";
 import { useHostedResume } from "./use-hosted-resume";
 
 /**
@@ -64,8 +64,8 @@ export interface CheckoutHostPorts {
  * - `setMethod` drops any order raised for the previous method (no stale QR/form).
  * - `startPayment` raises the order (PIX → QR, CARD → chargeable); `payWithEmail`
  *   re-raises with a corrected e-mail for the merchant-email rejection.
- * - `retry` re-charges the SAME order when the refusal says another instrument
- *   could work (FUT-1145), and raises a fresh one when it does not.
+ * - `retry` re-charges the SAME order when the refusal left it chargeable
+ *   (FUT-1145, FUT-4401), and raises a fresh one when it did not.
  *
  * @param basket WHICH basket this checkout is for (FUT-1213). Absent ⇒ the
  *   pre-1213 behaviour: a parked payment resumes on whatever checkout mounts
@@ -91,6 +91,7 @@ export function useCheckoutController(
   const [finalStatus, setFinalStatus] = useState<OrderStatus | null>(null);
   const [decline, setDecline] = useState<CheckoutDecline | null>(null);
   const [freshInstrument, setFreshInstrument] = useState(false);
+  const [waitElapsed, setWaitElapsed] = useState(false);
   const [creating, setCreating] = useState(false);
   const forgetHostedOrder = useForgetHostedOrder();
   const failure = useCreateFailure();
@@ -113,8 +114,8 @@ export function useCheckoutController(
     buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure,
     setCreating, setDecline, setOrder, setFinalStatus, setStep,
   });
-  const { payWithEmail, handleResolved } = useResolutionActions({
-    buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep,
+  const { payWithEmail, handleResolved, handleWaitElapsed } = useResolutionActions({
+    buyer, method, startPayment, setBuyerState, setDecline, setFinalStatus, setStep, setWaitElapsed,
   });
   // Re-price the order in place when the cart moved under it (FUT-1139), routed as a raise is.
   const route = useRaisedOrderRoute({ navigate, tenantSlug, basket, setOrder, setFinalStatus, setStep });
@@ -137,9 +138,9 @@ export function useCheckoutController(
     step, setStep, method, setMethod, buyer, setBuyer, saveProfile, setSaveProfile,
     order, finalStatus: settled, creating,
     decline, freshInstrument,
-    ...resumeSurface(resume, confirming),
+    ...withElapsedWait(resumeSurface(resume, confirming), waitElapsed, setWaitElapsed),
     createError: failure.message, errorField: failure.field, errorCode: failure.code,
     goToMenu: onExitToMenu,
-    startPayment, refresh, payWithEmail, handleResolved, retry, dropOrder,
+    startPayment, refresh, payWithEmail, handleResolved, handleWaitElapsed, retry, dropOrder,
   };
 }

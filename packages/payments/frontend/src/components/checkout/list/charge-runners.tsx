@@ -15,11 +15,12 @@ import type { CardChainLink } from "../method-capability";
 import { NEW_CARD, type CardTokenizationConfig } from "../../../card";
 import { useRefreshOnCartChanged } from "../cart-changed";
 import { SubmittedState } from "../charge-states";
-import type { ChallengeScope } from "../card-outcome";
+import type { CardRefusal, ChallengeScope } from "../card-outcome";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OnCheckoutResolved } from "../types";
 import { useCardSubmit } from "../card-submit";
 import type { DebitAuthentication } from "../debit-charge";
+import { isCardDataDecline } from "../decline";
 import { useWalletCharge } from "../use-wallet-charge";
 
 import type { ListCard } from "./use-list-state";
@@ -28,11 +29,22 @@ import type { ListCard } from "./use-list-state";
 export interface ListChargeFailure {
   message: string;
   code: string | null;
+  /**
+   * The card was refused (FUT-4401): how, and whether the order it went
+   * against is closed — then the buyer's next attempt must go on a fresh one.
+   */
+  refusal?: CardRefusal;
 }
 
 interface RunnerCallbacks {
   /** Accepted, and now awaited — the list gives way to the wait. */
   onAccepted: () => void;
+  /**
+   * The accepted charge's bounded wait ran out with no answer (FUT-4401). The
+   * caller takes the buyer to an ending that says so and offers a way on;
+   * without it the wait's own "Verificar de novo" stays on screen.
+   */
+  onWaitElapsed?: () => void;
   /** Refused, unresolved, or never sent — back to the list, saying why (or not, for a dismissal). */
   onFailed: (failure: ListChargeFailure | null) => void;
 }
@@ -61,6 +73,7 @@ export function CardRun({
   pollIntervalMs,
   onAccepted,
   onFailed,
+  onWaitElapsed,
   debit,
 }: RunnerCallbacks & {
   order: CheckoutOrder;
@@ -101,14 +114,30 @@ export function CardRun({
   useFireOnce(!submit.keyPending, () => void submit.handlePay());
   // Re-priced by the host when the server says the cart moved (FUT-1139).
   useRefreshOnCartChanged(submit.errorCode);
-  const { error, errorCode, submitted } = submit;
+  const { error, errorCode, submitted, refusal, pollTimedOut } = submit;
+  const latestCard = useRef(card);
+  latestCard.current = card;
   useEffect(() => {
-    if (error) onFailed({ message: error, code: errorCode });
-  }, [error, errorCode, onFailed]);
+    if (!error) return;
+    // A refused card keeps everything typed but the CVV, which is flagged when
+    // the refusal is about the card's data (FUT-4401).
+    if (refusal) forgetCvv(latestCard.current, isCardDataDecline(refusal.decline) ? fieldCopy.cvvRequired : null);
+    onFailed({ message: error, code: errorCode, ...(refusal ? { refusal } : {}) });
+  }, [error, errorCode, refusal, onFailed, fieldCopy]);
   useEffect(() => {
     if (submitted) onAccepted();
   }, [submitted, onAccepted]);
+  useEffect(() => {
+    if (submitted && pollTimedOut) onWaitElapsed?.();
+  }, [submitted, pollTimedOut, onWaitElapsed]);
   return submitted ? <SubmittedState card={submit} /> : null;
+}
+
+/** Clear the CVV of a typed card, flagging the field with `flag` when there is one. */
+function forgetCvv(card: ListCard, flag: string | null): void {
+  if (card.selection !== NEW_CARD) return;
+  card.setCard((current) => ({ ...current, cvv: "" }));
+  if (flag) card.setFieldErrors((current) => ({ ...current, cvv: flag }));
 }
 
 /**

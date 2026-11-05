@@ -248,7 +248,7 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
-    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} />;
+    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} onWaitElapsed={c.handleWaitElapsed} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
   return null;
@@ -358,7 +358,9 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const [failure, setFailure] = useState<ListChargeFailure | null>(null);
   const clearFailure = useCallback(() => setFailure(null), []);
   const { settle } = charge;
-  const onFailed = useCallback((next: ListChargeFailure | null) => { setFailure(next); settle(); }, [settle]);
+  const { dropOrder } = c;
+  // A refusal that closed the order sends the next press to a fresh one (FUT-4401).
+  const onFailed = useCallback((next: ListChargeFailure | null) => { setFailure(next); if (next?.refusal?.orderClosed) dropOrder(); settle(); }, [settle, dropOrder]);
   const wallets = useWallets(props, clearFailure);
   const { clearWalletFailure } = wallets;
   const act = useAct(props, () => {
