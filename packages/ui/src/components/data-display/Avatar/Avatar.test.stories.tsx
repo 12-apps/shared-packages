@@ -428,6 +428,9 @@ export const PerformanceTest: Story = {
 };
 
 // Edge Cases Tests
+/** Not an image: the browser fails to decode it at once, with no network involved. */
+const UNDECODABLE_IMAGE = 'data:image/png;base64,bm90LWFuLWltYWdl';
+
 export const EdgeCases: Story = {
   name: '🔧 Edge Cases Test',
   render: () => (
@@ -439,7 +442,8 @@ export const EdgeCases: Story = {
         <Avatar fallback="中文" dataTestId="unicode" />
       </Stack>
       <Stack direction="row" spacing={2} alignItems="center">
-        <Avatar src="https://invalid-url.com/image.jpg" fallback="ERR" dataTestId="error-image" />
+        {/* A src the browser rejects without a request, so the error is not a network race (FUT-4467). */}
+        <Avatar src={UNDECODABLE_IMAGE} fallback="ERR" dataTestId="error-image" />
       </Stack>
     </Stack>
   ),
