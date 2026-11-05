@@ -12,7 +12,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GooglePayButton, paymentDataRequest, type GooglePayApi } from "../google-pay-button";
+import { GooglePayButton, paymentDataRequest, useGooglePayClient, type GooglePayApi, type GooglePaymentsClient } from "../google-pay-button";
 import { googlePayConfig } from "../method-capability";
 import type { CheckoutOrder, CheckoutProviderConfig } from "../types";
 
@@ -58,6 +58,8 @@ function walletConfig(overrides: Record<string, unknown> = {}): CheckoutProvider
 
 interface FakeApiOptions {
   ready?: boolean;
+  /** Google's `paymentMethodPresent`; absent from the answer when omitted. */
+  present?: boolean;
   token?: string;
   rejectWith?: unknown;
 }
@@ -67,13 +69,15 @@ function installFakeApi(options: FakeApiOptions = {}) {
   const calls = {
     environments: [] as string[],
     loadRequests: [] as Record<string, unknown>[],
+    readyRequests: [] as Record<string, unknown>[],
   };
   class PaymentsClient {
     constructor(clientOptions: { environment: "TEST" | "PRODUCTION" }) {
       calls.environments.push(clientOptions.environment);
     }
-    async isReadyToPay(): Promise<{ result: boolean }> {
-      return { result: options.ready ?? true };
+    async isReadyToPay(request: Record<string, unknown>): Promise<{ result: boolean; paymentMethodPresent?: boolean }> {
+      calls.readyRequests.push(request);
+      return { result: options.ready ?? true, ...(options.present === undefined ? {} : { paymentMethodPresent: options.present }) };
     }
     createButton({ onClick }: { onClick: () => void }): HTMLElement {
       const button = document.createElement("button");
@@ -122,6 +126,39 @@ describe("GooglePayButton — the four steps gate rendering", () => {
 
     await waitFor(() => expect(calls.environments).toEqual(["TEST"]));
     await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
+  });
+});
+
+describe("GooglePayButton — only buyers who can actually pay (FUT-4399)", () => {
+  const renderIn = (environment: "TEST" | "PRODUCTION") =>
+    render(<GooglePayButton order={ORDER} params={PARAMS} onKey={vi.fn()} onError={vi.fn()} environment={environment} />);
+
+  it("asks for an existing payment method in PRODUCTION, and draws for a buyer who has one", async () => {
+    const calls = installFakeApi({ present: true });
+    renderIn("PRODUCTION");
+    await screen.findByTestId("google-pay-native");
+    expect(calls.readyRequests[0]).toMatchObject({ existingPaymentMethodRequired: true });
+  });
+
+  it("draws nothing in PRODUCTION when the buyer has no card in Google Pay", async () => {
+    const calls = installFakeApi({ present: false });
+    renderIn("PRODUCTION");
+    await waitFor(() => expect(calls.readyRequests).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
+  });
+
+  it("draws nothing in PRODUCTION when Google's answer carries no paymentMethodPresent", async () => {
+    const calls = installFakeApi({});
+    renderIn("PRODUCTION");
+    await waitFor(() => expect(calls.readyRequests).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
+  });
+
+  it("changes nothing in TEST: the bare probe, and the button draws on result alone", async () => {
+    const calls = installFakeApi({ present: false });
+    renderIn("TEST");
+    await screen.findByTestId("google-pay-native");
+    expect(calls.readyRequests[0]).not.toHaveProperty("existingPaymentMethodRequired");
   });
 });
 
@@ -197,5 +234,19 @@ describe("paymentDataRequest — Google's own merchant id", () => {
 
   it("sends none in TEST without one", () => {
     expect(paymentDataRequest({ gateway: "pagbank", gatewayMerchantId: "ACCO_1" }, { totalCents: 1250 })).not.toHaveProperty("merchantInfo");
+  });
+});
+
+describe("the homologação evidence keeps the bare probe in PRODUCTION (FUT-4399)", () => {
+  it("sends no existingPaymentMethodRequired and draws without paymentMethodPresent", async () => {
+    const calls = installFakeApi({});
+    const seen: (GooglePaymentsClient | null)[] = [];
+    function Probe() {
+      seen.push(useGooglePayClient(undefined, "PRODUCTION"));
+      return null;
+    }
+    render(<Probe />);
+    await waitFor(() => expect(seen.some((client) => client !== null)).toBe(true));
+    expect(calls.readyRequests[0]).not.toHaveProperty("existingPaymentMethodRequired");
   });
 });
