@@ -362,8 +362,6 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     details: string;
     chooseCard: string;
     cardDetails: string;
-    /** After a refusal, only the CVV is missing (FUT-4401): "Informe o CVV para tentar de novo." Absent ⇒ `cardDetails`. */
-    cvvAgain?: string;
     /** The refused card may not be sent again, so it was cleared (FUT-4401). Absent ⇒ `chooseCard` / `cardDetails`. */
     anotherCard?: (pixOffered: boolean) => string;
     /** Google Pay is chosen while the host re-prices (`totalCents` briefly absent). Absent ⇒ no sentence. */

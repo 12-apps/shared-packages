@@ -121,8 +121,9 @@ describe("a refusal at once is said beside the card (FUT-4401)", () => {
     expect(field("card-cvv").value).toBe("");
     expect(field("card-cvv").getAttribute("aria-invalid")).not.toBe("true");
     await waitFor(() => expect(screen.queryByText("Informe o CVV.")).toBeNull());
-    // The button says the one thing missing, not "fill in the card".
-    expect(reason()).toBe("Informe o CVV para tentar de novo.");
+    // The button is live again at once, with no reason under it.
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    expect(reason()).toBeNull();
     fireEvent.change(field("card-cvv"), { target: { value: "123" } });
     await waitFor(() => expect(payButton().disabled).toBe(false));
     await press();
@@ -213,6 +214,35 @@ describe("a refusal the same card may not answer again leaves it unready (FUT-44
 
     await refusedBesideTheCard(ANOTHER_CARD_SENTENCE);
     await waitFor(() => expect(reason()).toBe("Escolha outro cartão."));
+  });
+});
+
+describe("the pay button is live again after a refusal that kept the card (FUT-4401)", () => {
+  it("a press with the cleared CVV charges nothing: it flags the CVV and puts the focus there", async () => {
+    const { client, createOrder } = await typedCard(refusedWith({ declineReason: "CARD_DECLINED" }));
+    await press();
+    await refusedBesideTheCard("Seu banco não autorizou o pagamento e nada foi cobrado.");
+    expect(field("card-cvv").value).toBe("");
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    const focusesBefore = focusedOn.mock.contexts.length;
+
+    fireEvent.click(payButton());
+
+    await waitFor(() => expect(screen.getByText("Informe o CVV.")).toBeTruthy());
+    expect(field("card-cvv").getAttribute("aria-invalid")).toBe("true");
+    expect(focusedOn.mock.contexts.slice(focusesBefore)).toContain(field("card-cvv"));
+    // No 5-second bar, no new order, no second charge.
+    await waitFor(() => expect(screen.queryByTestId("list-charge-bar")).toBeNull());
+    expect(client.charge).toHaveBeenCalledTimes(1);
+    expect(createOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("20007 — the button is live at once, with no reason under it", async () => {
+    await typedCard(refusedWith({ declineReason: "INVALID_CARD", retriable: false }));
+    await press();
+    await refusedBesideTheCard(INVALID_CARD_SENTENCE);
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    expect(reason()).toBeNull();
   });
 });
 

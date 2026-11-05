@@ -29,9 +29,14 @@ test('an issuer decline says nothing was charged, and offers the retry', async (
   await fillCard(page, DECLINE_PAN);
   await payCard(page);
 
-  await expect(page.getByTestId('payment-failed')).toBeVisible();
-  // A decline is recoverable by the buyer, so the retry is the whole point.
-  await expect(page.getByTestId('payment-retry')).toBeVisible();
+  // FUT-4401: the refusal is said BESIDE the card form, which stays on screen
+  // with what was typed — no status screen swapped in for it.
+  await expect(page.getByTestId('card-error')).toBeVisible();
+  await expect(page.getByTestId('card-number')).toBeVisible();
+  await expect(page.getByTestId('payment-failed')).toHaveCount(0);
+  // A decline is recoverable by the buyer, so the retry is the whole point:
+  // the pay button is live again at once.
+  await expect(page.getByTestId('list-pay')).toBeEnabled();
 });
 
 test('an UNRESOLVED charge removes the pay bar and offers no retry anywhere', async ({ page }) => {

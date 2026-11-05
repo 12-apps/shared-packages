@@ -16,6 +16,7 @@ import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
+import { useCvvFirst } from "./cvv-first";
 import { ActionButton, ChargeBar, ListBar } from "./list-bar";
 import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
@@ -76,10 +77,7 @@ function saveAsked(props: ListFaceProps): void {
   saveBuyerContact?.({ name: c.buyer.name, phone: c.buyer.phone, taxId: c.buyer.taxId });
 }
 
-/**
- * What an online payment asks for: the host's amount due when a balance it
- * holds pays part of the cart, else the cart's total (P3).
- */
+/** What an online payment asks for: the host's amount due when a balance pays part, else the cart's total (P3). */
 function onlineTotal(props: ListFaceProps): string {
   return props.list.amountDueLabel ?? props.total;
 }
@@ -103,10 +101,12 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: Pay
  */
 function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean) => void {
   const mode = usePaymentListMode();
+  const cvvFirst = useCvvFirst();
   return (pick = false) => {
     const { choice } = props.state;
     if (!choice || inFlight(props)) return;
     if (choice.kind === "door") return chosenDoor(props)?.onSend();
+    if (cvvFirst({ card: props.state.card, choice, covered: coveredByHost(props.list) })) return;
     clearFailure();
     actOnline(props, choice.method, mode, pick);
   };

@@ -220,7 +220,9 @@ function cardReason(
   if (!needed || !refused) return needed;
   // The refused card was cleared and may not go again: say what may.
   if (declineBarsCard(refused.decline)) return reasons.anotherCard?.(refused.pixOffered) ?? needed;
-  return selection === NEW_CARD && refused.cvvOnly ? (reasons.cvvAgain ?? needed) : needed;
+  // Only the CVV it cleared is missing: the button stays live, and its press
+  // asks for the CVV in the field itself (`./cvv-first.ts`).
+  return selection === NEW_CARD && refused.cvvOnly ? null : needed;
 }
 
 /**
