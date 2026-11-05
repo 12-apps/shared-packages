@@ -271,13 +271,14 @@ function coveredByHost(list: CheckoutPaymentList): boolean {
  * it (E3); a door choice never does (R3). The debit card's billing address comes
  * last, as it sits below the card's fields (FUT-4109).
  */
-function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null): string | null {
+function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null, refusal?: ListChargeFailure["refusal"]): string | null {
   const { c, list, state, config } = props;
+  const refused = refusal ? { decline: refusal.decline, cvvOnly: state.card.cvvOnly === true, pixOffered: state.methods.includes("PIX") } : null;
   const debitChosen = state.choice?.kind === "online" && state.choice.funding === "DEBIT";
   return blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door,
     asked: gateFields(state, c.buyer, config, raisedOf(props)),
-    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
+    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list), refused,
   }) ?? (debitChosen ? debitAddressReason(debit, list.copy.debit) : null);
 }
 
@@ -368,7 +369,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
     clearWalletFailure();
   });
   const door = chosenDoor(props);
-  const reason = reasonOf(props, door, useDebitAddress());
+  const reason = reasonOf(props, door, useDebitAddress(), failure?.refusal);
   useChargeGuard(props, reason);
   const free = reason === null && props.charge.phase === "idle" && !c.creating;
   useArmedCharge(armedReady(list, state, free), act);

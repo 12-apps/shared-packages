@@ -107,6 +107,13 @@ export interface SettlingCopy {
   declined?: {
     generic: string;
     byReason?: Partial<Record<CheckoutDeclineReason, string>>;
+    /**
+     * The same card may not be sent again and its data is not the problem
+     * (`retriable: false`, e.g. a provider error the acquirer calls final): the
+     * checkout cleared it, so this sends the buyer to another card or way to
+     * pay instead of a reason's "try again". Absent ⇒ the reason's sentence.
+     */
+    anotherCard?: string;
   };
 }
 

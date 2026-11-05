@@ -1,5 +1,5 @@
 import { parkedBasket, type CheckoutBasketIdentity } from "./basket";
-import { declineKeepsOrder, type CheckoutDecline } from "./decline";
+import { declineBarsCard, declineKeepsOrder, type CheckoutDecline, type CheckoutDeclineReason } from "./decline";
 import { rememberHostedOrder } from "./hosted-return";
 import type { CheckoutNavigate } from "./navigate-context";
 import type { SettlingCopy } from "./screens-copy";
@@ -103,6 +103,16 @@ export function cardRefusalOf(outcome: Pick<ChargeOutcome, "declineReason" | "re
   return { decline, orderClosed: !declineKeepsOrder(decline) };
 }
 
+/** Reasons whose own sentence already sends the buyer to another card or way to pay. */
+const SAYS_ANOTHER_CARD: readonly CheckoutDeclineReason[] = ["INSUFFICIENT_FUNDS", "CARD_DECLINED", "FRAUD_SUSPECTED"];
+
+/** The pack's words for this reason — but never "try again" for a card that may not go again (FUT-4401). */
+function reasonWords(words: SettlingCopy["declined"], decline: CheckoutDecline): string | undefined {
+  const { reason } = decline;
+  if (declineBarsCard(decline) && !(reason && SAYS_ANOTHER_CARD.includes(reason))) return words?.anotherCard;
+  return reason ? words?.byReason?.[reason] : undefined;
+}
+
 /**
  * The sentence beside the card: the pack's words for this reason, else its
  * generic refusal, else the alert's own title alone — a pack written before
@@ -110,5 +120,5 @@ export function cardRefusalOf(outcome: Pick<ChargeOutcome, "declineReason" | "re
  */
 export function refusalSentence(copy: SettlingCopy, decline: CheckoutDecline): string {
   const words = copy.declined;
-  return (decline.reason ? words?.byReason?.[decline.reason] : undefined) ?? words?.generic ?? copy.cannotPay;
+  return reasonWords(words, decline) ?? words?.generic ?? copy.cannotPay;
 }

@@ -20,7 +20,7 @@ import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OnCheckoutResolved } from "../types";
 import { useCardSubmit } from "../card-submit";
 import type { DebitAuthentication } from "../debit-charge";
-import { isCardDataDecline } from "../decline";
+import { declineBarsCard, isCardDataDecline, type CheckoutDecline } from "../decline";
 import { useWalletCharge } from "../use-wallet-charge";
 
 import type { ListCard } from "./use-list-state";
@@ -119,9 +119,7 @@ export function CardRun({
   latestCard.current = card;
   useEffect(() => {
     if (!error) return;
-    // A refused card keeps everything typed but the CVV, which is flagged when
-    // the refusal is about the card's data (FUT-4401).
-    if (refusal) forgetCvv(latestCard.current, isCardDataDecline(refusal.decline) ? fieldCopy.cvvRequired : null);
+    if (refusal) afterRefusal(latestCard.current, refusal.decline, fieldCopy.cvvRequired);
     onFailed({ message: error, code: errorCode, ...(refusal ? { refusal } : {}) });
   }, [error, errorCode, refusal, onFailed, fieldCopy]);
   useEffect(() => {
@@ -133,11 +131,23 @@ export function CardRun({
   return submitted ? <SubmittedState card={submit} /> : null;
 }
 
-/** Clear the CVV of a typed card, flagging the field with `flag` when there is one. */
-function forgetCvv(card: ListCard, flag: string | null): void {
-  if (card.selection !== NEW_CARD) return;
+/**
+ * What a refusal leaves of the card (FUT-4401). One the same card may not
+ * answer again (`declineBarsCard`) leaves nothing ready to resend: a typed
+ * card keeps only its holder, a saved one is unselected (FUT-1145). Any other
+ * keeps everything typed but the CVV, flagged with `cvvFlag` when the refusal
+ * is about the card's data.
+ */
+function afterRefusal(card: ListCard, decline: CheckoutDecline, cvvFlag: string): void {
+  const typed = card.selection === NEW_CARD;
+  if (declineBarsCard(decline)) {
+    if (!typed) return card.setSelection(null);
+    card.setCard((current) => ({ ...current, number: "", expiry: "", cvv: "" }));
+    return card.setFieldErrors({});
+  }
+  if (!typed) return;
   card.setCard((current) => ({ ...current, cvv: "" }));
-  if (flag) card.setFieldErrors((current) => ({ ...current, cvv: flag }));
+  if (isCardDataDecline(decline)) card.setFieldErrors((current) => ({ ...current, cvv: cvvFlag }));
 }
 
 /**

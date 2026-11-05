@@ -348,11 +348,7 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     taxIdPlaceholder?: string;
     /** "Manter o documento salvo" under a field "Alterar" opened over one on file (FUT-3685, FUT-4080); absent ⇒ no link. */
     keepSavedCpf?: string;
-    /**
-     * The phone's link under the document field that opens the letters keyboard
-     * (FUT-590) — "Seu CNPJ tem letras? Usar teclado com letras" — and the one
-     * that brings the number keyboard back. Absent ⇒ no link, the number keyboard only.
-     */
+    /** The links that open the letters keyboard (FUT-590) and bring the numbers back. Absent ⇒ numbers only. */
     lettersKeyboard?: string;
     numbersKeyboard?: string;
     cpfIncomplete: string;
@@ -366,6 +362,10 @@ export interface PaymentListCopy extends PaymentListCreditCopy {
     details: string;
     chooseCard: string;
     cardDetails: string;
+    /** After a refusal, only the CVV is missing (FUT-4401): "Informe o CVV para tentar de novo." Absent ⇒ `cardDetails`. */
+    cvvAgain?: string;
+    /** The refused card may not be sent again, so it was cleared (FUT-4401). Absent ⇒ `chooseCard` / `cardDetails`. */
+    anotherCard?: (pixOffered: boolean) => string;
     /** Google Pay is chosen while the host re-prices (`totalCents` briefly absent). Absent ⇒ no sentence. */
     repricing?: string;
   };

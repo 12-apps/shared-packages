@@ -15,13 +15,15 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { ChargeOutcome, CreateOrderRequest, CreateOrderResult } from "../types";
-import { onPageStore, orderFor, renderList, stubClient } from "./list-harness";
+import { SAVED_VISA, onPageStore, orderFor, renderList, stubClient } from "./list-harness";
 
 const payButton = (): HTMLButtonElement => screen.getByTestId("list-pay") as HTMLButtonElement;
 const field = (testId: string): HTMLInputElement => {
   const node = screen.getByTestId(testId);
   return (node instanceof HTMLInputElement ? node : node.querySelector("input")) as HTMLInputElement;
 };
+
+const reason = (): string | null => screen.queryByTestId("list-blocked-reason")?.textContent ?? null;
 
 const INVALID_CARD_SENTENCE = "O banco recusou o cartão. Confira o número, a validade e o código de segurança.";
 
@@ -119,6 +121,8 @@ describe("a refusal at once is said beside the card (FUT-4401)", () => {
     expect(field("card-cvv").value).toBe("");
     expect(field("card-cvv").getAttribute("aria-invalid")).not.toBe("true");
     await waitFor(() => expect(screen.queryByText("Informe o CVV.")).toBeNull());
+    // The button says the one thing missing, not "fill in the card".
+    expect(reason()).toBe("Informe o CVV para tentar de novo.");
     fireEvent.change(field("card-cvv"), { target: { value: "123" } });
     await waitFor(() => expect(payButton().disabled).toBe(false));
     await press();
@@ -145,6 +149,70 @@ describe("a refusal at once is said beside the card (FUT-4401)", () => {
     await refusedBesideTheCard("O pagamento não foi aprovado e nada foi cobrado.");
     fireEvent.change(field("card-cvv"), { target: { value: "123" } });
     await waitFor(() => expect(payButton().disabled).toBe(false));
+  });
+});
+
+const ANOTHER_CARD_SENTENCE = "Não foi possível pagar com este cartão e nada foi cobrado. Use outro cartão ou outra forma de pagamento.";
+
+describe("a refusal the same card may not answer again leaves it unready (FUT-4401, FUT-1145)", () => {
+  it("a typed card refused retriable:false, not about its data, is cleared but its holder — the CVV alone cannot resend it", async () => {
+    const { client, createOrder } = await typedCard(refusedWith({ declineReason: "PROVIDER_ERROR", retriable: false }));
+    await press();
+
+    // Never "Tente de novo" for a card that may not go again.
+    await refusedBesideTheCard(ANOTHER_CARD_SENTENCE);
+    expect(screen.getByTestId("card-error").textContent).not.toContain("Tente de novo");
+    await waitFor(() => expect(field("card-number").value).toBe(""));
+    expect(field("card-expiry").value).toBe("");
+    expect(field("card-cvv").value).toBe("");
+    expect(field("card-holder").value).toBe("ANA TESTE");
+    expect(reason()).toBe("Escolha outro cartão ou Pix.");
+
+    // The CVV typed again is not enough: the refused card is gone.
+    fireEvent.change(field("card-cvv"), { target: { value: "123" } });
+    await waitFor(() => expect(reason()).toBe("Escolha outro cartão ou Pix."));
+    expect(payButton().disabled).toBe(true);
+
+    // Another card goes, on a fresh order: the server closed the refused one.
+    fireEvent.change(field("card-number"), { target: { value: "5555 5555 5555 4444" } });
+    fireEvent.change(field("card-expiry"), { target: { value: "11/39" } });
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    client.charge.mockResolvedValue({ ok: true, data: { status: "PAID" } } as never);
+    await press();
+    await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(2));
+    expect(createOrder).toHaveBeenCalledTimes(2);
+  });
+
+  it("a saved card refused retriable:false is unselected — one tap cannot charge it again", async () => {
+    const client = stubClient([SAVED_VISA]);
+    client.charge.mockResolvedValue({ ok: true, data: { status: "FAILED", declineReason: "FRAUD_SUSPECTED", retriable: false } } as never);
+    renderList({ config: onPageStore(), client, createOrder: recordingCreateOrder(), list: { lastMethod: "CARD" } });
+    const chip = (): HTMLElement => screen.getByTestId(`list-card-${SAVED_VISA.id}`);
+    await waitFor(() => expect(chip().getAttribute("aria-checked")).toBe("true"));
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    await press();
+
+    const alert = await screen.findByTestId("card-error");
+    expect(alert.textContent).toContain("O banco bloqueou esta compra por segurança e nada foi cobrado.");
+    await waitFor(() => expect(chip().getAttribute("aria-checked")).toBe("false"));
+    expect(reason()).toBe("Escolha outro cartão ou Pix.");
+    expect(payButton().disabled).toBe(true);
+    expect(client.charge).toHaveBeenCalledTimes(1);
+  });
+
+  it("without Pix on offer the button asks for another card only", async () => {
+    const client = refusedWith({ declineReason: "PROVIDER_ERROR", retriable: false });
+    renderList({ config: onPageStore({ methods: ["CARD"] }), client, createOrder: recordingCreateOrder() });
+    await waitFor(() => expect(screen.getByTestId("card-number")).toBeTruthy());
+    fireEvent.change(field("card-number"), { target: { value: "4111 1111 1111 1111" } });
+    fireEvent.change(field("card-holder"), { target: { value: "ANA TESTE" } });
+    fireEvent.change(field("card-expiry"), { target: { value: "12/40" } });
+    fireEvent.change(field("card-cvv"), { target: { value: "123" } });
+    await waitFor(() => expect(payButton().disabled).toBe(false));
+    await press();
+
+    await refusedBesideTheCard(ANOTHER_CARD_SENTENCE);
+    await waitFor(() => expect(reason()).toBe("Escolha outro cartão."));
   });
 });
 

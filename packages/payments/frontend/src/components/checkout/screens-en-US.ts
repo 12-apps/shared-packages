@@ -50,6 +50,7 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
         FRAUD_SUSPECTED: 'The bank blocked this purchase for security, and nothing was charged. Talk to your bank or use another way to pay.',
         PROVIDER_ERROR: 'The payment could not be processed right now, and nothing was charged. Try again or use another way to pay.',
       },
+      anotherCard: 'This card could not be used, and nothing was charged. Use another card or another way to pay.',
     },
   },
   pix: {

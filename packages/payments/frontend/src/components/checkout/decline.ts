@@ -70,3 +70,14 @@ export function isCardDataDecline(decline: CheckoutDecline | null | undefined): 
 export function declineKeepsOrder(decline: CheckoutDecline | null | undefined): boolean {
   return decline?.retriable === true || isCardDataDecline(decline);
 }
+
+/**
+ * The same card may not be presented again, and its data is not the problem
+ * (FUT-4401, FUT-1145): fraud suspected, attempts exhausted, a provider error
+ * the acquirer calls final. Nothing typed again can change that answer, so the
+ * checkout leaves that instrument unready — the next attempt needs another card
+ * or another way to pay.
+ */
+export function declineBarsCard(decline: CheckoutDecline | null | undefined): boolean {
+  return decline?.retriable === false && !isCardDataDecline(decline);
+}

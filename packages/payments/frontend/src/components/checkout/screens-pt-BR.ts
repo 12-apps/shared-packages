@@ -39,6 +39,7 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
         FRAUD_SUSPECTED: 'O banco bloqueou esta compra por segurança e nada foi cobrado. Fale com o seu banco ou use outra forma de pagamento.',
         PROVIDER_ERROR: 'Não foi possível processar o pagamento agora e nada foi cobrado. Tente de novo ou use outra forma de pagamento.',
       },
+      anotherCard: 'Não foi possível pagar com este cartão e nada foi cobrado. Use outro cartão ou outra forma de pagamento.',
     },
   },
   pix: {

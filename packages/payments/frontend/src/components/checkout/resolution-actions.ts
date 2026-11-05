@@ -60,18 +60,15 @@ export function useResolutionActions(input: {
  * rather than on a second 90-second spinner, while the confirmation wait asks
  * quietly behind it. "Verificar de novo" puts the spinner back, as it always did.
  */
-export function withElapsedWait<T extends { awaitingTimedOut: boolean; awaitingCheckAgain: () => void }>(
-  surface: T,
-  elapsed: boolean,
-  setElapsed: Dispatch<SetStateAction<boolean>>,
-): T {
+export function withElapsedWait<
+  T extends { awaitingTimedOut: boolean; awaitingCheckAgain: () => void; resumeTimedOut: boolean; resumeCheckAgain: () => void },
+>(surface: T, elapsed: boolean, setElapsed: Dispatch<SetStateAction<boolean>>): T {
   if (!elapsed) return surface;
-  return {
-    ...surface,
-    awaitingTimedOut: true,
-    awaitingCheckAgain: () => {
-      setElapsed(false);
-      surface.awaitingCheckAgain();
-    },
+  const checkAgain = (): void => {
+    setElapsed(false);
+    surface.awaitingCheckAgain();
   };
+  // The deprecated spellings (`resumeSurface`) say the same, or an adopter
+  // still reading them sees a spinner the screen no longer shows.
+  return { ...surface, awaitingTimedOut: true, awaitingCheckAgain: checkAgain, resumeTimedOut: true, resumeCheckAgain: checkAgain };
 }
