@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
@@ -310,6 +310,18 @@ describe("what it refuses", () => {
 describe("FUT-4441: when Itens grátis says a product is missing", () => {
   const message = "free-units-message";
 
+  // jsdom has no scrollIntoView, which the picker's listbox calls; give it one
+  // for this block only and take it away again.
+  beforeAll(() => {
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: () => {},
+    });
+  });
+  afterAll(() => {
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+
   async function pickFreeUnits(): Promise<void> {
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
     await screen.findByTestId("free-units-builder");
@@ -337,7 +349,6 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     await pickFreeUnits();
     fireEvent.click(screen.getByTestId("discount-form-submit"));
     await screen.findByTestId(message);
-    Element.prototype.scrollIntoView = vi.fn();
     const input = within(screen.getByTestId("free-units-items")).getByRole("combobox");
     await act(async () => {
       // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- a real focus, as the browser's pick keeps on the input
@@ -364,5 +375,14 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     await waitFor(() => {
       expect(screen.queryByTestId(message)).toBeNull();
     });
+  });
+
+  it("K30: no product AND a bad quantity still shows the product line after submit", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "0" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    expect(await screen.findByTestId(message)).toBeTruthy();
+    expect(screen.getAllByText(copy.form.invalidComboQuantity).length).toBeGreaterThan(0);
   });
 });

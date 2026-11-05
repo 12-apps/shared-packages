@@ -143,6 +143,20 @@ function checkCombo(
   slots: readonly ComboRequirement[],
   copy: DiscountsWebCopy,
 ): Record<string, string> {
+  const errors = checkComboKind(values, slots, copy);
+  // Recorded apart from `errors.kind`, which holds only ONE message: a bad
+  // quantity wins it, and the product line under the builder must still show.
+  if (values.kind === "FREE_UNITS" && slots.every((slot) => slot.menuItemIds.length === 0)) {
+    errors.freeUnitsTargets = copy.form.freeUnitsTargetRequired;
+  }
+  return errors;
+}
+
+function checkComboKind(
+  values: DiscountFormValues,
+  slots: readonly ComboRequirement[],
+  copy: DiscountsWebCopy,
+): Record<string, string> {
   if (!isComboKind(values.kind)) return {};
   // "Leve 3, pague 2" is one group of products, so it is refused in those words
   // rather than in the multi-group builder's — same stored shape, different
