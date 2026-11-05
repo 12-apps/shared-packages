@@ -59,9 +59,13 @@ interface ImageState {
 }
 
 /**
- * Tracks the `<img>` load lifecycle. `imageLoading` starts true whenever there is
- * a `src` and clears on load/error — the handlers must be wired to the actual img
- * (via `slotProps.img` in the view), since load/error don't bubble to the root.
+ * Tracks the image's load lifecycle. `imageLoading` starts true whenever there is
+ * a `src` and clears on load/error. Two sources report it: the `<img>`'s own
+ * events (wired via `slotProps.img` in the view, since load/error don't bubble to
+ * the root), and a probe of the same src. The probe is needed because MUI's
+ * Avatar runs its own probe and, once that one errors, stops rendering the
+ * `<img>` — whose error event then never fires, leaving the avatar blank under
+ * the spinner forever (FUT-4467). Whichever reports first wins.
  */
 function useImageState(src: string | undefined, onError?: React.ReactEventHandler): ImageState {
   const [imageError, setImageError] = useState(false);
@@ -70,6 +74,21 @@ function useImageState(src: string | undefined, onError?: React.ReactEventHandle
   useEffect(() => {
     setImageError(false);
     setImageLoading(!!src);
+    if (!src || typeof Image === 'undefined') return undefined;
+    let current = true;
+    const probe = new Image();
+    probe.onload = () => {
+      if (current) setImageLoading(false);
+    };
+    probe.onerror = () => {
+      if (!current) return;
+      setImageError(true);
+      setImageLoading(false);
+    };
+    probe.src = src;
+    return () => {
+      current = false;
+    };
   }, [src]);
 
   const handleImageError = useCallback<React.ReactEventHandler>(
