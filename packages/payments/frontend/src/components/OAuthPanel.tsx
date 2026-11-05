@@ -4,7 +4,8 @@ import { Alert, Box, Button } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 
 import { ConnectionProbe } from './ConnectionProbe';
-import { isConnected } from './connection-state';
+import { isConnected, sandboxRefused } from './connection-state';
+import { LiveSandboxBand } from './LiveSandboxBand';
 import { BLOCK_GAP, CARD_INSET, LINKISH_SX } from './panel-tokens';
 import { ProviderConnection } from './ProviderConnection';
 import type { ActivePanelProps } from './ProviderPanel';
@@ -72,19 +73,21 @@ function PathSwitch({
  */
 function ConnectUnavailableCard({
   statusBar,
+  band,
   notice,
   probe,
   verification,
   children,
 }: {
   statusBar: ReactNode;
+  band: ReactNode;
   notice: ReactNode;
   probe: ReactNode;
   verification: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <ProviderCard header={statusBar}>
+    <ProviderCard header={statusBar} band={band}>
       <Box sx={{ px: CARD_INSET, pb: BLOCK_GAP }}>
         <Alert severity="info">{notice}</Alert>
       </Box>
@@ -95,6 +98,34 @@ function ConnectUnavailableCard({
       ) : null}
     </ProviderCard>
   );
+}
+
+/**
+ * A refused sandbox on the OAuth panel (FUT-4432): the band under the header,
+ * and what its button does. A GRANT is removed through the "to Produção"
+ * dialog, which `ProviderConnection` owns; pasted keys are never removed — that
+ * wipes both environments — so the button opens the manual path on Produção.
+ * With no connect button on this installation the band offers nothing to press.
+ * The activation step is withheld meanwhile (the caller), and returns once the
+ * store is connected in Produção.
+ */
+function useLiveSandbox(
+  io: Pick<ActivePanelProps, 'config' | 'prepareConnect' | 'nextInLine' | 'readOnly'> & { toProductionTab?: () => void },
+  setManual: (manual: boolean) => void,
+) {
+  const [open, setOpen] = useState(false);
+  const refused = sandboxRefused(io.config);
+  if (!refused) return { refused, band: undefined, toProduction: undefined };
+  const grant = io.config?.connectedAccount != null;
+  const action = () => {
+    setManual(!grant);
+    if (grant) setOpen(true);
+    else io.toProductionTab?.();
+  };
+  const band = (
+    <LiveSandboxBand nextInLine={io.nextInLine === true} disabled={io.readOnly === true} onAction={io.prepareConnect ? action : undefined} />
+  );
+  return { refused, band, toProduction: grant ? { open, onClose: () => setOpen(false) } : undefined };
 }
 
 /**
@@ -130,42 +161,44 @@ function ConnectUnavailableCard({
  * application has no working connect button at all. Hiding the form outright
  * would strand both.
  */
-export function OAuthPanel({
-  descriptor,
-  config,
-  client,
-  reload,
-  prepareConnect,
-  verification,
-  statusBar,
-  walkthrough,
-  form,
-}: ActivePanelProps & {
-  statusBar: ReactNode;
-  walkthrough: (path: 'oauth' | 'credentials') => ReactNode;
-  form: ReactNode;
-}) {
+/**
+ * The connection probe, for a store whose connection is a grant: the form's
+ * own probe runs off Salvar, which an OAuth store never presses (FUT-691).
+ * Nothing to test before a connection, and then no box either: its padding
+ * alone left a ~32px hole under the path switch (FUT-4144).
+ */
+function grantProbe({ descriptor, config, client, reload }: ActivePanelProps): ReactNode {
+  if (!isConnected(config)) return null;
+  return <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />;
+}
+
+export function OAuthPanel(
+  props: ActivePanelProps & {
+    statusBar: ReactNode;
+    walkthrough: (path: 'oauth' | 'credentials') => ReactNode;
+    form: ReactNode;
+    /** Put the manual path's environment tabs on Produção (a refused sandbox). */
+    toProductionTab?: () => void;
+  },
+) {
+  const { descriptor, config, client, reload, prepareConnect, statusBar, walkthrough, form } = props;
   const copy = usePaymentsSettingsCopy().oauth;
   // Which path the owner is on. The disclosure is no longer just a container —
   // opening it CHOOSES the credentials path, so the panel has to know.
   const [manual, setManual] = useState(false);
-  // The connection probe, for a store whose connection is a grant: the form's
-  // own probe runs off Salvar, which an OAuth store never presses (FUT-691).
-  // Nothing to test before a connection, and then no box either: its padding
-  // alone left a ~32px hole under the path switch (FUT-4144).
-  const probe = isConnected(config) ? (
-    <ConnectionProbe descriptor={descriptor} config={config} client={client} reload={reload} />
-  ) : null;
+  const { refused, band, toProduction } = useLiveSandbox(props, setManual);
+  const step = refused ? null : props.verification;
+  const probe = grantProbe(props);
   if (!prepareConnect) {
     return (
-      <ConnectUnavailableCard statusBar={statusBar} notice={copy.connectUnavailable} probe={probe} verification={verification}>
+      <ConnectUnavailableCard statusBar={statusBar} band={band} notice={copy.connectUnavailable} probe={probe} verification={step}>
         {form}
       </ConnectUnavailableCard>
     );
   }
 
   return (
-    <ProviderCard header={statusBar}>
+    <ProviderCard header={statusBar} band={band}>
       {manual ? (
         <PathSwitch
           label={copy.preferOAuth}
@@ -180,6 +213,8 @@ export function OAuthPanel({
           client={client}
           prepareConnect={prepareConnect}
           onChanged={reload}
+          refused={refused}
+          toProduction={toProduction}
         />
       )}
       {/* The card's body carries no padding (ProviderCard), so every block sets
@@ -189,8 +224,8 @@ export function OAuthPanel({
           box above it and the manual link below it (FUT-4084). A host step
           that renders nothing leaves its box empty, and an empty box takes no
           gap. */}
-      {verification ? (
-        <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{verification}</Box>
+      {step ? (
+        <Box sx={{ px: CARD_INSET, pt: BLOCK_GAP, '&:empty': { display: 'none' } }}>{step}</Box>
       ) : null}
       {manual ? null : walkthrough('oauth')}
       {probe ? <Box sx={{ px: CARD_INSET, py: BLOCK_GAP }}>{probe}</Box> : null}

@@ -6,6 +6,7 @@ import type { MaskedProviderConfig, MerchantSettingsView, ProviderDescriptor } f
 
 import type { PaymentsSettingsClient } from '../client';
 import { connectionBadge } from './connection-state';
+import { WarnIcon } from './LiveSandboxBand';
 import { ProviderPriorityList, chainOf } from './ProviderPriorityList';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
@@ -72,6 +73,9 @@ function ProviderPicker({
               data-testid={`payments-provider-badge-${provider.name}`}
               label={badge.label}
               color={badge.color}
+              // A refused sandbox (FUT-4432): outlined, with an icon, so it never
+              // reads as the filled "Não conectado" by colour alone.
+              {...(badge.state === 'TEST_MODE' ? { variant: 'outlined' as const, icon: <WarnIcon />, sx: { fontWeight: 600 } } : {})}
             />
           </Box>
         );

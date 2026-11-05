@@ -10,6 +10,8 @@ import type {
 } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
+import { sandboxRefused } from './connection-state';
+import { LiveSandboxBand } from './LiveSandboxBand';
 import { CARD_INSET, CARD_SX } from './panel-tokens';
 import { OAuthPanel } from './OAuthPanel';
 import { EnvironmentNotice, EnvironmentSelector, soleEnvironment } from './EnvironmentTabs';
@@ -77,6 +79,13 @@ export interface ActivePanelProps {
   verification?: ReactNode;
   /** The stored credentials were replaced — see `ProviderForm`. */
   onCredentialsReplaced?: () => void;
+  /**
+   * A refused sandbox (FUT-4432) while another provider in the chain takes the
+   * money: the warning says the next provider pays, not that nobody can.
+   */
+  nextInLine?: boolean;
+  /** The viewer may not change settings: the warning's button is disabled. */
+  readOnly?: boolean;
 }
 
 /**
@@ -96,7 +105,7 @@ export interface ActivePanelProps {
  * checkout can charge, and an OAuth-connected store — told on the card above
  * that no key needs copying — has no reason to open that disclosure at all.
  */
-function EnableBar({ descriptor, config, client, onChanged, reload }: ActivePanelProps) {
+function EnableBar({ descriptor, config, client, onChanged, reload, nextInLine }: ActivePanelProps) {
   const [toggling, setToggling] = useState(false);
   const toggle = useCallback(
     async (enabled: boolean) => {
@@ -118,6 +127,7 @@ function EnableBar({ descriptor, config, client, onChanged, reload }: ActivePane
       config={config}
       busy={toggling}
       onToggle={(enabled) => void toggle(enabled)}
+      liveSandbox={sandboxRefused(config) ? { nextInLine: nextInLine === true } : undefined}
     />
   );
 }
@@ -238,11 +248,19 @@ function environmentChrome(
   environment: PaymentEnvironment,
   onChange: (next: PaymentEnvironment) => void,
   active: PaymentEnvironment | null,
+  /** A refused sandbox's band (FUT-4432), which replaces the sandbox notice. */
+  refusedBand: ReactNode = null,
 ): { selector: ReactNode; band: ReactNode; notice: ReactNode } {
   // Nothing to choose with one environment. The notice goes only for a
   // PRODUCTION-only provider (it would promise no money moves); a sandbox-only
   // one keeps its truthful "nothing is real" notice.
   if (sole === 'PRODUCTION') return { selector: null, band: undefined, notice: null };
+  // A refused sandbox (FUT-4432): its band takes the notice's place and never
+  // sits beside it; the manual path's inset Produção notice stays.
+  if (refusedBand) {
+    const selector = sole ? null : <EnvironmentSelector environment={environment} onChange={onChange} />;
+    return { selector, band: refusedBand, notice: environment === 'SANDBOX' ? null : <EnvironmentNotice environment={environment} active={active} band={false} /> };
+  }
   if (sole) {
     return {
       selector: null,
@@ -290,6 +308,24 @@ function manualPathForm({
   );
 }
 
+/**
+ * A refused sandbox's band on the credentials branch (FUT-4432): there is no
+ * grant to remove, so its button puts the tabs on Produção, where saving is
+ * today's path.
+ */
+function credentialsBand(props: ActivePanelProps, toProduction: () => void): ReactNode {
+  if (!sandboxRefused(props.config)) return null;
+  return <LiveSandboxBand nextInLine={props.nextInLine === true} disabled={props.readOnly === true} onAction={toProduction} />;
+}
+
+/**
+ * Step 3 on the credentials branch: not while a credential is being edited,
+ * nor on a tab holding none, nor while the sandbox is refused (FUT-4432).
+ */
+function stepShown(editing: boolean, storedHere: boolean, refused: boolean): boolean {
+  return !editing && storedHere && !refused;
+}
+
 export function ActivePanel(props: ActivePanelProps) {
   const { descriptor, config, client, onChanged, reload, guide, verification } = props;
   const statusBar = <EnableBar {...props} />;
@@ -314,7 +350,8 @@ export function ActivePanel(props: ActivePanelProps) {
     />
   );
 
-  const { selector, band, notice } = environmentChrome(sole, environment, setEnvironment, config?.environment ?? null);
+  const refused = sandboxRefused(config);
+  const { selector, notice, band } = environmentChrome(sole, environment, setEnvironment, config?.environment ?? null, credentialsBand(props, () => setEnvironment('PRODUCTION')));
 
   const storedHere = requiredStored(descriptor, config, environment);
 
@@ -330,7 +367,7 @@ export function ActivePanel(props: ActivePanelProps) {
         band={band}
       >
         {credentials}
-        {editing || !storedHere ? null : verification}
+        {stepShown(editing, storedHere, refused) ? verification : null}
       </ProviderCard>
     );
   }
@@ -341,6 +378,7 @@ export function ActivePanel(props: ActivePanelProps) {
       statusBar={statusBar}
       walkthrough={(path: 'oauth' | 'credentials') => oauthWalkthrough(props, path)}
       form={manualPathForm({ selector, notice, walkthrough: oauthWalkthrough(props, 'credentials'), credentials })}
+      toProductionTab={() => setEnvironment('PRODUCTION')}
     />
   );
 }

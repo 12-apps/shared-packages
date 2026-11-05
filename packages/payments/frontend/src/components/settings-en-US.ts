@@ -53,6 +53,7 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     connected: 'Connected',
     reconnect: 'Reconnect',
     notConnected: 'Not connected',
+    testMode: 'Test mode',
   },
   environment: {
     production: 'Production',
@@ -128,6 +129,21 @@ export const EN_US_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     removeRestartsSetup: 'To reconnect, the steps start again from the beginning.',
     pauseInstead: 'Just pause taking payments',
     cancel: 'Cancel',
+  },
+  liveSandbox: {
+    headerSub: 'Test mode: the store charges no customer.',
+    headerSubNextInLine: 'Test mode: this provider charges no customer.',
+    headerState: 'Not taking online sales',
+    bandLead: 'With the store live, the Sandbox offers no payment.',
+    bandNobodyPays: 'Customers cannot pay online.',
+    bandNextInLine: 'Customers pay through the next provider in line.',
+    bandAction: 'Connect in Production',
+    toProductionQuestion: () => 'Remove the test connection and connect in Production?',
+    toProductionConsequence: (displayName) =>
+      `The Sandbox connection leaves the store and you go to ${displayName} to connect the Production account.`,
+    toProductionAfter: 'Once connected, run the test charge to switch sales on.',
+    toProductionIrreversible: 'The test connection cannot be recovered once removed.',
+    toProductionConfirm: 'Remove and connect in Production',
   },
   credentials: {
     configuredKeepBlank: 'Configured — leave blank to keep the current value.',

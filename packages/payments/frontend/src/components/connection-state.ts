@@ -1,5 +1,6 @@
 import type { MaskedProviderConfig } from '@12-apps/payments-backend';
 import type { ConnectionBadgeCopy } from './settings-copy';
+import { EN_US_PAYMENTS_SETTINGS_COPY } from './settings-en-US';
 
 /**
  * Is there actually a connection here?
@@ -16,6 +17,17 @@ import type { ConnectionBadgeCopy } from './settings-copy';
 export function isConnected(config: MaskedProviderConfig | null | undefined): boolean {
   const status = config?.status;
   return status === 'VERIFIED' || status === 'RECONNECT_REQUIRED';
+}
+
+/**
+ * Is this connection in its provider's SIMULATED sandbox on a live deployment
+ * (FUT-4432)? Checkout offers nothing from it, so the screen warns and offers
+ * the way to Produção. The SERVER decides it (`MaskedProviderConfig
+ * .sandboxRefused`, from the deployment flag and the adapter); this only adds
+ * that there is a connection to warn about. The one gate every warning reads.
+ */
+export function sandboxRefused(config: MaskedProviderConfig | null | undefined): boolean {
+  return config?.sandboxRefused === true && isConnected(config);
 }
 
 /**
@@ -109,21 +121,26 @@ type ConnectionBadge =
   | { label: string; state: 'ACTIVE'; color: 'success' }
   | { label: string; state: 'CONNECTED'; color: 'default' }
   | { label: string; state: 'RECONNECT'; color: 'error' }
-  | { label: string; state: 'NOT_CONNECTED'; color: 'warning' };
+  | { label: string; state: 'NOT_CONNECTED'; color: 'warning' }
+  | { label: string; state: 'TEST_MODE'; color: 'warning' };
 
 /**
  * `enabled` is deliberately checked first: it is the only state that means
  * money can move, and a store reading `Ativo` has already passed everything
- * below it.
+ * below it — unless the deployment refuses its sandbox (FUT-4432), which is why
+ * TEST_MODE outranks it. A lapsed grant keeps "Reconectar": that is the news.
  */
 export function connectionBadge(
   copy: ConnectionBadgeCopy,
   config: MaskedProviderConfig | null,
 ): ConnectionBadge {
-  if (config?.enabled) return { label: copy.active, state: 'ACTIVE', color: 'success' };
-  if (config?.status === 'RECONNECT_REQUIRED') {
-    return { label: copy.reconnect, state: 'RECONNECT', color: 'error' };
+  const reconnect = { label: copy.reconnect, state: 'RECONNECT', color: 'error' } as const;
+  if (sandboxRefused(config)) {
+    if (config?.status === 'RECONNECT_REQUIRED') return reconnect;
+    return { label: copy.testMode ?? EN_US_PAYMENTS_SETTINGS_COPY.listBadge.testMode!, state: 'TEST_MODE', color: 'warning' };
   }
+  if (config?.enabled) return { label: copy.active, state: 'ACTIVE', color: 'success' };
+  if (config?.status === 'RECONNECT_REQUIRED') return reconnect;
   if (isConnected(config)) return { label: copy.connected, state: 'CONNECTED', color: 'default' };
   return { label: copy.notConnected, state: 'NOT_CONNECTED', color: 'warning' };
 }

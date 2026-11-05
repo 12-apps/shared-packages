@@ -5,9 +5,10 @@ import { Box, Stack, Switch, Tooltip, Typography } from '@mui/material';
 import type { MaskedProviderConfig, ProviderDescriptor } from '@12-apps/payments-backend';
 
 import { certificateExpiryProximity, isConnected } from './connection-state';
+import { useLiveSandboxCopy, WarnIcon } from './LiveSandboxBand';
 import { checksLocally } from './checks-locally';
 import { T } from './panel-tokens';
-import type { ConnectionStatusCopy } from './settings-copy';
+import type { ConnectionStatusCopy, LiveSandboxCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
@@ -158,6 +159,15 @@ function headline(
 }
 
 /**
+ * The header's two lines for a refused sandbox (FUT-4432), in the warning's
+ * tone. With another provider taking the money, the line names this provider
+ * rather than the store, which is still selling.
+ */
+function liveHeadline(live: LiveSandboxCopy, nextInLine: boolean) {
+  return { state: live.headerState, sub: nextInLine ? live.headerSubNextInLine : live.headerSub, tone: T.warn };
+}
+
+/**
  * Status chip + the "recebendo vendas" switch, hoisted OUT of the credential
  * form.
  *
@@ -278,11 +288,19 @@ export function ProviderStatusBar({
   config,
   busy,
   onToggle,
+  liveSandbox,
 }: {
   descriptor: ProviderDescriptor;
   config: MaskedProviderConfig | null;
   busy: boolean;
   onToggle: (enabled: boolean) => void;
+  /**
+   * The deployment refuses this connection's simulated sandbox (FUT-4432): the
+   * switch may read "on" and still take nothing, so both lines say so, in the
+   * warning's ink and never in red. `nextInLine`: another provider takes the
+   * money meanwhile, and "the store charges no customer" would be untrue.
+   */
+  liveSandbox?: { nextInLine: boolean };
 }) {
   const enabled = config?.enabled ?? false;
   const copy = usePaymentsSettingsCopy().status;
@@ -291,14 +309,17 @@ export function ProviderStatusBar({
 
   const proven = Boolean(config?.chargeVerifiedAt);
   const paused = proven && !enabled;
-  const { state, sub, tone } = headline(copy, { enabled, paused, lockedOff, hint });
+  const live = useLiveSandboxCopy();
+  const { state, sub, tone } = liveSandbox
+    ? liveHeadline(live, liveSandbox.nextInLine)
+    : headline(copy, { enabled, paused, lockedOff, hint });
 
   return (
     <Stack direction="row" alignItems="flex-start" gap="14px" flexWrap="wrap">
       <Box>
         <ProviderName displayName={descriptor.displayName} label={badge.label} proven={proven} />
         <Typography
-          sx={{ fontSize: '12.5px', color: T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
+          sx={{ fontSize: '12.5px', color: liveSandbox ? T.warnInk : T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
           data-testid="payments-enable-hint"
         >
           {sub}
@@ -320,7 +341,11 @@ export function ProviderStatusBar({
             />
           </span>
         </Tooltip>
-        <Typography sx={{ fontSize: '12.5px', fontWeight: tone === T.ink3 ? 400 : 600, color: tone }}>
+        <Typography
+          data-testid="payments-enable-state"
+          sx={{ fontSize: '12.5px', fontWeight: tone === T.ink3 ? 400 : 600, color: tone, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          {liveSandbox ? <WarnIcon /> : null}
           {state}
         </Typography>
       </Stack>
