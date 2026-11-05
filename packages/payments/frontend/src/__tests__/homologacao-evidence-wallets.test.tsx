@@ -42,12 +42,13 @@ afterEach(() => {
 
 /** The pay.js surface, recorded: the environment each client was built in, and each sheet request. */
 function fakeGooglePay(options: { ready?: boolean; rejectWith?: unknown } = {}) {
-  const calls = { environments: [] as string[], requests: [] as Record<string, unknown>[] };
+  const calls = { environments: [] as string[], requests: [] as Record<string, unknown>[], ready: [] as Record<string, unknown>[] };
   class PaymentsClient {
     constructor(clientOptions: { environment: 'TEST' | 'PRODUCTION' }) {
       calls.environments.push(clientOptions.environment);
     }
-    async isReadyToPay(): Promise<{ result: boolean }> {
+    async isReadyToPay(request: Record<string, unknown>): Promise<{ result: boolean }> {
+      calls.ready.push(request);
       return { result: options.ready ?? true };
     }
     createButton({ onClick }: { onClick: () => void }): HTMLElement {
@@ -148,6 +149,18 @@ describe('HomologacaoEvidenceCard — the wallet step', () => {
       ],
       transactionInfo: { totalPrice: '12.00', currencyCode: 'BRL' },
     });
+  });
+
+  it('given the PRODUCTION evidence and an operator with no card in Google Pay, then the button still draws on the bare probe (FUT-4399)', async () => {
+    const google = fakeGooglePay();
+    mount({
+      googlePayApi: google.api,
+      seller: { ...SELLER, wallets: { ...WALLETS, googlePay: { gateway: 'pagbank', gatewayMerchantId: 'ACCO_PROD', environment: 'PRODUCTION' } } },
+    });
+
+    await screen.findByTestId('google-pay-native');
+    expect(google.calls.environments).toEqual(['PRODUCTION']);
+    expect(google.calls.ready[0]).not.toHaveProperty('existingPaymentMethodRequired');
   });
 
   it('given a pressed Google Pay, then the card shows it ready with its card and never its token, and generating sends the token', async () => {

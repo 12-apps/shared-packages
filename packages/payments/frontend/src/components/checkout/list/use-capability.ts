@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { onAppleDevice } from "../apple-device";
 import { applePaySessionClass, applePaySupported, type ApplePaySessionClass } from "../apple-pay-button";
 import { useGooglePayClient, type GooglePayGatewayParams, type GooglePaymentsClient } from "../google-pay-button";
 import { applePayDeclared, cardHead, cardPathAvailable, googlePayConfig, offeredMethods } from "../method-capability";
@@ -115,6 +116,9 @@ function capabilityOf(
  * the block). Apple also needs the host's merchant-validation port: without it
  * the session could only abort.
  *
+ * Google Pay is never offered on an Apple device (iOS, iPadOS, Safari on
+ * macOS), whether or not the store offers Apple Pay (FUT-4399).
+ *
  * Both sheets open inside the tap, before any order exists, so they are priced
  * with the host's `totalCents` — the amount DUE. A host that never priced it,
  * or prices it at zero (a balance covers everything), offers no wallet.
@@ -128,8 +132,11 @@ export function useListCapability(
   hasBillingAddress = false,
 ): ListCapability {
   const declared = googlePayConfig(config);
-  // `null` tells the client hook not to load pay.js at all.
-  const client = useGooglePayClient(declared ? undefined : null, declared?.environment ?? "TEST");
+  // Google Pay is never offered on an Apple device (FUT-4399): decided here,
+  // once, before pay.js is even loaded. `null` tells the client hook not to
+  // load it at all. Apple Pay keeps its own gate, in `appleSession`.
+  const googleHere = declared !== null && !onAppleDevice();
+  const client = useGooglePayClient(googleHere ? undefined : null, declared?.environment ?? "TEST", { requireExistingMethod: true });
   const { priced, repricing } = useRepricing(totalCents);
   // The port is read at the press, through a ref: a host passing a new
   // function each render must not rebuild the capability (and the wallets'
