@@ -272,6 +272,12 @@ export interface MaskedProviderConfig {
    * recorded.
    */
   connectedAccount: ConnectedOAuthAccount | null;
+  /**
+   * On a LIVE deployment this row's active environment is its provider's
+   * simulated sandbox, so checkout offers nothing from it (FUT-4432,
+   * `refusesSimulatedSandbox`). Optional: absent means not refused.
+   */
+  sandboxRefused?: boolean;
 }
 
 /** Static description of a provider, for rendering its settings form. */

@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
 import type {
@@ -20,17 +12,11 @@ import type {
 
 import type { PaymentsSettingsClient } from '../client';
 import { ConnectionFacts, ConnectSteps, DisconnectDialog } from './ConnectionCard';
+import { ExpiryNote, GrantedScopes } from './GrantDetails';
 import { EnvironmentSelector } from './EnvironmentTabs';
 import { readConnection, useConnectEnvironment } from './connect-environment';
-import { expiryProximity } from './connection-state';
-import {
-  BAR_MSG_SX,
-  BAR_SX,
-  BTN_PRIMARY_SX,
-  BTN_QUIET_DANGER_SX,
-  CARD_INSET,
-  T,
-} from './panel-tokens';
+import { ToProductionDialog, useToProduction } from './to-production';
+import { BAR_MSG_SX, BAR_SX, BTN_INVERTED_PRIMARY_SX, BTN_PRIMARY_SX, BTN_QUIET_DANGER_SX, CARD_INSET, T } from './panel-tokens';
 import type { OAuthConnectionCopy } from './settings-copy';
 import { describeFailure } from './failure-copy';
 import { usePaymentsFailureCopy, usePaymentsSettingsCopy } from './settings-copy-context';
@@ -58,38 +44,20 @@ export interface ProviderConnectionProps {
     environment: PaymentEnvironment,
   ) => Promise<{ state: string; redirectUri: string; environment?: PaymentEnvironment }>;
   onChanged: () => void;
-}
-
-/**
- * The expiry caption, with PROXIMITY emphasis (FUT-683): the renewal sweep
- * normally refreshes a grant long before it lapses, so an expiry that is
- * actually close means renewal has been failing quietly — and this caption is
- * the only warning an owner gets before checkout starts refusing. A neutral
- * gray line read the same on the eve of an outage as a year out.
- */
-function ExpiryNote(props: { expiresAt: string }) {
-  const copy = usePaymentsSettingsCopy().oauth;
-  const when = new Date(props.expiresAt).toLocaleString('pt-BR');
-  const proximity = expiryProximity(props.expiresAt);
-  if (proximity === 'SAFE' || proximity === null) {
-    return (
-      <Typography variant="caption" color="text.secondary">
-        {copy.validUntil(when)}
-      </Typography>
-    );
-  }
-  return (
-    <Typography
-      variant="caption"
-      color={proximity === 'PAST' ? 'error.main' : 'warning.main'}
-      sx={{ fontWeight: 600 }}
-      data-testid="payments-expiry-warning"
-    >
-      {proximity === 'PAST'
-        ? copy.expiredAt(when)
-        : copy.expiresAt(when)}
-    </Typography>
-  );
+  /**
+   * The deployment refuses this connection's simulated sandbox (FUT-4432): the
+   * band above owns the card's one primary, so Reconectar steps down to the
+   * inverted primary.
+   */
+  refused?: boolean;
+  /**
+   * The band's "Conectar em Produção" for a GRANT: today's removal dialog in
+   * its "to Produção" variant, owned by the panel that draws the band. Confirm
+   * removes the grant, re-reads, closes, and starts the connect in PRODUCTION
+   * with no third tap; a failed removal stays in the dialog, a failed start
+   * lands on the not-connected card with Produção selected.
+   */
+  toProduction?: { open: boolean; onClose: () => void };
 }
 
 /**
@@ -138,47 +106,6 @@ function connectLabel(
 ) {
   if (busy === 'connect') return <CircularProgress size={18} />;
   return connected ? copy.reconnectAction : copy.connectAction(displayName);
-}
-
-/**
- * pt-BR labels for the scopes a store owner actually sees. Unknown scopes fall
- * back to the provider's own spelling — wrong words are worse than raw ones.
- */
-function scopeLabels(copy: OAuthConnectionCopy): Record<string, string> {
-  return {
-    'payments.read': copy.scopes.read,
-    'payments.create': copy.scopes.create,
-    'payments.refund': copy.scopes.refund,
-    'accounts.read': copy.scopes.account,
-  };
-}
-
-/**
- * WHAT the connected grant may do (FUT-300): its granted scopes, in the
- * owner's words.
- *
- * The account and the connect date used to be repeated here, as sentences
- * under the facts grid that already states both (`ConnectionFacts`). One place
- * per thing: the grid answers "which account, since when"; this answers only
- * what the grid cannot.
- */
-function GrantedScopes(props: { account: ConnectedOAuthAccount }) {
-  const copy = usePaymentsSettingsCopy().oauth;
-  const { grantedScopes } = props.account;
-  if (grantedScopes.length === 0) return null;
-  return (
-    <Stack
-      direction="row"
-      spacing={0.5}
-      useFlexGap
-      flexWrap="wrap"
-      data-testid="payments-connected-account"
-    >
-      {grantedScopes.map((scope) => (
-        <Chip key={scope} size="small" variant="outlined" label={scopeLabels(copy)[scope] ?? scope} />
-      ))}
-    </Stack>
-  );
 }
 
 /** Header + explanatory copy + any warning banner for the connection. */
@@ -239,8 +166,6 @@ function ConnectionSummary(props: {
   );
 }
 
-
-
 /**
  * The connect card's action bar.
  *
@@ -255,9 +180,10 @@ function ConnectionActions(props: {
   busy: string | null;
   onConnect: () => void;
   onDisconnect: () => void;
+  refused?: boolean;
 }) {
   const copy = usePaymentsSettingsCopy().oauth;
-  const { displayName, connected, busy, onConnect, onDisconnect } = props;
+  const { displayName, connected, busy, onConnect, onDisconnect, refused } = props;
   return (
     // The bar runs full-bleed for its rule, but its text starts at the card's
     // inset like every block above it — BAR_SX's own 18px is tuned for a bar
@@ -283,7 +209,7 @@ function ConnectionActions(props: {
         disableElevation
         disabled={busy !== null}
         onClick={onConnect}
-        sx={BTN_PRIMARY_SX}
+        sx={refused ? BTN_INVERTED_PRIMARY_SX : BTN_PRIMARY_SX}
       >
         {connectLabel(copy, displayName, connected, busy)}
       </Button>
@@ -297,18 +223,21 @@ function useConnectionAction(onChanged: () => void) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const run = async (kind: string, action: () => Promise<void>) => {
+  /** True once the action landed; a failure's sentence goes to `sink` (the card's, by default). */
+  const run = async (kind: string, action: () => Promise<void>, sink: (message: string | null) => void = setError): Promise<boolean> => {
     setBusy(kind);
-    setError(null);
+    sink(null);
     try {
       await action();
       onChanged();
+      return true;
     } catch (err) {
       // The missing-platform-app refusal keeps its raw message: `connectFailure`
       // recognises it there and names the way round. Everything else reads as
       // its code's sentence.
       const raw = err instanceof Error ? err.message : '';
-      setError(NO_PLATFORM_APP.test(raw) ? raw : describeFailure(err, failures));
+      sink(NO_PLATFORM_APP.test(raw) ? raw : describeFailure(err, failures));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -317,8 +246,29 @@ function useConnectionAction(onChanged: () => void) {
   return { busy, error, run };
 }
 
+/**
+ * Start a connect in `target` — passed, never read from the closure, because
+ * "to Produção" starts from a card whose stored environment is still SANDBOX.
+ */
+function connectTo(
+  run: ReturnType<typeof useConnectionAction>['run'],
+  { descriptor, client, prepareConnect }: ProviderConnectionProps,
+  environment: PaymentEnvironment,
+) {
+  return (target: PaymentEnvironment = environment) =>
+    run('connect', async () => {
+      // The host seals this environment into the state cookie and the callback
+      // trusts only that sealed value, so the grant lands where it was asked.
+      const ctx = await prepareConnect(descriptor.name, target);
+      const { url } = await client.beginOAuth(descriptor.name, { environment: target, ...ctx });
+      // Full-page navigation: the provider's consent screen must be a
+      // top-level document, never an iframe.
+      window.location.assign(url);
+    });
+}
+
 export function ProviderConnection(props: ProviderConnectionProps) {
-  const { descriptor, config, client, prepareConnect, onChanged } = props;
+  const { descriptor, config, client, onChanged } = props;
   const { busy, error, run } = useConnectionAction(onChanged);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const stored = readConnection(config);
@@ -336,16 +286,8 @@ export function ProviderConnection(props: ProviderConnectionProps) {
       setConfirmingDisconnect(false);
     });
 
-  const connect = () =>
-    void run('connect', async () => {
-      // The host seals this environment into the state cookie and the callback
-      // trusts only that sealed value, so the grant lands where it was asked.
-      const ctx = await prepareConnect(descriptor.name, environment);
-      const { url } = await client.beginOAuth(descriptor.name, { environment, ...ctx });
-      // Full-page navigation: the provider's consent screen must be a
-      // top-level document, never an iframe.
-      window.location.assign(url);
-    });
+  const connect = connectTo(run, props, environment);
+  const flow = useToProduction({ run, connect, setChosen, removeGrant: () => client.disconnectOAuth(descriptor.name), onClose: props.toProduction?.onClose });
 
   return (
     <Stack spacing={2}>
@@ -373,9 +315,12 @@ export function ProviderConnection(props: ProviderConnectionProps) {
         displayName={descriptor.displayName}
         connected={connected}
         busy={busy}
-        onConnect={connect}
+        onConnect={() => void connect()}
         onDisconnect={() => setConfirmingDisconnect(true)}
+        refused={props.refused}
       />
+
+      <ToProductionDialog open={props.toProduction?.open} displayName={descriptor.displayName} busy={busy === 'disconnect'} flow={flow} />
 
       <DisconnectDialog
         open={confirmingDisconnect}

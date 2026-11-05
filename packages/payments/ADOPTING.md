@@ -62,6 +62,13 @@ Two constructor arguments are security-critical:
   with no signature at all and a probe passes without asking the acquirer
   anything. Even when on it applies only to SANDBOX configs; PRODUCTION can
   never run stub charges.
+- **`liveOnlyCredentials` (the live deployment only)** — wrap the
+  `CredentialStore` the gateway routes through with
+  `liveOnlyCredentials(store, process.env, providers)` and set
+  `PAYMENTS_LIVE_DEPLOYMENT=1` in the configuration of the ONE deployment
+  that serves real buyers. A SANDBOX connection on an adapter declaring
+  `simulatedSandbox` then offers no method and takes no charge there; credential reads by name (webhooks,
+  reconciliation) are untouched. Leave it unset everywhere else.
 
 > **Upgrading from a version before FUT-696**: the stored `stub` column is no
 > longer believed on its own — every read now also requires the deployment's

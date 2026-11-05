@@ -326,6 +326,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     // no registered PagBank application.
     authMode: 'oauth',
     capabilities,
+    simulatedSandbox: true, // sandbox.api.pagseguro.com moves no money (FUT-4432)
     credentialSchema: ({ locale }) => credentialSchemaFor(copy(locale ?? undefined)),
     customerSchema,
     // A PIX code and a card typed on OUR page (FUT-596). Named for the SHAPE,

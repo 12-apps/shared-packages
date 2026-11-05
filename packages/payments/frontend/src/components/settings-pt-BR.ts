@@ -45,6 +45,7 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     connected: 'Conectado',
     reconnect: 'Reconectar',
     notConnected: 'Não conectado',
+    testMode: 'Modo de teste',
   },
   environment: {
     production: 'Produção',
@@ -117,6 +118,21 @@ export const PT_BR_PAYMENTS_SETTINGS_COPY: PaymentsSettingsCopy = {
     removeRestartsSetup: 'Para reconectar, os passos recomeçam do zero.',
     pauseInstead: 'Só pausar o recebimento',
     cancel: 'Cancelar',
+  },
+  liveSandbox: {
+    headerSub: 'Modo de teste: a loja não cobra clientes.',
+    headerSubNextInLine: 'Modo de teste: este provedor não cobra clientes.',
+    headerState: 'Não está recebendo vendas online',
+    bandLead: 'Com a loja no ar, o Sandbox não oferece pagamento.',
+    bandNobodyPays: 'Os clientes não conseguem pagar online.',
+    bandNextInLine: 'Os clientes pagam pelo próximo provedor da fila.',
+    bandAction: 'Conectar em Produção',
+    toProductionQuestion: () => 'Remover a conexão de teste e conectar em Produção?',
+    toProductionConsequence: (displayName) =>
+      `A conexão Sandbox sai da loja e você vai ao ${displayName} conectar a conta de Produção.`,
+    toProductionAfter: 'Depois de conectar, faça a cobrança de teste para ligar as vendas.',
+    toProductionIrreversible: 'A conexão de teste não pode ser recuperada depois de removida.',
+    toProductionConfirm: 'Remover e conectar em Produção',
   },
   credentials: {
     configuredKeepBlank: 'Configurado — deixe em branco para manter o valor atual.',

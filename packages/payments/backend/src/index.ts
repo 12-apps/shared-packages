@@ -164,6 +164,7 @@ export {
   STUB_MODE_ENV_VAR,
   type StubModeEnv,
 } from './core/stub-mode';
+export { liveOnlyCredentials, readLiveDeployment, LIVE_DEPLOYMENT_ENV_VAR, type LiveDeploymentEnv } from './core/live-deployment';
 
 // NOTHING reachable from this entry may import a Node builtin: the frontend
 // package's stories value-import it, so a provider module placed here drags

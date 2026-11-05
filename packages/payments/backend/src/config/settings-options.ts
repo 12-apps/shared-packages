@@ -1,3 +1,4 @@
+import type { LiveDeploymentEnv } from '../core/live-deployment';
 import type { MerchantWebhookUrlResolver } from '../core/webhook-url';
 
 /** Construction-time options — NOT reachable from any request body. */
@@ -22,6 +23,13 @@ export interface SettingsServiceOptions {
    * resolves it per read. Omitted, probes run on the stored fields alone.
    */
   webhookUrl?: MerchantWebhookUrlResolver;
+  /**
+   * The process environment `PAYMENTS_LIVE_DEPLOYMENT` is read from, per call
+   * (FUT-4432): on a live deployment each masked config says whether its
+   * simulated sandbox is refused, and the published chain leaves it out.
+   * Omitted: never live.
+   */
+  liveDeployment?: LiveDeploymentEnv;
 }
 
 /**

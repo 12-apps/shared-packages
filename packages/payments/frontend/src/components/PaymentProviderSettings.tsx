@@ -3,10 +3,10 @@
 import { Alert, Box, Button, CircularProgress } from '@mui/material';
 import { useCallback, type ReactNode } from 'react';
 
-import type { MaskedProviderConfig, ProviderSetupGuide } from '@12-apps/payments-backend';
+import type { MaskedProviderConfig, MerchantSettingsView, ProviderSetupGuide } from '@12-apps/payments-backend';
 
 import type { PaymentsSettingsClient } from '../client';
-import { canAttemptCharge } from './connection-state';
+import { canAttemptCharge, sandboxRefused } from './connection-state';
 import { ProviderList } from './ProviderList';
 import { ActivePanel, type ActivePanelProps, type PrepareConnect } from './ProviderPanel';
 import {
@@ -114,6 +114,8 @@ export interface PaymentProviderSettingsProps {
    * keeps no timer either way. See {@link PaymentsSettingsLiveSignal}.
    */
   live?: PaymentsSettingsLiveSignal;
+  /** Read-only viewer: the refused-sandbox warning's button is disabled (FUT-4432). */
+  readOnly?: boolean;
   /**
    * The activation step, rendered under the connection card.
    *
@@ -219,7 +221,8 @@ function activationRunnable(descriptor: { capabilities?: { methods?: readonly st
 
 /** The activation step's context, built from what this screen already knows. */
 function verificationFor(io: VerificationInputs): ReactNode {
-  if (!io.provable) return null;
+  // A refused sandbox shows no step (FUT-4432): it returns once in Produção.
+  if (!io.provable || sandboxRefused(io.config)) return null;
   // `enabled` is deliberately NOT passed: the step used it to show a standing
   // "provider is active" banner, which kept reassuring a store whose every
   // charge was being refused. `proven` is a different kind of fact — it is
@@ -302,6 +305,15 @@ function guideSlot(
   );
 }
 
+/**
+ * What a refused sandbox's warning needs from the mount (FUT-4432): whether
+ * another provider takes the money meanwhile — the view's chain already leaves
+ * the refused one out — and whether the viewer may press its button.
+ */
+function liveSandboxProps(view: MerchantSettingsView, provider: string, readOnly: boolean | undefined) {
+  return { readOnly, nextInLine: view.activeProvider !== null && view.activeProvider !== provider };
+}
+
 export function PaymentProviderSettings({
   client,
   copy,
@@ -312,17 +324,11 @@ export function PaymentProviderSettings({
   onProviderChange,
   renderVerification,
   live,
+  readOnly,
 }: PaymentProviderSettingsProps) {
-  const { view, error, reload } = useSettingsState(
-    client,
-    copy.failures ?? EN_US_PAYMENTS_SETTINGS_COPY.failures!,
-  );
+  const { view, error, reload } = useSettingsState(client, copy.failures ?? EN_US_PAYMENTS_SETTINGS_COPY.failures!);
   useSettingsLive(live, () => void reload());
-  const { selected, setSelected } = useSelectedProvider(
-    initialProvider,
-    selectedProvider,
-    onProviderChange,
-  );
+  const { selected, setSelected } = useSelectedProvider(initialProvider, selectedProvider, onProviderChange);
   // What leaves this component (and what it stores) is the adapter's URL
   // spelling, so a controlled host writes it into its path segment verbatim —
   // `useOpenProvider` resolves names and slugs alike, so either survives.
@@ -360,6 +366,7 @@ export function PaymentProviderSettings({
       reload={() => void reload()}
       prepareConnect={prepareConnect}
       onBack={() => openProvider(null)}
+      {...liveSandboxProps(view, active.name, readOnly)}
       // A new credential may name a DIFFERENT InfinitePay account, and the
       // owner's "Checkout Integrado is on" was said about the old one. The
       // server already drops its own verdict and its proof on any credential

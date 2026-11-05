@@ -160,6 +160,19 @@ export const BTN_SECONDARY_SX = {
 } as const;
 
 /**
+ * The primary, inverted: white fill, the primary as ink and border (ADR 0184
+ * rule 3). For a step's own button when another on the card is THE primary —
+ * Reconectar beside a refused sandbox's "Conectar em Produção" (FUT-4432).
+ */
+export const BTN_INVERTED_PRIMARY_SX = {
+  ...BTN_PRIMARY_SX,
+  background: T.bg,
+  color: T.brand,
+  border: `1px solid ${T.brand}`,
+  '&:hover': { background: T.brandSoft, boxShadow: 'none' },
+} as const;
+
+/**
  * Destructive, stated quietly.
  *
  * "Remover conexão" sits beside the step's own button and must not compete with

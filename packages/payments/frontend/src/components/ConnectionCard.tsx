@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -9,14 +10,19 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Drawer,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import type { ConnectedOAuthAccount, PaymentEnvironment } from '@12-apps/payments-backend';
 
+import { useLiveSandboxCopy } from './LiveSandboxBand';
 import { BTN_PRIMARY_SX, BTN_SECONDARY_SX, LINKISH_SX, T } from './panel-tokens';
+import { rems, sxRem } from './rem';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
@@ -155,6 +161,13 @@ export function ConnectSteps({ displayName }: { displayName: string }) {
  * here: it revokes the grant at the provider, so the store stops being able to
  * charge immediately and getting back requires the owner to authorize again on
  * the provider's site. It also sat one careless click from "Reconectar".
+ *
+ * `toProduction` is the same dialog for a refused sandbox (FUT-4432): removing
+ * the test grant is the first half of "Conectar em Produção", so it says where
+ * the owner goes next and what then switches sales on, and offers no pause —
+ * nothing is being charged. Removing still cannot be undone (ADR 0150), so it
+ * says that too. A removal that fails keeps the dialog open with the reason
+ * inside it, where the owner is looking.
  */
 export function DisconnectDialog(props: {
   open: boolean;
@@ -166,24 +179,28 @@ export function DisconnectDialog(props: {
   onConfirm: () => void;
   /** The softer path: keep the connection, stop taking orders through it. */
   onPauseInstead?: () => void;
+  variant?: 'remove' | 'toProduction';
+  /** Why the removal failed, shown inside the dialog. */
+  error?: string | null;
 }) {
   const copy = usePaymentsSettingsCopy().card;
-  const { displayName, receiving } = props;
+  const toProduction = props.variant === 'toProduction';
+  const words = useDialogWords(props.displayName, toProduction, props.receiving);
+  const { displayName } = props;
+  const receiving = props.receiving && !toProduction;
   return (
-    <Dialog open={props.open} onClose={props.onCancel} data-testid="payments-disconnect-confirm">
-      <DialogTitle sx={{ fontSize: '16.5px', fontWeight: 700, letterSpacing: '-.01em', pb: '8px' }}>
-        {copy.removeQuestion(displayName)}
+    <RemovalFrame open={props.open} sheet={toProduction} onClose={props.busy ? undefined : props.onCancel}>
+      <DialogTitle id={REMOVAL_TITLE_ID} sx={{ fontSize: sxRem(16.5), fontWeight: 700, letterSpacing: '-.01em', pb: sxRem(8) }}>
+        {words.question}
       </DialogTitle>
-      <DialogContent sx={{ pb: '4px' }}>
-        <DialogContentText sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.55 }}>
-          {receiving
-            ? copy.removeConsequenceLive
-            : copy.removeConsequenceIdle}
+      <DialogContent sx={{ pb: sxRem(4) }}>
+        <DialogContentText sx={{ fontSize: sxRem(13), color: T.ink2, lineHeight: 1.55 }}>
+          {words.consequence}
         </DialogContentText>
         {/* The consequences, itemised. A single paragraph makes the reversible
             facts and the irreversible one weigh the same, and the one that
             costs money is the one an owner skims past. */}
-        <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: '14px', p: 0 }}>
+        <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: sxRem(14), p: 0 }}>
           {receiving ? (
             <Consequence tone="bad">{copy.removeStopsChargingNow}</Consequence>
           ) : null}
@@ -193,41 +210,133 @@ export function DisconnectDialog(props: {
           <Consequence>
             {copy.removeKeepsSettled(displayName)}
           </Consequence>
-          <Consequence>{copy.removeRestartsSetup}</Consequence>
+          {words.closing.map((line) => (
+            <Consequence key={line}>{line}</Consequence>
+          ))}
         </Stack>
-      </DialogContent>
-      <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: '8px', p: '18px 22px 20px' }}>
-        {/* Offered FIRST, and only when it is a real alternative. An owner who
-            came here to stop taking orders wants the switch, not the removal —
-            and reaching for the destructive control is how they got here. */}
-        {receiving && props.onPauseInstead ? (
-          <Button
-            fullWidth
-            onClick={props.onPauseInstead}
-            disabled={props.busy}
-            sx={BTN_SECONDARY_SX}
-            data-testid="payments-pause-instead"
-          >
-            {copy.pauseInstead}
-          </Button>
+        {props.error ? (
+          <Alert severity="error" sx={{ mt: sxRem(14) }} data-testid="payments-disconnect-error">
+            {props.error}
+          </Alert>
         ) : null}
-        <Button
-          fullWidth
-          variant="contained"
-          disableElevation
-          onClick={props.onConfirm}
-          disabled={props.busy}
-          data-testid="payments-disconnect-confirm-action"
-          sx={{ ...BTN_PRIMARY_SX, background: T.bad, '&:hover': { background: '#a51f1f' } }}
-        >
-          {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : copy.removeAction}
-        </Button>
-        <Button fullWidth onClick={props.onCancel} disabled={props.busy} sx={LINKISH_SX}>
-          {copy.cancel}
-        </Button>
-      </DialogActions>
+      </DialogContent>
+      <RemovalActions
+        busy={props.busy}
+        confirm={words.confirm}
+        onConfirm={props.onConfirm}
+        onCancel={props.onCancel}
+        onPauseInstead={receiving ? props.onPauseInstead : undefined}
+      />
+    </RemovalFrame>
+  );
+}
+
+/**
+ * What the removal dialog sits in. Backdrop and Escape do nothing while the
+ * removal is in flight (`onClose` undefined): closing then would hide its
+ * outcome, a failure included (FUT-4432).
+ *
+ * The "to Produção" variant is a bottom SHEET on a phone and the system's
+ * centred dialog on a computer (UX13, "popup no computador e sheet no
+ * celular"); the plain removal dialog stays the centred dialog it is today.
+ */
+/** The removal dialog's title, which names it for assistive tech in both frames. */
+const REMOVAL_TITLE_ID = 'payments-removal-title';
+
+function RemovalFrame(props: { open: boolean; sheet: boolean; onClose?: () => void; children: ReactNode }) {
+  const theme = useTheme();
+  const phone = useMediaQuery(theme.breakpoints.down('sm'));
+  if (props.sheet && phone) {
+    return (
+      <Drawer
+        anchor="bottom"
+        open={props.open}
+        onClose={props.onClose}
+        data-testid="payments-disconnect-confirm"
+        // A Drawer gives its paper no dialog context, so the name the Dialog
+        // would link from its title is linked here by hand.
+        PaperProps={{
+          role: 'dialog',
+          'aria-modal': true,
+          'aria-labelledby': REMOVAL_TITLE_ID,
+          sx: { borderRadius: (t) => rems(t, 18, 18, 0, 0), maxHeight: '90%' },
+        }}
+      >
+        {props.children}
+      </Drawer>
+    );
+  }
+  return (
+    <Dialog open={props.open} onClose={props.onClose} aria-labelledby={REMOVAL_TITLE_ID} data-testid="payments-disconnect-confirm">
+      {props.children}
     </Dialog>
   );
+}
+
+/** The dialog's buttons: the pause offer (live only), the confirm, the dismiss. */
+function RemovalActions(props: {
+  busy: boolean;
+  confirm: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  onPauseInstead?: () => void;
+}) {
+  const copy = usePaymentsSettingsCopy().card;
+  return (
+    <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: sxRem(8), p: (t) => rems(t, 18, 22, 20) }}>
+      {/* Offered FIRST, and only when it is a real alternative. An owner who
+          came here to stop taking orders wants the switch, not the removal —
+          and reaching for the destructive control is how they got here. */}
+      {props.onPauseInstead ? (
+        <Button
+          fullWidth
+          onClick={props.onPauseInstead}
+          disabled={props.busy}
+          sx={BTN_SECONDARY_SX}
+          data-testid="payments-pause-instead"
+        >
+          {copy.pauseInstead}
+        </Button>
+      ) : null}
+      <Button
+        fullWidth
+        variant="contained"
+        disableElevation
+        onClick={props.onConfirm}
+        disabled={props.busy}
+        data-testid="payments-disconnect-confirm-action"
+        sx={{ ...BTN_PRIMARY_SX, background: T.bad, '&:hover': { background: '#a51f1f' } }}
+      >
+        {props.busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : props.confirm}
+      </Button>
+      <Button fullWidth onClick={props.onCancel} disabled={props.busy} sx={LINKISH_SX}>
+        {copy.cancel}
+      </Button>
+    </DialogActions>
+  );
+}
+
+/**
+ * The removal dialog's words, per variant. "To Produção" (FUT-4432) swaps the
+ * restart line for what to do next and the plain "cannot be undone" (ADR 0150).
+ */
+function useDialogWords(displayName: string, toProduction: boolean, receiving: boolean) {
+  const copy = usePaymentsSettingsCopy().card;
+  const live = useLiveSandboxCopy();
+  if (toProduction) {
+    return {
+      question: live.toProductionQuestion(displayName),
+      consequence: live.toProductionConsequence(displayName),
+      closing: [live.toProductionAfter, live.toProductionIrreversible],
+      confirm: live.toProductionConfirm,
+    };
+  }
+  return {
+    question: copy.removeQuestion(displayName),
+    consequence: receiving ? copy.removeConsequenceLive : copy.removeConsequenceIdle,
+    closing: [copy.removeRestartsSetup],
+    confirm: copy.removeAction,
+  };
 }
 
 /** One consequence of removing the connection, marked by how much it costs. */

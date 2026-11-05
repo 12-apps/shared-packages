@@ -82,6 +82,11 @@ export interface ConnectionBadgeCopy {
   /** It was working and stopped. */
   reconnect: string;
   notConnected: string;
+  /**
+   * Connected in a simulated sandbox on a live deployment: checkout offers
+   * nothing from it (FUT-4432). Optional; absent, the English pack's word.
+   */
+  testMode?: string;
 }
 
 /** The environment tabs, and what choosing one means. */
@@ -338,6 +343,36 @@ export interface SetupGuideCopy {
   copied: string;
 }
 
+/**
+ * A connection in its provider's SIMULATED sandbox, on a deployment that sells
+ * for real (FUT-4432): checkout offers nothing from it, so the screen says so
+ * and offers the way to Produção.
+ *
+ * Every sentence names the STATE, never the host's own nouns: which surface a
+ * buyer sees, and what it calls a store's catalogue, are the host's words, and
+ * it overrides `headerSub` and `bandNobodyPays` with them.
+ */
+export interface LiveSandboxCopy {
+  /** The header's line; `…NextInLine` while another provider takes the money. */
+  headerSub: string;
+  headerSubNextInLine: string;
+  /** The switch's label: why it may read "on" and still take nothing. */
+  headerState: string;
+  /** The band: its bold lead, its second sentence (two ways), its one button. */
+  bandLead: string;
+  bandNobodyPays: string;
+  bandNextInLine: string;
+  bandAction: string;
+  /** The removal dialog, in its "to Produção" variant. */
+  toProductionQuestion(displayName: string): string;
+  toProductionConsequence(displayName: string): string;
+  /** The item that replaces `removeRestartsSetup` in that variant. */
+  toProductionAfter: string;
+  /** What cannot be undone (ADR 0150). */
+  toProductionIrreversible: string;
+  toProductionConfirm: string;
+}
+
 /** The whole settings surface, in one object a host passes at the mount. */
 export interface PaymentsSettingsCopy {
   status: ConnectionStatusCopy;
@@ -356,4 +391,9 @@ export interface PaymentsSettingsCopy {
    * back to the English pack's sentences rather than the server's message.
    */
   failures?: PaymentsFailureCopy;
+  /**
+   * A refused sandbox on a live deployment (FUT-4432). OPTIONAL so a host's
+   * own pack keeps compiling; absent, the English pack's sentences.
+   */
+  liveSandbox?: LiveSandboxCopy;
 }
