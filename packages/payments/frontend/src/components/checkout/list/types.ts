@@ -111,14 +111,14 @@ export type CheckoutListChoice =
   | { kind: "online"; method: CheckoutOnlineChoice; funding?: "DEBIT" }
   | { kind: "door"; id: string };
 
-/**
- * A reason the HOST is holding the button, whatever is chosen — a step before
- * this one is still open ("Escolha o horário no passo 2."). The button reads
- * `action`, disabled, with `reason` under it.
- */
+/** `danger` (default): the buyer must fix something. `neutral`: a wait nobody caused, e.g. offline — not red. */
+export type CheckoutListHoldTone = "danger" | "neutral";
+
+/** The HOST holds the button whatever is chosen ("Escolha o horário no passo 2."): `action`, disabled, `reason` under it, in `tone`. */
 export interface CheckoutListHold {
   action: string;
   reason: string;
+  tone?: CheckoutListHoldTone;
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */

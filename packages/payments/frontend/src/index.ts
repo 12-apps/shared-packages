@@ -38,7 +38,7 @@ export {
 // ---------------------------------------------------------------------------
 export { CheckoutFlow, type CheckoutCartView, type CheckoutFlowProps } from './components/checkout/checkout-flow';
 // The Pagamento step as ONE list (FUT-3591/3592) — `CheckoutFlowProps.paymentList`, required.
-export type { CheckoutBillingAddress, CheckoutBillingLookup, CheckoutDoorOption, CheckoutDoorRowControls, CheckoutListChoice, CheckoutListHold, CheckoutOnlineChoice, CheckoutPaymentList, CheckoutPixBank, PaymentListCopy, PaymentListDebitCopy, PixBankCopy, PixBankId, PixBankName } from './components/checkout/list/types';
+export type { CheckoutBillingAddress, CheckoutBillingLookup, CheckoutDoorOption, CheckoutDoorRowControls, CheckoutListChoice, CheckoutListHold, CheckoutListHoldTone, CheckoutOnlineChoice, CheckoutPaymentList, CheckoutPixBank, PaymentListCopy, PaymentListDebitCopy, PixBankCopy, PixBankId, PixBankName } from './components/checkout/list/types';
 export { PT_BR_PAYMENT_LIST_COPY } from './components/checkout/list/pt-BR';
 // Inside the phone's "Resumo do pedido" sheet (FUT-589): a host's money rows leave their controls out there.
 export { useInSummarySheet } from './components/checkout/list/summary-sheet';

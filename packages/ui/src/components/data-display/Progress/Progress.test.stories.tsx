@@ -169,6 +169,29 @@ export const FormInteraction: Story = {
   render: () => <FormInteractionComponent />,
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
+    // Every percentage the bar renders, recorded as React commits it. The demo
+    // runs for about a second, and sampling it from inside a `waitFor` only
+    // sees what is on screen while that `waitFor` happens to be polling: a
+    // runner that reaches the sampling late, or whose renderer stalls past the
+    // poll's deadline, saw one or two values and failed "expected 1 to be
+    // greater than or equal to 3". An observer attached before Start misses
+    // none of them, whenever the play gets to read the set.
+    // "Running" and the disabled Start button last only as long as that run,
+    // so they are latched here too rather than looked for after the click.
+    const seenValues = new Set<number>();
+    const seen = { running: false, disabled: false };
+    const label = () => canvas.getByTestId('controllable-progress').parentElement;
+    const record = () => {
+      const match = label()?.textContent?.match(/(\d+)%/);
+      if (match) seenValues.add(Number(match[1]));
+      if (canvas.queryByText('Status: Running')) seen.running = true;
+      if ((canvas.getByTestId('start-button') as HTMLButtonElement).disabled) seen.disabled = true;
+    };
+    const observer = new MutationObserver(record);
+    // The bar's transform at 0%, read before Start for the same reason: read
+    // after it, a late runner can take it at 100% and wait for a change that
+    // already happened.
+    const start = { transform: '' };
 
     await step('Initial state verification', async () => {
       const progressComponent = canvas.getByTestId('controllable-progress');
@@ -187,31 +210,24 @@ export const FormInteraction: Story = {
 
     await step('Start progress interaction', async () => {
       const startButton = canvas.getByTestId('start-button');
+      observer.observe(canvasElement, { subtree: true, childList: true, characterData: true, attributes: true });
+      record();
+      const startBar = bar(canvas.getByTestId('controllable-progress'));
+      if (startBar) start.transform = window.getComputedStyle(startBar).transform;
       await userEvent.click(startButton);
 
-      // Button should become disabled when running
-      await expect(startButton).toBeDisabled();
-
-      // Status should change to running
-      await waitFor(
-        () => {
-          const status = canvas.getByText('Status: Running');
-          expect(status).toBeInTheDocument();
-        },
-        { timeout: 2000 },
-      );
+      // The click's own render disables Start and says Running; both are
+      // latched by `record`, so a play that gets here after the run has
+      // ended still sees that they happened.
+      await waitFor(() => {
+        expect(seen.disabled).toBe(true);
+        expect(seen.running).toBe(true);
+      });
     });
 
     await step('Progress value changes verification', async () => {
-      // Store initial transform value
       const progressComponent = canvas.getByTestId('controllable-progress');
-      const progressBar = bar(progressComponent);
-      let previousTransform = '';
-
-      if (progressBar) {
-        // eslint-disable-next-line test-flakiness/no-global-state-mutation -- function-scoped variable
-        previousTransform = window.getComputedStyle(progressBar).transform;
-      }
+      const previousTransform = start.transform;
 
       // Wait for progress to start changing
       await waitFor(
@@ -237,26 +253,6 @@ export const FormInteraction: Story = {
         },
         { timeout: 3000 },
       );
-
-      // Check that progress values are changing by verifying multiple intermediate values
-      const seenValues = new Set();
-      await waitFor(
-        () => {
-          const progressContainer = canvas.getByTestId('controllable-progress').parentElement;
-          const textContent = progressContainer?.textContent || '';
-
-          // Extract percentage value
-          const percentMatch = textContent.match(/(\d+)%/);
-          if (percentMatch) {
-            const value = parseInt(percentMatch[1] ?? '0');
-            seenValues.add(value);
-          }
-
-          // We should see at least 3 different values during animation
-          expect(seenValues.size).toBeGreaterThanOrEqual(3);
-        },
-        { timeout: 3000 },
-      );
     });
 
     await step('Progress completion', async () => {
@@ -268,6 +264,11 @@ export const FormInteraction: Story = {
         },
         { timeout: 5000 },
       );
+
+      // The bar went through the values in between, not straight to 100%.
+      observer.disconnect();
+      record();
+      expect(seenValues.size).toBeGreaterThanOrEqual(3);
 
       // Verify the progress bar shows full completion
       const progressComponent = canvas.getByTestId('controllable-progress');
