@@ -33,15 +33,18 @@ function useSwitchToProduction(client: PaymentsSettingsClient, provider: string,
   const failures = usePaymentsFailureCopy();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = async () => {
-    if (busy) return;
+  /** True once the switch landed; a failure stays in the band and leaves the card where it is. */
+  const run = async (): Promise<boolean> => {
+    if (busy) return false;
     setBusy(true);
     setError(null);
     try {
       await client.saveCredentials(provider, { environment: 'PRODUCTION', fields: {} });
       reload();
+      return true;
     } catch (err) {
       setError(describeFailure(err, failures));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -76,7 +79,15 @@ export function useLiveSandbox(
   const grant = isGrant(io.config);
   const stored = productionStored(io.config);
   const action = () => {
-    if (stored) return void save.run();
+    // Switched, the card shows the PRODUCTION keys it now uses, on the manual
+    // path, where "Testar conexão" and the activation step take it from here.
+    if (stored) {
+      return void save.run().then((switched) => {
+        if (!switched) return;
+        setManual(true);
+        io.toProductionTab?.();
+      });
+    }
     setManual(!grant);
     if (grant) setOpen(true);
     else io.toProductionTab?.();

@@ -398,6 +398,8 @@ describe('a refused sandbox: the edges of "Conectar em Produção"', () => {
     expect(client.saveCredentials).toHaveBeenCalledWith('aurora', { environment: 'PRODUCTION', fields: {} });
     expect(client.disconnectOAuth).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Switched, the card shows the keys it now uses: the manual path, on Produção.
+    await waitFor(() => expect(screen.getByTestId('payments-environment-PRODUCTION').getAttribute('aria-selected')).toBe('true'));
   });
 
   it('removes the grant BEFORE it mints the PRODUCTION connect', async () => {

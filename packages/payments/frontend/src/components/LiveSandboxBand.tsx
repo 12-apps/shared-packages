@@ -92,7 +92,7 @@ export function LiveSandboxBand({
         // The icon sits on the FIRST line, as in the prototype, whatever the
         // theme says about centring an alert's icon against its whole message.
         alignItems: 'flex-start',
-        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: '-1px', alignSelf: 'flex-start' },
+        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: '-3.5px', alignSelf: 'flex-start' },
         '& .MuiAlert-message': { py: 0, flex: '1 1 300px', minWidth: 0 },
       }}
     >
