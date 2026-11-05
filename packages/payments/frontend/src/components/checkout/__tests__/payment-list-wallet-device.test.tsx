@@ -38,6 +38,7 @@ describe("Google Pay by device", () => {
     ["Mac Chrome", "macChrome"],
     ["Mac Firefox", "macFirefox"],
     ["Windows Chrome", "windowsChrome"],
+    ["an Android tablet in desktop mode", "androidTabletDesktopMode"],
   ] as const)("shows on %s", async (_name, device) => {
     useDevice(DEVICES[device]);
     installGoogle();
@@ -52,15 +53,14 @@ describe("Google Pay by device", () => {
     ["Mac Safari", "macSafari"],
   ] as const)("never shows on %s, and pay.js is never asked", async (_name, device) => {
     useDevice(DEVICES[device]);
-    const { createButton } = installGoogle();
-    const scripts = vi.spyOn(document.head, "appendChild");
+    const { createButton, isReadyToPay, constructed } = installGoogle();
     render(["GOOGLE_PAY"]);
     await screen.findByTestId("payment-list");
     await waitFor(() => expect(screen.queryByTestId("list-google-pay")).toBeNull());
     await waitFor(() => expect(screen.queryByTestId("list-wallets")).toBeNull());
+    expect(constructed()).toBe(0);
+    expect(isReadyToPay).not.toHaveBeenCalled();
     expect(createButton).not.toHaveBeenCalled();
-    expect(scripts).not.toHaveBeenCalled();
-    scripts.mockRestore();
   });
 
   it("leaves Apple Pay alone on an iPhone whose store offers both", async () => {
@@ -69,7 +69,7 @@ describe("Google Pay by device", () => {
     installApple();
     render(["GOOGLE_PAY", "APPLE_PAY"]);
     expect(await screen.findByRole("button", { name: "Pagar com Apple Pay" })).toBeTruthy();
-    expect(screen.queryByTestId("list-google-pay")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("list-google-pay")).toBeNull());
   });
 
   it("keeps both wallets on a Chrome that can pay with both", async () => {

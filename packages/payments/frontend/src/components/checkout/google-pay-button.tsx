@@ -111,14 +111,16 @@ function loadGooglePayApi(): Promise<GooglePayApi | null> {
  * Step 2's probe: may this browser/device pay at all? In PRODUCTION it also
  * asks for a card already in the buyer's Google account
  * (`existingPaymentMethodRequired`), so the button only draws for a buyer who
- * can actually pay (FUT-4399). TEST answers `paymentMethodPresent: true` with
+ * can actually pay (FUT-4399) — asked only by the checkout, never by the
+ * homologação evidence, whose operator may have no card in their account.
+ * TEST answers `paymentMethodPresent: true` with
  * no account at all, so it keeps asking the bare question.
  */
-export function isReadyToPayRequest(environment: "TEST" | "PRODUCTION"): Record<string, unknown> {
+export function isReadyToPayRequest(environment: "TEST" | "PRODUCTION", requireExistingMethod = false): Record<string, unknown> {
   return {
     apiVersion: 2,
     apiVersionMinor: 0,
-    ...(environment === "PRODUCTION" ? { existingPaymentMethodRequired: true } : {}),
+    ...(requireExistingMethod && environment === "PRODUCTION" ? { existingPaymentMethodRequired: true } : {}),
     allowedPaymentMethods: [
       {
         type: "CARD",
@@ -184,7 +186,10 @@ export function sheetDismissed(error: unknown): boolean {
 export function useGooglePayClient(
   api: GooglePayApi | null | undefined,
   environment: "TEST" | "PRODUCTION",
+  /** The checkout's gate: in PRODUCTION, only a buyer with a card in Google Pay. Off keeps the bare probe. */
+  options: { requireExistingMethod?: boolean } = {},
 ): GooglePaymentsClient | null {
+  const requireExisting = options.requireExistingMethod === true && environment === "PRODUCTION";
   const [client, setClient] = useState<GooglePaymentsClient | null>(null);
   useEffect(() => {
     const alive = { current: true };
@@ -192,9 +197,9 @@ export function useGooglePayClient(
       if (!alive.current || !resolved) return;
       const paymentsClient = new resolved.PaymentsClient({ environment });
       paymentsClient
-        .isReadyToPay(isReadyToPayRequest(environment))
+        .isReadyToPay(isReadyToPayRequest(environment, requireExisting))
         .then((answer) => {
-          const payable = answer.result && (environment !== "PRODUCTION" || answer.paymentMethodPresent === true);
+          const payable = answer.result && (!requireExisting || answer.paymentMethodPresent === true);
           if (alive.current && payable) setClient(paymentsClient);
         })
         .catch(() => undefined);
@@ -202,7 +207,7 @@ export function useGooglePayClient(
     return () => {
       alive.current = false;
     };
-  }, [api, environment]);
+  }, [api, environment, requireExisting]);
   return client;
 }
 
@@ -244,7 +249,7 @@ export function GooglePayButton({
   api,
   onReady,
 }: GooglePayButtonProps): JSX.Element | null {
-  const client = useGooglePayClient(api, environment);
+  const client = useGooglePayClient(api, environment, { requireExistingMethod: true });
   const copy = useCheckoutCopy().screens.wallet.googlePay;
   const container = useRef<HTMLDivElement | null>(null);
   // The latest handlers/order, so the Google-rendered button — mounted once —

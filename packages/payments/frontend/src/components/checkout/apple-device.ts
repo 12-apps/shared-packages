@@ -20,8 +20,10 @@ export interface DeviceSignals {
 const IOS_UA = /\b(iPhone|iPad|iPod)\b/;
 const MAC_UA = /\bMacintosh\b/;
 /** Engines that are not Safari, though their UA says "Safari" too. */
-const NOT_SAFARI_UA = /\b(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPiOS|Firefox|FxiOS|Android)\//;
+const NOT_SAFARI_UA = /\b(Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPiOS|Firefox|FxiOS)\//;
 const SAFARI_UA = /\bVersion\/[\d.]+.*\bSafari\//;
+
+const NON_APPLE_PLATFORMS = new Set(["Android", "Windows", "Linux", "Chrome OS", "Chromium OS"]);
 
 export function isAppleDevice(device: DeviceSignals): boolean {
   const platform = device.userAgentData?.platform;
@@ -30,6 +32,9 @@ export function isAppleDevice(device: DeviceSignals): boolean {
   // decided here: a Chromium on a Mac says so too, and only the UA tells it
   // from Safari (an emulated Safari UA on Chromium reports "macOS" as well).
   if (platform === "iOS" || platform === "iPadOS") return true;
+  // A known non-Apple platform is never Apple, whatever UA it was handed (an
+  // Android tablet in desktop mode sends "Macintosh" and has a touchscreen).
+  if (platform !== undefined && NON_APPLE_PLATFORMS.has(platform)) return false;
   const ua = device.userAgent;
   // Every iOS browser (CriOS, FxiOS, EdgiOS…) is WebKit under Apple's rules.
   if (IOS_UA.test(ua)) return true;

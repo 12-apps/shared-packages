@@ -136,7 +136,7 @@ export function useListCapability(
   // once, before pay.js is even loaded. `null` tells the client hook not to
   // load it at all. Apple Pay keeps its own gate, in `appleSession`.
   const googleHere = declared !== null && !onAppleDevice();
-  const client = useGooglePayClient(googleHere ? undefined : null, declared?.environment ?? "TEST");
+  const client = useGooglePayClient(googleHere ? undefined : null, declared?.environment ?? "TEST", { requireExistingMethod: true });
   const { priced, repricing } = useRepricing(totalCents);
   // The port is read at the press, through a ref: a host passing a new
   // function each render must not rebuild the capability (and the wallets'

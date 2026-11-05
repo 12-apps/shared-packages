@@ -24,6 +24,7 @@ describe("isAppleDevice", () => {
     ["Mac Edge", "macEdge"],
     ["Mac Firefox", "macFirefox"],
     ["Android Chrome", "androidChrome"],
+    ["an Android tablet in desktop mode (Macintosh UA + touch)", "androidTabletDesktopMode"],
     ["Windows Chrome", "windowsChrome"],
   ] as const)("is false on %s", (_name, device) => {
     expect(isAppleDevice(DEVICES[device])).toBe(false);

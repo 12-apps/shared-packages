@@ -12,7 +12,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GooglePayButton, paymentDataRequest, type GooglePayApi } from "../google-pay-button";
+import { GooglePayButton, paymentDataRequest, useGooglePayClient, type GooglePayApi, type GooglePaymentsClient } from "../google-pay-button";
 import { googlePayConfig } from "../method-capability";
 import type { CheckoutOrder, CheckoutProviderConfig } from "../types";
 
@@ -234,5 +234,19 @@ describe("paymentDataRequest — Google's own merchant id", () => {
 
   it("sends none in TEST without one", () => {
     expect(paymentDataRequest({ gateway: "pagbank", gatewayMerchantId: "ACCO_1" }, { totalCents: 1250 })).not.toHaveProperty("merchantInfo");
+  });
+});
+
+describe("the homologação evidence keeps the bare probe in PRODUCTION (FUT-4399)", () => {
+  it("sends no existingPaymentMethodRequired and draws without paymentMethodPresent", async () => {
+    const calls = installFakeApi({});
+    let seen: GooglePaymentsClient | null = null;
+    function Probe() {
+      seen = useGooglePayClient(undefined, "PRODUCTION");
+      return null;
+    }
+    render(<Probe />);
+    await waitFor(() => expect(seen).not.toBeNull());
+    expect(calls.readyRequests[0]).not.toHaveProperty("existingPaymentMethodRequired");
   });
 });
