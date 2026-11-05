@@ -133,8 +133,9 @@ describe("Chip variant soft in dark mode", () => {
       expect(style.outlineOffset).toBe("0.125rem");
       expect(style.outlineColor).toBe(ink);
       // The ring against the page itself.
-      const paper = parse(darkTheme.palette.background.paper);
-      expect(ratio(over(parse(style.outlineColor), paper), over([...paper.slice(0, 3), 1] as Rgba, paper))).toBeGreaterThanOrEqual(3);
+      const [pr, pg, pb] = parse(darkTheme.palette.background.paper);
+      const page: Rgba = [pr, pg, pb, 1];
+      expect(ratio(over(parse(style.outlineColor), page), [pr, pg, pb])).toBeGreaterThanOrEqual(3);
       cleanup();
     }
   });
