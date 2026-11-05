@@ -385,4 +385,24 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     expect(await screen.findByTestId(message)).toBeTruthy();
     expect(screen.getAllByText(copy.form.invalidComboQuantity).length).toBeGreaterThan(0);
   });
+
+  it("K31: switching kind away and back after a refused submit shows no product line or toast", async () => {
+    renderForm(null);
+    await pickFreeUnits();
+    // A name and a valid reward, so the product is the ONLY refusal and the toast hangs on it.
+    fireEvent.change(screen.getByLabelText(copy.form.name), {
+      target: { value: "Leve 3" },
+    });
+    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "3" } });
+    fireEvent.change(screen.getByTestId("free-units-free"), { target: { value: "1" } });
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await screen.findByTestId(message);
+    fireEvent.click(screen.getAllByText("Porcentagem")[0] as HTMLElement);
+    fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
+    await screen.findByTestId("free-units-builder");
+    await waitFor(() => {
+      expect(screen.queryByTestId(message)).toBeNull();
+      expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull();
+    });
+  });
 });

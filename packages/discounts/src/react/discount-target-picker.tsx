@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { useEffect, type JSX } from "react";
 
 import { useFormContext } from "@12-apps/ui/form/total-form";
 
@@ -87,6 +87,14 @@ export function DiscountTargetPicker({
   const { values, errors, setFieldValue } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
   const scope = values.scope ?? "ORDER";
+  const staleTargets = errors.freeUnitsTargets !== undefined;
+
+  // `setFieldValue` clears only the key it sets, and the kind toggle sets
+  // `kind`: the product refusal would outlive a switch away (and keep the error
+  // toast up). Setting its own key drops it; the value is never read or sent.
+  useEffect(() => {
+    if (kind !== "FREE_UNITS" && staleTargets) setFieldValue("freeUnitsTargets", "");
+  }, [kind, staleTargets, setFieldValue]);
 
   if (kind === "FREE_UNITS") {
     return (
@@ -96,7 +104,7 @@ export function DiscountTargetPicker({
         copy={copy}
         freeUnits={values.freeUnits ?? ""}
         error={errors.freeUnits}
-        targetRefused={errors.freeUnitsTargets !== undefined}
+        targetRefused={staleTargets}
         onChange={selection.onComboRequirementsChange}
         onFreeUnitsChange={(next) => setFieldValue("freeUnits", next)}
       />
