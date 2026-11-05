@@ -44,6 +44,7 @@ export {
   buyerCheckoutConfig,
   usesHostedCheckout,
   type CheckoutConfigDeps,
+  type WalletApprovalPort,
 } from './config';
 /**
  * The Apple Pay vocabulary (FUT-3686), TYPE-ONLY on the root: the port

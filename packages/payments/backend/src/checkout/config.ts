@@ -5,7 +5,7 @@ import { declaredWallets, type ClientProviderConfig } from '../core/client-view'
 import type { PaymentsGateway } from '../core/gateway';
 import type { CredentialStore } from '../core/ports';
 import type { ProviderRegistry } from '../core/registry';
-import type { MerchantRef, PaymentMethodKind } from '../core/types';
+import type { MerchantRef, PaymentMethodKind, WalletType } from '../core/types';
 
 import type { BrowserKeyPort, BuyerCheckoutConfig, BuyerProviderLink } from './types';
 
@@ -58,7 +58,24 @@ export interface CheckoutConfigDeps {
    * Pay button, since its sheet would refuse the request.
    */
   googlePayMerchant?: { merchantId: string; merchantName?: string } | null;
+  /**
+   * Whether the PLATFORM may offer a wallet to buyers yet (FUT-4400): Google
+   * approves a production Google Pay integration, Apple a merchant, and until
+   * then a button whose sheet cannot produce a chargeable token is a dead end.
+   * While it answers `false` for a wallet, every chain entry drops it from
+   * `wallets`, and Google Pay's parameters are nulled. Asked at most once per
+   * wallet per config read, and FAILS CLOSED: a read that throws hides the
+   * wallet. Omit the port and the adapters' declarations stand as they are.
+   *
+   * Deliberately NOT an adapter capability: the homologação evidence run builds
+   * its own wallet config from the adapter, and must keep minting TEST tokens
+   * while the platform is still waiting for its approval.
+   */
+  walletApproval?: WalletApprovalPort;
 }
+
+/** Whether the platform may offer this wallet to buyers (see `CheckoutConfigDeps.walletApproval`). */
+export type WalletApprovalPort = (wallet: WalletType) => boolean | Promise<boolean>;
 
 const NO_PROVIDER: BuyerCheckoutConfig = {
   provider: null,
@@ -155,6 +172,38 @@ function identityOnce(deps: CheckoutConfigDeps, merchant: MerchantRef): () => Pr
   };
 }
 
+/**
+ * The wallets this read may offer, asking the approval port at most once per
+ * wallet however many entries declare it. No port: every wallet; a port that
+ * throws: not that one.
+ */
+function approvalOnce(deps: CheckoutConfigDeps): (wallet: WalletType) => Promise<boolean> {
+  const answers = new Map<WalletType, Promise<boolean>>();
+  return (wallet) => {
+    const port = deps.walletApproval;
+    if (!port) return Promise.resolve(true);
+    let answer = answers.get(wallet);
+    if (!answer) {
+      answer = Promise.resolve()
+        .then(() => port(wallet))
+        .then((approved) => approved === true, () => false);
+      answers.set(wallet, answer);
+    }
+    return answer;
+  };
+}
+
+/** The entry with every wallet the platform may not offer yet taken out. */
+async function withApprovedWallets(
+  entry: ClientProviderConfig,
+  approved: (wallet: WalletType) => Promise<boolean>,
+): Promise<ClientProviderConfig> {
+  const answers = await Promise.all(entry.wallets.map(approved));
+  const wallets = entry.wallets.filter((_, index) => answers[index]);
+  const googlePay = wallets.includes('GOOGLE_PAY') || !entry.wallets.includes('GOOGLE_PAY') ? entry.googlePay : null;
+  return { ...entry, wallets, googlePay };
+}
+
 /** The entry's Google Pay parameters with the platform's merchant id, when both are there. */
 function withMerchantInfo(
   googlePay: ClientProviderConfig['googlePay'],
@@ -172,9 +221,11 @@ function withMerchantInfo(
 async function toBuyerLink(
   deps: CheckoutConfigDeps,
   merchant: MerchantRef,
-  entry: ClientProviderConfig,
-  identity: () => Promise<boolean>,
+  declared: ClientProviderConfig,
+  asked: { identity: () => Promise<boolean>; approved: (wallet: WalletType) => Promise<boolean> },
 ): Promise<BuyerProviderLink> {
+  const { identity } = asked;
+  const entry = await withApprovedWallets(declared, asked.approved);
   const stored = await deps.connections.get(merchant, entry.provider);
   const isStub = stored?.stub === true;
   // A raw-seeded row can carry `""` — normalize to null so a blank never
@@ -210,8 +261,8 @@ export async function buyerCheckoutConfig(
   // (`ChargeOptions.confirmation`): a lane nobody watches leaves out the
   // providers only a person can confirm, exactly as its charge walk will.
   const entries = options.confirmation === 'AUTOMATIC' ? all.filter((entry) => entry.confirmation !== 'MANUAL') : all;
-  const identity = identityOnce(deps, merchant);
-  const chain = await Promise.all(entries.map((entry) => toBuyerLink(deps, merchant, entry, identity)));
+  const asked = { identity: identityOnce(deps, merchant), approved: approvalOnce(deps) };
+  const chain = await Promise.all(entries.map((entry) => toBuyerLink(deps, merchant, entry, asked)));
   const head = chain[0];
   if (!head) return NO_PROVIDER;
   return {
