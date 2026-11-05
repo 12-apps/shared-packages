@@ -157,12 +157,12 @@ describe("FUT-4157: the kind question sits on one line", () => {
     expect(kindControl()).toBe("toggle");
   });
 
-  it("Q4: a legacy bundle price, five kinds, needs more room before it is a toggle", async () => {
+  it("Q4: a bundle price keeps the four kinds (FUT-4417), so the same width keeps the toggle", async () => {
     containerWidth(600);
     renderForm(
       record({ type: "BUNDLE_PRICE", scope: "COMBO", percentOffBp: null, bundlePriceCents: 2_500 }),
     );
-    await waitFor(() => expect(kindControl()).toBe("select"));
+    await waitFor(() => expect(kindControl()).toBe("toggle"));
   });
 
   it("Q5: the select still paints the kind's refusal", async () => {

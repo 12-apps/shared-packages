@@ -66,6 +66,10 @@ export interface WireTarget {
   id: string;
   name: string;
   parentId?: string | null;
+  /** An ITEM row's unit price range (FUT-4417), for the combo preview only. */
+  priceRangeCents?: { minCents: number; maxCents: number } | null;
+  /** An ITEM row's own category, for the same preview. */
+  categoryId?: string | null;
 }
 
 /** One registered collection and its rows. */
@@ -119,7 +123,7 @@ export interface DiscountFormPayload {
 }
 
 /** A money amount as integer cents, or null when blank. */
-function toCents(typed: string, formatters: DiscountsFormatters): number | null {
+export function toCents(typed: string, formatters: DiscountsFormatters): number | null {
   const amount = formatters.parseDecimal(typed);
   return amount === null ? null : Math.round(amount * 100);
 }
@@ -138,7 +142,7 @@ function toCount(typed: string, formatters: DiscountsFormatters): number | null 
  * engine computes without a float. The `Math.round` after the ×100 is what
  * keeps "12,5" exactly 1250 rather than 1249.9999999999998.
  */
-function toBasisPoints(typed: string, formatters: DiscountsFormatters): number | null {
+export function toBasisPoints(typed: string, formatters: DiscountsFormatters): number | null {
   const percent = formatters.parseDecimal(typed);
   return percent === null ? null : Math.round(percent * 100);
 }

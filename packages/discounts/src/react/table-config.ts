@@ -54,9 +54,23 @@ function labelled(labels: Readonly<Record<string, string>>, value: string): stri
   return labels[value] ?? value;
 }
 
+/** The Nome column's floor, in design px (the grid converts it through the type scale). */
+const NAME_COLUMN_MIN_PX = 200;
+
 export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<DiscountListItem>[] {
   return [
-    { id: "name", header: copy.screen.columns.name, accessor: "name", searchable: true },
+    {
+      id: "name",
+      header: copy.screen.columns.name,
+      accessor: "name",
+      searchable: true,
+      // The column a row is read by: nine columns share the width, and with no
+      // floor the grid squeezed it until "Frete grátis na segunda" stood on
+      // three lines with "na" alone on one (ADR 0074 U1, FUT-4417). The floor
+      // holds a typical promotion name on one or two lines; the table scrolls
+      // sideways inside its own wrapper on a phone, as it already did.
+      minWidth: NAME_COLUMN_MIN_PX,
+    },
     // Pre-formatted by the page: a cell must not do arithmetic on basis points.
     { id: "value", header: copy.screen.columns.value, accessor: (row) => row.valueLabel },
     {

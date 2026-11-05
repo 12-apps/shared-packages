@@ -4,6 +4,7 @@ import type { DataViewQuery } from "@12-apps/ui/data-display/DataViews";
 
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import {
+  discountColumns,
   discountFilters,
   discountsAppliedState,
   discountsQueryToParams,
@@ -124,5 +125,12 @@ describe("which params travel", () => {
     expect(new URLSearchParams(search).get("page")).toBe("2");
     expect(new URLSearchParams(search).get("view")).toBeNull();
     expect(new URLSearchParams(search).get("nonsense")).toBeNull();
+  });
+});
+
+describe("the columns", () => {
+  it("V12: Nome keeps a floor, so a promotion's name is not squeezed one word per line (ADR 0074 U1)", () => {
+    const name = discountColumns(copy).find((column) => column.id === "name");
+    expect(name?.minWidth).toBe(200);
   });
 });

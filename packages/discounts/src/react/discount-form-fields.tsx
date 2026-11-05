@@ -13,7 +13,8 @@ import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 import type { DiscountSchedule } from "../engine/schedule";
 
 import type { DiscountsWebCopy } from "./copy";
-import { COMBO_REWARDS, isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
+import { ComboRewardFields } from "./combo-reward-fields";
+import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
 import { DateField } from "./date-field";
 import { PercentField, WholeNumberField } from "./number-fields";
 import { ScheduleBuilder } from "./schedule-builder";
@@ -76,43 +77,6 @@ export function optionsFor<TKey extends string>(
 export type CurrencyFieldComponent = (props: { name: string; label: string }) => JSX.Element;
 
 /**
- * A combo's reward: which of the two, and how much.
- *
- * Both are here rather than split between the top of the form and the bottom,
- * because to a merchant they are one sentence — "este combo dá 15% de
- * desconto". The two are the ONLY rewards a combo can give: a flat bundle price
- * reprices the group and goes silently wrong the first time one of its items
- * changes price, so it is not offered (see `./form-kind`).
- */
-function ComboRewardFields({
-  copy,
-  currencyField,
-}: {
-  copy: DiscountsWebCopy;
-  currencyField: CurrencyFieldComponent;
-}): JSX.Element {
-  const { values } = useFormContext();
-  const Currency = currencyField;
-  return (
-    <Stack spacing={0.5}>
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-        <Fields.ToggleField
-          name="comboReward"
-          label={copy.form.comboReward}
-          options={optionsFor(COMBO_REWARDS, copy.labels.type)}
-        />
-        {values.comboReward === "FIXED_AMOUNT" ? (
-          <Currency name="amountOff" label={copy.form.amountOff} />
-        ) : (
-          <PercentField copy={copy} />
-        )}
-      </Box>
-      <Text variant="caption">{copy.form.comboRewardHint}</Text>
-    </Stack>
-  );
-}
-
-/**
  * The reward, in whichever unit the chosen KIND actually stores.
  *
  * One input per kind, and the wrong one must never be mounted: the four value
@@ -123,7 +87,8 @@ function ComboRewardFields({
  *
  * `FREE_UNITS` is the one kind with nothing here: its reward is a count of the
  * units it gives away, which only reads as an offer beside the units it takes,
- * so the free-units builder carries both.
+ * so the free-units builder carries both. A `COMBO`'s reward is one of three —
+ * a rate, an amount or a closed price (FUT-4417) — see `./combo-reward-fields`.
  */
 export function RewardFields({
   copy,
@@ -137,7 +102,6 @@ export function RewardFields({
   const kind = values.kind ?? "PERCENTAGE";
   if (kind === "COMBO") return <ComboRewardFields copy={copy} currencyField={currencyField} />;
   if (kind === "FREE_UNITS") return null;
-  if (kind === "BUNDLE_PRICE") return <Currency name="bundlePrice" label={copy.form.bundlePrice} />;
   if (kind === "FIXED_AMOUNT") return <Currency name="amountOff" label={copy.form.amountOff} />;
   return <PercentField copy={copy} />;
 }

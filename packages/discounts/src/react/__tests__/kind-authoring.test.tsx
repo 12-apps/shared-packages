@@ -9,7 +9,6 @@ import {
   comboRewardOf,
   DISCOUNT_KINDS,
   kindOf,
-  kindOptions,
   SELECTABLE_DISCOUNT_SCOPES,
   typeAndScopeFor,
 } from "../form-kind";
@@ -124,8 +123,8 @@ describe("which kind a stored rule reads back as", () => {
     expect(kindOf({ type: "FREE_UNITS", scope: "COMBO" })).toBe("FREE_UNITS");
   });
 
-  it("K5: a rule saved as a bundle price still reads back as one", () => {
-    expect(kindOf({ type: "BUNDLE_PRICE", scope: "COMBO" })).toBe("BUNDLE_PRICE");
+  it("K5: a rule saved as a bundle price reads back as a combo (FUT-4417: a reward, not a kind)", () => {
+    expect(kindOf({ type: "BUNDLE_PRICE", scope: "COMBO" })).toBe("COMBO");
   });
 
   it("K6: a combo's reward toggle starts on whichever it was saved with", () => {
@@ -136,17 +135,13 @@ describe("which kind a stored rule reads back as", () => {
 });
 
 describe("which kinds are on offer", () => {
-  it("K7: a new promotion is offered four, and a bundle price is not one", () => {
-    expect(kindOptions(null)).toEqual(["PERCENTAGE", "FIXED_AMOUNT", "COMBO", "FREE_UNITS"]);
-    expect(kindOptions(null)).not.toContain("BUNDLE_PRICE");
+  it("K7: a promotion is offered four kinds, and a bundle price is not one", () => {
+    expect(DISCOUNT_KINDS).toEqual(["PERCENTAGE", "FIXED_AMOUNT", "COMBO", "FREE_UNITS"]);
   });
 
-  it("K8: editing a legacy bundle price grows the fifth option — on that form only", () => {
-    expect(kindOptions({ type: "BUNDLE_PRICE", scope: "COMBO" })).toEqual([
-      ...DISCOUNT_KINDS,
-      "BUNDLE_PRICE",
-    ]);
-    expect(kindOptions({ type: "PERCENTAGE", scope: "ORDER" })).not.toContain("BUNDLE_PRICE");
+  it("K8: editing a bundle price offers the same four — it is a combo's reward (FUT-4417)", () => {
+    expect(kindOf({ type: "BUNDLE_PRICE", scope: "COMBO" })).toBe("COMBO");
+    expect(comboRewardOf({ type: "BUNDLE_PRICE" })).toBe("BUNDLE_PRICE");
   });
 
   it("K9: COMBO is not a scope an operator picks — it is what a kind means", () => {
@@ -267,9 +262,10 @@ describe("what the operator sees", () => {
     expect(screen.getByTestId("free-units-summary").textContent).toBe("Leve 3, pague 2.");
   });
 
-  it("K22: the legacy bundle price is offered on its own form and nowhere else", () => {
+  it("K22: a bundle price opens on the combo's form, its reward on Preço fechado (FUT-4417)", async () => {
     renderForm(comboRecord({ type: "BUNDLE_PRICE", percentOffBp: null, bundlePriceCents: 2_500 }));
-    expect(screen.getAllByText(copy.labels.kind.BUNDLE_PRICE).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.queryByText(copy.labels.kind.BUNDLE_PRICE)).toBeNull());
+    expect(screen.getAllByText(copy.comboRewards.labels.BUNDLE_PRICE).length).toBeGreaterThan(0);
   });
 });
 

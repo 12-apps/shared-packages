@@ -27,12 +27,13 @@ import {
   WindowFields,
   type CurrencyFieldComponent,
 } from "./discount-form-fields";
+import { ComboPreviewLayout } from "./combo-cart-preview";
 import { DiscountTargetPicker } from "./discount-target-picker";
 import { KindField } from "./kind-field";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
 import { initialValues, type DiscountFormValues } from "./discount-form-values";
-import { kindOptions, typeAndScopeFor } from "./form-kind";
+import { DISCOUNT_KINDS, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 
 /**
@@ -195,58 +196,66 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
       onSubmit={handleSubmit}
       dataTestId="discount-form"
     >
-      <Stack spacing={2}>
-        <Fields.TextField name="name" label={copy.form.name} />
-        <KindField copy={copy} kinds={kindOptions(editing)} />
-        <RewardFields copy={copy} currencyField={currencyField} />
-        <ScopeField copy={copy} />
-        <DiscountTargetPicker
-          groups={groups}
-          copy={copy}
-          selection={{
-            categoryIds: extra.categoryIds,
-            menuItemIds: extra.menuItemIds,
-            comboRequirements: extra.comboRequirements,
-            onCategoryIdsChange: extra.setCategoryIds,
-            onMenuItemIdsChange: extra.setMenuItemIds,
-            onComboRequirementsChange: extra.setComboRequirements,
-          }}
-        />
-        <ComboCapField copy={copy} />
-        <TriggerFields copy={copy} />
-        <WindowFields
-          copy={copy}
-          schedule={extra.schedule}
-          scheduleEnabled={extra.scheduleEnabled}
-          timezoneLabel={props.timezoneLabel ?? null}
-          onScheduleChange={extra.setSchedule}
-          onScheduleEnabledChange={extra.setScheduleEnabled}
-        />
-        <LimitFields copy={copy} currencyField={currencyField} />
-        <FirstOrderField
-          copy={copy}
-          checked={extra.firstOrderOnly}
-          onChange={extra.setFirstOrderOnly}
-        />
-        <DiscountSwitches
-          copy={copy}
-          active={extra.active}
-          stackable={extra.stackable}
-          onActive={extra.setActive}
-          onStackable={extra.setStackable}
-        />
-        {error && (
-          <Alert
-            variant="danger"
-            title={copy.form.saveFailed}
-            description={error}
-            data-testid="discount-form-error"
+      {/* The combo preview's column (FUT-4417) beside a wide form; nothing for other kinds. */}
+      <ComboPreviewLayout
+        copy={copy}
+        formatters={formatters}
+        groups={groups}
+        slots={extra.comboRequirements}
+      >
+        <Stack spacing={2}>
+          <Fields.TextField name="name" label={copy.form.name} />
+          <KindField copy={copy} kinds={DISCOUNT_KINDS} />
+          <RewardFields copy={copy} currencyField={currencyField} />
+          <ScopeField copy={copy} />
+          <DiscountTargetPicker
+            groups={groups}
+            copy={copy}
+            selection={{
+              categoryIds: extra.categoryIds,
+              menuItemIds: extra.menuItemIds,
+              comboRequirements: extra.comboRequirements,
+              onCategoryIdsChange: extra.setCategoryIds,
+              onMenuItemIdsChange: extra.setMenuItemIds,
+              onComboRequirementsChange: extra.setComboRequirements,
+            }}
           />
-        )}
-        <SubmitButton dataTestId="discount-form-submit">
-          {editing ? copy.form.submitEdit : copy.form.submitCreate}
-        </SubmitButton>
-      </Stack>
+          <ComboCapField copy={copy} />
+          <TriggerFields copy={copy} />
+          <WindowFields
+            copy={copy}
+            schedule={extra.schedule}
+            scheduleEnabled={extra.scheduleEnabled}
+            timezoneLabel={props.timezoneLabel ?? null}
+            onScheduleChange={extra.setSchedule}
+            onScheduleEnabledChange={extra.setScheduleEnabled}
+          />
+          <LimitFields copy={copy} currencyField={currencyField} />
+          <FirstOrderField
+            copy={copy}
+            checked={extra.firstOrderOnly}
+            onChange={extra.setFirstOrderOnly}
+          />
+          <DiscountSwitches
+            copy={copy}
+            active={extra.active}
+            stackable={extra.stackable}
+            onActive={extra.setActive}
+            onStackable={extra.setStackable}
+          />
+          {error && (
+            <Alert
+              variant="danger"
+              title={copy.form.saveFailed}
+              description={error}
+              data-testid="discount-form-error"
+            />
+          )}
+          <SubmitButton dataTestId="discount-form-submit">
+            {editing ? copy.form.submitEdit : copy.form.submitCreate}
+          </SubmitButton>
+        </Stack>
+      </ComboPreviewLayout>
       <FormErrorSnackbar message={copy.form.errorSnackbar} />
     </FormContainer>
   );
