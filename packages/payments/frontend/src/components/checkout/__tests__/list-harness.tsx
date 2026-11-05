@@ -122,7 +122,7 @@ export function installGoogle(load: () => Promise<unknown> = async () => ({ paym
     button.addEventListener("click", onClick);
     return button;
   });
-  const isReadyToPay = vi.fn(async () => ({ result: true }));
+  const isReadyToPay = vi.fn<(request: Record<string, unknown>) => Promise<{ result: boolean; paymentMethodPresent?: boolean }>>(async () => ({ result: true }));
   let built = 0;
   class PaymentsClient {
     constructor() {

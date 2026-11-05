@@ -81,3 +81,32 @@ describe("Google Pay by device", () => {
     expect(screen.getByRole("button", { name: "Pagar com Apple Pay" })).toBeTruthy();
   });
 });
+
+describe("Google Pay in PRODUCTION: only a buyer with a card in Google Pay (FUT-4399)", () => {
+  const productionStore = () => {
+    const store = walletStore(["GOOGLE_PAY"]);
+    const head = store.chain?.[0];
+    if (!head) throw new Error("the store has a chain head");
+    return { ...store, chain: [{ ...head, googlePay: { gateway: "pagbank", gatewayMerchantId: "MID_1", environment: "PRODUCTION" as const, merchantInfo: { merchantId: "BCR2DN_1" } } }] };
+  };
+  const renderProduction = () => renderList({ config: productionStore(), client: stubClient(), list: { totalCents: 2700 } });
+
+  it("never draws when Google answers ready but no card is present", async () => {
+    useDevice(DEVICES.androidChrome);
+    const { isReadyToPay } = installGoogle();
+    isReadyToPay.mockResolvedValue({ result: true });
+    renderProduction();
+    await screen.findByTestId("payment-list");
+    await waitFor(() => expect(isReadyToPay).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("list-google-pay")).toBeNull());
+  });
+
+  it("draws when a card is present, and the probe asked for one", async () => {
+    useDevice(DEVICES.androidChrome);
+    const { isReadyToPay } = installGoogle();
+    isReadyToPay.mockResolvedValue({ result: true, paymentMethodPresent: true });
+    renderProduction();
+    expect(await screen.findByTestId("list-google-pay")).toBeTruthy();
+    expect(isReadyToPay.mock.calls[0]?.[0]).toMatchObject({ existingPaymentMethodRequired: true });
+  });
+});
