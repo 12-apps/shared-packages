@@ -64,11 +64,13 @@ function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
     };
   }
   const accent = theme.palette[color];
+  // The ink that reads on a 14% tint: `dark` over a light page, `light` over a dark one.
+  const ink = theme.mode === 'dark' ? accent.light : accent.dark;
   return {
     container: { backgroundColor: alpha(accent.main, SOFT_GROUND_ALPHA) },
     pressed: { backgroundColor: alpha(accent.main, SOFT_HOVER_ALPHA) },
-    label: { color: accent.dark, fontWeight: '600' },
-    deleteColor: alpha(accent.dark, DELETE_ICON_ALPHA),
+    label: { color: ink, fontWeight: '600' },
+    deleteColor: ink,
   };
 }
 

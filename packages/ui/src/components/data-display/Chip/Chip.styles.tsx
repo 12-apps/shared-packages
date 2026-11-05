@@ -12,6 +12,7 @@ import {
   CHIP_TRANSITION_MS,
   HOVER_LIFT_PX,
   HOVER_SHADOW,
+  SOFT_FOCUS_RING,
   SOFT_GROUND_ALPHA,
   SOFT_HOVER_ALPHA,
 } from './Chip.metrics';
@@ -78,12 +79,21 @@ const paletteKey = (color: NonNullable<ChipProps['color']>): 'primary' | 'second
   return color === 'danger' ? 'error' : color;
 };
 
-/** `soft`: the colour's tint for a ground, its dark step for ink (and the icon). */
+/**
+ * `soft`: the colour's tint for a ground, and for ink the step that reads on it:
+ * the `dark` step in light mode, the `light` step in dark mode (FUT-4442). The
+ * ground is a 14% tint over the page, so on a near-black page the ink has to be
+ * lighter than `main`; `dark` there is 2.6 to 3.9:1, `light` clears 4.5:1. The
+ * label, the icon and the delete glyph all take it.
+ */
 const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
   const key = paletteKey(color);
   const ground = (theme: Theme): string =>
     key ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : theme.palette.action.selected;
-  const ink = (theme: Theme): string => (key ? theme.palette[key].dark : theme.palette.text.secondary);
+  const ink = (theme: Theme): string => {
+    if (!key) return theme.palette.text.secondary;
+    return theme.palette.mode === 'dark' ? theme.palette[key].light : theme.palette[key].dark;
+  };
   return {
     backgroundColor: ground,
     color: ink,
@@ -93,8 +103,31 @@ const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
     '&.MuiChip-clickable:hover': {
       backgroundColor: (theme: Theme) => (key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : theme.palette.action.hover),
     },
+    // `neutral` keeps MUI's glyph and focus exactly as they were.
+    ...(key ? (accentedStates(key, ink) as object) : {}),
   };
 };
+
+/**
+ * What only an accented soft chip changes (FUT-4442, FUT-4461). MUI paints the
+ * delete glyph in `contrastText` at 0.7, near-black on a dark ground, so the glyph
+ * takes the ink. Focus, in both modes: the chip keeps its resting ground (MUI's
+ * `dark` step puts the ink at about 1:1 in light mode and sinks the light ink in
+ * dark mode) and draws a ring in the ink, so focus shows without the ground.
+ */
+const accentedStates = (
+  key: Exclude<ReturnType<typeof paletteKey>, null>,
+  ink: (theme: Theme) => string,
+): SxProps<Theme> => ({
+  '& .MuiChip-deleteIcon': { color: ink, '&:hover': { color: ink } },
+  '&.Mui-focusVisible': {
+    backgroundColor: (theme: Theme) => alpha(theme.palette[key].main, SOFT_GROUND_ALPHA),
+    outlineStyle: 'solid',
+    outlineWidth: (theme: Theme) => rem(theme, SOFT_FOCUS_RING.width),
+    outlineColor: ink,
+    outlineOffset: (theme: Theme) => rem(theme, SOFT_FOCUS_RING.offset),
+  },
+});
 
 export const chipStyles = ({
   variant,

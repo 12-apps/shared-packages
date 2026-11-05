@@ -197,3 +197,37 @@ export const LearnMoreDisclosure: Story = {
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
   },
 };
+
+// 8. The [i]'s tap target (FUT-4443)
+
+const LONG_SUMMARY =
+  'dominio-de-exemplo.com.br, dominio-de-exemplo.com.br/loja, www.dominio-de-exemplo.com.br e ainda um terceiro endereco que nao cabe em duas linhas num telefone estreito';
+
+export const InfoTapTarget: Story = {
+  name: 'The [i] is a 40px target and the title row does not grow',
+  globals: { viewport: { value: 'xxs', isRotated: false } },
+  render: () => (
+    <>
+      <Harness summary="Europe/Lisbon" dataTestId="short" />
+      <Harness summary={LONG_SUMMARY} dataTestId="long" />
+    </>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const info = await canvas.findByRole('button', { name: COPY.moreInfo });
+    const box = info.getBoundingClientRect();
+    await expect(box.width).toBeGreaterThanOrEqual(40);
+    await expect(box.height).toBeGreaterThanOrEqual(40);
+    // The glyph stays 16px inside the bigger box.
+    const glyph = info.querySelector('svg')?.getBoundingClientRect();
+    await expect(glyph?.width).toBe(16);
+    // The box ends where the pill ends: it never overlaps it.
+    const pill = canvas.getByTestId('long-status').getBoundingClientRect();
+    await expect(box.left).toBeGreaterThanOrEqual(pill.right - 0.5);
+    // The extra height is handed back as margin: the row is as tall as one with no [i].
+    const rowHeight = (id: string): number =>
+      canvas.getByTestId(`${id}-title`).parentElement?.getBoundingClientRect().height ?? 0;
+    await expect(canvas.getAllByRole('button', { name: COPY.moreInfo })).toHaveLength(1);
+    await expect(rowHeight('long')).toBeCloseTo(rowHeight('short'), 0);
+  },
+};

@@ -105,3 +105,5 @@ export const CHIP_TRANSITION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 export const SOFT_GROUND_ALPHA = 0.14;
 /** A soft chip's hover ground. */
 export const SOFT_HOVER_ALPHA = 0.22;
+/** A soft chip's keyboard-focus ring, in design px (read through `rem`). */
+export const SOFT_FOCUS_RING = { width: 2, offset: 2 } as const;

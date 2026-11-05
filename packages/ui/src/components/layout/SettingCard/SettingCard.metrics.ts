@@ -15,9 +15,26 @@ export const SETTING_CARD = {
   gridMinColumnWidth: 320,
   /** The widest the [i]'s full-summary tooltip gets. */
   infoMaxWidth: 360,
-  /** The [i]'s keyboard focus ring: its width, and its gap from the glyph. */
+  /**
+   * The [i]'s tap target, the house 40 px floor (FUT-4443). The glyph stays 16 px
+   * (`xs`); a negative margin of `(infoTapTarget - glyph) / 2` gives the box back
+   * to the title row, so nothing moves.
+   */
+  infoTapTarget: 40,
+  /** Above and below the glyph: (40 - 16) / 2, so the title row keeps its height. */
+  infoTapMarginBlock: -12,
+  /**
+   * Beside the glyph: minus the title row's `gap` (8 px), not (40 - 16) / 2, so the
+   * box ends where the status pill ends and never overlaps it.
+   */
+  infoTapMarginInline: -8,
+  /**
+   * The [i]'s keyboard focus ring: its width, and its offset from the box. The
+   * offset is negative so the ring's OUTER edge is the 40 px box (a 40 px circle
+   * round a 16 px glyph), instead of a 44 px one crowding the title and the pill.
+   */
   infoFocusRingWidth: 2,
-  infoFocusRingOffset: 2,
+  infoFocusRingOffset: -2,
 } as const;
 
 /** The grid's default gap, in theme SPACING units (not px): what `sx`'s `gap: 2` means. */
