@@ -221,7 +221,10 @@ export const InfoTapTarget: Story = {
     // The glyph stays 16px inside the bigger box.
     const glyph = info.querySelector('svg')?.getBoundingClientRect();
     await expect(glyph?.width).toBe(16);
-    // The extra 24px is handed back as margin: the row is as tall as one with no [i].
+    // The box ends where the pill ends: it never overlaps it.
+    const pill = canvas.getByTestId('long-status').getBoundingClientRect();
+    await expect(box.left).toBeGreaterThanOrEqual(pill.right - 0.5);
+    // The extra height is handed back as margin: the row is as tall as one with no [i].
     const rowHeight = (id: string): number =>
       canvas.getByTestId(`${id}-title`).parentElement?.getBoundingClientRect().height ?? 0;
     await expect(canvas.getAllByRole('button', { name: COPY.moreInfo })).toHaveLength(1);

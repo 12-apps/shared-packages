@@ -62,10 +62,10 @@ export const SummaryInfo: React.FC<{ label: string; summary: React.ReactNode; da
           alignItems: 'center',
           justifyContent: 'center',
           // A real box, not an overlay: a 16 px glyph in a 40 px target whose extra
-          // 24 px is handed back as margin, so the title row keeps its height.
+          // height is handed back as margin, so the title row keeps its height.
           minWidth: rem(theme, SETTING_CARD.infoTapTarget),
           minHeight: rem(theme, SETTING_CARD.infoTapTarget),
-          margin: rem(theme, SETTING_CARD.infoTapMargin),
+          margin: `${rem(theme, SETTING_CARD.infoTapMarginBlock)} ${rem(theme, SETTING_CARD.infoTapMarginInline)}`,
           padding: 0,
           border: 0,
           background: 'none',

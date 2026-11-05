@@ -46,7 +46,7 @@ describe('the summary clamp', () => {
     expect(screen.getByTestId('toggle-summary')).toHaveTextContent(LONG);
   });
 
-  it('gives the [i] a 40px box, and takes the extra 24px back as margin (FUT-4443)', async () => {
+  it('gives the [i] a 40px box, and hands the extra height and width back as margin (FUT-4443)', async () => {
     stubLayout(true);
     render(
       <SettingToggle
@@ -60,7 +60,7 @@ describe('the summary clamp', () => {
 
     const info = await screen.findByRole('button', { name: 'Show the full text' });
     expect(info).toHaveStyle({ minWidth: '2.5rem', minHeight: '2.5rem' });
-    expect(info).toHaveStyle({ margin: '-0.75rem' });
+    expect(info).toHaveStyle({ marginTop: '-0.75rem', marginBottom: '-0.75rem', marginLeft: '-0.5rem', marginRight: '-0.5rem' });
   });
 
   it('draws no [i] when the summary fits', async () => {

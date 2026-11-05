@@ -21,8 +21,13 @@ export const SETTING_CARD = {
    * to the title row, so nothing moves.
    */
   infoTapTarget: 40,
-  /** The margin that returns the target's extra 24 px: 12 on each side. */
-  infoTapMargin: -12,
+  /** Above and below the glyph: (40 - 16) / 2, so the title row keeps its height. */
+  infoTapMarginBlock: -12,
+  /**
+   * Beside the glyph: minus the title row's `gap` (8 px), not (40 - 16) / 2, so the
+   * box ends where the status pill ends and never overlaps it.
+   */
+  infoTapMarginInline: -8,
   /**
    * The [i]'s keyboard focus ring: its width, and its offset from the box. The
    * offset is negative so the ring's OUTER edge is the 40 px box (a 40 px circle
