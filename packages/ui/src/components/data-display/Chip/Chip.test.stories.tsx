@@ -283,6 +283,10 @@ const SOFT_COLORS = ['primary', 'secondary', 'success', 'warning', 'danger', 'in
 
 /** FUT-4442: a soft chip's words are the status, so they clear AA on the dark page. */
 export const SoftDarkContrast: Story = {
+  // Reads MUI's DOM: the chip root's computed colour and ground, and the
+  // `-delete` glyph. react-native-web lays the chip out as nested views, so the
+  // native ink is pinned by `Chip.native.test.tsx` instead.
+  tags: ['native-skip'],
   globals: { theme: 'dark' },
   render: () => (
     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
