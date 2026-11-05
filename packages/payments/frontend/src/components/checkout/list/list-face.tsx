@@ -16,7 +16,7 @@ import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
-import { ActionButton, ChargeBar, ListBar } from "./list-bar";
+import { ActionButton, ChargeBar, ListBar, holdToneOf } from "./list-bar";
 import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
 import type { ListCapability } from "./use-capability";
@@ -386,7 +386,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
-        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live}>
+        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} reasonTone={holdToneOf(list.hold, facts.underButton)} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live}>
           <BarAction props={props} failure={failure ?? wallets.failure} act={act} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />
         </ListBar>
       ) : null}

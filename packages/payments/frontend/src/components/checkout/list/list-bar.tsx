@@ -9,6 +9,7 @@ import { useCheckoutComponents } from "../ui";
 import { useSummaryColumnTarget } from "./summary-column";
 import { SummaryToggleLine } from "./summary-sheet";
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
+import type { CheckoutListHold, CheckoutListHoldTone } from "./types";
 
 /** The prototype's 52px action and 44px secondary, on the theme's spacing scale. */
 const ACTION_HEIGHT = 6.5;
@@ -84,18 +85,27 @@ function HeldTotal({ total }: { total?: string | null }): JSX.Element | null {
 }
 
 /**
+ * The tone a reason is drawn in when it IS the host's hold (`drawn` absent: the
+ * hold's own reason is what is drawn); any other reason is the list's, in `danger`.
+ */
+export function holdToneOf(hold: CheckoutListHold | null | undefined, drawn?: string | null): CheckoutListHoldTone | undefined {
+  if (!hold) return undefined;
+  return drawn === undefined || drawn === hold.reason ? hold.tone : undefined;
+}
+
+/**
  * The bar's ONE live region, always mounted: the reason the action is held,
  * drawn under it — unless it only repeats the button's own label, and that
  * label is whole (not cut), when it is announced and not drawn — or else what is under way. Out of the flow while it
  * has nothing to show: an empty row still took a gap under the button.
  */
-function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string | null; actionLabel?: string | null; labelCut: boolean; live?: string | null }): JSX.Element {
+function HeldReason({ reason, actionLabel, labelCut, live, tone = "danger" }: { reason?: string | null; actionLabel?: string | null; labelCut: boolean; live?: string | null; tone?: CheckoutListHoldTone }): JSX.Element {
   const { Text } = useCheckoutComponents();
   const drawn = reason && (labelCut || !repeatsLabel(reason, actionLabel)) ? reason : null;
   return (
     <Box role="status" aria-live="polite" data-testid="list-bar-live" sx={drawn ? undefined : VISUALLY_HIDDEN}>
       {drawn ? (
-        <Text variant="body" size="sm" color="danger" as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
+        <Text variant="body" size="sm" color={tone === "neutral" ? "secondary" : "danger"} as="p" style={{ margin: 0 }} data-testid="list-blocked-reason">
           {drawn}
         </Text>
       ) : (
@@ -119,7 +129,7 @@ function HeldReason({ reason, actionLabel, labelCut, live }: { reason?: string |
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, actionLabel, heldTotal, live, children }: {
+export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, reasonTone, actionLabel, heldTotal, live, children }: {
   summary?: ReactNode;
   /** A charge is under way: the phone's summary sheet closes and stays closed (FUT-589). */
   sheetHeld?: boolean;
@@ -132,6 +142,8 @@ export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, 
   payer?: ReactNode;
   /** Why the action is held, under it. */
   reason?: string | null;
+  /** How `reason` is drawn: the host hold's own tone when the reason is the hold's; absent ⇒ `danger`. */
+  reasonTone?: CheckoutListHoldTone;
   /** The cart's total, drawn above the action while it is held with nothing chosen (a phone; the column has its own). */
   heldTotal?: string | null;
   /** The action's own label: a reason that says the same is announced, not drawn twice. */
@@ -155,7 +167,7 @@ export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, 
       {payer}
       <HeldTotal total={column ? null : heldTotal} />
       {children}
-      <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} />
+      <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} tone={reasonTone} />
     </Box>
     </LabelCutContext.Provider>
   );

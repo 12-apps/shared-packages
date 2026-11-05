@@ -11,7 +11,7 @@ import { useCheckoutComponents } from "../ui";
 
 import { bankFlowOs, type PhoneOs } from "./bank-apps";
 import type { PaymentListMode } from "./context";
-import { ListBar, ActionButton } from "./list-bar";
+import { ListBar, ActionButton, holdToneOf } from "./list-bar";
 import { BeforeCopy } from "./list-pix-before";
 import { PixBanks, usePixBankState, type PixBankState } from "./pix-banks";
 import type { CheckoutPixBank, PixBankId } from "./types";
@@ -132,7 +132,7 @@ function ListPixBar({ mode, afterCopy, onCopy, bankFlow, onOtherBank, again }: {
   const settled = !hold && !stale;
   const other = settled && !afterCopy ? otherBankLabel(bankFlow) : null;
   return (
-    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} actionLabel={hold?.action} live={afterCopy && settled ? copy.waiting : null}>
+    <ListBar summary={mode.list.summary} reason={hold?.reason ?? null} reasonTone={holdToneOf(hold)} actionLabel={hold?.action} live={afterCopy && settled ? copy.waiting : null}>
       <PixBarAction mode={mode} afterCopy={afterCopy} onCopy={onCopy} copyLabel={copyLabel(copy.copyCode, bankFlow)} again={again} />
       {other ? <OtherBankLink label={other} onClick={onOtherBank} /> : null}
     </ListBar>

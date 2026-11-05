@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./locales": "./src/locales.ts",
+    "./hosted-return": "./src/hosted-return/index.ts",
     "./manifest": "./src/manifest/index.ts",
     "./manifest/web": "./src/manifest/web.ts",
     "./tender-split": "./src/tender-split/index.ts",
