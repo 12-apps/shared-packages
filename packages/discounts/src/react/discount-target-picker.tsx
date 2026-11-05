@@ -96,6 +96,7 @@ export function DiscountTargetPicker({
         copy={copy}
         freeUnits={values.freeUnits ?? ""}
         error={errors.freeUnits}
+        targetRefused={errors.kind === copy.form.freeUnitsTargetRequired}
         onChange={selection.onComboRequirementsChange}
         onFreeUnitsChange={(next) => setFieldValue("freeUnits", next)}
       />

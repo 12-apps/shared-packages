@@ -116,6 +116,7 @@ export function FreeUnitsBuilder({
   copy,
   freeUnits,
   error,
+  targetRefused,
   onChange,
   onFreeUnitsChange,
 }: {
@@ -130,6 +131,8 @@ export function FreeUnitsBuilder({
    * this itself, but it would also sit outside the sentence it belongs to.
    */
   error: string | undefined;
+  /** Criar/Salvar refused the product list; the message waits for it. */
+  targetRefused: boolean;
   onChange: (next: ComboRequirement[]) => void;
   onFreeUnitsChange: (next: string) => void;
 }): JSX.Element | null {
@@ -138,8 +141,6 @@ export function FreeUnitsBuilder({
 
   const slot = onlySlot(slots);
   const summary = summaryOf(slot.quantity, Number(freeUnits), copy);
-  const empty = slot.menuItemIds.length === 0;
-
   return (
     <FormControl fullWidth>
       <FormLabel>{copy.combo.freeUnitsTitle}</FormLabel>
@@ -172,7 +173,7 @@ export function FreeUnitsBuilder({
             {error ?? copy.form.wholeNumberOnly}
           </FormMessage>
         )}
-        {empty ? (
+        {slot.menuItemIds.length === 0 && targetRefused ? (
           <FormMessage error dataTestId="free-units-message">
             {copy.form.freeUnitsTargetRequired}
           </FormMessage>
