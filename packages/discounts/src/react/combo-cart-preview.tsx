@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useRef,
-  type JSX,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useRef, type JSX, type ReactNode } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { useFormContext } from "@12-apps/ui/form/total-form";
@@ -18,15 +12,8 @@ import type { ComboRequirement } from "../engine/types";
 
 import { toBasisPoints, toCents, type WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
-import {
-  comboPreviewOf,
-  type ComboPreview,
-  type ComboRewardValue,
-} from "./combo-preview";
-import {
-  comboPreviewLines,
-  type ComboPreviewLayout,
-} from "./combo-preview-lines";
+import { comboPreviewOf, type ComboPreview, type ComboRewardValue } from "./combo-preview";
+import { comboPreviewLines, type ComboPreviewLayout } from "./combo-preview-lines";
 import { comboRewardOf } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 import { KIND_TOGGLE_MIN_PX, useElementWidth } from "./kind-field";
@@ -53,9 +40,7 @@ const FORM_SHARE = 3 / 5;
  * squeezed it into a select would trade a control the operator already knows
  * for a box of text — the preview has room only when nothing else pays for it.
  */
-export const PREVIEW_ASIDE_MIN_PX = Math.ceil(
-  KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX,
-);
+export const PREVIEW_ASIDE_MIN_PX = Math.ceil(KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX);
 
 /** What the preview reads that is not a form value. */
 interface PreviewInputs {
@@ -99,39 +84,21 @@ function useComboPreview(world: PreviewInputs): {
   const { values } = useFormContext();
   const reward = rewardFrom(values, world.formatters);
   const preview =
-    values.kind === "COMBO"
-      ? comboPreviewOf(world.slots, world.groups, reward)
-      : null;
+    values.kind === "COMBO" ? comboPreviewOf(world.slots, world.groups, reward) : null;
   return { reward, preview };
 }
 
 function PreviewBox({ world }: { world: PreviewWorld }): JSX.Element | null {
   const { reward, preview } = world;
   if (preview === null) return null;
-  const lines = comboPreviewLines(
-    preview,
-    reward,
-    world.layout,
-    world.copy,
-    world.formatters,
-  );
+  const lines = comboPreviewLines(preview, reward, world.layout, world.copy, world.formatters);
   const aside = world.layout === "aside";
   return (
-    <Alert
-      variant="info"
-      showIcon={false}
-      animate={false}
-      data-testid="combo-cart-preview"
-    >
+    <Alert variant="info" showIcon={false} animate={false} data-testid="combo-cart-preview">
       <Stack spacing={aside ? 1 : 0.5}>
         {/* A small label over the figures, as the prototype draws it — not the
             Alert's own title, which is larger than the lines it heads. */}
-        <Text
-          as="p"
-          variant="caption"
-          weight="semibold"
-          data-testid="combo-cart-preview-heading"
-        >
+        <Text as="p" variant="caption" weight="semibold" data-testid="combo-cart-preview-heading">
           {world.copy.comboRewards.preview.title}
         </Text>
         <Text variant="body" size="sm" data-testid="combo-cart-preview-items">
@@ -187,9 +154,7 @@ export function ComboPreviewLayout({
     slots,
   });
   const layout: ComboPreviewLayout =
-    preview !== null && width !== null && width >= PREVIEW_ASIDE_MIN_PX
-      ? "aside"
-      : "inline";
+    preview !== null && width !== null && width >= PREVIEW_ASIDE_MIN_PX ? "aside" : "inline";
   const world: PreviewWorld = {
     layout,
     copy,
