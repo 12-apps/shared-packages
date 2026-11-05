@@ -28,6 +28,7 @@ export {
   type DiscountableCollection,
   type DiscountableOps,
   type DiscountTarget,
+  type DiscountTargetPriceRange,
   type DiscountTargetGroup,
 } from "./collections";
 

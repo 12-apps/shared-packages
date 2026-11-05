@@ -40,6 +40,26 @@ export interface DiscountTarget {
    * category path is built from the same edges. Absent or null at the root.
    */
   parentId?: string | null;
+  /**
+   * What a buyer can pay for one unit of this row, cheapest to dearest — its own
+   * price and its variations' (FUT-4417). Only an ITEM row carries it, and only
+   * so the combo form can say what a group's items sum to ("Como fica no
+   * carrinho"); nothing prices a cart from it. Absent: the form shows no
+   * preview for a group that can take this row alone.
+   */
+  priceRangeCents?: DiscountTargetPriceRange | null;
+  /**
+   * The category an ITEM row is filed under, for the same preview: a group that
+   * names a category takes every product filed under it or under its
+   * subcategories. Absent or null: uncategorized.
+   */
+  categoryId?: string | null;
+}
+
+/** The cheapest and dearest unit price of one target, in integer cents. */
+export interface DiscountTargetPriceRange {
+  minCents: number;
+  maxCents: number;
 }
 
 /**

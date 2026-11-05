@@ -7,11 +7,11 @@ import {
   useCardActions,
   useRemoveConfirm,
 } from "@12-apps/ui/data-display/CardKit";
-import { Dialog, DialogContent } from "@12-apps/ui/feedback/Dialog";
 import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
 import type { DiscountsApiClient, WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
+import { DiscountDialog } from "./discount-dialog";
 import { DiscountForm } from "./discount-form";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import type { DiscountsFormatters } from "./format";
@@ -125,36 +125,30 @@ export function DiscountActionsMenu({
       />
       {remove.dialog}
       {canEdit && (
-        <Dialog
+        <DiscountDialog
           open={editOpen}
           onClose={() => setEditOpen(false)}
           title={copy.form.editTitle}
-          size="md"
-          showCloseButton
-          dataTestId="discount-dialog"
+          copy={copy}
         >
-          {/* Mounted only while open, so the next open re-seeds from the row
+          {/* Each opening mounts a fresh form, so it re-seeds from the row
               instead of keeping the last attempt's values. */}
-          {editOpen && (
-            <DialogContent>
-              <DiscountForm
-                key={row.id}
-                api={api}
-                copy={copy}
-                formatters={formatters}
-                currencyField={currencyField}
-                groups={groups}
-                editing={row.record}
-                onError={onError}
-                {...(timezoneLabel ? { timezoneLabel } : {})}
-                onSaved={() => {
-                  setEditOpen(false);
-                  onRefresh();
-                }}
-              />
-            </DialogContent>
-          )}
-        </Dialog>
+          <DiscountForm
+            key={row.id}
+            api={api}
+            copy={copy}
+            formatters={formatters}
+            currencyField={currencyField}
+            groups={groups}
+            editing={row.record}
+            onError={onError}
+            {...(timezoneLabel ? { timezoneLabel } : {})}
+            onSaved={() => {
+              setEditOpen(false);
+              onRefresh();
+            }}
+          />
+        </DiscountDialog>
       )}
     </>
   );
