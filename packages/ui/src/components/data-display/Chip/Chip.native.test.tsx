@@ -246,4 +246,16 @@ describe('Chip (native)', () => {
     expect(screen.getByTestId('d').style.borderTopColor).toBe(paint(dark.palette.grey[700]));
     expect(screen.getByTestId('d-label').style.color).toBe(paint(dark.palette.text.primary));
   });
+
+  it('inks a soft chip with the light step in dark mode and the dark step in light (FUT-4442)', () => {
+    const dark = createUiTheme({ mode: 'dark' });
+    render(
+      <UiProvider theme={dark}>
+        <Chip label="x" variant="soft" color="danger" dataTestId="s" />
+      </UiProvider>,
+    );
+    expect(screen.getByTestId('s-label').style.color).toBe(paint(dark.palette.danger.light));
+    expect(chipPaint(dark, 'soft', 'danger', false).label.color).toBe(dark.palette.danger.light);
+    expect(chipPaint(theme, 'soft', 'danger', false).label.color).toBe(theme.palette.danger.dark);
+  });
 });

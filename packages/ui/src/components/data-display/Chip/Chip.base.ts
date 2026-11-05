@@ -10,8 +10,9 @@ import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
  * consumer has no `@mui/material` to resolve a type import against.
  */
 /**
- * `soft` is a status chip's look: the colour's tint for a ground and its dark
- * step for ink, so a row of states reads without a row of solid blocks.
+ * `soft` is a status chip's look: the colour's tint for a ground and, for ink,
+ * its dark step in light mode and its light step in dark mode (4.5:1 on the
+ * tint either way), so a row of states reads without a row of solid blocks.
  */
 export type ChipVariant = 'filled' | 'outlined' | 'soft';
 

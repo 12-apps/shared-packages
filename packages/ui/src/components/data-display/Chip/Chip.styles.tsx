@@ -78,20 +78,38 @@ const paletteKey = (color: NonNullable<ChipProps['color']>): 'primary' | 'second
   return color === 'danger' ? 'error' : color;
 };
 
-/** `soft`: the colour's tint for a ground, its dark step for ink (and the icon). */
+/**
+ * `soft`: the colour's tint for a ground, and for ink the step that reads on it:
+ * the `dark` step in light mode, the `light` step in dark mode (FUT-4442). The
+ * ground is a 14% tint over the page, so on a near-black page the ink has to be
+ * lighter than `main`; `dark` there is 2.6 to 3.9:1, `light` clears 4.5:1. The
+ * label, the icon and the delete glyph all take it.
+ */
 const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
   const key = paletteKey(color);
   const ground = (theme: Theme): string =>
     key ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : theme.palette.action.selected;
-  const ink = (theme: Theme): string => (key ? theme.palette[key].dark : theme.palette.text.secondary);
+  const ink = (theme: Theme): string => {
+    if (!key) return theme.palette.text.secondary;
+    return theme.palette.mode === 'dark' ? theme.palette[key].light : theme.palette[key].dark;
+  };
   return {
     backgroundColor: ground,
     color: ink,
     // A state is read at a glance: the label is set semibold.
     fontWeight: 600,
     '& .MuiChip-icon': { color: ink },
+    // MUI paints the glyph in `contrastText` at 0.7 (near-black on a dark ground).
+    '& .MuiChip-deleteIcon': { color: ink, '&:hover': { color: ink } },
     '&.MuiChip-clickable:hover': {
       backgroundColor: (theme: Theme) => (key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : theme.palette.action.hover),
+    },
+    // MUI's filled focus ground is the colour's `dark` step, which the dark-mode
+    // ink (`light`) does not clear 4.5:1 on. Dark mode keeps the tint instead;
+    // light mode keeps MUI's ground.
+    '&.Mui-focusVisible': {
+      backgroundColor: (theme: Theme) =>
+        theme.palette.mode === 'dark' && key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : undefined,
     },
   };
 };

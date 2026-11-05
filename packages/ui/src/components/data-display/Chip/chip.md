@@ -29,7 +29,7 @@ interface ChipProps {
 
 **Features**
 
-- Filled/Outlined/Soft variants; optional avatar or icon. `soft` is a status chip: the colour's tint for a ground and its dark step for ink.
+- Filled/Outlined/Soft variants; optional avatar or icon. `soft` is a status chip: the colour's tint for a ground and, for ink, its dark step in light mode and its light step in dark mode.
 - Selectable (toggle) and/or deletable (× button).
 - Keyboard: Space/Enter activates; Delete/Backspace triggers remove when focused.
 

@@ -260,3 +260,59 @@ export const EdgeCases: Story = {
     expect(deleteIcon).toBeInTheDocument();
   },
 };
+
+/** Channels of a computed `rgb()`/`rgba()` colour. */
+const channelsOf = (colour: string): [number, number, number, number] => {
+  const parts = (colour.match(/[\d.]+/gu) ?? []).map(Number);
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 1];
+};
+const compositeOver = (top: string, ground: [number, number, number]): [number, number, number] => {
+  const [r, g, b, a] = channelsOf(top);
+  return [r * a + ground[0] * (1 - a), g * a + ground[1] * (1 - a), b * a + ground[2] * (1 - a)];
+};
+const luminanceOf = ([r, g, b]: [number, number, number]): number => {
+  const lin = (v: number): number => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+const contrastOf = (a: [number, number, number], b: [number, number, number]): number => {
+  const [x, y] = [luminanceOf(a), luminanceOf(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+const SOFT_COLORS = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'neutral'] as const;
+
+/** FUT-4442: a soft chip's words are the status, so they clear AA on the dark page. */
+export const SoftDarkContrast: Story = {
+  globals: { theme: 'dark' },
+  render: () => (
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {SOFT_COLORS.map((color) => (
+        <Chip
+          key={color}
+          label={`Soft ${color}`}
+          variant="soft"
+          color={color}
+          deletable
+          onDelete={() => {}}
+          dataTestId={`soft-${color}`}
+        />
+      ))}
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = channelsOf(getComputedStyle(document.body).backgroundColor);
+    const paper: [number, number, number] = [page[0], page[1], page[2]];
+    for (const color of SOFT_COLORS) {
+      const chip = canvas.getByTestId(`soft-${color}`);
+      const style = getComputedStyle(chip);
+      const ground = compositeOver(style.backgroundColor, paper);
+      // The label (the chip's own colour) and the delete glyph.
+      const glyph = getComputedStyle(canvas.getByTestId(`soft-${color}-delete`));
+      for (const ink of [style.color, glyph.color]) {
+        const ratio = contrastOf(compositeOver(ink, ground), ground);
+        await expect(ratio).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  },
+};
