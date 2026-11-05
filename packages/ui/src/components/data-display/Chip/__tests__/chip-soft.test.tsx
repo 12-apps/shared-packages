@@ -49,7 +49,7 @@ function parse(input: string): Rgba {
   const colour = input.startsWith("#") ? rgbOf(input) : input;
   const parts = colour.match(/[\d.]+/gu)?.map(Number);
   if (!parts || parts.length < 3) throw new Error(`unreadable colour: ${colour}`);
-  return [parts[0], parts[1], parts[2], parts[3] ?? 1];
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 1];
 }
 
 function over([r, g, b, a]: Rgba, [br, bg, bb]: Rgba): [number, number, number] {
