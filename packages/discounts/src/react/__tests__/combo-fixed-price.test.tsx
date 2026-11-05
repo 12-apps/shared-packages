@@ -462,7 +462,7 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
   });
 
   it("F25: a wide form puts the preview in its own column, with the examples line", async () => {
-    containerWidth(760);
+    containerWidth(960);
     renderForm(record());
     await waitFor(() =>
       expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("aside"),
@@ -473,8 +473,16 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
     expect(screen.getByTestId("combo-cart-preview-examples")).toBeTruthy();
   });
 
-  it("F26: no column for a kind that is not a combo", async () => {
+  it("F27: a form too narrow to keep the kind toggle beside a column keeps the preview inline", async () => {
     containerWidth(760);
+    renderForm(record());
+    await waitFor(() => expect(screen.getByTestId("combo-cart-preview")).toBeTruthy());
+    expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
+    expect(screen.queryByTestId("combo-cart-preview-examples")).toBeNull();
+  });
+
+  it("F26: no column for a kind that is not a combo", async () => {
+    containerWidth(960);
     renderForm(record({ scope: "ORDER", comboRequirements: [] }));
     await waitFor(() =>
       expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline"),

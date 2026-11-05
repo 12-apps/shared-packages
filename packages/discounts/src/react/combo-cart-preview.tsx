@@ -16,7 +16,7 @@ import { comboPreviewOf, type ComboRewardValue } from "./combo-preview";
 import { comboPreviewLines, type ComboPreviewLayout } from "./combo-preview-lines";
 import { comboRewardOf } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
-import { useElementWidth } from "./kind-field";
+import { KIND_TOGGLE_MIN_PX, useElementWidth } from "./kind-field";
 
 /**
  * "Como fica no carrinho" on screen (FUT-4417), and where it sits.
@@ -28,12 +28,17 @@ import { useElementWidth } from "./kind-field";
  * than the screen.
  */
 
+/** The side column's share and gap: `minmax(0, 3fr) minmax(0, 2fr)`, `gap: 3`. */
+const ASIDE_GAP_PX = 24;
+const FORM_SHARE = 3 / 5;
+
 /**
- * The narrowest form that takes the side column: at 3fr / 2fr with a 24 px gap
- * that leaves the form ~418 px — room for the three reward parts on a line of
- * their own — and the preview ~278 px.
+ * The narrowest form that takes the side column: one whose left column still
+ * holds the kind question as a toggle (`KIND_TOGGLE_MIN_PX`). A column that
+ * squeezed it into a select would trade a control the operator already knows
+ * for a box of text — the preview has room only when nothing else pays for it.
  */
-export const PREVIEW_ASIDE_MIN_PX = 720;
+export const PREVIEW_ASIDE_MIN_PX = Math.ceil(KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX);
 
 /** What the preview needs that is not a form value, and where it was placed. */
 interface PreviewWorld {
@@ -59,10 +64,16 @@ function rewardFrom(
   };
 }
 
-function PreviewBox({ world }: { world: PreviewWorld }): JSX.Element | null {
+/** The preview the form currently describes, or null when there is nothing honest to sum. */
+function useComboPreview(world: Omit<PreviewWorld, "layout">) {
   const { values } = useFormContext();
   const reward = rewardFrom(values, world.formatters);
-  const preview = comboPreviewOf(world.slots, world.groups, reward);
+  const preview = values.kind === "COMBO" ? comboPreviewOf(world.slots, world.groups, reward) : null;
+  return { reward, preview };
+}
+
+function PreviewBox({ world }: { world: PreviewWorld }): JSX.Element | null {
+  const { reward, preview } = useComboPreview(world);
   if (preview === null) return null;
   const lines = comboPreviewLines(preview, reward, world.layout, world.copy, world.formatters);
   const aside = world.layout === "aside";
@@ -114,10 +125,12 @@ export function ComboPreviewLayout({
 }: Omit<PreviewWorld, "layout"> & { children: ReactNode }): JSX.Element {
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(box);
-  const { values } = useFormContext();
-  const combo = values.kind === "COMBO";
+  // The column exists only while there is a preview to put in it: an empty
+  // column beside a combo with no priced group yet is empty space, and the form
+  // would be squeezed for nothing.
+  const { preview } = useComboPreview({ copy, formatters, groups, slots });
   const layout: ComboPreviewLayout =
-    combo && width !== null && width >= PREVIEW_ASIDE_MIN_PX ? "aside" : "inline";
+    preview !== null && width !== null && width >= PREVIEW_ASIDE_MIN_PX ? "aside" : "inline";
   const world: PreviewWorld = { layout, copy, formatters, groups, slots };
   return (
     <PreviewContext.Provider value={world}>

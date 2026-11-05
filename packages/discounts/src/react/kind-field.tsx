@@ -7,7 +7,7 @@ import { Box } from "@12-apps/ui/mui/Box";
 
 import type { DiscountsWebCopy } from "./copy";
 import { optionsFor } from "./discount-form-fields";
-import type { DiscountKind } from "./form-kind";
+import { DISCOUNT_KINDS, type DiscountKind } from "./form-kind";
 
 /**
  * What kind of promotion this is — the form's first and most consequential
@@ -28,6 +28,9 @@ import type { DiscountKind } from "./form-kind";
 
 /** The widest pt-BR kind label at the toggle's type size (132 px measured), plus its padding. */
 const PART_MIN_PX = 136;
+
+/** How wide the form must be for the four kinds to be a toggle rather than a select. */
+export const KIND_TOGGLE_MIN_PX = DISCOUNT_KINDS.length * PART_MIN_PX;
 
 /** The element's own width as it changes; `null` until measured, or where nothing can measure. */
 export function useElementWidth(ref: RefObject<HTMLElement | null>): number | null {

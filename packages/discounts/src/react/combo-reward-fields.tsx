@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type JSX } from "react";
+import { useLayoutEffect, useRef, useState, type JSX, type RefObject } from "react";
 
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
@@ -33,21 +33,62 @@ import { PercentField } from "./number-fields";
  */
 
 /**
- * The widest pt-BR reward label at the toggle's type size plus its padding, per
- * label: "Porcentagem" is the widest, as it is in the kind toggle (132 px
- * measured there). Parts are equal, so the widest one sizes all three.
+ * What one part needs before a label wraps inside it, when nothing could
+ * measure it (a test DOM): the kind toggle's own figure for "Porcentagem".
  */
-const REWARD_PART_MIN_PX: Readonly<Record<(typeof COMBO_REWARDS)[number], number>> = {
-  PERCENTAGE: 136,
-  FIXED_AMOUNT: 104,
-  BUNDLE_PRICE: 128,
-};
+const FALLBACK_PART_PX = 136;
 
 /** The gap between the choices and the value's field, `gap: 2`. */
 const ROW_GAP_PX = 16;
 
-const NEEDED_PX =
-  COMBO_REWARDS.length * Math.max(...COMBO_REWARDS.map((reward) => REWARD_PART_MIN_PX[reward]));
+const PART_SELECTOR = '[data-testid^="total-form-field-comboReward-item-"]';
+
+/**
+ * A part's width with its label on ONE line: a hidden, unwrapped clone of it,
+ * measured beside it so it inherits the same type.
+ */
+function naturalWidth(part: HTMLElement): number {
+  const clone = part.cloneNode(true) as HTMLElement;
+  Object.assign(clone.style, {
+    position: "absolute",
+    visibility: "hidden",
+    width: "auto",
+    minWidth: "0",
+    flex: "none",
+    whiteSpace: "nowrap",
+  });
+  (part.parentElement ?? document.body).appendChild(clone);
+  const width = clone.getBoundingClientRect().width;
+  clone.remove();
+  return width;
+}
+
+/**
+ * The width the three equal parts need, measured off the toggle the first time
+ * it is on screen — the theme decides the type size and the padding, so a
+ * figure typed here would be wrong in the next density mode. Parts are equal,
+ * so the widest label sizes all three; the group's own padding and gaps are
+ * added on top.
+ */
+function useTogglePartsWidth(box: RefObject<HTMLElement | null>): number {
+  const [measured, setMeasured] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (measured !== null || box.current === null) return;
+    const parts = [...box.current.querySelectorAll<HTMLElement>(PART_SELECTOR)];
+    const group = parts[0]?.parentElement;
+    if (parts.length === 0 || !group) return;
+    const widest = Math.max(...parts.map(naturalWidth));
+    if (widest <= 0) return;
+    const style = getComputedStyle(group);
+    const chrome =
+      (parseFloat(style.paddingLeft) || 0) +
+      (parseFloat(style.paddingRight) || 0) +
+      (parseFloat(style.columnGap) || 0) * (parts.length - 1);
+    // +1 px a part: sub-pixel widths round the other way often enough to wrap.
+    setMeasured(Math.ceil((widest + 1) * parts.length + chrome));
+  });
+  return measured ?? COMBO_REWARDS.length * FALLBACK_PART_PX;
+}
 
 /** The value's input for the chosen reward; the other two are unmounted (`discounts_value_check`). */
 function RewardValueField({
@@ -76,14 +117,15 @@ export function ComboRewardFields({
   const { values } = useFormContext();
   const box = useRef<HTMLDivElement>(null);
   const width = useElementWidth(box);
+  const needed = useTogglePartsWidth(box);
   const reward = comboRewardOf({ type: values.comboReward ?? "" });
   const options = COMBO_REWARDS.map((value) => ({
     value,
     label: copy.comboRewards.labels[value],
   }));
-  const sideBySide = width === null || width >= 2 * NEEDED_PX + ROW_GAP_PX;
+  const sideBySide = width === null || width >= 2 * needed + ROW_GAP_PX;
   const column = width === null ? null : sideBySide ? (width - ROW_GAP_PX) / 2 : width;
-  const fits = column === null || column >= NEEDED_PX;
+  const fits = column === null || column >= needed;
   return (
     <Stack spacing={0.5} ref={box} sx={{ minWidth: 0 }}>
       <Box
