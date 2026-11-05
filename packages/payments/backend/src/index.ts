@@ -148,7 +148,7 @@ export {
   type ProviderRejectionReason,
 } from './core/error-readers';
 // Decline verdicts as taxonomy properties (FUT-761); ladders stay host policy.
-export { declineForbidsRetry, declineMeansInstrumentDead } from './core/decline-verdict';
+export { declineForbidsRetry, declineLeavesPayableOpen, declineMeansInstrumentDead } from './core/decline-verdict';
 
 /**
  * The deployment's stub-mode decision. A host resolves it ONCE at startup
