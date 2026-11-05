@@ -7,6 +7,7 @@ import type {
   DiscountWindowState,
 } from "../engine/kinds";
 
+import type { DiscountsComboRewardsCopy } from "./combo-reward-copy";
 import type { DiscountsScheduleCopy } from "./schedule-copy";
 
 /**
@@ -80,8 +81,8 @@ export interface DiscountsVocabularyCopy {
   /**
    * The KIND toggle's words — the one question the form actually asks (see
    * `./form-kind`). It is keyed by `DiscountType` because every kind is named
-   * after the type it stands for, `COMBO` included: a combo IS a discount, and
-   * `BUNDLE_PRICE`'s label survives for the legacy rules that still carry it.
+   * after the type it stands for. `BUNDLE_PRICE` is no longer a kind on offer
+   * (FUT-4417: a combo reward, `comboRewards.labels`); its entry keeps the shape.
    */
   readonly kind: LabelsFor<DiscountType | "COMBO">;
   readonly type: LabelsFor<DiscountType>;
@@ -106,20 +107,21 @@ export interface DiscountsWindowCopy {
 export interface DiscountsFormCopy {
   readonly createTitle: string;
   readonly editTitle: string;
+  readonly dialog: { readonly close: string; readonly back: string };
   readonly submitCreate: string;
   readonly submitEdit: string;
   readonly name: string;
   readonly type: string;
   /** The kind toggle's own label — the form's first real question. */
   readonly kind: string;
-  /** Which of the two rewards a COMBO gives, and the sentence under it. */
+  /** The combo reward's label; its choices and hints are `comboRewards` (FUT-4417). */
   readonly comboReward: string;
   readonly comboRewardHint: string;
   readonly percentOff: string;
   /** The example inside the empty percentage input. */
   readonly percentPlaceholder: string;
   readonly amountOff: string;
-  /** The combo's total price, shown only for a BUNDLE_PRICE rule. */
+  /** The combo's closed price, under the "Preço fechado" reward (FUT-4417). */
   readonly bundlePrice: string;
   /** How many of the matched units are given away, for a FREE_UNITS rule. */
   readonly freeUnits: string;
@@ -319,6 +321,7 @@ export interface DiscountsWebCopy {
   readonly schedule: DiscountsScheduleCopy;
   readonly form: DiscountsFormCopy;
   readonly combo: DiscountsComboCopy;
+  readonly comboRewards: DiscountsComboRewardsCopy;
   readonly targets: DiscountsTargetCopy;
   readonly actions: DiscountsActionsCopy;
   readonly card: DiscountsCardCopy;
