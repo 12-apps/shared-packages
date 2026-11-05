@@ -48,19 +48,27 @@ export interface ChargeCorrelationPort {
     approved: boolean;
     amount: Money;
     /**
-     * The provider's OWN verdict on whether another attempt with a different
-     * instrument could succeed (FUT-1145) — PagBank's "Retentável" column,
-     * normalized. Present only on a REFUSAL, and undefined when the provider
-     * offered no guidance.
-     *
-     * It travels because it changes what the host should DO with the payable,
-     * and only the host can act on it: a retriable decline is a buyer who is
-     * still trying to buy this, so leaving the payable OPEN lets the next
-     * instrument be charged against the SAME order instead of minting a fresh
-     * one — which is what leaves a trail of failed orders in a buyer's history
-     * for one purchase. A host that ignores it keeps today's behaviour.
+     * The provider's OWN verdict on whether the SAME instrument may be
+     * presented again (FUT-1145) — PagBank's "Retentável" column, normalized.
+     * Present only on a REFUSAL, and undefined when the provider offered no
+     * guidance. It has that one meaning (FUT-4401): `false` says resending the
+     * identical card data fails identically, never that no attempt can succeed.
      */
     retriable?: boolean;
+    /**
+     * Whether the payable stays CHARGEABLE after this refusal (FUT-4401) — the
+     * library's own verdict, `declineLeavesPayableOpen`: the same card may be
+     * retried, or the refusal is about card data the buyer corrects in place
+     * (a mistyped CVV is PagBank 20007, `retriable:false`). Present only on a
+     * refusal.
+     *
+     * It travels because only the host can act on it: a buyer still trying to
+     * buy this is charged again against the SAME order instead of a freshly
+     * minted one — which is what leaves a trail of failed orders in a buyer's
+     * history for one purchase. `false` keeps the behaviour hosts had: the
+     * payable closes. A host on an older contract reads `retriable` alone.
+     */
+    keepsPayableOpen?: boolean;
   }): Promise<string>;
   /**
    * A settlement the library has proof of. `capturedAmount` is what the

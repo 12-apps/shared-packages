@@ -1,3 +1,4 @@
+import { declineLeavesPayableOpen } from '../core/decline-verdict';
 import { attachedChargeOf } from './runtime';
 import type { ChargeSnapshot, DeclineReason } from '../core/types';
 import type { ChargeCorrelationPort, Payable } from './types';
@@ -51,14 +52,24 @@ export function declineOf(snapshot: ChargeSnapshot): {
 export function cardOutcomeOf(
   payable: Payable,
   snapshot: ChargeSnapshot,
-  refusal: { retriable?: boolean },
+  refusal: { declineReason?: DeclineReason; retriable?: boolean },
 ): Parameters<ChargeCorrelationPort['recordCardOutcome']>[0] {
+  // A decline is a business OUTCOME the provider reports, not an error.
+  const approved = snapshot.status === 'PAID' || snapshot.status === 'AUTHORIZED';
   return {
     ref: payable.ref,
     charge: attachedChargeOf(snapshot),
-    // A decline is a business OUTCOME the provider reports, not an error.
-    approved: snapshot.status === 'PAID' || snapshot.status === 'AUTHORIZED',
+    approved,
     amount: payable.amount,
     ...(refusal.retriable === undefined ? {} : { retriable: refusal.retriable }),
+    ...(approved ? {} : { keepsPayableOpen: keepsOpen(refusal) }),
   };
+}
+
+/** The refusal on the wire, read as the payable's fate (FUT-4401). */
+function keepsOpen(refusal: { declineReason?: DeclineReason; retriable?: boolean }): boolean {
+  return declineLeavesPayableOpen({
+    ...(refusal.declineReason === undefined ? {} : { reason: refusal.declineReason }),
+    ...(refusal.retriable === undefined ? {} : { retriable: refusal.retriable }),
+  });
 }

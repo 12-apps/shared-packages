@@ -77,6 +77,7 @@ export const PT_BR_PAYMENT_LIST_COPY: PaymentListCopy = {
     details: "Preencha seus dados para pagar pelo app.",
     chooseCard: "Escolha o cartão.",
     cardDetails: "Preencha os dados do cartão.",
+    anotherCard: (pix) => (pix ? "Escolha outro cartão ou Pix." : "Escolha outro cartão."),
     repricing: "Atualizando o valor…",
   },
   actions: {

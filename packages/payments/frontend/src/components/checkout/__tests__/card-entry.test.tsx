@@ -10,7 +10,7 @@
  *  - An accepted charge gives way to the wait; a refusal brings the buyer back
  *    to the card as they left it.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const client = vi.hoisted(() => ({
@@ -120,5 +120,43 @@ describe("the card entry for an existing payable", () => {
     await waitFor(() => expect(screen.getByTestId("card-error")).toBeTruthy());
     expect((screen.getByTestId("card-holder") as HTMLInputElement).value).toBe("VERA CADEIA");
     expect(screen.getByTestId("card-pay-bar")).toBeTruthy();
+  });
+
+  it("ends its 90 s wait on its own 'taking longer' face, with a live check-again (FUT-4401)", async () => {
+    // `screens.CardEntry` answers its host with a status only; it has no
+    // wait-elapsed ending to hand over, so the pane says it itself.
+    const onResolved = vi.fn();
+    render(<CardEntryPane order={ORDER} config={CONFIG} onResolved={onResolved} />);
+    await waitFor(() => expect(client.listSavedCards).toHaveBeenCalled());
+    type("card-number", "4111 1111 1111 1111");
+    type("card-holder", "VERA CADEIA");
+    type("card-expiry", "12/34");
+    type("card-cvv", "123");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    pay();
+    await waitFor(() => expect(screen.getByTestId("card-processing")).toBeTruthy());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(91_000);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.getByTestId("card-poll-timeout")).toBeTruthy());
+    expect((screen.getByTestId("card-check-again") as HTMLButtonElement).disabled).toBe(false);
+    expect(onResolved).not.toHaveBeenCalled();
+  });
+
+  it("hands a refusal the same card may not answer again to its host's ending (FUT-4401)", async () => {
+    client.chargeCard.mockResolvedValue({ ok: true, data: { status: "FAILED", declineReason: "FRAUD_SUSPECTED", retriable: false } });
+    const onResolved = vi.fn();
+    render(<CardEntryPane order={ORDER} config={CONFIG} onResolved={onResolved} />);
+    await waitFor(() => expect(client.listSavedCards).toHaveBeenCalled());
+    type("card-number", "4111 1111 1111 1111");
+    type("card-holder", "VERA CADEIA");
+    type("card-expiry", "12/34");
+    type("card-cvv", "123");
+
+    pay();
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith("FAILED", { reason: "FRAUD_SUSPECTED", retriable: false }));
   });
 });

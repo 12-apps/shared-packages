@@ -61,6 +61,7 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
     details: "Fill in your details to pay in the app.",
     chooseCard: "Choose the card.",
     cardDetails: "Fill in the card details.",
+    anotherCard: (pix) => (pix ? "Choose another card or Pix." : "Choose another card."),
     repricing: "Updating the amount…",
   },
   actions: {

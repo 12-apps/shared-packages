@@ -72,6 +72,7 @@ function Harness({ onResolved }: { onResolved: (status: OrderStatus) => void }):
     <div>
       <span data-testid="submitted">{String(cc.submitted)}</span>
       <span data-testid="selection">{cc.selection}</span>
+      <span data-testid="error">{cc.error ?? ""}</span>
       <button type="button" data-testid="pay" onClick={() => void cc.handlePay()}>
         Pagar
       </button>
@@ -188,15 +189,18 @@ describe("card charge → 3DS handover (FUT-698)", () => {
     expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).toBeNull();
   });
 
-  it("a decline resolves to the status screen, never a handover", async () => {
+  it("a decline stays beside the card (FUT-4401), never a handover", async () => {
+    // Before FUT-4401 a decline resolved to the status screen; it is now said
+    // next to the card form, so the buyer corrects the card in place.
     client.chargeCard.mockResolvedValue({ ok: true, data: { status: "FAILED" } });
     const onResolved = vi.fn();
 
     await pay(onResolved);
 
     await waitFor(() => {
-      expect(onResolved).toHaveBeenCalledWith("FAILED");
+      expect(screen.getByTestId("error").textContent).not.toBe("");
     });
+    expect(onResolved).not.toHaveBeenCalled();
     expect(assign).not.toHaveBeenCalled();
   });
 });
