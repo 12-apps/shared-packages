@@ -3,6 +3,7 @@
 import { Fragment, useState, type JSX, type ReactNode } from "react";
 
 import { UsableModal } from "@12-apps/ui/feedback/UsableModal";
+import { Box } from "@12-apps/ui/mui/Box";
 
 import type { DiscountsWebCopy } from "./copy";
 
@@ -51,7 +52,13 @@ export function DiscountDialog({
       backLabel={copy.form.dialogBack}
       dataTestId="discount-dialog"
     >
-      <Fragment key={opening}>{children}</Fragment>
+      {/* `clip`, not `hidden`: a checked switch's hit area reaches 24 px past
+          its track (the input is three tracks wide), which the sheet's 16 px
+          gutter turned into an 8 px sideways scroll of the whole form. Clipping
+          keeps that overflow out of the scroller without making a second one. */}
+      <Box sx={{ minWidth: 0, overflowX: "clip" }}>
+        <Fragment key={opening}>{children}</Fragment>
+      </Box>
     </UsableModal>
   );
 }
