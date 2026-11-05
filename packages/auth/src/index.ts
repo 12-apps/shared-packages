@@ -68,6 +68,7 @@ export { isAdminEmail, parseAdminEmails } from "./admin";
 export {
   createInProcessRateLimiter,
   DEFAULT_RATE_LIMITS,
+  type InProcessRateLimiter,
   type InProcessRateLimiterConfig,
 } from "./rate-limit";
 

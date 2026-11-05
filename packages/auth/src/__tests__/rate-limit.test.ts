@@ -89,6 +89,56 @@ describe("createInProcessRateLimiter", () => {
     expect(await limiter.check("signin:user0@b.co")).toBe(true);
   });
 
+  describe("retryAfterMs", () => {
+    it("answers the exact remaining ms of a limited key's window", async () => {
+      const time = clock();
+      const limiter = createInProcessRateLimiter({
+        limits: { signin: 2 },
+        windowMs: 60_000,
+        now: time.now,
+      });
+
+      await limiter.check("signin:ana@b.co");
+      await limiter.check("signin:ana@b.co");
+      time.advance(15_000);
+
+      expect(await limiter.check("signin:ana@b.co")).toBe(false);
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(45_000);
+    });
+
+    it("answers 0 once the limited key's window has expired", async () => {
+      const time = clock();
+      const limiter = createInProcessRateLimiter({
+        limits: { signin: 1 },
+        windowMs: 60_000,
+        now: time.now,
+      });
+
+      await limiter.check("signin:ana@b.co");
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(60_000);
+
+      time.advance(60_000);
+
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(0);
+    });
+
+    it("answers 0 for a key with budget left", async () => {
+      const limiter = createInProcessRateLimiter({ limits: { signin: 3 }, now: clock().now });
+
+      await limiter.check("signin:ana@b.co");
+
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(0);
+    });
+
+    it("answers 0 for a key it has never seen, and asking spends nothing", async () => {
+      const limiter = createInProcessRateLimiter({ limits: { signin: 1 }, now: clock().now });
+
+      expect(limiter.retryAfterMs("signin:nobody@b.co")).toBe(0);
+      // Read-only: the question opened no window, so the first real attempt passes.
+      expect(await limiter.check("signin:nobody@b.co")).toBe(true);
+    });
+  });
+
   it("ships defaults that are tighter for the three that send mail", async () => {
     // Sign-in is retyped by real people; a reset link is not requested five
     // times by anyone who is not being attacked with it.

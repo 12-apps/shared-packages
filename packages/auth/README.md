@@ -93,6 +93,13 @@ export const { GET, POST, PUT } = mountEmailAuth({
   aggregator.
 - `requireEmailVerification` changes the sign-up **contract**, not just its
   security — see ADOPTING.md.
+- `createInProcessRateLimiter()` returns an `InProcessRateLimiter`: the
+  `AuthRateLimiter` port (`check(key)`) plus `retryAfterMs(key)`, the
+  milliseconds until a key **at its limit** gets a fresh window (`0` when it is
+  not limited, its window expired, or it was never seen). Read-only, on the
+  injected `now`. A host answering 429 turns it into `Retry-After` with
+  `Math.ceil(ms / 1000)`. The port itself is unchanged, so a shared-store
+  limiter owes nothing new.
 
 ## Conventions
 
