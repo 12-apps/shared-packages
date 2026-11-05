@@ -55,6 +55,11 @@ export interface PendingSweepReport {
   settled: number;
   /** Charges whose re-read or settle threw — an outage, or a provider refusing to answer. */
   failed: number;
+  /**
+   * Charges the provider reported refused and the host's `decline` port ended
+   * (FUT-4401). Present only when the port is wired.
+   */
+  declined?: number;
 }
 
 export interface PendingSweepDeps {
@@ -75,8 +80,10 @@ export interface PendingSweepDeps {
    * reaction and this sweep's `settle` act on PAID only, so the payable sat
    * open and a buyer watching it waited out their screen's whole bound. The
    * host ends it — closes the payable, and tells the screen watching it.
-   * Throw to count the item failed. Omit to leave a refused charge waiting,
-   * as before.
+   * A throw counts the item `failed` for this pass and is logged; the sweep
+   * does not retry it — a later pass meets it again only if the host's
+   * `listPendingCharges` still lists it. Omit to leave a refused charge
+   * waiting, as before.
    */
   decline?: (snapshot: ChargeSnapshot, merchant: MerchantRef, charge: StoredCharge) => Promise<void>;
   /** Sweep observability; the package binds no logger. */
@@ -115,11 +122,12 @@ export async function reconcilePendingCharges(
   // status poll; the sweep must not race it.
   const askable = pending.filter((charge) => !charge.providerChargeId.startsWith('stub_'));
 
-  const report: PendingSweepReport = { checked: askable.length, settled: 0, failed: 0 };
+  const report: PendingSweepReport = { checked: askable.length, settled: 0, failed: 0, ...(deps.decline ? { declined: 0 } : {}) };
   for (const charge of askable) {
     const outcome = await reconcileOne(deps, charge);
     if (outcome === 'settled') report.settled += 1;
     if (outcome === 'failed') report.failed += 1;
+    if (outcome === 'declined') report.declined = (report.declined ?? 0) + 1;
   }
   return report;
 }
@@ -128,7 +136,7 @@ export async function reconcilePendingCharges(
 async function reconcileOne(
   deps: PendingSweepDeps,
   charge: StoredCharge,
-): Promise<'settled' | 'waiting' | 'failed'> {
+): Promise<'settled' | 'declined' | 'waiting' | 'failed'> {
   try {
     const snapshot = await deps.gateway.refreshCharge(
       charge.merchant,
@@ -137,7 +145,7 @@ async function reconcileOne(
     );
     if (snapshot?.status === 'DECLINED' && deps.decline) {
       await deps.decline(snapshot, charge.merchant, charge);
-      return 'waiting';
+      return 'declined';
     }
     if (snapshot?.status !== 'PAID') return 'waiting';
     await deps.settle(snapshot, charge.merchant, charge);

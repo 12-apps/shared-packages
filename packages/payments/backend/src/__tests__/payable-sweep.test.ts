@@ -162,7 +162,8 @@ describe('reconcilePendingCharges', () => {
     expect(decline.mock.calls[0]?.[0]?.providerChargeId).toBe('CHAR_refused');
     expect(decline.mock.calls[0]?.[1]).toEqual(TENANT);
     expect(settle).not.toHaveBeenCalled();
-    expect(report).toEqual({ checked: 2, settled: 0, failed: 0 });
+    // Counted as ended, not left "waiting": the report says what the pass did.
+    expect(report).toEqual({ checked: 2, settled: 0, failed: 0, declined: 1 });
   });
 
   it('leaves a refused charge waiting for a host with no decline port, as before', async () => {
@@ -188,6 +189,6 @@ describe('reconcilePendingCharges', () => {
       { now: NOW },
     );
 
-    expect(report).toEqual({ checked: 1, settled: 0, failed: 1 });
+    expect(report).toEqual({ checked: 1, settled: 0, failed: 1, declined: 0 });
   });
 });
