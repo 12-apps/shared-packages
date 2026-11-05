@@ -22,6 +22,7 @@ import type { ConnectedOAuthAccount, PaymentEnvironment } from '@12-apps/payment
 
 import { useLiveSandboxCopy } from './LiveSandboxBand';
 import { BTN_PRIMARY_SX, BTN_SECONDARY_SX, LINKISH_SX, T } from './panel-tokens';
+import { rems, sxRem } from './rem';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
 /**
@@ -189,17 +190,17 @@ export function DisconnectDialog(props: {
   const receiving = props.receiving && !toProduction;
   return (
     <RemovalFrame open={props.open} sheet={toProduction} onClose={props.busy ? undefined : props.onCancel}>
-      <DialogTitle sx={{ fontSize: '16.5px', fontWeight: 700, letterSpacing: '-.01em', pb: '8px' }}>
+      <DialogTitle id={REMOVAL_TITLE_ID} sx={{ fontSize: sxRem(16.5), fontWeight: 700, letterSpacing: '-.01em', pb: sxRem(8) }}>
         {words.question}
       </DialogTitle>
-      <DialogContent sx={{ pb: '4px' }}>
-        <DialogContentText sx={{ fontSize: '13px', color: T.ink2, lineHeight: 1.55 }}>
+      <DialogContent sx={{ pb: sxRem(4) }}>
+        <DialogContentText sx={{ fontSize: sxRem(13), color: T.ink2, lineHeight: 1.55 }}>
           {words.consequence}
         </DialogContentText>
         {/* The consequences, itemised. A single paragraph makes the reversible
             facts and the irreversible one weigh the same, and the one that
             costs money is the one an owner skims past. */}
-        <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: '14px', p: 0 }}>
+        <Stack component="ul" spacing={1} sx={{ listStyle: 'none', m: 0, mt: sxRem(14), p: 0 }}>
           {receiving ? (
             <Consequence tone="bad">{copy.removeStopsChargingNow}</Consequence>
           ) : null}
@@ -214,7 +215,7 @@ export function DisconnectDialog(props: {
           ))}
         </Stack>
         {props.error ? (
-          <Alert severity="error" sx={{ mt: '14px' }} data-testid="payments-disconnect-error">
+          <Alert severity="error" sx={{ mt: sxRem(14) }} data-testid="payments-disconnect-error">
             {props.error}
           </Alert>
         ) : null}
@@ -239,6 +240,9 @@ export function DisconnectDialog(props: {
  * centred dialog on a computer (UX13, "popup no computador e sheet no
  * celular"); the plain removal dialog stays the centred dialog it is today.
  */
+/** The removal dialog's title, which names it for assistive tech in both frames. */
+const REMOVAL_TITLE_ID = 'payments-removal-title';
+
 function RemovalFrame(props: { open: boolean; sheet: boolean; onClose?: () => void; children: ReactNode }) {
   const theme = useTheme();
   const phone = useMediaQuery(theme.breakpoints.down('sm'));
@@ -249,14 +253,21 @@ function RemovalFrame(props: { open: boolean; sheet: boolean; onClose?: () => vo
         open={props.open}
         onClose={props.onClose}
         data-testid="payments-disconnect-confirm"
-        PaperProps={{ role: 'dialog', 'aria-modal': true, sx: { borderRadius: '18px 18px 0 0', maxHeight: '90%' } }}
+        // A Drawer gives its paper no dialog context, so the name the Dialog
+        // would link from its title is linked here by hand.
+        PaperProps={{
+          role: 'dialog',
+          'aria-modal': true,
+          'aria-labelledby': REMOVAL_TITLE_ID,
+          sx: { borderRadius: (t) => rems(t, 18, 18, 0, 0), maxHeight: '90%' },
+        }}
       >
         {props.children}
       </Drawer>
     );
   }
   return (
-    <Dialog open={props.open} onClose={props.onClose} data-testid="payments-disconnect-confirm">
+    <Dialog open={props.open} onClose={props.onClose} aria-labelledby={REMOVAL_TITLE_ID} data-testid="payments-disconnect-confirm">
       {props.children}
     </Dialog>
   );
@@ -272,7 +283,7 @@ function RemovalActions(props: {
 }) {
   const copy = usePaymentsSettingsCopy().card;
   return (
-    <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: '8px', p: '18px 22px 20px' }}>
+    <DialogActions sx={{ display: 'flex', flexDirection: 'column', gap: sxRem(8), p: (t) => rems(t, 18, 22, 20) }}>
       {/* Offered FIRST, and only when it is a real alternative. An owner who
           came here to stop taking orders wants the switch, not the removal —
           and reaching for the destructive control is how they got here. */}

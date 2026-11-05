@@ -466,6 +466,10 @@ describe('a refused sandbox: the edges of "Conectar em Produção"', () => {
     const sheet = await screen.findByRole('dialog');
     expect(sheet.className).toMatch(/MuiDrawer-paper/);
     expect(sheet.textContent).toContain(live().toProductionConfirm);
+    // A Drawer has no dialog context: the sheet is named by its title by hand.
+    const titleId = sheet.getAttribute('aria-labelledby');
+    expect(titleId).toBeTruthy();
+    expect(document.getElementById(titleId!)?.textContent).toBe(live().toProductionQuestion('Aurora'));
   });
 });
 
@@ -480,5 +484,18 @@ describe('the failover order with a refused sandbox at its head', () => {
     const first = await screen.findByTestId('payments-priority-first');
     expect(screen.getByTestId('payments-priority-item-boreal').contains(first)).toBe(true);
     await waitFor(() => expect(within(screen.getByTestId('payments-priority-item-aurora')).queryByTestId('payments-priority-first')).toBeNull());
+  });
+});
+
+describe('sizes through the type scale (density)', () => {
+  it('writes a design px as rem through the theme, so a density mode scales it', async () => {
+    const { createTheme } = await import('@mui/material/styles');
+    const { rem, rems, sxRem } = await import('../components/rem');
+    const base = createTheme();
+    const compact = createTheme({ typography: { fontSize: 12 } });
+    expect(rem(base, 14)).toBe('0.875rem');
+    expect(sxRem(44)(base)).toBe(base.typography.pxToRem(44));
+    expect(parseFloat(rem(compact, 14))).toBeLessThan(parseFloat(rem(base, 14)));
+    expect(rems(base, 18, 0, 20)).toBe(`${base.typography.pxToRem(18)} 0 ${base.typography.pxToRem(20)}`);
   });
 });

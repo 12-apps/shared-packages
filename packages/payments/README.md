@@ -136,6 +136,14 @@ its own dialog, sheet or page. In `legs`, the last tender that was only tapped
 carries no amount. It is "the rest", divided against the total the host's
 server composes. See `src/tender-split/math.ts`.
 
+### Sizes are rem, through the theme (density)
+
+Every size a frontend component draws, whether font, height, width, padding, gap, radius or offset, goes through `src/components/rem.ts`: `sxRem(px)` in `sx`, and `rem(theme, px)` / `rems(theme, …)` in a theme callback. Each one returns `theme.typography.pxToRem(px)`. The 1px hairline border is the one literal left.
+
+The reason is density (owner, 2026-11-05: "tem que ser rem — se não for rem quebra a densidade"). A host's density mode sets the type scale, and only sizes written relative to it move with it. A `'14px'` literal stays put while the text around it shrinks. This is the same rule `@12-apps/ui/tokens` follows (FUT-2585). It is spelled out locally because this package may not import `@12-apps/ui`.
+
+Code written before FUT-4432 still carries px literals (`panel-tokens.ts` and older components). They are debt, not precedent: converting a file you touch is welcome, and new code never adds one.
+
 ## Database (self-contained)
 
 `backend/prisma/payments.prisma` and `backend/prisma/migrations/` are OWNED

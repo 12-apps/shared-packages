@@ -3,6 +3,7 @@
 import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
 
 import { BTN_PRIMARY_SX, CARD_INSET, T } from './panel-tokens';
+import { sxRem } from './rem';
 import type { LiveSandboxCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 import { EN_US_PAYMENTS_SETTINGS_COPY } from './settings-en-US';
@@ -29,7 +30,7 @@ export function WarnIcon({ size = 14 }: { size?: number }) {
       component="svg"
       aria-hidden="true"
       viewBox="0 0 24 24"
-      sx={{ width: size, height: size, flex: '0 0 auto', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
+      sx={{ width: sxRem(size), height: sxRem(size), flex: '0 0 auto', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
     >
       <path d="M12 3 2 20h20L12 3z" />
       <path d="M12 10v4" />
@@ -76,13 +77,13 @@ export function LiveSandboxBand({
       role="status"
       data-testid="payments-live-sandbox-band"
       sx={{
-        mt: '12px',
+        mt: sxRem(12),
         // The body below sets no top inset of its own (ProviderCard), so the
         // band keeps the prototype's 16px from the first block under it.
-        mb: '16px',
+        mb: sxRem(16),
         borderRadius: 0,
         px: CARD_INSET,
-        py: '12px',
+        py: sxRem(12),
         // `backgroundColor`, not `background`: a theme's standard-warning fill
         // is set on that property and would otherwise show through.
         '&&': { backgroundColor: T.warnSoft },
@@ -92,12 +93,12 @@ export function LiveSandboxBand({
         // The icon sits on the FIRST line, as in the prototype, whatever the
         // theme says about centring an alert's icon against its whole message.
         alignItems: 'flex-start',
-        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: '-3.5px', alignSelf: 'flex-start' },
-        '& .MuiAlert-message': { py: 0, flex: '1 1 300px', minWidth: 0 },
+        '& .MuiAlert-icon': { color: T.warn, py: 0, mt: sxRem(-3.5), alignSelf: 'flex-start' },
+        '& .MuiAlert-message': { py: 0, flex: (theme) => `1 1 ${theme.typography.pxToRem(300)}`, minWidth: 0 },
       }}
     >
-      <Stack gap="12px" alignItems="flex-start">
-        <Typography sx={{ fontSize: '13.5px', lineHeight: 1.5, color: T.warnInk }}>
+      <Stack sx={{ gap: sxRem(12) }} alignItems="flex-start">
+        <Typography sx={{ fontSize: sxRem(13.5), lineHeight: 1.5, color: T.warnInk }}>
           <strong>{copy.bandLead}</strong> {nextInLine ? copy.bandNextInLine : copy.bandNobodyPays}
         </Typography>
         {onAction ? (
@@ -107,13 +108,13 @@ export function LiveSandboxBand({
             disabled={disabled || busy}
             onClick={onAction}
             data-testid="payments-live-sandbox-action"
-            sx={{ ...BTN_PRIMARY_SX, minHeight: '44px' }}
+            sx={{ ...BTN_PRIMARY_SX, minHeight: sxRem(44) }}
           >
-            {busy ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : copy.bandAction}
+            {busy ? <CircularProgress size={18} sx={{ color: 'common.white' }} /> : copy.bandAction}
           </Button>
         ) : null}
         {error ? (
-          <Typography role="alert" data-testid="payments-live-sandbox-error" sx={{ fontSize: '13px', color: T.badInk }}>
+          <Typography role="alert" data-testid="payments-live-sandbox-error" sx={{ fontSize: sxRem(13), color: T.badInk }}>
             {error}
           </Typography>
         ) : null}

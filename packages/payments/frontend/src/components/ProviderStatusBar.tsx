@@ -8,6 +8,7 @@ import { certificateExpiryProximity, isConnected } from './connection-state';
 import { useLiveSandboxCopy, WarnIcon } from './LiveSandboxBand';
 import { checksLocally } from './checks-locally';
 import { T } from './panel-tokens';
+import { sxRem } from './rem';
 import type { ConnectionStatusCopy, LiveSandboxCopy } from './settings-copy';
 import { usePaymentsSettingsCopy } from './settings-copy-context';
 
@@ -319,7 +320,7 @@ export function ProviderStatusBar({
       <Box>
         <ProviderName displayName={descriptor.displayName} label={badge.label} proven={proven} />
         <Typography
-          sx={{ fontSize: '12.5px', color: liveSandbox ? T.warnInk : T.ink3, mt: '5px', maxWidth: '52ch', lineHeight: 1.5 }}
+          sx={{ fontSize: sxRem(12.5), color: liveSandbox ? T.warnInk : T.ink3, mt: sxRem(5), maxWidth: '52ch', lineHeight: 1.5 }}
           data-testid="payments-enable-hint"
         >
           {sub}
@@ -343,7 +344,7 @@ export function ProviderStatusBar({
         </Tooltip>
         <Typography
           data-testid="payments-enable-state"
-          sx={{ fontSize: '12.5px', fontWeight: tone === T.ink3 ? 400 : 600, color: tone, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          sx={{ fontSize: sxRem(12.5), fontWeight: tone === T.ink3 ? 400 : 600, color: tone, display: 'inline-flex', alignItems: 'center', gap: sxRem(6) }}
         >
           {liveSandbox ? <WarnIcon /> : null}
           {state}
