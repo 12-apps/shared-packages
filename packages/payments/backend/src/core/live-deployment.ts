@@ -21,9 +21,14 @@ import type { MerchantRef, ProviderName } from './types';
 /** The one environment variable that marks the deployment as live. */
 export const LIVE_DEPLOYMENT_ENV_VAR = 'PAYMENTS_LIVE_DEPLOYMENT';
 
-/** The slice of the process environment this policy reads. */
+/**
+ * The process environment this policy reads `PAYMENTS_LIVE_DEPLOYMENT` from.
+ * An index signature rather than one optional key: a type with only optional
+ * keys is weak, and TS refuses a bare `process.env` against it (TS2559). The
+ * host passes the live object so every call reads it afresh.
+ */
 export interface LiveDeploymentEnv {
-  PAYMENTS_LIVE_DEPLOYMENT?: string | undefined;
+  readonly [name: string]: string | undefined;
 }
 
 const TRUTHY = new Set(['1', 'true', 'yes', 'on']);

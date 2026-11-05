@@ -153,11 +153,20 @@ describe('a sandbox connection on any other deployment', () => {
   });
 
   it('follows the environment per call rather than when the store was built', async () => {
-    const env: LiveDeploymentEnv = {};
+    const env: Record<string, string | undefined> = {};
     const w = world(env, { alpha: 'SANDBOX' });
     expect(await w.credentials.providerChain(TENANT)).toEqual(['alpha']);
 
     env.PAYMENTS_LIVE_DEPLOYMENT = '1';
+
+    expect(await w.credentials.providerChain(TENANT)).toEqual([]);
+  });
+});
+
+describe('the environment a host hands over', () => {
+  it('takes a process environment as it is', async () => {
+    const processEnv: NodeJS.ProcessEnv = { PAYMENTS_LIVE_DEPLOYMENT: '1', NODE_ENV: 'production' };
+    const w = world(processEnv, { alpha: 'SANDBOX' });
 
     expect(await w.credentials.providerChain(TENANT)).toEqual([]);
   });
