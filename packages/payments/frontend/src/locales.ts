@@ -27,7 +27,7 @@ import type { PlatformHomologacaoCopy } from './components/platform/copy';
 import { EN_US_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/en-US';
 import { PT_BR_PLATFORM_HOMOLOGACAO_COPY } from './components/platform/pt-BR';
 import { EN_US_PAYMENTS_SETTINGS_COPY } from './components/settings-en-US';
-import type { PaymentsSettingsCopy } from './components/settings-copy';
+import type { LiveSandboxCopy, PaymentsSettingsCopy } from './components/settings-copy';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from './components/settings-pt-BR';
 import type { TenderSplitCopy } from './tender-split/copy';
 import { EN_US_TENDER_SPLIT_COPY } from './tender-split/en-US';
@@ -115,6 +115,23 @@ export const PAYMENTS_SETTINGS_COPY = {
   'pt-BR': PT_BR_PAYMENTS_SETTINGS_COPY,
   'en-US': EN_US_PAYMENTS_SETTINGS_COPY,
 } as const satisfies LocalePack<PaymentsSettingsCopy>;
+
+/**
+ * The settings packs with a host's OWN words for a refused sandbox over the
+ * neutral ones, locale by locale (FUT-4432). The package's sentences name no
+ * host noun and quote no host screen; a host that calls its catalogue
+ * something, or whose storefront says a particular thing to the buyer, states
+ * those two or three words here instead of re-spelling the whole pack.
+ */
+export function withLiveSandboxWords(words: {
+  readonly [L in keyof typeof PAYMENTS_SETTINGS_COPY]: { readonly liveSandbox: Partial<LiveSandboxCopy> };
+}): LocalePack<PaymentsSettingsCopy> {
+  const merged = (locale: keyof typeof PAYMENTS_SETTINGS_COPY): PaymentsSettingsCopy => {
+    const pack = PAYMENTS_SETTINGS_COPY[locale];
+    return { ...pack, liveSandbox: { ...pack.liveSandbox!, ...words[locale].liveSandbox } };
+  };
+  return { 'pt-BR': merged('pt-BR'), 'en-US': merged('en-US') };
+}
 
 export const PLATFORM_HOMOLOGACAO_COPY = {
   'pt-BR': PT_BR_PLATFORM_HOMOLOGACAO_COPY,

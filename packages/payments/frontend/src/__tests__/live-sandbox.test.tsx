@@ -7,6 +7,7 @@ import type { MaskedProviderConfig, MerchantSettingsView, ProviderDescriptor } f
 import type { PaymentsSettingsClient } from '../client';
 import { PaymentProviderSettings } from '../components/PaymentProviderSettings';
 import { connectionBadge, sandboxRefused } from '../components/connection-state';
+import { withLiveSandboxWords } from '../locales';
 import { EN_US_PAYMENTS_SETTINGS_COPY } from '../components/settings-en-US';
 import { PT_BR_PAYMENTS_SETTINGS_COPY } from '../components/settings-pt-BR';
 import type { PaymentsSettingsCopy } from '../components/settings-copy';
@@ -330,5 +331,20 @@ describe('anything that is not a refused sandbox', () => {
     const reconnect = await screen.findByRole('button', { name: 'Reconectar' });
     expect(getComputedStyle(reconnect).backgroundColor).not.toBe('rgb(255, 255, 255)');
     await waitFor(() => expect(screen.queryByTestId('payments-live-sandbox-band')).toBeNull());
+  });
+});
+
+describe('withLiveSandboxWords', () => {
+  it('lays a host\'s own words over the neutral ones, per locale, and keeps every other sentence', () => {
+    const packs = withLiveSandboxWords({
+      'pt-BR': { liveSandbox: { headerSub: 'Modo de teste: o catálogo não cobra clientes.' } },
+      'en-US': { liveSandbox: { bandNobodyPays: 'Shoppers see a closed checkout.' } },
+    });
+
+    expect(packs['pt-BR'].liveSandbox?.headerSub).toBe('Modo de teste: o catálogo não cobra clientes.');
+    expect(packs['pt-BR'].liveSandbox?.bandLead).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.liveSandbox!.bandLead);
+    expect(packs['en-US'].liveSandbox?.bandNobodyPays).toBe('Shoppers see a closed checkout.');
+    expect(packs['en-US'].liveSandbox?.headerSub).toBe(EN_US_PAYMENTS_SETTINGS_COPY.liveSandbox!.headerSub);
+    expect(packs['pt-BR'].status).toBe(PT_BR_PAYMENTS_SETTINGS_COPY.status);
   });
 });
