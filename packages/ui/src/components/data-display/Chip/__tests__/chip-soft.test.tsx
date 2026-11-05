@@ -196,7 +196,7 @@ describe("Chip variant soft, focused, in light mode (FUT-4461)", () => {
       expect(style.outlineColor).toBe(style.color);
       const page = parse(light.palette.background.paper);
       const ground = over(parse(style.backgroundColor), page);
-      const g = [ground[0], ground[1], ground[2]] as const;
+      const g: [number, number, number] = [ground[0], ground[1], ground[2]];
       expect(ratio(over(parse(style.color), g), g)).toBeGreaterThanOrEqual(3);
       expect(ratio(over(parse(getComputedStyle(glyph).color), g), g)).toBeGreaterThanOrEqual(3);
       cleanup();

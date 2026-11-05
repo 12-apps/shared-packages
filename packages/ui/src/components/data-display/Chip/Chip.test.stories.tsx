@@ -307,9 +307,10 @@ export const SoftDarkContrast: Story = {
       const chip = canvas.getByTestId(`soft-${color}`);
       const style = getComputedStyle(chip);
       const ground = compositeOver(style.backgroundColor, paper);
-      // The label (the chip's own colour) and the delete glyph.
+      // The label (the chip's own colour) and, for an accent, the delete glyph:
+      // a neutral soft chip keeps MUI's own glyph.
       const glyph = getComputedStyle(canvas.getByTestId(`soft-${color}-delete`));
-      for (const ink of [style.color, glyph.color]) {
+      for (const ink of color === 'neutral' ? [style.color] : [style.color, glyph.color]) {
         const ratio = contrastOf(compositeOver(ink, ground), ground);
         await expect(ratio).toBeGreaterThanOrEqual(4.5);
       }
