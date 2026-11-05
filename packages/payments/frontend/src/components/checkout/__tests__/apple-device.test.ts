@@ -29,9 +29,11 @@ describe("isAppleDevice", () => {
     expect(isAppleDevice(DEVICES[device])).toBe(false);
   });
 
-  it("trusts Client Hints over the UA when the engine sends them", () => {
-    expect(isAppleDevice({ userAgent: DEVICES.macSafari.userAgent, userAgentData: { platform: "macOS" } })).toBe(false);
+  it("reads an iOS Client Hint as Apple, and leaves macOS to the UA", () => {
     expect(isAppleDevice({ userAgent: "anything", userAgentData: { platform: "iOS" } })).toBe(true);
+    // Chromium on a Mac says "macOS" too — only the UA tells it from Safari.
+    expect(isAppleDevice({ userAgent: DEVICES.macChrome.userAgent, userAgentData: { platform: "macOS" } })).toBe(false);
+    expect(isAppleDevice({ userAgent: DEVICES.macSafari.userAgent, userAgentData: { platform: "macOS" } })).toBe(true);
   });
 
   it("is false for an empty UA", () => {

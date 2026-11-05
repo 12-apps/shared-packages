@@ -25,10 +25,11 @@ const SAFARI_UA = /\bVersion\/[\d.]+.*\bSafari\//;
 
 export function isAppleDevice(device: DeviceSignals): boolean {
   const platform = device.userAgentData?.platform;
-  // Client Hints, when the engine sends them (Chromium): authoritative. Safari
-  // and every iOS browser send none, so they fall through to the UA.
+  // Client Hints, when the engine sends them (Chromium). Safari and every real
+  // iOS browser send none, so they fall through to the UA. "macOS" is not
+  // decided here: a Chromium on a Mac says so too, and only the UA tells it
+  // from Safari (an emulated Safari UA on Chromium reports "macOS" as well).
   if (platform === "iOS" || platform === "iPadOS") return true;
-  if (platform === "macOS") return false;
   const ua = device.userAgent;
   // Every iOS browser (CriOS, FxiOS, EdgiOS…) is WebKit under Apple's rules.
   if (IOS_UA.test(ua)) return true;
