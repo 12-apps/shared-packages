@@ -92,7 +92,8 @@ export interface InProcessRateLimiter extends AuthRateLimiter {
    *
    * `0` when the key is not limited: it has budget left, its window already
    * expired, or it has never been seen. Read-only: asking never spends an
-   * attempt and never opens a window. Measured against the injected `now`.
+   * attempt and never opens a window. Measured against the injected `now`, and
+   * always a whole number of milliseconds (rounded up).
    */
   retryAfterMs(key: string): number;
 }
@@ -135,7 +136,8 @@ export function createInProcessRateLimiter(
       const existing = windows.get(key);
       if (!existing || existing.resetsAt <= at) return 0;
       const limit = limits[bucketOf(key)] ?? defaultLimit;
-      return existing.count >= limit ? existing.resetsAt - at : 0;
+      // Ceiled, so a fractional clock (`performance.now()`) still answers whole ms.
+      return existing.count >= limit ? Math.ceil(existing.resetsAt - at) : 0;
     },
   };
 }

@@ -130,6 +130,37 @@ describe("createInProcessRateLimiter", () => {
       expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(0);
     });
 
+    it("answers whole milliseconds, rounded up, on a fractional clock", async () => {
+      const time = clock(1_000.25);
+      const limiter = createInProcessRateLimiter({
+        limits: { signin: 1 },
+        windowMs: 60_000,
+        now: time.now,
+      });
+
+      await limiter.check("signin:ana@b.co");
+      time.advance(0.5);
+
+      // 59_999.5 ms remain; a header built from it must never undershoot.
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(60_000);
+    });
+
+    it("reports the window for a bucket limited to 0 once its first check opened one", async () => {
+      const time = clock();
+      const limiter = createInProcessRateLimiter({
+        limits: { signin: 0 },
+        windowMs: 60_000,
+        now: time.now,
+      });
+
+      // Existing behaviour: the first check admits and opens the window.
+      expect(await limiter.check("signin:ana@b.co")).toBe(true);
+      time.advance(10_000);
+
+      expect(limiter.retryAfterMs("signin:ana@b.co")).toBe(50_000);
+      expect(await limiter.check("signin:ana@b.co")).toBe(false);
+    });
+
     it("answers 0 for a key it has never seen, and asking spends nothing", async () => {
       const limiter = createInProcessRateLimiter({ limits: { signin: 1 }, now: clock().now });
 
