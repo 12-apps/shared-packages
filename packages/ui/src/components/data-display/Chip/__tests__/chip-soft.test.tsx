@@ -1,11 +1,11 @@
 /**
  * A soft chip is a status chip: the colour's tint for a ground, its dark step
- * for ink in light mode and its light step in dark mode (FUT-4442). It reaches MUI as `filled` (MUI has no third variant), never as an
- * unknown variant MUI would drop.
+ * for ink in light mode and its light step in dark mode (FUT-4442). It reaches
+ * MUI as `filled` (MUI has no third variant), never as an unknown variant MUI
+ * would drop.
  */
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Chip } from "../Chip";
@@ -52,7 +52,7 @@ function parse(input: string): Rgba {
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 1];
 }
 
-function over([r, g, b, a]: Rgba, [br, bg, bb]: Rgba): [number, number, number] {
+function over([r, g, b, a]: Rgba, [br, bg, bb]: readonly number[] & { 0: number; 1: number; 2: number }): [number, number, number] {
   return [r * a + br * (1 - a), g * a + bg * (1 - a), b * a + bb * (1 - a)];
 }
 
@@ -105,7 +105,7 @@ function inkContrast(t: typeof darkTheme, chip: HTMLElement): number {
   const style = getComputedStyle(chip);
   const paper = parse(t.palette.background.paper);
   const ground = over(parse(style.backgroundColor), paper);
-  return ratio(over(parse(style.color), ground as unknown as Rgba), ground);
+  return ratio(over(parse(style.color), ground), ground);
 }
 
 describe("Chip variant soft in dark mode", () => {
@@ -119,11 +119,22 @@ describe("Chip variant soft in dark mode", () => {
     expect(getComputedStyle(chip).color).toBe(rgbOf(seededWarning.palette.warning.light));
   });
 
-  it("keeps the ink on the keyboard-focus ground at 4.5:1", () => {
+  it("keeps the resting ground on focus and draws a ring in the ink", () => {
     for (const color of COLOURS) {
       const chip = renderDark(darkTheme, color);
+      const rest = getComputedStyle(chip).backgroundColor;
+      const ink = getComputedStyle(chip).color;
       chip.classList.add("Mui-focusVisible");
+      const style = getComputedStyle(chip);
+      expect(style.backgroundColor).toBe(rest);
       expect(inkContrast(darkTheme, chip)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+      expect(style.outlineStyle).toBe("solid");
+      expect(style.outlineWidth).toBe("0.125rem");
+      expect(style.outlineOffset).toBe("0.125rem");
+      expect(style.outlineColor).toBe(ink);
+      // The ring against the page itself.
+      const paper = parse(darkTheme.palette.background.paper);
+      expect(ratio(over(parse(style.outlineColor), paper), over([...paper.slice(0, 3), 1] as Rgba, paper))).toBeGreaterThanOrEqual(3);
       cleanup();
     }
   });
@@ -134,6 +145,20 @@ describe("Chip variant soft in dark mode", () => {
     expect(chip.contains(glyph)).toBe(true);
     expect(getComputedStyle(glyph).color).toBe(getComputedStyle(chip).color);
     expect(getComputedStyle(glyph).color).toBe(rgbOf(darkTheme.palette.error.light));
+  });
+
+  it("leaves a neutral soft chip's glyph and focus exactly as MUI paints them", () => {
+    for (const [mode, glyph] of [["light", "rgba(0, 0, 0, 0.26)"], ["dark", "rgba(255, 255, 255, 0.26)"]] as const) {
+      render(
+        <ThemeProvider theme={createTheme({ palette: { mode } })}>
+          <Chip label="x" variant="soft" color="neutral" deletable onDelete={() => undefined} dataTestId={`n-${mode}`} />
+        </ThemeProvider>,
+      );
+      expect(getComputedStyle(screen.getByTestId(`n-${mode}-delete`)).color).toBe(glyph);
+      const chip = screen.getByTestId(`n-${mode}`);
+      chip.classList.add("Mui-focusVisible");
+      expect(getComputedStyle(chip).outlineStyle).not.toBe("solid");
+    }
   });
 
   it("keeps the dark step for light mode's ink (unchanged)", () => {
@@ -148,3 +173,32 @@ function rgbOf(colour: string): string {
   const n = parseInt(colour.slice(1), 16);
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }
+
+describe("Chip variant soft, focused, in light mode", () => {
+  it("keeps MUI's focus ground and paints the glyph in contrastText at 0.7 on it", () => {
+    const light = createTheme();
+    for (const color of COLOURS) {
+      render(
+        <ThemeProvider theme={light}>
+          <Chip label="x" variant="soft" color={color} deletable onDelete={() => undefined} dataTestId={`l-${color}`} />
+        </ThemeProvider>,
+      );
+      const chip = screen.getByTestId(`l-${color}`);
+      const glyph = screen.getByTestId(`l-${color}-delete`);
+      const resting = getComputedStyle(glyph).color;
+      expect(resting).toBe(rgbOf(light.palette[color === "danger" ? "error" : color].dark));
+      chip.classList.add("Mui-focusVisible");
+      const key = color === "danger" ? "error" : color;
+      expect(getComputedStyle(chip).backgroundColor).toBe(rgbOf(light.palette[key].dark)); // MUI's focus ground
+      expect(getComputedStyle(chip).outlineStyle).not.toBe("solid");
+      const ground = parse(getComputedStyle(chip).backgroundColor);
+      const paint = parse(getComputedStyle(glyph).color);
+      expect(paint[3]).toBeCloseTo(0.7, 2);
+      // The glyph is what the filled chip painted before, so warning (orange ground)
+      // keeps MUI's own 2.55:1 there; every other colour clears 3:1.
+      const floor = color === "warning" ? 2.5 : 3;
+      expect(ratio(over(paint, ground), [ground[0], ground[1], ground[2]])).toBeGreaterThanOrEqual(floor);
+      cleanup();
+    }
+  });
+});

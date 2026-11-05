@@ -257,5 +257,8 @@ describe('Chip (native)', () => {
     expect(screen.getByTestId('s-label').style.color).toBe(paint(dark.palette.danger.light));
     expect(chipPaint(dark, 'soft', 'danger', false).label.color).toBe(dark.palette.danger.light);
     expect(chipPaint(theme, 'soft', 'danger', false).label.color).toBe(theme.palette.danger.dark);
+    // The delete glyph is the full ink in both modes, as on the web.
+    expect(chipPaint(dark, 'soft', 'danger', false).deleteColor).toBe(dark.palette.danger.light);
+    expect(chipPaint(theme, 'soft', 'danger', false).deleteColor).toBe(theme.palette.danger.dark);
   });
 });

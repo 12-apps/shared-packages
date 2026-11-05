@@ -70,7 +70,7 @@ function softPaint(theme: UiTheme, color: ChipColor): ChipPaint {
     container: { backgroundColor: alpha(accent.main, SOFT_GROUND_ALPHA) },
     pressed: { backgroundColor: alpha(accent.main, SOFT_HOVER_ALPHA) },
     label: { color: ink, fontWeight: '600' },
-    deleteColor: alpha(ink, DELETE_ICON_ALPHA),
+    deleteColor: ink,
   };
 }
 

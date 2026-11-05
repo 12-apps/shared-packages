@@ -10,8 +10,10 @@ import {
   CHIP_SIZES,
   CHIP_TRANSITION_EASING,
   CHIP_TRANSITION_MS,
+  DELETE_ICON_ON_COLOR_ALPHA,
   HOVER_LIFT_PX,
   HOVER_SHADOW,
+  SOFT_FOCUS_RING,
   SOFT_GROUND_ALPHA,
   SOFT_HOVER_ALPHA,
 } from './Chip.metrics';
@@ -99,20 +101,39 @@ const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
     // A state is read at a glance: the label is set semibold.
     fontWeight: 600,
     '& .MuiChip-icon': { color: ink },
-    // MUI paints the glyph in `contrastText` at 0.7 (near-black on a dark ground).
-    '& .MuiChip-deleteIcon': { color: ink, '&:hover': { color: ink } },
     '&.MuiChip-clickable:hover': {
       backgroundColor: (theme: Theme) => (key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : theme.palette.action.hover),
     },
-    // MUI's filled focus ground is the colour's `dark` step, which the dark-mode
-    // ink (`light`) does not clear 4.5:1 on. Dark mode keeps the tint instead;
-    // light mode keeps MUI's ground.
-    '&.Mui-focusVisible': {
-      backgroundColor: (theme: Theme) =>
-        theme.palette.mode === 'dark' && key ? alpha(theme.palette[key].main, SOFT_HOVER_ALPHA) : undefined,
-    },
+    // `neutral` keeps MUI's glyph and focus exactly as they were.
+    ...(key ? (accentedStates(key, ink) as object) : {}),
   };
 };
+
+/**
+ * What only an accented soft chip changes (FUT-4442). MUI paints the delete glyph in
+ * `contrastText` at 0.7, near-black on a dark ground, so the glyph takes the ink.
+ * Focus: dark mode keeps the resting ground (MUI's `dark` step would sink the light
+ * ink below 4.5:1) and draws a ring in the ink; light mode keeps MUI's focus ground,
+ * where the glyph goes back to what MUI painted, so it stays visible on it.
+ */
+const accentedStates = (
+  key: Exclude<ReturnType<typeof paletteKey>, null>,
+  ink: (theme: Theme) => string,
+): SxProps<Theme> => ({
+  '& .MuiChip-deleteIcon': { color: ink, '&:hover': { color: ink } },
+  '&.Mui-focusVisible': {
+    backgroundColor: (theme: Theme) =>
+      theme.palette.mode === 'dark' ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : undefined,
+    outlineStyle: (theme: Theme) => (theme.palette.mode === 'dark' ? 'solid' : undefined),
+    outlineWidth: (theme: Theme) => (theme.palette.mode === 'dark' ? rem(theme, SOFT_FOCUS_RING.width) : undefined),
+    outlineColor: (theme: Theme) => (theme.palette.mode === 'dark' ? ink(theme) : undefined),
+    outlineOffset: (theme: Theme) => (theme.palette.mode === 'dark' ? rem(theme, SOFT_FOCUS_RING.offset) : undefined),
+    '& .MuiChip-deleteIcon': {
+      color: (theme: Theme) =>
+        theme.palette.mode === 'dark' ? ink(theme) : alpha(theme.palette[key].contrastText, DELETE_ICON_ON_COLOR_ALPHA),
+    },
+  },
+});
 
 export const chipStyles = ({
   variant,
