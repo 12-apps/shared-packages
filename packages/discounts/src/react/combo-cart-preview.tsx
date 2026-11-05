@@ -40,7 +40,7 @@ const FORM_SHARE = 3 / 5;
  * squeezed it into a select would trade a control the operator already knows
  * for a box of text — the preview has room only when nothing else pays for it.
  */
-export const PREVIEW_ASIDE_MIN_PX = Math.ceil(KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX);
+const PREVIEW_ASIDE_MIN_PX = Math.ceil(KIND_TOGGLE_MIN_PX / FORM_SHARE + ASIDE_GAP_PX);
 
 /** What the preview reads that is not a form value. */
 interface PreviewInputs {

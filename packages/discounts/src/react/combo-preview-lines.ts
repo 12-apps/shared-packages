@@ -23,7 +23,7 @@ import type { DiscountsFormatters } from "./format";
  */
 export type ComboPreviewLayout = "inline" | "aside";
 
-export interface ComboPreviewLines {
+interface ComboPreviewLines {
   items: string;
   /** What the buyer pays; null while the reward's value is not typed. */
   pays: string | null;

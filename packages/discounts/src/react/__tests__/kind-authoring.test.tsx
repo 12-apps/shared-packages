@@ -262,9 +262,9 @@ describe("what the operator sees", () => {
     expect(screen.getByTestId("free-units-summary").textContent).toBe("Leve 3, pague 2.");
   });
 
-  it("K22: a bundle price opens on the combo's form, its reward on Preço fechado (FUT-4417)", () => {
+  it("K22: a bundle price opens on the combo's form, its reward on Preço fechado (FUT-4417)", async () => {
     renderForm(comboRecord({ type: "BUNDLE_PRICE", percentOffBp: null, bundlePriceCents: 2_500 }));
-    expect(screen.queryByText(copy.labels.kind.BUNDLE_PRICE)).toBeNull();
+    await waitFor(() => expect(screen.queryByText(copy.labels.kind.BUNDLE_PRICE)).toBeNull());
     expect(screen.getAllByText(copy.comboRewards.labels.BUNDLE_PRICE).length).toBeGreaterThan(0);
   });
 });

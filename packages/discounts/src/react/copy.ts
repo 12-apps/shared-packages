@@ -107,13 +107,7 @@ export interface DiscountsWindowCopy {
 export interface DiscountsFormCopy {
   readonly createTitle: string;
   readonly editTitle: string;
-  /**
-   * The create/edit modal's ✕ and back arrow (FUT-4417): each carries a glyph
-   * only, so each needs an accessible name. The back arrow shows when the
-   * modal opens over another stacked panel.
-   */
-  readonly dialogClose: string;
-  readonly dialogBack: string;
+  readonly dialog: { readonly close: string; readonly back: string };
   readonly submitCreate: string;
   readonly submitEdit: string;
   readonly name: string;
@@ -122,7 +116,6 @@ export interface DiscountsFormCopy {
   readonly kind: string;
   /** The combo reward's label; its choices and hints are `comboRewards` (FUT-4417). */
   readonly comboReward: string;
-  /** Under the percentage reward — the same sentence as `comboRewards.hints.PERCENTAGE`. */
   readonly comboRewardHint: string;
   readonly percentOff: string;
   /** The example inside the empty percentage input. */

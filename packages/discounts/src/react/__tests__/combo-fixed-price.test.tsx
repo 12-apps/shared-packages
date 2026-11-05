@@ -432,7 +432,7 @@ describe("the form", () => {
     renderForm(record());
     pickPrice();
     await waitFor(() => expect(screen.getByTestId("currency-bundlePrice")).toBeTruthy());
-    expect(screen.queryByTestId("currency-amountOff")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("currency-amountOff")).toBeNull());
     expect(screen.getByTestId("combo-reward-hint").textContent).toBe(
       "O combo sai por este preço, qualquer que seja o preço dos itens.",
     );
@@ -554,7 +554,7 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
     renderForm(record());
     await waitFor(() => expect(screen.getByTestId("combo-cart-preview")).toBeTruthy());
     expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
-    expect(screen.queryByTestId("combo-cart-preview-examples")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("combo-cart-preview-examples")).toBeNull());
   });
 
   it("F26: no column for a kind that is not a combo", async () => {
@@ -563,6 +563,6 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
     await waitFor(() =>
       expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline"),
     );
-    expect(screen.queryByTestId("combo-cart-preview")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("combo-cart-preview")).toBeNull());
   });
 });

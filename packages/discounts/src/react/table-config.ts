@@ -55,7 +55,7 @@ function labelled(labels: Readonly<Record<string, string>>, value: string): stri
 }
 
 /** The Nome column's floor, in design px (the grid converts it through the type scale). */
-export const NAME_COLUMN_MIN_PX = 200;
+const NAME_COLUMN_MIN_PX = 200;
 
 export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<DiscountListItem>[] {
   return [

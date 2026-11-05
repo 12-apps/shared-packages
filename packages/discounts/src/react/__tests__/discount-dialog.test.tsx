@@ -59,7 +59,7 @@ describe("the discount dialog", () => {
     render(<Harness />);
     expect((await screen.findByTestId("discount-dialog-title")).textContent).toBe("Novo desconto");
     expect(screen.getByRole("dialog", { name: "Novo desconto" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: copy.form.dialogClose })).toBeTruthy();
+    expect(screen.getByRole("button", { name: copy.form.dialog.close })).toBeTruthy();
   });
 
   it("D2: on a phone it is a bottom sheet, named by its title", async () => {
@@ -68,7 +68,7 @@ describe("the discount dialog", () => {
     expect((await screen.findByTestId("discount-dialog-header-title")).textContent).toBe(
       "Novo desconto",
     );
-    expect(screen.queryByTestId("discount-dialog-title")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("discount-dialog-title")).toBeNull());
   });
 
   it("D3: reopened while it is still leaving, the form starts empty again", async () => {

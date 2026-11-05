@@ -22,6 +22,9 @@ import type { DiscountsWebCopy } from "./copy";
  * out, while the closing body is still mounted (hence the key per opening).
  * The body stays mounted while it leaves, so the panel does not slide out
  * empty. The submit stays in the form: it acts on the fields above it.
+ *
+ * `copy.form.dialog` names the ✕ and the back arrow, which carry a glyph only;
+ * the arrow shows when the modal opens over another stacked panel.
  */
 export function DiscountDialog({
   open,
@@ -48,8 +51,8 @@ export function DiscountDialog({
       onClose={onClose}
       title={title}
       size="wide"
-      closeLabel={copy.form.dialogClose}
-      backLabel={copy.form.dialogBack}
+      closeLabel={copy.form.dialog.close}
+      backLabel={copy.form.dialog.back}
       dataTestId="discount-dialog"
     >
       {/* `clip`, not `hidden`: a checked switch's hit area reaches 24 px past

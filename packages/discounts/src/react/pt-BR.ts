@@ -130,8 +130,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   form: {
     createTitle: "Novo desconto",
     editTitle: "Editar desconto",
-    dialogClose: PT_BR_UI_LABELS.common.close,
-    dialogBack: "Voltar",
+    dialog: { close: PT_BR_UI_LABELS.common.close, back: "Voltar" },
     submitCreate: "Criar desconto",
     submitEdit: "Salvar alterações",
     name: "Nome da promoção",
