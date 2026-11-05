@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
+import { FreeUnitsBuilder } from "../free-units-builder";
 import { createFormatters } from "../format";
 import {
   comboRewardOf,
@@ -345,19 +346,26 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
   });
 
   it("K28: picking a product afterwards clears it", async () => {
-    renderForm(null);
-    await pickFreeUnits();
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    await screen.findByTestId(message);
-    const input = within(screen.getByTestId("free-units-items")).getByRole("combobox");
-    await act(async () => {
-      // eslint-disable-next-line test-flakiness/no-focus-check, test-flakiness/await-async-events -- a real focus, as the browser's pick keeps on the input
-      input.focus();
-    });
-    fireEvent.change(input, { target: { value: "Batata" } });
-    const option = within(await screen.findByRole("listbox")).getAllByRole("option")[0] as HTMLElement;
-    fireEvent.mouseDown(option);
-    fireEvent.click(option);
+    // The rule lives in the builder: the line shows while the list is empty AND
+    // the submit refused it. Rendered here rather than through the whole form
+    // and the picker's open list, which pushed this case past vitest's 5 s on
+    // a loaded runner and reddened main (FUT-4470); the form-level halves are
+    // K27 (refusal shows it) and K31 (a kind switch clears the refusal).
+    const props = {
+      groups: STORY_GROUPS,
+      copy,
+      freeUnits: "1",
+      error: undefined,
+      targetRefused: true,
+      onChange: () => {},
+      onFreeUnitsChange: () => {},
+    };
+    const empty = [{ menuItemIds: [], categoryIds: [], quantity: 3 }];
+    const picked = [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }];
+    const { rerender } = render(<FreeUnitsBuilder {...props} slots={empty} />);
+    expect(screen.getByTestId(message)).toBeTruthy();
+
+    rerender(<FreeUnitsBuilder {...props} slots={picked} />);
     await waitFor(() => {
       expect(screen.queryByTestId(message)).toBeNull();
     });
