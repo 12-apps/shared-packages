@@ -6,7 +6,7 @@
  * knows whether any checkout screen will be drawn, so the answer must not
  * reach one. Everything here is plain functions over `sessionStorage` and
  * the URL, plus the basket signature a parked order is matched against; the
- * module graph is pinned by `__tests__/hosted-return-entry.test.ts`, which
+ * module graph is pinned by `__tests__/narrow-entries.test.ts`, which
  * fails if it ever reaches React, MUI or a component file.
  */
 export {
