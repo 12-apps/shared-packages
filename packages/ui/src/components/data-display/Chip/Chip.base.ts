@@ -11,8 +11,9 @@ import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
  */
 /**
  * `soft` is a status chip's look: the colour's tint for a ground and, for ink,
- * its dark step in light mode and its light step in dark mode (4.5:1 on the
- * tint either way), so a row of states reads without a row of solid blocks.
+ * its dark step in light mode (warning's darkened a step further) and its light
+ * step in dark mode (4.5:1 on the tint either way), so a row of states reads
+ * without a row of solid blocks.
  */
 export type ChipVariant = 'filled' | 'outlined' | 'soft';
 
