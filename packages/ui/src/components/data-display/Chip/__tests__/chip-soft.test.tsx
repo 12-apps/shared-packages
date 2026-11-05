@@ -170,12 +170,13 @@ describe("Chip variant soft in dark mode", () => {
 /** A hex or `rgb()` colour as the DOM resolves it. */
 function rgbOf(colour: string): string {
   if (colour.startsWith("rgb")) return colour.replace(/,(?=\S)/gu, ", ");
-  const n = parseInt(colour.slice(1), 16);
+  const hex = colour.length === 4 ? [...colour.slice(1)].map((c) => c + c).join("") : colour.slice(1);
+  const n = parseInt(hex, 16);
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 }
 
-describe("Chip variant soft, focused, in light mode", () => {
-  it("keeps MUI's focus ground and paints the glyph in contrastText at 0.7 on it", () => {
+describe("Chip variant soft, focused, in light mode (FUT-4461)", () => {
+  it("keeps the resting ground, a readable label and a ring in the ink", () => {
     const light = createTheme();
     for (const color of COLOURS) {
       render(
@@ -185,19 +186,19 @@ describe("Chip variant soft, focused, in light mode", () => {
       );
       const chip = screen.getByTestId(`l-${color}`);
       const glyph = screen.getByTestId(`l-${color}-delete`);
-      const resting = getComputedStyle(glyph).color;
-      expect(resting).toBe(rgbOf(light.palette[color === "danger" ? "error" : color].dark));
+      const rest = getComputedStyle(chip).backgroundColor;
       chip.classList.add("Mui-focusVisible");
-      const key = color === "danger" ? "error" : color;
-      expect(getComputedStyle(chip).backgroundColor).toBe(rgbOf(light.palette[key].dark)); // MUI's focus ground
-      expect(getComputedStyle(chip).outlineStyle).not.toBe("solid");
-      const ground = parse(getComputedStyle(chip).backgroundColor);
-      const paint = parse(getComputedStyle(glyph).color);
-      expect(paint[3]).toBeCloseTo(0.7, 2);
-      // The glyph is what the filled chip painted before, so warning (orange ground)
-      // keeps MUI's own 2.55:1 there; every other colour clears 3:1.
-      const floor = color === "warning" ? 2.5 : 3;
-      expect(ratio(over(paint, ground), [ground[0], ground[1], ground[2]])).toBeGreaterThanOrEqual(floor);
+      const style = getComputedStyle(chip);
+      expect(style.backgroundColor).toBe(rest);
+      expect(style.outlineStyle).toBe("solid");
+      expect(style.outlineWidth).toBe("0.125rem");
+      expect(style.outlineOffset).toBe("0.125rem");
+      expect(style.outlineColor).toBe(style.color);
+      const page = parse(light.palette.background.paper);
+      const ground = over(parse(style.backgroundColor), page);
+      const g = [ground[0], ground[1], ground[2]] as const;
+      expect(ratio(over(parse(style.color), g), g)).toBeGreaterThanOrEqual(3);
+      expect(ratio(over(parse(getComputedStyle(glyph).color), g), g)).toBeGreaterThanOrEqual(3);
       cleanup();
     }
   });

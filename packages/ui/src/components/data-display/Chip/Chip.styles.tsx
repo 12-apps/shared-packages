@@ -10,7 +10,6 @@ import {
   CHIP_SIZES,
   CHIP_TRANSITION_EASING,
   CHIP_TRANSITION_MS,
-  DELETE_ICON_ON_COLOR_ALPHA,
   HOVER_LIFT_PX,
   HOVER_SHADOW,
   SOFT_FOCUS_RING,
@@ -110,11 +109,11 @@ const softStyles = (color: NonNullable<ChipProps['color']>): SxProps<Theme> => {
 };
 
 /**
- * What only an accented soft chip changes (FUT-4442). MUI paints the delete glyph in
- * `contrastText` at 0.7, near-black on a dark ground, so the glyph takes the ink.
- * Focus: dark mode keeps the resting ground (MUI's `dark` step would sink the light
- * ink below 4.5:1) and draws a ring in the ink; light mode keeps MUI's focus ground,
- * where the glyph goes back to what MUI painted, so it stays visible on it.
+ * What only an accented soft chip changes (FUT-4442, FUT-4461). MUI paints the
+ * delete glyph in `contrastText` at 0.7, near-black on a dark ground, so the glyph
+ * takes the ink. Focus, in both modes: the chip keeps its resting ground (MUI's
+ * `dark` step puts the ink at about 1:1 in light mode and sinks the light ink in
+ * dark mode) and draws a ring in the ink, so focus shows without the ground.
  */
 const accentedStates = (
   key: Exclude<ReturnType<typeof paletteKey>, null>,
@@ -122,16 +121,11 @@ const accentedStates = (
 ): SxProps<Theme> => ({
   '& .MuiChip-deleteIcon': { color: ink, '&:hover': { color: ink } },
   '&.Mui-focusVisible': {
-    backgroundColor: (theme: Theme) =>
-      theme.palette.mode === 'dark' ? alpha(theme.palette[key].main, SOFT_GROUND_ALPHA) : undefined,
-    outlineStyle: (theme: Theme) => (theme.palette.mode === 'dark' ? 'solid' : undefined),
-    outlineWidth: (theme: Theme) => (theme.palette.mode === 'dark' ? rem(theme, SOFT_FOCUS_RING.width) : undefined),
-    outlineColor: (theme: Theme) => (theme.palette.mode === 'dark' ? ink(theme) : undefined),
-    outlineOffset: (theme: Theme) => (theme.palette.mode === 'dark' ? rem(theme, SOFT_FOCUS_RING.offset) : undefined),
-    '& .MuiChip-deleteIcon': {
-      color: (theme: Theme) =>
-        theme.palette.mode === 'dark' ? ink(theme) : alpha(theme.palette[key].contrastText, DELETE_ICON_ON_COLOR_ALPHA),
-    },
+    backgroundColor: (theme: Theme) => alpha(theme.palette[key].main, SOFT_GROUND_ALPHA),
+    outlineStyle: 'solid',
+    outlineWidth: (theme: Theme) => rem(theme, SOFT_FOCUS_RING.width),
+    outlineColor: ink,
+    outlineOffset: (theme: Theme) => rem(theme, SOFT_FOCUS_RING.offset),
   },
 });
 
