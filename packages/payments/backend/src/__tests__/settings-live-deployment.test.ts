@@ -5,7 +5,7 @@ import { createSettingsService } from '../config/service';
 import type { StoredProviderConfig } from '../config/types';
 import { refusesSimulatedSandbox } from '../core/live-deployment';
 import { defineProviders } from '../core/registry';
-import type { PaymentEnvironment } from '../core/types';
+import type { MerchantRef, PaymentEnvironment } from '../core/types';
 import { createMemoryProviderConfigStore } from '../memory';
 import { infinitePayProvider } from '../providers/infinitepay';
 import { pagbankProvider } from '../providers/pagbank';
@@ -32,14 +32,14 @@ function provenRow(provider: string, environment: PaymentEnvironment, priority: 
   };
 }
 
-async function world(processEnv: Record<string, string | undefined>, rows: StoredProviderConfig[]) {
+async function world(processEnv: Record<string, string | undefined>, rows: StoredProviderConfig[], merchant: MerchantRef = TENANT) {
   const store = createMemoryProviderConfigStore();
-  for (const row of rows) await store.save(TENANT, row);
+  for (const row of rows) await store.save(merchant, row);
   const providers = defineProviders({
     pagbank: pagbankProvider(PT_BR_PAGBANK_COPY),
     infinitepay: infinitePayProvider(PT_BR_INFINITEPAY_COPY),
   } as const);
-  return createSettingsService(providers, store, { liveDeployment: processEnv });
+  return createSettingsService(providers, store, { liveDeployment: processEnv, allowStubMode: true });
 }
 
 const LIVE = { PAYMENTS_LIVE_DEPLOYMENT: '1' };
@@ -94,6 +94,26 @@ describe('the settings view on a LIVE deployment', () => {
     expect((await settings.applyChargeVerification(TENANT, 'pagbank', true)).sandboxRefused).toBe(true);
     const saved = await settings.saveCredentials(TENANT, 'pagbank', { environment: 'SANDBOX', fields: { token: 'new-sandbox' } });
     expect(saved.sandboxRefused).toBe(true);
+  });
+});
+
+describe('what else the live rule reaches', () => {
+  it('carries the flag on the config the credential probe returns', async () => {
+    const settings = await world(LIVE, [{ ...provenRow('pagbank', 'SANDBOX', 0), stub: true }]);
+
+    const verified = await settings.verify(TENANT, 'pagbank');
+
+    expect(verified.sandboxRefused).toBe(true);
+  });
+
+  it('leaves the platform\'s own billing account alone: no flag, and its sandbox heads its chain', async () => {
+    const platform: MerchantRef = { kind: 'PLATFORM', id: 'platform' };
+    const settings = await world(LIVE, [provenRow('pagbank', 'SANDBOX', 0)], platform);
+
+    const view = await settings.getSettings(platform);
+
+    expect(view.configs[0]).not.toHaveProperty('sandboxRefused');
+    expect(view.activeProvider).toBe('pagbank');
   });
 });
 

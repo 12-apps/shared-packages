@@ -183,12 +183,12 @@ host, which finds them structurally under `backend/prisma/migrations/`.
 - **A sandbox connection takes no money on a live deployment**: wrap the
   credential store with `liveOnlyCredentials(store, process.env, providers)`.
   While `PAYMENTS_LIVE_DEPLOYMENT=1`, every connection whose routed credentials
-  are SANDBOX on an adapter declaring `simulatedSandbox` (PagBank, Itaú, Stripe:
-  their sandbox moves no money) leaves `providerChain` and `defaultProvider`, so the
+  are SANDBOX on an adapter declaring `simulatedSandbox` (PagBank, Itaú: their
+  sandbox moves no money) leaves `providerChain` and `defaultProvider`, so the
   buyer config carries no method from it and the charge walk never reaches it;
   a store whose every connection is such a sandbox reads as one with none
   connected. A provider with one host for both modes, or whose key picks test
-  or live with no stored environment behind it (InfinitePay, Stone), is never
+  or live with no stored environment behind it (InfinitePay, Stone, Stripe), is never
   dropped: a row stored as SANDBOX there can take real money. The settings
   view says the same: `sandboxRefused` on each such masked config (pass
   `liveDeployment: process.env` to `createSettingsService`). A credential read that throws anything

@@ -131,8 +131,7 @@ export interface PaymentProviderAdapterBase {
   readonly minimumChargeCents?: number;
   /**
    * Its SANDBOX environment is the provider's own simulator: a charge there
-   * moves no money (PagBank's and Itaú's sandbox hosts, Stripe's `sk_test_`
-   * keys, which its SANDBOX row holds). A provider that
+   * moves no money (PagBank's and Itaú's sandbox hosts). A provider that
    * routes by its KEY, or has one host for both, leaves it out, because a row
    * stored as SANDBOX can still be taking real money. Only a declaring
    * adapter's SANDBOX connection leaves a live deployment's routing

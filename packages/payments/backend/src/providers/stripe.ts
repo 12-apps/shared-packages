@@ -228,7 +228,6 @@ export function stripeProvider(source: PaymentsCopySource<StripeCopy>): PaymentP
     name: NAME,
     displayName: 'Stripe',
     authMode: 'oauth',
-    simulatedSandbox: true, // a SANDBOX row holds an sk_test_ key: Stripe's test mode moves no money (FUT-4432)
     capabilities: {
       methods: ['PIX', 'CARD', 'BOLETO'],
       savedCards: true,

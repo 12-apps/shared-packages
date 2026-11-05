@@ -127,17 +127,28 @@ export function liveOnlyCredentials(
   processEnv: LiveDeploymentEnv,
   providers: ProviderRegistry,
 ): CredentialStore {
-  const live = (): boolean => readLiveDeployment(processEnv);
+  const live = (merchant: MerchantRef): boolean => refusesFor(merchant, processEnv);
   const providerChain = async (merchant: MerchantRef): Promise<ProviderName[]> => {
     const chain = await inner.providerChain(merchant);
-    return live() ? withoutSimulatedSandboxes(inner, providers, merchant, chain) : chain;
+    return live(merchant) ? withoutSimulatedSandboxes(inner, providers, merchant, chain) : chain;
   };
   return {
     ...inner,
     providerChain,
     defaultProvider: async (merchant) => {
-      if (!live()) return inner.defaultProvider(merchant);
+      if (!live(merchant)) return inner.defaultProvider(merchant);
       return (await providerChain(merchant))[0] ?? null;
     },
   };
+}
+
+/**
+ * Whether the live rule applies to this merchant: the deployment is live AND
+ * the merchant is a STORE. The platform's own account (`kind: 'PLATFORM'`,
+ * what subscription billing charges through) is left alone — which environment
+ * it bills in is the platform's explicit decision, not a store's leftover
+ * default, and refusing it would stop collection rather than protect a buyer.
+ */
+export function refusesFor(merchant: MerchantRef, processEnv: LiveDeploymentEnv | undefined): boolean {
+  return merchant.kind === 'TENANT' && readLiveDeployment(processEnv ?? {});
 }

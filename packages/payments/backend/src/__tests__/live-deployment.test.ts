@@ -7,7 +7,7 @@ import { liveOnlyCredentials, readLiveDeployment, type LiveDeploymentEnv } from 
 import type { PaymentProviderAdapter } from '../core/provider';
 import { defineProviders, type ProviderRegistry } from '../core/registry';
 import type { CredentialStore } from '../core/credential-store';
-import type { PaymentEnvironment, ResolvedCredentials } from '../core/types';
+import type { MerchantRef, PaymentEnvironment, ResolvedCredentials } from '../core/types';
 import { createMemoryAttemptLedger, createMemoryChargeStore, createMemoryCredentialStore } from '../memory';
 import { createMemoryWebhookInbox } from '../memory-webhook-inbox';
 import { infinitePayProvider } from '../providers/infinitepay';
@@ -116,6 +116,13 @@ function allSandbox(names: readonly string[]): CredentialStore {
   return store;
 }
 
+/** A memory store holding one SANDBOX `alpha` connection for `merchant`. */
+function sandboxFor(merchant: MerchantRef): CredentialStore {
+  const store = createMemoryCredentialStore();
+  store.set(merchant, 'alpha', creds('SANDBOX'));
+  return store;
+}
+
 const simulatedRegistry = (): ProviderRegistry => defineProviders({ alpha: adapter('alpha', [], true) });
 
 describe('readLiveDeployment', () => {
@@ -218,12 +225,23 @@ describe('the shipped adapters, each stored as SANDBOX, on a LIVE deployment', (
     pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY),
   });
 
-  it('drops PagBank, Itaú and Stripe, whose sandbox is a simulator, and keeps every other one', async () => {
+  it('drops PagBank and Itaú, whose sandbox is a simulator, and keeps every other one', async () => {
     const registry = shipped();
 
     const chain = await liveOnlyCredentials(allSandbox(registry.names), LIVE, registry).providerChain(TENANT);
 
-    expect(chain).toEqual(['infinitepay', 'stone', 'pixmanual']);
+    expect(chain).toEqual(['infinitepay', 'stone', 'stripe', 'pixmanual']);
+  });
+});
+
+describe('the platform\'s own account on a LIVE deployment', () => {
+  it('keeps its sandbox in routing: which environment it bills in is the platform\'s call', async () => {
+    const platform = { kind: 'PLATFORM', id: 'platform' } as const;
+
+    const routing = liveOnlyCredentials(sandboxFor(platform), LIVE, simulatedRegistry());
+
+    expect(await routing.providerChain(platform)).toEqual(['alpha']);
+    expect(await routing.defaultProvider(platform)).toBe('alpha');
   });
 });
 
