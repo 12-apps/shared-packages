@@ -4,14 +4,14 @@
  * says it is a wait that is nobody's fault, such as the device being offline;
  * then it reads in the secondary ink, at 4.5:1 or better on the paper.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { cleanup, screen, waitFor } from "@testing-library/react";
-import { createTheme } from "@mui/material/styles";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 
 import { ListBar } from "../list/list-bar";
-import type { CheckoutListHold } from "../list/types";
-import { SAVED_VISA, onPageStore, renderList, stubClient } from "./list-harness";
+import type { CheckoutDoorOption, CheckoutListHold } from "../list/types";
+import { SAVED_VISA, listFlow, onPageStore, renderList, stubClient } from "./list-harness";
 import { render } from "./test-utils";
 
 afterEach(cleanup);
@@ -76,5 +76,48 @@ describe("the host hold's tone", () => {
       </ListBar>,
     );
     expect(getComputedStyle(screen.getByTestId("list-blocked-reason")).color).toBe(computed(ink));
+  });
+
+  it("a neutral hold stays danger where the reason drawn is not the hold's: a door option's error (list-face)", async () => {
+    const door: CheckoutDoorOption = { id: "cash", label: "Dinheiro", action: "Enviar pedido", blocked: null, error: "Não deu para enviar o pedido.", onSend: vi.fn() };
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { door: [door], hold: { action: "Sem conexão", reason: "Sem conexão.", tone: "neutral" } },
+    });
+    await screen.findByTestId("payment-list");
+    fireEvent.click(screen.getByTestId("list-door-cash-radio"));
+    await waitFor(() => expect(screen.getByTestId("list-blocked-reason").textContent).toBe("Não deu para enviar o pedido."));
+    expect(getComputedStyle(screen.getByTestId("list-blocked-reason")).color).toBe(computed(THEME.palette.error.main));
+  });
+
+  it("the PIX face draws a neutral hold in the secondary ink (list-pix)", async () => {
+    const host = { config: onPageStore({ methods: ["PIX"] }), client: stubClient([]) };
+    const { rerender } = renderList(host);
+    await screen.findByTestId("payment-list");
+    fireEvent.click(screen.getByTestId("list-option-PIX-radio"));
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await screen.findByTestId("list-pix");
+    rerender(listFlow({ ...host, list: { hold: { action: "Aguardando a internet", reason: "Sem conexão. O pagamento volta quando a internet voltar.", tone: "neutral" } } }));
+    const reason = await waitFor(() => screen.getByTestId("list-blocked-reason"));
+    expect(screen.getByTestId("list-pix")).toBeTruthy();
+    expect(getComputedStyle(reason).color).toBe(computed(THEME.palette.text.secondary));
+  });
+});
+
+describe("the neutral reason in a dark theme", () => {
+  const DARK = createTheme({ palette: { mode: "dark" } });
+
+  it("reads in the dark theme's secondary ink at 4.5:1 or better on its paper", () => {
+    render(
+      <ThemeProvider theme={DARK}>
+        <ListBar reason="Sem conexão." reasonTone="neutral">
+          <button type="button">Copiar código</button>
+        </ListBar>
+      </ThemeProvider>,
+    );
+    const ink = getComputedStyle(screen.getByTestId("list-blocked-reason")).color;
+    expect(ink).toBe(computed(DARK.palette.text.secondary));
+    expect(contrastOver(ink, DARK.palette.background.paper)).toBeGreaterThanOrEqual(4.5);
   });
 });

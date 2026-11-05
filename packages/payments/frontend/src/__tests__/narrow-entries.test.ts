@@ -18,14 +18,22 @@ import * as taxId from "../tax-id";
  * The narrow entries a host imports on its first paint (FUT-1055):
  * `hosted-return`, `live` and `tax-id`. None may reach a checkout screen.
  *
- * Each case walks the entry's module graph, following relative imports
- * (`import type` included: harmless at runtime, but a type file that grows a
- * value import would join the graph unseen otherwise), and pins it twice: no
- * component file but the ones named, no package but the ones named, and the
- * exact file list, so a file joining the graph is a decision rather than a drift.
+ * Each case walks the entry's module graph through every import form a
+ * file can take: `import … from`, `export … from`, a side-effect
+ * `import "…"`, and a dynamic `import("…")` (a lazy screen is still one a host
+ * fetches through this entry). `import type` is followed too: harmless at run
+ * time, but a type file that grows a value import would join the graph unseen
+ * otherwise. Each graph is pinned twice: no component file and no package but
+ * the ones named, and the exact file list, so a file joining the graph is a
+ * decision rather than a drift. The walk's own spellings are pinned below.
  */
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const IMPORT = /(?:^|\n)\s*(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/g;
+/** `import|export … from "x"`, a side-effect `import "x"`, and a dynamic `import("x")`. */
+const IMPORT_FORMS = [
+  /(?:^|[\n;])\s*(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/g,
+  /(?:^|[\n;])\s*import\s+["']([^"']+)["']/g,
+  /\bimport\(\s*["']([^"']+)["']\s*\)/g,
+];
 
 function resolve(from: string, spec: string): string {
   const base = path.resolve(path.dirname(from), spec);
@@ -40,9 +48,14 @@ function resolve(from: string, spec: string): string {
   throw new Error(`cannot resolve ${spec} from ${from}`);
 }
 
-/** The specifiers one file imports or re-exports from. */
+/** The specifiers a source text imports, re-exports, imports for effect or imports lazily. */
+function specifiersIn(text: string): string[] {
+  return IMPORT_FORMS.flatMap((form) => [...text.matchAll(form)].map((match) => match[1] as string));
+}
+
+/** The specifiers one file reaches. */
 function importsOf(file: string): string[] {
-  return [...readFileSync(file, "utf8").matchAll(IMPORT)].map((match) => match[1] as string);
+  return specifiersIn(readFileSync(file, "utf8"));
 }
 
 /** Every file reachable from `from` through relative imports, and every package specifier met on the way. */
@@ -120,6 +133,23 @@ describe.each(ENTRIES)("@12-apps/payments-frontend/$entry", ({ entry, components
 
   it("is these files and no more", () => {
     expect(graph(entry).files).toEqual([...files]);
+  });
+});
+
+describe("the walk sees every import form (code review B1)", () => {
+  it.each([
+    ['import { a } from "../x";', "../x"],
+    ['export { a } from "../x";', "../x"],
+    ['import type { A } from "../x";', "../x"],
+    ['import "../components/checkout/checkout-flow";', "../components/checkout/checkout-flow"],
+    ['const flow = () => import("../components/checkout/checkout-flow");', "../components/checkout/checkout-flow"],
+    ["const flow = () => import( '../x' );", "../x"],
+  ])("%s", (text, specifier) => {
+    expect(specifiersIn(text)).toEqual([specifier]);
+  });
+
+  it("does not read a word that merely contains import", () => {
+    expect(specifiersIn('const reimport = "../x"; // importing nothing')).toEqual([]);
   });
 });
 
