@@ -67,6 +67,10 @@ describe("holderPrefill", () => {
   it("is the stored name, trimmed, in its own case", () => {
     expect(holderPrefill("  Ana Teste ")).toBe("Ana Teste");
     expect(holderPrefill("joão d'ávila-souza")).toBe("joão d'ávila-souza");
+    // The typographic apostrophe a phone keyboard types.
+    expect(holderPrefill("Ana D\u2019Ávila")).toBe("Ana D\u2019Ávila");
+    // Stored decomposed (NFD), the 30-letter name still fits once composed.
+    expect(holderPrefill("João Aparecida dos Santos Oli".normalize("NFD"))).toBe("João Aparecida dos Santos Oli");
   });
 
   it("is empty with no name, or one too short to be a holder's", () => {

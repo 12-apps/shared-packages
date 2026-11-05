@@ -124,7 +124,6 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
         'Não foi possível concluir o pagamento com o Google Pay. Tente novamente ou pague com cartão.',
       buttonLocale: 'pt',
     },
-    orPayWithCard: 'ou pague com cartão',
   },
   hosted: {
     destinationNamed: (displayName) => `à página de pagamento da ${displayName}`,

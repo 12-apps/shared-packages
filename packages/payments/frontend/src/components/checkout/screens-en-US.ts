@@ -135,7 +135,6 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
       // language subtag, not a full BCP-47 tag.
       buttonLocale: 'en',
     },
-    orPayWithCard: 'or pay by card',
   },
   hosted: {
     // Five fragments the screen composes into one sentence, so each keeps its

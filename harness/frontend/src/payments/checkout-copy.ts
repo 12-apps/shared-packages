@@ -272,7 +272,6 @@ export const HARNESS_CHECKOUT_COPY: CheckoutCopyFE = {
               'O pagamento pelo Google Pay não foi concluído. Tente de novo ou pague com cartão.',
             buttonLocale: 'pt',
           },
-          orPayWithCard: 'ou use o cartão',
         },
         hosted: {
           destinationNamed: (displayName) => `para a página de pagamento da ${displayName}`,

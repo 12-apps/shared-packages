@@ -19,8 +19,8 @@ const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
  * is 30 characters; a longer account name is left for the buyer to shorten.
  */
 const HOLDER_PREFILL_MAX = 30;
-/** Letters (any script), spaces and the punctuation a printed name carries. */
-const HOLDER_PREFILL_CHARACTERS = /^[\p{L}\p{M}' .-]+$/u;
+/** Letters (any script), spaces and the punctuation a printed name carries, typographic apostrophe included. */
+const HOLDER_PREFILL_CHARACTERS = /^[\p{L}\p{M}'\u2019 .-]+$/u;
 
 /**
  * The card holder's name as the new card opens with it (FUT-3811): the
@@ -28,7 +28,8 @@ const HOLDER_PREFILL_CHARACTERS = /^[\p{L}\p{M}' .-]+$/u;
  * there is no name, or one a provider would refuse as a card holder's.
  */
 export function holderPrefill(name: string | undefined): string {
-  const trimmed = name?.trim() ?? "";
+  // NFC first, so a name stored decomposed counts each accented letter once.
+  const trimmed = name?.normalize("NFC").trim() ?? "";
   if (trimmed.length < 2 || trimmed.length > HOLDER_PREFILL_MAX) return "";
   return HOLDER_PREFILL_CHARACTERS.test(trimmed) ? trimmed : "";
 }
