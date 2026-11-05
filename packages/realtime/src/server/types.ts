@@ -23,15 +23,22 @@ export interface EventsDenialOptions {
    * Seconds the caller should wait before trying again, answered as a
    * `Retry-After` header — typically on a 429. A positive integer; a fraction
    * is rounded UP (a header that says less than the real wait invites a retry
-   * that is refused again), and a non-finite or non-positive value is ignored.
+   * that is refused again), and a non-finite or non-positive value, or one past
+   * 2^31-1 seconds, is ignored.
    */
   retryAfterSeconds?: number;
 }
 
+/** The largest `Retry-After` a denial sends: 2^31-1 seconds, the common delta-seconds cap. */
+const MAX_RETRY_AFTER_SECONDS = 2 ** 31 - 1;
+
 /** A usable `Retry-After` value in whole seconds, or undefined when there is none. */
 function retryAfterFrom(seconds: number | undefined): number | undefined {
   if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) return undefined;
-  return Math.ceil(seconds);
+  const whole = Math.ceil(seconds);
+  // A wait past 2^31-1 seconds is nonsense, and a huge one would stringify as
+  // `1e+21`, which no client parses as seconds: ignored rather than sent.
+  return Number.isSafeInteger(whole) && whole <= MAX_RETRY_AFTER_SECONDS ? whole : undefined;
 }
 
 /**

@@ -237,7 +237,7 @@ describe("createApiEvents — the host's authorization is the whole boundary", (
     });
   });
 
-  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])(
+  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31, 1e21])(
     "sends no Retry-After for an unusable retryAfterSeconds (%s)",
     async (retryAfterSeconds) => {
       const { stream } = await harness({
@@ -249,6 +249,17 @@ describe("createApiEvents — the host's authorization is the whole boundary", (
       expect(answer).not.toHaveProperty("headers");
     },
   );
+
+  it("still sends the largest accepted Retry-After, 2^31-1 seconds", async () => {
+    const { stream } = await harness({
+      authorize: () => {
+        throw new EventsDenial(429, "Muitas tentativas.", { retryAfterSeconds: 2 ** 31 - 1 });
+      },
+    });
+    await expect(stream({ topics: "kitchen" })).resolves.toMatchObject({
+      headers: { "Retry-After": "2147483647" },
+    });
+  });
 
   it("sends no headers on a denial that set no retryAfterSeconds", async () => {
     const { stream } = await harness({

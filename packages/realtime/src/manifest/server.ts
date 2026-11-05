@@ -19,7 +19,13 @@
 
 import type { AnyServerManifest, WireRequest, WireRouteAnswer } from "@12-apps/wiring";
 
-import { createApiEvents, type EventsApi, type EventsRoute, type EventsServerConfig } from "../server";
+import {
+  createApiEvents,
+  type EventsApi,
+  type EventsRoute,
+  type EventsRouteResult,
+  type EventsServerConfig,
+} from "../server";
 import { REALTIME_JOBS } from "../jobs";
 
 /** One `EventsRoute` as the wiring contract reads it. */
@@ -33,13 +39,27 @@ function asWireRoute(route: EventsRoute): {
     method: route.method,
     path: route.path,
     transport: route.kind,
-    handle: (request) =>
-      route.handle({
-        params: request.params,
-        query: request.query,
-        ...(request.request !== undefined ? { request: request.request } : {}),
-      }),
+    handle: async (request) =>
+      withHeadersCarried(
+        await route.handle({
+          params: request.params,
+          query: request.query,
+          ...(request.request !== undefined ? { request: request.request } : {}),
+        }),
+      ),
   };
+}
+
+/**
+ * A JSON answer that carries headers (a denial's `Retry-After`), re-shaped as
+ * the contract's RAW `{ response }`: the wiring JSON half is `{ status, body }`
+ * only, and its `wireResponse` builds the `Response` from those two fields, so
+ * headers left on it would be dropped by every wiring host. The raw half passes
+ * through untouched. An answer with no headers is returned as it was.
+ */
+function withHeadersCarried(answer: EventsRouteResult): WireRouteAnswer {
+  if (!("status" in answer) || answer.headers === undefined) return answer;
+  return { response: Response.json(answer.body, { status: answer.status, headers: answer.headers }) };
 }
 
 /** `createApiEvents`, its routes re-shaped for the aggregate. */
