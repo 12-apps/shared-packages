@@ -233,7 +233,8 @@ const reconcilePending: PaymentsJobBlueprint = {
     if (report.checked > 0) {
       context.logger.info(
         `[payments] reconcile-pending checked ${report.checked}: ` +
-          `${report.settled} settled, ${report.failed} failed`,
+          `${report.settled} settled, ${report.failed} failed` +
+          (report.declined === undefined ? '' : `, ${report.declined} declined`),
       );
     }
   },

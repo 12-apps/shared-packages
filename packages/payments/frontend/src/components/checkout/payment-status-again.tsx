@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import type { CheckoutDecline } from "./decline";
+import { isCardDataDecline, type CheckoutDecline } from "./decline";
 import type { OrderStatus } from "./types";
 import { useCheckoutComponents } from "./ui";
 import type { PaymentStatusCopy } from "./view-copy";
@@ -20,12 +20,16 @@ import type { PaymentStatusCopy } from "./view-copy";
  * offering a button that mints another failed order and shows the same screen
  * again; on a card the issuer is already counting, it is worse than useless.
  *
+ * `retriable` is about THAT instrument only (FUT-4401): a refusal of the card's
+ * data — a mistyped CVV is PagBank 20007, `retriable:false` — is retried with
+ * the data corrected, so the button stays.
+ *
  * SILENCE MEANS YES. An undefined verdict is a provider that offered no
  * guidance, not a refusal to retry, and withholding the button on silence
  * would strand a buyer whose card is fine.
  */
 function retryable(decline: CheckoutDecline | null): boolean {
-  return decline?.retriable !== false;
+  return decline?.retriable !== false || isCardDataDecline(decline);
 }
 
 /**

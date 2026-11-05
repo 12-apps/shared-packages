@@ -6,7 +6,8 @@
  * block, and the factory's card entry — so a refusal reads the same wherever
  * the buyer met it.
  */
-import type { JSX } from "react";
+import { Box } from "@mui/material";
+import { useEffect, useRef, type JSX } from "react";
 
 import type { CardSubmit } from "./card-submit";
 import { useCheckoutCopy } from "./copy-context";
@@ -82,18 +83,32 @@ export function ChargeFailure({
 }): JSX.Element {
   const { Alert } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.settling;
-  if (unresolved) {
-    return (
-      <Alert
-        variant="warning"
-        title={copy.confirming}
-        description={message}
-        showIcon
-        data-testid="card-unresolved"
-      />
-    );
-  }
+  const at = useBroughtIntoView(message);
   return (
-    <Alert variant="danger" title={copy.cannotPay} description={message} showIcon data-testid="card-error" />
+    <Box ref={at} tabIndex={-1} data-testid="charge-failure" sx={{ scrollMarginBlock: (t) => t.spacing(12), "&:focus": { outline: "none" } }}>
+      {unresolved ? (
+        <Alert variant="warning" title={copy.confirming} description={message} showIcon data-testid="card-unresolved" />
+      ) : (
+        <Alert variant="danger" title={copy.cannotPay} description={message} showIcon data-testid="card-error" />
+      )}
+    </Box>
   );
+}
+
+/**
+ * Bring a charge's ending into view and give it the focus, once per message
+ * (FUT-4401). It renders under the card's fields, which at 360 px is below the
+ * fold and behind the sticky pay bar: said there and left there, the buyer saw
+ * nothing happen. The scroll margin keeps it clear of that bar; the focus is
+ * what a screen reader announces from.
+ */
+function useBroughtIntoView(message: string) {
+  const at = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = at.current;
+    if (!node) return;
+    node.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    node.focus({ preventScroll: true });
+  }, [message]);
+  return at;
 }

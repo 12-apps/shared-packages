@@ -40,6 +40,18 @@ export const EN_US_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     // shopper who reads a final-sounding refusal pays a second time.
     connectionLost: 'No connection right now — we keep trying',
     checkAgainAction: 'Check again',
+    declined: {
+      generic: 'The payment was not approved and nothing was charged. Check the card details or use another way to pay.',
+      byReason: {
+        INVALID_CARD: 'The bank refused the card. Check the number, the expiry date and the security code.',
+        EXPIRED_CARD: 'The card has expired. Check the expiry date or use another card.',
+        INSUFFICIENT_FUNDS: 'There was not enough balance or limit, and nothing was charged. Use another card or another way to pay.',
+        CARD_DECLINED: 'Your bank did not authorize the payment, and nothing was charged. Use another card or another way to pay.',
+        FRAUD_SUSPECTED: 'The bank blocked this purchase for security, and nothing was charged. Talk to your bank or use another way to pay.',
+        PROVIDER_ERROR: 'The payment could not be processed right now, and nothing was charged. Try again or use another way to pay.',
+      },
+      anotherCard: 'This card could not be used, and nothing was charged. Use another card or another way to pay.',
+    },
   },
   pix: {
     heading: 'Pay with Pix',

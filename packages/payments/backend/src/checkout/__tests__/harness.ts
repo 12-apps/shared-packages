@@ -150,7 +150,7 @@ export function testAdapter(name: string, options: AdapterOptions = {}): Payment
 /** Every correlation write the mount made, in order — the assertion surface. */
 interface CorrelationLog {
   pending: { ref: string; charge: AttachedCharge }[];
-  cardOutcomes: { ref: string; approved: boolean; amount: Money; retriable?: boolean }[];
+  cardOutcomes: { ref: string; approved: boolean; amount: Money; retriable?: boolean; keepsPayableOpen?: boolean }[];
   settlements: { ref: string; capturedAmount: Money }[];
   expiries: string[];
   /** The buyer released the payable and the provider agreed (FUT-1146). */
@@ -300,18 +300,19 @@ export function setupCheckoutWorld(options: WorldOptions = {}) {
       attachPending: async (ref, charge) => {
         correlation.pending.push({ ref, charge });
       },
-      recordCardOutcome: async ({ ref, approved, amount, retriable }) => {
+      recordCardOutcome: async ({ ref, approved, amount, retriable, keepsPayableOpen }) => {
         correlation.cardOutcomes.push({
           ref,
           approved,
           amount,
           ...(retriable === undefined ? {} : { retriable }),
+          ...(keepsPayableOpen === undefined ? {} : { keepsPayableOpen }),
         });
-        // A RETRIABLE decline leaves the payable chargeable (FUT-1145): the
-        // buyer is still trying to buy this, and the next instrument goes
-        // against the same payable rather than a freshly minted one. Every
-        // other outcome is terminal, exactly as before.
-        const next = approved ? 'SETTLED' : retriable ? 'OPEN' : 'CLOSED';
+        // A refusal the library says leaves the payable open (FUT-1145,
+        // FUT-4401) keeps it chargeable: the buyer is still trying to buy
+        // this, and the next attempt goes against the same payable rather than
+        // a freshly minted one. Every other outcome is terminal.
+        const next = approved ? 'SETTLED' : keepsPayableOpen ? 'OPEN' : 'CLOSED';
         world.payable = { ...world.payable, state: next };
         return world.payable.state;
       },

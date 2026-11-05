@@ -16,6 +16,7 @@ import { OtherBankLink } from "./list-pix";
 import { ChoiceList } from "./choice-list";
 import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
+import { useCvvFirst } from "./cvv-first";
 import { ActionButton, ChargeBar, ListBar, holdToneOf } from "./list-bar";
 import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
@@ -76,10 +77,7 @@ function saveAsked(props: ListFaceProps): void {
   saveBuyerContact?.({ name: c.buyer.name, phone: c.buyer.phone, taxId: c.buyer.taxId });
 }
 
-/**
- * What an online payment asks for: the host's amount due when a balance it
- * holds pays part of the cart, else the cart's total (P3).
- */
+/** What an online payment asks for: the host's amount due when a balance pays part, else the cart's total (P3). */
 function onlineTotal(props: ListFaceProps): string {
   return props.list.amountDueLabel ?? props.total;
 }
@@ -103,10 +101,12 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: Pay
  */
 function useAct(props: ListFaceProps, clearFailure: () => void): (pick?: boolean) => void {
   const mode = usePaymentListMode();
+  const cvvFirst = useCvvFirst();
   return (pick = false) => {
     const { choice } = props.state;
     if (!choice || inFlight(props)) return;
     if (choice.kind === "door") return chosenDoor(props)?.onSend();
+    if (cvvFirst({ card: props.state.card, choice, covered: coveredByHost(props.list) })) return;
     clearFailure();
     actOnline(props, choice.method, mode, pick);
   };
@@ -248,7 +248,7 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
-    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} />;
+    return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} onWaitElapsed={c.handleWaitElapsed} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
   return null;
@@ -271,13 +271,14 @@ function coveredByHost(list: CheckoutPaymentList): boolean {
  * it (E3); a door choice never does (R3). The debit card's billing address comes
  * last, as it sits below the card's fields (FUT-4109).
  */
-function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null): string | null {
+function reasonOf(props: ListFaceProps, door: CheckoutDoorOption | undefined, debit: DebitAddress | null, refusal?: ListChargeFailure["refusal"]): string | null {
   const { c, list, state, config } = props;
+  const refused = refusal ? { decline: refusal.decline, cvvOnly: state.card.cvvOnly === true, pixOffered: state.methods.includes("PIX") } : null;
   const debitChosen = state.choice?.kind === "online" && state.choice.funding === "DEBIT";
   return blockedReason({
     copy: list.copy, hold: list.hold?.reason ?? null, choice: state.choice, door,
     asked: gateFields(state, c.buyer, config, raisedOf(props)),
-    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list),
+    buyer: c.buyer, selection: state.card.selection, cardIsComplete: state.card.complete, covered: coveredByHost(list), refused,
   }) ?? (debitChosen ? debitAddressReason(debit, list.copy.debit) : null);
 }
 
@@ -358,7 +359,9 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const [failure, setFailure] = useState<ListChargeFailure | null>(null);
   const clearFailure = useCallback(() => setFailure(null), []);
   const { settle } = charge;
-  const onFailed = useCallback((next: ListChargeFailure | null) => { setFailure(next); settle(); }, [settle]);
+  const { dropOrder } = c;
+  // A refusal that closed the order sends the next press to a fresh one (FUT-4401).
+  const onFailed = useCallback((next: ListChargeFailure | null) => { setFailure(next); if (next?.refusal?.orderClosed) dropOrder(); settle(); }, [settle, dropOrder]);
   const wallets = useWallets(props, clearFailure);
   const { clearWalletFailure } = wallets;
   const act = useAct(props, () => {
@@ -366,7 +369,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
     clearWalletFailure();
   });
   const door = chosenDoor(props);
-  const reason = reasonOf(props, door, useDebitAddress());
+  const reason = reasonOf(props, door, useDebitAddress(), failure?.refusal);
   useChargeGuard(props, reason);
   const free = reason === null && props.charge.phase === "idle" && !c.creating;
   useArmedCharge(armedReady(list, state, free), act);

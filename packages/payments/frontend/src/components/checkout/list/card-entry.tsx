@@ -28,6 +28,7 @@ import {
   type CardFieldErrors,
 } from "../../../card";
 import { useSavedCards } from "../card-sources";
+import type { CheckoutDecline } from "../decline";
 import { ChargeFailure } from "../charge-states";
 import { useCheckoutCopy } from "../copy-context";
 import { UNRESOLVED_CODE } from "../failure-codes";
@@ -83,6 +84,12 @@ function EntryFields({ card }: { card: ListCard }): JSX.Element {
   );
 }
 
+/** Bubble a closed refusal up — with one argument when the server classified nothing, as before. */
+function resolveRefused(onResolved: OnCheckoutResolved, decline: CheckoutDecline): void {
+  if (decline.reason === undefined && decline.retriable === undefined) onResolved("FAILED");
+  else onResolved("FAILED", decline);
+}
+
 export function CardEntryPane({
   order,
   config,
@@ -107,8 +114,13 @@ export function CardEntryPane({
   const onAccepted = useCallback(() => setAccepted(true), []);
   const onFailed = useCallback((next: ListChargeFailure | null) => {
     setRunning(false);
+    setAccepted(false);
+    // A refusal that closed the payable cannot be paid again here: the host's
+    // own ending takes it, as every refusal did before FUT-4401. One that left
+    // it chargeable stays beside the card, for the buyer to correct and resend.
+    if (next?.refusal?.orderClosed) return void resolveRefused(onResolved, next.refusal.decline);
     setFailure(next);
-  }, []);
+  }, [onResolved]);
   const pay = (): void => {
     setFailure(null);
     if (card.selection === NEW_CARD) {

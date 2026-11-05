@@ -29,6 +29,18 @@ export const PT_BR_CHECKOUT_SCREENS_COPY: CheckoutScreensCopy = {
     cannotPay: 'Não foi possível pagar',
     connectionLost: 'Sem conexão no momento — continuamos tentando',
     checkAgainAction: 'Verificar de novo',
+    declined: {
+      generic: 'O pagamento não foi aprovado e nada foi cobrado. Confira os dados do cartão ou use outra forma de pagamento.',
+      byReason: {
+        INVALID_CARD: 'O banco recusou o cartão. Confira o número, a validade e o código de segurança.',
+        EXPIRED_CARD: 'O cartão está vencido. Confira a validade ou use outro cartão.',
+        INSUFFICIENT_FUNDS: 'Não havia saldo ou limite e nada foi cobrado. Use outro cartão ou outra forma de pagamento.',
+        CARD_DECLINED: 'Seu banco não autorizou o pagamento e nada foi cobrado. Use outro cartão ou outra forma de pagamento.',
+        FRAUD_SUSPECTED: 'O banco bloqueou esta compra por segurança e nada foi cobrado. Fale com o seu banco ou use outra forma de pagamento.',
+        PROVIDER_ERROR: 'Não foi possível processar o pagamento agora e nada foi cobrado. Tente de novo ou use outra forma de pagamento.',
+      },
+      anotherCard: 'Não foi possível pagar com este cartão e nada foi cobrado. Use outro cartão ou outra forma de pagamento.',
+    },
   },
   pix: {
     heading: 'Pague com Pix',

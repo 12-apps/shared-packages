@@ -109,4 +109,40 @@ describe('POST /charge — what a refusal tells the buyer', () => {
     expect(world.correlation.cardOutcomes[0]).toMatchObject({ approved: true });
     expect(world.correlation.cardOutcomes[0]).not.toHaveProperty('retriable');
   });
+  it('keeps the payable chargeable after a card-data refusal PagBank marks not retriable (FUT-4401)', async () => {
+    // 20007 — the buyer mistyped the CVV. "Do not retry" is about resending
+    // the identical card data; the corrected card goes against the SAME
+    // payable, so the host is told to leave it open.
+    const world = setupCheckoutWorld({
+      payable: CARD_PAYABLE,
+      chain: [{ name: 'alpha', adapter: testAdapter('alpha', { declines: { reason: 'INVALID_CARD', retriable: false } }) }],
+    });
+
+    const charged = await call(world.routes, 'POST', '/charge', { orderId: 'inv_2024_0043', token: 'tok_fresh', saveCard: false });
+
+    // The wire still says what PagBank said: the same card may not be resent.
+    expect(charged.body.data).toMatchObject({ declineReason: 'INVALID_CARD', retriable: false });
+    expect(world.correlation.cardOutcomes[0]).toMatchObject({ approved: false, retriable: false, keepsPayableOpen: true });
+    expect(world.world.payable.state).toBe('OPEN');
+  });
+
+  it('closes the payable on a refusal that is neither retriable nor about card data', async () => {
+    const world = setupCheckoutWorld({
+      payable: CARD_PAYABLE,
+      chain: [{ name: 'alpha', adapter: testAdapter('alpha', { declines: { reason: 'FRAUD_SUSPECTED', retriable: false } }) }],
+    });
+
+    await call(world.routes, 'POST', '/charge', { orderId: 'inv_2024_0043', token: 'tok_fresh', saveCard: false });
+
+    expect(world.correlation.cardOutcomes[0]).toMatchObject({ approved: false, keepsPayableOpen: false });
+    expect(world.world.payable.state).toBe('CLOSED');
+  });
+
+  it('tells the host nothing about the payable on an approved charge', async () => {
+    const world = setupCheckoutWorld({ payable: CARD_PAYABLE });
+
+    await call(world.routes, 'POST', '/charge', { orderId: 'inv_2024_0043', token: 'tok_fresh', saveCard: false });
+
+    expect(world.correlation.cardOutcomes[0]).not.toHaveProperty('keepsPayableOpen');
+  });
 });

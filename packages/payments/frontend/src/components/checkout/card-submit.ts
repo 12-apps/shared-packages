@@ -7,7 +7,7 @@
  * state of its own: the screen that draws the fields hands them in as
  * {@link CardFormState}.
  */
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   plainTaxId,
@@ -22,7 +22,15 @@ import {
   type CardInstruments,
   type RefreshBrowserKey,
 } from "./card-instruments";
-import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card-outcome";
+import {
+  CARD_DECLINED_CODE,
+  cardRefusalOf,
+  handOverToChallenge,
+  refusalSentence,
+  reportResolved,
+  type CardRefusal,
+  type ChallengeScope,
+} from "./card-outcome";
 import { useCardPublicKey } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
@@ -32,6 +40,7 @@ import { authenticateDebit, type DebitAuthentication } from "./debit-charge";
 import type { CheckoutClient } from "./transport";
 import { usePaymentPolling } from "./use-payment-polling";
 import type { CardCopy } from "../../card/copy";
+import type { SettlingCopy } from "./screens-copy";
 import { useCheckoutCopy } from "./copy-context";
 
 /** What a card charge reports while it runs — the screen around it draws from this. */
@@ -41,6 +50,12 @@ export interface CardSubmit {
   error: string | null;
   /** The failure's machine code, when the server sent one — drives PRESENTATION. */
   errorCode: string | null;
+  /**
+   * The card was REFUSED (FUT-4401) — at once, or after the charge was
+   * accepted — and {@link error} says why. The screen keeps the buyer on the
+   * card form with it, rather than swapping to a status screen.
+   */
+  refusal: CardRefusal | null;
   /**
    * The last status poll failed. TRANSIENT (FUT-1144): the wait carries on at a
    * backed-off cadence and this clears on the next success, so the view shows
@@ -175,9 +190,43 @@ function useCardWait(
 }
 
 /**
+ * Where a submit ENDED, as the screen reads it — and the three ways to end one:
+ * a failure that never became a charge, a refusal (FUT-4401), and a fresh press.
+ *
+ * Every ending leaves a message and gives the controls back: `submitting` and
+ * `submitted` both fall, so nothing stays on a spinner over a sentence.
+ */
+function useSubmitEnding(settlingCopy: SettlingCopy) {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<CardRefusal | null>(null);
+  const fail = (message: string, code: string | null = null): void => {
+    setError(message);
+    setErrorCode(code);
+    setSubmitted(false);
+    setSubmitting(false);
+  };
+  // A refusal is said beside the card, worded by the reason the server sent.
+  const refuse = (next: CardRefusal): void => {
+    setRefusal(next);
+    fail(refusalSentence(settlingCopy, next.decline), CARD_DECLINED_CODE);
+  };
+  const press = (): void => {
+    setError(null);
+    setErrorCode(null);
+    setRefusal(null);
+  };
+  const state = { submitting, submitted, error, errorCode, refusal };
+  return { state, setSubmitting, setSubmitted, fail, refuse, press };
+}
+
+/**
  * The submit state machine (FUT-58): validate → tokenize (self-heal) → charge →
  * poll for the async confirmation, bubbling the terminal status up via
- * {@link onResolved}.
+ * {@link onResolved}. A refusal — at once or after acceptance — stays beside
+ * the card (FUT-4401).
  */
 export function useCardSubmit(
   order: CheckoutOrder,
@@ -191,26 +240,27 @@ export function useCardSubmit(
    *  hand-off, which is otherwise resumable over any basket anywhere. */
   scope: ChallengeScope,
 ): CardSubmit {
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<string | null>(null);
   // The active key: resolved by the checkout config, overridden by the
   // rotated-key self-heal for the rest of the session.
   const { publicKey, setPublicKey, keyPending } = useCardPublicKey(order.orderId, providerConfig);
   const client = useCheckoutClientApi();
   const navigate = useCheckoutNavigate();
-  const cardCopy = useCheckoutCopy().card;
+  const { card: cardCopy, screens } = useCheckoutCopy();
+  const ending = useSubmitEnding(screens.settling);
+  const { setSubmitting, setSubmitted, fail, refuse } = ending;
 
-  const { status, ...wait } = useCardWait(order.orderId, submitted, pollIntervalMs);
-
+  const { status, ...wait } = useCardWait(order.orderId, ending.state.submitted, pollIntervalMs);
+  const latestRefuse = useRef(refuse);
+  latestRefuse.current = refuse;
   useEffect(() => {
-    if (status && status !== "AWAITING_PAYMENT") onResolved(status);
+    // A refusal that arrived after the charge was accepted: the poll carries no
+    // classification, and the server closed the order (`cardRefusalOf()`).
+    if (status === "FAILED") latestRefuse.current(cardRefusalOf());
+    else if (status && status !== "AWAITING_PAYMENT") onResolved(status);
   }, [status, onResolved]);
 
   const handlePay = async (): Promise<void> => {
-    setError(null);
-    setErrorCode(null);
+    ending.press();
     if (blockedByForm(form)) return;
     setSubmitting(true);
 
@@ -224,30 +274,24 @@ export function useCardSubmit(
       copy: cardCopy,
     });
     const body = resolved.ok ? await chargeBodyOf(form, resolved.data, { client, order, buyer }) : err<ChargeCardInput>(resolved.error);
-    if (!body.ok) {
-      setError(body.error);
-      setSubmitting(false);
-      return;
-    }
+    if (!body.ok) return fail(body.error);
     const charged = await client.charge(body.data);
-    if (!charged.ok) {
-      setError(charged.error); // transport/validation problem — stay on the form
-      // An UNRESOLVED charge is not a decline: some provider may be holding the
-      // money, so the view must not dress it as one (`./charge-states.tsx`).
-      setErrorCode(charged.code ?? null);
-      setSubmitting(false);
-      return;
-    }
+    // A transport/validation problem stays on the form. An UNRESOLVED charge is
+    // not a decline: some provider may be holding the money, so the view must
+    // not dress it as one (`./charge-states.tsx`) — hence the code.
+    if (!charged.ok) return fail(charged.error, charged.code ?? null);
     // 3-D Secure (FUT-698): the buyer must finish on the provider's page.
     // `submitting` stays true on purpose — the tab is navigating away.
     if (charged.data.hostedCheckoutUrl) {
       return handOverToChallenge(order, charged.data.hostedCheckoutUrl, navigate, scope);
     }
-    // A business outcome shows the status screen, carrying the refusal the
-    // server classified (FUT-1145); an accepted charge begins polling.
-    if (charged.data.status !== "AWAITING_PAYMENT") reportResolved(charged.data, onResolved);
+    // A refusal stays beside the card, worded by the reason the server
+    // classified (FUT-1145, FUT-4401); any other business outcome shows the
+    // status screen; an accepted charge begins polling.
+    if (charged.data.status === "FAILED") refuse(cardRefusalOf(charged.data));
+    else if (charged.data.status !== "AWAITING_PAYMENT") reportResolved(charged.data, onResolved);
     else setSubmitted(true);
   };
 
-  return { submitting, submitted, error, errorCode, ...wait, keyPending, handlePay };
+  return { ...ending.state, ...wait, keyPending, handlePay };
 }

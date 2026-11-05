@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import type { ConfirmationWait } from "./confirmation-wait";
-import type { CheckoutDecline } from "./decline";
+import { declineKeepsOrder, type CheckoutDecline } from "./decline";
 import { useForgetHostedOrder } from "./hosted-parking";
 import type {
   BuyerField,
@@ -171,7 +171,8 @@ export function useCreateFailure() {
 /**
  * "Tentar novamente" after a refusal — and WHICH order it goes against.
  *
- * A RETRIABLE decline keeps the order (FUT-1145). Minting a new one for every
+ * A decline that leaves the order chargeable keeps it (FUT-1145, FUT-4401:
+ * the same card may be retried, or the card's data is corrected). Minting a new one for every
  * refused card leaves a trail of failed orders in the buyer's own history for
  * one purchase they are still trying to make, and the money rule is unchanged
  * either way: the server refuses a second charge on a payable it has already
@@ -195,7 +196,7 @@ export function useRetryAction(input: {
     setFinalStatus(null);
     clearError();
     setStep("payment");
-    if (decline?.retriable && order) {
+    if (declineKeepsOrder(decline) && order) {
       setFreshInstrument(true);
       return;
     }

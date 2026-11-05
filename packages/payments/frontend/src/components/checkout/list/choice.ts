@@ -18,6 +18,7 @@ import {
 } from "../../../card";
 import type { CardFieldCopy } from "../../../card/copy";
 import { buyerFieldsFor, fieldSatisfied } from "../buyer-fields";
+import { declineBarsCard, type CheckoutDecline } from "../decline";
 import { handOffMethod } from "../method-capability";
 import type { BuyerInfo, CheckoutChainLink, CheckoutCustomerField, PaymentMethod } from "../types";
 
@@ -167,15 +168,14 @@ export function askedFields(input: {
   );
 }
 
+/** The number, holder and expiry are valid — all a refused card needs but its CVV (FUT-4401). */
+export function cardCompleteButCvv(card: CardDetails, copy: CardFieldCopy): boolean {
+  return !validateCardNumber(card.number, copy) && !validateHolder(card.holder, copy) && !validateExpiry(card.expiry, copy);
+}
+
 /** Every one of the four card fields is valid — the button's question. */
 export function cardComplete(card: CardDetails, copy: CardFieldCopy): boolean {
-  const brand = detectBrand(onlyDigits(card.number));
-  return (
-    !validateCardNumber(card.number, copy) &&
-    !validateHolder(card.holder, copy) &&
-    !validateExpiry(card.expiry, copy) &&
-    !validateCvv(card.cvv, copy, brand)
-  );
+  return cardCompleteButCvv(card, copy) && !validateCvv(card.cvv, copy, detectBrand(onlyDigits(card.number)));
 }
 
 /** The reason for the first of the asked fields the buyer has not satisfied yet. */
@@ -191,15 +191,38 @@ function buyerReason(
   return reasons.details;
 }
 
+/**
+ * The card after a refusal (FUT-4401): how it was refused, whether the typed
+ * card lacks only its CVV, and whether Pix is on offer — what the button's
+ * reason then says instead of asking for the card from scratch.
+ */
+interface CardAfterRefusal {
+  decline: CheckoutDecline;
+  cvvOnly: boolean;
+  pixOffered: boolean;
+}
+
 /** What the card option still needs: a card chosen, and a typed one complete. */
+function cardNeeds(selection: string | null, complete: boolean, reasons: PaymentListCopy["reasons"]): string | null {
+  if (selection === null) return reasons.chooseCard;
+  if (selection === NEW_CARD && !complete) return reasons.cardDetails;
+  return null;
+}
+
+/** {@link cardNeeds}, said for the moment after a refusal when there was one. */
 function cardReason(
   selection: string | null,
   complete: boolean,
   reasons: PaymentListCopy["reasons"],
+  refused?: CardAfterRefusal | null,
 ): string | null {
-  if (selection === null) return reasons.chooseCard;
-  if (selection === NEW_CARD && !complete) return reasons.cardDetails;
-  return null;
+  const needed = cardNeeds(selection, complete, reasons);
+  if (!needed || !refused) return needed;
+  // The refused card was cleared and may not go again: say what may.
+  if (declineBarsCard(refused.decline)) return reasons.anotherCard?.(refused.pixOffered) ?? needed;
+  // Only the CVV it cleared is missing: the button stays live, and its press
+  // asks for the CVV in the field itself (`./cvv-first.ts`).
+  return selection === NEW_CARD && refused.cvvOnly ? null : needed;
 }
 
 /**
@@ -218,6 +241,8 @@ export function blockedReason(input: {
   cardIsComplete: boolean;
   /** The host's balance pays the whole amount: no card needs choosing. */
   covered?: boolean;
+  /** The card was just refused (FUT-4401). */
+  refused?: CardAfterRefusal | null;
 }): string | null {
   const { copy, choice } = input;
   if (input.hold) return input.hold;
@@ -226,7 +251,7 @@ export function blockedReason(input: {
   const buyer = buyerReason(input.asked, input.buyer, copy.reasons);
   if (buyer) return buyer;
   if (choice.method !== "CARD" || input.covered) return null;
-  return cardReason(input.selection, input.cardIsComplete, copy.reasons);
+  return cardReason(input.selection, input.cardIsComplete, copy.reasons, input.refused);
 }
 
 /** The bar button's verb for what is chosen. */

@@ -5,7 +5,7 @@ import { useSavedCardList } from "../card-sources";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutCustomerField, CheckoutProviderConfig, PaymentMethod } from "../types";
 
-import { askedFields, cardComplete, lastUsedCard, onlineRows, preselection, raisedMethod, soleOption, type OnlineCapability, type OnlineRow } from "./choice";
+import { askedFields, cardComplete, cardCompleteButCvv, lastUsedCard, onlineRows, preselection, raisedMethod, soleOption, type OnlineCapability, type OnlineRow } from "./choice";
 import { useChoiceUpkeep, useStableIds } from "./choice-upkeep";
 import { isTaxId, topCpfField } from "./top-cpf";
 import type { CheckoutListChoice } from "./types";
@@ -47,6 +47,8 @@ export interface ListCard {
   saveCard: boolean;
   setSaveCard: (save: boolean) => void;
   complete: boolean;
+  /** Only the CVV is missing — what a refusal that kept the card leaves (FUT-4401). */
+  cvvOnly?: boolean;
 }
 
 /** Everything the one list holds, and nothing it raises. */
@@ -88,7 +90,8 @@ export function useListCard(saved: SavedCard[], holder = ""): ListCard {
   const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
   const [saveCard, setSaveCard] = useState(false);
   const complete = useMemo(() => cardComplete(card, fieldCopy), [card, fieldCopy]);
-  return { saved, selection, setSelection, card, setCard, fieldErrors, setFieldErrors, saveCard, setSaveCard, complete };
+  const cvvOnly = useMemo(() => !complete && cardCompleteButCvv(card, fieldCopy), [complete, card, fieldCopy]);
+  return { saved, selection, setSelection, card, setCard, fieldErrors, setFieldErrors, saveCard, setSaveCard, complete, cvvOnly };
 }
 
 /**

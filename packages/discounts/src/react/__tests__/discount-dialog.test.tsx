@@ -23,6 +23,13 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 
 const copy = PT_BR_DISCOUNTS_WEB_COPY;
 
+/**
+ * Each surface is a lazily imported chunk, and its FIRST import in a test file
+ * compiles the whole stacked modal or sheet. On a loaded CI runner that took
+ * 1.2 s, past `findBy`'s 1 s default, and reddened `main` once.
+ */
+const SURFACE_LOADED = { timeout: 10_000 };
+
 /** `useMediaQuery(down('sm'))` asks a `max-width` query: true on a phone. */
 function stubViewport(phone: boolean): void {
   vi.stubGlobal(
@@ -65,7 +72,9 @@ describe("the discount dialog", () => {
   it("D1: on a computer it is a stacked modal, named by its title, with the pack's ✕", async () => {
     stubViewport(false);
     render(<Harness />);
-    expect((await screen.findByTestId("discount-dialog-title")).textContent).toBe("Novo desconto");
+    expect(
+      (await screen.findByTestId("discount-dialog-title", {}, SURFACE_LOADED)).textContent,
+    ).toBe("Novo desconto");
     expect(screen.getByRole("dialog", { name: "Novo desconto" })).toBeTruthy();
     expect(screen.getByRole("button", { name: copy.form.dialog.close })).toBeTruthy();
   });
@@ -73,16 +82,16 @@ describe("the discount dialog", () => {
   it("D2: on a phone it is a bottom sheet, named by its title", async () => {
     stubViewport(true);
     render(<Harness />);
-    expect((await screen.findByTestId("discount-dialog-header-title")).textContent).toBe(
-      "Novo desconto",
-    );
+    expect(
+      (await screen.findByTestId("discount-dialog-header-title", {}, SURFACE_LOADED)).textContent,
+    ).toBe("Novo desconto");
     await waitFor(() => expect(screen.queryByTestId("discount-dialog-title")).toBeNull());
   });
 
   it("D3: reopened while it is still leaving, the form starts empty again", async () => {
     stubViewport(true);
     render(<Harness />);
-    const typed = (await screen.findByLabelText("Nome")) as HTMLInputElement;
+    const typed = (await screen.findByLabelText("Nome", {}, SURFACE_LOADED)) as HTMLInputElement;
     fireEvent.change(typed, { target: { value: "5 marmitas" } });
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "toggle", hidden: true }));

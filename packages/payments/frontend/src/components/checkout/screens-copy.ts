@@ -19,6 +19,8 @@
  * `"pt"` to Google has a checkout in two languages.
  */
 
+import type { CheckoutDeclineReason } from './decline';
+
 /** The method tiles, and what each one promises. */
 export interface MethodPickerCopy {
   /**
@@ -95,6 +97,24 @@ export interface SettlingCopy {
    * that has run out.
    */
   checkAgainAction: string;
+  /**
+   * A refused card, said BESIDE the card form under {@link cannotPay}
+   * (FUT-4401): what happened and what to do, in one sentence. `byReason`
+   * picks it from the server's classification; `generic` covers a refusal with
+   * no reason, or one this pack has no sentence for. Optional so a pack written
+   * before it still typechecks — such a pack shows {@link cannotPay} alone.
+   */
+  declined?: {
+    generic: string;
+    byReason?: Partial<Record<CheckoutDeclineReason, string>>;
+    /**
+     * The same card may not be sent again and its data is not the problem
+     * (`retriable: false`, e.g. a provider error the acquirer calls final): the
+     * checkout cleared it, so this sends the buyer to another card or way to
+     * pay instead of a reason's "try again". Absent ⇒ the reason's sentence.
+     */
+    anotherCard?: string;
+  };
 }
 
 /**
