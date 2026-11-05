@@ -71,10 +71,15 @@ export function LiveSandboxBand({
       data-testid="payments-live-sandbox-band"
       sx={{
         mt: '12px',
+        // The body below sets no top inset of its own (ProviderCard), so the
+        // band keeps the prototype's 16px from the first block under it.
+        mb: '16px',
         borderRadius: 0,
         px: CARD_INSET,
         py: '12px',
-        background: T.warnSoft,
+        // `backgroundColor`, not `background`: a theme's standard-warning fill
+        // is set on that property and would otherwise show through.
+        '&&': { backgroundColor: T.warnSoft },
         borderTop: `1px solid ${T.warnLine}`,
         borderBottom: `1px solid ${T.warnLine}`,
         color: T.warnInk,
