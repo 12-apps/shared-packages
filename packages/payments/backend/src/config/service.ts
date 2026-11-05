@@ -3,6 +3,7 @@ import { hasUsableCredentials } from './usable-credentials';
 import type { CredentialStore } from '../core/ports';
 import type { PaymentProviderAdapter } from '../core/provider';
 import { credentialSchemaOf } from '../core/credential-schema';
+import { readLiveDeployment, refusesSimulatedSandbox } from '../core/live-deployment';
 import type { ProviderRegistry } from '../core/registry';
 import type {
   MerchantRef,
@@ -160,7 +161,8 @@ function maskEnvironment(adapter: PaymentProviderAdapter, fields: Record<string,
   return masked;
 }
 
-function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig): MaskedProviderConfig {
+function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig, live = false): MaskedProviderConfig {
+  const refused = refusesSimulatedSandbox(adapter, config.environment, live);
   return {
     provider: config.provider,
     enabled: config.enabled,
@@ -179,6 +181,7 @@ function toMasked(adapter: PaymentProviderAdapter, config: StoredProviderConfig)
     },
     // WHO is connected (FUT-300) — identity facts only, never a credential.
     connectedAccount: connectedAccountFrom(adapter, config),
+    ...(refused ? { sandboxRefused: true } : {}),
   };
 }
 
@@ -215,8 +218,9 @@ async function settleEnablement(
   merchant: MerchantRef,
   config: StoredProviderConfig,
   enabled: boolean,
+  live: boolean,
 ): Promise<MaskedProviderConfig> {
-  return toMasked(adapter, await toggleInChain(store, merchant, config, enabled));
+  return toMasked(adapter, await toggleInChain(store, merchant, config, enabled), live);
 }
 
 /** The whole settings payload: catalog, per-provider state, and the chain. */
@@ -224,6 +228,7 @@ async function buildSettingsView(
   providers: ProviderRegistry,
   store: ProviderConfigStore,
   merchant: MerchantRef,
+  live: boolean,
   locale?: string,
 ): Promise<MerchantSettingsView> {
   const configs = await store.list(merchant);
@@ -233,13 +238,14 @@ async function buildSettingsView(
   // `inRotation`, not `enabled`: this chain is published as "what checkout
   // will actually walk", so it must agree with `credentialStoreFrom.chain`
   // about a row whose grant is dead (FUT-683).
+  // Nor a row checkout refuses on a live deployment (FUT-4432).
   const chain = known
-    .filter(inRotation)
+    .filter((c) => inRotation(c) && !refusesSimulatedSandbox(providers.get(c.provider), c.environment, live))
     .sort((a, b) => a.priority - b.priority || a.provider.localeCompare(b.provider))
     .map((c) => c.provider);
   return {
     providers: providers.names.map((name) => descriptorOf(providers, name, locale)),
-    configs: known.map((c) => toMasked(providers.get(c.provider), c)),
+    configs: known.map((c) => toMasked(providers.get(c.provider), c, live)),
     providerChain: chain,
     activeProvider: chain[0] ?? null,
     failoverPolicy: await store.getFailoverPolicy(merchant),
@@ -252,6 +258,8 @@ export function createSettingsService(
   options: SettingsServiceOptions = {},
 ): SettingsService {
   const allowStubMode = options.allowStubMode ?? false;
+  const live = (): boolean => readLiveDeployment(options.liveDeployment ?? {});
+  const masked = (adapter: PaymentProviderAdapter, config: StoredProviderConfig) => toMasked(adapter, config, live());
 
   async function load(merchant: MerchantRef, provider: ProviderName): Promise<StoredProviderConfig> {
     if (!providers.has(provider)) throw new UnknownProviderError(provider);
@@ -263,7 +271,7 @@ export function createSettingsService(
       return providers.names.map((name) => descriptorOf(providers, name, locale));
     },
 
-    getSettings: (merchant, locale) => buildSettingsView(providers, store, merchant, locale),
+    getSettings: (merchant, locale) => buildSettingsView(providers, store, merchant, live(), locale),
 
     async saveCredentials(merchant, provider, input) {
       const adapter = providers.get(provider);
@@ -278,21 +286,21 @@ export function createSettingsService(
       const checked = assertSaveCredentialsInput(adapter, input);
       const config = applySaveCredentials(await load(merchant, provider), checked, allowStubMode);
       await store.save(merchant, config);
-      return toMasked(adapter, config);
+      return masked(adapter, config);
     },
 
     async setEnabled(merchant, provider, enabled) {
       const config = await load(merchant, provider);
       const adapter = providers.get(provider);
       if (enabled) requireProven(adapter, config);
-      return settleEnablement(adapter, store, merchant, config, enabled);
+      return settleEnablement(adapter, store, merchant, config, enabled, live());
     },
 
     async applyChargeVerification(merchant, provider, passed) {
       // `applyProof` persists the stamp itself — see its note on why the
       // chain toggle alone loses it for an existing config.
       const config = await applyProof(store, merchant, await load(merchant, provider), passed);
-      return toMasked(providers.get(provider), config);
+      return masked(providers.get(provider), config);
     },
 
     ...pendingVerificationMethods(store, load),
@@ -315,7 +323,7 @@ export function createSettingsService(
       const config = await load(merchant, provider);
       const notificationUrl = await resolveWebhookUrl(options, merchant, provider);
       const target = environment ?? config.environment;
-      return runVerify(providers.get(provider), store, merchant, config, target, allowStubMode, toMasked, notificationUrl);
+      return runVerify(providers.get(provider), store, merchant, config, target, allowStubMode, masked, notificationUrl);
     },
   };
 }

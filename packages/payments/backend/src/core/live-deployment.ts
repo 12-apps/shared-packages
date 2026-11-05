@@ -1,7 +1,8 @@
 import type { CredentialStore } from './credential-store';
+import type { PaymentProviderAdapterBase } from './provider';
 import { CredentialsError } from './errors';
 import type { ProviderRegistry } from './registry';
-import type { MerchantRef, ProviderName } from './types';
+import type { MerchantRef, PaymentEnvironment, ProviderName } from './types';
 
 /**
  * A SIMULATED-sandbox connection takes no buyer's money on a LIVE deployment.
@@ -40,7 +41,22 @@ export function readLiveDeployment(env: LiveDeploymentEnv): boolean {
   return TRUTHY.has((env.PAYMENTS_LIVE_DEPLOYMENT ?? '').trim().toLowerCase());
 }
 
-/** Whether this provider's SANDBOX is a simulator (`PaymentProviderAdapterBase.simulatedSandbox`). */
+/**
+ * THE rule, as one pure predicate: on a live deployment, a connection in its
+ * provider's SIMULATED sandbox (`PaymentProviderAdapterBase.simulatedSandbox`)
+ * takes no buyer's money. Routing asks it of the resolved credentials
+ * (`liveOnlyCredentials`); the settings view asks it of the stored row, so the
+ * screen says what checkout does.
+ */
+export function refusesSimulatedSandbox(
+  adapter: Pick<PaymentProviderAdapterBase, 'simulatedSandbox'>,
+  environment: PaymentEnvironment,
+  live: boolean,
+): boolean {
+  return live && adapter.simulatedSandbox === true && environment === 'SANDBOX';
+}
+
+/** Whether this provider's SANDBOX is a simulator at all — no read needed when it is not. */
 function sandboxIsSimulated(providers: ProviderRegistry, name: ProviderName): boolean {
   return providers.has(name) && providers.get(name).simulatedSandbox === true;
 }
@@ -62,7 +78,7 @@ async function routesToSimulatedSandbox(
   if (!sandboxIsSimulated(providers, name)) return false;
   try {
     const credentials = await inner.getCredentials(merchant, name);
-    return credentials === null || credentials.environment === 'SANDBOX';
+    return credentials === null || refusesSimulatedSandbox(providers.get(name), credentials.environment, true);
   } catch (error) {
     if (error instanceof CredentialsError) return true;
     throw error;

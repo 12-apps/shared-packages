@@ -218,12 +218,12 @@ describe('the shipped adapters, each stored as SANDBOX, on a LIVE deployment', (
     pixmanual: pixManualProvider(PT_BR_PIX_MANUAL_COPY),
   });
 
-  it('drops PagBank and Itaú, whose sandbox is a simulator, and keeps every other one', async () => {
+  it('drops PagBank, Itaú and Stripe, whose sandbox is a simulator, and keeps every other one', async () => {
     const registry = shipped();
 
     const chain = await liveOnlyCredentials(allSandbox(registry.names), LIVE, registry).providerChain(TENANT);
 
-    expect(chain).toEqual(['infinitepay', 'stone', 'stripe', 'pixmanual']);
+    expect(chain).toEqual(['infinitepay', 'stone', 'pixmanual']);
   });
 });
 
