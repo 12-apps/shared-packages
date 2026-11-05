@@ -68,6 +68,17 @@ export interface PendingSweepDeps {
    * the sweep itself never throws.
    */
   settle: (snapshot: ChargeSnapshot, merchant: MerchantRef, charge: StoredCharge) => Promise<void>;
+  /**
+   * The HOST's path for a charge the provider now reports DECLINED (FUT-4401)
+   * — accepted at charge time (PagBank's `IN_ANALYSIS`/`WAITING`) and refused
+   * afterwards. Nothing else turns that answer into an outcome: the webhook
+   * reaction and this sweep's `settle` act on PAID only, so the payable sat
+   * open and a buyer watching it waited out their screen's whole bound. The
+   * host ends it — closes the payable, and tells the screen watching it.
+   * Throw to count the item failed. Omit to leave a refused charge waiting,
+   * as before.
+   */
+  decline?: (snapshot: ChargeSnapshot, merchant: MerchantRef, charge: StoredCharge) => Promise<void>;
   /** Sweep observability; the package binds no logger. */
   logWarn?: (line: string) => void;
 }
@@ -113,7 +124,7 @@ export async function reconcilePendingCharges(
   return report;
 }
 
-/** Re-read ONE charge; settle it if the provider says PAID. Never throws. */
+/** Re-read ONE charge; settle it if the provider says PAID, end it if DECLINED. Never throws. */
 async function reconcileOne(
   deps: PendingSweepDeps,
   charge: StoredCharge,
@@ -124,6 +135,10 @@ async function reconcileOne(
       charge.provider,
       charge.providerChargeId,
     );
+    if (snapshot?.status === 'DECLINED' && deps.decline) {
+      await deps.decline(snapshot, charge.merchant, charge);
+      return 'waiting';
+    }
     if (snapshot?.status !== 'PAID') return 'waiting';
     await deps.settle(snapshot, charge.merchant, charge);
     return 'settled';

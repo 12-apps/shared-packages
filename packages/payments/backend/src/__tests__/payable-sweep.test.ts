@@ -141,4 +141,53 @@ describe('reconcilePendingCharges', () => {
       ),
     ).rejects.toThrow(/listPendingCharges/);
   });
+
+  it('hands a charge refused after acceptance to the host decline port (FUT-4401)', async () => {
+    const store = await storeWith([
+      { id: 'CHAR_refused', ageMs: 10 * MIN },
+      { id: 'CHAR_waiting', ageMs: 10 * MIN },
+    ]);
+    const refreshCharge = vi.fn(async (_m: MerchantRef, _p: string, id: string) =>
+      snapshot({ providerChargeId: id, status: id === 'CHAR_refused' ? 'DECLINED' : 'PENDING', method: 'CARD' }),
+    );
+    const settle = vi.fn(async () => undefined);
+    const decline = vi.fn<(s: ChargeSnapshot, m: MerchantRef) => Promise<undefined>>(async () => undefined);
+
+    const report = await reconcilePendingCharges(
+      { charges: store, gateway: { refreshCharge } as never, settle, decline },
+      { now: NOW },
+    );
+
+    expect(decline).toHaveBeenCalledOnce();
+    expect(decline.mock.calls[0]?.[0]?.providerChargeId).toBe('CHAR_refused');
+    expect(decline.mock.calls[0]?.[1]).toEqual(TENANT);
+    expect(settle).not.toHaveBeenCalled();
+    expect(report).toEqual({ checked: 2, settled: 0, failed: 0 });
+  });
+
+  it('leaves a refused charge waiting for a host with no decline port, as before', async () => {
+    const store = await storeWith([{ id: 'CHAR_refused', ageMs: 10 * MIN }]);
+    const refreshCharge = vi.fn(async () => snapshot({ providerChargeId: 'CHAR_refused', status: 'DECLINED' }));
+    const settle = vi.fn(async () => undefined);
+
+    const report = await reconcilePendingCharges({ charges: store, gateway: { refreshCharge } as never, settle }, { now: NOW });
+
+    expect(settle).not.toHaveBeenCalled();
+    expect(report).toEqual({ checked: 1, settled: 0, failed: 0 });
+  });
+
+  it('counts a decline port that throws as a failed item, never failing the sweep', async () => {
+    const store = await storeWith([{ id: 'CHAR_refused', ageMs: 10 * MIN }]);
+    const refreshCharge = vi.fn(async () => snapshot({ providerChargeId: 'CHAR_refused', status: 'DECLINED' }));
+    const decline = vi.fn(async () => {
+      throw new Error('db down');
+    });
+
+    const report = await reconcilePendingCharges(
+      { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), decline },
+      { now: NOW },
+    );
+
+    expect(report).toEqual({ checked: 1, settled: 0, failed: 1 });
+  });
 });
