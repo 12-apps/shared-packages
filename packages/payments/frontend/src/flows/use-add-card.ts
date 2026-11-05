@@ -3,7 +3,7 @@
  * surface: `POST /cards/begin` equips this browser, the shared card form and
  * tokenizer mint the instrument, `POST /cards/complete` stores it and answers
  * display metadata. Extracted from the view for the same reason
- * `use-card-checkout.ts` is: the screen stays presentational, and a story can
+ * `components/checkout/card-submit.ts` is: the screen stays presentational, and a story can
  * stage any phase by building a {@link AddCardController} literal.
  *
  * What never appears here is as deliberate as what does:

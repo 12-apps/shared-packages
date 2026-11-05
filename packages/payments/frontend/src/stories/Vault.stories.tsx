@@ -3,7 +3,7 @@ import type { JSX } from "react";
 
 import type { BuyerVaultSession } from "../components/checkout/transport";
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
-import { AddCardView } from "../flows/screens-vault";
+import { AddCardPanel } from "../flows/screens-vault";
 import type { AddCardController, AddCardPhase } from "../flows/use-add-card";
 
 import { StoryFlow } from "./host";
@@ -18,8 +18,8 @@ import { CheckoutCopyProvider } from "../components/checkout/copy-context";
  * The AT-REST states (form, unavailable, the two lists) mount the factory's
  * screens against a REAL `createPaymentFlowsBE` mount, exactly like every
  * other story here. The POST-SUBMIT states (saving, saved, declined) are one
- * buyer action past at-rest, so they stage the presentational `AddCardView`
- * with a controller literal instead — the same split `card-view.tsx` uses,
+ * buyer action past at-rest, so they stage the presentational `AddCardPanel`
+ * with a controller literal instead — the same split the checkout card uses,
  * with the state machine in `use-add-card.ts` and the pixels here.
  *
  * Note what no story offers: a delete button. PagBank publishes no token-
@@ -80,7 +80,7 @@ function StagedAddCard({ controller }: { controller: AddCardController }): JSX.E
   // would have (FUT-760).
   return (
     <CheckoutCopyProvider copy={STORY_CHECKOUT_COPY.views.screens}>
-      <AddCardView controller={controller} copy={STORY_CHECKOUT_COPY} />
+      <AddCardPanel controller={controller} copy={STORY_CHECKOUT_COPY} />
     </CheckoutCopyProvider>
   );
 }

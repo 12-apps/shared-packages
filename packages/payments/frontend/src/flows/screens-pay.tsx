@@ -5,11 +5,7 @@
 import { Box } from "@mui/material";
 import type { JSX } from "react";
 
-import { CardView } from "../components/checkout/card-view";
-import {
-  cardChain,
-  cardTokenization,
-} from "../components/checkout/method-capability";
+import { CardEntryPane } from "../components/checkout/list/card-entry";
 import { PaymentStatus as PaymentStatusView } from "../components/checkout/payment-status";
 import { PixView } from "../components/checkout/pix-view";
 import type { CheckoutOrder, OrderStatus } from "../components/checkout/types";
@@ -27,15 +23,13 @@ function buildCardEntry(runtime: FlowsRuntime): CheckoutScreens["CardEntry"] {
     onResolved: (status: OrderStatus) => void;
   }): JSX.Element {
     const { config } = useResolvedConfig(runtime);
+    // The one list's card, for a payable that already exists (FUT-3811): the
+    // chain is read VERBATIM inside (FUT-563) — nothing here filters, sorts or
+    // de-duplicates it, or failover is silently off for the store it exists for.
     return (
-      <CardView
+      <CardEntryPane
         order={payable}
-        providerConfig={cardTokenization(config)}
-        // The chain VERBATIM (FUT-563). Nothing here filters, sorts or
-        // de-duplicates it: `tokensByProvider` is sent iff the SERVER-published
-        // chain has more than one entry, so any tidying done at this layer
-        // silently disables failover for the store it exists for.
-        providerChain={cardChain(config)}
+        config={config}
         tenantSlug={runtime.useTenantSlug()}
         onResolved={onResolved}
         pollIntervalMs={runtime.config.polling?.intervalMs}

@@ -13,6 +13,27 @@ import type { ListWallet } from "./use-capability";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
 
+/**
+ * The longest card holder's name a pre-fill may carry. The strictest
+ * provider rule for the card holder's name the tokenizers send (`holder.trim()`)
+ * is 30 characters; a longer account name is left for the buyer to shorten.
+ */
+const HOLDER_PREFILL_MAX = 30;
+/** Letters (any script), spaces and the punctuation a printed name carries, typographic apostrophe included. */
+const HOLDER_PREFILL_CHARACTERS = /^[\p{L}\p{M}'\u2019 .-]+$/u;
+
+/**
+ * The card holder's name as the new card opens with it (FUT-3811): the
+ * account holder's name as stored, trimmed, never re-cased — or empty when
+ * there is no name, or one a provider would refuse as a card holder's.
+ */
+export function holderPrefill(name: string | undefined): string {
+  // NFC first, so a name stored decomposed counts each accented letter once.
+  const trimmed = name?.normalize("NFC").trim() ?? "";
+  if (trimmed.length < 2 || trimmed.length > HOLDER_PREFILL_MAX) return "";
+  return HOLDER_PREFILL_CHARACTERS.test(trimmed) ? trimmed : "";
+}
+
 /** The card the buyer pays with, as the list holds it before any order exists. */
 export interface ListCard {
   saved: SavedCard[];
@@ -55,11 +76,15 @@ export interface ListState {
  * The card the buyer is typing or has picked. It outlives every order raised
  * under it: the charge reads it when the 5-second bar fills, and a refusal
  * brings the buyer back to it as they left it.
+ *
+ * The holder opens on `holder` ({@link holderPrefill}) — read once, as the
+ * initial state: the buyer's profile is settled before the list mounts, and
+ * what they type or clear afterwards is theirs, never written over.
  */
-function useListCard(saved: SavedCard[]): ListCard {
+export function useListCard(saved: SavedCard[], holder = ""): ListCard {
   const fieldCopy = useCheckoutCopy().card.fields;
   const [selection, setSelection] = useState<string | null>(null);
-  const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
+  const [card, setCard] = useState<CardDetails>(() => ({ ...EMPTY_CARD, holder }));
   const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
   const [saveCard, setSaveCard] = useState(false);
   const complete = useMemo(() => cardComplete(card, fieldCopy), [card, fieldCopy]);
@@ -152,7 +177,8 @@ export function useListState(input: {
   const { capability } = input;
   const rows = useMemo(() => onlineRows(capability), [capability]);
   const { cards, loaded } = useSavedCardList(input.tenantSlug);
-  const card = useListCard(cards);
+  // The account holder's name, as the card holder's (FUT-3811).
+  const card = useListCard(cards, holderPrefill(input.arrivedWith?.name));
   const [choice, setChoice] = useState<CheckoutListChoice | null>(null);
   const touched = useRef(false);
   const { setSelection } = card;

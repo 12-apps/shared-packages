@@ -127,7 +127,7 @@ Then('ela vê o formulário de cartão', async ({ page }) => {
 });
 
 Then('nenhum formulário de cartão é mostrado', async ({ page }) => {
-  await expect(page.getByTestId('card-view')).toHaveCount(0);
+  await expect(page.getByTestId('card-entry')).toHaveCount(0);
   await expect(page.getByTestId('card-number')).toHaveCount(0);
 });
 
@@ -194,7 +194,7 @@ Then('ela recebe a opção de chamar o garçom', async ({ page }) => {
 Then('nenhuma forma de pagamento é oferecida', async ({ page }) => {
   await expect(page.locator('[data-testid^="list-option-"]')).toHaveCount(0);
   await expect(page.getByTestId('list-pay')).toHaveCount(0);
-  await expect(page.getByTestId('card-view')).toHaveCount(0);
+  await expect(page.getByTestId('card-entry')).toHaveCount(0);
   await expect(page.getByTestId('pix-view')).toHaveCount(0);
 });
 

@@ -8,7 +8,7 @@ import type { ChargeOutcome, CheckoutOrder, OnCheckoutResolved } from "./types";
  * WHAT HAPPENS TO A CHARGE'S ANSWER — the two endings a card submit can have
  * that are not "keep polling".
  *
- * Split out of `./use-card-checkout.ts`, which is at its size ceiling. Both
+ * Split out of `./card-submit.ts`, which is at its size ceiling. Both
  * halves are about the same moment: the provider has answered, and the buyer
  * is either being sent somewhere or being told something.
  */

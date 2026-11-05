@@ -4,7 +4,7 @@
  *
  * `PAYMENT_UNRESOLVED` means some provider may be holding the buyer's money and
  * no probe could say. It is the one refusal where inviting a retry is actively
- * harmful, and both checkout surfaces used to do exactly that: the card view
+ * harmful, and both checkout surfaces used to do exactly that: the card entry
  * put "não pague de novo" under a danger heading reading "Não foi possível
  * pagar", with the live "Pagar R$ …" bar directly beneath it; the Pagamento
  * step gave the same body a solid "Tentar novamente" that mints a SECOND order
@@ -26,7 +26,7 @@ const client = vi.hoisted(() => ({
 
 vi.mock("../client", () => client);
 
-import { CardView } from "../card-view";
+import { CardEntryPane } from "../list/card-entry";
 import { PaymentErrorPanel } from "../payment-error-panel";
 import type { CheckoutOrder } from "../types";
 
@@ -69,17 +69,21 @@ afterEach(() => {
   cleanup();
 });
 
-describe("the CARD view", () => {
+describe("the CARD entry", () => {
   /** Render the card form and drive a submit whose charge comes back `code`d. */
   async function submitWith(failure: { error: string; code?: string }): Promise<void> {
     client.chargeCard.mockResolvedValue({ ok: false, ...failure });
     render(
-      <CardView
+      <CardEntryPane
         order={ORDER}
-        providerConfig={{ provider: "pagbank", publicKey: null, mockTokenization: true }}
-        providerChain={[
-          { provider: "pagbank", publicKey: null, mockTokenization: true, mintable: true },
-        ]}
+        config={{
+          provider: "pagbank",
+          tokenization: "PUBLIC_KEY",
+          publicKey: null,
+          mockTokenization: true,
+          methods: ["CARD"],
+          chain: [{ provider: "pagbank", tokenization: "PUBLIC_KEY", publicKey: null, mockTokenization: true, methods: ["CARD"] }],
+        }}
         onResolved={vi.fn()}
       />,
     );

@@ -14,11 +14,11 @@ import { useEffect, useRef, type JSX } from "react";
 import type { CardChainLink } from "../method-capability";
 import { NEW_CARD, type CardTokenizationConfig } from "../../../card";
 import { useRefreshOnCartChanged } from "../cart-changed";
-import { SubmittedState } from "../card-view";
+import { SubmittedState } from "../charge-states";
 import type { ChallengeScope } from "../card-outcome";
 import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo, CheckoutOrder, CheckoutWalletType, OnCheckoutResolved } from "../types";
-import { useCardSubmit } from "../use-card-checkout";
+import { useCardSubmit } from "../card-submit";
 import type { DebitAuthentication } from "../debit-charge";
 import { useWalletCharge } from "../use-wallet-charge";
 

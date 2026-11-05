@@ -249,8 +249,6 @@ export interface WalletCopy {
      */
     buttonLocale: string;
   };
-  /** The divider under the wallet buttons, pointing at the form below. */
-  orPayWithCard: string;
 }
 
 /** The interstitial before a buyer leaves for a provider's own page. */

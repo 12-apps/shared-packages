@@ -402,7 +402,13 @@ const production = createHomologacaoEvidence({
   pack's sentences. Both shipped packs fill it.
 - The buyer checkout: mount `createPaymentFlows(...).Checkout` (below) — its
   Pagamento step is the one payment list. The standalone `CheckoutPayment`
-  method-card step was removed with the tabbed checkout (FUT-4028).
+  method-card step was removed with the tabbed checkout (FUT-4028), and the
+  tabbed checkout's last pieces — the card view, its hook, the `pix-and-card`
+  provider screen and the wallet pane — with FUT-3811. A payable that already
+  exists is paid with `flows.screens.PixPayment` and `flows.screens.CardEntry`
+  (below); `CardEntry` is the list's own card and charge. On the list, "Nome
+  impresso no cartão" opens filled with `defaultBuyer.name`, trimmed, unless
+  the name is not one a card prints; the buyer's own edit is never overwritten.
 
 ### The activation step, mounted (`createActivationStep`, FUT-764)
 

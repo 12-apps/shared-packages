@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-// Internal, deliberately: the assembled fast-lane story mounts the same
-// non-exported screen `ProviderScreens.stories.tsx` reviews — the pane the
-// factory places for a `pix-and-card` store — so the wallet chain is consumed
-// where production consumes it.
-import { PixAndCardScreen } from "../components/checkout/providers/pix-and-card";
 import {
   APPLE_PAY_SUPPORTED_NETWORKS,
   ApplePayButton,
@@ -24,14 +19,11 @@ import type {
   GooglePayApi,
   GooglePaymentData,
   GooglePaymentsClient,
-  PaymentFlows,
 } from "../index";
 
 import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 
 import { STORY_CHECKOUT_COPY } from "./demo-copy";
-import { raisePayable, StoryFlow } from "./host";
-import type { StoryWorld } from "./store";
 
 /**
  * The words these two buttons render, from the story host's own pack
@@ -51,8 +43,8 @@ function WithWalletCopy({ children }: { children: ReactNode }): JSX.Element {
  * The WALLET buttons on their own (FUT-471/472).
  *
  * `GooglePayButton` and `ApplePayButton` own token ACQUISITION only — the
- * charge, the polling and the outcome belong to the pane above them
- * (`wallet-pane.tsx`) — so unlike every sibling story file there is no
+ * charge, the polling and the outcome belong to whoever mounts them (the one
+ * list runs its own sheets, `PaymentListWallets.stories.tsx`) — so unlike every sibling story file there is no
  * `StoryFlow`/store here: the buttons never talk to the wire. What a story
  * must fake instead is the BROWSER's wallet surface (`window.ApplePaySession`,
  * `google.payments.api`), the exact seams Safari and `pay.js` provide.
@@ -196,9 +188,6 @@ function googlePayApiOf(script: GoogleSheetScript): GooglePayApi {
   return { PaymentsClient: StoryPaymentsClient };
 }
 
-/** The buyer whose CPF the mount's default schema demands (FUT-595). */
-const WALLET_BUYER = { name: "Ana Compradora", email: "ana@exemplo.com", taxId: "52998224725" };
-
 /** The `window.google` slot, as far as these stories touch it. */
 interface GoogleWindow {
   google?: { payments: { api: GooglePayApi } };
@@ -235,8 +224,8 @@ function WithGooglePayApi({
 }
 
 /**
- * The pane's Google seam, minus the charge: `googlePayConfig` gates mounting
- * exactly as `wallet-pane.tsx` does, and every callback lands in the log.
+ * The button's Google seam, minus the charge: `googlePayConfig` gates mounting
+ * as a host composing its own pixels would, and every callback lands in the log.
  */
 function GooglePayDemo({
   config,
@@ -604,7 +593,7 @@ function GateList({ title, rows }: { title: string; rows: [string, string][] }):
  * Every clause of the two store-side gates (`googlePayConfig` and
  * `applePayDeclared`, both fail-closed) and of the device-side one
  * (`applePaySupported`, evaluated live under scoped fakes) — the exact reads
- * `wallet-pane.tsx` composes before either button may mount.
+ * a host composes before either button may mount.
  */
 /** A config with NO chain at all — what an older host publishes. */
 function chainlessStore(): CheckoutProviderConfig {
@@ -703,104 +692,3 @@ export const CapabilityGates: StoryObj = {
     );
   },
 };
-
-// ---------------------------------------------------------------------------
-// The fast lane ASSEMBLED — the pane, on a real mount that declares wallets
-// ---------------------------------------------------------------------------
-
-/**
- * The pane's half of the story, everything from the MOUNT: the config is
- * `flows.useCheckoutConfig()`'s read (the real projection publishing the chain
- * head's `wallets` + `googlePay` — the button demos above hand-build exactly
- * this shape), and the order is a payable RAISED on the mount, not a literal.
- * If the projection dropped either wallet field, the buttons here vanish and
- * the render suite's markers fail — which is the tripwire the hand-built
- * stories cannot be.
- */
-function AssembledPane({
-  flows,
-  world,
-}: {
-  flows: PaymentFlows;
-  world: StoryWorld;
-}): JSX.Element | null {
-  const { config } = flows.useCheckoutConfig();
-  const [order, setOrder] = useState<CheckoutOrder | null>(null);
-  const [outcome, setOutcome] = useState<string | null>(null);
-  useEffect(() => {
-    void raisePayable(world, { method: "CARD", buyer: WALLET_BUYER, saveProfile: false }).then(
-      (result) => {
-        if (result.ok) setOrder(result.data);
-      },
-    );
-  }, [world]);
-  if (!config || !order) return null;
-  return (
-    <>
-      <PixAndCardScreen
-        order={order}
-        buyer={WALLET_BUYER}
-        config={config}
-        method="CARD"
-        onResolved={(status) => setOutcome(status)}
-        validateApplePayMerchant={() => Promise.resolve({ merchantSession: "sessao-aurora" })}
-      />
-      <p style={{ opacity: 0.6, fontSize: 12 }}>
-        onResolved: <code>{outcome ?? "— ainda nada —"}</code>
-      </p>
-    </>
-  );
-}
-
-/**
- * `WalletCardPane`, whole (FUT-471/472/563): both wallet buttons above the
- * divider — "ou pague com cartão" renders only once something sits over it —
- * and the full card form below, none of it replaced or duplicated by the
- * wallet lane. The chain head declares both wallets ON THE STORE
- * (`store-adapter.ts` publishes them through the real gateway stamp), the
- * fakes supply the DEVICE half, and `PixAndCardScreen` is the same resolution
- * step production takes to reach the pane.
- *
- * Drive it: either wallet runs its sheet to a key and charges the mount for
- * real — the pane swaps every pay control for the processing state while it
- * does (one charge at a time, by construction) and `onResolved` reports the
- * landed status underneath.
- */
-export const WalletFastLaneAssembled: StoryObj = {
-  name: "A via rápida montada — botões, divisor e formulário",
-  render: () => (
-    <WalletSurface>
-      <StoryFlow
-        spec={{
-          chain: [
-            {
-              name: "aurora",
-              methods: ["PIX", "CARD"],
-              stub: true,
-              publicKey: null,
-              wallets: ["GOOGLE_PAY", "APPLE_PAY"],
-              googlePayMerchantId: "MID_LOJA_1",
-            },
-          ],
-        }}
-      >
-        {(flows, world) => (
-          <flows.Provider>
-            <AssembledPane flows={flows} world={world} />
-          </flows.Provider>
-        )}
-      </StoryFlow>
-    </WalletSurface>
-  ),
-};
-
-/** Both browser wallet surfaces, scoped to the assembled story's subtree. */
-function WalletSurface({ children }: { children: ReactNode }): JSX.Element {
-  const [api] = useState(() => googlePayApiOf({ ready: true, outcome: "authorize" }));
-  const [Session] = useState(() => applePaySessionOf({ canPay: true, sheet: "authorize" }));
-  return (
-    <WithGooglePayApi api={api}>
-      <WithApplePaySession Session={Session}>{children}</WithApplePaySession>
-    </WithGooglePayApi>
-  );
-}

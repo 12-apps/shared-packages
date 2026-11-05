@@ -1,30 +1,20 @@
 // @vitest-environment jsdom
 /**
- * FUT-471 — the Google Pay fast lane of the CARD pane.
+ * FUT-471 — the Google Pay button, on its own.
  *
  * The pay.js surface is faked at the same seam the real page uses (the
  * `google.payments.api` global), so these drive the four steps of Google's
  * guide in order: `isReadyToPay` gates rendering, `createButton` supplies the
- * element, `loadPaymentData` yields the token, and the token reaches the
- * charge call with the buyer's CPF. The charge itself goes through a fake
- * `CheckoutClient`, which is the seam the wire contract suite pins from both
- * ends.
+ * element, `loadPaymentData` yields the token, and the token is handed to the
+ * caller. What the caller does with it — the one list's charge — is pinned in
+ * `payment-list-wallet.test.tsx`.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "./test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { err, ok } from "../../../result";
-import { CheckoutClientProvider } from "../client-context";
-import { UNRESOLVED_CODE } from "../failure-codes";
-import { paymentDataRequest, type GooglePayApi } from "../google-pay-button";
-import type { CheckoutClient } from "../transport";
-import type {
-  ChargeWalletInput,
-  CheckoutOrder,
-  CheckoutProviderConfig,
-  OrderStatus,
-} from "../types";
-import { WalletCardPane } from "../wallet-pane";
+import { GooglePayButton, paymentDataRequest, type GooglePayApi } from "../google-pay-button";
+import { googlePayConfig } from "../method-capability";
+import type { CheckoutOrder, CheckoutProviderConfig } from "../types";
 
 afterEach(() => {
   cleanup();
@@ -106,111 +96,59 @@ function installFakeApi(options: FakeApiOptions = {}) {
   return calls;
 }
 
-interface FakeClientOptions {
-  chargeResult?: Awaited<ReturnType<CheckoutClient["chargeWallet"]>>;
-  statusResult?: OrderStatus;
-}
+const PARAMS = { gateway: "pagbank", gatewayMerchantId: "MID_1" };
 
-/** A bound client whose wallet charges are recorded and scripted. */
-function fakeClient(options: FakeClientOptions = {}) {
-  const walletCharges: ChargeWalletInput[] = [];
-  const client: CheckoutClient = {
-    getConfig: async () => err("not in this test"),
-    getStatus: async () => ok<OrderStatus>(options.statusResult ?? "PAID"),
-    releaseCheckout: async () => err("not in this test"),
-    charge: async () => err("not in this test"),
-    chargeWallet: async (input) => {
-      walletCharges.push(input);
-      return options.chargeResult ?? ok({ status: "AWAITING_PAYMENT" as OrderStatus });
-    },
-    listInstruments: async () => [],
-    beginVault: async () => err("not in this test"),
-    completeVault: async () => err("not in this test"),
-    refreshBrowserKey: async () => ok({ publicKey: null }),
-  };
-  return { client, walletCharges };
-}
-
-function renderPane(
-  client: CheckoutClient,
-  config: CheckoutProviderConfig,
-  onResolved: (status: OrderStatus) => void = () => undefined,
-): void {
-  render(
-    <CheckoutClientProvider client={client}>
-      <WalletCardPane
-        order={ORDER}
-        buyer={{ taxId: "529.982.247-25" }}
-        config={config}
-        method="CARD"
-        onResolved={onResolved}
-        pollIntervalMs={5}
-      />
-    </CheckoutClientProvider>,
-  );
+function renderButton() {
+  const onKey = vi.fn();
+  const onError = vi.fn();
+  render(<GooglePayButton order={ORDER} params={PARAMS} onKey={onKey} onError={onError} />);
+  return { onKey, onError };
 }
 
 describe("GooglePayButton — the four steps gate rendering", () => {
-  it("renders Google's button beside the card form once isReadyToPay approves", async () => {
+  it("renders Google's button once isReadyToPay approves", async () => {
     const calls = installFakeApi({ ready: true });
-    renderPane(fakeClient().client, walletConfig());
+    renderButton();
 
     await screen.findByTestId("google-pay-native");
     expect(screen.getByTestId("google-pay-button")).toBeTruthy();
-    // The card form is the fallback and stays offered next to the wallet.
-    expect(screen.getByTestId("card-view")).toBeTruthy();
     // Production requires Google's external registration; TEST is the default.
     expect(calls.environments).toEqual(["TEST"]);
   });
 
   it("renders no button when isReadyToPay refuses this browser", async () => {
-    installFakeApi({ ready: false });
-    renderPane(fakeClient().client, walletConfig());
+    const calls = installFakeApi({ ready: false });
+    renderButton();
 
-    await screen.findByTestId("card-view");
-    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
-  });
-
-  it("renders no button for a chain head that never declared the wallet", async () => {
-    installFakeApi({ ready: true });
-    renderPane(fakeClient().client, walletConfig({ wallets: [], googlePay: null }));
-
-    await screen.findByTestId("card-view");
-    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
-  });
-
-  it("renders no button when the connection carries no gatewayMerchantId", async () => {
-    // A token minted against a missing merchant id charges nobody — fail
-    // CLOSED, unlike the picker's fail-open method reads.
-    installFakeApi({ ready: true });
-    renderPane(
-      fakeClient().client,
-      walletConfig({ googlePay: { gateway: "pagbank", gatewayMerchantId: null } }),
-    );
-
-    await screen.findByTestId("card-view");
+    await waitFor(() => expect(calls.environments).toEqual(["TEST"]));
     await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
   });
 });
 
-describe("GooglePayButton — the token becomes the charge", () => {
-  it("charges the wallet key with the buyer's CPF and the published gateway params", async () => {
+describe("googlePayConfig — the store's half of the gate, fail-closed", () => {
+  it("publishes the head's parameters when it declares the wallet", () => {
+    expect(googlePayConfig(walletConfig())).toMatchObject(PARAMS);
+  });
+
+  it("is null for a chain head that never declared the wallet", () => {
+    expect(googlePayConfig(walletConfig({ wallets: [], googlePay: null }))).toBeNull();
+  });
+
+  it("is null when the connection carries no gatewayMerchantId", () => {
+    // A token minted against a missing merchant id charges nobody.
+    expect(googlePayConfig(walletConfig({ googlePay: { gateway: "pagbank", gatewayMerchantId: null } }))).toBeNull();
+  });
+});
+
+describe("GooglePayButton — the sheet's answer", () => {
+  it("hands over the token, from a request built on the published gateway params", async () => {
     const calls = installFakeApi({ token: "gp_tok_42" });
-    const { client, walletCharges } = fakeClient({
-      chargeResult: ok({ status: "FAILED" as OrderStatus }),
-    });
-    const resolved: OrderStatus[] = [];
-    renderPane(client, walletConfig(), (status) => resolved.push(status));
+    const { onKey, onError } = renderButton();
 
     fireEvent.click(await screen.findByTestId("google-pay-native"));
 
-    await waitFor(() => expect(walletCharges).toHaveLength(1));
-    expect(walletCharges[0]).toEqual({
-      orderId: "order-1",
-      wallet: { type: "GOOGLE_PAY", key: "gp_tok_42" },
-      taxId: "52998224725",
-    });
-    // The tokenizationSpecification came from the chain head, not a literal.
+    await waitFor(() => expect(onKey).toHaveBeenCalledWith("gp_tok_42"));
+    expect(onError).not.toHaveBeenCalled();
     expect(calls.loadRequests[0]).toMatchObject({
       allowedPaymentMethods: [
         {
@@ -223,79 +161,28 @@ describe("GooglePayButton — the token becomes the charge", () => {
       ],
       transactionInfo: { totalPrice: "75.00", currencyCode: "BRL", totalPriceStatus: "FINAL" },
     });
-    // A business outcome (decline → FAILED) resolves the step immediately.
-    await waitFor(() => expect(resolved).toEqual(["FAILED"]));
   });
 
-  it("an accepted charge polls to confirmation, with every pay control gone", async () => {
-    installFakeApi({});
-    const { client } = fakeClient({
-      chargeResult: ok({ status: "AWAITING_PAYMENT" as OrderStatus }),
-      statusResult: "PAID",
-    });
-    const resolved: OrderStatus[] = [];
-    renderPane(client, walletConfig(), (status) => resolved.push(status));
-
-    fireEvent.click(await screen.findByTestId("google-pay-native"));
-
-    // While confirming, neither the wallet button nor the card form may offer
-    // a second payment.
-    await waitFor(() => expect(screen.queryByTestId("card-view")).toBeNull());
-    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
-    await waitFor(() => expect(resolved).toEqual(["PAID"]));
-  });
-
-  it("an unresolved refusal removes every pay control and warns, not blames", async () => {
-    installFakeApi({});
-    const { client } = fakeClient({
-      chargeResult: err("Estamos confirmando seu pagamento.", UNRESOLVED_CODE),
-    });
-    renderPane(client, walletConfig());
-
-    fireEvent.click(await screen.findByTestId("google-pay-native"));
-
-    await screen.findByTestId("wallet-unresolved");
-    await waitFor(() => expect(screen.queryByTestId("card-view")).toBeNull());
-    await waitFor(() => expect(screen.queryByTestId("google-pay-button")).toBeNull());
-  });
-
-  it("a refused charge returns to the form with the refusal shown", async () => {
-    installFakeApi({});
-    const { client } = fakeClient({ chargeResult: err("Cartão recusado.") });
-    renderPane(client, walletConfig());
-
-    fireEvent.click(await screen.findByTestId("google-pay-native"));
-
-    await screen.findByTestId("wallet-error");
-    // Not unresolved — the buyer may try again, so the controls stay.
-    expect(screen.getByTestId("card-view")).toBeTruthy();
-    expect(screen.getByTestId("google-pay-button")).toBeTruthy();
-  });
-
-  it("a dismissed sheet charges nothing and says nothing", async () => {
-    installFakeApi({ rejectWith: { statusCode: "CANCELED" } });
-    const { client, walletCharges } = fakeClient();
-    renderPane(client, walletConfig());
+  it("a dismissed sheet hands over nothing and says nothing", async () => {
+    const calls = installFakeApi({ rejectWith: { statusCode: "CANCELED" } });
+    const { onKey, onError } = renderButton();
 
     fireEvent.click(await screen.findByTestId("google-pay-native"));
 
     // Closing the sheet is a choice, not a failure to report.
-    await screen.findByTestId("card-view");
-    expect(walletCharges).toHaveLength(0);
-    await waitFor(() => expect(screen.queryByTestId("wallet-sheet-error")).toBeNull());
-    await waitFor(() => expect(screen.queryByTestId("wallet-error")).toBeNull());
+    await waitFor(() => expect(calls.loadRequests).toHaveLength(1));
+    await waitFor(() => expect(onError).not.toHaveBeenCalled());
+    expect(onKey).not.toHaveBeenCalled();
   });
 
-  it("a sheet failure is reported while the card form stays usable", async () => {
+  it("a sheet failure is reported", async () => {
     installFakeApi({ rejectWith: { statusCode: "DEVELOPER_ERROR" } });
-    const { client, walletCharges } = fakeClient();
-    renderPane(client, walletConfig());
+    const { onKey, onError } = renderButton();
 
     fireEvent.click(await screen.findByTestId("google-pay-native"));
 
-    await screen.findByTestId("wallet-sheet-error");
-    expect(walletCharges).toHaveLength(0);
-    expect(screen.getByTestId("card-view")).toBeTruthy();
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onKey).not.toHaveBeenCalled();
   });
 });
 

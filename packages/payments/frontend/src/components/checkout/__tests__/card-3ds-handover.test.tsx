@@ -31,7 +31,7 @@ vi.mock("../client", () => client);
 
 import type { CardTokenizationConfig } from "../../../card";
 import type { CheckoutOrder, OrderStatus } from "../types";
-import { useCardCheckout } from "../use-card-checkout";
+import { useSubmitHarness } from "./card-submit-harness";
 
 const ORDER: CheckoutOrder = {
   orderId: "o1",
@@ -61,9 +61,12 @@ const SAVED_CARD = {
 };
 
 function Harness({ onResolved }: { onResolved: (status: OrderStatus) => void }): JSX.Element {
-  const cc = useCardCheckout(ORDER, {}, STRIPE_CONFIG, onResolved, 10, "acme", [], false, {
+  const cc = useSubmitHarness({
+    order: ORDER,
+    config: STRIPE_CONFIG,
+    onResolved,
     tenantSlug: "acme",
-    basket: { signature: "line-1x2", ready: true },
+    scope: { tenantSlug: "acme", basket: { signature: "line-1x2", ready: true } },
   });
   return (
     <div>

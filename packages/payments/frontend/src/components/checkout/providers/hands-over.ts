@@ -1,11 +1,9 @@
 /**
  * Whether a store finishes checkout on the PROVIDER's own page.
  *
- * Its own module because two callers need the same answer and must never be
- * able to disagree about it: {@link CapabilityDefaultScreen}, which picks the
- * pane for a provider that declared no screen, and the shell's picker gate,
- * which decides whether the buyer is asked PIX-or-card here at all. It lived
- * inside `capability-default.tsx` while there was one caller.
+ * Its own module so the answer has one home: `./registry.ts` falls back to it
+ * for a provider that declared no screen (or one this bundle does not know),
+ * and the list's hand-off row is decided from that.
  */
 import type { CheckoutChainLink, CheckoutProviderConfig } from "../types";
 

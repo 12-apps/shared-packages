@@ -29,10 +29,10 @@ import { usePaymentPolling } from "./use-payment-polling";
  * may already be holding the buyer's money is the double-payment invitation
  * the card view already refuses to render.
  */
-export type WalletPhase = "idle" | "charging" | "polling";
+type WalletPhase = "idle" | "charging" | "polling";
 
 /** Everything a wallet pane renders — state plus the one submit entry point. */
-export interface WalletCharge {
+interface WalletCharge {
   phase: WalletPhase;
   /** The refusal to show above the form, when the charge came back refused. */
   error: string | null;

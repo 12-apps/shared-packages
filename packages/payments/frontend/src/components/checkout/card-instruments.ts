@@ -33,7 +33,7 @@ export type RefreshBrowserKey = (input: {
  * contribution to card failover is here — take the card the buyer typed ONCE,
  * and produce an instrument for each entry of the chain the server published.
  *
- * Split out of `use-card-checkout.ts` so the hook stays about SUBMIT state:
+ * Split out of `card-submit.ts` so the hook stays about SUBMIT state:
  * nothing in this module touches React.
  */
 

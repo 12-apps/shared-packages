@@ -1,19 +1,19 @@
-import { useEffect, useState } from "react";
+/**
+ * The card charge's submit machine (FUT-58): validate → tokenize (self-heal) →
+ * charge → poll for the async confirmation.
+ *
+ * The one list (`./list/charge-runners.tsx`) and the factory's card entry
+ * (`./list/card-entry.tsx`) both run it; neither owns a copy. It holds no card
+ * state of its own: the screen that draws the fields hands them in as
+ * {@link CardFormState}.
+ */
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
-  NEW_CARD,
-  detectBrand,
-  onlyDigits,
   plainTaxId,
-  validateCardNumber,
-  validateCvv,
-  validateExpiry,
-  validateHolder,
-  type CardBrand,
   type CardDetails,
   type CardFieldErrors,
   type CardTokenizationConfig,
-  type SavedCard,
 } from "../../card";
 import { err, ok, type Result } from "../../result";
 
@@ -23,7 +23,7 @@ import {
   type RefreshBrowserKey,
 } from "./card-instruments";
 import { handOverToChallenge, reportResolved, type ChallengeScope } from "./card-outcome";
-import { useCardPublicKey, useSavedCards } from "./card-sources";
+import { useCardPublicKey } from "./card-sources";
 import { useCheckoutClientApi } from "./client-context";
 import { useCheckoutNavigate } from "./navigate-context";
 import type { CardChainLink } from "./method-capability";
@@ -34,27 +34,13 @@ import { usePaymentPolling } from "./use-payment-polling";
 import type { CardCopy } from "../../card/copy";
 import { useCheckoutCopy } from "./copy-context";
 
-const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
-
-
-/** Everything the card view renders — all checkout state + the submit handler. */
-export interface CardCheckout {
-  savedCards: SavedCard[];
-  selection: string;
-  setSelection: (id: string) => void;
-  usingNewCard: boolean;
-  card: CardDetails;
-  setCard: React.Dispatch<React.SetStateAction<CardDetails>>;
-  fieldErrors: CardFieldErrors;
-  setFieldErrors: React.Dispatch<React.SetStateAction<CardFieldErrors>>;
-  brand: CardBrand;
-  saveCard: boolean;
-  setSaveCard: (checked: boolean) => void;
+/** What a card charge reports while it runs — the screen around it draws from this. */
+export interface CardSubmit {
+  submitting: boolean;
+  submitted: boolean;
   error: string | null;
   /** The failure's machine code, when the server sent one — drives PRESENTATION. */
   errorCode: string | null;
-  submitting: boolean;
-  submitted: boolean;
   /**
    * The last status poll failed. TRANSIENT (FUT-1144): the wait carries on at a
    * backed-off cadence and this clears on the next success, so the view shows
@@ -74,14 +60,14 @@ export interface CardCheckout {
   handlePay: () => Promise<void>;
 }
 
-/** The form inputs the submit handler reads (owned by {@link useCardCheckout}). */
+/** The form inputs the submit handler reads — owned by the screen that draws the fields. */
 interface CardFormState {
   card: CardDetails;
   usingNewCard: boolean;
   selection: string;
   saveCard: boolean;
   validate: () => CardFieldErrors;
-  setFieldErrors: React.Dispatch<React.SetStateAction<CardFieldErrors>>;
+  setFieldErrors: Dispatch<SetStateAction<CardFieldErrors>>;
   /** Charge the card as DEBIT, after its 3-D Secure (FUT-3754). */
   debit?: DebitAuthentication;
 }
@@ -109,20 +95,6 @@ async function chargeBodyOf(
   if (!authenticated.ok) return authenticated;
   return ok({ ...body, tokensByProvider: undefined, saveCard: false, funding: "DEBIT", authenticationId: authenticated.data });
 }
-
-/** The submit slice of {@link useCardCheckout}. */
-type CardSubmit = Pick<
-  CardCheckout,
-  | "submitting"
-  | "submitted"
-  | "error"
-  | "errorCode"
-  | "pollError"
-  | "pollTimedOut"
-  | "pollCheckAgain"
-  | "keyPending"
-  | "handlePay"
->;
 
 /**
  * The card AWAITING wait, bounded in WALL TIME: 90 s (FUT-191, FUT-1144).
@@ -261,7 +233,7 @@ export function useCardSubmit(
     if (!charged.ok) {
       setError(charged.error); // transport/validation problem — stay on the form
       // An UNRESOLVED charge is not a decline: some provider may be holding the
-      // money, so the view must not dress it as one (`card-view.tsx`).
+      // money, so the view must not dress it as one (`./charge-states.tsx`).
       setErrorCode(charged.code ?? null);
       setSubmitting(false);
       return;
@@ -278,70 +250,4 @@ export function useCardSubmit(
   };
 
   return { submitting, submitted, error, errorCode, ...wait, keyPending, handlePay };
-}
-
-/**
- * All card-payment state + the async submit handler (FUT-58), extracted so the
- * card view stays presentational.
- */
-export function useCardCheckout(
-  order: CheckoutOrder,
-  buyer: BuyerInfo,
-  providerConfig: CardTokenizationConfig,
-  onResolved: OnCheckoutResolved,
-  pollIntervalMs: number,
-  /** The store whose saved cards may be offered (host routing owns the slug). */
-  tenantSlug?: string,
-  /**
-   * The merchant's ordered provider chain (FUT-563) — one instrument is minted
-   * per entry so a card charge can fail over. Omitted ⇒ the head alone.
-   */
-  providerChain: readonly CardChainLink[] = [],
-  /** Do not preselect a saved card — the last one was refused (FUT-1145). */
-  freshInstrument = false,
-  /** WHOSE store and WHICH basket, for the 3-D Secure hand-off's parked order. */
-  scope: ChallengeScope = {},
-): CardCheckout {
-  const { savedCards, selection, setSelection } = useSavedCards(tenantSlug, freshInstrument);
-  const [card, setCard] = useState<CardDetails>(EMPTY_CARD);
-  const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
-  const [saveCard, setSaveCard] = useState(false);
-
-  const brand = detectBrand(onlyDigits(card.number));
-  const usingNewCard = selection === NEW_CARD;
-
-  const cardCopy = useCheckoutCopy().card;
-  const fieldCopy = cardCopy.fields;
-  const validate = (): CardFieldErrors => ({
-    number: validateCardNumber(card.number, fieldCopy),
-    holder: validateHolder(card.holder, fieldCopy),
-    expiry: validateExpiry(card.expiry, fieldCopy),
-    cvv: validateCvv(card.cvv, fieldCopy, brand),
-  });
-
-  const submit = useCardSubmit(
-    order,
-    buyer,
-    providerConfig,
-    onResolved,
-    pollIntervalMs,
-    { card, usingNewCard, selection, saveCard, validate, setFieldErrors },
-    providerChain,
-    scope,
-  );
-
-  return {
-    savedCards,
-    selection,
-    setSelection,
-    usingNewCard,
-    card,
-    setCard,
-    fieldErrors,
-    setFieldErrors,
-    brand,
-    saveCard,
-    setSaveCard,
-    ...submit,
-  };
 }
