@@ -6,7 +6,7 @@ import {
   PT_BR_UI_LABELS,
 } from "@12-apps/ui/pt-BR";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 
 /**
  * The pt-BR pack for the discounts admin screens.
@@ -18,7 +18,7 @@ import type { DiscountsWebCopy } from "./copy";
  * module is imported by `createWebDiscounts` — the key names travel, the words
  * do not.
  */
-export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
+export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   screen: {
     title: "Descontos",
     aboutTitle: "Sobre os descontos",
@@ -76,6 +76,18 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     },
   },
   window: {
+    daysUnknown: "Datas indisponíveis",
+    daysUnknownList: "Datas indisponíveis em algumas promoções e bloqueadas em todas: o fuso horário da loja não foi reconhecido.",
+    daysUnknownForm:
+      "Datas indisponíveis: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    daysUnknownBoxes: "Sem datas: veja o aviso acima.",
+    daysUnknownPaused: "Datas indisponíveis · Pausada",
+    datesLockedForm:
+      "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    datesLockedBoxes: "Datas bloqueadas: veja o aviso acima.",
+    datesLockedList: "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    datesLockedCreate: "Sem datas: a promoção vale a partir de agora, sem término.",
+    openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
     from: "A partir de {date}",
     until: "Até {date}",
@@ -171,6 +183,12 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameRequired: "Informe o nome da promoção.",
     nameTooShort: "O nome precisa ter pelo menos 2 letras.",
     datePlaceholder: "DD/MM/AAAA",
+    calendar: {
+      locale: "pt-BR",
+      label: PT_BR_UI_LABELS.dateRangePicker.calendar,
+      previousMonth: PT_BR_UI_LABELS.calendar.previousMonth,
+      nextMonth: PT_BR_UI_LABELS.calendar.nextMonth,
+    },
     invalidDate: "Data inexistente. Use DD/MM/AAAA, como 25/12/2026.",
     dateIncomplete: "Termine a data: DD/MM/AAAA.",
     invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
@@ -191,6 +209,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidPerBuyerLimit: "Informe um número inteiro por cliente, a partir de 1, ou deixe em branco.",
     wholeNumberOnly: "Use só números inteiros, sem vírgula.",
     endsBeforeStarts: "A data de término deve ser posterior à data de início.",
+    endsBeforeStartDay: "A data de término não pode ser anterior à data de início.",
   },
   comboRewards: {
     labels: { PERCENTAGE: "Porcentagem", FIXED_AMOUNT: "Valor fixo", BUNDLE_PRICE: "Preço fechado" },

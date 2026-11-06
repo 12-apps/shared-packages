@@ -3,6 +3,7 @@ import type { DiscountSchedule } from "../engine/schedule";
 
 import { fill, type DiscountsWebCopy } from "./copy";
 import { formatScheduleCell } from "./schedule-summary";
+import { completeWebCopy } from "./copy-fallback";
 
 /**
  * Money, percentages and dates — as ONE locale's reader expects them, and as
@@ -36,6 +37,11 @@ export interface DiscountsFormatters {
   parseDecimal(typed: string): number | null;
   /** A number as the operator would type it back ("12.5" → "12,5"). */
   toInput(value: number): string;
+  /**
+   * The locale these format in — what a pack missing an optional sentence is
+   * filled in from (review round 6). Optional: a host's own formatters omit it.
+   */
+  readonly locale?: string;
 }
 
 /** The decimal separator this locale writes, read from `Intl` rather than guessed. */
@@ -57,6 +63,7 @@ export function createFormatters(locale: string, currency: string): DiscountsFor
   const group = groupSeparator(locale);
 
   return {
+    locale,
     money: (cents) => (cents === null ? EMPTY : money.format(cents / 100)),
     percent: (basisPoints) =>
       basisPoints === null ? EMPTY : `${percent.format(basisPoints / 100)}%`,
@@ -105,7 +112,7 @@ export function formatDiscountValue(
  * mean very different things when it is not running yet.
  */
 export function formatWindow(
-  row: { startsAt: string | null; endsAt: string | null; schedule?: DiscountSchedule | null },
+  row: PeriodRow & { schedule?: DiscountSchedule | null },
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
 ): string {
@@ -117,12 +124,24 @@ export function formatWindow(
   return schedule === null ? period : fill(copy.schedule.windowWithSchedule, { window: period, schedule });
 }
 
-function formatPeriod(
-  row: { startsAt: string | null; endsAt: string | null },
-  formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
-): string {
-  const { startsAt, endsAt } = row;
+/** A window's two bounds, as days when the server sent them (FUT-4482). */
+interface PeriodRow {
+  startsAt: string | null;
+  endsAt: string | null;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  daysUnknown?: boolean;
+}
+
+function formatPeriod(row: PeriodRow, formatters: DiscountsFormatters, copy: DiscountsWebCopy): string {
+  // Days the server cannot place are said as such, never formatted from the
+  // instants in a zone that is not the store's.
+  // Completed here, not trusted to the caller: `formatWindow` is exported, and a host may hand it its own pack.
+  if (row.daysUnknown === true) return completeWebCopy(copy, formatters.locale).window.daysUnknown;
+  // The days the rule runs on in the store's zone, when the server counts them;
+  // a `YYYY-MM-DD` formats as that day, like the UTC midnight it replaces.
+  const startsAt = row.startsOn === undefined ? row.startsAt : row.startsOn;
+  const endsAt = row.endsOn === undefined ? row.endsAt : row.endsOn;
   if (startsAt === null && endsAt === null) return copy.window.always;
   if (endsAt === null) return fill(copy.window.from, { date: formatters.date(startsAt) });
   if (startsAt === null) return fill(copy.window.until, { date: formatters.date(endsAt) });

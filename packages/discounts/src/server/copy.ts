@@ -34,6 +34,43 @@ export interface DiscountsServerCopy {
   readonly invalidDate: string;
   /** 422 — the window closes at or before it opens, so it is never open. */
   readonly endsBeforeStarts: string;
+  /**
+   * 422 — Término is BEFORE Início, on a surface that counts whole days in the
+   * store's zone (FUT-4482), where equal days are a one-day promotion.
+   *
+   * Optional, so a host with its own pack keeps compiling; `createApiDiscounts`
+   * requires it once the host passes `storeTimeZone`, since only then is it said.
+   */
+  readonly endsBeforeStartDay?: string;
+  /**
+   * 422 on the date field — a write that SENDS dates while the store's zone is
+   * not one the runtime knows (FUT-4482, review round 5): they cannot be placed
+   * on its clock. The one refusal a date problem leaves: the edit itself is
+   * never refused, since a form that cannot show the days sends `keepWindow`
+   * and no dates.
+   *
+   * Optional, so a host with its own pack keeps compiling; `createApiDiscounts`
+   * requires it once the host passes `storeTimeZone`, since only then is it said.
+   */
+  readonly datesNeedKnownZone?: string;
+  /**
+   * 422 on `keepWindow` — an update that sends `keepWindow: true` AND dates
+   * (review round 6): the one asks to keep the stored window, the other to
+   * change it, and which was meant cannot be told. Refused rather than one of
+   * the two dropped in silence.
+   *
+   * Optional, so a host's own pack keeps compiling: a pack without it is
+   * answered in the package's own pack for the request's language (pt-BR for
+   * a `pt` tag, en-US otherwise).
+   */
+  readonly keepWindowWithDates?: string;
+  /**
+   * 409 — the rule's window kept moving while a PATCH read and wrote it (three
+   * conditional writes found it changed): the operator opens the rule again and
+   * saves. Optional, and answered from the package's packs when missing, as
+   * `keepWindowWithDates` is.
+   */
+  readonly windowChanged?: string;
   /** The weekly schedule is not one the engine can act on (FUT-996). */
   readonly invalidSchedule: string;
   /** 422 — a minimum-basket threshold of zero or less. */
@@ -129,3 +166,10 @@ export function resolveDiscountsCopy<T>(
     ? (source as DiscountsCopyResolver<T>)({ locale })
     : source;
 }
+
+/** The keys a host's pack may leave out, said from the package's own packs then. */
+export type DiscountsServerFallbackKey = "keepWindowWithDates" | "windowChanged";
+
+/** A pack that says every sentence, the optional ones included: the package's own two. */
+export type CompleteDiscountsServerCopy = DiscountsServerCopy &
+  Required<Pick<DiscountsServerCopy, "endsBeforeStartDay" | "datesNeedKnownZone" | DiscountsServerFallbackKey>>;

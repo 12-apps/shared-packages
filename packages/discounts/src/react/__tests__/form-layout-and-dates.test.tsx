@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
 import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
-import { createFormatters } from "../format";
+import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
@@ -23,7 +23,7 @@ function PlainCurrency({ name, label }: { name: string; label: string }) {
   return <input name={name} aria-label={label} readOnly />;
 }
 
-function renderForm(editing: DiscountWireRecord | null = null): { sent: unknown[] } {
+function renderForm(editing: DiscountWireRecord | null = null, wholeDays = false): { sent: unknown[] } {
   const sent: unknown[] = [];
   const transport: DiscountsTransport = {
     get: <T,>(url: string): Promise<T> =>
@@ -46,6 +46,7 @@ function renderForm(editing: DiscountWireRecord | null = null): { sent: unknown[
       onSaved={vi.fn()}
       onError={() => {}}
       timezoneLabel="Horário de Brasília"
+      wholeDays={wholeDays}
     />,
   );
   return { sent };
@@ -313,6 +314,44 @@ describe("FUT-4156: Início and Término are DD/MM/AAAA on every browser", () =>
     submit();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ startsAt: null, endsAt: null });
+  });
+});
+
+describe("FUT-4482: the chosen days read back whole, in the store's zone", () => {
+  // Início 10/11 and Término 20/11 in São Paulo, as a zone-aware server stores
+  // them and answers them: 00:00 of the 10th and of the 21st there, plus the days.
+  const zoned = { startsAt: "2026-11-10T03:00:00.000Z", endsAt: "2026-11-21T03:00:00.000Z", startsOn: "2026-11-10", endsOn: "2026-11-20" };
+
+  it("W1: the edit form shows the days the server says, not the instants' UTC days", () => {
+    renderForm(record(zoned));
+    expect(input("total-form-field-startsAt").value).toBe("10/11/2026");
+    expect(input("total-form-field-endsAt").value).toBe("20/11/2026");
+  });
+
+  it("W2: the list says the same two days", () => {
+    expect(formatWindow({ ...zoned, schedule: null }, formatters, copy)).toBe("10/11/2026 a 20/11/2026");
+  });
+
+  // W3/W4 are a server that counts whole days (`wholeDays`); without it equal
+  // days are refused, as that server refuses them (period-calendar-round-two).
+  it("W3: Início = Término is a one-day promotion, sent as that day twice", async () => {
+    const { sent } = renderForm(null, true);
+    fillValid();
+    type("total-form-field-startsAt", "20112026");
+    type("total-form-field-endsAt", "20112026");
+    submit();
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ startsAt: "2026-11-20", endsAt: "2026-11-20" });
+  });
+
+  it("W4: Término before Início is refused in words that allow the same day", async () => {
+    renderForm(null, true);
+    type("total-form-field-startsAt", "20112026");
+    type("total-form-field-endsAt", "19112026");
+    submit();
+    await waitFor(() =>
+      expect(fieldMessage("endsAt")).toBe("A data de término não pode ser anterior à data de início."),
+    );
   });
 });
 

@@ -35,9 +35,44 @@ export interface DiscountFormValues extends Record<string, string> {
   perBuyerLimit: string;
 }
 
+/**
+ * Why the form cannot change a rule's days (FUT-4482): `unknown` when the
+ * server could not place an edited rule's and sent none (`daysUnknown`),
+ * `shown` when it sent them but the store's zone is unknown (`datesLocked`,
+ * review round 8), `create` for a new rule while that zone is unknown (CP8:
+ * none can be placed, so it saves open-ended), null when they can change.
+ */
+export type DatesLock = "unknown" | "shown" | "create" | null;
+
+function datesLockOf(editing: Pick<DiscountWireRecord, "daysUnknown" | "datesLocked"> | null | undefined): DatesLock {
+  if (editing?.daysUnknown === true) return "unknown";
+  return editing?.datesLocked === true ? "shown" : null;
+}
+
+/**
+ * The form's lock: an edit's from its row, a create's from the server's word
+ * that the store's zone is unknown now (`zoneUnknown`, the list's `datesLocked`).
+ */
+export function formDatesLock(editing: DiscountWireRecord | null, zoneUnknown: boolean): DatesLock {
+  if (editing !== null) return datesLockOf(editing);
+  return zoneUnknown ? "create" : null;
+}
+
 /** `YYYY-MM-DD` for a native date input, from the wire's ISO instant. */
 function toDateInput(iso: string | null): string {
   return iso === null ? "" : iso.slice(0, 10);
+}
+
+/**
+ * A bound as the box shows it: the day the server says it runs on, when it
+ * says one (FUT-4482); nothing when it says it cannot place the days; else the
+ * stored instant's own date — which is what a server counting UTC midnights
+ * always meant, and the only kind of server that sends neither.
+ */
+function dayInput(editing: DiscountWireRecord, bound: "starts" | "ends"): string {
+  if (editing.daysUnknown === true) return "";
+  const day = bound === "starts" ? editing.startsOn : editing.endsOn;
+  return day === undefined ? toDateInput(bound === "starts" ? editing.startsAt : editing.endsAt) : (day ?? "");
 }
 
 /** A new rule's defaults: the most common promotion an operator creates. */
@@ -80,8 +115,8 @@ export function initialValues(
     scope: editing.scope,
     trigger: editing.trigger,
     code: editing.code ?? "",
-    startsAt: toDateInput(editing.startsAt),
-    endsAt: toDateInput(editing.endsAt),
+    startsAt: dayInput(editing, "starts"),
+    endsAt: dayInput(editing, "ends"),
     minSubtotal: cents(editing.minSubtotalCents),
     usageLimit: editing.usageLimit === null ? "" : String(editing.usageLimit),
     perBuyerLimit: editing.perBuyerLimit === null ? "" : String(editing.perBuyerLimit),

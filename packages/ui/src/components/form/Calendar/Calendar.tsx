@@ -16,17 +16,34 @@ import type { DayCellContext } from './CalendarDayCell';
 import { CalendarMonth } from './CalendarMonth';
 import { CalendarSelectorsMonth } from './CalendarSelectorsMonth';
 
-const containerSx = (monthsToShow: number): SxProps<Theme> => ({
+const KEYBOARD_RING = {
+  outline: (theme: Theme) => `${rem(theme, 2)} solid`,
+  outlineColor: 'primary.main',
+  outlineOffset: sxRem(2),
+} as const;
+
+const containerSx = (monthsToShow: number, fullWidth: boolean): SxProps<Theme> => ({
   p: 3,
+  ...(fullWidth ? { width: '100%', boxSizing: 'border-box' } : {}),
   display: 'flex',
   flexDirection: monthsToShow > 1 ? 'row' : 'column',
   gap: 3,
   outline: 'none',
-  '&:focus-within': {
-    outline: (theme: Theme) => `${rem(theme, 2)} solid`,
-    outlineColor: 'primary.main',
-    outlineOffset: sxRem(2),
-  },
+  // The ring is for a KEYBOARD reader's place, so it shows on keyboard focus
+  // only — on the container, or on a day inside it — and never after a tap.
+  // Two rules, not one list: a browser without `:has` drops a whole selector
+  // list it cannot parse, and would lose the container's own ring with it.
+  '&:focus-visible': KEYBOARD_RING,
+  '&:has(:focus-visible)': KEYBOARD_RING,
+});
+
+// The months' row. Filling, it takes the container's whole width even where
+// the container lays it out in a row (two months or more).
+const monthsSx = (fullWidth: boolean): SxProps<Theme> => ({
+  display: 'flex',
+  gap: 3,
+  flexWrap: 'wrap',
+  ...(fullWidth ? { flex: '1 1 auto', minWidth: 0 } : {}),
 });
 
 type CalendarState = ReturnType<typeof useCalendar>;
@@ -37,6 +54,9 @@ const buildDayContext = (props: ResolvedCalendarProps, calendar: CalendarState):
   value: props.value,
   range: props.range,
   showOutsideDays: props.showOutsideDays,
+  todayIndicator: props.todayIndicator,
+  fullWidth: props.fullWidth,
+  locked: props.navigationDisabled === true,
   renderDay: props.renderDay,
   dayClassName: props.dayClassName,
   hoveredDate: calendar.hoveredDate,
@@ -133,9 +153,9 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
           : undefined
       }
       data-testid="calendar-container"
-      sx={containerSx(monthsToShow)}
+      sx={containerSx(monthsToShow, props.fullWidth)}
     >
-      <Box ref={calendar.gridRef} sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+      <Box ref={calendar.gridRef} sx={monthsSx(props.fullWidth)}>
         {props.captionLayout === 'selectors' && firstMonth ? (
           <CalendarSelectorsMonth
             matrix={firstMonth}
@@ -164,11 +184,11 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
               locale={locale}
               weekdayNames={calendar.weekdayNames}
               renderHeader={renderHeader}
-              // Only a host that passed `labels` gets named arrows: without
-              // them the arrows caption stays exactly as it always was.
+              // Only a host that passed `labels` gets named arrows; without them the caption is as it was.
               labels={props.labels ? labels : undefined}
               onPreviousMonth={calendar.goToPreviousMonth}
               onNextMonth={calendar.goToNextMonth}
+              navigationDisabled={props.navigationDisabled === true}
               dayContext={dayContext}
             />
           ))

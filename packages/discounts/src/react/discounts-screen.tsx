@@ -23,8 +23,9 @@ import { Dashboard } from "@12-apps/ui/layout/Dashboard";
 import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
-import type { DiscountsApiClient } from "./api";
-import { fill, type DiscountsWebCopy } from "./copy";
+import type { DiscountsApiClient, DiscountsPage } from "./api";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
+import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
 import { DiscountDialog } from "./discount-dialog";
@@ -53,12 +54,16 @@ import { useDiscountsData } from "./use-discounts-data";
 
 export interface DiscountsScreenProps {
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   /** The store's IANA zone, for the grid's live "ativa agora" dot (FUT-996). */
   timezone?: string;
   /** The store's timezone as a person says it, for the schedule editor. */
   timezoneLabel?: string;
+  /** Whether the server counts the period's days whole (FUT-4482). */
+  wholeDays?: boolean;
+  /** The host's link to its time-zone setting (FUT-4482, review round 4). */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
   currencyField: CurrencyFieldComponent;
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
@@ -68,7 +73,7 @@ export interface DiscountsScreenProps {
 /** The bulk delete's confirmation, described from the SELECTION. */
 function useBulkDelete(
   api: DiscountsApiClient,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   refresh: () => void,
   onError: (error: unknown, context: string) => void,
 ) {
@@ -110,7 +115,7 @@ function HeaderControls({
   onCreate,
 }: {
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   onCreate: () => void;
 }): JSX.Element {
   return (
@@ -165,7 +170,7 @@ function DiscountsGrid({
   bulkDelete,
 }: {
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   menu: MenuBinding;
   appliedState: DataViewState;
   server: ReturnType<typeof useServerDataViews>;
@@ -214,17 +219,30 @@ function DiscountsGrid({
   );
 }
 
+/**
+ * Whether the server said the store's zone is unknown now (FUT-4482, CP8): on
+ * the page itself, which an empty list still carries, or on any row — the
+ * same word, from a host proxy that kept the rows and dropped the envelope's
+ * extra key.
+ */
+function zoneUnknownOf(page: DiscountsPage | null): boolean {
+  if (page === null) return false;
+  return page.datesLocked === true || page.data.some((row) => row.datesLocked === true);
+}
+
 /** The create dialog; each opening mounts a fresh form, so it re-seeds empty. */
 function CreateDialog({
   open,
   onClose,
   onSaved,
   menu,
+  zoneUnknown,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   menu: MenuBinding;
+  zoneUnknown: boolean;
 }): JSX.Element {
   return (
     <DiscountDialog
@@ -237,6 +255,7 @@ function CreateDialog({
         {...menu}
         groups={menu.groups ?? []}
         editing={null}
+        zoneUnknown={zoneUnknown}
         onSaved={onSaved}
       />
     </DiscountDialog>
@@ -252,6 +271,7 @@ function CreateDialog({
 function ScreenBody({
   createOpen,
   setCreateOpen,
+  zoneUnknown,
   menu,
   refresh,
   rows,
@@ -263,10 +283,11 @@ function ScreenBody({
 }: {
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
+  zoneUnknown: boolean;
   menu: MenuBinding;
   refresh: () => void;
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   appliedState: DataViewState;
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (rows: DiscountListItem[]) => void;
@@ -277,6 +298,7 @@ function ScreenBody({
       <CreateDialog
         open={createOpen}
         menu={menu}
+        zoneUnknown={zoneUnknown}
         onClose={() => setCreateOpen(false)}
         onSaved={() => {
           setCreateOpen(false);
@@ -292,6 +314,7 @@ function ScreenBody({
         errorTitle={copy.actions.actionFailed}
         errorDismissLabel={copy.actions.actionFailedDismiss}
       >
+        <DaysUnknownListNotice rows={rows} copy={copy} timeZoneSettings={menu.timeZoneSettings} />
         <DiscountsGrid
           rows={rows}
           copy={copy}
@@ -353,6 +376,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
         <ScreenBody
           createOpen={createOpen}
           setCreateOpen={setCreateOpen}
+          zoneUnknown={zoneUnknownOf(data.page)}
           menu={menu}
           refresh={data.refresh}
           rows={rows}

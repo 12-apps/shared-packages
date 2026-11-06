@@ -18,7 +18,10 @@ A reusable calendar that supports **single date selection** and **date range sel
 - **Month grid** (role `grid`) with weekday headers and day cells (role `gridcell`).
 - **Range hover preview**: when a start date is chosen, hovering days previews the end.
 - **Dual month** layout for range mode (configurable).
-- **Disabled/unavailable days** visibly blocked and non-interactive.
+- **Disabled/unavailable days** visibly blocked and non-interactive, in the disabled ink — a
+  blocked day inside a live range included (a range CAN span one: Sundays, holidays). Only a
+  calendar shown locked (`navigationDisabled`, which a disabled `DateRangePicker` sets) draws its
+  in-range days in the secondary ink, so the period it states stays legible on the band.
 - Optional **footer** with Clear/Apply.
 
 ---
@@ -49,6 +52,9 @@ export interface CalendarProps {
   firstDayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6; // default: locale
   locale?: string; // e.g. 'en-US'
   showOutsideDays?: boolean; // days from prev/next month
+  todayIndicator?: 'bold' | 'ring'; // default 'bold'; 'ring' adds a primary-colour ring
+  fullWidth?: boolean; // default false; months fill the width, columns spread, faces stay 40
+  navigationDisabled?: boolean; // default false; the month arrows are disabled (a calendar whose days are all disabled)
   showWeekNumbers?: boolean;
   captionLayout?: 'arrows' | 'selectors'; // default: 'arrows'; 'selectors' shows one month
   defaultMonth?: Date; // month shown while nothing is chosen; default: today's month
@@ -219,10 +225,15 @@ month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
   two-month range calendar names two different days (FUT-4144).
 - The arrows of the default caption carry `labels.previousMonth`/`nextMonth`
   when the host passes `labels`; without `labels` they stay as they were.
+- The default caption is a title: its first letter upper-cased in `locale`
+  (`"Novembro de 2026"`, FUT-4156). The grid's own name keeps `Intl`'s words
+  (`aria-label="novembro de 2026"`).
 - Disabled days: `aria-disabled="true"`.
 - With `showOutsideDays={false}` an outside day is an inert, `aria-hidden`
   placeholder: no button, no name, no tab stop. Visible outside days are
   unchanged.
+- The focus ring (2px, primary) shows on KEYBOARD focus only
+  (`:focus-visible`) — on the container or a day — never after a tap.
 - Keyboard support (roving focus within the grid). When a NAVIGATION key is
   pressed on a day (the reader tabbed or clicked onto it), focus follows the tab
   stop to the new day in its own month (never its muted copy in the month

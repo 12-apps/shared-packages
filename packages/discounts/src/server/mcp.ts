@@ -46,7 +46,8 @@ export const discountItemParams = z.object({
 });
 
 /**
- * A calendar date (`YYYY-MM-DD`), read at UTC midnight by the API.
+ * A calendar date (`YYYY-MM-DD`): a whole day on the store's clock when the
+ * host passes `storeTimeZone` (FUT-4482), else read at UTC midnight.
  *
  * No custom message: a sentence here would be a default in one language, and
  * the schema's own path is what a client renders. The SEMANTIC failure — a
@@ -123,6 +124,25 @@ export const discountSchema = z.object({
   code: z.string().nullable(),
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
+  /**
+   * The days the form shows for the window (FUT-4482), present only on a
+   * surface that counts whole days. Their meaning follows `windowInZone`: on a
+   * `true` row they are the days it runs on in the store's zone, Término
+   * inclusive; on a `false` (legacy) row they are each bound's UTC date, as the
+   * old form showed them — Término the EXCLUSIVE bound, so the rule's last day
+   * is the one before — until the host's migration converts the row.
+   */
+  startsOn: z.string().nullable().optional(),
+  endsOn: z.string().nullable().optional(),
+  /** A rule written in the store's zone that the runtime cannot place now: no days. */
+  daysUnknown: z.boolean().optional(),
+  /**
+   * The store's zone is unknown now: the days shown (a legacy row's) cannot be
+   * changed, and a changed date is refused. Save other fields with keepWindow.
+   */
+  datesLocked: z.boolean().optional(),
+  /** Whether the window is whole days in the store's zone (the `window_in_zone` column). */
+  windowInZone: z.boolean().optional(),
   schedule: discountScheduleSchema.nullable().optional(),
   minSubtotalCents: z.number().int().nullable(),
   usageLimit: z.number().int().nullable(),
@@ -164,9 +184,9 @@ export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.par
  * WHOLE (the form re-states every field), so there is no partial-patch shape
  * to diverge from. The cross-field rules — a rate iff PERCENTAGE, a code iff
  * CODE, a target iff CATEGORY/ITEM, a slot list iff COMBO, a combo reward ONLY
- * at COMBO scope, `endsAt` strictly after `startsAt` — are enforced in
- * `./validate` and `./validate-combo`, where they produce a sentence naming the
- * field instead of a Zod path.
+ * at COMBO scope, `endsAt` not before `startsAt` (strictly after without a
+ * store zone) — are enforced in `./validate` and `./validate-combo`, where they
+ * produce a sentence naming the field instead of a Zod path.
  */
 const discountWriteShape = {
   name: z.string().min(2).max(120),
@@ -196,8 +216,25 @@ const discountWriteShape = {
 /** Body for creating a discount. */
 export const createDiscountBody = z.object(discountWriteShape);
 
-/** Body for updating a discount (every field re-stated). */
-export const updateDiscountBody = z.object(discountWriteShape);
+/**
+ * Body for updating a discount — and `keepWindow`, the one word an update has
+ * that a create has not (FUT-4482, review rounds 5 and 6): `true` when the
+ * editor could not show the rule's days (the store's zone is not one the
+ * runtime knows) and sends none. The stored window and its flag are then
+ * kept, and every other field is written.
+ */
+export const updateDiscountBody = z.object({
+  ...discountWriteShape,
+  keepWindow: z
+    .boolean()
+    .optional()
+    .describe(
+      "true to keep the stored campaign window (startsAt, endsAt and its clock) exactly as it is and write " +
+        "every other field. Send it with NO startsAt/endsAt: dates beside it are refused (422 on keepWindow). " +
+        "For a rule read with datesLocked, send it to save the other fields: its dates cannot change while " +
+          "the store's zone is unknown. Omit it otherwise.",
+    ),
+});
 
 /**
  * One collection of things a discount may be pointed at, and its rows.
@@ -239,7 +276,10 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     tags: ["discounts"],
     params: discountCollectionParams,
     query: listDiscountsQuery,
-    response: createSearchOutput(discountSchema),
+    // `datesLocked` (CP8): the store's zone is unknown now, said on the page as
+    // well as on every row, so a create on an empty list knows it too. Declared,
+    // or the wired response's parse strips it.
+    response: createSearchOutput(discountSchema).extend({ datesLocked: z.boolean().optional() }),
     annotations: { readOnly: true },
   },
   {
@@ -278,7 +318,11 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     operationId: "updateDiscount",
     method: "PATCH",
     path: "/discounts/{id}",
-    summary: "Update a store's discount (every field is re-stated, targets included).",
+    summary:
+      "Update a store's discount. Every field is re-stated, targets included, except the campaign window when " +
+      "`keepWindow` is true: then startsAt/endsAt are omitted and the stored window is kept. Dates equal to the " +
+      "startsOn/endsOn a read answered keep the stored window unchanged. Answers 409 when the rule kept changing " +
+      "while it was written: read it again and retry.",
     tags: ["discounts"],
     params: discountItemParams,
     body: updateDiscountBody,

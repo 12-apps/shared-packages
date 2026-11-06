@@ -4,7 +4,6 @@ import type { WireRequest, WireResponse, WireRoute } from "@12-apps/wiring";
 
 import {
   assertCollections,
-  assertTargetsOwned,
   ForeignTargetError,
   loadTargetGroups,
   type DiscountableCollection,
@@ -15,17 +14,25 @@ import {
   type DiscountsCopySource,
   type DiscountsServerCopy,
 } from "./copy";
+import {
+  assertWholeDayCopy,
+  pageWithCalendarDays,
+  readZoneFor,
+  warnUnflagged,
+  withCalendarDays,
+  writtenZone,
+  type ReadZone,
+  type StoreTimeZone,
+} from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
+import { fallbackSentence } from "./fallback-copy";
+import { prepareWrite } from "./prepare-write";
+import { updateWithWindow, WindowChangedError, windowModeOf } from "./update-window";
+import { isKnownTimeZone } from "../timezone";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
 import type { DiscountListInput, DiscountRecord, DiscountStore } from "./store";
-import {
-  DiscountValidationError,
-  targetsForScope,
-  toDiscountScalars,
-  toDiscountWriteInput,
-  type DiscountWriteBody,
-} from "./validate";
+import { DiscountValidationError } from "./validate";
 
 /**
  * The admin discounts HTTP surface (FUT-244), as framework-neutral wiring
@@ -95,6 +102,30 @@ export interface DiscountsApiConfig {
    * advertised surface and the enforced one cannot drift.
    */
   listQuery?: z.ZodType<DiscountListInput>;
+  /**
+   * The STORE's IANA zone for a tenant (FUT-4482) — `America/Sao_Paulo`.
+   *
+   * With it, Início and Término count WHOLE days on that clock: a write stores
+   * the first instant of Início and of the day after Término, Início = Término
+   * is a one-day promotion, and every record answered carries `startsOn` /
+   * `endsOn`, the days it runs on there. A save whose days equal the ones a
+   * read showed writes the stored window unchanged, whatever the zone (review
+   * round 6). A zone the runtime does not know refuses CHANGED dates — on any
+   * row, and on a create that sends any — with a 422 on the date field rather
+   * than storing a window on a guessed clock, while an edit that keeps the
+   * stored window (`keepWindow`, or the same days) saves, and so does a create
+   * with no dates. A read then logs a warning and answers EVERY row
+   * `datesLocked` (review round 8): a legacy row keeps its UTC days, a row
+   * written in the zone has none to show and is `daysUnknown` (unless it has no
+   * bounds: "sem prazo" needs no clock), so the list stays usable and shows no
+   * guessed days. A write's own answer reads the same way (round 9). A null or
+   * blank answer for a tenant fails every route: guard a nullable lookup.
+   *
+   * Omitted, every write and answer is what it was before: UTC midnights, an
+   * exclusive Término, no day fields. Opt-in so no adopter changes meaning on a
+   * version bump; a host that adopts it also re-reads its stored rules.
+   */
+  storeTimeZone?: StoreTimeZone;
 }
 
 function ok(body: unknown): WireResponse {
@@ -113,30 +144,6 @@ function fieldError(error: DiscountValidationError | ForeignTargetError): WireRe
 /** The id acknowledgement update and delete answer with. */
 function acknowledged(id: string): WireResponse {
   return ok({ data: { id } });
-}
-
-/**
- * Fold a validated body into what the store persists, and refuse a target that
- * is not this tenant's.
- *
- * Both writes go through it, so the rules run exactly once per write and a
- * second caller cannot half-apply them. The ownership check is here rather than
- * in each route for the same reason, and it runs AFTER the fold because the
- * fold is what narrows the targets to the scope — checking the raw body would
- * reject ids a COMBO-scoped write was about to drop anyway.
- */
-async function prepareWrite(
-  config: DiscountsApiConfig,
-  copy: DiscountsServerCopy,
-  clientId: string,
-  body: unknown,
-) {
-  const input = toDiscountWriteInput(body as DiscountWriteBody);
-  const write = { scalars: toDiscountScalars(input, copy), targets: targetsForScope(input) };
-  if (config.collections) {
-    await assertTargetsOwned(config.collections, clientId, write.targets, copy.foreignTarget);
-  }
-  return write;
 }
 
 /**
@@ -186,7 +193,10 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       // Returned as-is rather than wrapped: the page IS the `{ data,
       // pagination }` envelope the advertised response describes, and wrapping
       // it again would nest it under a second `data`.
-      return ok(await config.store.list(actor.clientId, parsed.data));
+      const page = await config.store.list(actor.clientId, parsed.data);
+      const zone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
+      warnUnflagged(page.data, zone, config.logger);
+      return ok(pageWithCalendarDays(page, zone));
     }),
   };
 }
@@ -230,7 +240,9 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
       if (record === null) {
         return { status: 404, body: { error: resolveDiscountsCopy(config.copy, locale).notFound } };
       }
-      return ok({ data: record as DiscountRecord });
+      const zone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
+      warnUnflagged([record as DiscountRecord], zone, config.logger);
+      return ok({ data: withCalendarDays(record as DiscountRecord, zone) });
     }),
   };
 }
@@ -242,10 +254,18 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
     permission: DISCOUNTS_WRITE,
     handle: endpoint(config, "POST /discounts", async (request) => {
       const { actor, body, locale } = request;
-      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
+      const { write, timeZone } = await prepareWrite(
+        config,
+        resolveDiscountsCopy(config.copy, locale),
+        actor.clientId,
+        body,
+        "create",
+      );
       const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
-      return ok({ data: created });
+      const zone = writtenZone(timeZone);
+      warnUnflagged([created], zone, config.logger);
+      return ok({ data: withCalendarDays(created, zone) });
     }),
   };
 }
@@ -258,12 +278,32 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
       const { actor, params, body, locale } = request;
       const id = String(params.id);
-      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
-      await config.store.update(actor.clientId, id, write);
+      const copy = resolveDiscountsCopy(config.copy, locale);
+      // Validation and the ownership check run FIRST, before the store is read:
+      // a refused body costs no read, and the window never excuses a bad one.
+      const prepared = await prepareWrite(config, copy, actor.clientId, body, "update", locale);
+      const mode = windowModeOf({ ...prepared, zone: preparedZone(prepared.timeZone) });
+      const target = { clientId: actor.clientId, id, logger: config.logger };
+      try {
+        const outcome = await updateWithWindow(config.store, target, mode, prepared.write);
+        if (outcome === "missing") return { status: 404, body: { error: copy.notFound } };
+      } catch (error) {
+        if (!(error instanceof WindowChangedError)) throw error;
+        // Review round 6 (N3): a row that kept moving is the operator's to
+        // re-open, said as such — never a 500.
+        config.logger.warn(`discounts: ${error.message}`);
+        return { status: 409, body: { error: fallbackSentence(copy, "windowChanged", locale) } };
+      }
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
     }),
   };
+}
+
+/** Where a read of the row placed its days: the zone the PATCH was prepared on. */
+function preparedZone(timeZone: string | undefined): ReadZone {
+  if (timeZone === undefined) return { kind: "off" };
+  return isKnownTimeZone(timeZone) ? { kind: "zone", timeZone } : { kind: "unknown" };
 }
 
 function archiveRoute(config: DiscountsApiConfig): DiscountRoute {
@@ -318,6 +358,7 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
         "every sentence this surface answers a human with is host config, with no defaults.",
     );
   }
+  assertWholeDayCopy(config.storeTimeZone, resolveDiscountsCopy(config.copy, undefined));
   assertLogger(config.logger);
   assertCollections(config.collections ?? []);
   return {

@@ -1,0 +1,16 @@
+-- @12-apps/discounts: which clock a rule's window is on (FUT-4482).
+--
+-- `window_in_zone` is TRUE on a window written as whole days in the store's
+-- zone (a host passing `storeTimeZone`) and FALSE on one stored as UTC
+-- midnights, Término exclusive — every row that exists today. A read places a
+-- row's days by it; `legacyUtcWindowToZoned` converts only FALSE rows and sets
+-- the flag in the same UPDATE, so no rerun can shift a row twice.
+--
+-- ── PURELY ADDITIVE ───────────────────────────────────────────────────────
+-- One NOT NULL column with a constant default, no backfill: FALSE is exactly
+-- what every existing row means, and what every write made without
+-- `storeTimeZone` stores.
+-- Postgres adds a column with a constant default without rewriting the table.
+--
+-- Replay-safe like its predecessors: `IF NOT EXISTS`.
+ALTER TABLE "discounts" ADD COLUMN IF NOT EXISTS "window_in_zone" BOOLEAN NOT NULL DEFAULT false;

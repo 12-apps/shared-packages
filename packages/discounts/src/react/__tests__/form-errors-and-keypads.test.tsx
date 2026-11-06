@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
-import type { DiscountsWebCopy } from "../copy";
+import type { CompleteDiscountsWebCopy } from "../copy";
 import { DiscountForm } from "../discount-form";
 import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { createFormatters } from "../format";
@@ -55,7 +55,7 @@ function refusingTransport(): DiscountsTransport {
 
 function renderForm(
   editing: DiscountWireRecord | null = null,
-  pack: DiscountsWebCopy = copy,
+  pack: CompleteDiscountsWebCopy = copy,
   refusing = false,
 ): { sent: unknown[] } {
   const recording = recordingTransport();

@@ -142,6 +142,7 @@ export const PT_BR_UI_LABELS: UiLabels = {
   },
   dateRangePicker: {
     calendar: "Calendário",
+    openEnded: "Sem data de término.",
   },
   calendar: {
     chooseMonth: (month) => `${month}, escolher mês`,

@@ -4,7 +4,7 @@ import React from 'react';
 import { bandFor } from './Calendar.band';
 import { isSameDay } from './Calendar.dates';
 import { buildDayArgs } from './Calendar.selection';
-import type { CalendarProps, DateRange, MonthMatrixDay, SelectionMode } from './Calendar.types';
+import type { CalendarProps, CalendarTodayIndicator, DateRange, MonthMatrixDay, SelectionMode } from './Calendar.types';
 import { CalendarDay } from './CalendarDay';
 
 // Everything a cell needs that is the same for every cell in the calendar.
@@ -18,6 +18,16 @@ export interface DayCellContext {
   focusedDate: Date;
   today: Date;
   showOutsideDays: boolean;
+  /** How today is marked (`CalendarProps.todayIndicator`). */
+  todayIndicator: CalendarTodayIndicator;
+  /** Spread the columns across the width (`CalendarProps.fullWidth`). */
+  fullWidth: boolean;
+  /**
+   * The whole calendar is shown locked (`CalendarProps.navigationDisabled`,
+   * which a disabled `DateRangePicker` sets): its in-range days keep the
+   * secondary ink. A live calendar's blocked days keep the disabled ink.
+   */
+  locked: boolean;
   isDisabled: (date: Date) => boolean;
   renderDay?: CalendarProps['renderDay'];
   dayClassName?: CalendarProps['dayClassName'];
@@ -30,6 +40,9 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   day,
   focusedDate,
   showOutsideDays,
+  todayIndicator,
+  fullWidth,
+  locked,
   renderDay,
   dayClassName,
   onSelect,
@@ -49,6 +62,9 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
       band={bandFor({ args, ...context })}
       focused={isSameDay(args.date, focusedDate)}
       showOutsideDays={showOutsideDays}
+      todayRing={todayIndicator === 'ring'}
+      fullWidth={fullWidth}
+      locked={locked}
       dayClassName={dayClassName}
       onSelect={onSelect}
       onHover={onHover}

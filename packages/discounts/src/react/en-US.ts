@@ -6,7 +6,7 @@ import {
   EN_US_UI_LABELS,
 } from "@12-apps/ui/en-US";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 
 /**
  * The en-US pack for the discounts admin screens.
@@ -22,7 +22,7 @@ import type { DiscountsWebCopy } from "./copy";
  * The KEYS of `labels.*` are the engine's wire values (`PERCENTAGE`, `ORDER`,
  * `RUNNING`, …). Only the words beside them are translated.
  */
-export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
+export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   screen: {
     title: "Discounts",
     aboutTitle: "About discounts",
@@ -85,6 +85,18 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   // promotion has no start or no end, and those mean very different things
   // when it is not running yet.
   window: {
+    daysUnknown: "Dates unavailable",
+    daysUnknownList: "Dates unavailable on some promotions and locked on all: the store's time zone was not recognised.",
+    daysUnknownForm:
+      "Dates unavailable: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
+    daysUnknownBoxes: "No dates: see the notice above.",
+    daysUnknownPaused: "Dates unavailable · Paused",
+    datesLockedForm:
+      "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
+    datesLockedBoxes: "Dates locked: see the notice above.",
+    datesLockedList: "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
+    datesLockedCreate: "No dates: the promotion runs from now on, with no end.",
+    openTimeZone: "View the store's time zone",
     always: "No end date",
     from: "From {date}",
     until: "Until {date}",
@@ -181,6 +193,12 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameRequired: "Give the promotion a name.",
     nameTooShort: "The name needs at least 2 characters.",
     datePlaceholder: "DD/MM/YYYY",
+    calendar: {
+      locale: "en-US",
+      label: EN_US_UI_LABELS.dateRangePicker.calendar,
+      previousMonth: EN_US_UI_LABELS.calendar.previousMonth,
+      nextMonth: EN_US_UI_LABELS.calendar.nextMonth,
+    },
     invalidDate: "That date does not exist. Use DD/MM/YYYY, such as 25/12/2026.",
     dateIncomplete: "Finish the date: DD/MM/YYYY.",
     invalidPercent: "Enter a percentage greater than 0 and at most 100.",
@@ -201,6 +219,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidPerBuyerLimit: "Enter a whole number per customer from 1 upwards, or leave it blank.",
     wholeNumberOnly: "Whole numbers only, no decimals.",
     endsBeforeStarts: "The end date must be after the start date.",
+    endsBeforeStartDay: "The end date cannot be before the start date.",
   },
   comboRewards: {
     labels: { PERCENTAGE: "Percentage", FIXED_AMOUNT: "Fixed amount", BUNDLE_PRICE: "Fixed price" },

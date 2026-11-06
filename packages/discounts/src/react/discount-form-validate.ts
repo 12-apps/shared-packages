@@ -4,7 +4,7 @@ import { toMinutes, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
 import { comboUnits } from "./combo-slot-builder";
-import { fill, type DiscountsWebCopy } from "./copy";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import { isCompleteMaskedDay, isIsoDay } from "./date-field";
 import type { DiscountFormValues } from "./discount-form-values";
 import { isComboKind, typeAndScopeFor } from "./form-kind";
@@ -36,7 +36,7 @@ function positiveCount(typed: string): number | null {
 }
 
 /** The name: present, and at least two characters, in the pack's words. */
-function checkName(typed: string, copy: DiscountsWebCopy): Record<string, string> {
+function checkName(typed: string, copy: CompleteDiscountsWebCopy): Record<string, string> {
   const refused =
     required(copy.form.nameRequired)(typed) ?? minLength(2, copy.form.nameTooShort)(typed.trim());
   return refused === undefined ? {} : { name: refused };
@@ -47,7 +47,7 @@ function checkName(typed: string, copy: DiscountsWebCopy): Record<string, string
  * from 1, so "2,5" is refused here instead of reaching the wire as 2 — or, in a
  * browser that read the comma away, as 25.
  */
-function checkLimits(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+function checkLimits(values: DiscountFormValues, copy: CompleteDiscountsWebCopy): Record<string, string> {
   const errors: Record<string, string> = {};
   if (values.usageLimit.trim() !== "" && positiveCount(values.usageLimit) === null) {
     errors.usageLimit = copy.form.invalidUsageLimit;
@@ -80,7 +80,7 @@ function checkMoney(
 function checkFreeUnits(
   typed: string,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const free = positiveCount(typed);
   if (free === null) return { freeUnits: copy.form.invalidFreeUnits };
@@ -97,7 +97,7 @@ function checkFreeUnits(
 function checkPercent(
   typed: string,
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const percent = formatters.parseDecimal(typed);
   return percent === null || percent <= 0 || percent > 100
@@ -118,7 +118,7 @@ function checkValue(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const { type } = typeAndScopeFor(values);
   if (type === "FIXED_AMOUNT") {
@@ -141,7 +141,7 @@ function checkValue(
 function checkCombo(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const errors = checkComboKind(values, slots, copy);
   // Recorded apart from `errors.kind`, which holds only ONE message: a bad
@@ -155,7 +155,7 @@ function checkCombo(
 function checkComboKind(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   if (!isComboKind(values.kind)) return {};
   // "Leve 3, pague 2" is one group of products, so it is refused in those words
@@ -183,10 +183,16 @@ function checkComboKind(
 /**
  * Início and Término. Each is blank or a whole real ISO day — the date box
  * holds its typed text until it is one (FUT-4156) — and only two real days are
- * compared. The window is half-open [start, end): equal dates are an EMPTY
- * window, so the rule is "after", not "not before".
+ * compared. Where the server counts whole days (FUT-4482, `wholeDays`),
+ * Início = Término is a one-day promotion and only a Término BEFORE Início is
+ * refused; elsewhere the server refuses equal days, so the form does too — a
+ * form that let them through would only send them to be refused.
  */
-function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+function checkPeriod(
+  values: DiscountFormValues,
+  copy: CompleteDiscountsWebCopy,
+  wholeDays: boolean,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const name of ["startsAt", "endsAt"] as const) {
     if (values[name] === "" || isIsoDay(values[name])) continue;
@@ -196,10 +202,14 @@ function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record
       ? copy.form.invalidDate
       : copy.form.dateIncomplete;
   }
-  if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt <= values.startsAt) {
-    errors.endsAt = copy.form.endsBeforeStarts;
-  }
-  return errors;
+  return { ...errors, ...checkOrder(values, copy, wholeDays) };
+}
+
+/** Término against Início, once both are real days. */
+function checkOrder(values: DiscountFormValues, copy: CompleteDiscountsWebCopy, wholeDays: boolean): Record<string, string> {
+  if (!isIsoDay(values.startsAt) || !isIsoDay(values.endsAt)) return {};
+  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: copy.form.endsBeforeStartDay } : {};
+  return values.endsAt <= values.startsAt ? { endsAt: copy.form.endsBeforeStarts } : {};
 }
 
 /** What the pickers and the builder currently hold, in one argument. */
@@ -224,7 +234,7 @@ export interface FormTargets {
  */
 function checkSchedule(
   state: ScheduleState,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   if (!state.enabled) return {};
   const { windows } = state.schedule;
@@ -247,17 +257,27 @@ function checkSchedule(
   return sameEnds ? { schedule: copy.schedule.timesRequired } : {};
 }
 
-/** The schedule editor's state: its switch and its rows, kept separate. */
+/**
+ * The schedule editor's state — its switch and its rows, kept separate — and
+ * whether the server counts the period's days whole (`wholeDays`, FUT-4482).
+ */
 interface ScheduleState {
   enabled: boolean;
   schedule: DiscountSchedule;
+  wholeDays?: boolean;
+  /**
+   * The period cannot change (a `datesLock`, FUT-4482, review round 9): its
+   * boxes hold the stored days and are not sent, so no rule of theirs may
+   * block a save — a locked box the operator cannot fix must never be red.
+   */
+  datesLocked?: boolean;
 }
 
 export function validate(
   values: DiscountFormValues,
   targets: FormTargets,
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   scheduleState: ScheduleState,
 ): Record<string, string> {
   const slots = targets.comboRequirements;
@@ -281,7 +301,7 @@ export function validate(
   if (scope === "ITEM" && targets.menuItemIds.length === 0) {
     errors.scope = copy.form.itemTargetRequired;
   }
-  Object.assign(errors, checkPeriod(values, copy));
+  if (scheduleState.datesLocked !== true) Object.assign(errors, checkPeriod(values, copy, scheduleState.wholeDays ?? false));
   return errors;
 }
 

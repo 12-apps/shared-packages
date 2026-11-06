@@ -201,6 +201,255 @@ keystroke on the storefront and would need a logger threaded through a browser
 bundle. A rejected coupon is already a `DiscountRejection` in the result, which
 is the host's to report if it wants to.
 
+## Whole days, in the store's zone — `storeTimeZone`
+
+> **Upgrading to this version: every host syncs the partial and runs migration
+> `20261106140000_discount_window_in_zone` — including a host that never passes
+> `storeTimeZone`.** Every write now carries `DiscountScalars.windowInZone`
+> (`false` without a zone), so a store that spreads the scalars writes the
+> `window_in_zone` column whether or not whole days are on; without the column
+> every create and update fails. The migration is additive (default `false`)
+> and safe to deploy before the code: `pnpm --filter @12-apps/discounts
+> prisma:sync`, then the host's own `migrate deploy`. Map the column back into
+> `DiscountRecord.windowInZone` in the same release (see below).
+
+Início and Término are calendar DAYS, and an operator means them whole on the
+store's clock (FUT-4482): Início 10/11 applies from 00:00 on the 10th, Término
+20/11 until the last instant of the 20th. Only the host knows a store's zone,
+so it passes it per tenant:
+
+```ts
+createApiDiscounts({
+  store, copy, logger,
+  storeTimeZone: async (clientId) => {
+    const client = await db.client.findUnique({ where: { id: clientId }, select: { timezone: true } });
+    // A tenant with no row, or no zone, is a wiring bug: say so, never answer null.
+    if (!client?.timezone) throw new Error(`no time zone for tenant ${clientId}`);
+    return client.timezone;
+  },
+});
+```
+
+With it, a write stores `startsAt` = the first instant of Início and `endsAt`
+(still exclusive, so the engine is unchanged) = the first instant of the day
+AFTER Término, both in that zone; Início = Término is a one-day promotion, and
+only a Término before Início is refused (`copy.endsBeforeStartDay`, required
+once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
+the days it runs on there, and the admin form and grid read those back.
+
+**Under an unknown zone the dates are locked and everything else saves**
+(review round 8, ADR 0186). A read answers EVERY row with `datesLocked: true`
+and logs a warning: a `windowInZone: false` (legacy) row still carries its UTC
+days in `startsOn` / `endsOn`, and a row written in the zone has none to show,
+so it carries `daysUnknown: true` in their place, never guessed days — unless it
+has no bounds at all, which reads as `startsOn` / `endsOn` null ("sem prazo"):
+an open window needs no clock (review round 9). The form then shows the
+calendar and both boxes locked — the legacy row's days in read-only boxes, in
+the input's ordinary ink, and in-range days in the secondary ink; empty,
+disabled boxes on a `daysUnknown` one — and one amber notice above them saying
+the dates cannot change and that saving keeps them. The list says one amber
+notice too, whenever any row is locked. No date rule of the form's runs on
+locked boxes, so they can never block a save. Its Salvar sends
+`keepWindow: true` with no dates, and the PATCH writes every other field — a
+pause, a rename, a new value — over the STORED `startsAt` / `endsAt` /
+`windowInZone`, without asking the zone anything. `keepWindow` sent beside a
+date is refused (422 on `keepWindow`, `copy.keepWindowWithDates`): keep and
+change are two answers, and dropping either in silence would lose an edit.
+
+**A save that does not change the dates never moves them** (review round 6),
+whatever the zone. Every PATCH reads the row first and compares the days it
+sends with the days a read of THAT row showed — a `windowInZone: false` row's
+legacy UTC days (`legacyWindowDays`), a `true` row's days in the store's zone —
+and, where they are equal, writes the stored `startsAt` / `endsAt` /
+`windowInZone` unchanged, under the same condition as every other
+read-then-write below. So a client that sends a legacy row's days back as it
+read them saves while the zone is unknown, and a legacy row saved unchanged
+under a known zone stays legacy, on its exact bounds, rather than turning zoned
+and growing a day; converting it is the migration's job. **Changed** days are
+whole days in a known zone; with the zone unknown they are refused, on ANY row
+and on a create, with a 422 on the date field and `copy.datesNeedKnownZone`
+(required once the zone is passed): a day cannot be placed without the zone —
+a whole-day Término is inclusive, and a legacy UTC midnight would drop it. Only
+the day the server cannot place is refused, never the edit. On an edit the
+screen never offers one: the dates are locked. A create has no row to read the
+lock off, so the list's PAGE says it too (`datesLocked: true` on the envelope,
+an empty list included): the Novo desconto form then shows the same amber
+notice, the calendar and both boxes locked and empty, and a line under them
+saying the promotion runs from now with no end (`window.datesLockedCreate`);
+Salvar sends no dates, and the create is stored once, open-ended, answered 200
+with `datesLocked`. A create that sends dates anyway still gets that
+date-field 422.
+
+**A form opened before the zone turned unknown** saves too (review round 9,
+N4). With `wholeDays`, an edit whose Início and Término are the ones it opened
+with sends `keepWindow` instead of the days, so the save needs no clock and
+cannot be refused for dates nobody changed; under a known zone the server
+wrote the stored window for equal days anyway. Only CHANGED dates get the
+date-field 422 then, and putting them back saves.
+
+A row the store answers without `windowInZone` reads as legacy, and so is
+locked with its UTC days under an unknown zone. A null or blank answer for a tenant fails every route —
+the function must answer a zone for every tenant it is asked about.
+
+A copy resolver may answer a reader's locale with a pack that lacks
+`endsBeforeStartDay`; that refusal then says the default rendering's sentence
+(the one asserted at the mount), never `endsBeforeStarts`, which would be false
+once equal days are legal.
+
+Without it, nothing changes: UTC midnights, an exclusive Término, equal days
+refused, no day fields, and `windowInZone: false` on every write.
+
+**Each row says which clock its window is on: `windowInZone`.** The partial's
+`window_in_zone` column (migration `20261106140000_discount_window_in_zone`,
+additive, default `false`) is set `true` by every write made with
+`storeTimeZone` — `DiscountScalars.windowInZone`, which a store that spreads the
+scalars persists without a line of its own — and the store maps it back into
+`DiscountRecord.windowInZone`. A read places a `true` row's days in the store's
+zone and a `false` row's on UTC, exactly as the old form showed them, with or
+without a zone. So a row written before the zone, or by the previous release
+while two serve side by side, keeps showing the days it was given. A store that
+answers no `windowInZone` while the zone is on is warned about, and its rows
+read as legacy.
+
+**Turn it on across two releases.** Release N ships the package bump, the
+column and the record mapping, without `storeTimeZone`: it writes `false`, as
+every release before it meant. Release N+1 passes `storeTimeZone` (and
+`wholeDays: true`). During N+1's rollout the release still serving is N, whose
+writes say `false` for the UTC windows they store — so no row ever holds a UTC
+window under a `true` flag.
+
+**Then migrate the legacy rows, once N has drained.** Their days already read
+right; the migration makes the window the engine prices on match them — Início
+whole from its 00:00 in the zone, Término now inclusive. Run it after the last
+N instance stopped serving, never at N+1's boot: an N instance still serving
+would keep writing `false` rows behind it (a rerun picks those up too, so a
+loop run early only has to be run again).
+
+```ts
+import { LegacyWindowNotMidnightError, legacyUtcWindowToZoned } from "@12-apps/discounts/server";
+
+// The host's own: its Prisma client, the tenant, its zone, and any logger with `warn`.
+declare const db: PrismaClient;
+declare const clientId: string;
+declare const zone: string; // the same answer storeTimeZone gives for clientId
+declare const logger: { warn(message: string): void };
+
+const legacy = await db.discount.findMany({
+  // `archivedAt: undefined` NAMES the key, which switches off the host's
+  // soft-delete default (archived rows are filtered out unless the key is
+  // named) — so archived rules are converted too, and read right if restored.
+  where: { clientId, windowInZone: false, archivedAt: undefined },
+  select: { id: true, startsAt: true, endsAt: true, windowInZone: true },
+});
+for (const rule of legacy) {
+  let migrated;
+  try {
+    migrated = legacyUtcWindowToZoned(rule, zone);
+  } catch (error) {
+    // A bound that is not a UTC midnight — a seeded demo row (`Date.now() ± n
+    // days`), a script's write — is not a window the old form stored. Skip it,
+    // say so, and convert the rest; any other error (an unknown zone) aborts.
+    if (!(error instanceof LegacyWindowNotMidnightError)) throw error;
+    logger.warn(`discount ${rule.id} left as legacy: ${error.field} ${error.bound} is not a UTC midnight`);
+    continue;
+  }
+  if (migrated === null) continue; // already whole days
+  // The same condition in the write: a row another run converted meanwhile is left alone.
+  await db.discount.updateMany({ where: { id: rule.id, windowInZone: false }, data: migrated });
+}
+```
+
+**A rerun is safe in every zone**, after a partial failure, alongside a second
+run, and at UTC+0, where a migrated window is still two UTC midnights: only a
+`false` row is converted, and the update that converts it sets the flag. A
+write that never touches the window — a redemption bumping `usage_count` and
+`updated_at` — changes nothing about it, so a rule redeemed after the release
+is still migrated. A `false` row whose bound is not a UTC midnight throws a
+`LegacyWindowNotMidnightError` (the old form never stored one), which the loop
+skips and logs; it keeps reading on its UTC days, as it always did. An unknown
+zone throws a plain `Error`, which aborts.
+
+**Rolling back from N+1 to N keeps every edit.** N runs with the zone off,
+and a row N+1 flagged holds a window in the store's zone that N cannot place:
+N reads it as it reads every row without a zone — the stored instants, which
+still price right (the engine compares instants), shown on their UTC dates, a
+few hours off the store's. A PATCH of such a row under N is never refused:
+
+- **The dates the zone-off form showed came back unchanged** (each stored
+  bound's UTC date): the stored `startsAt` / `endsAt` and `windowInZone: true`
+  are written. A pause, a rename or a new value leaves the row flagged and its
+  window as N+1 wrote it.
+- **The dates changed:** they are stored as legacy UTC midnights with
+  `windowInZone: false`, exactly as a create under N stores them, and the id is
+  logged (`warn`, "stored as legacy … rerun the migration").
+
+New rules and legacy rules save as N always saved them; a legacy row whose
+days came back unchanged keeps its stored bounds byte for byte. That costs one
+`store.get` per PATCH, which every PATCH makes, zone on or off.
+
+**Then, after every rollback, rerun the migration loop** once N+1 serves again
+and N has drained. The loop only ever converts `false` rows, so "run once" means
+once per batch of legacy rows, not once ever: the rows N wrote during the
+rollback — new rules, and flagged rules re-saved with new dates — are `false`
+rows the earlier run never saw, and the rerun converts them like any other.
+
+**The write is conditional.** Deciding from the row and then writing it is a
+read-then-write: between the two, another instance can re-date or re-flag the
+row, and copying the stale window over would undo that. So every PATCH that
+read the row passes `DiscountStore.update` a fourth argument,
+`{ window: { startsAt, endsAt, windowInZone } }` — the window and flag as read —
+and the store writes only where the row still holds all three, answering
+`{ applied }`. Not the flag alone: a write that copies the stored bounds would
+revert a date change made under the same flag. On `applied: false` the route
+reads again and decides afresh (three reads, then a conflict that names the
+rule, answered 409 with `copy.windowChanged` so the operator re-opens it). In
+Prisma, the conditional row write comes FIRST in the transaction, and the
+targets are rewritten only once it matched, so a row the condition missed keeps
+its targets as well as its window:
+
+```ts
+return db.$transaction(async (tx) => {
+  const { count } = await tx.discount.updateMany({
+    where: { id, clientId, ...(condition ? condition.window : {}) },
+    data: scalars,
+  });
+  if (count !== 1) {
+    if (condition) return { applied: false }; // nothing written: the targets are untouched
+    throw notFound(id);
+  }
+  await rewriteTargets(tx, id, targets); // the join tables, only once the row matched
+  return { applied: true };
+});
+```
+
+A store that ignores the condition and answers nothing keeps working, and the
+route warns on each such write that the race is open. A store that maps no
+`windowInZone` while the zone is off is warned about too: it cannot tell a
+zoned rule from a legacy one.
+
+The web surface must be told the same thing: pass `wholeDays: true` to
+`createWebDiscounts` on the host whose server passes `storeTimeZone`. With it the
+form accepts Início = Término as a one-day promotion; without it the form
+refuses equal days itself, as the server does, and a second tap on Início in
+the calendar does nothing.
+
+**Every copy key this feature added is optional**, on the web pack
+(`window.daysUnknown*`, `window.datesLocked*`, `window.openTimeZone`, `form.calendar.*`,
+`form.endsBeforeStartDay`) and on the server pack (`keepWindowWithDates`,
+`windowChanged`). A host pack written before them still mounts —
+`missingWebCopy` does not report them — and each missing sentence is said from
+the package's own pack for the host's language (pt-BR for any `pt` tag,
+`pt_BR` read as `pt-BR`; en-US otherwise). On the web the language is
+`createWebDiscounts`' `locale`, or for a bare `DiscountsSurface` its `locale`
+prop, then the formatters' `locale`, then the pack's `form.calendar.locale`;
+on the server it is the request's locale. With none, the pack's own words
+decide: it is taken for the package's pack it shares more sentences with,
+en-US on a tie — so a pack written wholly by hand in Portuguese, sharing no
+sentence with ours and naming no language, is filled in English. A missing
+`form.calendar.locale` is the host's own tag, so an `es-ES` host's months are
+Spanish while its missing sentences are English. Only `endsBeforeStartDay` and `datesNeedKnownZone` on the server
+are asserted at the mount, and only once `storeTimeZone` is passed.
+
 ## Letting a host table opt in — `DiscountableCollection`
 
 A discount points at rows this package will never see: a store's categories, its
@@ -277,6 +526,8 @@ schema folder and discovers the migration structurally:
 ```bash
 pnpm --filter @12-apps/discounts prisma:sync         # copy the partial
 pnpm --filter @12-apps/discounts prisma:sync:check   # drift gate, for CI
+# then the host's own migrate deploy: 20261106140000_discount_window_in_zone is
+# required by every host from this version on, storeTimeZone or not
 ```
 
 Three tables — `discounts`, `discount_combo_slots`, `discount_targets` — and

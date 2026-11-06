@@ -4,7 +4,10 @@
  * "1 August" is the same day in every zone, and only the question "which day is
  * TODAY" needs a zone to answer.
  */
-import type { DateRange } from '../Calendar';
+import type React from 'react';
+
+import type { CalendarLabels } from '../../../copy/labels';
+import type { CalendarTodayIndicator, DateRange } from '../Calendar';
 
 /** One inclusive calendar day as `AAAA-MM-DD`. Sorts lexicographically. */
 export type DayString = string;
@@ -90,6 +93,12 @@ export interface DateRangePickerMessages {
   quickRanges: string;
   /** Shown while only one end is chosen. */
   incomplete: string;
+  /**
+   * Shown, with `openEnd`, for a start with no end: a finished answer ("no end
+   * date"), worded WITHOUT the date, which the field beside it already shows.
+   * Optional so a full messages object written before it still type-checks.
+   */
+  openEnded?: string;
   /** Shown when the start is after the end. */
   reversed: string;
   /** Shown when the range — typed or quick-picked — exceeds the cap. */
@@ -164,6 +173,78 @@ export interface DateRangePickerProps {
   numberOfMonths?: number;
   /** Copy overrides, merged over the English defaults. */
   messages?: Partial<DateRangePickerMessages>;
+  /**
+   * Where the typed half sits. `below` (default) is the layout this picker
+   * always had. `beside` is for a picker laid out in a page rather than a
+   * popover: the months sit in their own frame and the fields in a column
+   * beside them when the PICKER's own width has room for both, under them when
+   * it has not — and one month instead of two when two would not fit either.
+   * Decided by measuring the picker, not the viewport, because a form column
+   * beside a preview is narrow on the widest screen.
+   */
+  fieldsPlacement?: 'below' | 'beside';
+  /**
+   * With `fieldsPlacement="beside"`: the months' frame meets the picker's own
+   * edges instead of hugging its months. Under the fields' row the frame spans
+   * the picker; beside them it takes what the fields' column leaves, and that
+   * column stops at 320 design px — a `dd/mm/aaaa` date and its message need
+   * no more. The calendar's seven columns spread across the frame and the day
+   * faces keep their size (`Calendar` `fullWidth`). For a picker laid into a
+   * form section whose edges the frame must line up with. Under the fields the
+   * frame trims its side padding before a column drops under 40 design px.
+   * Ignored without `fieldsPlacement="beside"`: the popover's frame is as wide
+   * as its months. Default: false — the frame as wide as its months, centred
+   * under the fields.
+   */
+  fullWidth?: boolean;
+  /**
+   * The consumer's OWN typed fields, in place of the built-in pair and the
+   * summary line under it — for a form whose fields carry its own rules (a
+   * half-typed date kept until submit, its own messages), which a second line
+   * would only repeat. Told where it sits, so it can lay its fields out for it.
+   * The calendar follows the value when the consumer changes it, as it follows
+   * a typed date.
+   */
+  renderFields?: (args: { placement: 'beside' | 'below'; disabled: boolean }) => React.ReactNode;
+  /**
+   * The period is shown but cannot be changed now — its consumer cannot place
+   * its days (FUT-4482). Every day of the grid is disabled and a tap writes
+   * nothing, the quick ranges are not offered, the built-in boxes are
+   * disabled, `renderFields` is told (`disabled`) so the consumer's own fields
+   * follow, and the root is a `group` named by `label` that carries
+   * `aria-disabled`. The month arrows are disabled too and today's ring takes
+   * the disabled ink (review round 6). Say WHY next to the picker; the control
+   * cannot — and describe the consumer's own fields with that sentence.
+   *
+   * In a popover, the picker is only what opens: the consumer disables its OWN
+   * trigger (the button or field that opens the popover); this prop cannot
+   * reach it. Default: false.
+   */
+  disabled?: boolean;
+  /**
+   * The picker's accessible name while it is `disabled` and its root is a
+   * group. Default: `messages.calendarLabel`.
+   */
+  label?: string;
+  /**
+   * A start with no end is a finished answer — "from this day on" — rather
+   * than half a range: the summary says `messages.openEnded` instead of asking
+   * for the end. `resolveDayRange` is unchanged; the caller decides what an
+   * open end means to it.
+   */
+  openEnd?: boolean;
+  /**
+   * The calendar's display options, passed through (`Calendar`'s own):
+   * whether a month shows its neighbours' days (default true), how today is
+   * marked (default `'bold'`), and whether one day may be the whole range
+   * (default true). With `allowSameDayRange={false}` a second tap on the start
+   * day does nothing.
+   */
+  showOutsideDays?: boolean;
+  todayIndicator?: CalendarTodayIndicator;
+  allowSameDayRange?: boolean;
+  /** Names for the calendar's own controls (the month arrows), in the host's language. */
+  calendarLabels?: Partial<CalendarLabels>;
   /** Root test id; every part derives from it (`-from`, `-quick-today`, …). */
   dataTestId?: string;
   className?: string;
@@ -182,6 +263,12 @@ export interface UseDateRangePickerArgs {
   weekStartsOn: WeekStart;
   quickRanges: QuickRange[];
   messages: Partial<DateRangePickerMessages> | undefined;
+  /**
+   * Remount the calendar onto the range whenever the CONSUMER moves it, not
+   * only when a typed field or a quick pick does — true when the consumer owns
+   * the fields (`renderFields`), whose edits never pass through the picker.
+   */
+  followValue?: boolean;
 }
 
 /** Everything the component renders from, and every way the range can move. */

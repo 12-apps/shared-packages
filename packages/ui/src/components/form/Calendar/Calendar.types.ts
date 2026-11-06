@@ -27,6 +27,9 @@ export interface DayRenderArgs {
  */
 export type CalendarCaptionLayout = 'arrows' | 'selectors';
 
+/** How today's day is marked — see `CalendarProps.todayIndicator`. */
+export type CalendarTodayIndicator = 'bold' | 'ring';
+
 export interface HeaderRenderContext {
   month: number;
   year: number;
@@ -55,7 +58,28 @@ export interface CalendarProps {
   firstDayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6; // default: locale
   locale?: string; // e.g. 'en-US'
   showOutsideDays?: boolean; // days from prev/next month
+  /**
+   * How today is marked. `'bold'` (the default) is the bold number it always
+   * was; `'ring'` adds a hairline ring in the primary colour around the day's
+   * face, for a calendar a reader must place a period against today on.
+   */
+  todayIndicator?: CalendarTodayIndicator;
   showWeekNumbers?: boolean;
+  /**
+   * Fill the width the calendar is given instead of stopping at a month's
+   * intrinsic 304 design px. The seven columns spread across it and the day
+   * faces keep their size (40 design px at most): only the spacing grows, and a
+   * range's band still runs unbroken across the columns. For a calendar laid
+   * into a page section whose edges it must meet. Default: false.
+   */
+  fullWidth?: boolean;
+  /**
+   * The month arrows are disabled (`'arrows'` caption): for a calendar shown
+   * for a period that cannot change right now, whose days are all disabled
+   * too — a live arrow beside a dead grid reads as the one control left.
+   * Default: false.
+   */
+  navigationDisabled?: boolean;
   /** default: 'arrows'. `'selectors'` always shows one month. */
   captionLayout?: CalendarCaptionLayout;
   /**
@@ -103,7 +127,9 @@ type CalendarDefaultedKeys =
   | 'minRangeLength'
   | 'allowSameDayRange'
   | 'autoFocus'
-  | 'captionLayout';
+  | 'captionLayout'
+  | 'todayIndicator'
+  | 'fullWidth';
 
 // CalendarProps with the defaults already applied, plus the month count resolved
 // from numberOfMonths and the selection mode.

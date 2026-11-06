@@ -49,6 +49,9 @@ export const bandFor = ({
   if (selectionMode !== 'range') return 'none';
   if (args.inRange) return 'full';
 
+  // A chosen end before the start is a pair being fixed, not a range: its
+  // inside is not filled, so neither end reaches towards the other.
+  if (range.start && range.end && range.end < range.start) return 'none';
   const other = otherEnd(range, hoveredDate, isDisabled);
   if (!range.start || !other || isSameDay(range.start, other)) return 'none';
   return endpointBand(args.date, range.start, other);

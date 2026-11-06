@@ -171,3 +171,23 @@ export const Narrow: Story = {
     </Stack>
   ),
 };
+
+/**
+ * Laid out IN a page, always open: the months in their own frame, the fields
+ * beside them while the picker is wide enough, a start alone read as "no end".
+ * Resize the canvas to watch the fields move under the months, then one month.
+ */
+export const InAPage: Story = {
+  render: () => (
+    <Stack sx={{ width: '100%' }}>
+      <Demo
+        initial={{ from: '2026-08-10', to: null }}
+        quickRanges={[]}
+        numberOfMonths={2}
+        fieldsPlacement="beside"
+        openEnd
+        calendarLabels={{ previousMonth: 'Previous month', nextMonth: 'Next month' }}
+      />
+    </Stack>
+  ),
+};

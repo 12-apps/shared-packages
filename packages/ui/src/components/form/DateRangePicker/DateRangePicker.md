@@ -45,6 +45,13 @@ interface DateRangePickerProps {
   messages?: Partial<DateRangePickerMessages>;
   dataTestId?: string;                      // default 'date-range-picker'
   className?: string;
+  // Opt-in, for a picker laid out IN a page (all off by default):
+  fieldsPlacement?: 'below' | 'beside';     // default 'below'
+  renderFields?: (args: { placement: 'beside' | 'below'; disabled: boolean }) => ReactNode;
+  openEnd?: boolean;                        // a start with no end is an answer
+  disabled?: boolean;                       // shown, not changeable (default false)
+  label?: string;                           // the disabled group's name (default: calendarLabel)
+  calendarLabels?: Partial<CalendarLabels>; // names for the month arrows
 }
 ```
 
@@ -144,8 +151,14 @@ mounts. The picker remounts it when a **quick pick** or a **typed date** moves
 the range, and never when a day inside the grid is clicked — a calendar that
 jumped under the pointer picking in it would be unusable.
 
-So the grid follows the range's **start**. Picking "This year" in August moves
-it to January, because that is where the range now begins.
+So the grid follows the range's **start** — or its **end** when only the end is
+chosen. Picking "This year" in August moves it to January, because that is
+where the range now begins.
+
+A consumer that owns the draft may complete a tap into a different draft than
+the one the picker handed it (keeping an end the tap would have dropped). That
+is still the tap's own result: the grid stays on its month and focus stays on
+the tapped day. Only a change that drops a bound the tap chose moves the grid.
 
 ## Layout
 
@@ -157,6 +170,68 @@ half its width and the numbers stop being readable.
 There is no `size` prop. The day grid has a fixed metric that a size scale would
 not change, and a prop that only altered the padding of the quick entries would
 be a scale in name only.
+
+## A picker laid out in a page
+
+The defaults above are a popover's: one framed block, fields underneath, a
+summary line. A form that shows the range ALWAYS OPEN among its other fields
+needs four more things, each opt-in so no existing screen changes:
+
+- **`fieldsPlacement="beside"`** — the months get their own outlined frame and
+  the typed half sits on the page: in a column BESIDE the frame when the
+  picker's own width holds both, under it when it does not, and with one month
+  instead of two when two would not fit either. Measured on the picker
+  (`ResizeObserver`), never the viewport: a form column beside a preview is
+  narrow on the widest screen. The root carries `data-fields-placement`.
+- **`renderFields({ placement, disabled })`** — the consumer's OWN fields instead of the
+  built-in pair, for a form whose fields carry rules this picker does not (a
+  half-typed date kept until submit, its own messages). The summary line goes
+  with the built-in pair: beside fields that say their own refusals it would
+  only repeat them. The calendar follows the value whenever the consumer moves
+  it, as it follows a typed date — never on a click in the grid.
+- **`openEnd`** — a start with no end is a finished answer ("from this day
+  on"), and the summary says `messages.openEnded` (default `No end date.`)
+  instead of asking for the end. It does not repeat the date: the field beside
+  it shows it. `resolveDayRange` is unchanged; what an open end means is the
+  caller's.
+- **`calendarLabels`** — names for the calendar's month arrows
+  (`PT_BR_UI_LABELS.calendar` in Portuguese); without them they stay unnamed,
+  as before. `PT_BR_UI_LABELS.dateRangePicker.openEnded` is the Portuguese
+  `openEnded`.
+- **`disabled`** — the period is shown but cannot be changed now (a consumer
+  that cannot place its days, FUT-4482). Every day is disabled and a tap
+  writes nothing, the quick ranges are not offered, the built-in boxes are
+  disabled, `renderFields` receives `disabled: true` so the consumer's fields
+  follow, and the root is a `group` named by `label` (default: the calendar
+  label) carrying `aria-disabled`. The month arrows are disabled and today's
+  ring takes the disabled ink. The days INSIDE a shown range keep the
+  secondary ink (`text.secondary`), so the period stays legible on the band
+  (the disabled ink there was 1.56:1). That is the locked picker only: on a
+  live one, a day `isDateDisabled` blocks inside the range keeps the disabled
+  ink. The control cannot say why: say it beside the
+  picker, and make that sentence your fields' `aria-describedby`. **In a
+  popover the consumer disables its own trigger** — the button or field that
+  opens the popover is the consumer's, and this prop cannot reach it.
+- **`showOutsideDays`, `todayIndicator`, `allowSameDayRange`** — `Calendar`'s
+  own options, passed through: hide the neighbouring months' days, ring today
+  (`'ring'`), or refuse one day as a whole range (a second tap on the start day
+  then does nothing). Defaults unchanged: drawn, bold, allowed.
+
+Under the fields' row (`placement="below"`) the frame is as wide as its months
+and centred, never stretched across the page around one month.
+
+- **`fullWidth`** (with `fieldsPlacement="beside"`) — the frame's edges are the
+  picker's: under the fields it spans the picker, beside them it takes what the
+  fields' column leaves (never less than its months at full size), and that
+  column stops at 320 design px. The calendar's seven columns spread across the
+  frame; the day faces keep their 40 design px, and the rows stay 40 tall. Under
+  the fields the frame trims its side padding before a column drops under 40
+  design px (a phone's tap target). For a picker laid into a form section whose
+  heading and fields the frame must line up with. Ignored in the default
+  (popover) layout. Default off.
+- **The in-page frame** is a card on the page: the raised surface role
+  (`surfaces(theme).raised`, `background.paper` unless the host states one) and the
+  default `Card`'s radius.
 
 ## Accessibility
 

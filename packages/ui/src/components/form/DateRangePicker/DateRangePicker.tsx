@@ -27,18 +27,19 @@ import Paper from '@mui/material/Paper/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
-import React from 'react';
+import React, { useRef } from 'react';
 
+import type { CalendarLabels } from '../../../copy/labels';
 import { Calendar } from '../Calendar';
 
 import { toLocalDay } from './DateRangePicker.dates';
 import { useDateRangePicker } from './DateRangePicker.hooks';
+import { CALENDAR_CLASS, FLAT_CALENDAR, fieldsColumnSx, frameSx } from './DateRangePicker.frame';
+import { besideLayout, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
 import { DEFAULT_QUICK_RANGES } from './DateRangePicker.quick';
 import type { DateRangeDraft, DateRangePickerProps, WeekStart } from './DateRangePicker.types';
 import { DateRangeFields } from './DateRangePickerFields';
 import { DateRangeQuickList } from './DateRangePickerQuickList';
-
-const CALENDAR_CLASS = 'date-range-picker__calendar';
 
 const ROOT_SX: SxProps<Theme> = {
   display: 'inline-flex',
@@ -46,15 +47,7 @@ const ROOT_SX: SxProps<Theme> = {
   gap: 2,
   p: 2,
   maxWidth: '100%',
-  // `Calendar` renders its own `Paper` with 24px of padding. Nested in this one
-  // that reads as a box inside a box, so the inner frame is flattened here
-  // through the className hook the component exposes for exactly this.
-  [`& .${CALENDAR_CLASS}`]: {
-    p: 0,
-    boxShadow: 'none',
-    backgroundColor: 'transparent',
-    backgroundImage: 'none',
-  },
+  ...FLAT_CALENDAR,
 };
 
 const BODY_SX: SxProps<Theme> = {
@@ -132,6 +125,15 @@ function useMonthCount(requested: number | undefined): number | undefined {
 }
 
 /** The grid, in range mode — `Calendar`, never a second implementation of one. */
+/** The calendar options a picker passes through untouched. */
+type CalendarDisplay = Pick<
+  DateRangePickerProps,
+  'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange' | 'fullWidth' | 'disabled'
+>;
+
+/** Every day, for a picker that is `disabled`. */
+const EVERY_DAY = (): boolean => true;
+
 function RangeCalendar({
   calendarLabel,
   picker,
@@ -140,7 +142,11 @@ function RangeCalendar({
   weekStartsOn,
   months,
   maxRangeDays,
+  labels,
+  display,
 }: {
+  labels: Partial<CalendarLabels> | undefined;
+  display: CalendarDisplay;
   picker: Picker;
   value: DateRangeDraft;
   locale: string;
@@ -169,6 +175,12 @@ function RangeCalendar({
       // The same ceiling the quick list is judged against, so the calendar
       // cannot hand back a window the control has just called too long.
       maxRangeLength={maxRangeDays}
+      {...(labels ? { labels } : {})}
+      showOutsideDays={display.showOutsideDays}
+      todayIndicator={display.todayIndicator}
+      allowSameDayRange={display.allowSameDayRange}
+      fullWidth={display.fullWidth}
+      {...(display.disabled === true ? { isDateDisabled: EVERY_DAY, navigationDisabled: true } : {})}
     />
   );
 }
@@ -200,59 +212,167 @@ function QuickColumn({
   );
 }
 
-export function DateRangePicker({
-  value,
-  onChange,
-  timeZone,
-  now,
-  maxRangeDays,
-  weekStartsOn = 0,
-  quickRanges = DEFAULT_QUICK_RANGES,
-  locale = 'en-US',
-  numberOfMonths,
-  messages,
-  dataTestId = 'date-range-picker',
-  className,
-}: DateRangePickerProps): React.JSX.Element {
-  const picker = useDateRangePicker({
-    value,
-    onChange,
-    timeZone,
-    now,
-    maxRangeDays,
-    weekStartsOn,
-    quickRanges,
-    messages,
-  });
-  const months = useMonthCount(numberOfMonths);
-
+/** The typed half: the consumer's own fields, or the built-in pair and its line. */
+function TypedHalf({
+  props,
+  picker,
+  placement,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  placement: FieldsPlacement;
+}): React.JSX.Element {
+  const disabled = props.disabled === true;
+  if (props.renderFields) return <>{props.renderFields({ placement, disabled })}</>;
   return (
-    <Paper className={className} data-testid={dataTestId} sx={ROOT_SX}>
-      <Box sx={BODY_SX}>
-        <RangeCalendar
-          calendarLabel={picker.copy.calendarLabel}
-          picker={picker}
-          value={value}
-          locale={locale}
-          weekStartsOn={weekStartsOn}
-          months={months}
-          maxRangeDays={maxRangeDays}
-        />
-        <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
+    <DateRangeFields
+      value={props.value}
+      status={picker.status}
+      messages={picker.copy}
+      maxRangeDays={props.maxRangeDays}
+      onEdit={picker.editBound}
+      statusId={picker.statusId}
+      dataTestId={props.dataTestId ?? 'date-range-picker'}
+      openEnd={props.openEnd ?? false}
+      stacked={placement === 'beside'}
+      disabled={disabled}
+    />
+  );
+}
+
+/**
+ * How many months, and where the typed half goes. The default layout counts
+ * months by the viewport, as it always did; `beside` measures the picker.
+ */
+function usePickerLayout(props: DateRangePickerProps): {
+  root: React.RefObject<HTMLDivElement | null>;
+  months: number | undefined;
+  placement: FieldsPlacement;
+} {
+  const theme = useTheme();
+  const viewportMonths = useMonthCount(props.numberOfMonths);
+  const root = useRef<HTMLDivElement>(null);
+  const beside = props.fieldsPlacement === 'beside';
+  const width = useMeasuredWidth(root, beside);
+  if (!beside || width === null) return { root, months: viewportMonths, placement: 'below' };
+  const layout = besideLayout(width, props.numberOfMonths ?? 2, theme);
+  return { root, months: layout.months, placement: layout.placement };
+}
+
+/** The `beside` layout: the months in their own frame, the fields on the page. */
+function InPageLayout({
+  props,
+  picker,
+  layout,
+  body,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  layout: ReturnType<typeof usePickerLayout>;
+  body: React.ReactNode;
+}): React.JSX.Element {
+  const sideBySide = layout.placement === 'beside';
+  return (
+    <Box
+      ref={layout.root}
+      className={props.className}
+      data-testid={props.dataTestId ?? 'date-range-picker'}
+      data-fields-placement={layout.placement}
+      {...disabledGroup(props, picker)}
+      sx={{
+        display: 'flex',
+        flexDirection: sideBySide ? 'row' : 'column',
+        alignItems: sideBySide ? 'flex-start' : 'stretch',
+        gap: sideBySide ? 4 : 2,
+        width: '100%',
+        minWidth: 0,
+      }}
+    >
+      <Paper variant="outlined" sx={frameSx(sideBySide, props.fullWidth === true, layout.months ?? 1)}>
+        {body}
+      </Paper>
+      <Box sx={fieldsColumnSx(sideBySide, props.fullWidth === true)}>
+        <TypedHalf props={props} picker={picker} placement={layout.placement} />
       </Box>
-      <Box sx={FIELDS_DIVIDER_SX}>
-        <DateRangeFields
-          value={value}
-          status={picker.status}
-          messages={picker.copy}
-          maxRangeDays={maxRangeDays}
-          onEdit={picker.editBound}
-          statusId={picker.statusId}
-          dataTestId={dataTestId}
-        />
-      </Box>
+    </Box>
+  );
+}
+
+/**
+ * A disabled picker's root is a named GROUP (review round 6): `aria-disabled`
+ * is only valid on an element with a role, and the name says what is off.
+ * Enabled, the root carries neither, as it always did.
+ */
+function disabledGroup(props: DateRangePickerProps, picker: Picker) {
+  if (props.disabled !== true) return {};
+  return { role: 'group', 'aria-label': props.label ?? picker.copy.calendarLabel, 'aria-disabled': true } as const;
+}
+
+/** The default layout: one framed block, the typed half under the months. */
+function PopoverLayout({
+  props,
+  picker,
+  body,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  body: React.ReactNode;
+}): React.JSX.Element {
+  const typed = <TypedHalf props={props} picker={picker} placement="below" />;
+  return (
+    <Paper
+      className={props.className}
+      data-testid={props.dataTestId ?? 'date-range-picker'}
+      {...disabledGroup(props, picker)}
+      sx={ROOT_SX}
+    >
+      {body}
+      {props.renderFields ? typed : <Box sx={FIELDS_DIVIDER_SX}>{typed}</Box>}
     </Paper>
   );
+}
+
+export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element {
+  const { value, maxRangeDays, weekStartsOn = 0, locale = 'en-US', dataTestId = 'date-range-picker' } = props;
+  const picker = useDateRangePicker({
+    value,
+    onChange: props.onChange,
+    timeZone: props.timeZone,
+    now: props.now,
+    maxRangeDays,
+    weekStartsOn,
+    quickRanges: props.quickRanges ?? DEFAULT_QUICK_RANGES,
+    messages: props.messages,
+    followValue: props.renderFields !== undefined,
+  });
+  const layout = usePickerLayout(props);
+
+  const body = (
+    <Box sx={BODY_SX}>
+      <RangeCalendar
+        calendarLabel={picker.copy.calendarLabel}
+        picker={picker}
+        value={value}
+        locale={locale}
+        weekStartsOn={weekStartsOn}
+        months={layout.months}
+        maxRangeDays={maxRangeDays}
+        labels={props.calendarLabels}
+        // `fullWidth` fills the in-page frame; the popover's frame is as wide
+        // as its months, and a filling calendar in it spread past the quick
+        // column and the typed pair (FUT-4156, round 3).
+        display={{ ...props, fullWidth: props.fieldsPlacement === 'beside' && props.fullWidth === true }}
+      />
+      {props.disabled === true ? null : (
+        <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
+      )}
+    </Box>
+  );
+
+  if (props.fieldsPlacement === 'beside') {
+    return <InPageLayout props={props} picker={picker} layout={layout} body={body} />;
+  }
+  return <PopoverLayout props={props} picker={picker} body={body} />;
 }
 
 export default DateRangePicker;

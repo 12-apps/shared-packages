@@ -31,6 +31,28 @@ export interface DiscountWireRecord {
   code: string | null;
   startsAt: string | null;
   endsAt: string | null;
+  /**
+   * The days the window runs on in the store's zone, Término inclusive
+   * (FUT-4482) — sent by a server that counts whole days, absent otherwise.
+   * Read in preference to the instants, which no browser can place on the
+   * store's calendar.
+   */
+  startsOn?: string | null;
+  endsOn?: string | null;
+  /**
+   * The server counts whole days but cannot place this rule's (FUT-4482): it
+   * was written in the store's zone, and that zone is unknown to it now. The
+   * form shows empty boxes and the list a notice — never days guessed from the
+   * instants.
+   */
+  daysUnknown?: boolean;
+  /**
+   * The server counts whole days and the store's zone is unknown to it now
+   * (FUT-4482, review round 8), said on every row then: the days shown — a
+   * legacy row's, none on a `daysUnknown` one — cannot change. The form shows
+   * them locked (read-only boxes holding days, round 9) and saves the rest with `keepWindow`.
+   */
+  datesLocked?: boolean;
   /** The weekly schedule (FUT-996), or null for "always". */
   schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
@@ -59,6 +81,13 @@ export interface DiscountsPagination {
 export interface DiscountsPage {
   data: DiscountWireRecord[];
   pagination: DiscountsPagination;
+  /**
+   * The server counts whole days and the store's zone is unknown to it now
+   * (FUT-4482, CP8): said on the page as well as on every row, so a create —
+   * which has no row, on a list that may be empty — saves no dates. Absent
+   * otherwise.
+   */
+  datesLocked?: boolean;
 }
 
 /** One selectable target, as `GET /discounts/targets` answers it. */
@@ -120,6 +149,12 @@ export interface DiscountFormPayload {
    * submit.
    */
   schedule: DiscountSchedule | null;
+  /**
+   * The form could not change the rule's days (`datesLocked` or `daysUnknown`, FUT-4482, review
+   * round 5): the dates are NOT sent, and the server keeps the stored window
+   * while it writes every other field. Only an edit sends it.
+   */
+  keepWindow?: boolean;
 }
 
 /** A money amount as integer cents, or null when blank. */
@@ -158,8 +193,16 @@ export function toWriteBody(
   input: DiscountFormPayload,
   formatters: DiscountsFormatters,
 ): Record<string, unknown> {
+  const body = wholeWriteBody(input, formatters);
+  return input.keepWindow === true ? keepingWindow(body) : body;
+}
+
+function wholeWriteBody(
+  input: DiscountFormPayload,
+  formatters: DiscountsFormatters,
+): Record<string, unknown> {
   const isCombo = input.scope === "COMBO";
-  return {
+  const body = {
     name: input.name.trim(),
     type: input.type,
     // Exactly one value column, chosen by the TYPE, with the other three
@@ -198,6 +241,15 @@ export function toWriteBody(
     categoryIds: input.scope === "CATEGORY" ? input.categoryIds : [],
     menuItemIds: input.scope === "ITEM" ? input.menuItemIds : [],
   };
+  return body;
+}
+
+/** The body with no dates and the word to keep the stored ones: the two empty boxes are not "sem prazo". */
+function keepingWindow(body: Record<string, unknown>): Record<string, unknown> {
+  const kept: Record<string, unknown> = { ...body, keepWindow: true };
+  delete kept.startsAt;
+  delete kept.endsAt;
+  return kept;
 }
 
 /** The bound wire client the screens use. Nothing else performs I/O. */

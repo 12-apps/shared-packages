@@ -12,11 +12,13 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 import type { DiscountSchedule } from "../engine/schedule";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
+import { DaysUnknownNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
+import type { DatesLock } from "./discount-form-values";
 import { ComboRewardFields } from "./combo-reward-fields";
 import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
-import { DateField } from "./date-field";
 import { PercentField, WholeNumberField } from "./number-fields";
+import { PeriodPicker } from "./period-picker";
 import { ScheduleBuilder } from "./schedule-builder";
 
 /**
@@ -94,7 +96,7 @@ export function RewardFields({
   copy,
   currencyField,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   currencyField: CurrencyFieldComponent;
 }): JSX.Element | null {
   const { values } = useFormContext();
@@ -107,7 +109,7 @@ export function RewardFields({
 }
 
 /** The coupon input, shown only for a CODE-triggered rule. */
-function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+function CodeField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   if (values.trigger !== "CODE") return null;
   return (
@@ -120,7 +122,7 @@ function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
 }
 
 /** What makes the promotion fire, and the code it fires on. */
-export function TriggerFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+export function TriggerFields({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element {
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
       <Fields.ToggleField
@@ -141,7 +143,7 @@ export function TriggerFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element
  * operator build "preço de combo, abrangência: pedido" and have the write path
  * refuse it.
  */
-export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+export function ScopeField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   if (isComboKind(values.kind ?? "PERCENTAGE")) return null;
   return (
@@ -165,7 +167,7 @@ export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | 
  * "combos por pedido" is a fact about THIS combo, and among "limite de usos"
  * and "limite por cliente" it read as a third redemption cap.
  */
-export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+export function ComboCapField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
   if (!isComboKind(kind)) return null;
@@ -185,21 +187,41 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
   );
 }
 
-/** Início and Término, day-first on every browser (FUT-4156). */
-function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+/**
+ * The period: the notice when the days cannot change, the picker, the hint.
+ *
+ * The form's own 16px between the notice and the frame; the hint keeps its
+ * 4px under the frame. While the days are locked — unknown, or shown under an
+ * unknown zone (review round 8) — the picker is disabled and the open-ended
+ * hint is not said: Salvar keeps the stored window then, never "sem prazo"
+ * (FUT-4482, review rounds 4 and 5).
+ */
+function PeriodSection({
+  copy,
+  wholeDays,
+  datesLock,
+  timeZoneSettings,
+}: {
+  copy: CompleteDiscountsWebCopy;
+  wholeDays: boolean;
+  datesLock: DatesLock;
+  timeZoneSettings: DiscountsTimeZoneSettings | undefined;
+}): JSX.Element {
   return (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-      {(["startsAt", "endsAt"] as const).map((name) => (
-        <DateField
-          key={name}
-          name={name}
-          label={copy.form[name]}
-          placeholder={copy.form.datePlaceholder}
-          invalidMessage={copy.form.invalidDate}
-          incompleteMessage={copy.form.dateIncomplete}
+    <Stack spacing={2} data-testid="discount-period">
+      {datesLock === null ? null : (
+        <DaysUnknownNotice
+          copy={copy}
+          message={datesLock === "unknown" ? copy.window.daysUnknownForm : copy.window.datesLockedForm}
+          timeZoneSettings={timeZoneSettings}
+          dataTestId="discount-days-unknown"
         />
-      ))}
-    </Box>
+      )}
+      <Stack spacing={0.5}>
+        <PeriodPicker copy={copy} wholeDays={wholeDays} datesLock={datesLock} />
+        {datesLock === null ? <Text variant="caption">{copy.schedule.periodHint}</Text> : null}
+      </Stack>
+    </Stack>
   );
 }
 
@@ -219,13 +241,22 @@ function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
  */
 export function WindowFields({
   copy,
+  wholeDays,
+  datesLock = null,
+  timeZoneSettings,
   schedule,
   scheduleEnabled,
   timezoneLabel,
   onScheduleChange,
   onScheduleEnabledChange,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
+  /** Whether Início = Término is a one-day promotion (the server counts whole days). */
+  wholeDays: boolean;
+  /** Why the edited rule's days cannot change (FUT-4482): disabled boxes, and the notice said. */
+  datesLock?: DatesLock;
+  /** The host's link to its time-zone setting, shown in that notice when given. */
+  timeZoneSettings?: DiscountsTimeZoneSettings | undefined;
   schedule: DiscountSchedule;
   scheduleEnabled: boolean;
   timezoneLabel: string | null;
@@ -243,10 +274,7 @@ export function WindowFields({
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
-      <Stack spacing={0.5}>
-        <PeriodFields copy={copy} />
-        <Text variant="caption">{copy.schedule.periodHint}</Text>
-      </Stack>
+      <PeriodSection copy={copy} wholeDays={wholeDays} datesLock={datesLock} timeZoneSettings={timeZoneSettings} />
       <FormControl>
         <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
         <Stack spacing={0.5}>
@@ -299,7 +327,7 @@ export function WindowFields({
  * here, only for the combination that has it, rather than left in a document
  * nobody opens while filling in a form.
  */
-function OrderScopeScheduleNote({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+function OrderScopeScheduleNote({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
   if (isComboKind(kind) || values.scope !== "ORDER") return null;
@@ -311,7 +339,7 @@ export function LimitFields({
   copy,
   currencyField,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   currencyField: CurrencyFieldComponent;
 }): JSX.Element {
   const Currency = currencyField;
@@ -332,7 +360,7 @@ export function DiscountSwitches({
   onActive,
   onStackable,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   active: boolean;
   stackable: boolean;
   onActive: (next: boolean) => void;

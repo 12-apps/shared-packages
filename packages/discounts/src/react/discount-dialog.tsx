@@ -5,7 +5,7 @@ import { Fragment, useState, type JSX, type ReactNode } from "react";
 import { UsableModal } from "@12-apps/ui/feedback/UsableModal";
 import { Box } from "@12-apps/ui/mui/Box";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 
 /**
  * The surface the create and edit forms open in (FUT-4417): a stacked modal on
@@ -36,7 +36,7 @@ export function DiscountDialog({
   open: boolean;
   onClose: () => void;
   title: string;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   children: ReactNode;
 }): JSX.Element {
   const [opening, setOpening] = useState(open ? 1 : 0);

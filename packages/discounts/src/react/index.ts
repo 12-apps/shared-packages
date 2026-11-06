@@ -23,6 +23,7 @@ export {
   type DiscountsWebConfig,
   type WebDiscounts,
 } from "./create-web-discounts";
+export type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 
 export {
   missingWebCopy,

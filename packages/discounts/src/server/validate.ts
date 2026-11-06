@@ -9,6 +9,9 @@ import { isUsableSchedule, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 import type { DiscountsServerCopy } from "./copy";
 import { comboRequirementsForScope, toComboColumns } from "./validate-combo";
+import { assertWindow, type DiscountWindowOptions } from "./validate-window";
+
+export type { DiscountWindowOptions } from "./validate-window";
 
 /**
  * The write-time rule set for a discount (FUT-244).
@@ -157,32 +160,6 @@ function assertTargets(input: DiscountWriteInput, copy: DiscountsServerCopy): vo
   }
 }
 
-/** A calendar date at UTC midnight, or null. The wire format is `YYYY-MM-DD`. */
-function toDate(value: string | null, field: string, copy: DiscountsServerCopy): Date | null {
-  if (value === null || value === "") return null;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) throw invalid(field, copy.invalidDate);
-  return parsed;
-}
-
-/**
- * The window, half-open `[startsAt, endsAt)`. `endsAt` is EXCLUSIVE, so equal
- * bounds are an EMPTY window rather than a one-instant one — an operator who
- * typed the same date twice meant something else, and an always-empty promotion
- * is worse than a rejected form.
- */
-function assertWindow(
-  input: DiscountWriteInput,
-  copy: DiscountsServerCopy,
-): { startsAt: Date | null; endsAt: Date | null } {
-  const startsAt = toDate(input.startsAt, "startsAt", copy);
-  const endsAt = toDate(input.endsAt, "endsAt", copy);
-  if (startsAt !== null && endsAt !== null && endsAt.getTime() <= startsAt.getTime()) {
-    throw invalid("endsAt", copy.endsBeforeStarts);
-  }
-  return { startsAt, endsAt };
-}
-
 /**
  * The weekly schedule, or null (FUT-996).
  *
@@ -235,6 +212,13 @@ export interface DiscountScalars {
   code: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  /**
+   * Whether `startsAt` / `endsAt` are whole days in the store's zone
+   * (FUT-4482): true on every write made with a zone, false on every other.
+   * Persisted as `window_in_zone`, it is how a read tells a whole-day window
+   * from a UTC one — the values alone cannot, at UTC+0.
+   */
+  windowInZone: boolean;
   /** The weekly schedule, or null. Persisted as a JSON column. */
   schedule: DiscountSchedule | null;
   minSubtotalCents: number | null;
@@ -273,11 +257,12 @@ export interface DiscountTargets {
 export function toDiscountScalars(
   input: DiscountWriteInput,
   copy: DiscountsServerCopy,
+  options: DiscountWindowOptions = {},
 ): DiscountScalars {
   assertValue(input, copy);
   const code = assertTrigger(input, copy);
   assertTargets(input, copy);
-  const { startsAt, endsAt } = assertWindow(input, copy);
+  const { startsAt, endsAt } = assertWindow(input, copy, options);
   const schedule = assertSchedule(input, copy);
   assertLimits(input, copy);
   const combo = toComboColumns(input, copy);
@@ -295,6 +280,7 @@ export function toDiscountScalars(
     code,
     startsAt,
     endsAt,
+    windowInZone: options.timeZone !== undefined,
     schedule,
     minSubtotalCents: input.minSubtotalCents,
     usageLimit: input.usageLimit,
@@ -346,6 +332,13 @@ export interface DiscountWriteBody {
   menuItemIds?: string[];
   comboRequirements?: ComboRequirement[];
   maxComboApplications?: number | null;
+  /**
+   * An UPDATE's word that the form could not show the window's days and sends
+   * none (FUT-4482, review round 5): every other field is written over the
+   * stored window. Ignored on a create; on an update, a date sent beside it is
+   * refused (422 on `keepWindow`, review round 6) — never dropped in silence.
+   */
+  keepWindow?: boolean;
 }
 
 /**

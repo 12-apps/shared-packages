@@ -16,7 +16,8 @@ import type { ComboRequirement } from "../engine/types";
 
 import { FirstOrderField } from "./first-order-field";
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import {
   ComboCapField,
   DiscountSwitches,
@@ -32,7 +33,7 @@ import { DiscountTargetPicker } from "./discount-target-picker";
 import { KindField } from "./kind-field";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
-import { initialValues, type DiscountFormValues } from "./discount-form-values";
+import { formDatesLock, initialValues, type DatesLock, type DiscountFormValues } from "./discount-form-values";
 import { DISCOUNT_KINDS, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 
@@ -110,7 +111,7 @@ type SubmitHelpers = { setFieldErrors: (errors: Record<string, string | undefine
 
 export interface DiscountFormProps {
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   currencyField: CurrencyFieldComponent;
   groups: readonly WireTargetGroup[];
@@ -120,6 +121,54 @@ export interface DiscountFormProps {
   onError: (error: unknown, context: string) => void;
   /** The store's timezone as a person says it — shown under the clocks. */
   timezoneLabel?: string;
+  /**
+   * Whether the server counts Início and Término WHOLE in the store's zone
+   * (its `storeTimeZone`, FUT-4482): equal days are then a one-day promotion.
+   * Default false, which refuses equal days as such a server does.
+   */
+  wholeDays?: boolean;
+  /** The host's link to its time-zone setting, for the "days unknown" notice. */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
+  /**
+   * The server said the store's zone is unknown now (the list's `datesLocked`,
+   * FUT-4482, CP8). Read on a create only — an edit reads its own row: the
+   * period is shown locked and empty, and the create saves no dates, since a
+   * dated one would be refused. Default false.
+   */
+  zoneUnknown?: boolean;
+}
+
+/**
+ * An edit whose dates are the ones it opened with (review round 9, N4): the
+ * stored window is kept (`keepWindow`) rather than re-sent as days. Where the
+ * server counts whole days its zone can turn unknown while the form is open,
+ * and re-sent days would then be refused on the date field — a save the
+ * operator never asked to change the dates of, refused for them. Kept, the
+ * save needs no clock; under a known zone the server wrote the same stored
+ * window for equal days anyway. Only with `wholeDays`: elsewhere no zone is
+ * ever asked, and the body stays as it always was.
+ */
+function keepsUnchangedDays(props: DiscountFormProps, values: DiscountFormValues): boolean {
+  if (props.editing === null || props.wholeDays !== true) return false;
+  const opened = initialValues(props.editing, props.formatters);
+  return values.startsAt === opened.startsAt && values.endsAt === opened.endsAt;
+}
+
+/**
+ * What a save does with the period. Days the form cannot change (FUT-4482):
+ * none shown (`daysUnknown`, and empty boxes sent would read as "sem prazo"),
+ * or shown and locked while the store's zone is unknown (round 8). They are
+ * not sent; everything else is saved over the stored window (`keepWindow`),
+ * never refused. A create under that zone (CP8) has no stored window: it
+ * sends no dates and saves open-ended.
+ */
+function windowIntent(
+  props: DiscountFormProps,
+  values: DiscountFormValues,
+): { locked: boolean; keepWindow: boolean; noDates: Partial<DiscountFormValues> } {
+  const lock = formDatesLock(props.editing, props.zoneUnknown === true);
+  if (lock === "create") return { locked: true, keepWindow: false, noDates: { startsAt: "", endsAt: "" } };
+  return { locked: lock !== null, keepWindow: lock !== null || keepsUnchangedDays(props, values), noDates: {} };
 }
 
 /**
@@ -137,6 +186,7 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
+    const { locked, keepWindow, noDates } = windowIntent(props, values);
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -145,6 +195,8 @@ function makeSubmit(
     const invalid = validate(values, targets, formatters, copy, {
       enabled: extra.scheduleEnabled,
       schedule: extra.schedule,
+      wholeDays: props.wholeDays ?? false,
+      datesLocked: locked,
     });
     if (Object.keys(invalid).length > 0) {
       // ONE message for a client refusal: the red fields and the toast
@@ -154,6 +206,7 @@ function makeSubmit(
     }
     const payload: DiscountFormPayload = {
       ...values,
+      ...noDates,
       // The switch decides whether the rows are sent at all — see the state
       // hook for why the two are separate.
       schedule: extra.scheduleEnabled ? extra.schedule : null,
@@ -165,6 +218,7 @@ function makeSubmit(
       stackable: extra.stackable,
       firstOrderOnly: extra.firstOrderOnly,
       active: extra.active,
+      ...(keepWindow ? { keepWindow } : {}),
     };
     const result = editing
       ? await api.update(editing.id, payload)
@@ -178,6 +232,24 @@ function makeSubmit(
     // — so highlight those inputs instead of only showing the banner.
     if (result.fieldErrors) setFieldErrors(result.fieldErrors);
     onError(result, editing ? "discounts.update" : "discounts.create");
+  };
+}
+
+/**
+ * What "Quando vale" is told about the server: whether it counts whole days,
+ * whether it could place the edited rule's days (FUT-4482), and its zone's name.
+ */
+function windowFlags(props: DiscountFormProps): {
+  wholeDays: boolean;
+  datesLock: DatesLock;
+  timezoneLabel: string | null;
+  timeZoneSettings: DiscountsTimeZoneSettings | undefined;
+} {
+  return {
+    wholeDays: props.wholeDays ?? false,
+    datesLock: formDatesLock(props.editing, props.zoneUnknown === true),
+    timezoneLabel: props.timezoneLabel ?? null,
+    timeZoneSettings: props.timeZoneSettings,
   };
 }
 
@@ -224,9 +296,9 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           <TriggerFields copy={copy} />
           <WindowFields
             copy={copy}
+            {...windowFlags(props)}
             schedule={extra.schedule}
             scheduleEnabled={extra.scheduleEnabled}
-            timezoneLabel={props.timezoneLabel ?? null}
             onScheduleChange={extra.setSchedule}
             onScheduleEnabledChange={extra.setScheduleEnabled}
           />

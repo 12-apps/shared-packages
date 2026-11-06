@@ -45,6 +45,34 @@ export const MONTH_SX = {
   maxWidth: sxRem(304),
 } as const;
 
+/**
+ * A filling month (`fullWidth`) drops the 304 ceiling and takes its share of
+ * the row; its columns spread, its day faces do not grow (`CalendarDay`).
+ */
+export const monthSx = (fullWidth: boolean) => (fullWidth ? FILL_MONTH_SX : MONTH_SX);
+
+/**
+ * The basis as a theme function: interpolated into a string, `sxRem` is a
+ * function and the whole `flex` value is dropped as invalid CSS. A filling
+ * month's cells have no intrinsic width to fall back on, so it must grow.
+ */
+const FILL_MONTH_SX = {
+  flex: (theme: Theme) => `1 1 ${rem(theme, 280)}`,
+  minWidth: 0,
+  maxWidth: 'none',
+} as const;
+
+/**
+ * The caption as a title: its first letter upper-cased in the calendar's own
+ * language ("novembro de 2026" → "Novembro de 2026"), as a heading reads in
+ * pt-BR; `Intl` writes month names lower-case there. The caption only — the
+ * grid's name and a day's name keep `Intl`'s words, which a sentence quotes.
+ */
+export const captionOf = (monthName: string, locale: string): string => {
+  const [first = '', ...rest] = [...monthName];
+  return `${first.toLocaleUpperCase(locale)}${rest.join('')}`;
+};
+
 /** The two arrows' accessible names; an icon alone names nothing. */
 export type MonthArrowLabels = Pick<CalendarLabels, 'previousMonth' | 'nextMonth'>;
 
@@ -55,9 +83,10 @@ const MonthNavHeader: FC<{
   showPrevious: boolean;
   showNext: boolean;
   labels?: MonthArrowLabels;
+  disabled: boolean;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
-}> = ({ title, showPrevious, showNext, labels, onPreviousMonth, onNextMonth }) => (
+}> = ({ title, showPrevious, showNext, labels, disabled, onPreviousMonth, onNextMonth }) => (
   <Box
     sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
     data-testid="calendar-header"
@@ -65,6 +94,7 @@ const MonthNavHeader: FC<{
     {showPrevious && (
       <IconButton
         onClick={onPreviousMonth}
+        disabled={disabled}
         size="small"
         aria-label={labels?.previousMonth}
         data-testid="calendar-prev-month"
@@ -84,6 +114,7 @@ const MonthNavHeader: FC<{
     {showNext && (
       <IconButton
         onClick={onNextMonth}
+        disabled={disabled}
         size="small"
         aria-label={labels?.nextMonth}
         data-testid="calendar-next-month"
@@ -156,6 +187,8 @@ export interface CalendarMonthProps {
   renderHeader?: CalendarProps['renderHeader'];
   /** The arrows' accessible names. */
   labels?: MonthArrowLabels;
+  /** `CalendarProps.navigationDisabled`. */
+  navigationDisabled?: boolean;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   dayContext: DayCellContext;
@@ -169,12 +202,14 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
   weekdayNames,
   renderHeader,
   labels,
+  navigationDisabled = false,
   onPreviousMonth,
   onNextMonth,
   dayContext,
 }) => {
-  const monthName = getMonthName(matrix.month, matrix.year, locale);
-  const title = renderHeader ? renderHeader({ month: matrix.month, year: matrix.year }) : monthName;
+  const title = renderHeader
+    ? renderHeader({ month: matrix.month, year: matrix.year })
+    : captionOf(getMonthName(matrix.month, matrix.year, locale), locale);
 
   return (
     /* The month is addressable by its position, because in a multi-month
@@ -182,12 +217,13 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
        January's 5th and February's. Without a per-month hook a test can only
        reach a day positionally, which is exactly what the flakiness gate
        refuses. Additive: `calendar-grid` below is unchanged. */
-    <Box sx={MONTH_SX} data-testid={`calendar-month-${monthIndex}`}>
+    <Box sx={monthSx(dayContext.fullWidth)} data-testid={`calendar-month-${monthIndex}`}>
       <MonthNavHeader
         title={title}
         showPrevious={monthIndex === 0}
         showNext={monthIndex === monthsToShow - 1}
         labels={labels}
+        disabled={navigationDisabled}
         onPreviousMonth={onPreviousMonth}
         onNextMonth={onNextMonth}
       />

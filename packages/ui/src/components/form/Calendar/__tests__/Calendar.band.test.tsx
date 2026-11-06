@@ -51,6 +51,16 @@ describe("the range band (FUT-4162)", () => {
     expect(bandFor({ args: day(17, { inRange: true }), selectionMode: "single", range, hoveredDate: null, isDisabled: never })).toBe("none");
   });
 
+  it("paints no half-band for a REVERSED pair, which is not a range (FUT-4156)", () => {
+    // A form can hand over Término before Início while it is being fixed; the
+    // inside is not filled, so the ends must not reach towards each other.
+    const reversed = { start: on(22), end: on(13) };
+    const band = (args: DayRenderArgs) =>
+      bandFor({ args, selectionMode: "range", range: reversed, hoveredDate: null, isDisabled: never });
+    expect(band(day(22, { rangeStart: true, selected: true }))).toBe("none");
+    expect(band(day(13, { rangeEnd: true, selected: true }))).toBe("none");
+  });
+
   it("lays the days out with no column gap", () => {
     render(<Calendar ariaLabel="Datas" selectionMode="range" range={range} defaultMonth={on(1)} locale="pt-BR" />);
     for (const grid of screen.getAllByTestId("calendar-grid")) {
@@ -78,5 +88,35 @@ describe("the endpoint fill (FUT-4162)", () => {
     const theme = brandTheme();
     expect(endpointFill(theme)).not.toBe(theme.palette.primary.main);
     expect(getContrastRatio(endpointFill(theme), theme.palette.primary.main)).toBeLessThan(1.1);
+  });
+});
+
+describe("a blocked day inside an ENABLED range (FUT-4482)", () => {
+  // A host may block days a range spans (Sundays, holidays). Only a calendar
+  // shown locked draws its in-range days in the secondary ink; a live one keeps
+  // a blocked day in the disabled ink, as on origin/main.
+  const resolved = (color: string): string => {
+    const probe = document.createElement("span");
+    probe.style.color = color;
+    return probe.style.color;
+  };
+  const isSunday = (date: Date) => date.getDay() === 0;
+
+  it("keeps the disabled ink on a blocked in-range day of a live calendar", () => {
+    // 2026-11-15 is a Sunday inside 10..20.
+    render(
+      <Calendar
+        ariaLabel="Datas"
+        selectionMode="range"
+        range={{ start: new Date(2026, 10, 10, 12), end: new Date(2026, 10, 20, 12) }}
+        isDateDisabled={isSunday}
+        numberOfMonths={1}
+        defaultMonth={new Date(2026, 10, 1, 12)}
+        showOutsideDays={false}
+      />,
+    );
+    const sunday = screen.getByTestId("calendar-date-15");
+    expect(sunday.getAttribute("aria-disabled")).toBe("true");
+    expect(getComputedStyle(sunday).color).toBe(resolved(createTheme().palette.text.disabled));
   });
 });

@@ -20,6 +20,10 @@ const COLUMN_SIZE = sxRem(304 / 7);
 /** 304/7 wide to 40 tall: the day's face is a 40 design px circle at full size. */
 const CELL_RATIO = '38 / 35';
 
+/** Emotion's documented flag for a positional selector known safe here. */
+const NTH_CHILD_IS_SAFE =
+  ' /* emotion-disable-server-rendering-unsafe-selector-warning-please-do-not-use-this-the-warning-exists-for-a-reason */';
+
 interface DayState extends DayRenderArgs {
   outside: boolean;
   focused: boolean;
@@ -66,9 +70,15 @@ const inDirection = (band: Exclude<DayBand, 'none'>, theme: Theme): Exclude<DayB
 const faceBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | string =>
   isEndpoint(day) ? endpointFill : 'transparent';
 
-const colorFor = (day: DayRenderArgs, visible: boolean): string => {
+const colorFor = (day: DayRenderArgs, visible: boolean, locked: boolean): string => {
   if (isEndpoint(day)) return 'primary.contrastText';
-  if (day.disabled) return 'text.disabled';
+  // On a calendar shown LOCKED (`navigationDisabled`, a disabled picker) every
+  // day is disabled, and the ones inside the range are the value the grid
+  // states: on the band the disabled ink was 1.56:1, so they take the secondary
+  // ink (FUT-4482, review round 9). A live range CAN span a blocked day (a
+  // host's `isDateDisabled`: Sundays, holidays); that day keeps the disabled
+  // ink, so it still reads as the one that cannot be picked.
+  if (day.disabled) return locked && day.inRange ? 'text.secondary' : 'text.disabled';
   // Outside days that are switched off still occupy the grid, they just have
   // nothing to show.
   if (!visible) return 'transparent';
@@ -85,13 +95,59 @@ const hoverBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | st
 // is a half-round cap on a cell as tall as it is wide.
 const BAND_RADIUS = '50%';
 
+const capRadius = (side: 'start' | 'end', fill: boolean) => {
+  const radius = fill ? FILL_CAP_RADIUS : BAND_RADIUS;
+  return side === 'start'
+    ? { borderStartStartRadius: radius, borderEndStartRadius: radius }
+    : { borderStartEndRadius: radius, borderEndEndRadius: radius };
+};
+
 /**
  * One cell: the band, painted on the button across its whole column, and the
  * day's round face, a `::before` circle behind the number. The face is a
  * pseudo-element so the button's own content stays the bare day number a host's
  * tests query (`getByText('27')` is the cell, as it always was).
  */
-const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps<Theme> => ({
+/**
+ * Today's ring, opt-in (`todayIndicator="ring"`): a hairline-and-a-half inset
+ * on the face, in the primary colour. An endpoint is already filled with that
+ * colour, so it carries none.
+ */
+const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => string) | undefined =>
+  ring && day.today && !isEndpoint(day)
+    ? // A disabled today keeps its ring in the disabled ink, like its number:
+      // a primary ring on a dead grid reads as the one live day (round 6).
+      (theme: Theme) =>
+        `inset 0 0 0 ${rem(theme, 1.5)} ${day.disabled ? theme.palette.text.disabled : theme.palette.primary.main}`
+    : undefined;
+
+/**
+ * A filling calendar's cell (`fullWidth`): the whole column wide, so a range's
+ * band runs unbroken however far the columns spread, and exactly as tall as the
+ * 40 design px face — the face is as tall as the cell, so it keeps its size
+ * while only the spacing grows. A row's end caps round at half that height
+ * (the radius clamps on a smaller cell) rather than half a wide cell's width.
+ */
+const FILL_CELL_HEIGHT = sxRem(40);
+const FILL_CAP_RADIUS = sxRem(20);
+
+// A filling cell is 40 tall at every width, never a ratio of its column: a
+// tap target under 600 wide is 40 design px each way, and a ratio made a 36px
+// column 33 tall at 320 (FUT-4156, round 3). The frame gives the columns their
+// 40 (`DateRangePicker.frame`).
+const cellSize = (fill: boolean) =>
+  fill
+    ? { width: '100%', maxWidth: '100%', height: FILL_CELL_HEIGHT, justifySelf: 'stretch' }
+    : { width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' };
+
+const dayCellSx = (
+  day: DayRenderArgs,
+  band: DayBand,
+  visible: boolean,
+  ring: boolean,
+  fill: boolean,
+  locked: boolean,
+): SxProps<Theme> => ({
   position: 'relative',
   isolation: 'isolate',
   display: 'flex',
@@ -101,24 +157,27 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
   // now that the seven columns carry no gap between them; `maxWidth` and the
   // column's `minmax(0, 1fr)` let it give way below that, and the ratio keeps
   // it 40 tall at full size and shrinking with it.
-  width: COLUMN_SIZE,
-  maxWidth: '100%',
-  aspectRatio: CELL_RATIO,
-  justifySelf: 'stretch',
+  ...cellSize(fill),
   boxSizing: 'border-box',
   padding: 0,
   border: 'none',
   background: 'none',
   backgroundImage: band === 'none' ? 'none' : (theme: Theme) => BAND_IMAGE[inDirection(band, theme)](bandColor(theme)),
   cursor: day.disabled ? 'not-allowed' : 'pointer',
-  color: colorFor(day, visible),
+  color: colorFor(day, visible, locked),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,
   fontWeight: day.today || isEndpoint(day) ? 'bold' : 'normal',
   // `nth-child`, counting every cell of the week: a hidden outside day is an
   // inert `span` placeholder (FUT-4144), and `nth-of-type` counted only the
   // buttons, so the caps landed mid-week in a month with hidden outside days.
-  '&:nth-child(7n + 1)': { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
-  '&:nth-child(7n)': { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
+  //
+  // Emotion warns on `:nth-child` in development, because a server render can
+  // put its style tag between the cells and shift the count. The calendar is
+  // never server-rendered into that position, and every screen that showed one
+  // printed the warning as a console error (FUT-4156), so the selectors carry
+  // Emotion's own opt-out flag.
+  [`&:nth-child(7n + 1)${NTH_CHILD_IS_SAFE}`]: capRadius('start', fill),
+  [`&:nth-child(7n)${NTH_CHILD_IS_SAFE}`]: capRadius('end', fill),
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -131,12 +190,14 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
     maxWidth: '100%',
     borderRadius: '50%',
     backgroundColor: faceBackgroundFor(day),
+    boxShadow: todayRingFor(day, ring),
   },
   '&:hover::before': {
     backgroundColor: hoverBackgroundFor(day),
   },
   '&:focus': { outline: 'none' },
-  '&:focus::before': {
+  // Keyboard focus only: a tapped day is already marked by what the tap did.
+  '&:focus-visible::before': {
     outline: (theme: Theme) => `${rem(theme, 2)} solid`,
     outlineColor: 'primary.main',
     outlineOffset: sxRem(1),
@@ -158,6 +219,12 @@ export interface CalendarDayProps {
   band: DayBand;
   focused: boolean;
   showOutsideDays: boolean;
+  /** Ring today's face (`todayIndicator="ring"`). */
+  todayRing?: boolean;
+  /** Fill the column (`CalendarProps.fullWidth`). */
+  fullWidth?: boolean;
+  /** The whole calendar is shown locked (`CalendarProps.navigationDisabled`). */
+  locked?: boolean;
   dayClassName?: (args: DayRenderArgs) => string;
   onSelect: (date: Date) => void;
   onHover: (date: Date) => void;
@@ -170,6 +237,9 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   band,
   focused,
   showOutsideDays,
+  todayRing = false,
+  fullWidth,
+  locked,
   dayClassName,
   onSelect,
   onHover,
@@ -187,7 +257,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
         component="span"
         aria-hidden="true"
         data-testid="calendar-outside-placeholder"
-        sx={{ width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' }}
+        sx={cellSize(fullWidth === true)}
       />
     );
   }
@@ -195,6 +265,8 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   return (
     <Box
       component="button"
+      // A day picks; it never submits the form a calendar sits in (FUT-4156).
+      type="button"
       role="gridcell"
       tabIndex={focused ? 0 : -1}
       aria-selected={day.selected}
@@ -207,7 +279,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       onClick={() => onSelect(day.date)}
       onMouseEnter={() => onHover(day.date)}
       onMouseLeave={onHoverEnd}
-      sx={dayCellSx(day, band, visible)}
+      sx={dayCellSx(day, band, visible, todayRing, fullWidth === true, locked === true)}
     >
       {day.selected && (
         <Box component="span" data-testid="calendar-selected-date" sx={{ display: 'none' }} />

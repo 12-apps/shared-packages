@@ -6,9 +6,11 @@ import { timeZoneLabel } from "../timezone";
 
 import { createDiscountsApiClient, type DiscountsApiClient } from "./api";
 import { missingWebCopy, type DiscountsWebCopy } from "./copy";
+import { completeWebCopy } from "./copy-fallback";
 import { DiscountForm, type DiscountFormProps } from "./discount-form";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
-import { DiscountsScreen, type DiscountsScreenProps } from "./discounts-screen";
+import { DiscountsScreen, type DiscountsScreenProps as BoundScreenProps } from "./discounts-screen";
 import { createFormatters, type DiscountsFormatters } from "./format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "./pt-BR";
 import { httpDiscountsTransport, type DiscountsTransport } from "./transport";
@@ -78,6 +80,26 @@ export interface DiscountsWebConfig {
    */
   timezone?: string;
   /**
+   * Whether the SERVER counts Início and Término whole in the store's zone —
+   * true exactly when the host passes `storeTimeZone` to `createApiDiscounts`
+   * (FUT-4482). With it the form takes Início = Término as a one-day
+   * promotion; without it the form refuses equal days, as that server does,
+   * and a second tap on Início in the calendar does nothing.
+   *
+   * Said here rather than inferred from {@link timezone}: that one feeds a
+   * browser-side dot, and a host may well pass it with a server that still
+   * counts UTC midnights. Default false.
+   */
+  wholeDays?: boolean;
+  /**
+   * Where the store's time zone is set, in the host (FUT-4482, review round
+   * 4): `{ href }` or `{ onClick }`. When the server cannot place a rule's
+   * days — the zone is not one it knows — the notice above the list and above
+   * the form's boxes links there, labelled with the packs' `openTimeZone`.
+   * Omitted, the notices name the cause and offer no link.
+   */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
+  /**
    * Where a failure goes, beyond the operator's own screen — REQUIRED, and for
    * the same reason `createApiDiscounts` requires a logger.
    *
@@ -140,7 +162,10 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb, timezone } = config;
+  const { onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings } = config;
+  // A host pack without a sentence added after it was written is filled in
+  // from the package's pack for this locale (review round 6): never a throw.
+  const copy = completeWebCopy(config.copy, config.locale);
   // DERIVED from the zone unless the host insists otherwise. A host naming the
   // zone in words would be shipping copy, which has to be bilingual; `Intl`
   // already knows it in every locale.
@@ -150,7 +175,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   const transport = config.transport ?? httpDiscountsTransport(copy.form.saveFailed);
   const api = createDiscountsApiClient(config.apiBase, transport, formatters);
 
-  const screenProps: DiscountsScreenProps = {
+  const screenProps: BoundScreenProps = {
     api,
     copy,
     formatters,
@@ -159,6 +184,8 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
     ...(breadcrumb ? { breadcrumb } : {}),
     ...(timezoneLabel ? { timezoneLabel } : {}),
     ...(timezone ? { timezone } : {}),
+    ...(wholeDays ? { wholeDays } : {}),
+    ...(timeZoneSettings ? { timeZoneSettings } : {}),
   };
 
   return {
@@ -171,6 +198,8 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
         currencyField={currencyField}
         onError={onError}
         {...(timezoneLabel ? { timezoneLabel } : {})}
+        {...(wholeDays ? { wholeDays } : {})}
+        {...(timeZoneSettings ? { timeZoneSettings } : {})}
         {...props}
       />
     ),
@@ -193,8 +222,17 @@ export function useWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   return useMemo(() => createWebDiscounts(config), [config]);
 }
 
-/** The screen as a bare component, for a host that wires everything itself. */
-export type { DiscountsScreenProps };
-export function DiscountsSurface(props: DiscountsScreenProps): JSX.Element {
-  return <DiscountsScreen {...props} />;
+/**
+ * The screen as a bare component, for a host that wires everything itself. The
+ * host's pack, which may lack the sentences added after it was written, and
+ * the language to fill them in from: `locale`, else the formatters', else the
+ * pack's own (`completeWebCopy`).
+ */
+export type DiscountsScreenProps = Omit<BoundScreenProps, "copy"> & {
+  copy: DiscountsWebCopy;
+  /** The host's BCP-47 tag (`pt-BR`, `es-ES`), as `DiscountsWebConfig.locale`. */
+  locale?: string;
+};
+export function DiscountsSurface({ locale, copy, ...props }: DiscountsScreenProps): JSX.Element {
+  return <DiscountsScreen {...props} copy={completeWebCopy(copy, locale ?? props.formatters.locale)} />;
 }

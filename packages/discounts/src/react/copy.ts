@@ -93,6 +93,27 @@ export interface DiscountsVocabularyCopy {
 
 /** The validity sentence, in all four shapes a nullable window can take. */
 export interface DiscountsWindowCopy {
+  /**
+   * When the server cannot place a rule's days (FUT-4482) — written in the store's zone, which it
+   * does not know now. `daysUnknown` is the SHORT words: the list's cell and the marker under a
+   * row's name on a phone. The cause is said once, above the list (`daysUnknownList`) and above the
+   * form's boxes (`daysUnknownForm`, which says saving keeps the saved dates, round 5).
+   * `daysUnknownBoxes`, the boxes' description, points at it (round 7). `daysUnknownPaused` is the
+   * phone marker of a rule that is also not active; `openTimeZone` labels the host's link to its
+   * time-zone setting; `datesLocked*` (round 8) are the form's two for days shown but locked,
+   * `datesLockedList` (round 9) the list's, `datesLockedCreate` (CP8) a create's locked boxes'. OPTIONAL,
+   * every one (round 6): a pack without one is answered from the package's pack for the host's `locale`.
+   */
+  readonly daysUnknown?: string;
+  readonly daysUnknownList?: string;
+  readonly daysUnknownForm?: string;
+  readonly daysUnknownBoxes?: string;
+  readonly daysUnknownPaused?: string;
+  readonly datesLockedForm?: string;
+  readonly datesLockedBoxes?: string;
+  readonly datesLockedList?: string;
+  readonly datesLockedCreate?: string;
+  readonly openTimeZone?: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;
   /** Only a start. `{date}`. */
@@ -136,6 +157,19 @@ export interface DiscountsFormCopy {
   readonly endsAt: string;
   /** Inside an empty Início / Término: the day-first order the box reads (FUT-4156). */
   readonly datePlaceholder: string;
+  /**
+   * The period calendar's names (FUT-4156): the language its months and
+   * weekdays are written in (a BCP-47 tag — the PACK's language, so a host
+   * resolving copy per reader gets the reader's month names), the grid's own
+   * name and its month arrows'. OPTIONAL (review round 6), filled in as the
+   * window's are, so a Portuguese host never gets an English calendar.
+   */
+  readonly calendar?: {
+    readonly locale?: string;
+    readonly label?: string;
+    readonly previousMonth?: string;
+    readonly nextMonth?: string;
+  };
   readonly minSubtotal: string;
   readonly usageLimit: string;
   readonly perBuyerLimit: string;
@@ -199,7 +233,13 @@ export interface DiscountsFormCopy {
    * away stored 25.
    */
   readonly wholeNumberOnly: string;
+  /** Término on or before Início, where the server counts no whole days: equal days are refused. */
   readonly endsBeforeStarts: string;
+  /**
+   * Término BEFORE Início, where the server counts whole days in the store's
+   * zone (FUT-4482, `wholeDays`): Início = Término is a one-day promotion. Optional (round 6).
+   */
+  readonly endsBeforeStartDay?: string;
   /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
   readonly invalidDate: string;
   /** A date left half-typed ("25/10/202"): shown once the box is left, or at Criar. */
@@ -355,46 +395,6 @@ export function fill(template: string, values: Readonly<Record<string, string | 
   );
 }
 
-/** Every leaf path of an object, dotted. */
-function leafPaths(value: unknown, prefix = ""): string[] {
-  if (value === null || typeof value !== "object") return prefix === "" ? [] : [prefix];
-  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
-    leafPaths(child, prefix === "" ? key : `${prefix}.${key}`),
-  );
-}
+export { missingWebCopy } from "./copy-completeness";
 
-/** One dotted path out of a pack, or `undefined` where the path does not exist. */
-function read(copy: unknown, path: string): unknown {
-  return path.split(".").reduce<unknown>(
-    (node, key) =>
-      node !== null && typeof node === "object"
-        ? (node as Record<string, unknown>)[key]
-        : undefined,
-    copy,
-  );
-}
-
-/**
- * The keys a pack is missing or left blank, as dotted paths.
- *
- * Walked from a REFERENCE pack rather than from a hand-kept key list: this
- * interface is seventy-odd keys deep in seven groups, and a list beside it
- * would be wrong within one release. Only the reference's SHAPE is read, never
- * its words — `createWebDiscounts` passes the pt-BR pack for that and nothing
- * of it survives into the answer.
- */
-export function missingWebCopy(
-  copy: DiscountsWebCopy | undefined,
-  reference: DiscountsWebCopy,
-): string[] {
-  return leafPaths(reference).filter((path) => {
-    const value = read(copy, path);
-    // A leaf is satisfied by a non-blank string OR a function. The `@12-apps/ui`
-    // packs folded in below carry entries that take the interpolated value as
-    // an argument — `noResults.title(query)`, `footer.selectedCount(count)` —
-    // because Portuguese decides word order and plural agreement per sentence.
-    // Demanding a string here would report every one of them as missing.
-    if (typeof value === "function") return false;
-    return typeof value !== "string" || value.trim() === "";
-  });
-}
+export type { CompleteDiscountsWebCopy, DiscountsWindowFallbackKey } from "./copy-complete";

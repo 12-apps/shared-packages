@@ -64,6 +64,7 @@ export function defaultMessages(): DateRangePickerMessages {
     to: 'End date',
     quickRanges: 'Quick ranges',
     incomplete: 'Choose both dates.',
+    openEnded: EN_US_UI_LABELS.dateRangePicker.openEnded,
     reversed: 'The end date must be on or after the start date.',
     overMax: ({ maxRangeDays }) => `Choose a range of at most ${maxRangeDays} days.`,
     summary: ({ from, to }) => `${isoToMasked(from, dayMask)} – ${isoToMasked(to, dayMask)}`,
@@ -72,14 +73,21 @@ export function defaultMessages(): DateRangePickerMessages {
   };
 }
 
-/** The line under the fields: the chosen window, or why there isn't one. */
+/**
+ * The line under the fields: the chosen window, or why there isn't one. With
+ * `openEnd`, a start with no end is an answer of its own and is said as one.
+ */
 export function statusMessage(
   status: DateRangeStatus,
   messages: DateRangePickerMessages,
   maxRangeDays: number | undefined,
+  openEnd: { enabled: boolean; draft: DateRangeDraft } = { enabled: false, draft: { from: null, to: null } },
 ): string {
   if (status.ok) return messages.summary(status.window);
-  if (status.problem === 'incomplete') return messages.incomplete;
+  if (status.problem === 'incomplete') {
+    const openEnded = openEnd.enabled && openEnd.draft.from !== null && openEnd.draft.to === null;
+    return openEnded ? (messages.openEnded ?? messages.incomplete) : messages.incomplete;
+  }
   if (status.problem === 'reversed') return messages.reversed;
   return messages.overMax({ maxRangeDays: maxRangeDays ?? status.days, days: status.days });
 }

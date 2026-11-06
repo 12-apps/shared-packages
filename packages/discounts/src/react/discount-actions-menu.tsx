@@ -10,7 +10,8 @@ import {
 import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
 import type { DiscountsApiClient, WireTargetGroup } from "./api";
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountDialog } from "./discount-dialog";
 import { DiscountForm } from "./discount-form";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
@@ -34,7 +35,7 @@ import type { DiscountListItem } from "./row";
 export interface DiscountActionsMenuProps {
   row: DiscountListItem;
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   currencyField: CurrencyFieldComponent;
   /**
@@ -49,6 +50,10 @@ export interface DiscountActionsMenuProps {
   onError: (error: unknown, context: string) => void;
   /** The store's timezone as a person says it, for the schedule editor. */
   timezoneLabel?: string;
+  /** Whether the server counts the period's days whole (FUT-4482). */
+  wholeDays?: boolean;
+  /** The host's link to its time-zone setting (FUT-4482, review round 4). */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
 }
 
 /**
@@ -60,7 +65,7 @@ export interface DiscountActionsMenuProps {
 function useDeleteConfirm(
   row: DiscountListItem,
   api: DiscountsApiClient,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   onError: (error: unknown, context: string) => void,
 ): ReturnType<typeof useRemoveConfirm> {
   return useRemoveConfirm({
@@ -88,6 +93,8 @@ export function DiscountActionsMenu({
   groups,
   onError,
   timezoneLabel,
+  wholeDays,
+  timeZoneSettings,
 }: DiscountActionsMenuProps): JSX.Element {
   const { onRefresh } = useCardActions();
   const [editOpen, setEditOpen] = useState(false);
@@ -143,6 +150,8 @@ export function DiscountActionsMenu({
             editing={row.record}
             onError={onError}
             {...(timezoneLabel ? { timezoneLabel } : {})}
+            {...(wholeDays ? { wholeDays } : {})}
+            {...(timeZoneSettings ? { timeZoneSettings } : {})}
             onSaved={() => {
               setEditOpen(false);
               onRefresh();

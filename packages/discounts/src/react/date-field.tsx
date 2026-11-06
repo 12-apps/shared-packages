@@ -5,6 +5,8 @@ import { useState, type JSX } from "react";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
 import { Input } from "@12-apps/ui/form/Input";
 import { useFormContext } from "@12-apps/ui/form/total-form";
+import { Box } from "@12-apps/ui/mui/Box";
+import type { SxProps, Theme } from "@12-apps/ui/mui/styles";
 
 /**
  * A day-first `DD/MM/AAAA` box that is NOT `<input type="date">` (FUT-4156).
@@ -83,6 +85,64 @@ function maskDate(raw: string, previous: string): string {
   return maskDigits(raw);
 }
 
+/**
+ * What the box itself says about its text. A complete day that no calendar has
+ * is marked while typed; anything still being typed waits for Criar, like every
+ * other field, and is only called unfinished once the box is left.
+ */
+function typedMessage(
+  shown: string,
+  left: boolean,
+  messages: { invalidMessage: string; incompleteMessage: string },
+): string | undefined {
+  if (MASKED_DAY.test(shown)) return maskedToIso(shown) === null ? messages.invalidMessage : undefined;
+  return left && shown !== "" ? messages.incompleteMessage : undefined;
+}
+
+/**
+ * A disabled box, drawn as one (review round 7): MUI's disabled fill and muted
+ * edge, from the theme, so the two boxes read as dimmed like the grid beside
+ * them rather than as empty fields waiting for a date. The outlined Input's own
+ * edge (and its primary hover) would otherwise win over MUI's disabled one.
+ */
+const DISABLED_BOX: SxProps<Theme> = {
+  "& .MuiOutlinedInput-root.Mui-disabled": { backgroundColor: "action.disabledBackground" },
+  "& .MuiOutlinedInput-root.Mui-disabled fieldset, & .MuiOutlinedInput-root.Mui-disabled:hover fieldset": {
+    borderColor: "action.disabled",
+  },
+};
+
+/**
+ * A box that HOLDS days it cannot change (review round 9): read-only, with the
+ * locked fill and edge of a disabled one, but its value in the ordinary input
+ * ink. MUI's disabled ink (`text.disabled`) put a stored date at 1.59:1, read
+ * as a placeholder; the value is the one fact the box still states.
+ */
+const READ_ONLY_BOX: SxProps<Theme> = {
+  "& .MuiOutlinedInput-root": { backgroundColor: "action.disabledBackground", cursor: "default" },
+  "& .MuiOutlinedInput-root:not(.Mui-focused) fieldset, & .MuiOutlinedInput-root:not(.Mui-focused):hover fieldset": {
+    borderColor: "action.disabled",
+  },
+  "& input": { color: "text.primary", WebkitTextFillColor: "currentColor", cursor: "default" },
+};
+
+/** The box's look: read-only holding days, disabled and empty, or live. */
+const boxLook = (readOnly: boolean, disabled: boolean): SxProps<Theme> =>
+  readOnly ? READ_ONLY_BOX : disabled ? DISABLED_BOX : {};
+
+/** What the `<input>` itself carries beyond its value. */
+function inputAttributes(testId: string, readOnly: boolean, describedBy: string | undefined) {
+  return {
+    inputMode: "numeric" as const,
+    maxLength: 10,
+    autoComplete: "off",
+    "data-testid": testId,
+    // On the <input> itself: the text field takes no root `readOnly`.
+    ...(readOnly ? { readOnly: true } : {}),
+    ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+  };
+}
+
 /** A form-bound day: the value is ISO when whole and real, the typed text otherwise. */
 export function DateField({
   name,
@@ -90,6 +150,9 @@ export function DateField({
   placeholder,
   invalidMessage,
   incompleteMessage,
+  disabled = false,
+  readOnly = false,
+  describedBy,
 }: {
   name: string;
   label: string;
@@ -97,40 +160,49 @@ export function DateField({
   invalidMessage: string;
   /** Under a half-typed date once the box is left — never while typing. */
   incompleteMessage: string;
+  /** Shown, never editable — the days cannot be placed (FUT-4482, review round 5). */
+  disabled?: boolean;
+  /**
+   * Shown, never editable, and still READ (review round 9): the days are
+   * stored but cannot change. Focusable and announced as read-only, its value
+   * in the ordinary ink — never MUI's disabled grey.
+   */
+  readOnly?: boolean;
+  /** The id of a line elsewhere that describes this box (review round 6: why it is disabled). */
+  describedBy?: string;
 }): JSX.Element {
   const { values, errors, setFieldValue } = useFormContext();
   const [left, setLeft] = useState(false);
   const value = values[name] ?? "";
   const shown = isIsoDay(value) ? isoToMasked(value) : value;
-  // A complete day that no calendar has is marked while typed; anything still
-  // being typed waits for Criar, like every other field.
-  const impossible = MASKED_DAY.test(shown) && maskedToIso(shown) === null;
-  const unfinished = left && shown !== "" && !MASKED_DAY.test(shown);
-  const message =
-    errors[name] ??
-    (impossible ? invalidMessage : unfinished ? incompleteMessage : undefined);
+  const message = errors[name] ?? typedMessage(shown, left, { invalidMessage, incompleteMessage });
   const testId = `total-form-field-${name}`;
   return (
     <FormControl fullWidth>
       <FormLabel htmlFor={name} error={message !== undefined}>
         {label}
       </FormLabel>
-      <Input
-        id={name}
-        name={name}
-        type="text"
-        placeholder={placeholder}
-        value={shown}
-        error={message !== undefined}
-        inputProps={{ inputMode: "numeric", maxLength: 10, autoComplete: "off", "data-testid": testId }}
-        data-testid={testId}
-        onBlur={() => setLeft(true)}
-        onChange={(event) => {
-          setLeft(false);
-          const masked = maskDate(event.target.value, shown);
-          setFieldValue(name, maskedToIso(masked) ?? masked);
-        }}
-      />
+      <Box data-testid={`${testId}-box`} sx={boxLook(readOnly, disabled)}>
+        <Input
+          id={name}
+          name={name}
+          type="text"
+          placeholder={placeholder}
+          disabled={disabled && !readOnly}
+          value={shown}
+          error={message !== undefined}
+          inputProps={inputAttributes(testId, readOnly, describedBy)}
+          data-testid={testId}
+          onBlur={() => setLeft(true)}
+          onChange={(event) => {
+            // A browser types nothing into a read-only box; a script's change event is refused the same.
+            if (readOnly) return;
+            setLeft(false);
+            const masked = maskDate(event.target.value, shown);
+            setFieldValue(name, maskedToIso(masked) ?? masked);
+          }}
+        />
+      </Box>
       {message !== undefined && (
         <FormMessage error dataTestId={`${testId}-message`}>
           {message}

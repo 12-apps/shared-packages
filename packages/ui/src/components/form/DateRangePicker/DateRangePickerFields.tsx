@@ -38,6 +38,12 @@ export interface DateRangeFieldsProps {
   /** Id of the status line, so both fields can point at it. */
   statusId: string;
   dataTestId: string;
+  /** A start with no end is an answer (`openEnd`), not a half-chosen range. */
+  openEnd?: boolean;
+  /** Beside the months the pair stacks; under them it sits side by side. */
+  stacked?: boolean;
+  /** The picker is `disabled`: both boxes are. */
+  disabled?: boolean;
 }
 
 export function DateRangeFields({
@@ -48,6 +54,9 @@ export function DateRangeFields({
   onEdit,
   statusId,
   dataTestId,
+  openEnd = false,
+  stacked = false,
+  disabled = false,
 }: DateRangeFieldsProps): React.JSX.Element {
   // "Incomplete" is not an error — it is a range that is not finished yet, and
   // painting it red would make the first click on a two-click control look like
@@ -56,7 +65,7 @@ export function DateRangeFields({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: stacked ? 'column' : 'row', flexWrap: 'wrap', gap: 2 }}>
         <DayBoundInput
           mask={messages.dayMask}
           label={messages.from}
@@ -65,6 +74,7 @@ export function DateRangeFields({
           testId={`${dataTestId}-from`}
           error={rejected}
           describedBy={statusId}
+          disabled={disabled}
         />
         <DayBoundInput
           mask={messages.dayMask}
@@ -74,6 +84,7 @@ export function DateRangeFields({
           testId={`${dataTestId}-to`}
           error={rejected}
           describedBy={statusId}
+          disabled={disabled}
         />
       </Box>
       <Typography
@@ -86,7 +97,7 @@ export function DateRangeFields({
         color={rejected ? 'error.main' : 'text.secondary'}
         data-testid={`${dataTestId}-status`}
       >
-        {statusMessage(status, messages, maxRangeDays)}
+        {statusMessage(status, messages, maxRangeDays, { enabled: openEnd, draft: value })}
       </Typography>
     </Box>
   );
