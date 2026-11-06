@@ -9,7 +9,7 @@ import type { DiscountsWebCopy } from "./copy";
  * Dotted paths `missingWebCopy` never reports (review round 6): optional in
  * the type, and filled in from the package's own packs by `completeWebCopy`.
  */
-export const OPTIONAL_WEB_COPY_PATHS: ReadonlySet<string> = new Set([
+const OPTIONAL_WEB_COPY_PATHS: ReadonlySet<string> = new Set([
   "window.daysUnknown",
   "window.daysUnknownList",
   "window.daysUnknownForm",

@@ -70,7 +70,7 @@ function keepingStored(write: DiscountWrite, row: StoredWindow): DiscountWrite {
   };
 }
 
-export type WindowMode =
+type WindowMode =
   | { kind: "keep" }
   | {
       kind: "days";

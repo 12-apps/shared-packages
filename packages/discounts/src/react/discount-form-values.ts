@@ -44,7 +44,7 @@ export interface DiscountFormValues extends Record<string, string> {
  */
 export type DatesLock = "unknown" | "shown" | "create" | null;
 
-export function datesLockOf(editing: Pick<DiscountWireRecord, "daysUnknown" | "datesLocked"> | null | undefined): DatesLock {
+function datesLockOf(editing: Pick<DiscountWireRecord, "daysUnknown" | "datesLocked"> | null | undefined): DatesLock {
   if (editing?.daysUnknown === true) return "unknown";
   return editing?.datesLocked === true ? "shown" : null;
 }
