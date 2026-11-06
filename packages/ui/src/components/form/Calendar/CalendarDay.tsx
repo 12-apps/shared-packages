@@ -222,7 +222,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   focused,
   showOutsideDays,
   todayRing = false,
-  fullWidth = false,
+  fullWidth,
   dayClassName,
   onSelect,
   onHover,
@@ -240,7 +240,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
         component="span"
         aria-hidden="true"
         data-testid="calendar-outside-placeholder"
-        sx={cellSize(fullWidth)}
+        sx={cellSize(fullWidth === true)}
       />
     );
   }
@@ -262,7 +262,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       onClick={() => onSelect(day.date)}
       onMouseEnter={() => onHover(day.date)}
       onMouseLeave={onHoverEnd}
-      sx={dayCellSx(day, band, visible, todayRing, fullWidth)}
+      sx={dayCellSx(day, band, visible, todayRing, fullWidth === true)}
     >
       {day.selected && (
         <Box component="span" data-testid="calendar-selected-date" sx={{ display: 'none' }} />
