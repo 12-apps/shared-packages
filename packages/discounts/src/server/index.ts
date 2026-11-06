@@ -17,7 +17,7 @@ export { missingServerCopy, type DiscountsServerCopy } from "./copy";
 
 export type { StoreTimeZone } from "./calendar-days";
 
-export { legacyUtcWindowToZoned, type LegacyRowMarker } from "../timezone";
+export { legacyUtcWindowToZoned, legacyWindowDays, type StoredWindow } from "../timezone";
 
 export { errorText, type DiscountsLogger } from "./logging";
 

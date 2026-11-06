@@ -130,6 +130,10 @@ export const discountSchema = z.object({
    */
   startsOn: z.string().nullable().optional(),
   endsOn: z.string().nullable().optional(),
+  /** A rule written in the store's zone that the runtime cannot place now: no days. */
+  daysUnknown: z.boolean().optional(),
+  /** Whether the window is whole days in the store's zone (the `window_in_zone` column). */
+  windowInZone: z.boolean().optional(),
   schedule: discountScheduleSchema.nullable().optional(),
   minSubtotalCents: z.number().int().nullable(),
   usageLimit: z.number().int().nullable(),

@@ -19,8 +19,10 @@ import {
   assertWholeDayCopy,
   pageWithCalendarDays,
   readZoneFor,
+  warnUnflagged,
   wholeDayCopyFor,
   withCalendarDays,
+  writtenZone,
   zoneFor,
   type StoreTimeZone,
 } from "./calendar-days";
@@ -218,8 +220,9 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       // pagination }` envelope the advertised response describes, and wrapping
       // it again would nest it under a second `data`.
       const page = await config.store.list(actor.clientId, parsed.data);
-      const timeZone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
-      return ok(pageWithCalendarDays(page, timeZone));
+      const zone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
+      warnUnflagged(page.data, zone, config.logger);
+      return ok(pageWithCalendarDays(page, zone));
     }),
   };
 }
@@ -263,8 +266,9 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
       if (record === null) {
         return { status: 404, body: { error: resolveDiscountsCopy(config.copy, locale).notFound } };
       }
-      const timeZone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
-      return ok({ data: withCalendarDays(record as DiscountRecord, timeZone) });
+      const zone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
+      warnUnflagged([record as DiscountRecord], zone, config.logger);
+      return ok({ data: withCalendarDays(record as DiscountRecord, zone) });
     }),
   };
 }
@@ -284,7 +288,9 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
       );
       const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
-      return ok({ data: withCalendarDays(created, timeZone) });
+      const zone = writtenZone(timeZone);
+      warnUnflagged([created], zone, config.logger);
+      return ok({ data: withCalendarDays(created, zone) });
     }),
   };
 }

@@ -1,4 +1,4 @@
-import { isKnownTimeZone, windowCalendarDays } from "../timezone";
+import { isKnownTimeZone, legacyWindowDays, windowCalendarDays } from "../timezone";
 import type { DiscountsServerCopy } from "./copy";
 import type { DiscountsLogger } from "./logging";
 import type { DiscountPage, DiscountRecord } from "./store";
@@ -34,44 +34,85 @@ export async function zoneFor(
 }
 
 /**
- * The zone a READ places days on. A zone the runtime does not know cannot place
+ * Where a READ places days (FUT-4482): nowhere (`off`, the host counts no
+ * whole days), on a zone this runtime knows, or on a zone it does not
+ * (`unknown`) — which only a row written in a zone needs; a legacy row reads
+ * on UTC without one.
+ */
+export type ReadZone = { kind: "off" } | { kind: "zone"; timeZone: string } | { kind: "unknown" };
+
+const OFF: ReadZone = { kind: "off" };
+
+/**
+ * The zone a read places days on. A zone the runtime does not know cannot place
  * them, and a read is not where that must stop the screen: nothing is stored
- * from it, and every write still refuses that zone loudly. So the record is
- * answered without `startsOn`/`endsOn` — days placed on UTC would be other
- * days than the store's, and a form would show them as if they were — and the
+ * from it, and every write still refuses that zone loudly. So a row written in
+ * the zone is answered `daysUnknown` — days placed on UTC would be other days
+ * than the store's, and a form would show them as if they were — and the
  * logger says why.
  */
 export async function readZoneFor(
   storeTimeZone: StoreTimeZone | undefined,
   clientId: string,
   logger: DiscountsLogger,
-): Promise<string | undefined> {
+): Promise<ReadZone> {
   const zone = await zoneFor(storeTimeZone, clientId);
-  if (zone === undefined || isKnownTimeZone(zone)) return zone;
+  if (zone === undefined) return OFF;
+  if (isKnownTimeZone(zone)) return { kind: "zone", timeZone: zone };
   logger.warn(
-    `discounts: unknown store time zone "${zone}" for tenant ${clientId} — answered without its days; ` +
-      "every write is refused until the zone is one this runtime knows.",
+    `discounts: unknown store time zone "${zone}" for tenant ${clientId} — rules written in it are ` +
+      "answered without their days; every write is refused until the zone is one this runtime knows.",
   );
-  return undefined;
+  return { kind: "unknown" };
 }
 
+/** The zone a write just stored in, as a read of its answer sees it. */
+export function writtenZone(timeZone: string | undefined): ReadZone {
+  return timeZone === undefined ? OFF : { kind: "zone", timeZone };
+}
+
+type Windowed = Pick<DiscountRecord, "startsAt" | "endsAt" | "windowInZone">;
+
+/** What a read adds to a record: its days, or the word that they cannot be placed. */
+type WithDays = Pick<DiscountRecord, "startsOn" | "endsOn" | "daysUnknown">;
+
 /**
- * One record with the days it runs on, in the store's zone — what a form reads
- * back instead of re-deriving days from instants it cannot place on a clock.
- * Without a zone the record is answered exactly as the store built it.
+ * One record with the days it runs on — what a form reads back instead of
+ * re-deriving days from instants it cannot place on a clock. The row's own
+ * flag decides the clock: `windowInZone` true reads in the store's zone (or
+ * `daysUnknown` when that zone cannot be placed); false, or a store that never
+ * mapped the column, reads the legacy UTC days the old form showed — so the
+ * previous release's writes during a rollout stay right. Without whole days
+ * the record is answered exactly as the store built it.
  */
-export function withCalendarDays<R extends Pick<DiscountRecord, "startsAt" | "endsAt">>(
-  record: R,
-  timeZone: string | undefined,
-): R {
-  if (timeZone === undefined) return record;
-  return { ...record, ...windowCalendarDays(record.startsAt, record.endsAt, timeZone) };
+export function withCalendarDays<R extends Windowed>(record: R, zone: ReadZone): R & WithDays {
+  if (zone.kind === "off") return record;
+  if (record.windowInZone !== true) return { ...record, ...legacyWindowDays(record.startsAt, record.endsAt) };
+  if (zone.kind === "unknown") return { ...record, daysUnknown: true };
+  return { ...record, ...windowCalendarDays(record.startsAt, record.endsAt, zone.timeZone) };
 }
 
 /** Every row of a page, the same way. */
-export function pageWithCalendarDays(page: DiscountPage, timeZone: string | undefined): DiscountPage {
-  if (timeZone === undefined) return page;
-  return { ...page, data: page.data.map((row) => withCalendarDays(row, timeZone)) };
+export function pageWithCalendarDays(page: DiscountPage, zone: ReadZone): DiscountPage {
+  if (zone.kind === "off") return page;
+  return { ...page, data: page.data.map((row) => withCalendarDays(row, zone)) };
+}
+
+/**
+ * A store that answers no `windowInZone` on a surface counting whole days
+ * maps a row without the column: every rule would read as legacy, a day early
+ * west of UTC once written in the zone. Said, never guessed.
+ */
+export function warnUnflagged(
+  records: readonly Windowed[],
+  zone: ReadZone,
+  logger: DiscountsLogger,
+): void {
+  if (zone.kind === "off" || records.every((row) => typeof row.windowInZone === "boolean")) return;
+  logger.warn(
+    "discounts: the store answered a record without windowInZone while storeTimeZone is on — map the " +
+      "column into DiscountRecord; until then every rule reads on the legacy UTC days.",
+  );
 }
 
 const said = (sentence: string | undefined): sentence is string =>

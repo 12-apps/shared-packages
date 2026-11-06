@@ -227,8 +227,10 @@ only a Término before Início is refused (`copy.endsBeforeStartDay`, required
 once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
 the days it runs on there, and the admin form and grid read those back. An
 unknown zone fails every write instead of storing a window on a guessed clock;
-a read answers its records without `startsOn` / `endsOn` and logs a warning,
-so the list stays usable while the zone is fixed and shows no guessed days. A null or blank answer for a tenant fails every route —
+a read answers a rule written in that zone with `daysUnknown: true` in place of
+`startsOn` / `endsOn` and logs a warning, so the list stays usable while the
+zone is fixed and shows no guessed days (the form and the grid say the dates
+are unavailable). A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
 the function must answer a zone for every tenant it is asked about.
 
 A copy resolver may answer a reader's locale with a pack that lacks
@@ -237,40 +239,53 @@ A copy resolver may answer a reader's locale with a pack that lacks
 once equal days are legal.
 
 Without it, nothing changes: UTC midnights, an exclusive Término, equal days
-refused, no day fields.
+refused, no day fields, and `windowInZone: false` on every write.
 
-**Turn the zone on only with the migration of the rules already stored.**
-Every rule written before it holds each chosen day as its UTC midnight with an
-exclusive Término. Unmigrated, it reads back on the store's clock as other days
-than the form showed (a day early west of UTC), and the first edit that
-re-saves it moves its window without anyone choosing to. The package exports the
-rewrite for that migration, pure, for the release that starts passing
-`storeTimeZone`:
+**Each row says which clock its window is on: `windowInZone`.** The partial's
+`window_in_zone` column (migration `20261106140000_discount_window_in_zone`,
+additive, default `false`) is set `true` by every write made with
+`storeTimeZone` — `DiscountScalars.windowInZone`, which a store that spreads the
+scalars persists without a line of its own — and the store maps it back into
+`DiscountRecord.windowInZone`. A read places a `true` row's days in the store's
+zone and a `false` row's on UTC, exactly as the old form showed them, with or
+without a zone. So a row written before the zone, or by the previous release
+while two serve side by side, keeps showing the days it was given. A store that
+answers no `windowInZone` while the zone is on is warned about, and its rows
+read as legacy.
+
+**Turn it on across two releases.** Release N ships the package bump, the
+column and the record mapping, without `storeTimeZone`: it writes `false`, as
+every release before it meant. Release N+1 passes `storeTimeZone` (and
+`wholeDays: true`). During N+1's rollout the release still serving is N, whose
+writes say `false` for the UTC windows they store — so no row ever holds a UTC
+window under a `true` flag.
+
+**Then migrate the legacy rows, in N+1.** Their days already read right; the
+migration makes the window the engine prices on match them — Início whole from
+its 00:00 in the zone, Término now inclusive:
 
 ```ts
 import { legacyUtcWindowToZoned } from "@12-apps/discounts/server";
 
-// The instant the release that passes `storeTimeZone` started serving writes.
-const zoneOnSince = new Date("2026-11-10T12:00:00.000Z");
-
-for (const rule of await db.discount.findMany({ where: { clientId, updatedAt: { lt: zoneOnSince } } })) {
-  const migrated = legacyUtcWindowToZoned(rule.startsAt, rule.endsAt, zone, {
-    updatedAt: rule.updatedAt,
-    zoneOnSince,
-  });
-  if (migrated === null) continue; // written since the zone went on: whole days already
-  await db.discount.update({ where: { id: rule.id }, data: migrated });
+const legacy = await db.discount.findMany({
+  where: { clientId, windowInZone: false },
+  select: { id: true, startsAt: true, endsAt: true, windowInZone: true },
+});
+for (const rule of legacy) {
+  const migrated = legacyUtcWindowToZoned(rule, zone);
+  if (migrated === null) continue; // already whole days
+  // The same condition in the write: a row another run converted meanwhile is left alone.
+  await db.discount.updateMany({ where: { id: rule.id, windowInZone: false }, data: migrated });
 }
 ```
 
-It keeps the days the old form showed — Início whole from its 00:00, Término
-now inclusive. **A rerun is safe in every zone**, after a partial failure
-included: each update moves the row's `updatedAt` past `zoneOnSince`, so the
-next pass skips it (the query leaves it out, and the function answers `null`
-for it anyway). The window's values alone could not say it: at UTC+0 a
-migrated window is still made of UTC midnights, and a second pass keyed on
-them would push Término a day on. A row the marker calls legacy whose bound is
-not a UTC midnight throws.
+**A rerun is safe in every zone**, after a partial failure, alongside a second
+run, and at UTC+0, where a migrated window is still two UTC midnights: only a
+`false` row is converted, and the update that converts it sets the flag. A
+write that never touches the window — a redemption bumping `usage_count` and
+`updated_at` — changes nothing about it, so a rule redeemed after the release
+is still migrated. A `false` row whose bound is not a UTC midnight throws (the
+old form never stored one), and so does an unknown zone.
 
 The web surface must be told the same thing: pass `wholeDays: true` to
 `createWebDiscounts` on the host whose server passes `storeTimeZone`. With it the

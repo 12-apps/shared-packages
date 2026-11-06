@@ -26,6 +26,7 @@ function record(overrides: Partial<DiscountRecord> = {}): DiscountRecord {
     code: null,
     startsAt: new Date("2026-11-10T03:00:00.000Z"),
     endsAt: new Date("2026-11-21T03:00:00.000Z"),
+    windowInZone: true,
     minSubtotalCents: null,
     usageLimit: null,
     perBuyerLimit: null,
@@ -51,18 +52,22 @@ const BODY = {
   endsAt: "2026-11-20",
 };
 
-function harness(extra: Partial<DiscountsApiConfig> = {}) {
+function harness(extra: Partial<DiscountsApiConfig> = {}, stored: DiscountRecord = record()) {
   const writes: DiscountWrite[] = [];
   const zonesAsked: string[] = [];
   const store: DiscountStore = {
     list: async () => ({
-      data: [record()],
+      data: [stored],
       pagination: { page: 1, pageSize: 20, total: 1, pageCount: 1, hasNextPage: false, hasPreviousPage: false },
     }),
-    get: async () => record(),
+    get: async () => stored,
     create: async (_clientId, write) => {
       writes.push(write);
-      return record({ startsAt: write.scalars.startsAt, endsAt: write.scalars.endsAt });
+      return record({
+        startsAt: write.scalars.startsAt,
+        endsAt: write.scalars.endsAt,
+        windowInZone: write.scalars.windowInZone,
+      });
     },
     update: async (_clientId, _id, write) => {
       writes.push(write);
@@ -97,6 +102,7 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     expect(zonesAsked).toContain("tenant-1");
     expect(writes[0]?.scalars.startsAt?.toISOString()).toBe("2026-11-10T03:00:00.000Z");
     expect(writes[0]?.scalars.endsAt?.toISOString()).toBe("2026-11-21T03:00:00.000Z");
+    expect(writes[0]?.scalars.windowInZone).toBe(true);
   });
 
   it("answers the created rule with the days that were chosen", async () => {
@@ -146,6 +152,7 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     const { call, writes } = harness({ storeTimeZone: undefined });
     const created = await call("POST", "/discounts", BODY);
     expect(writes[0]?.scalars.endsAt?.toISOString()).toBe("2026-11-20T00:00:00.000Z");
+    expect(writes[0]?.scalars.windowInZone).toBe(false);
     expect((created.body as { data: Record<string, unknown> }).data).not.toHaveProperty("startsOn");
     const read = await call("GET", "/discounts/:id");
     expect((read.body as { data: Record<string, unknown> }).data).not.toHaveProperty("endsOn");
@@ -176,6 +183,7 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     expect(row).not.toHaveProperty("startsOn");
     expect(row).not.toHaveProperty("endsOn");
     expect(row).toHaveProperty("startsAt");
+    expect(row).toMatchObject({ daysUnknown: true });
     expect(logger.at("warn").join("\n")).toMatch(/unknown store time zone "Not\/A_Zone" for tenant tenant-1/u);
   });
 
@@ -187,7 +195,18 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     const data = (response.body as { data: Record<string, unknown> }).data;
     expect(data).not.toHaveProperty("startsOn");
     expect(data).not.toHaveProperty("endsOn");
+    expect(data).toMatchObject({ daysUnknown: true });
     expect(logger.at("warn")).toHaveLength(1);
+  });
+
+  // Review round 3 (B1/B2): a legacy row needs no zone to be read — its days
+  // are the UTC ones the old form showed — so it is never "unknown".
+  it("still answers a legacy row's UTC days on an unknown zone", async () => {
+    const legacy = record({ startsAt: new Date("2026-11-10T00:00:00.000Z"), endsAt: new Date("2026-11-20T00:00:00.000Z"), windowInZone: false });
+    const { call } = harness({ storeTimeZone: () => "Not/A_Zone" }, legacy);
+    const data = (await call("GET", "/discounts/:id")).body as { data: Record<string, unknown> };
+    expect(data.data).toMatchObject({ startsOn: "2026-11-10", endsOn: "2026-11-20" });
+    expect(data.data).not.toHaveProperty("daysUnknown");
   });
 
   it("refuses a whitespace-only zone like an empty one", async () => {
@@ -201,6 +220,23 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     const { call, writes } = harness({ storeTimeZone: () => "Not/A_Zone" });
     await expect(call("PATCH", "/discounts/:id", BODY)).rejects.toThrow(/Not\/A_Zone/u);
     expect(writes).toEqual([]);
+  });
+});
+
+describe("reading by the row's flag through the routes (FUT-4482, review round 3)", () => {
+  it("reads the previous release's overlap write (UTC window, flag false) on its UTC days, in São Paulo", async () => {
+    const overlap = record({ startsAt: new Date("2026-11-10T00:00:00.000Z"), endsAt: new Date("2026-11-20T00:00:00.000Z"), windowInZone: false });
+    const { call } = harness({}, overlap);
+    expect((await call("GET", "/discounts")).body).toMatchObject({ data: [{ startsOn: "2026-11-10", endsOn: "2026-11-20" }] });
+  });
+
+  it("warns when the store answers no windowInZone, and reads the row as legacy", async () => {
+    const logger = recordingLogger();
+    const unmapped = record({ startsAt: new Date("2026-11-10T00:00:00.000Z"), endsAt: null });
+    delete unmapped.windowInZone;
+    const { call } = harness({ logger }, unmapped);
+    expect((await call("GET", "/discounts/:id")).body).toMatchObject({ data: { startsOn: "2026-11-10", endsOn: null } });
+    expect(logger.at("warn").join("\n")).toMatch(/without windowInZone/u);
   });
 });
 

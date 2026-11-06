@@ -212,6 +212,13 @@ export interface DiscountScalars {
   code: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  /**
+   * Whether `startsAt` / `endsAt` are whole days in the store's zone
+   * (FUT-4482): true on every write made with a zone, false on every other.
+   * Persisted as `window_in_zone`, it is how a read tells a whole-day window
+   * from a UTC one — the values alone cannot, at UTC+0.
+   */
+  windowInZone: boolean;
   /** The weekly schedule, or null. Persisted as a JSON column. */
   schedule: DiscountSchedule | null;
   minSubtotalCents: number | null;
@@ -273,6 +280,7 @@ export function toDiscountScalars(
     code,
     startsAt,
     endsAt,
+    windowInZone: options.timeZone !== undefined,
     schedule,
     minSubtotalCents: input.minSubtotalCents,
     usageLimit: input.usageLimit,

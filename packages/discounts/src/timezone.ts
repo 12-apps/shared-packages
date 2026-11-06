@@ -247,59 +247,65 @@ function legacyDay(bound: Date | string | null, field: string): string | null {
   const day = instant.toISOString().slice(0, 10);
   if (instant.getTime() !== Date.parse(`${day}T00:00:00.000Z`)) {
     throw new RangeError(
-      `@12-apps/discounts: ${field} ${instant.toISOString()} is not a UTC midnight, so it is not a ` +
-        "window stored before whole days — migrate each legacy row once, before the zone is on.",
+      `@12-apps/discounts: ${field} ${instant.toISOString()} is not a UTC midnight on a row whose ` +
+        "windowInZone is false, so it is not a window the old form stored — fix that row by hand.",
     );
   }
   return day;
 }
 
 /**
- * Which rows are still legacy, as the caller knows it: the instant the release
- * that passes `storeTimeZone` started serving writes (`zoneOnSince`), and the
- * row's own `updatedAt`. A row last written before that instant was written on
- * UTC midnights; one written after it — by the new form, or by this migration,
- * whose update moves `updatedAt` — is whole days already.
+ * A stored window and the row's own word on how it was written (FUT-4482):
+ * `windowInZone` is true on every row written with `storeTimeZone` — the
+ * whole-day write sets it, and so does this migration — and false (the
+ * column's default) on every other: the rows written before the zone went on,
+ * and the ones the PREVIOUS release writes while the two serve side by side.
  */
-export interface LegacyRowMarker {
-  updatedAt: Date | string;
-  zoneOnSince: Date | string;
+export interface StoredWindow {
+  startsAt: Date | string | null;
+  endsAt: Date | string | null;
+  windowInZone?: boolean | null;
 }
 
-const instantOf = (value: Date | string, field: string): number => {
-  const time = new Date(value).getTime();
-  if (Number.isNaN(time)) throw new RangeError(`@12-apps/discounts: ${field} is not an instant: ${String(value)}`);
-  return time;
-};
-
 /**
- * A window stored BEFORE whole days (FUT-4482) — each chosen day as its UTC
- * midnight, Término exclusive — rewritten as the whole-day window of the very
- * same days, in the store's zone: what `wholeDayWindow` stores for them today.
- *
- * For a host's ONE-TIME migration, run in the release that starts passing
- * `storeTimeZone`. Without it, every legacy row reads back on the store's
- * clock as other days than the old form showed (a day early west of UTC), and
- * the first edit that re-saves it moves its window silently. The days the old
- * form showed stay the days the new form shows: Início from its 00:00 in the
- * zone, and Término now the last day it runs, whole — the meaning the owner
- * gave the two boxes, so a legacy rule gains the last day it always claimed.
- *
- * Safe to run again, in every zone. The VALUES cannot say whether a row was
- * migrated: at UTC+0 (London in winter, Lisbon, UTC) a migrated window is
- * still made of UTC midnights, and a second pass would push Término a day on.
- * So the caller says it, with {@link LegacyRowMarker}: a row written since
- * `zoneOnSince` answers `null`, nothing to write. A bound that is not a UTC
- * midnight on a row the marker calls legacy still throws, and so does an
- * unknown zone, as every whole-day write does.
+ * The days a LEGACY window (`windowInZone` false) is read as: each bound's own
+ * UTC date, Término the stored exclusive day — exactly what the form showed
+ * before whole days, whatever zone the store is in, and with no zone needed.
  */
-export function legacyUtcWindowToZoned(
+export function legacyWindowDays(
   startsAt: Date | string | null,
   endsAt: Date | string | null,
+): { startsOn: string | null; endsOn: string | null } {
+  const utcDay = (bound: Date | string | null): string | null =>
+    bound === null ? null : new Date(bound).toISOString().slice(0, 10);
+  return { startsOn: utcDay(startsAt), endsOn: utcDay(endsAt) };
+}
+
+/**
+ * A LEGACY window — each chosen day as its UTC midnight, Término exclusive —
+ * rewritten as the whole-day window of the very same days, in the store's
+ * zone: what `wholeDayWindow` stores for them today, with `windowInZone: true`
+ * so the row is never read or converted as legacy again.
+ *
+ * For a host's migration, run in the release that starts passing
+ * `storeTimeZone`. It is not what keeps a legacy row's days right — the read
+ * does that, from the flag — but it makes the window the engine prices on the
+ * window the form shows: the days the old form showed, Início from its 00:00
+ * in the zone and Término now the last day it runs, whole.
+ *
+ * Answers `null` for a row whose flag is already true: nothing to write. Write
+ * the answer back under the same condition (`WHERE window_in_zone = false`),
+ * so a rerun, a run that failed half way, two runs at once or a UTC+0 zone —
+ * where a migrated window is still two UTC midnights — can never shift a row
+ * twice. Throws on an unknown zone, as every whole-day write does, and on a
+ * legacy bound that is not a UTC midnight, which the old form never stored.
+ */
+export function legacyUtcWindowToZoned(
+  row: StoredWindow,
   timeZone: string,
-  row: LegacyRowMarker,
-): { startsAt: Date | null; endsAt: Date | null } | null {
+): { startsAt: Date | null; endsAt: Date | null; windowInZone: true } | null {
   wallClockFormat(timeZone);
-  if (instantOf(row.updatedAt, "updatedAt") >= instantOf(row.zoneOnSince, "zoneOnSince")) return null;
-  return wholeDayWindow(legacyDay(startsAt, "startsAt"), legacyDay(endsAt, "endsAt"), timeZone);
+  if (row.windowInZone === true) return null;
+  const window = wholeDayWindow(legacyDay(row.startsAt, "startsAt"), legacyDay(row.endsAt, "endsAt"), timeZone);
+  return { ...window, windowInZone: true };
 }

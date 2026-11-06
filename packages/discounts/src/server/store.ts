@@ -42,6 +42,21 @@ export interface DiscountRecord {
   startsOn?: string | null;
   endsOn?: string | null;
   /**
+   * The routes' word, never the store's, that this rule was written in the
+   * store's zone and that zone is not one the runtime knows now (FUT-4482): its
+   * days cannot be placed, so `startsOn` / `endsOn` are absent and a form must
+   * not guess them from the instants.
+   */
+  daysUnknown?: boolean;
+  /**
+   * The `window_in_zone` column, which the STORE maps (FUT-4482): true when the
+   * window was written as whole days in the store's zone, false for a window on
+   * UTC midnights — a row older than the zone, or one the previous release
+   * wrote during a rollout. Optional so a host predating the column compiles;
+   * one that passes `storeTimeZone` must map it, and is warned when it does not.
+   */
+  windowInZone?: boolean;
+  /**
    * The WEEKLY schedule (FUT-996), OPTIONAL for the reason the combo columns
    * below are: a host that has not added the column keeps compiling and keeps
    * answering the record it always did. Null or absent = always, within the
