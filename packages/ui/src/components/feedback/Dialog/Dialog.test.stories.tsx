@@ -993,8 +993,12 @@ export const Integration: Story = {
     });
 
     await step('Verify main dialog still functional', async () => {
-      const mainDialog = document.querySelector('[role="dialog"]');
-      await expect(mainDialog).toBeInTheDocument();
+      // react-native-web hands `role="dialog"` to the top-most `Modal` only, and
+      // gives it back to the one beneath in a later commit than the one that
+      // unmounts the nested content (the closing `Modal`'s `onDismiss` effect
+      // re-activates it). Poll for the role instead of reading it right after
+      // the nested dialog's content disappears.
+      await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeInTheDocument());
 
       const dialogTitle = within(document.body).getByText('Integration Test');
       await expect(dialogTitle).toBeInTheDocument();
