@@ -50,6 +50,7 @@
     "20261006120000_shift_slots",
     "20261009200000_auth_sign_in_grant",
     "20261027120000_shift_slot_series",
-    "20261029120000_rbac_effective_grants"
+    "20261029120000_rbac_effective_grants",
+    "20261106140000_discount_window_in_zone"
   ]
 }

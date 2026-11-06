@@ -79,6 +79,15 @@ model Discount {
   // either side = open-ended.
   startsAt             DateTime? @map("starts_at")
   endsAt               DateTime? @map("ends_at")
+  // Whether [starts_at, ends_at) are WHOLE DAYS on the store's clock
+  // (FUT-4482): true on every write made with `storeTimeZone`, false on every
+  // other — rows older than the zone, and rows the previous release writes
+  // while two releases serve side by side. A read places a true row's days in
+  // the store's zone and a false row's on UTC, exactly as the old form showed
+  // them. A per-row flag rather than a date marker: `updated_at` moves on
+  // writes that never touch the window (a redemption bumps it), and the values
+  // alone cannot tell the two meanings apart at UTC+0.
+  windowInZone         Boolean   @default(false) @map("window_in_zone")
   // The WEEKLY schedule INSIDE that window (FUT-996) — "toda sexta, das 16:00
   // às 20:00", "segunda e terça à tarde". NULL = always, within
   // [starts_at, ends_at), which is what every row predating the feature means.
