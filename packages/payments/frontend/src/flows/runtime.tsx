@@ -17,7 +17,9 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type JSX,
   type ReactNode,
@@ -25,13 +27,19 @@ import {
 
 import { CheckoutClientProvider } from "../components/checkout/client-context";
 import { CheckoutNavigateProvider } from "../components/checkout/navigate-context";
-import type { CheckoutClient } from "../components/checkout/transport";
+import { createCheckoutClient, type CheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig } from "../components/checkout/types";
 import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 import { CheckoutComponentsProvider } from "../components/checkout/ui";
 
 import type { CheckoutCopyFE } from "./copy";
-import type { CheckoutAvailability, CheckoutConfigState, PaymentFlowsConfig } from "./types";
+import type {
+  CheckoutAvailability,
+  CheckoutConfigState,
+  CheckoutConfirmation,
+  CheckoutPorts,
+  PaymentFlowsConfig,
+} from "./types";
 
 /** Supplied by a `Provider`; `null` means "nobody above me fetched it". */
 const FetchedConfigContext = createContext<CheckoutConfigState | null>(null);
@@ -41,11 +49,86 @@ export interface FlowsRuntime {
   config: PaymentFlowsConfig;
   client: CheckoutClient;
   copy: CheckoutCopyFE;
-  navigate: (url: string) => void;
+  /** The host's ports for THIS render — `usePorts`, else the static `ports`. */
+  useHostPorts(): CheckoutPorts;
   /** The store slug for THIS render — read from the host's hook, never frozen. */
   useTenantSlug(): string | undefined;
   /** The host's availability vote for THIS render. Defaults to "payable". */
   useAvailability(): CheckoutAvailability;
+}
+
+/** The copy for THIS render: the host's `useCopy`, else the `copy` it built the flow with. */
+export function useFlowCopy(runtime: FlowsRuntime): CheckoutCopyFE {
+  return runtime.config.useCopy?.() ?? runtime.copy;
+}
+
+/**
+ * The transport for THIS render: the one built with the flow, unless the host
+ * answers its copy per render (`useCopy`) — then the failure sentences follow
+ * that copy too, so a buyer reading English is not told "Não foi possível
+ * conectar…" (FUT-1241). Memoised on the transport copy, so the client keeps
+ * its identity while the words do; a `transport` that names its own `copy`
+ * still wins, as it does when the flow is built.
+ */
+export function useFlowClient(runtime: FlowsRuntime): CheckoutClient {
+  const transportCopy = useFlowCopy(runtime).views.screens.screens.transport;
+  const { transport, useCopy } = runtime.config;
+  const follows = useCopy !== undefined && transport?.copy === undefined;
+  const built = runtime.copy.views.screens.screens.transport;
+  return useMemo(
+    () => (follows && transportCopy !== built ? createCheckoutClient({ ...transport, copy: transportCopy }) : runtime.client),
+    [follows, transportCopy, built, transport, runtime.client],
+  );
+}
+
+/** The paid screen's host half for THIS render: `useConfirmation`, else `confirmation`. */
+export function useFlowConfirmation(runtime: FlowsRuntime): CheckoutConfirmation | undefined {
+  return runtime.config.useConfirmation ? runtime.config.useConfirmation() : runtime.config.confirmation;
+}
+
+/** Where a hand-off leaves for: the host's `navigate` port, else a page load. */
+function assignLocation(url: string): void {
+  window.location.assign(url);
+}
+
+/**
+ * The host's ports, with identities that hold across renders.
+ *
+ * Each returned function calls the port the host returned on its LAST render,
+ * so a host on `usePorts` hands over functions that close over its current
+ * state and the flow's controller still sees one `createOrder` for its whole
+ * life — no host-side ref, and no effect restarted by a new identity. An
+ * optional port the host left out stays `undefined`, because the flow reads
+ * absence as a fact (no Apple Pay without a merchant-validation port).
+ */
+export function useFlowPorts(runtime: FlowsRuntime): Omit<CheckoutPorts, "useAvailability"> & {
+  navigate(url: string): void;
+} {
+  const current = runtime.useHostPorts();
+  const latest = useRef(current);
+  // Committed before any effect or handler can call through it.
+  useLayoutEffect(() => {
+    latest.current = current;
+  });
+  const hasSave = current.saveBuyerContact !== undefined;
+  const hasPaid = current.onPaid !== undefined;
+  const hasApple = current.validateApplePayMerchant !== undefined;
+  return useMemo(
+    () => ({
+      createPayable: (input) => latest.current.createPayable(input),
+      exitToCatalog: () => latest.current.exitToCatalog(),
+      navigate: (url) => (latest.current.navigate ?? assignLocation)(url),
+      saveBuyerContact: hasSave ? (contact) => latest.current.saveBuyerContact?.(contact) : undefined,
+      onPaid: hasPaid ? () => latest.current.onPaid?.() : undefined,
+      validateApplePayMerchant: hasApple
+        ? (validationURL) => {
+            const validate = latest.current.validateApplePayMerchant;
+            return validate ? validate(validationURL) : Promise.reject(new Error("no merchant validation port"));
+          }
+        : undefined,
+    }),
+    [hasSave, hasPaid, hasApple],
+  );
 }
 
 /**
@@ -60,7 +143,7 @@ function useFetchedConfig(
   runtime: FlowsRuntime,
   enabled: boolean,
 ): CheckoutConfigState {
-  const { client } = runtime;
+  const client = useFlowClient(runtime);
   const onWarning = runtime.config.onWarning;
   const tenantSlug = runtime.useTenantSlug();
   const [state, setState] = useState<CheckoutConfigState>({ config: null, pending: enabled });
@@ -111,14 +194,17 @@ export function FlowsShell({
   runtime: FlowsRuntime;
   children: ReactNode;
 }): JSX.Element {
+  const copy = useFlowCopy(runtime);
+  const client = useFlowClient(runtime);
+  const { navigate } = useFlowPorts(runtime);
   return (
     <CheckoutComponentsProvider components={runtime.config.components}>
       {/* The factory's STANDALONE screens (add-card, manage-cards) render the
           same card fields the checkout does, so they need the same words —
           and they are mounted here rather than under `CheckoutFlow`. */}
-      <CheckoutCopyProvider copy={runtime.config.copy.views.screens}>
-        <CheckoutClientProvider client={runtime.client}>
-          <CheckoutNavigateProvider navigate={runtime.navigate}>
+      <CheckoutCopyProvider copy={copy.views.screens}>
+        <CheckoutClientProvider client={client}>
+          <CheckoutNavigateProvider navigate={navigate}>
             {children}
           </CheckoutNavigateProvider>
         </CheckoutClientProvider>
@@ -133,22 +219,30 @@ export function FlowsShell({
  *
  * A host that passes its own `config` skips the fetch entirely — that is the
  * seam a story, a harness page or a server-rendered host uses to STATE the
- * protocol rather than round-trip for it.
+ * protocol rather than round-trip for it. `state` is the same seam with the
+ * in-flight flag kept: what `useProviderConfig` answers (FUT-1241).
  */
 export function FlowsProvider({
   runtime,
   config,
+  state,
   children,
 }: {
   runtime: FlowsRuntime;
   config?: CheckoutProviderConfig | null;
+  state?: CheckoutConfigState;
   children: ReactNode;
 }): JSX.Element {
-  const fetched = useFetchedConfig(runtime, config === undefined);
-  const value = useMemo<CheckoutConfigState>(
-    () => (config === undefined ? fetched : { config, pending: false }),
-    [config, fetched],
-  );
+  const hasState = state !== undefined;
+  const fetched = useFetchedConfig(runtime, !hasState && config === undefined);
+  // `state` is read through its two fields, so a host returning a fresh object
+  // each render does not hand every screen a new context value.
+  const statedConfig = state?.config ?? null;
+  const statedPending = state?.pending ?? false;
+  const value = useMemo<CheckoutConfigState>(() => {
+    if (hasState) return { config: statedConfig, pending: statedPending };
+    return config === undefined ? fetched : { config, pending: false };
+  }, [hasState, statedConfig, statedPending, config, fetched]);
   return (
     <FlowsShell runtime={runtime}>
       <FetchedConfigContext.Provider value={value}>{children}</FetchedConfigContext.Provider>

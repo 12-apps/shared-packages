@@ -29,7 +29,7 @@ import type { CheckoutOrder, OrderStatus } from "../components/checkout/types";
 import { useCheckoutComponents } from "../components/checkout/ui";
 import { usePaymentPolling } from "../components/checkout/use-payment-polling";
 
-import { FlowsShell, type FlowsRuntime } from "./runtime";
+import { FlowsShell, useFlowCopy, useFlowPorts, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
 /** Whose store and which basket this hand-off belongs to. */
@@ -84,10 +84,11 @@ function buildHostedHandoff(runtime: FlowsRuntime): CheckoutScreens["HostedHando
     onCancel?: () => void;
   }): JSX.Element {
     const { Button, LoadingState, Text } = useCheckoutComponents();
-    const copy = runtime.copy;
+    const copy = useFlowCopy(runtime);
+    const { navigate } = useFlowPorts(runtime);
     const tenantSlug = runtime.useTenantSlug();
     const cart = runtime.config.useCart();
-    useHandover(payable, url, runtime.navigate, {
+    useHandover(payable, url, navigate, {
       ...(tenantSlug === undefined ? {} : { tenantSlug }),
       ...(cart.identity === undefined ? {} : { basket: cart.identity }),
     });
@@ -175,16 +176,17 @@ function ReturnStalled({
   testId: string;
 }): JSX.Element {
   const { Alert, Button } = useCheckoutComponents();
+  const copy = useFlowCopy(runtime);
   return (
     <Box data-testid="checkout-hosted-return" sx={{ py: 4, display: "flex", flexDirection: "column", gap: 2 }}>
       <Alert
         variant="warning"
-        title={runtime.copy.returnPending}
+        title={copy.returnPending}
         {...(description === undefined ? {} : { description })}
         showIcon
         data-testid={testId}
       />
-      {runtime.copy.returnCheckAgain === undefined ? null : (
+      {copy.returnCheckAgain === undefined ? null : (
         <Button
           variant="outline"
           color="neutral"
@@ -192,7 +194,7 @@ function ReturnStalled({
           onClick={onCheckAgain}
           dataTestId="checkout-hosted-return-check-again"
         >
-          {runtime.copy.returnCheckAgain}
+          {copy.returnCheckAgain}
         </Button>
       )}
     </Box>
@@ -220,6 +222,7 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
     onResolved: (status: OrderStatus) => void;
   }): JSX.Element {
     const { Alert, LoadingState } = useCheckoutComponents();
+    const copy = useFlowCopy(runtime);
     // Read-and-clear, once, on first render: the resumed view belongs to
     // exactly one return trip.
     const [parked] = useState(resumeParked);
@@ -242,8 +245,8 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
       return (
         <Alert
           variant="info"
-          title={runtime.copy.returnPending}
-          description={runtime.copy.returnUnknown}
+          title={copy.returnPending}
+          description={copy.returnUnknown}
           showIcon
           data-testid="checkout-hosted-return-unknown"
         />
@@ -256,7 +259,7 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
       return (
         <ReturnStalled
           runtime={runtime}
-          description={runtime.copy.returnTimedOut}
+          description={copy.returnTimedOut}
           onCheckAgain={checkAgain}
           testId="checkout-hosted-return-timeout"
         />
@@ -266,7 +269,7 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
       return (
         <ReturnStalled
           runtime={runtime}
-          description={runtime.copy.returnUnreachable ?? error}
+          description={copy.returnUnreachable ?? error}
           onCheckAgain={checkAgain}
           testId="checkout-hosted-return-unreachable"
         />
@@ -277,7 +280,7 @@ function buildHostedReturn(runtime: FlowsRuntime): CheckoutScreens["HostedReturn
         <LoadingState
           variant="spinner"
           size="md"
-          message={runtime.copy.returnPending}
+          message={copy.returnPending}
           dataTestId="checkout-hosted-return-waiting"
         />
       </Box>

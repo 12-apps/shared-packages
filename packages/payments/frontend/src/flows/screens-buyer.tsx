@@ -12,22 +12,23 @@ import { useEffect, useState, type JSX } from "react";
 import { SavedCardsPicker, type SavedCard } from "../card";
 import { EmptyCart as EmptyCartView } from "../components/checkout/empty-cart";
 
-import { FlowsShell, type FlowsRuntime } from "./runtime";
+import { FlowsShell, useFlowClient, useFlowCopy, useFlowPorts, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
 /** The vaulted instruments this store can actually charge (FUT-697 scoping). */
 function useScopedInstruments(runtime: FlowsRuntime): SavedCard[] {
   const tenantSlug = runtime.useTenantSlug();
+  const client = useFlowClient(runtime);
   const [cards, setCards] = useState<SavedCard[]>([]);
   useEffect(() => {
     let active = true;
-    void runtime.client.listInstruments(tenantSlug).then((list) => {
+    void client.listInstruments(tenantSlug).then((list) => {
       if (active) setCards(list);
     });
     return () => {
       active = false;
     };
-  }, [runtime, tenantSlug]);
+  }, [client, tenantSlug]);
   return cards;
 }
 
@@ -56,9 +57,11 @@ function buildSavedCards(runtime: FlowsRuntime): CheckoutScreens["SavedCards"] {
 
 function buildEmptyCart(runtime: FlowsRuntime): CheckoutScreens["EmptyCart"] {
   return function EmptyCart() {
+    const copy = useFlowCopy(runtime);
+    const { exitToCatalog } = useFlowPorts(runtime);
     return (
       <FlowsShell runtime={runtime}>
-        <EmptyCartView copy={runtime.copy.views.emptyCart} onBack={runtime.config.ports.exitToCatalog} />
+        <EmptyCartView copy={copy.views.emptyCart} onBack={exitToCatalog} />
       </FlowsShell>
     );
   };
