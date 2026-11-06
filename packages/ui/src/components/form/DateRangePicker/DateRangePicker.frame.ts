@@ -6,6 +6,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import { rem, sxRem } from '../../../tokens/relative';
+import { surfaces } from '../../../tokens/surfaces';
 import { CARD_RADIUS_UNITS } from '../../layout/Card/Card.metrics';
 
 import { framedMonthsWidth } from './DateRangePicker.layout';
@@ -33,10 +34,11 @@ const BESIDE_FRAME_SX = {
   p: 2,
   maxWidth: '100%',
   minWidth: 0,
-  // A card on the page, as the prototype draws it: the paper surface and the
-  // default `Card`'s radius, not the page's ground and a Paper's 4px
-  // (FUT-4156, round 3). In-page only: the popover layout keeps its own.
-  bgcolor: 'background.paper',
+  // A card on the page, as the prototype draws it: the RAISED surface role
+  // (`background.paper` unless the host states one — a host whose paper is its
+  // page ground states a lighter card there) and the default `Card`'s radius,
+  // not a Paper's 4px (FUT-4156, round 3). In-page only: the popover keeps its own.
+  bgcolor: (theme: Theme) => surfaces(theme).raised,
   borderRadius: (theme: Theme) => theme.spacing(CARD_RADIUS_UNITS.md),
   ...FLAT_CALENDAR,
 } as const;

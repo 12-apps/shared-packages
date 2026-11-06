@@ -213,7 +213,8 @@ and centred, never stretched across the page around one month.
   design px (a phone's tap target). For a picker laid into a form section whose
   heading and fields the frame must line up with. Ignored in the default
   (popover) layout. Default off.
-- **The in-page frame** is a card on the page: `background.paper` and the
+- **The in-page frame** is a card on the page: the raised surface role
+  (`surfaces(theme).raised`, `background.paper` unless the host states one) and the
   default `Card`'s radius.
 
 ## Accessibility

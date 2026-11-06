@@ -105,6 +105,25 @@ function ownRules(element: Element): string {
 const frameElement = (): Element => within(picker()).getByTestId('calendar-container').parentElement!.parentElement!;
 
 describe('round 3 (FUT-4156)', () => {
+  it('FW5b: a host that states a raised surface gets it on the frame', () => {
+    pickerWidth(500);
+    const raised = createTheme({ uiSurfaces: { raised: '#fafbf9' } });
+    render(
+      <ThemeProvider theme={raised}>
+        <DateRangePicker
+          value={{ from: null, to: null }}
+          onChange={() => undefined}
+          quickRanges={[]}
+          fieldsPlacement="beside"
+          dataTestId={TEST_ID}
+          renderFields={() => <div />}
+          fullWidth
+        />
+      </ThemeProvider>,
+    );
+    expect(ownRules(frameElement())).toContain('background-color:#fafbf9');
+  });
+
   it('FW5: the in-page frame is a card: the paper surface and the default Card radius', () => {
     pickerWidth(500);
     mount({ fullWidth: true });
