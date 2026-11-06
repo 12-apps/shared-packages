@@ -229,3 +229,53 @@ export function windowCalendarDays(
     endsOn: endsAt === null ? null : dayAt(new Date(endsAt).getTime() - 1, timeZone),
   };
 }
+
+/** Whether `timeZone` is an IANA id this runtime can place days on. */
+export function isKnownTimeZone(timeZone: string): boolean {
+  try {
+    wallClockFormat(timeZone);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A stored bound that is exactly a UTC midnight, as its `YYYY-MM-DD`. */
+function legacyDay(bound: Date | string | null, field: string): string | null {
+  if (bound === null) return null;
+  const instant = new Date(bound);
+  const day = instant.toISOString().slice(0, 10);
+  if (instant.getTime() !== Date.parse(`${day}T00:00:00.000Z`)) {
+    throw new RangeError(
+      `@12-apps/discounts: ${field} ${instant.toISOString()} is not a UTC midnight, so it is not a ` +
+        "window stored before whole days — migrate each legacy row once, before the zone is on.",
+    );
+  }
+  return day;
+}
+
+/**
+ * A window stored BEFORE whole days (FUT-4482) — each chosen day as its UTC
+ * midnight, Término exclusive — rewritten as the whole-day window of the very
+ * same days, in the store's zone: what `wholeDayWindow` stores for them today.
+ *
+ * For a host's ONE-TIME migration, run in the release that starts passing
+ * `storeTimeZone`. Without it, every legacy row reads back on the store's
+ * clock as other days than the old form showed (a day early west of UTC), and
+ * the first edit that re-saves it moves its window silently. The days the old
+ * form showed stay the days the new form shows: Início from its 00:00 in the
+ * zone, and Término now the last day it runs, whole — the meaning the owner
+ * gave the two boxes, so a legacy rule gains the last day it always claimed.
+ *
+ * Pure, and loud on a row that is not legacy: a bound that is not a UTC
+ * midnight throws, so a migration run twice in a zone off UTC stops instead of
+ * shifting every row again. (In a zone AT UTC a second run cannot be told
+ * apart; run it once.) An unknown zone throws, as every whole-day write does.
+ */
+export function legacyUtcWindowToZoned(
+  startsAt: Date | string | null,
+  endsAt: Date | string | null,
+  timeZone: string,
+): { startsAt: Date | null; endsAt: Date | null } {
+  return wholeDayWindow(legacyDay(startsAt, "startsAt"), legacyDay(endsAt, "endsAt"), timeZone);
+}

@@ -67,6 +67,20 @@ function toDay(value: string | null, field: string, copy: DiscountsServerCopy): 
   return value;
 }
 
+/**
+ * The whole-day refusal. Never `endsBeforeStarts` in its place: with whole days
+ * equal days are legal, so "must be after" would be false — a caller counting
+ * whole days without the sentence is a wiring mistake, said as one.
+ */
+function wholeDaySentence(copy: DiscountsServerCopy): string {
+  const sentence = copy.endsBeforeStartDay;
+  if (typeof sentence === "string" && sentence.trim() !== "") return sentence;
+  throw new Error(
+    "@12-apps/discounts: a write counting whole days (timeZone) needs copy.endsBeforeStartDay — " +
+      "endsBeforeStarts says equal days are refused, which is false here.",
+  );
+}
+
 /** The FUT-4482 half: whole days on the store's clock. */
 function assertWholeDays(
   input: DiscountWriteInput,
@@ -77,7 +91,7 @@ function assertWholeDays(
   const endsOn = toDay(input.endsAt, "endsAt", copy);
   // ISO days sort as strings; equal is a one-day promotion.
   if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
-    throw invalid("endsAt", copy.endsBeforeStartDay ?? copy.endsBeforeStarts);
+    throw invalid("endsAt", wholeDaySentence(copy));
   }
   return wholeDayWindow(startsOn, endsOn, timeZone);
 }

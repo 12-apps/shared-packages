@@ -18,6 +18,8 @@ import {
 import {
   assertWholeDayCopy,
   pageWithCalendarDays,
+  readZoneFor,
+  wholeDayCopyFor,
   withCalendarDays,
   zoneFor,
   type StoreTimeZone,
@@ -109,7 +111,9 @@ export interface DiscountsApiConfig {
    * the first instant of Início and of the day after Término, Início = Término
    * is a one-day promotion, and every record answered carries `startsOn` /
    * `endsOn`, the days it runs on there. A zone the runtime does not know fails
-   * the request rather than storing a window on a guessed clock.
+   * every WRITE rather than storing a window on a guessed clock; a read answers
+   * its days on UTC and logs a warning, so the list stays usable. A null or
+   * blank answer for a tenant fails every route: guard a nullable lookup.
    *
    * Omitted, every write and answer is what it was before: UTC midnights, an
    * exclusive Término, no day fields. Opt-in so no adopter changes meaning on a
@@ -154,7 +158,10 @@ async function prepareWrite(
 ) {
   const input = toDiscountWriteInput(body as DiscountWriteBody);
   const timeZone = await zoneFor(config.storeTimeZone, clientId);
-  const scalars = toDiscountScalars(input, copy, timeZone === undefined ? {} : { timeZone });
+  const scalars =
+    timeZone === undefined
+      ? toDiscountScalars(input, copy)
+      : toDiscountScalars(input, wholeDayCopyFor(copy, resolveDiscountsCopy(config.copy, undefined)), { timeZone });
   const write = { scalars, targets: targetsForScope(input) };
   if (config.collections) {
     await assertTargetsOwned(config.collections, clientId, write.targets, copy.foreignTarget);
@@ -210,7 +217,8 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       // pagination }` envelope the advertised response describes, and wrapping
       // it again would nest it under a second `data`.
       const page = await config.store.list(actor.clientId, parsed.data);
-      return ok(pageWithCalendarDays(page, await zoneFor(config.storeTimeZone, actor.clientId)));
+      const timeZone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
+      return ok(pageWithCalendarDays(page, timeZone));
     }),
   };
 }
@@ -254,7 +262,7 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
       if (record === null) {
         return { status: 404, body: { error: resolveDiscountsCopy(config.copy, locale).notFound } };
       }
-      const timeZone = await zoneFor(config.storeTimeZone, actor.clientId);
+      const timeZone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
       return ok({ data: withCalendarDays(record as DiscountRecord, timeZone) });
     }),
   };

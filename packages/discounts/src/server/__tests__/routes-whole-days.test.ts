@@ -151,3 +151,74 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     expect((read.body as { data: Record<string, unknown> }).data).not.toHaveProperty("endsOn");
   });
 });
+
+describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review round 1)", () => {
+  it.each([null, undefined, ""])("fails a write when the host answers %j for a tenant", async (zone) => {
+    const { call, writes } = harness({ storeTimeZone: () => zone as unknown as string });
+    await expect(call("POST", "/discounts", BODY)).rejects.toThrow(/storeTimeZone answered .* for tenant "tenant-1"/u);
+    expect(writes).toEqual([]);
+  });
+
+  it("fails a read too when the host answers null, rather than answering UTC days", async () => {
+    const { call } = harness({ storeTimeZone: async () => null as unknown as string });
+    await expect(call("GET", "/discounts")).rejects.toThrow(/storeTimeZone answered null/u);
+  });
+
+  it("answers the list on an unknown zone, its days on UTC, and logs why", async () => {
+    const logger = recordingLogger();
+    const { call } = harness({ storeTimeZone: () => "Not/A_Zone", logger });
+    const response = await call("GET", "/discounts");
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ data: [{ startsOn: "2026-11-10", endsOn: "2026-11-21" }] });
+    expect(logger.at("warn").join("\n")).toMatch(/unknown store time zone "Not\/A_Zone" for tenant tenant-1/u);
+  });
+
+  it("answers one rule on an unknown zone the same way", async () => {
+    const logger = recordingLogger();
+    const { call } = harness({ storeTimeZone: () => "Not/A_Zone", logger });
+    const response = await call("GET", "/discounts/:id");
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ data: { startsOn: "2026-11-10", endsOn: "2026-11-21" } });
+    expect(logger.at("warn")).toHaveLength(1);
+  });
+
+  it("still refuses an update on an unknown zone", async () => {
+    const { call, writes } = harness({ storeTimeZone: () => "Not/A_Zone" });
+    await expect(call("PATCH", "/discounts/:id", BODY)).rejects.toThrow(/Not\/A_Zone/u);
+    expect(writes).toEqual([]);
+  });
+});
+
+describe("the whole-day refusal in every locale the copy resolves (FUT-4482, review round 1)", () => {
+  const callIn = (locale: string, copy: DiscountsApiConfig["copy"]) => {
+    const { routes } = createApiDiscounts({
+      store: { create: async () => record() } as unknown as DiscountStore,
+      copy,
+      logger: recordingLogger(),
+      storeTimeZone: () => SP,
+    });
+    const create = routes.find((entry) => entry.method === "POST" && entry.path === "/discounts")!;
+    return create.handle({
+      actor: { clientId: "tenant-1" },
+      params: {},
+      query: {},
+      locale,
+      body: { ...BODY, startsAt: "2026-11-20", endsAt: "2026-11-19" },
+    });
+  };
+
+  it("says the reader's own whole-day sentence when its pack has one", async () => {
+    const own = { ...PT_BR_DISCOUNTS_SERVER_COPY, endsBeforeStartDay: "Término before Início, in en." };
+    const response = await callIn("en-US", ({ locale }) => (locale === "en-US" ? own : PT_BR_DISCOUNTS_SERVER_COPY));
+    expect(response.body).toMatchObject({ issues: { endsAt: own.endsBeforeStartDay } });
+  });
+
+  it("says the default rendering's whole-day sentence, never 'must be after', when the reader's pack lacks it", async () => {
+    const without = { ...PT_BR_DISCOUNTS_SERVER_COPY, endsBeforeStartDay: undefined, endsBeforeStarts: "must be after" };
+    const response = await callIn("en-US", ({ locale }) =>
+      locale === "en-US" ? without : PT_BR_DISCOUNTS_SERVER_COPY,
+    );
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ issues: { endsAt: PT_BR_DISCOUNTS_SERVER_COPY.endsBeforeStartDay } });
+  });
+});

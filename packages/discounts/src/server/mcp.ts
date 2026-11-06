@@ -46,7 +46,8 @@ export const discountItemParams = z.object({
 });
 
 /**
- * A calendar date (`YYYY-MM-DD`), read at UTC midnight by the API.
+ * A calendar date (`YYYY-MM-DD`): a whole day on the store's clock when the
+ * host passes `storeTimeZone` (FUT-4482), else read at UTC midnight.
  *
  * No custom message: a sentence here would be a default in one language, and
  * the schema's own path is what a client renders. The SEMANTIC failure — a
@@ -170,9 +171,9 @@ export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.par
  * WHOLE (the form re-states every field), so there is no partial-patch shape
  * to diverge from. The cross-field rules — a rate iff PERCENTAGE, a code iff
  * CODE, a target iff CATEGORY/ITEM, a slot list iff COMBO, a combo reward ONLY
- * at COMBO scope, `endsAt` not before `startsAt` (strictly after, without a store zone) — are enforced in
- * `./validate` and `./validate-combo`, where they produce a sentence naming the
- * field instead of a Zod path.
+ * at COMBO scope, `endsAt` not before `startsAt` (strictly after without a
+ * store zone) — are enforced in `./validate` and `./validate-combo`, where they
+ * produce a sentence naming the field instead of a Zod path.
  */
 const discountWriteShape = {
   name: z.string().min(2).max(120),
