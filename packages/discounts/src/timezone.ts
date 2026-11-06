@@ -240,16 +240,37 @@ export function isKnownTimeZone(timeZone: string): boolean {
   }
 }
 
+/**
+ * A legacy row (`windowInZone` false) whose bound is not a UTC midnight, so not
+ * a window the old form stored: a seeded demo row (`Date.now() ± n days`), a
+ * script's write. TYPED so a host's migration loop can catch it per row, log
+ * it and go on — one such row must not stop every other row converting — while
+ * an unknown zone, which no row survives, still throws a plain `Error`.
+ */
+export class LegacyWindowNotMidnightError extends RangeError {
+  /** Which bound is off midnight. */
+  readonly field: "startsAt" | "endsAt";
+  /** The stored instant, ISO. */
+  readonly bound: string;
+
+  constructor(field: "startsAt" | "endsAt", bound: string) {
+    super(
+      `@12-apps/discounts: ${field} ${bound} is not a UTC midnight on a row whose windowInZone is ` +
+        "false, so it is not a window the old form stored — it is left as it is; fix that row by hand.",
+    );
+    this.name = "LegacyWindowNotMidnightError";
+    this.field = field;
+    this.bound = bound;
+  }
+}
+
 /** A stored bound that is exactly a UTC midnight, as its `YYYY-MM-DD`. */
-function legacyDay(bound: Date | string | null, field: string): string | null {
+function legacyDay(bound: Date | string | null, field: "startsAt" | "endsAt"): string | null {
   if (bound === null) return null;
   const instant = new Date(bound);
   const day = instant.toISOString().slice(0, 10);
   if (instant.getTime() !== Date.parse(`${day}T00:00:00.000Z`)) {
-    throw new RangeError(
-      `@12-apps/discounts: ${field} ${instant.toISOString()} is not a UTC midnight on a row whose ` +
-        "windowInZone is false, so it is not a window the old form stored — fix that row by hand.",
-    );
+    throw new LegacyWindowNotMidnightError(field, instant.toISOString());
   }
   return day;
 }
@@ -297,8 +318,9 @@ export function legacyWindowDays(
  * the answer back under the same condition (`WHERE window_in_zone = false`),
  * so a rerun, a run that failed half way, two runs at once or a UTC+0 zone —
  * where a migrated window is still two UTC midnights — can never shift a row
- * twice. Throws on an unknown zone, as every whole-day write does, and on a
- * legacy bound that is not a UTC midnight, which the old form never stored.
+ * twice. Throws on an unknown zone, as every whole-day write does, and — as a
+ * {@link LegacyWindowNotMidnightError}, which a loop catches per row and skips —
+ * on a legacy bound that is not a UTC midnight, which the old form never stored.
  */
 export function legacyUtcWindowToZoned(
   row: StoredWindow,

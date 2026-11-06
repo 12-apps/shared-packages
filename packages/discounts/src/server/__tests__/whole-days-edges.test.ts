@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { legacyUtcWindowToZoned, windowCalendarDays, wholeDayWindow } from "../../timezone";
+import {
+  LegacyWindowNotMidnightError,
+  legacyUtcWindowToZoned,
+  windowCalendarDays,
+  wholeDayWindow,
+} from "../../timezone";
 
 /**
  * FUT-4482, review round 1: the END bound across a clock change, in a zone
@@ -93,5 +98,46 @@ describe("legacyUtcWindowToZoned — the host's migration of legacy rows", () =>
 
   it("refuses a zone the runtime does not know", () => {
     expect(() => legacyUtcWindowToZoned(legacy("2026-11-10T00:00:00.000Z", null), "Not/A_Zone")).toThrow(/Not\/A_Zone/u);
+  });
+
+  // Review round 4: seeded demo rows (`Date.now() ± n days`) are legacy rows
+  // with bounds the old form never stored. A host's loop must skip them, not
+  // abort on the first one — so the refusal is a TYPED error it can catch.
+  it("throws a typed error naming the bound, which a loop catches per row", () => {
+    const seeded = { id: "seeded", ...legacy("2026-11-10T14:37:12.000Z", "2026-11-20T00:00:00.000Z") };
+    let caught: unknown;
+    try {
+      legacyUtcWindowToZoned(seeded, "America/Sao_Paulo");
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(LegacyWindowNotMidnightError);
+    expect(caught).toMatchObject({ field: "startsAt", bound: "2026-11-10T14:37:12.000Z" });
+  });
+
+  it("lets the README's loop convert every other row and log the one it skipped", () => {
+    const rows = [
+      { id: "a", ...legacy("2026-11-10T00:00:00.000Z", "2026-11-20T00:00:00.000Z") },
+      { id: "seeded", ...legacy("2026-11-10T14:37:12.000Z", null) },
+      { id: "b", ...legacy(null, "2026-12-01T00:00:00.000Z") },
+    ];
+    const written: string[] = [];
+    const skipped: string[] = [];
+    for (const rule of rows) {
+      try {
+        if (legacyUtcWindowToZoned(rule, "America/Sao_Paulo") !== null) written.push(rule.id);
+      } catch (error) {
+        if (!(error instanceof LegacyWindowNotMidnightError)) throw error;
+        skipped.push(`${rule.id}: ${error.field}`);
+      }
+    }
+    expect(written).toEqual(["a", "b"]);
+    expect(skipped).toEqual(["seeded: startsAt"]);
+  });
+
+  it("still throws a plain error, not the typed one, on an unknown zone — that must abort", () => {
+    expect(() => legacyUtcWindowToZoned(legacy("2026-11-10T03:00:00.000Z", null), "Not/A_Zone")).toThrow(
+      expect.not.objectContaining({ name: "LegacyWindowNotMidnightError" }),
+    );
   });
 });
