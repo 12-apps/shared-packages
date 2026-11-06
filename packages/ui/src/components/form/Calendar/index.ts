@@ -2,6 +2,7 @@ export { Calendar,Calendar as default } from './Calendar';
 export type {
   CalendarCaptionLayout,
   CalendarInternalState,
+  CalendarTodayIndicator,
   CalendarProps,
   DateRange,
   DayRenderArgs,

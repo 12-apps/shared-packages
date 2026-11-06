@@ -143,6 +143,7 @@ export const EN_US_UI_LABELS: UiLabels = {
   },
   dateRangePicker: {
     calendar: "Calendar",
+    openEnded: "No end date.",
   },
   calendar: {
     chooseMonth: (month) => `${month}, choose month`,

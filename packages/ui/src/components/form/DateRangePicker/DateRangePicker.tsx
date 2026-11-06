@@ -138,6 +138,9 @@ function useMonthCount(requested: number | undefined): number | undefined {
 }
 
 /** The grid, in range mode — `Calendar`, never a second implementation of one. */
+/** The calendar options a picker passes through untouched. */
+type CalendarDisplay = Pick<DateRangePickerProps, 'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange'>;
+
 function RangeCalendar({
   calendarLabel,
   picker,
@@ -147,8 +150,10 @@ function RangeCalendar({
   months,
   maxRangeDays,
   labels,
+  display,
 }: {
   labels: Partial<CalendarLabels> | undefined;
+  display: CalendarDisplay;
   picker: Picker;
   value: DateRangeDraft;
   locale: string;
@@ -178,6 +183,9 @@ function RangeCalendar({
       // cannot hand back a window the control has just called too long.
       maxRangeLength={maxRangeDays}
       {...(labels ? { labels } : {})}
+      showOutsideDays={display.showOutsideDays}
+      todayIndicator={display.todayIndicator}
+      allowSameDayRange={display.allowSameDayRange}
     />
   );
 }
@@ -219,6 +227,17 @@ const BESIDE_FRAME_SX = {
   maxWidth: '100%',
   minWidth: 0,
   ...FLAT_CALENDAR,
+} as const;
+
+/**
+ * Under the fields' row the frame is as wide as its months and centred: a
+ * frame stretched across the page around one month left a third of itself
+ * blank (FUT-4156, 600 and 900 wide).
+ */
+const BELOW_FRAME_SX = {
+  ...BESIDE_FRAME_SX,
+  alignSelf: 'center',
+  width: 'fit-content',
 } as const;
 
 /** The typed half: the consumer's own fields, or the built-in pair and its line. */
@@ -294,7 +313,7 @@ function InPageLayout({
         minWidth: 0,
       }}
     >
-      <Paper variant="outlined" sx={{ ...BESIDE_FRAME_SX, flex: sideBySide ? '0 0 auto' : undefined }}>
+      <Paper variant="outlined" sx={sideBySide ? { ...BESIDE_FRAME_SX, flex: '0 0 auto' } : BELOW_FRAME_SX}>
         {body}
       </Paper>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -349,6 +368,7 @@ export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element 
         months={layout.months}
         maxRangeDays={maxRangeDays}
         labels={props.calendarLabels}
+        display={props}
       />
       <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
     </Box>

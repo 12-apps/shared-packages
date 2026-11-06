@@ -49,6 +49,7 @@ export interface CalendarProps {
   firstDayOfWeek?: 0 | 1 | 2 | 3 | 4 | 5 | 6; // default: locale
   locale?: string; // e.g. 'en-US'
   showOutsideDays?: boolean; // days from prev/next month
+  todayIndicator?: 'bold' | 'ring'; // default 'bold'; 'ring' adds a primary-colour ring
   showWeekNumbers?: boolean;
   captionLayout?: 'arrows' | 'selectors'; // default: 'arrows'; 'selectors' shows one month
   defaultMonth?: Date; // month shown while nothing is chosen; default: today's month
@@ -223,6 +224,8 @@ month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
 - With `showOutsideDays={false}` an outside day is an inert, `aria-hidden`
   placeholder: no button, no name, no tab stop. Visible outside days are
   unchanged.
+- The focus ring (2px, primary) shows on KEYBOARD focus only
+  (`:focus-visible`) — on the container or a day — never after a tap.
 - Keyboard support (roving focus within the grid). When a NAVIGATION key is
   pressed on a day (the reader tabbed or clicked onto it), focus follows the tab
   stop to the new day in its own month (never its muted copy in the month

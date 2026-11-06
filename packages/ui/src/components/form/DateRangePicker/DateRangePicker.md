@@ -149,8 +149,14 @@ mounts. The picker remounts it when a **quick pick** or a **typed date** moves
 the range, and never when a day inside the grid is clicked — a calendar that
 jumped under the pointer picking in it would be unusable.
 
-So the grid follows the range's **start**. Picking "This year" in August moves
-it to January, because that is where the range now begins.
+So the grid follows the range's **start** — or its **end** when only the end is
+chosen. Picking "This year" in August moves it to January, because that is
+where the range now begins.
+
+A consumer that owns the draft may complete a tap into a different draft than
+the one the picker handed it (keeping an end the tap would have dropped). That
+is still the tap's own result: the grid stays on its month and focus stays on
+the tapped day. Only a change that drops a bound the tap chose moves the grid.
 
 ## Layout
 
@@ -188,7 +194,15 @@ needs four more things, each opt-in so no existing screen changes:
   caller's.
 - **`calendarLabels`** — names for the calendar's month arrows
   (`PT_BR_UI_LABELS.calendar` in Portuguese); without them they stay unnamed,
-  as before.
+  as before. `PT_BR_UI_LABELS.dateRangePicker.openEnded` is the Portuguese
+  `openEnded`.
+- **`showOutsideDays`, `todayIndicator`, `allowSameDayRange`** — `Calendar`'s
+  own options, passed through: hide the neighbouring months' days, ring today
+  (`'ring'`), or refuse one day as a whole range (a second tap on the start day
+  then does nothing). Defaults unchanged: drawn, bold, allowed.
+
+Under the fields' row (`placement="below"`) the frame is as wide as its months
+and centred, never stretched across the page around one month.
 
 ## Accessibility
 

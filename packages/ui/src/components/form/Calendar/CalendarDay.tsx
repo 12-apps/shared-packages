@@ -95,7 +95,17 @@ const BAND_RADIUS = '50%';
  * pseudo-element so the button's own content stays the bare day number a host's
  * tests query (`getByText('27')` is the cell, as it always was).
  */
-const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps<Theme> => ({
+/**
+ * Today's ring, opt-in (`todayIndicator="ring"`): a hairline-and-a-half inset
+ * on the face, in the primary colour. An endpoint is already filled with that
+ * colour, so it carries none.
+ */
+const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => string) | undefined =>
+  ring && day.today && !isEndpoint(day)
+    ? (theme: Theme) => `inset 0 0 0 ${rem(theme, 1.5)} ${theme.palette.primary.main}`
+    : undefined;
+
+const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean, ring: boolean): SxProps<Theme> => ({
   position: 'relative',
   isolation: 'isolate',
   display: 'flex',
@@ -141,12 +151,14 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
     maxWidth: '100%',
     borderRadius: '50%',
     backgroundColor: faceBackgroundFor(day),
+    boxShadow: todayRingFor(day, ring),
   },
   '&:hover::before': {
     backgroundColor: hoverBackgroundFor(day),
   },
   '&:focus': { outline: 'none' },
-  '&:focus::before': {
+  // Keyboard focus only: a tapped day is already marked by what the tap did.
+  '&:focus-visible::before': {
     outline: (theme: Theme) => `${rem(theme, 2)} solid`,
     outlineColor: 'primary.main',
     outlineOffset: sxRem(1),
@@ -168,6 +180,8 @@ export interface CalendarDayProps {
   band: DayBand;
   focused: boolean;
   showOutsideDays: boolean;
+  /** Ring today's face (`todayIndicator="ring"`). */
+  todayRing?: boolean;
   dayClassName?: (args: DayRenderArgs) => string;
   onSelect: (date: Date) => void;
   onHover: (date: Date) => void;
@@ -180,6 +194,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   band,
   focused,
   showOutsideDays,
+  todayRing = false,
   dayClassName,
   onSelect,
   onHover,
@@ -219,7 +234,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       onClick={() => onSelect(day.date)}
       onMouseEnter={() => onHover(day.date)}
       onMouseLeave={onHoverEnd}
-      sx={dayCellSx(day, band, visible)}
+      sx={dayCellSx(day, band, visible, todayRing)}
     >
       {day.selected && (
         <Box component="span" data-testid="calendar-selected-date" sx={{ display: 'none' }} />

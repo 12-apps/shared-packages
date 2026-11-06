@@ -20,9 +20,22 @@ import type {
 } from './DateRangePicker.types';
 
 /**
+ * Whether `value` is what the picker last handed out — or that tap's draft
+ * carried on by the consumer: every bound the tap chose kept, a bound it left
+ * open filled in (a consumer that keeps an end the tap would have dropped).
+ * Either way the grid under the pointer must not move, nor lose its focus.
+ */
+function cameFromPicker(value: DateRangeDraft, emitted: DateRangeDraft | null): boolean {
+  if (emitted === null) return false;
+  const kept = (bound: 'from' | 'to'): boolean => emitted[bound] === null || emitted[bound] === value[bound];
+  return kept('from') && kept('to');
+}
+
+/**
  * Bump the view nonce when the value moves and the picker did not move it —
  * a consumer's own field committed a day. Skips the mount and the picker's own
- * emissions, so a click in the grid never remounts the grid under it.
+ * emissions, so a click in the grid never remounts the grid under it. An
+ * emission is read once: the change after it is the consumer's own.
  */
 function useFollowValue(
   enabled: boolean,
@@ -36,7 +49,8 @@ function useFollowValue(
     previous.current = value;
     if (!enabled || (before.from === value.from && before.to === value.to)) return;
     const emitted = lastEmitted.current;
-    if (emitted && emitted.from === value.from && emitted.to === value.to) return;
+    lastEmitted.current = null;
+    if (cameFromPicker(value, emitted)) return;
     setViewNonce((nonce) => nonce + 1);
   }, [enabled, value, lastEmitted, setViewNonce]);
 }

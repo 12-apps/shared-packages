@@ -7,7 +7,7 @@
 import type React from 'react';
 
 import type { CalendarLabels } from '../../../copy/labels';
-import type { DateRange } from '../Calendar';
+import type { CalendarTodayIndicator, DateRange } from '../Calendar';
 
 /** One inclusive calendar day as `AAAA-MM-DD`. Sorts lexicographically. */
 export type DayString = string;
@@ -199,6 +199,16 @@ export interface DateRangePickerProps {
    * open end means to it.
    */
   openEnd?: boolean;
+  /**
+   * The calendar's display options, passed through (`Calendar`'s own):
+   * whether a month shows its neighbours' days (default true), how today is
+   * marked (default `'bold'`), and whether one day may be the whole range
+   * (default true). With `allowSameDayRange={false}` a second tap on the start
+   * day does nothing.
+   */
+  showOutsideDays?: boolean;
+  todayIndicator?: CalendarTodayIndicator;
+  allowSameDayRange?: boolean;
   /** Names for the calendar's own controls (the month arrows), in the host's language. */
   calendarLabels?: Partial<CalendarLabels>;
   /** Root test id; every part derives from it (`-from`, `-quick-today`, …). */

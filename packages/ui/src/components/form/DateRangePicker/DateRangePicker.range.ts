@@ -64,7 +64,7 @@ export function defaultMessages(): DateRangePickerMessages {
     to: 'End date',
     quickRanges: 'Quick ranges',
     incomplete: 'Choose both dates.',
-    openEnded: 'No end date.',
+    openEnded: EN_US_UI_LABELS.dateRangePicker.openEnded,
     reversed: 'The end date must be on or after the start date.',
     overMax: ({ maxRangeDays }) => `Choose a range of at most ${maxRangeDays} days.`,
     summary: ({ from, to }) => `${isoToMasked(from, dayMask)} – ${isoToMasked(to, dayMask)}`,

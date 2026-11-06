@@ -22,7 +22,9 @@ const containerSx = (monthsToShow: number): SxProps<Theme> => ({
   flexDirection: monthsToShow > 1 ? 'row' : 'column',
   gap: 3,
   outline: 'none',
-  '&:focus-within': {
+  // The ring is for a KEYBOARD reader's place, so it shows on keyboard focus
+  // only — on the container, or on a day inside it — and never after a tap.
+  '&:focus-visible, &:has(:focus-visible)': {
     outline: (theme: Theme) => `${rem(theme, 2)} solid`,
     outlineColor: 'primary.main',
     outlineOffset: sxRem(2),
@@ -37,6 +39,7 @@ const buildDayContext = (props: ResolvedCalendarProps, calendar: CalendarState):
   value: props.value,
   range: props.range,
   showOutsideDays: props.showOutsideDays,
+  todayIndicator: props.todayIndicator,
   renderDay: props.renderDay,
   dayClassName: props.dayClassName,
   hoveredDate: calendar.hoveredDate,

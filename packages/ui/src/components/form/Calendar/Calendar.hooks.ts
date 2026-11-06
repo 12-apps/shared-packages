@@ -8,11 +8,13 @@ import type { MonthMatrix, ResolvedCalendarProps } from './Calendar.types';
 
 const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
 
-// Which day the calendar opens on: whatever is already chosen, else the first
-// of `defaultMonth`, else today.
+// Which day the calendar opens on: whatever is already chosen — a range's
+// start, or its end when only the end is (FUT-4156) — else the first of
+// `defaultMonth`, else today.
 const initialFocus = (props: ResolvedCalendarProps, today: Date): Date => {
   if (props.selectionMode === 'single' && props.value) return normalizeDate(props.value);
   if (props.selectionMode === 'range' && props.range.start) return normalizeDate(props.range.start);
+  if (props.selectionMode === 'range' && props.range.end) return normalizeDate(props.range.end);
   if (props.defaultMonth) return normalizeDate(startOfMonth(props.defaultMonth));
   return today;
 };
