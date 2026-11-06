@@ -56,7 +56,7 @@ export function parseClientIdMetadataUrl(clientId: string): URL {
 
 /**
  * IPv4 blocks a server-side fetch must never reach: every special-use block of
- * RFC 6890 (draft-03 §10.5 MUST), as [network, prefix length].
+ * RFC 6890 (draft-03 §10.7 MUST), as [network, prefix length].
  */
 const NON_PUBLIC_V4: ReadonlyArray<readonly [string, number]> = [
   ["0.0.0.0", 8], // "this" network
@@ -96,7 +96,10 @@ function isNonPublicV4(address: string): boolean {
 const NON_PUBLIC_V6: ReadonlyArray<readonly [string, number]> = [
   ["::", 128], // unspecified
   ["::1", 128], // loopback
+  ["::", 96], // IPv4-compatible (deprecated), e.g. ::7f00:1
+  ["::ffff:0:0:0", 96], // SIIT translated addresses
   ["64:ff9b::", 96], // NAT64, which reaches v4 private space
+  ["64:ff9b:1::", 48], // local-use NAT64 (RFC 8215)
   ["100::", 64], // discard
   ["2001::", 23], // IETF protocol assignments (Teredo, benchmarking, ORCHID…)
   ["2001:db8::", 32], // documentation

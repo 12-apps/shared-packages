@@ -184,15 +184,20 @@ library updates, every host updates with **no app changes**. Same contract
     answers `400 invalid_client: unknown client_id` and the connection never
     reaches sign-in. With it, such a `client_id` is resolved by fetching the
     document it names (`src/oauth/client-metadata.ts`):
-    - the document must name itself (`client_id` equal to its URL), list
-      absolute `redirect_uris`, allow `authorization_code`, and be a public
-      client — no secret and no auth method but `none`;
+    - the document must name itself (`client_id` equal to its URL), list at
+      most 20 absolute `redirect_uris` (no credentials, no fragment), allow
+      `authorization_code`, and be a public client — no secret, no auth method
+      but `none`, and no client authentication at the token endpoint;
+      `client_name` is cut at 200 characters;
     - the fetch is https only, follows no redirect, refuses any destination that
       resolves to a non-public address at CONNECT time (so DNS rebinding cannot
-      reach one), and is bounded in time (5 s), size (10 KiB) and concurrency;
+      reach one) on a fresh socket every time (a pooled keep-alive socket would
+      skip the lookup), and is bounded in time (5 s), size (10 KiB) and
+      concurrency (16); a name that does not resolve is a refusal;
     - a valid document is reused for its `max-age` (clamped to 1 min–24 h, else
       5 min); a refused one is never cached; through an outage the last valid
-      copy keeps serving for up to a day, and with none the endpoints answer a
+      copy keeps serving for up to a day (retried at most once a minute), and
+      with none the endpoints answer a
       retryable 503 — never `invalid_client`, which a host may read as "drop the
       connection";
     - nothing is written to `stores.clients`. Refresh tokens and connections key

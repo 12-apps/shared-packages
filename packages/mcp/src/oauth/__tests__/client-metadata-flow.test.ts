@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { FetchMetadataDocument, MetadataDocumentAnswer } from "../client-metadata";
+import { inProcessConsentReplayStore } from "../consent-ticket";
 import { asHarness, authorize, codeFrom, pkcePair, token } from "./fixtures";
 
 /**
@@ -251,5 +252,60 @@ describe("a metadata-document client", () => {
     const loose = await authorizeFor(api, client_id, "http://localhost:1/api/mcp/auth_callback");
     expect(loose.response.status).toBe(400);
     expect(transport.calls).toEqual([]);
+  });
+});
+
+describe("a metadata-document client at the consent screen", () => {
+  async function consentHarness(documents: Record<string, unknown>) {
+    const transport = serving(documents);
+    const harness = await asHarness({
+      consent: { path: "/admin/oauth-consent", replay: inProcessConsentReplayStore() },
+      // No reuse: every lookup refetches, so the consent step's own lookup is exercised.
+      clientIdMetadataDocuments: { fetchDocument: transport, cacheTtlMs: 0, staleIfErrorMs: 0 },
+    });
+    harness.session.current = { subject: "google-sub-1", email: "owner@example.com", sessionBinding: "cookie-session-one" };
+    return { ...harness, transport, documents };
+  }
+
+  function ticketOf(response: Response): string {
+    return new URL(String(response.headers.get("location"))).searchParams.get("request") ?? "";
+  }
+
+  it("names the document's client and is approved back to its callback, loopback port included", async () => {
+    const { api } = await consentHarness({ [CODE_ID]: CODE_DOCUMENT });
+    const { response } = await authorizeFor(api, CODE_ID, "http://localhost:61234/callback");
+    const ticket = ticketOf(response);
+    const details = await api.handlers.consentDetails(
+      new Request(`https://app.example.com/api/oauth/consent?${new URLSearchParams({ request: ticket })}`),
+    );
+    expect(await details.json()).toMatchObject({ clientName: "Claude Code", redirectUri: "http://localhost:61234/callback" });
+    const decided = await api.handlers.consentDecision(new Request("https://app.example.com/api/oauth/consent", {
+      method: "POST",
+      headers: { origin: "https://app.example.com", "content-type": "application/json" },
+      body: JSON.stringify({ request: ticket, decision: "approve" }),
+    }));
+    const { redirectUrl } = (await decided.json()) as { redirectUrl: string };
+    expect(new URL(redirectUrl).searchParams.get("code")).toBeTruthy();
+  });
+
+  it("answers 503 temporarily_unavailable at both consent endpoints while the document cannot be fetched", async () => {
+    const { api, documents } = await consentHarness({ [CLAUDE_ID]: CLAUDE_DOCUMENT });
+    const { response } = await authorizeFor(api, CLAUDE_ID);
+    const ticket = ticketOf(response);
+    documents[CLAUDE_ID] = new Error("ECONNRESET");
+    for (const answer of [
+      await api.handlers.consentDetails(
+        new Request(`https://app.example.com/api/oauth/consent?${new URLSearchParams({ request: ticket })}`),
+      ),
+      await api.handlers.consentDecision(new Request("https://app.example.com/api/oauth/consent", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ request: ticket, decision: "approve" }),
+      })),
+    ]) {
+      expect(answer.status).toBe(503);
+      expect(answer.headers.get("retry-after")).toBe("30");
+      expect(await answer.json()).toEqual({ error: "temporarily_unavailable" });
+    }
   });
 });

@@ -27,7 +27,8 @@ function isAbsoluteWebUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password;
+    return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password &&
+      !value.includes("#");
   } catch {
     return false;
   }
@@ -112,7 +113,8 @@ function clientNameOf(doc: Doc): string | null {
 }
 
 function scopesOf(doc: Doc, served: readonly string[]): string[] {
-  if (typeof doc.scope !== "string") return [...served];
+  if (doc.scope === undefined) return [...served];
+  if (typeof doc.scope !== "string") refuse("document scope is not a string");
   const requested = doc.scope.split(/\s+/).filter(Boolean);
   return served.filter((scope) => requested.includes(scope));
 }

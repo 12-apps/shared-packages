@@ -100,7 +100,7 @@ describe("the destination address", () => {
     "100.64.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255", "198.18.0.1",
     "::1", "::", "fc00::1", "fd12::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1",
     "64:ff9b::a00:1", "2001:db8::1", "2002:a00:1::1", "2001:0:4136:e378::1", "2001::1", "100::1", "2001:2::1", "2001:10::1", "2001:1ff::1",
-    "::ffff:7f00:1", "::ffff:a00:1", "192.0.2.1", "198.51.100.1", "203.0.113.1", "192.88.99.1", "240.0.0.1",
+    "::ffff:7f00:1", "::ffff:a00:1", "::7f00:1", "::ffff:0:a00:1", "64:ff9b:1::a00:1", "192.0.2.1", "198.51.100.1", "203.0.113.1", "192.88.99.1", "240.0.0.1",
     "not-an-ip",
   ])("refuses %s", (address) => {
     expect(isNonPublicAddress(address)).toBe(true);
@@ -167,6 +167,8 @@ describe("the document", () => {
     ["a non-web redirect_uri", { ...CLAUDE_DOCUMENT, redirect_uris: ["javascript:alert(1)"] }, /redirect_uris/],
     ["no authorization_code grant", { ...CLAUDE_DOCUMENT, grant_types: ["client_credentials"] }, /authorization_code/],
     ["no code response type", { ...CLAUDE_DOCUMENT, response_types: ["token"] }, /response_type code/],
+    ["a scope that is not a string", { ...CLAUDE_DOCUMENT, scope: ["mcp:read"] }, /scope is not a string/],
+    ["a redirect_uri with a fragment", { ...CLAUDE_DOCUMENT, redirect_uris: ["https://claude.ai/cb#x"] }, /redirect_uris/],
     ["grant_types that is not a list", { ...CLAUDE_DOCUMENT, grant_types: "authorization_code" }, /grant_types is not a list/],
     ["response_types that is not a list", { ...CLAUDE_DOCUMENT, response_types: "code" }, /response_types is not a list/],
     [
@@ -223,6 +225,43 @@ describe("the resolver", () => {
     expect(transport.calls).toBe(2);
   });
 
+  it.each([
+    ["no-store", "no-store", 60_000],
+    ["no-cache", "private, no-cache", 60_000],
+    ["a max-age past the ceiling", "max-age=999999", 24 * 60 * 60 * 1000],
+  ])("keeps a document with %s for its clamped lifetime", async (_case, cacheControl, lifetime) => {
+    const stamps = clock();
+    const transport = scripted(answer(CLAUDE_DOCUMENT, 200, cacheControl));
+    const clamped = createClientMetadataDocumentResolver(SCOPES, { fetchDocument: transport, now: stamps.now });
+    await clamped.resolve(CLAUDE_ID);
+    stamps.advance(lifetime - 1);
+    await clamped.resolve(CLAUDE_ID);
+    expect(transport.calls).toBe(1);
+    stamps.advance(2);
+    await clamped.resolve(CLAUDE_ID);
+    expect(transport.calls).toBe(2);
+  });
+
+  it("retries an outage at most once per floor interval while it serves the last copy", async () => {
+    const time = clock();
+    const transport = scripted(answer(CLAUDE_DOCUMENT), answer("down", 503));
+    const stale = createClientMetadataDocumentResolver(SCOPES, { fetchDocument: transport, now: time.now });
+    await stale.resolve(CLAUDE_ID);
+    time.advance(6 * 60 * 1000);
+    await stale.resolve(CLAUDE_ID);
+    await stale.resolve(CLAUDE_ID);
+    expect(transport.calls).toBe(2);
+    time.advance(61_000);
+    await stale.resolve(CLAUDE_ID);
+    expect(transport.calls).toBe(3);
+  });
+
+  it("keeps the defaults when an option is passed as undefined", async () => {
+    const transport = scripted(answer(CLAUDE_DOCUMENT));
+    const defaulted = createClientMetadataDocumentResolver(SCOPES, { fetchDocument: transport, maxConcurrentFetches: undefined });
+    expect((await defaulted.resolve(CLAUDE_ID))?.clientName).toBe("Claude");
+  });
+
   it("never caches a refusal: the next lookup fetches again", async () => {
     const refusals: string[] = [];
     const transport = scripted(answer({ ...CLAUDE_DOCUMENT, client_id: "https://other.example/x" }), answer(CLAUDE_DOCUMENT));
@@ -250,6 +289,7 @@ describe("the resolver", () => {
   it.each([
     ["a 503", answer("down", 503)],
     ["a 429", answer("slow down", 429)],
+    ["a 408", answer("timeout", 408)],
     ["a network error", new Error("ECONNRESET")],
     ["a timeout", new ClientMetadataDocumentError("document fetch timed out", { transient: true })],
   ])("answers %s with nothing cached as unavailable, not as unknown", async (_case, failure) => {

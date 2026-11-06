@@ -11,10 +11,12 @@ import type { OAuthClientStore, StoredOAuthClient } from "./stores";
 export { clientFromMetadataDocument } from "./client-metadata-document";
 export { ClientMetadataDocumentError, ClientMetadataUnavailableError } from "./client-metadata-errors";
 export {
+  createMetadataDocumentTransport,
   fetchMetadataDocument,
   publicOnlyLookup,
   type FetchMetadataDocument,
   type MetadataDocumentAnswer,
+  type MetadataDocumentTransportDeps,
 } from "./client-metadata-fetch";
 export {
   isClientIdMetadataUrl,
@@ -100,7 +102,9 @@ const DEFAULTS: Required<Omit<ClientMetadataDocumentOptions, "fetchDocument" | "
 type Settings = typeof DEFAULTS & { fetchDocument: FetchMetadataDocument; now: () => number };
 
 function settingsOf(options: ClientMetadataDocumentOptions): Settings {
-  const merged = { ...DEFAULTS, fetchDocument: fetchMetadataDocument, now: Date.now, ...options };
+  // An explicit `undefined` keeps the default rather than erasing it.
+  const given = Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
+  const merged = { ...DEFAULTS, fetchDocument: fetchMetadataDocument, now: Date.now, ...given } as Settings;
   return {
     ...merged,
     minCacheTtlMs: Math.min(merged.minCacheTtlMs, merged.cacheTtlMs),
@@ -224,6 +228,9 @@ export function createClientMetadataDocumentResolver(
       return null;
     }
     if (cached && cached.staleUntil > settings.now()) {
+      // Through an outage, retry at most once per floor interval: without this,
+      // every request would first wait out the fetch timeout before being served.
+      cache.set(clientId, { ...cached, freshUntil: settings.now() + settings.minCacheTtlMs });
       onRefusal(clientId, `${failure.message}; serving the last valid document`);
       return cached.client;
     }

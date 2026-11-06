@@ -94,25 +94,54 @@ function collect(
   res.on("error", () => reject(transient("document could not be fetched")));
 }
 
+/** What the transport is built from; the defaults are the production ones. */
+export interface MetadataDocumentTransportDeps {
+  /** The request function. Default `node:https`'s `request`. */
+  request?: typeof httpsRequest;
+  /** The socket's DNS lookup. Default {@link publicOnlyLookup}. */
+  lookup?: LookupFunction;
+}
+
 /**
- * The default transport: one https GET through {@link publicOnlyLookup}, with no
- * redirect followed (`node:https` never follows one; a 3xx comes back as a
- * status), the WHOLE exchange bounded by `timeoutMs`, and the body by `maxBytes`
- * while it streams.
+ * A transport: one GET through the given lookup, with no redirect followed
+ * (`node:https` never follows one; a 3xx comes back as a status), the WHOLE
+ * exchange bounded by `timeoutMs`, and the body by `maxBytes` while it streams.
+ *
+ * `agent: false` is load-bearing. The global agent pools keep-alive sockets by
+ * host and port, and a pooled socket is reused WITHOUT a lookup — so a host that
+ * had already talked to `internal.example:443` would hand this fetch a live
+ * socket to it, and the address check would never run. A fresh socket per fetch
+ * means every fetch dials, and every dial goes through the lookup.
  */
-export const fetchMetadataDocument: FetchMetadataDocument = (url, { timeoutMs, maxBytes }) =>
-  new Promise((resolve, reject) => {
-    const req = httpsRequest(
-      url,
-      { method: "GET", headers: { accept: "application/json" }, lookup: publicOnlyLookup, timeout: timeoutMs },
-      (res) => collect(res, maxBytes, resolve, reject),
-    );
-    const deadline = setTimeout(() => req.destroy(transient("document fetch timed out")), timeoutMs);
-    req.on("timeout", () => req.destroy(transient("document fetch timed out")));
-    req.on("error", (error) => {
-      // The address refusal is a verdict; every other socket error is the network.
-      reject(error instanceof ClientMetadataDocumentError ? error : transient("document could not be fetched"));
+export function createMetadataDocumentTransport(deps: MetadataDocumentTransportDeps = {}): FetchMetadataDocument {
+  const request = deps.request ?? httpsRequest;
+  const lookup = deps.lookup ?? publicOnlyLookup;
+  return (url, { timeoutMs, maxBytes }) =>
+    new Promise((resolve, reject) => {
+      const req = request(
+        url,
+        { method: "GET", headers: { accept: "application/json" }, lookup, agent: false, timeout: timeoutMs },
+        (res) => collect(res, maxBytes, resolve, reject),
+      );
+      const deadline = setTimeout(() => req.destroy(transient("document fetch timed out")), timeoutMs);
+      req.on("timeout", () => req.destroy(transient("document fetch timed out")));
+      req.on("error", (error) => reject(socketFailure(error)));
+      req.on("close", () => clearTimeout(deadline));
+      req.end();
     });
-    req.on("close", () => clearTimeout(deadline));
-    req.end();
-  });
+}
+
+/**
+ * The address refusal and a name that does not exist are verdicts on the
+ * client_id; every other socket error (reset, refused, TLS, timeout) is the
+ * network's bad minute.
+ */
+function socketFailure(error: unknown): ClientMetadataDocumentError {
+  if (error instanceof ClientMetadataDocumentError) return error;
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === "ENOTFOUND") return new ClientMetadataDocumentError("client_id host does not exist");
+  return transient("document could not be fetched");
+}
+
+/** The default transport: `node:https` through {@link publicOnlyLookup}. */
+export const fetchMetadataDocument: FetchMetadataDocument = createMetadataDocumentTransport();

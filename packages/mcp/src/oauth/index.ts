@@ -79,6 +79,7 @@ export {
   ClientMetadataUnavailableError,
   clientFromMetadataDocument,
   createClientMetadataDocumentResolver,
+  createMetadataDocumentTransport,
   fetchMetadataDocument,
   isClientIdMetadataUrl,
   isNonPublicAddress,
@@ -90,6 +91,7 @@ export {
   type ClientMetadataDocumentResolver,
   type FetchMetadataDocument,
   type MetadataDocumentAnswer,
+  type MetadataDocumentTransportDeps,
 } from "./client-metadata";
 export {
   DEFAULT_PROVIDER_ROOTS,
