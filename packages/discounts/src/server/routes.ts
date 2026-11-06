@@ -110,10 +110,15 @@ export interface DiscountsApiConfig {
    * is a one-day promotion, and every record answered carries `startsOn` /
    * `endsOn`, the days it runs on there. A save whose days equal the ones a
    * read showed writes the stored window unchanged, whatever the zone (review
-   * round 6). A zone the runtime does not know refuses CHANGED dates (422 on
-   * the date field) rather than storing a window on a guessed clock, while an
-   * edit that keeps the stored window (`keepWindow`, or the same days) saves; a read answers its records without their days and
-   * logs a warning, so the list stays usable and shows no guessed days. A null or
+   * round 6). A zone the runtime does not know refuses CHANGED dates — on any
+   * row, and on a create that sends any — with a 422 on the date field rather
+   * than storing a window on a guessed clock, while an edit that keeps the
+   * stored window (`keepWindow`, or the same days) saves, and so does a create
+   * with no dates. A read then logs a warning and answers EVERY row
+   * `datesLocked` (review round 8): a legacy row keeps its UTC days, a row
+   * written in the zone has none to show and is `daysUnknown` (unless it has no
+   * bounds: "sem prazo" needs no clock), so the list stays usable and shows no
+   * guessed days. A write's own answer reads the same way (round 9). A null or
    * blank answer for a tenant fails every route: guard a nullable lookup.
    *
    * Omitted, every write and answer is what it was before: UTC midnights, an

@@ -105,7 +105,8 @@ export function windowModeOf(prepared: {
 /** The days a read of `row` showed, or null where it showed none (`daysUnknown`). */
 function shownDays(row: StoredWindow, zone: ReadZone): { startsOn: string | null; endsOn: string | null } | null {
   if (zone.kind === "off" || row.windowInZone !== true) return legacyWindowDays(row.startsAt, row.endsAt);
-  if (zone.kind === "unknown") return null;
+  // An open window shows no days on any clock (round 9): "sem prazo", as the read answered it.
+  if (zone.kind === "unknown") return row.startsAt === null && row.endsAt === null ? { startsOn: null, endsOn: null } : null;
   return windowCalendarDays(row.startsAt, row.endsAt, zone.timeZone);
 }
 

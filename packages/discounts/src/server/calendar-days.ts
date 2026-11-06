@@ -66,9 +66,16 @@ export async function readZoneFor(
   return { kind: "unknown" };
 }
 
-/** The zone a write just stored in, as a read of its answer sees it. */
+/**
+ * The zone a write just stored in, as a read of its answer sees it — the same
+ * three kinds a read answers (review round 9, B1). A write under an unknown
+ * zone stores only what needs no clock (no dates), and its answer must not then
+ * try to place days on that zone: the throw was a 500 for a row that WAS
+ * stored, and a retry stored a second promotion.
+ */
 export function writtenZone(timeZone: string | undefined): ReadZone {
-  return timeZone === undefined ? OFF : { kind: "zone", timeZone };
+  if (timeZone === undefined) return OFF;
+  return isKnownTimeZone(timeZone) ? { kind: "zone", timeZone } : { kind: "unknown" };
 }
 
 type Windowed = Pick<DiscountRecord, "startsAt" | "endsAt" | "windowInZone">;
@@ -89,13 +96,17 @@ type WithDays = Pick<DiscountRecord, "startsOn" | "endsOn" | "daysUnknown" | "da
  * day can be placed without the zone — a whole-day Término is inclusive, and
  * a legacy UTC midnight would drop it — so the form shows the days it can and
  * edits none. A legacy row still shows its UTC days; a zoned row has none to
- * show, and is `daysUnknown` too.
+ * show, and is `daysUnknown` too — unless it has no bounds at all (round 9):
+ * an open window is open on any clock, so it reads "sem prazo", not unknown.
  */
 export function withCalendarDays<R extends Windowed>(record: R, zone: ReadZone): R & WithDays {
   if (zone.kind === "off") return record;
   const locked = zone.kind === "unknown" ? { datesLocked: true } : {};
   if (record.windowInZone !== true) return { ...record, ...legacyWindowDays(record.startsAt, record.endsAt), ...locked };
-  if (zone.kind === "unknown") return { ...record, daysUnknown: true, datesLocked: true };
+  if (zone.kind === "unknown") {
+    const open = record.startsAt === null && record.endsAt === null;
+    return open ? { ...record, startsOn: null, endsOn: null, ...locked } : { ...record, daysUnknown: true, ...locked };
+  }
   return { ...record, ...windowCalendarDays(record.startsAt, record.endsAt, zone.timeZone) };
 }
 
