@@ -41,3 +41,21 @@ describe('a Calendar inside a form', () => {
     expect(days.every((day) => day.getAttribute('type') === 'button')).toBe(true);
   });
 });
+
+describe('a range Calendar in development', () => {
+  it('prints no console error for its band corners', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <Calendar
+        ariaLabel="Calendar"
+        selectionMode="range"
+        defaultMonth={new Date(2026, 10, 1)}
+        range={{ start: new Date(2026, 10, 10), end: new Date(2026, 10, 20) }}
+      />,
+    );
+
+    const unsafe = errors.mock.calls.filter((call) => String(call[0]).includes('nth-child'));
+    errors.mockRestore();
+    expect(unsafe).toHaveLength(0);
+  });
+});

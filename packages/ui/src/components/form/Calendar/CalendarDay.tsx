@@ -20,6 +20,10 @@ const COLUMN_SIZE = sxRem(304 / 7);
 /** 304/7 wide to 40 tall: the day's face is a 40 design px circle at full size. */
 const CELL_RATIO = '38 / 35';
 
+/** Emotion's documented flag for a positional selector known safe here. */
+const NTH_CHILD_IS_SAFE =
+  ' /* emotion-disable-server-rendering-unsafe-selector-warning-please-do-not-use-this-the-warning-exists-for-a-reason */';
+
 interface DayState extends DayRenderArgs {
   outside: boolean;
   focused: boolean;
@@ -117,8 +121,14 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean): SxProps
   // `nth-child`, counting every cell of the week: a hidden outside day is an
   // inert `span` placeholder (FUT-4144), and `nth-of-type` counted only the
   // buttons, so the caps landed mid-week in a month with hidden outside days.
-  '&:nth-child(7n + 1)': { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
-  '&:nth-child(7n)': { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
+  //
+  // Emotion warns on `:nth-child` in development, because a server render can
+  // put its style tag between the cells and shift the count. The calendar is
+  // never server-rendered into that position, and every screen that showed one
+  // printed the warning as a console error (FUT-4156), so the selectors carry
+  // Emotion's own opt-out flag.
+  [`&:nth-child(7n + 1)${NTH_CHILD_IS_SAFE}`]: { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
+  [`&:nth-child(7n)${NTH_CHILD_IS_SAFE}`]: { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
   '&::before': {
     content: '""',
     position: 'absolute',
