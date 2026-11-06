@@ -129,6 +129,10 @@ const CEP_INPUT_PROPS_NO_MANAGERS = {
   'data-bwignore': 'true',
 } as const;
 
+/** The `<input>`'s own props: the keypad always, the managers' flags only when asked (`offer` is the default). */
+const inputPropsOf = (passwordManagers: 'offer' | 'ignore' | undefined) =>
+  passwordManagers === 'ignore' ? CEP_INPUT_PROPS_NO_MANAGERS : CEP_INPUT_PROPS;
+
 /** `postal-code` unless the caller said otherwise (`off` for somebody else's address). */
 const autoCompleteOf = (autoComplete: string | undefined): string => autoComplete ?? 'postal-code';
 
@@ -196,7 +200,7 @@ export function CepField({
   size, // undefined reaches `Input`, whose own default is `md`
   labelPlacement = 'above',
   autoComplete,
-  passwordManagers = 'offer',
+  passwordManagers,
 }: CepFieldProps): React.ReactElement {
   const testId = dataTestId ?? `cep-field-${name}`;
 
@@ -226,7 +230,7 @@ export function CepField({
         // prop `Input` does not recognise, so it landed on the wrapper `div`
         // and the phone kept opening the letter keyboard for eight digits
         // (FUT-1440's CepField row).
-        inputProps={passwordManagers === 'ignore' ? CEP_INPUT_PROPS_NO_MANAGERS : CEP_INPUT_PROPS}
+        inputProps={inputPropsOf(passwordManagers)}
         autoComplete={autoCompleteOf(autoComplete)}
         size={size}
         // `inside`: the label is the Input's own, drawn in the box and floating
