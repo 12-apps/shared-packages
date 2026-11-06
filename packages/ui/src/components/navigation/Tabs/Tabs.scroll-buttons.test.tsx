@@ -69,11 +69,12 @@ describe('Tabs scroll buttons', () => {
     renderStrip();
     const buttons = scrollButtons();
     expect(buttons).toHaveLength(2);
-    // At the start, ‹ is disabled (collapsed by the styles) and › is live.
-    expect(buttons[0]).toHaveClass('Mui-disabled');
-    expect(buttons[1]).not.toHaveClass('Mui-disabled');
+    const [left, right] = buttons;
+    // At the start, ‹ carries MUI's disabled class and › is live.
+    expect(left).toHaveClass('Mui-disabled');
+    expect(right).not.toHaveClass('Mui-disabled');
     // Shown on phones too, as before: MUI's hide-below-sm class is absent.
-    expect(buttons[1]).not.toHaveClass('MuiTabs-scrollButtonsHideMobile');
+    expect(right).not.toHaveClass('MuiTabs-scrollButtonsHideMobile');
   });
 
   it('renders no scroll buttons at all with scrollButtons={false}', () => {
@@ -98,7 +99,8 @@ describe('Tabs scroll buttons', () => {
     renderStrip({ allowScrollButtonsMobile: false });
     const buttons = scrollButtons();
     expect(buttons).toHaveLength(2);
-    expect(buttons[1]).toHaveClass('MuiTabs-scrollButtonsHideMobile');
+    const [, right] = buttons;
+    expect(right).toHaveClass('MuiTabs-scrollButtonsHideMobile');
   });
 
   it('renders no buttons on a strip that does not scroll, whatever the prop says', () => {
