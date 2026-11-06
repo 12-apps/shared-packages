@@ -260,19 +260,35 @@ every release before it meant. Release N+1 passes `storeTimeZone` (and
 writes say `false` for the UTC windows they store — so no row ever holds a UTC
 window under a `true` flag.
 
-**Then migrate the legacy rows, in N+1.** Their days already read right; the
-migration makes the window the engine prices on match them — Início whole from
-its 00:00 in the zone, Término now inclusive:
+**Then migrate the legacy rows, once N has drained.** Their days already read
+right; the migration makes the window the engine prices on match them — Início
+whole from its 00:00 in the zone, Término now inclusive. Run it after the last
+N instance stopped serving, never at N+1's boot: an N instance still serving
+would keep writing `false` rows behind it (a rerun picks those up too, so a
+loop run early only has to be run again).
 
 ```ts
-import { legacyUtcWindowToZoned } from "@12-apps/discounts/server";
+import { LegacyWindowNotMidnightError, legacyUtcWindowToZoned } from "@12-apps/discounts/server";
 
 const legacy = await db.discount.findMany({
-  where: { clientId, windowInZone: false },
+  // `archivedAt: undefined` NAMES the key, which switches off the host's
+  // soft-delete default (archived rows are filtered out unless the key is
+  // named) — so archived rules are converted too, and read right if restored.
+  where: { clientId, windowInZone: false, archivedAt: undefined },
   select: { id: true, startsAt: true, endsAt: true, windowInZone: true },
 });
 for (const rule of legacy) {
-  const migrated = legacyUtcWindowToZoned(rule, zone);
+  let migrated;
+  try {
+    migrated = legacyUtcWindowToZoned(rule, zone);
+  } catch (error) {
+    // A bound that is not a UTC midnight — a seeded demo row (`Date.now() ± n
+    // days`), a script's write — is not a window the old form stored. Skip it,
+    // say so, and convert the rest; any other error (an unknown zone) aborts.
+    if (!(error instanceof LegacyWindowNotMidnightError)) throw error;
+    logger.warn(`discount ${rule.id} left as legacy: ${error.field} ${error.bound} is not a UTC midnight`);
+    continue;
+  }
   if (migrated === null) continue; // already whole days
   // The same condition in the write: a row another run converted meanwhile is left alone.
   await db.discount.updateMany({ where: { id: rule.id, windowInZone: false }, data: migrated });
@@ -284,8 +300,27 @@ run, and at UTC+0, where a migrated window is still two UTC midnights: only a
 `false` row is converted, and the update that converts it sets the flag. A
 write that never touches the window — a redemption bumping `usage_count` and
 `updated_at` — changes nothing about it, so a rule redeemed after the release
-is still migrated. A `false` row whose bound is not a UTC midnight throws (the
-old form never stored one), and so does an unknown zone.
+is still migrated. A `false` row whose bound is not a UTC midnight throws a
+`LegacyWindowNotMidnightError` (the old form never stored one), which the loop
+skips and logs; it keeps reading on its UTC days, as it always did. An unknown
+zone throws a plain `Error`, which aborts.
+
+**Rolling back from N+1 to N is not edit-safe on its own.** N runs with the
+zone off, and a row N+1 flagged holds a window in the store's zone: N cannot
+place its days, and it reads that row as it reads every row without a zone —
+the stored instants, which still price right (the engine compares instants),
+but shown on their UTC dates, a few hours off the store's. Re-saving such a
+row under N would store UTC midnights with the flag `false`: a legacy window
+again, which the next N+1 reads a day long, and a migration that already ran
+never sees. So **a write with the zone off refuses to un-flag a row**: the
+PATCH of a flagged rule answers 422 on Início with `zonedWindowNeedsZone`
+("Não é possível alterar esta promoção agora…"), and the row keeps its window.
+New rules and legacy (`false`) rules save as N always saved them. That costs
+one `store.get` per PATCH, only while the zone is off. In practice: during a
+rollback the flagged rules are frozen until N+1 is back, by the server; tell
+operators that edits to those rules wait, or accept the freeze. Rules N
+created or re-saved meanwhile are legacy (`false`) rows, read right by N+1:
+rerun the loop once N+1 has drained N again, and they are converted too.
 
 The web surface must be told the same thing: pass `wholeDays: true` to
 `createWebDiscounts` on the host whose server passes `storeTimeZone`. With it the

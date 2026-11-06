@@ -125,8 +125,12 @@ export const discountSchema = z.object({
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
   /**
-   * The days the window runs on, in the store's zone, Término inclusive
-   * (FUT-4482). Present only on a surface that counts whole days.
+   * The days the form shows for the window (FUT-4482), present only on a
+   * surface that counts whole days. Their meaning follows `windowInZone`: on a
+   * `true` row they are the days it runs on in the store's zone, Término
+   * inclusive; on a `false` (legacy) row they are each bound's UTC date, as the
+   * old form showed them — Término the EXCLUSIVE bound, so the rule's last day
+   * is the one before — until the host's migration converts the row.
    */
   startsOn: z.string().nullable().optional(),
   endsOn: z.string().nullable().optional(),

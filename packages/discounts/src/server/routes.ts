@@ -16,6 +16,7 @@ import {
   type DiscountsServerCopy,
 } from "./copy";
 import {
+  assertKeepsZonedFlag,
   assertWholeDayCopy,
   pageWithCalendarDays,
   readZoneFor,
@@ -303,7 +304,10 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
       const { actor, params, body, locale } = request;
       const id = String(params.id);
-      const { write } = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
+      const copy = resolveDiscountsCopy(config.copy, locale);
+      const { write, timeZone } = await prepareWrite(config, copy, actor.clientId, body);
+      const target = { clientId: actor.clientId, id, timeZone };
+      await assertKeepsZonedFlag(config.store, target, copy, resolveDiscountsCopy(config.copy, undefined));
       await config.store.update(actor.clientId, id, write);
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);

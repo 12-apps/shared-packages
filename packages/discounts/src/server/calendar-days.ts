@@ -1,7 +1,8 @@
 import { isKnownTimeZone, legacyWindowDays, windowCalendarDays } from "../timezone";
 import type { DiscountsServerCopy } from "./copy";
 import type { DiscountsLogger } from "./logging";
-import type { DiscountPage, DiscountRecord } from "./store";
+import type { DiscountPage, DiscountRecord, DiscountStore } from "./store";
+import { DiscountValidationError } from "./validate";
 
 /**
  * The store's zone, per tenant, as a host answers it (FUT-4482).
@@ -148,4 +149,37 @@ export function wholeDayCopyFor(
 ): DiscountsServerCopy {
   if (said(copy.endsBeforeStartDay)) return copy;
   return { ...copy, endsBeforeStartDay: fallback.endsBeforeStartDay };
+}
+
+/**
+ * The ROLLBACK guard (FUT-4482, review round 4): with the zone off, a write
+ * may not un-flag a row written in the zone.
+ *
+ * A release with no `storeTimeZone` — the one before whole days, or that same
+ * release again after a rollback — stores UTC midnights and `windowInZone:
+ * false`. Re-stating a FLAGGED row that way would hand it back as a legacy
+ * window the next zoned release reads on other days, and the host's migration,
+ * already run, would never see it again. Reading such a row is harmless (the
+ * engine prices its instants, which are right); writing it is not. So the
+ * write is refused on Início with a sentence, and the row keeps its window.
+ * Only a write with the zone off asks the store: with it on there is nothing
+ * to un-flag.
+ */
+export async function assertKeepsZonedFlag(
+  store: DiscountStore,
+  target: { clientId: string; id: string; timeZone: string | undefined },
+  copy: DiscountsServerCopy,
+  fallback: DiscountsServerCopy,
+): Promise<void> {
+  if (target.timeZone !== undefined) return;
+  const row = await store.get(target.clientId, target.id);
+  if (row?.windowInZone !== true) return;
+  const sentence = [copy.zonedWindowNeedsZone, fallback.zonedWindowNeedsZone].find(said);
+  if (sentence === undefined) {
+    throw new Error(
+      "@12-apps/discounts: a write with no storeTimeZone reached a rule written in the store's zone, " +
+        "and the copy has no zonedWindowNeedsZone to refuse it with — refused all the same.",
+    );
+  }
+  throw new DiscountValidationError("startsAt", sentence);
 }

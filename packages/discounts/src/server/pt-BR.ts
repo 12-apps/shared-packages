@@ -21,6 +21,8 @@ export const PT_BR_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   invalidDate: "Data inválida. Use o formato AAAA-MM-DD.",
   endsBeforeStarts: "A data de término deve ser posterior à data de início.",
   endsBeforeStartDay: "A data de término não pode ser anterior à data de início.",
+  zonedWindowNeedsZone:
+    "Não é possível alterar esta promoção agora: as datas dela foram salvas no fuso horário da loja, que está indisponível. Tente de novo mais tarde.",
   invalidSchedule: "Horários da promoção inválidos. Escolha ao menos um dia e um horário de início e fim diferentes.",
   invalidMinSubtotal: "O pedido mínimo deve ser maior que zero (ou deixe em branco).",
   invalidUsageLimit: "O limite de usos deve ser maior que zero (ou deixe em branco).",

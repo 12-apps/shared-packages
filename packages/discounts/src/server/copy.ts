@@ -42,6 +42,16 @@ export interface DiscountsServerCopy {
    * requires it once the host passes `storeTimeZone`, since only then is it said.
    */
   readonly endsBeforeStartDay?: string;
+  /**
+   * 422 — a write with NO store zone on a rule that was written in one
+   * (FUT-4482): the release serving cannot place its days, so it refuses to
+   * re-state them rather than shift them. Seen only after a rollback to a
+   * release without `storeTimeZone`, or a host that turned the zone off.
+   *
+   * Optional, so a host with its own pack keeps compiling; without it in any
+   * pack the write is still refused, as a 500 that names the key.
+   */
+  readonly zonedWindowNeedsZone?: string;
   /** The weekly schedule is not one the engine can act on (FUT-996). */
   readonly invalidSchedule: string;
   /** 422 — a minimum-basket threshold of zero or less. */
