@@ -53,7 +53,7 @@ const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
  * `Alert.metrics.ts` for why a layer replaced the opacity dip and the
  * brightness multiplier that each preceded it. It does move the surface toward
  * the ink's side, which is the contrast `pointerInkStyles` (`Alert.ink.ts`)
- * wins back by stepping the message column the same way.
+ * wins back by stepping the message's words the same way.
  *
  * The glow is COMPOSED rather than replaced, so hovering a glowing alert keeps
  * its glow; `glowStyles` gave up its `!important` for this.

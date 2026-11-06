@@ -124,8 +124,28 @@ describe('Given which absolute the ink steps toward', () => {
   });
 });
 
+/** Split a selector list at its TOP-LEVEL commas — the press's `:has(…)` carries commas of its own. */
+function selectorParts(list: string): string[] {
+  // A reduce rather than a walk with `let`s: the flakiness lane rejects
+  // reassigning a closed-over binding (see `pointer-states.helpers.tsx`).
+  const { parts, current } = Array.from(list).reduce(
+    (acc, char) => {
+      const depth = acc.depth + (char === '(' ? 1 : char === ')' ? -1 : 0);
+      if (char === ',' && depth === 0) return { parts: [...acc.parts, acc.current], current: '', depth };
+      return { parts: acc.parts, current: acc.current + char, depth };
+    },
+    { parts: [] as string[], current: '', depth: 0 },
+  );
+  return [...parts, current].map((part) => part.trim());
+}
+
+/** The element each stepped selector part lands on: its last compound, e.g. `.MuiAlertTitle-root`. */
+const targetOf = (part: string): string => part.split(/\s+/u).pop() ?? part;
+
 describe('Given the rule the sheet emits', () => {
   const VARIANTS = ['info', 'success', 'warning', 'danger', 'glass', 'gradient'] as const;
+  const titled = (mode: Mode) =>
+    createTheme({ ...muiThemeOptionsFrom(createUiTheme({ mode })), uiAlert: { iconPlacement: 'title' } });
   const emitted = (): string => {
     for (const mode of MODES) {
       for (const variant of VARIANTS) {
@@ -135,6 +155,11 @@ describe('Given the rule the sheet emits', () => {
             <Alert variant={variant}>Só o texto, como filho.</Alert>
           </ThemeProvider>,
         );
+        render(
+          <ThemeProvider theme={titled(mode)}>
+            <Alert variant={variant} title="Atenção" description="mensagem" />
+          </ThemeProvider>,
+        );
       }
     }
     return Array.from(document.querySelectorAll('style'))
@@ -142,23 +167,18 @@ describe('Given the rule the sheet emits', () => {
       .join('\n');
   };
   const percent = (step: number): string => `${Math.round((1 - step) * 100)}%`;
-  const steppedSelectors = (css: string): string[] =>
+  const steppedParts = (css: string): string[] =>
     css
       .split('}')
       .filter((chunk) => chunk.includes('color-mix(in srgb, currentColor'))
-      // One selector per rule: the press's `:has(…)` list is the only comma.
-      .map((chunk) => chunk.slice(0, chunk.indexOf('{')));
+      .flatMap((chunk) => selectorParts(chunk.slice(0, chunk.indexOf('{'))));
+  const steppedTargets = (): string[] => [...new Set(steppedParts(emitted()).map(targetOf))];
 
-  it('steps the message column, and nothing else, while hovered or pressed', () => {
-    const selectors = steppedSelectors(emitted());
-    expect(selectors.length).toBeGreaterThan(0);
-    for (const selector of selectors) {
-      expect(selector).toMatch(/:(hover|active)/);
-      // ONE step on the column the title, description and children inherit —
-      // never on a line inside it (which would step twice), the icon or the
-      // close button.
-      expect(selector.trim()).toMatch(/\) \.MuiAlert-message$|:hover \.MuiAlert-message$/);
-    }
+  it('steps the title, the description and the children, and nothing else, while hovered or pressed', () => {
+    const parts = steppedParts(emitted());
+    expect(parts.length).toBeGreaterThan(0);
+    for (const part of parts) expect(part).toMatch(/:(hover|active)/);
+    expect(steppedTargets().sort()).toEqual(['.MuiAlertTitle-root', '.alert-children', '.alert-description']);
   });
 
   it('steps by the hover and the press amounts, toward the side', () => {
@@ -173,16 +193,32 @@ describe('Given the rule the sheet emits', () => {
 
   it('reaches a children-only message, which has no title and no description to step', () => {
     render(<Alert variant="warning" data-testid="bare">Só o texto, como filho.</Alert>);
-    const message = document.querySelector('[data-testid="bare"] .MuiAlert-message');
-    expect(message?.textContent).toBe('Só o texto, como filho.');
-    // The step's selector ends at the column, so this text inherits it.
-    expect(steppedSelectors(emitted()).every((selector) => selector.trim().endsWith('.MuiAlert-message'))).toBe(true);
+    const words = document.querySelector('[data-testid="bare"] .MuiAlert-message')?.firstElementChild;
+    expect(words?.textContent).toBe('Só o texto, como filho.');
+    expect(steppedTargets().some((target) => words?.closest(target))).toBe(true);
   });
 
-  it('keeps the close button outside the stepped column', () => {
-    render(<Alert variant="info" description="mensagem" closable closeLabel="Fechar" data-testid="closable" />);
+  it('keeps a title-row icon still: it sits in the column, beside the title, under no stepped part', () => {
+    render(
+      <ThemeProvider theme={titled('light')}>
+        <Alert variant="info" title="Esta loja entrega aí" description="A entrega é grátis." data-testid="answer" />
+      </ThemeProvider>,
+    );
+    const icon = document.querySelector('[data-testid="answer-icon"]');
+    const title = document.querySelector('[data-testid="answer-title"]');
+    // The case that matters: the icon IS inside the message column here.
+    expect(icon?.closest('.MuiAlert-message')).not.toBeNull();
+    const targets = steppedTargets();
+    expect(targets.filter((target) => icon?.closest(target))).toEqual([]);
+    expect(targets.some((target) => title?.closest(target))).toBe(true);
+  });
+
+  it('keeps the gutter icon and the close button outside every stepped part', () => {
+    render(<Alert variant="info" title="Atenção" description="mensagem" closable closeLabel="Fechar" data-testid="closable" />);
     const close = document.querySelector('[data-testid="closable-close"]');
+    const icon = document.querySelector('[data-testid="closable-icon"]');
     expect(close?.closest('.MuiAlert-action')).not.toBeNull();
-    expect(close?.closest('.MuiAlert-message')).toBeNull();
+    const targets = steppedTargets();
+    expect(targets.filter((target) => close?.closest(target) || icon?.closest(target))).toEqual([]);
   });
 });

@@ -165,14 +165,20 @@ exported as `ALERT_POINTER_STATES` for a theme that asserts its own tones):
 | press | 0.35 | 0.6 |
 
 The message holds 4.5:1 at rest, hovered and pressed — the title too, since
-16.8px/600 is not WCAG "large" text. The step sits on `.MuiAlert-message`, so
-the three parts inherit ONE step, and it is a `color-mix()` over
-`currentColor`: its amount lands on whatever ink is actually painted, so a
-theme that repaints a semantic or `glass` alert's `color` gets the same step on
-its own ink. It eases on the tint's clock and lands at once on a press, like
-the tint. The icon, the close button (`.MuiAlert-action`), the focus ring and
-any control inside the message that declares its own colour keep their colours
-and states.
+16.8px/600 is not WCAG "large" text. The step sits on the title
+(`.MuiAlertTitle-root`), the description (`.alert-description`) and the
+children (wrapped in `.alert-children` at `display: contents`, so the layout
+does not change), each one step. It is a `color-mix()` over `currentColor`:
+its amount lands on whatever ink is actually painted, so a theme that repaints
+a semantic or `glass` alert's `color` gets the same step on its own ink. It
+eases on the tint's clock and lands at once on a press, like the tint.
+
+The icon does not step, in either placement: in the gutter (`.MuiAlert-icon`)
+and on the title's row (`iconPlacement: 'title'`), where it sits in the
+message column beside the title rather than inside it. The close button
+(`.MuiAlert-action`), the focus ring and any control in `children` that
+declares its own colour keep their colours and states; a `color="inherit"`
+control in `children` steps with the words around it.
 
 `gradient` is not stepped. The step's direction is the mode's, and a host that
 repaints a gradient to a light pane with a dark ink would have had that ink

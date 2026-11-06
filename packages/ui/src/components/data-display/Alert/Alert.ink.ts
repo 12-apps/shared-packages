@@ -15,18 +15,32 @@ import { ACTIVE, ALERT_EASING, POINTER_INK_STEP, seconds } from './Alert.metrics
  * re-opens.
  */
 
+/** The summary's class, so the pointer states can reach it without a test id. */
+export const ALERT_DESCRIPTION_CLASS = 'alert-description';
 /**
- * What steps: the MESSAGE COLUMN, so the title, the description and whatever
- * the caller passed as `children` inherit one step together. Stepping only the
- * title and the description left a children-only alert — about one in six in
- * the first host measured — at its rest ink under the press tint.
- *
- * Never the icon and never the close button: both live outside the column
- * (`.MuiAlert-icon`, `.MuiAlert-action`). A control INSIDE the column keeps its
- * own colour, because it declares one; only a `color="inherit"` one follows the
- * step, on the same tinted surface as the words around it.
+ * The wrapper `AlertContent` puts around `children`, at `display: contents`:
+ * no box of its own, so the column's flex layout is what it was, and a bare
+ * text node still inherits its colour.
  */
-const MESSAGE_INK = '& .MuiAlert-message';
+export const ALERT_CHILDREN_CLASS = 'alert-children';
+
+/**
+ * What steps: the WORDS of the message — the title, the description and
+ * whatever the caller passed as `children` — each one step, none nested in
+ * another. Stepping only the title and the description left a children-only
+ * alert (about one in six in the first host measured) at its rest ink under
+ * the press tint.
+ *
+ * Not the whole message column, because the column is not only words: with
+ * `iconPlacement: 'title'` the icon sits in it, on the title's row, beside
+ * `.MuiAlertTitle-root` rather than inside it. The icon is the variant's
+ * meaning, not an affordance, so it stays still in both placements; the close
+ * button (`.MuiAlert-action`) is outside the column altogether. A control
+ * inside `children` keeps its own colour, because it declares one; only a
+ * `color="inherit"` one follows the step, on the same tinted surface as the
+ * words around it.
+ */
+const MESSAGE_INK = `& .MuiAlertTitle-root, & .${ALERT_DESCRIPTION_CLASS}, & .${ALERT_CHILDREN_CLASS}`;
 
 export type PointerInkState = keyof typeof POINTER_INK_STEP;
 export type InkAbsolute = 'black' | 'white';
@@ -59,8 +73,9 @@ export function inkAbsolute(theme: Theme, variant: string | undefined): InkAbsol
  * toward the absolute by the state's step.
  *
  * `currentColor` in a `color` declaration is the PARENT's colour, which is why
- * this sits on the message column and never on the root: on the root it would
- * read the page's text colour instead of the alert's ink.
+ * this sits on the message's parts and never on the root: on the root it would
+ * read the page's text colour instead of the alert's ink. None of the three
+ * parts is nested in another, so nothing steps twice.
  */
 export function steppedInkCss(absolute: string, step: number): string {
   return `color-mix(in srgb, currentColor ${Math.round((1 - step) * 100)}%, ${absolute})`;
