@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { legacyUtcWindowToZoned } from "../../timezone";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountRoute, type DiscountsApiConfig } from "../routes";
 import type { DiscountRecord, DiscountStore, DiscountWrite } from "../store";
@@ -52,7 +53,11 @@ const BODY = {
   endsAt: "2026-11-20",
 };
 
-function harness(extra: Partial<DiscountsApiConfig> = {}, stored: DiscountRecord = record()) {
+function harness(
+  extra: Partial<DiscountsApiConfig> = {},
+  stored: DiscountRecord = record(),
+  storeOverrides: Partial<DiscountStore> = {},
+) {
   const writes: DiscountWrite[] = [];
   const zonesAsked: string[] = [];
   const store: DiscountStore = {
@@ -73,6 +78,7 @@ function harness(extra: Partial<DiscountsApiConfig> = {}, stored: DiscountRecord
       writes.push(write);
     },
     archive: async () => {},
+    ...storeOverrides,
   };
   const { routes } = createApiDiscounts({
     store,
@@ -116,6 +122,9 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     await call("PATCH", "/discounts/:id", { ...BODY, startsAt: "2026-11-20", endsAt: "2026-11-20" });
     expect(writes[0]?.scalars.startsAt?.toISOString()).toBe("2026-11-20T03:00:00.000Z");
     expect(writes[0]?.scalars.endsAt?.toISOString()).toBe("2026-11-21T03:00:00.000Z");
+    // Review round 4: the flag the PATCH stores is what the next read places
+    // the days by — a re-save that dropped it would read a day early.
+    expect(writes[0]?.scalars.windowInZone).toBe(true);
   });
 
   it("reads one rule back as the same days", async () => {
@@ -156,6 +165,14 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     expect((created.body as { data: Record<string, unknown> }).data).not.toHaveProperty("startsOn");
     const read = await call("GET", "/discounts/:id");
     expect((read.body as { data: Record<string, unknown> }).data).not.toHaveProperty("endsOn");
+  });
+
+  it("without a zone, an update stores the flag false, on UTC midnights (review round 4)", async () => {
+    const legacy = record({ windowInZone: false });
+    const { call, writes } = harness({ storeTimeZone: undefined }, legacy);
+    await call("PATCH", "/discounts/:id", BODY);
+    expect(writes[0]?.scalars.windowInZone).toBe(false);
+    expect(writes[0]?.scalars.startsAt?.toISOString()).toBe("2026-11-10T00:00:00.000Z");
   });
 });
 
@@ -237,6 +254,38 @@ describe("reading by the row's flag through the routes (FUT-4482, review round 3
     const { call } = harness({ logger }, unmapped);
     expect((await call("GET", "/discounts/:id")).body).toMatchObject({ data: { startsOn: "2026-11-10", endsOn: null } });
     expect(logger.at("warn").join("\n")).toMatch(/without windowInZone/u);
+  });
+
+  // Review round 4: the create twin — the record a create answers is mapped by
+  // the same store, so an unmapped column shows there first.
+  it("warns when the store's created record has no windowInZone", async () => {
+    const logger = recordingLogger();
+    const { call } = harness({ logger }, record(), {
+      create: async (_clientId, write) => {
+        const created = record({ startsAt: write.scalars.startsAt, endsAt: write.scalars.endsAt });
+        delete created.windowInZone;
+        return created;
+      },
+    });
+    const response = await call("POST", "/discounts", BODY);
+    expect(response.status).toBe(200);
+    expect(logger.at("warn").join("\n")).toMatch(/without windowInZone/u);
+  });
+
+  // Review round 4: an operator who opens a legacy rule and saves it with the
+  // days the form showed stores exactly what the host's migration would have —
+  // the same whole days, flag true — so a save and the migration never disagree.
+  it("re-saves a legacy row on the days it was read as, equal to the migration's answer", async () => {
+    const legacy = record({
+      startsAt: new Date("2026-11-10T00:00:00.000Z"),
+      endsAt: new Date("2026-11-20T00:00:00.000Z"),
+      windowInZone: false,
+    });
+    const { call, writes } = harness({}, legacy);
+    const read = (await call("GET", "/discounts/:id")).body as { data: { startsOn: string; endsOn: string } };
+    await call("PATCH", "/discounts/:id", { ...BODY, startsAt: read.data.startsOn, endsAt: read.data.endsOn });
+    expect(writes[0]?.scalars).toMatchObject(legacyUtcWindowToZoned(legacy, SP)!);
+    expect(writes[0]?.scalars.windowInZone).toBe(true);
   });
 });
 
