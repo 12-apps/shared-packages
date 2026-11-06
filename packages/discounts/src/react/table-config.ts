@@ -71,6 +71,13 @@ export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<Discount
       // sideways inside its own wrapper on a phone, as it already did.
       minWidth: NAME_COLUMN_MIN_PX,
     },
+    // Second, beside the name it qualifies: last in the row it left the screen
+    // below 1600px and a paused promotion read as live (FUT-4505).
+    {
+      id: "active",
+      header: copy.screen.columns.active,
+      accessor: (row) => (row.active ? copy.screen.yes : copy.screen.no),
+    },
     // Pre-formatted by the page: a cell must not do arithmetic on basis points.
     { id: "value", header: copy.screen.columns.value, accessor: (row) => row.valueLabel },
     {
@@ -109,11 +116,6 @@ export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<Discount
       id: "usageCount",
       header: copy.screen.columns.usageCount,
       accessor: (row) => String(row.usageCount),
-    },
-    {
-      id: "active",
-      header: copy.screen.columns.active,
-      accessor: (row) => (row.active ? copy.screen.yes : copy.screen.no),
     },
   ];
 }

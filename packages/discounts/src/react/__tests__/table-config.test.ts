@@ -133,4 +133,26 @@ describe("the columns", () => {
     const name = discountColumns(copy).find((column) => column.id === "name");
     expect(name?.minWidth).toBe(200);
   });
+
+  it("V13: Ativo comes right after Nome, so a paused promotion reads as paused below 1600px (FUT-4505)", () => {
+    // Last in the row, the column left the screen below 1600px and a paused
+    // promotion looked live. Second, it is on screen beside the name it qualifies.
+    expect(discountColumns(copy).map((column) => column.id)).toEqual([
+      "name",
+      "active",
+      "value",
+      "type",
+      "scope",
+      "trigger",
+      "window",
+      "activeNow",
+      "usageCount",
+    ]);
+  });
+
+  it("V14: the grid starts with every column visible, Ativo second, in the columns' own order", () => {
+    const state = discountsAppliedState(new URLSearchParams(), copy);
+    expect(state.visibleColumns).toEqual(discountColumns(copy).map((column) => column.id));
+    expect(state.visibleColumns?.[1]).toBe("active");
+  });
 });
