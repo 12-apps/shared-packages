@@ -73,6 +73,13 @@ export interface CalendarProps {
    * into a page section whose edges it must meet. Default: false.
    */
   fullWidth?: boolean;
+  /**
+   * The month arrows are disabled (`'arrows'` caption): for a calendar shown
+   * for a period that cannot change right now, whose days are all disabled
+   * too — a live arrow beside a dead grid reads as the one control left.
+   * Default: false.
+   */
+  navigationDisabled?: boolean;
   /** default: 'arrows'. `'selectors'` always shows one month. */
   captionLayout?: CalendarCaptionLayout;
   /**

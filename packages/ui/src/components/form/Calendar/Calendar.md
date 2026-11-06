@@ -51,6 +51,7 @@ export interface CalendarProps {
   showOutsideDays?: boolean; // days from prev/next month
   todayIndicator?: 'bold' | 'ring'; // default 'bold'; 'ring' adds a primary-colour ring
   fullWidth?: boolean; // default false; months fill the width, columns spread, faces stay 40
+  navigationDisabled?: boolean; // default false; the month arrows are disabled (a calendar whose days are all disabled)
   showWeekNumbers?: boolean;
   captionLayout?: 'arrows' | 'selectors'; // default: 'arrows'; 'selectors' shows one month
   defaultMonth?: Date; // month shown while nothing is chosen; default: today's month

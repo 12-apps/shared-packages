@@ -77,9 +77,10 @@ const MonthNavHeader: FC<{
   showPrevious: boolean;
   showNext: boolean;
   labels?: MonthArrowLabels;
+  disabled: boolean;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
-}> = ({ title, showPrevious, showNext, labels, onPreviousMonth, onNextMonth }) => (
+}> = ({ title, showPrevious, showNext, labels, disabled, onPreviousMonth, onNextMonth }) => (
   <Box
     sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
     data-testid="calendar-header"
@@ -87,6 +88,7 @@ const MonthNavHeader: FC<{
     {showPrevious && (
       <IconButton
         onClick={onPreviousMonth}
+        disabled={disabled}
         size="small"
         aria-label={labels?.previousMonth}
         data-testid="calendar-prev-month"
@@ -106,6 +108,7 @@ const MonthNavHeader: FC<{
     {showNext && (
       <IconButton
         onClick={onNextMonth}
+        disabled={disabled}
         size="small"
         aria-label={labels?.nextMonth}
         data-testid="calendar-next-month"
@@ -178,6 +181,8 @@ export interface CalendarMonthProps {
   renderHeader?: CalendarProps['renderHeader'];
   /** The arrows' accessible names. */
   labels?: MonthArrowLabels;
+  /** `CalendarProps.navigationDisabled`. */
+  navigationDisabled?: boolean;
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   dayContext: DayCellContext;
@@ -191,6 +196,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
   weekdayNames,
   renderHeader,
   labels,
+  navigationDisabled = false,
   onPreviousMonth,
   onNextMonth,
   dayContext,
@@ -211,6 +217,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
         showPrevious={monthIndex === 0}
         showNext={monthIndex === monthsToShow - 1}
         labels={labels}
+        disabled={navigationDisabled}
         onPreviousMonth={onPreviousMonth}
         onNextMonth={onNextMonth}
       />

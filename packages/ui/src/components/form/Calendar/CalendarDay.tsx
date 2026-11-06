@@ -109,7 +109,10 @@ const capRadius = (side: 'start' | 'end', fill: boolean) => {
  */
 const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => string) | undefined =>
   ring && day.today && !isEndpoint(day)
-    ? (theme: Theme) => `inset 0 0 0 ${rem(theme, 1.5)} ${theme.palette.primary.main}`
+    ? // A disabled today keeps its ring in the disabled ink, like its number:
+      // a primary ring on a dead grid reads as the one live day (round 6).
+      (theme: Theme) =>
+        `inset 0 0 0 ${rem(theme, 1.5)} ${day.disabled ? theme.palette.text.disabled : theme.palette.primary.main}`
     : undefined;
 
 /**

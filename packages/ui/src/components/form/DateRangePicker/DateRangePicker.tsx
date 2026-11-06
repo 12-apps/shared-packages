@@ -180,7 +180,7 @@ function RangeCalendar({
       todayIndicator={display.todayIndicator}
       allowSameDayRange={display.allowSameDayRange}
       fullWidth={display.fullWidth}
-      {...(display.disabled === true ? { isDateDisabled: EVERY_DAY } : {})}
+      {...(display.disabled === true ? { isDateDisabled: EVERY_DAY, navigationDisabled: true } : {})}
     />
   );
 }
@@ -278,7 +278,7 @@ function InPageLayout({
       className={props.className}
       data-testid={props.dataTestId ?? 'date-range-picker'}
       data-fields-placement={layout.placement}
-      aria-disabled={props.disabled === true ? true : undefined}
+      {...disabledGroup(props, picker)}
       sx={{
         display: 'flex',
         flexDirection: sideBySide ? 'row' : 'column',
@@ -298,6 +298,16 @@ function InPageLayout({
   );
 }
 
+/**
+ * A disabled picker's root is a named GROUP (review round 6): `aria-disabled`
+ * is only valid on an element with a role, and the name says what is off.
+ * Enabled, the root carries neither, as it always did.
+ */
+function disabledGroup(props: DateRangePickerProps, picker: Picker) {
+  if (props.disabled !== true) return {};
+  return { role: 'group', 'aria-label': props.label ?? picker.copy.calendarLabel, 'aria-disabled': true } as const;
+}
+
 /** The default layout: one framed block, the typed half under the months. */
 function PopoverLayout({
   props,
@@ -313,7 +323,7 @@ function PopoverLayout({
     <Paper
       className={props.className}
       data-testid={props.dataTestId ?? 'date-range-picker'}
-      aria-disabled={props.disabled === true ? true : undefined}
+      {...disabledGroup(props, picker)}
       sx={ROOT_SX}
     >
       {body}

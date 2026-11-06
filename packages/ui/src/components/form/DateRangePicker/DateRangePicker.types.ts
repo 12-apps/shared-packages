@@ -211,11 +211,21 @@ export interface DateRangePickerProps {
    * its days (FUT-4482). Every day of the grid is disabled and a tap writes
    * nothing, the quick ranges are not offered, the built-in boxes are
    * disabled, `renderFields` is told (`disabled`) so the consumer's own fields
-   * follow, and the root carries `aria-disabled`. The month arrows still page:
-   * looking is not changing. Say WHY next to the picker; the control cannot.
-   * Default: false.
+   * follow, and the root is a `group` named by `label` that carries
+   * `aria-disabled`. The month arrows are disabled too and today's ring takes
+   * the disabled ink (review round 6). Say WHY next to the picker; the control
+   * cannot — and describe the consumer's own fields with that sentence.
+   *
+   * In a popover, the picker is only what opens: the consumer disables its OWN
+   * trigger (the button or field that opens the popover); this prop cannot
+   * reach it. Default: false.
    */
   disabled?: boolean;
+  /**
+   * The picker's accessible name while it is `disabled` and its root is a
+   * group. Default: `messages.calendarLabel`.
+   */
+  label?: string;
   /**
    * A start with no end is a finished answer — "from this day on" — rather
    * than half a range: the summary says `messages.openEnded` instead of asking

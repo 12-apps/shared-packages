@@ -183,11 +183,11 @@ export const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>((compone
               locale={locale}
               weekdayNames={calendar.weekdayNames}
               renderHeader={renderHeader}
-              // Only a host that passed `labels` gets named arrows: without
-              // them the arrows caption stays exactly as it always was.
+              // Only a host that passed `labels` gets named arrows; without them the caption is as it was.
               labels={props.labels ? labels : undefined}
               onPreviousMonth={calendar.goToPreviousMonth}
               onNextMonth={calendar.goToNextMonth}
+              navigationDisabled={props.navigationDisabled === true}
               dayContext={dayContext}
             />
           ))

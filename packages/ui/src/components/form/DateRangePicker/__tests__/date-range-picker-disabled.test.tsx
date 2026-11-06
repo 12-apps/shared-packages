@@ -70,4 +70,63 @@ describe('a disabled picker', () => {
     expect(renderFields).toHaveBeenCalledWith(expect.objectContaining({ disabled: false }));
     expect(screen.getByTestId('date-range-picker').getAttribute('aria-disabled')).toBeNull();
   });
+
+  // Review round 6 (B3): every other case passes `quickRanges={[]}`, so none
+  // of them could tell a disabled picker that still offered its presets.
+  it('offers no quick ranges when disabled, even the default ones', () => {
+    const { rerender } = render(
+      <DateRangePicker value={{ from: null, to: null }} onChange={() => {}} numberOfMonths={1} now={new Date('2026-11-06T12:00:00Z')} />,
+    );
+    expect(screen.getByTestId('date-range-picker-quick-today')).toBeTruthy();
+    rerender(
+      <DateRangePicker
+        value={{ from: null, to: null }}
+        onChange={() => {}}
+        numberOfMonths={1}
+        now={new Date('2026-11-06T12:00:00Z')}
+        disabled
+      />,
+    );
+    expect(screen.queryAllByTestId('date-range-picker-quick-today')).toHaveLength(0);
+  });
+
+  // Review round 6 (N5): `aria-disabled` is valid only with a role.
+  it.each([['below', undefined], ['beside', 'beside' as const]])(
+    'makes the root a named group, %s the months',
+    (_where, fieldsPlacement) => {
+      render(
+        <DateRangePicker
+          value={{ from: null, to: null }}
+          onChange={() => {}}
+          quickRanges={[]}
+          {...(fieldsPlacement ? { fieldsPlacement } : {})}
+          label="Período"
+          disabled
+        />,
+      );
+      const group = screen.getByRole('group', { name: 'Período' });
+      expect(group.getAttribute('aria-disabled')).toBe('true');
+      expect(group).toBe(screen.getByTestId('date-range-picker'));
+    },
+  );
+
+  it('names the group by the calendar label when no label is given, and is no group enabled', () => {
+    const { rerender } = render(
+      <DateRangePicker value={{ from: null, to: null }} onChange={() => {}} quickRanges={[]} messages={{ calendarLabel: 'Calendário' }} disabled />,
+    );
+    expect(screen.getByRole('group', { name: 'Calendário' })).toBeTruthy();
+    rerender(<DateRangePicker value={{ from: null, to: null }} onChange={() => {}} quickRanges={[]} messages={{ calendarLabel: 'Calendário' }} />);
+    expect(screen.queryAllByRole('group')).toHaveLength(0);
+  });
+
+  // Review round 6: a live arrow beside a dead grid.
+  it('disables the month arrows', () => {
+    const { rerender } = render(
+      <DateRangePicker value={{ from: null, to: null }} onChange={() => {}} quickRanges={[]} numberOfMonths={1} />,
+    );
+    expect((screen.getByTestId('calendar-prev-month') as HTMLButtonElement).disabled).toBe(false);
+    rerender(<DateRangePicker value={{ from: null, to: null }} onChange={() => {}} quickRanges={[]} numberOfMonths={1} disabled />);
+    expect((screen.getByTestId('calendar-prev-month') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId('calendar-next-month') as HTMLButtonElement).disabled).toBe(true);
+  });
 });

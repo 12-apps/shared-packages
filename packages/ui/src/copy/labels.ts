@@ -212,8 +212,12 @@ export interface SocialLoginLabels {
 /** `DateRangePicker`'s calendar popover name. */
 export interface DateRangePickerLabels {
   calendar: string;
-  /** The line under the fields, with `openEnd`, for a start with no end. */
-  openEnded: string;
+  /**
+   * The line under the fields, with `openEnd`, for a start with no end.
+   * Optional (review round 6): a host's own `UiLabels` pack predates it, and
+   * the picker says the English default where it is missing.
+   */
+  openEnded?: string;
 }
 
 /**

@@ -50,6 +50,7 @@ interface DateRangePickerProps {
   renderFields?: (args: { placement: 'beside' | 'below'; disabled: boolean }) => ReactNode;
   openEnd?: boolean;                        // a start with no end is an answer
   disabled?: boolean;                       // shown, not changeable (default false)
+  label?: string;                           // the disabled group's name (default: calendarLabel)
   calendarLabels?: Partial<CalendarLabels>; // names for the month arrows
 }
 ```
@@ -201,8 +202,12 @@ needs four more things, each opt-in so no existing screen changes:
   that cannot place its days, FUT-4482). Every day is disabled and a tap
   writes nothing, the quick ranges are not offered, the built-in boxes are
   disabled, `renderFields` receives `disabled: true` so the consumer's fields
-  follow, and the root carries `aria-disabled`. The month arrows still page.
-  The control cannot say why: say it beside the picker.
+  follow, and the root is a `group` named by `label` (default: the calendar
+  label) carrying `aria-disabled`. The month arrows are disabled and today's
+  ring takes the disabled ink. The control cannot say why: say it beside the
+  picker, and make that sentence your fields' `aria-describedby`. **In a
+  popover the consumer disables its own trigger** — the button or field that
+  opens the popover is the consumer's, and this prop cannot reach it.
 - **`showOutsideDays`, `todayIndicator`, `allowSameDayRange`** — `Calendar`'s
   own options, passed through: hide the neighbouring months' days, ring today
   (`'ring'`), or refuse one day as a whole range (a second tap on the start day
