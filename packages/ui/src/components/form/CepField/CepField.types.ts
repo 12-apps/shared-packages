@@ -97,4 +97,13 @@ export interface CepFieldProps {
    * (FUT-4140).
    */
   autoComplete?: string;
+  /**
+   * Whether password managers may treat the box as theirs. `offer` (default)
+   * leaves them alone, as the field always has. `ignore` marks the `<input>`
+   * with `data-lpignore`, `data-1p-ignore` and `data-bwignore`, so LastPass,
+   * 1Password and Bitwarden keep their icon and fill out of a lone CEP box that
+   * their heuristics read as a login field (FUT-4444). The browser's own
+   * `autocomplete` is untouched: a saved CEP is still offered.
+   */
+  passwordManagers?: 'offer' | 'ignore';
 }

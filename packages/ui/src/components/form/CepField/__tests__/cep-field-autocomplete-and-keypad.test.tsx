@@ -83,3 +83,25 @@ describe('CepField: the numeric keypad', () => {
     expect(input).toHaveAttribute('aria-describedby', 'total-form-field-cep-status');
   });
 });
+
+describe('CepField: password managers (FUT-4444)', () => {
+  const FLAGS = ['data-lpignore', 'data-1p-ignore', 'data-bwignore'] as const;
+
+  it('leaves them alone by default', () => {
+    const input = renderPlain();
+
+    for (const flag of FLAGS) expect(input).not.toHaveAttribute(flag);
+  });
+
+  it('marks the <input>, not the wrapper, when asked to ignore them, keeping the keypad and the browser autofill', () => {
+    render(<CepField copy={PT_BR_CEP_FIELD_COPY} value="" onChange={() => {}} passwordManagers="ignore" />);
+    const input = screen.getByTestId('cep-field-postalCode');
+
+    for (const flag of FLAGS) {
+      expect(input).toHaveAttribute(flag, 'true');
+      expect(rootOf(input)).not.toHaveAttribute(flag);
+    }
+    expect(input).toHaveAttribute('inputmode', 'numeric');
+    expect(input).toHaveAttribute('autocomplete', 'postal-code');
+  });
+});

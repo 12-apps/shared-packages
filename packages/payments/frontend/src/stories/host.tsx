@@ -169,7 +169,12 @@ function plainList(amountCents: number): CheckoutPaymentList {
  * Build a factory for one story: a real mount behind the transport, and a real
  * host in front of it.
  */
-export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
+export function storyFlows(
+  spec: StorySpec = {},
+  host: StoryHost = {},
+  /** Config fields set over the demo host's own, last — the per-render hooks a story exercises. */
+  overrides?: Partial<PaymentFlowsConfig>,
+): {
   flows: PaymentFlows;
   world: StoryWorld;
 } {
@@ -208,6 +213,7 @@ export function storyFlows(spec: StorySpec = {}, host: StoryHost = {}): {
       validateApplePayMerchant: host.validateApplePayMerchant,
       useAvailability: () => host.availability ?? { payable: true },
     },
+    ...overrides,
   });
   return { flows, world };
 }

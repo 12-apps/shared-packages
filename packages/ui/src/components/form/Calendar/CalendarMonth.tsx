@@ -36,8 +36,14 @@ const GRID_SX = {
  * (304 design px: what 7 × 40 cells and 6 × 4 gaps came to before the gaps
  * went, FUT-4162). Months side by side keep a 280 basis,
  * so a multi-month calendar still wraps rather than squeezing every month.
+ * The basis is a theme callback: `sxRem` interpolated into the string wrote a
+ * function's source, and Emotion's whole `flex` was dropped (FUT-4486).
  */
-export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
+export const MONTH_SX = {
+  flex: (theme: Theme) => `1 1 ${rem(theme, 280)}`,
+  minWidth: 0,
+  maxWidth: sxRem(304),
+} as const;
 
 /**
  * A filling month (`fullWidth`) drops the 304 ceiling and takes its share of
