@@ -621,6 +621,31 @@ export const ScrollableTabs: Story = {
   },
 };
 
+/**
+ * A scrollable strip with NO scroll buttons (FUT-4408): the tabs run edge to
+ * edge, the strip scrolls by swipe, wheel and keyboard, and nothing shifts when
+ * it leaves its start. A host that wants arrows overlays its own.
+ */
+export const ScrollableWithoutButtons: Story = {
+  args: {
+    variant: 'pills',
+    scrollable: true,
+    scrollButtons: false,
+  },
+  render: (args) => {
+    const items = Array.from({ length: 14 }, (_, i) => ({
+      id: `category-${i}`,
+      label: `Category ${i + 1}`,
+      content: <Typography sx={{ p: 2 }}>Category {i + 1} content</Typography>,
+    }));
+    return (
+      <Paper elevation={2} sx={{ width: 360, minHeight: 200 }}>
+        <TabsWrapper {...args} initialTab="category-0" items={items} />
+      </Paper>
+    );
+  },
+};
+
 export const StickyScrollable: Story = {
   args: {
     variant: 'underline',

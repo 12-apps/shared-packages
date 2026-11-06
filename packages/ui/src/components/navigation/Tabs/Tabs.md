@@ -78,7 +78,8 @@ The Tabs component provides an intuitive way to organize related content into se
 | Prop             | Type                                    | Default  | Description                    |
 | ---------------- | --------------------------------------- | -------- | ------------------------------ |
 | `scrollable`     | `boolean`                               | `false`  | Enable scrolling for many tabs |
-| `scrollButtons`  | `'auto' \| 'desktop' \| 'on' \| 'off'`  | `'auto'` | Scroll button behavior         |
+| `scrollButtons`  | `boolean \| 'auto' \| 'desktop' \| 'on' \| 'off'` | `'auto'` | The ‹ › buttons of a `scrollable` strip: `'auto'` while it overflows, `true` always, `false` never (swipe/wheel/keyboard still scroll). `'desktop'`, `'on'`, `'off'` are deprecated and behave as `'auto'` |
+| `allowScrollButtonsMobile` | `boolean`                      | `scrollable` | Show the scroll buttons on phone widths too; `false` keeps MUI's hide-below-`sm` rule |
 | `sticky`         | `boolean`                               | `false`  | Pin the tab list while panels scroll beneath it |
 | `stickyOffset`   | `number`                                | `0`      | Top offset (px) when `sticky` — e.g. a fixed header height |
 
@@ -269,6 +270,26 @@ function ScrollableTabsExample() {
   );
 }
 ```
+
+### Scrollable Tabs Without Scroll Buttons
+
+`scrollButtons={false}` keeps the strip scrollable (swipe, wheel, keyboard) but
+renders no ‹ › buttons, so the tabs run edge to edge and nothing shifts when the
+strip leaves its start. A host that wants arrows draws its own, for example
+overlaid on a fade at the side with more tabs.
+
+```tsx
+<Tabs
+  items={items}
+  value={activeTab}
+  onChange={handleChange}
+  scrollable
+  scrollButtons={false}
+/>
+```
+
+Note that `scrollButtons="off"` does **not** do this: the legacy strings
+`'desktop'`, `'on'` and `'off'` all behave as `'auto'`, as they always have.
 
 ### Sticky, Scrollable Tabs
 
