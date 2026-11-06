@@ -5,7 +5,7 @@
  * whole range — and the grid kept where it is, focus included, when the
  * consumer completes a tap into a different draft than the one it was handed.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React, { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 
@@ -121,19 +121,31 @@ describe('a tap the consumer completes differently', () => {
       ? { from: tapped.from, to: before.to }
       : tapped;
 
-  it('keeps the grid on its month and focus on the tapped day', () => {
+  it('keeps the grid on the month it was moved to', () => {
     render(<Harness initial={{ from: null, to: '2027-03-20' }} keep={keepEnd} />);
     fireEvent.click(screen.getByTestId('calendar-prev-month'));
     expect(monthTitle()).toMatch(/fevereiro de 2027/u);
 
     const tapped = day(10);
-    tapped.focus();
     fireEvent.click(tapped);
 
     expect(valueText()).toBe('2027-02-10|2027-03-20');
     expect(monthTitle()).toMatch(/fevereiro de 2027/u);
     expect(tapped.isConnected).toBe(true);
-    expect(document.activeElement).toBe(tapped);
+  });
+
+  it('keeps keyboard focus on the day Enter picked', async () => {
+    render(<Harness initial={{ from: null, to: '2027-02-20' }} keep={keepEnd} />);
+    // The reader arrows from Término's day to the 19th: focus follows onto it.
+    fireEvent.keyDown(day(20), { key: 'ArrowLeft' });
+    await waitFor(() => expect(day(19)).toHaveFocus());
+    const picked = day(19);
+
+    fireEvent.keyDown(picked, { key: 'Enter' });
+
+    expect(valueText()).toBe('2027-02-19|2027-02-20');
+    await waitFor(() => expect(picked).toHaveFocus());
+    expect(picked.isConnected).toBe(true);
   });
 });
 
