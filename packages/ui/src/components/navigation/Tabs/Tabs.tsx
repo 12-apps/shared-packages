@@ -133,13 +133,28 @@ const definedProps = (props: TabsProps): Partial<TabsProps> =>
     Object.entries(props).filter(([, value]) => value !== undefined),
   ) as Partial<TabsProps>;
 
-// Once the row is scrollable every accepted scrollButtons value ends up as
-// MUI's 'auto'. That is exactly what the previous nested ternary did — it mapped
-// 'on'/'off'/'desktop' to 'auto', and its remaining branch could only ever be
-// 'auto' anyway — so the behaviour is preserved here rather than quietly
-// changed. Worth knowing that scrollButtons="off" therefore still shows buttons.
-const resolveScrollButtons = (scrollable?: boolean): 'auto' | false =>
-  scrollable ? 'auto' : false;
+/**
+ * The `scrollButtons` value handed to MUI (FUT-4408).
+ *
+ * A strip that does not scroll has no buttons. A scrollable one honours the
+ * host: `false` drops the buttons entirely (the host may draw its own, or let
+ * the strip be swiped), `true` keeps them on whether or not the row overflows,
+ * and `'auto'` — the default — shows them while it does.
+ *
+ * The legacy strings `'desktop'`, `'on'` and `'off'` keep resolving to
+ * `'auto'`, exactly as they always have: hosts already pass them (one passes
+ * `'off'` on a scrollable strip and gets buttons today), so giving them a new
+ * meaning in a patch release would move existing screens. They are deprecated
+ * in `TabsProps`; a host that wants none passes `false`.
+ */
+const resolveScrollButtons = (
+  scrollable: boolean | undefined,
+  scrollButtons: TabsProps['scrollButtons'],
+): 'auto' | boolean => {
+  if (!scrollable) return false;
+  if (typeof scrollButtons === 'boolean') return scrollButtons;
+  return 'auto';
+};
 
 const buildTabsSx = ({
   fullWidth,
@@ -233,8 +248,9 @@ const TabsBar: React.FC<
     // `scrollable` flag onto it so overflowing tab rows actually scroll.
     variant={p.scrollable ? 'scrollable' : 'standard'}
     data-testid={dataTestId ? `${dataTestId}-list` : 'tabs-list'}
-    scrollButtons={resolveScrollButtons(p.scrollable)}
-    allowScrollButtonsMobile={p.scrollable}
+    scrollButtons={resolveScrollButtons(p.scrollable, p.scrollButtons)}
+    // Phones get the buttons too unless the host says otherwise.
+    allowScrollButtonsMobile={p.allowScrollButtonsMobile ?? p.scrollable}
     textColor={p.color}
     indicatorColor={p.color}
     sx={buildTabsSx({

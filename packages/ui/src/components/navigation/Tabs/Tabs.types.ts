@@ -122,9 +122,25 @@ export interface TabsProps extends Omit<MuiTabsProps, 'variant' | 'children' | '
   scrollable?: boolean;
   
   /**
-   * Scroll button behavior
+   * The ‹ › scroll buttons of a `scrollable` strip (ignored when the strip does
+   * not scroll, which never has any):
+   *
+   * - `'auto'` (default): shown while the row overflows; the disabled one at
+   *   either end collapses to no width.
+   * - `true`: always shown, even when every tab fits.
+   * - `false`: never rendered. The strip still scrolls by swipe, wheel and
+   *   keyboard; a host that wants arrows draws its own (e.g. overlaid).
+   * - `'desktop'`, `'on'`, `'off'`: **deprecated**, each behaves exactly as
+   *   `'auto'` (as they always have). Use `false` for none, `true` for always.
    */
-  scrollButtons?: 'auto' | 'desktop' | 'on' | 'off';
+  scrollButtons?: boolean | 'auto' | 'desktop' | 'on' | 'off';
+
+  /**
+   * Whether the scroll buttons are shown on narrow (phone) viewports too.
+   * Defaults to the value of `scrollable`, so a scrollable strip shows them on
+   * phones; pass `false` to keep MUI's own rule of hiding them below `sm`.
+   */
+  allowScrollButtonsMobile?: boolean;
 
   /**
    * Pin the tab list in place (CSS `position: sticky`) while the tab panels
