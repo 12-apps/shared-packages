@@ -211,6 +211,14 @@ export interface PaymentFlowsConfig {
    * words whenever they change (a `transport.copy` of the host's still wins).
    * `copy` stays required: it is what `flows.client` — built once, with the
    * flow — speaks.
+   *
+   * **The `views.screens.screens.transport` words this returns must keep their
+   * identity across renders** — return a pack held at module scope (a locale's
+   * own object) or memoise it. "Changed" is read by identity, so a transport
+   * copy rebuilt on every render (a spread, a fresh literal) rebuilds the
+   * client every render, every effect keyed on the client re-runs, and the
+   * screens' reads (`/config`, the saved cards) fetch in a loop. The rest of
+   * the object may be fresh each render.
    */
   useCopy?(): CheckoutCopyFE;
   /**

@@ -12,6 +12,7 @@ import { CheckoutFlow, type CheckoutFlowProps } from "../../components/checkout/
 import { orderFor, onPageStore } from "../../components/checkout/__tests__/list-harness";
 import { EN_US_CHECKOUT_VIEW_COPY } from "../../components/checkout/en-US";
 import { HOSTED_ORDER_STORAGE_KEY, rememberHostedOrder } from "../../components/checkout/hosted-return";
+import { createCheckoutClient } from "../../components/checkout/transport";
 import { CHARGE_WINDOW_MS } from "../../components/checkout/list/use-list-charge";
 import { EN_US_PAYMENT_LIST_COPY } from "../../components/checkout/list/en-US";
 import { PT_BR_PAYMENT_LIST_COPY } from "../../components/checkout/list/pt-BR";
@@ -19,7 +20,8 @@ import { STORY_CHECKOUT_COPY } from "../../stories/demo-copy";
 import { createStoryStore } from "../../stories/store";
 import { CHECKOUT_PROP_ROUTES, createCheckoutPropsBinding } from "../checkout-props-binding";
 import { createPaymentFlows } from "../create-payment-flows";
-import { useFlowPorts, type FlowsRuntime } from "../runtime";
+import { useFlowClient, useFlowPorts, type FlowsRuntime } from "../runtime";
+import type { CheckoutCopyFE } from "../copy";
 import type { CheckoutPorts } from "../types";
 
 afterEach(cleanup);
@@ -231,5 +233,51 @@ describe("useFlowPorts' optional wrappers", () => {
     current.ports = { ...base };
     rerender();
     await expect(validate?.("https://apple.example/validate")).rejects.toThrow(/no merchant validation port/);
+  });
+});
+
+describe("useFlowClient: the client follows the transport words' IDENTITY (FUT-1241, review round 2)", () => {
+  /** A runtime built with the story pack, whose host answers `useCopy` with whatever `current` holds. */
+  function copyRuntime(current: { copy: CheckoutCopyFE }): FlowsRuntime {
+    const client = createCheckoutClient({ copy: STORY_CHECKOUT_COPY.views.screens.screens.transport });
+    return {
+      config: { copy: STORY_CHECKOUT_COPY, useCopy: () => current.copy },
+      client,
+      copy: STORY_CHECKOUT_COPY,
+    } as unknown as FlowsRuntime;
+  }
+  /** The buyer's en-US words, held once — as a locale's pack is. */
+  const ENGLISH: CheckoutCopyFE = { ...STORY_CHECKOUT_COPY, views: EN_US_CHECKOUT_VIEW_COPY };
+
+  it("keeps ONE client across renders for a copy whose transport words keep their identity", () => {
+    const runtime = copyRuntime({ copy: ENGLISH });
+    const { result, rerender } = renderHook(() => useFlowClient(runtime));
+    const first = result.current;
+    rerender();
+    rerender();
+    expect(result.current).toBe(first);
+    // …and it is the buyer's client, not the one built with the flow.
+    expect(first).not.toBe(runtime.client);
+  });
+
+  it("keeps it too when the rest of the copy is a fresh object each render", () => {
+    const current = { copy: { ...ENGLISH } };
+    const runtime = copyRuntime(current);
+    const { result, rerender } = renderHook(() => useFlowClient(runtime));
+    const first = result.current;
+    current.copy = { ...ENGLISH, views: { ...ENGLISH.views, screens: ENGLISH.views.screens } };
+    rerender();
+    expect(result.current).toBe(first);
+  });
+
+  it("rebuilds it when the transport words are a new object — why `useCopy` must not rebuild them", () => {
+    const current = { copy: ENGLISH };
+    const runtime = copyRuntime(current);
+    const { result, rerender } = renderHook(() => useFlowClient(runtime));
+    const first = result.current;
+    const screens = ENGLISH.views.screens;
+    current.copy = { ...ENGLISH, views: { ...ENGLISH.views, screens: { ...screens, screens: { ...screens.screens, transport: { ...screens.screens.transport } } } } };
+    rerender();
+    expect(result.current).not.toBe(first);
   });
 });
