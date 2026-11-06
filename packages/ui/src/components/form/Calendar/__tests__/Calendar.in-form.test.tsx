@@ -19,6 +19,7 @@ describe('a Calendar inside a form', () => {
     render(
       <form onSubmit={submit}>
         <Calendar
+          ariaLabel="Calendar"
           selectionMode="single"
           defaultMonth={new Date(2026, 10, 1)}
           onChange={pick}
@@ -33,7 +34,7 @@ describe('a Calendar inside a form', () => {
   });
 
   it('marks every day as a plain button', () => {
-    render(<Calendar selectionMode="range" defaultMonth={new Date(2026, 10, 1)} />);
+    render(<Calendar ariaLabel="Calendar" selectionMode="range" defaultMonth={new Date(2026, 10, 1)} />);
 
     const days = screen.getAllByRole('gridcell');
     expect(days.length).toBeGreaterThan(27);
