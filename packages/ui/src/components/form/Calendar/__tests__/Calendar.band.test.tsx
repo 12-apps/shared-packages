@@ -51,6 +51,16 @@ describe("the range band (FUT-4162)", () => {
     expect(bandFor({ args: day(17, { inRange: true }), selectionMode: "single", range, hoveredDate: null, isDisabled: never })).toBe("none");
   });
 
+  it("paints no half-band for a REVERSED pair, which is not a range (FUT-4156)", () => {
+    // A form can hand over Término before Início while it is being fixed; the
+    // inside is not filled, so the ends must not reach towards each other.
+    const reversed = { start: on(22), end: on(13) };
+    const band = (args: DayRenderArgs) =>
+      bandFor({ args, selectionMode: "range", range: reversed, hoveredDate: null, isDisabled: never });
+    expect(band(day(22, { rangeStart: true, selected: true }))).toBe("none");
+    expect(band(day(13, { rangeEnd: true, selected: true }))).toBe("none");
+  });
+
   it("lays the days out with no column gap", () => {
     render(<Calendar ariaLabel="Datas" selectionMode="range" range={range} defaultMonth={on(1)} locale="pt-BR" />);
     for (const grid of screen.getAllByTestId("calendar-grid")) {
