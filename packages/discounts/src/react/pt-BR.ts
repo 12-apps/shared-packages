@@ -86,6 +86,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
       "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
     datesLockedBoxes: "Datas bloqueadas: veja o aviso acima.",
     datesLockedList: "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    datesLockedCreate: "Sem datas: a promoção vale a partir de agora, sem término.",
     openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
     from: "A partir de {date}",

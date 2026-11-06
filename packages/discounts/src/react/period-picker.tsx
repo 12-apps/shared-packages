@@ -47,6 +47,12 @@ function afterTap(draft: DateRangeDraft, next: DateRangeDraft): DateRangeDraft {
   return keepsEnd ? { from: next.from, to: draft.to } : next;
 }
 
+/** The line under the disabled boxes: why they are, or (a create) what saving does. */
+function boxesLine(datesLock: DatesLock, copy: CompleteDiscountsWebCopy): string {
+  if (datesLock === "shown") return copy.window.datesLockedBoxes;
+  return datesLock === "create" ? copy.window.datesLockedCreate : copy.window.daysUnknownBoxes;
+}
+
 /** The id of the line under the disabled boxes, which describes both. */
 const UNAVAILABLE_LINE_ID = "discount-period-unavailable";
 
@@ -97,7 +103,7 @@ function PeriodBoxes({
           data-testid="discount-period-unavailable"
           sx={{ margin: 0, typography: "caption", color: "text.secondary", overflowWrap: "anywhere" }}
         >
-          {datesLock === "shown" ? copy.window.datesLockedBoxes : copy.window.daysUnknownBoxes}
+          {boxesLine(datesLock, copy)}
         </Box>
       ) : null}
     </Box>
@@ -115,7 +121,9 @@ export function PeriodPicker({
    * The rule's days cannot change (FUT-4482, review rounds 5 and 8): none
    * placed, or shown under an unknown zone. The calendar and both boxes are
    * shown disabled — holding the days when there are some — and change
-   * nothing; the form saves the rest over the stored window.
+   * nothing; the form saves the rest over the stored window. A create under
+   * an unknown zone (`create`, CP8) is drawn the same, empty, and saves
+   * open-ended.
    */
   datesLock?: DatesLock;
 }): JSX.Element {

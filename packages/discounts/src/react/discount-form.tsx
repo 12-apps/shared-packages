@@ -33,7 +33,7 @@ import { DiscountTargetPicker } from "./discount-target-picker";
 import { KindField } from "./kind-field";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
-import { datesLockOf, initialValues, type DatesLock, type DiscountFormValues } from "./discount-form-values";
+import { formDatesLock, initialValues, type DatesLock, type DiscountFormValues } from "./discount-form-values";
 import { DISCOUNT_KINDS, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 
@@ -129,6 +129,13 @@ export interface DiscountFormProps {
   wholeDays?: boolean;
   /** The host's link to its time-zone setting, for the "days unknown" notice. */
   timeZoneSettings?: DiscountsTimeZoneSettings;
+  /**
+   * The server said the store's zone is unknown now (the list's `datesLocked`,
+   * FUT-4482, CP8). Read on a create only — an edit reads its own row: the
+   * period is shown locked and empty, and the create saves no dates, since a
+   * dated one would be refused. Default false.
+   */
+  zoneUnknown?: boolean;
 }
 
 /**
@@ -148,6 +155,23 @@ function keepsUnchangedDays(props: DiscountFormProps, values: DiscountFormValues
 }
 
 /**
+ * What a save does with the period. Days the form cannot change (FUT-4482):
+ * none shown (`daysUnknown`, and empty boxes sent would read as "sem prazo"),
+ * or shown and locked while the store's zone is unknown (round 8). They are
+ * not sent; everything else is saved over the stored window (`keepWindow`),
+ * never refused. A create under that zone (CP8) has no stored window: it
+ * sends no dates and saves open-ended.
+ */
+function windowIntent(
+  props: DiscountFormProps,
+  values: DiscountFormValues,
+): { locked: boolean; keepWindow: boolean; noDates: Partial<DiscountFormValues> } {
+  const lock = formDatesLock(props.editing, props.zoneUnknown === true);
+  if (lock === "create") return { locked: true, keepWindow: false, noDates: { startsAt: "", endsAt: "" } };
+  return { locked: lock !== null, keepWindow: lock !== null || keepsUnchangedDays(props, values), noDates: {} };
+}
+
+/**
  * Build the submit handler.
  *
  * A factory rather than a closure inside the component, so the component stays
@@ -162,12 +186,7 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
-    // Days the form cannot change (FUT-4482): none shown (`daysUnknown`, and
-    // empty boxes sent would read as "sem prazo"), or shown and locked while
-    // the store's zone is unknown (round 8). They are not sent; everything
-    // else is saved over the stored window (`keepWindow`), never refused.
-    const locked = datesLockOf(editing) !== null;
-    const keepWindow = locked || keepsUnchangedDays(props, values);
+    const { locked, keepWindow, noDates } = windowIntent(props, values);
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -187,6 +206,7 @@ function makeSubmit(
     }
     const payload: DiscountFormPayload = {
       ...values,
+      ...noDates,
       // The switch decides whether the rows are sent at all — see the state
       // hook for why the two are separate.
       schedule: extra.scheduleEnabled ? extra.schedule : null,
@@ -227,7 +247,7 @@ function windowFlags(props: DiscountFormProps): {
 } {
   return {
     wholeDays: props.wholeDays ?? false,
-    datesLock: datesLockOf(props.editing),
+    datesLock: formDatesLock(props.editing, props.zoneUnknown === true),
     timezoneLabel: props.timezoneLabel ?? null,
     timeZoneSettings: props.timeZoneSettings,
   };

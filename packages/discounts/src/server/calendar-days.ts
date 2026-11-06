@@ -110,10 +110,16 @@ export function withCalendarDays<R extends Windowed>(record: R, zone: ReadZone):
   return { ...record, ...windowCalendarDays(record.startsAt, record.endsAt, zone.timeZone) };
 }
 
-/** Every row of a page, the same way. */
-export function pageWithCalendarDays(page: DiscountPage, zone: ReadZone): DiscountPage {
+/**
+ * Every row of a page, the same way. Under an unknown zone the PAGE says so
+ * too (`datesLocked`, CP8): a create has no row to read the lock off, and the
+ * list may be empty — a store's first promotion — so the create form learns
+ * from the envelope that a dated create would be refused, and offers none.
+ */
+export function pageWithCalendarDays(page: DiscountPage, zone: ReadZone): DiscountPage & { datesLocked?: true } {
   if (zone.kind === "off") return page;
-  return { ...page, data: page.data.map((row) => withCalendarDays(row, zone)) };
+  const data = page.data.map((row) => withCalendarDays(row, zone));
+  return zone.kind === "unknown" ? { ...page, data, datesLocked: true } : { ...page, data };
 }
 
 /**

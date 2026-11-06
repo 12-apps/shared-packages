@@ -36,16 +36,26 @@ export interface DiscountFormValues extends Record<string, string> {
 }
 
 /**
- * Why the form cannot change an edited rule's days (FUT-4482): `unknown` when
- * the server could not place them and sent none (`daysUnknown`), `shown` when
- * it sent them but the store's zone is unknown (`datesLocked`, review round 8),
- * null when they can change.
+ * Why the form cannot change a rule's days (FUT-4482): `unknown` when the
+ * server could not place an edited rule's and sent none (`daysUnknown`),
+ * `shown` when it sent them but the store's zone is unknown (`datesLocked`,
+ * review round 8), `create` for a new rule while that zone is unknown (CP8:
+ * none can be placed, so it saves open-ended), null when they can change.
  */
-export type DatesLock = "unknown" | "shown" | null;
+export type DatesLock = "unknown" | "shown" | "create" | null;
 
 export function datesLockOf(editing: Pick<DiscountWireRecord, "daysUnknown" | "datesLocked"> | null | undefined): DatesLock {
   if (editing?.daysUnknown === true) return "unknown";
   return editing?.datesLocked === true ? "shown" : null;
+}
+
+/**
+ * The form's lock: an edit's from its row, a create's from the server's word
+ * that the store's zone is unknown now (`zoneUnknown`, the list's `datesLocked`).
+ */
+export function formDatesLock(editing: DiscountWireRecord | null, zoneUnknown: boolean): DatesLock {
+  if (editing !== null) return datesLockOf(editing);
+  return zoneUnknown ? "create" : null;
 }
 
 /** `YYYY-MM-DD` for a native date input, from the wire's ISO instant. */

@@ -168,3 +168,17 @@ describe("a one-day legacy edit under a KNOWN zone", () => {
     expect(scalars.endsAt?.toISOString()).toBe("2026-11-16T03:00:00.000Z");
   });
 });
+
+describe("the list envelope says the zone is unknown (CP8)", () => {
+  // The create form has no row of its own to read the lock off, and the list
+  // may be empty (a store's first promotion), so the page itself says it.
+  it("carries datesLocked under an unknown zone", async () => {
+    const page = (await surface(LEGACY, { storeTimeZone: () => UNKNOWN }).list()).body as Record<string, unknown>;
+    expect(page.datesLocked).toBe(true);
+  });
+
+  it("carries nothing under a known zone, or without whole days", async () => {
+    expect((await surface(LEGACY, { storeTimeZone: () => SP }).list()).body).not.toHaveProperty("datesLocked");
+    expect((await surface(LEGACY).list()).body).not.toHaveProperty("datesLocked");
+  });
+});

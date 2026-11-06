@@ -18,6 +18,7 @@ export const OPTIONAL_WEB_COPY_PATHS: ReadonlySet<string> = new Set([
   "window.datesLockedForm",
   "window.datesLockedBoxes",
   "window.datesLockedList",
+  "window.datesLockedCreate",
   "window.openTimeZone",
   "form.calendar.locale",
   "form.calendar.label",

@@ -95,6 +95,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
       "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
     datesLockedBoxes: "Dates locked: see the notice above.",
     datesLockedList: "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
+    datesLockedCreate: "No dates: the promotion runs from now on, with no end.",
     openTimeZone: "View the store's time zone",
     always: "No end date",
     from: "From {date}",

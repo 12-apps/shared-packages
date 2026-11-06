@@ -23,7 +23,7 @@ import { Dashboard } from "@12-apps/ui/layout/Dashboard";
 import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
-import type { DiscountsApiClient } from "./api";
+import type { DiscountsApiClient, DiscountsPage } from "./api";
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
@@ -219,17 +219,30 @@ function DiscountsGrid({
   );
 }
 
+/**
+ * Whether the server said the store's zone is unknown now (FUT-4482, CP8): on
+ * the page itself, which an empty list still carries, or on any row — the
+ * same word, from a host proxy that kept the rows and dropped the envelope's
+ * extra key.
+ */
+function zoneUnknownOf(page: DiscountsPage | null): boolean {
+  if (page === null) return false;
+  return page.datesLocked === true || page.data.some((row) => row.datesLocked === true);
+}
+
 /** The create dialog; each opening mounts a fresh form, so it re-seeds empty. */
 function CreateDialog({
   open,
   onClose,
   onSaved,
   menu,
+  zoneUnknown,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   menu: MenuBinding;
+  zoneUnknown: boolean;
 }): JSX.Element {
   return (
     <DiscountDialog
@@ -242,6 +255,7 @@ function CreateDialog({
         {...menu}
         groups={menu.groups ?? []}
         editing={null}
+        zoneUnknown={zoneUnknown}
         onSaved={onSaved}
       />
     </DiscountDialog>
@@ -257,6 +271,7 @@ function CreateDialog({
 function ScreenBody({
   createOpen,
   setCreateOpen,
+  zoneUnknown,
   menu,
   refresh,
   rows,
@@ -268,6 +283,7 @@ function ScreenBody({
 }: {
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
+  zoneUnknown: boolean;
   menu: MenuBinding;
   refresh: () => void;
   rows: DiscountListItem[];
@@ -282,6 +298,7 @@ function ScreenBody({
       <CreateDialog
         open={createOpen}
         menu={menu}
+        zoneUnknown={zoneUnknown}
         onClose={() => setCreateOpen(false)}
         onSaved={() => {
           setCreateOpen(false);
@@ -359,6 +376,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
         <ScreenBody
           createOpen={createOpen}
           setCreateOpen={setCreateOpen}
+          zoneUnknown={zoneUnknownOf(data.page)}
           menu={menu}
           refresh={data.refresh}
           rows={rows}

@@ -81,6 +81,13 @@ export interface DiscountsPagination {
 export interface DiscountsPage {
   data: DiscountWireRecord[];
   pagination: DiscountsPagination;
+  /**
+   * The server counts whole days and the store's zone is unknown to it now
+   * (FUT-4482, CP8): said on the page as well as on every row, so a create —
+   * which has no row, on a list that may be empty — saves no dates. Absent
+   * otherwise.
+   */
+  datesLocked?: boolean;
 }
 
 /** One selectable target, as `GET /discounts/targets` answers it. */

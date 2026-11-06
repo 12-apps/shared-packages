@@ -14,6 +14,7 @@ export type DiscountsWindowFallbackKey =
   | "datesLockedForm"
   | "datesLockedBoxes"
   | "datesLockedList"
+  | "datesLockedCreate"
   | "openTimeZone";
 
 /**

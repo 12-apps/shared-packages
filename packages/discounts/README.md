@@ -271,10 +271,14 @@ and on a create, with a 422 on the date field and `copy.datesNeedKnownZone`
 (required once the zone is passed): a day cannot be placed without the zone —
 a whole-day Término is inclusive, and a legacy UTC midnight would drop it. Only
 the day the server cannot place is refused, never the edit. On an edit the
-screen never offers one: the dates are locked. A create cannot be locked — no
-row was read, so the form does not know the zone is unknown — so a create that
-sends dates under an unknown zone gets that date-field 422, and a create with
-no dates ("sem prazo") is stored once and answered 200 with `datesLocked`.
+screen never offers one: the dates are locked. A create has no row to read the
+lock off, so the list's PAGE says it too (`datesLocked: true` on the envelope,
+an empty list included): the Novo desconto form then shows the same amber
+notice, the calendar and both boxes locked and empty, and a line under them
+saying the promotion runs from now with no end (`window.datesLockedCreate`);
+Salvar sends no dates, and the create is stored once, open-ended, answered 200
+with `datesLocked`. A create that sends dates anyway still gets that
+date-field 422.
 
 **A form opened before the zone turned unknown** saves too (review round 9,
 N4). With `wholeDays`, an edit whose Início and Término are the ones it opened
