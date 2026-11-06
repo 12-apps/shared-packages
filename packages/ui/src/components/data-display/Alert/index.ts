@@ -6,3 +6,4 @@ export type {
   AlertVariant,
   UiAlertTheme,
 } from './Alert.types';
+export { POINTER_STATES as ALERT_POINTER_STATES } from './Alert.metrics';

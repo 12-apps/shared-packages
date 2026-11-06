@@ -10,6 +10,7 @@ import React from 'react';
 import { absoluteInk, modeInk } from '../../../tokens/ink';
 
 import { AlertContent } from './Alert.content';
+import { pointerInkStyles } from './Alert.ink';
 import { resolveAlertProps, resolveAnnouncement, testIdFor } from './Alert.helpers';
 import { resolveIconPlacement, type AlertIconPlacement } from './Alert.placement';
 import type { AlertPalette } from './Alert.metrics';
@@ -48,9 +49,11 @@ const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
  *
  * The tint is an inset spread at 100vmax, which always exceeds the element, so
  * it covers the surface edge to edge. It paints ABOVE the background and BELOW
- * the content, which is what keeps the ink's own contrast out of these states
- * entirely — see `ACTIVE` in `Alert.metrics.ts` for why a layer replaced the
- * opacity dip and the brightness multiplier that each preceded it.
+ * the content, so it never dims the ink itself — see `ACTIVE` in
+ * `Alert.metrics.ts` for why a layer replaced the opacity dip and the
+ * brightness multiplier that each preceded it. It does move the surface toward
+ * the ink's side, which is the contrast `pointerInkStyles` (`Alert.ink.ts`)
+ * wins back by stepping the message's words the same way.
  *
  * The glow is COMPOSED rather than replaced, so hovering a glowing alert keeps
  * its glow; `glowStyles` gave up its `!important` for this.
@@ -61,15 +64,19 @@ function pointerShadow(
   glow: boolean,
   variant: string | undefined,
 ): (alpha_: number) => string {
-  // The tint moves the surface AWAY from its own ink, which is why this reads
-  // the variant and not only the mode.
+  // The tint's colour reads the variant and not only the mode. On every
+  // surface that tracks the mode it moves the surface TOWARD its ink's side —
+  // the contrast cost `pointerInkStyles` pays back.
   //
   // `gradient` is the one variant where the two disagree: it paints a
   // mid-lightness sweep (L* 42–61) under WHITE ink in BOTH modes, so the
   // mode-keyed answer tinted it white in dark mode — toward the text. Measured:
   // white-on-gradient fell to 2.90:1 on hover and 2.41:1 pressed, under the 3:1
   // floor and below its own idle. Every other variant's surface tracks the mode,
-  // so for them the two rules agree.
+  // so for them the two rules agree. (Not quite WHITE in both modes: dark
+  // mode's light hues get a dark `getContrastText` ink, which this black layer
+  // closes on. That ink is not stepped (`inkAbsolute`); its rest contrast is
+  // FUT-4516's.)
   const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
   const glowShadow = glow
     ? `0 0 ${rems(theme, GLOW.blur, GLOW.spread)} ${alpha(colorPalette.main, GLOW.alpha)}`
@@ -91,6 +98,7 @@ const StyledAlert = styled(MuiAlert, {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
   const withTint = pointerShadow(theme, colorPalette, Boolean(glow), customVariant);
+  const ink = pointerInkStyles(theme, customVariant);
 
   return {
     borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
@@ -101,13 +109,15 @@ const StyledAlert = styled(MuiAlert, {
     willChange: 'transform, opacity',
 
     ...alertLayoutStyles(theme, colorPalette, animate),
+    ...ink.rest,
 
     // Hover: one tint step, and nothing that moves. An alert is a surface
     // rather than a control, so the pointer only needs telling it is here. The
     // icon keeps its own place for the same reason — it is the variant's
-    // meaning, not an affordance to animate.
+    // meaning, not an affordance to animate. The message's ink steps too.
     '&:hover': {
       boxShadow: withTint(HOVER.tintAlpha),
+      ...ink.hover,
 
       '&::before': {
         opacity: 1,
@@ -136,6 +146,7 @@ const StyledAlert = styled(MuiAlert, {
     '&:active:not(:has(button:active, a:active, [role="button"]:active))': {
       boxShadow: withTint(ACTIVE.tintAlpha),
       transition: 'none',
+      ...ink.press,
     },
 
     // Focus: `:focus-visible`, not `:focus-within`.

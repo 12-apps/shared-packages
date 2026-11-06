@@ -5,6 +5,7 @@ import React from 'react';
 import { sxRem } from '../../../tokens/relative';
 
 import { testIdFor } from './Alert.helpers';
+import { ALERT_CHILDREN_CLASS, ALERT_DESCRIPTION_CLASS } from './Alert.ink';
 import { DESCRIPTION, ICON_SLOT, TITLE, TITLE_ICON } from './Alert.metrics';
 import type { AlertProps } from './Alert.types';
 
@@ -13,6 +14,19 @@ const BREAK_WORDS = {
   overflowWrap: 'break-word',
   wordBreak: 'break-word',
 } as const;
+
+/**
+ * The caller's `children`, wrapped so the pointer step (`Alert.ink.ts`) reaches
+ * children-only text without reaching the title row's icon. `display: contents`
+ * gives the wrapper no box, so the column's flex layout is exactly what it was
+ * and a bare text node still inherits the stepped colour.
+ */
+const ChildrenInk: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
+  children === undefined || children === null || children === false ? null : (
+    <Box component="span" className={ALERT_CHILDREN_CLASS} sx={{ display: 'contents' }}>
+      {children}
+    </Box>
+  );
 
 /**
  * The message column: title, description, then whatever the caller put inside.
@@ -78,13 +92,14 @@ export const AlertContent: React.FC<{
       {description && (
         <Box
           component="div"
+          className={ALERT_DESCRIPTION_CLASS}
           data-testid={testIdFor(dataTestId, 'message')}
           sx={{ opacity: DESCRIPTION.opacity, fontSize: sxRem(DESCRIPTION.fontSize), ...BREAK_WORDS }}
         >
           {description}
         </Box>
       )}
-      {children}
+      <ChildrenInk>{children}</ChildrenInk>
     </>
   );
 };
