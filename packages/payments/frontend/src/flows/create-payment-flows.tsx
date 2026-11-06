@@ -14,11 +14,11 @@
  * one moment's cart total onto every checkout the page ever renders. Naming
  * them `use*` also keeps rules-of-hooks lint able to see them.
  */
-import type { JSX, ReactNode } from "react";
+import type { ComponentProps, JSX, ReactNode } from "react";
 
 import { CheckoutFlow } from "../components/checkout/checkout-flow";
 import { createCheckoutClient } from "../components/checkout/transport";
-import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
+import type { CheckoutProviderConfig } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
 import {
@@ -116,6 +116,9 @@ function useHostPaymentList(runtime: FlowsRuntime) {
   return usePaymentList();
 }
 
+/** What the mounted `Checkout` takes. */
+type CheckoutMountProps = ComponentProps<PaymentFlows["Checkout"]>;
+
 /** The whole flow — the one list, then the confirmation — with the config fetched and availability decided. */
 function buildCheckout(
   runtime: FlowsRuntime,
@@ -123,7 +126,9 @@ function buildCheckout(
 ): PaymentFlows["Checkout"] {
   const Unavailable = screens.PaymentsUnavailable;
 
-  function CheckoutBody({ settlement }: { settlement?: SettlementCheckout | null }): JSX.Element {
+  const refuses = runtime.config.refusesUnchargeableStore ?? true;
+
+  function CheckoutBody({ settlement, parkHostedOrders, components }: CheckoutMountProps): JSX.Element {
     const cart = runtime.config.useCart();
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
     const hostSettlement = runtime.config.useSettlement?.() ?? null;
@@ -139,7 +144,8 @@ function buildCheckout(
 
     // The host's in-person rows are a way to pay that no provider serves, so an
     // empty chain refuses only a list with nothing else on it (FUT-1241).
-    if (storeCannotCharge(config, pending, availability.payable, paymentList.door?.length ?? 0)) {
+    // …unless the host decides that screen itself (`refusesUnchargeableStore`).
+    if (refuses && storeCannotCharge(config, pending, availability.payable, paymentList.door?.length ?? 0)) {
       return <Unavailable />;
     }
 
@@ -158,6 +164,8 @@ function buildCheckout(
         {...confirmationProps(confirmation)}
         validateApplePayMerchant={ports.validateApplePayMerchant}
         paymentList={paymentList}
+        parkHostedOrders={parkHostedOrders}
+        components={components}
       />
     );
   }

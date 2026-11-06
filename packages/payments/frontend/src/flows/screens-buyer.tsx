@@ -12,22 +12,23 @@ import { useEffect, useState, type JSX } from "react";
 import { SavedCardsPicker, type SavedCard } from "../card";
 import { EmptyCart as EmptyCartView } from "../components/checkout/empty-cart";
 
-import { FlowsShell, useFlowCopy, useFlowPorts, type FlowsRuntime } from "./runtime";
+import { FlowsShell, useFlowClient, useFlowCopy, useFlowPorts, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
 /** The vaulted instruments this store can actually charge (FUT-697 scoping). */
 function useScopedInstruments(runtime: FlowsRuntime): SavedCard[] {
   const tenantSlug = runtime.useTenantSlug();
+  const client = useFlowClient(runtime);
   const [cards, setCards] = useState<SavedCard[]>([]);
   useEffect(() => {
     let active = true;
-    void runtime.client.listInstruments(tenantSlug).then((list) => {
+    void client.listInstruments(tenantSlug).then((list) => {
       if (active) setCards(list);
     });
     return () => {
       active = false;
     };
-  }, [runtime, tenantSlug]);
+  }, [client, tenantSlug]);
   return cards;
 }
 

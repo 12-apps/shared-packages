@@ -14,6 +14,25 @@
  * the host's provider answer (no second `/config` read) — and the host keeps
  * the one decision that is its own: which mount takes which lane.
  *
+ * ## A MIGRATION adapter, with three limits
+ *
+ * It is the inverse of the mapping `Checkout` makes from its config back to
+ * `<CheckoutFlow>`'s props: a props→config→props round trip, held here so a
+ * host can move lane by lane. {@link CHECKOUT_PROP_ROUTES} names where each
+ * prop goes, and a new `CheckoutFlowProps` key fails to compile until it is
+ * routed. A host whose lanes have ALL moved writes its config hooks directly
+ * and drops this.
+ *
+ *   - **Only `Checkout` is supported.** Every config hook reads the props
+ *     `mount` provides, and THROWS outside it — so `flows.Provider`, every
+ *     `flows.screens.*` and `flows.useCheckout` of a flow built over this
+ *     config throw when used. Mount screens from a flow of their own.
+ *   - **"/config is never fetched" holds for `Checkout` only**, the one place
+ *     `useProviderConfig` is read (see {@link PaymentFlowsConfig.useProviderConfig}).
+ *   - **No "Pagamento indisponível" of the factory's own**: the config sets
+ *     `refusesUnchargeableStore: false`, because `<CheckoutFlow>` never drew
+ *     that screen — the host decides it above the mount, as it did by hand.
+ *
  * ```ts
  * const binding = createCheckoutPropsBinding({ copy, components });
  * // bind `binding.config` (or pass it to createPaymentFlows), then:
@@ -42,9 +61,55 @@ export interface CheckoutPropsBindingBase
 /** The binding: the config to bind, and the mount that feeds it. */
 export interface CheckoutPropsBinding {
   config: PaymentFlowsConfig;
-  /** `flows.Checkout`, reading every value from the props it is given. */
+  /**
+   * `flows.Checkout`, reading every value from the props it is given. The
+   * ONLY member of a flow over {@link config} that works: the config's hooks
+   * throw outside this mount.
+   */
   mount(flows: PaymentFlows): ComponentType<CheckoutFlowProps>;
 }
+
+/** Where the binding reads a prop from: the config hook that answers it, or the mount. */
+type PropRoute =
+  | "useCopy"
+  | "useCart"
+  | "useBuyerDefaults"
+  | "useSettlement"
+  | "useScope"
+  | "useProviderConfig"
+  | "usePaymentList"
+  | "useConfirmation"
+  | "usePorts"
+  | "mount";
+
+/**
+ * Every `<CheckoutFlow>` prop, and where the bound flow reads it. `satisfies`
+ * over EVERY key, so a prop added to `CheckoutFlowProps` and forgotten here is
+ * a compile error rather than a value the bound mount silently drops — the
+ * drift this binding exists to prevent.
+ */
+export const CHECKOUT_PROP_ROUTES = {
+  copy: "useCopy",
+  cart: "useCart",
+  defaultBuyer: "useBuyerDefaults",
+  taxIdOnFile: "useBuyerDefaults",
+  taxIdKindOnFile: "useBuyerDefaults",
+  settlement: "mount",
+  tenantSlug: "useScope",
+  providerConfig: "useProviderConfig",
+  paymentList: "usePaymentList",
+  confirmationExtra: "useConfirmation",
+  confirmationHero: "useConfirmation",
+  confirmationFooter: "useConfirmation",
+  backActionEmphasis: "useConfirmation",
+  createOrder: "usePorts",
+  saveBuyerContact: "usePorts",
+  onExitToMenu: "usePorts",
+  onPaid: "usePorts",
+  validateApplePayMerchant: "usePorts",
+  components: "mount",
+  parkHostedOrders: "mount",
+} as const satisfies { readonly [K in keyof Required<CheckoutFlowProps>]: PropRoute };
 
 /** Bind the factory over `<CheckoutFlow>`'s props. */
 export function createCheckoutPropsBinding(base: CheckoutPropsBindingBase): CheckoutPropsBinding {
@@ -57,6 +122,9 @@ export function createCheckoutPropsBinding(base: CheckoutPropsBindingBase): Chec
   const { useCopy: useRest, ...fixed } = base;
   const config: PaymentFlowsConfig = {
     ...fixed,
+    // `<CheckoutFlow>` draws no unavailable screen of its own; neither does
+    // the bound mount (see the module doc).
+    refusesUnchargeableStore: false,
     useScope: () => ({ tenantSlug: useProps().tenantSlug }),
     useCart: () => useProps().cart,
     useBuyerDefaults: () => {
@@ -88,7 +156,8 @@ export function createCheckoutPropsBinding(base: CheckoutPropsBindingBase): Chec
     config,
     mount(flows) {
       return function BoundCheckout(props: CheckoutFlowProps): JSX.Element {
-        return createElement(Props.Provider, { value: props }, createElement(flows.Checkout, { settlement: props.settlement }));
+        const { settlement, parkHostedOrders, components } = props;
+        return createElement(Props.Provider, { value: props }, createElement(flows.Checkout, { settlement, parkHostedOrders, components }));
       };
     },
   };

@@ -141,8 +141,24 @@ export interface PaymentFlowsConfig {
    * factory fetches nothing: one read, and the host's answer is the one the list
    * draws. Return `undefined` to let the factory fetch. A HOOK, read every
    * render, because the host's answer follows its own state.
+   *
+   * Read by `Checkout` ONLY. `Provider`, the standalone `screens.*` and
+   * `useCheckoutConfig` still fetch `/config` for themselves; "nothing is
+   * fetched" holds for the one mount.
    */
   useProviderConfig?(): CheckoutConfigState | undefined;
+  /**
+   * Whether `Checkout` itself answers a store that cannot charge — the host's
+   * veto, or an empty provider chain with no in-person row — with
+   * `screens.PaymentsUnavailable` (FUT-1241). Default `true`.
+   *
+   * `false` draws the one list exactly as the host handed it, which is what
+   * `<CheckoutFlow>` does: a host that already decides that screen ABOVE the
+   * flow (its own route gate, its own "not paid online" answer) keeps that
+   * decision its own, and a lane moved onto the factory shows no screen the
+   * hand mount never showed. `createCheckoutPropsBinding` sets it.
+   */
+  refusesUnchargeableStore?: boolean;
 
   /** Design-system slots, filled ONCE instead of per screen. */
   components?: Partial<CheckoutComponents>;
@@ -190,8 +206,11 @@ export interface PaymentFlowsConfig {
   /**
    * The copy for THIS render (FUT-1241), for a host whose words follow its own
    * state — the buyer's language, the lane's exit word. Wins over `copy` on
-   * every screen the factory draws. `copy` stays required: it is what the
-   * transport's own failure sentences are built from, once, with the client.
+   * every screen the factory draws, AND on the transport's own failure
+   * sentences: the screens' client is rebuilt from this copy's `transport`
+   * words whenever they change (a `transport.copy` of the host's still wins).
+   * `copy` stays required: it is what `flows.client` — built once, with the
+   * flow — speaks.
    */
   useCopy?(): CheckoutCopyFE;
   /**
@@ -263,7 +282,13 @@ export interface CheckoutConfigState {
 /** What `createPaymentFlows` returns. */
 export interface PaymentFlows {
   /** THE mount: a complete buyer checkout in one line. */
-  Checkout: ComponentType<{ settlement?: SettlementCheckout | null }>;
+  Checkout: ComponentType<{
+    settlement?: SettlementCheckout | null;
+    /** `CheckoutFlowProps.parkHostedOrders` — default `true`, the host's one checkout. */
+    parkHostedOrders?: boolean;
+    /** Slots for THIS mount, layered over the config's `components`. */
+    components?: Partial<CheckoutComponents>;
+  }>;
   /** Slots + transport + scope + the fetched config, for a nesting host. */
   Provider: ComponentType<{ children: ReactNode; config?: CheckoutProviderConfig | null }>;
   screens: CheckoutScreens;

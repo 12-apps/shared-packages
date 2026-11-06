@@ -24,7 +24,7 @@ import type { VaultedCardDisplay } from "../components/checkout/transport";
 import { useCheckoutComponents } from "../components/checkout/ui";
 
 import type { CheckoutCopyFE } from "./copy";
-import { FlowsShell, useFlowCopy, type FlowsRuntime } from "./runtime";
+import { FlowsShell, useFlowClient, useFlowCopy, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 import { useAddCard, type AddCardController } from "./use-add-card";
 
@@ -179,19 +179,20 @@ function useInstrumentList(
   refresh: number,
 ): { cards: SavedCard[]; pending: boolean } {
   const tenantSlug = runtime.useTenantSlug();
+  const client = useFlowClient(runtime);
   const [state, setState] = useState<{ cards: SavedCard[]; pending: boolean }>({
     cards: [],
     pending: true,
   });
   useEffect(() => {
     let active = true;
-    void runtime.client.listInstruments(tenantSlug).then((cards) => {
+    void client.listInstruments(tenantSlug).then((cards) => {
       if (active) setState({ cards, pending: false });
     });
     return () => {
       active = false;
     };
-  }, [runtime, tenantSlug, refresh]);
+  }, [client, tenantSlug, refresh]);
   return state;
 }
 

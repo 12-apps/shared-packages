@@ -43,7 +43,7 @@ import type {
 import type { CheckoutProviderConfig } from "../components/checkout/types";
 import type { Result } from "../result";
 
-import { useFlowCopy, useResolvedConfig, type FlowsRuntime } from "./runtime";
+import { useFlowClient, useFlowCopy, useResolvedConfig, type FlowsRuntime } from "./runtime";
 import type { CheckoutCopyFE } from "./copy";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
@@ -113,12 +113,17 @@ function useVaultSession(runtime: FlowsRuntime): {
   // every time the host's copy changes identity.
   const copy = useFlowCopy(runtime);
   const copyRef = useRef(copy);
+  // The client follows the words (`useFlowClient`), and is read the same way:
+  // the vault is begun once, whatever language the buyer switches to.
+  const client = useFlowClient(runtime);
+  const clientRef = useRef(client);
   useLayoutEffect(() => {
     copyRef.current = copy;
+    clientRef.current = client;
   });
   useEffect(() => {
     let active = true;
-    void runtime.client.beginVault().then((result: Result<BuyerVaultSession>) => {
+    void clientRef.current.beginVault().then((result: Result<BuyerVaultSession>) => {
       if (!active) return;
       if (!result.ok) {
         setPhase({ kind: "unavailable", message: beginRefusalMessage(copyRef.current, result) });
@@ -153,6 +158,7 @@ export function useAddCard(
 
   const brand = detectBrand(onlyDigits(card.number));
 
+  const client = useFlowClient(runtime);
   const cardCopy = useFlowCopy(runtime).views.screens.card;
   const fieldCopy = cardCopy.fields;
   const validate = (): CardFieldErrors => ({
@@ -182,7 +188,7 @@ export function useAddCard(
     }
     // The browser's two legitimate facts, and nothing else: the session it is
     // completing and the instrument it minted. Ownership rides server-side.
-    const completed = await runtime.client.completeVault({
+    const completed = await client.completeVault({
       ...(phase.session.sessionId ? { sessionId: phase.session.sessionId } : {}),
       token: minted.data.token,
     });

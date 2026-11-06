@@ -4,16 +4,23 @@
  * host hands `<CheckoutFlow>`, draws the SAME screen — the shopper must see no
  * difference between a lane on the hand mount and a lane on the factory.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { useState, type JSX } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutFlow, type CheckoutFlowProps } from "../../components/checkout/checkout-flow";
+import { orderFor, onPageStore } from "../../components/checkout/__tests__/list-harness";
+import { EN_US_CHECKOUT_VIEW_COPY } from "../../components/checkout/en-US";
+import { HOSTED_ORDER_STORAGE_KEY, rememberHostedOrder } from "../../components/checkout/hosted-return";
+import { CHARGE_WINDOW_MS } from "../../components/checkout/list/use-list-charge";
+import { EN_US_PAYMENT_LIST_COPY } from "../../components/checkout/list/en-US";
 import { PT_BR_PAYMENT_LIST_COPY } from "../../components/checkout/list/pt-BR";
 import { STORY_CHECKOUT_COPY } from "../../stories/demo-copy";
 import { createStoryStore } from "../../stories/store";
-import { createCheckoutPropsBinding } from "../checkout-props-binding";
+import { CHECKOUT_PROP_ROUTES, createCheckoutPropsBinding } from "../checkout-props-binding";
 import { createPaymentFlows } from "../create-payment-flows";
+import { useFlowPorts, type FlowsRuntime } from "../runtime";
+import type { CheckoutPorts } from "../types";
 
 afterEach(cleanup);
 beforeEach(() => window.sessionStorage.clear());
@@ -40,14 +47,14 @@ function counterProps(over: Partial<CheckoutFlowProps> = {}): CheckoutFlowProps 
 }
 
 /** A binding over a real story mount, with its `/config` reads counted. */
-function bound(): { Checkout: (props: CheckoutFlowProps) => JSX.Element; configReads: string[] } {
+function bound(transportFetch?: typeof fetch): { Checkout: (props: CheckoutFlowProps) => JSX.Element; configReads: string[] } {
   const world = createStoryStore({});
   const configReads: string[] = [];
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (String(input).includes("/config")) configReads.push(String(input));
     return world.fetchImpl(input, init);
   }) as typeof fetch;
-  const binding = createCheckoutPropsBinding({ copy: STORY_CHECKOUT_COPY, transport: { fetchImpl } });
+  const binding = createCheckoutPropsBinding({ copy: STORY_CHECKOUT_COPY, transport: { fetchImpl: transportFetch ?? fetchImpl } });
   const Mounted = binding.mount(createPaymentFlows(binding.config));
   return { Checkout: (props) => <Mounted {...props} />, configReads };
 }
@@ -100,5 +107,129 @@ describe("the factory over <CheckoutFlow>'s props (FUT-1241)", () => {
     const flows = createPaymentFlows(binding.config);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() => render(<flows.Checkout />)).toThrow(/outside its `mount`/);
+  });
+});
+
+describe("what the bound mount must not lose against the hand mount (FUT-1241, review round 1)", () => {
+  it("speaks the transport's failures in the buyer's language, not the copy the flow was built with", async () => {
+    // Built with the pt-BR pack, as a host binds at module scope; the props
+    // carry the buyer's en-US words, as the hand mount's do.
+    const offline = (async () => {
+      throw new TypeError("network down");
+    }) as typeof fetch;
+    const { Checkout } = bound(offline);
+    render(
+      <Checkout
+        {...counterProps({
+          copy: EN_US_CHECKOUT_VIEW_COPY,
+          providerConfig: onPageStore({ methods: ["CARD"] }),
+          createOrder: () => Promise.resolve({ ok: true, data: orderFor("CARD") }),
+          paymentList: { copy: EN_US_PAYMENT_LIST_COPY, totalCents: 2700, door: [] },
+        })}
+      />,
+    );
+    await screen.findByTestId("payment-list");
+    await waitFor(() => expect(screen.queryByTestId("list-top-loading")).toBeNull());
+    fireEvent.click(screen.getByTestId("list-option-CARD-radio"));
+    await waitFor(() => expect(screen.getByTestId("card-number")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("card-number"), { target: { value: "4111 1111 1111 1111" } });
+    fireEvent.change(screen.getByTestId("card-holder"), { target: { value: "ANA COMPRADORA" } });
+    fireEvent.change(screen.getByTestId("card-expiry"), { target: { value: "12/34" } });
+    fireEvent.change(screen.getByTestId("card-cvv"), { target: { value: "123" } });
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByTestId("list-pay"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CHARGE_WINDOW_MS);
+    });
+    vi.useRealTimers();
+
+    expect(await screen.findByText(EN_US_CHECKOUT_VIEW_COPY.screens.screens.transport.offline)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(STORY_CHECKOUT_COPY.views.screens.screens.transport.offline)).toBeNull());
+  });
+
+  it("draws the list, never the factory's unavailable screen, for an empty chain with no in-person row", async () => {
+    // What the hand mount draws for a Comprar basket or a closed conta: the
+    // list, with no rows — the host decides "not paid online" above the mount.
+    const { Checkout } = bound();
+    render(
+      <Checkout
+        {...counterProps({
+          providerConfig: { ...onPageStore({ methods: [] }), chain: [] },
+          paymentList: { copy: PT_BR_PAYMENT_LIST_COPY, totalCents: 7500, door: [] },
+        })}
+      />,
+    );
+    await screen.findByTestId("payment-list");
+    await waitFor(() => expect(screen.queryByTestId("checkout-payments-disabled")).toBeNull());
+  });
+
+  it("forwards parkHostedOrders={false}: the parked Pix is left for the host's checkout", async () => {
+    const parked = { ...orderFor("PIX"), orderId: "checkout-pix" };
+    rememberHostedOrder(parked, { tenantSlug: "loja-1" });
+    const before = window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY);
+    const { Checkout } = bound();
+    render(
+      <Checkout
+        {...counterProps({ parkHostedOrders: false, providerConfig: onPageStore({ methods: ["PIX"] }) })}
+      />,
+    );
+
+    expect(await screen.findByRole("radio", { name: /Pix/ })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("list-pix")).toBeNull());
+    expect(window.sessionStorage.getItem(HOSTED_ORDER_STORAGE_KEY)).toBe(before);
+  });
+
+  it("routes every CheckoutFlow prop", () => {
+    // Every key REQUIRED, so a new prop is a compile error HERE as well as on
+    // the routes table; the runtime half compares the two lists.
+    const every: { [K in keyof Required<CheckoutFlowProps>]: CheckoutFlowProps[K] } = {
+      ...counterProps(),
+      defaultBuyer: undefined,
+      taxIdOnFile: true,
+      taxIdKindOnFile: null,
+      providerConfig: null,
+      tenantSlug: "loja-1",
+      settlement: null,
+      saveBuyerContact: () => undefined,
+      onPaid: () => undefined,
+      validateApplePayMerchant: () => Promise.resolve({}),
+      confirmationExtra: null,
+      confirmationHero: null,
+      confirmationFooter: null,
+      backActionEmphasis: "primary",
+      components: {},
+      parkHostedOrders: true,
+    };
+    expect(Object.keys(CHECKOUT_PROP_ROUTES).sort()).toEqual(Object.keys(every).sort());
+  });
+});
+
+describe("useFlowPorts' optional wrappers", () => {
+  /** A runtime whose host ports are whatever `current` holds on this render. */
+  function portsRuntime(current: { ports: CheckoutPorts }): FlowsRuntime {
+    return { useHostPorts: () => current.ports } as unknown as FlowsRuntime;
+  }
+  const base: CheckoutPorts = { createPayable: () => Promise.reject(new Error("unused")), exitToCatalog: () => undefined };
+
+  it("calls the saveBuyerContact and onPaid the host answered last", () => {
+    const calls: string[] = [];
+    const current = {
+      ports: { ...base, saveBuyerContact: () => void calls.push("save-1"), onPaid: () => void calls.push("paid-1") } as CheckoutPorts,
+    };
+    const { result, rerender } = renderHook(() => useFlowPorts(portsRuntime(current)));
+    current.ports = { ...base, saveBuyerContact: () => void calls.push("save-2"), onPaid: () => void calls.push("paid-2") };
+    rerender();
+    result.current.saveBuyerContact?.({ name: "Ana", phone: "11999990000" });
+    result.current.onPaid?.();
+    expect(calls).toEqual(["save-2", "paid-2"]);
+  });
+
+  it("rejects a merchant validation whose port went missing after the first render", async () => {
+    const current = { ports: { ...base, validateApplePayMerchant: () => Promise.resolve({ ok: true }) } as CheckoutPorts };
+    const { result, rerender } = renderHook(() => useFlowPorts(portsRuntime(current)));
+    const validate = result.current.validateApplePayMerchant;
+    current.ports = { ...base };
+    rerender();
+    await expect(validate?.("https://apple.example/validate")).rejects.toThrow(/no merchant validation port/);
   });
 });

@@ -27,7 +27,7 @@ import {
 
 import { CheckoutClientProvider } from "../components/checkout/client-context";
 import { CheckoutNavigateProvider } from "../components/checkout/navigate-context";
-import type { CheckoutClient } from "../components/checkout/transport";
+import { createCheckoutClient, type CheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig } from "../components/checkout/types";
 import { CheckoutCopyProvider } from "../components/checkout/copy-context";
 import { CheckoutComponentsProvider } from "../components/checkout/ui";
@@ -60,6 +60,25 @@ export interface FlowsRuntime {
 /** The copy for THIS render: the host's `useCopy`, else the `copy` it built the flow with. */
 export function useFlowCopy(runtime: FlowsRuntime): CheckoutCopyFE {
   return runtime.config.useCopy?.() ?? runtime.copy;
+}
+
+/**
+ * The transport for THIS render: the one built with the flow, unless the host
+ * answers its copy per render (`useCopy`) — then the failure sentences follow
+ * that copy too, so a buyer reading English is not told "Não foi possível
+ * conectar…" (FUT-1241). Memoised on the transport copy, so the client keeps
+ * its identity while the words do; a `transport` that names its own `copy`
+ * still wins, as it does when the flow is built.
+ */
+export function useFlowClient(runtime: FlowsRuntime): CheckoutClient {
+  const transportCopy = useFlowCopy(runtime).views.screens.screens.transport;
+  const { transport, useCopy } = runtime.config;
+  const follows = useCopy !== undefined && transport?.copy === undefined;
+  const built = runtime.copy.views.screens.screens.transport;
+  return useMemo(
+    () => (follows && transportCopy !== built ? createCheckoutClient({ ...transport, copy: transportCopy }) : runtime.client),
+    [follows, transportCopy, built, transport, runtime.client],
+  );
 }
 
 /** The paid screen's host half for THIS render: `useConfirmation`, else `confirmation`. */
@@ -124,7 +143,7 @@ function useFetchedConfig(
   runtime: FlowsRuntime,
   enabled: boolean,
 ): CheckoutConfigState {
-  const { client } = runtime;
+  const client = useFlowClient(runtime);
   const onWarning = runtime.config.onWarning;
   const tenantSlug = runtime.useTenantSlug();
   const [state, setState] = useState<CheckoutConfigState>({ config: null, pending: enabled });
@@ -176,6 +195,7 @@ export function FlowsShell({
   children: ReactNode;
 }): JSX.Element {
   const copy = useFlowCopy(runtime);
+  const client = useFlowClient(runtime);
   const { navigate } = useFlowPorts(runtime);
   return (
     <CheckoutComponentsProvider components={runtime.config.components}>
@@ -183,7 +203,7 @@ export function FlowsShell({
           same card fields the checkout does, so they need the same words —
           and they are mounted here rather than under `CheckoutFlow`. */}
       <CheckoutCopyProvider copy={copy.views.screens}>
-        <CheckoutClientProvider client={runtime.client}>
+        <CheckoutClientProvider client={client}>
           <CheckoutNavigateProvider navigate={navigate}>
             {children}
           </CheckoutNavigateProvider>

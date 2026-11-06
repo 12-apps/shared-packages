@@ -24,8 +24,9 @@ import { forgetHostedOrder } from "./hosted-store";
  * is what lets that route show the buyer the payment they made. Default
  * `true`, which is every mount before this existed.
  *
- * `createPaymentFlows`' Checkout screen does not pass this: it is the host's
- * one checkout, and always parks.
+ * `createPaymentFlows`' Checkout parks by default — it is the host's one
+ * checkout — and takes the same `parkHostedOrders` prop, so a host moved onto
+ * it (`createCheckoutPropsBinding`) keeps its pay-again mount's `false`.
  */
 export const HostedParkingContext = createContext(true);
 
