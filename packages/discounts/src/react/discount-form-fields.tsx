@@ -187,6 +187,42 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
 }
 
 /**
+ * The period: the notice when the days are unknown, the picker, the hint.
+ *
+ * The form's own 16px between the notice and the frame; the hint keeps its
+ * 4px under the frame. While the days are unknown the open-ended hint is not
+ * said: Salvar is refused then, never "sem prazo" (FUT-4482, review round 4).
+ */
+function PeriodSection({
+  copy,
+  wholeDays,
+  daysUnknown,
+  timeZoneSettings,
+}: {
+  copy: DiscountsWebCopy;
+  wholeDays: boolean;
+  daysUnknown: boolean;
+  timeZoneSettings: DiscountsTimeZoneSettings | undefined;
+}): JSX.Element {
+  return (
+    <Stack spacing={2} data-testid="discount-period">
+      {daysUnknown ? (
+        <DaysUnknownNotice
+          copy={copy}
+          message={copy.window.daysUnknownForm}
+          timeZoneSettings={timeZoneSettings}
+          dataTestId="discount-days-unknown"
+        />
+      ) : null}
+      <Stack spacing={0.5}>
+        <PeriodPicker copy={copy} wholeDays={wholeDays} />
+        {daysUnknown ? null : <Text variant="caption">{copy.schedule.periodHint}</Text>}
+      </Stack>
+    </Stack>
+  );
+}
+
+/**
  * "Quando vale" — the campaign PERIOD, and the weekly schedule inside it
  * (FUT-996).
  *
@@ -235,23 +271,7 @@ export function WindowFields({
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
-      {/* The form's own 16px between the notice and the frame; the hint keeps
-          its 4px under the frame. While the days are unknown the open-ended
-          hint is not said: Salvar is refused then, never "sem prazo". */}
-      <Stack spacing={2} data-testid="discount-period">
-        {daysUnknown ? (
-          <DaysUnknownNotice
-            copy={copy}
-            message={copy.window.daysUnknownForm}
-            timeZoneSettings={timeZoneSettings}
-            dataTestId="discount-days-unknown"
-          />
-        ) : null}
-        <Stack spacing={0.5}>
-          <PeriodPicker copy={copy} wholeDays={wholeDays} />
-          {daysUnknown ? null : <Text variant="caption">{copy.schedule.periodHint}</Text>}
-        </Stack>
-      </Stack>
+      <PeriodSection copy={copy} wholeDays={wholeDays} daysUnknown={daysUnknown} timeZoneSettings={timeZoneSettings} />
       <FormControl>
         <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
         <Stack spacing={0.5}>

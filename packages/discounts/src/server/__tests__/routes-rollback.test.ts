@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { EN_US_DISCOUNTS_SERVER_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
@@ -57,14 +57,15 @@ function stored(windowInZone: boolean | undefined): DiscountRecord {
 
 function patch(row: DiscountRecord | null, extra: Partial<DiscountsApiConfig> = {}, locale?: string) {
   const writes: DiscountWrite[] = [];
+  const get = vi.fn(async () => row);
   const store = {
-    get: async () => row,
+    get,
     update: async (_clientId: string, _id: string, write: DiscountWrite) => void writes.push(write),
   } as unknown as DiscountStore;
   const { routes } = createApiDiscounts({ store, copy: PT_BR_DISCOUNTS_SERVER_COPY, logger: recordingLogger(), ...extra });
   const update = routes.find((entry) => entry.method === "PATCH")!;
   const response = update.handle({ actor: { clientId: "tenant-1" }, params: { id: "d1" }, query: {}, locale, body: BODY });
-  return { response, writes };
+  return { response, writes, get };
 }
 
 describe("a write with the zone off on a row written in the zone (FUT-4482, review round 4)", () => {
@@ -105,24 +106,9 @@ describe("a write with the zone off on a row written in the zone (FUT-4482, revi
   });
 
   it("asks the store nothing extra while the zone is on", async () => {
-    let gets = 0;
-    const writes: DiscountWrite[] = [];
-    const store = {
-      get: async () => {
-        gets += 1;
-        return stored(true);
-      },
-      update: async (_clientId: string, _id: string, write: DiscountWrite) => void writes.push(write),
-    } as unknown as DiscountStore;
-    const { routes } = createApiDiscounts({
-      store,
-      copy: PT_BR_DISCOUNTS_SERVER_COPY,
-      logger: recordingLogger(),
-      storeTimeZone: () => "America/Sao_Paulo",
-    });
-    const update = routes.find((entry) => entry.method === "PATCH")!;
-    await update.handle({ actor: { clientId: "tenant-1" }, params: { id: "d1" }, query: {}, body: BODY });
-    expect(gets).toBe(0);
+    const { response, writes, get } = patch(stored(true), { storeTimeZone: () => "America/Sao_Paulo" });
+    expect((await response).status).toBe(200);
+    expect(get).not.toHaveBeenCalled();
     expect(writes[0]?.scalars.windowInZone).toBe(true);
   });
 });

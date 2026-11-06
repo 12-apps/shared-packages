@@ -105,14 +105,9 @@ describe("legacyUtcWindowToZoned — the host's migration of legacy rows", () =>
   // abort on the first one — so the refusal is a TYPED error it can catch.
   it("throws a typed error naming the bound, which a loop catches per row", () => {
     const seeded = { id: "seeded", ...legacy("2026-11-10T14:37:12.000Z", "2026-11-20T00:00:00.000Z") };
-    let caught: unknown;
-    try {
-      legacyUtcWindowToZoned(seeded, "America/Sao_Paulo");
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(LegacyWindowNotMidnightError);
-    expect(caught).toMatchObject({ field: "startsAt", bound: "2026-11-10T14:37:12.000Z" });
+    const convert = (): unknown => legacyUtcWindowToZoned(seeded, "America/Sao_Paulo");
+    expect(convert).toThrow(LegacyWindowNotMidnightError);
+    expect(convert).toThrow(expect.objectContaining({ field: "startsAt", bound: "2026-11-10T14:37:12.000Z" }));
   });
 
   it("lets the README's loop convert every other row and log the one it skipped", () => {
