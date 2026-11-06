@@ -89,12 +89,21 @@ export function DiscountTargetPicker({
   const scope = values.scope ?? "ORDER";
   const staleTargets = errors.freeUnitsTargets !== undefined;
 
-  // `setFieldValue` clears only the key it sets, and the kind toggle sets
-  // `kind`: the product refusal would outlive a switch away (and keep the error
-  // toast up). Setting its own key drops it; the value is never read or sent.
+  const picked = selection.comboRequirements.some((slot) => slot.menuItemIds.length > 0);
+  const productRefusal = errors.kind === copy.form.freeUnitsTargetRequired;
+
+  // `setFieldValue` clears only the key it sets, and neither the kind toggle
+  // nor a pick sets `freeUnitsTargets`: the product refusal would outlive a
+  // switch away, or the product the owner then picks, and keep the error toast
+  // up. Setting its own key drops it; the value is never read or sent. A pick
+  // also drops the same refusal from `errors.kind` (re-setting the kind it
+  // already has), but never a quantity refusal held there (FUT-4470).
   useEffect(() => {
-    if (kind !== "FREE_UNITS" && staleTargets) setFieldValue("freeUnitsTargets", "");
-  }, [kind, staleTargets, setFieldValue]);
+    const answered = kind !== "FREE_UNITS" || picked;
+    if (!answered) return;
+    if (staleTargets) setFieldValue("freeUnitsTargets", "");
+    if (kind === "FREE_UNITS" && productRefusal) setFieldValue("kind", kind);
+  }, [kind, picked, staleTargets, productRefusal, setFieldValue]);
 
   if (kind === "FREE_UNITS") {
     return (
