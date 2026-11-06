@@ -4,6 +4,9 @@
  * "1 August" is the same day in every zone, and only the question "which day is
  * TODAY" needs a zone to answer.
  */
+import type React from 'react';
+
+import type { CalendarLabels } from '../../../copy/labels';
 import type { DateRange } from '../Calendar';
 
 /** One inclusive calendar day as `AAAA-MM-DD`. Sorts lexicographically. */
@@ -90,6 +93,12 @@ export interface DateRangePickerMessages {
   quickRanges: string;
   /** Shown while only one end is chosen. */
   incomplete: string;
+  /**
+   * Shown, with `openEnd`, for a start with no end: a finished answer ("no end
+   * date"), worded WITHOUT the date, which the field beside it already shows.
+   * Optional so a full messages object written before it still type-checks.
+   */
+  openEnded?: string;
   /** Shown when the start is after the end. */
   reversed: string;
   /** Shown when the range — typed or quick-picked — exceeds the cap. */
@@ -164,6 +173,34 @@ export interface DateRangePickerProps {
   numberOfMonths?: number;
   /** Copy overrides, merged over the English defaults. */
   messages?: Partial<DateRangePickerMessages>;
+  /**
+   * Where the typed half sits. `below` (default) is the layout this picker
+   * always had. `beside` is for a picker laid out in a page rather than a
+   * popover: the months sit in their own frame and the fields in a column
+   * beside them when the PICKER's own width has room for both, under them when
+   * it has not — and one month instead of two when two would not fit either.
+   * Decided by measuring the picker, not the viewport, because a form column
+   * beside a preview is narrow on the widest screen.
+   */
+  fieldsPlacement?: 'below' | 'beside';
+  /**
+   * The consumer's OWN typed fields, in place of the built-in pair and the
+   * summary line under it — for a form whose fields carry its own rules (a
+   * half-typed date kept until submit, its own messages), which a second line
+   * would only repeat. Told where it sits, so it can lay its fields out for it.
+   * The calendar follows the value when the consumer changes it, as it follows
+   * a typed date.
+   */
+  renderFields?: (args: { placement: 'beside' | 'below' }) => React.ReactNode;
+  /**
+   * A start with no end is a finished answer — "from this day on" — rather
+   * than half a range: the summary says `messages.openEnded` instead of asking
+   * for the end. `resolveDayRange` is unchanged; the caller decides what an
+   * open end means to it.
+   */
+  openEnd?: boolean;
+  /** Names for the calendar's own controls (the month arrows), in the host's language. */
+  calendarLabels?: Partial<CalendarLabels>;
   /** Root test id; every part derives from it (`-from`, `-quick-today`, …). */
   dataTestId?: string;
   className?: string;
@@ -182,6 +219,12 @@ export interface UseDateRangePickerArgs {
   weekStartsOn: WeekStart;
   quickRanges: QuickRange[];
   messages: Partial<DateRangePickerMessages> | undefined;
+  /**
+   * Remount the calendar onto the range whenever the CONSUMER moves it, not
+   * only when a typed field or a quick pick does — true when the consumer owns
+   * the fields (`renderFields`), whose edits never pass through the picker.
+   */
+  followValue?: boolean;
 }
 
 /** Everything the component renders from, and every way the range can move. */

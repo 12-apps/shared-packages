@@ -27,12 +27,14 @@ import Paper from '@mui/material/Paper/index.js';
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type { SxProps, Theme } from '@mui/material/styles/index.js';
-import React from 'react';
+import React, { useRef } from 'react';
 
+import type { CalendarLabels } from '../../../copy/labels';
 import { Calendar } from '../Calendar';
 
 import { toLocalDay } from './DateRangePicker.dates';
 import { useDateRangePicker } from './DateRangePicker.hooks';
+import { BESIDE_GAP_PX, besideLayout, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
 import { DEFAULT_QUICK_RANGES } from './DateRangePicker.quick';
 import type { DateRangeDraft, DateRangePickerProps, WeekStart } from './DateRangePicker.types';
 import { DateRangeFields } from './DateRangePickerFields';
@@ -40,21 +42,25 @@ import { DateRangeQuickList } from './DateRangePickerQuickList';
 
 const CALENDAR_CLASS = 'date-range-picker__calendar';
 
-const ROOT_SX: SxProps<Theme> = {
-  display: 'inline-flex',
-  flexDirection: 'column',
-  gap: 2,
-  p: 2,
-  maxWidth: '100%',
-  // `Calendar` renders its own `Paper` with 24px of padding. Nested in this one
-  // that reads as a box inside a box, so the inner frame is flattened here
-  // through the className hook the component exposes for exactly this.
+// `Calendar` renders its own `Paper` with 24px of padding. Nested in this one
+// that reads as a box inside a box, so the inner frame is flattened here
+// through the className hook the component exposes for exactly this.
+const FLAT_CALENDAR = {
   [`& .${CALENDAR_CLASS}`]: {
     p: 0,
     boxShadow: 'none',
     backgroundColor: 'transparent',
     backgroundImage: 'none',
   },
+};
+
+const ROOT_SX: SxProps<Theme> = {
+  display: 'inline-flex',
+  flexDirection: 'column',
+  gap: 2,
+  p: 2,
+  maxWidth: '100%',
+  ...FLAT_CALENDAR,
 };
 
 const BODY_SX: SxProps<Theme> = {
@@ -140,7 +146,9 @@ function RangeCalendar({
   weekStartsOn,
   months,
   maxRangeDays,
+  labels,
 }: {
+  labels: Partial<CalendarLabels> | undefined;
   picker: Picker;
   value: DateRangeDraft;
   locale: string;
@@ -169,6 +177,7 @@ function RangeCalendar({
       // The same ceiling the quick list is judged against, so the calendar
       // cannot hand back a window the control has just called too long.
       maxRangeLength={maxRangeDays}
+      {...(labels ? { labels } : {})}
     />
   );
 }
@@ -200,20 +209,61 @@ function QuickColumn({
   );
 }
 
-export function DateRangePicker({
-  value,
-  onChange,
-  timeZone,
-  now,
-  maxRangeDays,
-  weekStartsOn = 0,
-  quickRanges = DEFAULT_QUICK_RANGES,
-  locale = 'en-US',
-  numberOfMonths,
-  messages,
-  dataTestId = 'date-range-picker',
-  className,
-}: DateRangePickerProps): React.JSX.Element {
+/**
+ * The months' own frame in the `beside` layout: the picker is part of a page
+ * there, so the frame holds the calendar alone and the fields sit on the page
+ * beside or under it, as the form's other fields do.
+ */
+const BESIDE_FRAME_SX = {
+  p: 2,
+  maxWidth: '100%',
+  minWidth: 0,
+  ...FLAT_CALENDAR,
+} as const;
+
+/** The typed half: the consumer's own fields, or the built-in pair and its line. */
+function TypedHalf({
+  props,
+  picker,
+  placement,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  placement: FieldsPlacement;
+}): React.JSX.Element {
+  if (props.renderFields) return <>{props.renderFields({ placement })}</>;
+  return (
+    <DateRangeFields
+      value={props.value}
+      status={picker.status}
+      messages={picker.copy}
+      maxRangeDays={props.maxRangeDays}
+      onEdit={picker.editBound}
+      statusId={picker.statusId}
+      dataTestId={props.dataTestId ?? 'date-range-picker'}
+      openEnd={props.openEnd ?? false}
+      stacked={placement === 'beside'}
+    />
+  );
+}
+
+export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element {
+  const {
+    value,
+    onChange,
+    timeZone,
+    now,
+    maxRangeDays,
+    weekStartsOn = 0,
+    quickRanges = DEFAULT_QUICK_RANGES,
+    locale = 'en-US',
+    numberOfMonths,
+    messages,
+    dataTestId = 'date-range-picker',
+    className,
+    fieldsPlacement = 'below',
+    calendarLabels,
+  } = props;
   const picker = useDateRangePicker({
     value,
     onChange,
@@ -223,34 +273,68 @@ export function DateRangePicker({
     weekStartsOn,
     quickRanges,
     messages,
+    followValue: props.renderFields !== undefined,
   });
-  const months = useMonthCount(numberOfMonths);
+  const viewportMonths = useMonthCount(numberOfMonths);
+  const root = useRef<HTMLDivElement>(null);
+  const beside = fieldsPlacement === 'beside';
+  const width = useMeasuredWidth(root, beside);
+  const layout = besideLayout(width, numberOfMonths ?? 2);
+  const months = beside && width !== null ? layout.months : viewportMonths;
+
+  const body = (
+    <Box sx={BODY_SX}>
+      <RangeCalendar
+        calendarLabel={picker.copy.calendarLabel}
+        picker={picker}
+        value={value}
+        locale={locale}
+        weekStartsOn={weekStartsOn}
+        months={months}
+        maxRangeDays={maxRangeDays}
+        labels={calendarLabels}
+      />
+      <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
+    </Box>
+  );
+
+  if (beside) {
+    const sideBySide = layout.placement === 'beside' && width !== null;
+    return (
+      <Box
+        ref={root}
+        className={className}
+        data-testid={dataTestId}
+        data-fields-placement={sideBySide ? 'beside' : 'below'}
+        sx={{
+          display: 'flex',
+          flexDirection: sideBySide ? 'row' : 'column',
+          alignItems: sideBySide ? 'flex-start' : 'stretch',
+          gap: sideBySide ? `${BESIDE_GAP_PX}px` : 2,
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <Paper variant="outlined" sx={{ ...BESIDE_FRAME_SX, flex: sideBySide ? '0 0 auto' : undefined }}>
+          {body}
+        </Paper>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <TypedHalf props={props} picker={picker} placement={sideBySide ? 'beside' : 'below'} />
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Paper className={className} data-testid={dataTestId} sx={ROOT_SX}>
-      <Box sx={BODY_SX}>
-        <RangeCalendar
-          calendarLabel={picker.copy.calendarLabel}
-          picker={picker}
-          value={value}
-          locale={locale}
-          weekStartsOn={weekStartsOn}
-          months={months}
-          maxRangeDays={maxRangeDays}
-        />
-        <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
-      </Box>
-      <Box sx={FIELDS_DIVIDER_SX}>
-        <DateRangeFields
-          value={value}
-          status={picker.status}
-          messages={picker.copy}
-          maxRangeDays={maxRangeDays}
-          onEdit={picker.editBound}
-          statusId={picker.statusId}
-          dataTestId={dataTestId}
-        />
-      </Box>
+      {body}
+      {props.renderFields ? (
+        <TypedHalf props={props} picker={picker} placement="below" />
+      ) : (
+        <Box sx={FIELDS_DIVIDER_SX}>
+          <TypedHalf props={props} picker={picker} placement="below" />
+        </Box>
+      )}
     </Paper>
   );
 }

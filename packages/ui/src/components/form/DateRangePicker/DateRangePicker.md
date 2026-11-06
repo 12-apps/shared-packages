@@ -45,6 +45,11 @@ interface DateRangePickerProps {
   messages?: Partial<DateRangePickerMessages>;
   dataTestId?: string;                      // default 'date-range-picker'
   className?: string;
+  // Opt-in, for a picker laid out IN a page (all off by default):
+  fieldsPlacement?: 'below' | 'beside';     // default 'below'
+  renderFields?: (args: { placement: 'beside' | 'below' }) => ReactNode;
+  openEnd?: boolean;                        // a start with no end is an answer
+  calendarLabels?: Partial<CalendarLabels>; // names for the month arrows
 }
 ```
 
@@ -157,6 +162,33 @@ half its width and the numbers stop being readable.
 There is no `size` prop. The day grid has a fixed metric that a size scale would
 not change, and a prop that only altered the padding of the quick entries would
 be a scale in name only.
+
+## A picker laid out in a page
+
+The defaults above are a popover's: one framed block, fields underneath, a
+summary line. A form that shows the range ALWAYS OPEN among its other fields
+needs four more things, each opt-in so no existing screen changes:
+
+- **`fieldsPlacement="beside"`** — the months get their own outlined frame and
+  the typed half sits on the page: in a column BESIDE the frame when the
+  picker's own width holds both, under it when it does not, and with one month
+  instead of two when two would not fit either. Measured on the picker
+  (`ResizeObserver`), never the viewport: a form column beside a preview is
+  narrow on the widest screen. The root carries `data-fields-placement`.
+- **`renderFields({ placement })`** — the consumer's OWN fields instead of the
+  built-in pair, for a form whose fields carry rules this picker does not (a
+  half-typed date kept until submit, its own messages). The summary line goes
+  with the built-in pair: beside fields that say their own refusals it would
+  only repeat them. The calendar follows the value whenever the consumer moves
+  it, as it follows a typed date — never on a click in the grid.
+- **`openEnd`** — a start with no end is a finished answer ("from this day
+  on"), and the summary says `messages.openEnded` (default `No end date.`)
+  instead of asking for the end. It does not repeat the date: the field beside
+  it shows it. `resolveDayRange` is unchanged; what an open end means is the
+  caller's.
+- **`calendarLabels`** — names for the calendar's month arrows
+  (`PT_BR_UI_LABELS.calendar` in Portuguese); without them they stay unnamed,
+  as before.
 
 ## Accessibility
 
