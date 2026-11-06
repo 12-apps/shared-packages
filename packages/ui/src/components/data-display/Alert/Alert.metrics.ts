@@ -123,8 +123,8 @@ export const HOVER = { tintAlpha: 0.06 } as const;
  * painted above the background and below the content, so it never dims the
  * ink itself; and animatable, which `background-image` is not. It DOES dim the
  * ink's contrast, because it darkens a light surface toward a dark ink (and
- * lightens a dark one toward a light ink) — {@link POINTER_INK_STEP} is the
- * other half of the press.
+ * lightens a dark one toward a light ink) — on Alert, {@link POINTER_INK_STEP}
+ * is the other half of the press.
  *
  * `ms` is 250 and not the 1000 first asked for, and the reason is that ONE
  * property carries both states. CSS runs a transition from the DESTINATION
@@ -140,8 +140,9 @@ export const HOVER = { tintAlpha: 0.06 } as const;
 export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
 
 /**
- * How far the TITLE and SUMMARY ink step toward the absolute on their own side
- * while the alert is hovered or pressed (FUT-4506, option C).
+ * How far the MESSAGE ink — title, description and children — steps toward the
+ * absolute on its own side while the alert is hovered or pressed (FUT-4506,
+ * option C).
  *
  * The tint layer above moves the surface toward the mode's absolute — black in
  * light mode, white in dark — which is the side the ink sits on, so every
@@ -158,12 +159,15 @@ export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
  * a light ink has less room above it than a dark ink has below it, and dark
  * mode's pressed step needs at least 0.55.
  *
- * Keyed by the absolute the ink moves TOWARD rather than by mode, because the
- * two disagree on one surface: `gradient`, whose ink is `getContrastText` of
- * the hue — white in light mode, dark for dark mode's light hues. The web
- * applies the step as `color-mix()` over `currentColor`, so it steps whatever
- * ink is actually painted, a host's repaint included. DOM only; native has no
- * pointer states.
+ * Keyed by the absolute the ink moves TOWARD, which is the mode's: black in
+ * light mode, white in dark. The web applies the step as `color-mix()` over
+ * `currentColor`, so its AMOUNT lands on whatever ink is actually painted — a
+ * host's repaint of a semantic or `glass` alert included. Its DIRECTION is the
+ * mode's, which is only safe where the surface tracks the mode, so `gradient`
+ * is not stepped at all (`inkAbsolute` in `Alert.ink.ts`): a host that
+ * repaints it to a light pane and a dark ink would otherwise have its ink
+ * stepped toward white under a black layer. DOM only; native has no pointer
+ * states. `Banner` paints the same tint and does not step yet.
  */
 export const POINTER_INK_STEP = {
   hover: { black: 0.15, white: 0.2 },

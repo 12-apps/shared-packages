@@ -23,7 +23,7 @@ import { blend, getContrastRatio } from '../../../../tokens/color';
 import { createUiTheme } from '../../../../tokens/theme';
 import { blocksFor } from '../../__tests__/pointer-states.helpers';
 import { Alert } from '../Alert';
-import { inkAbsolute } from '../Alert.ink';
+import { inkAbsolute, pointerInkStyles } from '../Alert.ink';
 import { ACTIVE, DESCRIPTION, HOVER, POINTER_INK_STEP, semanticSurface } from '../Alert.metrics';
 
 /** WCAG 2.1 AA for normal-size text. The title (16.8px/600) is not "large", so it is held here too. */
@@ -111,20 +111,16 @@ describe('Given which absolute the ink steps toward', () => {
   const themeOf = (mode: Mode) => createTheme(muiThemeOptionsFrom(createUiTheme({ mode })));
 
   it.each(MODES)('steps a semantic %s-mode ink toward the side it is already on', (mode) => {
-    const theme = themeOf(mode);
-    expect(inkAbsolute(theme, theme.palette.info, 'info')).toBe(sideOf(mode));
+    expect(inkAbsolute(themeOf(mode), 'info')).toBe(sideOf(mode));
   });
 
-  it('steps a dark ink on a dark-mode gradient toward black, away from its surface (FUT-4516 owns its rest)', () => {
-    // `getContrastText` of dark mode's light info is DARK. Keyed by the mode it
-    // would step toward white — onto the gradient it is read against.
-    const theme = themeOf('dark');
-    expect(inkAbsolute(theme, theme.palette.info, 'gradient')).toBe('black');
-  });
-
-  it('steps a white ink on a light-mode gradient toward white, which leaves it where it is', () => {
-    const theme = themeOf('light');
-    expect(inkAbsolute(theme, theme.palette.info, 'gradient')).toBe('white');
+  it.each(MODES)('does not step a %s-mode gradient, whose ink side a host repaint can flip', (mode) => {
+    // A host that repaints alerts to a light pane and a dark ink repaints the
+    // gradient too, under its BLACK layer. Stepped by the package's own white
+    // ink, that dark ink went toward white: 1.02:1 pressed (FUT-4506 review).
+    const styles = pointerInkStyles(themeOf(mode), 'gradient');
+    expect(inkAbsolute(themeOf(mode), 'gradient')).toBeNull();
+    expect(styles).toEqual({ rest: {}, hover: {}, press: {} });
   });
 });
 
@@ -135,7 +131,8 @@ describe('Given the rule the sheet emits', () => {
       for (const variant of VARIANTS) {
         render(
           <ThemeProvider theme={createTheme(muiThemeOptionsFrom(createUiTheme({ mode })))}>
-            <Alert variant={variant} title="Atenção" description="mensagem" data-testid="surface" />
+            <Alert variant={variant} title="Atenção" description="mensagem" closable closeLabel="Fechar" data-testid="surface" />
+            <Alert variant={variant}>Só o texto, como filho.</Alert>
           </ThemeProvider>,
         );
       }
@@ -145,28 +142,47 @@ describe('Given the rule the sheet emits', () => {
       .join('\n');
   };
   const percent = (step: number): string => `${Math.round((1 - step) * 100)}%`;
+  const steppedSelectors = (css: string): string[] =>
+    css
+      .split('}')
+      .filter((chunk) => chunk.includes('color-mix(in srgb, currentColor'))
+      // One selector per rule: the press's `:has(…)` list is the only comma.
+      .map((chunk) => chunk.slice(0, chunk.indexOf('{')));
 
-  it('steps the title and the summary, and nothing else, while hovered', () => {
-    const css = emitted();
-    const rule = `color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.hover.black)}, #000)`;
-    const stepped = css.split('}').filter((chunk) => chunk.includes(rule));
-    expect(stepped.length).toBeGreaterThan(0);
-    for (const chunk of stepped) {
-      const selector = chunk.slice(0, chunk.indexOf('{'));
-      expect(selector).toMatch(/:hover/);
-      for (const part of selector.split(',')) expect(part).toMatch(/\.MuiAlertTitle-root|\.alert-description/);
+  it('steps the message column, and nothing else, while hovered or pressed', () => {
+    const selectors = steppedSelectors(emitted());
+    expect(selectors.length).toBeGreaterThan(0);
+    for (const selector of selectors) {
+      expect(selector).toMatch(/:(hover|active)/);
+      // ONE step on the column the title, description and children inherit —
+      // never on a line inside it (which would step twice), the icon or the
+      // close button.
+      expect(selector.trim()).toMatch(/\) \.MuiAlert-message$|:hover \.MuiAlert-message$/);
     }
   });
 
-  it('steps by the press amount, toward the side, while pressed', () => {
+  it('steps by the hover and the press amounts, toward the side', () => {
     const css = emitted();
+    const hovered = blocksFor(css, ':hover').join('\n');
     const pressed = blocksFor(css, ':active').join('\n');
+    expect(hovered).toContain(`color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.hover.black)}, #000)`);
+    expect(hovered).toContain(`color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.hover.white)}, #fff)`);
     expect(pressed).toContain(`color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.press.black)}, #000)`);
     expect(pressed).toContain(`color-mix(in srgb, currentColor ${percent(POINTER_INK_STEP.press.white)}, #fff)`);
   });
 
-  it('puts the summary class on the description, so the rule has something to reach', () => {
-    render(<Alert variant="info" description="mensagem" data-testid="described" />);
-    expect(document.querySelector('[data-testid="described-message"]')?.classList).toContain('alert-description');
+  it('reaches a children-only message, which has no title and no description to step', () => {
+    render(<Alert variant="warning" data-testid="bare">Só o texto, como filho.</Alert>);
+    const message = document.querySelector('[data-testid="bare"] .MuiAlert-message');
+    expect(message?.textContent).toBe('Só o texto, como filho.');
+    // The step's selector ends at the column, so this text inherits it.
+    expect(steppedSelectors(emitted()).every((selector) => selector.trim().endsWith('.MuiAlert-message'))).toBe(true);
+  });
+
+  it('keeps the close button outside the stepped column', () => {
+    render(<Alert variant="info" description="mensagem" closable closeLabel="Fechar" data-testid="closable" />);
+    const close = document.querySelector('[data-testid="closable-close"]');
+    expect(close?.closest('.MuiAlert-action')).not.toBeNull();
+    expect(close?.closest('.MuiAlert-message')).toBeNull();
   });
 });

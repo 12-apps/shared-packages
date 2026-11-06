@@ -5,7 +5,6 @@ import React from 'react';
 import { sxRem } from '../../../tokens/relative';
 
 import { testIdFor } from './Alert.helpers';
-import { ALERT_DESCRIPTION_CLASS } from './Alert.ink';
 import { DESCRIPTION, ICON_SLOT, TITLE, TITLE_ICON } from './Alert.metrics';
 import type { AlertProps } from './Alert.types';
 
@@ -79,7 +78,6 @@ export const AlertContent: React.FC<{
       {description && (
         <Box
           component="div"
-          className={ALERT_DESCRIPTION_CLASS}
           data-testid={testIdFor(dataTestId, 'message')}
           sx={{ opacity: DESCRIPTION.opacity, fontSize: sxRem(DESCRIPTION.fontSize), ...BREAK_WORDS }}
         >

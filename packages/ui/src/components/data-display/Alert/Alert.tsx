@@ -53,7 +53,7 @@ const transition = `all ${seconds(ALERT_TRANSITION_MS)} ${ALERT_EASING}`;
  * `Alert.metrics.ts` for why a layer replaced the opacity dip and the
  * brightness multiplier that each preceded it. It does move the surface toward
  * the ink's side, which is the contrast `pointerInkStyles` (`Alert.ink.ts`)
- * wins back by stepping the title and summary the same way.
+ * wins back by stepping the message column the same way.
  *
  * The glow is COMPOSED rather than replaced, so hovering a glowing alert keeps
  * its glow; `glowStyles` gave up its `!important` for this.
@@ -75,7 +75,7 @@ function pointerShadow(
   // floor and below its own idle. Every other variant's surface tracks the mode,
   // so for them the two rules agree. (Not quite WHITE in both modes: dark
   // mode's light hues get a dark `getContrastText` ink, which this black layer
-  // closes on. `inkAbsolute` steps that ink toward black; its rest contrast is
+  // closes on. That ink is not stepped (`inkAbsolute`); its rest contrast is
   // FUT-4516's.)
   const ink = variant === 'gradient' ? absoluteInk(theme).black : modeInk(theme);
   const glowShadow = glow
@@ -98,7 +98,7 @@ const StyledAlert = styled(MuiAlert, {
   const colorPalette = getColorFromTheme(theme, customColor || customVariant || 'info');
 
   const withTint = pointerShadow(theme, colorPalette, Boolean(glow), customVariant);
-  const ink = pointerInkStyles(theme, colorPalette, customVariant);
+  const ink = pointerInkStyles(theme, customVariant);
 
   return {
     borderRadius: theme.spacing(ALERT_RADIUS_UNITS),
@@ -114,7 +114,7 @@ const StyledAlert = styled(MuiAlert, {
     // Hover: one tint step, and nothing that moves. An alert is a surface
     // rather than a control, so the pointer only needs telling it is here. The
     // icon keeps its own place for the same reason — it is the variant's
-    // meaning, not an affordance to animate. Title and summary ink step too.
+    // meaning, not an affordance to animate. The message's ink steps too.
     '&:hover': {
       boxShadow: withTint(HOVER.tintAlpha),
       ...ink.hover,
