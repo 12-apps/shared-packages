@@ -89,6 +89,13 @@ const hoverBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | st
 // is a half-round cap on a cell as tall as it is wide.
 const BAND_RADIUS = '50%';
 
+const capRadius = (side: 'start' | 'end', fill: boolean) => {
+  const radius = fill ? FILL_CAP_RADIUS : BAND_RADIUS;
+  return side === 'start'
+    ? { borderStartStartRadius: radius, borderEndStartRadius: radius }
+    : { borderStartEndRadius: radius, borderEndEndRadius: radius };
+};
+
 /**
  * One cell: the band, painted on the button across its whole column, and the
  * day's round face, a `::before` circle behind the number. The face is a
@@ -105,7 +112,28 @@ const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => str
     ? (theme: Theme) => `inset 0 0 0 ${rem(theme, 1.5)} ${theme.palette.primary.main}`
     : undefined;
 
-const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean, ring: boolean): SxProps<Theme> => ({
+/**
+ * A filling calendar's cell (`fullWidth`): the whole column wide, so a range's
+ * band runs unbroken however far the columns spread, and no taller than the
+ * 40 design px face — the face is as tall as the cell, so it keeps its size
+ * while only the spacing grows. A row's end caps round at half that height
+ * (the radius clamps on a smaller cell) rather than half a wide cell's width.
+ */
+const FILL_CELL_HEIGHT = sxRem(40);
+const FILL_CAP_RADIUS = sxRem(20);
+
+const cellSize = (fill: boolean) =>
+  fill
+    ? { width: '100%', maxWidth: '100%', maxHeight: FILL_CELL_HEIGHT, aspectRatio: CELL_RATIO, justifySelf: 'stretch' }
+    : { width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' };
+
+const dayCellSx = (
+  day: DayRenderArgs,
+  band: DayBand,
+  visible: boolean,
+  ring: boolean,
+  fill: boolean,
+): SxProps<Theme> => ({
   position: 'relative',
   isolation: 'isolate',
   display: 'flex',
@@ -115,10 +143,7 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean, ring: bo
   // now that the seven columns carry no gap between them; `maxWidth` and the
   // column's `minmax(0, 1fr)` let it give way below that, and the ratio keeps
   // it 40 tall at full size and shrinking with it.
-  width: COLUMN_SIZE,
-  maxWidth: '100%',
-  aspectRatio: CELL_RATIO,
-  justifySelf: 'stretch',
+  ...cellSize(fill),
   boxSizing: 'border-box',
   padding: 0,
   border: 'none',
@@ -137,8 +162,8 @@ const dayCellSx = (day: DayRenderArgs, band: DayBand, visible: boolean, ring: bo
   // never server-rendered into that position, and every screen that showed one
   // printed the warning as a console error (FUT-4156), so the selectors carry
   // Emotion's own opt-out flag.
-  [`&:nth-child(7n + 1)${NTH_CHILD_IS_SAFE}`]: { borderStartStartRadius: BAND_RADIUS, borderEndStartRadius: BAND_RADIUS },
-  [`&:nth-child(7n)${NTH_CHILD_IS_SAFE}`]: { borderStartEndRadius: BAND_RADIUS, borderEndEndRadius: BAND_RADIUS },
+  [`&:nth-child(7n + 1)${NTH_CHILD_IS_SAFE}`]: capRadius('start', fill),
+  [`&:nth-child(7n)${NTH_CHILD_IS_SAFE}`]: capRadius('end', fill),
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -182,6 +207,8 @@ export interface CalendarDayProps {
   showOutsideDays: boolean;
   /** Ring today's face (`todayIndicator="ring"`). */
   todayRing?: boolean;
+  /** Fill the column (`CalendarProps.fullWidth`). */
+  fullWidth?: boolean;
   dayClassName?: (args: DayRenderArgs) => string;
   onSelect: (date: Date) => void;
   onHover: (date: Date) => void;
@@ -195,6 +222,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   focused,
   showOutsideDays,
   todayRing = false,
+  fullWidth = false,
   dayClassName,
   onSelect,
   onHover,
@@ -212,7 +240,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
         component="span"
         aria-hidden="true"
         data-testid="calendar-outside-placeholder"
-        sx={{ width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' }}
+        sx={cellSize(fullWidth)}
       />
     );
   }
@@ -234,7 +262,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       onClick={() => onSelect(day.date)}
       onMouseEnter={() => onHover(day.date)}
       onMouseLeave={onHoverEnd}
-      sx={dayCellSx(day, band, visible, todayRing)}
+      sx={dayCellSx(day, band, visible, todayRing, fullWidth)}
     >
       {day.selected && (
         <Box component="span" data-testid="calendar-selected-date" sx={{ display: 'none' }} />

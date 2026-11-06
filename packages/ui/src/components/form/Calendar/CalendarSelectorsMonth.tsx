@@ -10,7 +10,7 @@ import type { MonthMatrix } from './Calendar.types';
 import type { DateBounds } from './Calendar.views';
 import { MONTH_INDEXES, canShiftMonth, isMonthOutOfBounds, isYearOutOfBounds, yearOptions } from './Calendar.views';
 import type { DayCellContext } from './CalendarDayCell';
-import { MONTH_SX, MonthDays } from './CalendarMonth';
+import { MonthDays, monthSx } from './CalendarMonth';
 import type { PickerOption } from './CalendarPickerGrid';
 import { CalendarPickerGrid } from './CalendarPickerGrid';
 import { CalendarSelectorsCaption } from './CalendarSelectorsCaption';
@@ -82,7 +82,7 @@ export const CalendarSelectorsMonth: FC<CalendarSelectorsMonthProps> = ({
   const picking = picker.view !== 'days';
 
   return (
-    <Box sx={MONTH_SX} data-testid="calendar-month-0">
+    <Box sx={monthSx(dayContext.fullWidth)} data-testid="calendar-month-0">
       <CalendarSelectorsCaption
         monthText={getMonthLabel(matrix.month, locale, 'long')}
         monthNames={MONTH_INDEXES.map((index) => getMonthLabel(index, locale, 'long'))}

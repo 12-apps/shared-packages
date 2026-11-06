@@ -20,6 +20,8 @@ export interface DayCellContext {
   showOutsideDays: boolean;
   /** How today is marked (`CalendarProps.todayIndicator`). */
   todayIndicator: CalendarTodayIndicator;
+  /** Spread the columns across the width (`CalendarProps.fullWidth`). */
+  fullWidth: boolean;
   isDisabled: (date: Date) => boolean;
   renderDay?: CalendarProps['renderDay'];
   dayClassName?: CalendarProps['dayClassName'];
@@ -33,6 +35,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   focusedDate,
   showOutsideDays,
   todayIndicator,
+  fullWidth,
   renderDay,
   dayClassName,
   onSelect,
@@ -53,6 +56,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
       focused={isSameDay(args.date, focusedDate)}
       showOutsideDays={showOutsideDays}
       todayRing={todayIndicator === 'ring'}
+      fullWidth={fullWidth}
       dayClassName={dayClassName}
       onSelect={onSelect}
       onHover={onHover}

@@ -7,7 +7,8 @@ import type { FC } from 'react';
 import React from 'react';
 
 import type { CalendarLabels } from '../../../copy/labels';
-import { sxRem } from '../../../tokens/relative';
+import type { Theme } from '@mui/material/styles/index.js';
+import { rem, sxRem } from '../../../tokens/relative';
 
 import { getMonthName } from './Calendar.dates';
 import type { CalendarProps, MonthMatrix } from './Calendar.types';
@@ -37,6 +38,23 @@ const GRID_SX = {
  * so a multi-month calendar still wraps rather than squeezing every month.
  */
 export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
+
+/**
+ * A filling month (`fullWidth`) drops the 304 ceiling and takes its share of
+ * the row; its columns spread, its day faces do not grow (`CalendarDay`).
+ */
+export const monthSx = (fullWidth: boolean) => (fullWidth ? FILL_MONTH_SX : MONTH_SX);
+
+/**
+ * The basis as a theme function: interpolated into a string, `sxRem` is a
+ * function and the whole `flex` value is dropped as invalid CSS. A filling
+ * month's cells have no intrinsic width to fall back on, so it must grow.
+ */
+const FILL_MONTH_SX = {
+  flex: (theme: Theme) => `1 1 ${rem(theme, 280)}`,
+  minWidth: 0,
+  maxWidth: 'none',
+} as const;
 
 /** The two arrows' accessible names; an icon alone names nothing. */
 export type MonthArrowLabels = Pick<CalendarLabels, 'previousMonth' | 'nextMonth'>;
@@ -175,7 +193,7 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
        January's 5th and February's. Without a per-month hook a test can only
        reach a day positionally, which is exactly what the flakiness gate
        refuses. Additive: `calendar-grid` below is unchanged. */
-    <Box sx={MONTH_SX} data-testid={`calendar-month-${monthIndex}`}>
+    <Box sx={monthSx(dayContext.fullWidth)} data-testid={`calendar-month-${monthIndex}`}>
       <MonthNavHeader
         title={title}
         showPrevious={monthIndex === 0}

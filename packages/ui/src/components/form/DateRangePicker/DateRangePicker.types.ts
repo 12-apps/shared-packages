@@ -184,6 +184,17 @@ export interface DateRangePickerProps {
    */
   fieldsPlacement?: 'below' | 'beside';
   /**
+   * With `fieldsPlacement="beside"`: the months' frame meets the picker's own
+   * edges instead of hugging its months. Under the fields' row the frame spans
+   * the picker; beside them it takes what the fields' column leaves, and that
+   * column stops at 320 design px — a `dd/mm/aaaa` date and its message need
+   * no more. The calendar's seven columns spread across the frame and the day
+   * faces keep their size (`Calendar` `fullWidth`). For a picker laid into a
+   * form section whose edges the frame must line up with. Default: false — the
+   * frame as wide as its months, centred under the fields.
+   */
+  fullWidth?: boolean;
+  /**
    * The consumer's OWN typed fields, in place of the built-in pair and the
    * summary line under it — for a form whose fields carry its own rules (a
    * half-typed date kept until submit, its own messages), which a second line

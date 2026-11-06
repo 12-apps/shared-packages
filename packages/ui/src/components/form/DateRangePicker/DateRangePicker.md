@@ -204,6 +204,13 @@ needs four more things, each opt-in so no existing screen changes:
 Under the fields' row (`placement="below"`) the frame is as wide as its months
 and centred, never stretched across the page around one month.
 
+- **`fullWidth`** (with `fieldsPlacement="beside"`) — the frame's edges are the
+  picker's: under the fields it spans the picker, beside them it takes what the
+  fields' column leaves (never less than its months at full size), and that
+  column stops at 320 design px. The calendar's seven columns spread across the
+  frame; the day faces keep their 40 design px. For a picker laid into a form
+  section whose heading and fields the frame must line up with. Default off.
+
 ## Accessibility
 
 - The quick entries are native `<button>`s with `aria-pressed`; the active one

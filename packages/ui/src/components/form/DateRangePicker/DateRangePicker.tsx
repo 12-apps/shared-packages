@@ -30,11 +30,12 @@ import type { SxProps, Theme } from '@mui/material/styles/index.js';
 import React, { useRef } from 'react';
 
 import type { CalendarLabels } from '../../../copy/labels';
+import { sxRem } from '../../../tokens/relative';
 import { Calendar } from '../Calendar';
 
 import { toLocalDay } from './DateRangePicker.dates';
 import { useDateRangePicker } from './DateRangePicker.hooks';
-import { besideLayout, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
+import { besideLayout, framedMonthsWidth, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
 import { DEFAULT_QUICK_RANGES } from './DateRangePicker.quick';
 import type { DateRangeDraft, DateRangePickerProps, WeekStart } from './DateRangePicker.types';
 import { DateRangeFields } from './DateRangePickerFields';
@@ -139,7 +140,10 @@ function useMonthCount(requested: number | undefined): number | undefined {
 
 /** The grid, in range mode — `Calendar`, never a second implementation of one. */
 /** The calendar options a picker passes through untouched. */
-type CalendarDisplay = Pick<DateRangePickerProps, 'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange'>;
+type CalendarDisplay = Pick<
+  DateRangePickerProps,
+  'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange' | 'fullWidth'
+>;
 
 function RangeCalendar({
   calendarLabel,
@@ -186,6 +190,7 @@ function RangeCalendar({
       showOutsideDays={display.showOutsideDays}
       todayIndicator={display.todayIndicator}
       allowSameDayRange={display.allowSameDayRange}
+      fullWidth={display.fullWidth}
     />
   );
 }
@@ -239,6 +244,32 @@ const BELOW_FRAME_SX = {
   alignSelf: 'center',
   width: 'fit-content',
 } as const;
+
+/**
+ * `fullWidth`: the frame's edges are the picker's. Under the fields it spans
+ * the picker; beside them it takes the row the fields' column leaves, and the
+ * months spread across it (FUT-4156: a fitted frame left blank bands of 10 to
+ * 77px each side at 390, 600 and 900 wide).
+ */
+const FILL_BELOW_FRAME_SX = { ...BESIDE_FRAME_SX, alignSelf: 'stretch' } as const;
+// Never narrower than its months at their full size: the fields' column gives
+// way first, down to the room `besideLayout` chose this placement with.
+const fillBesideFrameSx = (months: number) =>
+  ({ ...BESIDE_FRAME_SX, flex: '1 1 auto', minWidth: sxRem(framedMonthsWidth(months)) }) as const;
+
+/**
+ * The fields' column beside a filling frame stops at 320 design px: at 1920
+ * wide it ran to 694 for a ten-character date, with the room under it blank.
+ */
+const FILL_FIELDS_COLUMN = { flex: '0 1 auto', width: sxRem(320), minWidth: 0 } as const;
+
+const frameSx = (sideBySide: boolean, fill: boolean, months: number) => {
+  if (fill) return sideBySide ? fillBesideFrameSx(months) : FILL_BELOW_FRAME_SX;
+  return sideBySide ? { ...BESIDE_FRAME_SX, flex: '0 0 auto' } : BELOW_FRAME_SX;
+};
+
+const fieldsColumnSx = (sideBySide: boolean, fill: boolean) =>
+  fill && sideBySide ? FILL_FIELDS_COLUMN : { flex: 1, minWidth: 0 };
 
 /** The typed half: the consumer's own fields, or the built-in pair and its line. */
 function TypedHalf({
@@ -313,10 +344,10 @@ function InPageLayout({
         minWidth: 0,
       }}
     >
-      <Paper variant="outlined" sx={sideBySide ? { ...BESIDE_FRAME_SX, flex: '0 0 auto' } : BELOW_FRAME_SX}>
+      <Paper variant="outlined" sx={frameSx(sideBySide, props.fullWidth === true, layout.months ?? 1)}>
         {body}
       </Paper>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={fieldsColumnSx(sideBySide, props.fullWidth === true)}>
         <TypedHalf props={props} picker={picker} placement={layout.placement} />
       </Box>
     </Box>

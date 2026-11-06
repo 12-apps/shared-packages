@@ -12,6 +12,7 @@ const CALENDAR_DEFAULTS = {
   autoFocus: false,
   captionLayout: 'arrows',
   todayIndicator: 'bold',
+  fullWidth: false,
 } as const satisfies Partial<CalendarProps>;
 
 // Strips explicitly-undefined props before the merge, so `prop={undefined}` still

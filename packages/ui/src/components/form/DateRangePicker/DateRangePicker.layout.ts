@@ -25,6 +25,11 @@ const BESIDE_COLUMN = 252;
 
 export type FieldsPlacement = 'beside' | 'below';
 
+/** The design px a frame around `months` month grids needs (see FRAMED_MONTHS). */
+export function framedMonthsWidth(months: number): number {
+  return FRAMED_MONTHS[months] ?? (FRAMED_MONTHS[2]! * months) / 2;
+}
+
 /**
  * The layout for a picker `width` px wide asking for `requested` months, in
  * order of preference: every month requested with the fields beside, then
@@ -37,7 +42,7 @@ export function besideLayout(
   theme: Theme,
 ): { months: number; placement: FieldsPlacement } {
   if (width === null) return { months: requested, placement: 'below' };
-  const framed = (months: number): number => remPx(theme, FRAMED_MONTHS[months] ?? FRAMED_MONTHS[2]! * months / 2);
+  const framed = (months: number): number => remPx(theme, framedMonthsWidth(months));
   const beside = remPx(theme, BESIDE_COLUMN);
   const counts = requested > 1 ? [requested, 1] : [requested];
   for (const months of counts) {

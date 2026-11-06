@@ -65,6 +65,14 @@ export interface CalendarProps {
    */
   todayIndicator?: CalendarTodayIndicator;
   showWeekNumbers?: boolean;
+  /**
+   * Fill the width the calendar is given instead of stopping at a month's
+   * intrinsic 304 design px. The seven columns spread across it and the day
+   * faces keep their size (40 design px at most): only the spacing grows, and a
+   * range's band still runs unbroken across the columns. For a calendar laid
+   * into a page section whose edges it must meet. Default: false.
+   */
+  fullWidth?: boolean;
   /** default: 'arrows'. `'selectors'` always shows one month. */
   captionLayout?: CalendarCaptionLayout;
   /**
@@ -113,7 +121,8 @@ type CalendarDefaultedKeys =
   | 'allowSameDayRange'
   | 'autoFocus'
   | 'captionLayout'
-  | 'todayIndicator';
+  | 'todayIndicator'
+  | 'fullWidth';
 
 // CalendarProps with the defaults already applied, plus the month count resolved
 // from numberOfMonths and the selection mode.
