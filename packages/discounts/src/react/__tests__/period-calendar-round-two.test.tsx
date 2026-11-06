@@ -180,11 +180,13 @@ describe("the calendar as prototype B draws it", () => {
     expect(monthsShown()[0]).toBe("novembro de 2026");
   });
 
-  it("W10: a pack without the calendar's names is reported, never filled in English", () => {
+  // Review round 6: edited on purpose. Required, these names made the branch a
+  // breaking change for every host pack; optional, a pack without them is
+  // filled from the package's pack for the host's locale — still never English
+  // on a Portuguese host (see days-unknown-fallback.test.tsx).
+  it("W10: a pack without the calendar's names is not reported missing: it is filled in", () => {
     const form = Object.fromEntries(Object.entries(copy.form).filter(([key]) => key !== "calendar"));
-    expect(missingWebCopy({ ...copy, form } as unknown as typeof copy, copy)).toEqual(
-      expect.arrayContaining(["form.calendar.locale", "form.calendar.label", "form.calendar.previousMonth"]),
-    );
+    expect(missingWebCopy({ ...copy, form } as unknown as typeof copy, copy)).toEqual([]);
   });
 });
 

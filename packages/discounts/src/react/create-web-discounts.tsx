@@ -6,6 +6,7 @@ import { timeZoneLabel } from "../timezone";
 
 import { createDiscountsApiClient, type DiscountsApiClient } from "./api";
 import { missingWebCopy, type DiscountsWebCopy } from "./copy";
+import { completeWebCopy } from "./copy-fallback";
 import { DiscountForm, type DiscountFormProps } from "./discount-form";
 import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
@@ -161,7 +162,10 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings } = config;
+  const { onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings } = config;
+  // A host pack without a sentence added after it was written is filled in
+  // from the package's pack for this locale (review round 6): never a throw.
+  const copy = completeWebCopy(config.copy, config.locale);
   // DERIVED from the zone unless the host insists otherwise. A host naming the
   // zone in words would be shipping copy, which has to be bilingual; `Intl`
   // already knows it in every locale.
@@ -221,5 +225,5 @@ export function useWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
 /** The screen as a bare component, for a host that wires everything itself. */
 export type { DiscountsScreenProps };
 export function DiscountsSurface(props: DiscountsScreenProps): JSX.Element {
-  return <DiscountsScreen {...props} />;
+  return <DiscountsScreen {...props} copy={completeWebCopy(props.copy, props.formatters.locale)} />;
 }

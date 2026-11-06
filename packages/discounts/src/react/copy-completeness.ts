@@ -5,6 +5,24 @@ import type { DiscountsWebCopy } from "./copy";
  * file-size gate; `./copy` re-exports it.
  */
 
+/**
+ * Dotted paths `missingWebCopy` never reports (review round 6): optional in
+ * the type, and filled in from the package's own packs by `completeWebCopy`.
+ */
+export const OPTIONAL_WEB_COPY_PATHS: ReadonlySet<string> = new Set([
+  "window.daysUnknown",
+  "window.daysUnknownList",
+  "window.daysUnknownForm",
+  "window.daysUnknownBoxes",
+  "window.daysUnknownPaused",
+  "window.openTimeZone",
+  "form.calendar.locale",
+  "form.calendar.label",
+  "form.calendar.previousMonth",
+  "form.calendar.nextMonth",
+  "form.endsBeforeStartDay",
+]);
+
 /** Every leaf path of an object, dotted. */
 function leafPaths(value: unknown, prefix = ""): string[] {
   if (value === null || typeof value !== "object") return prefix === "" ? [] : [prefix];
@@ -38,6 +56,7 @@ export function missingWebCopy(
   reference: DiscountsWebCopy,
 ): string[] {
   return leafPaths(reference).filter((path) => {
+    if (OPTIONAL_WEB_COPY_PATHS.has(path)) return false;
     const value = read(copy, path);
     // A leaf is satisfied by a non-blank string OR a function. The `@12-apps/ui`
     // packs folded in below carry entries that take the interpolated value as

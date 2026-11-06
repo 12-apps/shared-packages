@@ -398,6 +398,15 @@ form accepts Início = Término as a one-day promotion; without it the form
 refuses equal days itself, as the server does, and a second tap on Início in
 the calendar does nothing.
 
+**Every copy key this feature added is optional**, on the web pack
+(`window.daysUnknown*`, `window.openTimeZone`, `form.calendar.*`,
+`form.endsBeforeStartDay`) and on the server pack (`keepWindowWithDates`,
+`windowChanged`). A host pack written before them still mounts —
+`missingWebCopy` does not report them — and each missing sentence is said from
+the package's own pack for the host's locale (pt-BR for a `pt` tag, en-US
+otherwise). Only `endsBeforeStartDay` and `datesNeedKnownZone` on the server
+are asserted at the mount, and only once `storeTimeZone` is passed.
+
 ## Letting a host table opt in — `DiscountableCollection`
 
 A discount points at rows this package will never see: a store's categories, its

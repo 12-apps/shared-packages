@@ -6,7 +6,8 @@ import { DateRangePicker, type DateRangeDraft } from "@12-apps/ui/form/DateRange
 import { useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy, DiscountsWebCopy } from "./copy";
+import { completeWebCopy } from "./copy-fallback";
 import { DateField, isIsoDay } from "./date-field";
 
 /**
@@ -46,37 +47,55 @@ function afterTap(draft: DateRangeDraft, next: DateRangeDraft): DateRangeDraft {
   return keepsEnd ? { from: next.from, to: draft.to } : next;
 }
 
+/** The id of the line under the disabled boxes, which describes both. */
+const UNAVAILABLE_LINE_ID = "discount-period-unavailable";
+
 function PeriodBoxes({
   copy,
   placement,
   disabled,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   placement: "beside" | "below";
   disabled: boolean;
 }): JSX.Element {
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gap: 2,
-        // Beside the months the two stack; under them they sit two-up, as the
-        // prototype draws them at 390.
-        gridTemplateColumns: placement === "beside" ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))",
-      }}
-    >
-      {(["startsAt", "endsAt"] as const).map((name) => (
-        <DateField
-          key={name}
-          name={name}
-          label={copy.form[name]}
-          // Disabled, the box says in words why it is empty.
-          placeholder={disabled ? copy.window.daysUnknown : copy.form.datePlaceholder}
-          disabled={disabled}
-          invalidMessage={copy.form.invalidDate}
-          incompleteMessage={copy.form.dateIncomplete}
-        />
-      ))}
+    <Box sx={{ display: "grid", gap: 1 }}>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          // Beside the months the two stack; under them they sit two-up, as the
+          // prototype draws them at 390.
+          gridTemplateColumns: placement === "beside" ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))",
+        }}
+      >
+        {(["startsAt", "endsAt"] as const).map((name) => (
+          <DateField
+            key={name}
+            name={name}
+            label={copy.form[name]}
+            // Disabled, the box says nothing: its words would be cut at 320
+            // (136px boxes) and drawn in placeholder grey. The line under both
+            // says why, in readable ink, and describes each box (round 6).
+            placeholder={disabled ? "" : copy.form.datePlaceholder}
+            disabled={disabled}
+            {...(disabled ? { describedBy: UNAVAILABLE_LINE_ID } : {})}
+            invalidMessage={copy.form.invalidDate}
+            incompleteMessage={copy.form.dateIncomplete}
+          />
+        ))}
+      </Box>
+      {disabled ? (
+        <Box
+          component="p"
+          id={UNAVAILABLE_LINE_ID}
+          data-testid="discount-period-unavailable"
+          sx={{ margin: 0, typography: "caption", color: "text.secondary", overflowWrap: "anywhere" }}
+        >
+          {copy.window.daysUnknownBoxes}
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -97,7 +116,8 @@ export function PeriodPicker({
 }): JSX.Element {
   const { values, setFieldValue } = useFormContext();
   const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
-  const names = copy.form.calendar;
+  const words = completeWebCopy(copy);
+  const names = words.form.calendar;
   return (
     <DateRangePicker
       value={draft}
@@ -117,7 +137,9 @@ export function PeriodPicker({
       openEnd
       dataTestId="discount-period-picker"
       disabled={daysUnknown}
-      renderFields={({ placement, disabled }) => <PeriodBoxes copy={copy} placement={placement} disabled={disabled} />}
+      // Disabled, the picker is a group named after the section's own period.
+      label={words.schedule.periodTitle}
+      renderFields={({ placement, disabled }) => <PeriodBoxes copy={words} placement={placement} disabled={disabled} />}
       showOutsideDays={false}
       todayIndicator="ring"
       allowSameDayRange={wholeDays}

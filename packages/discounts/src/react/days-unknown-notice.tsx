@@ -7,6 +7,7 @@ import { Box } from "@12-apps/ui/mui/Box";
 import { Link } from "@12-apps/ui/mui/Link";
 
 import type { DiscountsWebCopy } from "./copy";
+import { completeWebCopy } from "./copy-fallback";
 
 /**
  * "Datas indisponíveis" (FUT-4482, review round 4): a rule written in the
@@ -86,7 +87,7 @@ export function DaysUnknownNotice({
         "& .MuiAlert-icon": { paddingY: 0 },
       }}
     >
-      {timeZoneSettings ? <SettingsLink settings={timeZoneSettings} label={copy.window.openTimeZone} /> : null}
+      {timeZoneSettings ? <SettingsLink settings={timeZoneSettings} label={completeWebCopy(copy).window.openTimeZone} /> : null}
     </Alert>
   );
 }
@@ -106,7 +107,7 @@ export function DaysUnknownListNotice({
     <Box sx={{ marginBottom: 2 }}>
       <DaysUnknownNotice
         copy={copy}
-        message={copy.window.daysUnknownList}
+        message={completeWebCopy(copy).window.daysUnknownList}
         timeZoneSettings={timeZoneSettings}
         dataTestId="discounts-days-unknown-notice"
       />
@@ -120,7 +121,8 @@ export function DaysUnknownListNotice({
  * do not fit beside the admin's rails (measured: off-screen at 900, on screen
  * at 1280), so the grid scrolls sideways. From `lg` the cell itself says them.
  */
-export function DaysUnknownMarker({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+export function DaysUnknownMarker({ copy, paused = false }: { copy: DiscountsWebCopy; paused?: boolean }): JSX.Element {
+  const words = completeWebCopy(copy).window;
   return (
     <Box
       component="span"
@@ -132,20 +134,22 @@ export function DaysUnknownMarker({ copy }: { copy: DiscountsWebCopy }): JSX.Ele
         fontWeight: 600,
       }}
     >
-      {copy.window.daysUnknown}
+      {/* The status column is off-screen too below lg: a rule that is not
+          active says so here, or the phone reads it as running (round 6). */}
+      {paused ? words.daysUnknownPaused : words.daysUnknown}
     </Box>
   );
 }
 
 /** The Nome cell: the name, and the marker when the row's days are unknown. */
 export function nameCell(
-  row: { name: string; record: { daysUnknown?: boolean | undefined } },
+  row: { name: string; record: { daysUnknown?: boolean | undefined; active?: boolean | undefined } },
   copy: DiscountsWebCopy,
 ): JSX.Element {
   return (
     <>
       <span>{row.name}</span>
-      {row.record.daysUnknown === true ? <DaysUnknownMarker copy={copy} /> : null}
+      {row.record.daysUnknown === true ? <DaysUnknownMarker copy={copy} paused={row.record.active === false} /> : null}
     </>
   );
 }

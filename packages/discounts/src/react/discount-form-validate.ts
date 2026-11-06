@@ -9,6 +9,7 @@ import { isCompleteMaskedDay, isIsoDay } from "./date-field";
 import type { DiscountFormValues } from "./discount-form-values";
 import { isComboKind, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
+import { completeWebCopy } from "./copy-fallback";
 
 /**
  * Everything the create/edit form refuses locally, split from the form itself
@@ -208,7 +209,7 @@ function checkPeriod(
 /** Término against Início, once both are real days. */
 function checkOrder(values: DiscountFormValues, copy: DiscountsWebCopy, wholeDays: boolean): Record<string, string> {
   if (!isIsoDay(values.startsAt) || !isIsoDay(values.endsAt)) return {};
-  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: copy.form.endsBeforeStartDay } : {};
+  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: completeWebCopy(copy).form.endsBeforeStartDay } : {};
   return values.endsAt <= values.startsAt ? { endsAt: copy.form.endsBeforeStarts } : {};
 }
 

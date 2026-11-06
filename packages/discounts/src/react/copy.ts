@@ -100,13 +100,20 @@ export interface DiscountsWindowCopy {
    * said once, above the list (`daysUnknownList`) and above the form's boxes
    * (`daysUnknownForm`, which also says that saving keeps the saved dates —
    * Salvar is never refused for it, review round 5); `daysUnknown` is also
-   * what the two disabled boxes say. `openTimeZone` labels the host's
-   * optional link to its time-zone setting.
+   * the line under the two disabled boxes (`daysUnknownBoxes`, which wraps and
+   * is the boxes' accessible description). `daysUnknownPaused` is the phone
+   * marker of a rule that is also not active. `openTimeZone` labels the
+   * host's optional link to its time-zone setting.
+   *
+   * OPTIONAL, every one (review round 6): a pack without one is answered from
+   * the package's pack for the host's `locale` (`completeWebCopy`).
    */
-  readonly daysUnknown: string;
-  readonly daysUnknownList: string;
-  readonly daysUnknownForm: string;
-  readonly openTimeZone: string;
+  readonly daysUnknown?: string;
+  readonly daysUnknownList?: string;
+  readonly daysUnknownForm?: string;
+  readonly daysUnknownBoxes?: string;
+  readonly daysUnknownPaused?: string;
+  readonly openTimeZone?: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;
   /** Only a start. `{date}`. */
@@ -154,14 +161,14 @@ export interface DiscountsFormCopy {
    * The period calendar's names (FUT-4156): the language its months and
    * weekdays are written in (a BCP-47 tag — the PACK's language, so a host
    * resolving copy per reader gets the reader's month names), the grid's own
-   * name and its month arrows'. Required like every other sentence: a pack
-   * without them would leave an English calendar on a Portuguese form.
+   * name and its month arrows'. OPTIONAL (review round 6), filled in as the
+   * window's are, so a Portuguese host never gets an English calendar.
    */
-  readonly calendar: {
-    readonly locale: string;
-    readonly label: string;
-    readonly previousMonth: string;
-    readonly nextMonth: string;
+  readonly calendar?: {
+    readonly locale?: string;
+    readonly label?: string;
+    readonly previousMonth?: string;
+    readonly nextMonth?: string;
   };
   readonly minSubtotal: string;
   readonly usageLimit: string;
@@ -230,9 +237,9 @@ export interface DiscountsFormCopy {
   readonly endsBeforeStarts: string;
   /**
    * Término BEFORE Início, where the server counts whole days in the store's
-   * zone (FUT-4482, `wholeDays`): Início = Término is a one-day promotion.
+   * zone (FUT-4482, `wholeDays`): Início = Término is a one-day promotion. Optional (round 6).
    */
-  readonly endsBeforeStartDay: string;
+  readonly endsBeforeStartDay?: string;
   /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
   readonly invalidDate: string;
   /** A date left half-typed ("25/10/202"): shown once the box is left, or at Criar. */
@@ -389,3 +396,5 @@ export function fill(template: string, values: Readonly<Record<string, string | 
 }
 
 export { missingWebCopy } from "./copy-completeness";
+
+export type { CompleteDiscountsWebCopy, DiscountsWindowFallbackKey } from "./copy-complete";

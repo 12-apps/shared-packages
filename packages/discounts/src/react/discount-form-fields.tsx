@@ -19,6 +19,7 @@ import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
 import { PercentField, WholeNumberField } from "./number-fields";
 import { PeriodPicker } from "./period-picker";
 import { ScheduleBuilder } from "./schedule-builder";
+import { completeWebCopy } from "./copy-fallback";
 
 /**
  * The form's inputs, split from the form itself for the 400-line file gate —
@@ -210,7 +211,7 @@ function PeriodSection({
       {daysUnknown ? (
         <DaysUnknownNotice
           copy={copy}
-          message={copy.window.daysUnknownForm}
+          message={completeWebCopy(copy).window.daysUnknownForm}
           timeZoneSettings={timeZoneSettings}
           dataTestId="discount-days-unknown"
         />

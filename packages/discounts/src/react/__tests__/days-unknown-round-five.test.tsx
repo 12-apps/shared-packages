@@ -107,15 +107,22 @@ async function saveAndClose(): Promise<void> {
 }
 
 describe("the period while the days are unknown (review round 5)", () => {
-  it("disables the calendar and both boxes, and the boxes say the dates are unavailable", async () => {
+  // Review round 6: edited on purpose. The words in each box were cut at 320
+  // and drawn in placeholder grey; one line under both says them now, and is
+  // each box's accessible description.
+  it("disables the calendar and both boxes, and the line under them describes both", async () => {
     mount([UNKNOWN]);
     const period = await openEdit(UNKNOWN.id);
     const days = within(period).getAllByRole("gridcell").filter((cell) => cell.getAttribute("data-in-month") === "true");
     expect(days.every((cell) => cell.getAttribute("aria-disabled") === "true")).toBe(true);
+    const line = within(period).getByTestId("discount-period-unavailable");
+    expect(line.textContent).toBe(copy.window.daysUnknownBoxes);
     for (const box of dateBoxes(period)) {
       expect(box.disabled).toBe(true);
-      expect(box.placeholder).toBe(copy.window.daysUnknown);
+      expect(box.placeholder).toBe("");
+      expect(box.getAttribute("aria-describedby")).toBe(line.id);
     }
+    expect(within(period).getByRole("group", { name: copy.schedule.periodTitle }).getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(days[9]!);
     expect(dateBoxes(period).map((box) => box.value)).toEqual(["", ""]);
   });

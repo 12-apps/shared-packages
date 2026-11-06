@@ -3,6 +3,7 @@ import type { DiscountSchedule } from "../engine/schedule";
 
 import { fill, type DiscountsWebCopy } from "./copy";
 import { formatScheduleCell } from "./schedule-summary";
+import { completeWebCopy } from "./copy-fallback";
 
 /**
  * Money, percentages and dates — as ONE locale's reader expects them, and as
@@ -36,6 +37,11 @@ export interface DiscountsFormatters {
   parseDecimal(typed: string): number | null;
   /** A number as the operator would type it back ("12.5" → "12,5"). */
   toInput(value: number): string;
+  /**
+   * The locale these format in — what a pack missing an optional sentence is
+   * filled in from (review round 6). Optional: a host's own formatters omit it.
+   */
+  readonly locale?: string;
 }
 
 /** The decimal separator this locale writes, read from `Intl` rather than guessed. */
@@ -57,6 +63,7 @@ export function createFormatters(locale: string, currency: string): DiscountsFor
   const group = groupSeparator(locale);
 
   return {
+    locale,
     money: (cents) => (cents === null ? EMPTY : money.format(cents / 100)),
     percent: (basisPoints) =>
       basisPoints === null ? EMPTY : `${percent.format(basisPoints / 100)}%`,
@@ -129,7 +136,7 @@ interface PeriodRow {
 function formatPeriod(row: PeriodRow, formatters: DiscountsFormatters, copy: DiscountsWebCopy): string {
   // Days the server cannot place are said as such, never formatted from the
   // instants in a zone that is not the store's.
-  if (row.daysUnknown === true) return copy.window.daysUnknown;
+  if (row.daysUnknown === true) return completeWebCopy(copy, formatters.locale).window.daysUnknown;
   // The days the rule runs on in the store's zone, when the server counts them;
   // a `YYYY-MM-DD` formats as that day, like the UTC midnight it replaces.
   const startsAt = row.startsOn === undefined ? row.startsAt : row.startsOn;

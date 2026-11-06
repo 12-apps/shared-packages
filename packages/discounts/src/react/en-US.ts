@@ -6,7 +6,7 @@ import {
   EN_US_UI_LABELS,
 } from "@12-apps/ui/en-US";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 
 /**
  * The en-US pack for the discounts admin screens.
@@ -22,7 +22,7 @@ import type { DiscountsWebCopy } from "./copy";
  * The KEYS of `labels.*` are the engine's wire values (`PERCENTAGE`, `ORDER`,
  * `RUNNING`, …). Only the words beside them are translated.
  */
-export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
+export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   screen: {
     title: "Discounts",
     aboutTitle: "About discounts",
@@ -89,6 +89,8 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     daysUnknownList: "Dates unavailable on some promotions: the store's time zone was not recognised.",
     daysUnknownForm:
       "Dates unavailable: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
+    daysUnknownBoxes: "Dates unavailable: time zone not recognised.",
+    daysUnknownPaused: "Dates unavailable · Paused",
     openTimeZone: "View the store's time zone",
     always: "No end date",
     from: "From {date}",

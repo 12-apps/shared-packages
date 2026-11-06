@@ -105,6 +105,7 @@ export function DateField({
   invalidMessage,
   incompleteMessage,
   disabled = false,
+  describedBy,
 }: {
   name: string;
   label: string;
@@ -114,6 +115,8 @@ export function DateField({
   incompleteMessage: string;
   /** Shown, never editable — the days cannot be placed (FUT-4482, review round 5). */
   disabled?: boolean;
+  /** The id of a line elsewhere that describes this box (review round 6: why it is disabled). */
+  describedBy?: string;
 }): JSX.Element {
   const { values, errors, setFieldValue } = useFormContext();
   const [left, setLeft] = useState(false);
@@ -134,7 +137,13 @@ export function DateField({
         disabled={disabled}
         value={shown}
         error={message !== undefined}
-        inputProps={{ inputMode: "numeric", maxLength: 10, autoComplete: "off", "data-testid": testId }}
+        inputProps={{
+          inputMode: "numeric",
+          maxLength: 10,
+          autoComplete: "off",
+          "data-testid": testId,
+          ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+        }}
         data-testid={testId}
         onBlur={() => setLeft(true)}
         onChange={(event) => {

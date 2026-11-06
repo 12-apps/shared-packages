@@ -6,7 +6,7 @@ import {
   PT_BR_UI_LABELS,
 } from "@12-apps/ui/pt-BR";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 
 /**
  * The pt-BR pack for the discounts admin screens.
@@ -18,7 +18,7 @@ import type { DiscountsWebCopy } from "./copy";
  * module is imported by `createWebDiscounts` — the key names travel, the words
  * do not.
  */
-export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
+export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   screen: {
     title: "Descontos",
     aboutTitle: "Sobre os descontos",
@@ -80,6 +80,8 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     daysUnknownList: "Datas indisponíveis em algumas promoções: o fuso horário da loja não foi reconhecido.",
     daysUnknownForm:
       "Datas indisponíveis: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    daysUnknownBoxes: "Datas indisponíveis: fuso horário não reconhecido.",
+    daysUnknownPaused: "Datas indisponíveis · Pausada",
     openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
     from: "A partir de {date}",
