@@ -61,6 +61,16 @@ function appliesAt(scalars: DiscountScalars, now: string): boolean {
   return result.applied.some((applied) => applied.discountId === "d1");
 }
 
+/** What `run` threw, or undefined. */
+function thrownBy(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
 const scalarsIn = (overrides: Partial<DiscountWriteInput>, timeZone?: string): DiscountScalars =>
   toDiscountScalars(input(overrides), PT_BR_DISCOUNTS_SERVER_COPY, timeZone ? { timeZone } : {});
 
@@ -95,12 +105,7 @@ describe("whole days in the store's zone (FUT-4482)", () => {
   });
 
   it("still refuses Término before Início, on Término, with the whole-day sentence", () => {
-    let caught: unknown;
-    try {
-      scalarsIn({ startsAt: "2026-11-20", endsAt: "2026-11-19" }, SP);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => scalarsIn({ startsAt: "2026-11-20", endsAt: "2026-11-19" }, SP));
     expect(caught).toBeInstanceOf(DiscountValidationError);
     expect((caught as DiscountValidationError).field).toBe("endsAt");
     expect((caught as DiscountValidationError).message).toBe(PT_BR_DISCOUNTS_SERVER_COPY.endsBeforeStartDay);

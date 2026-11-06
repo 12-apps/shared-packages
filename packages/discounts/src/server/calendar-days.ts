@@ -51,6 +51,6 @@ export function assertWholeDayCopy(
   if (typeof copy.endsBeforeStartDay === "string" && copy.endsBeforeStartDay.trim() !== "") return;
   throw new Error(
     "@12-apps/discounts: createApiDiscounts counts whole days (storeTimeZone) but is missing copy " +
-      "for endsBeforeStartDay — the refusal of a Término before Início.",
+      "for endsBeforeStartDay — the refusal of an end day before the start day.",
   );
 }

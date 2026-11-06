@@ -119,8 +119,9 @@ describe('renderFields', () => {
     render(<Harness fieldsPlacement="beside" numberOfMonths={2} renderFields={ownFields} />);
 
     expect(screen.getByTestId('own-fields').getAttribute('data-where')).toBe('beside');
-    expect(screen.queryByTestId(`${TEST_ID}-from`)).toBeNull();
-    expect(screen.queryByTestId(`${TEST_ID}-status`)).toBeNull();
+    // Neither the built-in pair nor its summary line is drawn at all.
+    expect(screen.getByTestId(TEST_ID).querySelectorAll('input')).toHaveLength(0);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
   });
 
   it('tells the fields where they are, so they can lay themselves out', () => {

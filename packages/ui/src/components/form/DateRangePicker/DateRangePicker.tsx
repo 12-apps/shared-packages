@@ -34,7 +34,7 @@ import { Calendar } from '../Calendar';
 
 import { toLocalDay } from './DateRangePicker.dates';
 import { useDateRangePicker } from './DateRangePicker.hooks';
-import { BESIDE_GAP_PX, besideLayout, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
+import { besideLayout, useMeasuredWidth, type FieldsPlacement } from './DateRangePicker.layout';
 import { DEFAULT_QUICK_RANGES } from './DateRangePicker.quick';
 import type { DateRangeDraft, DateRangePickerProps, WeekStart } from './DateRangePicker.types';
 import { DateRangeFields } from './DateRangePickerFields';
@@ -247,40 +247,96 @@ function TypedHalf({
   );
 }
 
+/**
+ * How many months, and where the typed half goes. The default layout counts
+ * months by the viewport, as it always did; `beside` measures the picker.
+ */
+function usePickerLayout(props: DateRangePickerProps): {
+  root: React.RefObject<HTMLDivElement | null>;
+  months: number | undefined;
+  placement: FieldsPlacement;
+} {
+  const theme = useTheme();
+  const viewportMonths = useMonthCount(props.numberOfMonths);
+  const root = useRef<HTMLDivElement>(null);
+  const beside = props.fieldsPlacement === 'beside';
+  const width = useMeasuredWidth(root, beside);
+  if (!beside || width === null) return { root, months: viewportMonths, placement: 'below' };
+  const layout = besideLayout(width, props.numberOfMonths ?? 2, theme);
+  return { root, months: layout.months, placement: layout.placement };
+}
+
+/** The `beside` layout: the months in their own frame, the fields on the page. */
+function InPageLayout({
+  props,
+  picker,
+  layout,
+  body,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  layout: ReturnType<typeof usePickerLayout>;
+  body: React.ReactNode;
+}): React.JSX.Element {
+  const sideBySide = layout.placement === 'beside';
+  return (
+    <Box
+      ref={layout.root}
+      className={props.className}
+      data-testid={props.dataTestId ?? 'date-range-picker'}
+      data-fields-placement={layout.placement}
+      sx={{
+        display: 'flex',
+        flexDirection: sideBySide ? 'row' : 'column',
+        alignItems: sideBySide ? 'flex-start' : 'stretch',
+        gap: sideBySide ? 4 : 2,
+        width: '100%',
+        minWidth: 0,
+      }}
+    >
+      <Paper variant="outlined" sx={{ ...BESIDE_FRAME_SX, flex: sideBySide ? '0 0 auto' : undefined }}>
+        {body}
+      </Paper>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <TypedHalf props={props} picker={picker} placement={layout.placement} />
+      </Box>
+    </Box>
+  );
+}
+
+/** The default layout: one framed block, the typed half under the months. */
+function PopoverLayout({
+  props,
+  picker,
+  body,
+}: {
+  props: DateRangePickerProps;
+  picker: Picker;
+  body: React.ReactNode;
+}): React.JSX.Element {
+  const typed = <TypedHalf props={props} picker={picker} placement="below" />;
+  return (
+    <Paper className={props.className} data-testid={props.dataTestId ?? 'date-range-picker'} sx={ROOT_SX}>
+      {body}
+      {props.renderFields ? typed : <Box sx={FIELDS_DIVIDER_SX}>{typed}</Box>}
+    </Paper>
+  );
+}
+
 export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element {
-  const {
-    value,
-    onChange,
-    timeZone,
-    now,
-    maxRangeDays,
-    weekStartsOn = 0,
-    quickRanges = DEFAULT_QUICK_RANGES,
-    locale = 'en-US',
-    numberOfMonths,
-    messages,
-    dataTestId = 'date-range-picker',
-    className,
-    fieldsPlacement = 'below',
-    calendarLabels,
-  } = props;
+  const { value, maxRangeDays, weekStartsOn = 0, locale = 'en-US', dataTestId = 'date-range-picker' } = props;
   const picker = useDateRangePicker({
     value,
-    onChange,
-    timeZone,
-    now,
+    onChange: props.onChange,
+    timeZone: props.timeZone,
+    now: props.now,
     maxRangeDays,
     weekStartsOn,
-    quickRanges,
-    messages,
+    quickRanges: props.quickRanges ?? DEFAULT_QUICK_RANGES,
+    messages: props.messages,
     followValue: props.renderFields !== undefined,
   });
-  const viewportMonths = useMonthCount(numberOfMonths);
-  const root = useRef<HTMLDivElement>(null);
-  const beside = fieldsPlacement === 'beside';
-  const width = useMeasuredWidth(root, beside);
-  const layout = besideLayout(width, numberOfMonths ?? 2);
-  const months = beside && width !== null ? layout.months : viewportMonths;
+  const layout = usePickerLayout(props);
 
   const body = (
     <Box sx={BODY_SX}>
@@ -290,53 +346,18 @@ export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element 
         value={value}
         locale={locale}
         weekStartsOn={weekStartsOn}
-        months={months}
+        months={layout.months}
         maxRangeDays={maxRangeDays}
-        labels={calendarLabels}
+        labels={props.calendarLabels}
       />
       <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
     </Box>
   );
 
-  if (beside) {
-    const sideBySide = layout.placement === 'beside' && width !== null;
-    return (
-      <Box
-        ref={root}
-        className={className}
-        data-testid={dataTestId}
-        data-fields-placement={sideBySide ? 'beside' : 'below'}
-        sx={{
-          display: 'flex',
-          flexDirection: sideBySide ? 'row' : 'column',
-          alignItems: sideBySide ? 'flex-start' : 'stretch',
-          gap: sideBySide ? `${BESIDE_GAP_PX}px` : 2,
-          width: '100%',
-          minWidth: 0,
-        }}
-      >
-        <Paper variant="outlined" sx={{ ...BESIDE_FRAME_SX, flex: sideBySide ? '0 0 auto' : undefined }}>
-          {body}
-        </Paper>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <TypedHalf props={props} picker={picker} placement={sideBySide ? 'beside' : 'below'} />
-        </Box>
-      </Box>
-    );
+  if (props.fieldsPlacement === 'beside') {
+    return <InPageLayout props={props} picker={picker} layout={layout} body={body} />;
   }
-
-  return (
-    <Paper className={className} data-testid={dataTestId} sx={ROOT_SX}>
-      {body}
-      {props.renderFields ? (
-        <TypedHalf props={props} picker={picker} placement="below" />
-      ) : (
-        <Box sx={FIELDS_DIVIDER_SX}>
-          <TypedHalf props={props} picker={picker} placement="below" />
-        </Box>
-      )}
-    </Paper>
-  );
+  return <PopoverLayout props={props} picker={picker} body={body} />;
 }
 
 export default DateRangePicker;

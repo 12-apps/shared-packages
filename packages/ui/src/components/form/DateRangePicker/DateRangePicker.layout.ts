@@ -7,21 +7,23 @@
  * computer, and only its own box knows which. The numbers are the design px the
  * month grid is built to (`MONTH_SX` in `CalendarMonth`: 304 wide, 24 apart).
  */
+import type { Theme } from '@mui/material/styles/index.js';
 import { useLayoutEffect, useState, type RefObject } from 'react';
 
-/** A month grid's intrinsic width and the gap between two of them. */
-const MONTH_PX = 304;
-const MONTH_GAP_PX = 24;
-/** The months' frame: 16px of padding a side and a 1px hairline. */
-const FRAME_PX = 2 * 16 + 2;
-/** The narrowest column a `dd/mm/aaaa` field and its label read well in. */
-const FIELDS_MIN_PX = 220;
-/** The gap between the frame and the fields beside it. */
-export const BESIDE_GAP_PX = 32;
+import { remPx } from '../../../tokens/relative';
+
+/**
+ * The design px the layout is computed from, rendered through the theme
+ * (`remPx`) so a density that shrinks the grid shrinks the thresholds with it.
+ * Framed months: the grid's intrinsic 304 a month and 24 between two
+ * (`MONTH_SX`), plus the frame's 16px padding a side and its hairline. The
+ * column beside: the `gap: 4` to the frame and the 220 a `dd/mm/aaaa` field
+ * and its label read well in.
+ */
+const FRAMED_MONTHS: Readonly<Record<number, number>> = { 1: 338, 2: 666 };
+const BESIDE_COLUMN = 252;
 
 export type FieldsPlacement = 'beside' | 'below';
-
-const framed = (months: number): number => months * MONTH_PX + (months - 1) * MONTH_GAP_PX + FRAME_PX;
 
 /**
  * The layout for a picker `width` px wide asking for `requested` months, in
@@ -32,11 +34,14 @@ const framed = (months: number): number => months * MONTH_PX + (months - 1) * MO
 export function besideLayout(
   width: number | null,
   requested: number,
+  theme: Theme,
 ): { months: number; placement: FieldsPlacement } {
   if (width === null) return { months: requested, placement: 'below' };
+  const framed = (months: number): number => remPx(theme, FRAMED_MONTHS[months] ?? FRAMED_MONTHS[2]! * months / 2);
+  const beside = remPx(theme, BESIDE_COLUMN);
   const counts = requested > 1 ? [requested, 1] : [requested];
   for (const months of counts) {
-    if (width >= framed(months) + BESIDE_GAP_PX + FIELDS_MIN_PX) return { months, placement: 'beside' };
+    if (width >= framed(months) + beside) return { months, placement: 'beside' };
     if (width >= framed(months)) return { months, placement: 'below' };
   }
   return { months: 1, placement: 'below' };
