@@ -90,3 +90,33 @@ describe("the endpoint fill (FUT-4162)", () => {
     expect(getContrastRatio(endpointFill(theme), theme.palette.primary.main)).toBeLessThan(1.1);
   });
 });
+
+describe("a blocked day inside an ENABLED range (FUT-4482)", () => {
+  // A host may block days a range spans (Sundays, holidays). Only a calendar
+  // shown locked draws its in-range days in the secondary ink; a live one keeps
+  // a blocked day in the disabled ink, as on origin/main.
+  const resolved = (color: string): string => {
+    const probe = document.createElement("span");
+    probe.style.color = color;
+    return probe.style.color;
+  };
+  const isSunday = (date: Date) => date.getDay() === 0;
+
+  it("keeps the disabled ink on a blocked in-range day of a live calendar", () => {
+    // 2026-11-15 is a Sunday inside 10..20.
+    render(
+      <Calendar
+        ariaLabel="Datas"
+        selectionMode="range"
+        range={{ start: new Date(2026, 10, 10, 12), end: new Date(2026, 10, 20, 12) }}
+        isDateDisabled={isSunday}
+        numberOfMonths={1}
+        defaultMonth={new Date(2026, 10, 1, 12)}
+        showOutsideDays={false}
+      />,
+    );
+    const sunday = screen.getByTestId("calendar-date-15");
+    expect(sunday.getAttribute("aria-disabled")).toBe("true");
+    expect(getComputedStyle(sunday).color).toBe(resolved(createTheme().palette.text.disabled));
+  });
+});

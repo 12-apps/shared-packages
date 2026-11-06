@@ -56,6 +56,7 @@ const buildDayContext = (props: ResolvedCalendarProps, calendar: CalendarState):
   showOutsideDays: props.showOutsideDays,
   todayIndicator: props.todayIndicator,
   fullWidth: props.fullWidth,
+  locked: props.navigationDisabled === true,
   renderDay: props.renderDay,
   dayClassName: props.dayClassName,
   hoveredDate: calendar.hoveredDate,

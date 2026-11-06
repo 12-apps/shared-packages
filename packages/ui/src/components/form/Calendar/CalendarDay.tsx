@@ -70,13 +70,15 @@ const inDirection = (band: Exclude<DayBand, 'none'>, theme: Theme): Exclude<DayB
 const faceBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | string =>
   isEndpoint(day) ? endpointFill : 'transparent';
 
-const colorFor = (day: DayRenderArgs, visible: boolean): string => {
+const colorFor = (day: DayRenderArgs, visible: boolean, locked: boolean): string => {
   if (isEndpoint(day)) return 'primary.contrastText';
-  // A disabled day INSIDE the range is part of the value the grid states — a
-  // range never crosses a blocked day, so this is a calendar shown locked
-  // (FUT-4482, review round 9). On the band the disabled ink was 1.56:1; the
-  // secondary ink still reads as not-pickable and keeps the day legible.
-  if (day.disabled) return day.inRange ? 'text.secondary' : 'text.disabled';
+  // On a calendar shown LOCKED (`navigationDisabled`, a disabled picker) every
+  // day is disabled, and the ones inside the range are the value the grid
+  // states: on the band the disabled ink was 1.56:1, so they take the secondary
+  // ink (FUT-4482, review round 9). A live range CAN span a blocked day (a
+  // host's `isDateDisabled`: Sundays, holidays); that day keeps the disabled
+  // ink, so it still reads as the one that cannot be picked.
+  if (day.disabled) return locked && day.inRange ? 'text.secondary' : 'text.disabled';
   // Outside days that are switched off still occupy the grid, they just have
   // nothing to show.
   if (!visible) return 'transparent';
@@ -144,6 +146,7 @@ const dayCellSx = (
   visible: boolean,
   ring: boolean,
   fill: boolean,
+  locked: boolean,
 ): SxProps<Theme> => ({
   position: 'relative',
   isolation: 'isolate',
@@ -161,7 +164,7 @@ const dayCellSx = (
   background: 'none',
   backgroundImage: band === 'none' ? 'none' : (theme: Theme) => BAND_IMAGE[inDirection(band, theme)](bandColor(theme)),
   cursor: day.disabled ? 'not-allowed' : 'pointer',
-  color: colorFor(day, visible),
+  color: colorFor(day, visible, locked),
   opacity: !day.inCurrentMonth && visible ? 0.5 : 1,
   fontWeight: day.today || isEndpoint(day) ? 'bold' : 'normal',
   // `nth-child`, counting every cell of the week: a hidden outside day is an
@@ -220,6 +223,8 @@ export interface CalendarDayProps {
   todayRing?: boolean;
   /** Fill the column (`CalendarProps.fullWidth`). */
   fullWidth?: boolean;
+  /** The whole calendar is shown locked (`CalendarProps.navigationDisabled`). */
+  locked?: boolean;
   dayClassName?: (args: DayRenderArgs) => string;
   onSelect: (date: Date) => void;
   onHover: (date: Date) => void;
@@ -234,6 +239,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   showOutsideDays,
   todayRing = false,
   fullWidth,
+  locked,
   dayClassName,
   onSelect,
   onHover,
@@ -273,7 +279,7 @@ export const CalendarDay: FC<CalendarDayProps> = ({
       onClick={() => onSelect(day.date)}
       onMouseEnter={() => onHover(day.date)}
       onMouseLeave={onHoverEnd}
-      sx={dayCellSx(day, band, visible, todayRing, fullWidth === true)}
+      sx={dayCellSx(day, band, visible, todayRing, fullWidth === true, locked === true)}
     >
       {day.selected && (
         <Box component="span" data-testid="calendar-selected-date" sx={{ display: 'none' }} />

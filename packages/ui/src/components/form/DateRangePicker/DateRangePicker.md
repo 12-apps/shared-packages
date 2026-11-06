@@ -206,7 +206,9 @@ needs four more things, each opt-in so no existing screen changes:
   label) carrying `aria-disabled`. The month arrows are disabled and today's
   ring takes the disabled ink. The days INSIDE a shown range keep the
   secondary ink (`text.secondary`), so the period stays legible on the band
-  (the disabled ink there was 1.56:1). The control cannot say why: say it beside the
+  (the disabled ink there was 1.56:1). That is the locked picker only: on a
+  live one, a day `isDateDisabled` blocks inside the range keeps the disabled
+  ink. The control cannot say why: say it beside the
   picker, and make that sentence your fields' `aria-describedby`. **In a
   popover the consumer disables its own trigger** — the button or field that
   opens the popover is the consumer's, and this prop cannot reach it.

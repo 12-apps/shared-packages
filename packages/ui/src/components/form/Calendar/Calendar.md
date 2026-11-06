@@ -18,9 +18,10 @@ A reusable calendar that supports **single date selection** and **date range sel
 - **Month grid** (role `grid`) with weekday headers and day cells (role `gridcell`).
 - **Range hover preview**: when a start date is chosen, hovering days previews the end.
 - **Dual month** layout for range mode (configurable).
-- **Disabled/unavailable days** visibly blocked and non-interactive. A disabled day inside the
-  selected range (only a calendar shown locked has one: a range never crosses a blocked day)
-  keeps the secondary ink, so the range it states stays legible on the band.
+- **Disabled/unavailable days** visibly blocked and non-interactive, in the disabled ink — a
+  blocked day inside a live range included (a range CAN span one: Sundays, holidays). Only a
+  calendar shown locked (`navigationDisabled`, which a disabled `DateRangePicker` sets) draws its
+  in-range days in the secondary ink, so the period it states stays legible on the band.
 - Optional **footer** with Clear/Apply.
 
 ---

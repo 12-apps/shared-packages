@@ -22,6 +22,12 @@ export interface DayCellContext {
   todayIndicator: CalendarTodayIndicator;
   /** Spread the columns across the width (`CalendarProps.fullWidth`). */
   fullWidth: boolean;
+  /**
+   * The whole calendar is shown locked (`CalendarProps.navigationDisabled`,
+   * which a disabled `DateRangePicker` sets): its in-range days keep the
+   * secondary ink. A live calendar's blocked days keep the disabled ink.
+   */
+  locked: boolean;
   isDisabled: (date: Date) => boolean;
   renderDay?: CalendarProps['renderDay'];
   dayClassName?: CalendarProps['dayClassName'];
@@ -36,6 +42,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
   showOutsideDays,
   todayIndicator,
   fullWidth,
+  locked,
   renderDay,
   dayClassName,
   onSelect,
@@ -57,6 +64,7 @@ export const CalendarDayCell: FC<DayCellContext & { day: MonthMatrixDay }> = ({
       showOutsideDays={showOutsideDays}
       todayRing={todayIndicator === 'ring'}
       fullWidth={fullWidth}
+      locked={locked}
       dayClassName={dayClassName}
       onSelect={onSelect}
       onHover={onHover}
