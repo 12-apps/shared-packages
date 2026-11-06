@@ -24,7 +24,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
 import type { DiscountsApiClient } from "./api";
-import { fill, type DiscountsWebCopy } from "./copy";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
@@ -54,7 +54,7 @@ import { useDiscountsData } from "./use-discounts-data";
 
 export interface DiscountsScreenProps {
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   /** The store's IANA zone, for the grid's live "ativa agora" dot (FUT-996). */
   timezone?: string;
@@ -73,7 +73,7 @@ export interface DiscountsScreenProps {
 /** The bulk delete's confirmation, described from the SELECTION. */
 function useBulkDelete(
   api: DiscountsApiClient,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   refresh: () => void,
   onError: (error: unknown, context: string) => void,
 ) {
@@ -115,7 +115,7 @@ function HeaderControls({
   onCreate,
 }: {
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   onCreate: () => void;
 }): JSX.Element {
   return (
@@ -170,7 +170,7 @@ function DiscountsGrid({
   bulkDelete,
 }: {
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   menu: MenuBinding;
   appliedState: DataViewState;
   server: ReturnType<typeof useServerDataViews>;
@@ -271,7 +271,7 @@ function ScreenBody({
   menu: MenuBinding;
   refresh: () => void;
   rows: DiscountListItem[];
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   appliedState: DataViewState;
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (rows: DiscountListItem[]) => void;

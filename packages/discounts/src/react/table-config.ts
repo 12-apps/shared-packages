@@ -13,7 +13,7 @@ import {
   DISCOUNT_WINDOW_STATES,
 } from "../engine/kinds";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import { nameCell } from "./days-unknown-notice";
 import { EMPTY } from "./format";
 import type { DiscountListItem } from "./row";
@@ -42,7 +42,7 @@ const OWNED_PARAMS = [
 ] as const;
 
 /** A CODE rule is identified by its coupon, not by the word "code". */
-function triggerCell(row: DiscountListItem, copy: DiscountsWebCopy): string {
+function triggerCell(row: DiscountListItem, copy: CompleteDiscountsWebCopy): string {
   if (row.trigger === "CODE") return row.code ?? EMPTY;
   return copy.labels.trigger[row.trigger as keyof typeof copy.labels.trigger] ?? row.trigger;
 }
@@ -58,7 +58,7 @@ function labelled(labels: Readonly<Record<string, string>>, value: string): stri
 /** The Nome column's floor, in design px (the grid converts it through the type scale). */
 const NAME_COLUMN_MIN_PX = 200;
 
-export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<DiscountListItem>[] {
+export function discountColumns(copy: CompleteDiscountsWebCopy): DataViewColumn<DiscountListItem>[] {
   return [
     {
       id: "name",
@@ -130,7 +130,7 @@ function pillOptions<TKey extends string>(
   return values.map((value) => ({ value, label: labels[value] }));
 }
 
-export function discountFilters(copy: DiscountsWebCopy): FilterFieldConfig<DiscountListItem>[] {
+export function discountFilters(copy: CompleteDiscountsWebCopy): FilterFieldConfig<DiscountListItem>[] {
   return [
     {
       id: "type",
@@ -169,7 +169,7 @@ export function discountFilters(copy: DiscountsWebCopy): FilterFieldConfig<Disco
 }
 
 export function discountExportColumns(
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): ExportColumn<DiscountListItem>[] {
   return [
     { header: copy.screen.columns.name, value: (row) => row.name },
@@ -246,7 +246,7 @@ function pillsFromParams(params: URLSearchParams): Record<string, string[]> {
  */
 export function discountsAppliedState(
   params: URLSearchParams,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): DataViewState {
   const [sortField, sortDir] = (params.get("sort") ?? "").split(":");
   const sortBy: DataViewState["sortBy"] =

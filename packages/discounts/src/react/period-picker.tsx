@@ -6,8 +6,7 @@ import { DateRangePicker, type DateRangeDraft } from "@12-apps/ui/form/DateRange
 import { useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
 
-import type { CompleteDiscountsWebCopy, DiscountsWebCopy } from "./copy";
-import { completeWebCopy } from "./copy-fallback";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import { DateField, isIsoDay } from "./date-field";
 
 /**
@@ -105,7 +104,7 @@ export function PeriodPicker({
   wholeDays,
   daysUnknown = false,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   wholeDays: boolean;
   /**
    * The server cannot place the rule's days (FUT-4482, review round 5): the
@@ -116,7 +115,7 @@ export function PeriodPicker({
 }): JSX.Element {
   const { values, setFieldValue } = useFormContext();
   const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
-  const words = completeWebCopy(copy);
+  const words = copy;
   const names = words.form.calendar;
   return (
     <DateRangePicker

@@ -10,7 +10,7 @@ import { completeWebCopy } from "./copy-fallback";
 import { DiscountForm, type DiscountFormProps } from "./discount-form";
 import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
-import { DiscountsScreen, type DiscountsScreenProps } from "./discounts-screen";
+import { DiscountsScreen, type DiscountsScreenProps as BoundScreenProps } from "./discounts-screen";
 import { createFormatters, type DiscountsFormatters } from "./format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "./pt-BR";
 import { httpDiscountsTransport, type DiscountsTransport } from "./transport";
@@ -175,7 +175,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   const transport = config.transport ?? httpDiscountsTransport(copy.form.saveFailed);
   const api = createDiscountsApiClient(config.apiBase, transport, formatters);
 
-  const screenProps: DiscountsScreenProps = {
+  const screenProps: BoundScreenProps = {
     api,
     copy,
     formatters,
@@ -222,8 +222,17 @@ export function useWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   return useMemo(() => createWebDiscounts(config), [config]);
 }
 
-/** The screen as a bare component, for a host that wires everything itself. */
-export type { DiscountsScreenProps };
-export function DiscountsSurface(props: DiscountsScreenProps): JSX.Element {
-  return <DiscountsScreen {...props} copy={completeWebCopy(props.copy, props.formatters.locale)} />;
+/**
+ * The screen as a bare component, for a host that wires everything itself. The
+ * host's pack, which may lack the sentences added after it was written, and
+ * the language to fill them in from: `locale`, else the formatters', else the
+ * pack's own (`completeWebCopy`).
+ */
+export type DiscountsScreenProps = Omit<BoundScreenProps, "copy"> & {
+  copy: DiscountsWebCopy;
+  /** The host's BCP-47 tag (`pt-BR`, `es-ES`), as `DiscountsWebConfig.locale`. */
+  locale?: string;
+};
+export function DiscountsSurface({ locale, copy, ...props }: DiscountsScreenProps): JSX.Element {
+  return <DiscountsScreen {...props} copy={completeWebCopy(copy, locale ?? props.formatters.locale)} />;
 }

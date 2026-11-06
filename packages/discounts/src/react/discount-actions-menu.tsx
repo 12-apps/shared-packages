@@ -10,7 +10,7 @@ import {
 import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
 import type { DiscountsApiClient, WireTargetGroup } from "./api";
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountDialog } from "./discount-dialog";
 import { DiscountForm } from "./discount-form";
@@ -35,7 +35,7 @@ import type { DiscountListItem } from "./row";
 export interface DiscountActionsMenuProps {
   row: DiscountListItem;
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   currencyField: CurrencyFieldComponent;
   /**
@@ -65,7 +65,7 @@ export interface DiscountActionsMenuProps {
 function useDeleteConfirm(
   row: DiscountListItem,
   api: DiscountsApiClient,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   onError: (error: unknown, context: string) => void,
 ): ReturnType<typeof useRemoveConfirm> {
   return useRemoveConfirm({

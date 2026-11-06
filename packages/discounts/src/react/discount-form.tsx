@@ -16,7 +16,7 @@ import type { ComboRequirement } from "../engine/types";
 
 import { FirstOrderField } from "./first-order-field";
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import {
   ComboCapField,
@@ -111,7 +111,7 @@ type SubmitHelpers = { setFieldErrors: (errors: Record<string, string | undefine
 
 export interface DiscountFormProps {
   api: DiscountsApiClient;
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   currencyField: CurrencyFieldComponent;
   groups: readonly WireTargetGroup[];

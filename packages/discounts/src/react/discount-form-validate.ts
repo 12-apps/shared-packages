@@ -4,12 +4,11 @@ import { toMinutes, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
 
 import { comboUnits } from "./combo-slot-builder";
-import { fill, type DiscountsWebCopy } from "./copy";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import { isCompleteMaskedDay, isIsoDay } from "./date-field";
 import type { DiscountFormValues } from "./discount-form-values";
 import { isComboKind, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
-import { completeWebCopy } from "./copy-fallback";
 
 /**
  * Everything the create/edit form refuses locally, split from the form itself
@@ -37,7 +36,7 @@ function positiveCount(typed: string): number | null {
 }
 
 /** The name: present, and at least two characters, in the pack's words. */
-function checkName(typed: string, copy: DiscountsWebCopy): Record<string, string> {
+function checkName(typed: string, copy: CompleteDiscountsWebCopy): Record<string, string> {
   const refused =
     required(copy.form.nameRequired)(typed) ?? minLength(2, copy.form.nameTooShort)(typed.trim());
   return refused === undefined ? {} : { name: refused };
@@ -48,7 +47,7 @@ function checkName(typed: string, copy: DiscountsWebCopy): Record<string, string
  * from 1, so "2,5" is refused here instead of reaching the wire as 2 — or, in a
  * browser that read the comma away, as 25.
  */
-function checkLimits(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+function checkLimits(values: DiscountFormValues, copy: CompleteDiscountsWebCopy): Record<string, string> {
   const errors: Record<string, string> = {};
   if (values.usageLimit.trim() !== "" && positiveCount(values.usageLimit) === null) {
     errors.usageLimit = copy.form.invalidUsageLimit;
@@ -81,7 +80,7 @@ function checkMoney(
 function checkFreeUnits(
   typed: string,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const free = positiveCount(typed);
   if (free === null) return { freeUnits: copy.form.invalidFreeUnits };
@@ -98,7 +97,7 @@ function checkFreeUnits(
 function checkPercent(
   typed: string,
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const percent = formatters.parseDecimal(typed);
   return percent === null || percent <= 0 || percent > 100
@@ -119,7 +118,7 @@ function checkValue(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const { type } = typeAndScopeFor(values);
   if (type === "FIXED_AMOUNT") {
@@ -142,7 +141,7 @@ function checkValue(
 function checkCombo(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   const errors = checkComboKind(values, slots, copy);
   // Recorded apart from `errors.kind`, which holds only ONE message: a bad
@@ -156,7 +155,7 @@ function checkCombo(
 function checkComboKind(
   values: DiscountFormValues,
   slots: readonly ComboRequirement[],
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   if (!isComboKind(values.kind)) return {};
   // "Leve 3, pague 2" is one group of products, so it is refused in those words
@@ -191,7 +190,7 @@ function checkComboKind(
  */
 function checkPeriod(
   values: DiscountFormValues,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   wholeDays: boolean,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -207,9 +206,9 @@ function checkPeriod(
 }
 
 /** Término against Início, once both are real days. */
-function checkOrder(values: DiscountFormValues, copy: DiscountsWebCopy, wholeDays: boolean): Record<string, string> {
+function checkOrder(values: DiscountFormValues, copy: CompleteDiscountsWebCopy, wholeDays: boolean): Record<string, string> {
   if (!isIsoDay(values.startsAt) || !isIsoDay(values.endsAt)) return {};
-  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: completeWebCopy(copy).form.endsBeforeStartDay } : {};
+  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: copy.form.endsBeforeStartDay } : {};
   return values.endsAt <= values.startsAt ? { endsAt: copy.form.endsBeforeStarts } : {};
 }
 
@@ -235,7 +234,7 @@ export interface FormTargets {
  */
 function checkSchedule(
   state: ScheduleState,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
 ): Record<string, string> {
   if (!state.enabled) return {};
   const { windows } = state.schedule;
@@ -272,7 +271,7 @@ export function validate(
   values: DiscountFormValues,
   targets: FormTargets,
   formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
+  copy: CompleteDiscountsWebCopy,
   scheduleState: ScheduleState,
 ): Record<string, string> {
   const slots = targets.comboRequirements;

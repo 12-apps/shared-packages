@@ -12,14 +12,13 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 import type { DiscountSchedule } from "../engine/schedule";
 
-import type { DiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { ComboRewardFields } from "./combo-reward-fields";
 import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
 import { PercentField, WholeNumberField } from "./number-fields";
 import { PeriodPicker } from "./period-picker";
 import { ScheduleBuilder } from "./schedule-builder";
-import { completeWebCopy } from "./copy-fallback";
 
 /**
  * The form's inputs, split from the form itself for the 400-line file gate —
@@ -96,7 +95,7 @@ export function RewardFields({
   copy,
   currencyField,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   currencyField: CurrencyFieldComponent;
 }): JSX.Element | null {
   const { values } = useFormContext();
@@ -109,7 +108,7 @@ export function RewardFields({
 }
 
 /** The coupon input, shown only for a CODE-triggered rule. */
-function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+function CodeField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   if (values.trigger !== "CODE") return null;
   return (
@@ -122,7 +121,7 @@ function CodeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
 }
 
 /** What makes the promotion fire, and the code it fires on. */
-export function TriggerFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
+export function TriggerFields({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element {
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
       <Fields.ToggleField
@@ -143,7 +142,7 @@ export function TriggerFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element
  * operator build "preço de combo, abrangência: pedido" and have the write path
  * refuse it.
  */
-export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+export function ScopeField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   if (isComboKind(values.kind ?? "PERCENTAGE")) return null;
   return (
@@ -167,7 +166,7 @@ export function ScopeField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | 
  * "combos por pedido" is a fact about THIS combo, and among "limite de usos"
  * and "limite por cliente" it read as a third redemption cap.
  */
-export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+export function ComboCapField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
   if (!isComboKind(kind)) return null;
@@ -201,7 +200,7 @@ function PeriodSection({
   daysUnknown,
   timeZoneSettings,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   wholeDays: boolean;
   daysUnknown: boolean;
   timeZoneSettings: DiscountsTimeZoneSettings | undefined;
@@ -211,7 +210,7 @@ function PeriodSection({
       {daysUnknown ? (
         <DaysUnknownNotice
           copy={copy}
-          message={completeWebCopy(copy).window.daysUnknownForm}
+          message={copy.window.daysUnknownForm}
           timeZoneSettings={timeZoneSettings}
           dataTestId="discount-days-unknown"
         />
@@ -249,7 +248,7 @@ export function WindowFields({
   onScheduleChange,
   onScheduleEnabledChange,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   /** Whether Início = Término is a one-day promotion (the server counts whole days). */
   wholeDays: boolean;
   /** The server could not place the edited rule's days (FUT-4482): empty boxes, and this said. */
@@ -326,7 +325,7 @@ export function WindowFields({
  * here, only for the combination that has it, rather than left in a document
  * nobody opens while filling in a form.
  */
-function OrderScopeScheduleNote({ copy }: { copy: DiscountsWebCopy }): JSX.Element | null {
+function OrderScopeScheduleNote({ copy }: { copy: CompleteDiscountsWebCopy }): JSX.Element | null {
   const { values } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
   if (isComboKind(kind) || values.scope !== "ORDER") return null;
@@ -338,7 +337,7 @@ export function LimitFields({
   copy,
   currencyField,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   currencyField: CurrencyFieldComponent;
 }): JSX.Element {
   const Currency = currencyField;
@@ -359,7 +358,7 @@ export function DiscountSwitches({
   onActive,
   onStackable,
 }: {
-  copy: DiscountsWebCopy;
+  copy: CompleteDiscountsWebCopy;
   active: boolean;
   stackable: boolean;
   onActive: (next: boolean) => void;
