@@ -71,6 +71,24 @@ describe("on a computer", () => {
     await waitFor(() => expect(within(drawn).queryByTestId("list-price-discount")).toBeNull());
   });
 
+  it("the host's after-method rows sit after the method line: promotion, method, credit and fee, then the rule (L24)", async () => {
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      lines: LINES,
+      discountLines: <div data-testid="host-promotion">Desconto · Terça da Massa −R$ 9,30</div>,
+      list: { lastMethod: "PIX", prices: { online: { PIX, CARD } }, afterMethodLines: <div data-testid="host-fee">Taxa de entrega R$ 5,00</div> },
+    });
+    const drawn = await column();
+    const method = await within(drawn).findByTestId("list-price-discount");
+    const promotion = within(drawn).getByTestId("host-promotion");
+    const fee = within(drawn).getByTestId("host-fee");
+    const total = within(drawn).getByTestId("payment-step-total");
+    expect(promotion.compareDocumentPosition(method) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(method.compareDocumentPosition(fee) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(fee.compareDocumentPosition(total) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("with the host's credit rows, Total stays the cart's and 'A pagar' names the chosen row's amount", async () => {
     renderList({
       config: onPageStore(),
@@ -85,6 +103,27 @@ describe("on a computer", () => {
 });
 
 describe("on a phone", () => {
+  it("the bar says 'A pagar' and the chosen amount after the nudges and before the button (E26, L24)", async () => {
+    renderList({
+      config: onPageStore(),
+      client: stubClient([SAVED_VISA]),
+      list: { prices: { online: { PIX, CARD } }, nudges: [{ id: "to-pix", text: "No Pix fica", amountLabel: "R$ 126,75", action: { label: "Pagar com Pix", choose: { method: "PIX" } } }] },
+    });
+    const bar = await screen.findByTestId("list-pay-bar");
+    const due = await within(bar).findByTestId("list-bar-due");
+    expect(due.textContent).toBe("A pagarR$ 138,70");
+    const nudge = within(bar).getByTestId("list-nudge-to-pix");
+    expect(nudge.compareDocumentPosition(due) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(due.compareDocumentPosition(within(bar).getByTestId("list-pay")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("an unpriced bar has no 'A pagar' line, as today", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]) });
+    const bar = await screen.findByTestId("list-pay-bar");
+    await within(bar).findByTestId("list-pay");
+    await waitFor(() => expect(within(bar).queryByTestId("list-bar-due")).toBeNull());
+  });
+
   it("the chosen row's discount line is in the bar, and moves with the choice", async () => {
     renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { lastMethod: "PIX", prices: { online: { PIX, CARD } } } });
     const bar = await screen.findByTestId("list-pay-bar");

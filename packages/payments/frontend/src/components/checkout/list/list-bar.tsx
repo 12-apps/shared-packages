@@ -69,17 +69,18 @@ function focusButtonIn(scope: HTMLElement | null): void {
 }
 
 /**
- * "Total R$ 27,00" above a button held with nothing chosen. That button names
+ * "Total R$ 27,00" above a button held with nothing chosen — and, for a priced
+ * choice (FUT-4416), "A pagar R$ 126,75" above the button that charges it. That button names
  * no amount (its words need the width), so on a phone the bar says it here; the
  * computer's column already draws "Total" and passes none.
  */
-function HeldTotal({ total }: { total?: string | null }): JSX.Element | null {
+function HeldTotal({ total, title, testId = "list-bar-total" }: { total?: string | null; title?: string; testId?: string }): JSX.Element | null {
   const { Text } = useCheckoutComponents();
   const label = useCheckoutCopy().screens.layout.total;
   if (!total) return null;
   return (
-    <Box data-testid="list-bar-total" sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
-      <Text variant="body" size="sm" color="secondary" as="span">{label}</Text>
+    <Box data-testid={testId} sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
+      <Text variant="body" size="sm" color="secondary" as="span">{title ?? label}</Text>
       <Text variant="body" size="md" weight="semibold" as="span">{total}</Text>
     </Box>
   );
@@ -92,6 +93,21 @@ function HeldTotal({ total }: { total?: string | null }): JSX.Element | null {
 export function holdToneOf(hold: CheckoutListHold | null | undefined, drawn?: string | null): CheckoutListHoldTone | undefined {
   if (!hold) return undefined;
   return drawn === undefined || drawn === hold.reason ? hold.tone : undefined;
+}
+
+/**
+ * Right above the action on a phone (the column has its own "Total"): the
+ * cart's total over a button held with nothing chosen, or what the chosen,
+ * priced way to pay costs (FUT-4416).
+ */
+function AboveAction({ column, heldTotal, due }: { column: boolean; heldTotal?: string | null; due?: { title?: string; amountLabel: string } | null }): JSX.Element | null {
+  if (column) return null;
+  return (
+    <>
+      <HeldTotal total={heldTotal} />
+      {due ? <HeldTotal total={due.amountLabel} title={due.title} testId="list-bar-due" /> : null}
+    </>
+  );
 }
 
 /**
@@ -140,12 +156,18 @@ function BarLines({ discount, extras }: { discount?: { label: string; amountLabe
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, reasonTone, actionLabel, heldTotal, live, discount, nudges, children }: {
+export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, reasonTone, actionLabel, heldTotal, live, discount, nudges, due, children }: {
   summary?: ReactNode;
   /** The chosen way to pay's discount line (FUT-4416) — drawn here on a phone; the column's body draws its own. */
   discount?: { label: string; amountLabel: string } | null;
   /** The host's nudges and notes, just before the action (FUT-4416, L24). */
   nudges?: ReactNode;
+  /**
+   * What the chosen way to pay costs, as the host priced it (FUT-4416, E26):
+   * "A pagar R$ 126,75" just above the action, on a phone — the column says it
+   * under its rule. Absent ⇒ no line, as before.
+   */
+  due?: { title?: string; amountLabel: string } | null;
   /** A charge is under way: the phone's summary sheet closes and stays closed (FUT-589). */
   sheetHeld?: boolean;
   /**
@@ -181,7 +203,7 @@ export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, 
       <BarLines discount={column ? null : discount} extras={extras} />
       {payer}
       {nudges}
-      <HeldTotal total={column ? null : heldTotal} />
+      <AboveAction column={Boolean(column)} heldTotal={heldTotal} due={due} />
       {children}
       <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} tone={reasonTone} />
     </Box>

@@ -60,7 +60,7 @@ function Host({
 }): JSX.Element {
   const [answer, setAnswer] = useState<TenderSplitAnswer<Tender> | null>(null);
   return (
-    <Box sx={{ width: 360, display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 2 }}>
       <Paper sx={{ p: 2.5 }}>
         <TenderSplit
           tenders={tenders}

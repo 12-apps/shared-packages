@@ -4,7 +4,7 @@
  * Pure — no React — so every rule here is tested on its own terms.
  */
 import type { OnlineRow } from "./choice";
-import type { CheckoutChoicePrice, CheckoutListNudge, CheckoutOnlineRowId } from "./price-types";
+import type { CheckoutChoicePrice, CheckoutListNudge, CheckoutOnlineRowId, CheckoutPricedAs } from "./price-types";
 import type { CheckoutListChoice, CheckoutOnlineChoice, CheckoutPaymentList, PaymentListCopy } from "./types";
 
 /** An online row, or choice, as prices are keyed; `null` for one that is never priced (the retired Google Pay row). */
@@ -104,4 +104,13 @@ export function columnPrice(
   const price = chosenPrice(list, choice);
   if (!price) return undefined;
   return { discount: price.discount, title: dueTitle(list.copy, choice), amountLabel: priceText(list.copy, price) };
+}
+
+/**
+ * Which price an order raised for this choice is for (`CreateOrderRequest.pricedAs`)
+ * — `undefined` for a list the host did not price, which raises as before.
+ */
+export function raisedAs(list: Pick<CheckoutPaymentList, "prices">, choice: { method: CheckoutOnlineChoice; funding?: "DEBIT" } | null): CheckoutPricedAs | undefined {
+  if (!list.prices || !choice) return undefined;
+  return onlineRowId(choice) ?? undefined;
 }

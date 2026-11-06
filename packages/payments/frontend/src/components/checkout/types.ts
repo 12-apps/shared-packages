@@ -7,6 +7,7 @@
  * this folder. The host-side halves — the cart, the catalog, order CREATION — stay in the
  * host app and reach the flow through the ports declared on `CheckoutFlowProps`.
  */
+import type { CheckoutPricedAs } from "./list/price-types";
 import type { DebitChargeFields, DebitDeclaration } from "./debit-types";
 import type { GooglePayDeclaration } from "./google-pay-params";
 import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
@@ -197,6 +198,12 @@ export interface CreateOrderRequest {
    * id of the registered settlement verbatim.
    */
   settlementMethod?: string;
+  /**
+   * Which price the order is for, in a list priced per way to pay (FUT-4416):
+   * the chosen online row's (`CARD_DEBIT` for debit) or `WALLET` for a sheet.
+   * The host prices the order by it. ABSENT whenever the list is unpriced.
+   */
+  pricedAs?: CheckoutPricedAs;
 }
 
 /** What the flow hands the host's `saveBuyerContact` port on "Continuar". */

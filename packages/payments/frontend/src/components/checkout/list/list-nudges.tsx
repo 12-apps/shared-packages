@@ -30,11 +30,14 @@ export function ListNudges({ nudges, onChoose }: {
   );
 }
 
+/** The least the sentence keeps beside the link before the link wraps under it. */
+const SENTENCE_BASIS = "8rem";
+
 /** "No Pix fica **R$ 126,75**" — the host's text, then its amount in bold. */
 function Sentence({ nudge }: { nudge: CheckoutListNudge }): JSX.Element {
   const { Text } = useCheckoutComponents();
   return (
-    <Box sx={{ flex: 1, minWidth: 0 }}>
+    <Box sx={{ flex: `1 1 ${SENTENCE_BASIS}`, minWidth: 0 }}>
       <Text variant="body" size="sm" as="span">
         {nudge.text}
         {nudge.amountLabel ? (
@@ -50,7 +53,11 @@ function Sentence({ nudge }: { nudge: CheckoutListNudge }): JSX.Element {
 
 const nudgeTint = (theme: Theme): string => alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity);
 
-/** The tinted strip, with its link at the right. */
+/**
+ * The tinted strip, with its link at the right — or, on a row too narrow for
+ * both, under the sentence at the right, so the sentence never stacks one
+ * word a line and the link never squeezes it (ADR 0074 U1, U6).
+ */
 function NudgeStrip({ nudge, onChoose }: { nudge: CheckoutListNudge; onChoose: (choose: { method: "PIX" | "CARD" | "HAND_OFF"; funding?: "DEBIT" }) => void }): JSX.Element {
   const { Button } = useCheckoutComponents();
   const { action } = nudge;
@@ -59,11 +66,11 @@ function NudgeStrip({ nudge, onChoose }: { nudge: CheckoutListNudge; onChoose: (
     <Box
       data-testid={`list-nudge-${nudge.id}`}
       data-tone="nudge"
-      sx={{ display: "flex", alignItems: "center", gap: 1, bgcolor: nudgeTint, borderRadius: 5, px: 1.5, py: 0.5, minHeight: (t) => t.spacing(5) }}
+      sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 1, bgcolor: nudgeTint, borderRadius: 3, px: 1.5, py: 0.5, minHeight: (t) => t.spacing(5) }}
     >
       <Sentence nudge={nudge} />
       {action && press ? (
-        <Box sx={{ flex: "none", "& button": { whiteSpace: "nowrap" } }}>
+        <Box data-nudge-link sx={{ flex: "none", ml: "auto", "& button": { whiteSpace: "nowrap" } }}>
           <Button variant="text" color="primary" size="sm" onClick={press} dataTestId={`list-nudge-${nudge.id}-action`}>
             {action.label}
           </Button>

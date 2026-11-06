@@ -53,18 +53,22 @@ export const PRICED_LINES = [
   { key: "chope", quantity: 2, name: "Chope Pilsen", totalLabel: "R$ 32,00" },
 ];
 
-/** The host's money rows: the promotion and the delivery fee. */
-export function PricedMoneyRows(): JSX.Element {
+/** One of the host's money rows. */
+function MoneyRow({ label, amount }: { label: string; amount: string }): JSX.Element {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, typography: "body2", color: "text.secondary" }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-        <span>Desconto · Terça da Massa</span>
-        <span>−R$ 9,30</span>
-      </Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-        <span>Taxa de entrega</span>
-        <span>R$ 5,00</span>
-      </Box>
+    <Box sx={{ display: "flex", justifyContent: "space-between", typography: "body2", color: "text.secondary" }}>
+      <span>{label}</span>
+      <span>{amount}</span>
     </Box>
   );
+}
+
+/** The host's money rows before the method line: the promotion. */
+export function PricedMoneyRows(): JSX.Element {
+  return <MoneyRow label="Desconto · Terça da Massa" amount="−R$ 9,30" />;
+}
+
+/** The host's money rows after the method line (L24): the delivery fee. */
+export function PricedAfterMethodRows(): JSX.Element {
+  return <MoneyRow label="Taxa de entrega" amount="R$ 5,00" />;
 }

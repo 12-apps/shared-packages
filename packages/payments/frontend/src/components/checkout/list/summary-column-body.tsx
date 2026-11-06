@@ -23,6 +23,8 @@ export interface ColumnBodyProps {
    * own words ("A pagar R$ 126,75"). Absent ⇒ "Total" and the cart's total.
    */
   priced?: { discount?: { label: string; amountLabel: string }; title?: string; amountLabel: string };
+  /** The host's rows after the method line (`CheckoutPaymentList.afterMethodLines`). */
+  afterMethod?: ReactNode;
 }
 
 /** One label/amount row under "Total". */
@@ -60,7 +62,7 @@ function totalRow(totalLabel: string, credit: ColumnBodyProps["credit"], priced:
  * heading and the pay-button slot under them are the layout's own — eager —
  * so the bar's content never changes element when this lands.
  */
-export function SummaryBody({ lines, moneyLines, totalLabel, credit, priced }: ColumnBodyProps): JSX.Element {
+export function SummaryBody({ lines, moneyLines, totalLabel, credit, priced, afterMethod }: ColumnBodyProps): JSX.Element {
   const shown = lines ?? [];
   const total = totalRow(totalLabel, credit, priced);
   return (
@@ -68,6 +70,7 @@ export function SummaryBody({ lines, moneyLines, totalLabel, credit, priced }: C
       {shown.length > 0 ? <SummaryLines lines={shown} /> : null}
       {moneyLines ? <Box data-testid="list-summary-money">{moneyLines}</Box> : null}
       {priced?.discount ? <PriceDiscountLine discount={priced.discount} /> : null}
+      {afterMethod ? <Box data-testid="list-summary-after-method">{afterMethod}</Box> : null}
       <Box sx={{ height: "1px", bgcolor: "divider" }} />
       <SummaryTotal totalLabel={total.amountLabel} title={total.title} />
       {credit ? (

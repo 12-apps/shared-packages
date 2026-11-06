@@ -96,13 +96,14 @@ function SummaryColumn({ slot, ...body }: ColumnBodyProps & { slot: (element: HT
  * Only the list face is laid out this way: the Pix screen and the hand-off keep
  * their bar (K9).
  */
-export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, priced, children }: {
+export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, priced, afterMethod, children }: {
   hostTarget: HTMLElement | null | undefined;
   lines?: CheckoutSummaryLine[];
   moneyLines?: ReactNode;
   totalLabel: string;
   credit?: ColumnBodyProps["credit"];
   priced?: ColumnBodyProps["priced"];
+  afterMethod?: ReactNode;
   children: ReactNode;
 }): JSX.Element {
   const wide = useCheckoutLayout()?.wide ?? false;
@@ -110,8 +111,8 @@ export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, 
   const target = useMemo(() => ({ element: slot }), [slot]);
   const hosted = hostTarget !== undefined;
   const sideBySide = !hosted && wide;
-  const sheet = usePhoneSheet(!hosted && !sideBySide, { lines, moneyLines, totalLabel, credit, priced });
-  const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} credit={credit} priced={priced} slot={setSlot} />;
+  const sheet = usePhoneSheet(!hosted && !sideBySide, { lines, moneyLines, totalLabel, credit, priced, afterMethod });
+  const column = <SummaryColumn lines={lines} moneyLines={moneyLines} totalLabel={totalLabel} credit={credit} priced={priced} afterMethod={afterMethod} slot={setSlot} />;
   return (
     <SummaryColumnTarget value={hosted || sideBySide ? target : null}>
       <SummarySheetProvider value={sheet}>
@@ -131,12 +132,12 @@ export function ListLayout({ hostTarget, lines, moneyLines, totalLabel, credit, 
  */
 function usePhoneSheet(phone: boolean, body: ColumnBodyProps): SummarySheetContent | null {
   const forget = ColumnPart.useForget();
-  const { lines, moneyLines, totalLabel, credit, priced } = body;
-  const memo = useMemo(() => ({ lines, moneyLines, totalLabel, credit, priced }), [lines, moneyLines, totalLabel, credit, priced]);
+  const { lines, moneyLines, totalLabel, credit, priced, afterMethod } = body;
+  const memo = useMemo(() => ({ lines, moneyLines, totalLabel, credit, priced, afterMethod }), [lines, moneyLines, totalLabel, credit, priced, afterMethod]);
   // Any money-rows element counts as something to list, even one that renders nothing: an
   // element cannot be asked whether it will draw. No host passes an empty one (every cart has
   // lines), and the worst case is a sheet showing "Total" alone.
-  const listed = (lines?.length ?? 0) > 0 || Boolean(moneyLines);
+  const listed = (lines?.length ?? 0) > 0 || Boolean(moneyLines) || Boolean(afterMethod);
   return phone && listed ? { body: memo, Body: DeferredBody, forget } : null;
 }
 
