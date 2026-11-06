@@ -205,7 +205,17 @@ export interface DateRangePickerProps {
    * The calendar follows the value when the consumer changes it, as it follows
    * a typed date.
    */
-  renderFields?: (args: { placement: 'beside' | 'below' }) => React.ReactNode;
+  renderFields?: (args: { placement: 'beside' | 'below'; disabled: boolean }) => React.ReactNode;
+  /**
+   * The period is shown but cannot be changed now — its consumer cannot place
+   * its days (FUT-4482). Every day of the grid is disabled and a tap writes
+   * nothing, the quick ranges are not offered, the built-in boxes are
+   * disabled, `renderFields` is told (`disabled`) so the consumer's own fields
+   * follow, and the root carries `aria-disabled`. The month arrows still page:
+   * looking is not changing. Say WHY next to the picker; the control cannot.
+   * Default: false.
+   */
+  disabled?: boolean;
   /**
    * A start with no end is a finished answer — "from this day on" — rather
    * than half a range: the summary says `messages.openEnded` instead of asking

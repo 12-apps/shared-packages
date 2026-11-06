@@ -47,8 +47,9 @@ interface DateRangePickerProps {
   className?: string;
   // Opt-in, for a picker laid out IN a page (all off by default):
   fieldsPlacement?: 'below' | 'beside';     // default 'below'
-  renderFields?: (args: { placement: 'beside' | 'below' }) => ReactNode;
+  renderFields?: (args: { placement: 'beside' | 'below'; disabled: boolean }) => ReactNode;
   openEnd?: boolean;                        // a start with no end is an answer
+  disabled?: boolean;                       // shown, not changeable (default false)
   calendarLabels?: Partial<CalendarLabels>; // names for the month arrows
 }
 ```
@@ -181,7 +182,7 @@ needs four more things, each opt-in so no existing screen changes:
   instead of two when two would not fit either. Measured on the picker
   (`ResizeObserver`), never the viewport: a form column beside a preview is
   narrow on the widest screen. The root carries `data-fields-placement`.
-- **`renderFields({ placement })`** — the consumer's OWN fields instead of the
+- **`renderFields({ placement, disabled })`** — the consumer's OWN fields instead of the
   built-in pair, for a form whose fields carry rules this picker does not (a
   half-typed date kept until submit, its own messages). The summary line goes
   with the built-in pair: beside fields that say their own refusals it would
@@ -196,6 +197,12 @@ needs four more things, each opt-in so no existing screen changes:
   (`PT_BR_UI_LABELS.calendar` in Portuguese); without them they stay unnamed,
   as before. `PT_BR_UI_LABELS.dateRangePicker.openEnded` is the Portuguese
   `openEnded`.
+- **`disabled`** — the period is shown but cannot be changed now (a consumer
+  that cannot place its days, FUT-4482). Every day is disabled and a tap
+  writes nothing, the quick ranges are not offered, the built-in boxes are
+  disabled, `renderFields` receives `disabled: true` so the consumer's fields
+  follow, and the root carries `aria-disabled`. The month arrows still page.
+  The control cannot say why: say it beside the picker.
 - **`showOutsideDays`, `todayIndicator`, `allowSameDayRange`** — `Calendar`'s
   own options, passed through: hide the neighbouring months' days, ring today
   (`'ring'`), or refuse one day as a whole range (a second tap on the start day

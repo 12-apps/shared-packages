@@ -245,6 +245,8 @@ interface DayBoundInputProps {
    * calendar's width instead of leaving a gap beside them (FUT-4144).
    */
   fill?: boolean;
+  /** Shown, never editable. Default: false. */
+  disabled?: boolean;
 }
 
 /** What {@link useDayText} hands the field: its text, its verdict and its handlers. */
@@ -333,6 +335,7 @@ export function DayBoundInput({
   mask,
   invalidMessage,
   fill = false,
+  disabled = false,
 }: DayBoundInputProps): React.JSX.Element {
   const id = useId();
   const { text, impossible, handleChange, handlePaste, handleBlur } = useDayText(
@@ -351,6 +354,7 @@ export function DayBoundInput({
       error={error || impossible}
       helperText={impossible ? invalidMessage : undefined}
       placeholder={mask}
+      disabled={disabled}
       value={text}
       onChange={handleChange}
       onPaste={handlePaste}

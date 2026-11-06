@@ -128,8 +128,11 @@ function useMonthCount(requested: number | undefined): number | undefined {
 /** The calendar options a picker passes through untouched. */
 type CalendarDisplay = Pick<
   DateRangePickerProps,
-  'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange' | 'fullWidth'
+  'showOutsideDays' | 'todayIndicator' | 'allowSameDayRange' | 'fullWidth' | 'disabled'
 >;
+
+/** Every day, for a picker that is `disabled`. */
+const EVERY_DAY = (): boolean => true;
 
 function RangeCalendar({
   calendarLabel,
@@ -177,6 +180,7 @@ function RangeCalendar({
       todayIndicator={display.todayIndicator}
       allowSameDayRange={display.allowSameDayRange}
       fullWidth={display.fullWidth}
+      {...(display.disabled === true ? { isDateDisabled: EVERY_DAY } : {})}
     />
   );
 }
@@ -218,7 +222,8 @@ function TypedHalf({
   picker: Picker;
   placement: FieldsPlacement;
 }): React.JSX.Element {
-  if (props.renderFields) return <>{props.renderFields({ placement })}</>;
+  const disabled = props.disabled === true;
+  if (props.renderFields) return <>{props.renderFields({ placement, disabled })}</>;
   return (
     <DateRangeFields
       value={props.value}
@@ -230,6 +235,7 @@ function TypedHalf({
       dataTestId={props.dataTestId ?? 'date-range-picker'}
       openEnd={props.openEnd ?? false}
       stacked={placement === 'beside'}
+      disabled={disabled}
     />
   );
 }
@@ -272,6 +278,7 @@ function InPageLayout({
       className={props.className}
       data-testid={props.dataTestId ?? 'date-range-picker'}
       data-fields-placement={layout.placement}
+      aria-disabled={props.disabled === true ? true : undefined}
       sx={{
         display: 'flex',
         flexDirection: sideBySide ? 'row' : 'column',
@@ -303,7 +310,12 @@ function PopoverLayout({
 }): React.JSX.Element {
   const typed = <TypedHalf props={props} picker={picker} placement="below" />;
   return (
-    <Paper className={props.className} data-testid={props.dataTestId ?? 'date-range-picker'} sx={ROOT_SX}>
+    <Paper
+      className={props.className}
+      data-testid={props.dataTestId ?? 'date-range-picker'}
+      aria-disabled={props.disabled === true ? true : undefined}
+      sx={ROOT_SX}
+    >
       {body}
       {props.renderFields ? typed : <Box sx={FIELDS_DIVIDER_SX}>{typed}</Box>}
     </Paper>
@@ -341,7 +353,9 @@ export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element 
         // column and the typed pair (FUT-4156, round 3).
         display={{ ...props, fullWidth: props.fieldsPlacement === 'beside' && props.fullWidth === true }}
       />
-      <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
+      {props.disabled === true ? null : (
+        <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
+      )}
     </Box>
   );
 

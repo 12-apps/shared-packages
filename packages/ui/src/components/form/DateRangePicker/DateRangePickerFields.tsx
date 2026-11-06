@@ -42,6 +42,8 @@ export interface DateRangeFieldsProps {
   openEnd?: boolean;
   /** Beside the months the pair stacks; under them it sits side by side. */
   stacked?: boolean;
+  /** The picker is `disabled`: both boxes are. */
+  disabled?: boolean;
 }
 
 export function DateRangeFields({
@@ -54,6 +56,7 @@ export function DateRangeFields({
   dataTestId,
   openEnd = false,
   stacked = false,
+  disabled = false,
 }: DateRangeFieldsProps): React.JSX.Element {
   // "Incomplete" is not an error — it is a range that is not finished yet, and
   // painting it red would make the first click on a two-click control look like
@@ -71,6 +74,7 @@ export function DateRangeFields({
           testId={`${dataTestId}-from`}
           error={rejected}
           describedBy={statusId}
+          disabled={disabled}
         />
         <DayBoundInput
           mask={messages.dayMask}
@@ -80,6 +84,7 @@ export function DateRangeFields({
           testId={`${dataTestId}-to`}
           error={rejected}
           describedBy={statusId}
+          disabled={disabled}
         />
       </Box>
       <Typography
