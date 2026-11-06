@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { DISCOUNTS_MCP_TOOLS } from "../mcp";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountsApiConfig } from "../routes";
 import type { DiscountRecord, DiscountStore, DiscountUpdateCondition, DiscountWrite } from "../store";
@@ -175,6 +176,13 @@ describe("the list envelope says the zone is unknown (CP8)", () => {
   it("carries datesLocked under an unknown zone", async () => {
     const page = (await surface(LEGACY, { storeTimeZone: () => UNKNOWN }).list()).body as Record<string, unknown>;
     expect(page.datesLocked).toBe(true);
+  });
+
+  it("keeps it through the advertised response schema, which a wired host parses with", async () => {
+    // As it goes over the wire: the instants are strings there.
+    const page: unknown = JSON.parse(JSON.stringify((await surface(LEGACY, { storeTimeZone: () => UNKNOWN }).list()).body));
+    const listTool = DISCOUNTS_MCP_TOOLS.find((tool) => tool.operationId === "listDiscounts")!;
+    expect((listTool.response!.parse(page) as Record<string, unknown>).datesLocked).toBe(true);
   });
 
   it("carries nothing under a known zone, or without whole days", async () => {

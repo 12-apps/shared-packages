@@ -276,7 +276,10 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     tags: ["discounts"],
     params: discountCollectionParams,
     query: listDiscountsQuery,
-    response: createSearchOutput(discountSchema),
+    // `datesLocked` (CP8): the store's zone is unknown now, said on the page as
+    // well as on every row, so a create on an empty list knows it too. Declared,
+    // or the wired response's parse strips it.
+    response: createSearchOutput(discountSchema).extend({ datesLocked: z.boolean().optional() }),
     annotations: { readOnly: true },
   },
   {
