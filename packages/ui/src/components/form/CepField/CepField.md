@@ -52,6 +52,10 @@ serves a supplier form, a store-location form or a delivery checkout.
   form for somebody else's address (a supplier), or the browser offers the signed-in
   person's own CEP and the lookup then fills their street (FUT-4140). Same prop on
   `Fields.CepField`
+- `passwordManagers`: `offer` (default) or `ignore`. `ignore` puts `data-lpignore`,
+  `data-1p-ignore` and `data-bwignore` on the `<input>`, so LastPass, 1Password and
+  Bitwarden stop drawing their icon in a lone CEP box they read as a login field
+  (FUT-4444). The browser's own `autocomplete` still offers a saved CEP
 
 ### State Props
 
