@@ -181,6 +181,11 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameRequired: "Give the promotion a name.",
     nameTooShort: "The name needs at least 2 characters.",
     datePlaceholder: "DD/MM/YYYY",
+    calendar: {
+      label: EN_US_UI_LABELS.dateRangePicker.calendar,
+      previousMonth: EN_US_UI_LABELS.calendar.previousMonth,
+      nextMonth: EN_US_UI_LABELS.calendar.nextMonth,
+    },
     invalidDate: "That date does not exist. Use DD/MM/YYYY, such as 25/12/2026.",
     dateIncomplete: "Finish the date: DD/MM/YYYY.",
     invalidPercent: "Enter a percentage greater than 0 and at most 100.",

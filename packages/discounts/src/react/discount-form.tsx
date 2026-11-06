@@ -224,6 +224,7 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           <TriggerFields copy={copy} />
           <WindowFields
             copy={copy}
+            {...(formatters.locale ? { locale: formatters.locale } : {})}
             schedule={extra.schedule}
             scheduleEnabled={extra.scheduleEnabled}
             timezoneLabel={props.timezoneLabel ?? null}

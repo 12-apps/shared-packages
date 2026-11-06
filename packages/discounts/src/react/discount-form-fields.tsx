@@ -15,8 +15,8 @@ import type { DiscountSchedule } from "../engine/schedule";
 import type { DiscountsWebCopy } from "./copy";
 import { ComboRewardFields } from "./combo-reward-fields";
 import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
-import { DateField } from "./date-field";
 import { PercentField, WholeNumberField } from "./number-fields";
+import { PeriodPicker } from "./period-picker";
 import { ScheduleBuilder } from "./schedule-builder";
 
 /**
@@ -185,24 +185,6 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
   );
 }
 
-/** Início and Término, day-first on every browser (FUT-4156). */
-function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
-  return (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-      {(["startsAt", "endsAt"] as const).map((name) => (
-        <DateField
-          key={name}
-          name={name}
-          label={copy.form[name]}
-          placeholder={copy.form.datePlaceholder}
-          invalidMessage={copy.form.invalidDate}
-          incompleteMessage={copy.form.dateIncomplete}
-        />
-      ))}
-    </Box>
-  );
-}
-
 /**
  * "Quando vale" — the campaign PERIOD, and the weekly schedule inside it
  * (FUT-996).
@@ -219,6 +201,7 @@ function PeriodFields({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
  */
 export function WindowFields({
   copy,
+  locale,
   schedule,
   scheduleEnabled,
   timezoneLabel,
@@ -226,6 +209,8 @@ export function WindowFields({
   onScheduleEnabledChange,
 }: {
   copy: DiscountsWebCopy;
+  /** Month names and day names in the calendar. */
+  locale?: string;
   schedule: DiscountSchedule;
   scheduleEnabled: boolean;
   timezoneLabel: string | null;
@@ -243,8 +228,8 @@ export function WindowFields({
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
-      <Stack spacing={0.5}>
-        <PeriodFields copy={copy} />
+      <Stack spacing={0.5} data-testid="discount-period">
+        <PeriodPicker copy={copy} {...(locale ? { locale } : {})} />
         <Text variant="caption">{copy.schedule.periodHint}</Text>
       </Stack>
       <FormControl>

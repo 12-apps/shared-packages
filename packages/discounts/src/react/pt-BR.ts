@@ -171,6 +171,11 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameRequired: "Informe o nome da promoção.",
     nameTooShort: "O nome precisa ter pelo menos 2 letras.",
     datePlaceholder: "DD/MM/AAAA",
+    calendar: {
+      label: PT_BR_UI_LABELS.dateRangePicker.calendar,
+      previousMonth: PT_BR_UI_LABELS.calendar.previousMonth,
+      nextMonth: PT_BR_UI_LABELS.calendar.nextMonth,
+    },
     invalidDate: "Data inexistente. Use DD/MM/AAAA, como 25/12/2026.",
     dateIncomplete: "Termine a data: DD/MM/AAAA.",
     invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
