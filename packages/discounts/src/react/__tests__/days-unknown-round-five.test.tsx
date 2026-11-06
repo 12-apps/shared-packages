@@ -197,13 +197,23 @@ describe("Salvar while the days are unknown (review round 5)", () => {
     expect(screen.queryAllByTestId("discount-form-error")).toHaveLength(0);
   });
 
-  it("renames and changes the value the same way", async () => {
+  // One edit per test: both edits in one test re-render the whole form twice
+  // and ran past vitest's 5 s on a loaded CI shard (main, CI #42302355616).
+  it("renames the same way", async () => {
     const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
     fireEvent.change(screen.getByLabelText(copy.form.name), { target: { value: "Semana nova" } });
+    await saveAndClose();
+    expect(sent[0]).toMatchObject({ name: "Semana nova", keepWindow: true });
+    expect(sent[0]).not.toHaveProperty("startsAt");
+  });
+
+  it("changes the value the same way", async () => {
+    const sent = mount([UNKNOWN]);
+    await openEdit(UNKNOWN.id);
     fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "15" } });
     await saveAndClose();
-    expect(sent[0]).toMatchObject({ name: "Semana nova", percentOffBp: 1_500, keepWindow: true });
+    expect(sent[0]).toMatchObject({ percentOffBp: 1_500, keepWindow: true });
     expect(sent[0]).not.toHaveProperty("startsAt");
   });
 
