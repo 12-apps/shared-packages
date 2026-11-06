@@ -7,6 +7,7 @@ import {
 } from "../engine/kinds";
 import { isUsableSchedule, type DiscountSchedule } from "../engine/schedule";
 import type { ComboRequirement } from "../engine/types";
+import { isCalendarDay, wholeDayWindow } from "../timezone";
 import type { DiscountsServerCopy } from "./copy";
 import { comboRequirementsForScope, toComboColumns } from "./validate-combo";
 
@@ -166,21 +167,65 @@ function toDate(value: string | null, field: string, copy: DiscountsServerCopy):
 }
 
 /**
- * The window, half-open `[startsAt, endsAt)`. `endsAt` is EXCLUSIVE, so equal
- * bounds are an EMPTY window rather than a one-instant one — an operator who
- * typed the same date twice meant something else, and an always-empty promotion
- * is worse than a rejected form.
+ * How a write reads its two calendar days (FUT-4482).
+ *
+ * `timeZone` — the STORE's IANA zone, which only the host knows — turns the
+ * chosen days into WHOLE days on that clock: Início from its 00:00, Término
+ * until the last instant of its day, and Início = Término a one-day promotion.
+ *
+ * Omitted, a write keeps the behaviour every adopter had before: each day is
+ * UTC midnight and Término is the exclusive bound. That is the price of not
+ * breaking an adopter that has not wired a zone; it is also why the omission
+ * is never silent in a host that has — `createApiDiscounts` asks for the zone
+ * per tenant and fails the request loudly on one the runtime does not know.
+ */
+export interface DiscountWindowOptions {
+  timeZone?: string;
+}
+
+/**
+ * The window, half-open `[startsAt, endsAt)`.
+ *
+ * Without a zone, `endsAt` is the typed day itself, so equal bounds are an
+ * EMPTY window rather than a one-instant one — an operator who typed the same
+ * date twice meant something else, and an always-empty promotion is worse
+ * than a rejected form. With one, the last day is inclusive and equal days are
+ * a one-day promotion: only a Término BEFORE Início is refused.
  */
 function assertWindow(
   input: DiscountWriteInput,
   copy: DiscountsServerCopy,
+  options: DiscountWindowOptions,
 ): { startsAt: Date | null; endsAt: Date | null } {
+  if (options.timeZone !== undefined) return assertWholeDays(input, copy, options.timeZone);
   const startsAt = toDate(input.startsAt, "startsAt", copy);
   const endsAt = toDate(input.endsAt, "endsAt", copy);
   if (startsAt !== null && endsAt !== null && endsAt.getTime() <= startsAt.getTime()) {
     throw invalid("endsAt", copy.endsBeforeStarts);
   }
   return { startsAt, endsAt };
+}
+
+/** A chosen day, checked: blank is null, anything else must name a real day. */
+function toDay(value: string | null, field: string, copy: DiscountsServerCopy): string | null {
+  if (value === null || value === "") return null;
+  if (!isCalendarDay(value)) throw invalid(field, copy.invalidDate);
+  return value;
+}
+
+/** The FUT-4482 half: whole days on the store's clock. */
+function assertWholeDays(
+  input: DiscountWriteInput,
+  copy: DiscountsServerCopy,
+  timeZone: string,
+): { startsAt: Date | null; endsAt: Date | null } {
+  const startsOn = toDay(input.startsAt, "startsAt", copy);
+  const endsOn = toDay(input.endsAt, "endsAt", copy);
+  // ISO days sort as strings; equal is a one-day promotion.
+  if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
+    throw invalid("endsAt", copy.endsBeforeStartDay ?? copy.endsBeforeStarts);
+  }
+  return wholeDayWindow(startsOn, endsOn, timeZone);
 }
 
 /**
@@ -273,11 +318,12 @@ export interface DiscountTargets {
 export function toDiscountScalars(
   input: DiscountWriteInput,
   copy: DiscountsServerCopy,
+  options: DiscountWindowOptions = {},
 ): DiscountScalars {
   assertValue(input, copy);
   const code = assertTrigger(input, copy);
   assertTargets(input, copy);
-  const { startsAt, endsAt } = assertWindow(input, copy);
+  const { startsAt, endsAt } = assertWindow(input, copy, options);
   const schedule = assertSchedule(input, copy);
   assertLimits(input, copy);
   const combo = toComboColumns(input, copy);

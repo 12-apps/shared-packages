@@ -15,6 +15,13 @@ import {
   type DiscountsCopySource,
   type DiscountsServerCopy,
 } from "./copy";
+import {
+  assertWholeDayCopy,
+  pageWithCalendarDays,
+  withCalendarDays,
+  zoneFor,
+  type StoreTimeZone,
+} from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
@@ -95,6 +102,20 @@ export interface DiscountsApiConfig {
    * advertised surface and the enforced one cannot drift.
    */
   listQuery?: z.ZodType<DiscountListInput>;
+  /**
+   * The STORE's IANA zone for a tenant (FUT-4482) — `America/Sao_Paulo`.
+   *
+   * With it, Início and Término count WHOLE days on that clock: a write stores
+   * the first instant of Início and of the day after Término, Início = Término
+   * is a one-day promotion, and every record answered carries `startsOn` /
+   * `endsOn`, the days it runs on there. A zone the runtime does not know fails
+   * the request rather than storing a window on a guessed clock.
+   *
+   * Omitted, every write and answer is what it was before: UTC midnights, an
+   * exclusive Término, no day fields. Opt-in so no adopter changes meaning on a
+   * version bump; a host that adopts it also re-reads its stored rules.
+   */
+  storeTimeZone?: StoreTimeZone;
 }
 
 function ok(body: unknown): WireResponse {
@@ -132,11 +153,13 @@ async function prepareWrite(
   body: unknown,
 ) {
   const input = toDiscountWriteInput(body as DiscountWriteBody);
-  const write = { scalars: toDiscountScalars(input, copy), targets: targetsForScope(input) };
+  const timeZone = await zoneFor(config.storeTimeZone, clientId);
+  const scalars = toDiscountScalars(input, copy, timeZone === undefined ? {} : { timeZone });
+  const write = { scalars, targets: targetsForScope(input) };
   if (config.collections) {
     await assertTargetsOwned(config.collections, clientId, write.targets, copy.foreignTarget);
   }
-  return write;
+  return { write, timeZone };
 }
 
 /**
@@ -186,7 +209,8 @@ function listRoute(config: DiscountsApiConfig): DiscountRoute {
       // Returned as-is rather than wrapped: the page IS the `{ data,
       // pagination }` envelope the advertised response describes, and wrapping
       // it again would nest it under a second `data`.
-      return ok(await config.store.list(actor.clientId, parsed.data));
+      const page = await config.store.list(actor.clientId, parsed.data);
+      return ok(pageWithCalendarDays(page, await zoneFor(config.storeTimeZone, actor.clientId)));
     }),
   };
 }
@@ -230,7 +254,8 @@ function readRoute(config: DiscountsApiConfig): DiscountRoute {
       if (record === null) {
         return { status: 404, body: { error: resolveDiscountsCopy(config.copy, locale).notFound } };
       }
-      return ok({ data: record as DiscountRecord });
+      const timeZone = await zoneFor(config.storeTimeZone, actor.clientId);
+      return ok({ data: withCalendarDays(record as DiscountRecord, timeZone) });
     }),
   };
 }
@@ -242,10 +267,15 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
     permission: DISCOUNTS_WRITE,
     handle: endpoint(config, "POST /discounts", async (request) => {
       const { actor, body, locale } = request;
-      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
+      const { write, timeZone } = await prepareWrite(
+        config,
+        resolveDiscountsCopy(config.copy, locale),
+        actor.clientId,
+        body,
+      );
       const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
-      return ok({ data: created });
+      return ok({ data: withCalendarDays(created, timeZone) });
     }),
   };
 }
@@ -258,7 +288,7 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
     handle: endpoint(config, "PATCH /discounts/:id", async (request) => {
       const { actor, params, body, locale } = request;
       const id = String(params.id);
-      const write = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
+      const { write } = await prepareWrite(config, resolveDiscountsCopy(config.copy, locale), actor.clientId, body);
       await config.store.update(actor.clientId, id, write);
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
@@ -318,6 +348,7 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
         "every sentence this surface answers a human with is host config, with no defaults.",
     );
   }
+  assertWholeDayCopy(config.storeTimeZone, resolveDiscountsCopy(config.copy, undefined));
   assertLogger(config.logger);
   assertCollections(config.collections ?? []);
   return {

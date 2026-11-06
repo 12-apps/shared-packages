@@ -123,6 +123,12 @@ export const discountSchema = z.object({
   code: z.string().nullable(),
   startsAt: z.string().nullable(),
   endsAt: z.string().nullable(),
+  /**
+   * The days the window runs on, in the store's zone, Término inclusive
+   * (FUT-4482). Present only on a surface that counts whole days.
+   */
+  startsOn: z.string().nullable().optional(),
+  endsOn: z.string().nullable().optional(),
   schedule: discountScheduleSchema.nullable().optional(),
   minSubtotalCents: z.number().int().nullable(),
   usageLimit: z.number().int().nullable(),
@@ -164,7 +170,7 @@ export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.par
  * WHOLE (the form re-states every field), so there is no partial-patch shape
  * to diverge from. The cross-field rules — a rate iff PERCENTAGE, a code iff
  * CODE, a target iff CATEGORY/ITEM, a slot list iff COMBO, a combo reward ONLY
- * at COMBO scope, `endsAt` strictly after `startsAt` — are enforced in
+ * at COMBO scope, `endsAt` not before `startsAt` (strictly after, without a store zone) — are enforced in
  * `./validate` and `./validate-combo`, where they produce a sentence naming the
  * field instead of a Zod path.
  */

@@ -34,6 +34,14 @@ export interface DiscountsServerCopy {
   readonly invalidDate: string;
   /** 422 — the window closes at or before it opens, so it is never open. */
   readonly endsBeforeStarts: string;
+  /**
+   * 422 — Término is BEFORE Início, on a surface that counts whole days in the
+   * store's zone (FUT-4482), where equal days are a one-day promotion.
+   *
+   * Optional, so a host with its own pack keeps compiling; `createApiDiscounts`
+   * requires it once the host passes `storeTimeZone`, since only then is it said.
+   */
+  readonly endsBeforeStartDay?: string;
   /** The weekly schedule is not one the engine can act on (FUT-996). */
   readonly invalidSchedule: string;
   /** 422 — a minimum-basket threshold of zero or less. */

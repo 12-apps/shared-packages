@@ -15,6 +15,8 @@ export {
 
 export { missingServerCopy, type DiscountsServerCopy } from "./copy";
 
+export type { StoreTimeZone } from "./calendar-days";
+
 export { errorText, type DiscountsLogger } from "./logging";
 
 export {
@@ -53,6 +55,7 @@ export {
   toDiscountWriteInput,
   type DiscountScalars,
   type DiscountTargets,
+  type DiscountWindowOptions,
   type DiscountWriteBody,
   type DiscountWriteInput,
 } from "./validate";

@@ -94,3 +94,138 @@ export function timeZoneLabel(timeZone: string, locale: string): string {
   }
   return (timeZone.split("/").pop() ?? timeZone).replace(/_/g, " ");
 }
+
+/**
+ * WHOLE DAYS on the store's clock (FUT-4482).
+ *
+ * An operator chooses calendar days — "de 10/11 a 20/11" — and means them
+ * whole, on the store's clock: from 00:00 on the 10th to the last instant of
+ * the 20th. The engine compares INSTANTS against a half-open `[startsAt,
+ * endsAt)` and needs no change; these two functions are the whole translation
+ * between the two vocabularies, in both directions, so the write path and the
+ * read-back cannot disagree about where a day begins.
+ *
+ * They THROW on a zone the runtime does not know, where `resolveLocalClock`
+ * answers null. The two failures are not alike: a clock that cannot be read
+ * leaves a schedule firing, which a cart survives, while a window stored on a
+ * guessed zone is a promotion that runs on the wrong days with nothing red
+ * anywhere. A write is the one place that must refuse.
+ */
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WALL_CLOCKS = new Map<string, Intl.DateTimeFormat>();
+
+function wallClockFormat(timeZone: string): Intl.DateTimeFormat {
+  const cached = WALL_CLOCKS.get(timeZone);
+  if (cached !== undefined) return cached;
+  let format: Intl.DateTimeFormat;
+  try {
+    format = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+  } catch {
+    throw new Error(
+      `@12-apps/discounts: unknown time zone "${timeZone}" — the store's zone must be an IANA ` +
+        "id this runtime knows; a window is never stored on a guessed one.",
+    );
+  }
+  WALL_CLOCKS.set(timeZone, format);
+  return format;
+}
+
+/** The wall clock at `instant` in `timeZone`, read back as if it were UTC. */
+function wallAsUtc(instant: number, timeZone: string): number {
+  const parts = wallClockFormat(timeZone).formatToParts(new Date(instant));
+  const read = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return Date.UTC(read("year"), read("month") - 1, read("day"), read("hour") % 24, read("minute"), read("second"));
+}
+
+/** The `YYYY-MM-DD` the store's calendar shows at `instant`. */
+function dayAt(instant: number, timeZone: string): string {
+  return new Date(wallAsUtc(instant, timeZone)).toISOString().slice(0, 10);
+}
+
+/** `YYYY-MM-DD` when it names a real day, else null. */
+function realDay(day: string): { y: number; m: number; d: number } | null {
+  const match = ISO_DAY.exec(day);
+  if (match === null) return null;
+  const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const real = date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  return real ? { y, m, d } : null;
+}
+
+/** Whether `day` is a `YYYY-MM-DD` that names a real calendar day. */
+export function isCalendarDay(day: string): boolean {
+  return realDay(day) !== null;
+}
+
+/**
+ * The FIRST instant of `day` on the store's clock — usually its 00:00.
+ *
+ * Candidates come from the offsets in force a day either side of the day's UTC
+ * midnight, which covers every zone's transitions. The earliest candidate that
+ * reads as `day` wins: where midnight does not exist (Chile's clocks jump 00:00
+ * → 01:00) that is the instant of the jump, which is when the day begins.
+ */
+function startOfDay(day: string, timeZone: string): Date {
+  const parts = realDay(day);
+  if (parts === null) throw new RangeError(`not a calendar day: ${day}`);
+  const guess = Date.UTC(parts.y, parts.m - 1, parts.d);
+  const candidates = [-DAY_MS, 0, DAY_MS].map((shift) => guess - (wallAsUtc(guess + shift, timeZone) - (guess + shift)));
+  const onDay = [...new Set(candidates)].filter((instant) => dayAt(instant, timeZone) === day).sort((a, b) => a - b);
+  return new Date(onDay[0] ?? candidates[1]!);
+}
+
+/** The day after `YYYY-MM-DD`. */
+function nextDay(day: string): string {
+  const parts = realDay(day);
+  if (parts === null) throw new RangeError(`not a calendar day: ${day}`);
+  return new Date(Date.UTC(parts.y, parts.m - 1, parts.d + 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * Two chosen days (either may be open) as the half-open window the engine
+ * reads: `startsAt` = the first instant of `startsOn`, `endsAt` = the first
+ * instant of the day AFTER `endsOn` — so the last chosen day runs whole.
+ */
+export function wholeDayWindow(
+  startsOn: string | null,
+  endsOn: string | null,
+  timeZone: string,
+): { startsAt: Date | null; endsAt: Date | null } {
+  wallClockFormat(timeZone);
+  return {
+    startsAt: startsOn === null ? null : startOfDay(startsOn, timeZone),
+    endsAt: endsOn === null ? null : startOfDay(nextDay(endsOn), timeZone),
+  };
+}
+
+/**
+ * A stored window read back as the days it RUNS on, in the store's zone:
+ * `startsOn` is the day `startsAt` falls on, `endsOn` the day of the last
+ * instant before the exclusive `endsAt`. A window written by
+ * {@link wholeDayWindow} reads back as the very days that were chosen; one
+ * stored on UTC midnights reads as the days it really covers there, never as
+ * the UTC ones.
+ */
+export function windowCalendarDays(
+  startsAt: Date | string | null,
+  endsAt: Date | string | null,
+  timeZone: string,
+): { startsOn: string | null; endsOn: string | null } {
+  wallClockFormat(timeZone);
+  return {
+    startsOn: startsAt === null ? null : dayAt(new Date(startsAt).getTime(), timeZone),
+    endsOn: endsAt === null ? null : dayAt(new Date(endsAt).getTime() - 1, timeZone),
+  };
+}

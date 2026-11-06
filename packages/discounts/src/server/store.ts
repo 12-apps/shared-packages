@@ -35,6 +35,13 @@ export interface DiscountRecord {
   startsAt: Date | null;
   endsAt: Date | null;
   /**
+   * The days the window runs on in the store's zone, Término inclusive
+   * (FUT-4482). Never the store's to fill: the routes add them when the host
+   * passed `storeTimeZone`, and leave them absent otherwise.
+   */
+  startsOn?: string | null;
+  endsOn?: string | null;
+  /**
    * The WEEKLY schedule (FUT-996), OPTIONAL for the reason the combo columns
    * below are: a host that has not added the column keeps compiling and keeps
    * answering the record it always did. Null or absent = always, within the
