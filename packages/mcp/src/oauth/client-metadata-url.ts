@@ -54,7 +54,10 @@ export function parseClientIdMetadataUrl(clientId: string): URL {
   return url;
 }
 
-/** IPv4 ranges a server-side fetch must never reach, as [network, prefix length]. */
+/**
+ * IPv4 blocks a server-side fetch must never reach: every special-use block of
+ * RFC 6890 (draft-03 §10.5 MUST), as [network, prefix length].
+ */
 const NON_PUBLIC_V4: ReadonlyArray<readonly [string, number]> = [
   ["0.0.0.0", 8], // "this" network
   ["10.0.0.0", 8], // private
@@ -63,8 +66,12 @@ const NON_PUBLIC_V4: ReadonlyArray<readonly [string, number]> = [
   ["169.254.0.0", 16], // link-local, where cloud metadata services live
   ["172.16.0.0", 12], // private
   ["192.0.0.0", 24], // IETF protocol assignments
+  ["192.0.2.0", 24], // TEST-NET-1
+  ["192.88.99.0", 24], // 6to4 relay anycast
   ["192.168.0.0", 16], // private
   ["198.18.0.0", 15], // benchmarking
+  ["198.51.100.0", 24], // TEST-NET-2
+  ["203.0.113.0", 24], // TEST-NET-3
   ["224.0.0.0", 3], // multicast, reserved, broadcast
 ];
 
@@ -81,25 +88,54 @@ function isNonPublicV4(address: string): boolean {
   return NON_PUBLIC_V4.some((range) => inV4Range(address, range));
 }
 
-/** IPv6 prefixes refused, by the value of the first 16 bits under a mask. */
-const NON_PUBLIC_V6: ReadonlyArray<readonly [number, number]> = [
-  [0xfe00, 0xfc00], // unique local fc00::/7
-  [0xffc0, 0xfe80], // link-local fe80::/10
-  [0xff00, 0xff00], // multicast ff00::/8
-  [0xffff, 0x0064], // NAT64 64:ff9b::/96 reaches v4 private space
+/**
+ * IPv6 blocks refused: the special-use blocks of RFC 6890 plus multicast, as
+ * [network, prefix length]. `::ffff:0:0/96` is not here: a mapped address is
+ * judged by the IPv4 address it carries.
+ */
+const NON_PUBLIC_V6: ReadonlyArray<readonly [string, number]> = [
+  ["::", 128], // unspecified
+  ["::1", 128], // loopback
+  ["64:ff9b::", 96], // NAT64, which reaches v4 private space
+  ["100::", 64], // discard
+  ["2001::", 23], // IETF protocol assignments (Teredo, benchmarking, ORCHID…)
+  ["2001:db8::", 32], // documentation
+  ["2002::", 16], // 6to4
+  ["fc00::", 7], // unique local
+  ["fe80::", 10], // link-local
+  ["ff00::", 8], // multicast
 ];
 
-/** Prefixes refused by their text: documentation, 6to4, Teredo and discard. */
-const NON_PUBLIC_V6_TEXT = ["2001:db8:", "2002:", "2001:0:", "2001::", "100::"];
+/** The 128-bit value of an IPv6 address, embedded IPv4 tail included. */
+function v6ToBigInt(address: string): bigint {
+  let text = address;
+  const v4Tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(text)?.[1];
+  if (v4Tail) {
+    const value = v4ToInt(v4Tail);
+    text = `${text.slice(0, -v4Tail.length)}${(value >>> 16).toString(16)}:${(value & 0xffff).toString(16)}`;
+  }
+  const [head = "", tail] = text.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? left : [...left, ...Array(8 - left.length - right.length).fill("0"), ...right];
+  return groups.reduce((value, group) => (value << 16n) + BigInt(Number.parseInt(group || "0", 16)), 0n);
+}
+
+function inV6Range(value: bigint, [network, bits]: readonly [string, number]): boolean {
+  const shift = BigInt(128 - bits);
+  return value >> shift === v6ToBigInt(network) >> shift;
+}
+
+const MAPPED_V4_PREFIX = 0xffffn << 32n;
 
 function isNonPublicV6(address: string): boolean {
-  if (address === "::" || address === "::1" || NON_PUBLIC_V6_TEXT.some((prefix) => address.startsWith(prefix))) {
-    return true;
+  const value = v6ToBigInt(address);
+  // ::ffff:a.b.c.d, in dotted or hex form, is judged as the IPv4 address it is.
+  if (value >> 32n === MAPPED_V4_PREFIX >> 32n) {
+    const v4 = Number(value & 0xffffffffn);
+    return isNonPublicV4([v4 >>> 24, (v4 >>> 16) & 255, (v4 >>> 8) & 255, v4 & 255].join("."));
   }
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(address)?.[1];
-  if (mapped) return isNonPublicV4(mapped);
-  const first = Number.parseInt(address.split(":")[0] || "0", 16);
-  return NON_PUBLIC_V6.some(([mask, value]) => (first & mask) === value);
+  return NON_PUBLIC_V6.some((range) => inV6Range(value, range));
 }
 
 /** Whether `address` (v4 or v6) is somewhere a server-side fetch must never go. */

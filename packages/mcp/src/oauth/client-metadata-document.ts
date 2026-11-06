@@ -89,15 +89,20 @@ function redirectUrisOf(doc: Doc): string[] {
   return [...(uris as string[])];
 }
 
+/** An optional array-valued field: absent is `undefined`, anything but an array is a refusal. */
+function listOf(doc: Doc, field: "grant_types" | "response_types"): unknown[] | undefined {
+  const value = doc[field];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) refuse(`document ${field} is not a list`);
+  return value;
+}
+
 function grantTypesOf(doc: Doc): string[] {
-  const listed = doc.grant_types;
-  const grants = Array.isArray(listed)
-    ? SUPPORTED_GRANT_TYPES.filter((grant) => listed.includes(grant))
-    : ["authorization_code"];
+  const listed = listOf(doc, "grant_types");
+  const grants = listed ? SUPPORTED_GRANT_TYPES.filter((grant) => listed.includes(grant)) : ["authorization_code"];
   if (!grants.includes("authorization_code")) refuse("document does not allow authorization_code");
-  if (Array.isArray(doc.response_types) && !doc.response_types.includes("code")) {
-    refuse("document does not allow response_type code");
-  }
+  const responses = listOf(doc, "response_types");
+  if (responses && !responses.includes("code")) refuse("document does not allow response_type code");
   return grants;
 }
 

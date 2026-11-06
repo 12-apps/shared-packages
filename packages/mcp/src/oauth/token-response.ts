@@ -72,6 +72,8 @@ function sha256Hex(value: string): string {
 export interface ClientCredentials {
   clientId: string | null;
   clientSecret: string | null;
+  /** Whether the body carries a `client_assertion` (JWT client authentication). */
+  assertion?: boolean;
 }
 
 /**
@@ -94,7 +96,11 @@ export function readClientCredentials(
       };
     }
   }
-  return { clientId: form.get("client_id"), clientSecret: form.get("client_secret") };
+  return {
+    clientId: form.get("client_id"),
+    clientSecret: form.get("client_secret"),
+    assertion: form.has("client_assertion") || form.has("client_assertion_type"),
+  };
 }
 
 /** The 401 challenge issued on a client-authentication failure. */
@@ -130,22 +136,23 @@ export async function authenticateClient(
   if (!client) {
     return tokenError("invalid_client", 401, "unknown client", CLIENT_AUTH_CHALLENGE);
   }
-  return clientCredentialRefusal(client, credentials.clientSecret);
+  return clientCredentialRefusal(client, credentials);
 }
 
 /**
  * The credential half of client authentication, once the client is known.
  *
  * A metadata-document client authenticates with nothing, and one that presents a
- * credential anyway is refused (draft-ietf-oauth-client-id-metadata-document-03
+ * credential anyway — a secret, Basic, or a `client_assertion` — is refused (draft-ietf-oauth-client-id-metadata-document-03
  * §5); registered public clients keep their behaviour. A confidential client
  * (`client_secret_basic`) must present the secret whose hash is stored.
  */
 function clientCredentialRefusal(
   client: { clientId: string; tokenEndpointAuthMethod: string; clientSecretHash: string | null },
-  secret: string | null,
+  credentials: ClientCredentials,
 ): Response | null {
-  if (isClientIdMetadataUrl(client.clientId) && secret !== null) {
+  const secret = credentials.clientSecret;
+  if (isClientIdMetadataUrl(client.clientId) && (secret !== null || credentials.assertion)) {
     return tokenError("invalid_client", 401, "client authentication is not accepted for this client", CLIENT_AUTH_CHALLENGE);
   }
   if (client.tokenEndpointAuthMethod !== "client_secret_basic") return null;

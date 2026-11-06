@@ -155,6 +155,7 @@ describe("a metadata-document client", () => {
     const basic = `Basic ${Buffer.from(`${encodeURIComponent(CLAUDE_ID)}:secret`).toString("base64")}`;
     for (const [form, headers] of [
       [{ client_id: CLAUDE_ID, client_secret: "secret" }, {}],
+      [{ client_id: CLAUDE_ID, client_assertion: "eyJ.x.y", client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" }, {}],
       [{}, { authorization: basic }],
     ] as const) {
       const { response, verifier } = await authorizeFor(api, CLAUDE_ID);

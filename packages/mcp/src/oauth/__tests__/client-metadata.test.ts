@@ -99,12 +99,14 @@ describe("the destination address", () => {
     "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254",
     "100.64.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255", "198.18.0.1",
     "::1", "::", "fc00::1", "fd12::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1",
-    "64:ff9b::a00:1", "2001:db8::1", "2002:a00:1::1", "2001:0:4136:e378::1", "2001::1", "100::1", "not-an-ip",
+    "64:ff9b::a00:1", "2001:db8::1", "2002:a00:1::1", "2001:0:4136:e378::1", "2001::1", "100::1", "2001:2::1", "2001:10::1", "2001:1ff::1",
+    "::ffff:7f00:1", "::ffff:a00:1", "192.0.2.1", "198.51.100.1", "203.0.113.1", "192.88.99.1", "240.0.0.1",
+    "not-an-ip",
   ])("refuses %s", (address) => {
     expect(isNonPublicAddress(address)).toBe(true);
   });
 
-  it.each(["160.79.104.10", "8.8.8.8", "172.32.0.1", "100.128.0.1", "2606:4700::6810:1", "::ffff:8.8.8.8"])(
+  it.each(["160.79.104.10", "8.8.8.8", "172.32.0.1", "100.128.0.1", "2606:4700::6810:1", "::ffff:8.8.8.8", "::ffff:808:808", "2001:4860:4860::8888", "2001:200::1"])(
     "allows the public address %s",
     (address) => {
       expect(isNonPublicAddress(address)).toBe(false);
@@ -165,6 +167,8 @@ describe("the document", () => {
     ["a non-web redirect_uri", { ...CLAUDE_DOCUMENT, redirect_uris: ["javascript:alert(1)"] }, /redirect_uris/],
     ["no authorization_code grant", { ...CLAUDE_DOCUMENT, grant_types: ["client_credentials"] }, /authorization_code/],
     ["no code response type", { ...CLAUDE_DOCUMENT, response_types: ["token"] }, /response_type code/],
+    ["grant_types that is not a list", { ...CLAUDE_DOCUMENT, grant_types: "authorization_code" }, /grant_types is not a list/],
+    ["response_types that is not a list", { ...CLAUDE_DOCUMENT, response_types: "code" }, /response_types is not a list/],
     [
       "an auth-methods list without none",
       { ...CLAUDE_DOCUMENT, token_endpoint_auth_method: undefined, token_endpoint_auth_methods_supported: ["private_key_jwt"] },
