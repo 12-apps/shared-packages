@@ -7,7 +7,8 @@ import type { FC } from 'react';
 import React from 'react';
 
 import type { CalendarLabels } from '../../../copy/labels';
-import { sxRem } from '../../../tokens/relative';
+import type { Theme } from '@mui/material/styles/index.js';
+import { rem, sxRem } from '../../../tokens/relative';
 
 import { getMonthName } from './Calendar.dates';
 import type { CalendarProps, MonthMatrix } from './Calendar.types';
@@ -35,8 +36,14 @@ const GRID_SX = {
  * (304 design px: what 7 × 40 cells and 6 × 4 gaps came to before the gaps
  * went, FUT-4162). Months side by side keep a 280 basis,
  * so a multi-month calendar still wraps rather than squeezing every month.
+ * The basis is a theme callback: `sxRem` interpolated into the string wrote a
+ * function's source, and Emotion's whole `flex` was dropped (FUT-4486).
  */
-export const MONTH_SX = { flex: `1 1 ${sxRem(280)}`, minWidth: 0, maxWidth: sxRem(304) } as const;
+export const MONTH_SX = {
+  flex: (theme: Theme) => `1 1 ${rem(theme, 280)}`,
+  minWidth: 0,
+  maxWidth: sxRem(304),
+} as const;
 
 /** The two arrows' accessible names; an icon alone names nothing. */
 export type MonthArrowLabels = Pick<CalendarLabels, 'previousMonth' | 'nextMonth'>;
