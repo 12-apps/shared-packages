@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 
+import { Alert } from "@12-apps/ui/data-display/Alert";
 import { FormControl, FormLabel } from "@12-apps/ui/form/Form";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
@@ -202,6 +203,7 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
 export function WindowFields({
   copy,
   wholeDays,
+  daysUnknown = false,
   schedule,
   scheduleEnabled,
   timezoneLabel,
@@ -211,6 +213,8 @@ export function WindowFields({
   copy: DiscountsWebCopy;
   /** Whether Início = Término is a one-day promotion (the server counts whole days). */
   wholeDays: boolean;
+  /** The server could not place the edited rule's days (FUT-4482): empty boxes, and this said. */
+  daysUnknown?: boolean;
   schedule: DiscountSchedule;
   scheduleEnabled: boolean;
   timezoneLabel: string | null;
@@ -229,6 +233,9 @@ export function WindowFields({
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
       <Stack spacing={0.5} data-testid="discount-period">
+        {daysUnknown ? (
+          <Alert variant="warning" animate={false} description={copy.window.daysUnknown} data-testid="discount-days-unknown" />
+        ) : null}
         <PeriodPicker copy={copy} wholeDays={wholeDays} />
         <Text variant="caption">{copy.schedule.periodHint}</Text>
       </Stack>

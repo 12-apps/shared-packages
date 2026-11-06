@@ -123,9 +123,13 @@ interface PeriodRow {
   endsAt: string | null;
   startsOn?: string | null;
   endsOn?: string | null;
+  daysUnknown?: boolean;
 }
 
 function formatPeriod(row: PeriodRow, formatters: DiscountsFormatters, copy: DiscountsWebCopy): string {
+  // Days the server cannot place are said as such, never formatted from the
+  // instants in a zone that is not the store's.
+  if (row.daysUnknown === true) return copy.window.daysUnknown;
   // The days the rule runs on in the store's zone, when the server counts them;
   // a `YYYY-MM-DD` formats as that day, like the UTC midnight it replaces.
   const startsAt = row.startsOn === undefined ? row.startsAt : row.startsOn;

@@ -39,6 +39,13 @@ export interface DiscountWireRecord {
    */
   startsOn?: string | null;
   endsOn?: string | null;
+  /**
+   * The server counts whole days but cannot place this rule's (FUT-4482): it
+   * was written in the store's zone, and that zone is unknown to it now. The
+   * form shows empty boxes and the list a notice — never days guessed from the
+   * instants.
+   */
+  daysUnknown?: boolean;
   /** The weekly schedule (FUT-996), or null for "always". */
   schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;

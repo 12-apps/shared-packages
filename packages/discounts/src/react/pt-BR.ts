@@ -76,6 +76,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     },
   },
   window: {
+    daysUnknown: "Datas indisponíveis — confira o fuso horário da loja.",
     always: "Sem prazo",
     from: "A partir de {date}",
     until: "Até {date}",

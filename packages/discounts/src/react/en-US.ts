@@ -85,6 +85,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   // promotion has no start or no end, and those mean very different things
   // when it is not running yet.
   window: {
+    daysUnknown: "Dates unavailable — check the store's time zone.",
     always: "No end date",
     from: "From {date}",
     until: "Until {date}",

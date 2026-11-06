@@ -93,6 +93,12 @@ export interface DiscountsVocabularyCopy {
 
 /** The validity sentence, in all four shapes a nullable window can take. */
 export interface DiscountsWindowCopy {
+  /**
+   * In place of the period, in the list and above the form's empty boxes, when
+   * the server cannot place a rule's days (FUT-4482): it was written in the
+   * store's zone and that zone is not one the server knows now.
+   */
+  readonly daysUnknown: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;
   /** Only a start. `{date}`. */

@@ -188,6 +188,18 @@ function makeSubmit(
   };
 }
 
+/**
+ * What "Quando vale" is told about the server: whether it counts whole days,
+ * whether it could place the edited rule's days (FUT-4482), and its zone's name.
+ */
+function windowFlags(props: DiscountFormProps): { wholeDays: boolean; daysUnknown: boolean; timezoneLabel: string | null } {
+  return {
+    wholeDays: props.wholeDays ?? false,
+    daysUnknown: props.editing?.daysUnknown === true,
+    timezoneLabel: props.timezoneLabel ?? null,
+  };
+}
+
 export function DiscountForm(props: DiscountFormProps): JSX.Element {
   const { copy, formatters, currencyField, groups, editing } = props;
   const [error, setError] = useState<string | null>(null);
@@ -231,10 +243,9 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           <TriggerFields copy={copy} />
           <WindowFields
             copy={copy}
-            wholeDays={props.wholeDays ?? false}
+            {...windowFlags(props)}
             schedule={extra.schedule}
             scheduleEnabled={extra.scheduleEnabled}
-            timezoneLabel={props.timezoneLabel ?? null}
             onScheduleChange={extra.setSchedule}
             onScheduleEnabledChange={extra.setScheduleEnabled}
           />

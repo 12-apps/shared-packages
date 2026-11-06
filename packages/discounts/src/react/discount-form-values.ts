@@ -42,11 +42,14 @@ function toDateInput(iso: string | null): string {
 
 /**
  * A bound as the box shows it: the day the server says it runs on, when it
- * says one (FUT-4482), else the stored instant's own date — which is what a
- * server counting UTC midnights always meant.
+ * says one (FUT-4482); nothing when it says it cannot place the days; else the
+ * stored instant's own date — which is what a server counting UTC midnights
+ * always meant, and the only kind of server that sends neither.
  */
-function dayInput(day: string | null | undefined, iso: string | null): string {
-  return day === undefined ? toDateInput(iso) : (day ?? "");
+function dayInput(editing: DiscountWireRecord, bound: "starts" | "ends"): string {
+  if (editing.daysUnknown === true) return "";
+  const day = bound === "starts" ? editing.startsOn : editing.endsOn;
+  return day === undefined ? toDateInput(bound === "starts" ? editing.startsAt : editing.endsAt) : (day ?? "");
 }
 
 /** A new rule's defaults: the most common promotion an operator creates. */
@@ -89,8 +92,8 @@ export function initialValues(
     scope: editing.scope,
     trigger: editing.trigger,
     code: editing.code ?? "",
-    startsAt: dayInput(editing.startsOn, editing.startsAt),
-    endsAt: dayInput(editing.endsOn, editing.endsAt),
+    startsAt: dayInput(editing, "starts"),
+    endsAt: dayInput(editing, "ends"),
     minSubtotal: cents(editing.minSubtotalCents),
     usageLimit: editing.usageLimit === null ? "" : String(editing.usageLimit),
     perBuyerLimit: editing.perBuyerLimit === null ? "" : String(editing.perBuyerLimit),
