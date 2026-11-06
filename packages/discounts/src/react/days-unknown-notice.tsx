@@ -113,8 +113,9 @@ export function DaysUnknownListNotice({
 
 /**
  * The short words under a row's name, for the widths where the table's
- * Vigência cell has scrolled off to the right (below `md`, where the grid
- * scrolls sideways). Above that the cell itself says them.
+ * Vigência cell has scrolled off to the right: below `lg` the nine columns
+ * do not fit beside the admin's rails (measured: off-screen at 900, on screen
+ * at 1280), so the grid scrolls sideways. From `lg` the cell itself says them.
  */
 export function DaysUnknownMarker({ copy }: { copy: DiscountsWebCopy }): JSX.Element {
   return (
@@ -122,7 +123,7 @@ export function DaysUnknownMarker({ copy }: { copy: DiscountsWebCopy }): JSX.Ele
       component="span"
       data-testid="discount-days-unknown-marker"
       sx={{
-        display: { xs: "block", md: "none" },
+        display: { xs: "block", lg: "none" },
         color: "warning.dark",
         typography: "caption",
         fontWeight: 600,
@@ -140,7 +141,7 @@ export function nameCell(
 ): JSX.Element {
   return (
     <>
-      {row.name}
+      <span>{row.name}</span>
       {row.record.daysUnknown === true ? <DaysUnknownMarker copy={copy} /> : null}
     </>
   );
