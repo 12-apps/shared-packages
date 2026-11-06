@@ -13,6 +13,11 @@ import { REFRESH_TOKEN_TTL_MS } from "./refresh";
 import { DEFAULT_ROTATION_GRACE_MS } from "./rotation-grace";
 import { loadSigningKeyFromEnv, type McpSigningKeyProvider } from "./keys";
 import type { ProviderAttributionRule } from "./clients";
+import {
+  createClientMetadataDocumentResolver,
+  withClientMetadataDocuments,
+  type ClientMetadataDocumentOptions,
+} from "./client-metadata";
 import type { McpOauthStores, StoredOAuthClient } from "./stores";
 
 /**
@@ -181,6 +186,23 @@ export interface McpOauthConfig {
   preApprovedClientIds?: readonly string[];
   /** Liveness recording on a grant; omit to record nothing. */
   connections?: McpConnectionRecording;
+  /**
+   * Accept OAuth Client ID Metadata Documents (CIMD): a `client_id` that is an
+   * `https` URL is resolved by fetching the document it names, instead of being
+   * looked up in `stores.clients` (see `./client-metadata.ts`). The
+   * authorization-server metadata then advertises
+   * `client_id_metadata_document_supported: true`.
+   *
+   * OFF by default, because turning it on makes the server fetch URLs an
+   * unauthenticated caller chooses — bounded, but a host should decide to.
+   * `true` takes every default; an object tunes the cache, timeout and size cap.
+   */
+  clientIdMetadataDocuments?: boolean | ClientMetadataDocumentOptions;
+  /**
+   * Told why a metadata document was refused (the client only ever sees
+   * `invalid_client`), so the host can log it. Never throws into the flow.
+   */
+  onClientMetadataRefusal?: (clientId: string, reason: string) => void;
 }
 
 /** The config with every default applied — what the handlers actually read. */
@@ -212,6 +234,8 @@ export interface McpOauthContext {
     scopes: readonly string[],
   ) => Promise<boolean>;
   connections?: McpConnectionRecording;
+  /** Whether metadata-document client ids are resolved (and advertised). */
+  clientIdMetadataDocuments: boolean;
   /** The trusted public origin for THIS request (issuance and verification agree). */
   originOf: (request: Request) => string;
 }
@@ -246,8 +270,10 @@ export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
   const enabled = config.enabled ?? true;
   validateConsentConfig(config.consent);
   const trustedOrigins = config.trustedOrigins ?? [];
+  const surface = resolveSurface(config);
   return {
-    stores: config.stores,
+    stores: resolveStores(config, surface.scopes),
+    clientIdMetadataDocuments: Boolean(config.clientIdMetadataDocuments),
     ...(config.consent ? { consent: config.consent } : {}),
     ...(config.isAccessTokenActive ? { isAccessTokenActive: config.isAccessTokenActive } : {}),
     resolveSession: config.resolveSession,
@@ -258,7 +284,7 @@ export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
     // JWKS answers 503 rather than falling back to a weaker mode.
     signingKey: config.signingKey ?? loadSigningKeyFromEnv(),
     trustedOrigins,
-    ...resolveSurface(config),
+    ...surface,
     // `'in-process'` is an ACKNOWLEDGEMENT, not a default — see the field's docs.
     codeReplay:
       config.codeReplay === "in-process" ? inProcessCodeReplayStore() : config.codeReplay,
@@ -266,6 +292,29 @@ export function resolveMcpOauthConfig(config: McpOauthConfig): McpOauthContext {
     ...(config.connections ? { connections: config.connections } : {}),
     originOf: (request) => originFromRequest(request, trustedOrigins),
   };
+}
+
+/**
+ * The stores the handlers read: the host's own, with the client lookup routed
+ * through the metadata-document resolver when CIMD is on. One resolver per
+ * surface, so its cache is shared by authorize, consent and token.
+ */
+function resolveStores(config: McpOauthConfig, scopes: readonly string[]): McpOauthStores {
+  const option = config.clientIdMetadataDocuments;
+  if (!option) return config.stores;
+  const report = config.onClientMetadataRefusal;
+  const resolver = createClientMetadataDocumentResolver(
+    scopes,
+    option === true ? {} : option,
+    (clientId, reason) => {
+      try {
+        report?.(clientId, reason);
+      } catch {
+        // A logging hook must never decide the outcome of a grant.
+      }
+    },
+  );
+  return { ...config.stores, clients: withClientMetadataDocuments(config.stores.clients, resolver) };
 }
 
 /**

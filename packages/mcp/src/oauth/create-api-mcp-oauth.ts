@@ -2,6 +2,7 @@ import { buildAuthorizationServerMetadata } from "../auth/authorization-server-m
 import { buildProtectedResourceMetadata } from "../auth/resource-metadata";
 
 import { authorizeEndpoint } from "./authorize";
+import { ClientMetadataUnavailableError } from "./client-metadata";
 import { consentDetailsEndpoint, consentDecisionEndpoint } from "./consent";
 import { issuer, resourceAudience } from "./config";
 import {
@@ -130,6 +131,7 @@ function discoveryHandlers(
           // The RESOLVED paths, so what a connector reads before its first request
           // is where the endpoints actually are.
           paths: context.paths,
+          clientIdMetadataDocumentSupported: context.clientIdMetadataDocuments,
         }),
       ),
     protectedResourceMetadata: async (request) => {
@@ -161,15 +163,52 @@ function buildHandlers(context: McpOauthContext): McpOauthHandlers {
   const discovery = discoveryHandlers(context);
 
   return {
-    authorize: gated((request) => authorizeEndpoint(context, request)),
-    consentDetails: gated((request) => consentDetailsEndpoint(context, request)),
-    consentDecision: gated((request) => consentDecisionEndpoint(context, request)),
-    token: gated((request) => tokenEndpoint(context, request)),
+    authorize: gated(retryable((request) => authorizeEndpoint(context, request), "text")),
+    consentDetails: gated(retryable((request) => consentDetailsEndpoint(context, request), "json")),
+    consentDecision: gated(retryable((request) => consentDecisionEndpoint(context, request), "json")),
+    token: gated(retryable((request) => tokenEndpoint(context, request), "token")),
     register: async (request) =>
       context.enabled() ? registerEndpoint(context, request) : registrationDisabled(),
     jwks: gated(() => jwksResponse(context)),
     authorizationServerMetadata: gated(discovery.authorizationServerMetadata),
     protectedResourceMetadata: gated(discovery.protectedResourceMetadata),
+  };
+}
+
+/** Seconds a caller should wait before retrying a metadata document outage. */
+const METADATA_RETRY_AFTER_SECONDS = 30;
+
+/**
+ * A client whose metadata document cannot be fetched right now (and has no
+ * earlier copy) is a 503 with `Retry-After`, never `invalid_client`: the client
+ * did nothing wrong, and a host that reads `invalid_client` at refresh may drop a
+ * live connection over a vendor's bad minute. The authorize answer is plain text
+ * and never a redirect, as every pre-validation failure there is.
+ */
+function retryable(
+  handler: (request: Request) => Promise<Response>,
+  shape: "text" | "json" | "token",
+): (request: Request) => Promise<Response> {
+  return async (request) => {
+    try {
+      return await handler(request);
+    } catch (error) {
+      if (!(error instanceof ClientMetadataUnavailableError)) throw error;
+      const headers = { "Cache-Control": "no-store", "Retry-After": String(METADATA_RETRY_AFTER_SECONDS) };
+      if (shape === "text") {
+        return new Response("temporarily_unavailable: the client metadata document could not be fetched", {
+          status: 503,
+          headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+      const body = shape === "token"
+        ? { error: "server_error", error_description: "the client metadata document could not be fetched; retry" }
+        : { error: "temporarily_unavailable" };
+      return new Response(JSON.stringify(body), {
+        status: 503,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
   };
 }
 

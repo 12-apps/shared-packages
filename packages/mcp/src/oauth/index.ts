@@ -75,6 +75,23 @@ export {
   type PublicSigningJwk,
 } from "./keys";
 export {
+  ClientMetadataDocumentError,
+  ClientMetadataUnavailableError,
+  clientFromMetadataDocument,
+  createClientMetadataDocumentResolver,
+  fetchMetadataDocument,
+  isClientIdMetadataUrl,
+  isNonPublicAddress,
+  matchesLoopbackRedirectUri,
+  parseClientIdMetadataUrl,
+  publicOnlyLookup,
+  withClientMetadataDocuments,
+  type ClientMetadataDocumentOptions,
+  type ClientMetadataDocumentResolver,
+  type FetchMetadataDocument,
+  type MetadataDocumentAnswer,
+} from "./client-metadata";
+export {
   DEFAULT_PROVIDER_ROOTS,
   hashSecret,
   matchesRedirectUri,
