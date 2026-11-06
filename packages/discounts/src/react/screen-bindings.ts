@@ -44,7 +44,7 @@ export function toMenuBinding(
   props: DiscountsScreenProps,
   groups: readonly WireTargetGroup[] | undefined,
 ): MenuBinding {
-  const { api, copy, formatters, currencyField, onError, timezoneLabel } = props;
+  const { api, copy, formatters, currencyField, onError, timezoneLabel, wholeDays } = props;
   return {
     api,
     copy,
@@ -53,5 +53,6 @@ export function toMenuBinding(
     groups,
     onError,
     ...(timezoneLabel ? { timezoneLabel } : {}),
+    ...(wholeDays ? { wholeDays } : {}),
   };
 }

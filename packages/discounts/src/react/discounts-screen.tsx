@@ -59,6 +59,8 @@ export interface DiscountsScreenProps {
   timezone?: string;
   /** The store's timezone as a person says it, for the schedule editor. */
   timezoneLabel?: string;
+  /** Whether the server counts the period's days whole (FUT-4482). */
+  wholeDays?: boolean;
   currencyField: CurrencyFieldComponent;
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */

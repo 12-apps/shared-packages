@@ -183,11 +183,16 @@ function checkComboKind(
 /**
  * Início and Término. Each is blank or a whole real ISO day — the date box
  * holds its typed text until it is one (FUT-4156) — and only two real days are
- * compared. The days count whole (FUT-4482), so Início = Término is a one-day
- * promotion and only a Término BEFORE Início is refused. A server that still
- * counts UTC midnights refuses equal days itself, in its own words.
+ * compared. Where the server counts whole days (FUT-4482, `wholeDays`),
+ * Início = Término is a one-day promotion and only a Término BEFORE Início is
+ * refused; elsewhere the server refuses equal days, so the form does too — a
+ * form that let them through would only send them to be refused.
  */
-function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
+function checkPeriod(
+  values: DiscountFormValues,
+  copy: DiscountsWebCopy,
+  wholeDays: boolean,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const name of ["startsAt", "endsAt"] as const) {
     if (values[name] === "" || isIsoDay(values[name])) continue;
@@ -197,10 +202,14 @@ function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record
       ? copy.form.invalidDate
       : copy.form.dateIncomplete;
   }
-  if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt < values.startsAt) {
-    errors.endsAt = copy.form.endsBeforeStarts;
-  }
-  return errors;
+  return { ...errors, ...checkOrder(values, copy, wholeDays) };
+}
+
+/** Término against Início, once both are real days. */
+function checkOrder(values: DiscountFormValues, copy: DiscountsWebCopy, wholeDays: boolean): Record<string, string> {
+  if (!isIsoDay(values.startsAt) || !isIsoDay(values.endsAt)) return {};
+  if (wholeDays) return values.endsAt < values.startsAt ? { endsAt: copy.form.endsBeforeStartDay } : {};
+  return values.endsAt <= values.startsAt ? { endsAt: copy.form.endsBeforeStarts } : {};
 }
 
 /** What the pickers and the builder currently hold, in one argument. */
@@ -248,10 +257,14 @@ function checkSchedule(
   return sameEnds ? { schedule: copy.schedule.timesRequired } : {};
 }
 
-/** The schedule editor's state: its switch and its rows, kept separate. */
+/**
+ * The schedule editor's state — its switch and its rows, kept separate — and
+ * whether the server counts the period's days whole (`wholeDays`, FUT-4482).
+ */
 interface ScheduleState {
   enabled: boolean;
   schedule: DiscountSchedule;
+  wholeDays?: boolean;
 }
 
 export function validate(
@@ -282,7 +295,7 @@ export function validate(
   if (scope === "ITEM" && targets.menuItemIds.length === 0) {
     errors.scope = copy.form.itemTargetRequired;
   }
-  Object.assign(errors, checkPeriod(values, copy));
+  Object.assign(errors, checkPeriod(values, copy, scheduleState.wholeDays ?? false));
   return errors;
 }
 

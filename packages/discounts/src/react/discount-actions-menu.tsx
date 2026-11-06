@@ -49,6 +49,8 @@ export interface DiscountActionsMenuProps {
   onError: (error: unknown, context: string) => void;
   /** The store's timezone as a person says it, for the schedule editor. */
   timezoneLabel?: string;
+  /** Whether the server counts the period's days whole (FUT-4482). */
+  wholeDays?: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ export function DiscountActionsMenu({
   groups,
   onError,
   timezoneLabel,
+  wholeDays,
 }: DiscountActionsMenuProps): JSX.Element {
   const { onRefresh } = useCardActions();
   const [editOpen, setEditOpen] = useState(false);
@@ -143,6 +146,7 @@ export function DiscountActionsMenu({
             editing={row.record}
             onError={onError}
             {...(timezoneLabel ? { timezoneLabel } : {})}
+            {...(wholeDays ? { wholeDays } : {})}
             onSaved={() => {
               setEditOpen(false);
               onRefresh();

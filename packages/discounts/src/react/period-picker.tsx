@@ -22,6 +22,11 @@ import { DateField, isIsoDay } from "./date-field";
  *
  * The two stay in step through the form values alone: the calendar reads a box
  * once it holds a whole real day, and a tap writes only the bound it moved.
+ *
+ * As B draws it: only the month's own days, today ringed, and — where the
+ * server counts no whole days — a second tap on Início does nothing, since
+ * Início = Término would be refused. Where it counts them (`wholeDays`,
+ * FUT-4482) that tap is a one-day promotion.
  */
 
 /** A form value as the calendar reads it: a whole real ISO day, or no bound. */
@@ -70,7 +75,7 @@ function PeriodBoxes({
   );
 }
 
-export function PeriodPicker({ copy, locale }: { copy: DiscountsWebCopy; locale?: string }): JSX.Element {
+export function PeriodPicker({ copy, wholeDays }: { copy: DiscountsWebCopy; wholeDays: boolean }): JSX.Element {
   const { values, setFieldValue } = useFormContext();
   const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
   const names = copy.form.calendar;
@@ -90,13 +95,12 @@ export function PeriodPicker({ copy, locale }: { copy: DiscountsWebCopy; locale?
       openEnd
       dataTestId="discount-period-picker"
       renderFields={({ placement }) => <PeriodBoxes copy={copy} placement={placement} />}
-      {...(locale ? { locale } : {})}
-      {...(names
-        ? {
-            messages: { calendarLabel: names.label },
-            calendarLabels: { previousMonth: names.previousMonth, nextMonth: names.nextMonth },
-          }
-        : {})}
+      showOutsideDays={false}
+      todayIndicator="ring"
+      allowSameDayRange={wholeDays}
+      locale={names.locale}
+      messages={{ calendarLabel: names.label }}
+      calendarLabels={{ previousMonth: names.previousMonth, nextMonth: names.nextMonth }}
     />
   );
 }

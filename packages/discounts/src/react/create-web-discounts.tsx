@@ -78,6 +78,18 @@ export interface DiscountsWebConfig {
    */
   timezone?: string;
   /**
+   * Whether the SERVER counts Início and Término whole in the store's zone —
+   * true exactly when the host passes `storeTimeZone` to `createApiDiscounts`
+   * (FUT-4482). With it the form takes Início = Término as a one-day
+   * promotion; without it the form refuses equal days, as that server does,
+   * and a second tap on Início in the calendar does nothing.
+   *
+   * Said here rather than inferred from {@link timezone}: that one feeds a
+   * browser-side dot, and a host may well pass it with a server that still
+   * counts UTC midnights. Default false.
+   */
+  wholeDays?: boolean;
+  /**
    * Where a failure goes, beyond the operator's own screen — REQUIRED, and for
    * the same reason `createApiDiscounts` requires a logger.
    *
@@ -140,7 +152,7 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb, timezone } = config;
+  const { copy, onError, currencyField, breadcrumb, timezone, wholeDays } = config;
   // DERIVED from the zone unless the host insists otherwise. A host naming the
   // zone in words would be shipping copy, which has to be bilingual; `Intl`
   // already knows it in every locale.
@@ -159,6 +171,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
     ...(breadcrumb ? { breadcrumb } : {}),
     ...(timezoneLabel ? { timezoneLabel } : {}),
     ...(timezone ? { timezone } : {}),
+    ...(wholeDays ? { wholeDays } : {}),
   };
 
   return {
@@ -171,6 +184,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
         currencyField={currencyField}
         onError={onError}
         {...(timezoneLabel ? { timezoneLabel } : {})}
+        {...(wholeDays ? { wholeDays } : {})}
         {...props}
       />
     ),

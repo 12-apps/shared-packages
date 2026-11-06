@@ -201,7 +201,7 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
  */
 export function WindowFields({
   copy,
-  locale,
+  wholeDays,
   schedule,
   scheduleEnabled,
   timezoneLabel,
@@ -209,8 +209,8 @@ export function WindowFields({
   onScheduleEnabledChange,
 }: {
   copy: DiscountsWebCopy;
-  /** Month names and day names in the calendar. */
-  locale?: string;
+  /** Whether Início = Término is a one-day promotion (the server counts whole days). */
+  wholeDays: boolean;
   schedule: DiscountSchedule;
   scheduleEnabled: boolean;
   timezoneLabel: string | null;
@@ -229,7 +229,7 @@ export function WindowFields({
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
       <Stack spacing={0.5} data-testid="discount-period">
-        <PeriodPicker copy={copy} {...(locale ? { locale } : {})} />
+        <PeriodPicker copy={copy} wholeDays={wholeDays} />
         <Text variant="caption">{copy.schedule.periodHint}</Text>
       </Stack>
       <FormControl>

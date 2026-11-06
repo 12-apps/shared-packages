@@ -172,6 +172,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     nameTooShort: "O nome precisa ter pelo menos 2 letras.",
     datePlaceholder: "DD/MM/AAAA",
     calendar: {
+      locale: "pt-BR",
       label: PT_BR_UI_LABELS.dateRangePicker.calendar,
       previousMonth: PT_BR_UI_LABELS.calendar.previousMonth,
       nextMonth: PT_BR_UI_LABELS.calendar.nextMonth,
@@ -195,7 +196,8 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidUsageLimit: "Informe um número inteiro de usos, a partir de 1, ou deixe em branco.",
     invalidPerBuyerLimit: "Informe um número inteiro por cliente, a partir de 1, ou deixe em branco.",
     wholeNumberOnly: "Use só números inteiros, sem vírgula.",
-    endsBeforeStarts: "A data de término não pode ser anterior à data de início.",
+    endsBeforeStarts: "A data de término deve ser posterior à data de início.",
+    endsBeforeStartDay: "A data de término não pode ser anterior à data de início.",
   },
   comboRewards: {
     labels: { PERCENTAGE: "Porcentagem", FIXED_AMOUNT: "Valor fixo", BUNDLE_PRICE: "Preço fechado" },

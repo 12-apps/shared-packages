@@ -36,11 +36,6 @@ export interface DiscountsFormatters {
   parseDecimal(typed: string): number | null;
   /** A number as the operator would type it back ("12.5" → "12,5"). */
   toInput(value: number): string;
-  /**
-   * The locale these were built for — what the period calendar names months
-   * and days in. Optional so a host's hand-built formatters still type-check.
-   */
-  readonly locale?: string;
 }
 
 /** The decimal separator this locale writes, read from `Intl` rather than guessed. */
@@ -88,7 +83,6 @@ export function createFormatters(locale: string, currency: string): DiscountsFor
       return Number.isFinite(parsed) ? parsed : null;
     },
     toInput: (value) => String(value).replace(".", decimal),
-    locale,
   };
 }
 

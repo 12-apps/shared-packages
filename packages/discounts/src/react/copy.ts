@@ -137,11 +137,14 @@ export interface DiscountsFormCopy {
   /** Inside an empty Início / Término: the day-first order the box reads (FUT-4156). */
   readonly datePlaceholder: string;
   /**
-   * The period calendar's names (FUT-4156): the grid's own, and its month
-   * arrows'. OPTIONAL — a host with its own pack keeps building, and without
-   * them the calendar keeps the library's English name and unnamed arrows.
+   * The period calendar's names (FUT-4156): the language its months and
+   * weekdays are written in (a BCP-47 tag — the PACK's language, so a host
+   * resolving copy per reader gets the reader's month names), the grid's own
+   * name and its month arrows'. Required like every other sentence: a pack
+   * without them would leave an English calendar on a Portuguese form.
    */
-  readonly calendar?: {
+  readonly calendar: {
+    readonly locale: string;
     readonly label: string;
     readonly previousMonth: string;
     readonly nextMonth: string;
@@ -209,7 +212,13 @@ export interface DiscountsFormCopy {
    * away stored 25.
    */
   readonly wholeNumberOnly: string;
+  /** Término on or before Início, where the server counts no whole days: equal days are refused. */
   readonly endsBeforeStarts: string;
+  /**
+   * Término BEFORE Início, where the server counts whole days in the store's
+   * zone (FUT-4482, `wholeDays`): Início = Término is a one-day promotion.
+   */
+  readonly endsBeforeStartDay: string;
   /** A date that is not a whole, real day — "31/02/2026", or "12/0" at Criar. */
   readonly invalidDate: string;
   /** A date left half-typed ("25/10/202"): shown once the box is left, or at Criar. */

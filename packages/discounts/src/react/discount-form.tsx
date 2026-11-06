@@ -120,6 +120,12 @@ export interface DiscountFormProps {
   onError: (error: unknown, context: string) => void;
   /** The store's timezone as a person says it — shown under the clocks. */
   timezoneLabel?: string;
+  /**
+   * Whether the server counts Início and Término WHOLE in the store's zone
+   * (its `storeTimeZone`, FUT-4482): equal days are then a one-day promotion.
+   * Default false, which refuses equal days as such a server does.
+   */
+  wholeDays?: boolean;
 }
 
 /**
@@ -145,6 +151,7 @@ function makeSubmit(
     const invalid = validate(values, targets, formatters, copy, {
       enabled: extra.scheduleEnabled,
       schedule: extra.schedule,
+      wholeDays: props.wholeDays ?? false,
     });
     if (Object.keys(invalid).length > 0) {
       // ONE message for a client refusal: the red fields and the toast
@@ -224,7 +231,7 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
           <TriggerFields copy={copy} />
           <WindowFields
             copy={copy}
-            {...(formatters.locale ? { locale: formatters.locale } : {})}
+            wholeDays={props.wholeDays ?? false}
             schedule={extra.schedule}
             scheduleEnabled={extra.scheduleEnabled}
             timezoneLabel={props.timezoneLabel ?? null}

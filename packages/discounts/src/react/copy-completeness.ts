@@ -24,9 +24,6 @@ function read(copy: unknown, path: string): unknown {
   );
 }
 
-/** Groups a pack may leave out — see each one's own comment. */
-const OPTIONAL_PATHS: readonly string[] = ["form.calendar."];
-
 /**
  * The keys a pack is missing or left blank, as dotted paths.
  *
@@ -41,7 +38,6 @@ export function missingWebCopy(
   reference: DiscountsWebCopy,
 ): string[] {
   return leafPaths(reference).filter((path) => {
-    if (OPTIONAL_PATHS.some((prefix) => path.startsWith(prefix))) return false;
     const value = read(copy, path);
     // A leaf is satisfied by a non-blank string OR a function. The `@12-apps/ui`
     // packs folded in below carry entries that take the interpolated value as

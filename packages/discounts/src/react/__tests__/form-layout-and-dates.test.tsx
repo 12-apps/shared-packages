@@ -23,7 +23,7 @@ function PlainCurrency({ name, label }: { name: string; label: string }) {
   return <input name={name} aria-label={label} readOnly />;
 }
 
-function renderForm(editing: DiscountWireRecord | null = null): { sent: unknown[] } {
+function renderForm(editing: DiscountWireRecord | null = null, wholeDays = false): { sent: unknown[] } {
   const sent: unknown[] = [];
   const transport: DiscountsTransport = {
     get: <T,>(url: string): Promise<T> =>
@@ -46,6 +46,7 @@ function renderForm(editing: DiscountWireRecord | null = null): { sent: unknown[
       onSaved={vi.fn()}
       onError={() => {}}
       timezoneLabel="Horário de Brasília"
+      wholeDays={wholeDays}
     />,
   );
   return { sent };
@@ -331,8 +332,10 @@ describe("FUT-4482: the chosen days read back whole, in the store's zone", () =>
     expect(formatWindow({ ...zoned, schedule: null }, formatters, copy)).toBe("10/11/2026 a 20/11/2026");
   });
 
+  // W3/W4 are a server that counts whole days (`wholeDays`); without it equal
+  // days are refused, as that server refuses them (period-calendar-round-two).
   it("W3: Início = Término is a one-day promotion, sent as that day twice", async () => {
-    const { sent } = renderForm();
+    const { sent } = renderForm(null, true);
     fillValid();
     type("total-form-field-startsAt", "20112026");
     type("total-form-field-endsAt", "20112026");
@@ -342,7 +345,7 @@ describe("FUT-4482: the chosen days read back whole, in the store's zone", () =>
   });
 
   it("W4: Término before Início is refused in words that allow the same day", async () => {
-    renderForm();
+    renderForm(null, true);
     type("total-form-field-startsAt", "20112026");
     type("total-form-field-endsAt", "19112026");
     submit();

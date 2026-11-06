@@ -211,7 +211,12 @@ so it passes it per tenant:
 ```ts
 createApiDiscounts({
   store, copy, logger,
-  storeTimeZone: async (clientId) => (await db.client.findUnique({ where: { id: clientId } })).timezone,
+  storeTimeZone: async (clientId) => {
+    const client = await db.client.findUnique({ where: { id: clientId }, select: { timezone: true } });
+    // A tenant with no row, or no zone, is a wiring bug: say so, never answer null.
+    if (!client?.timezone) throw new Error(`no time zone for tenant ${clientId}`);
+    return client.timezone;
+  },
 });
 ```
 
@@ -221,12 +226,45 @@ AFTER Término, both in that zone; Início = Término is a one-day promotion, an
 only a Término before Início is refused (`copy.endsBeforeStartDay`, required
 once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
 the days it runs on there, and the admin form and grid read those back. An
-unknown zone fails the request instead of storing a window on a guessed clock.
+unknown zone fails every write instead of storing a window on a guessed clock;
+a read answers its days on UTC and logs a warning, so the list stays usable
+while the zone is fixed. A null or blank answer for a tenant fails every route —
+the function must answer a zone for every tenant it is asked about.
+
+A copy resolver may answer a reader's locale with a pack that lacks
+`endsBeforeStartDay`; that refusal then says the default rendering's sentence
+(the one asserted at the mount), never `endsBeforeStarts`, which would be false
+once equal days are legal.
 
 Without it, nothing changes: UTC midnights, an exclusive Término, equal days
-refused, no day fields. A host that turns it on should migrate the rules it
-already stored (UTC midnight of each chosen day) to the new meaning, or they
-read back as the days they really ran on in its zone — a day early.
+refused, no day fields.
+
+**Turn the zone on only with the migration of the rules already stored.**
+Every rule written before it holds each chosen day as its UTC midnight with an
+exclusive Término. Unmigrated, it reads back on the store's clock as other days
+than the form showed (a day early west of UTC), and the first edit that
+re-saves it moves its window without anyone choosing to. The package exports the
+rewrite for that migration, pure and run once per row in the release that
+starts passing `storeTimeZone`:
+
+```ts
+import { legacyUtcWindowToZoned } from "@12-apps/discounts/server";
+
+for (const rule of await db.discountRule.findMany({ where: { clientId } })) {
+  const { startsAt, endsAt } = legacyUtcWindowToZoned(rule.startsAt, rule.endsAt, zone);
+  await db.discountRule.update({ where: { id: rule.id }, data: { startsAt, endsAt } });
+}
+```
+
+It keeps the days the old form showed — Início whole from its 00:00, Término
+now inclusive — and throws on a bound that is not a UTC midnight, so a second
+run off UTC stops instead of shifting every row again.
+
+The web surface must be told the same thing: pass `wholeDays: true` to
+`createWebDiscounts` on the host whose server passes `storeTimeZone`. With it the
+form accepts Início = Término as a one-day promotion; without it the form
+refuses equal days itself, as the server does, and a second tap on Início in
+the calendar does nothing.
 
 ## Letting a host table opt in — `DiscountableCollection`
 
