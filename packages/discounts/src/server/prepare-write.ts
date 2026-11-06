@@ -27,11 +27,12 @@ function assertKeepsOnly(sent: SentDays, copy: DiscountsServerCopy, locale: stri
  * round 6): days equal to the ones a read showed are no change, and save.
  */
 function heldRefusal(
+  write: "create" | "update",
   sent: DiscountWriteInput,
   copy: DiscountsServerCopy,
   timeZone: string | undefined,
 ): DiscountValidationError | null {
-  if (timeZone === undefined) return null;
+  if (write !== "update" || timeZone === undefined) return null;
   return unplaceableDays(checkedWholeDays(sent, copy), copy, timeZone);
 }
 
@@ -62,7 +63,7 @@ export async function prepareWrite(
   const timeZone = keepWindow ? undefined : await zoneFor(config.storeTimeZone, clientId);
   const dayCopy =
     timeZone === undefined ? copy : wholeDayCopyFor(copy, resolveDiscountsCopy(config.copy, undefined));
-  const refusal = write === "update" ? heldRefusal(sent, dayCopy, timeZone) : null;
+  const refusal = heldRefusal(write, sent, dayCopy, timeZone);
   const input = keepWindow || refusal !== null ? { ...sent, startsAt: null, endsAt: null } : sent;
   const scalars =
     timeZone === undefined ? toDiscountScalars(input, copy) : toDiscountScalars(input, dayCopy, { timeZone });
@@ -70,5 +71,9 @@ export async function prepareWrite(
   if (config.collections) {
     await assertTargetsOwned(config.collections, clientId, folded.targets, copy.foreignTarget);
   }
-  return { write: folded, timeZone, sent: sentDays, keepWindow, refusal };
+  // A legacy row (flag false) whose dates change while the zone is unknown is
+  // written as legacy UTC midnights, its own meaning, which needs no zone
+  // (review round 7, ADR 0186): built only if the row read turns out legacy.
+  const legacy = refusal === null ? null : () => ({ scalars: toDiscountScalars(sent, copy), targets: folded.targets });
+  return { write: folded, timeZone, sent: sentDays, keepWindow, refusal, legacy };
 }

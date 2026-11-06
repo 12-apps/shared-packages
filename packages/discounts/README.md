@@ -248,9 +248,12 @@ read-then-write below. So the admin form pausing a legacy row saves while the
 zone is unknown, and a legacy row saved unchanged under a known zone stays
 legacy, on its exact bounds, rather than turning zoned and growing a day;
 converting it is the migration's job. **Changed** days take the paths above:
-whole days in a known zone and, the one refusal left, a 422 on the date field
-with `copy.datesNeedKnownZone` (required once the zone is passed) when the zone
-is unknown: the server cannot place a changed day on the store's clock. It
+whole days in a known zone; with the zone unknown, a `windowInZone: false`
+row's new days are written as legacy UTC midnights, flag still false — its own
+meaning, which needs no zone (review round 7, ADR 0186) — and the one refusal
+left is a 422 on the date field with `copy.datesNeedKnownZone` (required once
+the zone is passed) for a `windowInZone: true` row's changed days and for a
+create's dates: the server cannot place those days on the store's clock. It
 refuses the date it cannot place, never the edit.
 
 A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
@@ -403,8 +406,16 @@ the calendar does nothing.
 `form.endsBeforeStartDay`) and on the server pack (`keepWindowWithDates`,
 `windowChanged`). A host pack written before them still mounts —
 `missingWebCopy` does not report them — and each missing sentence is said from
-the package's own pack for the host's locale (pt-BR for a `pt` tag, en-US
-otherwise). Only `endsBeforeStartDay` and `datesNeedKnownZone` on the server
+the package's own pack for the host's language (pt-BR for any `pt` tag,
+`pt_BR` read as `pt-BR`; en-US otherwise). On the web the language is
+`createWebDiscounts`' `locale`, or for a bare `DiscountsSurface` its `locale`
+prop, then the formatters' `locale`, then the pack's `form.calendar.locale`;
+on the server it is the request's locale. With none, the pack's own words
+decide: it is taken for the package's pack it shares more sentences with,
+en-US on a tie — so a pack written wholly by hand in Portuguese, sharing no
+sentence with ours and naming no language, is filled in English. A missing
+`form.calendar.locale` is the host's own tag, so an `es-ES` host's months are
+Spanish while its missing sentences are English. Only `endsBeforeStartDay` and `datesNeedKnownZone` on the server
 are asserted at the mount, and only once `storeTimeZone` is passed.
 
 ## Letting a host table opt in — `DiscountableCollection`

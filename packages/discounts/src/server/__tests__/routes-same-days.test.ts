@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { legacyWindowDays } from "../../timezone";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountsApiConfig } from "../routes";
 import type { DiscountRecord, DiscountStore, DiscountUpdateCondition, DiscountWrite } from "../store";
@@ -84,7 +85,7 @@ async function readDays(call: ReturnType<typeof surface>["call"]): Promise<{ sta
   return { startsAt: data.startsOn, endsAt: data.endsOn };
 }
 
-describe("a pause of a legacy row while the store's zone is unknown (B1)", () => {
+describe("a legacy row while the store's zone is unknown (B1, round 7 N1)", () => {
   it("saves (200) and writes the stored window and flag unchanged", async () => {
     const { call, writes } = surface(LEGACY, { storeTimeZone: () => UNKNOWN });
     const days = await readDays(call);
@@ -98,13 +99,40 @@ describe("a pause of a legacy row while the store's zone is unknown (B1)", () =>
     expect(writes[0]!.condition).toEqual({ window: { startsAt: LEGACY_STARTS, endsAt: LEGACY_ENDS, windowInZone: false } });
   });
 
-  it("still refuses a CHANGED day on the date field only", async () => {
+  // Review round 7 (N1, ADR 0186): a legacy row's days are UTC dates, so its
+  // new ones need no zone — written as legacy UTC midnights, never refused.
+  it("saves a CHANGED day as legacy UTC midnights, flag still false", async () => {
     const { call, writes } = surface(LEGACY, { storeTimeZone: () => UNKNOWN });
+    const response = await call("PATCH", { ...BODY, startsAt: "2026-11-10", endsAt: "2026-11-25" });
+    expect(response.status).toBe(200);
+    expect(writes).toHaveLength(1);
+    const { scalars } = writes[0]!.write;
+    expect(scalars.windowInZone).toBe(false);
+    expect(scalars.startsAt?.toISOString()).toBe("2026-11-10T00:00:00.000Z");
+    expect(legacyWindowDays(scalars.startsAt ?? null, scalars.endsAt ?? null)).toEqual({
+      startsOn: "2026-11-10",
+      endsOn: "2026-11-25",
+    });
+    expect(writes[0]!.condition).toEqual({ window: { startsAt: LEGACY_STARTS, endsAt: LEGACY_ENDS, windowInZone: false } });
+  });
+
+  it("still refuses a ZONED row's changed day on the date field only", async () => {
+    const zoned = row({ startsAt: new Date("2026-11-10T03:00:00.000Z"), endsAt: new Date("2026-11-21T03:00:00.000Z"), windowInZone: true });
+    const { call, writes } = surface(zoned, { storeTimeZone: () => UNKNOWN });
     expect(await call("PATCH", { ...BODY, startsAt: "2026-11-10", endsAt: "2026-11-25" })).toMatchObject({
       status: 422,
       body: { issues: { startsAt: PT_BR_DISCOUNTS_SERVER_COPY.datesNeedKnownZone } },
     });
     expect(writes).toEqual([]);
+  });
+
+  it("still refuses a create's dates under the unknown zone", async () => {
+    const { call, created } = surface(LEGACY, { storeTimeZone: () => UNKNOWN });
+    expect(await call("POST", { ...BODY, startsAt: "2026-11-10", endsAt: "2026-11-25" })).toMatchObject({
+      status: 422,
+      body: { issues: { startsAt: PT_BR_DISCOUNTS_SERVER_COPY.datesNeedKnownZone } },
+    });
+    expect(created).toEqual([]);
   });
 
   it("still refuses a malformed day as a malformed day, before the zone", async () => {

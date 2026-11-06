@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { EN_US_DISCOUNTS_SERVER_COPY } from "../en-US";
+import { fallbackSentence } from "../fallback-copy";
 import { updateDiscountBody } from "../mcp";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountsApiConfig } from "../routes";
@@ -113,6 +114,20 @@ describe("keepWindow while the store's zone is unknown (review round 5, B2)", ()
     const without = { ...EN_US_DISCOUNTS_SERVER_COPY, keepWindowWithDates: undefined };
     const { response } = patch({ ...BODY, keepWindow: true, startsAt: "2026-12-01" }, ROW, { copy: without });
     expect((await response).body).toMatchObject({ issues: { keepWindow: EN_US_DISCOUNTS_SERVER_COPY.keepWindowWithDates } });
+  });
+
+  // Review round 7 (N3): no locale on the request, and a pt-BR host pack from
+  // before the key: the host's own language, never en-US.
+  it("says that refusal in the host pack's own language when the request names none", async () => {
+    const without = { ...PT_BR_DISCOUNTS_SERVER_COPY, keepWindowWithDates: undefined };
+    const { response } = patch({ ...BODY, keepWindow: true, startsAt: "2026-12-01" }, ROW, { copy: without });
+    expect((await response).body).toMatchObject({ issues: { keepWindow: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates } });
+  });
+
+  it("reads a POSIX pt_BR request as Portuguese", () => {
+    const without = { ...EN_US_DISCOUNTS_SERVER_COPY, keepWindowWithDates: undefined };
+    expect(fallbackSentence(without, "keepWindowWithDates", "pt_BR")).toBe(PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates);
+    expect(fallbackSentence(without, "keepWindowWithDates", "es-ES")).toBe(EN_US_DISCOUNTS_SERVER_COPY.keepWindowWithDates);
   });
 
   it("takes blank dates beside the marker as none", async () => {
