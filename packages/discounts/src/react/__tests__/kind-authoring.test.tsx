@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
@@ -310,18 +310,6 @@ describe("what it refuses", () => {
 
 describe("FUT-4441: when Itens grátis says a product is missing", () => {
   const message = "free-units-message";
-
-  // jsdom has no scrollIntoView, which the picker's listbox calls; give it one
-  // for this block only and take it away again.
-  beforeAll(() => {
-    Object.defineProperty(Element.prototype, "scrollIntoView", {
-      configurable: true,
-      value: () => {},
-    });
-  });
-  afterAll(() => {
-    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-  });
 
   async function pickFreeUnits(): Promise<void> {
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
