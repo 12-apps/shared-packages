@@ -8,6 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { createTheme } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import { createWebDiscounts, type DiscountsWebConfig } from "../create-web-discounts";
@@ -125,6 +126,37 @@ describe("the period while the days are unknown (review round 5)", () => {
     expect(within(period).getByRole("group", { name: copy.schedule.periodTitle }).getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(days[9]!);
     expect(dateBoxes(period).map((box) => box.value)).toEqual(["", ""]);
+  });
+
+  // Review round 7: the line under the boxes pointed at nothing new — it said
+  // the amber notice again. It is short now and points at it, and the boxes
+  // are drawn disabled (MUI's disabled fill and edge), not as empty fields.
+  it("says a short pointer under the boxes, never the notice again", async () => {
+    mount([UNKNOWN]);
+    const period = await openEdit(UNKNOWN.id);
+    const line = within(period).getByTestId("discount-period-unavailable").textContent ?? "";
+    const notice = within(period).getByTestId("discount-days-unknown").textContent ?? "";
+    expect(line).toBe("Sem datas: veja o aviso acima.");
+    expect(EN_US_DISCOUNTS_WEB_COPY.window.daysUnknownBoxes).toBe("No dates: see the notice above.");
+    expect(notice).not.toContain(line);
+    expect(line).not.toMatch(/fuso/iu);
+  });
+
+  it("draws the disabled boxes with the theme's disabled fill and edge", async () => {
+    mount([UNKNOWN]);
+    const period = await openEdit(UNKNOWN.id);
+    const { action } = createTheme().palette;
+    const rules = [...document.querySelectorAll("style")].map((tag) => tag.textContent ?? "").join("\n");
+    for (const name of ["startsAt", "endsAt"]) {
+      const wrapper = within(period).getByTestId(`total-form-field-${name}-box`);
+      const own = wrapper.className
+        .split(" ")
+        .filter((cls) => cls.startsWith("css-"))
+        .map((cls) => rules.split(`.${cls} `).slice(1).map((rule) => rule.split("}")[0]).join(""))
+        .join("");
+      expect(own).toContain(`background-color:${action.disabledBackground}`);
+      expect(own).toContain(`border-color:${action.disabled}`);
+    }
   });
 
   it("keeps both boxes and the calendar live on a rule whose days are known", async () => {

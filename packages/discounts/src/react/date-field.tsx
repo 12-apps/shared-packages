@@ -5,6 +5,8 @@ import { useState, type JSX } from "react";
 import { FormControl, FormLabel, FormMessage } from "@12-apps/ui/form/Form";
 import { Input } from "@12-apps/ui/form/Input";
 import { useFormContext } from "@12-apps/ui/form/total-form";
+import { Box } from "@12-apps/ui/mui/Box";
+import type { SxProps, Theme } from "@12-apps/ui/mui/styles";
 
 /**
  * A day-first `DD/MM/AAAA` box that is NOT `<input type="date">` (FUT-4156).
@@ -97,6 +99,19 @@ function typedMessage(
   return left && shown !== "" ? messages.incompleteMessage : undefined;
 }
 
+/**
+ * A disabled box, drawn as one (review round 7): MUI's disabled fill and muted
+ * edge, from the theme, so the two boxes read as dimmed like the grid beside
+ * them rather than as empty fields waiting for a date. The outlined Input's own
+ * edge (and its primary hover) would otherwise win over MUI's disabled one.
+ */
+const DISABLED_BOX: SxProps<Theme> = {
+  "& .MuiOutlinedInput-root.Mui-disabled": { backgroundColor: "action.disabledBackground" },
+  "& .MuiOutlinedInput-root.Mui-disabled fieldset, & .MuiOutlinedInput-root.Mui-disabled:hover fieldset": {
+    borderColor: "action.disabled",
+  },
+};
+
 /** A form-bound day: the value is ISO when whole and real, the typed text otherwise. */
 export function DateField({
   name,
@@ -129,29 +144,31 @@ export function DateField({
       <FormLabel htmlFor={name} error={message !== undefined}>
         {label}
       </FormLabel>
-      <Input
-        id={name}
-        name={name}
-        type="text"
-        placeholder={placeholder}
-        disabled={disabled}
-        value={shown}
-        error={message !== undefined}
-        inputProps={{
-          inputMode: "numeric",
-          maxLength: 10,
-          autoComplete: "off",
-          "data-testid": testId,
-          ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
-        }}
-        data-testid={testId}
-        onBlur={() => setLeft(true)}
-        onChange={(event) => {
-          setLeft(false);
-          const masked = maskDate(event.target.value, shown);
-          setFieldValue(name, maskedToIso(masked) ?? masked);
-        }}
-      />
+      <Box data-testid={`${testId}-box`} sx={disabled ? DISABLED_BOX : {}}>
+        <Input
+          id={name}
+          name={name}
+          type="text"
+          placeholder={placeholder}
+          disabled={disabled}
+          value={shown}
+          error={message !== undefined}
+          inputProps={{
+            inputMode: "numeric",
+            maxLength: 10,
+            autoComplete: "off",
+            "data-testid": testId,
+            ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+          }}
+          data-testid={testId}
+          onBlur={() => setLeft(true)}
+          onChange={(event) => {
+            setLeft(false);
+            const masked = maskDate(event.target.value, shown);
+            setFieldValue(name, maskedToIso(masked) ?? masked);
+          }}
+        />
+      </Box>
       {message !== undefined && (
         <FormMessage error dataTestId={`${testId}-message`}>
           {message}

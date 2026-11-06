@@ -99,9 +99,9 @@ export interface DiscountsWindowCopy {
    * the list's cell and the marker under a row's name on a phone. The cause is
    * said once, above the list (`daysUnknownList`) and above the form's boxes
    * (`daysUnknownForm`, which also says that saving keeps the saved dates —
-   * Salvar is never refused for it, review round 5); `daysUnknown` is also
-   * the line under the two disabled boxes (`daysUnknownBoxes`, which wraps and
-   * is the boxes' accessible description). `daysUnknownPaused` is the phone
+   * Salvar is never refused for it, review round 5). `daysUnknownBoxes`, the
+   * boxes' accessible description under them, is short and points at that
+   * notice, never repeats it (round 7: "Sem datas: veja o aviso acima."). `daysUnknownPaused` is the phone
    * marker of a rule that is also not active. `openTimeZone` labels the
    * host's optional link to its time-zone setting.
    *

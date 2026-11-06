@@ -89,7 +89,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     daysUnknownList: "Dates unavailable on some promotions: the store's time zone was not recognised.",
     daysUnknownForm:
       "Dates unavailable: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
-    daysUnknownBoxes: "Dates unavailable: time zone not recognised.",
+    daysUnknownBoxes: "No dates: see the notice above.",
     daysUnknownPaused: "Dates unavailable · Paused",
     openTimeZone: "View the store's time zone",
     always: "No end date",

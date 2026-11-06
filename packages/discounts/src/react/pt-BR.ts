@@ -80,7 +80,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     daysUnknownList: "Datas indisponíveis em algumas promoções: o fuso horário da loja não foi reconhecido.",
     daysUnknownForm:
       "Datas indisponíveis: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
-    daysUnknownBoxes: "Datas indisponíveis: fuso horário não reconhecido.",
+    daysUnknownBoxes: "Sem datas: veja o aviso acima.",
     daysUnknownPaused: "Datas indisponíveis · Pausada",
     openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
