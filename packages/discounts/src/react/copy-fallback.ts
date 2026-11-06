@@ -18,6 +18,8 @@ const WINDOW_KEYS: readonly DiscountsWindowFallbackKey[] = [
   "daysUnknownForm",
   "daysUnknownBoxes",
   "daysUnknownPaused",
+  "datesLockedForm",
+  "datesLockedBoxes",
   "openTimeZone",
 ];
 
@@ -28,6 +30,16 @@ const said = (value: unknown): value is string => typeof value === "string" && v
 /** The package's own pack for a language tag: pt-BR for any `pt`, en-US otherwise. */
 function packFor(tag: string): CompleteDiscountsWebCopy {
   return isPortuguese(tag) ? PT_BR_DISCOUNTS_WEB_COPY : EN_US_DISCOUNTS_WEB_COPY;
+}
+
+/** Whether a pack says every optional sentence itself. */
+function isComplete({ window, form }: DiscountsWebCopy): boolean {
+  const calendar = form.calendar ?? {};
+  return (
+    WINDOW_KEYS.every((key) => said(window[key])) &&
+    CALENDAR_KEYS.every((key) => said(calendar[key])) &&
+    said(form.endsBeforeStartDay)
+  );
 }
 
 /**
@@ -42,11 +54,10 @@ function packFor(tag: string): CompleteDiscountsWebCopy {
 export function completeWebCopy(copy: DiscountsWebCopy, locale?: string): CompleteDiscountsWebCopy {
   const { window, form } = copy;
   const calendar = form.calendar ?? {};
-  const complete =
-    WINDOW_KEYS.every((key) => said(window[key])) &&
-    CALENDAR_KEYS.every((key) => said(calendar[key])) &&
-    said(form.endsBeforeStartDay);
-  if (complete) return copy as CompleteDiscountsWebCopy;
+  // A declared calendar language as a BCP-47 tag (review round 8, N1): the
+  // calendar hands it to `toLocaleDateString`, which throws on `pt_BR`.
+  const declared = languageTagOf(calendar.locale);
+  if (isComplete(copy) && declared === calendar.locale) return copy as CompleteDiscountsWebCopy;
   const tag = languageTagOf(locale) ?? languageTagOf(calendar.locale);
   const pack = tag ? packFor(tag) : nearestPack(copy, PT_BR_DISCOUNTS_WEB_COPY, EN_US_DISCOUNTS_WEB_COPY);
   const filledWindow = Object.fromEntries(
@@ -60,7 +71,7 @@ export function completeWebCopy(copy: DiscountsWebCopy, locale?: string): Comple
     window: { ...window, ...filledWindow },
     form: {
       ...form,
-      calendar: { ...filledCalendar, locale: said(calendar.locale) ? calendar.locale : (tag ?? pack.form.calendar.locale) },
+      calendar: { ...filledCalendar, locale: declared ?? tag ?? pack.form.calendar.locale },
       endsBeforeStartDay: said(form.endsBeforeStartDay) ? form.endsBeforeStartDay : pack.form.endsBeforeStartDay,
     },
   };

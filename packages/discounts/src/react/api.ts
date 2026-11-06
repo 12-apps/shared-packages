@@ -46,6 +46,13 @@ export interface DiscountWireRecord {
    * instants.
    */
   daysUnknown?: boolean;
+  /**
+   * The server counts whole days and the store's zone is unknown to it now
+   * (FUT-4482, review round 8), said on every row then: the days shown — a
+   * legacy row's, none on a `daysUnknown` one — cannot change. The form shows
+   * them disabled and saves the rest with `keepWindow`.
+   */
+  datesLocked?: boolean;
   /** The weekly schedule (FUT-996), or null for "always". */
   schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;
@@ -136,7 +143,7 @@ export interface DiscountFormPayload {
    */
   schedule: DiscountSchedule | null;
   /**
-   * The form could not show the rule's days (`daysUnknown`, FUT-4482, review
+   * The form could not change the rule's days (`datesLocked` or `daysUnknown`, FUT-4482, review
    * round 5): the dates are NOT sent, and the server keeps the stored window
    * while it writes every other field. Only an edit sends it.
    */

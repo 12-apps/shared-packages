@@ -35,6 +35,19 @@ export interface DiscountFormValues extends Record<string, string> {
   perBuyerLimit: string;
 }
 
+/**
+ * Why the form cannot change an edited rule's days (FUT-4482): `unknown` when
+ * the server could not place them and sent none (`daysUnknown`), `shown` when
+ * it sent them but the store's zone is unknown (`datesLocked`, review round 8),
+ * null when they can change.
+ */
+export type DatesLock = "unknown" | "shown" | null;
+
+export function datesLockOf(editing: Pick<DiscountWireRecord, "daysUnknown" | "datesLocked"> | null | undefined): DatesLock {
+  if (editing?.daysUnknown === true) return "unknown";
+  return editing?.datesLocked === true ? "shown" : null;
+}
+
 /** `YYYY-MM-DD` for a native date input, from the wire's ISO instant. */
 function toDateInput(iso: string | null): string {
   return iso === null ? "" : iso.slice(0, 10);

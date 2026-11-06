@@ -74,7 +74,7 @@ export function writtenZone(timeZone: string | undefined): ReadZone {
 type Windowed = Pick<DiscountRecord, "startsAt" | "endsAt" | "windowInZone">;
 
 /** What a read adds to a record: its days, or the word that they cannot be placed. */
-type WithDays = Pick<DiscountRecord, "startsOn" | "endsOn" | "daysUnknown">;
+type WithDays = Pick<DiscountRecord, "startsOn" | "endsOn" | "daysUnknown" | "datesLocked">;
 
 /**
  * One record with the days it runs on — what a form reads back instead of
@@ -84,11 +84,18 @@ type WithDays = Pick<DiscountRecord, "startsOn" | "endsOn" | "daysUnknown">;
  * mapped the column, reads the legacy UTC days the old form showed — so the
  * previous release's writes during a rollout stay right. Without whole days
  * the record is answered exactly as the store built it.
+ *
+ * With the zone unknown EVERY row is `datesLocked` (review round 8): no new
+ * day can be placed without the zone — a whole-day Término is inclusive, and
+ * a legacy UTC midnight would drop it — so the form shows the days it can and
+ * edits none. A legacy row still shows its UTC days; a zoned row has none to
+ * show, and is `daysUnknown` too.
  */
 export function withCalendarDays<R extends Windowed>(record: R, zone: ReadZone): R & WithDays {
   if (zone.kind === "off") return record;
-  if (record.windowInZone !== true) return { ...record, ...legacyWindowDays(record.startsAt, record.endsAt) };
-  if (zone.kind === "unknown") return { ...record, daysUnknown: true };
+  const locked = zone.kind === "unknown" ? { datesLocked: true } : {};
+  if (record.windowInZone !== true) return { ...record, ...legacyWindowDays(record.startsAt, record.endsAt), ...locked };
+  if (zone.kind === "unknown") return { ...record, daysUnknown: true, datesLocked: true };
   return { ...record, ...windowCalendarDays(record.startsAt, record.endsAt, zone.timeZone) };
 }
 

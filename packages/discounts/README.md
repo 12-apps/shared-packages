@@ -227,16 +227,19 @@ only a Término before Início is refused (`copy.endsBeforeStartDay`, required
 once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
 the days it runs on there, and the admin form and grid read those back.
 
-**An unknown zone never refuses an edit.** A read answers a rule written in
-that zone with `daysUnknown: true` in place of `startsOn` / `endsOn` and logs a
-warning, so the list stays usable while the zone is fixed and shows no guessed
-days. The form then shows the calendar and both boxes disabled, says above them
-that the dates are unavailable and that saving keeps them, and its Salvar sends
-`keepWindow: true` with no dates: the PATCH writes every other field — a pause,
-a rename, a new value — over the STORED `startsAt` / `endsAt` / `windowInZone`,
-without asking the zone anything. `keepWindow` sent beside a date is refused
-(422 on `keepWindow`, `copy.keepWindowWithDates`): keep and change are two
-answers, and dropping either in silence would lose an edit.
+**Under an unknown zone the dates are locked and everything else saves**
+(review round 8, ADR 0186). A read answers EVERY row with `datesLocked: true`
+and logs a warning: a `windowInZone: false` (legacy) row still carries its UTC
+days in `startsOn` / `endsOn`, and a row written in the zone has none to show,
+so it carries `daysUnknown: true` in their place, never guessed days. The form
+then shows the calendar and both boxes disabled — holding the legacy row's
+days, empty on a `daysUnknown` one — and one amber notice above them saying the
+dates cannot change and that saving keeps them; its Salvar sends
+`keepWindow: true` with no dates, and the PATCH writes every other field — a
+pause, a rename, a new value — over the STORED `startsAt` / `endsAt` /
+`windowInZone`, without asking the zone anything. `keepWindow` sent beside a
+date is refused (422 on `keepWindow`, `copy.keepWindowWithDates`): keep and
+change are two answers, and dropping either in silence would lose an edit.
 
 **A save that does not change the dates never moves them** (review round 6),
 whatever the zone. Every PATCH reads the row first and compares the days it
@@ -244,19 +247,19 @@ sends with the days a read of THAT row showed — a `windowInZone: false` row's
 legacy UTC days (`legacyWindowDays`), a `true` row's days in the store's zone —
 and, where they are equal, writes the stored `startsAt` / `endsAt` /
 `windowInZone` unchanged, under the same condition as every other
-read-then-write below. So the admin form pausing a legacy row saves while the
-zone is unknown, and a legacy row saved unchanged under a known zone stays
-legacy, on its exact bounds, rather than turning zoned and growing a day;
-converting it is the migration's job. **Changed** days take the paths above:
-whole days in a known zone; with the zone unknown, a `windowInZone: false`
-row's new days are written as legacy UTC midnights, flag still false — its own
-meaning, which needs no zone (review round 7, ADR 0186) — and the one refusal
-left is a 422 on the date field with `copy.datesNeedKnownZone` (required once
-the zone is passed) for a `windowInZone: true` row's changed days and for a
-create's dates: the server cannot place those days on the store's clock. It
-refuses the date it cannot place, never the edit.
+read-then-write below. So a client that sends a legacy row's days back as it
+read them saves while the zone is unknown, and a legacy row saved unchanged
+under a known zone stays legacy, on its exact bounds, rather than turning zoned
+and growing a day; converting it is the migration's job. **Changed** days are
+whole days in a known zone; with the zone unknown they are refused, on ANY row
+and on a create, with a 422 on the date field and `copy.datesNeedKnownZone`
+(required once the zone is passed): a day cannot be placed without the zone —
+a whole-day Término is inclusive, and a legacy UTC midnight would drop it. Only
+the day the server cannot place is refused, never the edit, and the screen
+never offers one.
 
-A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
+A row the store answers without `windowInZone` reads as legacy, and so is
+locked with its UTC days under an unknown zone. A null or blank answer for a tenant fails every route —
 the function must answer a zone for every tenant it is asked about.
 
 A copy resolver may answer a reader's locale with a pack that lacks
@@ -402,7 +405,7 @@ refuses equal days itself, as the server does, and a second tap on Início in
 the calendar does nothing.
 
 **Every copy key this feature added is optional**, on the web pack
-(`window.daysUnknown*`, `window.openTimeZone`, `form.calendar.*`,
+(`window.daysUnknown*`, `window.datesLocked*`, `window.openTimeZone`, `form.calendar.*`,
 `form.endsBeforeStartDay`) and on the server pack (`keepWindowWithDates`,
 `windowChanged`). A host pack written before them still mounts —
 `missingWebCopy` does not report them — and each missing sentence is said from

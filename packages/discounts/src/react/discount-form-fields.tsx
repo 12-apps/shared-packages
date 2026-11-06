@@ -14,6 +14,7 @@ import type { DiscountSchedule } from "../engine/schedule";
 
 import type { CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
+import type { DatesLock } from "./discount-form-values";
 import { ComboRewardFields } from "./combo-reward-fields";
 import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
 import { PercentField, WholeNumberField } from "./number-fields";
@@ -187,37 +188,38 @@ export function ComboCapField({ copy }: { copy: CompleteDiscountsWebCopy }): JSX
 }
 
 /**
- * The period: the notice when the days are unknown, the picker, the hint.
+ * The period: the notice when the days cannot change, the picker, the hint.
  *
  * The form's own 16px between the notice and the frame; the hint keeps its
- * 4px under the frame. While the days are unknown the picker is disabled and
- * the open-ended hint is not said: Salvar keeps the stored window then, never
- * "sem prazo" (FUT-4482, review rounds 4 and 5).
+ * 4px under the frame. While the days are locked — unknown, or shown under an
+ * unknown zone (review round 8) — the picker is disabled and the open-ended
+ * hint is not said: Salvar keeps the stored window then, never "sem prazo"
+ * (FUT-4482, review rounds 4 and 5).
  */
 function PeriodSection({
   copy,
   wholeDays,
-  daysUnknown,
+  datesLock,
   timeZoneSettings,
 }: {
   copy: CompleteDiscountsWebCopy;
   wholeDays: boolean;
-  daysUnknown: boolean;
+  datesLock: DatesLock;
   timeZoneSettings: DiscountsTimeZoneSettings | undefined;
 }): JSX.Element {
   return (
     <Stack spacing={2} data-testid="discount-period">
-      {daysUnknown ? (
+      {datesLock === null ? null : (
         <DaysUnknownNotice
           copy={copy}
-          message={copy.window.daysUnknownForm}
+          message={datesLock === "unknown" ? copy.window.daysUnknownForm : copy.window.datesLockedForm}
           timeZoneSettings={timeZoneSettings}
           dataTestId="discount-days-unknown"
         />
-      ) : null}
+      )}
       <Stack spacing={0.5}>
-        <PeriodPicker copy={copy} wholeDays={wholeDays} daysUnknown={daysUnknown} />
-        {daysUnknown ? null : <Text variant="caption">{copy.schedule.periodHint}</Text>}
+        <PeriodPicker copy={copy} wholeDays={wholeDays} datesLock={datesLock} />
+        {datesLock === null ? <Text variant="caption">{copy.schedule.periodHint}</Text> : null}
       </Stack>
     </Stack>
   );
@@ -240,7 +242,7 @@ function PeriodSection({
 export function WindowFields({
   copy,
   wholeDays,
-  daysUnknown = false,
+  datesLock = null,
   timeZoneSettings,
   schedule,
   scheduleEnabled,
@@ -251,8 +253,8 @@ export function WindowFields({
   copy: CompleteDiscountsWebCopy;
   /** Whether Início = Término is a one-day promotion (the server counts whole days). */
   wholeDays: boolean;
-  /** The server could not place the edited rule's days (FUT-4482): empty boxes, and this said. */
-  daysUnknown?: boolean;
+  /** Why the edited rule's days cannot change (FUT-4482): disabled boxes, and the notice said. */
+  datesLock?: DatesLock;
   /** The host's link to its time-zone setting, shown in that notice when given. */
   timeZoneSettings?: DiscountsTimeZoneSettings | undefined;
   schedule: DiscountSchedule;
@@ -272,7 +274,7 @@ export function WindowFields({
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
-      <PeriodSection copy={copy} wholeDays={wholeDays} daysUnknown={daysUnknown} timeZoneSettings={timeZoneSettings} />
+      <PeriodSection copy={copy} wholeDays={wholeDays} datesLock={datesLock} timeZoneSettings={timeZoneSettings} />
       <FormControl>
         <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
         <Stack spacing={0.5}>

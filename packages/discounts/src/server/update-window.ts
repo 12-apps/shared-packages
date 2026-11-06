@@ -20,9 +20,11 @@ import type { DiscountValidationError, DiscountWriteBody } from "./validate";
  *   so a pause of a legacy row neither grows a day nor turns zoned, and a pause
  *   while the zone is unknown is not refused. **Changed**, the existing paths:
  *   whole days in a known zone, legacy UTC midnights with the zone off (a
- *   flag-true row's id is logged so the migration, rerun, converts it), legacy
- *   UTC midnights for a flag-false row when the zone is unknown (its own
- *   meaning, round 7), and the date-field 422 only for a flag-true row then.
+ *   flag-true row's id is logged so the migration, rerun, converts it), and
+ *   the date-field 422 on ANY row when the zone is unknown (review round 8):
+ *   a read then answers every row `datesLocked`, so no form offers a day the
+ *   server could not place — a legacy row's inclusive Término, or its one-day
+ *   promotion, needs the zone as much as a zoned row's days do.
  *
  * Every write is conditional on the row still holding the window and flag that
  * were read (see {@link DiscountUpdateCondition}); a store answering
@@ -75,10 +77,8 @@ export type WindowMode =
       sent: SentDays;
       /** Where a read of this row placed its days. */
       zone: ReadZone;
-      /** The date-field 422 held until the read: said only when a ZONED row's days changed. */
+      /** The date-field 422 held until the read: said only when the days changed. */
       refusal: DiscountValidationError | null;
-      /** With a refusal: the same days as legacy UTC midnights, for a legacy row (round 7). */
-      legacy: (() => DiscountWrite) | null;
     };
 
 /** The form's word that it could not show the days and sends none. */
@@ -97,10 +97,9 @@ export function windowModeOf(prepared: {
   zone: ReadZone;
   sent: SentDays;
   refusal: DiscountValidationError | null;
-  legacy?: (() => DiscountWrite) | null;
 }): WindowMode {
   if (prepared.keepWindow) return { kind: "keep" };
-  return { kind: "days", sent: prepared.sent, zone: prepared.zone, refusal: prepared.refusal, legacy: prepared.legacy ?? null };
+  return { kind: "days", sent: prepared.sent, zone: prepared.zone, refusal: prepared.refusal };
 }
 
 /** The days a read of `row` showed, or null where it showed none (`daysUnknown`). */
@@ -138,21 +137,6 @@ function zoneOffChange(row: DiscountRecord, write: DiscountWrite, context: { id:
   return write;
 }
 
-/**
- * Changed days while the zone is unknown (review round 7, ADR 0186): a legacy
- * row's days are UTC dates, so its new ones are written as legacy UTC
- * midnights and the flag stays false — no zone needed, nothing refused. Only a
- * row written in the zone, whose days only the zone can place, keeps the 422.
- */
-function legacyOrRefusal(
-  legacy: (() => DiscountWrite) | null,
-  refusal: DiscountValidationError,
-  row: StoredWindow,
-): DiscountWrite {
-  if (row.windowInZone === true || legacy === null) throw refusal;
-  return legacy();
-}
-
 /** One decision over one read: what to write, under what condition. */
 function decide(
   mode: WindowMode,
@@ -161,7 +145,7 @@ function decide(
   context: { id: string; logger: DiscountsLogger },
 ): DiscountWrite {
   if (mode.kind === "keep" || unchanged(row, mode)) return keepingStored(write, row);
-  if (mode.refusal !== null) return legacyOrRefusal(mode.legacy, mode.refusal, row);
+  if (mode.refusal !== null) throw mode.refusal;
   return mode.zone.kind === "off" ? zoneOffChange(row, write, context) : write;
 }
 

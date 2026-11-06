@@ -8,6 +8,7 @@ import { Box } from "@12-apps/ui/mui/Box";
 
 import type { CompleteDiscountsWebCopy } from "./copy";
 import { DateField, isIsoDay } from "./date-field";
+import type { DatesLock } from "./discount-form-values";
 
 /**
  * "Quando vale"'s period: approved prototype option B (FUT-4156).
@@ -53,10 +54,12 @@ function PeriodBoxes({
   copy,
   placement,
   disabled,
+  datesLock,
 }: {
   copy: CompleteDiscountsWebCopy;
   placement: "beside" | "below";
   disabled: boolean;
+  datesLock: DatesLock;
 }): JSX.Element {
   return (
     <Box sx={{ display: "grid", gap: 1 }}>
@@ -92,7 +95,7 @@ function PeriodBoxes({
           data-testid="discount-period-unavailable"
           sx={{ margin: 0, typography: "caption", color: "text.secondary", overflowWrap: "anywhere" }}
         >
-          {copy.window.daysUnknownBoxes}
+          {datesLock === "shown" ? copy.window.datesLockedBoxes : copy.window.daysUnknownBoxes}
         </Box>
       ) : null}
     </Box>
@@ -102,16 +105,17 @@ function PeriodBoxes({
 export function PeriodPicker({
   copy,
   wholeDays,
-  daysUnknown = false,
+  datesLock = null,
 }: {
   copy: CompleteDiscountsWebCopy;
   wholeDays: boolean;
   /**
-   * The server cannot place the rule's days (FUT-4482, review round 5): the
-   * calendar and both boxes are shown disabled and change nothing; the form
-   * saves the rest over the stored window.
+   * The rule's days cannot change (FUT-4482, review rounds 5 and 8): none
+   * placed, or shown under an unknown zone. The calendar and both boxes are
+   * shown disabled — holding the days when there are some — and change
+   * nothing; the form saves the rest over the stored window.
    */
-  daysUnknown?: boolean;
+  datesLock?: DatesLock;
 }): JSX.Element {
   const { values, setFieldValue } = useFormContext();
   const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
@@ -135,10 +139,10 @@ export function PeriodPicker({
       fullWidth
       openEnd
       dataTestId="discount-period-picker"
-      disabled={daysUnknown}
+      disabled={datesLock !== null}
       // Disabled, the picker is a group named after the section's own period.
       label={words.schedule.periodTitle}
-      renderFields={({ placement, disabled }) => <PeriodBoxes copy={words} placement={placement} disabled={disabled} />}
+      renderFields={({ placement, disabled }) => <PeriodBoxes copy={words} placement={placement} disabled={disabled} datesLock={datesLock} />}
       showOutsideDays={false}
       todayIndicator="ring"
       allowSameDayRange={wholeDays}

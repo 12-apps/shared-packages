@@ -136,6 +136,11 @@ export const discountSchema = z.object({
   endsOn: z.string().nullable().optional(),
   /** A rule written in the store's zone that the runtime cannot place now: no days. */
   daysUnknown: z.boolean().optional(),
+  /**
+   * The store's zone is unknown now: the days shown (a legacy row's) cannot be
+   * changed, and a changed date is refused. Save other fields with keepWindow.
+   */
+  datesLocked: z.boolean().optional(),
   /** Whether the window is whole days in the store's zone (the `window_in_zone` column). */
   windowInZone: z.boolean().optional(),
   schedule: discountScheduleSchema.nullable().optional(),
@@ -226,7 +231,8 @@ export const updateDiscountBody = z.object({
     .describe(
       "true to keep the stored campaign window (startsAt, endsAt and its clock) exactly as it is and write " +
         "every other field. Send it with NO startsAt/endsAt: dates beside it are refused (422 on keepWindow). " +
-        "For a rule read with daysUnknown, this is the only way to save it without new dates. Omit it otherwise.",
+        "For a rule read with datesLocked, send it to save the other fields: its dates cannot change while " +
+          "the store's zone is unknown. Omit it otherwise.",
     ),
 });
 

@@ -71,9 +71,5 @@ export async function prepareWrite(
   if (config.collections) {
     await assertTargetsOwned(config.collections, clientId, folded.targets, copy.foreignTarget);
   }
-  // A legacy row (flag false) whose dates change while the zone is unknown is
-  // written as legacy UTC midnights, its own meaning, which needs no zone
-  // (review round 7, ADR 0186): built only if the row read turns out legacy.
-  const legacy = refusal === null ? null : () => ({ scalars: toDiscountScalars(sent, copy), targets: folded.targets });
-  return { write: folded, timeZone, sent: sentDays, keepWindow, refusal, legacy };
+  return { write: folded, timeZone, sent: sentDays, keepWindow, refusal };
 }

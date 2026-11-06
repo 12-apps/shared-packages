@@ -15,6 +15,8 @@ export const OPTIONAL_WEB_COPY_PATHS: ReadonlySet<string> = new Set([
   "window.daysUnknownForm",
   "window.daysUnknownBoxes",
   "window.daysUnknownPaused",
+  "window.datesLockedForm",
+  "window.datesLockedBoxes",
   "window.openTimeZone",
   "form.calendar.locale",
   "form.calendar.label",

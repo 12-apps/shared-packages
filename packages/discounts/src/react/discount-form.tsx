@@ -33,7 +33,7 @@ import { DiscountTargetPicker } from "./discount-target-picker";
 import { KindField } from "./kind-field";
 import { blankWindow } from "./schedule-builder";
 import { validate, type FormTargets } from "./discount-form-validate";
-import { initialValues, type DiscountFormValues } from "./discount-form-values";
+import { datesLockOf, initialValues, type DatesLock, type DiscountFormValues } from "./discount-form-values";
 import { DISCOUNT_KINDS, typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 
@@ -146,11 +146,11 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
-    // Days the server cannot place (FUT-4482): the boxes are empty only
-    // because the days could not be shown, so they are not sent — that would
-    // read as "sem prazo". Everything else is saved over the stored window
-    // (`keepWindow`); an edit is never refused for it (review round 5).
-    const keepWindow = editing?.daysUnknown === true;
+    // Days the form cannot change (FUT-4482): none shown (`daysUnknown`, and
+    // empty boxes sent would read as "sem prazo"), or shown and locked while
+    // the store's zone is unknown (round 8). They are not sent; everything
+    // else is saved over the stored window (`keepWindow`), never refused.
+    const keepWindow = datesLockOf(editing) !== null;
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -203,13 +203,13 @@ function makeSubmit(
  */
 function windowFlags(props: DiscountFormProps): {
   wholeDays: boolean;
-  daysUnknown: boolean;
+  datesLock: DatesLock;
   timezoneLabel: string | null;
   timeZoneSettings: DiscountsTimeZoneSettings | undefined;
 } {
   return {
     wholeDays: props.wholeDays ?? false,
-    daysUnknown: props.editing?.daysUnknown === true,
+    datesLock: datesLockOf(props.editing),
     timezoneLabel: props.timezoneLabel ?? null,
     timeZoneSettings: props.timeZoneSettings,
   };

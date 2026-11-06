@@ -82,6 +82,9 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
       "Datas indisponíveis: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
     daysUnknownBoxes: "Sem datas: veja o aviso acima.",
     daysUnknownPaused: "Datas indisponíveis · Pausada",
+    datesLockedForm:
+      "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
+    datesLockedBoxes: "Datas bloqueadas: veja o aviso acima.",
     openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
     from: "A partir de {date}",

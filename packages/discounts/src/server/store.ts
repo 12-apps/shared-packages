@@ -49,6 +49,14 @@ export interface DiscountRecord {
    */
   daysUnknown?: boolean;
   /**
+   * The routes' word, never the store's, that the store's zone is not one the
+   * runtime knows now (FUT-4482, review round 8), on EVERY row then: no
+   * changed day can be placed, so a form shows the days it was given (a legacy
+   * row's; none on a `daysUnknown` one) and edits none, and saves the rest with
+   * `keepWindow`. A changed date is refused on the date field.
+   */
+  datesLocked?: boolean;
+  /**
    * The `window_in_zone` column, which the STORE maps (FUT-4482): true when the
    * window was written as whole days in the store's zone, false for a window on
    * UTC midnights — a row older than the zone, or one the previous release
