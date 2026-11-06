@@ -41,6 +41,9 @@ function TotalAmount({
   return (
     <Box
       sx={{
+        // The figure is never broken across lines ("até R$ / 138,70"): the words beside it wrap instead.
+        flex: "none",
+        whiteSpace: "nowrap",
         "&& > *": {
           fontSize: big ? "2.5rem" : "1.625rem",
           lineHeight: 1.1,
@@ -83,14 +86,19 @@ export function SummaryLines({ lines }: { lines: CheckoutSummaryLine[] }): JSX.E
 }
 
 /** "Total" and the amount on one line, the host's money rows under it. */
-export function SummaryTotal({ totalLabel, discountLines }: { totalLabel: string; discountLines?: ReactNode }): JSX.Element {
+export function SummaryTotal({ totalLabel, discountLines, title }: {
+  totalLabel: string;
+  discountLines?: ReactNode;
+  /** The row's words in place of "Total" — "A pagar" for a priced way to pay (FUT-4416). */
+  title?: string;
+}): JSX.Element {
   const { Text } = useCheckoutComponents();
   const copy = useCheckoutCopy().screens.layout;
   return (
     <Box data-testid="payment-step-total" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2 }}>
         <Text variant="body" size="md" weight="semibold" as="span">
-          {copy.total}
+          {title ?? copy.total}
         </Text>
         <TotalAmount totalLabel={totalLabel} big={false} />
       </Box>

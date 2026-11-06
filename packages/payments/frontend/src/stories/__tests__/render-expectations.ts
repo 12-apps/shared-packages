@@ -579,6 +579,11 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     text: ["Falta R$ 444,40", "Escolha a forma"],
     absentTestIds: ["tender-split-change"],
   },
+  // FUT-4416: each card says what the bill comes to paid that way.
+  "TenderSplit/PricedPtBr": {
+    testIds: ["tender-split-option-PIX-price", "tender-split-option-CASH-price", "tender-split-confirm"],
+    text: ["R$ 75,20", "R$ 82,16", "Escolha a forma"],
+  },
   "TenderSplit/EnUs": {
     testIds: ["tender-split-option-CASH", "tender-split-confirm"],
     text: ["Left $82.00", "Pick a method"],
@@ -616,6 +621,28 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["payment-list", "card-number", "save-card"],
     text: ["Preencha os dados do cartão."],
     absentText: ["Escolha como pagar."],
+  },
+  // ------------------------------------- PaymentListPrices (FUT-4416)
+  // The host prices each way to pay: every row says its amount, the chosen
+  // one names its own on the button, and the card draws the nudge to Pix.
+  "PaymentListPrices/PixRemembered": {
+    testIds: ["list-option-PIX-amount", "list-option-CARD-amount", "list-door-cash-amount", "list-door-reader-amount", "list-price-discount"],
+    text: ["R$ 11,95 a menos", "até R$ 138,70", "Desconto no Pix"],
+  },
+  "PaymentListPrices/CardWithNudge": {
+    testIds: ["list-option-CARD-amount", "list-nudge-to-pix"],
+    text: ["Pagar com Pix"],
+    absentTestIds: ["list-price-discount"],
+  },
+  // jsdom measures no width, so the computer's column is the visual gate's to
+  // show; here the desktop stories pin what they share with the phone.
+  "PaymentListPrices/PixDesktop": {
+    testIds: ["list-option-PIX-amount", "list-price-discount"],
+    text: ["R$ 126,75"],
+  },
+  "PaymentListPrices/CardDesktop": {
+    testIds: ["list-option-CARD-amount", "list-nudge-to-pix"],
+    text: ["No Pix fica"],
   },
   // ------------------------------------------- PaymentListStates (FUT-3591/3592)
   // The starting points of the harder runs; the visual gate plays the clicks.

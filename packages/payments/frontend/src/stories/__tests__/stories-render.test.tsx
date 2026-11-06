@@ -35,6 +35,7 @@ import * as connectionStories from "../Connection.stories";
 import * as headlessStories from "../Headless.stories";
 import * as hostedStories from "../Hosted.stories";
 import * as paymentListStories from "../PaymentList.stories";
+import * as paymentListPricesStories from "../PaymentListPrices.stories";
 import * as paymentListStatesStories from "../PaymentListStates.stories";
 import * as paymentListWalletsStories from "../PaymentListWallets.stories";
 import * as platformOpsStories from "../PlatformOps.stories";
@@ -100,6 +101,7 @@ function moduleEntries(): [string, Record<string, unknown>][] {
     ["Headless", headlessStories],
     ["TenderSplit", tenderSplitStories],
     ["PaymentList", paymentListStories],
+    ["PaymentListPrices", paymentListPricesStories],
     ["PaymentListStates", paymentListStatesStories],
     ["PaymentListWallets", paymentListWalletsStories],
   ];

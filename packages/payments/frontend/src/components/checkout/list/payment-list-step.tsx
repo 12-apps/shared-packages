@@ -13,6 +13,7 @@ import { HostedLinkScreen } from "../providers/hosted-link";
 import type { BuyerContact, BuyerInfo, CheckoutProviderConfig, PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
+import { chosenOnlineCents, chosenPrice, columnPrice, priceText, walletCents, walletOwnCents } from "./choice-price";
 import { PaymentListProvider } from "./context";
 import { ListBar, WaitingLine } from "./list-bar";
 import { ListFace } from "./list-face";
@@ -191,7 +192,9 @@ function PreloadTop({ state, cap, config, taxIdOnFile }: { state: ListState; cap
 function creditRows(list: CheckoutPaymentList, choice: CheckoutListChoice | null): { label: string; amountLabel: string; dueTitle: string; dueLabel: string } | undefined {
   if (choice?.kind !== "online") return undefined;
   if (!list.credit || !list.amountDueLabel || !list.copy.amountDue) return undefined;
-  return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: list.amountDueLabel };
+  // A priced row names its own amount due (FUT-4416); the host's otherwise.
+  const price = chosenPrice(list, choice);
+  return { ...list.credit, dueTitle: list.copy.amountDue, dueLabel: price ? priceText(list.copy, price) : list.amountDueLabel };
 }
 
 /**
@@ -216,7 +219,8 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
   const { c, list } = props;
   const config = props.providerConfig ?? null;
   const debitReady = useDebitReady(list);
-  const cap = useListCapability(config, list.totalCents, props.validateApplePayMerchant, debitReady);
+  // The wallets' sheets open at the wallets' own price (FUT-4416), else the host's total, as before.
+  const cap = useListCapability(config, walletCents(list), props.validateApplePayMerchant, debitReady);
   const reveal = useReveal(c, props.defaultBuyer);
   const { revealed } = reveal;
   const state = useListState({
@@ -232,7 +236,9 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
     revealed,
     doorIds: list.door?.map((option) => option.id),
   });
-  const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents });
+  const priced = { choice: chosenOnlineCents(list, state.choice), wallets: walletOwnCents(list) };
+  const charge = useListCharge({ ...c, cartTotal: displayTotals(props.totalOverride, props.cart).label, dueCents: list.totalCents, priced });
+  const column = useMemo(() => columnPrice(list, state.choice), [list, state.choice]);
   const [handingOff, startHandOff] = useHandingOff(c.createError);
   const pixStage = usePaymentPixStage(cap, usePreferMethod(c, state.choose));
   const pix = c.order?.method === "PIX" ? c.order : null;
@@ -251,6 +257,7 @@ export function PaymentListStep(props: PaymentListStepProps): JSX.Element {
       moneyLines={props.cart.discountLines}
       totalLabel={displayTotals(props.totalOverride, props.cart).label}
       credit={creditRows(list, state.choice)}
+      priced={column}
     >
       <ListFaceFor props={props} state={state} charge={charge} cap={cap} onHandOff={startHandOff} reveal={reveal} />
     </ListLayout>
