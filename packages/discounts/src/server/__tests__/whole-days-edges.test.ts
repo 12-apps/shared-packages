@@ -107,16 +107,23 @@ describe("legacyUtcWindowToZoned rerun in London (UTC+0 in winter, review round 
     updatedAt: Date;
   }
 
-  /** The README's loop over an in-memory table whose updates move `updatedAt`. */
-  function migrate(rows: Row[], now: Date, failAfter = Infinity): void {
-    let written = 0;
-    for (const row of rows.filter((candidate) => candidate.updatedAt < ZONE_ON)) {
+  /**
+   * The README's loop over an in-memory table whose updates move `updatedAt`:
+   * the table after the run, and whether it stopped half way (after
+   * `failAfter` writes).
+   */
+  function migrate(rows: readonly Row[], now: Date, failAfter = Infinity): { rows: Row[]; failed: boolean } {
+    type Run = { rows: Row[]; failed: boolean; written: number };
+    const step = (run: Run, row: Row): Run => {
+      const kept = { ...run, rows: [...run.rows, { ...row }] };
+      if (run.failed || row.updatedAt >= ZONE_ON) return kept;
       const migrated = legacyUtcWindowToZoned(row.startsAt, row.endsAt, LONDON, { updatedAt: row.updatedAt, zoneOnSince: ZONE_ON });
-      if (migrated === null) continue;
-      if (written === failAfter) throw new Error("connection lost");
-      Object.assign(row, migrated, { updatedAt: now });
-      written += 1;
-    }
+      if (migrated === null) return kept;
+      if (run.written === failAfter) return { ...kept, failed: true };
+      return { rows: [...run.rows, { ...row, ...migrated, updatedAt: now }], failed: false, written: run.written + 1 };
+    };
+    const { rows: next, failed } = rows.reduce(step, { rows: [], failed: false, written: 0 });
+    return { rows: next, failed };
   }
 
   const table = (): Row[] => [
@@ -125,22 +132,20 @@ describe("legacyUtcWindowToZoned rerun in London (UTC+0 in winter, review round 
   ];
 
   it("answers null for a row written since the zone went on, so a second run changes nothing", () => {
-    const rows = table();
-    migrate(rows, new Date("2026-12-02T00:00:00.000Z"));
-    const once = rows.map((row) => ({ ...row }));
-    expect(windowCalendarDays(rows[0]!.startsAt, rows[0]!.endsAt, LONDON)).toEqual({ startsOn: "2026-12-10", endsOn: "2026-12-20" });
-    migrate(rows, new Date("2026-12-03T00:00:00.000Z"));
-    expect(rows).toEqual(once);
+    const once = migrate(table(), new Date("2026-12-02T00:00:00.000Z")).rows;
+    expect(windowCalendarDays(once[0]!.startsAt, once[0]!.endsAt, LONDON)).toEqual({ startsOn: "2026-12-10", endsOn: "2026-12-20" });
+    expect(migrate(once, new Date("2026-12-03T00:00:00.000Z")).rows).toEqual(once);
     expect(
-      legacyUtcWindowToZoned(rows[0]!.startsAt, rows[0]!.endsAt, LONDON, { updatedAt: rows[0]!.updatedAt, zoneOnSince: ZONE_ON }),
+      legacyUtcWindowToZoned(once[0]!.startsAt, once[0]!.endsAt, LONDON, { updatedAt: once[0]!.updatedAt, zoneOnSince: ZONE_ON }),
     ).toBeNull();
   });
 
   it("finishes a run that failed half way without moving the rows it already wrote", () => {
-    const rows = table();
-    expect(() => migrate(rows, new Date("2026-12-02T00:00:00.000Z"), 1)).toThrow(/connection lost/u);
-    migrate(rows, new Date("2026-12-02T01:00:00.000Z"));
-    expect(rows.map((row) => windowCalendarDays(row.startsAt, row.endsAt, LONDON))).toEqual([
+    const partial = migrate(table(), new Date("2026-12-02T00:00:00.000Z"), 1);
+    expect(partial.failed).toBe(true);
+    const finished = migrate(partial.rows, new Date("2026-12-02T01:00:00.000Z"));
+    expect(finished.failed).toBe(false);
+    expect(finished.rows.map((row) => windowCalendarDays(row.startsAt, row.endsAt, LONDON))).toEqual([
       { startsOn: "2026-12-10", endsOn: "2026-12-20" },
       { startsOn: "2026-12-05", endsOn: "2026-12-06" },
     ]);

@@ -7,7 +7,7 @@
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React, { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { PT_BR_UI_LABELS } from '../../../../pt-BR.labels';
 import { Calendar } from '../../Calendar';
@@ -91,8 +91,10 @@ describe('days outside the month', () => {
 
 describe("today's mark", () => {
   /** The `::before` rule emitted for today's cell — jsdom computes no pseudo-elements. */
-  const todayFace = (indicator?: 'bold' | 'ring'): string => {
-    const { unmount } = render(<Calendar ariaLabel="c" {...(indicator ? { todayIndicator: indicator } : {})} />);
+  const todayFace = (indicator?: 'bold' | 'ring', extra: Partial<React.ComponentProps<typeof Calendar>> = {}): string => {
+    const { unmount } = render(
+      <Calendar ariaLabel="c" {...(indicator ? { todayIndicator: indicator } : {})} {...extra} />,
+    );
     const cell = screen.getByTestId('calendar-today').parentElement!;
     const rules = [...document.querySelectorAll('style')].map((tag) => tag.textContent ?? '').join('\n');
     const own = cell.className
@@ -113,18 +115,16 @@ describe("today's mark", () => {
   });
 
   it('is left off a range endpoint, which is already filled in that colour', () => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    render(<Calendar ariaLabel="c" selectionMode="range" numberOfMonths={1} todayIndicator="ring" range={{ start: today, end: null }} />);
-    const cell = screen.getByTestId('calendar-today').parentElement!;
-    expect(cell.className).toMatch(/range-start|selected/u);
-    const rules = [...document.querySelectorAll('style')].map((tag) => tag.textContent ?? '').join('\n');
-    const face = cell.className
-      .split(' ')
-      .filter((name) => name.startsWith('css-'))
-      .map((name) => rules.split(`.${name}::before{`)[1]?.split('}')[0] ?? '')
-      .join('');
-    expect(face).not.toMatch(/inset 0 0 0/u);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2027, 1, 10, 12));
+    try {
+      const face = todayFace('ring', { selectionMode: 'range', numberOfMonths: 1, range: { start: new Date(2027, 1, 10), end: null } });
+      expect(face).not.toMatch(/inset 0 0 0/u);
+      // The same day off the range is ringed, so the case above is the endpoint's doing.
+      expect(todayFace('ring', { selectionMode: 'range', numberOfMonths: 1 })).toMatch(/inset 0 0 0/u);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
