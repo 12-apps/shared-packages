@@ -72,7 +72,11 @@ const faceBackgroundFor = (day: DayRenderArgs): ((theme: Theme) => string) | str
 
 const colorFor = (day: DayRenderArgs, visible: boolean): string => {
   if (isEndpoint(day)) return 'primary.contrastText';
-  if (day.disabled) return 'text.disabled';
+  // A disabled day INSIDE the range is part of the value the grid states — a
+  // range never crosses a blocked day, so this is a calendar shown locked
+  // (FUT-4482, review round 9). On the band the disabled ink was 1.56:1; the
+  // secondary ink still reads as not-pickable and keeps the day legible.
+  if (day.disabled) return day.inRange ? 'text.secondary' : 'text.disabled';
   // Outside days that are switched off still occupy the grid, they just have
   // nothing to show.
   if (!visible) return 'transparent';

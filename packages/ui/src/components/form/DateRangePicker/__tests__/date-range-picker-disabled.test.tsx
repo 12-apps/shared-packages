@@ -165,4 +165,30 @@ describe('a disabled picker', () => {
       vi.useRealTimers();
     }
   });
+  // Review round 9: on a locked period the in-range day numbers were drawn in
+  // the disabled ink on the band, 1.56:1. They take the secondary ink; a day
+  // outside the range keeps the disabled one, and every day stays disabled.
+  it('draws the in-range days of a disabled grid in the secondary ink', () => {
+    const now = new Date(2026, 10, 6, 12);
+    render(
+      <DateRangePicker
+        value={{ from: '2026-11-10', to: '2026-11-20' }}
+        onChange={() => {}}
+        quickRanges={[]}
+        numberOfMonths={1}
+        now={now}
+        disabled
+      />,
+    );
+    const palette = createTheme().palette;
+    const ink = (cell: HTMLElement): string => getComputedStyle(cell).color;
+    const expected = (color: string): string => {
+      const probe = document.createElement('span');
+      probe.style.color = color;
+      return probe.style.color;
+    };
+    expect(inMonth(15).getAttribute('aria-disabled')).toBe('true');
+    expect(ink(inMonth(15))).toBe(expected(palette.text.secondary));
+    expect(ink(inMonth(25))).toBe(expected(palette.text.disabled));
+  });
 });
