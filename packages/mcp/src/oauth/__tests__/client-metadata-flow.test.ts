@@ -150,6 +150,40 @@ describe("a metadata-document client", () => {
     expect(transport.calls).toEqual([CLAUDE_ID]);
   });
 
+  it("refuses a token request that presents a client credential, in the body or as Basic", async () => {
+    const { api } = await cimdHarness();
+    const basic = `Basic ${Buffer.from(`${encodeURIComponent(CLAUDE_ID)}:secret`).toString("base64")}`;
+    for (const [form, headers] of [
+      [{ client_id: CLAUDE_ID, client_secret: "secret" }, {}],
+      [{}, { authorization: basic }],
+    ] as const) {
+      const { response, verifier } = await authorizeFor(api, CLAUDE_ID);
+      const refused = await token(api, {
+        grant_type: "authorization_code",
+        code: codeFrom(response),
+        redirect_uri: CALLBACK,
+        code_verifier: verifier,
+        ...form,
+      }, headers);
+      expect(refused.status).toBe(401);
+      expect(await refused.json()).toMatchObject({ error: "invalid_client" });
+    }
+    // The body case reaches the document rule itself (the Basic one is refused
+    // a step earlier, on its undecoded client id); prove it is that rule.
+    const { response, verifier } = await authorizeFor(api, CLAUDE_ID);
+    const withSecret = await token(api, {
+      grant_type: "authorization_code",
+      code: codeFrom(response),
+      redirect_uri: CALLBACK,
+      code_verifier: verifier,
+      client_id: CLAUDE_ID,
+      client_secret: "secret",
+    });
+    expect(await withSecret.json()).toMatchObject({
+      error_description: "client authentication is not accepted for this client",
+    });
+  });
+
   it("accepts a loopback callback on any port when the document lists it without one", async () => {
     const { api } = await cimdHarness({ [CODE_ID]: CODE_DOCUMENT });
     const { response, verifier } = await authorizeFor(api, CODE_ID, "http://localhost:61234/callback");

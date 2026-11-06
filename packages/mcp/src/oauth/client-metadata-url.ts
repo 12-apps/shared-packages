@@ -89,8 +89,13 @@ const NON_PUBLIC_V6: ReadonlyArray<readonly [number, number]> = [
   [0xffff, 0x0064], // NAT64 64:ff9b::/96 reaches v4 private space
 ];
 
+/** Prefixes refused by their text: documentation, 6to4, Teredo and discard. */
+const NON_PUBLIC_V6_TEXT = ["2001:db8:", "2002:", "2001:0:", "2001::", "100::"];
+
 function isNonPublicV6(address: string): boolean {
-  if (address === "::" || address === "::1" || address.startsWith("2001:db8:")) return true;
+  if (address === "::" || address === "::1" || NON_PUBLIC_V6_TEXT.some((prefix) => address.startsWith(prefix))) {
+    return true;
+  }
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(address)?.[1];
   if (mapped) return isNonPublicV4(mapped);
   const first = Number.parseInt(address.split(":")[0] || "0", 16);

@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import { isClientIdMetadataUrl } from "./client-metadata-url";
 import type { OAuthClientStore } from "./stores";
 
 /**
@@ -129,26 +130,30 @@ export async function authenticateClient(
   if (!client) {
     return tokenError("invalid_client", 401, "unknown client", CLIENT_AUTH_CHALLENGE);
   }
+  return clientCredentialRefusal(client, credentials.clientSecret);
+}
 
-  if (client.tokenEndpointAuthMethod === "client_secret_basic") {
-    const secret = credentials.clientSecret;
-    if (!secret || !client.clientSecretHash) {
-      return tokenError(
-        "invalid_client",
-        401,
-        "client authentication required",
-        CLIENT_AUTH_CHALLENGE,
-      );
-    }
-    if (!hashesEqual(sha256Hex(secret), client.clientSecretHash)) {
-      return tokenError(
-        "invalid_client",
-        401,
-        "invalid client credentials",
-        CLIENT_AUTH_CHALLENGE,
-      );
-    }
+/**
+ * The credential half of client authentication, once the client is known.
+ *
+ * A metadata-document client authenticates with nothing, and one that presents a
+ * credential anyway is refused (draft-ietf-oauth-client-id-metadata-document-03
+ * §5); registered public clients keep their behaviour. A confidential client
+ * (`client_secret_basic`) must present the secret whose hash is stored.
+ */
+function clientCredentialRefusal(
+  client: { clientId: string; tokenEndpointAuthMethod: string; clientSecretHash: string | null },
+  secret: string | null,
+): Response | null {
+  if (isClientIdMetadataUrl(client.clientId) && secret !== null) {
+    return tokenError("invalid_client", 401, "client authentication is not accepted for this client", CLIENT_AUTH_CHALLENGE);
   }
-
+  if (client.tokenEndpointAuthMethod !== "client_secret_basic") return null;
+  if (!secret || !client.clientSecretHash) {
+    return tokenError("invalid_client", 401, "client authentication required", CLIENT_AUTH_CHALLENGE);
+  }
+  if (!hashesEqual(sha256Hex(secret), client.clientSecretHash)) {
+    return tokenError("invalid_client", 401, "invalid client credentials", CLIENT_AUTH_CHALLENGE);
+  }
   return null;
 }

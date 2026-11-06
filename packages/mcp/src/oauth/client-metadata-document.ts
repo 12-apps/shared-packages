@@ -40,10 +40,45 @@ function asObject(document: unknown): Doc {
   return document as Doc;
 }
 
+/** Any method that rests on a shared secret, which a public document cannot hold (draft-03 §4.1). */
+function isSharedSecretMethod(method: unknown): boolean {
+  return typeof method === "string" && method.startsWith("client_secret");
+}
+
+/**
+ * The client authentication the document allows, which must come out as `none`
+ * (draft-03 §4.1, §5): this server authenticates a document client with nothing,
+ * so a document that allows only something else is refused, and one that lists
+ * a shared-secret method at all is refused outright.
+ *
+ * - `token_endpoint_auth_methods_supported`, when present, must be a list that
+ *   includes `none` and no shared-secret method; `none` is then chosen from it.
+ * - `token_endpoint_auth_method`, when present with that list, must be one of
+ *   its entries (the draft's consistency rule) and not a shared-secret method.
+ * - With no list, the single method must be absent or `none`.
+ */
 function checkPublicClient(doc: Doc): void {
-  const authMethod = doc.token_endpoint_auth_method ?? "none";
-  if (authMethod !== "none") refuse(`unsupported token_endpoint_auth_method (${String(authMethod)})`);
   if ("client_secret" in doc || "client_secret_expires_at" in doc) refuse("document carries a client secret");
+  const single = doc.token_endpoint_auth_method;
+  const listed = doc.token_endpoint_auth_methods_supported;
+  if (listed !== undefined) {
+    checkListedMethods(listed, single);
+    return;
+  }
+  if ((single ?? "none") !== "none") refuse(`unsupported token_endpoint_auth_method (${String(single)})`);
+}
+
+/** The `token_endpoint_auth_methods_supported` half of {@link checkPublicClient}. */
+function checkListedMethods(listed: unknown, single: unknown): void {
+  if (!Array.isArray(listed) || !listed.includes("none")) {
+    refuse("document token_endpoint_auth_methods_supported does not include none");
+  }
+  if (listed.some(isSharedSecretMethod) || isSharedSecretMethod(single)) {
+    refuse("document allows a shared-secret auth method");
+  }
+  if (single !== undefined && !listed.includes(single)) {
+    refuse("document token_endpoint_auth_method is not in token_endpoint_auth_methods_supported");
+  }
 }
 
 function redirectUrisOf(doc: Doc): string[] {

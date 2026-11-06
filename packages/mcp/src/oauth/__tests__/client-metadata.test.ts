@@ -99,7 +99,7 @@ describe("the destination address", () => {
     "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254",
     "100.64.0.1", "0.0.0.0", "224.0.0.1", "255.255.255.255", "198.18.0.1",
     "::1", "::", "fc00::1", "fd12::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1",
-    "64:ff9b::a00:1", "2001:db8::1", "not-an-ip",
+    "64:ff9b::a00:1", "2001:db8::1", "2002:a00:1::1", "2001:0:4136:e378::1", "2001::1", "100::1", "not-an-ip",
   ])("refuses %s", (address) => {
     expect(isNonPublicAddress(address)).toBe(true);
   });
@@ -132,6 +132,15 @@ describe("the document", () => {
     });
   });
 
+  it("chooses none from an auth-methods list that offers it, whatever single method is named", () => {
+    const client = clientFromMetadataDocument(
+      CLAUDE_ID,
+      { ...CLAUDE_DOCUMENT, token_endpoint_auth_method: "private_key_jwt", token_endpoint_auth_methods_supported: ["none", "private_key_jwt"] },
+      SCOPES,
+    );
+    expect(client.tokenEndpointAuthMethod).toBe("none");
+  });
+
   it("narrows the scopes to the ones a document asks for, never widens them", () => {
     const client = clientFromMetadataDocument(CLAUDE_ID, { ...CLAUDE_DOCUMENT, scope: "mcp:read admin:all" }, SCOPES);
     expect(client.scopes).toEqual(["mcp:read"]);
@@ -156,6 +165,26 @@ describe("the document", () => {
     ["a non-web redirect_uri", { ...CLAUDE_DOCUMENT, redirect_uris: ["javascript:alert(1)"] }, /redirect_uris/],
     ["no authorization_code grant", { ...CLAUDE_DOCUMENT, grant_types: ["client_credentials"] }, /authorization_code/],
     ["no code response type", { ...CLAUDE_DOCUMENT, response_types: ["token"] }, /response_type code/],
+    [
+      "an auth-methods list without none",
+      { ...CLAUDE_DOCUMENT, token_endpoint_auth_method: undefined, token_endpoint_auth_methods_supported: ["private_key_jwt"] },
+      /does not include none/,
+    ],
+    [
+      "an auth-methods list that is not a list",
+      { ...CLAUDE_DOCUMENT, token_endpoint_auth_methods_supported: "none" },
+      /does not include none/,
+    ],
+    [
+      "a shared-secret method in the list",
+      { ...CLAUDE_DOCUMENT, token_endpoint_auth_methods_supported: ["none", "client_secret_post"] },
+      /shared-secret/,
+    ],
+    [
+      "a method outside its own list",
+      { ...CLAUDE_DOCUMENT, token_endpoint_auth_method: "private_key_jwt", token_endpoint_auth_methods_supported: ["none"] },
+      /is not in token_endpoint_auth_methods_supported/,
+    ],
   ])("is refused with %s", (_case, document, reason) => {
     expect(() => clientFromMetadataDocument(CLAUDE_ID, document, SCOPES)).toThrow(reason);
   });
