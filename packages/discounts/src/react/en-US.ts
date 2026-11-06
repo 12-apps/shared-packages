@@ -200,7 +200,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidUsageLimit: "Enter a whole number of uses from 1 upwards, or leave it blank.",
     invalidPerBuyerLimit: "Enter a whole number per customer from 1 upwards, or leave it blank.",
     wholeNumberOnly: "Whole numbers only, no decimals.",
-    endsBeforeStarts: "The end date must be after the start date.",
+    endsBeforeStarts: "The end date cannot be before the start date.",
   },
   comboRewards: {
     labels: { PERCENTAGE: "Percentage", FIXED_AMOUNT: "Fixed amount", BUNDLE_PRICE: "Fixed price" },

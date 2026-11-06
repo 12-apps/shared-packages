@@ -40,6 +40,15 @@ function toDateInput(iso: string | null): string {
   return iso === null ? "" : iso.slice(0, 10);
 }
 
+/**
+ * A bound as the box shows it: the day the server says it runs on, when it
+ * says one (FUT-4482), else the stored instant's own date — which is what a
+ * server counting UTC midnights always meant.
+ */
+function dayInput(day: string | null | undefined, iso: string | null): string {
+  return day === undefined ? toDateInput(iso) : (day ?? "");
+}
+
 /** A new rule's defaults: the most common promotion an operator creates. */
 const BLANK: DiscountFormValues = {
   name: "",
@@ -80,8 +89,8 @@ export function initialValues(
     scope: editing.scope,
     trigger: editing.trigger,
     code: editing.code ?? "",
-    startsAt: toDateInput(editing.startsAt),
-    endsAt: toDateInput(editing.endsAt),
+    startsAt: dayInput(editing.startsOn, editing.startsAt),
+    endsAt: dayInput(editing.endsOn, editing.endsAt),
     minSubtotal: cents(editing.minSubtotalCents),
     usageLimit: editing.usageLimit === null ? "" : String(editing.usageLimit),
     perBuyerLimit: editing.perBuyerLimit === null ? "" : String(editing.perBuyerLimit),

@@ -31,6 +31,14 @@ export interface DiscountWireRecord {
   code: string | null;
   startsAt: string | null;
   endsAt: string | null;
+  /**
+   * The days the window runs on in the store's zone, Término inclusive
+   * (FUT-4482) — sent by a server that counts whole days, absent otherwise.
+   * Read in preference to the instants, which no browser can place on the
+   * store's calendar.
+   */
+  startsOn?: string | null;
+  endsOn?: string | null;
   /** The weekly schedule (FUT-996), or null for "always". */
   schedule?: DiscountSchedule | null;
   minSubtotalCents: number | null;

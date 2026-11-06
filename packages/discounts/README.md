@@ -201,6 +201,33 @@ keystroke on the storefront and would need a logger threaded through a browser
 bundle. A rejected coupon is already a `DiscountRejection` in the result, which
 is the host's to report if it wants to.
 
+## Whole days, in the store's zone — `storeTimeZone`
+
+Início and Término are calendar DAYS, and an operator means them whole on the
+store's clock (FUT-4482): Início 10/11 applies from 00:00 on the 10th, Término
+20/11 until the last instant of the 20th. Only the host knows a store's zone,
+so it passes it per tenant:
+
+```ts
+createApiDiscounts({
+  store, copy, logger,
+  storeTimeZone: async (clientId) => (await db.client.findUnique({ where: { id: clientId } })).timezone,
+});
+```
+
+With it, a write stores `startsAt` = the first instant of Início and `endsAt`
+(still exclusive, so the engine is unchanged) = the first instant of the day
+AFTER Término, both in that zone; Início = Término is a one-day promotion, and
+only a Término before Início is refused (`copy.endsBeforeStartDay`, required
+once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
+the days it runs on there, and the admin form and grid read those back. An
+unknown zone fails the request instead of storing a window on a guessed clock.
+
+Without it, nothing changes: UTC midnights, an exclusive Término, equal days
+refused, no day fields. A host that turns it on should migrate the rules it
+already stored (UTC midnight of each chosen day) to the new meaning, or they
+read back as the days they really ran on in its zone — a day early.
+
 ## Letting a host table opt in — `DiscountableCollection`
 
 A discount points at rows this package will never see: a store's categories, its

@@ -183,8 +183,9 @@ function checkComboKind(
 /**
  * Início and Término. Each is blank or a whole real ISO day — the date box
  * holds its typed text until it is one (FUT-4156) — and only two real days are
- * compared. The window is half-open [start, end): equal dates are an EMPTY
- * window, so the rule is "after", not "not before".
+ * compared. The days count whole (FUT-4482), so Início = Término is a one-day
+ * promotion and only a Término BEFORE Início is refused. A server that still
+ * counts UTC midnights refuses equal days itself, in its own words.
  */
 function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -196,7 +197,7 @@ function checkPeriod(values: DiscountFormValues, copy: DiscountsWebCopy): Record
       ? copy.form.invalidDate
       : copy.form.dateIncomplete;
   }
-  if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt <= values.startsAt) {
+  if (isIsoDay(values.startsAt) && isIsoDay(values.endsAt) && values.endsAt < values.startsAt) {
     errors.endsAt = copy.form.endsBeforeStarts;
   }
   return errors;

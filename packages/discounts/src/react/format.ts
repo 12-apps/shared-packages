@@ -105,7 +105,7 @@ export function formatDiscountValue(
  * mean very different things when it is not running yet.
  */
 export function formatWindow(
-  row: { startsAt: string | null; endsAt: string | null; schedule?: DiscountSchedule | null },
+  row: PeriodRow & { schedule?: DiscountSchedule | null },
   formatters: DiscountsFormatters,
   copy: DiscountsWebCopy,
 ): string {
@@ -117,12 +117,19 @@ export function formatWindow(
   return schedule === null ? period : fill(copy.schedule.windowWithSchedule, { window: period, schedule });
 }
 
-function formatPeriod(
-  row: { startsAt: string | null; endsAt: string | null },
-  formatters: DiscountsFormatters,
-  copy: DiscountsWebCopy,
-): string {
-  const { startsAt, endsAt } = row;
+/** A window's two bounds, as days when the server sent them (FUT-4482). */
+interface PeriodRow {
+  startsAt: string | null;
+  endsAt: string | null;
+  startsOn?: string | null;
+  endsOn?: string | null;
+}
+
+function formatPeriod(row: PeriodRow, formatters: DiscountsFormatters, copy: DiscountsWebCopy): string {
+  // The days the rule runs on in the store's zone, when the server counts them;
+  // a `YYYY-MM-DD` formats as that day, like the UTC midnight it replaces.
+  const startsAt = row.startsOn === undefined ? row.startsAt : row.startsOn;
+  const endsAt = row.endsOn === undefined ? row.endsAt : row.endsOn;
   if (startsAt === null && endsAt === null) return copy.window.always;
   if (endsAt === null) return fill(copy.window.from, { date: formatters.date(startsAt) });
   if (startsAt === null) return fill(copy.window.until, { date: formatters.date(endsAt) });

@@ -190,7 +190,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     invalidUsageLimit: "Informe um número inteiro de usos, a partir de 1, ou deixe em branco.",
     invalidPerBuyerLimit: "Informe um número inteiro por cliente, a partir de 1, ou deixe em branco.",
     wholeNumberOnly: "Use só números inteiros, sem vírgula.",
-    endsBeforeStarts: "A data de término deve ser posterior à data de início.",
+    endsBeforeStarts: "A data de término não pode ser anterior à data de início.",
   },
   comboRewards: {
     labels: { PERCENTAGE: "Porcentagem", FIXED_AMOUNT: "Valor fixo", BUNDLE_PRICE: "Preço fechado" },
