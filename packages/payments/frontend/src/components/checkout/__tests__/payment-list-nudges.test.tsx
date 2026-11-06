@@ -60,6 +60,29 @@ describe("a nudge that chooses a row (C21)", () => {
   });
 });
 
+describe("a nudge's choice is the buyer's own (review round 1)", () => {
+  it("takes the buyer to the CPF at the top, as a tap on the row does", async () => {
+    const nativeScroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    renderList({ config: onPageStore(), client: stubClient([]), taxIdOnFile: false, list: { lastMethod: "CARD", nudges: [TO_PIX] } });
+    await screen.findByTestId("list-cpf");
+    fireEvent.click(await screen.findByTestId("list-nudge-to-pix-action"));
+    const field = screen.getByTestId("list-buyer-taxId");
+    const input = field.tagName === "INPUT" ? field : field.querySelector("input");
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    expect(radio("list-option-PIX").checked).toBe(true);
+    Element.prototype.scrollIntoView = nativeScroll;
+  });
+
+  it("wraps its link under the sentence on a narrow row rather than squeezing it (U1, U6)", async () => {
+    renderList({ config: onPageStore(), client: stubClient([SAVED_VISA]), list: { nudges: [TO_PIX] } });
+    const strip = await screen.findByTestId("list-nudge-to-pix");
+    expect(getComputedStyle(strip).flexWrap).toBe("wrap");
+    const link = screen.getByTestId("list-nudge-to-pix-action").closest("[data-nudge-link]") as HTMLElement;
+    expect(getComputedStyle(link).marginLeft).toBe("auto");
+  });
+});
+
 describe("a nudge that runs the host's act (C23)", () => {
   it("calls the host's press, and leaves the choice alone", async () => {
     const onPress = vi.fn();

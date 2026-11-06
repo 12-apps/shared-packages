@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /**
  * What each way to pay COSTS, as the host prices it (FUT-4416) — a store may
  * charge less for Pix or cash than for a card.
@@ -5,8 +7,9 @@
  * The list computes no price: the host does, and hands each way to pay its
  * amount, already formatted. The list draws it at the row's right, names the
  * CHOSEN one on the button, in the 5-second bar and under the rule of "Resumo
- * do pedido", asks the provider for the chosen online row's cents, and opens
- * the wallets' sheets at the wallets' price.
+ * do pedido", and opens the wallets' sheets at the wallets' price. Every order
+ * it raises says which price it is for (`CreateOrderRequest.pricedAs`), and a
+ * card order that does not ask the chosen row's cents is never charged.
  *
  * Every field is optional, and a list handed none of them is exactly the list
  * before them: no amount on any row, "Total" and the cart's total.
@@ -17,11 +20,12 @@ export interface CheckoutChoicePrice {
   /** What paying this way costs, formatted by the host — "R$ 126,75". */
   amountLabel: string;
   /**
-   * The same amount in integer cents. On an ONLINE row it is what the provider
-   * is asked for while the row is chosen, in place of `totalCents` — so the
-   * order the host raises for it MUST ask that amount (`amountDueCents`, else
-   * its total). A value that is not a whole, non-negative number is ignored.
-   * A door option's is never read: nothing is charged here.
+   * The same amount in integer cents. On an ONLINE row it is what the order
+   * the host raises for it (`pricedAs` names the row) MUST ask the provider
+   * for — `amountDueCents`, else its total: a card order asking anything else
+   * is not charged, and a held one is reused only while it asks this. A value
+   * that is not a whole, non-negative number is ignored. A door option's is
+   * never read: nothing is charged here.
    */
   amountCents?: number;
   /** What this way saves against the full price, formatted — "R$ 11,95", drawn "R$ 11,95 a menos". */
@@ -40,6 +44,13 @@ export interface CheckoutChoicePrice {
 
 /** An online row, as prices are keyed: the debit card row is `CARD_DEBIT`. */
 export type CheckoutOnlineRowId = "PIX" | "CARD" | "CARD_DEBIT" | "HAND_OFF";
+
+/**
+ * Which price an order is raised for (`CreateOrderRequest.pricedAs`): an
+ * online row's, or `WALLET` — a Google Pay or Apple Pay sheet, whatever row is
+ * chosen. Sent only by a list the host priced (`CheckoutPaymentList.prices`).
+ */
+export type CheckoutPricedAs = CheckoutOnlineRowId | "WALLET";
 
 /** The wallets' price (Google Pay, Apple Pay) — the cents their sheets open at. */
 export interface CheckoutWalletPrice {
@@ -98,6 +109,13 @@ export interface CheckoutListNudge {
 /** The pricing half of `CheckoutPaymentList`. */
 export interface PaymentListPricing {
   prices?: CheckoutListPrices;
+  /**
+   * The host's money rows that come AFTER the chosen way to pay's discount
+   * line in "Resumo do pedido" — the store credit, the delivery fee — so it
+   * reads items → promotion → method → credit → fee (L24). `cart.discountLines`
+   * stays before the method line. Absent ⇒ every money row before it.
+   */
+  afterMethodLines?: ReactNode;
   /** Drawn while nothing is being charged: the nudges, then the notes, each in the order given. */
   nudges?: readonly CheckoutListNudge[];
 }

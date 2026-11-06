@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CheckoutOrder, PaymentMethod } from "../types";
+import type { BuyerInfo, CheckoutOrder, PaymentMethod } from "../types";
+
+import type { CheckoutPricedAs } from "./price-types";
 
 /**
  * How long the card's "Pagando R$ X no Visa 4242…" bar takes to fill —
@@ -29,7 +31,7 @@ interface RaisePorts {
   creating: boolean;
   createError: string | null;
   setMethod: (method: PaymentMethod) => void;
-  startPayment: (method: PaymentMethod) => Promise<void>;
+  startPayment: (method: PaymentMethod, override?: BuyerInfo, pricedAs?: CheckoutPricedAs) => Promise<void>;
   /** The amount the buyer is shown now (the cart's, or the balance's). */
   cartTotal: string;
   /** What an online payment asks the provider for now, when the host prices it (`paymentList.totalCents`). */
@@ -41,6 +43,11 @@ interface RaisePorts {
    * no longer the cart's.
    */
   priced?: { choice?: number; wallets?: number };
+  /**
+   * Which price a fresh card order is raised for (`CreateOrderRequest.pricedAs`):
+   * the chosen row's, or the wallets'. Absent ⇒ none is named, as before.
+   */
+  raiseAs?: { choice?: CheckoutPricedAs; wallets?: CheckoutPricedAs };
 }
 
 export interface ListCharge {
@@ -78,6 +85,12 @@ function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: numb
   if (own !== undefined) return asked === own;
   if (order.totalLabel !== cartTotal) return false;
   return dueCents === undefined || asked === dueCents;
+}
+
+/** The price a press is judged and raised by (FUT-4416): the wallets' for a wallet's sheet, the chosen row's otherwise. */
+function pressPrice(ports: RaisePorts, wallet: boolean): { cents: number | undefined; pricedAs: CheckoutPricedAs | undefined } {
+  const { priced, raiseAs } = ports;
+  return wallet ? { cents: priced?.wallets, pricedAs: raiseAs?.wallets } : { cents: priced?.choice, pricedAs: raiseAs?.choice };
 }
 
 /**
@@ -149,14 +162,15 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     // the bar's: its sheet is already open, and the block held it itself.
     if (!wallet && !allowed.current) return cancel();
     setPhase("sending");
-    const { order, cartTotal, dueCents, priced } = latest.current;
-    if (reusable(order, cartTotal, dueCents, wallet ? priced?.wallets : priced?.choice) && order) {
+    const { order, cartTotal, dueCents } = latest.current;
+    const press = pressPrice(latest.current, wallet);
+    if (reusable(order, cartTotal, dueCents, press.cents) && order) {
       target.current = { reuse: order };
       return;
     }
     target.current = { replace: order };
     latest.current.setMethod("CARD");
-    void latest.current.startPayment("CARD");
+    void latest.current.startPayment("CARD", undefined, press.pricedAs);
   }, [cancel]);
 
   const phaseRef = useRef(phase);

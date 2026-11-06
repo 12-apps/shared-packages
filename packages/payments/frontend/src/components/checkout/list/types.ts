@@ -25,7 +25,7 @@ import type { PixFaceCopy } from "./pix-face-copy";
 import type { CheckoutDoorPrice, PaymentListAmountsCopy, PaymentListPricing } from "./price-types";
 
 export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
-export type { CheckoutChoicePrice, CheckoutListNudge, CheckoutListNudgeAction, CheckoutListPrices, CheckoutOnlineRowId, CheckoutWalletPrice } from "./price-types";
+export type { CheckoutChoicePrice, CheckoutListNudge, CheckoutListNudgeAction, CheckoutListPrices, CheckoutOnlineRowId, CheckoutPricedAs, CheckoutWalletPrice } from "./price-types";
 
 /**
  * What a door option's `content` function is handed (FUT-3715).

@@ -55,6 +55,20 @@ describe("a priced choice", () => {
   });
 });
 
+describe("a priced choice whose label and amount due still match", () => {
+  it("re-raises the card when only the row's own cents moved", async () => {
+    vi.useFakeTimers();
+    const host = { ...ports(), order: orderFor("CARD"), cartTotal: "R$ 27,00" };
+    const { result } = renderHook(() => useListCharge({ ...host, dueCents: 2700, priced: { choice: 2500 } }));
+    act(() => result.current.start("CARD", "R$ 25,00"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(host.startPayment).toHaveBeenCalledTimes(1);
+    expect(result.current.chargeable).toBeNull();
+  });
+});
+
 describe("no price", () => {
   it("still raises a fresh order when the held one's total is not the cart's", () => {
     const host = ports();

@@ -1,7 +1,8 @@
 import { Box } from "@mui/material";
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX, type RefObject } from "react";
 
 import { taxIdKind } from "../../../card";
+import { useCheckoutCopy } from "../copy-context";
 import { cardChain, cardTokenization, handOffMethod } from "../method-capability";
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
@@ -9,13 +10,13 @@ import type { PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
 import { blockedReason, cardName, raisedMethod } from "./choice";
-import { chosenPrice, shownNudges, walletCents, walletTotal } from "./choice-price";
+import { chosenOnlineCents, chosenPrice, columnPrice, raisedAs, shownNudges, walletCents, walletTotal } from "./choice-price";
 import { buttonFacts, chosenDoor, coveredByHost, inFlight, onlineTotal, unpricedTotal, type ListFaceProps } from "./face-facts";
 import { usePaymentListMode, type PaymentListMode } from "./context";
 import { armPixCopy, armedReady, otherBankShown, useArmedCharge, useDropRefusedCopy } from "./list-memory";
 import { ListNudges } from "./list-nudges";
 import { OtherBankLink } from "./list-pix";
-import { ChoiceList } from "./choice-list";
+import { ChoiceList, focusTopCpf } from "./choice-list";
 import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
 import { useCvvFirst } from "./cvv-first";
@@ -47,7 +48,7 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: Pay
   const raised = method === "PIX" ? "PIX" : handOffMethod(cap.offered);
   if (method === "HAND_OFF") props.onHandOff();
   c.setMethod(raised);
-  void c.startPayment(raised);
+  void c.startPayment(raised, undefined, raisedAs(props.list, { method }));
 }
 
 /**
@@ -192,9 +193,23 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
+    // A card order must ask the chosen row's own cents (FUT-4416): another amount is never charged.
+    const expected = chosenOnlineCents(props.list, props.state.choice);
+    if (expected !== undefined && (order.amountDueCents ?? order.totalCents) !== expected) return <PriceMismatch onFailed={onFailed} />;
     return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} onWaitElapsed={c.handleWaitElapsed} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
+  return null;
+}
+
+/**
+ * A card order that does not ask the chosen row's price (FUT-4416): nothing is
+ * sent, and the list is back, saying the payment did not go through — the
+ * wallets' runner refuses a sheet's mismatched amount the same way.
+ */
+function PriceMismatch({ onFailed }: { onFailed: (failure: ListChargeFailure | null) => void }): null {
+  const words = useCheckoutCopy().screens.settling.cannotPay;
+  useEffect(() => onFailed({ message: words, code: null }), [onFailed, words]);
   return null;
 }
 
@@ -241,6 +256,7 @@ function barFacts(props: ListFaceProps, door: CheckoutDoorOption | undefined, re
     underButton: charging ? null : (door?.error ?? reason),
     live: cardCharging(props.charge) ? chargingText(props) : null,
     discount: chosenPrice(props.list, props.state.choice)?.discount,
+    due: columnPrice(props.list, props.state.choice),
   };
 }
 
@@ -248,15 +264,15 @@ function barFacts(props: ListFaceProps, door: CheckoutDoorOption | undefined, re
  * The host's nudges (FUT-4416), while nothing is under way: a link that
  * chooses a row chooses it as its radio would; a door option never.
  */
-function BarNudges({ props, hidden }: { props: ListFaceProps; hidden: boolean }): JSX.Element | null {
+function BarNudges({ props, hidden, root }: { props: ListFaceProps; hidden: boolean; root: RefObject<HTMLElement | null> }): JSX.Element | null {
   const { list, state } = props;
   if (hidden) return null;
-  return (
-    <ListNudges
-      nudges={shownNudges(list.nudges, state.rows, state.choice)}
-      onChoose={({ method, funding }) => state.choose({ kind: "online", method, ...(funding ? { funding } : {}) })}
-    />
-  );
+  const onChoose = ({ method, funding }: { method: CheckoutOnlineChoice; funding?: "DEBIT" }): void => {
+    state.choose({ kind: "online", method, ...(funding ? { funding } : {}) });
+    // The buyer's own choice, as a tap on the row: take them to the CPF it needs.
+    if (cpfAskedBy(state, props.c.buyer, props.config, props.cap.offered, method)) focusTopCpf(root.current);
+  };
+  return <ListNudges nudges={shownNudges(list.nudges, state.rows, state.choice)} onChoose={onChoose} />;
 }
 
 /**
@@ -333,9 +349,10 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const shown = charge.phase !== "waiting";
   const facts = barFacts(props, door, reason);
   const rowsShown = useRef(false);
+  const root = useRef<HTMLDivElement | null>(null);
   const top = <ListTop props={props} held={wallets.held} failure={wallets.failure} onGoogle={wallets.onGoogle} onApple={wallets.onApple} rowsShown={rowsShown} />;
   return (
-    <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box ref={root} data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
         <TopAndRows rowsShown={rowsShown} drawn={state.settled}>
           <ChoiceList copy={list.copy} prices={list.prices} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
@@ -344,7 +361,7 @@ export function ListFace(props: ListFaceProps): JSX.Element {
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
-        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} reasonTone={holdToneOf(list.hold, facts.underButton)} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live} discount={facts.discount} nudges={<BarNudges props={props} hidden={facts.locked} />}>
+        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} reasonTone={holdToneOf(list.hold, facts.underButton)} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live} discount={facts.discount} nudges={<BarNudges props={props} hidden={facts.locked} root={root} />} due={facts.due}>
           <BarAction props={props} failure={failure ?? wallets.failure} act={act} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />
         </ListBar>
       ) : null}

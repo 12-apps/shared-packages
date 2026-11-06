@@ -47,7 +47,7 @@ function useUnavailableHint(): string {
  * the focus — in the tap's own handler, so a phone opens its keyboard — and
  * the block, words included, is scrolled into view only when it is not already.
  */
-function focusTopCpf(list: HTMLElement | null): void {
+export function focusTopCpf(list: HTMLElement | null): void {
   const block = list?.querySelector<HTMLElement>('[data-testid="list-cpf"]');
   const input = block?.querySelector<HTMLInputElement>("input");
   if (!block || !input) return;

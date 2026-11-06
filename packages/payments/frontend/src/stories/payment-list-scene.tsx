@@ -18,7 +18,7 @@ import type { GooglePayApi, GooglePaymentData, GooglePaymentsClient } from "../c
 import type { CheckoutCartView, CheckoutDoorOption, CheckoutListChoice, CheckoutPaymentList } from "../index";
 
 import { StoryFlow, type StoryHost } from "./host";
-import { DEMO_PRICES, PRICED_LINES, PricedMoneyRows, demoNudges, pricedDoor } from "./price-demo";
+import { DEMO_PRICES, PRICED_LINES, PricedAfterMethodRows, PricedMoneyRows, demoNudges, pricedDoor } from "./price-demo";
 import { brlLabel, type StorySpec } from "./store";
 import type { StoryProvider } from "./store-adapter";
 
@@ -87,7 +87,7 @@ export const CART_CENTS = { before: 2700, after: 3400 };
 function usePricing(priced: boolean, door: CheckoutDoorOption[]): Partial<CheckoutPaymentList> {
   const [choice, setChoice] = useState<CheckoutListChoice | null>(null);
   return useMemo(
-    () => (priced ? { prices: DEMO_PRICES, door: pricedDoor(door), nudges: demoNudges(choice), onChoiceChange: setChoice } : {}),
+    () => (priced ? { prices: DEMO_PRICES, door: pricedDoor(door), nudges: demoNudges(choice), onChoiceChange: setChoice, afterMethodLines: <PricedAfterMethodRows /> } : {}),
     [priced, door, choice],
   );
 }
