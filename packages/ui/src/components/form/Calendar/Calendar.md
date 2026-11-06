@@ -221,6 +221,9 @@ month/year buttons rather than squeezing them (`SelectorsFitA320Sheet`).
   two-month range calendar names two different days (FUT-4144).
 - The arrows of the default caption carry `labels.previousMonth`/`nextMonth`
   when the host passes `labels`; without `labels` they stay as they were.
+- The default caption is a title: its first letter upper-cased in `locale`
+  (`"Novembro de 2026"`, FUT-4156). The grid's own name keeps `Intl`'s words
+  (`aria-label="novembro de 2026"`).
 - Disabled days: `aria-disabled="true"`.
 - With `showOutsideDays={false}` an outside day is an inert, `aria-hidden`
   placeholder: no button, no name, no tab stop. Visible outside days are

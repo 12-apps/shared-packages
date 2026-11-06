@@ -90,3 +90,54 @@ describe('fullWidth', () => {
     expect(fieldsColumn().flex).toBe('0 1 auto');
   });
 });
+
+/** Every rule block Emotion emitted for one of the element's own classes, bodies only. */
+function ownRules(element: Element): string {
+  const css = [...document.querySelectorAll('style')].map((tag) => tag.textContent ?? '').join('\n');
+  const own = [...element.classList].filter((name) => name.startsWith('css-'));
+  return css
+    .split('}')
+    .filter((block) => own.some((name) => block.trimStart().startsWith(`.${name}{`)))
+    .map((block) => block.slice(block.indexOf('{') + 1))
+    .join(';');
+}
+
+const frameElement = (): Element => within(picker()).getByTestId('calendar-container').parentElement!.parentElement!;
+
+describe('round 3 (FUT-4156)', () => {
+  it('FW5: the in-page frame is a card: the paper surface and the default Card radius', () => {
+    pickerWidth(500);
+    mount({ fullWidth: true });
+    const rules = ownRules(frameElement());
+    const expected = createTheme();
+    expect(rules).toContain(`background-color:${expected.palette.background.paper}`);
+    expect(rules).toContain(`border-radius:${expected.spacing(1)}`);
+  });
+
+  it('FW6: under the fields the frame trims its side padding so seven columns keep 40 design px', () => {
+    pickerWidth(320);
+    mount({ fullWidth: true });
+    const rules = ownRules(frameElement()).replace(/\s/g, '');
+    const pad = `clamp(0px,calc((100%-${r(282)})/2),${createTheme().spacing(2)})`;
+    expect(rules).toContain(`padding-left:${pad}`);
+    expect(rules).toContain(`padding-right:${pad}`);
+  });
+
+  it('FW7: fullWidth in the popover layout leaves the calendar as wide as its months', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <DateRangePicker
+          value={{ from: null, to: null }}
+          onChange={() => undefined}
+          quickRanges={[]}
+          numberOfMonths={2}
+          dataTestId="popover"
+          fullWidth
+        />
+      </ThemeProvider>,
+    );
+    const calendar = within(screen.getByTestId('popover')).getByTestId('calendar-container');
+    expect(getComputedStyle(calendar).width).not.toBe('100%');
+    expect(getComputedStyle(within(calendar).getByTestId('calendar-month-0')).maxWidth).toBe(r(304));
+  });
+});

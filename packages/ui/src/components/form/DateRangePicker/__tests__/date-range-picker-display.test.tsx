@@ -52,12 +52,12 @@ const day = (n: number): HTMLElement =>
 describe('the opening month', () => {
   it('opens on Término when only Término is chosen', () => {
     render(<Harness initial={{ from: null, to: '2027-03-15' }} />);
-    expect(monthTitle()).toMatch(/março de 2027/u);
+    expect(monthTitle()).toMatch(/^Março de 2027$/u);
   });
 
   it('opens on Início when both are chosen', () => {
     render(<Harness initial={{ from: '2027-02-01', to: '2027-03-15' }} />);
-    expect(monthTitle()).toMatch(/fevereiro de 2027/u);
+    expect(monthTitle()).toMatch(/^Fevereiro de 2027$/u);
   });
 });
 
@@ -139,13 +139,13 @@ describe('a tap the consumer completes differently', () => {
   it('keeps the grid on the month it was moved to', () => {
     render(<Harness initial={{ from: null, to: '2027-03-20' }} keep={keepEnd} />);
     fireEvent.click(screen.getByTestId('calendar-prev-month'));
-    expect(monthTitle()).toMatch(/fevereiro de 2027/u);
+    expect(monthTitle()).toMatch(/^Fevereiro de 2027$/u);
 
     const tapped = day(10);
     fireEvent.click(tapped);
 
     expect(valueText()).toBe('2027-02-10|2027-03-20');
-    expect(monthTitle()).toMatch(/fevereiro de 2027/u);
+    expect(monthTitle()).toMatch(/^Fevereiro de 2027$/u);
     expect(tapped.isConnected).toBe(true);
   });
 

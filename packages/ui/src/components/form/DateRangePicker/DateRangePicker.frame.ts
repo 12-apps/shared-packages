@@ -3,7 +3,10 @@
  * beside it: how wide each is, with and without `fullWidth`. Kept out of the
  * component so that file stays a layout of parts.
  */
-import { sxRem } from '../../../tokens/relative';
+import type { Theme } from '@mui/material/styles/index.js';
+
+import { rem, sxRem } from '../../../tokens/relative';
+import { CARD_RADIUS_UNITS } from '../../layout/Card/Card.metrics';
 
 import { framedMonthsWidth } from './DateRangePicker.layout';
 
@@ -30,6 +33,11 @@ const BESIDE_FRAME_SX = {
   p: 2,
   maxWidth: '100%',
   minWidth: 0,
+  // A card on the page, as the prototype draws it: the paper surface and the
+  // default `Card`'s radius, not the page's ground and a Paper's 4px
+  // (FUT-4156, round 3). In-page only: the popover layout keeps its own.
+  bgcolor: 'background.paper',
+  borderRadius: (theme: Theme) => theme.spacing(CARD_RADIUS_UNITS.md),
   ...FLAT_CALENDAR,
 } as const;
 
@@ -50,7 +58,17 @@ const BELOW_FRAME_SX = {
  * months spread across it (FUT-4156: a fitted frame left blank bands of 10 to
  * 77px each side at 390, 600 and 900 wide).
  */
-const FILL_BELOW_FRAME_SX = { ...BESIDE_FRAME_SX, alignSelf: 'stretch' } as const;
+/**
+ * Under the fields the frame gives up its side padding before its columns
+ * drop under 40 design px: seven 40px columns and the hairlines need 282, so
+ * the padding is what is left of the row past that, never more than its 16
+ * (FUT-4156, round 3: at 320 wide the columns were 36). `100%` is the row's
+ * width — padding percentages read the containing block.
+ */
+export const FILL_COLUMN_MIN = 40;
+const sidePadding = (theme: Theme): string =>
+  `clamp(0px, calc((100% - ${rem(theme, 7 * FILL_COLUMN_MIN + 2)}) / 2), ${theme.spacing(2)})`;
+const FILL_BELOW_FRAME_SX = { ...BESIDE_FRAME_SX, alignSelf: 'stretch', px: sidePadding } as const;
 // Never narrower than its months at their full size: the fields' column gives
 // way first, down to the room `besideLayout` chose this placement with.
 const fillBesideFrameSx = (months: number) =>

@@ -336,7 +336,10 @@ export function DateRangePicker(props: DateRangePickerProps): React.JSX.Element 
         months={layout.months}
         maxRangeDays={maxRangeDays}
         labels={props.calendarLabels}
-        display={props}
+        // `fullWidth` fills the in-page frame; the popover's frame is as wide
+        // as its months, and a filling calendar in it spread past the quick
+        // column and the typed pair (FUT-4156, round 3).
+        display={{ ...props, fullWidth: props.fieldsPlacement === 'beside' && props.fullWidth === true }}
       />
       <QuickColumn picker={picker} maxRangeDays={maxRangeDays} dataTestId={dataTestId} />
     </Box>

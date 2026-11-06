@@ -190,8 +190,11 @@ export interface DateRangePickerProps {
    * column stops at 320 design px — a `dd/mm/aaaa` date and its message need
    * no more. The calendar's seven columns spread across the frame and the day
    * faces keep their size (`Calendar` `fullWidth`). For a picker laid into a
-   * form section whose edges the frame must line up with. Default: false — the
-   * frame as wide as its months, centred under the fields.
+   * form section whose edges the frame must line up with. Under the fields the
+   * frame trims its side padding before a column drops under 40 design px.
+   * Ignored without `fieldsPlacement="beside"`: the popover's frame is as wide
+   * as its months. Default: false — the frame as wide as its months, centred
+   * under the fields.
    */
   fullWidth?: boolean;
   /**

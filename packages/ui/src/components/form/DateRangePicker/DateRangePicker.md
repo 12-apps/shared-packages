@@ -208,8 +208,13 @@ and centred, never stretched across the page around one month.
   picker's: under the fields it spans the picker, beside them it takes what the
   fields' column leaves (never less than its months at full size), and that
   column stops at 320 design px. The calendar's seven columns spread across the
-  frame; the day faces keep their 40 design px. For a picker laid into a form
-  section whose heading and fields the frame must line up with. Default off.
+  frame; the day faces keep their 40 design px, and the rows stay 40 tall. Under
+  the fields the frame trims its side padding before a column drops under 40
+  design px (a phone's tap target). For a picker laid into a form section whose
+  heading and fields the frame must line up with. Ignored in the default
+  (popover) layout. Default off.
+- **The in-page frame** is a card on the page: `background.paper` and the
+  default `Card`'s radius.
 
 ## Accessibility
 

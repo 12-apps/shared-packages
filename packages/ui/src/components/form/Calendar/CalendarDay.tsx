@@ -114,7 +114,7 @@ const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => str
 
 /**
  * A filling calendar's cell (`fullWidth`): the whole column wide, so a range's
- * band runs unbroken however far the columns spread, and no taller than the
+ * band runs unbroken however far the columns spread, and exactly as tall as the
  * 40 design px face — the face is as tall as the cell, so it keeps its size
  * while only the spacing grows. A row's end caps round at half that height
  * (the radius clamps on a smaller cell) rather than half a wide cell's width.
@@ -122,9 +122,13 @@ const todayRingFor = (day: DayRenderArgs, ring: boolean): ((theme: Theme) => str
 const FILL_CELL_HEIGHT = sxRem(40);
 const FILL_CAP_RADIUS = sxRem(20);
 
+// A filling cell is 40 tall at every width, never a ratio of its column: a
+// tap target under 600 wide is 40 design px each way, and a ratio made a 36px
+// column 33 tall at 320 (FUT-4156, round 3). The frame gives the columns their
+// 40 (`DateRangePicker.frame`).
 const cellSize = (fill: boolean) =>
   fill
-    ? { width: '100%', maxWidth: '100%', maxHeight: FILL_CELL_HEIGHT, aspectRatio: CELL_RATIO, justifySelf: 'stretch' }
+    ? { width: '100%', maxWidth: '100%', height: FILL_CELL_HEIGHT, justifySelf: 'stretch' }
     : { width: COLUMN_SIZE, maxWidth: '100%', aspectRatio: CELL_RATIO, justifySelf: 'stretch' };
 
 const dayCellSx = (

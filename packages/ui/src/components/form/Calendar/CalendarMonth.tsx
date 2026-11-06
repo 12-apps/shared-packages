@@ -56,6 +56,17 @@ const FILL_MONTH_SX = {
   maxWidth: 'none',
 } as const;
 
+/**
+ * The caption as a title: its first letter upper-cased in the calendar's own
+ * language ("novembro de 2026" → "Novembro de 2026"), as a heading reads in
+ * pt-BR; `Intl` writes month names lower-case there. The caption only — the
+ * grid's name and a day's name keep `Intl`'s words, which a sentence quotes.
+ */
+export const captionOf = (monthName: string, locale: string): string => {
+  const [first = '', ...rest] = [...monthName];
+  return `${first.toLocaleUpperCase(locale)}${rest.join('')}`;
+};
+
 /** The two arrows' accessible names; an icon alone names nothing. */
 export type MonthArrowLabels = Pick<CalendarLabels, 'previousMonth' | 'nextMonth'>;
 
@@ -184,8 +195,9 @@ export const CalendarMonth: FC<CalendarMonthProps> = ({
   onNextMonth,
   dayContext,
 }) => {
-  const monthName = getMonthName(matrix.month, matrix.year, locale);
-  const title = renderHeader ? renderHeader({ month: matrix.month, year: matrix.year }) : monthName;
+  const title = renderHeader
+    ? renderHeader({ month: matrix.month, year: matrix.year })
+    : captionOf(getMonthName(matrix.month, matrix.year, locale), locale);
 
   return (
     /* The month is addressable by its position, because in a multi-month

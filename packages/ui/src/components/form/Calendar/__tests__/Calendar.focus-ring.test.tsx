@@ -22,7 +22,7 @@ function rulesFor(element: HTMLElement, suffix: string): string[] {
     .filter((name) => name.startsWith('css-'))
     .flatMap((name) => {
       const selector = `.${name}${suffix}{`;
-      return css.split('}').filter((block) => block.trimStart().startsWith(selector) || block.includes(`}${selector}`));
+      return css.split('}').filter((block) => block.trimStart().startsWith(selector));
     })
     .map((block) => block.slice(block.indexOf('{') + 1));
 }
