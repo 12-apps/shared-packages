@@ -34,7 +34,11 @@ import { PickedTender, TenderChoice, type TenderOption } from './tender-card';
  */
 export interface TenderSplitProps<T extends string> {
   readonly tenders: readonly TenderOption<T>[];
-  /** The bill, in whole cents of `currency`. */
+  /**
+   * The bill, in whole cents of `currency` — its FULL price when tenders
+   * carry their own (`TenderOption.priceCents`): each share is then priced
+   * pro rata, and the bar and the confirm name the bill at the picks' prices.
+   */
   readonly totalCents: number;
   readonly copy: TenderSplitCopy;
   /** BCP 47 tag every amount is formatted in, e.g. `pt-BR`. */
@@ -70,11 +74,12 @@ export function TenderSplit<T extends string>({
   // A pick the host no longer offers (its list refetched mid-question) is not
   // on screen, so it is not sent either.
   const offered = picks.filter((pick) => tenders.some((tender) => tender.id === pick.tender));
-  const state = readTenderSplit(offered, totalCents, (tender) => changing.has(tender));
+  const priceOf = usePriceOf(tenders);
+  const state = readTenderSplit(offered, totalCents, (tender) => changing.has(tender), priceOf);
   const lastPicked = offered[offered.length - 1]?.tender;
   return (
     <Stack spacing={2} data-testid={dataTestId}>
-      <Progress state={state} totalCents={totalCents} copy={copy} money={money} testId={dataTestId} />
+      <Progress state={state} totalCents={state.dueCents} copy={copy} money={money} testId={dataTestId} />
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.25 }}>
         {tenders.map((tender) => {
           const pick = offered.find((candidate) => candidate.tender === tender.id);
@@ -83,6 +88,7 @@ export function TenderSplit<T extends string>({
             <TenderChoice
               key={tender.id}
               tender={tender}
+              price={pricedCents(tender) === null ? null : money.full(pricedCents(tender)!)}
               testId={`${dataTestId}-option-${tender.id}`}
               autoFocus={tender.id === removed}
               onPick={() => setPicks((current) => withPicked(current, tender.id))}
@@ -110,7 +116,7 @@ export function TenderSplit<T extends string>({
         <ChangeLine cents={state.changeCents} copy={copy} money={money} testId={dataTestId} />
       ) : null}
       <Actions
-        label={confirmText(state, totalCents, copy, money)}
+        label={confirmText(state, state.dueCents, copy, money)}
         onConfirm={state.answer === null ? null : () => onConfirm(state.answer!)}
         onCancel={onCancel}
         copy={copy}
@@ -118,6 +124,24 @@ export function TenderSplit<T extends string>({
       />
     </Stack>
   );
+}
+
+/** A tender's usable price — a positive whole number of cents — or `null`. */
+function pricedCents<T extends string>(tender: TenderOption<T>): number | null {
+  const cents = tender.priceCents;
+  return cents !== undefined && Number.isInteger(cents) && cents > 0 ? cents : null;
+}
+
+/**
+ * The tenders' prices for the arithmetic (FUT-4416) — `undefined` when no
+ * tender carries one, so an unpriced split answers in its old shape.
+ */
+function usePriceOf<T extends string>(tenders: readonly TenderOption<T>[]): ((tender: T) => number) | undefined {
+  return useMemo(() => {
+    if (!tenders.some((tender) => pricedCents(tender) !== null)) return undefined;
+    const prices = new Map(tenders.map((tender) => [tender.id, pricedCents(tender) ?? Number.NaN]));
+    return (tender: T) => prices.get(tender) ?? Number.NaN;
+  }, [tenders]);
 }
 
 function ChangeLine({

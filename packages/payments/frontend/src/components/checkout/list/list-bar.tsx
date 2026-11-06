@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useCheckoutCopy } from "../copy-context";
 import { useCheckoutComponents } from "../ui";
 
+import { PriceDiscountLine } from "./list-nudges";
 import { useSummaryColumnTarget } from "./summary-column";
 import { SummaryToggleLine } from "./summary-sheet";
 import { CHARGE_WINDOW_MS } from "./use-list-charge";
@@ -115,6 +116,16 @@ function HeldReason({ reason, actionLabel, labelCut, live, tone = "danger" }: { 
   );
 }
 
+/** The chosen way to pay's discount line (a phone only: the column's body draws its own) and the host's extras. */
+function BarLines({ discount, extras }: { discount?: { label: string; amountLabel: string } | null; extras?: ReactNode }): JSX.Element {
+  return (
+    <>
+      {discount ? <PriceDiscountLine discount={discount} /> : null}
+      {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
+    </>
+  );
+}
+
 /**
  * The one list's bar (FUT-3591 #7, M12), top to bottom: the host's line
  * (items and delivery fee), the host's online-only extras (store credit), who
@@ -129,8 +140,12 @@ function HeldReason({ reason, actionLabel, labelCut, live, tone = "danger" }: { 
  * reason it is held, the charge under way, the wait — because a region that
  * mounts with its text already in it is announced by nobody.
  */
-export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, reasonTone, actionLabel, heldTotal, live, children }: {
+export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, reasonTone, actionLabel, heldTotal, live, discount, nudges, children }: {
   summary?: ReactNode;
+  /** The chosen way to pay's discount line (FUT-4416) — drawn here on a phone; the column's body draws its own. */
+  discount?: { label: string; amountLabel: string } | null;
+  /** The host's nudges and notes, just before the action (FUT-4416, L24). */
+  nudges?: ReactNode;
   /** A charge is under way: the phone's summary sheet closes and stays closed (FUT-589). */
   sheetHeld?: boolean;
   /**
@@ -163,8 +178,9 @@ export function ListBar({ summary, sheetHeld, sheetShut, extras, payer, reason, 
       {summary && column ? <Box data-testid="list-bar-summary" sx={{ ...NO_EMPTY_ROW, color: "text.secondary" }}>{summary}</Box> : null}
       {/* On a phone the line opens the "Resumo do pedido" sheet when the layout has one to show (FUT-589). */}
       {summary && !column ? <SummaryToggleLine summary={summary} testId="list-bar-summary" held={sheetHeld} shut={sheetShut} /> : null}
-      {extras ? <Box data-testid="list-bar-extras" sx={NO_EMPTY_ROW}>{extras}</Box> : null}
+      <BarLines discount={column ? null : discount} extras={extras} />
       {payer}
+      {nudges}
       <HeldTotal total={column ? null : heldTotal} />
       {children}
       <HeldReason reason={reason} actionLabel={actionLabel} labelCut={labelCut} live={live} tone={reasonTone} />

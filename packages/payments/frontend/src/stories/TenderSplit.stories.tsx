@@ -50,18 +50,20 @@ function Host({
   locale,
   currency,
   totalCents,
+  tenders = TENDERS,
 }: {
   copy: TenderSplitCopy;
   locale: string;
   currency: string;
   totalCents: number;
+  tenders?: TenderOption<Tender>[];
 }): JSX.Element {
   const [answer, setAnswer] = useState<TenderSplitAnswer<Tender> | null>(null);
   return (
     <Box sx={{ width: 360, display: "flex", flexDirection: "column", gap: 2 }}>
       <Paper sx={{ p: 2.5 }}>
         <TenderSplit
-          tenders={TENDERS}
+          tenders={tenders}
           totalCents={totalCents}
           copy={copy}
           locale={locale}
@@ -80,6 +82,19 @@ function Host({
 export const PtBr: StoryObj = {
   name: "pt-BR, R$ 444,40",
   render: () => <Host copy={PT_BR_TENDER_SPLIT_COPY} locale="pt-BR" currency="BRL" totalCents={44440} />,
+};
+
+/**
+ * FUT-4416 — tenders priced apart (the ticket's mesa: R$ 84,70 full, Pix
+ * R$ 75,20, cash R$ 82,16, debit R$ 83,01): each card says what the bill
+ * comes to paid that way, and a split prices each share pro rata.
+ */
+const PRICES: Record<Tender, number> = { CASH: 8216, CREDIT: 8470, DEBIT: 8301, PIX: 7520 };
+const PRICED_TENDERS: TenderOption<Tender>[] = TENDERS.map((tender) => ({ ...tender, priceCents: PRICES[tender.id] }));
+
+export const PricedPtBr: StoryObj = {
+  name: "pt-BR, priced per tender, R$ 84,70",
+  render: () => <Host copy={PT_BR_TENDER_SPLIT_COPY} locale="pt-BR" currency="BRL" totalCents={8470} tenders={PRICED_TENDERS} />,
 };
 
 export const EnUs: StoryObj = {

@@ -22,8 +22,10 @@ import type { ReactNode } from "react";
 import type { PaymentListCredit, PaymentListCreditCopy, PaymentListSummary } from "./credit-types";
 import type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy, PaymentListDebitInputs } from "./debit-copy";
 import type { PixFaceCopy } from "./pix-face-copy";
+import type { CheckoutDoorPrice, PaymentListAmountsCopy, PaymentListPricing } from "./price-types";
 
 export type { CheckoutBillingAddress, CheckoutBillingLookup, PaymentListDebitCopy };
+export type { CheckoutChoicePrice, CheckoutListNudge, CheckoutListNudgeAction, CheckoutListPrices, CheckoutOnlineRowId, CheckoutWalletPrice } from "./price-types";
 
 /**
  * What a door option's `content` function is handed (FUT-3715).
@@ -48,7 +50,7 @@ export interface CheckoutDoorRowControls {
  * Rebuild the array whenever any of them changes (a hook that returns it is the
  * natural shape): the list renders what it is handed on every render.
  */
-export interface CheckoutDoorOption {
+export interface CheckoutDoorOption extends CheckoutDoorPrice {
   /** Stable within the list; reported back through `onChoiceChange`. */
   id: string;
   /** The row's label — "Dinheiro". */
@@ -122,7 +124,7 @@ export interface CheckoutListHold {
 }
 
 /** `CheckoutFlowProps.paymentList` — see the module comment. */
-export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSummary, PaymentListDebitInputs {
+export interface CheckoutPaymentList extends PaymentListCredit, PaymentListSummary, PaymentListDebitInputs, PaymentListPricing {
   /** Every sentence the list draws. REQUIRED, with no default (FUT-760). */
   copy: PaymentListCopy;
   /**
@@ -284,7 +286,7 @@ export interface PixBankCopy {
 }
 
 /** The list's words — a pack per locale ships at `@12-apps/payments-frontend/locales`. */
-export interface PaymentListCopy extends PaymentListCreditCopy {
+export interface PaymentListCopy extends PaymentListCreditCopy, PaymentListAmountsCopy {
   /** "Como você quer pagar?" */
   title: string;
   /** "Pagar agora, pelo app" — drawn in capitals by CSS. */

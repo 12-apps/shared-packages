@@ -34,6 +34,13 @@ interface RaisePorts {
   cartTotal: string;
   /** What an online payment asks the provider for now, when the host prices it (`paymentList.totalCents`). */
   dueCents?: number;
+  /**
+   * The cents a way to pay asks under its OWN price (FUT-4416): the chosen
+   * online row's (`prices.online`), and the wallets' (`prices.wallets`). Set,
+   * a held order is reused on those cents alone — its total is that price,
+   * no longer the cart's.
+   */
+  priced?: { choice?: number; wallets?: number };
 }
 
 export interface ListCharge {
@@ -62,11 +69,15 @@ export interface ListCharge {
 /**
  * A held CARD order still awaiting payment AND priced as the buyer now sees —
  * reusable for the charge. A balance ticked or unticked moves what the charge
- * asks for and not the order's total, so the amount due is compared too.
+ * asks for and not the order's total, so the amount due is compared too. A
+ * way to pay with its own price (`own`) is judged by the cents it asks alone.
  */
-function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined): boolean {
-  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || order.totalLabel !== cartTotal) return false;
-  return dueCents === undefined || (order.amountDueCents ?? order.totalCents) === dueCents;
+function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined, own: number | undefined): boolean {
+  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT") return false;
+  const asked = order.amountDueCents ?? order.totalCents;
+  if (own !== undefined) return asked === own;
+  if (order.totalLabel !== cartTotal) return false;
+  return dueCents === undefined || asked === dueCents;
 }
 
 /**
@@ -138,8 +149,8 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     // the bar's: its sheet is already open, and the block held it itself.
     if (!wallet && !allowed.current) return cancel();
     setPhase("sending");
-    const { order, cartTotal, dueCents } = latest.current;
-    if (reusable(order, cartTotal, dueCents) && order) {
+    const { order, cartTotal, dueCents, priced } = latest.current;
+    if (reusable(order, cartTotal, dueCents, wallet ? priced?.wallets : priced?.choice) && order) {
       target.current = { reuse: order };
       return;
     }

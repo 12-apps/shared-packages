@@ -77,6 +77,12 @@ export const EN_US_PAYMENT_LIST_COPY: PaymentListCopy = {
   charging: (total, card) => `Paying ${total} with ${card ?? "the card entered"}…`,
   chargingCovered: "Confirming the order, paid with your balance…",
   amountDue: "Amount due",
+  amounts: {
+    less: (amount) => `${amount} off`,
+    upTo: (amount) => `up to ${amount}`,
+    due: "Amount due",
+    dueAtDoor: "Amount due on delivery",
+  },
   cancel: "Cancel",
   pixFace: {
     title: (total) => `Pay ${total} with Pix`,
