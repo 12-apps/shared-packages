@@ -112,7 +112,8 @@ export interface DiscountsApiConfig {
    * is a one-day promotion, and every record answered carries `startsOn` /
    * `endsOn`, the days it runs on there. A zone the runtime does not know fails
    * every WRITE rather than storing a window on a guessed clock; a read answers
-   * its days on UTC and logs a warning, so the list stays usable. A null or
+   * its records without their days and logs a warning, so the list stays
+   * usable and shows no guessed days. A null or
    * blank answer for a tenant fails every route: guard a nullable lookup.
    *
    * Omitted, every write and answer is what it was before: UTC midnights, an

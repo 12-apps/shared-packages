@@ -255,6 +255,24 @@ function legacyDay(bound: Date | string | null, field: string): string | null {
 }
 
 /**
+ * Which rows are still legacy, as the caller knows it: the instant the release
+ * that passes `storeTimeZone` started serving writes (`zoneOnSince`), and the
+ * row's own `updatedAt`. A row last written before that instant was written on
+ * UTC midnights; one written after it — by the new form, or by this migration,
+ * whose update moves `updatedAt` — is whole days already.
+ */
+export interface LegacyRowMarker {
+  updatedAt: Date | string;
+  zoneOnSince: Date | string;
+}
+
+const instantOf = (value: Date | string, field: string): number => {
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) throw new RangeError(`@12-apps/discounts: ${field} is not an instant: ${String(value)}`);
+  return time;
+};
+
+/**
  * A window stored BEFORE whole days (FUT-4482) — each chosen day as its UTC
  * midnight, Término exclusive — rewritten as the whole-day window of the very
  * same days, in the store's zone: what `wholeDayWindow` stores for them today.
@@ -267,15 +285,21 @@ function legacyDay(bound: Date | string | null, field: string): string | null {
  * zone, and Término now the last day it runs, whole — the meaning the owner
  * gave the two boxes, so a legacy rule gains the last day it always claimed.
  *
- * Pure, and loud on a row that is not legacy: a bound that is not a UTC
- * midnight throws, so a migration run twice in a zone off UTC stops instead of
- * shifting every row again. (In a zone AT UTC a second run cannot be told
- * apart; run it once.) An unknown zone throws, as every whole-day write does.
+ * Safe to run again, in every zone. The VALUES cannot say whether a row was
+ * migrated: at UTC+0 (London in winter, Lisbon, UTC) a migrated window is
+ * still made of UTC midnights, and a second pass would push Término a day on.
+ * So the caller says it, with {@link LegacyRowMarker}: a row written since
+ * `zoneOnSince` answers `null`, nothing to write. A bound that is not a UTC
+ * midnight on a row the marker calls legacy still throws, and so does an
+ * unknown zone, as every whole-day write does.
  */
 export function legacyUtcWindowToZoned(
   startsAt: Date | string | null,
   endsAt: Date | string | null,
   timeZone: string,
-): { startsAt: Date | null; endsAt: Date | null } {
+  row: LegacyRowMarker,
+): { startsAt: Date | null; endsAt: Date | null } | null {
+  wallClockFormat(timeZone);
+  if (instantOf(row.updatedAt, "updatedAt") >= instantOf(row.zoneOnSince, "zoneOnSince")) return null;
   return wholeDayWindow(legacyDay(startsAt, "startsAt"), legacyDay(endsAt, "endsAt"), timeZone);
 }

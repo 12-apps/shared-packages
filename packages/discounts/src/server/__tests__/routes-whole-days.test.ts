@@ -164,12 +164,18 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     await expect(call("GET", "/discounts")).rejects.toThrow(/storeTimeZone answered null/u);
   });
 
-  it("answers the list on an unknown zone, its days on UTC, and logs why", async () => {
+  // Review round 2: days placed on UTC are other days than the store's, and a
+  // form would show them as the store's. Edited on purpose: the round-1 cases
+  // asserted the UTC days this now refuses to answer.
+  it("answers the list on an unknown zone WITHOUT its days, and logs why", async () => {
     const logger = recordingLogger();
     const { call } = harness({ storeTimeZone: () => "Not/A_Zone", logger });
     const response = await call("GET", "/discounts");
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: [{ startsOn: "2026-11-10", endsOn: "2026-11-21" }] });
+    const row = (response.body as { data: Record<string, unknown>[] }).data[0]!;
+    expect(row).not.toHaveProperty("startsOn");
+    expect(row).not.toHaveProperty("endsOn");
+    expect(row).toHaveProperty("startsAt");
     expect(logger.at("warn").join("\n")).toMatch(/unknown store time zone "Not\/A_Zone" for tenant tenant-1/u);
   });
 
@@ -178,8 +184,17 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     const { call } = harness({ storeTimeZone: () => "Not/A_Zone", logger });
     const response = await call("GET", "/discounts/:id");
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { startsOn: "2026-11-10", endsOn: "2026-11-21" } });
+    const data = (response.body as { data: Record<string, unknown> }).data;
+    expect(data).not.toHaveProperty("startsOn");
+    expect(data).not.toHaveProperty("endsOn");
     expect(logger.at("warn")).toHaveLength(1);
+  });
+
+  it("refuses a whitespace-only zone like an empty one", async () => {
+    const { call, writes } = harness({ storeTimeZone: () => "   " });
+    await expect(call("POST", "/discounts", BODY)).rejects.toThrow(/storeTimeZone answered .* for tenant "tenant-1"/u);
+    await expect(call("GET", "/discounts")).rejects.toThrow(/storeTimeZone answered/u);
+    expect(writes).toEqual([]);
   });
 
   it("still refuses an update on an unknown zone", async () => {

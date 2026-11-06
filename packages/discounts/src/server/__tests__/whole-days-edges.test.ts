@@ -46,39 +46,103 @@ describe("Término across a clock change", () => {
 });
 
 describe("legacyUtcWindowToZoned — the host's one-time migration", () => {
+  const ZONE_ON = "2026-11-06T12:00:00.000Z";
+  /** A row last written before the zone went on: still legacy. */
+  const LEGACY = { updatedAt: "2026-11-01T09:00:00.000Z", zoneOnSince: ZONE_ON };
+
   it("keeps the days the old form showed, now whole in the store's zone", () => {
     const migrated = legacyUtcWindowToZoned(
       new Date("2026-11-10T00:00:00.000Z"),
       "2026-11-20T00:00:00.000Z",
       "America/Sao_Paulo",
+      LEGACY,
     );
-    expect(iso(migrated.startsAt)).toBe("2026-11-10T03:00:00.000Z");
-    expect(iso(migrated.endsAt)).toBe("2026-11-21T03:00:00.000Z");
-    expect(windowCalendarDays(migrated.startsAt, migrated.endsAt, "America/Sao_Paulo")).toEqual({
+    expect(iso(migrated!.startsAt)).toBe("2026-11-10T03:00:00.000Z");
+    expect(iso(migrated!.endsAt)).toBe("2026-11-21T03:00:00.000Z");
+    expect(windowCalendarDays(migrated!.startsAt, migrated!.endsAt, "America/Sao_Paulo")).toEqual({
       startsOn: "2026-11-10",
       endsOn: "2026-11-20",
     });
   });
 
   it("is what a whole-day write of those days stores", () => {
-    const migrated = legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", "2026-11-20T00:00:00.000Z", "Asia/Tokyo");
+    const migrated = legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", "2026-11-20T00:00:00.000Z", "Asia/Tokyo", LEGACY);
     const written = wholeDayWindow("2026-11-10", "2026-11-20", "Asia/Tokyo");
     expect(migrated).toEqual(written);
   });
 
   it("leaves an open bound open", () => {
-    expect(legacyUtcWindowToZoned(null, "2026-11-20T00:00:00.000Z", "America/Sao_Paulo").startsAt).toBeNull();
-    expect(legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", null, "America/Sao_Paulo").endsAt).toBeNull();
+    expect(legacyUtcWindowToZoned(null, "2026-11-20T00:00:00.000Z", "America/Sao_Paulo", LEGACY)!.startsAt).toBeNull();
+    expect(legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", null, "America/Sao_Paulo", LEGACY)!.endsAt).toBeNull();
   });
 
-  it("refuses a row that was already migrated, so a second run stops instead of shifting it", () => {
-    const once = legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", "2026-11-20T00:00:00.000Z", "America/Sao_Paulo");
-    expect(() => legacyUtcWindowToZoned(once.startsAt, once.endsAt, "America/Sao_Paulo")).toThrow(
+  it("refuses a bound that is not a UTC midnight on a row the marker calls legacy", () => {
+    const once = legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", "2026-11-20T00:00:00.000Z", "America/Sao_Paulo", LEGACY)!;
+    expect(() => legacyUtcWindowToZoned(once.startsAt, once.endsAt, "America/Sao_Paulo", LEGACY)).toThrow(
       /not a UTC midnight/u,
     );
   });
 
   it("refuses a zone the runtime does not know", () => {
-    expect(() => legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", null, "Not/A_Zone")).toThrow(/Not\/A_Zone/u);
+    expect(() => legacyUtcWindowToZoned("2026-11-10T00:00:00.000Z", null, "Not/A_Zone", LEGACY)).toThrow(/Not\/A_Zone/u);
+  });
+
+  it("refuses a marker that is not an instant", () => {
+    expect(() =>
+      legacyUtcWindowToZoned(null, null, "UTC", { updatedAt: "yesterday", zoneOnSince: ZONE_ON }),
+    ).toThrow(/updatedAt is not an instant/u);
+  });
+});
+
+describe("legacyUtcWindowToZoned rerun in London (UTC+0 in winter, review round 2)", () => {
+  // At UTC+0 a migrated window is still two UTC midnights, so the values alone
+  // cannot tell a migrated row from a legacy one: only the caller's marker can.
+  const ZONE_ON = new Date("2026-12-01T12:00:00.000Z");
+  const LONDON = "Europe/London";
+
+  interface Row {
+    id: string;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    updatedAt: Date;
+  }
+
+  /** The README's loop over an in-memory table whose updates move `updatedAt`. */
+  function migrate(rows: Row[], now: Date, failAfter = Infinity): void {
+    let written = 0;
+    for (const row of rows.filter((candidate) => candidate.updatedAt < ZONE_ON)) {
+      const migrated = legacyUtcWindowToZoned(row.startsAt, row.endsAt, LONDON, { updatedAt: row.updatedAt, zoneOnSince: ZONE_ON });
+      if (migrated === null) continue;
+      if (written === failAfter) throw new Error("connection lost");
+      Object.assign(row, migrated, { updatedAt: now });
+      written += 1;
+    }
+  }
+
+  const table = (): Row[] => [
+    { id: "a", startsAt: new Date("2026-12-10T00:00:00.000Z"), endsAt: new Date("2026-12-20T00:00:00.000Z"), updatedAt: new Date("2026-11-20T00:00:00.000Z") },
+    { id: "b", startsAt: new Date("2026-12-05T00:00:00.000Z"), endsAt: new Date("2026-12-06T00:00:00.000Z"), updatedAt: new Date("2026-11-21T00:00:00.000Z") },
+  ];
+
+  it("answers null for a row written since the zone went on, so a second run changes nothing", () => {
+    const rows = table();
+    migrate(rows, new Date("2026-12-02T00:00:00.000Z"));
+    const once = rows.map((row) => ({ ...row }));
+    expect(windowCalendarDays(rows[0]!.startsAt, rows[0]!.endsAt, LONDON)).toEqual({ startsOn: "2026-12-10", endsOn: "2026-12-20" });
+    migrate(rows, new Date("2026-12-03T00:00:00.000Z"));
+    expect(rows).toEqual(once);
+    expect(
+      legacyUtcWindowToZoned(rows[0]!.startsAt, rows[0]!.endsAt, LONDON, { updatedAt: rows[0]!.updatedAt, zoneOnSince: ZONE_ON }),
+    ).toBeNull();
+  });
+
+  it("finishes a run that failed half way without moving the rows it already wrote", () => {
+    const rows = table();
+    expect(() => migrate(rows, new Date("2026-12-02T00:00:00.000Z"), 1)).toThrow(/connection lost/u);
+    migrate(rows, new Date("2026-12-02T01:00:00.000Z"));
+    expect(rows.map((row) => windowCalendarDays(row.startsAt, row.endsAt, LONDON))).toEqual([
+      { startsOn: "2026-12-10", endsOn: "2026-12-20" },
+      { startsOn: "2026-12-05", endsOn: "2026-12-06" },
+    ]);
   });
 });

@@ -36,8 +36,10 @@ export async function zoneFor(
 /**
  * The zone a READ places days on. A zone the runtime does not know cannot place
  * them, and a read is not where that must stop the screen: nothing is stored
- * from it, and every write still refuses that zone loudly. So the days are
- * read on UTC, and the logger says why.
+ * from it, and every write still refuses that zone loudly. So the record is
+ * answered without `startsOn`/`endsOn` — days placed on UTC would be other
+ * days than the store's, and a form would show them as if they were — and the
+ * logger says why.
  */
 export async function readZoneFor(
   storeTimeZone: StoreTimeZone | undefined,
@@ -47,10 +49,10 @@ export async function readZoneFor(
   const zone = await zoneFor(storeTimeZone, clientId);
   if (zone === undefined || isKnownTimeZone(zone)) return zone;
   logger.warn(
-    `discounts: unknown store time zone "${zone}" for tenant ${clientId} — days answered on UTC; ` +
+    `discounts: unknown store time zone "${zone}" for tenant ${clientId} — answered without its days; ` +
       "every write is refused until the zone is one this runtime knows.",
   );
-  return "UTC";
+  return undefined;
 }
 
 /**
