@@ -98,14 +98,14 @@ export interface DiscountsWindowCopy {
    * store's zone, which it does not know now. `daysUnknown` is the SHORT words:
    * the list's cell and the marker under a row's name on a phone. The cause is
    * said once, above the list (`daysUnknownList`) and above the form's boxes
-   * (`daysUnknownForm`, which also says Salvar is refused and the saved dates
-   * stay); `daysUnknownSave` is that refusal on Salvar. `openTimeZone` labels
-   * the host's optional link to its time-zone setting.
+   * (`daysUnknownForm`, which also says that saving keeps the saved dates —
+   * Salvar is never refused for it, review round 5); `daysUnknown` is also
+   * what the two disabled boxes say. `openTimeZone` labels the host's
+   * optional link to its time-zone setting.
    */
   readonly daysUnknown: string;
   readonly daysUnknownList: string;
   readonly daysUnknownForm: string;
-  readonly daysUnknownSave: string;
   readonly openTimeZone: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;

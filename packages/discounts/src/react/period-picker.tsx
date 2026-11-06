@@ -49,9 +49,11 @@ function afterTap(draft: DateRangeDraft, next: DateRangeDraft): DateRangeDraft {
 function PeriodBoxes({
   copy,
   placement,
+  disabled,
 }: {
   copy: DiscountsWebCopy;
   placement: "beside" | "below";
+  disabled: boolean;
 }): JSX.Element {
   return (
     <Box
@@ -68,7 +70,9 @@ function PeriodBoxes({
           key={name}
           name={name}
           label={copy.form[name]}
-          placeholder={copy.form.datePlaceholder}
+          // Disabled, the box says in words why it is empty.
+          placeholder={disabled ? copy.window.daysUnknown : copy.form.datePlaceholder}
+          disabled={disabled}
           invalidMessage={copy.form.invalidDate}
           incompleteMessage={copy.form.dateIncomplete}
         />
@@ -77,7 +81,20 @@ function PeriodBoxes({
   );
 }
 
-export function PeriodPicker({ copy, wholeDays }: { copy: DiscountsWebCopy; wholeDays: boolean }): JSX.Element {
+export function PeriodPicker({
+  copy,
+  wholeDays,
+  daysUnknown = false,
+}: {
+  copy: DiscountsWebCopy;
+  wholeDays: boolean;
+  /**
+   * The server cannot place the rule's days (FUT-4482, review round 5): the
+   * calendar and both boxes are shown disabled and change nothing; the form
+   * saves the rest over the stored window.
+   */
+  daysUnknown?: boolean;
+}): JSX.Element {
   const { values, setFieldValue } = useFormContext();
   const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
   const names = copy.form.calendar;
@@ -99,7 +116,8 @@ export function PeriodPicker({ copy, wholeDays }: { copy: DiscountsWebCopy; whol
       fullWidth
       openEnd
       dataTestId="discount-period-picker"
-      renderFields={({ placement }) => <PeriodBoxes copy={copy} placement={placement} />}
+      disabled={daysUnknown}
+      renderFields={({ placement, disabled }) => <PeriodBoxes copy={copy} placement={placement} disabled={disabled} />}
       showOutsideDays={false}
       todayIndicator="ring"
       allowSameDayRange={wholeDays}

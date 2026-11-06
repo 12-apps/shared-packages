@@ -190,8 +190,9 @@ export function ComboCapField({ copy }: { copy: DiscountsWebCopy }): JSX.Element
  * The period: the notice when the days are unknown, the picker, the hint.
  *
  * The form's own 16px between the notice and the frame; the hint keeps its
- * 4px under the frame. While the days are unknown the open-ended hint is not
- * said: Salvar is refused then, never "sem prazo" (FUT-4482, review round 4).
+ * 4px under the frame. While the days are unknown the picker is disabled and
+ * the open-ended hint is not said: Salvar keeps the stored window then, never
+ * "sem prazo" (FUT-4482, review rounds 4 and 5).
  */
 function PeriodSection({
   copy,
@@ -215,7 +216,7 @@ function PeriodSection({
         />
       ) : null}
       <Stack spacing={0.5}>
-        <PeriodPicker copy={copy} wholeDays={wholeDays} />
+        <PeriodPicker copy={copy} wholeDays={wholeDays} daysUnknown={daysUnknown} />
         {daysUnknown ? null : <Text variant="caption">{copy.schedule.periodHint}</Text>}
       </Stack>
     </Stack>

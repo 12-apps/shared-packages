@@ -18,13 +18,13 @@ import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 
 /**
- * FUT-4482, review round 4: a rule whose days the server cannot place
- * (`daysUnknown`, the store's zone is not one it knows). The server refuses
- * every write while that holds, so the edit form must not read as "Salvar makes
- * it never-ending": no open-ended hint, a notice that says Salvar is refused
- * and the saved dates stay, and a Salvar that refuses up front — never a write
- * with the two boxes empty. The list says it once above the grid, short in the
- * cell, and under the name where the cell is off-screen.
+ * FUT-4482, review rounds 4 and 5: a rule whose days the server cannot place
+ * (`daysUnknown`, the store's zone is not one it knows). The edit form must
+ * not read as "Salvar makes it never-ending": no open-ended hint, and an amber
+ * notice that says the dates are unavailable and that saving keeps them.
+ * Salvar is never refused for it (round 5, days-unknown-round-five.test.tsx).
+ * The list says it once above the grid, short in the cell, and under the name
+ * where the cell is off-screen.
  */
 
 const copy = PT_BR_DISCOUNTS_WEB_COPY;
@@ -115,15 +115,6 @@ describe("the edit form of a rule whose days are unknown (review round 4)", () =
     mount([PLACED]);
     const period = await openEdit(PLACED.id);
     expect(within(period).getByText(copy.schedule.periodHint)).toBeTruthy();
-  });
-
-  it("refuses Salvar up front, with a sentence, and sends nothing", async () => {
-    const sent = mount([UNKNOWN]);
-    await openEdit(UNKNOWN.id);
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    const refusal = await screen.findByTestId("discount-form-error");
-    expect(refusal.textContent).toContain(copy.window.daysUnknownSave);
-    expect(sent).toEqual([]);
   });
 
   it("has no link without a host action", async () => {

@@ -135,6 +135,12 @@ export interface DiscountFormPayload {
    * submit.
    */
   schedule: DiscountSchedule | null;
+  /**
+   * The form could not show the rule's days (`daysUnknown`, FUT-4482, review
+   * round 5): the dates are NOT sent, and the server keeps the stored window
+   * while it writes every other field. Only an edit sends it.
+   */
+  keepWindow?: boolean;
 }
 
 /** A money amount as integer cents, or null when blank. */
@@ -173,8 +179,16 @@ export function toWriteBody(
   input: DiscountFormPayload,
   formatters: DiscountsFormatters,
 ): Record<string, unknown> {
+  const body = wholeWriteBody(input, formatters);
+  return input.keepWindow === true ? keepingWindow(body) : body;
+}
+
+function wholeWriteBody(
+  input: DiscountFormPayload,
+  formatters: DiscountsFormatters,
+): Record<string, unknown> {
   const isCombo = input.scope === "COMBO";
-  return {
+  const body = {
     name: input.name.trim(),
     type: input.type,
     // Exactly one value column, chosen by the TYPE, with the other three
@@ -213,6 +227,15 @@ export function toWriteBody(
     categoryIds: input.scope === "CATEGORY" ? input.categoryIds : [],
     menuItemIds: input.scope === "ITEM" ? input.menuItemIds : [],
   };
+  return body;
+}
+
+/** The body with no dates and the word to keep the stored ones: the two empty boxes are not "sem prazo". */
+function keepingWindow(body: Record<string, unknown>): Record<string, unknown> {
+  const kept: Record<string, unknown> = { ...body, keepWindow: true };
+  delete kept.startsAt;
+  delete kept.endsAt;
+  return kept;
 }
 
 /** The bound wire client the screens use. Nothing else performs I/O. */

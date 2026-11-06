@@ -146,14 +146,11 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
-    // Days the server cannot place (FUT-4482): it refuses every write until
-    // the store's zone is fixed, and the boxes are empty only because the days
-    // could not be shown — sending them would read as "sem prazo" the moment
-    // the zone came back. Refused here, with what stays true: nothing changed.
-    if (editing?.daysUnknown === true) {
-      setError(copy.window.daysUnknownSave);
-      return;
-    }
+    // Days the server cannot place (FUT-4482): the boxes are empty only
+    // because the days could not be shown, so they are not sent — that would
+    // read as "sem prazo". Everything else is saved over the stored window
+    // (`keepWindow`); an edit is never refused for it (review round 5).
+    const keepWindow = editing?.daysUnknown === true;
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -183,6 +180,7 @@ function makeSubmit(
       stackable: extra.stackable,
       firstOrderOnly: extra.firstOrderOnly,
       active: extra.active,
+      ...(keepWindow ? { keepWindow } : {}),
     };
     const result = editing
       ? await api.update(editing.id, payload)

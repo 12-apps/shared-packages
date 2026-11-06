@@ -18,10 +18,13 @@ import type { DiscountsWebCopy } from "./copy";
 /**
  * Where the host's own time-zone setting is (review round 4): a route, or a
  * handler for a host that opens it some other way. Optional — without it the
- * notice names the cause and offers no link. The label is the packs'
+ * notice names the cause and offers no link. One or the other, never both —
+ * which would win is a guess (review round 5). The label is the packs'
  * `window.openTimeZone`, never the host's: copy ships bilingual.
  */
-export type DiscountsTimeZoneSettings = { href: string } | { onClick: () => void };
+export type DiscountsTimeZoneSettings =
+  | { href: string; onClick?: never }
+  | { onClick: () => void; href?: never };
 
 function SettingsLink({
   settings,
@@ -31,7 +34,7 @@ function SettingsLink({
   label: string;
 }): JSX.Element {
   const look = { color: "inherit", fontWeight: 600, alignSelf: "flex-start" } as const;
-  if ("href" in settings) {
+  if (settings.href !== undefined) {
     return (
       <Link href={settings.href} underline="always" sx={look} data-testid="discounts-open-time-zone">
         {label}
