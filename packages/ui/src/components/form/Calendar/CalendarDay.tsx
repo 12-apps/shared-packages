@@ -195,6 +195,8 @@ export const CalendarDay: FC<CalendarDayProps> = ({
   return (
     <Box
       component="button"
+      // A day picks; it never submits the form a calendar sits in (FUT-4156).
+      type="button"
       role="gridcell"
       tabIndex={focused ? 0 : -1}
       aria-selected={day.selected}
