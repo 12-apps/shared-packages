@@ -13,6 +13,13 @@
 // host ports. Additive: the hand-composing path is unchanged.
 // ---------------------------------------------------------------------------
 export { createPaymentFlows } from './create-payment-flows';
+// The factory over the props a hand-composing host already builds (FUT-1241):
+// how a host moves one lane at a time without the two mounts drifting.
+export {
+  createCheckoutPropsBinding,
+  type CheckoutPropsBinding,
+  type CheckoutPropsBindingBase,
+} from './checkout-props-binding';
 // A type and nothing else now: `DEFAULT_CHECKOUT_COPY_FE` used to sit beside it
 // and was the only value this module ever published (FUT-760).
 export type { CheckoutCopyFE } from './copy';
