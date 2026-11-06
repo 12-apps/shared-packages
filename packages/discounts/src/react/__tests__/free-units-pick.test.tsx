@@ -18,8 +18,18 @@ import { STORY_GROUPS } from "../__stories__/fixtures";
  * file-wide, which is why this lives in its own file.
  */
 vi.mock("../target-picker-field", () => ({
-  TargetPickerField: ({ onChange, dataTestId }: { onChange: (next: string[]) => void; dataTestId?: string }) => (
-    <button type="button" data-testid={`${dataTestId ?? "picker"}-pick`} onClick={() => onChange(["m-burger"])}>
+  TargetPickerField: ({
+    onChange,
+    dataTestId,
+  }: {
+    onChange: (next: string[]) => void;
+    dataTestId?: string;
+  }) => (
+    <button
+      type="button"
+      data-testid={`${dataTestId ?? "picker"}-pick`}
+      onClick={() => onChange(["m-burger"])}
+    >
       pick
     </button>
   ),
@@ -37,34 +47,47 @@ const transport: DiscountsTransport = {
     url.includes("/discounts/targets")
       ? Promise.resolve({ data: STORY_GROUPS } as T)
       : Promise.resolve({ data: [], pagination: {} } as T),
-  send: <T,>(): Promise<DiscountsResult<T>> => Promise.resolve({ ok: true, data: null as T }),
+  send: <T,>(): Promise<DiscountsResult<T>> =>
+    Promise.resolve({ ok: true, data: null as T }),
 };
+
+function renderForm(): void {
+  render(
+    <DiscountForm
+      api={createDiscountsApiClient("/api/admin/loja", transport, formatters)}
+      copy={copy}
+      formatters={formatters}
+      currencyField={PlainCurrency}
+      groups={STORY_GROUPS}
+      editing={null}
+      onSaved={() => {}}
+      onError={() => {}}
+    />,
+  );
+}
 
 describe("FUT-4441: a pick through the form clears the product refusal", () => {
   it("drops the product line and the error toast once a product is picked", async () => {
-    render(
-      <DiscountForm
-        api={createDiscountsApiClient("/api/admin/loja", transport, formatters)}
-        copy={copy}
-        formatters={formatters}
-        currencyField={PlainCurrency}
-        groups={STORY_GROUPS}
-        editing={null}
-        onSaved={() => {}}
-        onError={() => {}}
-      />,
-    );
+    renderForm();
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
     await screen.findByTestId("free-units-builder");
     // Everything else valid, so the product list is the ONE refusal and the
     // toast stands or falls with it.
-    fireEvent.change(screen.getByLabelText(copy.form.name), { target: { value: "Leve 3 pague 2" } });
-    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "3" } });
-    fireEvent.change(screen.getByTestId("free-units-free"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(copy.form.name), {
+      target: { value: "Leve 3 pague 2" },
+    });
+    fireEvent.change(screen.getByTestId("free-units-quantity"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByTestId("free-units-free"), {
+      target: { value: "1" },
+    });
 
     fireEvent.click(screen.getByTestId("discount-form-submit"));
     expect(await screen.findByTestId("free-units-message")).toBeTruthy();
-    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy(),
+    );
 
     fireEvent.click(screen.getByTestId("free-units-items-pick"));
 
@@ -72,5 +95,30 @@ describe("FUT-4441: a pick through the form clears the product refusal", () => {
       expect(screen.queryByTestId("free-units-message")).toBeNull();
       expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull();
     });
+  });
+
+  it("keeps a quantity refusal, and its toast, after the pick", async () => {
+    renderForm();
+    fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
+    await screen.findByTestId("free-units-builder");
+    fireEvent.change(screen.getByLabelText(copy.form.name), {
+      target: { value: "Leve 3 pague 2" },
+    });
+    fireEvent.change(screen.getByTestId("free-units-quantity"), {
+      target: { value: "0" },
+    });
+
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    expect(await screen.findByTestId("free-units-message")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("free-units-items-pick"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("free-units-message")).toBeNull();
+    });
+    expect(
+      screen.getAllByText(copy.form.invalidComboQuantity).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
   });
 });
