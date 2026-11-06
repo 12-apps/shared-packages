@@ -86,7 +86,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   // when it is not running yet.
   window: {
     daysUnknown: "Dates unavailable",
-    daysUnknownList: "Dates unavailable on some promotions: the store's time zone was not recognised.",
+    daysUnknownList: "Dates unavailable on some promotions and locked on all: the store's time zone was not recognised.",
     daysUnknownForm:
       "Dates unavailable: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
     daysUnknownBoxes: "No dates: see the notice above.",
@@ -94,6 +94,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     datesLockedForm:
       "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
     datesLockedBoxes: "Dates locked: see the notice above.",
+    datesLockedList: "Dates locked: the store's time zone was not recognised. Saving keeps the saved dates as they are.",
     openTimeZone: "View the store's time zone",
     always: "No end date",
     from: "From {date}",

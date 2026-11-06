@@ -265,6 +265,12 @@ interface ScheduleState {
   enabled: boolean;
   schedule: DiscountSchedule;
   wholeDays?: boolean;
+  /**
+   * The period cannot change (a `datesLock`, FUT-4482, review round 9): its
+   * boxes hold the stored days and are not sent, so no rule of theirs may
+   * block a save — a locked box the operator cannot fix must never be red.
+   */
+  datesLocked?: boolean;
 }
 
 export function validate(
@@ -295,7 +301,7 @@ export function validate(
   if (scope === "ITEM" && targets.menuItemIds.length === 0) {
     errors.scope = copy.form.itemTargetRequired;
   }
-  Object.assign(errors, checkPeriod(values, copy, scheduleState.wholeDays ?? false));
+  if (scheduleState.datesLocked !== true) Object.assign(errors, checkPeriod(values, copy, scheduleState.wholeDays ?? false));
   return errors;
 }
 

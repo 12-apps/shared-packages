@@ -203,6 +203,16 @@ is the host's to report if it wants to.
 
 ## Whole days, in the store's zone — `storeTimeZone`
 
+> **Upgrading to this version: every host syncs the partial and runs migration
+> `20261106140000_discount_window_in_zone` — including a host that never passes
+> `storeTimeZone`.** Every write now carries `DiscountScalars.windowInZone`
+> (`false` without a zone), so a store that spreads the scalars writes the
+> `window_in_zone` column whether or not whole days are on; without the column
+> every create and update fails. The migration is additive (default `false`)
+> and safe to deploy before the code: `pnpm --filter @12-apps/discounts
+> prisma:sync`, then the host's own `migrate deploy`. Map the column back into
+> `DiscountRecord.windowInZone` in the same release (see below).
+
 Início and Término are calendar DAYS, and an operator means them whole on the
 store's clock (FUT-4482): Início 10/11 applies from 00:00 on the 10th, Término
 20/11 until the last instant of the 20th. Only the host knows a store's zone,
@@ -231,10 +241,15 @@ the days it runs on there, and the admin form and grid read those back.
 (review round 8, ADR 0186). A read answers EVERY row with `datesLocked: true`
 and logs a warning: a `windowInZone: false` (legacy) row still carries its UTC
 days in `startsOn` / `endsOn`, and a row written in the zone has none to show,
-so it carries `daysUnknown: true` in their place, never guessed days. The form
-then shows the calendar and both boxes disabled — holding the legacy row's
-days, empty on a `daysUnknown` one — and one amber notice above them saying the
-dates cannot change and that saving keeps them; its Salvar sends
+so it carries `daysUnknown: true` in their place, never guessed days — unless it
+has no bounds at all, which reads as `startsOn` / `endsOn` null ("sem prazo"):
+an open window needs no clock (review round 9). The form then shows the
+calendar and both boxes locked — the legacy row's days in read-only boxes, in
+the input's ordinary ink, and in-range days in the secondary ink; empty,
+disabled boxes on a `daysUnknown` one — and one amber notice above them saying
+the dates cannot change and that saving keeps them. The list says one amber
+notice too, whenever any row is locked. No date rule of the form's runs on
+locked boxes, so they can never block a save. Its Salvar sends
 `keepWindow: true` with no dates, and the PATCH writes every other field — a
 pause, a rename, a new value — over the STORED `startsAt` / `endsAt` /
 `windowInZone`, without asking the zone anything. `keepWindow` sent beside a
@@ -255,8 +270,18 @@ whole days in a known zone; with the zone unknown they are refused, on ANY row
 and on a create, with a 422 on the date field and `copy.datesNeedKnownZone`
 (required once the zone is passed): a day cannot be placed without the zone —
 a whole-day Término is inclusive, and a legacy UTC midnight would drop it. Only
-the day the server cannot place is refused, never the edit, and the screen
-never offers one.
+the day the server cannot place is refused, never the edit. On an edit the
+screen never offers one: the dates are locked. A create cannot be locked — no
+row was read, so the form does not know the zone is unknown — so a create that
+sends dates under an unknown zone gets that date-field 422, and a create with
+no dates ("sem prazo") is stored once and answered 200 with `datesLocked`.
+
+**A form opened before the zone turned unknown** saves too (review round 9,
+N4). With `wholeDays`, an edit whose Início and Término are the ones it opened
+with sends `keepWindow` instead of the days, so the save needs no clock and
+cannot be refused for dates nobody changed; under a known zone the server
+wrote the stored window for equal days anyway. Only CHANGED dates get the
+date-field 422 then, and putting them back saves.
 
 A row the store answers without `windowInZone` reads as legacy, and so is
 locked with its UTC days under an unknown zone. A null or blank answer for a tenant fails every route —
@@ -497,6 +522,8 @@ schema folder and discovers the migration structurally:
 ```bash
 pnpm --filter @12-apps/discounts prisma:sync         # copy the partial
 pnpm --filter @12-apps/discounts prisma:sync:check   # drift gate, for CI
+# then the host's own migrate deploy: 20261106140000_discount_window_in_zone is
+# required by every host from this version on, storeTimeZone or not
 ```
 
 Three tables — `discounts`, `discount_combo_slots`, `discount_targets` — and

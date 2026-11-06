@@ -20,6 +20,7 @@ const WINDOW_KEYS: readonly DiscountsWindowFallbackKey[] = [
   "daysUnknownPaused",
   "datesLockedForm",
   "datesLockedBoxes",
+  "datesLockedList",
   "openTimeZone",
 ];
 

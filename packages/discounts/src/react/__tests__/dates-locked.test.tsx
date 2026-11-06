@@ -98,12 +98,14 @@ const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement
 };
 
 describe("a legacy row read with datesLocked (review round 8)", () => {
-  it("shows its days in the disabled boxes and calendar, under the locked notice", async () => {
+  // Round 9: the boxes are read-only rather than disabled, so the days read
+  // in the input's ink (dates-locked-round-nine); they still change nothing.
+  it("shows its days in the locked boxes and the disabled calendar, under the locked notice", async () => {
     mount([LOCKED]);
     const period = await openEdit(LOCKED.id);
     expect([box(period, "startsAt").value, box(period, "endsAt").value]).toEqual(["10/11/2026", "20/11/2026"]);
-    expect(box(period, "startsAt").disabled).toBe(true);
-    expect(box(period, "endsAt").disabled).toBe(true);
+    expect(box(period, "startsAt").readOnly).toBe(true);
+    expect(box(period, "endsAt").readOnly).toBe(true);
     const days = within(period).getAllByRole("gridcell").filter((cell) => cell.getAttribute("data-in-month") === "true");
     expect(days.every((cell) => cell.getAttribute("aria-disabled") === "true")).toBe(true);
     fireEvent.click(days[14]!);

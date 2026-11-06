@@ -132,6 +132,22 @@ export interface DiscountFormProps {
 }
 
 /**
+ * An edit whose dates are the ones it opened with (review round 9, N4): the
+ * stored window is kept (`keepWindow`) rather than re-sent as days. Where the
+ * server counts whole days its zone can turn unknown while the form is open,
+ * and re-sent days would then be refused on the date field — a save the
+ * operator never asked to change the dates of, refused for them. Kept, the
+ * save needs no clock; under a known zone the server wrote the same stored
+ * window for equal days anyway. Only with `wholeDays`: elsewhere no zone is
+ * ever asked, and the body stays as it always was.
+ */
+function keepsUnchangedDays(props: DiscountFormProps, values: DiscountFormValues): boolean {
+  if (props.editing === null || props.wholeDays !== true) return false;
+  const opened = initialValues(props.editing, props.formatters);
+  return values.startsAt === opened.startsAt && values.endsAt === opened.endsAt;
+}
+
+/**
  * Build the submit handler.
  *
  * A factory rather than a closure inside the component, so the component stays
@@ -150,7 +166,8 @@ function makeSubmit(
     // empty boxes sent would read as "sem prazo"), or shown and locked while
     // the store's zone is unknown (round 8). They are not sent; everything
     // else is saved over the stored window (`keepWindow`), never refused.
-    const keepWindow = datesLockOf(editing) !== null;
+    const locked = datesLockOf(editing) !== null;
+    const keepWindow = locked || keepsUnchangedDays(props, values);
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -160,6 +177,7 @@ function makeSubmit(
       enabled: extra.scheduleEnabled,
       schedule: extra.schedule,
       wholeDays: props.wholeDays ?? false,
+      datesLocked: locked,
     });
     if (Object.keys(invalid).length > 0) {
       // ONE message for a client refusal: the red fields and the toast

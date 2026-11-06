@@ -82,6 +82,8 @@ function PeriodBoxes({
             // says why, in readable ink, and describes each box (round 6).
             placeholder={disabled ? "" : copy.form.datePlaceholder}
             disabled={disabled}
+            // Holding stored days (round 9): read-only, the value in the input's ink.
+            readOnly={datesLock === "shown"}
             {...(disabled ? { describedBy: UNAVAILABLE_LINE_ID } : {})}
             invalidMessage={copy.form.invalidDate}
             incompleteMessage={copy.form.dateIncomplete}

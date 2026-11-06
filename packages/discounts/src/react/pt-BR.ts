@@ -77,7 +77,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
   },
   window: {
     daysUnknown: "Datas indisponíveis",
-    daysUnknownList: "Datas indisponíveis em algumas promoções: o fuso horário da loja não foi reconhecido.",
+    daysUnknownList: "Datas indisponíveis em algumas promoções e bloqueadas em todas: o fuso horário da loja não foi reconhecido.",
     daysUnknownForm:
       "Datas indisponíveis: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
     daysUnknownBoxes: "Sem datas: veja o aviso acima.",
@@ -85,6 +85,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     datesLockedForm:
       "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
     datesLockedBoxes: "Datas bloqueadas: veja o aviso acima.",
+    datesLockedList: "Datas bloqueadas: o fuso horário da loja não foi reconhecido. As datas salvas não mudam ao salvar.",
     openTimeZone: "Ver fuso horário da loja",
     always: "Sem prazo",
     from: "A partir de {date}",

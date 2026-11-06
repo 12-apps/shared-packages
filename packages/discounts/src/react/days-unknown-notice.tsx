@@ -91,22 +91,36 @@ export function DaysUnknownNotice({
   );
 }
 
-/** One notice above the list whenever any row's days are unknown; nothing otherwise. */
+/** What a row tells the list notice: days it cannot show, or days it cannot change. */
+type LockedRow = { record: { daysUnknown?: boolean | undefined; datesLocked?: boolean | undefined } };
+
+/**
+ * The list notice's words, or null for none. Days unknown on any row say so
+ * (and that every row is locked); otherwise a row whose days show but cannot
+ * change — a legacy row under an unknown zone (review round 9) — says that.
+ */
+function listNoticeMessage(rows: readonly LockedRow[], copy: CompleteDiscountsWebCopy): string | null {
+  if (rows.some((row) => row.record.daysUnknown === true)) return copy.window.daysUnknownList;
+  return rows.some((row) => row.record.datesLocked === true) ? copy.window.datesLockedList : null;
+}
+
+/** One notice above the list whenever any row's days are unknown or locked; nothing otherwise. */
 export function DaysUnknownListNotice({
   rows,
   copy,
   timeZoneSettings,
 }: {
-  rows: readonly { record: { daysUnknown?: boolean | undefined } }[];
+  rows: readonly LockedRow[];
   copy: CompleteDiscountsWebCopy;
   timeZoneSettings?: DiscountsTimeZoneSettings | undefined;
 }): JSX.Element | null {
-  if (!rows.some((row) => row.record.daysUnknown === true)) return null;
+  const message = listNoticeMessage(rows, copy);
+  if (message === null) return null;
   return (
     <Box sx={{ marginBottom: 2 }}>
       <DaysUnknownNotice
         copy={copy}
-        message={copy.window.daysUnknownList}
+        message={message}
         timeZoneSettings={timeZoneSettings}
         dataTestId="discounts-days-unknown-notice"
       />

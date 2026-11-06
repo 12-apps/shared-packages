@@ -102,7 +102,7 @@ export interface DiscountsWindowCopy {
    * `daysUnknownBoxes`, the boxes' description, points at it (round 7). `daysUnknownPaused` is the phone
    * marker of a rule that is also not active; `openTimeZone` labels the host's
    * link to its time-zone setting; `datesLocked*` (round 8) are the form's two
-   * for days shown but locked. OPTIONAL, every one (round 6): a pack without
+   * for days shown but locked, `datesLockedList` (round 9) the list's. OPTIONAL, every one (round 6): a pack without
    * one is answered from the package's pack for the host's `locale`.
    */
   readonly daysUnknown?: string;
@@ -112,6 +112,7 @@ export interface DiscountsWindowCopy {
   readonly daysUnknownPaused?: string;
   readonly datesLockedForm?: string;
   readonly datesLockedBoxes?: string;
+  readonly datesLockedList?: string;
   readonly openTimeZone?: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;

@@ -50,7 +50,7 @@ export interface DiscountWireRecord {
    * The server counts whole days and the store's zone is unknown to it now
    * (FUT-4482, review round 8), said on every row then: the days shown — a
    * legacy row's, none on a `daysUnknown` one — cannot change. The form shows
-   * them disabled and saves the rest with `keepWindow`.
+   * them locked (read-only boxes holding days, round 9) and saves the rest with `keepWindow`.
    */
   datesLocked?: boolean;
   /** The weekly schedule (FUT-996), or null for "always". */

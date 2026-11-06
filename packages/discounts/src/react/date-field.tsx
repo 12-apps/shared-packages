@@ -112,6 +112,37 @@ const DISABLED_BOX: SxProps<Theme> = {
   },
 };
 
+/**
+ * A box that HOLDS days it cannot change (review round 9): read-only, with the
+ * locked fill and edge of a disabled one, but its value in the ordinary input
+ * ink. MUI's disabled ink (`text.disabled`) put a stored date at 1.59:1, read
+ * as a placeholder; the value is the one fact the box still states.
+ */
+const READ_ONLY_BOX: SxProps<Theme> = {
+  "& .MuiOutlinedInput-root": { backgroundColor: "action.disabledBackground", cursor: "default" },
+  "& .MuiOutlinedInput-root:not(.Mui-focused) fieldset, & .MuiOutlinedInput-root:not(.Mui-focused):hover fieldset": {
+    borderColor: "action.disabled",
+  },
+  "& input": { color: "text.primary", WebkitTextFillColor: "currentColor", cursor: "default" },
+};
+
+/** The box's look: read-only holding days, disabled and empty, or live. */
+const boxLook = (readOnly: boolean, disabled: boolean): SxProps<Theme> =>
+  readOnly ? READ_ONLY_BOX : disabled ? DISABLED_BOX : {};
+
+/** What the `<input>` itself carries beyond its value. */
+function inputAttributes(testId: string, readOnly: boolean, describedBy: string | undefined) {
+  return {
+    inputMode: "numeric" as const,
+    maxLength: 10,
+    autoComplete: "off",
+    "data-testid": testId,
+    // On the <input> itself: the text field takes no root `readOnly`.
+    ...(readOnly ? { readOnly: true } : {}),
+    ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+  };
+}
+
 /** A form-bound day: the value is ISO when whole and real, the typed text otherwise. */
 export function DateField({
   name,
@@ -120,6 +151,7 @@ export function DateField({
   invalidMessage,
   incompleteMessage,
   disabled = false,
+  readOnly = false,
   describedBy,
 }: {
   name: string;
@@ -130,6 +162,12 @@ export function DateField({
   incompleteMessage: string;
   /** Shown, never editable — the days cannot be placed (FUT-4482, review round 5). */
   disabled?: boolean;
+  /**
+   * Shown, never editable, and still READ (review round 9): the days are
+   * stored but cannot change. Focusable and announced as read-only, its value
+   * in the ordinary ink — never MUI's disabled grey.
+   */
+  readOnly?: boolean;
   /** The id of a line elsewhere that describes this box (review round 6: why it is disabled). */
   describedBy?: string;
 }): JSX.Element {
@@ -144,25 +182,21 @@ export function DateField({
       <FormLabel htmlFor={name} error={message !== undefined}>
         {label}
       </FormLabel>
-      <Box data-testid={`${testId}-box`} sx={disabled ? DISABLED_BOX : {}}>
+      <Box data-testid={`${testId}-box`} sx={boxLook(readOnly, disabled)}>
         <Input
           id={name}
           name={name}
           type="text"
           placeholder={placeholder}
-          disabled={disabled}
+          disabled={disabled && !readOnly}
           value={shown}
           error={message !== undefined}
-          inputProps={{
-            inputMode: "numeric",
-            maxLength: 10,
-            autoComplete: "off",
-            "data-testid": testId,
-            ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
-          }}
+          inputProps={inputAttributes(testId, readOnly, describedBy)}
           data-testid={testId}
           onBlur={() => setLeft(true)}
           onChange={(event) => {
+            // A browser types nothing into a read-only box; a script's change event is refused the same.
+            if (readOnly) return;
             setLeft(false);
             const masked = maskDate(event.target.value, shown);
             setFieldValue(name, maskedToIso(masked) ?? masked);

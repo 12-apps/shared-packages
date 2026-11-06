@@ -207,11 +207,15 @@ describe("Salvar while the days are unknown (review round 5)", () => {
     expect(sent[0]).not.toHaveProperty("startsAt");
   });
 
-  it("sends the dates, and no marker, for a rule whose days are known", async () => {
+  // Round 9 (N4): days left as they opened are kept (`keepWindow`, see
+  // dates-locked-round-nine), so the dates are sent once the operator CHANGES them.
+  it("sends changed dates, and no marker, for a rule whose days are known", async () => {
     const sent = mount([PLACED]);
-    await openEdit(PLACED.id);
+    const period = await openEdit(PLACED.id);
+    const endsAt = within(period).getByTestId("total-form-field-endsAt");
+    fireEvent.change(endsAt.querySelector("input") ?? endsAt, { target: { value: "25/11/2026" } });
     await saveAndClose();
-    expect(sent[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-20" });
+    expect(sent[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-25" });
     expect(sent[0]).not.toHaveProperty("keepWindow");
   });
 });
