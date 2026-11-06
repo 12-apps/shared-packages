@@ -187,3 +187,33 @@ describe("the calendar as prototype B draws it", () => {
     );
   });
 });
+
+describe("a tap with only Término chosen, as prototype B's pick() does it", () => {
+  // B (`Quando.dc.html`, pick): with Término alone, a tap before it is Início
+  // and Término stays (W5); a tap ON or AFTER it is a new Início and Término
+  // is cleared — `e: (ek && !sk && ek > k) ? st.e : ''`.
+  const ENDS_20_11 = { startsOn: null, endsOn: "2026-11-20", startsAt: null, endsAt: "2026-11-21T03:00:00.000Z" };
+
+  it("W11: a tap on Término's own day makes it Início and clears Término", async () => {
+    openForm(ENDS_20_11, true);
+    fireEvent.click(cellOf(20));
+    await waitFor(() => expect(box("startsAt").value).toBe("20/11/2026"));
+    expect(box("endsAt").value).toBe("");
+  });
+
+  it("W12: a tap after Término makes it Início and clears Término", async () => {
+    openForm(ENDS_20_11, true);
+    fireEvent.click(cellOf(25));
+    await waitFor(() => expect(box("startsAt").value).toBe("25/11/2026"));
+    expect(box("endsAt").value).toBe("");
+  });
+});
+
+describe("the frame meets the section's edges (round 2)", () => {
+  it("W13: spans the section rather than hugging its month", () => {
+    openForm(STARTS_10_11);
+    const frame = within(period()).getByTestId("calendar-container").parentElement!.parentElement!;
+    expect(getComputedStyle(frame).alignSelf).toBe("stretch");
+    expect(getComputedStyle(within(period()).getByTestId("calendar-container")).width).toBe("100%");
+  });
+});

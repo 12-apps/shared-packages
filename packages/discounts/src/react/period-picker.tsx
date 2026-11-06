@@ -37,6 +37,8 @@ const dayOf = (value: string | undefined): string | null =>
  * Where a tap leaves the period. The calendar's own step, with one addition
  * the prototype draws: with only Término chosen, a tap before it is Início and
  * Término stays — the calendar alone would start a fresh range and drop it.
+ * A tap on or after Término is a new Início and clears Término, as B's own
+ * `pick` does.
  */
 function afterTap(draft: DateRangeDraft, next: DateRangeDraft): DateRangeDraft {
   const keepsEnd =
@@ -92,6 +94,9 @@ export function PeriodPicker({ copy, wholeDays }: { copy: DiscountsWebCopy; whol
       quickRanges={[]}
       numberOfMonths={2}
       fieldsPlacement="beside"
+      // The frame meets the section's edges at every width; the boxes' column
+      // stops at 320 beside the months (FUT-4156, round 2).
+      fullWidth
       openEnd
       dataTestId="discount-period-picker"
       renderFields={({ placement }) => <PeriodBoxes copy={copy} placement={placement} />}
