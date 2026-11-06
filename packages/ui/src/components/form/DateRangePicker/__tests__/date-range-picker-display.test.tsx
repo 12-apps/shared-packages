@@ -111,6 +111,21 @@ describe("today's mark", () => {
   it('is a ring in the primary colour with todayIndicator="ring"', () => {
     expect(todayFace('ring')).toMatch(/box-shadow:inset 0 0 0 [\d.]+rem #/u);
   });
+
+  it('is left off a range endpoint, which is already filled in that colour', () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    render(<Calendar ariaLabel="c" selectionMode="range" numberOfMonths={1} todayIndicator="ring" range={{ start: today, end: null }} />);
+    const cell = screen.getByTestId('calendar-today').parentElement!;
+    expect(cell.className).toMatch(/range-start|selected/u);
+    const rules = [...document.querySelectorAll('style')].map((tag) => tag.textContent ?? '').join('\n');
+    const face = cell.className
+      .split(' ')
+      .filter((name) => name.startsWith('css-'))
+      .map((name) => rules.split(`.${name}::before{`)[1]?.split('}')[0] ?? '')
+      .join('');
+    expect(face).not.toMatch(/inset 0 0 0/u);
+  });
 });
 
 describe('a tap the consumer completes differently', () => {
