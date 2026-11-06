@@ -76,7 +76,12 @@ export const PT_BR_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
     },
   },
   window: {
-    daysUnknown: "Datas indisponíveis — confira o fuso horário da loja.",
+    daysUnknown: "Datas indisponíveis",
+    daysUnknownList: "Datas indisponíveis em algumas promoções: o fuso horário da loja não foi reconhecido.",
+    daysUnknownForm:
+      "Datas indisponíveis: o fuso horário da loja não foi reconhecido. Até corrigi-lo, esta promoção não pode ser salva — as datas salvas não mudam.",
+    daysUnknownSave: "Corrija o fuso horário da loja para salvar esta promoção. As datas salvas não mudaram.",
+    openTimeZone: "Abrir fuso horário",
     always: "Sem prazo",
     from: "A partir de {date}",
     until: "Até {date}",

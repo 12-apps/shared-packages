@@ -2,7 +2,6 @@
 
 import type { JSX } from "react";
 
-import { Alert } from "@12-apps/ui/data-display/Alert";
 import { FormControl, FormLabel } from "@12-apps/ui/form/Form";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
@@ -14,6 +13,7 @@ import { DISCOUNT_TRIGGERS } from "../engine/kinds";
 import type { DiscountSchedule } from "../engine/schedule";
 
 import type { DiscountsWebCopy } from "./copy";
+import { DaysUnknownNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { ComboRewardFields } from "./combo-reward-fields";
 import { isComboKind, SELECTABLE_DISCOUNT_SCOPES } from "./form-kind";
 import { PercentField, WholeNumberField } from "./number-fields";
@@ -204,6 +204,7 @@ export function WindowFields({
   copy,
   wholeDays,
   daysUnknown = false,
+  timeZoneSettings,
   schedule,
   scheduleEnabled,
   timezoneLabel,
@@ -215,6 +216,8 @@ export function WindowFields({
   wholeDays: boolean;
   /** The server could not place the edited rule's days (FUT-4482): empty boxes, and this said. */
   daysUnknown?: boolean;
+  /** The host's link to its time-zone setting, shown in that notice when given. */
+  timeZoneSettings?: DiscountsTimeZoneSettings | undefined;
   schedule: DiscountSchedule;
   scheduleEnabled: boolean;
   timezoneLabel: string | null;
@@ -232,12 +235,22 @@ export function WindowFields({
   return (
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
-      <Stack spacing={0.5} data-testid="discount-period">
+      {/* The form's own 16px between the notice and the frame; the hint keeps
+          its 4px under the frame. While the days are unknown the open-ended
+          hint is not said: Salvar is refused then, never "sem prazo". */}
+      <Stack spacing={2} data-testid="discount-period">
         {daysUnknown ? (
-          <Alert variant="warning" animate={false} description={copy.window.daysUnknown} data-testid="discount-days-unknown" />
+          <DaysUnknownNotice
+            copy={copy}
+            message={copy.window.daysUnknownForm}
+            timeZoneSettings={timeZoneSettings}
+            dataTestId="discount-days-unknown"
+          />
         ) : null}
-        <PeriodPicker copy={copy} wholeDays={wholeDays} />
-        <Text variant="caption">{copy.schedule.periodHint}</Text>
+        <Stack spacing={0.5}>
+          <PeriodPicker copy={copy} wholeDays={wholeDays} />
+          {daysUnknown ? null : <Text variant="caption">{copy.schedule.periodHint}</Text>}
+        </Stack>
       </Stack>
       <FormControl>
         <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>

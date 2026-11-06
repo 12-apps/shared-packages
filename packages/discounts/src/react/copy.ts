@@ -94,11 +94,19 @@ export interface DiscountsVocabularyCopy {
 /** The validity sentence, in all four shapes a nullable window can take. */
 export interface DiscountsWindowCopy {
   /**
-   * In place of the period, in the list and above the form's empty boxes, when
-   * the server cannot place a rule's days (FUT-4482): it was written in the
-   * store's zone and that zone is not one the server knows now.
+   * When the server cannot place a rule's days (FUT-4482) — written in the
+   * store's zone, which it does not know now. `daysUnknown` is the SHORT words:
+   * the list's cell and the marker under a row's name on a phone. The cause is
+   * said once, above the list (`daysUnknownList`) and above the form's boxes
+   * (`daysUnknownForm`, which also says Salvar is refused and the saved dates
+   * stay); `daysUnknownSave` is that refusal on Salvar. `openTimeZone` labels
+   * the host's optional link to its time-zone setting.
    */
   readonly daysUnknown: string;
+  readonly daysUnknownList: string;
+  readonly daysUnknownForm: string;
+  readonly daysUnknownSave: string;
+  readonly openTimeZone: string;
   /** Neither bound set — it runs until somebody stops it. */
   readonly always: string;
   /** Only a start. `{date}`. */

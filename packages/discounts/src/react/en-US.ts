@@ -85,7 +85,12 @@ export const EN_US_DISCOUNTS_WEB_COPY: DiscountsWebCopy = {
   // promotion has no start or no end, and those mean very different things
   // when it is not running yet.
   window: {
-    daysUnknown: "Dates unavailable — check the store's time zone.",
+    daysUnknown: "Dates unavailable",
+    daysUnknownList: "Dates unavailable on some promotions: the store's time zone was not recognised.",
+    daysUnknownForm:
+      "Dates unavailable: the store's time zone was not recognised. Until it is fixed, this promotion can't be saved — its saved dates stay as they are.",
+    daysUnknownSave: "Fix the store's time zone to save this promotion. Its saved dates have not changed.",
+    openTimeZone: "Open time zone",
     always: "No end date",
     from: "From {date}",
     until: "Until {date}",

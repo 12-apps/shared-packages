@@ -11,6 +11,7 @@ import type { DropdownMenuItem } from "@12-apps/ui/navigation/DropdownMenu";
 
 import type { DiscountsApiClient, WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountDialog } from "./discount-dialog";
 import { DiscountForm } from "./discount-form";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
@@ -51,6 +52,8 @@ export interface DiscountActionsMenuProps {
   timezoneLabel?: string;
   /** Whether the server counts the period's days whole (FUT-4482). */
   wholeDays?: boolean;
+  /** The host's link to its time-zone setting (FUT-4482, review round 4). */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
 }
 
 /**
@@ -91,6 +94,7 @@ export function DiscountActionsMenu({
   onError,
   timezoneLabel,
   wholeDays,
+  timeZoneSettings,
 }: DiscountActionsMenuProps): JSX.Element {
   const { onRefresh } = useCardActions();
   const [editOpen, setEditOpen] = useState(false);
@@ -147,6 +151,7 @@ export function DiscountActionsMenu({
             onError={onError}
             {...(timezoneLabel ? { timezoneLabel } : {})}
             {...(wholeDays ? { wholeDays } : {})}
+            {...(timeZoneSettings ? { timeZoneSettings } : {})}
             onSaved={() => {
               setEditOpen(false);
               onRefresh();

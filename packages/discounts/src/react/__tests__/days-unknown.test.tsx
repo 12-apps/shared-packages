@@ -54,9 +54,9 @@ describe("a rule whose days the server cannot place", () => {
   });
 
   it("says so in the list in place of the period, in both packs", () => {
-    expect(formatWindow(TOKYO_UNKNOWN, formatters, copy)).toBe(
-      "Datas indisponíveis — confira o fuso horário da loja.",
-    );
+    // Review round 4: the cell says the short words; the cause is said once,
+    // above the list (days-unknown-round-four.test.tsx).
+    expect(formatWindow(TOKYO_UNKNOWN, formatters, copy)).toBe("Datas indisponíveis");
     expect(formatWindow(TOKYO_UNKNOWN, formatters, EN_US_DISCOUNTS_WEB_COPY)).toBe(
       EN_US_DISCOUNTS_WEB_COPY.window.daysUnknown,
     );
@@ -80,7 +80,7 @@ describe("a rule whose days the server cannot place", () => {
         wholeDays
       />,
     );
-    expect(screen.getByTestId("discount-days-unknown").textContent).toContain(copy.window.daysUnknown);
+    expect(screen.getByTestId("discount-days-unknown").textContent).toContain(copy.window.daysUnknownForm);
     expect((screen.getByTestId("total-form-field-startsAt") as HTMLInputElement).value).toBe("");
     expect((screen.getByTestId("total-form-field-endsAt") as HTMLInputElement).value).toBe("");
   });

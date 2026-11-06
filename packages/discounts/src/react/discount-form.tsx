@@ -17,6 +17,7 @@ import type { ComboRequirement } from "../engine/types";
 import { FirstOrderField } from "./first-order-field";
 import type { DiscountFormPayload, DiscountsApiClient, DiscountWireRecord, WireTargetGroup } from "./api";
 import type { DiscountsWebCopy } from "./copy";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import {
   ComboCapField,
   DiscountSwitches,
@@ -126,6 +127,8 @@ export interface DiscountFormProps {
    * Default false, which refuses equal days as such a server does.
    */
   wholeDays?: boolean;
+  /** The host's link to its time-zone setting, for the "days unknown" notice. */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
 }
 
 /**
@@ -143,6 +146,14 @@ function makeSubmit(
   const { api, copy, formatters, editing, onSaved, onError } = props;
   return async function handleSubmit(values, { setFieldErrors }): Promise<void> {
     setError(null);
+    // Days the server cannot place (FUT-4482): it refuses every write until
+    // the store's zone is fixed, and the boxes are empty only because the days
+    // could not be shown — sending them would read as "sem prazo" the moment
+    // the zone came back. Refused here, with what stays true: nothing changed.
+    if (editing?.daysUnknown === true) {
+      setError(copy.window.daysUnknownSave);
+      return;
+    }
     const targets: FormTargets = {
       categoryIds: extra.categoryIds,
       menuItemIds: extra.menuItemIds,
@@ -192,11 +203,17 @@ function makeSubmit(
  * What "Quando vale" is told about the server: whether it counts whole days,
  * whether it could place the edited rule's days (FUT-4482), and its zone's name.
  */
-function windowFlags(props: DiscountFormProps): { wholeDays: boolean; daysUnknown: boolean; timezoneLabel: string | null } {
+function windowFlags(props: DiscountFormProps): {
+  wholeDays: boolean;
+  daysUnknown: boolean;
+  timezoneLabel: string | null;
+  timeZoneSettings: DiscountsTimeZoneSettings | undefined;
+} {
   return {
     wholeDays: props.wholeDays ?? false,
     daysUnknown: props.editing?.daysUnknown === true,
     timezoneLabel: props.timezoneLabel ?? null,
+    timeZoneSettings: props.timeZoneSettings,
   };
 }
 

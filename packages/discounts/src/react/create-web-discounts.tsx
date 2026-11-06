@@ -7,6 +7,7 @@ import { timeZoneLabel } from "../timezone";
 import { createDiscountsApiClient, type DiscountsApiClient } from "./api";
 import { missingWebCopy, type DiscountsWebCopy } from "./copy";
 import { DiscountForm, type DiscountFormProps } from "./discount-form";
+import type { DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import { DiscountsScreen, type DiscountsScreenProps } from "./discounts-screen";
 import { createFormatters, type DiscountsFormatters } from "./format";
@@ -90,6 +91,14 @@ export interface DiscountsWebConfig {
    */
   wholeDays?: boolean;
   /**
+   * Where the store's time zone is set, in the host (FUT-4482, review round
+   * 4): `{ href }` or `{ onClick }`. When the server cannot place a rule's
+   * days — the zone is not one it knows — the notice above the list and above
+   * the form's boxes links there, labelled with the packs' `openTimeZone`.
+   * Omitted, the notices name the cause and offer no link.
+   */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
+  /**
    * Where a failure goes, beyond the operator's own screen — REQUIRED, and for
    * the same reason `createApiDiscounts` requires a logger.
    *
@@ -152,7 +161,7 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { copy, onError, currencyField, breadcrumb, timezone, wholeDays } = config;
+  const { copy, onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings } = config;
   // DERIVED from the zone unless the host insists otherwise. A host naming the
   // zone in words would be shipping copy, which has to be bilingual; `Intl`
   // already knows it in every locale.
@@ -172,6 +181,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
     ...(timezoneLabel ? { timezoneLabel } : {}),
     ...(timezone ? { timezone } : {}),
     ...(wholeDays ? { wholeDays } : {}),
+    ...(timeZoneSettings ? { timeZoneSettings } : {}),
   };
 
   return {
@@ -185,6 +195,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
         onError={onError}
         {...(timezoneLabel ? { timezoneLabel } : {})}
         {...(wholeDays ? { wholeDays } : {})}
+        {...(timeZoneSettings ? { timeZoneSettings } : {})}
         {...props}
       />
     ),

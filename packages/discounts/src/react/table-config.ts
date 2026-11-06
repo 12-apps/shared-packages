@@ -14,6 +14,7 @@ import {
 } from "../engine/kinds";
 
 import type { DiscountsWebCopy } from "./copy";
+import { nameCell } from "./days-unknown-notice";
 import { EMPTY } from "./format";
 import type { DiscountListItem } from "./row";
 
@@ -70,6 +71,9 @@ export function discountColumns(copy: DiscountsWebCopy): DataViewColumn<Discount
       // holds a typical promotion name on one or two lines; the table scrolls
       // sideways inside its own wrapper on a phone, as it already did.
       minWidth: NAME_COLUMN_MIN_PX,
+      // Days the server cannot place are marked under the name too, where the
+      // Vigência cell is off-screen on a phone (FUT-4482, review round 4).
+      cell: ({ row }) => nameCell(row, copy),
     },
     // Pre-formatted by the page: a cell must not do arithmetic on basis points.
     { id: "value", header: copy.screen.columns.value, accessor: (row) => row.valueLabel },

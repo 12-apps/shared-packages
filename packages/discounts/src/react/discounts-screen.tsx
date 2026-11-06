@@ -25,6 +25,7 @@ import { exportRows } from "@12-apps/ui/utils";
 
 import type { DiscountsApiClient } from "./api";
 import { fill, type DiscountsWebCopy } from "./copy";
+import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
 import { DiscountDialog } from "./discount-dialog";
@@ -61,6 +62,8 @@ export interface DiscountsScreenProps {
   timezoneLabel?: string;
   /** Whether the server counts the period's days whole (FUT-4482). */
   wholeDays?: boolean;
+  /** The host's link to its time-zone setting (FUT-4482, review round 4). */
+  timeZoneSettings?: DiscountsTimeZoneSettings;
   currencyField: CurrencyFieldComponent;
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
@@ -294,6 +297,7 @@ function ScreenBody({
         errorTitle={copy.actions.actionFailed}
         errorDismissLabel={copy.actions.actionFailedDismiss}
       >
+        <DaysUnknownListNotice rows={rows} copy={copy} timeZoneSettings={menu.timeZoneSettings} />
         <DiscountsGrid
           rows={rows}
           copy={copy}
