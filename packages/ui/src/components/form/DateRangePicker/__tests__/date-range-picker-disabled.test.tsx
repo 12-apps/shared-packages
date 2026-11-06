@@ -7,6 +7,7 @@
  */
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
+import { createTheme } from '@mui/material/styles/index.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DateRangePicker } from '../DateRangePicker';
@@ -128,5 +129,40 @@ describe('a disabled picker', () => {
     rerender(<DateRangePicker value={{ from: null, to: null }} onChange={() => {}} quickRanges={[]} numberOfMonths={1} disabled />);
     expect((screen.getByTestId('calendar-prev-month') as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByTestId('calendar-next-month') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // Review round 7 (B1): today's ring on a disabled grid takes the disabled
+  // ink. jsdom computes no pseudo-elements, so the colour is read from the
+  // `::before` rule Emotion emitted for today's cell.
+  it('rings today in the disabled ink, never the primary colour', () => {
+    const now = new Date(2026, 10, 6, 12);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    try {
+      render(
+        <DateRangePicker
+          value={{ from: null, to: null }}
+          onChange={() => {}}
+          quickRanges={[]}
+          numberOfMonths={1}
+          now={now}
+          todayIndicator="ring"
+          disabled
+        />,
+      );
+      const cell = screen.getByTestId('calendar-today').parentElement!;
+      const rules = [...document.querySelectorAll('style')].map((tag) => tag.textContent ?? '').join('\n');
+      const face = cell.className
+        .split(' ')
+        .filter((name) => name.startsWith('css-'))
+        .map((name) => rules.split(`.${name}::before{`)[1]?.split('}')[0] ?? '')
+        .join('');
+      const ring = /box-shadow:inset 0 0 0 [\d.]+rem ([^;]+);/u.exec(face)?.[1];
+      const palette = createTheme().palette;
+      expect(ring).toBe(palette.text.disabled);
+      expect(ring).not.toBe(palette.primary.main);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
