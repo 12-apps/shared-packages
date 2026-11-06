@@ -12,7 +12,7 @@ import { useEffect, useState, type JSX } from "react";
 import { SavedCardsPicker, type SavedCard } from "../card";
 import { EmptyCart as EmptyCartView } from "../components/checkout/empty-cart";
 
-import { FlowsShell, type FlowsRuntime } from "./runtime";
+import { FlowsShell, useFlowCopy, useFlowPorts, type FlowsRuntime } from "./runtime";
 import type { CheckoutScreens } from "./types";
 
 /** The vaulted instruments this store can actually charge (FUT-697 scoping). */
@@ -56,9 +56,11 @@ function buildSavedCards(runtime: FlowsRuntime): CheckoutScreens["SavedCards"] {
 
 function buildEmptyCart(runtime: FlowsRuntime): CheckoutScreens["EmptyCart"] {
   return function EmptyCart() {
+    const copy = useFlowCopy(runtime);
+    const { exitToCatalog } = useFlowPorts(runtime);
     return (
       <FlowsShell runtime={runtime}>
-        <EmptyCartView copy={runtime.copy.views.emptyCart} onBack={runtime.config.ports.exitToCatalog} />
+        <EmptyCartView copy={copy.views.emptyCart} onBack={exitToCatalog} />
       </FlowsShell>
     );
   };

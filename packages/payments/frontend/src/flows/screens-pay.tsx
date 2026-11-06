@@ -11,7 +11,14 @@ import { PixView } from "../components/checkout/pix-view";
 import type { CheckoutOrder, OrderStatus } from "../components/checkout/types";
 import { useCheckoutComponents } from "../components/checkout/ui";
 
-import { FlowsShell, useResolvedConfig, type FlowsRuntime } from "./runtime";
+import {
+  FlowsShell,
+  useFlowConfirmation,
+  useFlowCopy,
+  useFlowPorts,
+  useResolvedConfig,
+  type FlowsRuntime,
+} from "./runtime";
 import type { CheckoutScreens } from "./types";
 
 function buildCardEntry(runtime: FlowsRuntime): CheckoutScreens["CardEntry"] {
@@ -76,17 +83,19 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
     // The SAME door the chrome's back link takes (FUT-1240). Bound straight to
     // the port, this control ignored a registered `exit` — so one host got its
     // router from one way out of the checkout and a page load from the other.
-    const backToMenu = runtime.config.ports.exitToCatalog;
+    const backToMenu = useFlowPorts(runtime).exitToCatalog;
+    const copy = useFlowCopy(runtime);
+    const confirmation = useFlowConfirmation(runtime);
     return (
       <FlowsShell runtime={runtime}>
         <PaymentStatusView
-          copy={runtime.copy.views.status}
+          copy={copy.views.status}
           status={status}
           totalLabel={payable?.totalLabel ?? ""}
           orderId={payable?.orderId}
           onBackToMenu={backToMenu}
-          paidExtra={runtime.config.confirmation?.extra}
-          paidHero={runtime.config.confirmation?.hero}
+          paidExtra={confirmation?.extra}
+          paidHero={confirmation?.hero}
         />
       </FlowsShell>
     );
@@ -106,14 +115,22 @@ function buildPaymentStatus(runtime: FlowsRuntime): CheckoutScreens["PaymentStat
  * While the config is still in flight, neither fact is known — so nothing is
  * refused. The unavailable screen is a statement about the store, and stating
  * it early would be a lie a spinner never tells.
+ *
+ * An empty chain refuses only a list with nothing else on it (FUT-1241). The
+ * host's in-person rows (`paymentList.door` — at the counter, at the door) are
+ * paid without any provider, so a store that never connected one still sells
+ * through them; refusing it would hide a checkout that works. The host's veto
+ * is untouched: it is the host's own statement, and it may cover those rows.
  */
 export function storeCannotCharge(
   config: { chain?: unknown[] } | null,
   pending: boolean,
   hostSaysPayable: boolean,
+  inPersonRows = 0,
 ): boolean {
   if (pending) return false;
   if (!hostSaysPayable) return true;
+  if (inPersonRows > 0) return false;
   return config !== null && (config.chain?.length ?? 0) === 0;
 }
 
@@ -123,7 +140,7 @@ function buildPaymentsUnavailable(
   function PaymentsUnavailableBody(): JSX.Element {
     const { Alert, Button } = useCheckoutComponents();
     const { remedy } = runtime.useAvailability();
-    const copy = runtime.copy;
+    const copy = useFlowCopy(runtime);
     if (!remedy) {
       return (
         <Box

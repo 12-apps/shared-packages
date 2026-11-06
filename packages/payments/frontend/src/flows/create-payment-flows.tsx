@@ -14,21 +14,30 @@
  * one moment's cart total onto every checkout the page ever renders. Naming
  * them `use*` also keeps rules-of-hooks lint able to see them.
  */
-import { useCallback, type JSX, type ReactNode } from "react";
+import type { JSX, ReactNode } from "react";
 
 import { CheckoutFlow } from "../components/checkout/checkout-flow";
 import { createCheckoutClient } from "../components/checkout/transport";
 import type { CheckoutProviderConfig, SettlementCheckout } from "../components/checkout/types";
 import { useCheckoutController } from "../components/checkout/use-checkout-controller";
 
-import { FlowsProvider, useResolvedConfig, type FlowsRuntime } from "./runtime";
+import {
+  FlowsProvider,
+  useFlowConfirmation,
+  useFlowCopy,
+  useFlowPorts,
+  useResolvedConfig,
+  type FlowsRuntime,
+} from "./runtime";
 import { buyerScreens } from "./screens-buyer";
 import { hostedScreens } from "./screens-hosted";
 import { payScreens, storeCannotCharge } from "./screens-pay";
 import { vaultScreens } from "./screens-vault";
 import type {
   CheckoutAvailability,
+  CheckoutConfirmation,
   CheckoutController,
+  CheckoutPorts,
   CheckoutScreens,
   PaymentFlows,
   PaymentFlowsConfig,
@@ -37,8 +46,21 @@ import type {
 /** A store that is always payable — what a host with no veto to cast means. */
 const ALWAYS_PAYABLE: CheckoutAvailability = { payable: true };
 
+/**
+ * The host's ports as a hook: `usePorts` when it gave one, else the fixed
+ * `ports`. One of the two is required, and saying so at build time beats a
+ * checkout that throws on the buyer's first tap.
+ */
+function hostPortsHook(config: PaymentFlowsConfig): () => CheckoutPorts {
+  if (config.usePorts) return config.usePorts;
+  const fixed = config.ports;
+  if (!fixed) throw new Error("createPaymentFlows: pass `ports` or `usePorts` — the flow has no host to raise a payable through.");
+  return () => fixed;
+}
+
 /** Build the runtime every screen closes over. */
 function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
+  const useHostPorts = hostPortsHook(config);
   // The transport's own failure sentences come from the SAME copy pack the
   // screens read (FUT-760), so a host answers the question once. A `transport`
   // that names its own `copy` still wins — a second mount may talk to a
@@ -47,31 +69,35 @@ function buildRuntime(config: PaymentFlowsConfig): FlowsRuntime {
     copy: config.copy.views.screens.screens.transport,
     ...config.transport,
   });
-  const navigate =
-    config.ports.navigate ??
-    ((url: string) => {
-      window.location.assign(url);
-    });
   return {
     config,
     client,
     copy: config.copy,
-    navigate,
+    useHostPorts,
     // Both of these are HOOKS. They are called from a component body on every
     // render, so the slug follows the host's router and the availability vote
     // follows whatever the host currently knows.
     useTenantSlug: () => config.useScope?.().tenantSlug,
-    useAvailability: () => config.ports.useAvailability?.() ?? ALWAYS_PAYABLE,
+    useAvailability: () => useHostPorts().useAvailability?.() ?? ALWAYS_PAYABLE,
   };
 }
 
 /** The host's confirmation slots, as `CheckoutFlow` takes them. */
-function confirmationProps(confirmation: PaymentFlowsConfig["confirmation"]) {
+function confirmationProps(confirmation: CheckoutConfirmation | undefined) {
   return {
     confirmationExtra: confirmation?.extra,
     confirmationHero: confirmation?.hero,
     confirmationFooter: confirmation?.footer,
     backActionEmphasis: confirmation?.backActionEmphasis,
+  };
+}
+
+/** The buyer's saved details, as `CheckoutFlow` takes them. */
+function buyerProps(defaults: ReturnType<NonNullable<PaymentFlowsConfig["useBuyerDefaults"]>>) {
+  return {
+    defaultBuyer: defaults.buyer,
+    taxIdOnFile: defaults.taxIdOnFile ?? false,
+    taxIdKindOnFile: defaults.taxIdKindOnFile ?? null,
   };
 }
 
@@ -95,7 +121,6 @@ function buildCheckout(
   runtime: FlowsRuntime,
   screens: CheckoutScreens,
 ): PaymentFlows["Checkout"] {
-  const { ports } = runtime.config;
   const Unavailable = screens.PaymentsUnavailable;
 
   function CheckoutBody({ settlement }: { settlement?: SettlementCheckout | null }): JSX.Element {
@@ -106,29 +131,31 @@ function buildCheckout(
     const { config, pending } = useResolvedConfig(runtime);
     const availability = runtime.useAvailability();
     const tenantSlug = runtime.useTenantSlug();
-    // Adapts the port to the package's older, prop-shaped contract. Memoised so
-    // the controller does not see a fresh `createOrder` identity each render.
-    const createOrder = useCallback(
-      (input: Parameters<typeof ports.createPayable>[0]) => ports.createPayable(input),
-      [],
-    );
+    // Stable across renders (see `useFlowPorts`), so the controller does not
+    // see a fresh `createOrder` identity each render.
+    const ports = useFlowPorts(runtime);
+    const copy = useFlowCopy(runtime);
+    const confirmation = useFlowConfirmation(runtime);
 
-    if (storeCannotCharge(config, pending, availability.payable)) return <Unavailable />;
+    // The host's in-person rows are a way to pay that no provider serves, so an
+    // empty chain refuses only a list with nothing else on it (FUT-1241).
+    if (storeCannotCharge(config, pending, availability.payable, paymentList.door?.length ?? 0)) {
+      return <Unavailable />;
+    }
 
     return (
       <CheckoutFlow
-        copy={runtime.copy.views}
+        copy={copy.views}
         cart={cart}
-        createOrder={createOrder}
+        createOrder={ports.createPayable}
         saveBuyerContact={ports.saveBuyerContact}
         onExitToMenu={ports.exitToCatalog}
         onPaid={ports.onPaid}
-        defaultBuyer={defaults.buyer}
-        taxIdOnFile={defaults.taxIdOnFile ?? false}
+        {...buyerProps(defaults)}
         settlement={settlement ?? hostSettlement}
         providerConfig={config}
         tenantSlug={tenantSlug}
-        {...confirmationProps(runtime.config.confirmation)}
+        {...confirmationProps(confirmation)}
         validateApplePayMerchant={ports.validateApplePayMerchant}
         paymentList={paymentList}
       />
@@ -136,15 +163,19 @@ function buildCheckout(
   }
 
   return function Checkout(props) {
+    // The host's own provider answer, when it holds one: then nothing is
+    // fetched here, and the host's answer is the one the list draws.
+    const hostConfig = runtime.config.useProviderConfig?.();
     // Its OWN provider, so the one-line mount really is one line: `/config` is
-    // fetched here and every nested screen reads that answer.
+    // fetched here — unless the host answered above — and every nested screen
+    // reads that answer.
     //
     // The design-system slots come from the `FlowsShell` inside it, and the
     // `CheckoutComponentsProvider` that `CheckoutFlow` opens one level down
     // INHERITS them (see `ui.tsx`) rather than resetting to raw MUI — which is
     // why nothing here re-threads `components`.
     return (
-      <FlowsProvider runtime={runtime}>
+      <FlowsProvider runtime={runtime} state={hostConfig}>
         <CheckoutBody {...props} />
       </FlowsProvider>
     );
@@ -169,8 +200,8 @@ function buildScreens(runtime: FlowsRuntime): CheckoutScreens {
 
 /** The flow controller, pre-bound to the ports. */
 function buildUseCheckout(runtime: FlowsRuntime): () => CheckoutController {
-  const { ports } = runtime.config;
   return function useCheckout(): CheckoutController {
+    const ports = useFlowPorts(runtime);
     const defaults = runtime.config.useBuyerDefaults?.() ?? {};
     const cart = runtime.config.useCart();
     const scope = { tenantSlug: runtime.useTenantSlug() };

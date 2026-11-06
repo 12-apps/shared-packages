@@ -19,6 +19,7 @@ export type { CheckoutCopyFE } from './copy';
 export {
   type BoundCheckoutClient,
   type CheckoutAvailability,
+  type CheckoutConfirmation,
   type CheckoutConfigState,
   type CheckoutController,
   type CheckoutPorts,

@@ -16,6 +16,8 @@
  */
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -41,7 +43,8 @@ import type {
 import type { CheckoutProviderConfig } from "../components/checkout/types";
 import type { Result } from "../result";
 
-import { useResolvedConfig, type FlowsRuntime } from "./runtime";
+import { useFlowCopy, useResolvedConfig, type FlowsRuntime } from "./runtime";
+import type { CheckoutCopyFE } from "./copy";
 
 const EMPTY_CARD: CardDetails = { number: "", holder: "", expiry: "", cvv: "" };
 
@@ -76,10 +79,10 @@ export interface AddCardController {
  * message the host's copy table worded.
  */
 function beginRefusalMessage(
-  runtime: FlowsRuntime,
+  copy: CheckoutCopyFE,
   refusal: { error: string; code?: string },
 ): string {
-  return refusal.code === "VAULT_NOT_ENABLED" ? runtime.copy.addCardUnavailable : refusal.error;
+  return refusal.code === "VAULT_NOT_ENABLED" ? copy.addCardUnavailable : refusal.error;
 }
 
 /**
@@ -106,12 +109,19 @@ function useVaultSession(runtime: FlowsRuntime): {
   setPhase: Dispatch<SetStateAction<AddCardPhase>>;
 } {
   const [phase, setPhase] = useState<AddCardPhase>({ kind: "preparing" });
+  // The words of the render the answer lands in, without re-asking the vault
+  // every time the host's copy changes identity.
+  const copy = useFlowCopy(runtime);
+  const copyRef = useRef(copy);
+  useLayoutEffect(() => {
+    copyRef.current = copy;
+  });
   useEffect(() => {
     let active = true;
     void runtime.client.beginVault().then((result: Result<BuyerVaultSession>) => {
       if (!active) return;
       if (!result.ok) {
-        setPhase({ kind: "unavailable", message: beginRefusalMessage(runtime, result) });
+        setPhase({ kind: "unavailable", message: beginRefusalMessage(copyRef.current, result) });
         return;
       }
       setPhase({ kind: "form", session: result.data });
@@ -143,7 +153,8 @@ export function useAddCard(
 
   const brand = detectBrand(onlyDigits(card.number));
 
-  const fieldCopy = runtime.copy.views.screens.card.fields;
+  const cardCopy = useFlowCopy(runtime).views.screens.card;
+  const fieldCopy = cardCopy.fields;
   const validate = (): CardFieldErrors => ({
     number: validateCardNumber(card.number, fieldCopy),
     holder: validateHolder(card.holder, fieldCopy),
@@ -162,7 +173,7 @@ export function useAddCard(
     const minted = await tokenizeForCheckout(
       card,
       sessionTokenization(phase.session, config),
-      runtime.copy.views.screens.card,
+      cardCopy,
     );
     if (!minted.ok) {
       setError(minted.error);
