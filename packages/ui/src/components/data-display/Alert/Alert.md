@@ -145,6 +145,35 @@ The Alert component implements comprehensive accessibility features:
 - High contrast colors meeting WCAG guidelines
 - Screen reader compatible content structure
 
+### Hover and press keep the words at 4.5:1
+
+An alert answers a pointer with a flat tint layer (`HOVER.tintAlpha` 0.06,
+`ACTIVE.tintAlpha` 0.2, eased back over `ACTIVE.ms`), and nothing moves. That
+layer moves the surface toward the mode's absolute — black in light mode, white
+in dark — which is the side the ink is on, so on its own it CLOSED the gap the
+words are read across: a summary at 4.71:1 idle fell to 3.17:1 pressed in
+light mode and 2.68:1 in dark (FUT-4506).
+
+So while the tint is on, the **title and the summary** step their ink toward
+that same absolute (`POINTER_INK_STEP`; both states' tint and step are
+exported as `ALERT_POINTER_STATES` for a theme that asserts its own tones):
+
+| state | toward black (light mode) | toward white (dark mode) |
+|---|---|---|
+| hover | 0.15 | 0.2 |
+| press | 0.35 | 0.6 |
+
+Both lines hold 4.5:1 at rest, hovered and pressed — the title too, since
+16.8px/600 is not WCAG "large" text. The step is a `color-mix()` over
+`currentColor`, so it moves whatever ink is actually painted: a theme that
+repaints the alert's `color` gets the same step on its own ink. It eases on the
+tint's clock and lands at once on a press, like the tint. The icon, the focus
+ring and any control inside the alert keep their own colours and states.
+`gradient` steps toward the absolute on its ink's side (white in light mode,
+black for dark mode's dark `getContrastText` ink), never toward its surface.
+
+The summary carries the class `alert-description` so the rule can reach it.
+
 ### `announce` — whether the alert interrupts
 
 `role` and `aria-live` are two attributes with one meaning between them, and by

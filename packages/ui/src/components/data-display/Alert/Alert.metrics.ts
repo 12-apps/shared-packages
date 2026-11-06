@@ -94,9 +94,12 @@ export const PULSE = { alpha: 0.2, ms: 2000, spread: 10 } as const;
  * dark one. A `filter: brightness()` fixed the direction but is MULTIPLICATIVE,
  * so it moved a near-black `glass` by four counts (ΔE76 1.71, under the JND)
  * and Banner's 10%-alpha wash by ΔE76 0.44. A layer is additive: it reads the
- * same on an opaque tint, a translucent wash and a gradient, and because it
- * paints above the background and below the content the ink keeps its own
- * contrast.
+ * same on an opaque tint, a translucent wash and a gradient.
+ *
+ * Painting above the background and below the content keeps the layer off the
+ * INK, but not off the ink's CONTRAST: the layer moves the surface toward the
+ * mode's absolute, which is the side the ink is on, so the two close in. That
+ * is what {@link POINTER_INK_STEP} answers (FUT-4506).
  */
 export const HOVER = { tintAlpha: 0.06 } as const;
 
@@ -117,8 +120,11 @@ export const HOVER = { tintAlpha: 0.06 } as const;
  *
  * An inset shadow at 100vmax is a flat tint over the whole surface: ADDITIVE,
  * so it reads the same on an opaque tint, a translucent wash and a gradient;
- * painted above the background and below the content, so the ink keeps its
- * own contrast; and animatable, which `background-image` is not.
+ * painted above the background and below the content, so it never dims the
+ * ink itself; and animatable, which `background-image` is not. It DOES dim the
+ * ink's contrast, because it darkens a light surface toward a dark ink (and
+ * lightens a dark one toward a light ink) — {@link POINTER_INK_STEP} is the
+ * other half of the press.
  *
  * `ms` is 250 and not the 1000 first asked for, and the reason is that ONE
  * property carries both states. CSS runs a transition from the DESTINATION
@@ -132,6 +138,48 @@ export const HOVER = { tintAlpha: 0.06 } as const;
  * product owner made when shown both.
  */
 export const ACTIVE = { tintAlpha: 0.2, ms: 250 } as const;
+
+/**
+ * How far the TITLE and SUMMARY ink step toward the absolute on their own side
+ * while the alert is hovered or pressed (FUT-4506, option C).
+ *
+ * The tint layer above moves the surface toward the mode's absolute — black in
+ * light mode, white in dark — which is the side the ink sits on, so every
+ * pointer state CLOSED the gap the ink is read across. Measured on a host pane
+ * whose summary sat at 4.71:1 idle: 4.22 hovered, 3.17 pressed in light mode,
+ * and down to 2.68 pressed in dark. The title, at 16.8px/600, is not WCAG
+ * "large" text, so it is held to 4.5:1 as well.
+ *
+ * The answer keeps the layer (the pointer still gets its feedback) and moves
+ * the ink FURTHER the same way, so the gap re-opens. The amounts are the
+ * prototype's measured steps on that host pane, the worst case in reach: they
+ * hold the 0.9 summary at 4.75–6.07:1 there, and at 6.38:1 or more on this
+ * package's default palette in both modes. White needs the bigger step because
+ * a light ink has less room above it than a dark ink has below it, and dark
+ * mode's pressed step needs at least 0.55.
+ *
+ * Keyed by the absolute the ink moves TOWARD rather than by mode, because the
+ * two disagree on one surface: `gradient`, whose ink is `getContrastText` of
+ * the hue — white in light mode, dark for dark mode's light hues. The web
+ * applies the step as `color-mix()` over `currentColor`, so it steps whatever
+ * ink is actually painted, a host's repaint included. DOM only; native has no
+ * pointer states.
+ */
+export const POINTER_INK_STEP = {
+  hover: { black: 0.15, white: 0.2 },
+  press: { black: 0.35, white: 0.6 },
+} as const;
+
+/**
+ * Both pointer states as a host reads them: the tint layer's alpha and the ink
+ * step, per absolute. Exported (as `ALERT_POINTER_STATES`) so a theme that
+ * repaints the alert's pane and ink can assert its own tones still clear 4.5:1
+ * hovered and pressed, against the numbers the package actually draws with.
+ */
+export const POINTER_STATES = {
+  hover: { tintAlpha: HOVER.tintAlpha, inkStep: POINTER_INK_STEP.hover },
+  press: { tintAlpha: ACTIVE.tintAlpha, inkStep: POINTER_INK_STEP.press },
+} as const;
 
 export const FOCUS = { ringWidth: 2, ringAlpha: 1, offset: 2 } as const;
 
