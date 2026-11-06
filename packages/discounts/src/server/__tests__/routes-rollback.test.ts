@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { EN_US_DISCOUNTS_SERVER_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
 import { createApiDiscounts, type DiscountsApiConfig } from "../routes";
 import type { DiscountRecord, DiscountStore, DiscountUpdateCondition, DiscountWrite } from "../store";
@@ -134,11 +135,21 @@ describe("a write with the zone off on a row written in the zone (review round 5
     }
   });
 
-  it.each([false, undefined])("still re-states a row whose flag is %j, on UTC midnights", async (flag) => {
-    const { response, writes } = patch(stored(flag), { applied: [applied] });
+  // Review round 6: edited on purpose. The same days on a legacy row are no
+  // change, so the stored bounds stay byte for byte; a changed day still goes
+  // to UTC midnights, as N's create stores it.
+  it.each([false, undefined])("keeps a row whose flag is %j as stored when its days come back unchanged", async (flag) => {
+    const { response, writes } = patch(stored(flag), { body: { active: false }, applied: [applied] });
+    expect((await response).status).toBe(200);
+    expect(writes[0]?.write.scalars).toMatchObject({ windowInZone: false, active: false, startsAt: STARTS, endsAt: ENDS });
+  });
+
+  it.each([false, undefined])("still re-states a changed day of a row whose flag is %j, on UTC midnights", async (flag) => {
+    const { response, writes } = patch(stored(flag), { body: { endsAt: "2026-11-25" }, applied: [applied] });
     expect((await response).status).toBe(200);
     expect(writes[0]?.write.scalars).toMatchObject({ windowInZone: false });
     expect(writes[0]?.write.scalars.startsAt?.toISOString()).toBe("2026-11-10T00:00:00.000Z");
+    expect(writes[0]?.write.scalars.endsAt?.toISOString()).toBe("2026-11-25T00:00:00.000Z");
   });
 
   it("leaves a missing row to the store, as before, with no condition", async () => {
@@ -148,12 +159,19 @@ describe("a write with the zone off on a row written in the zone (review round 5
     expect(writes[0]!.condition).toBeUndefined();
   });
 
-  it("asks the store nothing extra while the zone is on", async () => {
-    const { response, writes, get } = patch(stored(true), { extra: { storeTimeZone: () => "America/Sao_Paulo" } });
+  // Review round 6: edited on purpose. Every PATCH now reads the row, with the
+  // zone on too, to tell the days a read showed from changed ones.
+  it("reads the row and conditions the write while the zone is on too", async () => {
+    const { response, writes, get } = patch(stored(true), {
+      extra: { storeTimeZone: () => "America/Sao_Paulo" },
+      applied: [applied],
+    });
     expect((await response).status).toBe(200);
-    expect(get).not.toHaveBeenCalled();
-    expect(writes[0]?.write.scalars.windowInZone).toBe(true);
-    expect(writes[0]?.condition).toBeUndefined();
+    expect(get).toHaveBeenCalledTimes(1);
+    // Read in São Paulo as 10..20; Término 21 is a changed day, written whole.
+    expect(writes[0]?.write.scalars).toMatchObject({ windowInZone: true });
+    expect(writes[0]?.write.scalars.endsAt?.toISOString()).toBe("2026-11-22T03:00:00.000Z");
+    expect(writes[0]?.condition).toEqual({ window: { startsAt: STARTS, endsAt: ENDS, windowInZone: true } });
   });
 });
 
@@ -184,10 +202,28 @@ describe("the read-then-write race (review round 5)", () => {
     expect(writes[1]!.condition?.window.windowInZone).toBe(true);
   });
 
-  it("gives up loudly, never silently, when the row keeps moving", async () => {
-    const { response, writes } = patch(stored(true), { applied: [{ applied: false }] });
-    await expect(response).rejects.toThrow(/changed/u);
-    expect(writes.length).toBeGreaterThan(1);
+  // Review round 6 (N3): edited on purpose — a 409 with a sentence, not a 500.
+  it("answers 409 with a sentence, never a 500, when the row keeps moving", async () => {
+    const { response, writes, log } = patch(stored(true), { applied: [{ applied: false }] });
+    expect(await response).toEqual({ status: 409, body: { error: PT_BR_DISCOUNTS_SERVER_COPY.windowChanged } });
+    expect(writes).toHaveLength(3);
+    expect(log.at("warn").join("\n")).toMatch(/rule d1 changed under 3 writes/u);
+  });
+
+  it("says the 409 in the package's pack for the request's language when the host's lacks it", async () => {
+    const without = { ...PT_BR_DISCOUNTS_SERVER_COPY, windowChanged: undefined };
+    const { routes } = createApiDiscounts({
+      store: {
+        get: async () => stored(true),
+        update: async () => ({ applied: false }),
+      } as unknown as DiscountStore,
+      copy: without,
+      logger: recordingLogger(),
+    });
+    const answer = (locale: string) =>
+      routes.find((entry) => entry.method === "PATCH")!.handle({ actor: { clientId: "tenant-1" }, params: { id: "d1" }, query: {}, body: BODY, locale });
+    expect((await answer("en-US")).body).toEqual({ error: EN_US_DISCOUNTS_SERVER_COPY.windowChanged });
+    expect((await answer("pt-BR")).body).toEqual({ error: PT_BR_DISCOUNTS_SERVER_COPY.windowChanged });
   });
 
   it("says so when the store answers nothing about the condition", async () => {
@@ -199,7 +235,7 @@ describe("the read-then-write race (review round 5)", () => {
 
 describe("a store with no windowInZone while the zone is off (review round 5)", () => {
   it("warns that the guard cannot tell a zoned rule, and saves", async () => {
-    const { response, log } = patch(stored(undefined), { applied: [applied] });
+    const { response, log } = patch(stored(undefined), { body: { endsAt: "2026-11-25" }, applied: [applied] });
     expect((await response).status).toBe(200);
     expect(log.at("warn").some((line) => line.includes("windowInZone") && line.includes("storeTimeZone is off"))).toBe(true);
   });

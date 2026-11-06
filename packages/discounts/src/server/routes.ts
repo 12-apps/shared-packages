@@ -4,7 +4,6 @@ import type { WireRequest, WireResponse, WireRoute } from "@12-apps/wiring";
 
 import {
   assertCollections,
-  assertTargetsOwned,
   ForeignTargetError,
   loadTargetGroups,
   type DiscountableCollection,
@@ -20,24 +19,20 @@ import {
   pageWithCalendarDays,
   readZoneFor,
   warnUnflagged,
-  wholeDayCopyFor,
   withCalendarDays,
   writtenZone,
-  zoneFor,
+  type ReadZone,
   type StoreTimeZone,
 } from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
-import { keepsWindow, updateWithWindow, windowModeOf } from "./update-window";
+import { fallbackSentence } from "./fallback-copy";
+import { prepareWrite } from "./prepare-write";
+import { updateWithWindow, WindowChangedError, windowModeOf } from "./update-window";
+import { isKnownTimeZone } from "../timezone";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
 import type { DiscountListInput, DiscountRecord, DiscountStore } from "./store";
-import {
-  DiscountValidationError,
-  targetsForScope,
-  toDiscountScalars,
-  toDiscountWriteInput,
-  type DiscountWriteBody,
-} from "./validate";
+import { DiscountValidationError } from "./validate";
 
 /**
  * The admin discounts HTTP surface (FUT-244), as framework-neutral wiring
@@ -113,10 +108,11 @@ export interface DiscountsApiConfig {
    * With it, Início and Término count WHOLE days on that clock: a write stores
    * the first instant of Início and of the day after Término, Início = Término
    * is a one-day promotion, and every record answered carries `startsOn` /
-   * `endsOn`, the days it runs on there. A zone the runtime does not know
-   * refuses DATES sent to it (422 on the date field) rather than storing a
-   * window on a guessed clock, while an edit that keeps the stored window
-   * (`keepWindow`) saves; a read answers its records without their days and
+   * `endsOn`, the days it runs on there. A save whose days equal the ones a
+   * read showed writes the stored window unchanged, whatever the zone (review
+   * round 6). A zone the runtime does not know refuses CHANGED dates (422 on
+   * the date field) rather than storing a window on a guessed clock, while an
+   * edit that keeps the stored window (`keepWindow`, or the same days) saves; a read answers its records without their days and
    * logs a warning, so the list stays usable and shows no guessed days. A null or
    * blank answer for a tenant fails every route: guard a nullable lookup.
    *
@@ -143,40 +139,6 @@ function fieldError(error: DiscountValidationError | ForeignTargetError): WireRe
 /** The id acknowledgement update and delete answer with. */
 function acknowledged(id: string): WireResponse {
   return ok({ data: { id } });
-}
-
-/**
- * Fold a validated body into what the store persists, and refuse a target that
- * is not this tenant's.
- *
- * Both writes go through it, so the rules run exactly once per write and a
- * second caller cannot half-apply them. The ownership check is here rather than
- * in each route for the same reason, and it runs AFTER the fold because the
- * fold is what narrows the targets to the scope — checking the raw body would
- * reject ids a COMBO-scoped write was about to drop anyway.
- */
-async function prepareWrite(
-  config: DiscountsApiConfig,
-  copy: DiscountsServerCopy,
-  clientId: string,
-  body: unknown,
-  write: "create" | "update",
-) {
-  // `keepWindow` (an update's only, review round 5): the STORED dates are put
-  // back by the update, so none is read here and no zone is asked.
-  const keepWindow = write === "update" && keepsWindow(body);
-  const sent = toDiscountWriteInput(body as DiscountWriteBody);
-  const input = keepWindow ? { ...sent, startsAt: null, endsAt: null } : sent;
-  const timeZone = keepWindow ? undefined : await zoneFor(config.storeTimeZone, clientId);
-  const scalars =
-    timeZone === undefined
-      ? toDiscountScalars(input, copy)
-      : toDiscountScalars(input, wholeDayCopyFor(copy, resolveDiscountsCopy(config.copy, undefined)), { timeZone });
-  const folded = { scalars, targets: targetsForScope(input) };
-  if (config.collections) {
-    await assertTargetsOwned(config.collections, clientId, folded.targets, copy.foreignTarget);
-  }
-  return { write: folded, timeZone, sent: { startsAt: sent.startsAt, endsAt: sent.endsAt }, keepWindow };
 }
 
 /**
@@ -314,19 +276,29 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
       const copy = resolveDiscountsCopy(config.copy, locale);
       // Validation and the ownership check run FIRST, before the store is read:
       // a refused body costs no read, and the window never excuses a bad one.
-      const prepared = await prepareWrite(config, copy, actor.clientId, body, "update");
-      const mode = windowModeOf(prepared);
-      if (mode === null) {
-        await config.store.update(actor.clientId, id, prepared.write);
-      } else {
-        const target = { clientId: actor.clientId, id, logger: config.logger };
+      const prepared = await prepareWrite(config, copy, actor.clientId, body, "update", locale);
+      const mode = windowModeOf({ ...prepared, zone: preparedZone(prepared.timeZone) });
+      const target = { clientId: actor.clientId, id, logger: config.logger };
+      try {
         const outcome = await updateWithWindow(config.store, target, mode, prepared.write);
         if (outcome === "missing") return { status: 404, body: { error: copy.notFound } };
+      } catch (error) {
+        if (!(error instanceof WindowChangedError)) throw error;
+        // Review round 6 (N3): a row that kept moving is the operator's to
+        // re-open, said as such — never a 500.
+        config.logger.warn(`discounts: ${error.message}`);
+        return { status: 409, body: { error: fallbackSentence(copy, "windowChanged", locale) } };
       }
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
     }),
   };
+}
+
+/** Where a read of the row placed its days: the zone the PATCH was prepared on. */
+function preparedZone(timeZone: string | undefined): ReadZone {
+  if (timeZone === undefined) return { kind: "off" };
+  return isKnownTimeZone(timeZone) ? { kind: "zone", timeZone } : { kind: "unknown" };
 }
 
 function archiveRoute(config: DiscountsApiConfig): DiscountRoute {

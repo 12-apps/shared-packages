@@ -87,9 +87,18 @@ function wholeDaySentence(copy: DiscountsServerCopy): string {
  * round 5): they cannot be placed on its clock, so they are refused on the
  * first date field sent — the one refusal a date problem leaves, never the
  * edit's. No dates at all need no clock: an open window is open anywhere.
+ *
+ * ANSWERED, not thrown, so a PATCH can hold it until it has read the row
+ * (review round 6): days equal to the ones the read showed are not a change,
+ * and keep the stored window without a clock.
  */
-function assertPlaceable(startsOn: string | null, endsOn: string | null, copy: DiscountsServerCopy, timeZone: string): void {
-  if ((startsOn === null && endsOn === null) || isKnownTimeZone(timeZone)) return;
+export function unplaceableDays(
+  days: { startsOn: string | null; endsOn: string | null },
+  copy: DiscountsServerCopy,
+  timeZone: string,
+): DiscountValidationError | null {
+  const { startsOn, endsOn } = days;
+  if ((startsOn === null && endsOn === null) || isKnownTimeZone(timeZone)) return null;
   const sentence = copy.datesNeedKnownZone;
   if (typeof sentence !== "string" || sentence.trim() === "") {
     throw new Error(
@@ -97,7 +106,24 @@ function assertPlaceable(startsOn: string | null, endsOn: string | null, copy: D
         "copy.datesNeedKnownZone to be refused with.",
     );
   }
-  throw invalid(startsOn === null ? "endsAt" : "startsAt", sentence);
+  return invalid(startsOn === null ? "endsAt" : "startsAt", sentence);
+}
+
+/**
+ * The two chosen days of a whole-day write, checked as days: each a real day
+ * or blank, and Término not before Início. No clock is needed for that.
+ */
+export function checkedWholeDays(
+  input: Pick<DiscountWriteInput, "startsAt" | "endsAt">,
+  copy: DiscountsServerCopy,
+): { startsOn: string | null; endsOn: string | null } {
+  const startsOn = toDay(input.startsAt, "startsAt", copy);
+  const endsOn = toDay(input.endsAt, "endsAt", copy);
+  // ISO days sort as strings; equal is a one-day promotion.
+  if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
+    throw invalid("endsAt", wholeDaySentence(copy));
+  }
+  return { startsOn, endsOn };
 }
 
 /** The FUT-4482 half: whole days on the store's clock. */
@@ -106,14 +132,9 @@ function assertWholeDays(
   copy: DiscountsServerCopy,
   timeZone: string,
 ): { startsAt: Date | null; endsAt: Date | null } {
-  const startsOn = toDay(input.startsAt, "startsAt", copy);
-  const endsOn = toDay(input.endsAt, "endsAt", copy);
-  // ISO days sort as strings; equal is a one-day promotion.
-  if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
-    throw invalid("endsAt", wholeDaySentence(copy));
-  }
-  assertPlaceable(startsOn, endsOn, copy, timeZone);
-  if (startsOn === null && endsOn === null) return { startsAt: null, endsAt: null };
-  return wholeDayWindow(startsOn, endsOn, timeZone);
+  const days = checkedWholeDays(input, copy);
+  const refusal = unplaceableDays(days, copy, timeZone);
+  if (refusal !== null) throw refusal;
+  if (days.startsOn === null && days.endsOn === null) return { startsAt: null, endsAt: null };
+  return wholeDayWindow(days.startsOn, days.endsOn, timeZone);
 }
-

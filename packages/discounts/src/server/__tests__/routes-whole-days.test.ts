@@ -278,10 +278,12 @@ describe("reading by the row's flag through the routes (FUT-4482, review round 3
     expect(logger.at("warn").join("\n")).toMatch(/without windowInZone/u);
   });
 
-  // Review round 4: an operator who opens a legacy rule and saves it with the
-  // days the form showed stores exactly what the host's migration would have —
-  // the same whole days, flag true — so a save and the migration never disagree.
-  it("re-saves a legacy row on the days it was read as, equal to the migration's answer", async () => {
+  // Review round 6 (B2): edited on purpose. Round 4 had a legacy row re-saved
+  // on the days it was read as turn zoned and grow a day (10..20 exclusive
+  // became 10T03Z..21T03Z). A save that does not change the dates never moves
+  // them: the stored bounds and flag are written as they are, and the host's
+  // migration — not a pause — is what converts the row.
+  it("keeps a legacy row's stored window, flag false, when it is saved on the days it was read as", async () => {
     const legacy = record({
       startsAt: new Date("2026-11-10T00:00:00.000Z"),
       endsAt: new Date("2026-11-20T00:00:00.000Z"),
@@ -289,9 +291,22 @@ describe("reading by the row's flag through the routes (FUT-4482, review round 3
     });
     const { call, writes } = harness({}, legacy);
     const read = (await call("GET", "/discounts/:id")).body as { data: { startsOn: string; endsOn: string } };
-    await call("PATCH", "/discounts/:id", { ...BODY, startsAt: read.data.startsOn, endsAt: read.data.endsOn });
-    expect(writes[0]?.scalars).toMatchObject(legacyUtcWindowToZoned(legacy, SP)!);
-    expect(writes[0]?.scalars.windowInZone).toBe(true);
+    await call("PATCH", "/discounts/:id", { ...BODY, active: false, startsAt: read.data.startsOn, endsAt: read.data.endsOn });
+    expect(writes[0]?.scalars).toMatchObject({ active: false, windowInZone: false });
+    expect(writes[0]?.scalars.startsAt?.toISOString()).toBe("2026-11-10T00:00:00.000Z");
+    expect(writes[0]?.scalars.endsAt?.toISOString()).toBe("2026-11-20T00:00:00.000Z");
+  });
+
+  it("still converts a legacy row whose day changed: whole days in the zone, flag true", async () => {
+    const legacy = record({
+      startsAt: new Date("2026-11-10T00:00:00.000Z"),
+      endsAt: new Date("2026-11-20T00:00:00.000Z"),
+      windowInZone: false,
+    });
+    const { call, writes } = harness({}, legacy);
+    await call("PATCH", "/discounts/:id", { ...BODY, startsAt: "2026-11-10", endsAt: "2026-11-22" });
+    expect(writes[0]?.scalars).toMatchObject(legacyUtcWindowToZoned({ ...legacy, endsAt: new Date("2026-11-22T00:00:00.000Z") }, SP)!);
+    expect(writes[0]?.scalars.endsAt?.toISOString()).toBe("2026-11-23T03:00:00.000Z");
   });
 });
 

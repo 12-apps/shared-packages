@@ -1,4 +1,4 @@
-import type { DiscountsServerCopy } from "./copy";
+import type { CompleteDiscountsServerCopy } from "./copy";
 
 /**
  * The pt-BR pack — a NAMED export a host passes by hand
@@ -10,7 +10,7 @@ import type { DiscountsServerCopy } from "./copy";
  * errors: the route reports them with the offending FIELD alongside, so an
  * admin form can paint that input rather than only flashing a banner.
  */
-export const PT_BR_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
+export const PT_BR_DISCOUNTS_SERVER_COPY: CompleteDiscountsServerCopy = {
   invalidQuery: "Parâmetros de consulta inválidos.",
   notFound: "Desconto não encontrado.",
   invalidPercent: "Informe uma porcentagem maior que 0 e no máximo 100.",
@@ -23,6 +23,9 @@ export const PT_BR_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   endsBeforeStartDay: "A data de término não pode ser anterior à data de início.",
   datesNeedKnownZone:
     "Não foi possível salvar estas datas: o fuso horário da loja não foi reconhecido. Corrija o fuso horário e tente de novo.",
+  keepWindowWithDates:
+    "Não dá para manter as datas salvas e mudar as datas no mesmo envio. Envie só um dos dois.",
+  windowChanged: "A promoção mudou enquanto você editava. Abra de novo e salve.",
   invalidSchedule: "Horários da promoção inválidos. Escolha ao menos um dia e um horário de início e fim diferentes.",
   invalidMinSubtotal: "O pedido mínimo deve ser maior que zero (ou deixe em branco).",
   invalidUsageLimit: "O limite de usos deve ser maior que zero (ou deixe em branco).",

@@ -335,7 +335,8 @@ export interface DiscountWriteBody {
   /**
    * An UPDATE's word that the form could not show the window's days and sends
    * none (FUT-4482, review round 5): every other field is written over the
-   * stored window. Ignored on a create; any dates beside it are ignored.
+   * stored window. Ignored on a create; on an update, a date sent beside it is
+   * refused (422 on `keepWindow`, review round 6) — never dropped in silence.
    */
   keepWindow?: boolean;
 }

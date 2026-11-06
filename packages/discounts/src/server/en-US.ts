@@ -1,4 +1,4 @@
-import type { DiscountsServerCopy } from "./copy";
+import type { CompleteDiscountsServerCopy } from "./copy";
 
 /**
  * The en-US pack — a NAMED export a host passes by hand
@@ -10,7 +10,7 @@ import type { DiscountsServerCopy } from "./copy";
  * translation that generalised them ("invalid data") would keep the field and
  * lose the instruction.
  */
-export const EN_US_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
+export const EN_US_DISCOUNTS_SERVER_COPY: CompleteDiscountsServerCopy = {
   invalidQuery: "Invalid query parameters.",
   notFound: "Discount not found.",
   invalidPercent: "Enter a percentage greater than 0 and at most 100.",
@@ -26,6 +26,9 @@ export const EN_US_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   endsBeforeStartDay: "The end date cannot be before the start date.",
   datesNeedKnownZone:
     "These dates can't be saved: the store's time zone was not recognised. Fix the time zone and try again.",
+  keepWindowWithDates:
+    "The saved dates can't be kept and changed in the same request. Send only one of the two.",
+  windowChanged: "The promotion changed while you were editing. Open it again and save.",
   invalidSchedule: "Invalid promotion schedule. Pick at least one day, and a start and end time that differ.",
   invalidMinSubtotal: "The minimum order must be greater than zero (or left blank).",
   invalidUsageLimit: "The usage limit must be greater than zero (or left blank).",

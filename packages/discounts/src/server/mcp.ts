@@ -212,13 +212,23 @@ const discountWriteShape = {
 export const createDiscountBody = z.object(discountWriteShape);
 
 /**
- * Body for updating a discount (every field re-stated) — and `keepWindow`, the
- * one word an update has that a create has not (FUT-4482, review round 5):
- * `true` when the editor could not show the rule's days (the store's zone is
- * not one the runtime knows) and sends none. The stored window and its flag
- * are then kept, and every other field is written.
+ * Body for updating a discount — and `keepWindow`, the one word an update has
+ * that a create has not (FUT-4482, review rounds 5 and 6): `true` when the
+ * editor could not show the rule's days (the store's zone is not one the
+ * runtime knows) and sends none. The stored window and its flag are then
+ * kept, and every other field is written.
  */
-export const updateDiscountBody = z.object({ ...discountWriteShape, keepWindow: z.boolean().optional() });
+export const updateDiscountBody = z.object({
+  ...discountWriteShape,
+  keepWindow: z
+    .boolean()
+    .optional()
+    .describe(
+      "true to keep the stored campaign window (startsAt, endsAt and its clock) exactly as it is and write " +
+        "every other field. Send it with NO startsAt/endsAt: dates beside it are refused (422 on keepWindow). " +
+        "For a rule read with daysUnknown, this is the only way to save it without new dates. Omit it otherwise.",
+    ),
+});
 
 /**
  * One collection of things a discount may be pointed at, and its rows.
@@ -299,7 +309,11 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     operationId: "updateDiscount",
     method: "PATCH",
     path: "/discounts/{id}",
-    summary: "Update a store's discount (every field is re-stated, targets included).",
+    summary:
+      "Update a store's discount. Every field is re-stated, targets included, except the campaign window when " +
+      "`keepWindow` is true: then startsAt/endsAt are omitted and the stored window is kept. Dates equal to the " +
+      "startsOn/endsOn a read answered keep the stored window unchanged. Answers 409 when the rule kept changing " +
+      "while it was written: read it again and retry.",
     tags: ["discounts"],
     params: discountItemParams,
     body: updateDiscountBody,

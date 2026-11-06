@@ -234,11 +234,26 @@ days. The form then shows the calendar and both boxes disabled, says above them
 that the dates are unavailable and that saving keeps them, and its Salvar sends
 `keepWindow: true` with no dates: the PATCH writes every other field — a pause,
 a rename, a new value — over the STORED `startsAt` / `endsAt` / `windowInZone`,
-without asking the zone anything. **The one refusal left** is a write that
-SENDS dates while the zone is unknown (an MCP call, a script): the server
-cannot place them on the store's clock, so it answers 422 on the date field
-with `copy.datesNeedKnownZone` (required once the zone is passed). It refuses
-the date it cannot place, never the edit. A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
+without asking the zone anything. `keepWindow` sent beside a date is refused
+(422 on `keepWindow`, `copy.keepWindowWithDates`): keep and change are two
+answers, and dropping either in silence would lose an edit.
+
+**A save that does not change the dates never moves them** (review round 6),
+whatever the zone. Every PATCH reads the row first and compares the days it
+sends with the days a read of THAT row showed — a `windowInZone: false` row's
+legacy UTC days (`legacyWindowDays`), a `true` row's days in the store's zone —
+and, where they are equal, writes the stored `startsAt` / `endsAt` /
+`windowInZone` unchanged, under the same condition as every other
+read-then-write below. So the admin form pausing a legacy row saves while the
+zone is unknown, and a legacy row saved unchanged under a known zone stays
+legacy, on its exact bounds, rather than turning zoned and growing a day;
+converting it is the migration's job. **Changed** days take the paths above:
+whole days in a known zone and, the one refusal left, a 422 on the date field
+with `copy.datesNeedKnownZone` (required once the zone is passed) when the zone
+is unknown: the server cannot place a changed day on the store's clock. It
+refuses the date it cannot place, never the edit.
+
+A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
 the function must answer a zone for every tenant it is asked about.
 
 A copy resolver may answer a reader's locale with a pack that lacks
@@ -333,8 +348,9 @@ few hours off the store's. A PATCH of such a row under N is never refused:
   `windowInZone: false`, exactly as a create under N stores them, and the id is
   logged (`warn`, "stored as legacy … rerun the migration").
 
-New rules and legacy rules save as N always saved them. That costs one
-`store.get` per PATCH, only while the zone is off.
+New rules and legacy rules save as N always saved them; a legacy row whose
+days came back unchanged keeps its stored bounds byte for byte. That costs one
+`store.get` per PATCH, which every PATCH makes, zone on or off.
 
 **Then, after every rollback, rerun the migration loop** once N+1 serves again
 and N has drained. The loop only ever converts `false` rows, so "run once" means
@@ -350,16 +366,25 @@ read the row passes `DiscountStore.update` a fourth argument,
 and the store writes only where the row still holds all three, answering
 `{ applied }`. Not the flag alone: a write that copies the stored bounds would
 revert a date change made under the same flag. On `applied: false` the route
-reads again and decides afresh (three reads, then an error that names the
-rule). In Prisma, inside the transaction that rewrites the targets:
+reads again and decides afresh (three reads, then a conflict that names the
+rule, answered 409 with `copy.windowChanged` so the operator re-opens it). In
+Prisma, the conditional row write comes FIRST in the transaction, and the
+targets are rewritten only once it matched, so a row the condition missed keeps
+its targets as well as its window:
 
 ```ts
-const { count } = await tx.discount.updateMany({
-  where: { id, clientId, ...(condition ? condition.window : {}) },
-  data: scalars,
+return db.$transaction(async (tx) => {
+  const { count } = await tx.discount.updateMany({
+    where: { id, clientId, ...(condition ? condition.window : {}) },
+    data: scalars,
+  });
+  if (count !== 1) {
+    if (condition) return { applied: false }; // nothing written: the targets are untouched
+    throw notFound(id);
+  }
+  await rewriteTargets(tx, id, targets); // the join tables, only once the row matched
+  return { applied: true };
 });
-if (condition) return { applied: count === 1 };
-if (count === 0) throw notFound(id);
 ```
 
 A store that ignores the condition and answers nothing keeps working, and the

@@ -91,11 +91,34 @@ describe("keepWindow while the store's zone is unknown (review round 5, B2)", ()
     expect(writes[0]!.condition).toEqual({ window: { startsAt: STARTS, endsAt: ENDS, windowInZone: true } });
   });
 
-  it("ignores any dates sent beside the marker", async () => {
-    const { response, writes } = patch({ ...BODY, keepWindow: true, startsAt: "2026-12-01", endsAt: null });
+  // Review round 6 (N1): edited on purpose. Keeping the window and sending a
+  // date is two answers to one question; dropping the date in silence would
+  // lose an edit, so the combination is refused and named.
+  it.each([
+    ["Início", { startsAt: "2026-12-01", endsAt: null }],
+    ["Término", { startsAt: "", endsAt: "2026-12-01" }],
+  ])("refuses the marker beside %s with a 422 naming the combination", async (_which, dates) => {
+    const { response, writes } = patch({ ...BODY, keepWindow: true, ...dates });
+    expect(await response).toEqual({
+      status: 422,
+      body: {
+        error: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates,
+        issues: { keepWindow: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates },
+      },
+    });
+    expect(writes).toEqual([]);
+  });
+
+  it("says that refusal in the package's en-US pack when the host's pack lacks it", async () => {
+    const without = { ...EN_US_DISCOUNTS_SERVER_COPY, keepWindowWithDates: undefined };
+    const { response } = patch({ ...BODY, keepWindow: true, startsAt: "2026-12-01" }, ROW, { copy: without });
+    expect((await response).body).toMatchObject({ issues: { keepWindow: EN_US_DISCOUNTS_SERVER_COPY.keepWindowWithDates } });
+  });
+
+  it("takes blank dates beside the marker as none", async () => {
+    const { response, writes } = patch({ ...BODY, keepWindow: true, startsAt: "", endsAt: null });
     expect((await response).status).toBe(200);
-    expect(writes[0]!.write.scalars.startsAt).toEqual(STARTS);
-    expect(writes[0]!.write.scalars.endsAt).toEqual(ENDS);
+    expect(writes[0]!.write.scalars).toMatchObject({ startsAt: STARTS, endsAt: ENDS, windowInZone: true });
   });
 
   it("keeps the window with the zone known, and with it off, alike", async () => {
