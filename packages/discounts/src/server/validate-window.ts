@@ -1,4 +1,4 @@
-import { isCalendarDay, wholeDayWindow } from "../timezone";
+import { isCalendarDay, isKnownTimeZone, wholeDayWindow } from "../timezone";
 import type { DiscountsServerCopy } from "./copy";
 import { DiscountValidationError, type DiscountWriteInput } from "./validate";
 
@@ -31,7 +31,8 @@ function toDate(value: string | null, field: string, copy: DiscountsServerCopy):
  * UTC midnight and Término is the exclusive bound. That is the price of not
  * breaking an adopter that has not wired a zone; it is also why the omission
  * is never silent in a host that has — `createApiDiscounts` asks for the zone
- * per tenant and fails the request loudly on one the runtime does not know.
+ * per tenant, and dates sent while it is one the runtime does not know are
+ * refused on the date field (`datesNeedKnownZone`).
  */
 export interface DiscountWindowOptions {
   timeZone?: string;
@@ -81,6 +82,24 @@ function wholeDaySentence(copy: DiscountsServerCopy): string {
   );
 }
 
+/**
+ * Dates sent while the store's zone is one the runtime does not know (review
+ * round 5): they cannot be placed on its clock, so they are refused on the
+ * first date field sent — the one refusal a date problem leaves, never the
+ * edit's. No dates at all need no clock: an open window is open anywhere.
+ */
+function assertPlaceable(startsOn: string | null, endsOn: string | null, copy: DiscountsServerCopy, timeZone: string): void {
+  if ((startsOn === null && endsOn === null) || isKnownTimeZone(timeZone)) return;
+  const sentence = copy.datesNeedKnownZone;
+  if (typeof sentence !== "string" || sentence.trim() === "") {
+    throw new Error(
+      `@12-apps/discounts: dates sent while the store's zone "${timeZone}" is unknown need ` +
+        "copy.datesNeedKnownZone to be refused with.",
+    );
+  }
+  throw invalid(startsOn === null ? "endsAt" : "startsAt", sentence);
+}
+
 /** The FUT-4482 half: whole days on the store's clock. */
 function assertWholeDays(
   input: DiscountWriteInput,
@@ -93,6 +112,8 @@ function assertWholeDays(
   if (startsOn !== null && endsOn !== null && endsOn < startsOn) {
     throw invalid("endsAt", wholeDaySentence(copy));
   }
+  assertPlaceable(startsOn, endsOn, copy, timeZone);
+  if (startsOn === null && endsOn === null) return { startsAt: null, endsAt: null };
   return wholeDayWindow(startsOn, endsOn, timeZone);
 }
 

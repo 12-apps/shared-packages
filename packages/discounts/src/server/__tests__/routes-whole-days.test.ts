@@ -146,9 +146,12 @@ describe("createApiDiscounts with the store's zone (FUT-4482)", () => {
     expect(response.body).toMatchObject({ issues: { endsAt: PT_BR_DISCOUNTS_SERVER_COPY.endsBeforeStartDay } });
   });
 
-  it("fails the request loudly on a zone the runtime does not know", async () => {
+  it("refuses dates on a zone the runtime does not know, on the date field (review round 5)", async () => {
     const { call, writes } = harness({ storeTimeZone: () => "Not/A_Zone" });
-    await expect(call("POST", "/discounts", BODY)).rejects.toThrow(/Not\/A_Zone/);
+    expect(await call("POST", "/discounts", BODY)).toMatchObject({
+      status: 422,
+      body: { issues: { startsAt: PT_BR_DISCOUNTS_SERVER_COPY.datesNeedKnownZone } },
+    });
     expect(writes).toEqual([]);
   });
 
@@ -233,9 +236,12 @@ describe("createApiDiscounts when the store's zone is wrong (FUT-4482, review ro
     expect(writes).toEqual([]);
   });
 
-  it("still refuses an update on an unknown zone", async () => {
+  it("still refuses an update's dates on an unknown zone — on the date field, never the edit", async () => {
     const { call, writes } = harness({ storeTimeZone: () => "Not/A_Zone" });
-    await expect(call("PATCH", "/discounts/:id", BODY)).rejects.toThrow(/Not\/A_Zone/u);
+    expect(await call("PATCH", "/discounts/:id", BODY)).toMatchObject({
+      status: 422,
+      body: { issues: { startsAt: PT_BR_DISCOUNTS_SERVER_COPY.datesNeedKnownZone } },
+    });
     expect(writes).toEqual([]);
   });
 });

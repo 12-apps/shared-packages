@@ -113,6 +113,27 @@ export interface DiscountWrite {
 }
 
 /**
+ * The window a PATCH READ before it decided what to write (FUT-4482, review
+ * round 5): both bounds and the flag, exactly as `get` answered them.
+ *
+ * Passed to {@link DiscountStore.update} only when the write depends on that
+ * read — it copies the stored window over, or it decided from the flag which
+ * clock the window goes on. The store applies the write ONLY where the row
+ * still holds all three (in Prisma: an `updateMany` whose `where` names them,
+ * inside the transaction that rewrites the targets) and answers whether it
+ * did. Not only the flag: a write that copies the stored bounds would revert a
+ * concurrent date change made under the same flag.
+ */
+export interface DiscountUpdateCondition {
+  window: { startsAt: Date | null; endsAt: Date | null; windowInZone: boolean };
+}
+
+/** What a conditional update answers: whether the row still matched. */
+export interface DiscountUpdateOutcome {
+  applied: boolean;
+}
+
+/**
  * The list query as the store receives it: the shared search engine's parsed
  * input, widened so a host can carry pills of its OWN vocabulary through.
  *
@@ -141,8 +162,21 @@ export interface DiscountStore {
    * offending field.
    */
   create(clientId: string, write: DiscountWrite): Promise<DiscountRecord>;
-  /** Re-state a discount whole. Raises the host's not-found for a stale id. */
-  update(clientId: string, id: string, write: DiscountWrite): Promise<void>;
+  /**
+   * Re-state a discount whole. Raises the host's not-found for a stale id.
+   *
+   * With a `condition`, write only where the row still holds that window and
+   * flag, and answer `{ applied }` — false sends the route back to read the
+   * row again and decide afresh. A store that ignores the condition and
+   * answers nothing keeps working, and is warned about on every such write:
+   * it leaves the read-then-write race open.
+   */
+  update(
+    clientId: string,
+    id: string,
+    write: DiscountWrite,
+    condition?: DiscountUpdateCondition,
+  ): Promise<void | DiscountUpdateOutcome>;
   /**
    * SOFT-delete. The row survives: its redemption snapshots are order history
    * and its counter is reporting history, so removing it would either orphan

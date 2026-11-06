@@ -16,7 +16,6 @@ import {
   type DiscountsServerCopy,
 } from "./copy";
 import {
-  assertKeepsZonedFlag,
   assertWholeDayCopy,
   pageWithCalendarDays,
   readZoneFor,
@@ -28,6 +27,7 @@ import {
   type StoreTimeZone,
 } from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
+import { keepsWindow, updateWithWindow, windowModeOf } from "./update-window";
 import { listDiscountsQuery } from "./mcp";
 import { DISCOUNTS_READ, DISCOUNTS_WRITE } from "./contribution";
 import type { DiscountListInput, DiscountRecord, DiscountStore } from "./store";
@@ -113,10 +113,11 @@ export interface DiscountsApiConfig {
    * With it, Início and Término count WHOLE days on that clock: a write stores
    * the first instant of Início and of the day after Término, Início = Término
    * is a one-day promotion, and every record answered carries `startsOn` /
-   * `endsOn`, the days it runs on there. A zone the runtime does not know fails
-   * every WRITE rather than storing a window on a guessed clock; a read answers
-   * its records without their days and logs a warning, so the list stays
-   * usable and shows no guessed days. A null or
+   * `endsOn`, the days it runs on there. A zone the runtime does not know
+   * refuses DATES sent to it (422 on the date field) rather than storing a
+   * window on a guessed clock, while an edit that keeps the stored window
+   * (`keepWindow`) saves; a read answers its records without their days and
+   * logs a warning, so the list stays usable and shows no guessed days. A null or
    * blank answer for a tenant fails every route: guard a nullable lookup.
    *
    * Omitted, every write and answer is what it was before: UTC midnights, an
@@ -159,18 +160,23 @@ async function prepareWrite(
   copy: DiscountsServerCopy,
   clientId: string,
   body: unknown,
+  write: "create" | "update",
 ) {
-  const input = toDiscountWriteInput(body as DiscountWriteBody);
-  const timeZone = await zoneFor(config.storeTimeZone, clientId);
+  // `keepWindow` (an update's only, review round 5): the STORED dates are put
+  // back by the update, so none is read here and no zone is asked.
+  const keepWindow = write === "update" && keepsWindow(body);
+  const sent = toDiscountWriteInput(body as DiscountWriteBody);
+  const input = keepWindow ? { ...sent, startsAt: null, endsAt: null } : sent;
+  const timeZone = keepWindow ? undefined : await zoneFor(config.storeTimeZone, clientId);
   const scalars =
     timeZone === undefined
       ? toDiscountScalars(input, copy)
       : toDiscountScalars(input, wholeDayCopyFor(copy, resolveDiscountsCopy(config.copy, undefined)), { timeZone });
-  const write = { scalars, targets: targetsForScope(input) };
+  const folded = { scalars, targets: targetsForScope(input) };
   if (config.collections) {
-    await assertTargetsOwned(config.collections, clientId, write.targets, copy.foreignTarget);
+    await assertTargetsOwned(config.collections, clientId, folded.targets, copy.foreignTarget);
   }
-  return { write, timeZone };
+  return { write: folded, timeZone, sent: { startsAt: sent.startsAt, endsAt: sent.endsAt }, keepWindow };
 }
 
 /**
@@ -286,6 +292,7 @@ function createRoute(config: DiscountsApiConfig): DiscountRoute {
         resolveDiscountsCopy(config.copy, locale),
         actor.clientId,
         body,
+        "create",
       );
       const created = await config.store.create(actor.clientId, write);
       logWrite(config.logger, "created", request, created.id);
@@ -305,10 +312,17 @@ function updateRoute(config: DiscountsApiConfig): DiscountRoute {
       const { actor, params, body, locale } = request;
       const id = String(params.id);
       const copy = resolveDiscountsCopy(config.copy, locale);
-      const { write, timeZone } = await prepareWrite(config, copy, actor.clientId, body);
-      const target = { clientId: actor.clientId, id, timeZone };
-      await assertKeepsZonedFlag(config.store, target, copy, resolveDiscountsCopy(config.copy, undefined));
-      await config.store.update(actor.clientId, id, write);
+      // Validation and the ownership check run FIRST, before the store is read:
+      // a refused body costs no read, and the window never excuses a bad one.
+      const prepared = await prepareWrite(config, copy, actor.clientId, body, "update");
+      const mode = windowModeOf(prepared);
+      if (mode === null) {
+        await config.store.update(actor.clientId, id, prepared.write);
+      } else {
+        const target = { clientId: actor.clientId, id, logger: config.logger };
+        const outcome = await updateWithWindow(config.store, target, mode, prepared.write);
+        if (outcome === "missing") return { status: 404, body: { error: copy.notFound } };
+      }
       logWrite(config.logger, "re-stated", request, id);
       return acknowledged(id);
     }),

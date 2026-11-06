@@ -211,8 +211,14 @@ const discountWriteShape = {
 /** Body for creating a discount. */
 export const createDiscountBody = z.object(discountWriteShape);
 
-/** Body for updating a discount (every field re-stated). */
-export const updateDiscountBody = z.object(discountWriteShape);
+/**
+ * Body for updating a discount (every field re-stated) — and `keepWindow`, the
+ * one word an update has that a create has not (FUT-4482, review round 5):
+ * `true` when the editor could not show the rule's days (the store's zone is
+ * not one the runtime knows) and sends none. The stored window and its flag
+ * are then kept, and every other field is written.
+ */
+export const updateDiscountBody = z.object({ ...discountWriteShape, keepWindow: z.boolean().optional() });
 
 /**
  * One collection of things a discount may be pointed at, and its rows.

@@ -225,12 +225,20 @@ With it, a write stores `startsAt` = the first instant of Início and `endsAt`
 AFTER Término, both in that zone; Início = Término is a one-day promotion, and
 only a Término before Início is refused (`copy.endsBeforeStartDay`, required
 once the zone is passed). Every record answered carries `startsOn` / `endsOn`,
-the days it runs on there, and the admin form and grid read those back. An
-unknown zone fails every write instead of storing a window on a guessed clock;
-a read answers a rule written in that zone with `daysUnknown: true` in place of
-`startsOn` / `endsOn` and logs a warning, so the list stays usable while the
-zone is fixed and shows no guessed days (the form and the grid say the dates
-are unavailable). A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
+the days it runs on there, and the admin form and grid read those back.
+
+**An unknown zone never refuses an edit.** A read answers a rule written in
+that zone with `daysUnknown: true` in place of `startsOn` / `endsOn` and logs a
+warning, so the list stays usable while the zone is fixed and shows no guessed
+days. The form then shows the calendar and both boxes disabled, says above them
+that the dates are unavailable and that saving keeps them, and its Salvar sends
+`keepWindow: true` with no dates: the PATCH writes every other field — a pause,
+a rename, a new value — over the STORED `startsAt` / `endsAt` / `windowInZone`,
+without asking the zone anything. **The one refusal left** is a write that
+SENDS dates while the zone is unknown (an MCP call, a script): the server
+cannot place them on the store's clock, so it answers 422 on the date field
+with `copy.datesNeedKnownZone` (required once the zone is passed). It refuses
+the date it cannot place, never the edit. A legacy row (`windowInZone` false) still reads its UTC days. A null or blank answer for a tenant fails every route —
 the function must answer a zone for every tenant it is asked about.
 
 A copy resolver may answer a reader's locale with a pack that lacks
@@ -270,6 +278,12 @@ loop run early only has to be run again).
 ```ts
 import { LegacyWindowNotMidnightError, legacyUtcWindowToZoned } from "@12-apps/discounts/server";
 
+// The host's own: its Prisma client, the tenant, its zone, and any logger with `warn`.
+declare const db: PrismaClient;
+declare const clientId: string;
+declare const zone: string; // the same answer storeTimeZone gives for clientId
+declare const logger: { warn(message: string): void };
+
 const legacy = await db.discount.findMany({
   // `archivedAt: undefined` NAMES the key, which switches off the host's
   // soft-delete default (archived rows are filtered out unless the key is
@@ -305,22 +319,53 @@ is still migrated. A `false` row whose bound is not a UTC midnight throws a
 skips and logs; it keeps reading on its UTC days, as it always did. An unknown
 zone throws a plain `Error`, which aborts.
 
-**Rolling back from N+1 to N is not edit-safe on its own.** N runs with the
-zone off, and a row N+1 flagged holds a window in the store's zone: N cannot
-place its days, and it reads that row as it reads every row without a zone —
-the stored instants, which still price right (the engine compares instants),
-but shown on their UTC dates, a few hours off the store's. Re-saving such a
-row under N would store UTC midnights with the flag `false`: a legacy window
-again, which the next N+1 reads a day long, and a migration that already ran
-never sees. So **a write with the zone off refuses to un-flag a row**: the
-PATCH of a flagged rule answers 422 on Início with `zonedWindowNeedsZone`
-("Não é possível alterar esta promoção agora…"), and the row keeps its window.
-New rules and legacy (`false`) rules save as N always saved them. That costs
-one `store.get` per PATCH, only while the zone is off. In practice: during a
-rollback the flagged rules are frozen until N+1 is back, by the server; tell
-operators that edits to those rules wait, or accept the freeze. Rules N
-created or re-saved meanwhile are legacy (`false`) rows, read right by N+1:
-rerun the loop once N+1 has drained N again, and they are converted too.
+**Rolling back from N+1 to N keeps every edit.** N runs with the zone off,
+and a row N+1 flagged holds a window in the store's zone that N cannot place:
+N reads it as it reads every row without a zone — the stored instants, which
+still price right (the engine compares instants), shown on their UTC dates, a
+few hours off the store's. A PATCH of such a row under N is never refused:
+
+- **The dates the zone-off form showed came back unchanged** (each stored
+  bound's UTC date): the stored `startsAt` / `endsAt` and `windowInZone: true`
+  are written. A pause, a rename or a new value leaves the row flagged and its
+  window as N+1 wrote it.
+- **The dates changed:** they are stored as legacy UTC midnights with
+  `windowInZone: false`, exactly as a create under N stores them, and the id is
+  logged (`warn`, "stored as legacy … rerun the migration").
+
+New rules and legacy rules save as N always saved them. That costs one
+`store.get` per PATCH, only while the zone is off.
+
+**Then, after every rollback, rerun the migration loop** once N+1 serves again
+and N has drained. The loop only ever converts `false` rows, so "run once" means
+once per batch of legacy rows, not once ever: the rows N wrote during the
+rollback — new rules, and flagged rules re-saved with new dates — are `false`
+rows the earlier run never saw, and the rerun converts them like any other.
+
+**The write is conditional.** Deciding from the row and then writing it is a
+read-then-write: between the two, another instance can re-date or re-flag the
+row, and copying the stale window over would undo that. So every PATCH that
+read the row passes `DiscountStore.update` a fourth argument,
+`{ window: { startsAt, endsAt, windowInZone } }` — the window and flag as read —
+and the store writes only where the row still holds all three, answering
+`{ applied }`. Not the flag alone: a write that copies the stored bounds would
+revert a date change made under the same flag. On `applied: false` the route
+reads again and decides afresh (three reads, then an error that names the
+rule). In Prisma, inside the transaction that rewrites the targets:
+
+```ts
+const { count } = await tx.discount.updateMany({
+  where: { id, clientId, ...(condition ? condition.window : {}) },
+  data: scalars,
+});
+if (condition) return { applied: count === 1 };
+if (count === 0) throw notFound(id);
+```
+
+A store that ignores the condition and answers nothing keeps working, and the
+route warns on each such write that the race is open. A store that maps no
+`windowInZone` while the zone is off is warned about too: it cannot tell a
+zoned rule from a legacy one.
 
 The web surface must be told the same thing: pass `wholeDays: true` to
 `createWebDiscounts` on the host whose server passes `storeTimeZone`. With it the

@@ -24,8 +24,8 @@ export const EN_US_DISCOUNTS_SERVER_COPY: DiscountsServerCopy = {
   invalidDate: "Invalid date. Use the format YYYY-MM-DD.",
   endsBeforeStarts: "The end date must be after the start date.",
   endsBeforeStartDay: "The end date cannot be before the start date.",
-  zonedWindowNeedsZone:
-    "This promotion can't be changed right now: its dates were saved in the store's time zone, which is unavailable. Try again later.",
+  datesNeedKnownZone:
+    "These dates can't be saved: the store's time zone was not recognised. Fix the time zone and try again.",
   invalidSchedule: "Invalid promotion schedule. Pick at least one day, and a start and end time that differ.",
   invalidMinSubtotal: "The minimum order must be greater than zero (or left blank).",
   invalidUsageLimit: "The usage limit must be greater than zero (or left blank).",

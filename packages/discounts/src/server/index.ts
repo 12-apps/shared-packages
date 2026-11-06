@@ -53,6 +53,8 @@ export type {
   DiscountRecord,
   DiscountStore,
   DiscountWrite,
+  DiscountUpdateCondition,
+  DiscountUpdateOutcome,
 } from "./store";
 
 export {

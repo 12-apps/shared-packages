@@ -1,8 +1,7 @@
 import { isKnownTimeZone, legacyWindowDays, windowCalendarDays } from "../timezone";
 import type { DiscountsServerCopy } from "./copy";
 import type { DiscountsLogger } from "./logging";
-import type { DiscountPage, DiscountRecord, DiscountStore } from "./store";
-import { DiscountValidationError } from "./validate";
+import type { DiscountPage, DiscountRecord } from "./store";
 
 /**
  * The store's zone, per tenant, as a host answers it (FUT-4482).
@@ -47,7 +46,7 @@ const OFF: ReadZone = { kind: "off" };
 /**
  * The zone a read places days on. A zone the runtime does not know cannot place
  * them, and a read is not where that must stop the screen: nothing is stored
- * from it, and every write still refuses that zone loudly. So a row written in
+ * from it, and a write that sends dates refuses that zone on the date field. So a row written in
  * the zone is answered `daysUnknown` — days placed on UTC would be other days
  * than the store's, and a form would show them as if they were — and the
  * logger says why.
@@ -62,7 +61,7 @@ export async function readZoneFor(
   if (isKnownTimeZone(zone)) return { kind: "zone", timeZone: zone };
   logger.warn(
     `discounts: unknown store time zone "${zone}" for tenant ${clientId} — rules written in it are ` +
-      "answered without their days; every write is refused until the zone is one this runtime knows.",
+      "answered without their days, and dates sent to it are refused until the zone is one this runtime knows.",
   );
   return { kind: "unknown" };
 }
@@ -116,6 +115,9 @@ export function warnUnflagged(
   );
 }
 
+/** The sentences only a surface counting whole days says (FUT-4482). */
+const WHOLE_DAY_KEYS = ["endsBeforeStartDay", "datesNeedKnownZone"] as const;
+
 const said = (sentence: string | undefined): sentence is string =>
   typeof sentence === "string" && sentence.trim() !== "";
 
@@ -130,16 +132,18 @@ export function assertWholeDayCopy(
   copy: DiscountsServerCopy,
 ): void {
   if (storeTimeZone === undefined) return;
-  if (said(copy.endsBeforeStartDay)) return;
+  const missing = WHOLE_DAY_KEYS.filter((key) => !said(copy[key]));
+  if (missing.length === 0) return;
   throw new Error(
     "@12-apps/discounts: createApiDiscounts counts whole days (storeTimeZone) but is missing copy " +
-      "for endsBeforeStartDay — the refusal of an end day before the start day.",
+      `for ${missing.join(", ")} — the refusals of an end day before the start day, and of dates ` +
+      "sent while the store's zone is unknown.",
   );
 }
 
 /**
  * The copy one whole-day write refuses in. A resolver may answer a reader's
- * locale with a pack the mount never saw; where that pack has no whole-day
+ * locale with a pack the mount never saw; where that pack lacks a whole-day
  * sentence, the default rendering's (asserted at the mount) is said instead —
  * a true sentence, never the "must be after" that equal days would make false.
  */
@@ -147,39 +151,10 @@ export function wholeDayCopyFor(
   copy: DiscountsServerCopy,
   fallback: DiscountsServerCopy,
 ): DiscountsServerCopy {
-  if (said(copy.endsBeforeStartDay)) return copy;
-  return { ...copy, endsBeforeStartDay: fallback.endsBeforeStartDay };
-}
-
-/**
- * The ROLLBACK guard (FUT-4482, review round 4): with the zone off, a write
- * may not un-flag a row written in the zone.
- *
- * A release with no `storeTimeZone` — the one before whole days, or that same
- * release again after a rollback — stores UTC midnights and `windowInZone:
- * false`. Re-stating a FLAGGED row that way would hand it back as a legacy
- * window the next zoned release reads on other days, and the host's migration,
- * already run, would never see it again. Reading such a row is harmless (the
- * engine prices its instants, which are right); writing it is not. So the
- * write is refused on Início with a sentence, and the row keeps its window.
- * Only a write with the zone off asks the store: with it on there is nothing
- * to un-flag.
- */
-export async function assertKeepsZonedFlag(
-  store: DiscountStore,
-  target: { clientId: string; id: string; timeZone: string | undefined },
-  copy: DiscountsServerCopy,
-  fallback: DiscountsServerCopy,
-): Promise<void> {
-  if (target.timeZone !== undefined) return;
-  const row = await store.get(target.clientId, target.id);
-  if (row?.windowInZone !== true) return;
-  const sentence = [copy.zonedWindowNeedsZone, fallback.zonedWindowNeedsZone].find(said);
-  if (sentence === undefined) {
-    throw new Error(
-      "@12-apps/discounts: a write with no storeTimeZone reached a rule written in the store's zone, " +
-        "and the copy has no zonedWindowNeedsZone to refuse it with — refused all the same.",
-    );
-  }
-  throw new DiscountValidationError("startsAt", sentence);
+  if (WHOLE_DAY_KEYS.every((key) => said(copy[key]))) return copy;
+  return {
+    ...copy,
+    endsBeforeStartDay: said(copy.endsBeforeStartDay) ? copy.endsBeforeStartDay : fallback.endsBeforeStartDay,
+    datesNeedKnownZone: said(copy.datesNeedKnownZone) ? copy.datesNeedKnownZone : fallback.datesNeedKnownZone,
+  };
 }

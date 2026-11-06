@@ -332,6 +332,12 @@ export interface DiscountWriteBody {
   menuItemIds?: string[];
   comboRequirements?: ComboRequirement[];
   maxComboApplications?: number | null;
+  /**
+   * An UPDATE's word that the form could not show the window's days and sends
+   * none (FUT-4482, review round 5): every other field is written over the
+   * stored window. Ignored on a create; any dates beside it are ignored.
+   */
+  keepWindow?: boolean;
 }
 
 /**

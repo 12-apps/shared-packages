@@ -121,8 +121,14 @@ describe("whole days in the store's zone (FUT-4482)", () => {
     expect(scalars.endsAt?.toISOString()).toBe("2026-11-10T15:00:00.000Z");
   });
 
-  it("fails LOUDLY on a zone the runtime does not know, rather than guessing UTC", () => {
-    expect(() => scalarsIn({ startsAt: "2026-11-10" }, "Mars/Olympus_Mons")).toThrow(/Mars\/Olympus_Mons/);
+  it("refuses dates on a zone the runtime does not know, rather than guessing UTC", () => {
+    expect(() => scalarsIn({ startsAt: "2026-11-10" }, "Mars/Olympus_Mons")).toThrow(
+      PT_BR_DISCOUNTS_SERVER_COPY.datesNeedKnownZone,
+    );
+  });
+
+  it("places an open window on an unknown zone: no dates need no clock", () => {
+    expect(scalarsIn({}, "Mars/Olympus_Mons")).toMatchObject({ startsAt: null, endsAt: null, windowInZone: true });
   });
 
   it("with no zone, keeps today's behaviour exactly: UTC midnight, Término exclusive, equal refused", () => {
