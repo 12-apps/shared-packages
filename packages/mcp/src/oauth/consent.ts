@@ -142,7 +142,7 @@ export async function consentDecisionEndpoint(
   // Consume before minting: a crash or repeated click can never issue two codes.
   // A lost response requires a fresh authorization flow, not a credential replay.
   const result = decision.decision === "deny"
-    ? errorRedirect(validated.redirectUri, "access_denied", validated.state)
+    ? errorRedirect(validated, "access_denied")
     : await mintAuthorization(context, session, origin, validated);
   return json({ redirectUrl: result.headers.get("location") });
 }

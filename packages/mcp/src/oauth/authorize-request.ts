@@ -1,6 +1,6 @@
 import { matchesRedirectUri } from "./clients";
 import { isClientIdMetadataUrl, matchesLoopbackRedirectUri } from "./client-metadata";
-import { resourceAudience } from "./config";
+import { issuer, resourceAudience } from "./config";
 import type { McpOauthContext } from "./context";
 import { SUPPORTED_CHALLENGE_METHOD } from "./pkce";
 import type { StoredOAuthClient } from "./stores";
@@ -56,18 +56,35 @@ function badRequest(message: string): Response {
 }
 
 /**
- * Build an error redirect back to the (already-validated) `redirect_uri`, carrying
- * the OAuth `error` and the echoed `state` per OAuth 2.1 §4.1.2.1.
+ * Where an authorization response goes: the already-validated `redirect_uri`, the
+ * `state` to echo, and the `iss` to name (RFC 9207, the mix-up defence; the CIMD
+ * draft makes it a MUST for a server that accepts metadata-document clients).
  */
-export function errorRedirect(
-  redirectUri: string,
-  error: AuthorizeErrorCode,
-  state: string | null,
-): Response {
-  const target = new URL(redirectUri);
-  target.searchParams.set("error", error);
-  if (state !== null) target.searchParams.set("state", state);
+export interface AuthorizeCallback {
+  redirectUri: string;
+  state: string | null;
+  /** The issuer of the request's trusted origin, as the metadata's `issuer` serves it. */
+  issuer: string;
+}
+
+/**
+ * Every authorization response, success or error, is the callback plus its own
+ * parameters, then `state` and `iss` (RFC 9207 §2).
+ */
+export function callbackRedirect(callback: AuthorizeCallback, params: Readonly<Record<string, string>>): Response {
+  const target = new URL(callback.redirectUri);
+  for (const [name, value] of Object.entries(params)) target.searchParams.set(name, value);
+  if (callback.state !== null) target.searchParams.set("state", callback.state);
+  target.searchParams.set("iss", callback.issuer);
   return redirectTo(target.toString());
+}
+
+/**
+ * Build an error redirect back to the (already-validated) `redirect_uri`, carrying
+ * the OAuth `error`, the echoed `state` (OAuth 2.1 §4.1.2.1) and `iss`.
+ */
+export function errorRedirect(callback: AuthorizeCallback, error: AuthorizeErrorCode): Response {
+  return callbackRedirect(callback, { error });
 }
 
 /**
@@ -118,33 +135,29 @@ async function validateClientAndRedirect(
  */
 function validateAuthorizeRequest(
   params: AuthorizeParams,
-  redirectUri: string,
+  callback: AuthorizeCallback,
   clientScopes: readonly string[],
 ): Response | null {
-  const { state } = params;
-
   if (params.responseType !== "code") {
-    return errorRedirect(redirectUri, "unsupported_response_type", state);
+    return errorRedirect(callback, "unsupported_response_type");
   }
   // Mandatory PKCE S256: reject a missing challenge or any non-S256 method.
   if (!params.codeChallenge || params.codeChallengeMethod !== SUPPORTED_CHALLENGE_METHOD) {
-    return errorRedirect(redirectUri, "invalid_request", state);
+    return errorRedirect(callback, "invalid_request");
   }
   if (!scopeIsSupported(params.scope, clientScopes)) {
-    return errorRedirect(redirectUri, "invalid_scope", state);
+    return errorRedirect(callback, "invalid_scope");
   }
   return null;
 }
 
 /** The already-validated inputs an authorize request resolves to before minting. */
-export interface ValidatedAuthorize {
+export interface ValidatedAuthorize extends AuthorizeCallback {
   /** The registered client — needed by the approval seam, not just its id. */
   client: StoredOAuthClient;
   clientId: string;
-  redirectUri: string;
   codeChallenge: string;
   scope: string;
-  state: string | null;
 }
 
 /** Validate without authenticating or issuing any credential. */
@@ -161,18 +174,18 @@ export async function validateAuthorization(
   const params = parseParams(url);
   const result = await validateClientAndRedirect(context, params);
   if (result instanceof Response) return result;
-  const error = validateAuthorizeRequest(params, result.redirectUri, result.client.scopes);
+  const callback: AuthorizeCallback = { redirectUri: result.redirectUri, state: params.state, issuer: issuer(origin) };
+  const error = validateAuthorizeRequest(params, callback, result.client.scopes);
   if (error) return error;
   const resource = url.searchParams.get("resource");
   if (resource !== null && resource !== resourceAudience(origin, context.resourcePath)) {
-    return errorRedirect(result.redirectUri, "invalid_request", params.state);
+    return errorRedirect(callback, "invalid_request");
   }
   return {
+    ...callback,
     client: result.client,
     clientId: params.clientId as string,
-    redirectUri: result.redirectUri,
     codeChallenge: params.codeChallenge as string,
     scope: params.scope ?? "",
-    state: params.state,
   };
 }

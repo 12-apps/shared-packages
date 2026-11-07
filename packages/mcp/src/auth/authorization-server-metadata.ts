@@ -58,6 +58,8 @@ export interface AuthorizationServerMetadata {
   grant_types_supported: string[];
   code_challenge_methods_supported: string[];
   token_endpoint_auth_methods_supported: string[];
+  /** RFC 9207: every authorization response, success or error, carries `iss`. */
+  authorization_response_iss_parameter_supported: true;
   client_id_metadata_document_supported?: true;
 }
 
@@ -96,6 +98,7 @@ export function buildAuthorizationServerMetadata(
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported:
       input.tokenEndpointAuthMethods ?? [...DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS],
+    authorization_response_iss_parameter_supported: true,
     ...(input.clientIdMetadataDocumentSupported ? { client_id_metadata_document_supported: true as const } : {}),
   };
 }

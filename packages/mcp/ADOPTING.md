@@ -247,6 +247,13 @@ library updates, every host updates with **no app changes**. Same contract
 | POST | `/api/oauth/token` | `authorization_code` (single-use, PKCE-verified, bound `redirect_uri`) and `refresh_token` (rotated, client-bound, narrow-only scope) |
 | POST | `/api/oauth/register` | 201 RFC 7591 client information; the secret exactly once, hashed at rest |
 
+Every redirect back to a client's `redirect_uri`, the code and every error alike
+(and the consent decision's `redirectUrl`), carries `iss`: the issuer of the
+request's trusted origin, the same value the metadata's `issuer` serves, which
+advertises `authorization_response_iss_parameter_supported: true` (RFC 9207, the
+mix-up defence; FUT-4523). A host consent screen that re-checks the returned URL
+must leave its query alone.
+
 ## The MCP transport (`/api/mcp`)
 
 `handleMcpJsonRpc` is the JSON-RPC 2.0 request half of the Streamable HTTP

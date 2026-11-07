@@ -33,6 +33,8 @@ describe("buildAuthorizationServerMetadata", () => {
       "none",
       "client_secret_basic",
     ]);
+    // RFC 9207: every authorization response carries `iss` (FUT-4523).
+    expect(meta.authorization_response_iss_parameter_supported).toBe(true);
   });
 
   it("passes the supplied scopes through to scopes_supported", () => {
