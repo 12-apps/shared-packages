@@ -30,7 +30,6 @@ import { getByLabelFor } from "./labelled-control";
 const copy = PT_BR_DISCOUNTS_WEB_COPY;
 const SURFACE_LOADED = { timeout: 10_000 };
 
-
 const UNKNOWN: DiscountWireRecord = {
   id: "d-1",
   name: "Semana do hambúrguer",

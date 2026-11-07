@@ -30,7 +30,6 @@ import { STILL_THEME } from "./still-theme";
 
 const SURFACE_LOADED = { timeout: 10_000 };
 
-
 const LOCKED: DiscountWireRecord = {
   id: "d-1",
   name: "Semana do hambúrguer",
