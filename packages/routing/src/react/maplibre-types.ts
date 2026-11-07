@@ -18,7 +18,7 @@ export interface MapLike {
   /** Optional so an older fake still drives the map; a draggable pin's arrow step and `onZoomChange` read it. */
   getZoom?(): number;
   /** Optional like `getZoom`; `focus.zoom` centres with it (a fit stands in without it). */
-  easeTo?(options: { center: [number, number]; zoom: number; duration: number }): unknown;
+  easeTo?(options: { center: [number, number]; zoom: number; padding?: { top: number; right: number; bottom: number; left: number }; duration: number }): unknown;
   /** Optional like `getZoom`; an arrow-key nudge keeps a pin inside the frame with it. */
   unproject?(point: [number, number]): { lng: number; lat: number };
   /** Optional like `getZoom`; the scale bar reads its latitude. */

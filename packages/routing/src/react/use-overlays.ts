@@ -135,8 +135,9 @@ export function useOverlays(
   };
 
   const fitTo = (points: readonly LngLat[], zoom?: number): void => {
-    if (centreAt(handle.mapRef.current, points.filter((point) => isValidPoint(point)), zoom)) return;
-    const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
+    const valid = points.filter((point) => isValidPoint(point));
+    if (centreAt(handle.mapRef.current, valid, zoom, fitPadding(propsRef.current))) return;
+    const bounds = boundsOf(valid);
     // Animated: its zoomend/moveend re-place the tags where it lands.
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
   };
@@ -274,10 +275,15 @@ function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPla
     });
 }
 
-/** `focus.zoom`: centre on the points at exactly that zoom; false when there is no zoom or the map cannot ease. */
-function centreAt(map: MapLike | null, points: readonly LngLat[], zoom: number | undefined): boolean {
-  if (zoom === undefined || points.length === 0 || !map?.easeTo) return false;
-  const mean = (pick: (point: LngLat) => number): number => points.reduce((sum, point) => sum + pick(point), 0) / points.length;
-  map.easeTo({ center: [mean((point) => point.lng), mean((point) => point.lat)], zoom, duration: 300 });
+/**
+ * `focus.zoom`: centre on the points' bounds at exactly that zoom, inside the
+ * same padding a fit keeps clear; false when there is no zoom or the map cannot
+ * ease. At a fixed zoom, far-apart points may fall outside the frame.
+ */
+function centreAt(map: MapLike | null, points: readonly LngLat[], zoom: number | undefined, padding: Record<Edge, number>): boolean {
+  const bounds = boundsOf(points);
+  if (zoom === undefined || !bounds || !map?.easeTo) return false;
+  const [[west, south], [east, north]] = bounds;
+  map.easeTo({ center: [(west + east) / 2, (south + north) / 2], zoom, padding, duration: 300 });
   return true;
 }

@@ -27,7 +27,7 @@ interface FakeMarker {
 }
 
 /** A MapLibre stand-in that records sources' data, markers' options and drag listeners. */
-function fakeMapLibre(initialZoom = 13) {
+function fakeMapLibre(initialZoom = 13, canEase = true) {
   /** What the fake map reports as its zoom; a test zooms it by writing here. */
   const view = { zoom: initialZoom };
   const data = new Map<string, unknown>();
@@ -109,11 +109,12 @@ function fakeMapLibre(initialZoom = 13) {
     for (const listener of listeners[event] ?? []) listener();
   };
   const constructed = () => (listeners.load?.length ?? 0) > 0;
+  if (!canEase) Reflect.deleteProperty(lib.Map.prototype, "easeTo");
   return { lib, data, layers, markers, fire, constructed, view, eased, fitted };
 }
 
-async function mount(props: Partial<RouteMapProps>, zoom = 13) {
-  const fake = fakeMapLibre(zoom);
+async function mount(props: Partial<RouteMapProps>, zoom = 13, canEase = true) {
+  const fake = fakeMapLibre(zoom, canEase);
   const { RouteMap } = createWebRouting({ copy: EN_US_ROUTE_MAP_COPY, theme: THEME, loadMapLibre: async () => fake.lib });
   const view = render(<RouteMap height={400} {...props} />);
   await waitFor(() => expect(fake.constructed()).toBe(true));
@@ -350,7 +351,22 @@ describe("RouteMap · the scale bar", () => {
 describe("RouteMap · a focus at a zoom", () => {
   it("centres on the points at exactly the zoom asked, without a fit", async () => {
     const { fake } = await mount({ focus: { key: "street", points: [[SHOP.lng, SHOP.lat]], zoom: 16 } });
-    await waitFor(() => expect(fake.eased).toEqual([{ center: [SHOP.lng, SHOP.lat], zoom: 16, duration: 300 }]));
+    await waitFor(() =>
+      expect(fake.eased).toEqual([{ center: [SHOP.lng, SHOP.lat], zoom: 16, padding: { top: 40, right: 76, bottom: 48, left: 40 }, duration: 300 }]),
+    );
+    expect(fake.fitted).toEqual([]);
+  });
+
+  it("keeps the host's insets clear when it centres", async () => {
+    const { fake } = await mount({ focus: { key: "street", points: [[SHOP.lng, SHOP.lat]], zoom: 16 }, insets: { bottom: 60 } });
+    await waitFor(() => expect(fake.eased).toHaveLength(1));
+    expect(fake.eased[0]).toMatchObject({ padding: { bottom: 108 } });
+  });
+
+  it("falls back to the fit on a map that cannot ease", async () => {
+    const { fake } = await mount({ focus: { key: "street", points: [[SHOP.lng, SHOP.lat]], zoom: 16 } }, 13, false);
+    await waitFor(() => expect(fake.fitted.length).toBeGreaterThan(0));
+    expect(fake.eased).toEqual([]);
   });
 
   it("fits as before when no zoom is asked", async () => {

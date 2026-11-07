@@ -94,8 +94,10 @@ const { RouteMap } = createWebRouting({
   receives their ids; without that callback, the map zooms in on them.
 - `focus={{ key, points }}` fits to just those points (a selected trip)
   whenever `key` changes — a viewer's selection, never a refresh.
-  `focus={{ key, points, zoom: 16 }}` centres on them at exactly that zoom
-  instead: a fit pads a lone point to a few hundred metres and keeps the
+  `focus={{ key, points, zoom: 16 }}` centres on their bounds at exactly that
+  zoom instead, inside the same padding and `insets` a fit keeps clear (far-apart
+  points may fall outside the frame; a new `zoom` under the same `key` does
+  nothing): a fit pads a lone point to a few hundred metres and keeps the
   controls clear, which on a small map stops short of the street.
 - `insets={{ bottom: legendHeight }}` tells the fit what the host's own
   overlays cover, so fitted pins never land under a legend or a sheet.
