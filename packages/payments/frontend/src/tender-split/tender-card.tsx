@@ -74,7 +74,7 @@ export function TenderChoice<T extends string>({
     >
       <TenderHeading tender={tender} />
       {price === null ? null : (
-        <Typography variant="body2" color="text.secondary" data-testid={`${testId}-price`} sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+        <Typography variant="caption" color="text.secondary" data-testid={`${testId}-price`} sx={{ fontWeight: 400, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           {price}
         </Typography>
       )}
