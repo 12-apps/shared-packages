@@ -12,6 +12,7 @@
   "form/Button": "src/components/form/Button/index.native.ts",
   "form/Checkbox": "src/components/form/Checkbox/index.native.ts",
   "form/Input": "src/components/form/Input/index.native.ts",
+  "form/InputOTP": "src/components/form/InputOTP/index.native.ts",
   "form/Select": "src/components/form/Select/index.native.ts",
   "form/Switch": "src/components/form/Switch/index.native.ts",
   "icons": "src/icons/index.native.ts",
