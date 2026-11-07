@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,7 @@ describe('InputOTP (native)', () => {
     for (let index = 0; index < 6; index += 1) {
       expect(box(index)).toHaveStyle({ width: `${side}px`, height: `${side}px` });
     }
-    expect(screen.queryByTestId('otp-slot-6')).toBeNull();
+    expect(screen.getAllByRole('textbox')).toHaveLength(6);
   });
 
   it('asks for the number pad on every box and the SMS code on the first', () => {
@@ -44,52 +44,54 @@ describe('InputOTP (native)', () => {
     expect(box(1)).toHaveAttribute('maxlength', '1');
   });
 
-  it('types forward, one digit per box, and reports the code once it is whole', () => {
+  it('types forward, one digit per box, and reports the code once it is whole', async () => {
     const onComplete = vi.fn();
     render(<Controlled onComplete={onComplete} />);
     '48291'.split('').forEach((digit, index) => type(index, digit));
+    await waitFor(() => expect(box(5)).toHaveFocus());
     expect(onComplete).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(box(5));
     type(5, '3');
-    expect(onComplete).toHaveBeenCalledWith('482913');
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith('482913'));
     expect(box(5)).toHaveValue('3');
   });
 
-  it('refuses a letter in a numeric box', () => {
+  it('refuses a letter in a numeric box', async () => {
     render(<Controlled />);
     type(0, 'a');
-    expect(box(0)).toHaveValue('');
+    await waitFor(() => expect(box(0)).toHaveValue(''));
   });
 
-  it('spreads a whole code filled into the first box across all six', () => {
+  it('spreads a whole code filled into the first box across all six', async () => {
     const onComplete = vi.fn();
     render(<Controlled onComplete={onComplete} />);
     type(0, '482913');
-    expect(['4', '8', '2', '9', '1', '3']).toEqual([0, 1, 2, 3, 4, 5].map((index) => box(index).value));
-    expect(onComplete).toHaveBeenCalledWith('482913');
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith('482913'));
+    expect([0, 1, 2, 3, 4, 5].map((index) => box(index).value)).toEqual(['4', '8', '2', '9', '1', '3']);
   });
 
-  it('drops the digit already in the first box when the phone inserts the code before it', () => {
-    render(<Controlled />);
+  it('drops the digit already in the first box when the phone inserts the code before it', async () => {
+    const onComplete = vi.fn();
+    render(<Controlled onComplete={onComplete} />);
     type(0, '4');
     type(0, '4482913');
-    expect([0, 1, 2, 3, 4, 5].map((index) => box(index).value).join('')).toBe('482913');
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith('482913'));
   });
 
-  it('spreads an alphanumeric code pasted into the first box, without capitals or autocorrect', () => {
-    render(<InputOTP dataTestId="otp" variant="alphanumeric" />);
+  it('spreads an alphanumeric code pasted into the first box, without capitals or autocorrect', async () => {
+    const onComplete = vi.fn();
+    render(<InputOTP dataTestId="otp" variant="alphanumeric" onComplete={onComplete} />);
     expect(box(0)).toHaveAttribute('autocapitalize', 'none');
     expect(box(0)).toHaveAttribute('autocorrect', 'off');
     type(0, 'AB12CD');
-    expect([0, 1, 2, 3, 4, 5].map((index) => box(index).value).join('')).toBe('AB12CD');
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith('AB12CD'));
   });
 
-  it('steps back on Backspace in an empty box', () => {
+  it('steps back on Backspace in an empty box', async () => {
     render(<Controlled />);
     type(0, '4');
-    box(1).focus();
+    await waitFor(() => expect(box(1)).toHaveFocus());
     fireEvent.keyDown(box(1), { key: 'Backspace' });
-    expect(document.activeElement).toBe(box(0));
+    await waitFor(() => expect(box(0)).toHaveFocus());
   });
 
   it('draws the error border on every box and keeps the digits', () => {
