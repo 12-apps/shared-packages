@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import { DiscountForm } from "../discount-form";
@@ -65,6 +65,14 @@ function renderForm(editing: DiscountWireRecord | null = null) {
   );
   return { sent };
 }
+
+// The worker's first mount of the form pays for emotion writing every style
+// once; paid here, under the hook's own limit, not inside the first case
+// (FUT-4530).
+beforeAll(() => {
+  renderForm(null);
+  cleanup();
+});
 
 /** Switch the form to "em dias e horários específicos". */
 function chooseSpecificHours(): void {
