@@ -5,7 +5,7 @@ import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
 import { createTheme } from "@12-apps/ui/mui/styles";
@@ -28,6 +28,17 @@ import { STORY_GROUPS } from "../__stories__/fixtures";
  */
 
 const SURFACE_LOADED = { timeout: 10_000 };
+
+// FUT-4530: every case here mounts the WHOLE admin — the grid, the edit
+// dialog with its slide-in, the form and its two-month calendar — and jsdom
+// pays for MUI's modal and transitions with a style lookup over ~900 emotion
+// sheets. Measured after cutting what was cuttable (the label and role
+// queries, the calendar redrawn on every edit): 250–1,600 ms per case alone,
+// the worker's first case the dearest; 2,400–4,800 ms on one core shared with
+// two busy processes; and loaded CI runners have run these cases at up to
+// eight times their unloaded time. 15 s covers that; 5 s did not (main went
+// red four runs in a row at 5.0–5.6 s).
+vi.setConfig({ testTimeout: 15_000 });
 
 const LOCKED: DiscountWireRecord = {
   id: "d-1",

@@ -16,6 +16,7 @@ import {
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { getByLabelFor } from "./labelled-control";
 
 /**
  * The KIND of promotion, and what it decides (FUT-268).
@@ -386,7 +387,7 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     renderForm(null);
     await pickFreeUnits();
     // A name and a valid reward, so the product is the ONLY refusal and the toast hangs on it.
-    fireEvent.change(screen.getByLabelText(copy.form.name), {
+    fireEvent.change(getByLabelFor(copy.form.name), {
       target: { value: "Leve 3" },
     });
     fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "3" } });
