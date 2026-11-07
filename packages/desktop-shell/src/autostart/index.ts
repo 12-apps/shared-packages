@@ -30,6 +30,12 @@ export {
   type AutostartEnv,
   type DesktopEntry,
 } from "./desktop-entry";
+export {
+  createFirstRunAutostart,
+  observeAutostart,
+  type FirstRunAutostart,
+  type FirstRunAutostartOptions,
+} from "./first-run";
 
 /** Electron's `app` login-item surface, narrowed to what is used. */
 export interface LoginItemPort {

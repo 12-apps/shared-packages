@@ -16,6 +16,11 @@ import { buildTrayMenu, type TrayActions, type TrayCopy } from "./tray-menu";
 interface TrayController {
   /** Repaint for a status. Safe to call before anything has changed. */
   render(status: ShellStatus): void;
+  /**
+   * Read autostart back and repaint: it changed somewhere else (the host's
+   * first-time step, a settings checkbox), and the checkbox must say so.
+   */
+  refreshAutostart(): Promise<void>;
 }
 
 interface TrayControllerOptions {
@@ -27,6 +32,8 @@ interface TrayControllerOptions {
   status: () => ShellStatus;
   /** Everything the menu can do, except the autostart toggle this owns. */
   actions: Omit<TrayActions, "toggleAutostart">;
+  /** After the person flips the checkbox here: a choice the host may record. */
+  onAutostartToggled?: () => void | Promise<void>;
 }
 
 export async function createTrayController(
@@ -44,6 +51,11 @@ export async function createTrayController(
    */
   async function toggleAutostart(): Promise<void> {
     await options.autostart.set(!view.autostartEnabled);
+    await refreshAutostart();
+    await options.onAutostartToggled?.();
+  }
+
+  async function refreshAutostart(): Promise<void> {
     view.autostartEnabled = await options.autostart.isEnabled();
     render(options.status());
   }
@@ -70,5 +82,5 @@ export async function createTrayController(
     options.status() === "signed-out" ? options.actions.signIn() : options.actions.settings(),
   );
   render(options.status());
-  return { render };
+  return { render, refreshAutostart };
 }
