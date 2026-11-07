@@ -60,7 +60,7 @@ function badRequest(message: string): Response {
  * `state` to echo, and the `iss` to name (RFC 9207, the mix-up defence; the CIMD
  * draft makes it a MUST for a server that accepts metadata-document clients).
  */
-export interface AuthorizeCallback {
+interface AuthorizeCallback {
   redirectUri: string;
   state: string | null;
   /** The issuer of the request's trusted origin, as the metadata's `issuer` serves it. */
