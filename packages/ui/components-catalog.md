@@ -443,9 +443,10 @@ Components for user input and form interactions.
 **Docs**: `src/components/form/Input/Input.md`
 
 ### InputOTP
-**Purpose**: One-time password input
-**Use Cases**: 2FA, verification codes, security codes
-**Features**: Auto-focus next field, paste support, validation
+**Purpose**: One-time password input — one box per character (web AND React Native)
+**Use Cases**: 2FA, verification codes, security codes, a six-digit join code typed on a phone
+**Features**: Auto-focus next field, paste and SMS one-time-code fill spread from the first box, Backspace steps back from an empty box, number pad for `numeric`, error state keeps the digits
+**Native**: yes — `@12-apps/ui/form/InputOTP` resolves to `InputOTP.native.tsx` under Metro: one `TextInput` per box in a row named by `aria-label`, each box named by `labels.slot`; the boxes shrink rather than wrap at 320.
 **Location**: `src/components/form/InputOTP`
 **Docs**: `src/components/form/InputOTP/InputOTP.md`
 

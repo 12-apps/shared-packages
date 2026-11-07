@@ -5,7 +5,9 @@ import React, { forwardRef } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
+import { slotMaxLength } from './InputOTP.core';
 import { useOtpDigits } from './InputOTP.hooks';
+import { OTP_GAP_UNITS } from './InputOTP.metrics';
 import { otpSlotSx } from './InputOTP.styles';
 import type { OtpSlotFlags } from './InputOTP.styles';
 import type { InputOTPProps } from './InputOTP.types';
@@ -33,22 +35,6 @@ function keypadProps(variant: InputOTPProps['variant'], index: number): Record<s
     ...(index === 0 ? { autoComplete: 'one-time-code' } : {}),
   };
 }
-
-/**
- * One character per slot — except the numeric FIRST slot, which carries
- * `one-time-code`: the phone's SMS fill writes the whole code there in one
- * change, and a `maxLength` of 1 would cut it to one digit before the hook
- * could spread it.
- *
- * The code's length PLUS ONE: a phone that INSERTS the code at the caret keeps
- * the digit already there in front (`4` + `482913`), and the browser caps that
- * insertion at `maxlength` BEFORE the hook sees it. At the bare length it
- * arrived as `448291` — a wrong code that looks whole. One more character lets
- * the hook see the leading digit and drop it. A keystroke into the slot once
- * filled is still refused, by the hook, as `maxLength={1}` refused it.
- */
-const slotMaxLength = (variant: InputOTPProps['variant'], index: number, length: number): number =>
-  variant === 'numeric' && index === 0 ? length + 1 : 1;
 
 const DEFAULTS = {
   variant: 'numeric',
@@ -87,7 +73,7 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
       // A group, so the `aria-label` a caller gives the code names the six
       // slots together: on a plain `div` it named nothing anyone could reach.
       role="group"
-      sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}
+      sx={{ display: 'flex', gap: OTP_GAP_UNITS, justifyContent: 'center', alignItems: 'center' }}
       {...rest}
     >
       {digits.map((digit, index) => (

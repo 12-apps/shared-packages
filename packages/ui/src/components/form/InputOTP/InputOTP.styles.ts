@@ -7,6 +7,8 @@ import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 
+import { OTP_BORDER, OTP_FONT_PX, OTP_FONT_WEIGHT, OTP_GLASS_ALPHA, OTP_GLASS_BLUR } from './InputOTP.metrics';
+
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -49,15 +51,6 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
 
 type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
-/** Each slot's type, in design px. Its side is the theme's field height for the size (a square). */
-const SIZES: Record<SizeKey, { fontPx: number }> = {
-  xs: { fontPx: 12 },
-  sm: { fontPx: 14 },
-  md: { fontPx: 16 },
-  lg: { fontPx: 18 },
-  xl: { fontPx: 20 },
-};
-
 export interface OtpSlotFlags {
   customColor?: string;
   customSize?: string;
@@ -68,7 +61,7 @@ export interface OtpSlotFlags {
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
   const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
   const palette = getColorFromTheme(theme, customColor);
-  const { fontPx } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  const fontPx = OTP_FONT_PX[customSize as SizeKey] ?? OTP_FONT_PX.md;
   // A slot is a field: a square of the theme's field height for its size.
   const side = fieldHeight(theme, asFieldSize(customSize));
 
@@ -79,24 +72,24 @@ export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
       width: side,
       height: side,
       fontSize: rem(theme, fontPx),
-      fontWeight: 600,
+      fontWeight: OTP_FONT_WEIGHT,
       textAlign: 'center',
       borderRadius: fieldRadius(theme),
       ...(glass && {
-        backgroundColor: alpha(theme.palette.background.paper, 0.1),
-        backdropFilter: `blur(${rem(theme, 20)})`,
+        backgroundColor: alpha(theme.palette.background.paper, OTP_GLASS_ALPHA),
+        backdropFilter: `blur(${rem(theme, OTP_GLASS_BLUR)})`,
         '& fieldset': { border: `1px solid ${fieldEdge(theme)}` },
       }),
       ...(gradient && {
         '&.Mui-focused fieldset': {
           background: `linear-gradient(135deg, ${palette.main}, ${palette.light})`,
-          borderWidth: rem(theme, 2),
+          borderWidth: rem(theme, OTP_BORDER.focused),
         },
       }),
       '& input': { textAlign: 'center', padding: 0, fontWeight: 'inherit' },
       ...(!glass && { '& fieldset': { borderColor: fieldEdge(theme) } }),
       '&:hover fieldset': { borderColor: palette.main },
-      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: rem(theme, 2) },
+      '&.Mui-focused fieldset': { borderColor: palette.main, borderWidth: rem(theme, OTP_BORDER.focused) },
     },
   };
 };

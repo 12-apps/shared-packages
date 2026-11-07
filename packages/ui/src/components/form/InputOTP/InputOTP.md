@@ -33,7 +33,7 @@ The InputOTP component provides a specialized input field for one-time passwords
 | `glass` | `boolean` | `false` | Apply glass morphism effect |
 | `gradient` | `boolean` | `false` | Apply gradient focus effect |
 | `className` | `string` | - | Additional CSS classes |
-| `aria-label` | `string` | - | Accessibility label |
+| `aria-label` | `string` | - | Accessibility label (names the row, a `role="group"`) |
 
 ## Usage Examples
 
@@ -415,6 +415,48 @@ export const VisualTest: Story = {
   },
 };
 ```
+
+## React Native
+
+`@12-apps/ui/form/InputOTP` resolves to `InputOTP.native.tsx` under Metro —
+same import path, same props (`InputOTP.base.ts`), the same digit rules
+(`InputOTP.core.ts`, shared with the web hook) and the same numbers
+(`InputOTP.metrics.ts`). Native adds three props:
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `aria-label` | `string` | Names the row, a `role="group"`, so the boxes are announced as one code. |
+| `labels` | `Partial<InputOTPLabels>` | `slot(position, length)` names each box; English ("Digit 1 of 6") when omitted; the pt-BR pack's family is `inputOtp` (`UI_LABELS['pt-BR'].inputOtp` from `@12-apps/ui/locales`), or the host passes its own. |
+| `style` | `StyleProp<ViewStyle>` | Reaches the row, as `sx` does on the web. |
+
+```tsx
+import { InputOTP } from '@12-apps/ui/form/InputOTP';
+
+<InputOTP
+  length={6}
+  variant="numeric"
+  value={code}
+  onChange={setCode}
+  onComplete={join}
+  error={refused}
+  aria-label={copy.codeLabel}
+  labels={{ slot: copy.codeSlot }}
+/>
+```
+
+- **Typing** fills a box and moves to the next; **Backspace** in an empty box
+  steps back; a refused character (a letter in `numeric`) leaves the box as it was.
+- **A whole code** written into the first box — the keyboard's SMS suggestion
+  (`oneTimeCode` on iOS, `sms-otp` on Android) or a paste — spreads across every
+  box; a digit the phone left in front of an inserted code is dropped.
+- **`onComplete`** fires when the last box is filled, with the code.
+- **`error`** draws every box's border in the danger hue and keeps the digits,
+  so the person corrects the code instead of retyping it.
+- **Layout**: the row never wraps. Each box is a square of the field height
+  that may shrink, so six `md` boxes fit one row at 320dp inside a padded sheet.
+
+What it cannot draw (the glass blur, the gradient fill, hover) is listed in
+[NATIVE-NOTES.md](./NATIVE-NOTES.md) and the ledger in `NATIVE.md`.
 
 ## Related Components
 

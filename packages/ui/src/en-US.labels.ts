@@ -137,6 +137,9 @@ export const EN_US_UI_LABELS: UiLabels = {
   infiniteScroll: {
     loadFailed: "An error occurred while loading more items",
   },
+  inputOtp: {
+    slot: (position, length) => `Digit ${position} of ${length}`,
+  },
   socialLogin: {
     title: "Sign in to continue",
     divider: "or",

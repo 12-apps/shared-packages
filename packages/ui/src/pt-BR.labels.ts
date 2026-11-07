@@ -136,6 +136,9 @@ export const PT_BR_UI_LABELS: UiLabels = {
   infiniteScroll: {
     loadFailed: "Ocorreu um erro ao carregar mais itens",
   },
+  inputOtp: {
+    slot: (position, length) => `Dígito ${position} de ${length}`,
+  },
   socialLogin: {
     title: "Entre para continuar",
     divider: "ou",

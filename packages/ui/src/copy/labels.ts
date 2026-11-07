@@ -203,6 +203,12 @@ export interface InfiniteScrollLabels {
   loadFailed: string;
 }
 
+/** The native `InputOTP`'s name for each of its slots. */
+export interface InputOTPLabels {
+  /** A slot's accessible name, from its 1-based position and the code's length. */
+  slot(position: number, length: number): string;
+}
+
 /** `SocialLoginContainer`'s heading and the word on its divider. */
 export interface SocialLoginLabels {
   title: string;
@@ -268,6 +274,7 @@ export interface UiLabels {
   breadcrumbs: BreadcrumbsLabels;
   animatedIcon: AnimatedIconLabels;
   infiniteScroll: InfiniteScrollLabels;
+  inputOtp: InputOTPLabels;
   socialLogin: SocialLoginLabels;
   dateRangePicker: DateRangePickerLabels;
   calendar: CalendarLabels;
