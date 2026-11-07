@@ -126,9 +126,13 @@ export interface RouteMapProps {
   /**
    * Fit to just these points (a selected trip) whenever `key` changes — a
    * viewer's selection, never a data refresh. Wins over `fitKey` on the same
-   * render.
+   * render. With `zoom`, the map centres on the points' bounds at exactly that
+   * zoom, inside the fit's padding, instead of fitting them (far-apart points
+   * may then fall outside the frame): a fit pads a lone point to a few hundred metres
+   * and keeps the controls clear, which on a small map stops short of the
+   * street (a pin to place on a door).
    */
-  focus?: { key: string; points: readonly Position[] };
+  focus?: { key: string; points: readonly Position[]; zoom?: number };
   /** CSS height of the map area. */
   height: number | string;
   /**

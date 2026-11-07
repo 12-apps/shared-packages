@@ -42,7 +42,8 @@ interface Overlays {
   place: () => void;
   clear: () => void;
   fitAll: () => void;
-  fitTo: (points: readonly LngLat[]) => void;
+  /** Fit to `points`, or centre on them at exactly `zoom` when given. */
+  fitTo: (points: readonly LngLat[], zoom?: number) => void;
 }
 
 interface Drawn extends Placed {
@@ -133,7 +134,8 @@ export function useOverlays(
     place();
   };
 
-  const fitTo = (points: readonly LngLat[]): void => {
+  const fitTo = (points: readonly LngLat[], zoom?: number): void => {
+    if (centreAt(handle.mapRef.current, points.filter((point) => isValidPoint(point)), zoom, fitPadding(propsRef.current))) return;
     const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
     // Animated: its zoomend/moveend re-place the tags where it lands.
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
@@ -244,7 +246,7 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
 
   // After the fit above, so a selection made before the map was ready wins.
   useEffect(() => {
-    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })));
+    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })), props.focus.zoom);
   }, [ready, props.focus?.key]);
 }
 
@@ -270,4 +272,17 @@ function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPla
       if (spot.draggable) return drags.wanted(spot, spot.draggable);
       return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
     });
+}
+
+/**
+ * `focus.zoom`: centre on the points' bounds at exactly that zoom, inside the
+ * same padding a fit keeps clear; false when there is no zoom or the map cannot
+ * ease. At a fixed zoom, far-apart points may fall outside the frame.
+ */
+function centreAt(map: MapLike | null, points: readonly LngLat[], zoom: number | undefined, padding: Record<Edge, number>): boolean {
+  const bounds = boundsOf(points);
+  if (zoom === undefined || !bounds || !map?.easeTo) return false;
+  const [[west, south], [east, north]] = bounds;
+  map.easeTo({ center: [(west + east) / 2, (south + north) / 2], zoom, padding, duration: 300 });
+  return true;
 }
