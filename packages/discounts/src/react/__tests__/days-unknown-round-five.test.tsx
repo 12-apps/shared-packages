@@ -33,11 +33,12 @@ const SURFACE_LOADED = { timeout: 10_000 };
 // dialog with its slide-in, the form and its two-month calendar — and jsdom
 // pays for MUI's modal and transitions with a style lookup over ~900 emotion
 // sheets. Measured after cutting what was cuttable (the label and role
-// queries, the calendar redrawn on every edit): 450–1,500 ms per case alone,
-// the worker's first case the dearest; 1,900–4,700 ms on one core shared with
-// two busy processes; and loaded CI runners have run these cases at up to
-// eight times their unloaded time. 15 s covers that; 5 s did not (main went
-// red four runs in a row at 5.0–5.6 s).
+// queries, the calendar redrawn on every edit): up to 1,560 ms per case
+// alone, the worker's first case the dearest; up to 4,780 ms on one core
+// shared with two busy processes, 7,160 ms with four; and loaded CI
+// runners have run these cases at up to eight times their unloaded time.
+// 15 s covers that; 5 s did not (main went red four runs in a row at
+// 5.0–5.6 s).
 vi.setConfig({ testTimeout: 15_000 });
 
 const UNKNOWN: DiscountWireRecord = {
