@@ -112,8 +112,11 @@ const NON_PUBLIC_V6: ReadonlyArray<readonly [string, number]> = [
 /** The 128-bit value of an IPv6 address, embedded IPv4 tail included. */
 function v6ToBigInt(address: string): bigint {
   let text = address;
-  const v4Tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(text)?.[1];
-  if (v4Tail) {
+  // An embedded IPv4 tail is whatever follows the last colon, when it has dots.
+  // Split rather than matched: the address may come from outside, and a
+  // backtracking pattern over it is a slow-input hazard.
+  const v4Tail = text.slice(text.lastIndexOf(":") + 1);
+  if (v4Tail.includes(".")) {
     const value = v4ToInt(v4Tail);
     text = `${text.slice(0, -v4Tail.length)}${(value >>> 16).toString(16)}:${(value & 0xffff).toString(16)}`;
   }

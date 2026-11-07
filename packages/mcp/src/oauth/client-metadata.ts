@@ -126,10 +126,13 @@ interface CacheEntry {
  */
 function lifetimeMs(cacheControl: string | undefined, settings: Settings): number {
   if (!cacheControl) return settings.cacheTtlMs;
-  if (/(^|,)\s*(no-store|no-cache)\s*(,|$)/i.test(cacheControl)) return settings.minCacheTtlMs;
-  const maxAge = /(?:^|,)\s*max-age\s*=\s*(\d+)/i.exec(cacheControl)?.[1];
-  if (maxAge === undefined) return settings.cacheTtlMs;
-  return Math.min(settings.maxCacheTtlMs, Math.max(settings.minCacheTtlMs, Number(maxAge) * 1000));
+  // Split, not matched: the header comes from the document's host.
+  const directives = cacheControl.toLowerCase().split(",").map((part) => part.trim());
+  if (directives.includes("no-store") || directives.includes("no-cache")) return settings.minCacheTtlMs;
+  const maxAge = directives.find((part) => part.startsWith("max-age="))?.slice("max-age=".length);
+  const seconds = maxAge === undefined ? Number.NaN : Number(maxAge);
+  if (!Number.isInteger(seconds) || seconds < 0) return settings.cacheTtlMs;
+  return Math.min(settings.maxCacheTtlMs, Math.max(settings.minCacheTtlMs, seconds * 1000));
 }
 
 const transient = (message: string): ClientMetadataDocumentError =>
