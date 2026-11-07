@@ -1,8 +1,11 @@
+import Fade from "@mui/material/Fade";
+
 import { createTheme } from "@12-apps/ui/mui/styles";
 
 /**
- * A theme whose transitions take no time and whose modals lock no scroll, for
- * suites that open and close the discount dialog in every case (FUT-4530).
+ * A theme whose transitions take no time, whose dialogs do not slide and whose
+ * modals lock no scroll, for suites that open and close the discount dialog
+ * in every case (FUT-4530).
  *
  * jsdom runs MUI's slide and fade on real timers, so each open and each
  * close-after-save waited out its duration before the next query could see
@@ -17,6 +20,14 @@ import { createTheme } from "@12-apps/ui/mui/styles";
  * alone, several times that on a loaded runner, for a lock on a page that
  * cannot scroll. `Menu` and `Dialog` reach `Modal` through `Popover` and
  * directly, so both defaults are set.
+ *
+ * The dialog's slide is the other: `Slide` reads the panel's computed
+ * `transform` as it enters and twice as it leaves, three of those lookups on
+ * the panel and its ancestors per case — 200 ms of a case alone, the largest
+ * single cost left once the lock was gone. `StackedModal` hands `Dialog` its
+ * slide as `TransitionComponent`, and `slots.transition` wins over it, so the
+ * dialog fades instead: the same enter and exit callbacks the modal mounts and
+ * unmounts its panel on, in no time and with no style lookup.
  */
 export const STILL_THEME = createTheme({
   transitions: {
@@ -34,6 +45,7 @@ export const STILL_THEME = createTheme({
   components: {
     MuiModal: { defaultProps: { disableScrollLock: true } },
     MuiPopover: { defaultProps: { disableScrollLock: true } },
+    MuiDialog: { defaultProps: { slots: { transition: Fade } } },
   },
 });
 
