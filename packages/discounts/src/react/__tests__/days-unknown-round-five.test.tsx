@@ -17,7 +17,7 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
-import { setBrowserRootFont, STILL_THEME } from "./still-theme";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 import { getByLabelFor } from "./labelled-control";
 import { oneAdminPerDescribe } from "./one-admin";
 
@@ -109,8 +109,9 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // writing every style once (1–1.5 s alone, several times that on a loaded
 // runner). Paid here, under the hook's own limit, not inside the first case
 // (FUT-4530).
+browserRootFontForThisFile();
+
 beforeAll(async () => {
-  setBrowserRootFont();
   mount([UNKNOWN]);
   await openEdit(UNKNOWN.id);
   cleanup();

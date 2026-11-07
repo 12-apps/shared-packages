@@ -1,4 +1,5 @@
 import Fade from "@mui/material/Fade";
+import { afterAll, beforeAll } from "vitest";
 
 import { createTheme } from "@12-apps/ui/mui/styles";
 
@@ -57,6 +58,15 @@ export const STILL_THEME = createTheme({
  * admin's grid — the dearest `getComputedStyle` there is, for the same 16 px
  * each time. With the browser's default set, it measures once per worker.
  */
-export function setBrowserRootFont(): void {
-  document.documentElement.style.fontSize = "16px";
+export function browserRootFontForThisFile(): void {
+  // Set for the file's suites and taken off after them, so nothing it changes
+  // outlives the file. Register it before the file's other `beforeAll` hooks:
+  // they run in order, and the warm-up mount needs the font in place.
+  const root = document.documentElement;
+  beforeAll(() => {
+    root.style.setProperty("font-size", "16px");
+  });
+  afterAll(() => {
+    root.style.removeProperty("font-size");
+  });
 }

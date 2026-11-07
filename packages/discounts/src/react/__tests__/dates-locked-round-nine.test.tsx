@@ -20,7 +20,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { oneAdminPerDescribe } from "./one-admin";
-import { setBrowserRootFont, STILL_THEME } from "./still-theme";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 9. Under an unknown zone the dates are locked and
@@ -125,8 +125,9 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // writing every style once (1–1.5 s alone, several times that on a loaded
 // runner). Paid here, under the hook's own limit, not inside the first case
 // (FUT-4530).
+browserRootFontForThisFile();
+
 beforeAll(async () => {
-  setBrowserRootFont();
   mount([LOCKED]);
   await openEdit(LOCKED.id);
   cleanup();
