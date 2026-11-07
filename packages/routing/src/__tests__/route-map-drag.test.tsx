@@ -330,6 +330,16 @@ describe("RouteMap · this mount's words, kept zoom and the zoom it reports", ()
     expect(screen.queryAllByRole("button", { name: EN_US_ROUTE_MAP_COPY.fitAll })).toHaveLength(0);
   });
 
+  it("draws the fit control as its word when asked, and still fits", async () => {
+    const onFitAll = vi.fn();
+    await mount({ copy: { fitAll: "See all" }, controls: { fitAsText: true }, onFitAll });
+    const fit = await screen.findByRole("button", { name: "See all" });
+    expect(fit.textContent).toBe("See all");
+    expect(fit.querySelectorAll("svg")).toHaveLength(0);
+    fireEvent.click(fit);
+    expect(onFitAll).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the zoom buttons out of the narrow-width rule when asked", async () => {
     const first = await mount({});
     expect((await screen.findByRole("button", { name: EN_US_ROUTE_MAP_COPY.zoomIn })).className).toBe("routing-zoom");

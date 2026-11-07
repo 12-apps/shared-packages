@@ -172,6 +172,8 @@ export interface RouteMapProps {
      * the host's own wider map. Wheel and pinch still zoom out.
      */
     onZoomOut?: () => void;
+    /** Draws the fit control as its word (`copy.fitAll`) rather than the corners glyph, e.g. beside a host's own full-screen glyph. */
+    fitAsText?: boolean;
   };
   /** Words for this mount only, over the surface's copy (e.g. a fit control named for this map). */
   copy?: Partial<RouteMapCopy>;

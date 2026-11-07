@@ -146,6 +146,8 @@ const { RouteMap } = createWebRouting({
   `controls={{ zoomWhenNarrow: true }}` keeps the zoom buttons under 600 px,
   where they are hidden by default; `onZoomChange(zoom)` reports the zoom once
   ready and after every zoom.
+- `controls={{ fitAsText: true }}` draws the fit control as its word
+  (`copy.fitAll`) instead of the corners glyph.
 - `controls={{ onZoomOut }}` replaces what the zoom-out control does (a host
   leaving a street view for its own wider map); wheel and pinch still zoom.
 - `scaleBar={(metres) => "100 m"}` draws a scale bar bottom-left: the longest
