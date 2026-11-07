@@ -1,6 +1,6 @@
 import { app, session } from "electron";
 
-import type { Autostart } from "../autostart";
+import { createFirstRunAutostart, observeAutostart, type Autostart, type FirstRunAutostart } from "../autostart";
 import type { SessionWatch } from "../session";
 import type { ShellState, ShellStatus } from "../status";
 
@@ -55,6 +55,20 @@ export interface DesktopShellOptions {
     /** Shown in the desktop environment's startup list. Host copy. */
     name: string;
     comment?: string;
+    /**
+     * Ask "start with the machine?" once, on the app's first-time setup
+     * (`../autostart/first-run`). The host keeps the "already chose" flag and
+     * draws the step; the shell applies the answer, and a flip of the tray's
+     * checkbox before answering counts as the choice.
+     */
+    firstRun?: {
+      /** What the step preselects. */
+      defaultOn: boolean;
+      /** Whether this install already chose — the host's stored flag. */
+      chosen: () => boolean;
+      /** Store that it chose. */
+      remember: () => Promise<void>;
+    };
   };
   /** Runs when a session appears. The app's own work starts here. */
   onSignedIn?: (context: ShellContext) => void | Promise<void>;
@@ -70,7 +84,10 @@ export interface DesktopShell {
   showSignIn(): void;
   showSettings(): void;
   signOut(): Promise<void>;
+  /** Changes made through it reach the tray's checkbox. */
   autostart: Autostart;
+  /** The first-time question, when the host asked for one (`autostart.firstRun`); `null` otherwise. */
+  firstRunAutostart: FirstRunAutostart | null;
   sessionWatch: SessionWatch;
 }
 
@@ -102,7 +119,7 @@ export async function startDesktopShell(
 
   const shellSession = session.fromPartition(`persist:${options.appId}`);
   const windows = createWindowManager(shellSession);
-  const autostart = createShellAutostart({
+  const platformAutostart = createShellAutostart({
     appId: options.appId,
     app,
     entry: {
@@ -112,12 +129,20 @@ export async function startDesktopShell(
     backgroundArgs: [BACKGROUND_FLAG],
   });
   const core = createShellCore(coreOptions(options, shellSession, windows));
-  const shell = shellApi(options, windows, core, autostart);
+  // The tray is built below and reads autostart once; a change the host makes
+  // through `shell.autostart` repaints it.
+  const trayRef: { current: { refreshAutostart(): Promise<void> } | null } = { current: null };
+  const autostart = observeAutostart(platformAutostart, () => trayRef.current?.refreshAutostart());
+  const firstRun = options.autostart?.firstRun;
+  const firstRunAutostart =
+    firstRun === undefined ? null : createFirstRunAutostart({ autostart, platform: process.platform, ...firstRun });
+  const shell = shellApi(options, windows, core, autostart, firstRunAutostart);
 
   const tray = await createTrayController({
     copy: options.tray.copy,
     icons: options.tray.icons,
-    autostart,
+    autostart: platformAutostart,
+    ...(firstRunAutostart === null ? {} : { onAutostartToggled: () => firstRunAutostart.noteChosen() }),
     status: () => core.status(),
     actions: {
       signIn: () => shell.showSignIn(),
@@ -129,6 +154,7 @@ export async function startDesktopShell(
       },
     },
   });
+  trayRef.current = tray;
   core.onRender((status) => tray.render(status));
 
   wireLifecycle(shell, windows.beginQuit, () => core.watch.stop());
@@ -169,6 +195,7 @@ function shellApi(
   windows: ReturnType<typeof createWindowManager>,
   core: ReturnType<typeof createShellCore>,
   autostart: Autostart,
+  firstRunAutostart: FirstRunAutostart | null,
 ): DesktopShell {
   return {
     get status(): ShellStatus {
@@ -192,6 +219,7 @@ function shellApi(
       }),
     signOut: () => core.watch.signOut(),
     autostart,
+    firstRunAutostart,
     sessionWatch: core.watch,
   };
 }
