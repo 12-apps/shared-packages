@@ -176,6 +176,38 @@ library updates, every host updates with **no app changes**. Same contract
     map its `reason` through, and the tool call comes back with a sentence a model
     can relay and a `data` payload a client can act on — `refresh`, `reconnect` or
     `contact_operator`. See `src/server/auth-failure.ts`.
+14. **Turn on `clientIdMetadataDocuments` if an assistant may identify itself by
+    URL** (OAuth Client ID Metadata Documents, CIMD — FUT-4522). Claude's connector
+    dialog defaults to it ("Use Claude's published identity") and the MCP
+    authorization spec recommends it over registration. Without it, an authorize
+    request whose `client_id` is `https://claude.ai/oauth/mcp-oauth-client-metadata`
+    answers `400 invalid_client: unknown client_id` and the connection never
+    reaches sign-in. With it, such a `client_id` is resolved by fetching the
+    document it names (`src/oauth/client-metadata.ts`):
+    - the document must name itself (`client_id` equal to its URL), list at
+      most 20 absolute `redirect_uris` (no credentials, no fragment), allow
+      `authorization_code`, and be a public client — no secret, no auth method
+      but `none`, and no client authentication at the token endpoint;
+      `client_name` is cut at 200 characters;
+    - the fetch is https only, follows no redirect, refuses any destination that
+      resolves to a non-public address at CONNECT time (so DNS rebinding cannot
+      reach one) on a fresh socket every time (a pooled keep-alive socket would
+      skip the lookup), and is bounded in time (5 s), size (10 KiB) and
+      concurrency (16); a name that does not resolve is a refusal;
+    - a valid document is reused for its `max-age` (clamped to 1 min–24 h, else
+      5 min); a refused one is never cached; through an outage the last valid
+      copy keeps serving for up to a day (retried at most once a minute), and
+      with none the endpoints answer a
+      retryable 503 — never `invalid_client`, which a host may read as "drop the
+      connection";
+    - nothing is written to `stores.clients`. Refresh tokens and connections key
+      on the `client_id` string, so one URL is ONE client for every user — a
+      user who connects twice from the same assistant has one connection;
+    - a loopback callback in the document (`http://localhost/callback`) matches
+      on any port (RFC 8252 §7.3) — for a document client only.
+    Your eligibility rules (`resolveApproval`) and consent screen see it as any
+    other client. Pass `onClientMetadataRefusal` to log why a document was
+    refused: the client is only ever told `invalid_client`.
 
 ## The config, field by field
 
@@ -199,6 +231,8 @@ library updates, every host updates with **no app changes**. Same contract
 | `consent` | no | legacy approval policy | Same-origin UI path, atomic replay store and optional existing-client eligibility ceiling — rule 9 |
 | `isAccessTokenActive` | no | no live revocation check | Use `isRefreshBindingActive` for immediate lineage-bound access revocation — rule 11 |
 | `connections` | no | — | `resolveUserId`, `providerRules`, `activityThrottleMs` |
+| `clientIdMetadataDocuments` | no | `false` | `true` (or tuning options) resolves an `https` `client_id` from its metadata document and advertises `client_id_metadata_document_supported` — rule 14 |
+| `onClientMetadataRefusal` | no | — | `(clientId, reason)`, told why a document was refused or served stale — rule 14 |
 
 ## The endpoints
 

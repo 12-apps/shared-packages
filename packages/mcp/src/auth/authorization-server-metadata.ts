@@ -29,6 +29,13 @@ export interface AuthorizationServerMetadataInput {
    * resolved paths, so the two cannot disagree).
    */
   paths?: Partial<AuthorizationServerPaths>;
+  /**
+   * Whether a `client_id` may be a Client ID Metadata Document URL (CIMD). When
+   * true the document says so with `client_id_metadata_document_supported`, which
+   * is how a host that prefers CIMD (Claude's "published identity") knows it may
+   * skip dynamic registration. Omitted when false.
+   */
+  clientIdMetadataDocumentSupported?: boolean;
 }
 
 /** The endpoint paths this document advertises, relative to the issuer origin. */
@@ -51,6 +58,7 @@ export interface AuthorizationServerMetadata {
   grant_types_supported: string[];
   code_challenge_methods_supported: string[];
   token_endpoint_auth_methods_supported: string[];
+  client_id_metadata_document_supported?: true;
 }
 
 const DEFAULT_PATHS: AuthorizationServerPaths = {
@@ -88,5 +96,6 @@ export function buildAuthorizationServerMetadata(
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported:
       input.tokenEndpointAuthMethods ?? [...DEFAULT_TOKEN_ENDPOINT_AUTH_METHODS],
+    ...(input.clientIdMetadataDocumentSupported ? { client_id_metadata_document_supported: true as const } : {}),
   };
 }

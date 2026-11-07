@@ -68,4 +68,12 @@ describe("buildAuthorizationServerMetadata", () => {
     });
     expect(meta.code_challenge_methods_supported).toEqual(["S256"]);
   });
+
+  it("advertises client_id_metadata_document_supported only when asked to", () => {
+    const base = { issuer: "https://app.example.com", scopesSupported: ["mcp:read"] };
+    expect(buildAuthorizationServerMetadata(base)).not.toHaveProperty("client_id_metadata_document_supported");
+    expect(
+      buildAuthorizationServerMetadata({ ...base, clientIdMetadataDocumentSupported: true }).client_id_metadata_document_supported,
+    ).toBe(true);
+  });
 });
