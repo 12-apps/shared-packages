@@ -10,6 +10,7 @@ import type {
   BuyerField,
   BuyerInfo,
   CheckoutOrder,
+  CheckoutPricedAs,
   CreateOrderRequest,
   CreateOrderResult,
   OrderStatus,
@@ -101,12 +102,12 @@ export function useStartPayment(input: {
   setFinalStatus: Dispatch<SetStateAction<OrderStatus | null>>;
   /** Moves the flow to Confirmação for an order that needs no payment. */
   setStep: Dispatch<SetStateAction<Step>>;
-}): (chosen: PaymentMethod, override?: BuyerInfo) => Promise<void> {
+}): (chosen: PaymentMethod, override?: BuyerInfo, pricedAs?: CheckoutPricedAs) => Promise<void> {
   const { buyer, saveProfile, createOrder, navigate, tenantSlug, basket, failure } = input;
   const { setCreating, setDecline, setOrder, setFinalStatus, setStep } = input;
   const park = useHostedParking();
   return useCallback(
-    async (chosen: PaymentMethod, override?: BuyerInfo) => {
+    async (chosen: PaymentMethod, override?: BuyerInfo, pricedAs?: CheckoutPricedAs) => {
       failure.clear();
       setDecline(null);
       // THE CHARGE BEING REPLACED IS DROPPED FIRST (FUT-1170), before the raise
@@ -124,7 +125,8 @@ export function useStartPayment(input: {
       setOrder(null);
       setFinalStatus(null);
       setCreating(true);
-      const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile });
+      // `pricedAs` only when given (FUT-4416): an unpriced list raises exactly as before.
+      const result = await createOrder({ method: chosen, buyer: override ?? buyer, saveProfile, ...(pricedAs ? { pricedAs } : {}) });
       setCreating(false);
       if (!result.ok) {
         failure.fail(result.error);

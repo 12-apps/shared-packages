@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CheckoutOrder, PaymentMethod } from "../types";
+import type { BuyerInfo, CheckoutOrder, PaymentMethod } from "../types";
+
+import type { CheckoutPricedAs } from "./price-types";
 
 /**
  * How long the card's "Pagando R$ X no Visa 4242…" bar takes to fill —
@@ -29,11 +31,23 @@ interface RaisePorts {
   creating: boolean;
   createError: string | null;
   setMethod: (method: PaymentMethod) => void;
-  startPayment: (method: PaymentMethod) => Promise<void>;
+  startPayment: (method: PaymentMethod, override?: BuyerInfo, pricedAs?: CheckoutPricedAs) => Promise<void>;
   /** The amount the buyer is shown now (the cart's, or the balance's). */
   cartTotal: string;
   /** What an online payment asks the provider for now, when the host prices it (`paymentList.totalCents`). */
   dueCents?: number;
+  /**
+   * The cents a way to pay asks under its OWN price (FUT-4416): the chosen
+   * online row's (`prices.online`), and the wallets' (`prices.wallets`). Set,
+   * a held order is reused on those cents alone — its total is that price,
+   * no longer the cart's.
+   */
+  priced?: { choice?: number; wallets?: number };
+  /**
+   * Which price a fresh card order is raised for (`CreateOrderRequest.pricedAs`):
+   * the chosen row's, or the wallets'. Absent ⇒ none is named, as before.
+   */
+  raiseAs?: { choice?: CheckoutPricedAs; wallets?: CheckoutPricedAs };
 }
 
 export interface ListCharge {
@@ -57,16 +71,37 @@ export interface ListCharge {
   settle: () => void;
   /** The CARD order the runner charges — set once one is held for this charge. */
   chargeable: CheckoutOrder | null;
+  /**
+   * The fresh CARD order raised for this press asks other cents than the
+   * chosen row's price AT THE PRESS (FUT-4416): it is never charged, and the
+   * list says the payment did not go through. Judged once, against the cents
+   * frozen when `send` ran — a re-price by the host while a charge is out
+   * never reaches a charge already under way.
+   */
+  mismatched: boolean;
 }
+
+/** What `send` decided to charge: the held order it reused, or a fresh one replacing `replace`, owed `cents` (frozen at the press). */
+type ChargeIntent = { reuse: CheckoutOrder } | { replace: CheckoutOrder | null; cents: number | undefined };
 
 /**
  * A held CARD order still awaiting payment AND priced as the buyer now sees —
  * reusable for the charge. A balance ticked or unticked moves what the charge
- * asks for and not the order's total, so the amount due is compared too.
+ * asks for and not the order's total, so the amount due is compared too. A
+ * way to pay with its own price (`own`) is judged by the cents it asks alone.
  */
-function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined): boolean {
-  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || order.totalLabel !== cartTotal) return false;
-  return dueCents === undefined || (order.amountDueCents ?? order.totalCents) === dueCents;
+function reusable(order: CheckoutOrder | null, cartTotal: string, dueCents: number | undefined, own: number | undefined): boolean {
+  if (order?.method !== "CARD" || order.status !== "AWAITING_PAYMENT") return false;
+  const asked = order.amountDueCents ?? order.totalCents;
+  if (own !== undefined) return asked === own;
+  if (order.totalLabel !== cartTotal) return false;
+  return dueCents === undefined || asked === dueCents;
+}
+
+/** The price a press is judged and raised by (FUT-4416): the wallets' for a wallet's sheet, the chosen row's otherwise. */
+function pressPrice(ports: RaisePorts, wallet: boolean): { cents: number | undefined; pricedAs: CheckoutPricedAs | undefined } {
+  const { priced, raiseAs } = ports;
+  return wallet ? { cents: priced?.wallets, pricedAs: raiseAs?.wallets } : { cents: priced?.choice, pricedAs: raiseAs?.choice };
 }
 
 /**
@@ -78,14 +113,22 @@ function owesNothing(order: CheckoutOrder | null): boolean {
   return order?.method === "CARD" && order.status === "AWAITING_PAYMENT" && order.amountDueCents === 0;
 }
 
-/** The order `send` meant: the one it reused, or the CARD order raised to replace a stale one. */
-function chargeTarget(
-  order: CheckoutOrder | null,
-  target: { reuse: CheckoutOrder } | { replace: CheckoutOrder | null } | null,
-): CheckoutOrder | null {
-  if (!order || !target || order.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || owesNothing(order)) return null;
+/** An awaiting CARD order that asks the provider for something: one a runner may charge. */
+function owesCard(order: CheckoutOrder): boolean {
+  return order.method === "CARD" && order.status === "AWAITING_PAYMENT" && !owesNothing(order);
+}
+
+/**
+ * The order `send` meant — the one it reused, or the CARD order raised to
+ * replace a stale one — or `mismatch` for a fresh order that does not ask the
+ * cents the press was made for. Reads only the order and what `send` froze.
+ */
+function chargeTarget(order: CheckoutOrder | null, target: ChargeIntent | null): CheckoutOrder | "mismatch" | null {
+  if (!order || !target || !owesCard(order)) return null;
   if ("reuse" in target) return target.reuse === order ? order : null;
-  return order !== target.replace ? order : null;
+  if (order === target.replace) return null;
+  const asked = order.amountDueCents ?? order.totalCents;
+  return target.cents !== undefined && asked !== target.cents ? "mismatch" : order;
 }
 
 /**
@@ -118,8 +161,9 @@ export function useListCharge(ports: RaisePorts): ListCharge {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowed = useRef(true);
   // What `send` decided to charge: the held order it reused, or "a fresh one"
-  // — any CARD order other than the stale one it replaced.
-  const target = useRef<{ reuse: CheckoutOrder } | { replace: CheckoutOrder | null } | null>(null);
+  // — any CARD order other than the stale one it replaced — and the cents the
+  // press was made for, frozen here so no later render's prices can move them.
+  const target = useRef<ChargeIntent | null>(null);
   const latest = useRef(ports);
   latest.current = ports;
 
@@ -139,13 +183,15 @@ export function useListCharge(ports: RaisePorts): ListCharge {
     if (!wallet && !allowed.current) return cancel();
     setPhase("sending");
     const { order, cartTotal, dueCents } = latest.current;
-    if (reusable(order, cartTotal, dueCents) && order) {
+    const press = pressPrice(latest.current, wallet);
+    if (reusable(order, cartTotal, dueCents, press.cents) && order) {
       target.current = { reuse: order };
       return;
     }
-    target.current = { replace: order };
+    // A wallet's sheet froze its own cents (`WalletSheet.cents`), and its runner judges them.
+    target.current = { replace: order, cents: wallet ? undefined : press.cents };
     latest.current.setMethod("CARD");
-    void latest.current.startPayment("CARD");
+    void latest.current.startPayment("CARD", undefined, press.pricedAs);
   }, [cancel]);
 
   const phaseRef = useRef(phase);
@@ -183,6 +229,8 @@ export function useListCharge(ports: RaisePorts): ListCharge {
   useSettleWhenNothingToCharge(phase, kind, ports, settle);
 
   const sending = phase === "sending" || phase === "waiting";
-  const chargeable = sending && !creating ? chargeTarget(order, target.current) : null;
-  return { phase, kind, pressedTotal, start, cancel, setAllowed, accepted, settle, chargeable };
+  const verdict = sending && !creating ? chargeTarget(order, target.current) : null;
+  const mismatched = verdict === "mismatch";
+  const chargeable = mismatched ? null : verdict;
+  return { phase, kind, pressedTotal, start, cancel, setAllowed, accepted, settle, chargeable, mismatched };
 }

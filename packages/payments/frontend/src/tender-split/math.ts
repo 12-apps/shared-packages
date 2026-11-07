@@ -15,15 +15,40 @@
  *
  * ## What the host is sent
  *
- * One leg per tender carrying money, in the order they were picked. The LAST
- * automatic leg goes without an amount — it is "the rest", divided by the
- * server against the total it composes, so a total that moved between this
- * screen and the write lands on that leg instead of being refused. With no
- * automatic leg every amount is named and they add up to the total exactly.
+ * One leg per tender carrying money, in the order they were picked. The OPEN
+ * leg — the last automatic pick — goes without an amount: it is "the rest",
+ * divided by the server against the total it composes, so a total that moved
+ * between this screen and the write lands on that leg instead of being
+ * refused. With no automatic leg every amount is named and they add up to the
+ * total exactly.
  *
  * A tender flagged `givesChange` (cash) may be typed above what the bill
  * leaves: the excess is change handed back, reported beside the legs and
  * taken off that leg, never sent as money received.
+ *
+ * ## A tender with its own price, pro rata (FUT-4416)
+ *
+ * A host may price the bill per tender (a discount for Pix or cash): `priceOf`
+ * answers what the WHOLE bill costs in that tender, `P`, against the bill's
+ * full price `T`. A pick then covers a share of `T` and pays that share at its
+ * tender's price:
+ *
+ * - a typed amount `A` covers `A × T / P` of the bill (unrounded);
+ * - the automatic picks share what the typed ones leave, equally, in whole
+ *   cents of coverage; each but the open one pays `round(share × P / T)`;
+ * - THE OPEN LEG TAKES THE REMAINDER: it pays
+ *   `round((T − Σ amountᵢ × T / Pᵢ) × P_open / T)`, the sum over every other
+ *   leg as SENT (rounded amounts). This is the rule a server mirrors to price
+ *   the leg it is sent without an amount, so the screen's total — the legs'
+ *   sum, `dueCents` — is exactly the total the server derives;
+ * - what is still missing is said at the last tender's price;
+ * - a typed cash tender gives change only when it covers more of the bill
+ *   than the excess, and the change is that excess at the CASH price. A
+ *   non-cash tender typed above its own price explains nothing: the split is
+ *   OVER, and no leg is ever dropped to make it fit.
+ *
+ * Without `priceOf`, with a bill of zero, or with every tender at the full
+ * price, every figure is exactly what it was.
  */
 
 /** One picked tender: `typed` is what was typed, `null` while automatic. */
@@ -43,6 +68,8 @@ export interface TenderSplitAnswer<T extends string> {
   readonly legs: readonly TenderSplitLeg<T>[];
   /** Handed back to the payer; already taken off the leg that received it. */
   readonly changeCents: number;
+  /** The bill at the picks' prices (FUT-4416) — only when the tenders are priced. */
+  readonly dueCents?: number;
 }
 
 /**
@@ -63,6 +90,12 @@ export interface TenderSplitState<T extends string> {
   /** The bill minus what the picks carry — negative when they pass it. */
   readonly restCents: number;
   readonly changeCents: number;
+  /**
+   * What the bill comes to at the picks' prices (FUT-4416): what they carry
+   * less the change, plus what is still missing. The bill itself when the
+   * tenders are not priced.
+   */
+  readonly dueCents: number;
   readonly outcome: TenderSplitOutcome;
   readonly answer: TenderSplitAnswer<T> | null;
 }
@@ -152,45 +185,115 @@ export function shareEqually(pool: number, parts: number): number[] {
   return shares;
 }
 
-/** Where the picks stand against a bill of `totalCents`. */
+/** What the whole bill costs in one tender — the full bill when unpriced or priced unusably. */
+type BillPrice<T extends string> = (tender: T) => number;
+
+function billPrice<T extends string>(totalCents: number, priceOf: ((tender: T) => number) | undefined): BillPrice<T> {
+  // A bill of zero has nothing to price: every share of it is zero at any price.
+  if (!priceOf || totalCents <= 0) return () => totalCents;
+  return (tender) => {
+    const price = priceOf(tender);
+    return Number.isInteger(price) && price > 0 ? price : totalCents;
+  };
+}
+
+/** `cents` of the bill at one price, said at another — exact when the two are the same. */
+function rescale(cents: number, from: number, to: number): number {
+  return from === to ? cents : (cents * to) / from;
+}
+
+/**
+ * Where the picks stand against a bill of `totalCents` — at the tenders' own
+ * prices when `priceOf` gives them (see "A tender with its own price").
+ */
 export function readTenderSplit<T extends string>(
   picks: readonly TenderPick<T>[],
   totalCents: number,
   givesChange: (tender: T) => boolean,
+  priceOf?: (tender: T) => number,
 ): TenderSplitState<T> {
-  const amounts = amountsOf(picks, totalCents);
+  const priced = priceOf !== undefined && totalCents > 0;
+  const price = billPrice(totalCents, priced ? priceOf : undefined);
+  const { amounts, covered, open } = amountsOf(picks, totalCents, price);
   const sum = [...amounts.values()].reduce((total, cents) => total + cents, 0);
-  const restCents = totalCents - sum;
-  const base = { amounts, launchedCents: Math.min(sum, totalCents), restCents };
+  const { changeFrom, restCents } = restOf(picks, amounts, { covered, totalCents, price, givesChange });
   const outcome = outcomeOf(picks, restCents);
-  if (outcome === 'SHORT' || outcome === 'EMPTY' || outcome === 'INVALID') {
-    return { ...base, changeCents: 0, outcome, answer: null };
-  }
-  const changeFrom = outcome === 'OVER' ? changeTaker(picks, amounts, -restCents, givesChange) : null;
-  if (outcome === 'OVER' && changeFrom === null) {
-    return { ...base, changeCents: 0, outcome, answer: null };
-  }
-  const changeCents = changeFrom === null ? 0 : -restCents;
-  const legs = legsOf(picks, amounts, changeFrom, changeCents);
-  return { ...base, changeCents, outcome: 'READY', answer: { legs, changeCents } };
+  if (!settles(outcome, changeFrom)) return unsettled({ amounts, restCents, outcome }, sum);
+  // Settled over the bill only through a cash tender's change.
+  const changeCents = outcome === 'OVER' ? -restCents : 0;
+  const dueCents = sum - changeCents;
+  const legs = legsOf(picks, amounts, open, changeCents > 0 ? changeFrom : null, changeCents);
+  const answer = { legs, changeCents, ...(priced ? { dueCents } : {}) };
+  return { amounts, launchedCents: Math.min(sum, dueCents), restCents, changeCents, dueCents, outcome: 'READY', answer };
 }
 
+/**
+ * What the picks leave of the bill, in money, and the cash tender that gives
+ * change for an excess: the excess is measured in coverage of the full price,
+ * and the rest is said at the cash price when cash gives change, else at the
+ * last tender's.
+ */
+function restOf<T extends string>(
+  picks: readonly TenderPick<T>[],
+  amounts: ReadonlyMap<T, number>,
+  bill: { covered: number; totalCents: number; price: BillPrice<T>; givesChange: (tender: T) => boolean },
+): { changeFrom: T | null; restCents: number } {
+  const { covered, totalCents, price } = bill;
+  const coverOf = (tender: T, cents: number): number => rescale(cents, price(tender), totalCents);
+  const excess = covered - totalCents;
+  const changeFrom = excess > 0 ? changeTaker(picks, amounts, excess, bill.givesChange, coverOf) : null;
+  const reference = changeFrom ?? picks[picks.length - 1]?.tender;
+  const at = reference === undefined ? totalCents : price(reference);
+  return { changeFrom, restCents: Math.round(rescale(totalCents - covered, totalCents, at)) };
+}
+
+/** The picks answer the bill: covered exactly, or over it with a cash tender to give the change. */
+function settles<T extends string>(outcome: TenderSplitOutcome, changeFrom: T | null): boolean {
+  return outcome === 'READY' || (outcome === 'OVER' && changeFrom !== null);
+}
+
+/** A state with no answer: the picks carry `sum`, and what is missing is still owed. */
+function unsettled<T extends string>(
+  settled: { amounts: ReadonlyMap<T, number>; restCents: number; outcome: TenderSplitOutcome },
+  sum: number,
+): TenderSplitState<T> {
+  const dueCents = sum + settled.restCents;
+  const { amounts, restCents, outcome } = settled;
+  return { amounts, launchedCents: Math.min(sum, dueCents), restCents, changeCents: 0, dueCents, outcome, answer: null };
+}
+
+/**
+ * The money each pick carries, how much of the bill's full price they cover
+ * between them, and the open leg (the last automatic pick). A typed amount
+ * covers its share at its tender's price; the automatic picks share the rest
+ * equally, each paying its share at its own price — and the open one pays the
+ * remainder against the others' amounts as sent, as the server prices it.
+ */
 function amountsOf<T extends string>(
   picks: readonly TenderPick<T>[],
   totalCents: number,
-): Map<T, number> {
-  const typed = picks.filter((pick) => pick.typed !== null);
-  const typedSum = typed.reduce((sum, pick) => sum + (parseAmount(pick.typed!) ?? 0), 0);
+  price: BillPrice<T>,
+): { amounts: Map<T, number>; covered: number; open: T | null } {
+  const coverOf = (tender: T, cents: number): number => rescale(cents, price(tender), totalCents);
+  const typedCover = picks
+    .filter((pick) => pick.typed !== null)
+    .reduce((sum, pick) => sum + coverOf(pick.tender, parseAmount(pick.typed!) ?? 0), 0);
   const automatic = picks.filter((pick) => pick.typed === null);
-  const shares = shareEqually(totalCents - typedSum, automatic.length);
-  const amounts = new Map<T, number>();
+  const shares = shareEqually(Math.round(totalCents - typedCover), automatic.length);
+  const open = automatic[automatic.length - 1] ?? null;
+  // Every pick takes its place first, so the map keeps the order they were picked.
+  const amounts = new Map<T, number>(picks.map((pick) => [pick.tender, 0]));
+  let fixed = typedCover;
   for (const pick of picks) {
-    amounts.set(
-      pick.tender,
-      pick.typed === null ? shares[automatic.indexOf(pick)]! : parseAmount(pick.typed) ?? 0,
-    );
+    if (pick === open) continue;
+    const cents = pick.typed === null ? Math.round(rescale(shares[automatic.indexOf(pick)]!, totalCents, price(pick.tender))) : parseAmount(pick.typed) ?? 0;
+    amounts.set(pick.tender, cents);
+    if (pick.typed === null) fixed += coverOf(pick.tender, cents);
   }
-  return amounts;
+  if (open === null) return { amounts, covered: fixed, open: null };
+  const remainder = Math.max(0, Math.round(rescale(totalCents - fixed, totalCents, price(open.tender))));
+  amounts.set(open.tender, remainder);
+  return { amounts, covered: fixed + coverOf(open.tender, remainder), open: open.tender };
 }
 
 function outcomeOf<T extends string>(
@@ -205,15 +308,20 @@ function outcomeOf<T extends string>(
   return restCents < 0 ? 'OVER' : 'READY';
 }
 
-/** The typed change-giving tender that received more than the excess. */
+/**
+ * The typed change-giving tender that covers more of the bill than the
+ * excess — measured in coverage of the full price, so a cash leg is judged at
+ * the cash price whatever tender was picked last.
+ */
 function changeTaker<T extends string>(
   picks: readonly TenderPick<T>[],
   amounts: ReadonlyMap<T, number>,
   excess: number,
   givesChange: (tender: T) => boolean,
+  coverOf: (tender: T, cents: number) => number,
 ): T | null {
   const taker = picks.find(
-    (pick) => pick.typed !== null && givesChange(pick.tender) && amounts.get(pick.tender)! > excess,
+    (pick) => pick.typed !== null && givesChange(pick.tender) && coverOf(pick.tender, amounts.get(pick.tender)!) > excess,
   );
   return taker?.tender ?? null;
 }
@@ -221,6 +329,7 @@ function changeTaker<T extends string>(
 function legsOf<T extends string>(
   picks: readonly TenderPick<T>[],
   amounts: ReadonlyMap<T, number>,
+  open: T | null,
   changeFrom: T | null,
   changeCents: number,
 ): TenderSplitLeg<T>[] {
@@ -233,9 +342,9 @@ function legsOf<T extends string>(
   // A bill of zero leaves every tender carrying nothing; the last one tapped
   // still answers, as "the rest" of nothing, which a server accepts.
   if (carrying.length === 0) return [{ tender: picks[picks.length - 1]!.tender }];
-  const open = [...carrying].reverse().find((entry) => entry.pick.typed === null);
+  // The open leg is the last automatic pick, the one whose amount is the remainder.
   return carrying.map((entry) =>
-    entry === open
+    entry.pick.tender === open
       ? { tender: entry.pick.tender }
       : { tender: entry.pick.tender, amountCents: entry.cents },
   );

@@ -5,10 +5,11 @@ import { useCheckoutCopy } from "../copy-context";
 import type { BuyerInfo } from "../types";
 
 import { cardName, type OnlineRow } from "./choice";
+import { onlinePrice, rowAmount } from "./choice-price";
 import type { ListChargeFailure } from "./charge-runners";
 import { OnlineContent, opensContent } from "./online-content";
 import { GroupHeading, OptionRow } from "./option-row";
-import type { CheckoutDoorOption, CheckoutOnlineChoice, PaymentListCopy } from "./types";
+import type { CheckoutDoorOption, CheckoutListPrices, CheckoutOnlineChoice, PaymentListCopy } from "./types";
 import type { ListState } from "./use-list-state";
 
 /** An online row's label and hint, worded for what the store and the buyer hold. */
@@ -46,7 +47,7 @@ function useUnavailableHint(): string {
  * the focus — in the tap's own handler, so a phone opens its keyboard — and
  * the block, words included, is scrolled into view only when it is not already.
  */
-function focusTopCpf(list: HTMLElement | null): void {
+export function focusTopCpf(list: HTMLElement | null): void {
   const block = list?.querySelector<HTMLElement>('[data-testid="list-cpf"]');
   const input = block?.querySelector<HTMLInputElement>("input");
   if (!block || !input) return;
@@ -70,6 +71,8 @@ interface RowProps {
   cpfAsked?: (choice: CheckoutOnlineChoice) => boolean;
   /** The buyer chose an online row themselves — the list may take them to the CPF. */
   onChosenOnline: (choice: CheckoutOnlineChoice) => void;
+  /** The host's price per online row (FUT-4416); absent ⇒ no row draws an amount. */
+  prices?: CheckoutListPrices;
 }
 
 /** One of the store's online options, with what opens inside it. */
@@ -86,6 +89,7 @@ function OnlineOptionRow({ row, props }: { row: OnlineRow; props: RowProps }): J
       disabled={row.disabled}
       label={words.label}
       hint={row.disabled ? unavailable : words.hint}
+      amount={rowAmount(copy, onlinePrice(props, row))}
       onChoose={() => {
         state.choose({ kind: "online", method: row.method, ...(row.funding ? { funding: row.funding } : {}) });
         // Only the buyer's own choice: a preselection never comes through here.
@@ -135,6 +139,7 @@ function DoorOptionRow({ option, props }: { option: CheckoutDoorOption; props: R
       onChoose={choose}
       testId={`list-door-${option.id}`}
       open={option.showContentWhileIdle === true}
+      amount={rowAmount(props.copy, option.price)}
     >
       {content}
     </OptionRow>

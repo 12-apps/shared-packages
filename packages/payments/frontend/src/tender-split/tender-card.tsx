@@ -21,6 +21,13 @@ export interface TenderOption<T extends string> {
   /** The glyph on the card; `null` for a host that draws none. */
   readonly icon: ReactNode;
   readonly givesChange: boolean;
+  /**
+   * What the WHOLE bill costs paid in this tender, in whole cents, when the
+   * host prices tenders apart (FUT-4416: a discount for Pix or cash). The card
+   * says it, and a split prices each tender's share at it, pro rata. Absent
+   * (or not a positive whole number) ⇒ the bill's own total, as before.
+   */
+  readonly priceCents?: number;
 }
 
 const CARD_RADIUS = 1.5;
@@ -28,11 +35,14 @@ const CARD_RADIUS = 1.5;
 /** A tender nobody picked yet: one tap picks it. */
 export function TenderChoice<T extends string>({
   tender,
+  price,
   testId,
   autoFocus,
   onPick,
 }: {
   tender: TenderOption<T>;
+  /** The bill in this tender, formatted — "R$ 75,20" — or `null` for none. */
+  price: string | null;
   testId: string;
   /** The card just removed comes back as a choice and keeps the focus. */
   autoFocus: boolean;
@@ -63,6 +73,11 @@ export function TenderChoice<T extends string>({
       }}
     >
       <TenderHeading tender={tender} />
+      {price === null ? null : (
+        <Typography variant="caption" color="text.secondary" data-testid={`${testId}-price`} sx={{ fontWeight: 400, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+          {price}
+        </Typography>
+      )}
     </ButtonBase>
   );
 }

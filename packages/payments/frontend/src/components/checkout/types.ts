@@ -11,6 +11,10 @@ import type { DebitChargeFields, DebitDeclaration } from "./debit-types";
 import type { GooglePayDeclaration } from "./google-pay-params";
 import type { CheckoutDecline, CheckoutDeclineReason } from "./decline";
 
+/** An online row as prices key it (debit is `CARD_DEBIT`); `WALLET` is a Google/Apple Pay sheet (FUT-4416). */
+export type CheckoutOnlineRowId = "PIX" | "CARD" | "CARD_DEBIT" | "HAND_OFF";
+export type CheckoutPricedAs = CheckoutOnlineRowId | "WALLET";
+
 /** Payment methods offered at checkout. Mirrors `Payment.method` (FUT-42). */
 export type PaymentMethod = "PIX" | "CARD";
 
@@ -197,6 +201,8 @@ export interface CreateOrderRequest {
    * id of the registered settlement verbatim.
    */
   settlementMethod?: string;
+  /** Which price the host raises the order for (FUT-4416); ABSENT whenever the list is unpriced. */
+  pricedAs?: CheckoutPricedAs;
 }
 
 /** What the flow hands the host's `saveBuyerContact` port on "Continuar". */

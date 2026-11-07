@@ -1,71 +1,33 @@
 import { Box } from "@mui/material";
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX, type RefObject } from "react";
 
 import { taxIdKind } from "../../../card";
+import { useCheckoutCopy } from "../copy-context";
 import { cardChain, cardTokenization, handOffMethod } from "../method-capability";
 import { PaymentErrorPanel } from "../payment-error-panel";
 import { UNRESOLVED_CODE } from "../failure-codes";
-import type { CheckoutBasketIdentity } from "../basket";
-import type { BuyerContact, CheckoutProviderConfig, PaymentMethod } from "../types";
+import type { PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
-import { actionLabel, blockedReason, cardName, raisedMethod } from "./choice";
+import { blockedReason, cardName, raisedMethod } from "./choice";
+import { chosenPrice, columnPrice, raisedAs, shownNudges, walletCents, walletTotal } from "./choice-price";
+import { buttonFacts, chosenDoor, coveredByHost, inFlight, onlineTotal, unpricedTotal, type ListFaceProps } from "./face-facts";
 import { usePaymentListMode, type PaymentListMode } from "./context";
-import { armPixCopy, armedReady, otherBankShown, pixBankLabel, useArmedCharge, useDropRefusedCopy } from "./list-memory";
+import { armPixCopy, armedReady, otherBankShown, useArmedCharge, useDropRefusedCopy } from "./list-memory";
+import { ListNudges } from "./list-nudges";
 import { OtherBankLink } from "./list-pix";
-import { ChoiceList } from "./choice-list";
+import { ChoiceList, focusTopCpf } from "./choice-list";
 import { debitAddressReason, useDebitAddress, useDebitRun, type DebitAddress } from "./debit-address";
 import { CardRun, WalletRun, type ListChargeFailure, type WalletSheet } from "./charge-runners";
 import { useCvvFirst } from "./cvv-first";
 import { ActionButton, ChargeBar, ListBar, holdToneOf } from "./list-bar";
 import { ListTop, TopAndRows, cpfAskedBy, gateFields, walletsHeld } from "./list-top";
 import { PayerLine } from "./payer-line";
-import type { ListCapability } from "./use-capability";
 import type { ListCharge } from "./use-list-charge";
-import type { ListState } from "./use-list-state";
 import { useApplePayPress, useCloseOrphanSheet, useGooglePayPress, type WalletPressInput } from "./wallet-press";
-import type { CheckoutDoorOption, CheckoutOnlineChoice, CheckoutPaymentList } from "./types";
+import type { CheckoutDoorOption, CheckoutOnlineChoice } from "./types";
 
 type Controller = ReturnType<typeof useCheckoutController>;
-
-/** Everything the list face reads, gathered by the step. */
-interface ListFaceProps {
-  c: Controller;
-  list: CheckoutPaymentList;
-  state: ListState;
-  charge: ListCharge;
-  cap: ListCapability;
-  config: CheckoutProviderConfig | null;
-  /** The amount the buyer sees now — the cart's, or the balance's. Never a held order's. */
-  total: string;
-  provider: string | null;
-  taxIdOnFile: boolean;
-  /** Which document is on file, when the host knows (FUT-4080); a document typed now wins. */
-  taxIdKindOnFile: "CPF" | "CNPJ" | null;
-  tenantSlug: string | undefined;
-  basket: CheckoutBasketIdentity | undefined;
-  pollIntervalMs: number;
-  saveBuyerContact?: (contact: BuyerContact) => void;
-  /** The hand-off was started: the step shows where the buyer is going. */
-  onHandOff: () => void;
-  /** "Alterar" on the payer line opened the document (CPF or CNPJ) at the top (E2 → E1). */
-  revealed: boolean;
-  onRevealCpf: () => void;
-  /** "Manter o documento salvo": close the revealed field, keeping the document on file. */
-  onKeepSavedCpf: () => void;
-}
-
-function chosenDoor(props: ListFaceProps): CheckoutDoorOption | undefined {
-  const { choice } = props.state;
-  if (choice?.kind !== "door") return undefined;
-  return props.list.door?.find((option) => option.id === choice.id);
-}
-
-/** Something is on its way that a second press would duplicate: a raise, a host send, a charge. */
-function inFlight(props: ListFaceProps): boolean {
-  const doorPending = props.list.door?.some((option) => option.pending) ?? false;
-  return props.c.creating || doorPending || props.charge.phase !== "idle";
-}
 
 /** Remember the asked details for next time, as the Dados step's "Continuar" did — only with the buyer's consent. */
 function saveAsked(props: ListFaceProps): void {
@@ -77,11 +39,6 @@ function saveAsked(props: ListFaceProps): void {
   saveBuyerContact?.({ name: c.buyer.name, phone: c.buyer.phone, taxId: c.buyer.taxId });
 }
 
-/** What an online payment asks for: the host's amount due when a balance pays part, else the cart's total (P3). */
-function onlineTotal(props: ListFaceProps): string {
-  return props.list.amountDueLabel ?? props.total;
-}
-
 /** An online choice's press: the card goes through the bar, Pix and the hand-off raise at once. */
 function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: PaymentListMode | null, pick = false): void {
   const { c, charge, cap } = props;
@@ -91,7 +48,7 @@ function actOnline(props: ListFaceProps, method: CheckoutOnlineChoice, mode: Pay
   const raised = method === "PIX" ? "PIX" : handOffMethod(cap.offered);
   if (method === "HAND_OFF") props.onHandOff();
   c.setMethod(raised);
-  void c.startPayment(raised);
+  void c.startPayment(raised, undefined, raisedAs(props.list, { method }));
 }
 
 /**
@@ -124,8 +81,9 @@ function walletInput(
     pressed,
     cap: props.cap,
     charge: props.charge,
-    cents: props.list.totalCents,
-    total: onlineTotal(props),
+    // The wallets' own price (FUT-4416), else what an unpriced online payment asks.
+    cents: walletCents(props.list),
+    total: walletTotal(props.list, unpricedTotal(props)),
     blocked: held !== null || inFlight(props),
     before: () => {
       clearFailures();
@@ -169,19 +127,6 @@ function chargingText(props: ListFaceProps): string {
   if (coveredByHost(list) && list.copy.chargingCovered) return list.copy.chargingCovered;
   const selected = state.card.saved.find((card) => card.id === state.card.selection);
   return list.copy.charging(charge.pressedTotal ?? onlineTotal(props), selected ? cardName(list.copy, selected) : null);
-}
-
-/** The verb, the amount (none while nothing is chosen) and the busy state of the button, for what is chosen. */
-function buttonFacts(props: ListFaceProps): { label: string; total: string | null; busy: boolean } {
-  const { list, state } = props;
-  const door = chosenDoor(props);
-  const online = state.choice?.kind === "online";
-  return {
-    label: list.hold ? list.hold.action : pixBankLabel(list, state) ?? actionLabel(list.copy, state.choice, door, props.provider, coveredByHost(list)),
-    // A button held with nothing chosen charges nothing: no amount, so its words get the whole width.
-    total: door ? (door.totalLabel ?? props.total) : online ? onlineTotal(props) : state.choice ? props.total : null,
-    busy: inFlight(props),
-  };
 }
 
 /** The 5-second bar (or the charge going out), and the host's footer while it counts. */
@@ -241,6 +186,9 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
 }): JSX.Element | null {
   const { c, charge, config } = props;
   const debit = useDebitRun(props.state.choice, props.list);
+  // Judged once by the charge, against the cents frozen at the press: a
+  // re-price while a charge is out never turns it into a failure (FUT-4416).
+  if (charge.mismatched) return <PriceMismatch onFailed={onFailed} />;
   const order = charge.chargeable;
   if (!order) return null;
   const common = {
@@ -254,15 +202,21 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
   return null;
 }
 
+/**
+ * A card order that does not ask the chosen row's price (FUT-4416): nothing is
+ * sent, and the list is back, saying the payment did not go through — the
+ * wallets' runner refuses a sheet's mismatched amount the same way.
+ */
+function PriceMismatch({ onFailed }: { onFailed: (failure: ListChargeFailure | null) => void }): null {
+  const words = useCheckoutCopy().screens.settling.cannotPay;
+  useEffect(() => onFailed({ message: words, code: null }), [onFailed, words]);
+  return null;
+}
+
 /** A raise the host refused, with the step's own retry — as the tabs layout shows it. */
 function RaiseError({ c, onRetry }: { c: Controller; onRetry: () => void }): JSX.Element | null {
   if (!c.createError || c.order || c.creating) return null;
   return <PaymentErrorPanel message={c.createError} emailFlagged={c.errorField === "email"} code={c.errorCode} onUseEmail={c.payWithEmail} onRetry={onRetry} />;
-}
-
-/** The host's balance pays the whole amount (`totalCents: 0`): no card is asked for or charged. */
-function coveredByHost(list: CheckoutPaymentList): boolean {
-  return list.totalCents === 0;
 }
 
 /**
@@ -301,7 +255,24 @@ function barFacts(props: ListFaceProps, door: CheckoutDoorOption | undefined, re
     extras: payingHere(props) && !charging ? props.list.onlineExtras : undefined,
     underButton: charging ? null : (door?.error ?? reason),
     live: cardCharging(props.charge) ? chargingText(props) : null,
+    discount: chosenPrice(props.list, props.state.choice)?.discount,
+    due: columnPrice(props.list, props.state.choice),
   };
+}
+
+/**
+ * The host's nudges (FUT-4416), while nothing is under way: a link that
+ * chooses a row chooses it as its radio would; a door option never.
+ */
+function BarNudges({ props, hidden, root }: { props: ListFaceProps; hidden: boolean; root: RefObject<HTMLElement | null> }): JSX.Element | null {
+  const { list, state } = props;
+  if (hidden) return null;
+  const onChoose = ({ method, funding }: { method: CheckoutOnlineChoice; funding?: "DEBIT" }): void => {
+    state.choose({ kind: "online", method, ...(funding ? { funding } : {}) });
+    // The buyer's own choice, as a tap on the row: take them to the CPF it needs.
+    if (cpfAskedBy(state, props.c.buyer, props.config, props.cap.offered, method)) focusTopCpf(root.current);
+  };
+  return <ListNudges nudges={shownNudges(list.nudges, state.rows, state.choice)} onChoose={onChoose} />;
 }
 
 /**
@@ -378,18 +349,19 @@ export function ListFace(props: ListFaceProps): JSX.Element {
   const shown = charge.phase !== "waiting";
   const facts = barFacts(props, door, reason);
   const rowsShown = useRef(false);
+  const root = useRef<HTMLDivElement | null>(null);
   const top = <ListTop props={props} held={wallets.held} failure={wallets.failure} onGoogle={wallets.onGoogle} onApple={wallets.onApple} rowsShown={rowsShown} />;
   return (
-    <Box data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box ref={root} data-testid="payment-list-step" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {shown ? (
         <TopAndRows rowsShown={rowsShown} drawn={state.settled}>
-          <ChoiceList copy={list.copy} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
+          <ChoiceList copy={list.copy} prices={list.prices} state={state} door={list.door ?? []} buyer={c.buyer} onBuyerChange={c.setBuyer} provider={props.provider} failure={failure} locked={facts.locked} covered={coveredByHost(list)} cpfAsked={(choice) => cpfAskedBy(state, c.buyer, props.config, props.cap.offered, choice)} top={top} />
         </TopAndRows>
       ) : null}
       <Runners props={props} sheet={wallets.sheet.current} onFailed={onFailed} onWalletFailed={wallets.onFailed} />
       <RaiseError c={c} onRetry={() => act()} />
       {shown ? (
-        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} reasonTone={holdToneOf(list.hold, facts.underButton)} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live}>
+        <ListBar summary={list.summary} sheetHeld={facts.charging} sheetShut={props.revealed} extras={facts.extras} payer={facts.charging ? null : <Payer props={props} />} reason={facts.underButton} reasonTone={holdToneOf(list.hold, facts.underButton)} actionLabel={buttonFacts(props).label} heldTotal={state.choice ? null : props.total} live={facts.live} discount={facts.discount} nudges={<BarNudges props={props} hidden={facts.locked} root={root} />} due={facts.due}>
           <BarAction props={props} failure={failure ?? wallets.failure} act={act} onCancel={onCancel} reason={reason} returnFocus={returnFocus} />
         </ListBar>
       ) : null}
