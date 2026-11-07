@@ -7,7 +7,7 @@ import { isValidPoint } from "../core/geo";
 import type { LngLat, Position } from "../core/types";
 
 import type { MapLike } from "./maplibre-types";
-import type { RouteMapCircle, RouteMapDot, RouteMapMarker, RouteMapProps, RouteMapTheme } from "./types";
+import type { RouteMapCircle, RouteMapDot, RouteMapMarker, RouteMapProps, RouteMapTether, RouteMapTheme } from "./types";
 
 /** Below this many pixels apart, two markers are one tap target. */
 const GROUP_RADIUS_PX = 32;
@@ -132,16 +132,27 @@ export function circleRing(circle: RouteMapCircle): [number, number][] {
   return ring;
 }
 
-/** Every valid circle as a polygon carrying its colour and whether it is dashed. */
-export function circlesFeature(circles: readonly RouteMapCircle[] | undefined, theme: RouteMapTheme) {
-  const features = (circles ?? [])
+/** Every valid tether as a dashed line, drawn by the dashed circle layer. */
+function tetherFeatures(tethers: readonly RouteMapTether[] | undefined, theme: RouteMapTheme) {
+  return (tethers ?? [])
+    .filter((tether) => isValidPoint(tether.from) && isValidPoint(tether.to))
+    .map((tether) => ({
+      type: "Feature" as const,
+      properties: { id: tether.id, dashed: true, color: tether.color ?? theme.ink },
+      geometry: { type: "LineString" as const, coordinates: [[tether.from.lng, tether.from.lat], [tether.to.lng, tether.to.lat]] },
+    }));
+}
+
+/** Every valid circle as a polygon carrying its colour and whether it is dashed, then the tethers as dashed lines. */
+export function circlesFeature(circles: readonly RouteMapCircle[] | undefined, theme: RouteMapTheme, tethers?: readonly RouteMapTether[]) {
+  const rings = (circles ?? [])
     .filter((circle) => isValidPoint(circle.center) && circle.radiusMetres > 0)
     .map((circle) => ({
       type: "Feature" as const,
       properties: { id: circle.id, dashed: !!circle.dashed, color: circle.color ?? (circle.dashed ? theme.ink : theme.travelled) },
       geometry: { type: "Polygon" as const, coordinates: [circleRing(circle)] },
     }));
-  return { type: "FeatureCollection" as const, features };
+  return { type: "FeatureCollection" as const, features: [...rings, ...tetherFeatures(tethers, theme)] };
 }
 
 /** Every valid dot as a point carrying whether it is filled. */

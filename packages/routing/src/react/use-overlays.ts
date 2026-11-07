@@ -29,7 +29,7 @@ import type { LngLat } from "../core/types";
 
 import type { RouteMapCopy } from "./copy";
 import { dragPlaces, type DragPlaces } from "./drag-places";
-import { groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
+import { ghostPlaceElement, groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
 import { addShapes, boundsOf, CIRCLES_SOURCE, circlesFeature, DOTS_SOURCE, dotsFeature, groupMarkers, PLANNED_LAYER, pointsOf, setLine, setTravelled, TRAVELLED_LAYER } from "./map-geometry";
 import type { MapLibreLike, MapLike, MarkerLike } from "./maplibre-types";
 import { placeTags, type Placed } from "./tag-placement";
@@ -232,9 +232,9 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
   useEffect(() => {
     const map = handle.mapRef.current;
     if (!ready || !map || !withShapes(map, props, theme)) return;
-    map.getSource(CIRCLES_SOURCE)?.setData(circlesFeature(props.circles, theme));
+    map.getSource(CIRCLES_SOURCE)?.setData(circlesFeature(props.circles, theme, props.tethers));
     map.getSource(DOTS_SOURCE)?.setData(dotsFeature(props.dots));
-  }, [ready, props.circles, props.dots]);
+  }, [ready, props.circles, props.tethers, props.dots]);
 
   useEffect(() => {
     if (ready) overlays.draw();
@@ -256,7 +256,7 @@ const SHAPED = new WeakSet<MapLike>();
 /** Adds the circle and dot layers the first time a host draws one; false while it never has. */
 function withShapes(map: MapLike, props: RouteMapProps, theme: RouteMapTheme): boolean {
   if (SHAPED.has(map)) return true;
-  if (!props.circles?.length && !props.dots?.length) return false;
+  if (!props.circles?.length && !props.tethers?.length && !props.dots?.length) return false;
   addShapes(map, theme);
   SHAPED.add(map);
   return true;
@@ -269,8 +269,9 @@ function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPla
   return (props.places ?? [])
     .filter((spot) => isValidPoint(spot.position))
     .map((spot): Wanted => {
+      if (spot.ghost) return { key: `g:${spot.id}`, signature: JSON.stringify([spot.label, spot.color]), position: spot.position, anchor: "center", role: "place", build: () => ghostPlaceElement(spot, theme) };
       if (spot.draggable) return drags.wanted(spot, spot.draggable);
-      return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
+      return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, spot.color, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
     });
 }
 

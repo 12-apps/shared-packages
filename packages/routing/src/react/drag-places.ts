@@ -73,7 +73,7 @@ export function dragPlaces(map: () => MapLike | null, frame: () => HTMLElement |
       const key = `d:${spot.id}`;
       entries.set(key, { spec, position: spot.position });
       const onKey = (event: KeyboardEvent): void => nudge(key, event);
-      return { key, signature: JSON.stringify([spot.label, spec.ariaLabel]), position: spot.position, anchor: "bottom", role: "place", draggable: true, build: () => draggablePlaceElement(spot, spec.ariaLabel, theme, onKey) };
+      return { key, signature: JSON.stringify([spot.label, spot.color, spec.ariaLabel]), position: spot.position, anchor: "bottom", role: "place", draggable: true, build: () => draggablePlaceElement(spot, spec.ariaLabel, theme, onKey) };
     },
     bind: (key, marker) => {
       const report = (done: boolean): void => {
