@@ -8,6 +8,7 @@ import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { getByLabelFor } from "./labelled-control";
 
 /**
  * Authoring a recurring promotion (FUT-996).
@@ -81,7 +82,7 @@ function setTime(kind: "from" | "to", value: string, index = 0): void {
 
 /** Fill the name so the form's other rules do not mask a schedule failure. */
 function nameIt(name = "Happy hour"): void {
-  fireEvent.change(screen.getByLabelText(copy.form.name), { target: { value: name } });
+  fireEvent.change(getByLabelFor(copy.form.name), { target: { value: name } });
 }
 
 /** A radio's checked state — jest-dom is not installed in this package. */
@@ -105,7 +106,7 @@ describe("the default is unchanged", () => {
     // plain 10%-off must produce exactly the payload they always did.
     const { sent } = renderForm();
     nameIt("Dez por cento");
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     await submit();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((sent[0] as { schedule: unknown }).schedule).toBeNull();
@@ -127,7 +128,7 @@ describe("toda sexta, das 16:00 às 20:00", () => {
   it("sends the schedule the sentence described", async () => {
     const { sent } = renderForm();
     nameIt();
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     toggleDay("Sex");
     setTime("from", "16:00");
@@ -193,7 +194,7 @@ describe("the presets write into the chips", () => {
     // What makes a preset a shortcut rather than a fourth mode to understand.
     const { sent } = renderForm();
     nameIt();
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetWeekdays}`));
     toggleDay("Qua");
@@ -208,7 +209,7 @@ describe("several time rows", () => {
   it('adds a second row with "Adicionar outro horário"', async () => {
     const { sent } = renderForm();
     nameIt();
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     toggleDay("Sex");
     setTime("from", "16:00");
@@ -230,7 +231,7 @@ describe("what the form refuses", () => {
   it("will not save a schedule with no day chosen", async () => {
     const { sent } = renderForm();
     nameIt();
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     await submit();
     await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
