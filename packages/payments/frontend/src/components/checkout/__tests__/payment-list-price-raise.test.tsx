@@ -13,7 +13,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { CHARGE_WINDOW_MS } from "../list/use-list-charge";
 import type { CheckoutListPrices } from "../list/types";
 import type { CreateOrderRequest, CreateOrderResult } from "../types";
-import { SAVED_VISA, installGoogle, onPageStore, orderFor, renderList, stubClient, uninstallWallets, walletStore } from "./list-harness";
+import { SAVED_VISA, installGoogle, listFlow, onPageStore, orderFor, renderList, stubClient, uninstallWallets, walletStore } from "./list-harness";
 
 const PRICES: CheckoutListPrices = {
   online: {
@@ -108,5 +108,46 @@ describe("a fresh card order is checked against the chosen row", () => {
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
     await pressCardAndWait();
     await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(1));
+  });
+});
+
+/**
+ * Review round 2: the chosen row's cents are frozen at the press. A host that
+ * re-prices the row while the charge is out (3DS, the AWAITING wait) never
+ * turns that charge into a failure and never brings the button back over it:
+ * a second press would charge twice.
+ */
+describe("a re-price while the card charge is out", () => {
+  const REPRICED: CheckoutListPrices = { ...PRICES, online: { ...PRICES.online, CARD: { amountLabel: "R$ 26,00", amountCents: 2600 } } };
+
+  async function pressThenReprice(client: ReturnType<typeof stubClient>): Promise<void> {
+    const host = { config: onPageStore(), client, createOrder: raiseAt(2700), list: { prices: PRICES } };
+    const { rerender } = renderList(host);
+    await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
+    await pressCardAndWait();
+    await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(1));
+    rerender(listFlow({ ...host, list: { prices: REPRICED } }));
+    // Let any effect the re-price would trigger run, then look.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+  }
+
+  it("a charge still being answered says no failure and shows no button", async () => {
+    const client = stubClient([SAVED_VISA]);
+    client.charge.mockImplementation(() => new Promise(() => undefined) as never);
+    await pressThenReprice(client);
+    expect(screen.queryAllByText("Não foi possível pagar")).toHaveLength(0);
+    expect(screen.queryByTestId("list-pay")).toBeNull();
+    expect(client.charge).toHaveBeenCalledTimes(1);
+  });
+
+  it("a charge accepted and awaited says no failure and shows no button", async () => {
+    const client = stubClient([SAVED_VISA]);
+    client.charge.mockResolvedValue({ ok: true, data: { status: "AWAITING_PAYMENT" } } as never);
+    await pressThenReprice(client);
+    expect(screen.queryAllByText("Não foi possível pagar")).toHaveLength(0);
+    expect(screen.queryByTestId("list-pay")).toBeNull();
+    expect(client.charge).toHaveBeenCalledTimes(1);
   });
 });

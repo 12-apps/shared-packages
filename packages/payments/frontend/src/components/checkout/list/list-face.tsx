@@ -10,7 +10,7 @@ import type { PaymentMethod } from "../types";
 import type { useCheckoutController } from "../use-checkout-controller";
 
 import { blockedReason, cardName, raisedMethod } from "./choice";
-import { chosenOnlineCents, chosenPrice, columnPrice, raisedAs, shownNudges, walletCents, walletTotal } from "./choice-price";
+import { chosenPrice, columnPrice, raisedAs, shownNudges, walletCents, walletTotal } from "./choice-price";
 import { buttonFacts, chosenDoor, coveredByHost, inFlight, onlineTotal, unpricedTotal, type ListFaceProps } from "./face-facts";
 import { usePaymentListMode, type PaymentListMode } from "./context";
 import { armPixCopy, armedReady, otherBankShown, useArmedCharge, useDropRefusedCopy } from "./list-memory";
@@ -186,6 +186,9 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
 }): JSX.Element | null {
   const { c, charge, config } = props;
   const debit = useDebitRun(props.state.choice, props.list);
+  // Judged once by the charge, against the cents frozen at the press: a
+  // re-price while a charge is out never turns it into a failure (FUT-4416).
+  if (charge.mismatched) return <PriceMismatch onFailed={onFailed} />;
   const order = charge.chargeable;
   if (!order) return null;
   const common = {
@@ -193,9 +196,6 @@ function Runners({ props, sheet, onFailed, onWalletFailed }: {
     onResolved: c.handleResolved, pollIntervalMs: props.pollIntervalMs, onAccepted: charge.accepted, onFailed,
   };
   if (charge.kind === "CARD") {
-    // A card order must ask the chosen row's own cents (FUT-4416): another amount is never charged.
-    const expected = chosenOnlineCents(props.list, props.state.choice);
-    if (expected !== undefined && (order.amountDueCents ?? order.totalCents) !== expected) return <PriceMismatch onFailed={onFailed} />;
     return <CardRun {...common} card={props.state.card} config={cardTokenization(config)} chain={cardChain(config)} debit={debit} onWaitElapsed={c.handleWaitElapsed} />;
   }
   if (charge.kind !== null && charge.kind === sheet?.type) return <WalletRun {...common} onFailed={onWalletFailed} sheet={sheet} />;
