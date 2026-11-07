@@ -3,12 +3,12 @@
 // a cold worker's chunk import is not what the `findBy` waits on.
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
-import { createTheme } from "@12-apps/ui/mui/styles";
+import { createTheme, ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import type { DiscountsWebCopy } from "../copy";
@@ -18,6 +18,7 @@ import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 9. Under an unknown zone the dates are locked and
@@ -28,18 +29,6 @@ import { STORY_GROUPS } from "../__stories__/fixtures";
  */
 
 const SURFACE_LOADED = { timeout: 10_000 };
-
-// FUT-4530: every case here mounts the WHOLE admin — the grid, the edit
-// dialog with its slide-in, the form and its two-month calendar — and jsdom
-// pays for MUI's modal and transitions with a style lookup over ~900 emotion
-// sheets. Measured after cutting what was cuttable (the label and role
-// queries, the calendar redrawn on every edit): up to 1,540 ms per case
-// alone, the worker's first case the dearest; up to 4,350 ms on one core
-// shared with two busy processes, 6,720 ms with four; and loaded CI
-// runners have run these cases at up to eight times their unloaded time.
-// 15 s covers that; 5 s did not (main went red four runs in a row at
-// 5.0–5.6 s).
-vi.setConfig({ testTimeout: 15_000 });
 
 const LOCKED: DiscountWireRecord = {
   id: "d-1",
@@ -109,9 +98,11 @@ function mount(rows: DiscountWireRecord[], options: MountOptions = {}): Record<s
     ...(options.wholeDays === false ? {} : { wholeDays: true }),
   });
   render(
-    <MemoryRouter initialEntries={["/discounts"]}>
-      <Screen />
-    </MemoryRouter>,
+    <ThemeProvider theme={STILL_THEME}>
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
   return sent;
 }
@@ -122,6 +113,16 @@ async function openEdit(id: string): Promise<HTMLElement> {
   fireEvent.click(await screen.findByTestId("discount-action-edit"));
   return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
 }
+
+// The worker's first mount of the admin and its edit form pays for emotion
+// writing every style once (1–1.5 s alone, several times that on a loaded
+// runner). Paid here, under the hook's own limit, not inside the first case
+// (FUT-4530).
+beforeAll(async () => {
+  mount([LOCKED]);
+  await openEdit(LOCKED.id);
+  cleanup();
+});
 
 const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement => {
   const field = within(period).getByTestId(`total-form-field-${name}`);
