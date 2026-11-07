@@ -4,7 +4,7 @@ import { useEffect, useRef, type JSX, type ReactNode, type RefObject } from "rea
 
 import { useCheckoutComponents } from "../ui";
 
-import { revealRow } from "./reveal-row";
+import { browserSettleDeps, keepRowClear, revealRow } from "./reveal-row";
 
 /**
  * One row of the one list (FUT-3591): a radio, its label and hint, and — while
@@ -150,18 +150,26 @@ function rowFrameSx(chosen: boolean, disabled: boolean): SxProps<Theme> {
 
 /**
  * Once the buyer chooses the row (a tap, never the choice the list starts
- * with), scroll it clear of the bar after the frame that opened it — the bar
- * has grown by then (the discount line, the host's note), and is measured.
+ * with), scroll it clear of the bar after the frame that opened it, and keep
+ * it clear while the bar settles: the host's nudges and notes reach the bar a
+ * render or more later, and each size the bar takes is measured again.
  */
 function useRevealOnChoose(chosen: boolean): { row: RefObject<HTMLDivElement | null>; pressed: () => void } {
   const row = useRef<HTMLDivElement | null>(null);
   const asked = useRef(false);
   useEffect(() => {
-    if (!chosen || !asked.current) return undefined;
+    const element = row.current;
+    const view = element?.ownerDocument.defaultView;
+    if (!chosen || !asked.current || !element || !view) return undefined;
     asked.current = false;
-    if (typeof requestAnimationFrame !== "function") return undefined;
-    const frame = requestAnimationFrame(() => revealRow(row.current));
-    return () => cancelAnimationFrame(frame);
+    let stop: (() => void) | null = null;
+    const frame = view.requestAnimationFrame(() => {
+      stop = keepRowClear(element, () => revealRow(element), browserSettleDeps(view));
+    });
+    return () => {
+      view.cancelAnimationFrame(frame);
+      stop?.();
+    };
   }, [chosen]);
   return { row, pressed: () => { asked.current = true; } };
 }

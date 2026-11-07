@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { ROW_TO_BAR_GAP, barClearance, revealRow, type RowBox } from "../list/reveal-row";
+import { ROW_TO_BAR_GAP, SETTLE_MS, barClearance, keepRowClear, revealRow, type RowBox, type SettleDeps } from "../list/reveal-row";
 
 const ROW: RowBox = { top: 400, bottom: 540, left: 16, right: 374 };
 
@@ -62,9 +62,125 @@ describe("revealRow", () => {
     container.remove();
   });
 
+  it("puts a row taller than the room above the bar at the top of the screen", () => {
+    const container = document.createElement("div");
+    const row = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.setAttribute("data-testid", "list-pay-bar");
+    container.append(row, bar);
+    document.body.append(container);
+    // A 320×640 phone: 208px of row, and the bar's top at 192.
+    vi.spyOn(row, "getBoundingClientRect").mockReturnValue({ top: 300, bottom: 508, left: 16, right: 304, x: 16, y: 300, width: 288, height: 208, toJSON: () => ({}) });
+    vi.spyOn(bar, "getBoundingClientRect").mockReturnValue({ top: 192, bottom: 640, left: 0, right: 320, x: 0, y: 192, width: 320, height: 448, toJSON: () => ({}) });
+    const scroll = vi.fn();
+    Object.defineProperty(row, "scrollIntoView", { value: scroll });
+    revealRow(row, 640);
+    expect(scroll).toHaveBeenCalledWith({ block: "start" });
+    expect(row.style.scrollMarginBottom).toBe("");
+    container.remove();
+  });
+
   it("does nothing where there is no layout to scroll", () => {
     const row = document.createElement("div");
     Object.defineProperty(row, "scrollIntoView", { value: undefined });
     expect(() => revealRow(row, 844)).not.toThrow();
+  });
+});
+
+/**
+ * The bar grows a render or more after the press (the host's nudges arrive
+ * through its own state): the row is revealed again on each size the bar
+ * takes, until the buyer scrolls or the settle window ends.
+ */
+describe("keepRowClear", () => {
+  /** A fake browser: the observer, the timer and the buyer's scroll are fired by the test. */
+  function fakeDeps() {
+    const resized: (() => void)[] = [];
+    const timers: { ms: number; done: () => void }[] = [];
+    const scrolls: (() => void)[] = [];
+    const observed: Element[][] = [];
+    const ended = { observer: 0, timer: 0, scroll: 0 };
+    const deps: SettleDeps = {
+      observe: (targets, onResize) => {
+        observed.push([...targets]);
+        resized.push(onResize);
+        return () => { ended.observer += 1; };
+      },
+      after: (ms, done) => {
+        timers.push({ ms, done });
+        return () => { ended.timer += 1; };
+      },
+      onUserScroll: (scrolled) => {
+        scrolls.push(scrolled);
+        return () => { ended.scroll += 1; };
+      },
+    };
+    return { deps, resized, timers, scrolls, observed, ended };
+  }
+
+  function rowAndBar() {
+    const container = document.createElement("div");
+    const row = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.setAttribute("data-testid", "list-pay-bar");
+    container.append(row, bar);
+    document.body.append(container);
+    return { row, bar, release: () => container.remove() };
+  }
+
+  it("reveals at once, observes the row and the bar, and reveals again on each resize", () => {
+    const { row, bar, release } = rowAndBar();
+    const fake = fakeDeps();
+    const reveal = vi.fn();
+    keepRowClear(row, reveal, fake.deps);
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(fake.observed).toEqual([[row, bar]]);
+    fake.resized[0]!();
+    fake.resized[0]!();
+    expect(reveal).toHaveBeenCalledTimes(3);
+    release();
+  });
+
+  it("stops after the settle window: a later resize reveals nothing, and everything is released", () => {
+    const { row, release } = rowAndBar();
+    const fake = fakeDeps();
+    const reveal = vi.fn();
+    keepRowClear(row, reveal, fake.deps);
+    expect(fake.timers.map((timer) => timer.ms)).toEqual([SETTLE_MS]);
+    fake.timers[0]!.done();
+    fake.resized[0]!();
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(fake.ended).toEqual({ observer: 1, timer: 1, scroll: 1 });
+    release();
+  });
+
+  it("stops on the buyer's own scroll, never fighting it", () => {
+    const { row, release } = rowAndBar();
+    const fake = fakeDeps();
+    const reveal = vi.fn();
+    keepRowClear(row, reveal, fake.deps);
+    fake.scrolls[0]!();
+    fake.resized[0]!();
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(fake.ended).toEqual({ observer: 1, timer: 1, scroll: 1 });
+    release();
+  });
+
+  it("the returned stop releases everything once, however often it is called", () => {
+    const { row, release } = rowAndBar();
+    const fake = fakeDeps();
+    const stop = keepRowClear(row, vi.fn(), fake.deps);
+    stop();
+    stop();
+    fake.timers[0]!.done();
+    expect(fake.ended).toEqual({ observer: 1, timer: 1, scroll: 1 });
+    release();
+  });
+
+  it("with no bar on the page observes the row alone", () => {
+    const row = document.createElement("div");
+    const fake = fakeDeps();
+    keepRowClear(row, vi.fn(), fake.deps);
+    expect(fake.observed).toEqual([[row]]);
   });
 });
