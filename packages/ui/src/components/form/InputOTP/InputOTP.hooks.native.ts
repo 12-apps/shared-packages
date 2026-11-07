@@ -56,7 +56,11 @@ export const useNativeOtpDigits = ({ variant, length, value, onChange, onComplet
 
   const handleChangeText = useCallback(
     (index: number, text: string) => {
-      const fill = firstSlotFill(variant, index, text, digits[0] ?? '');
+      // The web's paste spreads a code for EVERY variant; React Native has no
+      // paste event, so a code arrives as a change of the first box, read by
+      // the numeric rule for `alphanumeric` too (`masked` shows a bullet, whose
+      // text no longer holds the digit it hides: it keeps one character a box).
+      const fill = firstSlotFill(variant === 'alphanumeric' ? 'numeric' : variant, index, text, digits[0] ?? '');
       if (fill) return fill === 'code' ? spread(codeOfFill(text, digits[0] ?? '', length)) : undefined;
       if (!isAllowed(variant, text)) return;
       const next = [...digits];

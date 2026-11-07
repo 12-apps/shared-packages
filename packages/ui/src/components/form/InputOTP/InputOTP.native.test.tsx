@@ -76,6 +76,14 @@ describe('InputOTP (native)', () => {
     expect([0, 1, 2, 3, 4, 5].map((index) => box(index).value).join('')).toBe('482913');
   });
 
+  it('spreads an alphanumeric code pasted into the first box, without capitals or autocorrect', () => {
+    render(<InputOTP dataTestId="otp" variant="alphanumeric" />);
+    expect(box(0)).toHaveAttribute('autocapitalize', 'none');
+    expect(box(0)).toHaveAttribute('autocorrect', 'off');
+    type(0, 'AB12CD');
+    expect([0, 1, 2, 3, 4, 5].map((index) => box(index).value).join('')).toBe('AB12CD');
+  });
+
   it('steps back on Backspace in an empty box', () => {
     render(<Controlled />);
     type(0, '4');
@@ -102,8 +110,9 @@ describe('InputOTP (native)', () => {
     expect(box(1)).toHaveStyle({ borderTopWidth: `${OTP_BORDER.rest}px` });
   });
 
-  it('takes nothing while disabled', () => {
+  it('takes nothing while disabled, and fades its border as the web does', () => {
     render(<InputOTP dataTestId="otp" disabled />);
     expect(box(0)).toBeDisabled();
+    expect(box(0)).toHaveStyle({ borderTopColor: theme.palette.action.disabled });
   });
 });

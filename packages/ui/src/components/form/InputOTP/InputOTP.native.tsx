@@ -4,7 +4,7 @@ import { Platform, StyleSheet, TextInput, View, type TextInputProps, type TextSt
 import { useNativeOtpDigits } from './InputOTP.hooks.native';
 import { OTP_BORDER, OTP_FONT_PX, OTP_GAP_PX } from './InputOTP.metrics';
 import type { InputOTPProps } from './InputOTP.types.native';
-import { webDisabled } from '../../../platform/aria';
+import { webAria, webDisabled } from '../../../platform/aria';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
 import { fieldHeightPx } from '../../../tokens/field-height.core';
 import type { UiPaletteKey, UiTheme } from '../../../tokens/theme';
@@ -26,7 +26,8 @@ function accentOf(theme: UiTheme, color: string): string {
  * `sms-otp` on Android.
  */
 function keypadProps(variant: string, index: number): Partial<TextInputProps> {
-  if (variant !== 'numeric') return {};
+  // A code is not prose: no capital on the first letter, no autocorrect.
+  if (variant !== 'numeric') return { autoCapitalize: 'none', autoCorrect: false, spellCheck: false };
   const fill: Partial<TextInputProps> =
     index === 0
       ? Platform.select<Partial<TextInputProps>>({
@@ -38,9 +39,9 @@ function keypadProps(variant: string, index: number): Partial<TextInputProps> {
   return { keyboardType: 'number-pad', inputMode: 'numeric', ...fill };
 }
 
-/** The first numeric box takes a whole code in one change (see the web's `slotMaxLength`). */
+/** The first box takes a whole code in one change (see the web's `slotMaxLength`), except `masked`'s. */
 const boxMaxLength = (variant: string, index: number, length: number): number =>
-  variant === 'numeric' && index === 0 ? length + 1 : 1;
+  variant !== 'masked' && index === 0 ? length + 1 : 1;
 
 interface BoxState {
   focused: boolean;
@@ -52,7 +53,14 @@ interface BoxState {
 function boxStyle(theme: UiTheme, size: SizeValue, accent: string, state: BoxState): TextStyle {
   const side = fieldHeightPx(theme.fieldHeight, size);
   const edge = resolveFieldEdge(theme.palette.divider, theme.palette.background.paper);
-  const borderColor = state.error ? theme.palette.danger.main : state.focused ? accent : edge;
+  // Error and disabled outrank focus, as in MUI's outlined input (and the native `Input`).
+  const borderColor = state.error
+    ? theme.palette.danger.main
+    : state.disabled
+      ? theme.palette.action.disabled
+      : state.focused
+        ? accent
+        : edge;
   return {
     width: side,
     height: side,
@@ -123,7 +131,7 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
           autoFocus={autoFocus && index === 0}
           editable={!disabled}
           aria-disabled={disabled}
-          aria-invalid={error}
+          {...webAria({ 'aria-invalid': error })}
           maxLength={boxMaxLength(variant, index, length)}
           style={boxStyle(theme, size, accent, { focused: focusedIndex === index && !disabled, error, disabled })}
           {...webDisabled(disabled)}
