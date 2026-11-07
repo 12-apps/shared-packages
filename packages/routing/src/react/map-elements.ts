@@ -216,7 +216,10 @@ export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme, lifted =
  */
 export function ghostPlaceElement(spot: RouteMapPlace, theme: RouteMapTheme): HTMLElement {
   const ink = spot.color ?? theme.ink;
-  const element = span("", { position: "relative", width: "14px", height: "14px", pointerEvents: "none", zIndex: "1" });
+  // No inline position: MapLibre's marker class makes the root absolute, and an
+  // inline "relative" would put it back in the canvas container's flow, under
+  // whatever marker came before it.
+  const element = span("", { display: "block", width: "14px", height: "14px", pointerEvents: "none", zIndex: "1" });
   element.dataset.routingGhost = spot.id;
   const ring = span("", { position: "absolute", inset: "0", boxSizing: "border-box", borderRadius: "50%", border: `2px dashed ${ink}`, background: theme.paper, opacity: "0.85" });
   const label = span(spot.label, {
@@ -243,8 +246,8 @@ export function ghostPlaceElement(spot: RouteMapPlace, theme: RouteMapTheme): HT
  * the pin, never the page; MapLibre's own marker drag moves it.
  */
 export function draggablePlaceElement(spot: RouteMapPlace, ariaLabel: string, theme: RouteMapTheme, onKey: (event: KeyboardEvent) => void): HTMLElement {
+  // No inline position, as for the ghost: MapLibre's marker class places it.
   const element = button(ariaLabel, {
-    position: "relative",
     width: "44px",
     height: "48px",
     padding: "0",
