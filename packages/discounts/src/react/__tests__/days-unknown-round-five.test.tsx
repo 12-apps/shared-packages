@@ -5,7 +5,7 @@ import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
 import { createTheme } from "@12-apps/ui/mui/styles";
@@ -16,6 +16,7 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { getByLabelFor } from "./labelled-control";
 
 /**
  * FUT-4482, review round 5 (B2): a promotion edit is never refused. While the
@@ -27,6 +28,18 @@ import { STORY_GROUPS } from "../__stories__/fixtures";
 
 const copy = PT_BR_DISCOUNTS_WEB_COPY;
 const SURFACE_LOADED = { timeout: 10_000 };
+
+// FUT-4530: every case here mounts the WHOLE admin — the grid, the edit
+// dialog with its slide-in, the form and its two-month calendar — and jsdom
+// pays for MUI's modal and transitions with a style lookup over ~900 emotion
+// sheets. Measured after cutting what was cuttable (the label and role
+// queries, the calendar redrawn on every edit): up to 1,560 ms per case
+// alone, the worker's first case the dearest; up to 4,780 ms on one core
+// shared with two busy processes, 7,160 ms with four; and loaded CI
+// runners have run these cases at up to eight times their unloaded time.
+// 15 s covers that; 5 s did not (main went red four runs in a row at
+// 5.0–5.6 s).
+vi.setConfig({ testTimeout: 15_000 });
 
 const UNKNOWN: DiscountWireRecord = {
   id: "d-1",
@@ -114,7 +127,10 @@ describe("the period while the days are unknown (review round 5)", () => {
   it("disables the calendar and both boxes, and the line under them describes both", async () => {
     mount([UNKNOWN]);
     const period = await openEdit(UNKNOWN.id);
-    const days = within(period).getAllByRole("gridcell").filter((cell) => cell.getAttribute("data-in-month") === "true");
+    // `hidden: true` skips the per-cell visibility check (a getComputedStyle
+    // over ~900 emotion sheets, 200 ms for the 84 days): the period sits in the
+    // open dialog, so no cell of it is hidden either way (FUT-4530).
+    const days = within(period).getAllByRole("gridcell", { hidden: true }).filter((cell) => cell.getAttribute("data-in-month") === "true");
     expect(days.every((cell) => cell.getAttribute("aria-disabled") === "true")).toBe(true);
     const line = within(period).getByTestId("discount-period-unavailable");
     expect(line.textContent).toBe(copy.window.daysUnknownBoxes);
@@ -123,7 +139,7 @@ describe("the period while the days are unknown (review round 5)", () => {
       expect(box.placeholder).toBe("");
       expect(box.getAttribute("aria-describedby")).toBe(line.id);
     }
-    expect(within(period).getByRole("group", { name: copy.schedule.periodTitle }).getAttribute("aria-disabled")).toBe("true");
+    expect(within(period).getByRole("group", { name: copy.schedule.periodTitle, hidden: true }).getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(days[9]!);
     expect(dateBoxes(period).map((box) => box.value)).toEqual(["", ""]);
   });
@@ -163,15 +179,15 @@ describe("the period while the days are unknown (review round 5)", () => {
     mount([PLACED]);
     const period = await openEdit(PLACED.id);
     expect(dateBoxes(period).every((box) => !box.disabled)).toBe(true);
-    expect(within(period).getAllByRole("gridcell").some((cell) => cell.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(within(period).getAllByRole("gridcell", { hidden: true }).some((cell) => cell.getAttribute("aria-disabled") !== "true")).toBe(true);
   });
 
   it("keeps every other field editable", async () => {
     mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
-    const name = screen.getByLabelText(copy.form.name) as HTMLInputElement;
+    const name = getByLabelFor(copy.form.name);
     expect(name.disabled).toBe(false);
-    expect((screen.getByLabelText(copy.form.percentOff) as HTMLInputElement).disabled).toBe(false);
+    expect(getByLabelFor(copy.form.percentOff).disabled).toBe(false);
   });
 
   it("says it once, amber, with the round-five words and link", async () => {
@@ -202,7 +218,7 @@ describe("Salvar while the days are unknown (review round 5)", () => {
   it("renames the same way", async () => {
     const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
-    fireEvent.change(screen.getByLabelText(copy.form.name), { target: { value: "Semana nova" } });
+    fireEvent.change(getByLabelFor(copy.form.name), { target: { value: "Semana nova" } });
     await saveAndClose();
     expect(sent[0]).toMatchObject({ name: "Semana nova", keepWindow: true });
     expect(sent[0]).not.toHaveProperty("startsAt");
@@ -211,7 +227,7 @@ describe("Salvar while the days are unknown (review round 5)", () => {
   it("changes the value the same way", async () => {
     const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
-    fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "15" } });
+    fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "15" } });
     await saveAndClose();
     expect(sent[0]).toMatchObject({ percentOffBp: 1_500, keepWindow: true });
     expect(sent[0]).not.toHaveProperty("startsAt");

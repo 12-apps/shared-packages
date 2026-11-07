@@ -1,4 +1,5 @@
 import { matchesRedirectUri } from "./clients";
+import { isClientIdMetadataUrl, matchesLoopbackRedirectUri } from "./client-metadata";
 import { resourceAudience } from "./config";
 import type { McpOauthContext } from "./context";
 import { SUPPORTED_CHALLENGE_METHOD } from "./pkce";
@@ -99,7 +100,11 @@ async function validateClientAndRedirect(
 
   const client = await context.stores.clients.findByClientId(params.clientId);
   if (!client) return badRequest("invalid_client: unknown client_id");
-  if (!matchesRedirectUri(client, params.redirectUri)) {
+  // A metadata-document client's loopback callback matches on any port (RFC 8252
+  // §7.3); every other redirect is the exact match it always was.
+  const loopback = context.clientIdMetadataDocuments && isClientIdMetadataUrl(client.clientId) &&
+    matchesLoopbackRedirectUri(client.redirectUris, params.redirectUri);
+  if (!loopback && !matchesRedirectUri(client, params.redirectUri)) {
     return badRequest("invalid_request: redirect_uri is not registered");
   }
 
