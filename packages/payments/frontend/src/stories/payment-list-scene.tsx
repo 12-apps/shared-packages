@@ -18,7 +18,7 @@ import type { GooglePayApi, GooglePaymentData, GooglePaymentsClient } from "../c
 import type { CheckoutCartView, CheckoutDoorOption, CheckoutListChoice, CheckoutPaymentList } from "../index";
 
 import { StoryFlow, type StoryHost } from "./host";
-import { DEMO_PRICES, PRICED_LINES, PricedAfterMethodRows, PricedMoneyRows, demoNudges, pricedDoor } from "./price-demo";
+import { CREDIT_PRICES, DEMO_PRICES, DemoCreditBox, PRICED_LINES, PricedAfterMethodRows, PricedMoneyRows, demoNudges, pricedDoor } from "./price-demo";
 import { brlLabel, type StorySpec } from "./store";
 import type { StoryProvider } from "./store-adapter";
 
@@ -83,19 +83,35 @@ function useDemoDoor(): CheckoutDoorOption[] {
 /** The cart's two prices — the second after "Adicionar um item". */
 export const CART_CENTS = { before: 2700, after: 3400 };
 
-/** A host pricing each way to pay (FUT-4416): the prices, and nudges that follow the choice. */
-function usePricing(priced: boolean, door: CheckoutDoorOption[]): Partial<CheckoutPaymentList> {
+/**
+ * A host pricing each way to pay (FUT-4416): the prices, nudges that follow
+ * the choice, and the store credit the buyer may use — which, used on an
+ * online way to pay, cancels the method's discount whole (E28, C23): every
+ * online row costs the cart less the credit, and "Não usar crédito" is offered.
+ */
+function usePricing(priced: boolean, door: CheckoutDoorOption[], creditAtStart: boolean): Partial<CheckoutPaymentList> {
   const [choice, setChoice] = useState<CheckoutListChoice | null>(null);
-  return useMemo(
-    () => (priced ? { prices: DEMO_PRICES, door: pricedDoor(door), nudges: demoNudges(choice), onChoiceChange: setChoice, afterMethodLines: <PricedAfterMethodRows /> } : {}),
-    [priced, door, choice],
-  );
+  const [credit, setCredit] = useState(creditAtStart);
+  return useMemo(() => {
+    if (!priced) return {};
+    // The credit pays only online: at the door the saldo is not used.
+    const used = credit && choice?.kind !== "door";
+    return {
+      prices: used ? CREDIT_PRICES : DEMO_PRICES,
+      door: pricedDoor(door),
+      nudges: demoNudges(choice, { used, drop: () => setCredit(false) }),
+      onChoiceChange: setChoice,
+      onlineExtras: <DemoCreditBox used={credit} onChange={setCredit} />,
+      afterMethodLines: <PricedAfterMethodRows credit={used} />,
+      ...(used ? { totalCents: CREDIT_PRICES.wallets?.amountCents } : {}),
+    };
+  }, [priced, door, choice, credit]);
 }
 
-function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDueLabel: string | undefined, lastMethod: "PIX" | "CARD" | undefined, priced = false): CheckoutPaymentList {
+function useDemoList(withDoor: boolean, totalCents: number | undefined, amountDueLabel: string | undefined, lastMethod: "PIX" | "CARD" | undefined, priced = false, credit = false): CheckoutPaymentList {
   const door = useDemoDoor();
   const { held, bumped } = useContext(Controls);
-  const pricing = usePricing(priced, door);
+  const pricing = usePricing(priced, door, credit);
   return useMemo(
     () => ({
       copy: PT_BR_PAYMENT_LIST_COPY,
@@ -170,13 +186,15 @@ interface SceneOptions {
   lastMethod?: "PIX" | "CARD";
   /** The host prices each way to pay (FUT-4416): the ticket's example cart, its rows, nudges and notes. */
   priced?: boolean;
+  /** With `priced`: the buyer's R$ 20,00 store credit starts ticked, cancelling the method's discount (E28). */
+  credit?: boolean;
 }
 
 export function scene(spec: StorySpec, host: StoryHost, options: SceneOptions = {}): StoryObj {
   const { withDoor = true, totalCents, controls = false, desktop = false } = options;
   // The list is the host's HOOK, called inside the checkout on every render —
   // so the door options' own state (the troco answer) reaches the bar.
-  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents, options.amountDueLabel, options.lastMethod, options.priced);
+  const usePaymentList = (): CheckoutPaymentList => useDemoList(withDoor, totalCents, options.amountDueLabel, options.lastMethod, options.priced, options.credit);
   const full: StoryHost = {
     ...host,
     usePaymentList,

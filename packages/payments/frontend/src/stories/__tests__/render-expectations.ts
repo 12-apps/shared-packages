@@ -644,6 +644,20 @@ export const EXPECTATIONS: Record<string, RenderExpectation> = {
     testIds: ["list-option-CARD-amount", "list-nudge-to-pix"],
     text: ["No Pix fica"],
   },
+  // Google Pay beside priced rows: the wallet's button over the rows, Pix
+  // still chosen at its own price (the sheet's price is the visual gate's).
+  "PaymentListPrices/GooglePayPriced": {
+    testIds: ["list-wallets", "list-google-pay", "list-option-PIX-amount", "list-price-discount"],
+    text: ["Desconto no Pix", "R$ 126,75"],
+  },
+  // The credit cancels the method's discount (E28): no discount line, the
+  // credit's row, and the nudge that gives the discount back.
+  "PaymentListPrices/StoreCreditCancelsDiscount": {
+    testIds: ["list-option-PIX-amount", "list-nudge-drop-credit", "list-nudge-drop-credit-action"],
+    text: ["R$ 118,70", "Sem o desconto do Pix", "Sem o crédito, no Pix fica", "Não usar crédito"],
+    absentTestIds: ["list-price-discount"],
+    absentText: ["Desconto no Pix", "R$ 11,95 a menos"],
+  },
   // ------------------------------------------- PaymentListStates (FUT-3591/3592)
   // The starting points of the harder runs; the visual gate plays the clicks.
   "PaymentListStates/GooglePay": {
