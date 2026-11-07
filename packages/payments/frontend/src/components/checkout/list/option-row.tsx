@@ -1,8 +1,10 @@
 import { Box, Radio, type SxProps } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
-import type { JSX, ReactNode } from "react";
+import { useEffect, useRef, type JSX, type ReactNode, type RefObject } from "react";
 
 import { useCheckoutComponents } from "../ui";
+
+import { revealRow } from "./reveal-row";
 
 /**
  * One row of the one list (FUT-3591): a radio, its label and hint, and — while
@@ -146,6 +148,24 @@ function rowFrameSx(chosen: boolean, disabled: boolean): SxProps<Theme> {
   };
 }
 
+/**
+ * Once the buyer chooses the row (a tap, never the choice the list starts
+ * with), scroll it clear of the bar after the frame that opened it — the bar
+ * has grown by then (the discount line, the host's note), and is measured.
+ */
+function useRevealOnChoose(chosen: boolean): { row: RefObject<HTMLDivElement | null>; pressed: () => void } {
+  const row = useRef<HTMLDivElement | null>(null);
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!chosen || !asked.current) return undefined;
+    asked.current = false;
+    if (typeof requestAnimationFrame !== "function") return undefined;
+    const frame = requestAnimationFrame(() => revealRow(row.current));
+    return () => cancelAnimationFrame(frame);
+  }, [chosen]);
+  return { row, pressed: () => { asked.current = true; } };
+}
+
 export function OptionRow({
   name,
   value,
@@ -181,8 +201,10 @@ export function OptionRow({
   /** What the row costs, at its right (FUT-4416). Absent ⇒ no amount, as before. */
   amount?: RowAmountText | null;
 }): JSX.Element {
+  const reveal = useRevealOnChoose(chosen);
   return (
     <Box
+      ref={reveal.row}
       data-testid={testId}
       data-chosen={chosen ? "true" : "false"}
       sx={rowFrameSx(chosen, disabled)}
@@ -201,7 +223,10 @@ export function OptionRow({
           value={value}
           checked={chosen}
           disabled={disabled}
-          onChange={onChoose}
+          onChange={() => {
+            reveal.pressed();
+            onChoose();
+          }}
           onClick={chosen ? onChooseAgain : undefined}
           size="small"
           sx={{ p: 0, flex: "none", mt: RADIO_ON_TITLE }}
