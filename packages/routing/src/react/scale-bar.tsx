@@ -43,7 +43,7 @@ export function readScale(map: MapLike | null, widthPx: number): ScaleReading | 
 }
 
 export function ScaleBar({ reading, label, theme }: { reading: ScaleReading; label: (metres: number) => string; theme: RouteMapTheme }): JSX.Element {
-  const box: CSSProperties = { position: "absolute", left: 10, bottom: 8, zIndex: 2, pointerEvents: "none", color: theme.ink, fontSize: 11 };
+  const box: CSSProperties = { position: "absolute", left: 10, bottom: 8, zIndex: 2, pointerEvents: "none", color: theme.ink, fontSize: 12 };
   return (
     <div data-routing-scale="" aria-hidden="true" style={box}>
       <span style={{ display: "block", background: theme.paper, padding: "0 3px", borderRadius: 3, width: "fit-content" }}>{label(reading.metres)}</span>

@@ -42,7 +42,8 @@ interface Overlays {
   place: () => void;
   clear: () => void;
   fitAll: () => void;
-  fitTo: (points: readonly LngLat[]) => void;
+  /** Fit to `points`, or centre on them at exactly `zoom` when given. */
+  fitTo: (points: readonly LngLat[], zoom?: number) => void;
 }
 
 interface Drawn extends Placed {
@@ -133,7 +134,8 @@ export function useOverlays(
     place();
   };
 
-  const fitTo = (points: readonly LngLat[]): void => {
+  const fitTo = (points: readonly LngLat[], zoom?: number): void => {
+    if (centreAt(handle.mapRef.current, points.filter((point) => isValidPoint(point)), zoom)) return;
     const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
     // Animated: its zoomend/moveend re-place the tags where it lands.
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
@@ -244,7 +246,7 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
 
   // After the fit above, so a selection made before the map was ready wins.
   useEffect(() => {
-    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })));
+    if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })), props.focus.zoom);
   }, [ready, props.focus?.key]);
 }
 
@@ -270,4 +272,12 @@ function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPla
       if (spot.draggable) return drags.wanted(spot, spot.draggable);
       return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
     });
+}
+
+/** `focus.zoom`: centre on the points at exactly that zoom; false when there is no zoom or the map cannot ease. */
+function centreAt(map: MapLike | null, points: readonly LngLat[], zoom: number | undefined): boolean {
+  if (zoom === undefined || points.length === 0 || !map?.easeTo) return false;
+  const mean = (pick: (point: LngLat) => number): number => points.reduce((sum, point) => sum + pick(point), 0) / points.length;
+  map.easeTo({ center: [mean((point) => point.lng), mean((point) => point.lat)], zoom, duration: 300 });
+  return true;
 }

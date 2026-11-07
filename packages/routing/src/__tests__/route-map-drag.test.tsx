@@ -33,6 +33,8 @@ function fakeMapLibre(initialZoom = 13) {
   const data = new Map<string, unknown>();
   const layers: Record<string, unknown>[] = [];
   const markers: FakeMarker[] = [];
+  const eased: unknown[] = [];
+  const fitted: unknown[] = [];
   const listeners: Record<string, (() => void)[]> = {};
   const lib: MapLibreLike = {
     Map: class {
@@ -53,7 +55,12 @@ function fakeMapLibre(initialZoom = 13) {
         layers.push(layer);
       }
       setPaintProperty() {}
-      fitBounds() {}
+      fitBounds(bounds: unknown) {
+        fitted.push(bounds);
+      }
+      easeTo(options: unknown) {
+        eased.push(options);
+      }
       zoomIn() {}
       zoomOut() {}
       project([lng, lat]: [number, number]) {
@@ -102,7 +109,7 @@ function fakeMapLibre(initialZoom = 13) {
     for (const listener of listeners[event] ?? []) listener();
   };
   const constructed = () => (listeners.load?.length ?? 0) > 0;
-  return { lib, data, layers, markers, fire, constructed, view };
+  return { lib, data, layers, markers, fire, constructed, view, eased, fitted };
 }
 
 async function mount(props: Partial<RouteMapProps>, zoom = 13) {
@@ -337,5 +344,18 @@ describe("RouteMap · the scale bar", () => {
       await mount({ scaleBar: (metres) => `${metres} m` }, 16);
       expect(await screen.findByText("100 m")).toBeTruthy();
     });
+  });
+});
+
+describe("RouteMap · a focus at a zoom", () => {
+  it("centres on the points at exactly the zoom asked, without a fit", async () => {
+    const { fake } = await mount({ focus: { key: "street", points: [[SHOP.lng, SHOP.lat]], zoom: 16 } });
+    await waitFor(() => expect(fake.eased).toEqual([{ center: [SHOP.lng, SHOP.lat], zoom: 16, duration: 300 }]));
+  });
+
+  it("fits as before when no zoom is asked", async () => {
+    const { fake } = await mount({ focus: { key: "trip", points: [[SHOP.lng, SHOP.lat]] } });
+    await waitFor(() => expect(fake.fitted.length).toBeGreaterThan(0));
+    expect(fake.eased).toEqual([]);
   });
 });
