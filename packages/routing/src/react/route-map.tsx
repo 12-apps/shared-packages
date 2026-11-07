@@ -18,6 +18,7 @@ import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react
 import type { RouteMapCopy } from "./copy";
 import type { MapLibreLike } from "./maplibre-types";
 import type { RouteMapConfig, RouteMapProps, RouteMapTheme } from "./types";
+import { readScale, ScaleBar, type ScaleReading } from "./scale-bar";
 import { useMapInstance } from "./use-map";
 import { useOverlays, useOverlaySync } from "./use-overlays";
 
@@ -47,6 +48,19 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
     const propsRef = useRef(props);
     propsRef.current = props;
     const overlaysRef = useRef<ReturnType<typeof useOverlays> | null>(null);
+    // This mount's words over the surface's (a fit control named for this map).
+    const words: RouteMapCopy = props.copy ? { ...copy, ...props.copy } : copy;
+    const [scale, setScale] = useState<ScaleReading | null>(null);
+    // The zoom last reported: a pan ends in `moveend` too, and reports no zoom.
+    const lastZoom = useRef<number | null>(null);
+    const reportZoom = (): void => {
+      const zoom = handle.mapRef.current?.getZoom?.();
+      if (zoom !== undefined && zoom !== lastZoom.current) {
+        lastZoom.current = zoom;
+        propsRef.current.onZoomChange?.(zoom);
+      }
+      if (propsRef.current.scaleBar) setScale(readScale(handle.mapRef.current, container.current?.clientWidth ?? 0));
+    };
     const handle = useMapInstance({
       load,
       styleUrl,
@@ -54,27 +68,36 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
       theme,
       container,
       propsRef,
-      onMoveEnd: () => overlaysRef.current?.draw(),
-      onZoomEnd: () => overlaysRef.current?.place(),
+      onMoveEnd: () => {
+        overlaysRef.current?.draw();
+        reportZoom();
+      },
+      onZoomEnd: () => {
+        overlaysRef.current?.place();
+        reportZoom();
+      },
       onDispose: () => overlaysRef.current?.clear(),
     });
-    const overlays = useOverlays({ ...handle, container }, propsRef, copy, theme);
+    const overlays = useOverlays({ ...handle, container }, propsRef, words, theme);
     overlaysRef.current = overlays;
     useOverlaySync(handle.status === "ready", handle, props, overlays, theme);
+    useEffect(() => {
+      if (handle.status === "ready") reportZoom();
+    }, [handle.status]);
 
     const height = typeof props.height === "number" ? `${props.height}px` : props.height;
     return (
-      <div className="routing-map" data-testid={props.testId} data-state={handle.status} role="region" aria-label={copy.mapLabel} style={{ position: "relative", height, width: "100%", overflow: "hidden", borderRadius: "inherit" }}>
+      <div className="routing-map" data-testid={props.testId} data-state={handle.status} role="region" aria-label={words.mapLabel} style={{ position: "relative", height, width: "100%", overflow: "hidden", borderRadius: "inherit" }}>
         <div ref={container} style={{ position: "absolute", inset: 0 }} />
         {handle.status === "error" ? (
-          <MapError copy={copy} theme={theme} onRetry={handle.retry} />
+          <MapError copy={words} theme={theme} onRetry={handle.retry} />
         ) : (
           <MapControls
-            copy={copy}
+            copy={words}
             theme={theme}
             {...controlsOf(props)}
             onZoomIn={() => handle.mapRef.current?.zoomIn()}
-            onZoomOut={() => handle.mapRef.current?.zoomOut()}
+            onZoomOut={() => (props.controls?.onZoomOut ? props.controls.onZoomOut() : handle.mapRef.current?.zoomOut())}
             onFit={() => {
               overlays.fitAll();
               propsRef.current.onFitAll?.();
@@ -82,15 +105,16 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
           />
         )}
         {props.overlay && handle.status !== "error" ? <div style={{ position: "absolute", left: 12, right: 12, bottom: 28, zIndex: 2 }}>{props.overlay}</div> : null}
-        <Attribution copy={copy} theme={theme} compact={props.attribution === "compact"} />
+        {props.scaleBar && scale && handle.status === "ready" ? <ScaleBar reading={scale} label={props.scaleBar} theme={theme} /> : null}
+        <Attribution copy={words} theme={theme} compact={props.attribution === "compact"} />
       </div>
     );
   };
 }
 
 /** The controls the host asked for, with their defaults: both, top-right. */
-function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement"> {
-  return { zoom: controls?.zoom ?? true, fit: controls?.fit ?? true, placement: controls?.placement ?? "top-right" };
+function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement" | "zoomWhenNarrow"> {
+  return { zoom: controls?.zoom ?? true, fit: controls?.fit ?? true, placement: controls?.placement ?? "top-right", zoomWhenNarrow: controls?.zoomWhenNarrow ?? false };
 }
 
 /** The basemap's required credit: the full line, or an "i" that opens it. */
@@ -120,22 +144,26 @@ interface ControlsProps {
   zoom: boolean;
   fit: boolean;
   placement: "top-right" | "top-left";
+  /** Keep the zoom buttons under 600 px (they hide there by default). */
+  zoomWhenNarrow: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFit: () => void;
 }
 
-function MapControls({ copy, theme, zoom, fit, placement, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
+function MapControls({ copy, theme, zoom, fit, placement, zoomWhenNarrow, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
   if (!zoom && !fit) return null;
+  // The narrow-width rule hides `.routing-zoom`; a kept zoom carries no such class.
+  const zoomClass = zoomWhenNarrow ? undefined : "routing-zoom";
   const corner = placement === "top-left" ? { left: 12 } : { right: 12 };
   return (
     <div style={{ position: "absolute", top: 12, ...corner, display: "flex", flexDirection: "column", gap: 8, zIndex: 2 }}>
       {zoom ? (
         <>
-          <button type="button" className="routing-zoom" aria-label={copy.zoomIn} onClick={onZoomIn} style={controlStyle(theme)}>
+          <button type="button" className={zoomClass} aria-label={copy.zoomIn} onClick={onZoomIn} style={controlStyle(theme)}>
             +
           </button>
-          <button type="button" className="routing-zoom" aria-label={copy.zoomOut} onClick={onZoomOut} style={controlStyle(theme)}>
+          <button type="button" className={zoomClass} aria-label={copy.zoomOut} onClick={onZoomOut} style={controlStyle(theme)}>
             −
           </button>
         </>

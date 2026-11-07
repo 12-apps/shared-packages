@@ -22,15 +22,16 @@
  * re-offset in place, never rebuilt, so the focus rule above still holds.
  */
 
-import { useEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 
 import { isValidPoint } from "../core/geo";
 import type { LngLat } from "../core/types";
 
 import type { RouteMapCopy } from "./copy";
+import { dragPlaces, type DragPlaces } from "./drag-places";
 import { groupElement, markerElement, PLACE_LIFT, placeElement, stopElement } from "./map-elements";
-import { boundsOf, groupMarkers, PLANNED_LAYER, pointsOf, setLine, setTravelled, TRAVELLED_LAYER } from "./map-geometry";
-import type { MarkerLike } from "./maplibre-types";
+import { addShapes, boundsOf, CIRCLES_SOURCE, circlesFeature, DOTS_SOURCE, dotsFeature, groupMarkers, PLANNED_LAYER, pointsOf, setLine, setTravelled, TRAVELLED_LAYER } from "./map-geometry";
+import type { MapLibreLike, MapLike, MarkerLike } from "./maplibre-types";
 import { placeTags, type Placed } from "./tag-placement";
 import type { MapHandle } from "./use-map";
 import type { RouteMapMarker, RouteMapProps, RouteMapTheme } from "./types";
@@ -57,6 +58,8 @@ interface Wanted {
   anchor: "bottom" | "center";
   role: Placed["role"];
   build: () => HTMLElement;
+  /** A draggable place: the marker is built draggable and its moves are reported. */
+  draggable?: boolean;
 }
 
 export function useOverlays(
@@ -68,6 +71,8 @@ export function useOverlays(
   const drawn = useRef(new Map<string, Drawn>());
   /** The current action per key, read at click time. */
   const actions = useRef(new Map<string, () => void>());
+  /** The draggable places, built once per map component. */
+  const [drags] = useState(() => dragPlaces(() => handle.mapRef.current, () => handle.container.current, theme));
 
   const clear = (): void => {
     for (const item of drawn.current.values()) item.marker.remove();
@@ -85,11 +90,7 @@ export function useOverlays(
     const map = handle.mapRef.current;
     if (!map) return [];
     actions.current.clear();
-    const out: Wanted[] = [];
-    for (const spot of (props.places ?? []).filter((item) => isValidPoint(item.position))) {
-      const lifted = props.placeLabels !== "at-point";
-      out.push({ key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) });
-    }
+    const out: Wanted[] = placesWanted(props, theme, drags);
     for (const stop of (props.stops ?? []).filter((item) => isValidPoint(item.position))) {
       out.push({ key: `s:${stop.id}`, signature: JSON.stringify([stop.mark, stop.title, stop.variant, !!stop.emphasized]), position: stop.position, anchor: "center", role: "stop", build: () => stopElement(stop, theme) });
     }
@@ -115,7 +116,10 @@ export function useOverlays(
   const draw = (): void => {
     const lib = handle.libRef.current;
     const map = handle.mapRef.current;
-    if (lib && map) reconcile(drawn.current, wanted(propsRef.current), (element, anchor, at) => new lib.Marker({ element, anchor }).setLngLat(at).addTo(map));
+    if (lib && map) {
+      reconcile(drawn.current, wanted(propsRef.current), placeWith(lib, map, drags));
+      drags.sync((key) => drawn.current.get(key)?.marker);
+    }
     place();
   };
 
@@ -176,7 +180,16 @@ function insetOf(value: number | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-type Place = (element: HTMLElement, anchor: Wanted["anchor"], at: [number, number]) => MarkerLike;
+type Place = (element: HTMLElement, item: Wanted, at: [number, number]) => MarkerLike;
+
+/** Builds each new marker on the map: a draggable place as MapLibre's draggable marker, its drag reported. */
+function placeWith(lib: MapLibreLike, map: MapLike, drags: DragPlaces): Place {
+  return (element, item, at) => {
+    const marker = new lib.Marker({ element, anchor: item.anchor, ...(item.draggable ? { draggable: true } : {}) }).setLngLat(at).addTo(map);
+    if (item.draggable) drags.bind(item.key, marker);
+    return marker;
+  };
+}
 
 /** Remove what left, move what is unchanged, replace what changed — keeping focus. */
 function reconcile(drawn: Map<string, Drawn>, next: readonly Wanted[], place: Place): void {
@@ -197,7 +210,7 @@ function reconcile(drawn: Map<string, Drawn>, next: readonly Wanted[], place: Pl
     const hadFocus = !!current && current.element.contains(document.activeElement);
     current?.marker.remove();
     const element = item.build();
-    drawn.set(item.key, { marker: place(element, item.anchor, at), element, signature: item.signature, at, anchor: item.anchor, role: item.role });
+    drawn.set(item.key, { marker: place(element, item, at), element, signature: item.signature, at, anchor: item.anchor, role: item.role });
     if (hadFocus) element.focus();
   }
 }
@@ -212,6 +225,15 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
     map.setPaintProperty(TRAVELLED_LAYER, "line-color", props.travelledColor ?? theme.travelled);
   }, [ready, props.planned, props.travelled, props.travelledParts, props.travelledColor]);
 
+  // The circle and dot layers exist only once a host draws one, so a map that
+  // never does keeps exactly the layers and source writes it had before them.
+  useEffect(() => {
+    const map = handle.mapRef.current;
+    if (!ready || !map || !withShapes(map, props, theme)) return;
+    map.getSource(CIRCLES_SOURCE)?.setData(circlesFeature(props.circles, theme));
+    map.getSource(DOTS_SOURCE)?.setData(dotsFeature(props.dots));
+  }, [ready, props.circles, props.dots]);
+
   useEffect(() => {
     if (ready) overlays.draw();
   }, [ready, props.markers, props.stops, props.places, props.placeLabels, props.tagPlacement]);
@@ -224,4 +246,28 @@ export function useOverlaySync(ready: boolean, handle: Pick<MapHandle, "mapRef">
   useEffect(() => {
     if (ready && props.focus) overlays.fitTo(props.focus.points.map(([lng, lat]) => ({ lng, lat })));
   }, [ready, props.focus?.key]);
+}
+
+/** The maps whose circle and dot layers have been added. */
+const SHAPED = new WeakSet<MapLike>();
+
+/** Adds the circle and dot layers the first time a host draws one; false while it never has. */
+function withShapes(map: MapLike, props: RouteMapProps, theme: RouteMapTheme): boolean {
+  if (SHAPED.has(map)) return true;
+  if (!props.circles?.length && !props.dots?.length) return false;
+  addShapes(map, theme);
+  SHAPED.add(map);
+  return true;
+}
+
+/** The places as the overlays draw them (listing the draggable ones afresh): a draggable pin, or a label (lifted above a pin, or on its point). */
+function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPlaces): Wanted[] {
+  drags.reset();
+  const lifted = props.placeLabels !== "at-point";
+  return (props.places ?? [])
+    .filter((spot) => isValidPoint(spot.position))
+    .map((spot): Wanted => {
+      if (spot.draggable) return drags.wanted(spot, spot.draggable);
+      return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
+    });
 }

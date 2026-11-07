@@ -207,3 +207,56 @@ export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme, lifted =
   element.append(label, span("", { width: "2px", height: "46px", background: theme.place }), span("", { width: "8px", height: "8px", borderRadius: "50%", background: theme.place }));
   return element;
 }
+
+/**
+ * A draggable place: a teardrop pin whose tip is the point, inside a 44×48
+ * button the viewer grabs or focuses (`RouteMapPlace.draggable`), with the
+ * place's label beside it. `touch-action: none` so a finger on the pin moves
+ * the pin, never the page; MapLibre's own marker drag moves it.
+ */
+export function draggablePlaceElement(spot: RouteMapPlace, ariaLabel: string, theme: RouteMapTheme, onKey: (event: KeyboardEvent) => void): HTMLElement {
+  const element = button(ariaLabel, {
+    position: "relative",
+    width: "44px",
+    height: "48px",
+    padding: "0",
+    border: "0",
+    background: "none",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    cursor: "grab",
+    touchAction: "none",
+    zIndex: "3",
+  });
+  element.dataset.routingDraggable = spot.id;
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [key, value] of Object.entries({ width: "32", height: "42", viewBox: "0 0 32 42", "aria-hidden": "true" })) svg.setAttribute(key, value);
+  svg.style.filter = "drop-shadow(0 2px 2px rgba(0,0,0,.35))";
+  const drop = document.createElementNS(SVG_NS, "path");
+  drop.setAttribute("d", "M16 41C16 41 3 25 3 15.5A13 13 0 1 1 29 15.5C29 25 16 41 16 41Z");
+  drop.setAttribute("fill", theme.travelled);
+  drop.setAttribute("stroke", theme.paper);
+  drop.setAttribute("stroke-width", "2");
+  const eye = document.createElementNS(SVG_NS, "circle");
+  for (const [key, value] of Object.entries({ cx: "16", cy: "15.5", r: "5", fill: theme.paper })) eye.setAttribute(key, value);
+  svg.append(drop, eye);
+  const label = span(spot.label, {
+    position: "absolute",
+    left: "38px",
+    top: "2px",
+    padding: "1px 6px",
+    borderRadius: "4px",
+    border: `1px solid ${theme.controlBorder}`,
+    background: theme.paper,
+    color: theme.ink,
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+  });
+  label.setAttribute("aria-hidden", "true");
+  element.append(svg, label);
+  element.addEventListener("keydown", onKey);
+  return element;
+}

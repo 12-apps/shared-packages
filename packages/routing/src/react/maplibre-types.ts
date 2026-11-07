@@ -15,6 +15,12 @@ export interface MapLike {
   zoomIn(): unknown;
   zoomOut(): unknown;
   project(lngLat: [number, number]): { x: number; y: number };
+  /** Optional so an older fake still drives the map; a draggable pin's arrow step and `onZoomChange` read it. */
+  getZoom?(): number;
+  /** Optional like `getZoom`; an arrow-key nudge keeps a pin inside the frame with it. */
+  unproject?(point: [number, number]): { lng: number; lat: number };
+  /** Optional like `getZoom`; the scale bar reads its latitude. */
+  getCenter?(): { lng: number; lat: number };
 }
 
 export interface MarkerLike {
@@ -27,6 +33,10 @@ export interface MarkerLike {
    * map; without it the tag keeps its default side.
    */
   setOffset?(offset: [number, number]): MarkerLike;
+  /** A draggable marker's `drag` / `dragend` (MapLibre's own). */
+  on?(event: "drag" | "dragend", listener: () => void): unknown;
+  getLngLat?(): { lng: number; lat: number };
+  setDraggable?(draggable: boolean): MarkerLike;
 }
 
 export interface MapLibreLike {
@@ -37,7 +47,7 @@ export interface MapLibreLike {
     center: [number, number];
     zoom: number;
   }) => MapLike;
-  Marker: new (options: { element: HTMLElement; anchor: "bottom" | "center" }) => MarkerLike;
+  Marker: new (options: { element: HTMLElement; anchor: "bottom" | "center"; draggable?: boolean }) => MarkerLike;
   /** MapLibre 6 loads its worker from a separate file; the host says where. */
   setWorkerUrl?(url: string): void;
 }

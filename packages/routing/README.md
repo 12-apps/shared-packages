@@ -118,6 +118,28 @@ const { RouteMap } = createWebRouting({
   needs `Marker#setOffset` for a tag to move.
 - `controls={{ placement: "top-left" }}` moves the zoom and fit column to the
   other top corner when the host's floating chrome covers the top-right.
+- **A draggable place:** `places={[{ id, position, label, draggable: { ariaLabel, onMove, onDrop } }]}`
+  turns the place into a pin the viewer drags (mouse or one finger; MapLibre's
+  own marker drag) or focuses and nudges with the arrow keys (5 m from zoom 15,
+  50 m below it; `stepMetres(zoom)` overrides). The host owns the position:
+  `onMove` reports every move, `onDrop` where it came to rest, and the host
+  passes the position back. The element is kept across moves, so focus stays.
+  `disabled: true` holds it (a save in flight).
+- **Circles and dots:** `circles={[{ id, center, radiusMetres, dashed? }]}`
+  draws rings on the ground (solid and faintly filled in `theme.travelled`, or
+  dashed in `theme.ink`), redrawn whenever the array changes, so a host that
+  moves a centre with a dragged pin redraws its rings live; "fit all" includes
+  them. `dots={[{ id, position, filled }]}` draws small points under the pins,
+  filled with `theme.ink` or hollow. A map with neither adds no layer for them.
+- `copy={{ fitAll: "…" }}` overrides the surface's words for one mount;
+  `controls={{ zoomWhenNarrow: true }}` keeps the zoom buttons under 600 px,
+  where they are hidden by default; `onZoomChange(zoom)` reports the zoom once
+  ready and after every zoom.
+- `controls={{ onZoomOut }}` replaces what the zoom-out control does (a host
+  leaving a street view for its own wider map); wheel and pinch still zoom.
+- `scaleBar={(metres) => "100 m"}` draws a scale bar bottom-left: the longest
+  nice distance (50 m … 50 km) within a quarter of the map's width, re-measured
+  after every pan and zoom. A host fake needs `getZoom` and `getCenter`.
 - No WebGL, a library or style that does not arrive within `readyTimeoutMs`
   (default 15 s), shows `copy.mapError` with a retry. The region's
   `data-state` reads `loading`, `ready` or `error`. The host's `overlay` is
