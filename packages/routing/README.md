@@ -136,10 +136,18 @@ const { RouteMap } = createWebRouting({
   moves a centre with a dragged pin redraws its rings live; "fit all" includes
   them. `dots={[{ id, position, filled }]}` draws small points under the pins,
   filled with `theme.ink` or hollow. A map with neither adds no layer for them.
+- **A place's colour, ghost places and tethers:** `color` on a place fills its
+  draggable pin (over `theme.travelled`), its label (over `theme.place`) or a
+  ghost's ring and label (over `theme.ink`), e.g. with the host's brand colour. `ghost: true` draws a reference position (where
+  a pin was, or would be) as a dashed hollow ring with a quiet label, never a
+  pin. `tethers={[{ id, from, to, color? }]}` draws thin dashed segments in
+  `theme.ink` with the circles; "fit all" leaves them out.
 - `copy={{ fitAll: "…" }}` overrides the surface's words for one mount;
   `controls={{ zoomWhenNarrow: true }}` keeps the zoom buttons under 600 px,
   where they are hidden by default; `onZoomChange(zoom)` reports the zoom once
   ready and after every zoom.
+- `controls={{ fitAsText: true }}` draws the fit control as its word
+  (`copy.fitAll`) instead of the corners glyph.
 - `controls={{ onZoomOut }}` replaces what the zoom-out control does (a host
   leaving a street view for its own wider map); wheel and pinch still zoom.
 - `scaleBar={(metres) => "100 m"}` draws a scale bar bottom-left: the longest

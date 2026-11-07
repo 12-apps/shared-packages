@@ -286,11 +286,58 @@ describe("RouteMap · circles and dots", () => {
   });
 });
 
+describe("RouteMap · a place's colour, a ghost place and tethers", () => {
+  it("fills a draggable pin and a label with the place's own colour", async () => {
+    const drag = { ariaLabel: "Store pin", onDrop: () => {} };
+    await mount({ places: [{ id: "shop", position: SHOP, label: "Store", color: "#b45", draggable: drag }, { id: "home", position: offsetMetres(SHOP, 300, 0), label: "Home", color: "#3a6" }] });
+    const pin = await screen.findByRole("button", { name: "Store pin" });
+    expect(pin.querySelector("path")!.getAttribute("fill")).toBe("#b45");
+    expect((await screen.findByText("Home")).style.background).toBe("rgb(51, 170, 102)");
+  });
+
+  it("draws a ghost place as a dashed hollow ring with a quiet label, never a pin", async () => {
+    await mount({ places: [{ id: "was", position: SHOP, label: "Address point", ghost: true, draggable: { ariaLabel: "Never", onDrop: () => {} } }] });
+    const label = await screen.findByText("Address point");
+    const ghost = label.closest<HTMLElement>("[data-routing-ghost]")!;
+    expect(ghost.dataset.routingGhost).toBe("was");
+    expect((ghost.firstElementChild as HTMLElement).style.border).toContain("dashed");
+    expect(label.style.fontWeight).toBe("400");
+    expect(screen.queryAllByRole("button", { name: "Never" })).toHaveLength(0);
+  });
+
+  it("draws each tether as a dashed line after the circles, and leaves it out of the fit", async () => {
+    const far = offsetMetres(SHOP, 5000, 0);
+    const { fake } = await mount({ circles: [{ id: "ring", center: SHOP, radiusMetres: 100 }], tethers: [{ id: "t", from: SHOP, to: far }, { id: "bad", from: SHOP, to: { lng: Number.NaN, lat: 0 } }], fitKey: "a" });
+    await waitFor(() => expect((fake.data.get("routing-circles") as Collection).features).toHaveLength(2));
+    const [, tether] = (fake.data.get("routing-circles") as Collection).features;
+    expect(tether!.properties).toEqual({ id: "t", dashed: true, color: THEME.ink });
+    expect(tether!.geometry.coordinates).toEqual([[SHOP.lng, SHOP.lat], [far.lng, far.lat]]);
+    const [, [east]] = fake.fitted.at(-1) as [[number, number], [number, number]];
+    expect(east).toBeLessThan(far.lng);
+  });
+
+  it("adds the shape layers for a map that draws only a tether", async () => {
+    const { fake } = await mount({ tethers: [{ id: "t", from: SHOP, to: offsetMetres(SHOP, 50, 0), color: "#777" }] });
+    await waitFor(() => expect((fake.data.get("routing-circles") as Collection).features).toHaveLength(1));
+    expect((fake.data.get("routing-circles") as Collection).features[0]!.properties.color).toBe("#777");
+  });
+});
+
 describe("RouteMap · this mount's words, kept zoom and the zoom it reports", () => {
   it("names the fit control with this mount's copy", async () => {
     await mount({ copy: { fitAll: "See all" } });
     expect(await screen.findByRole("button", { name: "See all" })).toBeTruthy();
     expect(screen.queryAllByRole("button", { name: EN_US_ROUTE_MAP_COPY.fitAll })).toHaveLength(0);
+  });
+
+  it("draws the fit control as its word when asked, and still fits", async () => {
+    const onFitAll = vi.fn();
+    await mount({ copy: { fitAll: "See all" }, controls: { fitAsText: true }, onFitAll });
+    const fit = await screen.findByRole("button", { name: "See all" });
+    expect(fit.textContent).toBe("See all");
+    expect(fit.querySelectorAll("svg")).toHaveLength(0);
+    fireEvent.click(fit);
+    expect(onFitAll).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the zoom buttons out of the narrow-width rule when asked", async () => {

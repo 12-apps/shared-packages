@@ -21,7 +21,7 @@ export function createWebRouting(config: RouteMapConfig): RoutingSurface {
 export { DEFAULT_STYLE_URL } from "./route-map";
 export { metresPerPixel, scaleReading } from "./scale-bar";
 export { boundsOf, circleRing, groupMarkers, offsetMetres } from "./map-geometry";
-export type { RouteMapCircle, RouteMapConfig, RouteMapDot, RouteMapDrag, RouteMapMarker, RouteMapPlace, RouteMapProps, RouteMapStop, RouteMapTheme } from "./types";
+export type { RouteMapCircle, RouteMapConfig, RouteMapDot, RouteMapDrag, RouteMapMarker, RouteMapPlace, RouteMapProps, RouteMapStop, RouteMapTether, RouteMapTheme } from "./types";
 export type { RouteMapCopy } from "./copy";
 export type { MapLibreLike, MapLike, MarkerLike } from "./maplibre-types";
 export { PT_BR_ROUTE_MAP_COPY } from "./pt-BR";

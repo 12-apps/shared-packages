@@ -113,8 +113,9 @@ export function buildRouteMap(config: RouteMapConfig): (props: RouteMapProps) =>
 }
 
 /** The controls the host asked for, with their defaults: both, top-right. */
-function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement" | "zoomWhenNarrow"> {
-  return { zoom: controls?.zoom ?? true, fit: controls?.fit ?? true, placement: controls?.placement ?? "top-right", zoomWhenNarrow: controls?.zoomWhenNarrow ?? false };
+function controlsOf({ controls }: RouteMapProps): Pick<ControlsProps, "zoom" | "fit" | "placement" | "zoomWhenNarrow" | "fitAsText"> {
+  const { zoom = true, fit = true, placement = "top-right", zoomWhenNarrow = false, fitAsText = false } = controls ?? {};
+  return { zoom, fit, placement, zoomWhenNarrow, fitAsText };
 }
 
 /** The basemap's required credit: the full line, or an "i" that opens it. */
@@ -146,12 +147,14 @@ interface ControlsProps {
   placement: "top-right" | "top-left";
   /** Keep the zoom buttons under 600 px (they hide there by default). */
   zoomWhenNarrow: boolean;
+  /** The fit control as its word, not the glyph. */
+  fitAsText: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFit: () => void;
 }
 
-function MapControls({ copy, theme, zoom, fit, placement, zoomWhenNarrow, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
+function MapControls({ copy, theme, zoom, fit, placement, zoomWhenNarrow, fitAsText, onZoomIn, onZoomOut, onFit }: ControlsProps): JSX.Element | null {
   if (!zoom && !fit) return null;
   // The narrow-width rule hides `.routing-zoom`; a kept zoom carries no such class.
   const zoomClass = zoomWhenNarrow ? undefined : "routing-zoom";
@@ -169,9 +172,15 @@ function MapControls({ copy, theme, zoom, fit, placement, zoomWhenNarrow, onZoom
         </>
       ) : null}
       {fit ? (
-        <button type="button" aria-label={copy.fitAll} onClick={onFit} style={controlStyle(theme)}>
-          <FitIcon />
-        </button>
+        fitAsText ? (
+          <button type="button" onClick={onFit} style={{ ...controlStyle(theme), width: "auto", padding: "0 10px", fontSize: 13 }}>
+            {copy.fitAll}
+          </button>
+        ) : (
+          <button type="button" aria-label={copy.fitAll} onClick={onFit} style={controlStyle(theme)}>
+            <FitIcon />
+          </button>
+        )
       ) : null}
     </div>
   );

@@ -197,14 +197,42 @@ export function placeElement(spot: RouteMapPlace, theme: RouteMapTheme, lifted =
   // pins (z 1 against their 2–3), so the stem never crosses a pin's name, and
   // under any host overlay; clicks pass through to whatever is beneath.
   const element = span("", { display: "flex", flexDirection: "column", alignItems: "center", pointerEvents: "none", zIndex: "1" });
-  const label = span("", { display: "inline-flex", alignItems: "center", gap: "6px", background: theme.place, color: theme.paper, padding: "4px 10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap" });
+  const label = span("", { display: "inline-flex", alignItems: "center", gap: "6px", background: spot.color ?? theme.place, color: theme.paper, padding: "4px 10px", borderRadius: "10px", fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap" });
   if (spot.icon) label.appendChild(glyph(spot.icon));
   label.appendChild(document.createTextNode(spot.label));
   if (!lifted) {
     element.append(label);
     return element;
   }
-  element.append(label, span("", { width: "2px", height: "46px", background: theme.place }), span("", { width: "8px", height: "8px", borderRadius: "50%", background: theme.place }));
+  const ink = spot.color ?? theme.place;
+  element.append(label, span("", { width: "2px", height: "46px", background: ink }), span("", { width: "8px", height: "8px", borderRadius: "50%", background: ink }));
+  return element;
+}
+
+/**
+ * A ghost place (`RouteMapPlace.ghost`): a dashed hollow ring on the point and
+ * a quiet label beside it, so a reference position never reads louder than the
+ * pin it refers to. Clicks pass through.
+ */
+export function ghostPlaceElement(spot: RouteMapPlace, theme: RouteMapTheme): HTMLElement {
+  const ink = spot.color ?? theme.ink;
+  const element = span("", { position: "relative", width: "14px", height: "14px", pointerEvents: "none", zIndex: "1" });
+  element.dataset.routingGhost = spot.id;
+  const ring = span("", { position: "absolute", inset: "0", boxSizing: "border-box", borderRadius: "50%", border: `2px dashed ${ink}`, background: theme.paper, opacity: "0.85" });
+  const label = span(spot.label, {
+    position: "absolute",
+    left: "20px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    padding: "1px 6px",
+    borderRadius: "4px",
+    background: theme.paper,
+    color: ink,
+    fontSize: "12px",
+    fontWeight: "400",
+    whiteSpace: "nowrap",
+  });
+  element.append(ring, label);
   return element;
 }
 
@@ -235,7 +263,7 @@ export function draggablePlaceElement(spot: RouteMapPlace, ariaLabel: string, th
   svg.style.filter = "drop-shadow(0 2px 2px rgba(0,0,0,.35))";
   const drop = document.createElementNS(SVG_NS, "path");
   drop.setAttribute("d", "M16 41C16 41 3 25 3 15.5A13 13 0 1 1 29 15.5C29 25 16 41 16 41Z");
-  drop.setAttribute("fill", theme.travelled);
+  drop.setAttribute("fill", spot.color ?? theme.travelled);
   drop.setAttribute("stroke", theme.paper);
   drop.setAttribute("stroke-width", "2");
   const eye = document.createElementNS(SVG_NS, "circle");

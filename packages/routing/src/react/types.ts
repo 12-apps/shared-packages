@@ -42,6 +42,13 @@ export interface RouteMapPlace {
   label: string;
   /** A glyph before the label: a shopfront for a store. */
   icon?: "store";
+  /** Overrides `theme.travelled` on a draggable pin, `theme.place` on a label, or `theme.ink` on a ghost's ring and label (e.g. the host's brand colour). */
+  color?: string;
+  /**
+   * A reference position (where the place was, or would be): a dashed hollow
+   * ring with a quiet label beside it, no stem. Wins over `draggable`.
+   */
+  ghost?: boolean;
   /**
    * Makes the place a pin the viewer moves: dragged with a mouse or one
    * finger, or focused and nudged with the arrow keys. The host owns the
@@ -79,6 +86,15 @@ export interface RouteMapCircle {
   color?: string;
 }
 
+/** A thin dashed segment between two points, e.g. from a reference position to where a pin moved. */
+export interface RouteMapTether {
+  id: string;
+  from: LngLat;
+  to: LngLat;
+  /** Overrides `theme.ink`. */
+  color?: string;
+}
+
 /** A small point, e.g. a customer's address, filled or hollow. */
 export interface RouteMapDot {
   id: string;
@@ -107,6 +123,8 @@ export interface RouteMapProps {
   places?: readonly RouteMapPlace[];
   /** Circles on the ground, redrawn whenever the array changes; "fit all" includes them. */
   circles?: readonly RouteMapCircle[];
+  /** Thin dashed segments, drawn with the circles; "fit all" leaves them out (they join points already drawn). */
+  tethers?: readonly RouteMapTether[];
   /** Small points drawn under every pin (they are not tappable). */
   dots?: readonly RouteMapDot[];
   /** The dashed line, `[lng, lat][]`. */
@@ -154,6 +172,8 @@ export interface RouteMapProps {
      * the host's own wider map. Wheel and pinch still zoom out.
      */
     onZoomOut?: () => void;
+    /** Draws the fit control as its word (`copy.fitAll`) rather than the corners glyph, e.g. beside a host's own full-screen glyph. */
+    fitAsText?: boolean;
   };
   /** Words for this mount only, over the surface's copy (e.g. a fit control named for this map). */
   copy?: Partial<RouteMapCopy>;
