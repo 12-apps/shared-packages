@@ -376,7 +376,7 @@ export function ScaleBar({
       aria-hidden
       sx={{ position: 'absolute', left: 0, right: 0, bottom: rem(theme, 10), pointerEvents: 'none', zIndex: 1 }}
     >
-      <Box component="span" sx={{ display: 'block', ml: rem(theme, 10), fontSize: rem(theme, 11), color: 'text.secondary' }}>
+      <Box component="span" sx={{ display: 'block', ml: rem(theme, 10), fontSize: rem(theme, 12), color: 'text.secondary' }}>
         {copy.scale(metres)}
       </Box>
       <Box
