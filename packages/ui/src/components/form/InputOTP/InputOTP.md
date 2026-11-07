@@ -421,13 +421,14 @@ export const VisualTest: Story = {
 `@12-apps/ui/form/InputOTP` resolves to `InputOTP.native.tsx` under Metro —
 same import path, same props (`InputOTP.base.ts`), the same digit rules
 (`InputOTP.core.ts`, shared with the web hook) and the same numbers
-(`InputOTP.metrics.ts`). Native adds three props:
+(`InputOTP.metrics.ts`). Native adds these props:
 
 | Prop | Type | Description |
 |------|------|-------------|
 | `aria-label` | `string` | Names the row, a `role="group"`, so the boxes are announced as one code. |
 | `labels` | `Partial<InputOTPLabels>` | `slot(position, length)` names each box; English ("Digit 1 of 6") when omitted; the pt-BR pack's family is `inputOtp` (`UI_LABELS['pt-BR'].inputOtp` from `@12-apps/ui/locales`), or the host passes its own. |
 | `style` | `StyleProp<ViewStyle>` | Reaches the row, as `sx` does on the web. |
+| `testID` / `data-testid` | `string` | Other spellings of `dataTestId`; the slots are `<id>-slot-<n>`. |
 
 ```tsx
 import { InputOTP } from '@12-apps/ui/form/InputOTP';

@@ -1,2 +1,2 @@
 export { InputOTP } from './InputOTP';
-export type { InputOTPProps } from './InputOTP.types';
+export type { InputOTPBaseProps, InputOTPProps, InputOTPVariant } from './InputOTP.types';
