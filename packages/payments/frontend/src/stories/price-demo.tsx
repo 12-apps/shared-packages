@@ -21,8 +21,7 @@ export const DEMO_PRICES: CheckoutListPrices = {
   wallets: { amountLabel: "R$\u00a0138,70", amountCents: 13870 },
 };
 
-/** The store credit the demo buyer holds, in cents, and the cart's price once it is used. */
-export const DEMO_CREDIT_CENTS = 2000;
+/** The cart's price once the demo buyer's R$ 20,00 store credit is used. */
 const AFTER_CREDIT = { amountLabel: "R$\u00a0118,70", amountCents: 11870 };
 
 /**
@@ -56,7 +55,7 @@ const DOOR_NOTES: Record<string, string> = {
 };
 
 /** The store credit as the demo host holds it: whether it is used, and how to drop it. */
-export interface DemoCredit {
+interface DemoCredit {
   used: boolean;
   drop: () => void;
 }
