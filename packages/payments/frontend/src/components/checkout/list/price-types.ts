@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 
+import type { CheckoutOnlineRowId } from "../types";
+
+// Defined in ../types so the narrow entries (hosted-return, live) never reach react.
+export type { CheckoutOnlineRowId, CheckoutPricedAs } from "../types";
+
 /**
  * What each way to pay COSTS, as the host prices it (FUT-4416) — a store may
  * charge less for Pix or cash than for a card.
@@ -42,15 +47,7 @@ export interface CheckoutChoicePrice {
   discount?: { label: string; amountLabel: string };
 }
 
-/** An online row, as prices are keyed: the debit card row is `CARD_DEBIT`. */
-export type CheckoutOnlineRowId = "PIX" | "CARD" | "CARD_DEBIT" | "HAND_OFF";
 
-/**
- * Which price an order is raised for (`CreateOrderRequest.pricedAs`): an
- * online row's, or `WALLET` — a Google Pay or Apple Pay sheet, whatever row is
- * chosen. Sent only by a list the host priced (`CheckoutPaymentList.prices`).
- */
-export type CheckoutPricedAs = CheckoutOnlineRowId | "WALLET";
 
 /** The wallets' price (Google Pay, Apple Pay) — the cents their sheets open at. */
 export interface CheckoutWalletPrice {

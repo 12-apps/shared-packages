@@ -10,12 +10,12 @@ import type {
   BuyerField,
   BuyerInfo,
   CheckoutOrder,
+  CheckoutPricedAs,
   CreateOrderRequest,
   CreateOrderResult,
   OrderStatus,
   PaymentMethod,
 } from "./types";
-import type { CheckoutPricedAs } from "./list/price-types";
 
 /**
  * RAISING the order, and what becomes of it.
