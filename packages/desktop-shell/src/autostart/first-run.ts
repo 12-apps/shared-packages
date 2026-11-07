@@ -30,7 +30,7 @@ export interface FirstRunAutostartOptions {
   autostart: Pick<Autostart, "set" | "isEnabled">;
   /** `process.platform`. */
   platform: string;
-  /** What the step preselects, and so what one tap on Continuar keeps. The APP's call. */
+  /** What the step preselects, and so what one tap on its confirm button keeps. The APP's call. */
   defaultOn: boolean;
   /** Whether this install already chose — the host's stored flag, read live. */
   chosen: () => boolean;

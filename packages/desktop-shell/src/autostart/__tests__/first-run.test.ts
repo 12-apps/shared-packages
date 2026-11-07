@@ -77,7 +77,7 @@ describe("createFirstRunAutostart", () => {
   });
 
   it("never asks an install that already chose, and leaves its autostart alone", () => {
-    // An earlier version's flag (the printer agent's `autostartChosen`): that
+    // An earlier version's flag (the host's stored "already chose"): that
     // install turned autostart on at its first run, or the person changed it.
     const autostart = fakeAutostart(false);
     const ask = createFirstRunAutostart({ autostart, platform: "linux", defaultOn: true, ...flag(true) });
