@@ -85,6 +85,14 @@ describe("revealRow", () => {
     Object.defineProperty(row, "scrollIntoView", { value: undefined });
     expect(() => revealRow(row, 844)).not.toThrow();
   });
+
+  it("does nothing for a row with no box, as in jsdom, whatever the frame timing", () => {
+    const row = document.createElement("div");
+    const scroll = vi.fn();
+    Object.defineProperty(row, "scrollIntoView", { value: scroll });
+    revealRow(row, 844);
+    expect(scroll).not.toHaveBeenCalled();
+  });
 });
 
 /**

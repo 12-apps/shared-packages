@@ -42,12 +42,19 @@ function barOf(doc: Document): HTMLElement | null {
  * `viewportHeight` defaults to the row's window's. Absent where there is no
  * layout (jsdom, a host's own tests): nothing.
  */
+/** The row's box, or null where there is nothing to scroll: no row, no scrolling, or no layout (jsdom, a hidden row). */
+function laidOutBox(row: HTMLElement | null): DOMRect | null {
+  if (!row || typeof row.scrollIntoView !== "function") return null;
+  const box = row.getBoundingClientRect();
+  return box.width === 0 && box.height === 0 ? null : box;
+}
+
 export function revealRow(row: HTMLElement | null, viewportHeight?: number): void {
-  if (!row || typeof row.scrollIntoView !== "function") return;
+  const box = laidOutBox(row);
+  if (!row || !box) return;
   const height = viewportHeight ?? row.ownerDocument.defaultView?.innerHeight;
   if (height === undefined) return;
   const bar = barOf(row.ownerDocument);
-  const box = row.getBoundingClientRect();
   const clearance = barClearance(box, bar?.getBoundingClientRect() ?? null, height);
   // A row taller than the room above the bar: its top at the top of the screen.
   if (box.bottom - box.top + ROW_TO_BAR_GAP > height - clearance) return row.scrollIntoView({ block: "start" });
