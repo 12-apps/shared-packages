@@ -305,6 +305,16 @@ describe("RouteMap · a place's colour, a ghost place and tethers", () => {
     expect(screen.queryAllByRole("button", { name: "Never" })).toHaveLength(0);
   });
 
+  it("leaves a ghost and a draggable pin to MapLibre's own marker positioning", async () => {
+    const drag = { ariaLabel: "Store pin", onDrop: () => {} };
+    await mount({ places: [{ id: "shop", position: SHOP, label: "Store", draggable: drag }, { id: "was", position: offsetMetres(SHOP, 30, 0), label: "Was", ghost: true }] });
+    const pin = await screen.findByRole("button", { name: "Store pin" });
+    const ghost = (await screen.findByText("Was")).closest<HTMLElement>("[data-routing-ghost]")!;
+    // An inline position would beat the marker class's absolute and stack the second marker under the first.
+    expect(pin.style.position).toBe("");
+    expect(ghost.style.position).toBe("");
+  });
+
   it("draws each tether as a dashed line after the circles, and leaves it out of the fit", async () => {
     const far = offsetMetres(SHOP, 5000, 0);
     const { fake } = await mount({ circles: [{ id: "ring", center: SHOP, radiusMetres: 100 }], tethers: [{ id: "t", from: SHOP, to: far }, { id: "bad", from: SHOP, to: { lng: Number.NaN, lat: 0 } }], fitKey: "a" });
