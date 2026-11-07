@@ -4,6 +4,7 @@
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -16,8 +17,9 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
-import { STILL_THEME } from "./still-theme";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 import { getByLabelFor } from "./labelled-control";
+import { oneAdminPerDescribe } from "./one-admin";
 
 /**
  * FUT-4482, review round 5 (B2): a promotion edit is never refused. While the
@@ -55,8 +57,8 @@ const UNKNOWN: DiscountWireRecord = {
 
 const PLACED: DiscountWireRecord = { ...UNKNOWN, id: "d-2", daysUnknown: undefined, startsOn: "2026-11-10", endsOn: "2026-11-20" };
 
-function mount(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig> = {}) {
-  const sent: Record<string, unknown>[] = [];
+/** The whole admin over `rows`, recording each body Salvar sends in `sent`. */
+function adminTree(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig>, sent: Record<string, unknown>[]): ReactElement {
   const transport: DiscountsTransport = {
     get: <T,>(url: string): Promise<T> =>
       url.endsWith("/targets")
@@ -81,13 +83,18 @@ function mount(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig> = 
     wholeDays: true,
     ...extra,
   });
-  render(
+  return (
     <ThemeProvider theme={STILL_THEME}>
       <MemoryRouter initialEntries={["/discounts"]}>
         <Screen />
       </MemoryRouter>
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+}
+
+function mount(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig> = {}): Record<string, unknown>[] {
+  const sent: Record<string, unknown>[] = [];
+  render(adminTree(rows, extra, sent));
   return sent;
 }
 
@@ -102,6 +109,8 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // writing every style once (1–1.5 s alone, several times that on a loaded
 // runner). Paid here, under the hook's own limit, not inside the first case
 // (FUT-4530).
+browserRootFontForThisFile();
+
 beforeAll(async () => {
   mount([UNKNOWN]);
   await openEdit(UNKNOWN.id);
@@ -202,8 +211,12 @@ describe("the period while the days are unknown (review round 5)", () => {
 });
 
 describe("Salvar while the days are unknown (review round 5)", () => {
+  // The three cases open the same row on the same host: one admin under them,
+  // each opening its own fresh form (FUT-4530, `one-admin.ts`).
+  const sent: Record<string, unknown>[] = [];
+  oneAdminPerDescribe(() => adminTree([UNKNOWN], {}, sent), () => sent.splice(0));
+
   it("pauses: sends keepWindow and no dates, closes, and shows no refusal", async () => {
-    const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
     toggleActiveOff();
     await saveAndClose();
@@ -217,7 +230,6 @@ describe("Salvar while the days are unknown (review round 5)", () => {
   // One edit per test: both edits in one test re-render the whole form twice
   // and ran past vitest's 5 s on a loaded CI shard (main, CI #42302355616).
   it("renames the same way", async () => {
-    const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
     fireEvent.change(getByLabelFor(copy.form.name), { target: { value: "Semana nova" } });
     await saveAndClose();
@@ -226,14 +238,15 @@ describe("Salvar while the days are unknown (review round 5)", () => {
   });
 
   it("changes the value the same way", async () => {
-    const sent = mount([UNKNOWN]);
     await openEdit(UNKNOWN.id);
     fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "15" } });
     await saveAndClose();
     expect(sent[0]).toMatchObject({ percentOffBp: 1_500, keepWindow: true });
     expect(sent[0]).not.toHaveProperty("startsAt");
   });
+});
 
+describe("Salvar while the days are unknown (review round 5)", () => {
   // Round 9 (N4): days left as they opened are kept (`keepWindow`, see
   // dates-locked-round-nine), so the dates are sent once the operator CHANGES them.
   it("sends changed dates, and no marker, for a rule whose days are known", async () => {

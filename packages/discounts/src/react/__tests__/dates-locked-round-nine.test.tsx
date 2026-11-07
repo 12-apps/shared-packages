@@ -4,6 +4,7 @@
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -18,7 +19,8 @@ import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
-import { STILL_THEME } from "./still-theme";
+import { oneAdminPerDescribe } from "./one-admin";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 9. Under an unknown zone the dates are locked and
@@ -72,8 +74,8 @@ interface MountOptions {
   wholeDays?: boolean;
 }
 
-function mount(rows: DiscountWireRecord[], options: MountOptions = {}): Record<string, unknown>[] {
-  const sent: Record<string, unknown>[] = [];
+/** The whole admin over `rows`, recording each body Salvar sends in `sent`. */
+function adminTree(rows: DiscountWireRecord[], options: MountOptions, sent: Record<string, unknown>[]): ReactElement {
   const transport: DiscountsTransport = {
     get: <T,>(url: string): Promise<T> =>
       url.endsWith("/targets")
@@ -97,13 +99,18 @@ function mount(rows: DiscountWireRecord[], options: MountOptions = {}): Record<s
     transport,
     ...(options.wholeDays === false ? {} : { wholeDays: true }),
   });
-  render(
+  return (
     <ThemeProvider theme={STILL_THEME}>
       <MemoryRouter initialEntries={["/discounts"]}>
         <Screen />
       </MemoryRouter>
-    </ThemeProvider>,
+    </ThemeProvider>
   );
+}
+
+function mount(rows: DiscountWireRecord[], options: MountOptions = {}): Record<string, unknown>[] {
+  const sent: Record<string, unknown>[] = [];
+  render(adminTree(rows, options, sent));
   return sent;
 }
 
@@ -118,6 +125,8 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // writing every style once (1–1.5 s alone, several times that on a loaded
 // runner). Paid here, under the hook's own limit, not inside the first case
 // (FUT-4530).
+browserRootFontForThisFile();
+
 beforeAll(async () => {
   mount([LOCKED]);
   await openEdit(LOCKED.id);
@@ -196,8 +205,12 @@ describe("locked boxes never block a save (N3)", () => {
 });
 
 describe("an unchanged period on an open form keeps the stored window (N4)", () => {
+  // Both cases open the same row on the same host: one admin under them, each
+  // opening its own fresh form (FUT-4530, `one-admin.ts`).
+  const sent: Record<string, unknown>[] = [];
+  oneAdminPerDescribe(() => adminTree([OPEN], {}, sent), () => sent.splice(0));
+
   it("sends keepWindow, no dates, when the days are the ones the form opened with", async () => {
-    const sent = mount([OPEN]);
     await openEdit(OPEN.id);
     const body = await pauseAndSave(sent);
     expect(body).toMatchObject({ active: false, keepWindow: true });
@@ -206,14 +219,15 @@ describe("an unchanged period on an open form keeps the stored window (N4)", () 
   });
 
   it("still sends changed days as days", async () => {
-    const sent = mount([OPEN]);
     const period = await openEdit(OPEN.id);
     fireEvent.change(box(period, "endsAt"), { target: { value: "25/11/2026" } });
     const body = await pauseAndSave(sent);
     expect(body).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-25" });
     expect(body).not.toHaveProperty("keepWindow");
   });
+});
 
+describe("an unchanged period on an open form keeps the stored window (N4)", () => {
   it("keeps the old body on a host that counts no whole days", async () => {
     const sent = mount([OPEN], { wholeDays: false });
     await openEdit(OPEN.id);
