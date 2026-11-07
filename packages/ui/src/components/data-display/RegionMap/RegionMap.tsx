@@ -39,6 +39,9 @@ export function RegionMap({
   regions,
   center,
   circles,
+  pin,
+  ghost,
+  dots,
   reach,
   overlay,
   onToggle,
@@ -62,6 +65,7 @@ export function RegionMap({
             model={{ ...model, view }}
             overlay={overlay}
             showCenter={center !== null}
+            moving={center === null ? undefined : { center, pin, ghost, dots, copy }}
             highlightedIds={highlightedIds}
             maxHeight={maxHeight}
             label={copy.mapLabel}

@@ -102,7 +102,10 @@ drawing means copying its view math and losing its frame. So:
 |---|---|---|---|
 | `regions` | `readonly RegionMapRegion[]` | — | the areas; drawn when any part is in view |
 | `center` | `{ latitude, longitude } \| null` | — | centre, dot and circles; `null` centres on the areas, no dot |
-| `circles` | `readonly { radiusMetres }[]` | `[]` | dashed circles; the view fits the largest |
+| `circles` | `readonly { radiusMetres }[]` | `[]` | dashed circles; the view fits the largest (solid, around the pin, when there is a `pin`) |
+| `pin` | `{ at, label, ariaLabel, onMove?, onDrop, stepMetres?, disabled? }` | — | the centre as a pin the viewer drags or nudges with the arrow keys; the view stays on `center` |
+| `ghost` | `{ at, radiusMetres }` | — | a dashed ring and dot where the circles stood, a dashed line to the pin |
+| `dots` | `readonly { id, at, filled }[]` | — | small points, filled or hollow, not tappable |
 | `reach` | `{ radiusMetres } \| { bounds: { south, west, north, east } }` | — | an extent the view must also fit (margin on top) |
 | `overlay` | `(layer: { view, projection }) => ReactNode` | — | a host layer inside the SVG, under the circles, tap-transparent |
 | `onToggle` | `(id: string) => void` | — | a tap or a list press; omit for read-only |
@@ -132,7 +135,21 @@ drawing means copying its view math and losing its frame. So:
 
 `mapLabel`, `legendExcluded`, `legendCircle(radiusMetres)`, `legendCenter`,
 `listLabel`, `showList(count)` (the count of LISTED areas), `hideList`, and
-`rowState: { excluded, outside }` — a row's state in words, for a screen reader.
+`rowState: { excluded, outside }` — a row's state in words, for a screen reader;
+optional `scale(metres)` — a scale bar's length ("1 km"), shown only when given.
+
+### The movable centre (`pin`)
+
+A store's point placed 200 m off by a geocoder is corrected by dragging it
+where the circles are measured from. So the pin moves and the VIEW does not:
+the areas never slide under a dragging finger. The pin is HTML over the
+drawing (a 44×48 button, `touch-action: none`), carrying `data-region-pin` so
+a host that zooms the drawing's layers can move it with them. A drag is
+captured, clamped inside the view, and kept from the host's own listeners on
+the drawing; each arrow key moves it `stepMetres` (50). Moves are reported
+(`onMove`, `onDrop`), never applied: the host passes the new `at` back.
+`latLngAt(center, planePoint)` is the projection's inverse for a host that
+needs it.
 
 ## Helpers
 

@@ -9,12 +9,16 @@ import { labelPosition, type AreaGeometry, type DrawnRegion, type PlaneBox } fro
 import type { RegionMapModel } from './RegionMap.hooks';
 import { labelOrder, placeLabels } from './RegionMap.labels';
 import type { RegionMapLayer } from './RegionMap.types';
+import type { Moving } from './RegionMapPin';
+import { PinOverlay, PinShapes } from './RegionMapPin';
 
 export interface RegionMapDrawingProps {
   model: RegionMapModel & { view: PlaneBox };
   /** The host's layer, drawn inside the SVG under the circles (`RegionMapProps.overlay`). */
   overlay?: (layer: RegionMapLayer) => React.ReactNode;
   showCenter: boolean;
+  /** The movable centre and what is drawn with it (`RegionMapProps.pin`, `ghost`, `dots`). */
+  moving?: Moving;
   highlightedIds: readonly string[];
   maxHeight: string | undefined;
   label: string;
@@ -33,17 +37,8 @@ export interface RegionMapDrawingProps {
  * The base areas are a memoised layer: a toggle changes `excluded`, not the
  * geometry, so only the hatch, highlight and label layers re-render.
  */
-export function RegionMapDrawing({
-  model,
-  overlay,
-  showCenter,
-  highlightedIds,
-  maxHeight,
-  label,
-  tappable,
-  testId,
-  theme,
-}: RegionMapDrawingProps): React.JSX.Element {
+export function RegionMapDrawing(props: RegionMapDrawingProps): React.JSX.Element {
+  const { model, overlay, showCenter, moving, highlightedIds, maxHeight, label, tappable, testId, theme } = props;
   const hatchId = `${React.useId().replace(/:/g, '')}-hatch`;
   const { view, drawn } = model;
   const wanted = new Set(highlightedIds);
@@ -52,6 +47,7 @@ export function RegionMapDrawing({
   // claim their place in, so a collision hides the less important one.
   const labelled = labelOrder(drawn.filter((d) => d.excluded || wanted.has(d.id)), wanted);
   const boxRef = React.useRef<HTMLDivElement>(null);
+  const svgRef = React.useRef<SVGSVGElement>(null);
   useLabelPlacement(boxRef, labelled.map((d) => d.id).join('|'), remPx(theme, 4));
   const base = drawn.map((d) => ({ id: d.id, name: d.name, geometry: d.geometry, outside: d.outside === true }));
   return (
@@ -72,6 +68,7 @@ export function RegionMapDrawing({
       ref={boxRef}
     >
       <svg
+        ref={svgRef}
         viewBox={`${view.minX} ${view.minY} ${view.spanX} ${view.spanY}`}
         role="img"
         aria-label={label}
@@ -89,9 +86,9 @@ export function RegionMapDrawing({
             {overlay({ view, projection: model.projection })}
           </g>
         )}
-        <Circles radii={model.radii} theme={theme} />
+        <PinShapes model={model} moving={moving} testId={testId} theme={theme} fallback={<Circles radii={model.radii} theme={theme} />} />
         <Highlights areas={highlighted} testId={testId} theme={theme} />
-        {showCenter && (
+        {showCenter && !moving?.pin && (
           <circle
             cx={0}
             cy={0}
@@ -108,6 +105,7 @@ export function RegionMapDrawing({
       {labelled.map((d) => (
         <AreaLabel key={`l-${d.id}`} area={d} view={view} testId={testId} theme={theme} />
       ))}
+      <PinOverlay model={model} moving={moving} svgRef={svgRef} testId={testId} theme={theme} />
     </Box>
   );
 }
