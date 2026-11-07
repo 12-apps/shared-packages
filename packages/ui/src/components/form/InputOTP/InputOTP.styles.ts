@@ -7,6 +7,8 @@ import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 
+import { OTP_FONT_PX } from './InputOTP.metrics';
+
 interface ColorPalette {
   main: string;
   dark?: string;
@@ -47,16 +49,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
   };
 };
 
-type SizeKey = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-
-/** Each slot's type, in design px. Its side is the theme's field height for the size (a square). */
-const SIZES: Record<SizeKey, { fontPx: number }> = {
-  xs: { fontPx: 12 },
-  sm: { fontPx: 14 },
-  md: { fontPx: 16 },
-  lg: { fontPx: 18 },
-  xl: { fontPx: 20 },
-};
+type SizeKey = keyof typeof OTP_FONT_PX;
 
 export interface OtpSlotFlags {
   customColor?: string;
@@ -68,7 +61,7 @@ export interface OtpSlotFlags {
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
   const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
   const palette = getColorFromTheme(theme, customColor);
-  const { fontPx } = SIZES[customSize as SizeKey] ?? SIZES.md;
+  const fontPx = OTP_FONT_PX[customSize as SizeKey] ?? OTP_FONT_PX.md;
   // A slot is a field: a square of the theme's field height for its size.
   const side = fieldHeight(theme, asFieldSize(customSize));
 

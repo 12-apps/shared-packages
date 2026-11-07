@@ -443,11 +443,12 @@ Components for user input and form interactions.
 **Docs**: `src/components/form/Input/Input.md`
 
 ### InputOTP
-**Purpose**: One-time password input
+**Purpose**: One-time password input (web AND React Native)
 **Use Cases**: 2FA, verification codes, security codes
 **Features**: Auto-focus next field, paste support, validation
 **Location**: `src/components/form/InputOTP`
 **Docs**: `src/components/form/InputOTP/InputOTP.md`
+**Native**: yes — `@12-apps/ui/form/InputOTP` resolves to `InputOTP.native.tsx` under Metro: the same props, the number pad and the SMS one-time-code fill on the first box; gaps in `NATIVE-NOTES.md`.
 
 ### Label
 **Purpose**: Form field labels

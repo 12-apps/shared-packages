@@ -433,6 +433,10 @@
       "default": "./dist/form/Input/outlined.js"
     },
     "./form/InputOTP": {
+      "react-native": {
+        "types": "./dist/types-native/components/form/InputOTP/index.native.d.ts",
+        "default": "./dist/native/form/InputOTP.js"
+      },
       "types": "./dist/types/components/form/InputOTP/index.d.ts",
       "default": "./dist/form/InputOTP.js"
     },
