@@ -119,23 +119,11 @@ export async function startDesktopShell(
 
   const shellSession = session.fromPartition(`persist:${options.appId}`);
   const windows = createWindowManager(shellSession);
-  const platformAutostart = createShellAutostart({
-    appId: options.appId,
-    app,
-    entry: {
-      name: options.autostart?.name ?? options.appId,
-      ...(options.autostart?.comment === undefined ? {} : { comment: options.autostart.comment }),
-    },
-    backgroundArgs: [BACKGROUND_FLAG],
-  });
   const core = createShellCore(coreOptions(options, shellSession, windows));
   // The tray is built below and reads autostart once; a change the host makes
   // through `shell.autostart` repaints it.
-  const trayRef: { current: { refreshAutostart(): Promise<void> } | null } = { current: null };
-  const autostart = observeAutostart(platformAutostart, () => trayRef.current?.refreshAutostart());
-  const firstRun = options.autostart?.firstRun;
-  const firstRunAutostart =
-    firstRun === undefined ? null : createFirstRunAutostart({ autostart, platform: process.platform, ...firstRun });
+  const trayRef: TrayRef = { current: null };
+  const { platformAutostart, autostart, firstRunAutostart } = shellAutostart(options, trayRef);
   const shell = shellApi(options, windows, core, autostart, firstRunAutostart);
 
   const tray = await createTrayController({
@@ -162,6 +150,35 @@ export async function startDesktopShell(
   await core.watch.start();
   if (core.watch.state === "signed-out" && !startedInBackground(process.argv)) shell.showSignIn();
   return shell;
+}
+
+/** The tray's handle, filled in once the tray exists. */
+interface TrayRef {
+  current: { refreshAutostart(): Promise<void> } | null;
+}
+
+/**
+ * The platform's autostart, the observed one the host holds (it repaints the
+ * tray), and the first-run question when the host asked for one.
+ */
+function shellAutostart(
+  options: DesktopShellOptions,
+  trayRef: TrayRef,
+): { platformAutostart: Autostart; autostart: Autostart; firstRunAutostart: FirstRunAutostart | null } {
+  const platformAutostart = createShellAutostart({
+    appId: options.appId,
+    app,
+    entry: {
+      name: options.autostart?.name ?? options.appId,
+      ...(options.autostart?.comment === undefined ? {} : { comment: options.autostart.comment }),
+    },
+    backgroundArgs: [BACKGROUND_FLAG],
+  });
+  const autostart = observeAutostart(platformAutostart, () => trayRef.current?.refreshAutostart());
+  const firstRun = options.autostart?.firstRun;
+  const firstRunAutostart =
+    firstRun === undefined ? null : createFirstRunAutostart({ autostart, platform: process.platform, ...firstRun });
+  return { platformAutostart, autostart, firstRunAutostart };
 }
 
 /**

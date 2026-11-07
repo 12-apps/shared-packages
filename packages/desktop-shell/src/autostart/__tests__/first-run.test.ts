@@ -22,14 +22,14 @@ function fakeAutostart(initial: boolean, { refuses = false } = {}): Autostart & 
 
 /** The host's stored "already chose" flag. */
 function flag(initial: boolean): { chosen: () => boolean; remember: () => Promise<void>; value: () => boolean } {
-  let value = initial;
+  const state = { value: initial };
   return {
-    chosen: () => value,
+    chosen: () => state.value,
     remember: () => {
-      value = true;
+      state.value = true;
       return Promise.resolve();
     },
-    value: () => value,
+    value: () => state.value,
   };
 }
 
@@ -125,10 +125,10 @@ describe("observeAutostart", () => {
   });
 
   it("reads without telling anybody", async () => {
-    let told = 0;
+    const told: boolean[] = [];
     await observeAutostart(fakeAutostart(true), () => {
-      told += 1;
+      told.push(true);
     }).isEnabled();
-    expect(told).toBe(0);
+    expect(told).toEqual([]);
   });
 });
