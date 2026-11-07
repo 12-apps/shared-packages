@@ -269,7 +269,7 @@ function placesWanted(props: RouteMapProps, theme: RouteMapTheme, drags: DragPla
   return (props.places ?? [])
     .filter((spot) => isValidPoint(spot.position))
     .map((spot): Wanted => {
-      if (spot.ghost) return { key: `g:${spot.id}`, signature: JSON.stringify([spot.label, spot.color]), position: spot.position, anchor: "center", role: "place", build: () => ghostPlaceElement(spot, theme) };
+      if (spot.ghost) return { key: `ghost:${spot.id}`, signature: JSON.stringify([spot.label, spot.color]), position: spot.position, anchor: "center", role: "place", build: () => ghostPlaceElement(spot, theme) };
       if (spot.draggable) return drags.wanted(spot, spot.draggable);
       return { key: `p:${spot.id}`, signature: JSON.stringify([spot.label, spot.icon, spot.color, lifted]), position: spot.position, anchor: lifted ? "bottom" : "center", role: "place", build: () => placeElement(spot, theme, lifted) };
     });

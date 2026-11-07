@@ -42,7 +42,7 @@ export interface RouteMapPlace {
   label: string;
   /** A glyph before the label: a shopfront for a store. */
   icon?: "store";
-  /** Overrides `theme.travelled` on a draggable pin, or `theme.place` on a label (e.g. the host's brand colour). */
+  /** Overrides `theme.travelled` on a draggable pin, `theme.place` on a label, or `theme.ink` on a ghost's ring and label (e.g. the host's brand colour). */
   color?: string;
   /**
    * A reference position (where the place was, or would be): a dashed hollow
