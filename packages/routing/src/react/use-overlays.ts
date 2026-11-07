@@ -135,9 +135,8 @@ export function useOverlays(
   };
 
   const fitTo = (points: readonly LngLat[], zoom?: number): void => {
-    const valid = points.filter((point) => isValidPoint(point));
-    if (centreAt(handle.mapRef.current, valid, zoom, fitPadding(propsRef.current))) return;
-    const bounds = boundsOf(valid);
+    if (centreAt(handle.mapRef.current, points.filter((point) => isValidPoint(point)), zoom, fitPadding(propsRef.current))) return;
+    const bounds = boundsOf(points.filter((point) => isValidPoint(point)));
     // Animated: its zoomend/moveend re-place the tags where it lands.
     if (bounds) handle.mapRef.current?.fitBounds(bounds, { padding: fitPadding(propsRef.current), maxZoom: 16, duration: 300 });
   };
