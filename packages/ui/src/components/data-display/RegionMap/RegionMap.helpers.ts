@@ -9,7 +9,7 @@ import type { RegionMapPoint, RegionMapRegion, RegionMapRing } from './RegionMap
  */
 
 /** Metres per degree of latitude on the mean sphere. */
-const METRES_PER_DEGREE = 111_195;
+export const METRES_PER_DEGREE = 111_195;
 
 /** A projected point, metres east (`x`) and south (`y`) of the centre. */
 export interface PlanePoint {

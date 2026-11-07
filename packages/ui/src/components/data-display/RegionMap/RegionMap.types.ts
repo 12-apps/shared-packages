@@ -49,6 +49,46 @@ export interface RegionMapRegion {
   detail?: string;
 }
 
+/** A latitude/longitude pair, by name. */
+export interface RegionMapCenter {
+  latitude: number;
+  longitude: number;
+}
+
+/**
+ * The centre as a pin the viewer moves (a store's door). The VIEW stays on
+ * `center`; the pin, and the circles with it, are drawn at `at`. Moves are
+ * reported, never applied: the host passes the new `at` back.
+ */
+export interface RegionMapPin {
+  at: RegionMapCenter;
+  /** Printed beside the pin, e.g. "Store". */
+  label: string;
+  /** The pin's accessible name, e.g. "Store pin. Drag it, or use the arrow keys, to move it". */
+  ariaLabel: string;
+  /** Every point while a pointer drags it. */
+  onMove?: (at: RegionMapCenter) => void;
+  /** Where it came to rest: the pointer let go, or an arrow key moved it. */
+  onDrop: (at: RegionMapCenter) => void;
+  /** Metres one arrow key moves it. Default 50. */
+  stepMetres?: number;
+  /** Held in place (a save in flight). */
+  disabled?: boolean;
+}
+
+/** Where the pin's outermost circle stood: a dashed ring of `radiusMetres` and a dashed dot at `at`. */
+export interface RegionMapGhost {
+  at: RegionMapCenter;
+  radiusMetres: number;
+}
+
+/** A small point on the map (an address), filled or hollow. Not tappable. */
+export interface RegionMapDot {
+  id: string;
+  at: RegionMapCenter;
+  filled: boolean;
+}
+
 /** A circle drawn around the centre, e.g. a delivery ring. */
 export interface RegionMapCircle {
   radiusMetres: number;
@@ -99,6 +139,8 @@ export interface RegionMapCopy {
    * `outside` one (faded). Neither is shown; the row's look carries it.
    */
   rowState: { excluded: string; outside: string };
+  /** A scale bar's length, e.g. "1 km". Omit for no scale bar. */
+  scale?: (metres: number) => string;
 }
 
 /** The order of the list: as given (e.g. nearest first), or by name. */
@@ -120,8 +162,14 @@ export interface RegionMapProps {
    * `null` with no regions renders NOTHING rather than a map of `0, 0`.
    */
   center: { latitude: number; longitude: number } | null;
-  /** Circles around the centre; the view fits the largest. */
+  /** Circles around the centre (around `pin.at` when there is a pin); the view fits the largest. */
   circles?: readonly RegionMapCircle[];
+  /** The centre as a draggable pin; it replaces the centre's dot, and the circles follow it. */
+  pin?: RegionMapPin;
+  /** A dashed ring and dot where the circles stood (drawn with a `pin`). */
+  ghost?: RegionMapGhost;
+  /** Small points, filled or hollow, over the areas and under the pin. */
+  dots?: readonly RegionMapDot[];
   /**
    * An extent the view must ALSO fit, before its margin — something the host
    * draws past the largest circle. With circles the view stays centred on the

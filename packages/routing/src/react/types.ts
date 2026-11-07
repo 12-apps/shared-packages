@@ -42,6 +42,49 @@ export interface RouteMapPlace {
   label: string;
   /** A glyph before the label: a shopfront for a store. */
   icon?: "store";
+  /**
+   * Makes the place a pin the viewer moves: dragged with a mouse or one
+   * finger, or focused and nudged with the arrow keys. The host owns the
+   * position — it gets every move and the drop, and passes the new position
+   * back; a host that ignores them leaves the pin where it was.
+   */
+  draggable?: RouteMapDrag;
+}
+
+/** How a draggable place reports its moves (see `RouteMapPlace.draggable`). */
+export interface RouteMapDrag {
+  /** The pin's accessible name, e.g. "Store pin. Drag it, or use the arrow keys, to move it". */
+  ariaLabel: string;
+  /** Every position while the pin moves (a pointer move, or each arrow key). */
+  onMove?: (at: LngLat) => void;
+  /** Where the pin came to rest: the pointer let go, or an arrow key moved it. */
+  onDrop: (at: LngLat) => void;
+  /**
+   * Metres one arrow key moves the pin, by the map's zoom. Default: 5 m from
+   * zoom 15 (the street), 50 m below it (the neighbourhood).
+   */
+  stepMetres?: (zoom: number) => number;
+  /** While true the pin stays put (a save in flight). */
+  disabled?: boolean;
+}
+
+/** A circle on the ground, e.g. a delivery ring around a store. */
+export interface RouteMapCircle {
+  id: string;
+  center: LngLat;
+  radiusMetres: number;
+  /** A dashed outline with no fill (a previous or reference position). Default: solid, faintly filled. */
+  dashed?: boolean;
+  /** Overrides `theme.travelled` (solid) or `theme.ink` (dashed). */
+  color?: string;
+}
+
+/** A small point, e.g. a customer's address, filled or hollow. */
+export interface RouteMapDot {
+  id: string;
+  position: LngLat;
+  /** Filled with `theme.ink`; hollow (paper with an ink ring) when false. */
+  filled: boolean;
 }
 
 /** Colours, from the host's theme — the component never picks one itself. */
@@ -62,6 +105,10 @@ export interface RouteMapProps {
   markers?: readonly RouteMapMarker[];
   stops?: readonly RouteMapStop[];
   places?: readonly RouteMapPlace[];
+  /** Circles on the ground, redrawn whenever the array changes; "fit all" includes them. */
+  circles?: readonly RouteMapCircle[];
+  /** Small points drawn under every pin (they are not tappable). */
+  dots?: readonly RouteMapDot[];
   /** The dashed line, `[lng, lat][]`. */
   planned?: readonly Position[];
   /** The solid line, `[lng, lat][]`. */
@@ -88,7 +135,32 @@ export interface RouteMapProps {
    * Which controls show, and in which top corner (default `top-right`). A
    * host whose own floating chrome covers one corner moves them to the other.
    */
-  controls?: { zoom?: boolean; fit?: boolean; placement?: "top-right" | "top-left" };
+  controls?: {
+    zoom?: boolean;
+    fit?: boolean;
+    placement?: "top-right" | "top-left";
+    /**
+     * Keep the zoom buttons on a map under 600 px wide, where they are hidden
+     * by default (pinch zooms there). For a map whose task needs a precise
+     * zoom, such as placing a draggable pin on a door.
+     */
+    zoomWhenNarrow?: boolean;
+    /**
+     * Replaces what the zoom-out control does, e.g. leaving a street view for
+     * the host's own wider map. Wheel and pinch still zoom out.
+     */
+    onZoomOut?: () => void;
+  };
+  /** Words for this mount only, over the surface's copy (e.g. a fit control named for this map). */
+  copy?: Partial<RouteMapCopy>;
+  /** The map's zoom after every zoom, and once when ready. */
+  onZoomChange?: (zoom: number) => void;
+  /**
+   * A scale bar, bottom-left, worded by the host: `(metres) => "100 m"`. Its
+   * length is the longest nice distance (50 m … 50 km) within a quarter of the
+   * map's width, re-measured after every pan and zoom. Omit for none.
+   */
+  scaleBar?: (metres: number) => string;
   /** Called when the viewer presses the fit control (after it fits). */
   onFitAll?: () => void;
   /** Called with the ids of a pressed group of overlapping markers. */

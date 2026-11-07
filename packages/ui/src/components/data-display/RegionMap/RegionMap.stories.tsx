@@ -200,3 +200,25 @@ export const ReachBounds: Story = {
     reach: AREAS_BOUNDS === null ? undefined : { bounds: AREAS_BOUNDS },
   },
 };
+
+/** The pin a viewer drags (FUT-4405): the circles follow it, a dashed ring stays where they stood. */
+function MovablePin(props: RegionMapProps): React.JSX.Element {
+  const [at, setAt] = React.useState(REGION_MAP_CENTER);
+  return (
+    <RegionMap
+      {...props}
+      copy={{ ...REGION_MAP_COPY, scale: (metres) => (metres >= 1000 ? `${metres / 1000} km` : `${metres} m`) }}
+      pin={{ at, label: 'Store', ariaLabel: 'Store pin. Drag it, or use the arrow keys, to move it', onMove: setAt, onDrop: setAt }}
+      ghost={at === REGION_MAP_CENTER ? undefined : { at: REGION_MAP_CENTER, radiusMetres: 3000 }}
+      dots={[
+        { id: 'a', at: { latitude: -19.8, longitude: -43.95 }, filled: true },
+        { id: 'b', at: { latitude: -19.79, longitude: -43.99 }, filled: false },
+      ]}
+    />
+  );
+}
+
+export const DraggablePin: Story = {
+  render: (args) => <MovablePin {...args} />,
+  args: { listMode: 'none', circles: [{ radiusMetres: 1500 }, { radiusMetres: 3000 }] },
+};
