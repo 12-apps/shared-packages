@@ -113,13 +113,18 @@ function owesNothing(order: CheckoutOrder | null): boolean {
   return order?.method === "CARD" && order.status === "AWAITING_PAYMENT" && order.amountDueCents === 0;
 }
 
+/** An awaiting CARD order that asks the provider for something: one a runner may charge. */
+function owesCard(order: CheckoutOrder): boolean {
+  return order.method === "CARD" && order.status === "AWAITING_PAYMENT" && !owesNothing(order);
+}
+
 /**
  * The order `send` meant — the one it reused, or the CARD order raised to
  * replace a stale one — or `mismatch` for a fresh order that does not ask the
  * cents the press was made for. Reads only the order and what `send` froze.
  */
 function chargeTarget(order: CheckoutOrder | null, target: ChargeIntent | null): CheckoutOrder | "mismatch" | null {
-  if (!order || !target || order.method !== "CARD" || order.status !== "AWAITING_PAYMENT" || owesNothing(order)) return null;
+  if (!order || !target || !owesCard(order)) return null;
   if ("reuse" in target) return target.reuse === order ? order : null;
   if (order === target.replace) return null;
   const asked = order.amountDueCents ?? order.totalCents;
