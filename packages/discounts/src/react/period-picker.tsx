@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX } from "react";
+import { memo, type JSX } from "react";
 
 import { DateRangePicker, type DateRangeDraft } from "@12-apps/ui/form/DateRangePicker";
 import { useFormContext } from "@12-apps/ui/form/total-form";
@@ -128,7 +128,44 @@ export function PeriodPicker({
   datesLock?: DatesLock;
 }): JSX.Element {
   const { values, setFieldValue } = useFormContext();
-  const draft: DateRangeDraft = { from: dayOf(values.startsAt), to: dayOf(values.endsAt) };
+  return (
+    <PeriodCalendar
+      copy={copy}
+      wholeDays={wholeDays}
+      datesLock={datesLock}
+      from={dayOf(values.startsAt)}
+      to={dayOf(values.endsAt)}
+      setFieldValue={setFieldValue}
+    />
+  );
+}
+
+/**
+ * The calendar itself, drawn again only when its days, its lock or its words
+ * change (FUT-4530).
+ *
+ * The form's context hands every reader ALL the values, so without this
+ * boundary each keystroke in Nome, each kind or switch redrew both months —
+ * 84 day cells and their styles — for nothing: it was most of what any edit
+ * cost. The boxes still follow every keystroke: they read the form themselves.
+ * `setFieldValue` is the form's stable writer.
+ */
+const PeriodCalendar = memo(function PeriodCalendar({
+  copy,
+  wholeDays,
+  datesLock,
+  from,
+  to,
+  setFieldValue,
+}: {
+  copy: CompleteDiscountsWebCopy;
+  wholeDays: boolean;
+  datesLock: DatesLock;
+  from: string | null;
+  to: string | null;
+  setFieldValue: (name: string, value: string) => void;
+}): JSX.Element {
+  const draft: DateRangeDraft = { from, to };
   const words = copy;
   const names = words.form.calendar;
   return (
@@ -161,4 +198,4 @@ export function PeriodPicker({
       calendarLabels={{ previousMonth: names.previousMonth, nextMonth: names.nextMonth }}
     />
   );
-}
+});
