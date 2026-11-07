@@ -38,14 +38,15 @@ function barOf(doc: Document): HTMLElement | null {
 /**
  * Scroll `row` into view clear of the bar: its bottom, gap included, above
  * the bar's top — or, for a row taller than the room left, its top in view.
- * Absent where there is no layout (jsdom, a host's own tests): nothing.
+ * `viewportHeight` defaults to the row's window's. Absent where there is no
+ * layout (jsdom, a host's own tests): nothing.
  */
-export function revealRow(row: HTMLElement | null): void {
+export function revealRow(row: HTMLElement | null, viewportHeight?: number): void {
   if (!row || typeof row.scrollIntoView !== "function") return;
-  const view = row.ownerDocument.defaultView;
-  if (!view) return;
+  const height = viewportHeight ?? row.ownerDocument.defaultView?.innerHeight;
+  if (height === undefined) return;
   const bar = barOf(row.ownerDocument);
-  const clearance = barClearance(row.getBoundingClientRect(), bar?.getBoundingClientRect() ?? null, view.innerHeight);
+  const clearance = barClearance(row.getBoundingClientRect(), bar?.getBoundingClientRect() ?? null, height);
   const previous = row.style.scrollMarginBottom;
   row.style.scrollMarginBottom = `${clearance + ROW_TO_BAR_GAP}px`;
   row.scrollIntoView({ block: "nearest" });

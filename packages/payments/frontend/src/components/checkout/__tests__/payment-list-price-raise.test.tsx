@@ -126,11 +126,9 @@ describe("a re-price while the card charge is out", () => {
     await waitFor(() => expect(radio("list-option-CARD").checked).toBe(true));
     await pressCardAndWait();
     await waitFor(() => expect(client.charge).toHaveBeenCalledTimes(1));
+    // `rerender` runs in `act`: every effect the re-price triggers, and the
+    // renders those effects cause, have run when it returns.
     rerender(listFlow({ ...host, list: { prices: REPRICED } }));
-    // Let any effect the re-price would trigger run, then look.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
   }
 
   it("a charge still being answered says no failure and shows no button", async () => {
@@ -138,7 +136,7 @@ describe("a re-price while the card charge is out", () => {
     client.charge.mockImplementation(() => new Promise(() => undefined) as never);
     await pressThenReprice(client);
     expect(screen.queryAllByText("Não foi possível pagar")).toHaveLength(0);
-    expect(screen.queryByTestId("list-pay")).toBeNull();
+    expect(screen.queryAllByTestId("list-pay")).toHaveLength(0);
     expect(client.charge).toHaveBeenCalledTimes(1);
   });
 
@@ -147,7 +145,7 @@ describe("a re-price while the card charge is out", () => {
     client.charge.mockResolvedValue({ ok: true, data: { status: "AWAITING_PAYMENT" } } as never);
     await pressThenReprice(client);
     expect(screen.queryAllByText("Não foi possível pagar")).toHaveLength(0);
-    expect(screen.queryByTestId("list-pay")).toBeNull();
+    expect(screen.queryAllByTestId("list-pay")).toHaveLength(0);
     expect(client.charge).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,15 +4,11 @@
  * the pinned bar as measured. jsdom has no layout, so the measuring is tested
  * on boxes, and `revealRow` on a stubbed `getBoundingClientRect`.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ROW_TO_BAR_GAP, barClearance, revealRow, type RowBox } from "../list/reveal-row";
 
 const ROW: RowBox = { top: 400, bottom: 540, left: 16, right: 374 };
-
-afterEach(() => {
-  document.body.innerHTML = "";
-});
 
 describe("barClearance", () => {
   it("is the height the bar hides at the bottom of the screen", () => {
@@ -42,27 +38,33 @@ describe("barClearance", () => {
 
 describe("revealRow", () => {
   it("scrolls the row to the nearest edge, its bottom clear of the measured bar, and restores its margin", () => {
+    // The row and the bar in a container of the test's own: the bar is found
+    // through the row's document, so it is queried there and the container
+    // is removed afterwards.
+    const container = document.createElement("div");
     const row = document.createElement("div");
     const bar = document.createElement("div");
-    bar.dataset.testid = "list-pay-bar";
-    document.body.append(row, bar);
+    bar.setAttribute("data-testid", "list-pay-bar");
+    container.append(row, bar);
+    document.body.append(container);
     vi.spyOn(row, "getBoundingClientRect").mockReturnValue({ ...ROW, x: 16, y: 400, width: 358, height: 140, toJSON: () => ({}) });
     vi.spyOn(bar, "getBoundingClientRect").mockReturnValue({ top: 508, bottom: 844, left: 0, right: 390, x: 0, y: 508, width: 390, height: 336, toJSON: () => ({}) });
-    vi.stubGlobal("innerHeight", 844);
-    let marginAtScroll = "";
-    row.scrollIntoView = vi.fn(() => {
-      marginAtScroll = row.style.scrollMarginBottom;
+    const marginsAtScroll: string[] = [];
+    const scroll = vi.fn(() => {
+      marginsAtScroll.push(row.style.scrollMarginBottom);
     });
-    revealRow(row);
-    expect(row.scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
-    expect(marginAtScroll).toBe(`${336 + ROW_TO_BAR_GAP}px`);
+    Object.defineProperty(row, "scrollIntoView", { value: scroll });
+    // A 390×844 phone: the bar's top at 508 hides its bottom 336px.
+    revealRow(row, 844);
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    expect(marginsAtScroll).toEqual([`${336 + ROW_TO_BAR_GAP}px`]);
     expect(row.style.scrollMarginBottom).toBe("");
-    vi.unstubAllGlobals();
+    container.remove();
   });
 
   it("does nothing where there is no layout to scroll", () => {
     const row = document.createElement("div");
     Object.defineProperty(row, "scrollIntoView", { value: undefined });
-    expect(() => revealRow(row)).not.toThrow();
+    expect(() => revealRow(row, 844)).not.toThrow();
   });
 });
