@@ -22,13 +22,13 @@ export async function authorizeEndpoint(
   if (context.consent) {
     if (context.consent.requireClientApproval &&
       !(await context.approve(request, validated.client, scopes))) {
-      return errorRedirect(validated.redirectUri, "access_denied", validated.state);
+      return errorRedirect(validated, "access_denied");
     }
     // Eligibility can narrow who reaches consent, never approve on their behalf.
     return beginConsent(context, session, url, origin);
   }
   if (!(await context.approve(request, validated.client, scopes))) {
-    return errorRedirect(validated.redirectUri, "access_denied", validated.state);
+    return errorRedirect(validated, "access_denied");
   }
   return mintAuthorization(context, session, origin, validated);
 }
