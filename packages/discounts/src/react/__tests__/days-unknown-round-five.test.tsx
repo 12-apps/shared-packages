@@ -16,7 +16,7 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
-import { STILL_THEME } from "./still-theme";
+import { setBrowserRootFont, STILL_THEME } from "./still-theme";
 import { getByLabelFor } from "./labelled-control";
 
 /**
@@ -103,6 +103,7 @@ async function openEdit(id: string): Promise<HTMLElement> {
 // runner). Paid here, under the hook's own limit, not inside the first case
 // (FUT-4530).
 beforeAll(async () => {
+  setBrowserRootFont();
   mount([UNKNOWN]);
   await openEdit(UNKNOWN.id);
   cleanup();
