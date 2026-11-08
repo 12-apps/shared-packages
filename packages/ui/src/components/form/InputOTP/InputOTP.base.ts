@@ -33,6 +33,8 @@ export interface InputOTPBaseProps {
    * with a 6px gap. Each keeps the size's field height (never under 40) and
    * its type, and narrows to fit: never wider than it is tall, never under
    * 32. On a narrow phone that draws PORTRAIT boxes instead of a smaller size.
+   * The boxes share the row's outer width, so pad the parent, not the row: a
+   * `style` (or `sx`) setting the row's padding or gap is not accounted for.
    */
   fit?: 'width';
 

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
+import { View } from 'react-native';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { InputOTP } from './InputOTP.native';
@@ -206,6 +207,17 @@ describe('InputOTP (native) fit="width"', () => {
     layOut(272);
     await waitFor(() => expect(box(0)).toHaveStyle({ width: '40px', height: '40px' }));
     expect(fontOf(0)).toBe(`${OTP_FONT_PX.xs}px`);
+  });
+
+  it('spans a row-direction parent too, rather than shrinking to its boxes', async () => {
+    render(
+      <View style={{ flexDirection: 'row' }}>
+        <InputOTP dataTestId="otp" size="lg" fit="width" />
+      </View>,
+    );
+    expect(getComputedStyle(screen.getByTestId('otp')).width).toBe('100%');
+    layOut(312);
+    await waitFor(() => expect(box(0)).toHaveStyle({ width: '47px', height: `${lg}px` }));
   });
 
   it('shares the row by flex until the row has been measured', () => {

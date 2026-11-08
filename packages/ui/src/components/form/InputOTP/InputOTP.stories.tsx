@@ -793,7 +793,7 @@ const FitWidthComponent = () => {
             length={6}
             value={value}
             onChange={setValue}
-            aria-label={`Código, ${phone}px`}
+            aria-label={`Code, ${phone}px row`}
             dataTestId={`otp-fit-${phone}`}
           />
         </Box>

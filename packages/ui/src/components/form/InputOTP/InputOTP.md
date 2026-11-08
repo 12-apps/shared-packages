@@ -218,6 +218,10 @@ At `size="lg"` (48 tall), a sheet with 24px of padding on each side draws:
 <InputOTP fit="width" size="lg" length={6} value={code} onChange={setCode} />
 ```
 
+The boxes share the row's **outer** width, and the row spans its parent in a
+column or a row parent alike. Pad the parent, not the row: a `style` (or `sx`)
+that sets the row's own padding or gap is not taken off the share.
+
 The arithmetic is `otpFitBox` in `InputOTP.metrics.ts`, shared by both
 renderers: React Native measures the row with `onLayout`, the web lets CSS flex
 share it under the same bounds.

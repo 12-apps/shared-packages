@@ -78,17 +78,21 @@ function fitFootprint(side: number, length: number, rowWidth: number | null): Te
 }
 
 /**
- * `fit="width"`'s state: the row's width once laid out (the row stretches to
- * its parent's), the boxes' footprint from it, and the row's `onLayout`.
- * Without the option, nothing: the boxes keep their square.
+ * `fit="width"`'s state: the row's width once laid out (the row takes its
+ * parent's whole width), the boxes' footprint from it, and what the row adds —
+ * its `onLayout` and the fit style. Without the option, nothing: the boxes keep
+ * their square and the row's props are exactly the default's.
+ *
+ * The share is of the row's OUTER width, so under `fit` the row's `style`
+ * should set no horizontal padding and no gap: pad the parent instead.
  */
 function useFitWidth(fit: InputOTPProps['fit'], side: number, length: number) {
   const [rowWidth, setRowWidth] = React.useState<number | null>(null);
-  if (fit !== 'width') return { fitsWidth: false, footprint: undefined, onLayout: undefined };
+  if (fit !== 'width') return { footprint: undefined, rowLayout: {}, rowStyles: [] };
   return {
-    fitsWidth: true,
     footprint: fitFootprint(side, length, rowWidth),
-    onLayout: (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width),
+    rowLayout: { onLayout: (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width) },
+    rowStyles: [styles.fitRow],
   };
 }
 
@@ -149,7 +153,7 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
   const theme = useUiTheme();
   const accent = accentOf(theme, color);
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null);
-  const { fitsWidth, footprint, onLayout } = useFitWidth(fit, fieldHeightPx(theme.fieldHeight, size), length);
+  const { footprint, rowLayout, rowStyles } = useFitWidth(fit, fieldHeightPx(theme.fieldHeight, size), length);
   const { digits, boxRefs, handleChangeText, handleKey } = useNativeOtpDigits({
     variant,
     length,
@@ -164,8 +168,8 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
       testID={dataTestId}
       role="group"
       aria-label={ariaLabel}
-      onLayout={onLayout}
-      style={[styles.row, fitsWidth && styles.fitRow, style]}
+      {...rowLayout}
+      style={[styles.row, ...rowStyles, style]}
     >
       {digits.map((digit, index) => (
         <TextInput
@@ -202,9 +206,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: OTP_GAP_PX,
   },
-  /** `fit="width"`: the parent's whole width, shared by the boxes at the prototype's gap. */
+  /** `fit="width"`: the parent's whole width, in a column or a row parent, shared at the prototype's gap. */
   fitRow: {
+    // Both: `stretch` alone spans a column parent but not a row parent, where
+    // the row would shrink to its boxes and collapse them to their minimum.
     alignSelf: 'stretch',
+    width: '100%',
     gap: OTP_FIT_GAP_PX,
   } satisfies ViewStyle,
 });
