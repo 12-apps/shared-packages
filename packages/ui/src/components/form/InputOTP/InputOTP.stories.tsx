@@ -769,3 +769,44 @@ const ResponsiveComponent = () => {
 export const Responsive: Story = {
   render: () => <ResponsiveComponent />,
 };
+
+/** The rows of a 320, 360 and 390 phone's sheet: the screen less 24 on each side. */
+const FIT_ROWS = [
+  { phone: 320, row: 272 },
+  { phone: 360, row: 312 },
+  { phone: 390, row: 342 },
+] as const;
+
+const FitWidthComponent = () => {
+  const [value, setValue] = useState('482913');
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {FIT_ROWS.map(({ phone, row }) => (
+        <Box key={phone} sx={{ width: row, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography variant="subtitle2">
+            {phone}px phone, {row}px row
+          </Typography>
+          <InputOTP
+            fit="width"
+            size="lg"
+            length={6}
+            value={value}
+            onChange={setValue}
+            aria-label={`Código, ${phone}px`}
+            dataTestId={`otp-fit-${phone}`}
+          />
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
+/**
+ * `fit="width"` (FUT-4585): the boxes keep the size's height and type and
+ * narrow to share the row — portrait on a 320 phone, square once the row has
+ * room — instead of dropping to `xs`.
+ */
+export const FitWidth: Story = {
+  render: () => <FitWidthComponent />,
+};

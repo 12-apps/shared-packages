@@ -1,8 +1,25 @@
 import * as React from 'react';
-import { Platform, StyleSheet, TextInput, View, type TextInputProps, type TextStyle } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+  type TextInputProps,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import { useNativeOtpDigits } from './InputOTP.hooks.native';
-import { OTP_BORDER, OTP_FONT_PX, OTP_GAP_PX } from './InputOTP.metrics';
+import {
+  OTP_BORDER,
+  OTP_FIT_GAP_PX,
+  OTP_FIT_MIN_HEIGHT_PX,
+  OTP_FIT_MIN_WIDTH_PX,
+  OTP_FONT_PX,
+  OTP_GAP_PX,
+  otpFitBox,
+} from './InputOTP.metrics';
 import type { InputOTPProps } from './InputOTP.types.native';
 import { webAria, webDisabled } from '../../../platform/aria';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
@@ -49,8 +66,34 @@ interface BoxState {
   disabled: boolean;
 }
 
+/**
+ * A box's footprint under `fit="width"`: the measured share of the row once
+ * the row has been laid out, and until then a flex share bounded by the same
+ * limits, so the first frame already fits the row.
+ */
+function fitFootprint(side: number, length: number, rowWidth: number | null): TextStyle {
+  if (rowWidth !== null) return otpFitBox(rowWidth, side, length);
+  const height = Math.max(side, OTP_FIT_MIN_HEIGHT_PX);
+  return { height, flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: OTP_FIT_MIN_WIDTH_PX, maxWidth: height };
+}
+
+/**
+ * `fit="width"`'s state: the row's width once laid out (the row stretches to
+ * its parent's), the boxes' footprint from it, and the row's `onLayout`.
+ * Without the option, nothing: the boxes keep their square.
+ */
+function useFitWidth(fit: InputOTPProps['fit'], side: number, length: number) {
+  const [rowWidth, setRowWidth] = React.useState<number | null>(null);
+  if (fit !== 'width') return { fitsWidth: false, footprint: undefined, onLayout: undefined };
+  return {
+    fitsWidth: true,
+    footprint: fitFootprint(side, length, rowWidth),
+    onLayout: (event: LayoutChangeEvent) => setRowWidth(event.nativeEvent.layout.width),
+  };
+}
+
 /** One box's paint: the web slot's square, border and type, from the same numbers. */
-function boxStyle(theme: UiTheme, size: SizeValue, accent: string, state: BoxState): TextStyle {
+function boxStyle(theme: UiTheme, size: SizeValue, accent: string, state: BoxState, footprint?: TextStyle): TextStyle {
   const side = fieldHeightPx(theme.fieldHeight, size);
   const edge = resolveFieldEdge(theme.palette.divider, theme.palette.background.paper);
   // Error and disabled outrank focus, as in MUI's outlined input (and the native `Input`).
@@ -62,8 +105,7 @@ function boxStyle(theme: UiTheme, size: SizeValue, accent: string, state: BoxSta
         ? accent
         : edge;
   return {
-    width: side,
-    height: side,
+    ...(footprint ?? { width: side, height: side }),
     borderRadius: theme.radius.field,
     borderWidth: state.focused ? OTP_BORDER.focused : OTP_BORDER.rest,
     borderColor,
@@ -99,6 +141,7 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
     error = false,
     disabled = false,
     dataTestId,
+    fit,
     style,
     'aria-label': ariaLabel,
   } = props;
@@ -106,6 +149,7 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
   const theme = useUiTheme();
   const accent = accentOf(theme, color);
   const [focusedIndex, setFocusedIndex] = React.useState<number | null>(null);
+  const { fitsWidth, footprint, onLayout } = useFitWidth(fit, fieldHeightPx(theme.fieldHeight, size), length);
   const { digits, boxRefs, handleChangeText, handleKey } = useNativeOtpDigits({
     variant,
     length,
@@ -115,7 +159,14 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
   });
 
   return (
-    <View ref={ref} testID={dataTestId} role="group" aria-label={ariaLabel} style={[styles.row, style]}>
+    <View
+      ref={ref}
+      testID={dataTestId}
+      role="group"
+      aria-label={ariaLabel}
+      onLayout={onLayout}
+      style={[styles.row, fitsWidth && styles.fitRow, style]}
+    >
       {digits.map((digit, index) => (
         <TextInput
           key={index}
@@ -133,7 +184,7 @@ export const InputOTP = React.forwardRef<View, InputOTPProps>((props, ref) => {
           aria-disabled={disabled}
           {...webAria({ 'aria-invalid': error })}
           maxLength={boxMaxLength(variant, index, length)}
-          style={boxStyle(theme, size, accent, { focused: focusedIndex === index && !disabled, error, disabled })}
+          style={boxStyle(theme, size, accent, { focused: focusedIndex === index && !disabled, error, disabled }, footprint)}
           {...webDisabled(disabled)}
           {...keypadProps(variant, index)}
         />
@@ -151,4 +202,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: OTP_GAP_PX,
   },
+  /** `fit="width"`: the parent's whole width, shared by the boxes at the prototype's gap. */
+  fitRow: {
+    alignSelf: 'stretch',
+    gap: OTP_FIT_GAP_PX,
+  } satisfies ViewStyle,
 });

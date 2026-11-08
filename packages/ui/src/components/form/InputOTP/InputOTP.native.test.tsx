@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { InputOTP } from './InputOTP.native';
-import { OTP_BORDER } from './InputOTP.metrics';
+import { OTP_BORDER, OTP_FIT_GAP_PX, OTP_FONT_PX, otpFitBox } from './InputOTP.metrics';
 import { createUiTheme } from '../../../tokens/theme';
 import { resolveFieldEdge } from '../../../tokens/field-edge.core';
 import { DEFAULT_FIELD_HEIGHT, fieldHeightPx } from '../../../tokens/field-height.core';
@@ -116,5 +116,110 @@ describe('InputOTP (native)', () => {
     render(<InputOTP dataTestId="otp" disabled />);
     expect(box(0)).toBeDisabled();
     expect(box(0)).toHaveStyle({ borderTopColor: theme.palette.action.disabled });
+  });
+});
+
+/**
+ * `fit="width"` (FUT-4585): the courier's code sheet at phone widths. The row
+ * is the sheet's content box, a 320 / 360 / 390 phone less 24 on each side.
+ *
+ * The row's width reaches the component through `onLayout`, which
+ * react-native-web measures from a ResizeObserver and the element's offset box
+ * — neither of which jsdom lays out — so both are supplied here.
+ */
+describe('InputOTP (native) fit="width"', () => {
+  const layout: { notify?: ResizeObserverCallback } = {};
+
+  /** react-native-web builds ONE observer for every `onLayout`, on first use. */
+  class LayoutObserver {
+    constructor(notify: ResizeObserverCallback) {
+      layout.notify = notify;
+    }
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+
+  beforeAll(() => {
+    vi.stubGlobal('ResizeObserver', LayoutObserver);
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Lays the row out `width` wide; react-native-web reports it on the next tick. */
+  function layOut(width: number): void {
+    const row = screen.getByTestId('otp');
+    Object.defineProperty(row, 'offsetWidth', { configurable: true, value: width });
+    Object.defineProperty(row, 'offsetHeight', { configurable: true, value: 48 });
+    act(() => {
+      layout.notify?.([{ target: row } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+    });
+  }
+
+  const lg = fieldHeightPx(DEFAULT_FIELD_HEIGHT, 'lg');
+
+  /**
+   * A box's type size, as written on it. Read off the element's own style:
+   * jsdom resolves react-native-web's `font` shorthand class over it.
+   */
+  const fontOf = (index: number): string => box(index).style.fontSize;
+
+  it.each([
+    // phone, row, box width: 6 boxes + 5 gaps of 6 fill the row, floored
+    [320, 272, 40],
+    [360, 312, 47],
+    // wide enough for squares: the box stops at its own height
+    [390, 342, lg],
+  ])('draws portrait boxes that fit a %ipx phone\'s %ipx row at size lg', async (_phone, row, width) => {
+    render(<InputOTP dataTestId="otp" size="lg" fit="width" value="482913" />);
+    layOut(row);
+    await waitFor(() => expect(box(0)).toHaveStyle({ width: `${width}px` }));
+    for (let index = 0; index < 6; index += 1) {
+      expect(box(index)).toHaveStyle({ width: `${width}px`, height: `${lg}px` });
+      expect(fontOf(index)).toBe(`${OTP_FONT_PX.lg}px`);
+    }
+    expect(lg).toBeGreaterThanOrEqual(40);
+    expect(6 * width + 5 * OTP_FIT_GAP_PX).toBeLessThanOrEqual(row);
+    const rowStyle = getComputedStyle(screen.getByTestId('otp'));
+    expect(rowStyle.alignSelf).toBe('stretch');
+    expect(rowStyle.getPropertyValue('gap')).toBe(`${OTP_FIT_GAP_PX}px`);
+  });
+
+  it.each([
+    [320, 272],
+    [360, 312],
+    [390, 342],
+  ])('keeps the md font and a 40px floor at a %ipx phone\'s %ipx row', async (_phone, row) => {
+    render(<InputOTP dataTestId="otp" fit="width" />);
+    layOut(row);
+    const expected = otpFitBox(row, fieldHeightPx(DEFAULT_FIELD_HEIGHT, 'md'), 6);
+    await waitFor(() => expect(box(0)).toHaveStyle({ width: `${expected.width}px` }));
+    expect(expected.height).toBeGreaterThanOrEqual(40);
+    expect(box(0)).toHaveStyle({ height: `${expected.height}px` });
+    expect(fontOf(0)).toBe(`${OTP_FONT_PX.md}px`);
+  });
+
+  it('lifts a compact size to the 40px floor and keeps its own type', async () => {
+    render(<InputOTP dataTestId="otp" size="xs" fit="width" />);
+    layOut(272);
+    await waitFor(() => expect(box(0)).toHaveStyle({ width: '40px', height: '40px' }));
+    expect(fontOf(0)).toBe(`${OTP_FONT_PX.xs}px`);
+  });
+
+  it('shares the row by flex until the row has been measured', () => {
+    render(<InputOTP dataTestId="otp" size="lg" fit="width" />);
+    expect(box(0)).toHaveStyle({ height: `${lg}px`, maxWidth: `${lg}px`, minWidth: '32px', flexGrow: '1' });
+  });
+});
+
+describe('otpFitBox', () => {
+  it('never narrows a box under 32, however narrow the row', () => {
+    expect(otpFitBox(100, 48, 6)).toEqual({ width: 32, height: 48 });
+  });
+
+  it('keeps squares on a wide row', () => {
+    expect(otpFitBox(1000, 48, 6)).toEqual({ width: 48, height: 48 });
   });
 });

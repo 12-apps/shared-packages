@@ -24,6 +24,19 @@ export interface InputOTPBaseProps {
   size?: SizeValue;
   
   /**
+   * How the boxes take the row's width (FUT-4585).
+   *
+   * Left out, each box is a square of the size's field height, and the row is
+   * as wide as its boxes — what every caller drew before this option.
+   *
+   * `'width'`: the row takes its parent's whole width and the boxes share it
+   * with a 6px gap. Each keeps the size's field height (never under 40) and
+   * its type, and narrows to fit: never wider than it is tall, never under
+   * 32. On a narrow phone that draws PORTRAIT boxes instead of a smaller size.
+   */
+  fit?: 'width';
+
+  /**
    * Number of OTP digits
    */
   length?: number;
