@@ -3,16 +3,20 @@ import TextField from '@mui/material/TextField/index.js';
 import { styled } from '@mui/material/styles/index.js';
 import React, { forwardRef } from 'react';
 
+import type { Theme } from '@mui/material/styles/index.js';
+
+import { rem } from '../../../tokens/relative';
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { useOtpDigits } from './InputOTP.hooks';
+import { OTP_FIT_GAP_PX } from './InputOTP.metrics';
 import { otpSlotSx } from './InputOTP.styles';
 import type { OtpSlotFlags } from './InputOTP.styles';
 import type { InputOTPProps } from './InputOTP.types';
 
 const StyledOTPInput = styled(TextField, {
   shouldForwardProp: (prop) =>
-    !['customColor', 'customSize', 'glass', 'gradient'].includes(prop as string),
+    !['customColor', 'customSize', 'glass', 'gradient', 'fitWidth'].includes(prop as string),
 })<OtpSlotFlags>(({ theme, ...flags }) => ({ ...otpSlotSx(theme, flags) }));
 
 /**
@@ -50,6 +54,15 @@ function keypadProps(variant: InputOTPProps['variant'], index: number): Record<s
 const slotMaxLength = (variant: InputOTPProps['variant'], index: number, length: number): number =>
   variant === 'numeric' && index === 0 ? length + 1 : 1;
 
+const OTP_ROW_SX = { display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' } as const;
+
+/** `fit="width"`: the row takes its parent's width and the slots share it (`otpSlotSx`). */
+const OTP_FIT_ROW_SX = {
+  ...OTP_ROW_SX,
+  width: '100%',
+  gap: (theme: Theme) => rem(theme, OTP_FIT_GAP_PX),
+} as const;
+
 const DEFAULTS = {
   variant: 'numeric',
   color: 'primary',
@@ -68,7 +81,7 @@ type ResolvedProps = InputOTPProps & Required<Pick<InputOTPProps, keyof typeof D
 export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) => {
   const {
     variant, color, size, length, value, onChange, onComplete,
-    glass, gradient, autoFocus, error, disabled, dataTestId,
+    glass, gradient, autoFocus, error, disabled, dataTestId, fit,
     ...rest
   } = withDefaults(props, DEFAULTS) as ResolvedProps;
 
@@ -87,7 +100,7 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
       // A group, so the `aria-label` a caller gives the code names the six
       // slots together: on a plain `div` it named nothing anyone could reach.
       role="group"
-      sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}
+      sx={fit === 'width' ? OTP_FIT_ROW_SX : OTP_ROW_SX}
       {...rest}
     >
       {digits.map((digit, index) => (
@@ -100,6 +113,7 @@ export const InputOTP = forwardRef<HTMLDivElement, InputOTPProps>((props, ref) =
           customSize={size}
           glass={glass}
           gradient={gradient}
+          fitWidth={fit === 'width'}
           // `masked` keeps the digit in state and shows a bullet in its place.
           value={variant === 'masked' ? (digit ? '•' : '') : digit}
           onChange={(e) => handleInputChange(index, e.target.value)}

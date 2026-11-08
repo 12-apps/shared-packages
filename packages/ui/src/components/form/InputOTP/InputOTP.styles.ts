@@ -7,7 +7,7 @@ import { asFieldSize, fieldHeight } from '../../../tokens/field-height';
 import { absoluteInk, controlNeutral } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 
-import { OTP_FONT_PX } from './InputOTP.metrics';
+import { OTP_FIT_MIN_HEIGHT_PX, OTP_FIT_MIN_WIDTH_PX, OTP_FONT_PX } from './InputOTP.metrics';
 
 interface ColorPalette {
   main: string;
@@ -56,21 +56,47 @@ export interface OtpSlotFlags {
   customSize?: string;
   glass?: boolean;
   gradient?: boolean;
+  /** `fit="width"`: share the row's width instead of drawing a square (FUT-4585). */
+  fitWidth?: boolean;
 }
 
+interface SlotBox {
+  /** The slot's own footprint in the row. */
+  outer: CSSObject;
+  /** The outlined input inside it. */
+  inner: CSSObject;
+}
+
+/**
+ * A slot's box. By default a square of the field height, inside and out.
+ *
+ * Under `fit="width"` (FUT-4585), the native `otpFitBox` in CSS: the slot keeps
+ * the field's height (never under the 40px touch floor) and takes an equal
+ * share of the row, never wider than it is tall, never under 32px; the input
+ * fills it.
+ */
+const slotBox = (theme: Theme, side: string, fitWidth: boolean | undefined): SlotBox => {
+  if (!fitWidth) return { outer: { width: side, height: side }, inner: { width: side, height: side } };
+  const height = `max(${side}, ${rem(theme, OTP_FIT_MIN_HEIGHT_PX)})`;
+  return {
+    outer: { flex: '1 1 0', minWidth: rem(theme, OTP_FIT_MIN_WIDTH_PX), maxWidth: height, height },
+    inner: { width: '100%', height },
+  };
+};
+
 export const otpSlotSx = (theme: Theme, flags: OtpSlotFlags): CSSObject => {
-  const { customColor = 'primary', customSize = 'md', glass, gradient } = flags;
+  const { customColor = 'primary', customSize = 'md', glass, gradient, fitWidth } = flags;
   const palette = getColorFromTheme(theme, customColor);
   const fontPx = OTP_FONT_PX[customSize as SizeKey] ?? OTP_FONT_PX.md;
   // A slot is a field: a square of the theme's field height for its size.
   const side = fieldHeight(theme, asFieldSize(customSize));
 
+  const box = slotBox(theme, side, fitWidth);
+
   return {
-    width: side,
-    height: side,
+    ...box.outer,
     '& .MuiOutlinedInput-root': {
-      width: side,
-      height: side,
+      ...box.inner,
       fontSize: rem(theme, fontPx),
       fontWeight: 600,
       textAlign: 'center',

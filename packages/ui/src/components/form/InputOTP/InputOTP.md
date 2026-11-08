@@ -27,6 +27,7 @@ The InputOTP component provides a specialized input field for one-time passwords
 | `onComplete` | `(value: string) => void` | - | Callback when all digits are filled |
 | `color` | `'primary' \| 'secondary' \| 'success' \| 'warning' \| 'danger' \| 'neutral'` | `'primary'` | Theme color |
 | `size` | `'xs' \| 'sm' \| 'md' \| 'lg' \| 'xl'` | `'md'` | Input size |
+| `fit` | `'width'` | - | Share the row's width: each box keeps the size's height (never under 40) and type, and narrows to fit, never wider than tall nor under 32. Left out, each box is a square of the size's field height |
 | `autoFocus` | `boolean` | `false` | Auto-focus first input on mount |
 | `disabled` | `boolean` | `false` | Disable all inputs |
 | `error` | `boolean` | `false` | Show error state |
@@ -190,6 +191,40 @@ The component supports various visual customizations:
 - `md`: Medium (default desktop)
 - `lg`: Large (prominent forms)
 - `xl`: Extra large (accessibility focus)
+
+### Fitting a narrow row: `fit="width"`
+
+A square box is as wide as its field is tall, so six `lg` boxes need 328px. On
+a narrow phone the only way to fit them used to be a smaller size, whose boxes
+drop under the 40px tap minimum and whose type shrinks with them. `fit="width"`
+keeps the size and narrows the boxes instead (FUT-4585):
+
+- the row takes its parent's whole width, with a 6px gap between boxes;
+- each box keeps the size's field height, lifted to 40 if it is shorter, and
+  the size's own type;
+- each box's width is the row less the gaps, divided by `length`, floored to a
+  whole pixel, never wider than the box is tall (a wide row keeps squares) and
+  never under 32.
+
+At `size="lg"` (48 tall), a sheet with 24px of padding on each side draws:
+
+| phone | row | box |
+|---|---|---|
+| 320 | 272 | 40 × 48 |
+| 360 | 312 | 47 × 48 |
+| 390 | 342 | 48 × 48 |
+
+```tsx
+<InputOTP fit="width" size="lg" length={6} value={code} onChange={setCode} />
+```
+
+The boxes share the row's **outer** width, and the row spans its parent in a
+column or a row parent alike. Pad the parent, not the row: a `style` (or `sx`)
+that sets the row's own padding or gap is not taken off the share.
+
+The arithmetic is `otpFitBox` in `InputOTP.metrics.ts`, shared by both
+renderers: React Native measures the row with `onLayout`, the web lets CSS flex
+share it under the same bounds.
 
 ### Color Themes
 - `primary`: Main brand color
