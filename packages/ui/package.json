@@ -348,13 +348,13 @@
       "types": "./dist/types/components/feedback/Toast/index.d.ts",
       "default": "./dist/feedback/Toast.js"
     },
-    "./feedback/UploadProgress": {
-      "types": "./dist/types/components/feedback/UploadProgress/index.d.ts",
-      "default": "./dist/feedback/UploadProgress.js"
-    },
     "./feedback/TutorialOverlay": {
       "types": "./dist/types/components/feedback/TutorialOverlay/index.d.ts",
       "default": "./dist/feedback/TutorialOverlay.js"
+    },
+    "./feedback/UploadProgress": {
+      "types": "./dist/types/components/feedback/UploadProgress/index.d.ts",
+      "default": "./dist/feedback/UploadProgress.js"
     },
     "./feedback/UsableModal": {
       "types": "./dist/types/components/feedback/UsableModal/index.d.ts",
