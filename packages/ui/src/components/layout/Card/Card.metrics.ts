@@ -113,9 +113,21 @@ export function neumorphicShadows(lifted: boolean, near: string, far: string): U
  * `section`: a flat ink wash rather than a palette slot, so a section reads as
  * a recess in whatever surface it sits on.
  */
+export const CARD_SECTION_ALPHA = {
+  dark: { rest: 0.2, lifted: 0.25 },
+  light: { rest: 0.02, lifted: 0.04 },
+} as const;
+
+/** {@link CARD_SECTION_ALPHA} over the absolute black, for native, which has no palette to read. */
 export const CARD_SECTION_BACKGROUND = {
-  dark: { rest: alpha(ABSOLUTE_INK.black, 0.2), lifted: alpha(ABSOLUTE_INK.black, 0.25) },
-  light: { rest: alpha(ABSOLUTE_INK.black, 0.02), lifted: alpha(ABSOLUTE_INK.black, 0.04) },
+  dark: {
+    rest: alpha(ABSOLUTE_INK.black, CARD_SECTION_ALPHA.dark.rest),
+    lifted: alpha(ABSOLUTE_INK.black, CARD_SECTION_ALPHA.dark.lifted),
+  },
+  light: {
+    rest: alpha(ABSOLUTE_INK.black, CARD_SECTION_ALPHA.light.rest),
+    lifted: alpha(ABSOLUTE_INK.black, CARD_SECTION_ALPHA.light.lifted),
+  },
 } as const;
 
 /* ── Decorations ──────────────────────────────────────────────────────────── */

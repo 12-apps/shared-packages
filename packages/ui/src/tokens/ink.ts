@@ -1,6 +1,7 @@
 import type { Theme } from '@mui/material/styles/index.js';
 
 import { alpha } from './color';
+import { DARK_TEXT_PRIMARY, LIGHT_TEXT_PRIMARY, type InkChoices } from './ink-over';
 import {
   ATTENTION_INK,
   CELEBRATION_GRADIENTS,
@@ -121,6 +122,32 @@ export const modeInk = (theme: Theme): string =>
  */
 export const fieldWell = (theme: Theme): string =>
   theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.common.white;
+
+/**
+ * The two inks a label is chosen between over a fill that is not one colour:
+ * the palette's white, and its black at MUI's dark-text strength (0.87). At the
+ * default theme they are `#fff` and `rgba(0, 0, 0, 0.87)`, exactly the pair
+ * `inkOver` has always chosen between.
+ *
+ * Precedence: `inkOver` keeps the fill's own `contrastText` and turns to this
+ * pair only when that ink loses (under 3:1, or a material gain). MUI derives
+ * `contrastText` from its fixed `#fff` / `rgba(0, 0, 0, 0.87)`, not from
+ * `palette.common`, so a host that wants its re-tinted inks on every fill sets
+ * `contrastText` from `common` too.
+ *
+ * A `palette.common.black` the colour parser cannot read (a CSS variable, which
+ * `tokens/color` does not support) yields MUI's default pair instead of throwing,
+ * so the Button gradient renders as it did before the pair moved onto the theme.
+ */
+export const inkPair = (theme: Theme): InkChoices => {
+  try {
+    return { light: theme.palette.common.white, dark: alpha(theme.palette.common.black, 0.87) };
+  } catch {
+    return { light: LIGHT_TEXT_PRIMARY, dark: DARK_TEXT_PRIMARY };
+  }
+};
+
+export type { InkChoices } from './ink-over';
 
 /* ── Neutral tones over the grey ramp ─────────────────────────────────────── */
 

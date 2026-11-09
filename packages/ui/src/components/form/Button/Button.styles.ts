@@ -3,7 +3,7 @@ import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { BUTTON_SIZES, ICON_ONLY_PADDING as ICON_ONLY_PADDING_PX } from './Button.metrics';
 import { asFieldSize, fieldBorder, fieldHeight } from '../../../tokens/field-height';
-import { absoluteInk, controlNeutral } from '../../../tokens/ink';
+import { absoluteInk, controlNeutral, inkPair } from '../../../tokens/ink';
 import { rem, rems } from '../../../tokens/relative';
 import { inkOver } from '../../../tokens/theme';
 
@@ -186,7 +186,7 @@ const gradientFor = (theme: Theme, color: string, palette: ColorPalette): string
  * the worse of them.
  */
 const gradientInk = (theme: Theme, color: string, palette: ColorPalette): string =>
-  inkOver(gradientStops(theme, color, palette), palette.contrastText || absoluteInk(theme).white);
+  inkOver(gradientStops(theme, color, palette), palette.contrastText || absoluteInk(theme).white, inkPair(theme));
 
 /**
  * The label colour for the two variants that paint no background of their own.

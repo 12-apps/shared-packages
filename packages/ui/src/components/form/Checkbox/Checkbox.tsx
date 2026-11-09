@@ -21,26 +21,30 @@ import {
 } from './Checkbox.metrics';
 import type { CheckboxProps } from './Checkbox.types';
 import { splitTestId } from '../../../platform/test-id';
+import { uiInk } from '../../../tokens/ink';
 import { rem, sxRem } from '../../../tokens/relative';
+
+/** The hue `glow` and `pulse` draw in: the host's `uiInk.effectGlow`, MUI's blue by default. */
+const glowInk = (theme: Theme): string => uiInk(theme).effectGlow.muiBlue;
 
 const pulse = (theme: Theme) => keyframes`
   0% {
-    box-shadow: 0 0 0 0 ${effectInk(CHECKBOX_PULSE.alpha)};
+    box-shadow: 0 0 0 0 ${effectInk(CHECKBOX_PULSE.alpha, glowInk(theme))};
   }
   70% {
-    box-shadow: 0 0 0 ${rem(theme, CHECKBOX_PULSE.spread)} ${effectInk(0)};
+    box-shadow: 0 0 0 ${rem(theme, CHECKBOX_PULSE.spread)} ${effectInk(0, glowInk(theme))};
   }
   100% {
-    box-shadow: 0 0 0 0 ${effectInk(0)};
+    box-shadow: 0 0 0 0 ${effectInk(0, glowInk(theme))};
   }
 `;
 
 const glow = (theme: Theme) => keyframes`
   0%, 100% {
-    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.from)} ${effectInk(CHECKBOX_GLOW.alpha.from)};
+    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.from)} ${effectInk(CHECKBOX_GLOW.alpha.from, glowInk(theme))};
   }
   50% {
-    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.to)} ${effectInk(CHECKBOX_GLOW.alpha.to)};
+    box-shadow: 0 0 ${rem(theme, CHECKBOX_GLOW.blur.to)} ${effectInk(CHECKBOX_GLOW.alpha.to, glowInk(theme))};
   }
 `;
 

@@ -117,15 +117,27 @@ const INK_CHANGE_MARGIN = 0.5;
  */
 const INK_CHANGE_FLOOR = CONTRAST_THRESHOLD;
 
-export function inkOver(fills: readonly string[], incumbent: string): string {
+/**
+ * The two inks {@link inkOver} chooses between. They default to MUI's own pair
+ * ({@link LIGHT_TEXT_PRIMARY} and {@link DARK_TEXT_PRIMARY}); a web caller with
+ * a theme passes the pair its `palette.common` makes (`inkPair` in `./ink`), so
+ * a host that re-tints white or black moves the choice with it (FUT-4215).
+ */
+export interface InkChoices {
+  light: string;
+  dark: string;
+}
+
+export function inkOver(
+  fills: readonly string[],
+  incumbent: string,
+  inks: InkChoices = { light: LIGHT_TEXT_PRIMARY, dark: DARK_TEXT_PRIMARY },
+): string {
   try {
     const worstCase = (ink: string): number =>
       Math.min(...fills.map((fill) => getContrastRatio(ink, fill)));
 
-    const better =
-      worstCase(LIGHT_TEXT_PRIMARY) >= worstCase(DARK_TEXT_PRIMARY)
-        ? LIGHT_TEXT_PRIMARY
-        : DARK_TEXT_PRIMARY;
+    const better = worstCase(inks.light) >= worstCase(inks.dark) ? inks.light : inks.dark;
 
     // The incumbent is the palette's OWN answer for this role, which is what
     // makes "keep it unless the gain is material" a statement about churn
