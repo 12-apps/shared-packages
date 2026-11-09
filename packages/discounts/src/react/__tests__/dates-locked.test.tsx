@@ -3,11 +3,12 @@
 // a cold worker's chunk import is not what the `findBy` waits on.
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import { createWebDiscounts } from "../create-web-discounts";
@@ -15,6 +16,7 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 8 (B2): under an unknown zone the dates are locked
@@ -78,9 +80,11 @@ function mount(rows: DiscountWireRecord[]): Record<string, unknown>[] {
     wholeDays: true,
   });
   render(
-    <MemoryRouter initialEntries={["/discounts"]}>
-      <Screen />
-    </MemoryRouter>,
+    <ThemeProvider theme={STILL_THEME}>
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
   return sent;
 }
@@ -96,6 +100,17 @@ const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement
   const field = within(period).getByTestId(`total-form-field-${name}`);
   return (field.querySelector("input") ?? field) as HTMLInputElement;
 };
+
+// The worker's first mount of the admin and its form pays for emotion writing
+// every style once (1–1.5 s alone, several times that on a loaded runner).
+// Paid here, under the hook's own limit, not inside the first case (FUT-4623).
+browserRootFontForThisFile();
+
+beforeAll(async () => {
+  mount([LOCKED]);
+  await openEdit(LOCKED.id);
+  cleanup();
+});
 
 describe("a legacy row read with datesLocked (review round 8)", () => {
   // Round 9: the boxes are read-only rather than disabled, so the days read
