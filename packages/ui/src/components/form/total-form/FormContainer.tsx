@@ -7,7 +7,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Form } from '../Form';
 
 import { FormContext } from './FormContext';
-import type { TotalFormContextValue } from './FormContext';
+import type { SetFieldErrors, TotalFormContextValue } from './FormContext';
 
 /** Imperative helpers handed to {@link FormContainerProps.onSubmit}. */
 export interface FormSubmitHelpers {
@@ -66,7 +66,7 @@ export function FormContainer<T extends Record<string, string>>({
     });
   }, []);
 
-  const setFieldErrors = useCallback<TotalFormContextValue['setFieldErrors']>(
+  const setFieldErrors = useCallback<SetFieldErrors>(
     (fieldErrors) => setErrors(fieldErrors),
     [],
   );

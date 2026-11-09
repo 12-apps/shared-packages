@@ -6,7 +6,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { FormContainer, FormErrorSnackbar, Fields, SubmitButton, useFormContext } from "./index";
+import { FormContainer, FormContext, FormErrorSnackbar, Fields, SubmitButton, useFormContext } from "./index";
+import type { TotalFormContextValue } from "./index";
 
 interface Values extends Record<string, string> {
   name: string;
@@ -147,5 +148,39 @@ describe("FormErrorSnackbar show", () => {
     await waitFor(() => expect(snackbar()).not.toBeNull());
     fireEvent.click(screen.getByText("clear"));
     await waitFor(() => expect(snackbar()).toBeNull());
+  });
+});
+
+describe("setFieldErrors is optional on the exported value type", () => {
+  // Compile fixture: a hand-built value written before `setFieldErrors` existed
+  // (a test double of the context) must keep type-checking. `check-types` fails
+  // this file if the member becomes required again.
+  const handBuilt: TotalFormContextValue = {
+    values: {},
+    errors: {},
+    submitting: false,
+    setFieldValue: () => undefined,
+  };
+
+  function Probe(): React.ReactElement {
+    const { setFieldErrors } = useFormContext();
+    // Non-optional for callers of the hook: no `?.` needed.
+    const result: void = setFieldErrors({ name: "x" });
+    return <span data-testid="probe">{typeof setFieldErrors}:{String(result)}</span>;
+  }
+
+  it("lets the hook return a callable setFieldErrors under a hand-built provider", () => {
+    render(
+      <FormContext.Provider value={handBuilt}>
+        <Probe />
+      </FormContext.Provider>,
+    );
+    expect(screen.getByTestId("probe")).toHaveTextContent("function:undefined");
+  });
+
+  it("returns the container's own setter under a FormContainer", async () => {
+    renderForm(<LiveValidation />);
+    fireEvent.click(screen.getByText("paint"));
+    expect(await screen.findByTestId("total-form-field-name-message")).toBeInTheDocument();
   });
 });

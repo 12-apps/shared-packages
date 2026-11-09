@@ -113,9 +113,79 @@ describe("done with error", () => {
     expect(screen.getAllByRole("button")).toHaveLength(1);
   });
 
+  it("draws the outlined error marker with the step NUMBER, and keeps the card edge neutral", () => {
+    render(<StepCardList items={items({ kind: { state: "error", error: "Pick a kind" } })} />);
+    const marker = screen.getByTestId("step-card-list-kind").querySelector("[data-marker]");
+    expect(marker).toHaveAttribute("data-marker", "invalid");
+    expect(marker).toHaveTextContent("1");
+    expect(marker?.querySelector("svg")).toBeNull();
+  });
+
+  it("keeps the error text out of the button's name when it is the description", () => {
+    render(<StepCardList items={items({ kind: { state: "error", error: "Pick a kind" } })} />);
+    const button = screen.getByTestId("step-card-list-kind-change");
+    expect(button).toHaveAccessibleName(expect.not.stringContaining("Pick a kind"));
+    expect(button).toHaveAccessibleDescription("Pick a kind");
+  });
+
+  it("describes each button with its OWN error when two lists share a page", () => {
+    render(
+      <>
+        <StepCardList dataTestId="a" items={items({ kind: { state: "error", error: "Error of A" } })} />
+        <StepCardList dataTestId="b" items={items({ kind: { state: "error", error: "Error of B" } })} />
+      </>,
+    );
+    expect(screen.getByTestId("a-kind-change")).toHaveAccessibleDescription("Error of A");
+    expect(screen.getByTestId("b-kind-change")).toHaveAccessibleDescription("Error of B");
+    const ids = [screen.getByTestId("a-kind-error").id, screen.getByTestId("b-kind-error").id];
+    expect(new Set(ids).size).toBe(2);
+  });
+
   it("has no description when there is no error text", () => {
     render(<StepCardList items={items({ kind: { state: "error" } })} />);
     expect(screen.getByTestId("step-card-list-kind-change")).not.toHaveAttribute("aria-describedby");
+  });
+});
+
+describe("the current card, once invalid", () => {
+  it("draws the same outlined error marker with its number", () => {
+    render(<StepCardList items={items({ amount: { invalid: true } })} />);
+    const marker = screen.getByTestId("step-card-list-amount").querySelector("[data-marker]");
+    expect(marker).toHaveAttribute("data-marker", "invalid");
+    expect(marker).toHaveTextContent("2");
+  });
+
+  it("draws the ordinary current marker when valid", () => {
+    render(<StepCardList items={items()} />);
+    expect(screen.getByTestId("step-card-list-amount").querySelector("[data-marker]")).toHaveAttribute("data-marker", "current");
+  });
+});
+
+describe("allOpen", () => {
+  function everyStepHasAFace(): StepCardItem[] {
+    return items({ kind: { children: <p>kind face</p> }, price: { children: <p>price face</p> } });
+  }
+
+  it("draws every step's heading and face, with no aria-current", async () => {
+    render(<StepCardList items={everyStepHasAFace()} allOpen />);
+    expect(screen.getAllByRole("heading")).toHaveLength(3);
+    expect(screen.getByText("kind face")).toBeInTheDocument();
+    expect(screen.getByText("price face")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("step-card-list").querySelector("[aria-current]")).toBeNull());
+  });
+
+  it("moves no focus and reveals nothing when the list switches to all-open", async () => {
+    const { rerender } = render(<StepCardList items={everyStepHasAFace()} />);
+    rerender(<StepCardList items={everyStepHasAFace()} allOpen />);
+    await waitFor(() => expect(document.body).toHaveFocus());
+    expect(reveal.followBlock).not.toHaveBeenCalled();
+  });
+
+  it("restores the states, and the current step's aria-current, when switched back", () => {
+    const { rerender } = render(<StepCardList items={items()} allOpen />);
+    rerender(<StepCardList items={items()} />);
+    expect(screen.getByTestId("step-card-list-amount")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByTestId("step-card-list-kind")).toHaveAttribute("data-state", "done");
   });
 });
 
@@ -142,7 +212,11 @@ describe("heading focus and reveal on arrival", () => {
     );
     await waitFor(() => expect(screen.getByRole("heading", { name: "Price" })).toHaveFocus());
     expect(reveal.followBlock).toHaveBeenCalledTimes(1);
-    expect(reveal.followBlock).toHaveBeenCalledWith(expect.any(HTMLElement), expect.objectContaining({ bottomInset: 80 }));
+    // The target is the whole card (the <li>), so its bottom edge clears a sticky bar.
+    expect(reveal.followBlock).toHaveBeenCalledWith(
+      screen.getByTestId("step-card-list-price"),
+      expect.objectContaining({ bottomInset: 80 }),
+    );
   });
 
   it("does not steal focus again on an unrelated re-render", async () => {
@@ -169,6 +243,15 @@ describe("heading focus and reveal on arrival", () => {
     );
     await waitFor(() => expect(screen.getByRole("heading", { name: "Price" })).toHaveFocus());
     expect(reveal.followBlock).not.toHaveBeenCalled();
+  });
+
+  it("focuses WITH scrolling when reveal is false, so the heading is brought into view", () => {
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const { rerender } = render(<StepCardList items={items()} reveal={false} />);
+    rerender(
+      <StepCardList items={items({ amount: { state: "done" }, price: { state: "current" } })} reveal={false} />,
+    );
+    expect(focus).toHaveBeenLastCalledWith(undefined);
   });
 
   it("reopens a done step: Change makes it current and focuses its heading", async () => {

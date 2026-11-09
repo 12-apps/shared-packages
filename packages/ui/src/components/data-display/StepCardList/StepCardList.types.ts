@@ -35,6 +35,12 @@ export interface StepCardItem {
    * error colour and linked to the button with `aria-describedby`.
    */
   error?: string;
+  /**
+   * The step's answer is wrong. On a `state: 'error'` card (implied there) and
+   * on a `current` one once the visitor tried it: the number marker is drawn
+   * outlined in the error colour. The card's edge stays neutral.
+   */
+  invalid?: boolean;
   /** Reopens the step. Offered on `done` and `error` cards only. */
   onChange?: () => void;
   /** The visible word that reopens the step. There is no default copy. */
@@ -66,6 +72,12 @@ export interface StepCardListProps {
    * focus stays where it was.
    */
   focusOnMount?: boolean;
+  /**
+   * Show every step open at once ("see it all on one page"): each item draws its
+   * heading and face, whatever its state. No item is `aria-current`, focus does
+   * not move and nothing is revealed. Switching it back restores the states.
+   */
+  allOpen?: boolean;
   /** Heading level of the current step's title. Default 2. */
   headingLevel?: 2 | 3 | 4 | 5 | 6;
   /** Accessible name of the list. */

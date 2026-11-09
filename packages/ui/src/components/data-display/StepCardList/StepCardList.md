@@ -14,7 +14,8 @@ interface StepCardItem {
   caption?: string; // done card, small secondary line. Default: `${number} · ${title}`
   answer?: ReactNode; // done card, bold
   detail?: ReactNode; // done card, muted line
-  error?: string; // state 'error': error colour, linked with aria-describedby
+  error?: string; // state 'error': error colour, linked with aria-describedby (an id unique per list instance)
+  invalid?: boolean; // wrong answer on a current (tried) or error step: outlined error marker with the number
   onChange?: () => void; // reopens the step; without it a done card is plain content
   changeLabel?: string; // the visible word ("Edit"); no default
   changeAriaLabel?: string; // optional accessible name for the button
@@ -25,6 +26,7 @@ interface StepCardListProps {
   items: readonly StepCardItem[];
   reveal?: RevealOptions | false; // insets for sticky bars; false = focus only, no scroll
   revealWatch?: readonly (Element | null)[]; // bars whose resize re-runs the reveal
+  allOpen?: boolean; // every step open at once: heading + face, no aria-current, no focus move, no reveal
   focusOnMount?: boolean; // default false: focus moves only when the current step CHANGES
   headingLevel?: 2 | 3 | 4 | 5 | 6; // default 2
   'aria-label'?: string;
@@ -37,7 +39,9 @@ interface StepCardListProps {
 - An `<ol>`; each item is an `<li>` with `data-state`. The current item has `aria-current="step"`.
 - Numbers count the items in the list: leave a hidden step out of `items`.
 - A **done** card is one `type="button"`: marker (check), caption, bold answer, muted line, then `changeLabel`. The whole card is the target. Its accessible name is what it shows unless `changeAriaLabel` is given.
-- An **error** card is a done card whose marker is the error colour and whose `error` text shows under the answer; the button is described by it. Colour is not the only signal: the marker is an exclamation mark and the text is there.
+- An **error** card is a done card whose marker is an outlined circle in the error colour holding the step number, and whose `error` text shows under the answer; the button is described by it (the text is kept out of its name). The card's edge stays neutral. A **current** step the visitor already tried and that is still wrong takes the same marker with `invalid`. Colour is not the only signal: the error text is there.
+- A long `answer` is not clamped by the list: wrap it in your own clamping element (for example two lines) before passing it.
+- With **`allOpen`** every item draws its heading and face whatever its state, none is `aria-current`, and focus and scroll are left alone. Switching it off restores the states.
 - The **current** card renders `children` under its heading. When a step *becomes* current after the list was drawn (after "continue" or after a done card's change button), its heading takes focus and the card is revealed (see below). The first draw leaves the page's own focus alone unless `focusOnMount`.
 - A **todo** card shows the number and `title`.
 - There is no default copy: every word is a prop. The only generated string is the default caption's `N · title`.

@@ -49,12 +49,11 @@ function setMotion(reduced: boolean): void {
 }
 
 describe("revealBlock", () => {
-  let scrollBy: ReturnType<typeof vi.fn>;
+  let scrollBy: ReturnType<typeof vi.spyOn>;
   let box: HTMLElement;
 
   beforeEach(() => {
-    scrollBy = vi.fn();
-    window.scrollBy = scrollBy as unknown as typeof window.scrollBy;
+    scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => undefined);
     Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
     setMotion(false);
     box = document.createElement("div");
@@ -64,6 +63,7 @@ describe("revealBlock", () => {
   afterEach(() => {
     box.remove();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   function place(top: number, bottom: number): void {
@@ -144,7 +144,7 @@ describe("followBlock", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     observers = [];
-    window.scrollBy = vi.fn() as unknown as typeof window.scrollBy;
+    vi.spyOn(window, "scrollBy").mockImplementation(() => undefined);
     setMotion(false);
     class FakeResizeObserver {
       private readonly entry: (typeof observers)[number];
@@ -168,6 +168,7 @@ describe("followBlock", () => {
   afterEach(() => {
     box.remove();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
