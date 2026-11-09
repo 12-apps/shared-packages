@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { messagesOf, transportFailure, uploadFailure } from '../failures';
 import { PT_BR_WEB_STORAGE_MESSAGES } from '../pt-BR';
 import { REENCODE_BYTES_PER_MS, resetMeasuredUploadRate, type UploadProgress } from '../upload-progress';
+import { createWebStorage } from '../create-web-storage';
 import { useUpload, type UseUploadConfig } from '../use-upload';
 
 /**
@@ -69,6 +70,9 @@ class FakeXhr {
   }
   progress(loaded: number, total: number): void {
     this.upload.onprogress?.({ lengthComputable: true, loaded, total });
+  }
+  progressUnknownTotal(loaded: number): void {
+    this.upload.onprogress?.({ lengthComputable: false, loaded, total: 0 });
   }
   sent(): void {
     this.upload.onload?.();
@@ -359,5 +363,86 @@ describe('useUpload preparing', () => {
     await flush(200);
     expect(now().progress?.totalSecondsLeft).not.toBeNull();
     expect(Number.isFinite(now().progress?.totalSecondsLeft)).toBe(true);
+  });
+});
+
+describe('useUpload — review round 1', () => {
+  it('reports `fraction: null` when the browser cannot compute the total', async () => {
+    const { now } = setup();
+    act(() => void now().upload(photo(), { optimize: false }));
+    await flush(600);
+    act(() => lastXhr().progressUnknownTotal(400));
+    expect(now().progress).toMatchObject({ stage: 'sending', fraction: null, secondsLeft: null });
+  });
+
+  it('does not learn a rate from a send shorter than the measuring window', async () => {
+    const { now } = setup({ estimatePrepareMs: () => 2000 });
+    act(() => void now().upload(photo(), { optimize: false }));
+    await flush(100);
+    // A buffering proxy swallows the body at once: the send "took" 100 ms.
+    act(() => lastXhr().progress(1000, 1000));
+    act(() => lastXhr().sent());
+    act(() => lastXhr().respond(200, { data: { imageKey: KEY } }));
+    await flush();
+
+    holdReencode();
+    act(() => void now().upload(photo()));
+    await flush(200);
+    expect(now().progress?.stage).toBe('preparing');
+    expect(now().progress?.totalSecondsLeft).toBeNull();
+  });
+
+  it('abort() while idle leaves the last error in place', async () => {
+    const { now } = setup();
+    act(() => void now().upload(photo()));
+    await flush();
+    act(() => lastXhr().fail());
+    await flush();
+    const message = transportFailure(PT_BR_WEB_STORAGE_MESSAGES);
+    expect(now().error).toBe(message);
+    act(() => now().abort());
+    expect(now().error).toBe(message);
+  });
+
+  it('keeps upload, abort and clearError stable across renders', async () => {
+    const { hook: rendered, now } = setup();
+    const first = { upload: now().upload, abort: now().abort, clearError: now().clearError };
+    rendered.rerender();
+    act(() => void now().upload(photo()));
+    await flush();
+    expect(now().progress?.stage).toBe('sending');
+    expect(now().upload).toBe(first.upload);
+    expect(now().abort).toBe(first.abort);
+    expect(now().clearError).toBe(first.clearError);
+  });
+});
+
+describe('createWebStorage forwards the upload knobs', () => {
+  it('passes query, xhrFactory, estimatePrepareMs and assumedBytesPerSecond to the hook', async () => {
+    holdReencode();
+    const made: FakeXhr[] = [];
+    const estimate = vi.fn(() => 2000);
+    const storage = createWebStorage({
+      apiBase: '/api',
+      messages: PT_BR_WEB_STORAGE_MESSAGES,
+      query: { tenant: 'my store' },
+      xhrFactory: () => {
+        const xhr = new FakeXhr();
+        made.push(xhr);
+        return xhr as unknown as XMLHttpRequest;
+      },
+      estimatePrepareMs: estimate,
+      assumedBytesPerSecond: 100,
+    });
+    const hook = renderHook(() => storage.useUpload());
+    act(() => void hook.result.current.upload(photo(1000)));
+    await flush(200);
+    expect(estimate).toHaveBeenCalled();
+    // 1.8 s of re-encode left, plus 1000 bytes at the assumed 100 B/s.
+    expect(hook.result.current.progress?.totalSecondsLeft).toBeCloseTo(1.8 + 10, 1);
+
+    act(() => void hook.result.current.upload(photo(), { optimize: false }));
+    await flush();
+    expect(made[made.length - 1]?.opened?.url).toBe('/api/uploads/image?tenant=my%20store');
   });
 });

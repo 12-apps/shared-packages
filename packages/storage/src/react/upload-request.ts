@@ -18,7 +18,7 @@ export type SendOutcome =
   | { kind: 'aborted' };
 
 export interface XhrSendHooks {
-  /** Bytes of the body sent so far, out of `total`. */
+  /** Bytes of the body sent so far, out of `total` (`0` when the browser cannot tell). */
   onProgress: (loaded: number, total: number) => void;
   /** The body is fully sent; the answer has not come yet. */
   onSent: () => void;
@@ -59,8 +59,10 @@ export function sendWithXhr(
   return new Promise((resolve) => {
     xhr.open('POST', url);
     xhr.setRequestHeader('content-type', file.type);
+    // A total the browser cannot compute is reported as 0: the fraction is
+    // then `null` (the spinner), never a bar stuck at a determinate 0 %.
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) hooks.onProgress(event.loaded, event.total);
+      hooks.onProgress(event.loaded, event.lengthComputable ? event.total : 0);
     };
     xhr.upload.onload = () => hooks.onSent();
     xhr.onload = () => {

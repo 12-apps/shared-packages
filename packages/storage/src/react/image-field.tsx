@@ -9,7 +9,7 @@ import type { UploadButtonCopy } from '@12-apps/ui/copy';
 import { UploadButton } from '@12-apps/ui/form/UploadButton';
 
 import { ACCEPTED_CONTENT_TYPES } from '../content-types';
-import type { UploadOptions, UploadState } from './use-upload';
+import type { UploadDriver, UploadOptions } from './use-upload';
 
 /**
  * The picker, the preview and the refusal, as one field.
@@ -55,7 +55,7 @@ export interface ImageFieldProps {
 
 /** {@link ImageFieldProps} plus the bound upload state the factory injects. */
 export interface BoundImageFieldProps extends ImageFieldProps {
-  uploader: UploadState;
+  uploader: UploadDriver;
 }
 
 const ACCEPT = ACCEPTED_CONTENT_TYPES.join(',');

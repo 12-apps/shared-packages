@@ -154,7 +154,7 @@ export const SAVING: UploadProgress = {
  */
 export interface SendMeter {
   sample: (loaded: number, total: number, now: number) => UploadProgress;
-  /** Bytes per second over the whole send, for the next upload's estimate. */
+  /** Bytes per second over the whole send, for the next upload's estimate — only from a send that lasted the measuring window. */
   finish: (total: number, now: number) => void;
 }
 
@@ -175,11 +175,15 @@ export function createSendMeter(startedAt: number): SendMeter {
       update(loaded, now);
       const fraction = total > 0 ? Math.min(1, loaded / total) : null;
       const measured = now - startedAt >= MEASURE_MIN_MS || (fraction ?? 0) >= MEASURE_MIN_FRACTION;
-      const secondsLeft = measured && rate ? secondsFor(Math.max(0, total - loaded), rate) : null;
+      // No total, no estimate: a rate says nothing about bytes nobody counted.
+      const secondsLeft = fraction !== null && measured && rate ? secondsFor(Math.max(0, total - loaded), rate) : null;
       return { stage: 'sending', fraction, secondsLeft, step: 2, totalSecondsLeft: secondsLeft };
     },
     finish(total, now) {
-      recordUploadRate(total, now - startedAt);
+      // A send shorter than the measuring window is a buffer filling (a
+      // proxy, the socket), not the network: it would teach the next upload
+      // a rate it will never see.
+      if (now - startedAt >= MEASURE_MIN_MS) recordUploadRate(total, now - startedAt);
     },
   };
 }

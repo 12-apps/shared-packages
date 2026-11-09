@@ -13,10 +13,11 @@ import { createWebStorage } from '@12-apps/storage/react';
  * preview — lives inside the package. This file names where the API is mounted,
  * and that is the only part that is genuinely the host's.
  *
- * There is no `fetchImpl`, deliberately: the package's default is same-origin
- * `fetch`, Vite proxies `/api` to `harness/backend`, and so a pick below crosses
- * a real socket into the package's own Hono router, through its own local-disk
- * driver, onto a real file. That is what makes the round trip below a test of the
+ * There is no `fetchImpl`, deliberately: the package's default is a same-origin
+ * `XMLHttpRequest` (the one browser API that reports upload progress), Vite
+ * proxies `/api` to `harness/backend`, and so a pick below crosses a real socket
+ * into the package's own Hono router, through its own local-disk driver, onto a
+ * real file. That is what makes the round trip below a test of the
  * seam BETWEEN the two published halves rather than of either one alone — and the
  * seam is where a `{ data }` envelope, a key shape and a served content type can
  * disagree while both sides' own suites stay green.

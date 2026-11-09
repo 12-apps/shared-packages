@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   messagesOf,
@@ -69,6 +69,14 @@ export interface UploadState {
   error: string | null;
   clearError: () => void;
 }
+
+/**
+ * What a component that DRIVES an upload needs from the hook — the input type
+ * for one (`ImageField`'s `uploader`). Narrower than {@link UploadState} on
+ * purpose: a host passing its own uploader object keeps type-checking when the
+ * hook grows a member.
+ */
+export type UploadDriver = Pick<UploadState, 'upload' | 'uploading' | 'error' | 'clearError'>;
 
 export interface UseUploadConfig {
   /** Where the router is mounted, e.g. `/api`. */
@@ -235,52 +243,66 @@ async function runUpload(
  * `progress` follows the most recent upload. Two uploads from one hook may run at
  * once (a host with one hook for a list of photos), so `uploading` is true while
  * ANY runs and `abort()` cancels all of them.
+ *
+ * `upload`, `abort` and `clearError` keep ONE identity across renders: a host
+ * puts them in effect dependencies and in its own callbacks (a card's Cancel
+ * calls `abort`), and a new function every render would re-run those. The
+ * latest `config` is read through a ref, so a host passing an inline object
+ * still uploads with what it passed last.
  */
 export function useUpload(config: UseUploadConfig): UploadState {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const runs = useRef<UploadRun[]>([]);
+  const configRef = useRef(config);
+  configRef.current = config;
 
-  const latest = (): UploadRun | undefined => runs.current[runs.current.length - 1];
-
-  function end(run: UploadRun): void {
+  const end = useCallback((run: UploadRun): void => {
     if (!runs.current.includes(run)) return;
-    const wasLatest = latest() === run;
+    const wasLatest = runs.current[runs.current.length - 1] === run;
     runs.current = runs.current.filter((other) => other !== run);
     if (wasLatest) setProgress(null);
     if (runs.current.length === 0) setUploading(false);
-  }
+  }, []);
 
-  async function upload(file: File, options: UploadOptions = {}): Promise<string | null> {
-    const run = newRun();
-    runs.current = [...runs.current, run];
-    const show: SetProgress = (next) => {
-      if (latest() === run) setProgress(next);
-    };
-    setUploading(true);
-    setError(null);
-    try {
-      const result = await runUpload({ config, run, show }, file, options);
-      if (!result || run.aborted) return null;
-      if ('key' in result) return result.key;
-      setError(result.message);
-      return null;
-    } catch {
-      if (!run.aborted) setError(messagesOf(config.maxBytes, config.messages).upload_failed);
-      return null;
-    } finally {
-      end(run);
-    }
-  }
+  const upload = useCallback(
+    async (file: File, options: UploadOptions = {}): Promise<string | null> => {
+      const current = configRef.current;
+      const run = newRun();
+      runs.current = [...runs.current, run];
+      const show: SetProgress = (next) => {
+        if (runs.current[runs.current.length - 1] === run) setProgress(next);
+      };
+      setUploading(true);
+      setError(null);
+      try {
+        const result = await runUpload({ config: current, run, show }, file, options);
+        if (!result || run.aborted) return null;
+        if ('key' in result) return result.key;
+        setError(result.message);
+        return null;
+      } catch {
+        if (!run.aborted) setError(messagesOf(current.maxBytes, current.messages).upload_failed);
+        return null;
+      } finally {
+        end(run);
+      }
+    },
+    [end],
+  );
 
-  function abort(): void {
+  const abort = useCallback((): void => {
+    // Idle: nothing to cancel, and the last failure's message stays where it is.
+    if (runs.current.length === 0) return;
     for (const run of runs.current) run.setAborted();
     runs.current = [];
     setUploading(false);
     setProgress(null);
     setError(null);
-  }
+  }, []);
 
-  return { upload, uploading, progress, abort, error, clearError: () => setError(null) };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { upload, uploading, progress, abort, error, clearError };
 }

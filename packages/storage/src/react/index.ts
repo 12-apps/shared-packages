@@ -21,6 +21,7 @@ export { ImageField, type BoundImageFieldProps, type ImageFieldProps } from './i
 export {
   useUpload,
   type UploadOptions,
+  type UploadDriver,
   type UploadState,
   type UseUploadConfig,
 } from './use-upload';
