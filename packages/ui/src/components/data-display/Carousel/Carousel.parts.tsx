@@ -34,6 +34,8 @@ const activateOnKey = (onSelect: () => void) => (e: React.KeyboardEvent) => {
 };
 
 const INDICATOR_POSITIONS = (theme: Theme): Record<IndicatorPosition, CSSObject> => ({
+  // In flow, after the frame: the wrapper that holds both places it.
+  below: { position: 'static', justifyContent: 'center', marginTop: theme.spacing(1) },
   top: { top: theme.spacing(2), left: '50%', transform: 'translateX(-50%)' },
   bottom: { bottom: theme.spacing(2), left: '50%', transform: 'translateX(-50%)' },
   left: {

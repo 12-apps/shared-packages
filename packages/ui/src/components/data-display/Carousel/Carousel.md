@@ -145,9 +145,9 @@ import { Carousel } from '@/components/data-display/Carousel';
 
 ### indicatorPosition
 
-- **Type**: `'top' | 'bottom' | 'left' | 'right'`
+- **Type**: `'top' | 'bottom' | 'left' | 'right' | 'below'`
 - **Default**: `'bottom'`
-- **Description**: Position of the indicator dots
+- **Description**: Position of the indicator dots. `below` draws the row after the frame, outside the photo, centred with token spacing; the others sit on the photo.
 
 ### arrowPosition
 

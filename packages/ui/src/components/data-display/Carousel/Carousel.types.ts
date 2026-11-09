@@ -48,7 +48,8 @@ export interface CarouselProps {
   onChange?: (index: number) => void;
   onFocus?: () => void;
   onBlur?: () => void;
-  indicatorPosition?: 'top' | 'bottom' | 'left' | 'right';
+  /** `below` draws the row after the frame, outside the photo; the rest sit on it. */
+  indicatorPosition?: 'top' | 'bottom' | 'left' | 'right' | 'below';
   arrowPosition?: 'inside' | 'outside' | 'overlay';
   animation?: 'slide' | 'fade' | 'zoom' | 'flip';
   /** The slide shown first (0-based, clamped). Read once, on mount. */
@@ -69,7 +70,7 @@ export interface CarouselIndicatorsProps {
   count: number;
   activeIndex: number;
   onSelect: (index: number) => void;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'below';
   color?: ColorValue;
   variant?: 'dots' | 'lines' | 'numbers' | 'pills';
   /** Names each indicator through `goToSlide`; the English pack's wording when omitted. */

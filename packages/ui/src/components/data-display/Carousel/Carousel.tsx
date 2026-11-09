@@ -5,13 +5,14 @@ import Slide from '@mui/material/Slide/index.js';
 import Zoom from '@mui/material/Zoom/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type { CSSObject } from '@mui/material/styles/index.js';
-import React, { useCallback } from 'react';
+import React from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
-import { useCarouselNavigation } from './Carousel.hooks';
+import { useCarouselNavigation, useItemClick } from './Carousel.hooks';
 import { useCarouselInteraction } from './Carousel.swipe';
 import { CarouselChrome } from './Carousel.chrome';
+import { CarouselIndicators } from './Carousel.parts';
 import { CarouselTrack } from './Carousel.slide';
 import { containerStyles, frameBox, interactionSx } from './Carousel.styles';
 import type { CarouselItem, CarouselProps } from './Carousel.types';
@@ -56,6 +57,14 @@ const CarouselLoading: React.FC<{ sx: CSSObject; color: CarouselProps['color'] }
   </Box>
 );
 
+/**
+ * With `indicatorPosition="below"` the frame and the dot row share a wrapper, so
+ * the row sits outside the photo; otherwise the frame is returned as it is.
+ */
+const CarouselRow: React.FC<{ row: React.ReactNode; width: string; children: React.ReactNode }> = ({
+  row, width, children,
+}) => (row ? <Box sx={{ width }}>{children}{row}</Box> : <>{children}</>);
+
 export const Carousel: React.FC<CarouselProps> = (props) => {
   const resolved = withDefaults(props, DEFAULTS) as ResolvedCarouselProps;
   const {
@@ -82,14 +91,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
     enabled, onPrev: handlePrev, onNext: handleNext,
   });
 
-  const handleItemClick = useCallback(
-    (item: CarouselItem, index: number) => {
-      if (!disabled) {
-        onClick?.(item, index);
-      }
-    },
-    [disabled, onClick],
-  );
+  const handleItemClick = useItemClick(disabled, onClick);
 
   const frameSx = containerStyles({
     theme, variant, size, color, glow, pulse, glass, gradient, ...frameBox(theme, size, height, width),
@@ -99,7 +101,18 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
     return <CarouselLoading sx={frameSx} color={color} />;
   }
 
+  const below = resolved.indicatorPosition === 'below' && resolved.showIndicators && items.length > 1;
+
   return (
+    <CarouselRow
+      width={String(frameSx.width)}
+      row={below && (
+        <CarouselIndicators
+          copy={copy} count={items.length} activeIndex={activeIndex} onSelect={handleSelect}
+          position="below" color={color} variant={resolved.indicatorVariant}
+        />
+      )}
+    >
     <Box
       className={className}
       data-testid="carousel-container"
@@ -134,5 +147,6 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
         onSelect={handleSelect}
       />
     </Box>
+    </CarouselRow>
   );
 };

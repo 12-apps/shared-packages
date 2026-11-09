@@ -83,7 +83,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
       />
     )}
 
-    {showIndicators && (
+    {showIndicators && indicatorPosition !== 'below' && (
       <CarouselIndicators
         copy={copy}
         count={items.length}

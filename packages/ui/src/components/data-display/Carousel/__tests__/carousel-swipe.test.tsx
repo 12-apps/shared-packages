@@ -155,3 +155,30 @@ describe('Carousel start index, counter and a11y', () => {
     expect(screen.getByRole('button', { name: 'Próximo' })).toBeTruthy();
   });
 });
+
+describe('Carousel indicators below the photo', () => {
+  it('draws the dot row after the frame, outside it, and keeps it in step', () => {
+    mount({ indicatorPosition: 'below', indicatorVariant: 'pills' });
+    const frame = screen.getByTestId('carousel-container');
+    const row = screen.getByTestId('carousel-indicators');
+
+    expect(frame.contains(row)).toBe(false);
+    expect(frame.parentElement).toBe(row.parentElement);
+    expect(frame.nextElementSibling).toBe(row);
+
+    fireEvent.click(screen.getByTestId('carousel-next-button'));
+    expect(screen.getByTestId('carousel-indicator-1')).toHaveAttribute('data-active', 'true');
+  });
+
+  it('keeps every other position inside the frame', () => {
+    mount({ indicatorPosition: 'bottom' });
+    expect(
+      screen.getByTestId('carousel-container').contains(screen.getByTestId('carousel-indicators')),
+    ).toBe(true);
+  });
+
+  it('draws no row below for a single item', () => {
+    mount({ items: makeItems().slice(0, 1), indicatorPosition: 'below' });
+    expect(screen.queryAllByTestId('carousel-indicators')).toHaveLength(0);
+  });
+});

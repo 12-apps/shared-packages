@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { CarouselItem } from './Carousel.types';
+
 interface CarouselNavigationInput {
   count: number;
   loop: boolean;
@@ -92,3 +94,15 @@ export const useCarouselNavigation = ({
 
   return { activeIndex: shownIndex, handleNext, handlePrev, handleSelect, hoverProps };
 };
+
+/** A tap on a slide, reported unless the carousel is disabled. */
+export const useItemClick = (
+  disabled: boolean,
+  onClick?: (item: CarouselItem, index: number) => void,
+) =>
+  useCallback(
+    (item: CarouselItem, index: number) => {
+      if (!disabled) onClick?.(item, index);
+    },
+    [disabled, onClick],
+  );

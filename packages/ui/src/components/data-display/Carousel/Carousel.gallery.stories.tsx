@@ -125,3 +125,22 @@ export const TapReportsTheItem: Story = {
   },
   args: gallery,
 };
+
+/** The approved storefront frame: the pill dots sit under the photo, not on it. */
+export const DotsBelow: Story = {
+  render: (args) => (
+    <Frame width={390}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, indicatorPosition: 'below', hideArrowsOnTouch: true },
+};
+
+export const DotsBelowDesktop: Story = {
+  render: (args) => (
+    <Frame width={720}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, height: 400, indicatorPosition: 'below' },
+};
