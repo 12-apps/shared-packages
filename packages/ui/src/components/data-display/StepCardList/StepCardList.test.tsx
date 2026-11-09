@@ -147,6 +147,18 @@ describe("done with error", () => {
   });
 });
 
+describe("review round 2", () => {
+  it("leaves the error readable when the card has no button to describe", () => {
+    render(<StepCardList items={[{ id: "kind", title: "Kind", state: "error", answer: "Flour", error: "Pick a kind" }]} />);
+    expect(screen.getByTestId("step-card-list-kind-error")).not.toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("keeps the red marker on an error step under allOpen", () => {
+    render(<StepCardList allOpen items={[{ id: "kind", title: "Kind", state: "error", error: "Pick a kind" }]} />);
+    expect(screen.getByTestId("step-card-list-kind").querySelector("[data-marker]")).toHaveAttribute("data-marker", "invalid");
+  });
+});
+
 describe("the current card, once invalid", () => {
   it("draws the same outlined error marker with its number", () => {
     render(<StepCardList items={items({ amount: { invalid: true } })} />);

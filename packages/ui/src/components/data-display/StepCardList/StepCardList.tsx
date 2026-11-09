@@ -114,7 +114,7 @@ interface RowProps {
 }
 
 /** The done card's words: caption, bold answer, muted line and, when wrong, the error. */
-function DoneText({ item, number, testId, errorId }: RowProps): React.JSX.Element {
+function DoneText({ item, number, testId, errorId, described }: RowProps & { described: boolean }): React.JSX.Element {
   return (
       <Box component="span" sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minWidth: 0 }}>
         <Text as="span" size="xs" color="secondary">
@@ -131,8 +131,9 @@ function DoneText({ item, number, testId, errorId }: RowProps): React.JSX.Elemen
           </Text>
         ) : null}
         {item.state === 'error' && item.error ? (
-          // Hidden from the button's NAME: it is its description, and read once.
-          <Text as="span" id={errorId} aria-hidden="true" size="xs" color="danger" dataTestId={`${testId}-error`}>
+          // Hidden from the button's NAME only when the button describes itself with it;
+          // a card with no button has nothing else to read it.
+          <Text as="span" id={errorId} aria-hidden={described ? 'true' : undefined} size="xs" color="danger" dataTestId={`${testId}-error`}>
             {item.error}
           </Text>
         ) : null}
@@ -147,7 +148,7 @@ function DoneRow({ item, number, testId, errorId }: RowProps): React.JSX.Element
   const body = (
     <>
       <Marker kind={wrong ? 'invalid' : 'done'} number={number} />
-      <DoneText item={item} number={number} testId={testId} errorId={errorId} />
+      <DoneText item={item} number={number} testId={testId} errorId={errorId} described={Boolean(item.onChange)} />
     </>
   );
   if (!item.onChange) return <Box sx={{ ...doneRowSx, px: 1.75, py: 1.5 }}>{body}</Box>;
@@ -207,7 +208,7 @@ function CurrentBody({ item, number, arrived, quiet, headingLevel, reveal, revea
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
       <Box sx={rowSx}>
-        <Marker kind={item.invalid ? 'invalid' : 'current'} number={number} />
+        <Marker kind={item.invalid ?? item.state === 'error' ? 'invalid' : 'current'} number={number} />
         <Box ref={heading} component={`h${headingLevel}` as 'h2'} tabIndex={-1} sx={headingSx}>
           {item.title}
         </Box>
