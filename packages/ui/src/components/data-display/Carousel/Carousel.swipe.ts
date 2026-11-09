@@ -1,7 +1,7 @@
 import useMediaQuery from '@mui/material/useMediaQuery/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
 import type React from 'react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { remPx } from '../../../tokens/relative';
 import { classifySwipe, swipeAxis } from '../../../utils/swipe';
@@ -25,6 +25,40 @@ interface Gesture {
 
 /** How long after a drag its stray click is still swallowed. */
 const DRAG_CLICK_WINDOW_MS = 300;
+
+/**
+ * The "this was a drag, not a tap" flag. On touch Chrome may send the click of a
+ * short drag in a later task, so the flag outlives pointerup: until that click, a
+ * new pointerdown or a key press clears it, or DRAG_CLICK_WINDOW_MS pass,
+ * whichever comes first. There is ONE timer: an older gesture's must not clear a
+ * newer gesture's flag, so `hold` and `clear` cancel it first, and so does unmount.
+ */
+const useDragFlag = () => {
+  const flag = useRef(false);
+  const timer = useRef<number | null>(null);
+
+  const cancel = useCallback(() => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
+
+  useEffect(() => cancel, [cancel]);
+
+  const hold = useCallback(() => {
+    cancel();
+    timer.current = window.setTimeout(() => {
+      flag.current = false;
+      timer.current = null;
+    }, DRAG_CLICK_WINDOW_MS);
+  }, [cancel]);
+
+  const clear = useCallback(() => {
+    cancel();
+    flag.current = false;
+  }, [cancel]);
+
+  return useMemo(() => ({ flag, hold, clear }), [hold, clear]);
+};
 
 /** Whether `event` is another finger than the one the gesture follows. */
 const isOtherPointer = (event: React.PointerEvent, gesture: Gesture) =>
@@ -61,21 +95,17 @@ const isEditable = (target: EventTarget): boolean => {
 export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput) => {
   const theme = useTheme();
   const gestureRef = useRef<Gesture | null>(null);
-  const draggedRef = useRef(false);
+  const drag = useDragFlag();
+  const draggedRef = drag.flag;
 
-  // On touch Chrome may send the click of a short drag in a later task, so the
-  // flag outlives pointerup: until that click, a new pointerdown or a key press
-  // clears it, or DRAG_CLICK_WINDOW_MS pass, whichever comes first.
   const endGesture = useCallback(() => {
     gestureRef.current = null;
-    window.setTimeout(() => {
-      draggedRef.current = false;
-    }, DRAG_CLICK_WINDOW_MS);
-  }, []);
+    drag.hold();
+  }, [drag]);
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {
-      draggedRef.current = false;
+      drag.clear();
       if (event.isPrimary === false) {
         gestureRef.current = null;
         return;
@@ -85,7 +115,7 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
         pointerId: event.pointerId, x: event.clientX, y: event.clientY, at: event.timeStamp, axis: null,
       };
     },
-    [enabled],
+    [enabled, drag],
   );
 
   const onPointerMove = useCallback(
@@ -131,11 +161,7 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
     event.preventDefault();
   }, []);
 
-  const clearDrag = useCallback(() => {
-    draggedRef.current = false;
-  }, []);
-
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: endGesture, onClickCapture, clearDrag };
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: endGesture, onClickCapture, clearDrag: drag.clear };
 };
 
 const ARROW_STEPS: Record<string, 'prev' | 'next'> = { ArrowLeft: 'prev', ArrowRight: 'next' };

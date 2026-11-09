@@ -317,6 +317,30 @@ describe('Carousel review round 1', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps swallowing the click of a second quick drag when the first one\'s window ends', () => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
+    mount({ onClick });
+    const frame = screen.getByTestId('carousel-container');
+    const shortDrag = (at: number) => {
+      pointer(frame, 'pointerDown', 200, 100, at);
+      pointer(frame, 'pointerMove', 212, 100, at + 20);
+      pointer(frame, 'pointerUp', 212, 100, at + 40);
+    };
+
+    shortDrag(1000);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    shortDrag(1250);
+    act(() => {
+      vi.advanceTimersByTime(70);
+    });
+    fireEvent.click(screen.getByText('A'));
+    vi.useRealTimers();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('does not report a vertical mouse drag as a tap', () => {
     const onClick = vi.fn();
     mount({ onClick });
