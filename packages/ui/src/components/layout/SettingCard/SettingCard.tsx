@@ -49,7 +49,7 @@ const OpenBody: React.FC<OpenBodyProps> = ({
   const hold = useFormHoldRoot();
   const { busy } = hold;
   // Looks as unavailable as it is, without the spinner a save would show.
-  const heldStyle = busy ? { opacity: theme.palette.action.disabledOpacity, cursor: 'not-allowed' } : undefined;
+  const heldStyle = busy ? { opacity: theme.palette.action.disabledOpacity } : undefined;
   const pressSave = () => {
     if (!busy) onSave();
   };
