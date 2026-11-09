@@ -29,7 +29,7 @@ const svg = (fill: string): string =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="${fill}"/></svg>`,
   )}`;
 
-const photo = (index: number): string => svg(TONES[index % TONES.length] ?? TONES[0]);
+const photo = (index: number): string => svg(TONES[index % TONES.length] ?? '#d98a5f');
 
 /** The two extremes the chrome must hold on: a near-white photo and a near-black one. */
 const tonePhotos = (fill: string): CarouselItem[] =>
