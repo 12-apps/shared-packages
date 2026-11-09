@@ -5,6 +5,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
+import { ButtonProgressContent, buttonProgressStyles, useButtonPress } from './Button.progress';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
 import { fieldRadius } from '../../../tokens/field-radius';
@@ -20,7 +21,7 @@ import type { ButtonComponent, ButtonProps } from './Button.types';
 
 const StyledButton = styled(MuiButton, {
   shouldForwardProp: (prop) =>
-    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple'].indexOf(
+    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple', 'progressing'].indexOf(
       prop as string,
     ) === -1,
 })<{
@@ -29,7 +30,8 @@ const StyledButton = styled(MuiButton, {
   glow?: boolean;
   pulse?: boolean;
   ripple?: boolean;
-}>(({ theme, customVariant, customColor = 'primary', glow, pulse }) => {
+  progressing?: boolean;
+}>(({ theme, customVariant, customColor = 'primary', glow, pulse, progressing }) => {
   const colorPalette = getColorFromTheme(theme, customColor);
 
   return {
@@ -42,6 +44,7 @@ const StyledButton = styled(MuiButton, {
     ...iconAlignmentStyles(theme),
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
+    ...(progressing ? buttonProgressStyles(theme, customColor) : {}),
   };
 });
 
@@ -128,6 +131,31 @@ const LOADING_SPINNER_STYLE: React.CSSProperties = {
 const iconSlotStyle = (theme: Theme, loading: boolean | undefined): React.CSSProperties =>
   loading ? { ...iconGlyphStyle(theme), ...LOADING_LABEL_STYLE } : iconGlyphStyle(theme);
 
+/** The children, or — while loading — the children made transparent under a spinner. */
+function ButtonLabel({
+  loading,
+  theme,
+  testId,
+  children,
+}: {
+  loading: boolean;
+  theme: Theme;
+  testId: (suffix: string) => string | undefined;
+  children: React.ReactNode;
+}): React.ReactElement {
+  if (!loading) return <>{children}</>;
+  return (
+    <>
+      <span style={LOADING_LABEL_STYLE} data-testid={testId('busy-label')}>
+        {children}
+      </span>
+      <span style={LOADING_SPINNER_STYLE}>
+        <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
+      </span>
+    </>
+  );
+}
+
 /**
  * An icon and nothing else — the shape that should render square.
  *
@@ -174,6 +202,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
       active,
       children,
       disabled,
+      progress,
       onClick,
       onFocus,
       onBlur,
@@ -185,9 +214,10 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const testId = (suffix: string) => childTestId(others, suffix, 'button');
     const props = withoutTestIdProps(others);
     const theme = useTheme();
+    const press = useButtonPress({ progress, loading, disabled, type: props.type, onClick });
 
     // Wrap icon with testId if provided
-    const iconWithTestId = icon ? (
+    const iconWithTestId = icon && !progress ? (
       <span data-testid={testId('icon')} style={iconSlotStyle(theme, loading)}>
         {icon}
       </span>
@@ -210,12 +240,14 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         glow={glow}
         pulse={pulse}
         ripple={ripple}
-        disabled={disabled || loading}
-        aria-busy={loading ? true : undefined}
+        progressing={progress != null}
+        disabled={press.disabled}
+        aria-disabled={press.ariaDisabled}
+        aria-busy={press.ariaBusy}
         disableRipple={!ripple}
         startIcon={iconPosition === 'left' ? iconWithTestId : undefined}
         endIcon={iconPosition === 'right' ? iconWithTestId : undefined}
-        onClick={onClick}
+        onClick={press.onClick}
         onFocus={onFocus}
         onBlur={onBlur}
         sx={buttonSize(size, iconOnly)}
@@ -223,17 +255,12 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
         className={mergedClassName}
       >
-        {loading ? (
-          <>
-            <span style={LOADING_LABEL_STYLE} data-testid={testId('busy-label')}>
-              {children}
-            </span>
-            <span style={LOADING_SPINNER_STYLE}>
-              <CircularProgress size={rem(theme, 16)} color="inherit" data-testid={testId('loading')} />
-            </span>
-          </>
+        {progress ? (
+          <ButtonProgressContent progress={progress} color={color} testId={testId} />
         ) : (
-          children
+          <ButtonLabel loading={loading} theme={theme} testId={testId}>
+            {children}
+          </ButtonLabel>
         )}
       </StyledButton>
     );

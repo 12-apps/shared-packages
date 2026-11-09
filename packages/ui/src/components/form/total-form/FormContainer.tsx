@@ -5,6 +5,7 @@ import type { ValidatorSchema } from '@12-apps/forms-core';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { Form } from '../Form';
+import { FormHoldScope, useFormHoldRoot } from '../FormHold/FormHold';
 
 import { FormContext } from './FormContext';
 import type { SetFieldErrors, TotalFormContextValue } from './FormContext';
@@ -43,6 +44,11 @@ export interface FormContainerProps<T extends Record<string, string>> {
  * `onSubmit` with the validated values when no field errors remain. Uses no
  * zod and no react-hook-form.
  *
+ * It is also a form HOLD scope (`useFormHold` / `useFormBusy`): while any field
+ * holds it — a photo still uploading — the fields and the submit are held and
+ * the submit handler returns without calling `onSubmit`, so neither
+ * `requestSubmit()` nor a keyboard shortcut can get past it.
+ *
  * @typeParam T - The form's value shape (a record of string fields).
  */
 export function FormContainer<T extends Record<string, string>>({
@@ -55,6 +61,8 @@ export function FormContainer<T extends Record<string, string>>({
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [submitting, setSubmitting] = useState(false);
+  const hold = useFormHoldRoot();
+  const { busy } = hold;
 
   const setFieldValue = useCallback<TotalFormContextValue['setFieldValue']>((name, value) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -74,6 +82,7 @@ export function FormContainer<T extends Record<string, string>>({
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      if (busy) return;
       const nextErrors = schema ? validateFields(values, schema) : {};
       setErrors(nextErrors);
       if (Object.values(nextErrors).some(Boolean)) return;
@@ -89,7 +98,7 @@ export function FormContainer<T extends Record<string, string>>({
         setSubmitting(false);
       }
     },
-    [onSubmit, schema, setFieldErrors, values],
+    [busy, onSubmit, schema, setFieldErrors, values],
   );
 
   const contextValue = useMemo<TotalFormContextValue>(
@@ -98,10 +107,12 @@ export function FormContainer<T extends Record<string, string>>({
   );
 
   return (
-    <FormContext.Provider value={contextValue}>
-      <Form dataTestId={dataTestId} onSubmit={handleSubmit} noValidate>
-        {children}
-      </Form>
-    </FormContext.Provider>
+    <FormHoldScope value={hold}>
+      <FormContext.Provider value={contextValue}>
+        <Form dataTestId={dataTestId} onSubmit={handleSubmit} noValidate aria-busy={busy || undefined}>
+          {children}
+        </Form>
+      </FormContext.Provider>
+    </FormHoldScope>
   );
 }

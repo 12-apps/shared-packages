@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useRef } from 'react';
 
 import type { InputSize } from '../../Input/Input.base';
 import { CepField as BaseCepField, type CepAddress } from '../../CepField';
+import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
 
 /** The resolved address parts a form can receive. */
@@ -123,6 +124,8 @@ export function CepField({
 }: CepFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
   const { write, clearOwned } = useOwnedAutofill();
+  // Held while the form waits on an upload (`useFormHold`), like the submit.
+  const busy = useFormBusy();
 
   const handleResolved = useCallback(
     (address: CepAddress) => {
@@ -158,6 +161,7 @@ export function CepField({
       size={size}
       labelPlacement={labelPlacement}
       autoComplete={autoComplete}
+      disabled={busy}
       dataTestId={`total-form-field-${name}`}
     />
   );

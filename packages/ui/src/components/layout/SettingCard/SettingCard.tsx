@@ -3,6 +3,7 @@ import React, { forwardRef, useId } from 'react';
 
 import { Icon } from '../../../icons';
 import { Button } from '../../form/Button';
+import { FormHoldScope, useFormHoldRoot } from '../../form/FormHold/FormHold';
 
 import { useSettingCard } from './SettingCard.hooks';
 import { LearnMore, PendingSpinner, SaveError, SettingHeader, partTestId } from './SettingCard.parts';
@@ -33,10 +34,21 @@ interface OpenBodyProps {
  * the click. A disabled button drops the focus it holds, so a keyboard user
  * who pressed Save would land on `<body>` and, if the save then failed, have
  * to find their way back to the form from the top of the page.
+ *
+ * It is also a form HOLD scope (`useFormHold`): while the host's form holds it
+ * — a photo still uploading — Save is `aria-disabled` and a press does nothing,
+ * WITHOUT the saving spinner: the upload shows its own progress where the photo
+ * is, and an upload must not look like a save. Cancel stays live, so the host's
+ * `onCancel` can abort the upload; only the card's own save disables it.
  */
 const OpenBody: React.FC<OpenBodyProps> = ({
   bodyRef, titleId, errorId, copy, learnMore, children, saving, error, saveDisabled, onSave, onCancel, dataTestId,
 }) => {
+  const hold = useFormHoldRoot();
+  const { busy } = hold;
+  const pressSave = () => {
+    if (!busy) onSave();
+  };
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key !== 'Escape') return;
     event.stopPropagation();
@@ -52,7 +64,9 @@ const OpenBody: React.FC<OpenBodyProps> = ({
       sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}
       data-testid={partTestId(dataTestId, 'body')}
     >
-      <Box>{children}</Box>
+      <FormHoldScope value={hold}>
+        <Box>{children}</Box>
+      </FormHoldScope>
       {learnMore && (
         <LearnMore label={copy.learnMore} dataTestId={dataTestId}>
           {learnMore}
@@ -65,9 +79,9 @@ const OpenBody: React.FC<OpenBodyProps> = ({
         </Button>
         <Button
           variant="solid"
-          onClick={onSave}
+          onClick={pressSave}
           disabled={saveDisabled}
-          aria-disabled={saving || undefined}
+          aria-disabled={saving || busy || undefined}
           aria-describedby={error ? errorId : undefined}
           icon={saving ? <PendingSpinner dataTestId={dataTestId} /> : undefined}
           iconPosition="left"

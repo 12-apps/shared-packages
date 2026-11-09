@@ -5,6 +5,7 @@ import React from 'react';
 
 import { CategorySelect } from '../../CategorySelect';
 import type { CategorySelectOption } from '../../CategorySelect';
+import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
 
 /** Props for the `total-form` {@link CategoryField}. */
@@ -42,6 +43,8 @@ export function CategoryField({
   copy,
 }: CategoryFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
+  // Held while the form waits on an upload (`useFormHold`), like the submit.
+  const busy = useFormBusy();
   const error = errors[name];
 
   return (
@@ -56,6 +59,7 @@ export function CategoryField({
       value={values[name] ? values[name] : null}
       error={error}
       onChange={(next) => setFieldValue(name, next ?? '')}
+      disabled={busy}
       dataTestId={`total-form-field-${name}`}
     />
   );
