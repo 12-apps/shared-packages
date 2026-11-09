@@ -17,7 +17,7 @@ export type SendOutcome =
   | { kind: 'transport' }
   | { kind: 'aborted' };
 
-export interface XhrSendHooks {
+interface XhrSendHooks {
   /** Bytes of the body sent so far, out of `total` (`0` when the browser cannot tell). */
   onProgress: (loaded: number, total: number) => void;
   /** The body is fully sent; the answer has not come yet. */

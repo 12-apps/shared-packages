@@ -92,7 +92,7 @@ export function measuredUploadRate(): number | null {
   return sessionBytesPerSecond;
 }
 
-export function recordUploadRate(bytes: number, milliseconds: number): void {
+function recordUploadRate(bytes: number, milliseconds: number): void {
   if (bytes > 0 && milliseconds > 0) sessionBytesPerSecond = (bytes / milliseconds) * 1000;
 }
 
@@ -106,7 +106,7 @@ function secondsFor(bytes: number, bytesPerSecond: number | null): number | null
   return bytes / bytesPerSecond;
 }
 
-export interface PreparingInput {
+interface PreparingInput {
   elapsedMs: number;
   estimateMs: number;
   sendBytes: number;
@@ -152,7 +152,7 @@ export const SAVING: UploadProgress = {
  * seeded with the cumulative one, so a single burst (the socket buffer filling
  * in the first event) never becomes the time a person reads.
  */
-export interface SendMeter {
+interface SendMeter {
   sample: (loaded: number, total: number, now: number) => UploadProgress;
   /** Bytes per second over the whole send, for the next upload's estimate — only from a send that lasted the measuring window. */
   finish: (total: number, now: number) => void;
