@@ -256,7 +256,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={mergedClassName}
       >
         {progress ? (
-          <ButtonProgressContent progress={progress} color={color} testId={testId} />
+          <ButtonProgressContent progress={progress} testId={testId} />
         ) : (
           <ButtonLabel loading={loading} theme={theme} testId={testId}>
             {children}

@@ -1,11 +1,11 @@
 import CircularProgress from '@mui/material/CircularProgress/index.js';
-import { alpha } from '@mui/material/styles/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
-import { Progress } from '../../data-display/Progress';
-import type { ColorValue } from '../../../tokens/vocabulary';
+import { rem } from '../../../tokens/relative';
 import { useFormBusy } from '../FormHold/FormHold';
+import { buttonProgressColors } from './Button.progress.colors';
 import { getColorFromTheme } from './Button.styles';
 import type { ButtonProgress } from './Button.types';
 
@@ -59,69 +59,83 @@ export function useButtonPress({ progress, loading, disabled, type, onClick }: P
   };
 }
 
+/** The fill's own element, found by the button's styles. */
+const FILL_ATTR = 'data-button-progress-fill';
+
 /**
- * The look while it fills: the button's own colour, washed out, is the track;
- * the fill is the colour itself. Hover and focus keep it — a bar that changes
- * shade under the pointer reads as a second state.
+ * The look while it fills: the track is the button's colour shaded until its
+ * label reads (4.5:1, `Button.progress.colors.ts`), the fill a further shade of
+ * it. Hover keeps it — a bar that changes shade under the pointer reads as a
+ * second state. The fill grows with a short transition, none under reduced
+ * motion.
  */
 export function buttonProgressStyles(theme: Theme, color: string): CSSObject {
   const palette = getColorFromTheme(theme, color);
-  // Washed out enough to read as "not yet", dark enough that the label on it
-  // keeps a readable contrast (the prototype's track sits near two thirds).
-  const track = alpha(palette.main, 0.65);
+  const { track, fill } = buttonProgressColors(palette.main, palette.contrastText);
   return {
     '&&': { backgroundColor: track, color: palette.contrastText, borderColor: 'transparent', cursor: 'progress' },
     '&&:hover': { backgroundColor: track },
+    [`& [${FILL_ATTR}]`]: {
+      backgroundColor: fill,
+      transition: `width ${theme.transitions.duration.short}ms linear`,
+      '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+    },
   };
 }
 
-const FILL_STYLE: React.CSSProperties = {
+/** Clips the fill to the button's own shape at every width, 5 % and 100 % included. */
+const CLIP_STYLE: React.CSSProperties = {
   position: 'absolute',
   inset: 0,
-  display: 'flex',
+  borderRadius: 'inherit',
+  overflow: 'hidden',
   pointerEvents: 'none',
 };
 
-const LABEL_STYLE: React.CSSProperties = {
-  position: 'relative',
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.5em',
-};
+const fillStyle = (percent: number): React.CSSProperties => ({
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  left: 0,
+  width: `${percent}%`,
+});
 
-/** The fill behind the label, and the label; a spinner instead when there is no fraction. */
+/**
+ * The fill behind the label, and the label; the spinner `loading` uses instead
+ * when there is no fraction. A plain span, not `data-display/Progress`: every
+ * `Button` in every host bundles this file, and a LinearProgress would ride
+ * along for the few that ever fill.
+ */
 export function ButtonProgressContent({
   progress,
-  color,
   testId,
 }: {
   progress: ButtonProgress;
-  color: ColorValue;
   testId: (suffix: string) => string | undefined;
 }): React.ReactElement {
+  const theme = useTheme();
   const known = progress.fraction !== null;
-  const percent = known ? Math.round(Math.min(1, Math.max(0, progress.fraction ?? 0)) * 100) : undefined;
+  const percent = Math.round(Math.min(1, Math.max(0, progress.fraction ?? 0)) * 100);
   return (
     <>
       {known && (
         // Decorative: the label carries the words, `aria-busy` the state.
-        <span aria-hidden style={FILL_STYLE} data-testid={testId('progress-fill')} data-value={percent}>
-          <Progress
-            value={percent}
-            color={color}
-            sx={(theme: Theme) => ({
-              height: '100%',
-              width: '100%',
-              borderRadius: 0,
-              backgroundColor: 'transparent',
-              '& .MuiLinearProgress-bar': { borderRadius: 0, transition: `transform ${theme.transitions.duration.short}ms linear` },
-            })}
-          />
+        <span aria-hidden style={CLIP_STYLE} data-testid={testId('progress-track')}>
+          <span {...{ [FILL_ATTR]: '' }} style={fillStyle(percent)} data-testid={testId('progress-fill')} data-value={percent} />
         </span>
       )}
-      <span style={LABEL_STYLE} data-testid={testId('progress-label')}>
+      <span
+        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: theme.spacing(1) }}
+        data-testid={testId('progress-label')}
+      >
         {!known && (
-          <CircularProgress size="1em" color="inherit" disableShrink aria-hidden data-testid={testId('progress-spinner')} />
+          <CircularProgress
+            size={rem(theme, 16)}
+            color="inherit"
+            disableShrink
+            aria-hidden
+            data-testid={testId('progress-spinner')}
+          />
         )}
         {progress.label}
       </span>
