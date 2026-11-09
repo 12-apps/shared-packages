@@ -232,6 +232,10 @@
       "types": "./dist/types/components/data-display/StatCard/index.d.ts",
       "default": "./dist/data-display/StatCard.js"
     },
+    "./data-display/StepCardList": {
+      "types": "./dist/types/components/data-display/StepCardList/index.d.ts",
+      "default": "./dist/data-display/StepCardList.js"
+    },
     "./data-display/HoverCard": {
       "types": "./dist/types/components/data-display/HoverCard/index.d.ts",
       "default": "./dist/data-display/HoverCard.js"

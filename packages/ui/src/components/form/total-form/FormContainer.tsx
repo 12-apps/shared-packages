@@ -66,6 +66,11 @@ export function FormContainer<T extends Record<string, string>>({
     });
   }, []);
 
+  const setFieldErrors = useCallback<TotalFormContextValue['setFieldErrors']>(
+    (fieldErrors) => setErrors(fieldErrors),
+    [],
+  );
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -79,19 +84,17 @@ export function FormContainer<T extends Record<string, string>>({
         // clears, and a later field-less failure can't leave a stale highlight.
         // `onSubmit` only runs once client validation passes, so there are no
         // client errors here to preserve.
-        await onSubmit(values, {
-          setFieldErrors: (fieldErrors) => setErrors(fieldErrors),
-        });
+        await onSubmit(values, { setFieldErrors });
       } finally {
         setSubmitting(false);
       }
     },
-    [onSubmit, schema, values],
+    [onSubmit, schema, setFieldErrors, values],
   );
 
   const contextValue = useMemo<TotalFormContextValue>(
-    () => ({ values, errors, submitting, setFieldValue }),
-    [errors, setFieldValue, submitting, values],
+    () => ({ values, errors, submitting, setFieldValue, setFieldErrors }),
+    [errors, setFieldErrors, setFieldValue, submitting, values],
   );
 
   return (

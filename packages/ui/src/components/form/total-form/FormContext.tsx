@@ -18,6 +18,13 @@ export interface TotalFormContextValue {
   submitting: boolean;
   /** Updates a single field's value and clears any resolved error for it. */
   setFieldValue: (name: string, value: string) => void;
+  /**
+   * Replaces the whole error map (the same setter `onSubmit` receives in its
+   * helpers). Pass `{}` to clear. `setFieldValue` still clears the edited
+   * field's error, so a caller that validates live sets the errors again after
+   * each change.
+   */
+  setFieldErrors: (errors: Record<string, string | undefined>) => void;
 }
 
 /** React context backing the `total-form` layer. `null` outside a container. */

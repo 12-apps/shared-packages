@@ -27,6 +27,7 @@ export * from './ScheduleGrid';
 export * from './SectionOnboarding/SectionOnboarding';
 export * from './Sheet';
 export * from './StatCard';
+export * from './StepCardList';
 export * from './Stepper/Stepper';
 export * from './Table';
 export * from './Timeline';
