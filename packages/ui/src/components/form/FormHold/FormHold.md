@@ -26,10 +26,17 @@ function ReplaceButton() {
 `FormContainer` (`total-form`) and an open `SettingCard` each provide a hold
 scope. A host form that is neither wraps itself in `<FormHoldProvider>`.
 
-Sibling scopes under one shared provider DO hold each other, through it: a
-hold in one scope holds the shared provider above it, and a provider's hold
-reaches every scope inside it, so the sibling scope is busy too. Give two
-forms that must stay independent no shared provider.
+Scopes nest, and by default a hold anywhere in a branch holds all of it: a
+hold in an inner scope holds every scope around it, and an outer scope's hold
+reaches every scope inside it. That is what makes one form one hold — inside a
+`FormContainer`, the main photo or a variation photo in a portalled drawer's
+own scope holds the whole form. Two default scopes under one shared provider
+therefore hold each other through it.
+
+`isolate` makes a scope an island: its holds do not travel up, and nothing
+above or beside it reaches in. Independent forms on one page — settings cards
+that each save on their own — are isolated. An open `SettingCard` always is:
+while one card's logo uploads, another card's Save still works.
 
 ## API
 
@@ -37,7 +44,7 @@ forms that must stay independent no shared provider.
 | --- | --- | --- |
 | `useFormHold` | `(key: string, held: boolean) => void` | Holds the nearest scope while `held`; released when it turns false and on unmount. `key` is unique within the form. No-op outside a scope. |
 | `useFormBusy` | `() => boolean` | True while any key holds the nearest scope or one around it. `false` outside a scope. |
-| `FormHoldProvider` | `({ children }) => ReactElement` | A hold scope of its own. Scopes nest: an inner hold also holds the outer scope, and an outer hold reaches inside. |
+| `FormHoldProvider` | `({ children, isolate? }) => ReactElement` | A hold scope of its own. Scopes nest: an inner hold also holds the outer scope, and an outer hold reaches inside. `isolate` makes it an island (see below). |
 
 ## What busy holds
 

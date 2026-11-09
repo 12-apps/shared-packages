@@ -90,6 +90,10 @@ like a save. **Cancel stays enabled**: it calls `onCancel`, which is where the
 host aborts the upload and restores the saved value. Busy (an upload) and
 saving (the card's own write) are separate states; only saving disables Cancel.
 
+The card's scope is ISOLATED: an upload in one card never holds another card's
+Save, even under a hold provider the page puts around them, and a card's own
+upload does not hold that page provider.
+
 ## Cancelling
 
 Cancel (or Escape inside the open card) closes the card and calls `onCancel`.

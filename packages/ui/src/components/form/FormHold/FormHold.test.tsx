@@ -136,6 +136,34 @@ describe('FormHold — what busy holds', () => {
     expect(screen.getByTestId('sibling-busy')).toHaveTextContent('true');
   });
 
+  it('an isolated scope sends nothing up and takes nothing in', () => {
+    function Probe({ id }: { id: string }): React.ReactElement {
+      return <span data-testid={id}>{String(useFormBusy())}</span>;
+    }
+    function Page({ inIsland, outside }: { inIsland: boolean; outside: boolean }): React.ReactElement {
+      return (
+        <FormHoldProvider>
+          <Uploader holdKey="outside" held={outside} />
+          <Probe id="page-busy" />
+          <FormHoldProvider isolate>
+            <Uploader holdKey="island" held={inIsland} />
+            <Probe id="island-busy" />
+          </FormHoldProvider>
+          <FormHoldProvider>
+            <Probe id="sibling-busy" />
+          </FormHoldProvider>
+        </FormHoldProvider>
+      );
+    }
+    const { rerender } = render(<Page inIsland outside={false} />);
+    expect(screen.getByTestId('island-busy')).toHaveTextContent('true');
+    expect(screen.getByTestId('page-busy')).toHaveTextContent('false');
+    expect(screen.getByTestId('sibling-busy')).toHaveTextContent('false');
+    rerender(<Page inIsland={false} outside />);
+    expect(screen.getByTestId('page-busy')).toHaveTextContent('true');
+    expect(screen.getByTestId('island-busy')).toHaveTextContent('false');
+  });
+
   it('is false, and holds nothing, outside any provider', () => {
     render(
       <>
@@ -144,6 +172,36 @@ describe('FormHold — what busy holds', () => {
       </>,
     );
     expect(screen.getByTestId('opt-in')).toBeEnabled();
+  });
+});
+
+describe('FormContainer with a drawer scope inside it', () => {
+  /** The product editor: a variation drawer is its own (portal-safe) scope inside the form. */
+  function Editor({ main, drawer }: { main: boolean; drawer: boolean }): React.ReactElement {
+    return (
+      <FormContainer initialValues={{ name: 'Soap' }} onSubmit={vi.fn()} dataTestId="form">
+        <Uploader holdKey="main-photo" held={main} />
+        <TextField name="name" label="Name" />
+        <SubmitButton>Save</SubmitButton>
+        <FormHoldProvider>
+          <Uploader holdKey="variation-photo" held={drawer} />
+          <OptIn />
+        </FormHoldProvider>
+      </FormContainer>
+    );
+  }
+
+  it('a hold in the drawer holds the whole form', () => {
+    render(<Editor main={false} drawer />);
+    expect(screen.getByTestId('total-form-submit')).toBeDisabled();
+    expect(screen.getByTestId('total-form-field-name')).toBeDisabled();
+    expect(screen.getByTestId('opt-in')).toBeDisabled();
+  });
+
+  it('a hold in the form holds the drawer', () => {
+    render(<Editor main drawer={false} />);
+    expect(screen.getByTestId('opt-in')).toBeDisabled();
+    expect(screen.getByTestId('total-form-submit')).toBeDisabled();
   });
 });
 

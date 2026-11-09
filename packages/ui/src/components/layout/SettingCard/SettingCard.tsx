@@ -46,7 +46,9 @@ const OpenBody: React.FC<OpenBodyProps> = ({
   bodyRef, titleId, errorId, copy, learnMore, children, saving, error, saveDisabled, onSave, onCancel, dataTestId,
 }) => {
   const theme = useTheme();
-  const hold = useFormHoldRoot();
+  // Isolated: a card is its own form. Another card's upload never holds this
+  // one's Save, and this one's never holds a provider the page put around it.
+  const hold = useFormHoldRoot({ isolate: true });
   const { busy } = hold;
   // Looks as unavailable as it is, without the spinner a save would show.
   const heldStyle = busy ? { opacity: theme.palette.action.disabledOpacity } : undefined;

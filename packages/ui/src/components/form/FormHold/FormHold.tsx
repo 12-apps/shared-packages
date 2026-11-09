@@ -16,7 +16,9 @@ import React, { createContext, useCallback, useContext, useEffect, useId, useMem
  * held, so navigation — close, back, tabs — stays live while the form waits.
  *
  * Providers nest: a hold inside an inner provider also holds every provider
- * around it, and an inner provider is busy while an outer one is.
+ * around it, and an inner provider is busy while an outer one is — so one
+ * form, drawer scopes included, is held as a whole. An `isolate`d provider is
+ * an island instead: nothing goes up out of it or comes down into it.
  */
 
 export interface FormHoldContextValue {
@@ -38,13 +40,24 @@ function useHoldIn(scope: FormHoldContextValue | null, key: string, held: boolea
   }, [setHeld, key, held]);
 }
 
+export interface FormHoldRootOptions {
+  /**
+   * An island: its holds do not travel up to the scopes around it, and theirs
+   * (or a sibling's) do not reach in. For one of several independent forms
+   * under a shared provider — two settings cards on one page each save on
+   * their own while the other's logo uploads. Default `false`.
+   */
+  isolate?: boolean;
+}
+
 /**
  * The state behind a provider: which keys hold it. For a component that must
  * read its own `busy` where it renders the provider (`FormContainer`'s submit
  * handler, `SettingCard`'s Save); everyone else uses {@link FormHoldProvider}.
  */
-export function useFormHoldRoot(): FormHoldContextValue {
-  const parent = useContext(FormHoldContext);
+export function useFormHoldRoot({ isolate = false }: FormHoldRootOptions = {}): FormHoldContextValue {
+  const context = useContext(FormHoldContext);
+  const parent = isolate ? null : context;
   const [keys, setKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   const setHeld = useCallback((key: string, held: boolean) => {
@@ -66,13 +79,13 @@ export function useFormHoldRoot(): FormHoldContextValue {
   return useMemo(() => ({ setHeld, busy }), [setHeld, busy]);
 }
 
-export interface FormHoldProviderProps {
+export interface FormHoldProviderProps extends FormHoldRootOptions {
   children: React.ReactNode;
 }
 
 /** A hold scope of its own, for a host form that is not a `FormContainer`. */
-export function FormHoldProvider({ children }: FormHoldProviderProps): React.ReactElement {
-  const value = useFormHoldRoot();
+export function FormHoldProvider({ children, isolate }: FormHoldProviderProps): React.ReactElement {
+  const value = useFormHoldRoot({ isolate });
   return <FormHoldScope value={value}>{children}</FormHoldScope>;
 }
 

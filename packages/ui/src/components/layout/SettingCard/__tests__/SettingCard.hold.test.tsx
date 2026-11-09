@@ -7,7 +7,7 @@ import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EN_US_SETTING_CARD_COPY as COPY } from '../../../../en-US';
-import { useFormHold } from '../../../form/FormHold';
+import { FormHoldProvider, useFormBusy, useFormHold } from '../../../form/FormHold';
 import { SettingCard } from '../SettingCard';
 import { deferred } from './deferred';
 
@@ -74,5 +74,32 @@ describe('SettingCard while busy', () => {
     expect(await screen.findByTestId('card-saving')).toBeInTheDocument();
     expect(screen.getByTestId('card-cancel')).toBeDisabled();
     pending.resolve();
+  });
+});
+
+describe('SettingCard is its own hold scope', () => {
+  function PageBusy(): React.ReactElement {
+    return <span data-testid="page-busy">{String(useFormBusy())}</span>;
+  }
+
+  it("one card's upload leaves another card's Save working, under a shared provider", async () => {
+    const onSaveB = vi.fn();
+    render(
+      <FormHoldProvider>
+        <PageBusy />
+        <SettingCard title="Brand" copy={COPY} dataTestId="brand" defaultOpen onSave={vi.fn()}>
+          <LogoField uploading />
+        </SettingCard>
+        <SettingCard title="Dark mode" copy={COPY} dataTestId="dark" defaultOpen onSave={onSaveB}>
+          <input data-testid="dark-field" />
+        </SettingCard>
+      </FormHoldProvider>,
+    );
+    expect(screen.getByTestId('brand-save')).toHaveAttribute('aria-disabled', 'true');
+    const saveB = screen.getByTestId('dark-save');
+    expect(saveB).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByTestId('page-busy')).toHaveTextContent('false');
+    fireEvent.click(saveB);
+    await waitFor(() => expect(onSaveB).toHaveBeenCalledTimes(1));
   });
 });
