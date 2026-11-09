@@ -87,7 +87,9 @@ export const CHECKBOX_SPINNER = { size: 20, offset: -10 } as const;
 
 /**
  * `glow` and `pulse` are keyed to MUI's DEFAULT blue rather than the theme's
- * primary — `EFFECT_GLOW.muiBlue` (`tokens/ink.core`) — on both renderers.
+ * primary. Web reads it from the theme, `uiInk(theme).effectGlow.muiBlue`
+ * (`tokens/ink`, FUT-4215), so a host can re-tint it; native, which has no
+ * theme to read, keeps `EFFECT_GLOW.muiBlue` (`tokens/ink.core`).
  */
 export const CHECKBOX_GLOW = { blur: { from: 5, to: 20 }, alpha: { from: 0.5, to: 0.8 }, ms: 2000 } as const;
 export const CHECKBOX_PULSE = { spread: 10, alpha: 0.7, ms: 2000 } as const;

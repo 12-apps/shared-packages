@@ -24,8 +24,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { getColorFromTheme as alertPalette } from '../components/data-display/Alert/Alert.styles';
 import { Avatar } from '../components/data-display/Avatar';
 import { pulse as breadcrumbsPulse } from '../components/navigation/Breadcrumbs/Breadcrumbs.styles';
+import { buttonVariantStyles } from '../components/form/Button/Button.styles';
 import { Checkbox } from '../components/form/Checkbox';
-import { iosThumbShadow, iosTrackShadow } from '../components/form/Switch/Switch.metrics';
 import { onTrackInk, switchSx } from '../components/form/Switch/Switch.styles';
 import { Card } from '../components/layout/Card';
 import { cardStyles } from '../components/layout/Card/Card.styles';
@@ -81,12 +81,12 @@ const section = (theme: Theme, lifted: boolean) =>
 describe('a host that passes nothing keeps today\'s look', () => {
   it('Switch: the resting thumb is white and the iOS shadows are black washes', () => {
     expect(thumb(DEFAULT).backgroundColor).toBe('#fff');
+    const r = (px: number): string => rem(DEFAULT, px);
     expect(thumb(DEFAULT, { customVariant: 'ios' }).boxShadow).toBe(
-      iosThumbShadow((px) => rem(DEFAULT, px)),
+      `0 ${r(3)} ${r(1)} 0 rgba(0, 0, 0, 0.04), 0 ${r(3)} ${r(8)} 0 rgba(0, 0, 0, 0.12), 0 ${r(1)} 0 0 rgba(0, 0, 0, 0.08)`,
     );
-    expect(thumb(DEFAULT, { customVariant: 'ios' }).boxShadow).toContain('rgba(0, 0, 0, 0.12)');
     expect(track(DEFAULT, { customVariant: 'ios' }).boxShadow).toBe(
-      iosTrackShadow((px) => rem(DEFAULT, px)),
+      `inset 0 0 0 ${r(0.5)} rgba(0, 0, 0, 0.1), inset 0 ${r(2)} ${r(3)} rgba(0, 0, 0, 0.12)`,
     );
     expect(track(DEFAULT, { customVariant: 'ios' }).boxShadow).toContain('rgba(0, 0, 0, 0.1)');
     expect(track(DEFAULT, { customVariant: 'ios' }).backgroundColor).toBe('rgba(0, 0, 0, 0.1)');
@@ -137,11 +137,42 @@ describe('a host that hands in a theme reaches the component', () => {
     expect(track(RE_TINTED, { customVariant: 'ios' }).backgroundColor).toBe('rgba(16, 32, 48, 0.1)');
   });
 
-  it('Switch / Button gradient: palette.common picks the ink over a fill', () => {
+  it('inkOver: palette.common is the pair chosen from when the incumbent loses', () => {
     const neutral = createTheme({ palette: { common: { black: '#102030', white: '#fafafa' } } });
-    // A fill white cannot label: the dark ink is the palette's black at 0.87.
+    // An incumbent white cannot label this fill, so the dark ink is the palette's black at 0.87.
     expect(inkOver(['#7ED957'], '#fff', inkPair(neutral))).toBe('rgba(16, 32, 48, 0.87)');
     expect(inkOver(['#1A237E'], inkPair(neutral).light, inkPair(neutral))).toBe('#fafafa');
+  });
+
+  it('Button gradient: palette.common reaches the label when contrastText loses', () => {
+    const tinted = createTheme({
+      palette: {
+        common: { black: '#102030', white: '#fafafa' },
+        // A pale brand whose contrastText (white) cannot clear its fill.
+        primary: { main: '#B9F6CA', contrastText: '#fff' },
+      },
+    });
+    const css = buttonVariantStyles(tinted, 'gradient', tinted.palette.primary, 'primary');
+    expect(css.color).toBe('rgba(16, 32, 48, 0.87)');
+  });
+
+  it('Button gradient: the real contrastText is kept when it already reads', () => {
+    const tinted = createTheme({
+      palette: { common: { black: '#102030', white: '#fafafa' }, primary: { main: '#1A237E' } },
+    });
+    const css = buttonVariantStyles(tinted, 'gradient', tinted.palette.primary, 'primary');
+    expect(css.color).toBe(tinted.palette.primary.contrastText);
+  });
+
+  it('Switch: palette.common reaches the neutral checked ink', () => {
+    expect(onTrackInk(RE_TINTED, { customColor: 'neutral' })).toBe('#fafafa');
+  });
+
+  it('inkPair: an unparseable palette.common falls back to MUI\'s pair instead of throwing', () => {
+    const vars = createTheme();
+    (vars.palette.common as { black: string }).black = 'var(--ink)';
+    expect(inkPair(vars)).toEqual({ light: vars.palette.common.white, dark: 'rgba(0, 0, 0, 0.87)' });
+    expect(() => buttonVariantStyles(vars, 'gradient', vars.palette.primary, 'primary')).not.toThrow();
   });
 
   it('Switch: palette.grey moves the neutral colour', () => {
