@@ -329,34 +329,93 @@ describe("the box bound's own terms (FUT-2919 review round 2)", () => {
   });
 });
 
-describe("output on edges whose horizontal run overflows (FUT-2919 review round 2)", () => {
+describe("output on edges whose horizontal run overflows (FUT-2919 review round 3)", () => {
   /** Straight alpha of pixel (x, y) on a `width`-wide raster. */
   const alpha = (data: Uint8ClampedArray, width: number, x: number, y: number): number => data[(y * width + x) * 4 + 3] ?? 0;
 
-  // On a sub-row where such an edge's crossing is NaN, compositing skips the row and its coverage
-  // stays in the row buffer. Main (d80754a) then composited it into the NEXT row, through a span
-  // ending exactly on pixel 0's left boundary that it counted as touching pixel 0. A span no
-  // longer reaches a pixel it does not cover, so these pixels take their geometric value. The
-  // skipped row's coverage still stays in the buffer, as it did on main, and can reach a later
-  // row or the next shape: that defect predates FUT-2919 and is not fixed here.
-  it("leaves the row under the skipped one as the geometry paints it, on a 2-dot canvas", () => {
+  // An edge from x = -1e308 to x = +1e308 used to cross every sub-row at +-Infinity, and at NaN
+  // (0 x Infinity) on a sub-row exactly at its top: spans the shape does not have, and a row left
+  // uncomposited whose coverage main (d80754a) carried into the next row. Each edge below is
+  // finite, so the expected values are the geometry's, worked out by hand in each comment.
+
+  it("paints the geometry of a 2-dot canvas crossed by an edge 2.7e308 long", () => {
+    // The long edge crosses x = 0..2 at t = 1 / 2.7, y = 158.625 + 2048 / 2.7 = 917.14; above it
+    // only the box [0, 1) is inside, below it the triangle covers both dots (even-odd: dot 0 out).
+    // Row 917 has one sub-row (917.125) above the crossing and three below. Main: 0, 128, 255, 255.
     const shape: Shape = {
       polygons: [[[-1e308, 158.625], [1.7e308, 2206.625], [0.5, 2206.625]], [[0, 0], [1, 0], [1, 2048], [0, 2048]]],
       rgba: [0, 0, 0, 255],
       rule: "evenodd",
     };
+    const data = paint([shape], 2, 2048, new Budget());
 
-    expect(alpha(paint([shape], 2, 2048, new Budget()), 2, 0, 159)).toBe(0);
+    expect([alpha(data, 2, 0, 159), alpha(data, 2, 1, 159), alpha(data, 2, 0, 917), alpha(data, 2, 1, 917)]).toEqual([255, 0, 64, 191]);
+    expect([alpha(data, 2, 0, 1000), alpha(data, 2, 1, 1000)]).toEqual([0, 255]);
   });
 
-  it("leaves the row under the skipped one as the geometry paints it, on a 100-dot canvas", () => {
+  it("paints the geometry of a 100-dot canvas, the box alone until the long edge reaches it", () => {
+    // Both triangle edges stay left of the canvas until the long one crosses x = 0 at
+    // y = 10.875 + 5 = 15.875; from row 16 the triangle spans the canvas. Main drew row 10 empty,
+    // row 11 at 191 (row 10's coverage carried down) and the right half from row 11 on.
     const shape: Shape = {
       polygons: [[[-1e308, 10.875], [1e308, 20.875], [7.53, 20.875]], [[0, 0], [50, 0], [50, 20], [0, 20]]],
       rgba: [0, 0, 0, 255],
       rule: "evenodd",
     };
     const data = paint([shape], 100, 20, new Budget());
+    const row = (y: number): number[] => [0, 25, 49, 50, 75, 99].map((x) => alpha(data, 100, x, y));
 
-    expect([alpha(data, 100, 0, 11), alpha(data, 100, 25, 11), alpha(data, 100, 75, 11)]).toEqual([0, 0, 255]);
+    expect([row(10), row(11), row(15), row(16)]).toEqual([
+      [255, 255, 255, 0, 0, 0],
+      [255, 255, 255, 0, 0, 0],
+      [255, 255, 255, 0, 0, 0],
+      [0, 0, 0, 255, 255, 255],
+    ]);
+  });
+
+  it("paints half of the dot the box edge halves on the sub-rows the triangle leaves alone", () => {
+    // Row 9 of a 33-dot canvas: dot 16 is half inside the box [0, 16.5) on each of its four
+    // sub-rows (the triangle's spans are off the canvas or start at 16.5), so 0.5 coverage; dot 5
+    // is fully inside on two sub-rows, 0.69 on the third (the triangle cuts it at 5.31), out on the
+    // fourth: (1 + 1 + 0.69) / 4. Main: 255 and 211.
+    const shape: Shape = {
+      polygons: [[[-1e308, 8.625], [1e308, 18.625], [5.31, 9.625]], [[0, 0], [16.5, 0], [16.5, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const data = paint([shape], 33, 20, new Budget());
+
+    expect([alpha(data, 33, 16, 9), alpha(data, 33, 5, 9)]).toEqual([128, 171]);
+  });
+
+  it("places an edge whose rise overflows where it is", () => {
+    // Edges from y = -1e308 to +1e308 are at their midpoint on the canvas: x = 20 and x = 5. With
+    // the rise overflowing, t used to be 0 on every row and both crossed at their top, x = 10.
+    const tall: Shape = { polygons: [[[10, -1e308], [30, 1e308], [0, 1e308]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const data = paint([tall], 40, 4, new Budget());
+
+    expect([alpha(data, 40, 2, 1), alpha(data, 40, 12, 1), alpha(data, 40, 25, 1)]).toEqual([0, 255, 0]);
+  });
+
+  it("carries nothing from one shape into the next", () => {
+    // Painted together, each pixel is the second shape composited over the first, exactly as
+    // when each is painted alone; the c0f92b4 code gave (25, 15) 255 instead of 64 over 0.
+    const first: Shape = {
+      polygons: [[[-1e308, 10.875], [1e308, 20.875], [7.53, 20.875]], [[0, 0], [50, 0], [50, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const second: Shape = { polygons: [box(0, 15, 100, 0.25)], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const alone1 = paint([first], 100, 20, new Budget());
+    const alone2 = paint([second], 100, 20, new Budget());
+    const both = paint([first, second], 100, 20, new Budget());
+    const over = (x: number, y: number): number => {
+      const [a, b] = [alpha(alone1, 100, x, y) / 255, alpha(alone2, 100, x, y) / 255];
+      return Math.round((b + a * (1 - b)) * 255);
+    };
+
+    for (const [x, y] of [[25, 15], [75, 15], [25, 16], [75, 16], [25, 11]] as const) {
+      expect(Math.abs(alpha(both, 100, x, y) - over(x, y))).toBeLessThanOrEqual(1);
+    }
   });
 });

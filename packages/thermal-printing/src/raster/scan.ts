@@ -36,12 +36,29 @@ export function edgesOf(polygons: readonly Point[][]): Edge[] {
   return edges;
 }
 
+/**
+ * Where edge `e` crosses the horizontal line `y`: `x0 + t × (x1 - x0)`, the
+ * same arithmetic as always while the differences are finite. An edge whose
+ * run overflows (ends near ±1e308) made that `x0 + t × Infinity`: +-Infinity
+ * on most sub-rows and 0 × Infinity = NaN on one exactly at its top, which
+ * drew spans the shape does not have and left a NaN-ended row uncomposited,
+ * its coverage carried into a later row or shape. Such an edge is
+ * interpolated as `(1 - t) × x0 + t × x1` instead, with `t` from halved
+ * coordinates when the rise overflows too: finite, and where the edge is.
+ */
+function crossingX(e: Edge, y: number): number {
+  const rise = e.y1 - e.y0;
+  const t = Number.isFinite(rise) ? (y - e.y0) / rise : (y / 2 - e.y0 / 2) / (e.y1 / 2 - e.y0 / 2);
+  const run = e.x1 - e.x0;
+  return Number.isFinite(run) ? e.x0 + t * run : (1 - t) * e.x0 + t * e.x1;
+}
+
 /** Where each edge crosses the horizontal line `y`, with its direction. */
 function crossings(edges: readonly Edge[], y: number): { x: number; dir: number }[] {
   const out: { x: number; dir: number }[] = [];
   for (const e of edges) {
     if (y < e.y0 || y >= e.y1) continue;
-    out.push({ x: e.x0 + ((y - e.y0) / (e.y1 - e.y0)) * (e.x1 - e.x0), dir: e.dir });
+    out.push({ x: crossingX(e, y), dir: e.dir });
   }
   return out.sort((a, b) => a.x - b.x);
 }

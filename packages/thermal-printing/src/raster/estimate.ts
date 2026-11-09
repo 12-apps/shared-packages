@@ -128,8 +128,8 @@ function charge(plan: Plan, width: number, height: number, allowance: number, st
  *
  * Its own cost is the edge visits and sub-rows `scanCost` charges, each span
  * counted in O(1): linear in edges × sub-rows spanned, never in the pixel
- * area. Rows no edge reaches are skipped. A span with a NaN end (a crossing
- * whose x overflowed) is not counted; the fill writes no pixel for it either.
+ * area. Rows no edge reaches are skipped. Crossings are finite (see
+ * `crossingX` in ./scan); a span that reaches no pixel is not counted.
  */
 function paintedExcess(
   edges: readonly Edge[],

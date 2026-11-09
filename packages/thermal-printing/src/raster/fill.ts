@@ -106,9 +106,8 @@ function paintShape(target: Target, { shape, edges }: Prepared): void {
   const factor = sortFactor(edges);
   let written = 0;
   const onSpan = (x0: number, x1: number): void => {
-    // A span whose start overflowed to NaN still writes its end pixel, as it
-    // always has, but returns NaN for its count: the counter takes it as 0
-    // (the estimate counts no such span either), so it stays finite.
+    // Crossings are finite (see `crossingX` in ./scan), so a count is too;
+    // the counter still refuses a non-finite one, so it can never turn NaN.
     const count = addCovered(target.row, x0, x1);
     if (Number.isFinite(count)) written += count;
   };
