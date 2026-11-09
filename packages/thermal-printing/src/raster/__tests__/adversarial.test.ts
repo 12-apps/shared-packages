@@ -107,6 +107,33 @@ describe("rasterizeSvg on hostile input", () => {
     expect(raster.data.length).toBe(0);
   });
 
+  it("draws a tall layered logo whose shapes each span the whole 576 x 2048 canvas (FUT-2919)", () => {
+    const strokes = [100, 200, 376, 476].map((x) => `<path d="M${x} 0h4v2048h-4Z"/>`).join("");
+    const diagonals = [4, 8].map((t) => `<path d="M0 0h${t}L576 2048h-${t}Z"/><path d="M${576 - t} 0h${t}L${t} 2048h-${t}Z"/>`);
+    const wordmark = [0, 1, 2, 3].map(
+      (i) => `<path d="M${4 + i * 10} 4h6v20h-6Z M${566 - i * 10} 2024h6v20h-6Z M${200 + i * 40} 1000h30v40h-30Z"/>`,
+    );
+    const svg =
+      '<svg viewBox="0 0 576 2048">' +
+      '<path fill-rule="evenodd" d="M0 0H576V2048H0Z M6 6V2042H570V6Z"/>' +
+      '<path d="M12 12H564V2036H12Z M15 15V2033H561V15Z"/>' +
+      `${strokes}${diagonals.join("")}${wordmark.join("")}</svg>`;
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
+    const alpha = (x: number, y: number): number => raster.data[(y * 576 + x) * 4 + 3] ?? 0;
+
+    expect(raster.unsupported).toEqual([]);
+    expect([raster.width, raster.height]).toEqual([576, 2048]);
+    expect([alpha(2, 1000), alpha(13, 1000), alpha(101, 1000), alpha(300, 1500)]).toEqual([255, 255, 255, 0]);
+  });
+
+  it("refuses nine filled shapes that each cover the whole 576 x 2048 canvas", () => {
+    const svg = `<svg viewBox="0 0 576 2048">${'<path d="M0 0H576V2048H0Z"/>'.repeat(9)}</svg>`;
+    const raster = guarded(() => rasterizeSvg(svg, { width: 576 }));
+
+    expect(raster.unsupported).toEqual(["too complex to fill"]);
+    expect(raster.data.length).toBe(0);
+  });
+
   it("refuses a document past the size cap without reading it", () => {
     const huge = `<svg viewBox="0 0 1 1">${" ".repeat(MAX_SVG_LENGTH)}</svg>`;
     const raster = rasterizeSvg(huge, { width: 8 });

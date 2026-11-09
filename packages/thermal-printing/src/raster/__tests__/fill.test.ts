@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { Budget, BudgetExceeded, MAX_FILL_WORK } from "../budget";
+import { Budget, BudgetExceeded, MAX_FILL_WORK, MAX_RASTER_HEIGHT, MAX_RASTER_WIDTH } from "../budget";
 import { estimateFillWork, paint, type PaintStats } from "../fill";
 import type { Shape } from "../svg-doc";
 import type { Point } from "../svg-path";
 
 /**
- * The fill budget is charged from an ESTIMATE, before any row is scanned, so
- * a refusal costs reading the edges once. These pin the estimate and prove the
- * refusal fills nothing — deterministically, with no clock.
+ * The fill budget is charged from an ESTIMATE, before any row is filled. A
+ * document whose edges alone put it over budget is refused at the cost of
+ * reading them once; otherwise the estimate may scan a shape's sub-rows, and
+ * that scan is charged too. These pin the estimate and prove the refusal fills
+ * nothing — deterministically, with no clock: cost is read from counters.
  */
 
 const shape = (polygon: Point[]): Shape => ({ polygons: [polygon], rgba: [0, 0, 0, 255], rule: "nonzero" });
@@ -22,7 +24,7 @@ function zigzag(n: number, width: number, height: number): Shape {
 }
 
 describe("estimateFillWork", () => {
-  it("counts edge sub-rows times the sort factor, plus five units per bounding-box pixel", () => {
+  it("charges a filled square its edge visits times the sort factor, plus five units per pixel it paints", () => {
     // Two vertical edges x 10 rows x 4 sub-rows = 80 edge visits; log2(4) = 2;
     // plus 10 x 10 pixels x 5.
     expect(estimateFillWork([square(10)], 10, 10)).toBe(80 * 2 + 100 * 5);
@@ -57,5 +59,363 @@ describe("paint over budget", () => {
     paint([square(10)], 10, 10, new Budget(), stats);
 
     expect(stats.rowsFilled).toBe(10);
+  });
+});
+
+/** Clockwise in device space (y down). */
+const box = (x: number, y: number, w: number, h: number): Point[] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+/** The same box anticlockwise: a hole under the nonzero rule. */
+const hole = (x: number, y: number, w: number, h: number): Point[] => box(x, y, w, h).reverse();
+/** A `thickness`-wide stroke from the top-left corner to the bottom-right one, or mirrored. */
+function diagonal(thickness: number, width: number, height: number, mirrored = false): Point[] {
+  return mirrored
+    ? [[width - thickness, 0], [width, 0], [thickness, height], [0, height]]
+    : [[0, 0], [thickness, 0], [width, height], [width - thickness, height]];
+}
+
+const W = MAX_RASTER_WIDTH;
+const H = MAX_RASTER_HEIGHT;
+
+/**
+ * A tall, layered store logo on the largest canvas: a background frame
+ * (even-odd), a border frame (nonzero, its hole wound the other way), four
+ * full-height strokes, four corner-to-corner strokes and a wordmark of four
+ * compound paths whose glyphs sit in opposite corners. Ten of its shapes have
+ * a bounding box of (nearly) the whole 576 x 2048 canvas though each paints a
+ * few dots per row; charged by bounding box, about 5.9M each, it was refused
+ * (FUT-2919).
+ */
+const tallLogo: Shape[] = [
+  { polygons: [box(0, 0, W, H), box(6, 6, W - 12, H - 12)], rgba: [0, 0, 0, 255], rule: "evenodd" },
+  { polygons: [box(12, 12, W - 24, H - 24), hole(15, 15, W - 30, H - 30)], rgba: [0, 0, 0, 255], rule: "nonzero" },
+  ...[100, 200, 376, 476].map((x) => shape(box(x, 0, 4, H))),
+  ...[4, 8].flatMap((thickness) => [shape(diagonal(thickness, W, H)), shape(diagonal(thickness, W, H, true))]),
+  ...[0, 1, 2, 3].map((i): Shape => ({
+    polygons: [box(4 + i * 10, 4, 6, 20), box(W - 10 - i * 10, H - 24, 6, 20), box(200 + i * 40, 1000, 30, 40)],
+    rgba: [0, 0, 0, 255],
+    rule: "nonzero",
+  })),
+];
+
+/** `count` filled shapes that each cover the whole canvas. */
+const fullCanvasStack = (count: number): Shape[] => Array.from({ length: count }, () => shape(box(0, 0, W, H)));
+
+describe("estimateFillWork on a tall canvas (FUT-2919)", () => {
+  it("charges a tall thin-stroke logo for the dots it paints, not its bounding boxes", () => {
+    expect(estimateFillWork(tallLogo, W, H)).toBeLessThan(MAX_FILL_WORK / 10);
+  });
+
+  it("paints the tall logo instead of refusing it", () => {
+    const stats: PaintStats = { rowsFilled: 0 };
+
+    expect(() => paint(tallLogo, W, H, new Budget(), stats)).not.toThrow();
+    // Every row of every shape: nine span all 2048, the border 2024, each wordmark path 2040.
+    expect(stats.rowsFilled).toBe(9 * H + 2024 + 4 * 2040);
+  });
+
+  it("still charges a filled full-canvas shape five units per pixel, so eight fit and nine are refused", () => {
+    expect(estimateFillWork(fullCanvasStack(1), W, H)).toBeGreaterThanOrEqual(W * H * 5);
+    expect(estimateFillWork(fullCanvasStack(8), W, H)).toBeLessThanOrEqual(MAX_FILL_WORK);
+    expect(estimateFillWork(fullCanvasStack(9), W, H)).toBeGreaterThan(MAX_FILL_WORK);
+  });
+
+  it("refuses a stack of full-canvas shapes before filling a single row", () => {
+    const stats: PaintStats = { rowsFilled: 0 };
+
+    expect(() => paint(fullCanvasStack(9), W, H, new Budget(), stats)).toThrow(BudgetExceeded);
+    expect(stats.rowsFilled).toBe(0);
+  });
+
+  it("charges a pixel-aligned one-dot stroke no more than its bounding box was", () => {
+    // Two edges x 2048 rows x 4 sub-rows x log2(4), plus five units per row of one dot: a span
+    // ending on a pixel boundary is not charged for the pixel after it.
+    expect(estimateFillWork([shape(box(10, 0, 1, H))], W, H)).toBe(2 * H * 4 * 2 + H * 5);
+  });
+
+  it("refuses the tall logo stacked on full-canvas shapes", () => {
+    expect(() => paint([...fullCanvasStack(8), ...tallLogo], W, H, new Budget())).toThrow(BudgetExceeded);
+  });
+});
+
+describe("estimateFillWork is an upper bound on the work paint does", () => {
+  /** A five-point star drawn in one stroke: its centre is wound twice. */
+  const star: Point[] = Array.from({ length: 5 }, (_, i) => {
+    const angle = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+    return [50 + 45 * Math.cos(angle), 50 + 45 * Math.sin(angle)] as Point;
+  });
+  const samples: [string, Shape][] = [
+    ["a concave L", shape([[5, 5], [60, 5], [60, 20], [20, 20], [20, 90], [5, 90]])],
+    ["a self-overlapping star, nonzero", shape(star)],
+    ["a self-overlapping star, even-odd", { ...shape(star), rule: "evenodd" }],
+    ["a frame with a hole, even-odd", { polygons: [box(2, 2, 90, 90), box(10, 10, 74, 74)], rgba: [0, 0, 0, 255], rule: "evenodd" }],
+    ["a frame with a hole, nonzero", { polygons: [box(2, 2, 90, 90), hole(10, 10, 74, 74)], rgba: [0, 0, 0, 255], rule: "nonzero" }],
+    ["two overlapping boxes, nonzero", { polygons: [box(10, 10, 50, 50), box(30, 30, 50, 50)], rgba: [0, 0, 0, 255], rule: "nonzero" }],
+    ["a shape clipped on every side", shape([[-50, -40], [160, 30], [130, 170], [-20, 120]])],
+    ["fractional, sub-row-thin slivers", shape([[3.3, 7.12], [90.7, 7.38], [4.1, 7.38]])],
+    ["a thin diagonal", shape(diagonal(2.5, 100, 100))],
+    ["coordinates far outside the canvas", shape([[-1e12, -1e12], [1e12, -1e12], [1e12, 1e12], [-1e12, 1e12]])],
+  ];
+
+  it.each(samples)("on %s", (_label, sample) => {
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint([sample], 100, 100, new Budget(), stats);
+
+    // The charge covers the fill AND the estimate's own scan, if it ran one.
+    expect(stats.work).toBeGreaterThan(0);
+    expect(estimateFillWork([sample], 100, 100, estimate)).toBeGreaterThanOrEqual(
+      (stats.work ?? Infinity) + (estimate.scanWork ?? Infinity),
+    );
+  });
+
+  it("on the tall logo, shape by shape", () => {
+    for (const sample of tallLogo) {
+      const stats: PaintStats = { rowsFilled: 0, work: 0 };
+      const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+      paint([sample], W, H, new Budget(), stats);
+
+      expect(stats.work).toBeGreaterThan(0);
+      expect(estimateFillWork([sample], W, H, estimate)).toBeGreaterThanOrEqual(
+        (stats.work ?? Infinity) + (estimate.scanWork ?? Infinity),
+      );
+    }
+  });
+});
+
+describe("estimateFillWork on degenerate shapes", () => {
+  it("charges nothing for a shape entirely outside the canvas", () => {
+    expect(estimateFillWork([shape(box(200, 200, 10, 10)), shape(box(-30, -30, 10, 10))], 100, 100)).toBe(0);
+  });
+
+  it("charges nothing for a shape with no height", () => {
+    expect(estimateFillWork([shape([[0, 5], [50, 5], [90, 5]])], 100, 100)).toBe(0);
+  });
+
+  it("charges a box with huge coordinates as the canvas it covers", () => {
+    const huge = shape([[-1e300, -1e300], [1e300, -1e300], [1e300, 1e300], [-1e300, 1e300]]);
+
+    expect(estimateFillWork([huge], 100, 100)).toBe(estimateFillWork([square(100)], 100, 100));
+  });
+
+  it("stays finite and non-negative when an edge has a non-finite coordinate", () => {
+    const poisoned = shape([[0, 0], [Infinity, 50], [NaN, 100], [0, 100]]);
+    const work = estimateFillWork([poisoned], 100, 100);
+
+    expect(Number.isFinite(work)).toBe(true);
+    expect(work).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/** One-dot, pixel-aligned strokes the full height of the canvas: the most sub-rows per unit charged. */
+const strokes = (count: number): Shape[] => Array.from({ length: count }, (_, i) => shape(box(i % W, 0, 1, H)));
+/** One-dot strokes slanted 76 dots across the full height: a 77-dot bounding box, a dot or two painted per row. */
+const slants = (count: number): Shape[] =>
+  Array.from({ length: count }, (_, i) => shape([[i % 500, 0], [(i % 500) + 1, 0], [(i % 500) + 77, H], [(i % 500) + 76, H]]));
+
+describe("what the estimate itself costs (FUT-2919 review)", () => {
+  it("charges the scan it runs, so estimating and filling stay within the budget", () => {
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint(slants(1), W, H, new Budget(), stats);
+
+    expect(estimateFillWork(slants(1), W, H, estimate)).toBeGreaterThanOrEqual((stats.work ?? 0) + (estimate.scanWork ?? 0));
+    expect(estimate.scanWork).toBeGreaterThan(0);
+  });
+
+  it("charges a narrow shape its bounding box without scanning it, so as many one-dot strokes fit as before", () => {
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    expect(estimateFillWork(strokes(1162), W, H, estimate)).toBeLessThanOrEqual(MAX_FILL_WORK);
+    expect(estimateFillWork(strokes(1163), W, H)).toBeGreaterThan(MAX_FILL_WORK);
+    expect(estimate.scanWork).toBe(0);
+  });
+
+  it("refuses a document over budget on its edges alone before scanning any shape", () => {
+    for (const shapes of [[...strokes(1162), ...fullCanvasStack(1)], slants(900)]) {
+      const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+      expect(() => paint(shapes, W, H, new Budget(), estimate)).toThrow(BudgetExceeded);
+      expect(estimate.scanWork).toBe(0);
+      expect(estimate.rowsFilled).toBe(0);
+    }
+  });
+
+  it("skips the rows no edge reaches when it scans", () => {
+    const specks = Array.from({ length: 64 }, (): Shape => ({
+      polygons: [box(0, 0, 1, 1), box(W - 1, H - 1, 1, 1)],
+      rgba: [0, 0, 0, 255],
+      rule: "nonzero",
+    }));
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    estimateFillWork(specks, W, H, estimate);
+
+    // Each shape is scanned (its bounding box is the canvas), but only on its
+    // two rows: 8 sub-rows and 16 edge visits x log2(6), not 8192 sub-rows.
+    expect(estimate.scanWork).toBe(64 * (8 + 16 * 3));
+  });
+});
+
+describe("estimateFillWork when interpolation rounds", () => {
+  it("bounds a slanted edge 1e307 long, whose crossings round far past its endpoints", () => {
+    // From a random-SVG property check: every endpoint but one is right of a 200-dot canvas,
+    // yet the rounded crossings of the long edges paint inside it.
+    const far: Shape = {
+      polygons: [
+        [[3.6977460599706543e307, -1.29128137799254e306], [1056.507996832269, 1778.221403697498], [1644.139964208467, 1708.2018532766836], [1484.5693422877619, 1741.1708715053333]],
+        [[1761.2534004853978, 1772.5971053622084], [1718.5185419573281, 1707.0853982335539], [1551.1369871876677, 1728.4799632432391], [1237.0845968676306, 1754.7630585363681]],
+      ],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint([far], 200, H, new Budget(), stats);
+
+    expect(estimateFillWork([far], 200, H, estimate)).toBeGreaterThanOrEqual((stats.work ?? Infinity) + (estimate.scanWork ?? Infinity));
+  });
+});
+
+describe("PaintStats.work on a crossing that overflows", () => {
+  it("stays finite when an edge's horizontal run overflows to infinity", () => {
+    // x1 - x0 overflows, so the crossing at a sample exactly on y0 is 0 x Infinity = NaN.
+    const overflow: Shape = { polygons: [[[-1e308, 0.125], [1e308, 10.125], [50, 10.125]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+
+    paint([overflow], 100, 20, new Budget(), stats);
+
+    expect(Number.isFinite(stats.work)).toBe(true);
+    expect(estimateFillWork([overflow], 100, 20)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
+  });
+});
+
+describe("the box bound's own terms (FUT-2919 review round 2)", () => {
+  it("charges the pixel two spans of one sub-row share", () => {
+    // Two even-odd boxes meeting at x = 0.5 on a 1 x 1 canvas: the sub-rows below 0.25 paint
+    // [0, 0.5) and [0.5, 1) — two spans writing the one pixel twice.
+    const touching: Shape = {
+      polygons: [[[0, 0], [0.5, 0], [0.5, 1], [0, 1]], [[0.5, 0.25], [1, 0.25], [1, 1], [0.5, 1]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+
+    paint([touching], 1, 1, new Budget(), stats);
+
+    expect(estimateFillWork([touching], 1, 1)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
+  });
+
+  it("scans a narrow shape whose edge overflows instead of trusting its bounding box", () => {
+    const overflow: Shape = { polygons: [[[-1e308, 0.125], [1e308, 10.125], [0.5, 10.125]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint([overflow], 1, 20, new Budget(), stats);
+
+    expect(estimateFillWork([overflow], 1, 20, estimate)).toBeGreaterThanOrEqual((stats.work ?? Infinity) + (estimate.scanWork ?? Infinity));
+    expect(estimate.scanWork).toBeGreaterThan(0);
+  });
+
+  it("returns past the budget on edge counts alone, scanning nothing", () => {
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    expect(estimateFillWork(slants(900), W, H, estimate)).toBeGreaterThan(MAX_FILL_WORK);
+    expect(estimate.scanWork).toBe(0);
+  });
+});
+
+describe("output on edges whose horizontal run overflows (FUT-2919 review round 3)", () => {
+  /** Straight alpha of pixel (x, y) on a `width`-wide raster. */
+  const alpha = (data: Uint8ClampedArray, width: number, x: number, y: number): number => data[(y * width + x) * 4 + 3] ?? 0;
+
+  // An edge from x = -1e308 to x = +1e308 used to cross every sub-row at +-Infinity, and at NaN
+  // (0 x Infinity) on a sub-row exactly at its top: spans the shape does not have, and a row left
+  // uncomposited whose coverage main (d80754a) carried into the next row. Each edge below is
+  // finite, so the expected values are the geometry's, worked out by hand in each comment.
+
+  it("paints the geometry of a 2-dot canvas crossed by an edge 2.7e308 long", () => {
+    // The long edge crosses x = 0..2 at t = 1 / 2.7, y = 158.625 + 2048 / 2.7 = 917.14; above it
+    // only the box [0, 1) is inside, below it the triangle covers both dots (even-odd: dot 0 out).
+    // Row 917 has one sub-row (917.125) above the crossing and three below. Main: 0, 128, 255, 255.
+    const shape: Shape = {
+      polygons: [[[-1e308, 158.625], [1.7e308, 2206.625], [0.5, 2206.625]], [[0, 0], [1, 0], [1, 2048], [0, 2048]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const data = paint([shape], 2, 2048, new Budget());
+
+    expect([alpha(data, 2, 0, 159), alpha(data, 2, 1, 159), alpha(data, 2, 0, 917), alpha(data, 2, 1, 917)]).toEqual([255, 0, 64, 191]);
+    expect([alpha(data, 2, 0, 1000), alpha(data, 2, 1, 1000)]).toEqual([0, 255]);
+  });
+
+  it("paints the geometry of a 100-dot canvas, the box alone until the long edge reaches it", () => {
+    // Both triangle edges stay left of the canvas until the long one crosses x = 0 at
+    // y = 10.875 + 5 = 15.875; from row 16 the triangle spans the canvas. Main drew row 10 empty,
+    // row 11 at 191 (row 10's coverage carried down) and the right half from row 11 on.
+    const shape: Shape = {
+      polygons: [[[-1e308, 10.875], [1e308, 20.875], [7.53, 20.875]], [[0, 0], [50, 0], [50, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const data = paint([shape], 100, 20, new Budget());
+    const row = (y: number): number[] => [0, 25, 49, 50, 75, 99].map((x) => alpha(data, 100, x, y));
+
+    expect([row(10), row(11), row(15), row(16)]).toEqual([
+      [255, 255, 255, 0, 0, 0],
+      [255, 255, 255, 0, 0, 0],
+      [255, 255, 255, 0, 0, 0],
+      [0, 0, 0, 255, 255, 255],
+    ]);
+  });
+
+  it("paints half of the dot the box edge halves on the sub-rows the triangle leaves alone", () => {
+    // Row 9 of a 33-dot canvas: dot 16 is half inside the box [0, 16.5) on each of its four
+    // sub-rows (the triangle's spans are off the canvas or start at 16.5), so 0.5 coverage; dot 5
+    // is fully inside on two sub-rows, 0.69 on the third (the triangle cuts it at 5.31), out on the
+    // fourth: (1 + 1 + 0.69) / 4. Main: 255 and 211.
+    const shape: Shape = {
+      polygons: [[[-1e308, 8.625], [1e308, 18.625], [5.31, 9.625]], [[0, 0], [16.5, 0], [16.5, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const data = paint([shape], 33, 20, new Budget());
+
+    expect([alpha(data, 33, 16, 9), alpha(data, 33, 5, 9)]).toEqual([128, 171]);
+  });
+
+  it("places an edge whose rise overflows where it is", () => {
+    // Edges from y = -1e308 to +1e308 are at their midpoint on the canvas: x = 20 and x = 5. With
+    // the rise overflowing, t used to be 0 on every row and both crossed at their top, x = 10.
+    const tall: Shape = { polygons: [[[10, -1e308], [30, 1e308], [0, 1e308]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const data = paint([tall], 40, 4, new Budget());
+
+    expect([alpha(data, 40, 2, 1), alpha(data, 40, 12, 1), alpha(data, 40, 25, 1)]).toEqual([0, 255, 0]);
+  });
+
+  it("carries nothing from one shape into the next", () => {
+    // Painted together, each pixel is the second shape composited over the first, exactly as
+    // when each is painted alone; the c0f92b4 code gave (25, 15) 255 instead of 64 over 0.
+    const first: Shape = {
+      polygons: [[[-1e308, 10.875], [1e308, 20.875], [7.53, 20.875]], [[0, 0], [50, 0], [50, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const second: Shape = { polygons: [box(0, 15, 100, 0.25)], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const alone1 = paint([first], 100, 20, new Budget());
+    const alone2 = paint([second], 100, 20, new Budget());
+    const both = paint([first, second], 100, 20, new Budget());
+    const over = (x: number, y: number): number => {
+      const [a, b] = [alpha(alone1, 100, x, y) / 255, alpha(alone2, 100, x, y) / 255];
+      return Math.round((b + a * (1 - b)) * 255);
+    };
+
+    for (const [x, y] of [[25, 15], [75, 15], [25, 16], [75, 16], [25, 11]] as const) {
+      expect(Math.abs(alpha(both, 100, x, y) - over(x, y))).toBeLessThanOrEqual(1);
+    }
   });
 });
