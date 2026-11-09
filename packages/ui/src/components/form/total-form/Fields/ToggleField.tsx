@@ -5,6 +5,7 @@ import React from 'react';
 import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { ToggleGroup } from '../../ToggleGroup';
 import type { ToggleOption } from '../../ToggleGroup';
+import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
 
 /** Props for the `total-form` {@link ToggleField}. */
@@ -29,6 +30,8 @@ export interface ToggleFieldProps {
  */
 export function ToggleField({ name, options, label }: ToggleFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
+  // Held while the form waits on an upload (`useFormHold`), like the submit.
+  const busy = useFormBusy();
   const error = errors[name];
   const testId = `total-form-field-${name}`;
 
@@ -47,6 +50,7 @@ export function ToggleField({ name, options, label }: ToggleFieldProps): React.R
         // A `role="group"` div is not labelable, so the `<label htmlFor>`
         // above names nothing; the group carries the question itself (FUT-4157).
         aria-label={label}
+        disabled={busy}
         dataTestId={testId}
         onChange={(_event, next) => {
           if (typeof next === 'string') setFieldValue(name, next);

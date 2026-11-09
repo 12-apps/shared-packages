@@ -4,8 +4,12 @@ import React, { useState } from 'react';
 import { userEvent, within } from 'storybook/test';
 
 import { EN_US_SETTING_CARD_COPY } from '../../../en-US';
+import { PT_BR_SETTING_CARD_COPY } from '../../../pt-BR';
 import { ThemeProvider, createTheme } from '../../../mui/styles';
 import { Icon } from '../../../icons';
+import { UploadProgress } from '../../feedback/UploadProgress';
+import { useFormBusy, useFormHold } from '../../form/FormHold';
+import { Input } from '../../form/Input';
 import { NumberField } from '../../form/NumberField';
 import { SettingCard } from './SettingCard';
 import type { SettingCardProps } from './SettingCard.types';
@@ -122,6 +126,48 @@ export const HostErrorMessage: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByTestId('session-timeout-save'));
   },
+};
+
+/** A logo uploading inside the card: it holds the card through `useFormHold`. */
+function LogoUploading(): React.ReactElement {
+  useFormHold('logo', true);
+  // A host field opts in to the hold by reading it.
+  const busy = useFormBusy();
+  return (
+    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: (theme) => theme.spacing(21) }}>
+        <Box aria-hidden sx={{ bgcolor: 'primary.light', borderRadius: 1.5, aspectRatio: '4 / 3' }} />
+        <UploadProgress
+          progress={{ stage: 'sending', fraction: 0.48, secondsLeft: 2.6, step: 2, totalSecondsLeft: 2.6 }}
+          copy={{
+            preparing: 'Ajustando o logo',
+            sending: 'Enviando logo',
+            saving: 'Logo enviado, salvando…',
+            step: (n, of) => `${n} de ${of}`,
+            secondsLeft: (n) => `Faltam ~${n} s`,
+            totalSecondsLeft: (n) => `Faltam ~${n} s no total`,
+            percent: (n) => `${n}%`,
+          }}
+        />
+      </Box>
+      <Box sx={{ flex: 1, minWidth: (theme) => theme.spacing(20) }}>
+        <Input label="Frase da mesa" placeholder="Peça pelo QR" disabled={busy} data-testid="brand-phrase" />
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * Busy while a logo uploads: Save is `aria-disabled` and does nothing, with NO
+ * saving spinner (the upload shows its own progress); Cancel stays live and is
+ * where the host aborts the upload.
+ */
+export const BusyWhileUploading: Story = {
+  render: () => (
+    <SettingCard copy={PT_BR_SETTING_CARD_COPY} title="Marca" defaultOpen onSave={() => undefined} dataTestId="brand">
+      <LogoUploading />
+    </SettingCard>
+  ),
 };
 
 /** Edit disabled: the setting is visible but cannot be changed from here. */

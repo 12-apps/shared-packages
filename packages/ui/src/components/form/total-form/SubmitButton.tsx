@@ -5,6 +5,7 @@ import React from 'react';
 import { fieldHeight } from '../../../tokens/field-height';
 import { sxRem } from '../../../tokens/relative';
 import { Button } from '../Button';
+import type { ButtonProgress } from '../Button';
 import { useFormContext } from './FormContext';
 
 /** Props for {@link SubmitButton}. */
@@ -20,12 +21,20 @@ export interface SubmitButtonProps {
    * `aria-describedby` so a screen reader reads the reason with the button.
    */
   describedBy?: string;
+  /**
+   * Turns the button into the bar of what the form waits for (`Button`'s
+   * `progress`): it fills behind `progress.label`, stays focusable, and a press
+   * submits nothing.
+   */
+  progress?: ButtonProgress;
 }
 
 /**
  * Submit control wired to {@link useFormContext}. Wraps the existing `@12-apps/ui`
  * `Button` as a `type="submit"` button (testid `total-form-submit`) and
- * reflects the form's `submitting` state via `loading`/`disabled`.
+ * reflects the form's `submitting` state via `loading`/`disabled`. While the
+ * form is held (`useFormHold`) it is held too — `Button` holds every
+ * `type="submit"` — and `progress` draws what it is waiting for.
  *
  * It matches the form field height and never wraps its label, so it aligns with
  * an adjacent input on the same row (and stays full-width when the row stacks).
@@ -35,6 +44,7 @@ export function SubmitButton({
   dataTestId = 'total-form-submit',
   disabled = false,
   describedBy,
+  progress,
 }: SubmitButtonProps): React.ReactElement {
   const { submitting } = useFormContext();
 
@@ -45,6 +55,7 @@ export function SubmitButton({
       loading={submitting}
       disabled={submitting || disabled}
       aria-describedby={describedBy}
+      progress={progress}
       // `Button` replaces (not merges) its size styles with this `sx`, so restate
       // the md padding/font here alongside the theme's field height — the height
       // every input on the form stands at — and no-wrap alignment.

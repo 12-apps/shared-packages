@@ -30,8 +30,16 @@ export interface WebStorageConfig {
   maxBytes?: number;
   /** The browser-side re-encode profile. */
   profile?: ImageProfile;
-  /** How requests are made. Default: same-origin `fetch`. */
+  /** How requests are made. Default: an `XMLHttpRequest`, which reports the bytes sent (see `useUpload`). */
   fetchImpl?: typeof fetch;
+  /** Query parameters appended to the upload endpoint (see `UseUploadConfig.query`). */
+  query?: UseUploadConfig['query'];
+  /** Makes the default transport's request (see `UseUploadConfig.xhrFactory`). */
+  xhrFactory?: UseUploadConfig['xhrFactory'];
+  /** The re-encode's estimated duration (see `UseUploadConfig.estimatePrepareMs`). */
+  estimatePrepareMs?: UseUploadConfig['estimatePrepareMs'];
+  /** The sending rate to assume before one is measured (see `UseUploadConfig.assumedBytesPerSecond`). */
+  assumedBytesPerSecond?: UseUploadConfig['assumedBytesPerSecond'];
   /**
    * Every sentence this surface renders — REQUIRED, the host's own factory of
    * the mount's ceiling, mirroring the server mount's `messages` (pt-BR
@@ -59,8 +67,13 @@ export function createWebStorage(config: WebStorageConfig): WebStorage {
   const uploadConfig: UseUploadConfig = {
     apiBase: config.apiBase,
     maxBytes,
-    ...(config.profile ? { profile: config.profile } : {}),
-    ...(config.fetchImpl ? { fetchImpl: config.fetchImpl } : {}),
+    // Every optional knob is forwarded as given; `undefined` means the hook's default.
+    profile: config.profile,
+    fetchImpl: config.fetchImpl,
+    query: config.query,
+    xhrFactory: config.xhrFactory,
+    estimatePrepareMs: config.estimatePrepareMs,
+    assumedBytesPerSecond: config.assumedBytesPerSecond,
     messages: config.messages,
   };
   const useBoundUpload = (): UploadState => useUpload(uploadConfig);

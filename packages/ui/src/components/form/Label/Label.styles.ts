@@ -1,8 +1,9 @@
 import { alpha } from '@mui/material/styles/index.js';
 import type { CSSObject, SxProps, Theme } from '@mui/material/styles/index.js';
 
+import { VISUALLY_HIDDEN_SX } from '../../../platform/visually-hidden';
 import type { LabelProps } from './Label.types';
-import { accentFor, rem, sxRem } from '../../../tokens/scales';
+import { accentFor, rem } from '../../../tokens/scales';
 
 type Size = NonNullable<LabelProps['size']>;
 type Variant = NonNullable<LabelProps['variant']>;
@@ -195,15 +196,5 @@ export const labelStyles = (theme: Theme, flags: LabelStyleFlags): CSSObject => 
   };
 };
 
-/** Visually hidden but still read aloud, for the `srOnly` label. */
-export const SR_ONLY_SX: SxProps<Theme> = {
-  position: 'absolute',
-  width: sxRem(1),
-  height: sxRem(1),
-  padding: 0,
-  margin: sxRem(-1),
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
+/** Visually hidden but still read aloud, for the `srOnly` label (the shared box). */
+export const SR_ONLY_SX: SxProps<Theme> = VISUALLY_HIDDEN_SX;

@@ -9,6 +9,7 @@ export * from './CodeEditor';
 export * from './Command';
 export * from './DateRangePicker';
 export * from './Form';
+export * from './FormHold';
 export * from './Input';
 export * from './InputOTP';
 export * from './Label';

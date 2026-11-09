@@ -80,6 +80,21 @@ Save is `aria-disabled`, not `disabled`, while pending: a disabled button drops
 the focus it holds, and a keyboard user whose save then failed would be sent
 back to the top of the page.
 
+## Busy while something uploads
+
+The open card is a form HOLD scope ([`FormHold`](../../form/FormHold/FormHold.md)).
+While a field in it holds — `useFormHold('logo', uploading)` — Save is
+`aria-disabled`, drawn with the theme's disabled tokens (its label kept at
+3:1), and a press does nothing, **without** the saving spinner: the
+upload shows its own progress where the photo is, and an upload must not look
+like a save. **Cancel stays enabled**: it calls `onCancel`, which is where the
+host aborts the upload and restores the saved value. Busy (an upload) and
+saving (the card's own write) are separate states; only saving disables Cancel.
+
+The card's scope is ISOLATED: an upload in one card never holds another card's
+Save, even under a hold provider the page puts around them, and a card's own
+upload does not hold that page provider.
+
 ## Cancelling
 
 Cancel (or Escape inside the open card) closes the card and calls `onCancel`.

@@ -14,9 +14,28 @@ export type { ButtonBaseProps, ButtonVariant } from './Button.base';
  * `component?: React.ElementType` as a plain prop is exactly what threw the
  * target's own props away (12-70).
  */
+/**
+ * The button as a progress bar (`Button`'s `progress`): `fraction` 0–1 fills it
+ * left to right, `null` shows a spinner; `label` replaces the children and says
+ * what the button is waiting for ("Sending photo · ~5 s").
+ */
+export interface ButtonProgress {
+  fraction: number | null;
+  label: string;
+}
+
 export interface ButtonOwnProps
   extends ButtonBaseProps,
     Omit<MuiButtonProps, 'variant' | 'color' | 'size' | 'component' | keyof ButtonBaseProps> {
+  /**
+   * Turns the button into the bar of something it waits for. Present, the
+   * button fills behind `progress.label`, is `aria-busy` and `aria-disabled`
+   * (still focusable — the label is the reason), and a press does nothing:
+   * not `onClick`, not a form submit. It is never `disabled`, whatever
+   * `disabled` or `loading` say.
+   */
+  progress?: ButtonProgress;
+
   /**
    * Click handler
    */

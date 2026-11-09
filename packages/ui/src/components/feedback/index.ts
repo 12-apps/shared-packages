@@ -7,3 +7,4 @@ export * from './Sonner';
 export * from './StackedModal';
 export * from './Toast';
 export * from './TutorialOverlay';
+export * from './UploadProgress';

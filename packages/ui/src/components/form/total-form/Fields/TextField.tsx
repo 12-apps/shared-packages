@@ -5,6 +5,7 @@ import React from 'react';
 
 import { FormControl, FormLabel, FormMessage } from '../../Form';
 import { Input } from '../../Input';
+import { useFormBusy } from '../../FormHold/FormHold';
 import { useFormContext } from '../FormContext';
 
 /** Props for the `total-form` {@link TextField}. */
@@ -89,6 +90,8 @@ export function TextField({
   inputProps,
 }: TextFieldProps): React.ReactElement {
   const { values, errors, setFieldValue } = useFormContext();
+  // Held while the form waits on an upload (`useFormHold`), like the submit.
+  const busy = useFormBusy();
   const error = errors[name];
   const testId = `total-form-field-${name}`;
 
@@ -108,6 +111,7 @@ export function TextField({
         error={Boolean(error)}
         autoComplete={autoComplete}
         inputProps={callerInputProps(inputProps, testId)}
+        disabled={busy}
         data-testid={testId}
         onChange={(event) => setFieldValue(name, event.target.value)}
       />
