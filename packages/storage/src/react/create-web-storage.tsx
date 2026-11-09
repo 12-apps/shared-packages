@@ -30,7 +30,7 @@ export interface WebStorageConfig {
   maxBytes?: number;
   /** The browser-side re-encode profile. */
   profile?: ImageProfile;
-  /** How requests are made. Default: same-origin `fetch`. */
+  /** How requests are made. Default: an `XMLHttpRequest`, which reports the bytes sent (see `useUpload`). */
   fetchImpl?: typeof fetch;
   /**
    * Every sentence this surface renders — REQUIRED, the host's own factory of
