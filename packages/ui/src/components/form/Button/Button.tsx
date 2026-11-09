@@ -246,7 +246,9 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         progressing={progress != null}
         held={press.held}
         disabled={press.disabled}
-        aria-disabled={press.ariaDisabled}
+        // Only when held or in progress: an explicit undefined would erase the
+        // aria-disabled MUI sets on a disabled link (href), which has no `disabled`.
+        {...(press.ariaDisabled ? { 'aria-disabled': true } : {})}
         aria-busy={press.ariaBusy}
         disableRipple={!ripple}
         startIcon={iconPosition === 'left' ? iconWithTestId : undefined}
