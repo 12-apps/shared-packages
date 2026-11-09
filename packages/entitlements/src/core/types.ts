@@ -158,6 +158,21 @@ export interface ResolvedPlan<F extends string> {
   rank: number;
 }
 
+/** Options for `definePlans`. */
+export interface PlanOptions<K extends string = string> {
+  /**
+   * Is this plan currently on sale? Called on EVERY `cheapestWith` /
+   * `isOffered` call (never cached), so the host can answer from a runtime
+   * snapshot. Absent means every plan is offered.
+   *
+   * It narrows only what is NAMED as an upsell target (`requiredPlan`,
+   * `quota.nextPlan`, the impact calculator's cheapest tier). It never changes
+   * what a tenant is GRANTED: entitlement checks do not read it, so a tenant
+   * on a plan that is no longer offered keeps every entitlement it has.
+   */
+  offered?: (planKey: K) => boolean;
+}
+
 /** The compiled plan catalog. */
 export interface PlanCatalog<F extends string, K extends string = string> {
   /** Every plan key, in declaration order (assumed cheapest -> richest). */
@@ -166,7 +181,9 @@ export interface PlanCatalog<F extends string, K extends string = string> {
   get(key: K): ResolvedPlan<F>;
   /**
    * The lowest-ranked plan whose resolved map grants `feature` with a ceiling
-   * STRICTLY GREATER than `minLimit`, or `null` if no plan does. This is what
+   * STRICTLY GREATER than `minLimit` and that is currently OFFERED, or `null`
+   * if no such plan exists (including when the `offered` predicate rules out
+   * every plan that would grant it: the same answer as "no plan grants it"). This is what
    * populates the 402's `requiredPlan`, and hence the upsell CTA.
    *
    * `minLimit` defaults to 0, i.e. "any plan that grants this at all". Pass
@@ -175,6 +192,12 @@ export interface PlanCatalog<F extends string, K extends string = string> {
    * have.
    */
   cheapestWith(feature: F, minLimit?: number): ResolvedPlan<F> | null;
+  /**
+   * Is `key` currently offered, per the `offered` option of `definePlans`?
+   * Always `true` when none was given. Optional so a hand-built catalog stays
+   * valid; absent reads as "offered".
+   */
+  isOffered?(key: K): boolean;
 }
 
 // ---------------------------------------------------------------------------

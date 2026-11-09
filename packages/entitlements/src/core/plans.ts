@@ -5,6 +5,7 @@ import type {
   FeatureRegistry,
   PlanCatalog,
   PlanDef,
+  PlanOptions,
   ResolvedPlan,
 } from './types';
 
@@ -24,7 +25,8 @@ import type {
  *
  * Declaration order is assumed cheapest -> richest and drives
  * {@link PlanCatalog.cheapestWith}, i.e. the `requiredPlan` in every 402 and
- * therefore the upsell CTA.
+ * therefore the upsell CTA. An optional `offered` predicate (see
+ * {@link PlanOptions}) narrows that to the plans the host currently sells.
  *
  * @example
  * const PLANS = definePlans(FEATURES, {
@@ -79,7 +81,11 @@ function validateEntitlements<F extends string>(
 export function definePlans<
   F extends string,
   const M extends Record<string, PlanDef<F, Extract<keyof M, string>>>,
->(registry: FeatureRegistry<F>, plans: M): PlanCatalog<F, keyof M & string> {
+>(
+  registry: FeatureRegistry<F>,
+  plans: M,
+  options: PlanOptions<keyof M & string> = {},
+): PlanCatalog<F, keyof M & string> {
   type K = keyof M & string;
 
   const list = Object.keys(plans) as K[];
@@ -117,8 +123,13 @@ export function definePlans<
     });
   });
 
+  const { offered } = options;
+
   return {
     list,
+    // Evaluated on EVERY call, never snapshotted here: the host answers it
+    // from live state, so a plan retired after boot stops being offered at once.
+    isOffered: (key: K): boolean => offered === undefined || offered(key),
     get(key: K): ResolvedPlan<F> {
       const plan = resolved.get(key);
       if (!plan) throw new Error(`Unknown plan: "${String(key)}"`);
@@ -127,7 +138,9 @@ export function definePlans<
     cheapestWith(feature: F, minLimit = 0): ResolvedPlan<F> | null {
       for (const key of list) {
         const plan = resolved.get(key);
-        if (plan && toLimit(plan.entitlements[feature]) > minLimit) return plan;
+        if (!plan) continue;
+        if (offered !== undefined && !offered(key)) continue;
+        if (toLimit(plan.entitlements[feature]) > minLimit) return plan;
       }
       return null;
     },

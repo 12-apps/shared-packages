@@ -104,8 +104,8 @@ export interface PlanImpact<S extends string, K extends string> {
   /** Every surface `usage` exceeds on `tier`, worst first. */
   impactOf(usage: Record<S, number>, tier: K): Violation<S>[];
   /**
-   * The cheapest tier that costs this tenant nothing, or `null` if even the
-   * top tier would cap them. Walks the catalog's declaration order — the same
+   * The cheapest OFFERED tier that costs this tenant nothing, or `null` if even
+   * the top offered tier would cap them (or none is offered). Walks the catalog's declaration order — the same
    * order `cheapestWith` answers upsell CTAs from, so the two never disagree.
    */
   cheapestTierFor(usage: Record<S, number>): K | null;
@@ -311,7 +311,11 @@ export function createPlanImpact<F extends string, S extends string, K extends s
   return {
     impactOf,
     cheapestTierFor(usage) {
-      return plans.list.find((tier) => impactOf(usage, tier).length === 0) ?? null;
+      return (
+        plans.list.find(
+          (tier) => (plans.isOffered?.(tier) ?? true) && impactOf(usage, tier).length === 0,
+        ) ?? null
+      );
     },
     emptyUsage() {
       const usage = {} as Record<S, number>;

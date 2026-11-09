@@ -143,6 +143,14 @@ i.e. the `requiredPlan` on every 402. A richer tier may *lower* an inherited
 value (set a quota to `0`) as well as raise it. Cycles and undeclared feature
 keys throw.
 
+`definePlans(FEATURES, plans, { offered })` takes an optional predicate
+`(planKey) => boolean`, evaluated on **every** call so the host can answer from
+a runtime snapshot. `cheapestWith()` (and so `requiredPlan`, the plan view's
+`nextPlan` and `cheapestTierFor`) then names the cheapest **offered** plan; when
+no offered plan grants the feature it returns `null`, exactly like "no plan
+grants it". `offered` never affects what a tenant is granted: entitlement checks
+do not read it, so a tenant on a retired plan keeps every entitlement.
+
 ### `createEntitlements(config)`
 
 ```ts
