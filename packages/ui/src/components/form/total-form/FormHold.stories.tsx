@@ -70,10 +70,16 @@ export const SubmitButtonSaving: Story = {
 export const ButtonWithProgress: Story = {
   render: () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+      <Button dataTestId="publish-5" progress={{ fraction: 0.05, label: 'Ajustando a foto · ~7 s' }}>
+        Publicar
+      </Button>
       <Button dataTestId="publish-25" progress={{ fraction: 0.25, label: 'Ajustando a foto · ~7 s' }}>
         Publicar
       </Button>
       <Button dataTestId="publish-62" progress={{ fraction: 0.62, label: 'Enviando foto · ~5 s' }}>
+        Publicar
+      </Button>
+      <Button dataTestId="publish-100" progress={{ fraction: 1, label: 'Enviando foto · ~1 s' }}>
         Publicar
       </Button>
       <Button dataTestId="publish-saving" progress={{ fraction: null, label: 'Salvando foto…' }}>
