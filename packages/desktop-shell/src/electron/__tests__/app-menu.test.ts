@@ -191,12 +191,23 @@ describe("the manual check's answer", () => {
     expect(updates.install).not.toHaveBeenCalled();
   });
 
-  it("is an info box for every other answer, with a single OK", async () => {
-    const updates = checking({ kind: "downloading", version: "2.0.0", percent: 40 });
+  it.each<[string, UpdateState, string]>([
+    ["signed out (idle)", { kind: "idle" }, "Sign in to check."],
+    ["automatic updates off", { kind: "off" }, "Automatic updates are off."],
+    ["updates manual on this system", { kind: "unsupported" }, "Updates are manual on this system."],
+    ["still checking", { kind: "checking" }, "Looking for a new version…"],
+    ["already the newest", { kind: "none" }, "You are on the newest version."],
+    ["downloading, no progress yet", { kind: "downloading", version: "2.0.0", percent: null }, "Downloading 2.0.0…"],
+    ["downloading, 40%", { kind: "downloading", version: "2.0.0", percent: 40 }, "Downloading 2.0.0 (40%)"],
+  ])("is an info box with a single OK, and installs nothing, when the answer is: %s", async (_, after, message) => {
+    const updates = checking(after);
 
     await ask(updates);
+    await settled();
 
-    expect(recorded.boxes[0]).toMatchObject({ type: "info", message: "Downloading 2.0.0 (40%)", buttons: ["OK"], cancelId: 0 });
+    // Only `failed` warns and only `ready` offers a restart: every other answer is plain news.
+    expect(recorded.boxes[0]).toMatchObject({ title: "Agent", type: "info", message, buttons: ["OK"], defaultId: 0, cancelId: 0 });
+    expect(updates.install).not.toHaveBeenCalled();
   });
 
   it("parents the box to the window in front, when there is one", async () => {
@@ -214,14 +225,23 @@ describe("the manual check's answer", () => {
     expect(recorded.boxes[0]).toMatchObject({ parented: false, owner: null });
   });
 
-  it("lets a check that rejects pass without a box, and without an unhandled rejection", async () => {
-    const updates = offline();
-    installAppMenu({ copy: TEST_MENU_COPY, updates });
+  it("handles a check that rejects: no box, and no unhandled rejection reaches the process", async () => {
+    const unhandled: unknown[] = [];
+    const watcher = (reason: unknown): void => void unhandled.push(reason);
+    process.on("unhandledRejection", watcher);
+    try {
+      const updates = offline();
+      installAppMenu({ copy: TEST_MENU_COPY, updates });
 
-    entry("Help", "Check for updates")?.click?.();
-    await settled();
+      entry("Help", "Check for updates")?.click?.();
+      await settled();
 
-    expect(updates.check).toHaveBeenCalledWith({ manual: true });
-    expect(recorded.boxes).toEqual([]);
+      expect(updates.check).toHaveBeenCalledWith({ manual: true });
+      expect(recorded.boxes).toEqual([]);
+      // `settled` runs after the microtask queue drains, which is when Node reports one.
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", watcher);
+    }
   });
 });
