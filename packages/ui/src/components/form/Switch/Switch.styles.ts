@@ -15,7 +15,6 @@ import {
   IOS_TRAVEL_INSET,
   SWITCH_GLASS,
   SWITCH_GLOW,
-  NEUTRAL_CONTRAST,
   SWITCH_FOCUS_RING,
   SWITCH_GRADIENT,
   SWITCH_HOVER,
@@ -23,7 +22,6 @@ import {
   SWITCH_RIPPLE,
   SWITCH_SPINNER,
   SWITCH_TRANSITION,
-  RESTING_THUMB,
   THUMB_ELEVATION,
   THUMB_RADIUS,
   TRACK_LABEL,
@@ -40,7 +38,7 @@ import {
 } from './Switch.metrics';
 import type { SwitchVariant } from './Switch.base';
 
-import { absoluteInk, controlNeutral, neutralTones } from '../../../tokens/ink';
+import { absoluteInk, controlNeutral, inkPair, neutralTones } from '../../../tokens/ink';
 import { rem } from '../../../tokens/relative';
 import { inkOver } from '../../../tokens/theme';
 import type { ColorValue, SizeValue } from '../../../tokens/vocabulary';
@@ -83,7 +81,7 @@ const getColorFromTheme = (theme: Theme, color: string): ColorPalette => {
     main: palette.main || primary.main,
     dark: palette.dark || palette.main || primary.dark,
     light: palette.light || palette.main || primary.light,
-    contrastText: palette.contrastText || NEUTRAL_CONTRAST,
+    contrastText: palette.contrastText || absoluteInk(theme).white,
   };
 };
 
@@ -109,7 +107,7 @@ const lengthOrPercent = (theme: Theme, value: number | string): string =>
 
 const thumbShadow = (theme: Theme, look: SwitchLook): string =>
   look === 'ios'
-    ? iosThumbShadow((px) => rem(theme, px))
+    ? iosThumbShadow((px) => rem(theme, px), absoluteInk(theme).black)
     : (theme.shadows[THUMB_ELEVATION[look]] ?? 'none');
 
 /** The ripple that expands from the thumb on hover. */
@@ -145,12 +143,12 @@ const rippleOverlay = (palette: ColorPalette): CSSObject => ({
  * washed over the page, which no tenant chooses, and a white thumb on it is the
  * conventional look in both modes.
  */
-const checkedInk = (flags: SwitchFlags, palette: ColorPalette): string => {
+const checkedInk = (theme: Theme, flags: SwitchFlags, palette: ColorPalette): string => {
   const fills = flags.gradient
     ? [palette.light || palette.main, palette.main, palette.dark || palette.main]
     : [palette.main];
 
-  return inkOver(fills, palette.contrastText || NEUTRAL_CONTRAST);
+  return inkOver(fills, palette.contrastText || absoluteInk(theme).white, inkPair(theme));
 };
 
 /** The checked track: the filled bar behind the thumb once the switch is on. */
@@ -198,7 +196,7 @@ const switchBaseSx = (
       // The thumb travels the track minus its own width and both paddings; the
       // iOS look insets differently, so it gets its own distance.
       transform: `translateX(${rem(theme, width - thumbSize - padding * 2)})`,
-      color: checkedInk(flags, palette),
+      color: checkedInk(theme, flags, palette),
       '& .MuiSwitch-thumb': {
         animation: flags.loading ? 'none' : `${bounceAnimation} ${seconds(SWITCH_TRANSITION.ms)} ease-out`,
         /*
@@ -228,8 +226,8 @@ const switchBaseSx = (
           there — the same split {@link checkedInk}'s own docblock makes.
         */
         ...(flags.glass
-          ? { borderColor: checkedInk(flags, palette) }
-          : { backgroundColor: checkedInk(flags, palette) }),
+          ? { borderColor: checkedInk(theme, flags, palette) }
+          : { backgroundColor: checkedInk(theme, flags, palette) }),
       },
       '& + .MuiSwitch-track': checkedTrack(theme, flags, palette),
       '&.Mui-disabled + .MuiSwitch-track': { opacity: DISABLED.checkedTrackOpacity },
@@ -255,8 +253,8 @@ const thumbSx = (
   height: rem(theme, thumbSize),
   borderRadius: lengthOrPercent(theme, THUMB_RADIUS[look](thumbSize)),
   // `.Mui-checked` above replaces this for the brand-filled track; see
-  // {@link RESTING_THUMB} for why the resting one stays white.
-  backgroundColor: RESTING_THUMB,
+  // `RESTING_THUMB` in `Switch.metrics.ts` for why the resting one stays white.
+  backgroundColor: absoluteInk(theme).white,
   boxShadow: thumbShadow(theme, look),
   transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
   position: 'relative',
@@ -328,7 +326,7 @@ const trackLabels = (
       left: theme.spacing(TRACK_LABEL.insetUnits),
       // The `on` word sits at the end the thumb travels TO, which is the
       // filled half of the track once checked.
-      color: checkedInk(flags, palette),
+      color: checkedInk(theme, flags, palette),
     },
   }),
   ...(offText && {
@@ -358,7 +356,7 @@ const trackSx = (
     opacity: 1,
     transition: `all ${seconds(SWITCH_TRANSITION.ms)} ${SWITCH_TRANSITION.easing}`,
     position: 'relative',
-    boxShadow: look === 'ios' ? iosTrackShadow((px) => rem(theme, px)) : 'none',
+    boxShadow: look === 'ios' ? iosTrackShadow((px) => rem(theme, px), absoluteInk(theme).black) : 'none',
     ...(glass && {
       backgroundColor: alpha(theme.palette.background.paper, SWITCH_GLASS.trackAlpha),
       backdropFilter: `blur(${rem(theme, SWITCH_GLASS.trackBlur)})`,
@@ -379,7 +377,7 @@ const trackSx = (
  * reach {@link checkedInk} directly.
  */
 export const onTrackInk = (theme: Theme, flags: SwitchFlags): string =>
-  checkedInk(flags, getColorFromTheme(theme, flags.customColor ?? 'primary'));
+  checkedInk(theme, flags, getColorFromTheme(theme, flags.customColor ?? 'primary'));
 
 export const switchSx = (theme: Theme, flags: SwitchFlags): CSSObject => {
   const palette = getColorFromTheme(theme, flags.customColor ?? 'primary');

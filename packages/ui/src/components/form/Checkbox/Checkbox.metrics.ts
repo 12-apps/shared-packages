@@ -92,8 +92,12 @@ export const CHECKBOX_SPINNER = { size: 20, offset: -10 } as const;
 export const CHECKBOX_GLOW = { blur: { from: 5, to: 20 }, alpha: { from: 0.5, to: 0.8 }, ms: 2000 } as const;
 export const CHECKBOX_PULSE = { spread: 10, alpha: 0.7, ms: 2000 } as const;
 
-/** MUI's default blue at an alpha, as the web's keyframes spell it. */
-export const effectInk = (alphaValue: number): string => alpha(EFFECT_GLOW.muiBlue, alphaValue);
+/**
+ * The glow's hue at an alpha, as the web's keyframes spell it. `glow` is the
+ * host's `uiInk(theme).effectGlow.muiBlue` on the web; native keeps MUI's blue.
+ */
+export const effectInk = (alphaValue: number, glow: string = EFFECT_GLOW.muiBlue): string =>
+  alpha(glow, alphaValue);
 
 /** `FormControlLabel`: flush left, its label at MUI's `body2` size. */
 export const CHECKBOX_LABEL = { marginLeft: 0, fontSize: 14 } as const;

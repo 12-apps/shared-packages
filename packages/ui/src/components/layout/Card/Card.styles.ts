@@ -13,7 +13,7 @@ import {
   CARD_PULSE,
   CARD_RADIUS_FULL,
   CARD_RADIUS_UNITS,
-  CARD_SECTION_BACKGROUND,
+  CARD_SECTION_ALPHA,
   neumorphicShadows,
 } from './Card.metrics';
 import { neutralTones, shadowInk, sheen } from '../../../tokens/ink';
@@ -91,8 +91,8 @@ const neumorphicShadow = (theme: Theme, lifted: boolean): string => {
 };
 
 const sectionBackground = (theme: Theme, lifted: boolean): string => {
-  const wash = CARD_SECTION_BACKGROUND[theme.palette.mode === 'dark' ? 'dark' : 'light'];
-  return lifted ? wash.lifted : wash.rest;
+  const wash = CARD_SECTION_ALPHA[theme.palette.mode === 'dark' ? 'dark' : 'light'];
+  return shadowInk(theme, lifted ? wash.lifted : wash.rest);
 };
 
 const glowShadow = (theme: Theme, lifted: boolean): string => {

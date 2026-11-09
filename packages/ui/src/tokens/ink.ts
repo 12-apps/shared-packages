@@ -122,6 +122,17 @@ export const modeInk = (theme: Theme): string =>
 export const fieldWell = (theme: Theme): string =>
   theme.palette.mode === 'dark' ? theme.palette.background.paper : theme.palette.common.white;
 
+/**
+ * The two inks a label is chosen between over a fill that is not one colour:
+ * the palette's white, and its black at MUI's dark-text strength (0.87). At the
+ * default theme they are `#fff` and `rgba(0, 0, 0, 0.87)`, exactly the pair
+ * `inkOver` has always chosen between.
+ */
+export const inkPair = (theme: Theme): { light: string; dark: string } => ({
+  light: theme.palette.common.white,
+  dark: alpha(theme.palette.common.black, 0.87),
+});
+
 /* ── Neutral tones over the grey ramp ─────────────────────────────────────── */
 
 const step = (theme: Theme, n: keyof typeof NEUTRAL_RAMP): string => theme.palette.grey[n] ?? NEUTRAL_RAMP[n];

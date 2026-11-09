@@ -2,7 +2,6 @@ import { alpha, keyframes } from '@mui/material/styles/index.js';
 import type { CSSObject, Theme } from '@mui/material/styles/index.js';
 
 import { modeInk, shadowInk, sheen, uiInk } from '../../../tokens/ink';
-import { EFFECT_GLOW } from '../../../tokens/ink.core';
 import { rem } from '../../../tokens/relative';
 
 export const slideIn = (theme: Theme) => keyframes`
@@ -16,17 +15,20 @@ export const slideIn = (theme: Theme) => keyframes`
   }
 `;
 
-export const pulse = (theme: Theme) => keyframes`
+export const pulse = (theme: Theme) => {
+  const indigo = uiInk(theme).effectGlow.brandIndigo;
+  return keyframes`
   0% {
-    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0.4)};
+    box-shadow: 0 0 0 0 ${alpha(indigo, 0.4)};
   }
   70% {
-    box-shadow: 0 0 0 ${rem(theme, 10)} ${alpha(EFFECT_GLOW.brandIndigo, 0)};
+    box-shadow: 0 0 0 ${rem(theme, 10)} ${alpha(indigo, 0)};
   }
   100% {
-    box-shadow: 0 0 0 0 ${alpha(EFFECT_GLOW.brandIndigo, 0)};
+    box-shadow: 0 0 0 0 ${alpha(indigo, 0)};
   }
 `;
+};
 
 const BAR_VARIANTS: Record<string, (theme: Theme, elevation: number) => CSSObject> = {
   glass: (theme, elevation) => ({

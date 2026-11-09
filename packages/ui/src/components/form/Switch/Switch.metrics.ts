@@ -97,16 +97,19 @@ export type ShadowLength = (px: number) => string;
 /** A length written as the px it was drawn at — what native reads. */
 export const AS_PX: ShadowLength = (value) => `${value}px`;
 
-/** The iOS thumb's own three-layer shadow. */
-export const iosThumbShadow = (length: ShadowLength = AS_PX): string =>
-  `0 ${length(3)} ${length(1)} 0 ${alpha(SWITCH_BLACK, 0.04)}, 0 ${length(3)} ${length(8)} 0 ${alpha(SWITCH_BLACK, 0.12)}, 0 ${length(1)} 0 0 ${alpha(SWITCH_BLACK, 0.08)}`;
+/**
+ * The iOS thumb's own three-layer shadow. `black` is the shadow's ink: the web
+ * passes its theme's `palette.common.black`, native keeps {@link SWITCH_BLACK}.
+ */
+export const iosThumbShadow = (length: ShadowLength = AS_PX, black: string = SWITCH_BLACK): string =>
+  `0 ${length(3)} ${length(1)} 0 ${alpha(black, 0.04)}, 0 ${length(3)} ${length(8)} 0 ${alpha(black, 0.12)}, 0 ${length(1)} 0 0 ${alpha(black, 0.08)}`;
 
 /** {@link iosThumbShadow} in px, as native draws it. */
 export const IOS_THUMB_SHADOW = iosThumbShadow();
 
 /** The iOS track's inset hairline and inner shade. */
-export const iosTrackShadow = (length: ShadowLength = AS_PX): string =>
-  `inset 0 0 0 ${length(0.5)} ${alpha(SWITCH_BLACK, 0.1)}, inset 0 ${length(2)} ${length(3)} ${alpha(SWITCH_BLACK, 0.12)}`;
+export const iosTrackShadow = (length: ShadowLength = AS_PX, black: string = SWITCH_BLACK): string =>
+  `inset 0 0 0 ${length(0.5)} ${alpha(black, 0.1)}, inset 0 ${length(2)} ${length(3)} ${alpha(black, 0.12)}`;
 
 /** The resting track: a black wash on iOS, the disabled ink elsewhere. */
 export const TRACK_ALPHA = { ios: 0.1, android: 0.2, other: 0.3 } as const;
