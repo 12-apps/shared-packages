@@ -59,6 +59,7 @@ import { Button } from '@procurement/ui';
 | `loading`    | `boolean`                                                                     | `false`     | Shows loading spinner over the label, sets `aria-busy`, disables button |
 | `loadingLabel` | `string`                                                                    | `loading`   | React Native only: the busy spinner's accessible name (`UI_LABELS[locale].common.loading`) |
 | `disabled`   | `boolean`                                                                     | `false`     | Disables button interaction               |
+| `progress`   | `{ fraction: number \| null; label: string }`                                | -           | Web only. The button becomes the bar of what it waits for: it fills left to right behind `label` (`fraction` 0–1; `null` shows a spinner instead), is `aria-busy` and `aria-disabled` but stays focusable, and a press does nothing — not `onClick`, not a form submit. Never `disabled`, whatever `disabled` / `loading` say. See [Progress and holds](#progress-and-holds). |
 | `icon`       | `ReactNode`                                                                   | -           | Icon element to display before text       |
 | `glow`       | `boolean`                                                                     | `false`     | Adds glow visual effect                   |
 | `pulse`      | `boolean`                                                                     | `false`     | Adds pulse animation effect               |
@@ -73,6 +74,26 @@ import { Button } from '@procurement/ui';
 | `className`  | `string`                                                                      | -           | Additional CSS classes                    |
 | `component`  | `ElementType`                                                                 | `'button'`  | Render as this element/component instead  |
 | `href`       | `string`                                                                      | -           | Renders an `<a>` (MUI's own behaviour)    |
+
+## Progress and holds
+
+`progress` is for a button that must wait on something the person can see
+running — a photo uploading before Publish can act:
+
+```tsx
+<Button
+  type="button"
+  onClick={publish}
+  progress={uploading ? { fraction: upload.fraction, label: 'Sending photo · ~5 s' } : undefined}
+>
+  Publish
+</Button>
+```
+
+A `type="submit"` button is also HELD while its form is busy
+([`FormHold`](../FormHold/FormHold.md)): it is `disabled` until the hold is
+released. Any other button is not held, so navigation stays live; a host
+control opts in by reading `useFormBusy()`.
 
 ## Rendering as something else
 

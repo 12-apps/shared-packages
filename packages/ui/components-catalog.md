@@ -350,6 +350,14 @@ Components for providing feedback to users about system state and actions.
 **Location**: `src/components/feedback/TutorialOverlay`
 **Docs**: `src/components/feedback/TutorialOverlay/TutorialOverlay.md`
 
+### UploadProgress
+**Purpose**: Where a photo is while it goes up — the stage, a bar and the time left, at the photo itself
+**Use Cases**: Any image upload (a product photo, a logo, a variation thumbnail); pair with `@12-apps/storage/react`'s `useUpload().progress`
+**Features**: Three stages in order — `preparing` (step "1 of 3", its time or the total until the bytes are up), `sending` (percentage, time left once measured), `saving` (spinner and the word, no number); determinate or indeterminate bar (composes `data-display/Progress`); seconds rounded up and never jumping up by more than one between renders (`useUploadTimeLeft` for a caller's own slot); `compact` size (bar alone, for a 44 px thumbnail); the stage word is the only text in a polite `role="status"`, so stage changes are announced and percents are not; structural `progress` type (no import from storage); required `copy` (no shipped words)
+**Types**: `UploadProgressProps`, `UploadProgressValue`, `UploadProgressCopy`, `UploadProgressStage`
+**Location**: `src/components/feedback/UploadProgress`
+**Docs**: `src/components/feedback/UploadProgress/UploadProgress.md`
+
 ---
 
 ## Form Components
@@ -373,7 +381,7 @@ Components for user input and form interactions.
 ### Button
 **Purpose**: Clickable button component
 **Use Cases**: Actions, form submissions, navigation, active state indicators
-**Features**: Multiple variants (solid, outline, ghost, text, glass, gradient), sizes (xs-xl), colors (primary, secondary, success, warning, info, danger, neutral), icons, loading states, disabled states, glow/pulse effects, active state support, renders as another element or component via `component` (a router link painted as a button keeps that link's own typed props)
+**Features**: Multiple variants (solid, outline, ghost, text, glass, gradient), sizes (xs-xl), colors (primary, secondary, success, warning, info, danger, neutral), icons, loading states, disabled states, `progress` (the button fills left to right behind a label while it waits, stays focusable and `aria-disabled`, a press does nothing; `SubmitButton` forwards it), glow/pulse effects, active state support, renders as another element or component via `component` (a router link painted as a button keeps that link's own typed props)
 **Location**: `src/components/form/Button`
 **Docs**: `src/components/form/Button/Button.md`
 
@@ -434,6 +442,13 @@ Components for user input and form interactions.
 **Features**: Validation, error handling, submission handling
 **Location**: `src/components/form/Form`
 **Docs**: `src/components/form/Form/Form.md`
+
+### FormHold
+**Purpose**: Hold a form while something it depends on still runs (a photo uploading) — fields and submit wait, navigation stays live
+**Use Cases**: A form with an image field; a settings card whose logo uploads; a drawer portalled out of the form's DOM
+**Features**: `useFormHold(key, held)` registers a hold, `useFormBusy()` reads it, `FormHoldProvider` scopes it; a React context, not `<fieldset disabled>`, so it reaches portals; scopes nest both ways; provided by `total-form`'s `FormContainer` (which also refuses a held submit, `requestSubmit()` included) and an open `SettingCard` (Save `aria-disabled` with no spinner, Cancel live); holds `Fields.*`, `Button type="submit"`, `SubmitButton` and any control that opts in — a plain `Button` is not held
+**Location**: `src/components/form/FormHold`
+**Docs**: `src/components/form/FormHold/FormHold.md`
 
 ### HeaderActions
 **Purpose**: Page-header actions sized to how many there are (0 ⇒ nothing, 1 ⇒ a button, n ⇒ a button + a dropdown of the rest)
@@ -670,7 +685,7 @@ Components for structuring and organizing page layouts.
 ### SettingCard
 **Purpose**: One setting, summarised while closed and edited in place
 **Use Cases**: Settings screens — any value with a title, a current state and a small form behind an Edit
-**Features**: Closed title + status pill + a summary of at most two lines (an [i] beside the title holds the rest) + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; required `copy` (no shipped words)
+**Features**: Closed title + status pill + a summary of at most two lines (an [i] beside the title holds the rest) + Edit; opens in place (no modal/route) around the host form with a "learn more" disclosure and Cancel/Save; async save with a pending state, stays open and shows the error on rejection (`formatError` for host sentences); Cancel/Escape discard; focus moves into the card on open and back to Edit on close; controlled or uncontrolled; spans the full row of a grid while open; a form hold scope while open (`useFormHold`: Save `aria-disabled` without the saving spinner, Cancel live); required `copy` (no shipped words)
 **Types**: `SettingCardProps`, `SettingCardCopy`, `SettingStatus`, `SettingErrorFormatter`, `SettingSaveResult`
 **Location**: `src/components/layout/SettingCard`
 **Docs**: `src/components/layout/SettingCard/SettingCard.md`
@@ -972,6 +987,7 @@ const CustomCard = ({ children, ...props }) => (
 | Display code | Code | CodeEditor (editable) |
 | Load more items | InfiniteScroll | Pagination |
 | File upload | UploadButton | Input (type="file") |
+| Photo upload in progress | UploadProgress (at the photo) + FormHold | Button `progress` (the action that waits) |
 | Async data states | AsyncStateContainer | LoadingState, ErrorState, EmptyState |
 | Settings screen | SettingCard, SettingToggle in a SettingGrid | SettingGroup (one subject, main switch) |
 | Whole number entry | NumberField | Input (free text) |
