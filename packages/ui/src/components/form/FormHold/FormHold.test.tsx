@@ -119,6 +119,23 @@ describe('FormHold — what busy holds', () => {
     expect(screen.getByTestId('inner-busy')).toHaveTextContent('false');
   });
 
+  it('sibling scopes under one shared provider hold each other through it', () => {
+    function Probe({ id }: { id: string }): React.ReactElement {
+      return <span data-testid={id}>{String(useFormBusy())}</span>;
+    }
+    render(
+      <FormHoldProvider>
+        <FormHoldProvider>
+          <Uploader holdKey="a" held />
+        </FormHoldProvider>
+        <FormHoldProvider>
+          <Probe id="sibling-busy" />
+        </FormHoldProvider>
+      </FormHoldProvider>,
+    );
+    expect(screen.getByTestId('sibling-busy')).toHaveTextContent('true');
+  });
+
   it('is false, and holds nothing, outside any provider', () => {
     render(
       <>

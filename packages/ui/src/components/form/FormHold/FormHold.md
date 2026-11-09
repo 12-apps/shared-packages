@@ -26,10 +26,10 @@ function ReplaceButton() {
 `FormContainer` (`total-form`) and an open `SettingCard` each provide a hold
 scope. A host form that is neither wraps itself in `<FormHoldProvider>`.
 
-Sibling scopes under one shared provider do not hold each other: a hold in one
-holds that scope and the shared provider above it (so anything reading the
-shared provider waits), but the sibling scope stays live — holds travel up and
-down a branch, never across.
+Sibling scopes under one shared provider DO hold each other, through it: a
+hold in one scope holds the shared provider above it, and a provider's hold
+reaches every scope inside it, so the sibling scope is busy too. Give two
+forms that must stay independent no shared provider.
 
 ## API
 
