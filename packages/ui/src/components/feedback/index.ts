@@ -6,4 +6,5 @@ export * from './SequenceResolver';
 export * from './Sonner';
 export * from './StackedModal';
 export * from './Toast';
+export * from './UploadProgress';
 export * from './TutorialOverlay';
