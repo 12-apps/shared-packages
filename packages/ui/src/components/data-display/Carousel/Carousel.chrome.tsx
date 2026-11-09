@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { CarouselCounter } from './Carousel.counter';
 import { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
 import type { CarouselCopy } from '../../../copy';
 import type {
@@ -18,7 +19,6 @@ export interface CarouselChromeProps {
   items: CarouselItem[];
   activeIndex: number;
   loop: boolean;
-  disabled: boolean;
   showArrows: boolean;
   showIndicators: boolean;
   showThumbnails: boolean;
@@ -26,6 +26,12 @@ export interface CarouselChromeProps {
   indicatorPosition: IndicatorPosition;
   color: Color;
   size: NonNullable<CarouselThumbnailsProps['size']>;
+  indicatorVariant?: CarouselIndicatorsProps['variant'];
+  /** The counter's text, already worded; no counter when absent. */
+  counterText?: string;
+  counterPosition?: 'top-end' | 'bottom-end';
+  hideArrowsOnTouch?: boolean;
+  arrowVariant?: CarouselArrowsProps['variant'];
   onPrev: () => void;
   onNext: () => void;
   onSelect: (index: number) => void;
@@ -41,7 +47,6 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   items,
   activeIndex,
   loop,
-  disabled,
   showArrows,
   showIndicators,
   showThumbnails,
@@ -49,12 +54,18 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   indicatorPosition,
   color,
   size,
+  indicatorVariant,
+  counterText,
+  counterPosition,
+  hideArrowsOnTouch,
+  arrowVariant,
   onPrev,
   onNext,
   onSelect,
-}) => (
+}) => {
+  return (
   <>
-    {showArrows && !disabled && (
+    {showArrows && (
       <CarouselArrows
         copy={copy}
         onPrev={onPrev}
@@ -63,6 +74,8 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
         color={color}
         disablePrev={!loop && activeIndex === 0}
         disableNext={!loop && activeIndex === items.length - 1}
+        hideOnTouch={hideArrowsOnTouch}
+        variant={arrowVariant}
       />
     )}
 
@@ -74,6 +87,14 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
         onSelect={onSelect}
         position={indicatorPosition}
         color={color}
+        variant={indicatorVariant}
+      />
+    )}
+
+    {counterText && (
+      <CarouselCounter
+        text={counterText}
+        position={counterPosition}
       />
     )}
 
@@ -86,4 +107,5 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
       />
     )}
   </>
-);
+  );
+};

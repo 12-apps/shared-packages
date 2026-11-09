@@ -103,3 +103,27 @@ export const containerStyles = (input: ContainerStyleInput): CSSObject => {
     ...(SURFACES[variant] ?? SURFACES.default)(input),
   };
 };
+
+/**
+ * What the frame adds once it can be driven: while it can be swiped the page
+ * keeps vertical panning and pinch-zoom (the horizontal drag is the carousel's)
+ * and a drag selects no text; while it is a tab stop it has a focus ring.
+ */
+export const interactionSx = (theme: Theme, swipeable: boolean, focusable: boolean): CSSObject => ({
+  ...(swipeable && { touchAction: 'pan-y pinch-zoom', userSelect: 'none' }),
+  ...(focusable && {
+    // The frame's own ring is a two-tone overlay inset from the edge, so it reads
+    // against the photo and not only against the page (the slides paint over an outline).
+    '&:focus-visible': { outline: 'none' },
+    '&:focus-visible::after': {
+      content: '""',
+      position: 'absolute',
+      inset: rem(theme, 6),
+      zIndex: 4,
+      pointerEvents: 'none',
+      borderRadius: theme.spacing(0.5),
+      border: `${rem(theme, 2)} solid ${theme.palette.text.primary}`,
+      boxShadow: `0 0 0 ${rem(theme, 2)} ${theme.palette.background.paper}, inset 0 0 0 ${rem(theme, 2)} ${theme.palette.background.paper}`,
+    },
+  }),
+});

@@ -1,5 +1,7 @@
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import Box from '@mui/material/Box/index.js';
 import IconButton from '@mui/material/IconButton/index.js';
@@ -14,6 +16,8 @@ import { EN_US_CAROUSEL_COPY } from '../../../en-US.data-display';
 import { neutralTones } from '../../../tokens/ink';
 import { accentFor, muiSize, rem } from '../../../tokens/scales';
 
+import { focusRing, indicatorAttrs, pillRowOnPhoto, surfaceArrowSx } from './Carousel.look';
+import { PillIndicator } from './Carousel.pills';
 import type {
   CarouselArrowsProps,
   CarouselIndicatorsProps,
@@ -34,6 +38,8 @@ const activateOnKey = (onSelect: () => void) => (e: React.KeyboardEvent) => {
 };
 
 const INDICATOR_POSITIONS = (theme: Theme): Record<IndicatorPosition, CSSObject> => ({
+  // In flow, after the frame: the wrapper that holds both places it.
+  below: { position: 'static', justifyContent: 'center', marginTop: theme.spacing(1) },
   top: { top: theme.spacing(2), left: '50%', transform: 'translateX(-50%)' },
   bottom: { bottom: theme.spacing(2), left: '50%', transform: 'translateX(-50%)' },
   left: {
@@ -55,15 +61,10 @@ interface IndicatorProps {
   label: string;
   isActive: boolean;
   color: Color;
+  /** Drawn over the photo rather than on the page. */
+  onPhoto?: boolean;
   onSelect: () => void;
 }
-
-/** Attributes every indicator variant carries, whatever it draws. */
-const indicatorAttrs = (index: number, isActive: boolean, label: string) => ({
-  'aria-label': label,
-  'data-testid': `carousel-indicator-${index}`,
-  'data-active': isActive,
-});
 
 const LineIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color, onSelect }) => {
   const theme = useTheme();
@@ -144,6 +145,7 @@ const INDICATORS: Record<IndicatorVariant, React.FC<IndicatorProps>> = {
   lines: LineIndicator,
   numbers: NumberIndicator,
   dots: DotIndicator,
+  pills: PillIndicator,
 };
 
 const INDICATORS_DEFAULTS = {
@@ -169,8 +171,10 @@ export const CarouselIndicators: React.FC<CarouselIndicatorsProps> = (props) => 
       sx={{
         position: 'absolute',
         display: 'flex',
-        gap: 1,
+        // Pills carry their own 24 px target, so their pitch is the target.
+        gap: variant === 'pills' ? 0 : 1,
         zIndex: 2,
+        ...(variant === 'pills' && position !== 'below' && pillRowOnPhoto(theme)),
         ...(INDICATOR_POSITIONS(theme)[position] ?? INDICATOR_POSITIONS(theme).bottom),
         ...style,
       }}
@@ -182,6 +186,7 @@ export const CarouselIndicators: React.FC<CarouselIndicatorsProps> = (props) => 
           label={goToSlide(index + 1)}
           isActive={index === activeIndex}
           color={color}
+          onPhoto={position !== 'below'}
           onSelect={() => onSelect(index)}
         />
       ))}
@@ -202,7 +207,8 @@ const ARROWS_DEFAULTS = {
  * All three positions place the arrow the same way; only `overlay` fades it back
  * until hovered, and only `outside` sits it clear of the frame.
  */
-const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => ({
+const arrowSx = (theme: Theme, color: Color, isOverlay: boolean, hideOnTouch: boolean): CSSObject => ({
+  '&:focus-visible': focusRing(theme),
   position: 'absolute',
   top: '50%',
   transform: 'translateY(-50%)',
@@ -210,6 +216,7 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
   backgroundColor: alpha(theme.palette.background.paper, 0.8),
   color: accentFor(theme, color).main,
   '&:disabled': { opacity: 0.3 },
+  ...(hideOnTouch && { '@media (hover: none) and (pointer: coarse)': { display: 'none' } }),
   ...(isOverlay
     ? {
         opacity: 0.7,
@@ -220,14 +227,15 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
 
 export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
   const {
-    copy, onPrev, onNext, position, disabled, disablePrev, disableNext, color, size, className,
-    style,
+    copy, onPrev, onNext, position, disabled, disablePrev, disableNext, hideOnTouch, color, size,
+    className, style, variant,
   } = withDefaults(props, ARROWS_DEFAULTS) as CarouselArrowsProps &
     Required<Pick<CarouselArrowsProps, keyof typeof ARROWS_DEFAULTS>>;
 
   const theme = useTheme();
-  const sx = arrowSx(theme, color, position === 'overlay');
-  const offset = rem(theme, position === 'outside' ? -40 : 8);
+  const surface = variant === 'surface';
+  const sx = { ...arrowSx(theme, color, position === 'overlay', Boolean(hideOnTouch)), ...(surface && surfaceArrowSx(theme)) };
+  const offset = rem(theme, position === 'outside' ? -40 : surface ? 16 : 8);
 
   return (
     <Box data-testid="carousel-navigation">
@@ -240,7 +248,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
         data-testid="carousel-prev-button"
         sx={{ ...sx, left: offset, ...style }}
       >
-        <ArrowBackIosIcon />
+        {surface ? <ChevronLeftIcon /> : <ArrowBackIosIcon />}
       </IconButton>
 
       <IconButton
@@ -252,7 +260,7 @@ export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
         data-testid="carousel-next-button"
         sx={{ ...sx, right: offset, ...style }}
       >
-        <ArrowForwardIosIcon />
+        {surface ? <ChevronRightIcon /> : <ArrowForwardIosIcon />}
       </IconButton>
     </Box>
   );

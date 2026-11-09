@@ -24,9 +24,9 @@ import { Carousel } from '@/components/data-display/Carousel';
 
 ### copy
 
-- **Type**: `CarouselCopy` — `{ previous: string; next: string; goToSlide?: (position: number) => string }`
+- **Type**: `CarouselCopy` — `{ previous: string; next: string; goToSlide?: (position: number) => string; region?: string; roleDescription?: string; slideRoleDescription?: string; slideLabel?: (position: number, total: number) => string; position?: (position: number, total: number) => string }`
 - **Required**: Yes
-- **Description**: The arrows' accessible names (they render only a glyph) and each indicator's, from its 1-based position. `goToSlide` is optional; omitted, it reads `Go to slide ${position}`. Pass `CAROUSEL_COPY[locale]` from `@12-apps/ui/locales` (`PT_BR_CAROUSEL_COPY` for pt-BR)
+- **Description**: The arrows' accessible names (they render only a glyph) and each indicator's, from its 1-based position. `goToSlide` is optional; omitted, it reads `Go to slide ${position}`. `roleDescription` / `slideRoleDescription` are the `aria-roledescription` of the region and of each slide ("carrossel", "slide"; the attribute is omitted when absent), `region` names the carousel for a screen reader, `slideLabel` names each slide ("2 de 5"), and `position` words the counter chip (`showCounter`). The package holds no wording of its own: omitted `region` and `slideLabel` leave those names off, an omitted `position` falls back to English. Pass `CAROUSEL_COPY[locale]` from `@12-apps/ui/locales` (`PT_BR_CAROUSEL_COPY` for pt-BR)
 
 ### items
 
@@ -88,6 +88,39 @@ import { Carousel } from '@/components/data-display/Carousel';
 - **Default**: `false`
 - **Description**: Show thumbnail navigation
 
+### startIndex
+
+- **Type**: `number`
+- **Default**: `0`
+- **Description**: The slide shown first (0-based, clamped to the list). Read once, on mount: a product sheet that opens on its back-cover photo passes that photo's index.
+
+### showCounter / counterPosition
+
+- **Type**: `boolean` (default `false`) / `'top-end' | 'bottom-end'` (default `'top-end'`)
+- **Description**: An "n of m" chip over the photo, worded by `copy.position`. It reads the same index as the indicators, so the two never disagree. Never drawn for a single item.
+
+### indicatorVariant
+
+- **Type**: `'dots' | 'lines' | 'numbers' | 'pills'`
+- **Default**: `'dots'`
+- **Description**: `pills` is small dots with a wider current one.
+
+### hideArrowsOnTouch
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Hides the arrows on a touch-only device (`hover: none` and `pointer: coarse`), where the swipe does their job. A desktop browser keeps them.
+
+### Swipe, keys and tap
+
+- A horizontal drag past 50 design px, or a short fast fling, goes to the next or previous slide. The axis is decided on the first move: a vertical start is left to the page (the frame sets `touch-action: pan-y pinch-zoom`, so pinch-zoom still works; only the first pointer is followed), so scrolling still works. The classification is `classifySwipe` in `utils/swipe`, the same one the Lightbox uses.
+- Left and Right move the slide while the carousel, or a control inside it, has focus. There is no global key listener.
+- With `onClick` set, Enter and Space on the focused frame tap the active slide, so the keyboard reaches what a tap opens. The arrow keys are left alone inside a text field.
+- While autoplay rotates, the slides are `aria-live="off"`; otherwise `polite`.
+- `onClick(item, index)` reports a tap. A horizontal drag, swipe or not, never counts as one.
+- With a single item the arrows, indicators, counter and swipe are all off.
+- Under `prefers-reduced-motion: reduce` the slides change with no transition.
+
 ### pauseOnHover
 
 - **Type**: `boolean`
@@ -114,9 +147,9 @@ import { Carousel } from '@/components/data-display/Carousel';
 
 ### indicatorPosition
 
-- **Type**: `'top' | 'bottom' | 'left' | 'right'`
+- **Type**: `'top' | 'bottom' | 'left' | 'right' | 'below'`
 - **Default**: `'bottom'`
-- **Description**: Position of the indicator dots
+- **Description**: Position of the indicator dots. `below` draws the row after the frame, outside the photo, centred with token spacing; the others sit on the photo.
 
 ### arrowPosition
 
@@ -218,6 +251,8 @@ import { Carousel } from '@/components/data-display/Carousel';
 ```
 
 ## Accessibility
+
+- The frame is `role="region"` with `aria-roledescription="carousel"`, named by `copy.region`; each slide is `role="group"` with `aria-roledescription="slide"`, named by `copy.slideLabel`. The arrows are real buttons named by `copy.previous` and `copy.next`.
 
 - **Keyboard Navigation**: Supports arrow keys for navigation (Left/Right arrows)
 - **ARIA Attributes**: Includes proper ARIA labels and roles for screen readers

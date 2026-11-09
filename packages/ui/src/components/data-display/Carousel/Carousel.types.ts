@@ -13,8 +13,9 @@ export interface CarouselItem {
 
 export interface CarouselProps {
   /**
-   * The two arrows' accessible names. They render a glyph and nothing else,
-   * so this pair IS what a screen reader announces for them. REQUIRED.
+   * The arrows' accessible names (a glyph and nothing else, so this IS what a
+   * screen reader announces), plus the optional region, slide and counter
+   * wording. REQUIRED.
    */
   copy: CarouselCopy;
   items: CarouselItem[];
@@ -47,18 +48,33 @@ export interface CarouselProps {
   onChange?: (index: number) => void;
   onFocus?: () => void;
   onBlur?: () => void;
-  indicatorPosition?: 'top' | 'bottom' | 'left' | 'right';
+  /** `below` draws the row after the frame, outside the photo; the rest sit on it. */
+  indicatorPosition?: 'top' | 'bottom' | 'left' | 'right' | 'below';
   arrowPosition?: 'inside' | 'outside' | 'overlay';
   animation?: 'slide' | 'fade' | 'zoom' | 'flip';
+  /** The slide shown first (0-based, clamped). Read once, on mount. */
+  startIndex?: number;
+  /**
+   * Draws an "n of m" chip on the photo, worded by `copy.position`. Stays in
+   * step with the indicators. Hidden with a single item.
+   */
+  showCounter?: boolean;
+  counterPosition?: 'top-end' | 'bottom-end';
+  /** How the indicators look; `pills` is small dots with a wider current one. */
+  indicatorVariant?: NonNullable<CarouselIndicatorsProps['variant']>;
+  /** The arrows' look; `default` is as it always was. */
+  arrowVariant?: 'default' | 'surface';
+  /** Hides the arrows on a touch-only device, where a swipe does their job. */
+  hideArrowsOnTouch?: boolean;
 }
 
 export interface CarouselIndicatorsProps {
   count: number;
   activeIndex: number;
   onSelect: (index: number) => void;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'below';
   color?: ColorValue;
-  variant?: 'dots' | 'lines' | 'numbers';
+  variant?: 'dots' | 'lines' | 'numbers' | 'pills';
   /** Names each indicator through `goToSlide`; the English pack's wording when omitted. */
   copy?: CarouselCopy;
   className?: string;
@@ -73,6 +89,10 @@ export interface CarouselArrowsProps {
   disabled?: boolean;
   disablePrev?: boolean;
   disableNext?: boolean;
+  /** Hidden on a touch-only device, where a swipe does their job. */
+  hideOnTouch?: boolean;
+  /** `surface` is the storefront look: a near-opaque surface circle, ink chevron, 16 px in. Default unchanged. */
+  variant?: 'default' | 'surface';
   color?: ColorValue;
   size?: SizeValue;
   className?: string;
