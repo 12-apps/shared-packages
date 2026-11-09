@@ -4,17 +4,22 @@
 // discount-dialog.test.tsx).
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import { createWebDiscounts, type DiscountsWebConfig } from "../create-web-discounts";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { getByLabelFor } from "./labelled-control";
+import { oneAdminPerDescribe } from "./one-admin";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * `wholeDays` from the factory to the form (FUT-4482, review round 2): the
@@ -51,8 +56,7 @@ const RECORD: DiscountWireRecord = {
   createdAt: "2026-11-01T00:00:00.000Z",
 };
 
-function surface(wholeDays: boolean, rows: DiscountWireRecord[] = []) {
-  const sent: unknown[] = [];
+function surface(wholeDays: boolean, rows: DiscountWireRecord[] = [], sent: unknown[] = []) {
   const transport: DiscountsTransport = {
     get: <T,>(url: string): Promise<T> =>
       url.endsWith("/targets")
@@ -79,15 +83,16 @@ function surface(wholeDays: boolean, rows: DiscountWireRecord[] = []) {
   return { built: createWebDiscounts(config), sent };
 }
 
-function mountScreen(wholeDays: boolean, rows: DiscountWireRecord[] = []) {
-  const { built, sent } = surface(wholeDays, rows);
-  const { Screen } = built;
-  render(
-    <MemoryRouter initialEntries={["/discounts"]}>
-      <Screen />
-    </MemoryRouter>,
+/** The whole admin over `rows`, recording each body Salvar sends in `sent`. */
+function adminTree(wholeDays: boolean, rows: DiscountWireRecord[], sent: unknown[]): ReactElement {
+  const { Screen } = surface(wholeDays, rows, sent).built;
+  return (
+    <ThemeProvider theme={STILL_THEME}>
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>
+    </ThemeProvider>
   );
-  return sent;
 }
 
 const box = (name: "startsAt" | "endsAt"): HTMLInputElement =>
@@ -101,8 +106,8 @@ const tap = (day: number): void => {
   fireEvent.click(cell);
 };
 const fillRequired = (): void => {
-  fireEvent.change(screen.getByLabelText(copy.form.name), { target: { value: "Dia do hambúrguer" } });
-  fireEvent.change(screen.getByLabelText(copy.form.percentOff), { target: { value: "10" } });
+  fireEvent.change(getByLabelFor(copy.form.name), { target: { value: "Dia do hambúrguer" } });
+  fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
 };
 
 async function openCreate(): Promise<void> {
@@ -117,9 +122,29 @@ async function openEdit(): Promise<void> {
   await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
 }
 
+// The worker's first mount of the admin and its form pays for emotion writing
+// every style once (1–1.5 s alone, several times that on a loaded runner).
+// Paid here, under the hook's own limit, not inside the first case (FUT-4623).
+browserRootFontForThisFile();
+
+beforeAll(async () => {
+  // The create form and the edit form once each: what the first case of each
+  // kind would otherwise pay for inside its 5 s.
+  render(adminTree(true, [RECORD], []));
+  await openCreate();
+  cleanup();
+  render(adminTree(true, [RECORD], []));
+  await openEdit();
+  cleanup();
+});
+
 describe("createWebDiscounts({ wholeDays: true }).Screen — the create dialog", () => {
+  // Both cases open the create dialog on the same host: one admin under them,
+  // each opening its own fresh form (FUT-4623, `one-admin.ts`).
+  const sent: unknown[] = [];
+  oneAdminPerDescribe(() => adminTree(true, [], sent), () => sent.splice(0));
+
   it("WD1: accepts equal typed days and sends them", async () => {
-    const sent = mountScreen(true);
     await openCreate();
     fillRequired();
     typeInto("startsAt", "10112026");
@@ -130,7 +155,6 @@ describe("createWebDiscounts({ wholeDays: true }).Screen — the create dialog",
   });
 
   it("WD2: a second tap on Início makes a one-day range", async () => {
-    mountScreen(true);
     await openCreate();
     typeInto("startsAt", "10112026");
     tap(10);
@@ -140,8 +164,11 @@ describe("createWebDiscounts({ wholeDays: true }).Screen — the create dialog",
 });
 
 describe("createWebDiscounts({ wholeDays: true }).Screen — the edit dialog", () => {
+  // Same here: one admin over the record, a fresh edit form per case (FUT-4623).
+  const sent: unknown[] = [];
+  oneAdminPerDescribe(() => adminTree(true, [RECORD], sent), () => sent.splice(0));
+
   it("WD3: a second tap on the record's Início makes a one-day range", async () => {
-    mountScreen(true, [RECORD]);
     await openEdit();
     expect(box("startsAt").value).toBe("10/11/2026");
     tap(10);
@@ -149,7 +176,6 @@ describe("createWebDiscounts({ wholeDays: true }).Screen — the edit dialog", (
   });
 
   it("WD4: accepts equal typed days and sends them", async () => {
-    const sent = mountScreen(true, [RECORD]);
     await openEdit();
     typeInto("endsAt", "10112026");
     fireEvent.click(screen.getByTestId("discount-form-submit"));
@@ -162,7 +188,11 @@ describe("createWebDiscounts({ wholeDays: true }).DiscountForm", () => {
   it("WD5: accepts equal days, typed and by a second tap", async () => {
     const { built, sent } = surface(true);
     const { DiscountForm } = built;
-    render(<DiscountForm groups={STORY_GROUPS} editing={null} onSaved={() => {}} />);
+    render(
+      <ThemeProvider theme={STILL_THEME}>
+        <DiscountForm groups={STORY_GROUPS} editing={null} onSaved={() => {}} />
+      </ThemeProvider>,
+    );
     fillRequired();
     typeInto("startsAt", "10112026");
     tap(10);

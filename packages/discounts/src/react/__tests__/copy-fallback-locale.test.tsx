@@ -2,11 +2,13 @@
 // The surface's chunks, warmed before the test starts.
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
 import type { DiscountsWebCopy } from "../copy";
@@ -17,6 +19,7 @@ import { createFormatters, type DiscountsFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 7: the language a host pack's missing sentences are
@@ -92,11 +95,10 @@ function hostFormatters(): DiscountsFormatters {
   };
 }
 
-describe("a bare DiscountsSurface with a pt-BR pack from before the calendar block (B2)", () => {
-  it("says the list and the calendar in Portuguese with no locale anywhere", async () => {
-    const formatters = hostFormatters();
-    expect(formatters.locale).toBeUndefined();
-    render(
+/** A bare surface over a host's own formatters, under the still theme. */
+function bareSurface(formatters: DiscountsFormatters): ReactElement {
+  return (
+    <ThemeProvider theme={STILL_THEME}>
       <MemoryRouter initialEntries={["/discounts"]}>
         <DiscountsSurface
           api={createDiscountsApiClient("/api/admin/loja", transport, formatters)}
@@ -106,8 +108,31 @@ describe("a bare DiscountsSurface with a pt-BR pack from before the calendar blo
           currencyField={({ name, label }) => <Fields.TextField name={name} label={label} />}
           onError={() => {}}
         />
-      </MemoryRouter>,
-    );
+      </MemoryRouter>
+    </ThemeProvider>
+  );
+}
+
+// The worker's first mount of the surface and its edit form pays for emotion
+// writing every style once (1–1.5 s alone, several times that on a loaded
+// runner). Paid here, under the hook's own limit, not inside the first case
+// (FUT-4623).
+browserRootFontForThisFile();
+
+beforeAll(async () => {
+  render(bareSurface(hostFormatters()));
+  const kebab = await screen.findAllByTestId(`discount-actions-${UNKNOWN.id}`, undefined, SURFACE_LOADED);
+  fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
+  fireEvent.click(await screen.findByTestId("discount-action-edit"));
+  await screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  cleanup();
+});
+
+describe("a bare DiscountsSurface with a pt-BR pack from before the calendar block (B2)", () => {
+  it("says the list and the calendar in Portuguese with no locale anywhere", async () => {
+    const formatters = hostFormatters();
+    expect(formatters.locale).toBeUndefined();
+    render(bareSurface(formatters));
     const notice = await screen.findByTestId("discounts-days-unknown-notice", undefined, SURFACE_LOADED);
     expect(notice.textContent).toContain("Datas indisponíveis");
     const kebab = await screen.findAllByTestId(`discount-actions-${UNKNOWN.id}`, undefined, SURFACE_LOADED);

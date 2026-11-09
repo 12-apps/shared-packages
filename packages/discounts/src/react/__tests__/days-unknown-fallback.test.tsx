@@ -2,11 +2,12 @@
 // The surface's chunks, warmed before the test starts.
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import { missingWebCopy, type DiscountsWebCopy } from "../copy";
@@ -15,6 +16,7 @@ import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review round 6 (release): the web-copy keys this branch added are
@@ -89,9 +91,11 @@ function mount(copy: DiscountsWebCopy, locale: string) {
     wholeDays: true,
   });
   render(
-    <MemoryRouter initialEntries={["/discounts"]}>
-      <Screen />
-    </MemoryRouter>,
+    <ThemeProvider theme={STILL_THEME}>
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -101,6 +105,17 @@ async function openEdit(): Promise<HTMLElement> {
   fireEvent.click(await screen.findByTestId("discount-action-edit"));
   return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
 }
+
+// The worker's first mount of the admin and its form pays for emotion writing
+// every style once (1–1.5 s alone, several times that on a loaded runner).
+// Paid here, under the hook's own limit, not inside the first case (FUT-4623).
+browserRootFontForThisFile();
+
+beforeAll(async () => {
+  mount(olderPack(PT_BR_DISCOUNTS_WEB_COPY), "pt-BR");
+  await openEdit();
+  cleanup();
+});
 
 describe.each([
   ["pt-BR", PT_BR_DISCOUNTS_WEB_COPY],

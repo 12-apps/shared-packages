@@ -3,11 +3,12 @@
 // a cold worker's chunk import is not what the `findBy` waits on.
 import "@12-apps/ui/feedback/StackedModal";
 import "@12-apps/ui/data-display/Sheet";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
+import { ThemeProvider } from "@12-apps/ui/mui/styles";
 
 import type { DiscountWireRecord } from "../api";
 import { createWebDiscounts, type DiscountsWebConfig } from "../create-web-discounts";
@@ -16,6 +17,7 @@ import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
 
 /**
  * FUT-4482, review rounds 4 and 5: a rule whose days the server cannot place
@@ -89,9 +91,11 @@ function mount(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig> = 
     ...extra,
   });
   render(
-    <MemoryRouter initialEntries={["/discounts"]}>
-      <Screen />
-    </MemoryRouter>,
+    <ThemeProvider theme={STILL_THEME}>
+      <MemoryRouter initialEntries={["/discounts"]}>
+        <Screen />
+      </MemoryRouter>
+    </ThemeProvider>,
   );
   return sent;
 }
@@ -102,6 +106,17 @@ async function openEdit(id: string): Promise<HTMLElement> {
   fireEvent.click(await screen.findByTestId("discount-action-edit"));
   return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
 }
+
+// The worker's first mount of the admin and its form pays for emotion writing
+// every style once (1–1.5 s alone, several times that on a loaded runner).
+// Paid here, under the hook's own limit, not inside the first case (FUT-4623).
+browserRootFontForThisFile();
+
+beforeAll(async () => {
+  mount([UNKNOWN]);
+  await openEdit(UNKNOWN.id);
+  cleanup();
+});
 
 describe("the edit form of a rule whose days are unknown (review round 4)", () => {
   it("drops the open-ended hint and says what Salvar does", async () => {
