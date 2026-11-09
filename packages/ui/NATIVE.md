@@ -82,7 +82,7 @@ does not already supply one. See [Screen](./src/components/layout/Screen/Screen.
 ## Ledger
 
 <!-- native-parity:start -->
-Ported: **29 of 154** public subpaths carry a `react-native` condition.
+Ported: **29 of 155** public subpaths carry a `react-native` condition.
 
 | subpath | shared stories run natively | skipped (`native-skip`) | known gaps |
 |---|---|---|---|

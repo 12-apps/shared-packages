@@ -224,6 +224,13 @@ Components for displaying data, visualizations, and information to users.
 **Location**: `src/components/data-display/Stepper`
 **Docs**: `src/components/data-display/Stepper/Stepper.md`
 
+### StepCardList
+**Purpose**: Every step of a form on screen at once, as a stack of cards: answered steps collapse into one button that reopens them, the current step draws its face, the rest wait dashed
+**Use Cases**: A long form split in steps where the visitor must see how many steps there are and how many are left (a "new X" dialog, a discount or ingredient form), not a wizard that hides the other steps. `Stepper` cannot carry this: it is a progress strip of labels with no per-step face, no answer summary and no reopen control
+**Features**: `<ol>` of cards in four states (`done`, `current`, `todo`, `error` = done with an invalid answer); a done card is one `type="button"` holding caption, bold answer, muted line and the caller's change word; the current item has `aria-current="step"` and its heading takes focus when the step arrives; the arrival scrolls just far enough to read the card whole (`reveal` insets for sticky bars, `prefers-reduced-motion` honoured, from `utils/reveal-block`); no default copy; theme tokens only; container queries
+**Location**: `src/components/data-display/StepCardList`
+**Docs**: `src/components/data-display/StepCardList/StepCardList.md`
+
 ### Table
 **Purpose**: Display tabular data
 **Use Cases**: Simple data tables, lists with columns, comparison tables

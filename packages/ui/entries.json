@@ -44,6 +44,7 @@
   "data-display/ScheduleGrid": "src/components/data-display/ScheduleGrid/index.ts",
   "data-display/SectionOnboarding": "src/components/data-display/SectionOnboarding/index.ts",
   "data-display/StatCard": "src/components/data-display/StatCard/index.ts",
+  "data-display/StepCardList": "src/components/data-display/StepCardList/index.ts",
   "data-display/HoverCard": "src/components/data-display/HoverCard/index.ts",
   "data-display/InteractiveTooltip": "src/components/data-display/InteractiveTooltip/index.ts",
   "data-display/LazyImage": "src/components/data-display/LazyImage/index.ts",
