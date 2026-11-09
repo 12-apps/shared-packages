@@ -24,10 +24,16 @@ type Story = StoryObj<typeof Carousel>;
 
 const TONES = ['#d98a5f', '#b8a07a', '#8fa98c', '#7f9bb5', '#a68bb0'];
 
-const photo = (index: number): string =>
+const svg = (fill: string): string =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="${TONES[index % TONES.length]}"/></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="${fill}"/></svg>`,
   )}`;
+
+const photo = (index: number): string => svg(TONES[index % TONES.length] ?? TONES[0]);
+
+/** The two extremes the chrome must hold on: a near-white photo and a near-black one. */
+const tonePhotos = (fill: string): CarouselItem[] =>
+  photos(5).map((item) => ({ ...item, image: svg(fill) }));
 
 const photos = (count: number): CarouselItem[] =>
   Array.from({ length: count }, (_, index) => ({
@@ -43,7 +49,9 @@ const gallery = {
   height: 320,
   animation: 'slide' as const,
   autoPlay: false,
+  loop: true,
   showCounter: true,
+  arrowVariant: 'surface' as const,
   indicatorVariant: 'pills' as const,
   variant: 'minimal' as const,
 };
@@ -153,4 +161,34 @@ export const DotsBelow320: Story = {
     </Frame>
   ),
   args: { ...gallery, indicatorPosition: 'below', hideArrowsOnTouch: true },
+};
+
+/** A near-white photo: the arrows, pills and chip are judged on it. */
+export const LightPhoto: Story = {
+  render: (args) => (
+    <Frame width={390}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, items: tonePhotos('#f4efe6'), indicatorPosition: 'below' },
+};
+
+/** A near-black photo, the other extreme. */
+export const DarkPhoto: Story = {
+  render: (args) => (
+    <Frame width={390}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, items: tonePhotos('#14110f'), indicatorPosition: 'below' },
+};
+
+/** The pills over the photo (on their scrim chip), on the near-white photo. */
+export const PillsOnPhoto: Story = {
+  render: (args) => (
+    <Frame width={390}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, items: tonePhotos('#f4efe6'), indicatorPosition: 'bottom' },
 };

@@ -375,4 +375,26 @@ describe('Carousel review round 1', () => {
     );
     expect(reduced.test(cssText())).toBe(true);
   });
+
+  it('draws a keyboard focus ring on the arrows and on the pills', () => {
+    mount({ indicatorVariant: 'pills' });
+    const ring = (el: Element) =>
+      new RegExp(`\\.${ownClass(el)}:focus-visible\\{[^}]*outline:${rem(createTheme(), 2).replace('.', '\\.')} solid`);
+    expect(ring(screen.getByTestId('carousel-next-button')).test(cssText())).toBe(true);
+    expect(ring(screen.getByTestId('carousel-indicator-0')).test(cssText())).toBe(true);
+  });
+
+  it('emits the surface arrow look only for arrowVariant="surface", leaving the default as it was', () => {
+    const arrowRule = () =>
+      cssText().match(new RegExp(`\\.${ownClass(screen.getByTestId('carousel-next-button'))}\\{([^}]*)\\}`))?.[1] ?? '';
+    const theme = createTheme();
+
+    mount({ arrowVariant: 'surface' });
+    expect(arrowRule()).toContain(`right:${rem(theme, 16)}`);
+    expect(arrowRule()).toContain(`color:${theme.palette.text.primary}`);
+    cleanup();
+    mount();
+    expect(arrowRule()).toContain(`right:${rem(theme, 8)}`);
+    expect(arrowRule()).not.toContain(`color:${theme.palette.text.primary}`);
+  });
 });

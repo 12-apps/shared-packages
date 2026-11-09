@@ -62,6 +62,8 @@ export interface CarouselProps {
   counterPosition?: 'top-end' | 'bottom-end';
   /** How the indicators look; `pills` is small dots with a wider current one. */
   indicatorVariant?: NonNullable<CarouselIndicatorsProps['variant']>;
+  /** The arrows' look; `default` is as it always was. */
+  arrowVariant?: 'default' | 'surface';
   /** Hides the arrows on a touch-only device, where a swipe does their job. */
   hideArrowsOnTouch?: boolean;
 }
@@ -89,6 +91,8 @@ export interface CarouselArrowsProps {
   disableNext?: boolean;
   /** Hidden on a touch-only device, where a swipe does their job. */
   hideOnTouch?: boolean;
+  /** `surface` is the storefront look: a near-opaque surface circle, ink chevron, 16 px in. Default unchanged. */
+  variant?: 'default' | 'surface';
   color?: ColorValue;
   size?: SizeValue;
   className?: string;

@@ -112,9 +112,18 @@ export const containerStyles = (input: ContainerStyleInput): CSSObject => {
 export const interactionSx = (theme: Theme, swipeable: boolean, focusable: boolean): CSSObject => ({
   ...(swipeable && { touchAction: 'pan-y pinch-zoom', userSelect: 'none' }),
   ...(focusable && {
-    '&:focus-visible': {
-      outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
-      outlineOffset: rem(theme, -2),
+    // The frame's own ring is a two-tone overlay inset from the edge, so it reads
+    // against the photo and not only against the page (the slides paint over an outline).
+    '&:focus-visible': { outline: 'none' },
+    '&:focus-visible::after': {
+      content: '""',
+      position: 'absolute',
+      inset: rem(theme, 6),
+      zIndex: 4,
+      pointerEvents: 'none',
+      borderRadius: theme.spacing(0.5),
+      border: `${rem(theme, 2)} solid ${theme.palette.text.primary}`,
+      boxShadow: `0 0 0 ${rem(theme, 2)} ${theme.palette.background.paper}, inset 0 0 0 ${rem(theme, 2)} ${theme.palette.background.paper}`,
     },
   }),
 });

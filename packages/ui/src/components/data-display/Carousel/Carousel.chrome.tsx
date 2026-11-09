@@ -31,6 +31,7 @@ export interface CarouselChromeProps {
   counterText?: string;
   counterPosition?: 'top-end' | 'bottom-end';
   hideArrowsOnTouch?: boolean;
+  arrowVariant?: CarouselArrowsProps['variant'];
   onPrev: () => void;
   onNext: () => void;
   onSelect: (index: number) => void;
@@ -57,6 +58,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   counterText,
   counterPosition,
   hideArrowsOnTouch,
+  arrowVariant,
   onPrev,
   onNext,
   onSelect,
@@ -73,6 +75,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
         disablePrev={!loop && activeIndex === 0}
         disableNext={!loop && activeIndex === items.length - 1}
         hideOnTouch={hideArrowsOnTouch}
+        variant={arrowVariant}
       />
     )}
 
