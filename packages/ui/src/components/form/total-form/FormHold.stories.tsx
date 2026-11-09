@@ -2,6 +2,7 @@ import Box from '@mui/material/Box/index.js';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React from 'react';
 
+import { ThemeProvider, createTheme } from '../../../mui/styles';
 import { UploadProgress } from '../../feedback/UploadProgress';
 import type { UploadProgressCopy, UploadProgressValue } from '../../feedback/UploadProgress';
 import { Button } from '../Button';
@@ -66,9 +67,9 @@ export const SubmitButtonSaving: Story = {
   ),
 };
 
-/** A plain `type="button"` publish button, which must stay one, as the bar. */
-export const ButtonWithProgress: Story = {
-  render: () => (
+/** Publicar at 5, 25, 62 and 100 %, without an estimate, and idle. */
+function ProgressButtons(): React.ReactElement {
+  return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
       <Button dataTestId="publish-5" progress={{ fraction: 0.05, label: 'Ajustando a foto · ~7 s' }}>
         Publicar
@@ -87,6 +88,29 @@ export const ButtonWithProgress: Story = {
       </Button>
       <Button dataTestId="publish-idle">Publicar</Button>
     </Box>
+  );
+}
+
+/** A plain `type="button"` publish button, which must stay one, as the bar. */
+export const ButtonWithProgress: Story = {
+  render: () => <ProgressButtons />,
+};
+
+/** A black brand: no room to darken, so the track lightens to the last readable grey. */
+export const ButtonWithProgressBlackBrand: Story = {
+  render: () => (
+    <ThemeProvider theme={createTheme({ palette: { primary: { main: '#000' } } })}>
+      <ProgressButtons />
+    </ThemeProvider>
+  ),
+};
+
+/** A white brand: dark ink, no room to lighten, so the track darkens instead. */
+export const ButtonWithProgressWhiteBrand: Story = {
+  render: () => (
+    <ThemeProvider theme={createTheme({ palette: { primary: { main: '#fff' } } })}>
+      <ProgressButtons />
+    </ThemeProvider>
   ),
 };
 

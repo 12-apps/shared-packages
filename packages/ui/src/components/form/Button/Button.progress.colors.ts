@@ -14,6 +14,9 @@ import { darken, getContrastRatio, getLuminance, lighten } from '../../../tokens
  */
 export const BUTTON_PROGRESS_MIN_CONTRAST = 4.5;
 
+/** The least contrast between fill and track: the bar must show at a glance. */
+export const BUTTON_PROGRESS_MIN_SEPARATION = 1.3;
+
 /** How far the fill sits from the track: enough to see the bar at a glance. */
 const FILL_SHIFT = 0.3;
 
@@ -38,7 +41,37 @@ export interface ButtonProgressColors {
   fill: string;
 }
 
+/** `color` moved toward `ink` — lighter under light ink, darker under dark. */
+function towardInk(color: string, ink: string, coefficient: number): string {
+  return getLuminance(ink) > 0.5 ? lighten(color, coefficient) : darken(color, coefficient);
+}
+
+/**
+ * The shade of `color` CLOSEST to `ink` that still keeps `minimum` contrast with
+ * it — for a colour already at the far end (black under white ink), the only
+ * room left to put a second shade in.
+ */
+function lastReadableTowardInk(color: string, ink: string, minimum = BUTTON_PROGRESS_MIN_CONTRAST): string {
+  for (let coefficient = 1; coefficient > 0; coefficient -= STEP / 2) {
+    const shade = towardInk(color, ink, coefficient);
+    if (getContrastRatio(ink, shade) >= minimum) return shade;
+  }
+  return color;
+}
+
+/**
+ * Track and fill. Normally the fill is the track pushed further from the ink.
+ * A brand already at the far end (black, white, a pale yellow) has no room
+ * there — the push lands on the same colour and the bar vanishes — so the
+ * track moves TOWARD the ink instead, to the last shade that still reads, and
+ * the far-end colour becomes the fill. Either way the label reads on both and
+ * the two stay {@link BUTTON_PROGRESS_MIN_SEPARATION} apart.
+ */
 export function buttonProgressColors(main: string, ink: string): ButtonProgressColors {
-  const track = withContrast(main, ink);
-  return { track, fill: awayFromInk(track, ink, FILL_SHIFT) };
+  const readable = withContrast(main, ink);
+  const pushed = awayFromInk(readable, ink, FILL_SHIFT);
+  if (getContrastRatio(readable, pushed) >= BUTTON_PROGRESS_MIN_SEPARATION) {
+    return { track: readable, fill: pushed };
+  }
+  return { track: lastReadableTowardInk(readable, ink), fill: readable };
 }

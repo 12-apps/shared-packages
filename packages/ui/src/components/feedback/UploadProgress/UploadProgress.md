@@ -18,6 +18,11 @@ stands in. `progress: null` (idle, done or failed) draws nothing but keeps the
 empty live region mounted; a failure is the host's to state, with its retry,
 where the photo is.
 
+**Layout note:** the component always renders its root and its (empty, visually
+hidden) live region, even while idle. Do not put it in a `gap` / `spacing`
+container whose gap would then sit around an idle, invisible element — give it
+its own wrapper, or its own margin.
+
 ## Usage
 
 ```tsx
