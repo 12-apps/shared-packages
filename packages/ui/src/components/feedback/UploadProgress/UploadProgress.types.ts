@@ -8,7 +8,7 @@ export type UploadProgressStage = 'preparing' | 'sending' | 'saving';
 
 export interface UploadProgressValue {
   stage: UploadProgressStage;
-  /** 0–1 through the stage, or `null` when it cannot be measured (spinner). */
+  /** 0–1 through the stage, or `null` when it cannot be measured (a spinner stands in). */
   fraction: number | null;
   /** Seconds left in the stage, or `null` when there is no honest estimate. */
   secondsLeft: number | null;
@@ -37,7 +37,10 @@ export interface UploadProgressCopy {
 }
 
 export interface UploadProgressProps {
-  /** The upload's progress; `null` renders nothing (idle, done or failed). */
+  /**
+   * The upload's progress; `null` (idle, done or failed) draws nothing but keeps
+   * the empty live region mounted, so the next upload's first stage is announced.
+   */
   progress: UploadProgressValue | null;
   copy: UploadProgressCopy;
   /**

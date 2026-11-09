@@ -36,9 +36,11 @@ const saving: UploadProgressValue = { stage: 'saving', fraction: null, secondsLe
 const text = (id: string) => screen.queryByTestId(id)?.textContent ?? null;
 
 describe('UploadProgress — what each stage says', () => {
-  it('renders nothing while idle', () => {
-    const { container } = render(<UploadProgress progress={null} copy={COPY} />);
-    expect(container).toBeEmptyDOMElement();
+  it('draws nothing while idle but keeps the empty live region', () => {
+    render(<UploadProgress progress={null} copy={COPY} />);
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryAllByRole('progressbar')).toHaveLength(0);
+    expect(screen.getByTestId('upload-progress')).toHaveAttribute('data-stage', 'idle');
   });
 
   it('preparing: the stage word, its step, and the total time when it is known', () => {
@@ -83,11 +85,13 @@ describe('UploadProgress — the bar', () => {
     expect(bar).toHaveAttribute('aria-valuenow', '62');
   });
 
-  it('is indeterminate, with no number, when the fraction is unknown', () => {
+  it('gives way to the spinner, with no number, when the fraction is unknown', () => {
     render(<UploadProgress progress={sending({ fraction: null, secondsLeft: null })} copy={COPY} />);
-    const bar = screen.getByRole('progressbar', { name: 'Sending photo' });
-    expect(bar).not.toHaveAttribute('aria-valuenow');
+    expect(screen.getByTestId('upload-progress-spinner')).toBeInTheDocument();
+    expect(screen.queryAllByRole('progressbar')).toHaveLength(0);
+    expect(text('upload-progress-stage')).toBe('Sending photo');
     expect(text('upload-progress-figure')).toBeNull();
+    expect(text('upload-progress-time')).toBeNull();
   });
 
   it('compact: the bar alone, the stage still in the live region', () => {
@@ -100,6 +104,18 @@ describe('UploadProgress — the bar', () => {
 });
 
 describe('UploadProgress — the live region', () => {
+  it('is the SAME node from idle to the first stage, so the start is announced', () => {
+    const { rerender } = render(<UploadProgress progress={null} copy={COPY} />);
+    const status = screen.getByRole('status');
+    rerender(<UploadProgress progress={preparing()} copy={COPY} />);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status.textContent).toBe('Adjusting the photo');
+    rerender(<UploadProgress progress={null} copy={COPY} />);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toBeEmptyDOMElement();
+  });
+
+
   it('holds only the stage word, and is the SAME node across stages', () => {
     const { rerender } = render(<UploadProgress progress={preparing()} copy={COPY} />);
     const status = screen.getByRole('status');

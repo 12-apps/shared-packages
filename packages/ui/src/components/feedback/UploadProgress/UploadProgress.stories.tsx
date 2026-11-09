@@ -102,8 +102,8 @@ export const SendingNotYetMeasured: Story = {
   args: { progress: { ...SENDING, fraction: 0.04, secondsLeft: null, totalSecondsLeft: null } },
 };
 
-/** A transport that reports no bytes: an indeterminate bar, no number. */
-export const SendingIndeterminate: Story = {
+/** A transport that reports no bytes: no estimate, so the spinner stands in. */
+export const SendingWithoutEstimate: Story = {
   args: { progress: { ...SENDING, fraction: null, secondsLeft: null, totalSecondsLeft: null } },
 };
 

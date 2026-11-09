@@ -12,9 +12,11 @@ happen:
 | `sending` | the bytes go up | the stage word, the percentage, the bar, the time left once it can be estimated |
 | `saving` | the server cuts its crops | a spinner and the stage word, no number |
 
-A stage whose `fraction` is `null` draws an indeterminate bar and no number.
-`progress: null` renders nothing (idle, done or failed — a failure is the
-host's to state, with its retry, where the photo is).
+A stage that cannot be estimated — `saving`, or any stage whose `fraction` is
+`null` — shows the spinner and its word, no bar and no number: the spinner
+stands in. `progress: null` (idle, done or failed) draws nothing but keeps the
+empty live region mounted; a failure is the host's to state, with its retry,
+where the photo is.
 
 ## Usage
 
@@ -48,9 +50,10 @@ caller's own slot.
 
 The stage word is a polite live region (`role="status"`) and the only text in
 it, so a screen reader hears each stage change once and never every percent.
-The bar is a `progressbar` named by the stage, with `aria-valuenow` while it is
-determinate. In `compact` the word is visually hidden but still announced.
+The region stays mounted, empty, while idle, so the first stage of every upload
+is announced. The bar is a `progressbar` named by the stage, with
+`aria-valuenow`. In `compact` the word is visually hidden but still announced.
 
 ## Composes
 
-`data-display/Progress` (linear and circular). It draws no bar of its own.
+`data-display/Progress` (the linear bar). It draws no bar of its own.
