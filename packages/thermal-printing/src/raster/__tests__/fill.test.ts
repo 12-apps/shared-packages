@@ -6,9 +6,11 @@ import type { Shape } from "../svg-doc";
 import type { Point } from "../svg-path";
 
 /**
- * The fill budget is charged from an ESTIMATE, before any row is scanned, so
- * a refusal costs reading the edges once. These pin the estimate and prove the
- * refusal fills nothing — deterministically, with no clock.
+ * The fill budget is charged from an ESTIMATE, before any row is filled. A
+ * document whose edges alone put it over budget is refused at the cost of
+ * reading them once; otherwise the estimate may scan a shape's sub-rows, and
+ * that scan is charged too. These pin the estimate and prove the refusal fills
+ * nothing — deterministically, with no clock: cost is read from counters.
  */
 
 const shape = (polygon: Point[]): Shape => ({ polygons: [polygon], rgba: [0, 0, 0, 255], rule: "nonzero" });
@@ -22,7 +24,7 @@ function zigzag(n: number, width: number, height: number): Shape {
 }
 
 describe("estimateFillWork", () => {
-  it("counts edge sub-rows times the sort factor, plus five units per bounding-box pixel", () => {
+  it("charges a filled square its edge visits times the sort factor, plus five units per pixel it paints", () => {
     // Two vertical edges x 10 rows x 4 sub-rows = 80 edge visits; log2(4) = 2;
     // plus 10 x 10 pixels x 5.
     expect(estimateFillWork([square(10)], 10, 10)).toBe(80 * 2 + 100 * 5);
@@ -157,20 +159,28 @@ describe("estimateFillWork is an upper bound on the work paint does", () => {
   it.each(samples)("on %s", (_label, sample) => {
     const stats: PaintStats = { rowsFilled: 0, work: 0 };
 
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
     paint([sample], 100, 100, new Budget(), stats);
 
+    // The charge covers the fill AND the estimate's own scan, if it ran one.
     expect(stats.work).toBeGreaterThan(0);
-    expect(estimateFillWork([sample], 100, 100)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
+    expect(estimateFillWork([sample], 100, 100, estimate)).toBeGreaterThanOrEqual(
+      (stats.work ?? Infinity) + (estimate.scanWork ?? Infinity),
+    );
   });
 
   it("on the tall logo, shape by shape", () => {
     for (const sample of tallLogo) {
       const stats: PaintStats = { rowsFilled: 0, work: 0 };
+      const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
 
       paint([sample], W, H, new Budget(), stats);
 
       expect(stats.work).toBeGreaterThan(0);
-      expect(estimateFillWork([sample], W, H)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
+      expect(estimateFillWork([sample], W, H, estimate)).toBeGreaterThanOrEqual(
+        (stats.work ?? Infinity) + (estimate.scanWork ?? Infinity),
+      );
     }
   });
 });
@@ -196,5 +206,90 @@ describe("estimateFillWork on degenerate shapes", () => {
 
     expect(Number.isFinite(work)).toBe(true);
     expect(work).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/** One-dot, pixel-aligned strokes the full height of the canvas: the most sub-rows per unit charged. */
+const strokes = (count: number): Shape[] => Array.from({ length: count }, (_, i) => shape(box(i % W, 0, 1, H)));
+/** One-dot strokes slanted 76 dots across the full height: a 77-dot bounding box, a dot or two painted per row. */
+const slants = (count: number): Shape[] =>
+  Array.from({ length: count }, (_, i) => shape([[i % 500, 0], [(i % 500) + 1, 0], [(i % 500) + 77, H], [(i % 500) + 76, H]]));
+
+describe("what the estimate itself costs (FUT-2919 review)", () => {
+  it("charges the scan it runs, so estimating and filling stay within the budget", () => {
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint(slants(1), W, H, new Budget(), stats);
+
+    expect(estimateFillWork(slants(1), W, H, estimate)).toBeGreaterThanOrEqual((stats.work ?? 0) + (estimate.scanWork ?? 0));
+    expect(estimate.scanWork).toBeGreaterThan(0);
+  });
+
+  it("charges a narrow shape its bounding box without scanning it, so as many one-dot strokes fit as before", () => {
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    expect(estimateFillWork(strokes(1162), W, H, estimate)).toBeLessThanOrEqual(MAX_FILL_WORK);
+    expect(estimateFillWork(strokes(1163), W, H)).toBeGreaterThan(MAX_FILL_WORK);
+    expect(estimate.scanWork).toBe(0);
+  });
+
+  it("refuses a document over budget on its edges alone before scanning any shape", () => {
+    for (const shapes of [[...strokes(1162), ...fullCanvasStack(1)], slants(900)]) {
+      const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+      expect(() => paint(shapes, W, H, new Budget(), estimate)).toThrow(BudgetExceeded);
+      expect(estimate.scanWork).toBe(0);
+      expect(estimate.rowsFilled).toBe(0);
+    }
+  });
+
+  it("skips the rows no edge reaches when it scans", () => {
+    const specks = Array.from({ length: 64 }, (): Shape => ({
+      polygons: [box(0, 0, 1, 1), box(W - 1, H - 1, 1, 1)],
+      rgba: [0, 0, 0, 255],
+      rule: "nonzero",
+    }));
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    estimateFillWork(specks, W, H, estimate);
+
+    // Each shape is scanned (its bounding box is the canvas), but only on its
+    // two rows: 8 sub-rows and 16 edge visits x log2(6), not 8192 sub-rows.
+    expect(estimate.scanWork).toBe(64 * (8 + 16 * 3));
+  });
+});
+
+describe("estimateFillWork when interpolation rounds", () => {
+  it("bounds a slanted edge 1e307 long, whose crossings round far past its endpoints", () => {
+    // From a random-SVG property check: every endpoint but one is right of a 200-dot canvas,
+    // yet the rounded crossings of the long edges paint inside it.
+    const far: Shape = {
+      polygons: [
+        [[3.6977460599706543e307, -1.29128137799254e306], [1056.507996832269, 1778.221403697498], [1644.139964208467, 1708.2018532766836], [1484.5693422877619, 1741.1708715053333]],
+        [[1761.2534004853978, 1772.5971053622084], [1718.5185419573281, 1707.0853982335539], [1551.1369871876677, 1728.4799632432391], [1237.0845968676306, 1754.7630585363681]],
+      ],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint([far], 200, H, new Budget(), stats);
+
+    expect(estimateFillWork([far], 200, H, estimate)).toBeGreaterThanOrEqual((stats.work ?? Infinity) + (estimate.scanWork ?? Infinity));
+  });
+});
+
+describe("PaintStats.work on a crossing that overflows", () => {
+  it("stays finite when an edge's horizontal run overflows to infinity", () => {
+    // x1 - x0 overflows, so the crossing at a sample exactly on y0 is 0 x Infinity = NaN.
+    const overflow: Shape = { polygons: [[[-1e308, 0.125], [1e308, 10.125], [50, 10.125]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+
+    paint([overflow], 100, 20, new Budget(), stats);
+
+    expect(Number.isFinite(stats.work)).toBe(true);
+    expect(estimateFillWork([overflow], 100, 20)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
   });
 });

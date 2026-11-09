@@ -23,26 +23,29 @@ export const MAX_PATH_POINTS = 250_000;
 
 /**
  * Units of scan-conversion work per document, as ESTIMATED before any row is
- * filled (an upper bound on the real work; see `estimateFillWork` in
- * `./fill`): edge visits per sub-row times the sort's log factor, plus, on
- * each of a row's four sub-rows, the pixels its painted spans reach, plus
- * the row's composited extent — at least one unit each.
+ * filled (an upper bound on the real work; see `Plan` in `./fill`): edge
+ * visits per sub-row times the sort's log factor, plus, on each of a row's
+ * four sub-rows, the pixels its painted spans reach, plus the row's
+ * composited extent — at least one unit each. A shape is charged its bounding
+ * box when that is small; otherwise the estimate scans its sub-rows to count
+ * what it paints, and that scan is charged too, so estimating and filling a
+ * document together stay within this many units.
  *
- * So a shape is charged for what it PAINTS, not for its bounding box, and the
- * limit depends on the canvas height only through what is painted on it
- * (FUT-2919):
+ * So a sparse shape is charged for what it PAINTS, not for its bounding box,
+ * and the limit depends on the canvas height only through what is painted on
+ * it (FUT-2919):
  *
- * - a filled shape covering the whole canvas costs about five units per pixel
- *   plus 16 per row for its two edges: 5 × 576 × 300 + 16 × 300 ≈ 0.87M on a
- *   full-width logo 300 dots tall, so about fifty-seven such shapes fit, but
- *   5 × 576 × 2048 + 16 × 2048 ≈ 5.93M on the tallest canvas, so eight fit
- *   and a ninth is refused;
- * - a stroke, a frame or a sparse compound path costs about five units per
- *   dot it paints per row, plus its composited extent and its edges: a 3-dot
- *   frame around the whole 576 × 2048 canvas about 1.3M, a 4-dot diagonal
- *   across it about 0.08M, so a tall layered logo of ten such shapes is a
- *   fraction of the budget where its bounding boxes alone (5.9M each) were
- *   refused.
+ * - a filled shape covering the whole canvas costs five units per pixel plus
+ *   its two edges' visits and the scan: 874 800 at 576 × 300, so fifty-seven
+ *   fit, and 5 971 968 at 576 × 2048, so eight fit and a ninth is refused;
+ * - a one-dot full-height stroke costs its box, 43 008 at 2048 tall, so 1162
+ *   fit, as before;
+ * - a stroke, frame or sparse compound path that spans the canvas costs about
+ *   five units per dot it paints per row, plus its composited extent, its
+ *   edges and the scan: a 3-dot frame around the whole 576 × 2048 canvas about
+ *   1.45M, a 4-dot diagonal across it about 0.13M, so a tall layered logo of
+ *   ten such shapes is a fraction of the budget where its bounding boxes
+ *   alone (5.9M each) were refused.
  */
 export const MAX_FILL_WORK = 50_000_000;
 
