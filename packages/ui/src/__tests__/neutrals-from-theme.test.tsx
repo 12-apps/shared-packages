@@ -82,12 +82,16 @@ describe('a host that passes nothing keeps today\'s look', () => {
   it('Switch: the resting thumb is white and the iOS shadows are black washes', () => {
     expect(thumb(DEFAULT).backgroundColor).toBe('#fff');
     const r = (px: number): string => rem(DEFAULT, px);
-    expect(thumb(DEFAULT, { customVariant: 'ios' }).boxShadow).toBe(
-      `0 ${r(3)} ${r(1)} 0 rgba(0, 0, 0, 0.04), 0 ${r(3)} ${r(8)} 0 rgba(0, 0, 0, 0.12), 0 ${r(1)} 0 0 rgba(0, 0, 0, 0.08)`,
-    );
-    expect(track(DEFAULT, { customVariant: 'ios' }).boxShadow).toBe(
-      `inset 0 0 0 ${r(0.5)} rgba(0, 0, 0, 0.1), inset 0 ${r(2)} ${r(3)} rgba(0, 0, 0, 0.12)`,
-    );
+    // Each layer pinned as a literal (not compared with the function under test).
+    expect(thumb(DEFAULT, { customVariant: 'ios' }).boxShadow?.toString().split(/, (?=0 |inset )/)).toEqual([
+      `0 ${r(3)} ${r(1)} 0 rgba(0, 0, 0, 0.04)`,
+      `0 ${r(3)} ${r(8)} 0 rgba(0, 0, 0, 0.12)`,
+      `0 ${r(1)} 0 0 rgba(0, 0, 0, 0.08)`,
+    ]);
+    expect(track(DEFAULT, { customVariant: 'ios' }).boxShadow?.toString().split(/, (?=0 |inset )/)).toEqual([
+      `inset 0 0 0 ${r(0.5)} rgba(0, 0, 0, 0.1)`,
+      `inset 0 ${r(2)} ${r(3)} rgba(0, 0, 0, 0.12)`,
+    ]);
     expect(track(DEFAULT, { customVariant: 'ios' }).boxShadow).toContain('rgba(0, 0, 0, 0.1)');
     expect(track(DEFAULT, { customVariant: 'ios' }).backgroundColor).toBe('rgba(0, 0, 0, 0.1)');
   });
