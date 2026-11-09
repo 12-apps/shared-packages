@@ -2,7 +2,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from '@testing-library/react';
 
+import { createTheme } from '@mui/material/styles/index.js';
+
 import { Carousel } from '../Carousel';
+import { rem } from '../../../../tokens/scales';
 import { PT_BR_CAROUSEL_COPY } from '../../../../pt-BR';
 
 afterEach(cleanup);
@@ -191,6 +194,13 @@ describe('Carousel indicators below the photo', () => {
   });
 });
 
+/** The element's own Emotion class, so a rule is read for it and not for a leftover from another test. */
+const ownClass = (el: Element): string => {
+  const own = Array.from(el.classList).find((name) => name.startsWith('css-'));
+  if (!own) throw new Error('no Emotion class on the element');
+  return own;
+};
+
 const cssText = () =>
   Array.from(document.querySelectorAll('style'))
     .map((style) => style.textContent ?? '')
@@ -282,6 +292,31 @@ describe('Carousel review round 1', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('swallows a click that arrives in a later task after a short drag, and not one after the window', () => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
+    mount({ onClick });
+    const frame = screen.getByTestId('carousel-container');
+    pointer(frame, 'pointerDown', 200, 100, 1000);
+    pointer(frame, 'pointerMove', 212, 100, 1020);
+    pointer(frame, 'pointerUp', 212, 100, 1040);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    fireEvent.click(screen.getByText('A'));
+    expect(onClick).not.toHaveBeenCalled();
+
+    pointer(frame, 'pointerDown', 200, 100, 2000);
+    pointer(frame, 'pointerMove', 212, 100, 2020);
+    pointer(frame, 'pointerUp', 212, 100, 2040);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.click(screen.getByText('A'));
+    vi.useRealTimers();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it('does not report a vertical mouse drag as a tap', () => {
     const onClick = vi.fn();
     mount({ onClick });
@@ -290,14 +325,30 @@ describe('Carousel review round 1', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('emits the hide-on-touch rule for the arrows only when asked', () => {
+  it('emits the hide-on-touch rule on the next arrow only when asked', () => {
+    const touchRule = (cls: string) =>
+      new RegExp(`@media \\(hover: none\\) and \\(pointer: coarse\\)\\{\\.${cls}\\{[^}]*display:none`);
+
     mount({ hideArrowsOnTouch: true });
-    expect(cssText()).toMatch(/@media \(hover: none\) and \(pointer: coarse\)\{[^}]*display:none/);
+    expect(cssText()).toMatch(touchRule(ownClass(screen.getByTestId('carousel-next-button'))));
+    cleanup();
+    mount();
+    expect(cssText()).not.toMatch(touchRule(ownClass(screen.getByTestId('carousel-next-button'))));
   });
 
-  it('gives a pill a 24 design px target and no transition under reduced motion', () => {
+  it('gives a pill button a 24 design px target and its pill no transition under reduced motion', () => {
     mount({ indicatorVariant: 'pills' });
-    expect(cssText()).toContain('prefers-reduced-motion: reduce');
-    expect(screen.getByTestId('carousel-indicator-0').tagName).toBe('BUTTON');
+    const button = screen.getByTestId('carousel-indicator-0');
+    const side = rem(createTheme(), 24);
+    const rule = cssText().match(new RegExp(`\\.${ownClass(button)}\\{([^}]*)\\}`))?.[1] ?? '';
+
+    expect(rule).toContain(`min-width:${side}`);
+    expect(rule).toContain(`height:${side}`);
+
+    const pill = button.querySelector('span') as HTMLElement;
+    const reduced = new RegExp(
+      `@media \\(prefers-reduced-motion: reduce\\)\\{\\.${ownClass(pill)}\\{[^}]*transition:none`,
+    );
+    expect(reduced.test(cssText())).toBe(true);
   });
 });

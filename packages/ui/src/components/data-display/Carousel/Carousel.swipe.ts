@@ -23,6 +23,9 @@ interface Gesture {
   axis: 'x' | 'y' | null;
 }
 
+/** How long after a drag its stray click is still swallowed. */
+const DRAG_CLICK_WINDOW_MS = 300;
+
 /** Whether `event` is another finger than the one the gesture follows. */
 const isOtherPointer = (event: React.PointerEvent, gesture: Gesture) =>
   event.isPrimary === false || event.pointerId !== gesture.pointerId;
@@ -60,12 +63,14 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
   const gestureRef = useRef<Gesture | null>(null);
   const draggedRef = useRef(false);
 
-  // The click of a drag arrives synchronously after pointerup; later ones are real taps.
+  // On touch Chrome may send the click of a short drag in a later task, so the
+  // flag outlives pointerup: until that click, a new pointerdown or a key press
+  // clears it, or DRAG_CLICK_WINDOW_MS pass, whichever comes first.
   const endGesture = useCallback(() => {
     gestureRef.current = null;
     window.setTimeout(() => {
       draggedRef.current = false;
-    }, 0);
+    }, DRAG_CLICK_WINDOW_MS);
   }, []);
 
   const onPointerDown = useCallback(
