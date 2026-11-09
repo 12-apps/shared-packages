@@ -5,6 +5,8 @@ import { PT_BR_WEB_STORAGE_MESSAGES } from '../pt-BR';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createWebStorage } from '../create-web-storage';
+import { ImageField } from '../image-field';
+import type { UploadDriver } from '../use-upload';
 
 /**
  * The web half, rendered.
@@ -228,5 +230,20 @@ describe('createWebStorage', () => {
 
     await waitFor(() => expect(changes).toEqual([null]));
     await waitFor(() => expect(screen.queryByTestId('storage-image-field-preview')).toBeNull());
+  });
+});
+
+describe('ImageField takes a narrow uploader', () => {
+  it("renders with a host's own four-member uploader, with no progress or abort", () => {
+    // Type-checked: a host object written before the hook grew `progress` and
+    // `abort` still satisfies the input type.
+    const uploader: UploadDriver = {
+      upload: () => Promise.resolve(null),
+      uploading: false,
+      error: null,
+      clearError: () => undefined,
+    };
+    render(<ImageField {...LABELS} uploader={uploader} onChange={() => undefined} />);
+    expect(screen.getByTestId('storage-image-field')).toBeTruthy();
   });
 });
