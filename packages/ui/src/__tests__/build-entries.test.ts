@@ -96,8 +96,9 @@ describe("the build emits one module per component", () => {
     // `feedback/SequenceResolver` (FUT-3671); 150 → 151 adds
     // `data-display/RegionMap` (FUT-2729); 151 → 153 adds
     // `data-display/ScheduleGrid` and `data-display/DayRuler` (FUT-3825);
-    // 153 → 154 adds `feedback/UsableModal` (FUT-4394).
-    expect(Object.keys(entries).length - internal.length).toBe(154);
+    // 153 → 154 adds `feedback/UsableModal` (FUT-4394); 154 → 155 adds
+    // `data-display/StepCardList` (FUT-4476).
+    expect(Object.keys(entries).length - internal.length).toBe(155);
   });
 
   it("builds no story or spec — each would drag a test runner into dist", () => {
