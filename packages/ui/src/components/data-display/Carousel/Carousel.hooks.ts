@@ -9,7 +9,7 @@ interface CarouselNavigationInput {
   autoPlayInterval: number;
   pauseOnHover: boolean;
   disabled: boolean;
-  /** The slide shown first; out of range is clamped. */
+  /** The slide shown first. Kept raw and clamped when read, so it survives a list that is still loading. */
   startIndex?: number;
   onChange?: (index: number) => void;
 }
@@ -44,13 +44,15 @@ export const useCarouselNavigation = ({
   startIndex = 0,
   onChange,
 }: CarouselNavigationInput) => {
-  const [activeIndex, setActiveIndex] = useState(() => Math.min(Math.max(0, Math.trunc(startIndex) || 0), Math.max(0, count - 1)));
+  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, Math.trunc(startIndex) || 0));
   const [isHovered, setIsHovered] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   const goBy = useCallback(
     (step: number) => {
-      setActiveIndex((prev) => {
+      setActiveIndex((raw) => {
+        // The list may have shrunk since `raw` was set; step from what is shown.
+        const prev = Math.min(raw, Math.max(0, count - 1));
         const next = stepIndex(prev, step, count, loop);
         if (next !== prev) {
           onChange?.(next);
@@ -92,17 +94,32 @@ export const useCarouselNavigation = ({
   // The list can shrink under the carousel; never point past its end.
   const shownIndex = Math.min(activeIndex, Math.max(0, count - 1));
 
-  return { activeIndex: shownIndex, handleNext, handlePrev, handleSelect, hoverProps };
+  // Rotating means the timer is running; a screen reader should not be read every slide then.
+  const rotating = autoPlay && count > 1 && !isHovered && !disabled;
+
+  return { activeIndex: shownIndex, handleNext, handlePrev, handleSelect, hoverProps, rotating };
 };
 
-/** A tap on a slide, reported unless the carousel is disabled. */
+/**
+ * A tap on a slide, reported unless the carousel is disabled, and its keyboard
+ * twin: `onActivate` taps whichever slide is showing, and is absent when there
+ * is nothing to report to.
+ */
 export const useItemClick = (
   disabled: boolean,
+  items: CarouselItem[],
+  activeIndex: number,
   onClick?: (item: CarouselItem, index: number) => void,
-) =>
-  useCallback(
+) => {
+  const handleItemClick = useCallback(
     (item: CarouselItem, index: number) => {
       if (!disabled) onClick?.(item, index);
     },
     [disabled, onClick],
   );
+
+  const active = items[activeIndex];
+  const onActivate = onClick && !disabled && active ? () => onClick(active, activeIndex) : undefined;
+
+  return { handleItemClick, onActivate };
+};

@@ -151,7 +151,8 @@ const PillIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color
       size="small"
       {...indicatorAttrs(index, isActive, label)}
       onClick={onSelect}
-      sx={{ p: 0.5 }}
+      // The pill is 8 design px tall; the button around it is a 24 px target.
+      sx={{ p: 0, minWidth: rem(theme, 24), height: rem(theme, 24) }}
     >
       <Box
         component="span"
@@ -162,6 +163,7 @@ const PillIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color
           borderRadius: rem(theme, 4),
           backgroundColor: isActive ? main : alpha(main, 0.3),
           transition: theme.transitions.create(['width', 'background-color']),
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         }}
       />
     </IconButton>

@@ -3,7 +3,6 @@ import React from 'react';
 import { CarouselCounter } from './Carousel.counter';
 import { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
 import type { CarouselCopy } from '../../../copy';
-import { EN_US_CAROUSEL_COPY } from '../../../en-US.data-display';
 import type {
   CarouselArrowsProps,
   CarouselIndicatorsProps,
@@ -20,7 +19,6 @@ export interface CarouselChromeProps {
   items: CarouselItem[];
   activeIndex: number;
   loop: boolean;
-  disabled: boolean;
   showArrows: boolean;
   showIndicators: boolean;
   showThumbnails: boolean;
@@ -29,7 +27,8 @@ export interface CarouselChromeProps {
   color: Color;
   size: NonNullable<CarouselThumbnailsProps['size']>;
   indicatorVariant?: CarouselIndicatorsProps['variant'];
-  showCounter?: boolean;
+  /** The counter's text, already worded; no counter when absent. */
+  counterText?: string;
   counterPosition?: 'top-end' | 'bottom-end';
   hideArrowsOnTouch?: boolean;
   onPrev: () => void;
@@ -47,7 +46,6 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   items,
   activeIndex,
   loop,
-  disabled,
   showArrows,
   showIndicators,
   showThumbnails,
@@ -56,21 +54,16 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   color,
   size,
   indicatorVariant,
-  showCounter,
+  counterText,
   counterPosition,
   hideArrowsOnTouch,
   onPrev,
   onNext,
   onSelect,
 }) => {
-  // One slide has nowhere to go: no arrows, dots, counter or strip to draw.
-  if (items.length <= 1) return null;
-
-  const position = copy.position ?? EN_US_CAROUSEL_COPY.position;
-
   return (
   <>
-    {showArrows && !disabled && (
+    {showArrows && (
       <CarouselArrows
         copy={copy}
         onPrev={onPrev}
@@ -83,7 +76,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
       />
     )}
 
-    {showIndicators && indicatorPosition !== 'below' && (
+    {showIndicators && (
       <CarouselIndicators
         copy={copy}
         count={items.length}
@@ -95,9 +88,9 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
       />
     )}
 
-    {showCounter && (
+    {counterText && (
       <CarouselCounter
-        text={position(activeIndex + 1, items.length)}
+        text={counterText}
         position={counterPosition}
       />
     )}

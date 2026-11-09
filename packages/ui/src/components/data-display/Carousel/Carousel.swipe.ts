@@ -10,9 +10,12 @@ interface CarouselSwipeInput {
   enabled: boolean;
   onPrev: () => void;
   onNext: () => void;
+  /** Enter or Space on the focused frame: the keyboard's tap on the active slide. */
+  onActivate?: () => void;
 }
 
 interface Gesture {
+  pointerId: number;
   x: number;
   y: number;
   at: number;
@@ -20,27 +23,62 @@ interface Gesture {
   axis: 'x' | 'y' | null;
 }
 
+/** Whether `event` is another finger than the one the gesture follows. */
+const isOtherPointer = (event: React.PointerEvent, gesture: Gesture) =>
+  event.isPrimary === false || event.pointerId !== gesture.pointerId;
+
+/** A mouse leaving the frame mid-drag still ends the gesture on the frame. */
+const capturePointer = (event: React.PointerEvent) => {
+  try {
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  } catch {
+    /* a synthetic or already-released pointer: the gesture still works */
+  }
+};
+
+/** A control the arrow keys already mean something in. */
+const isEditable = (target: EventTarget): boolean => {
+  const el = target as HTMLElement;
+  if (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
+  return el.getAttribute?.('role') === 'slider';
+};
+
 /**
  * Horizontal swipe for the carousel, on pointer events so one path serves a
  * finger, a pen and a mouse. The axis is decided on the first move past a small
  * slop: a vertical start is released to the page for good (the frame also sets
- * `touch-action: pan-y`, so the browser keeps the vertical pan), a horizontal
- * one is ours. How far counts as a swipe, and what a fling is, come from the
- * Lightbox's own `classifySwipe`.
+ * `touch-action: pan-y pinch-zoom`, so the browser keeps the vertical pan and
+ * the pinch), a horizontal one is ours. How far counts as a swipe, and what a
+ * fling is, come from the Lightbox's own `classifySwipe`. Only the first
+ * pointer is followed; a second one drops the gesture.
  *
- * A horizontal gesture, swipe or not, is a drag and never a tap: the click that
- * follows it is swallowed in the capture phase.
+ * A drag past the slop, on either axis, is never a tap: the click that follows
+ * it is swallowed in the capture phase, and the flag clears once the gesture ends.
  */
 export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput) => {
   const theme = useTheme();
   const gestureRef = useRef<Gesture | null>(null);
   const draggedRef = useRef(false);
 
+  // The click of a drag arrives synchronously after pointerup; later ones are real taps.
+  const endGesture = useCallback(() => {
+    gestureRef.current = null;
+    window.setTimeout(() => {
+      draggedRef.current = false;
+    }, 0);
+  }, []);
+
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {
       draggedRef.current = false;
+      if (event.isPrimary === false) {
+        gestureRef.current = null;
+        return;
+      }
       if (!enabled || (event.pointerType === 'mouse' && event.button !== 0)) return;
-      gestureRef.current = { x: event.clientX, y: event.clientY, at: event.timeStamp, axis: null };
+      gestureRef.current = {
+        pointerId: event.pointerId, x: event.clientX, y: event.clientY, at: event.timeStamp, axis: null,
+      };
     },
     [enabled],
   );
@@ -48,22 +86,15 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
   const onPointerMove = useCallback(
     (event: React.PointerEvent) => {
       const gesture = gestureRef.current;
-      if (!gesture || gesture.axis) return;
+      if (!gesture || gesture.axis || isOtherPointer(event, gesture)) return;
 
       const deltaX = event.clientX - gesture.x;
       const deltaY = event.clientY - gesture.y;
       if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < remPx(theme, 8)) return;
 
       gesture.axis = swipeAxis(deltaX, deltaY);
-      if (gesture.axis === 'x') {
-        draggedRef.current = true;
-        // A mouse leaving the frame mid-drag still ends the gesture here.
-        try {
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-        } catch {
-          /* a synthetic or already-released pointer: the gesture still works */
-        }
-      }
+      draggedRef.current = true;
+      if (gesture.axis === 'x') capturePointer(event);
     },
     [theme],
   );
@@ -71,8 +102,9 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
   const onPointerUp = useCallback(
     (event: React.PointerEvent) => {
       const gesture = gestureRef.current;
-      gestureRef.current = null;
-      if (!gesture || gesture.axis !== 'x') return;
+      if (!gesture || isOtherPointer(event, gesture)) return;
+      endGesture();
+      if (gesture.axis !== 'x') return;
 
       const direction = classifySwipe({
         deltaX: event.clientX - gesture.x,
@@ -84,12 +116,8 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
       if (direction === 'left') onNext();
       else if (direction === 'right') onPrev();
     },
-    [theme, onNext, onPrev],
+    [theme, onNext, onPrev, endGesture],
   );
-
-  const onPointerCancel = useCallback(() => {
-    gestureRef.current = null;
-  }, []);
 
   const onClickCapture = useCallback((event: React.MouseEvent) => {
     if (!draggedRef.current) return;
@@ -98,44 +126,66 @@ export const useCarouselSwipe = ({ enabled, onPrev, onNext }: CarouselSwipeInput
     event.preventDefault();
   }, []);
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClickCapture };
+  const clearDrag = useCallback(() => {
+    draggedRef.current = false;
+  }, []);
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: endGesture, onClickCapture, clearDrag };
 };
 
+const ARROW_STEPS: Record<string, 'prev' | 'next'> = { ArrowLeft: 'prev', ArrowRight: 'next' };
+const ACTIVATE_KEYS = new Set(['Enter', ' ']);
+
 /**
- * Left and Right step the carousel while it, or a control inside it, has focus:
- * the handler sits on the frame, so there is no global listener to leak.
+ * Left and Right step the carousel while it, or a control inside it, has focus;
+ * Enter and Space on the frame itself tap the active slide. The handler sits on
+ * the frame, so there is no global listener, and a text field inside keeps its
+ * own arrow keys.
  */
-export const useCarouselKeys = ({ enabled, onPrev, onNext }: CarouselSwipeInput) =>
+export const useCarouselKeys = ({ enabled, onPrev, onNext, onActivate }: CarouselSwipeInput) =>
   useCallback(
     (event: React.KeyboardEvent) => {
-      if (!enabled || event.defaultPrevented) return;
-      if (event.key === 'ArrowLeft') onPrev();
-      else if (event.key === 'ArrowRight') onNext();
-      else return;
+      if (event.defaultPrevented || isEditable(event.target)) return;
+
+      const step = enabled ? ARROW_STEPS[event.key] : undefined;
+      const tap = event.target === event.currentTarget && ACTIVATE_KEYS.has(event.key);
+      const action = step ? (step === 'prev' ? onPrev : onNext) : tap && onActivate;
+      if (!action) return;
+
+      action();
       event.preventDefault();
     },
-    [enabled, onPrev, onNext],
+    [enabled, onPrev, onNext, onActivate],
   );
 
 /**
  * Everything the frame listens to: swipe, keys, and the drag-ghost guard, plus
- * whether motion is reduced. `enabled` is false for a lone slide or a disabled
- * carousel, which then has no handlers and is not a tab stop.
+ * whether motion is reduced. A lone slide or a disabled carousel is not
+ * swipeable and has no arrow keys; with `onActivate` it is still a tab stop, so
+ * the keyboard can open what a tap opens.
  */
 export const useCarouselInteraction = (input: CarouselSwipeInput) => {
-  const swipe = useCarouselSwipe(input);
-  const onKeyDown = useCarouselKeys(input);
+  const { clearDrag, ...swipe } = useCarouselSwipe(input);
+  const onKeys = useCarouselKeys(input);
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const focusable = input.enabled || Boolean(input.onActivate);
 
-  const frameProps = input.enabled
-    ? {
-        ...swipe,
-        onKeyDown,
-        tabIndex: 0,
-        // A dragged photo would otherwise start the browser's own image drag.
-        onDragStart: (event: React.DragEvent) => event.preventDefault(),
-      }
-    : {};
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      clearDrag();
+      onKeys(event);
+    },
+    [clearDrag, onKeys],
+  );
 
-  return { interactive: input.enabled, reducedMotion, frameProps };
+  const frameProps = {
+    ...(input.enabled && swipe),
+    ...(focusable && { onKeyDown }),
+    ...(input.enabled && {
+      // A dragged photo would otherwise start the browser's own image drag.
+      onDragStart: (event: React.DragEvent) => event.preventDefault(),
+    }),
+  };
+
+  return { interactive: input.enabled, focusable, reducedMotion, frameProps };
 };

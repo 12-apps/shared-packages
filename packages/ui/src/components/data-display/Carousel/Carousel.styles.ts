@@ -105,18 +105,16 @@ export const containerStyles = (input: ContainerStyleInput): CSSObject => {
 };
 
 /**
- * What the frame adds once it can be swiped: the page keeps vertical panning
- * (the horizontal drag is the carousel's), text is not selected by a drag, and
- * a keyboard focus ring.
+ * What the frame adds once it can be driven: while it can be swiped the page
+ * keeps vertical panning and pinch-zoom (the horizontal drag is the carousel's)
+ * and a drag selects no text; while it is a tab stop it has a focus ring.
  */
-export const interactionSx = (theme: Theme, interactive: boolean): CSSObject =>
-  interactive
-    ? {
-        touchAction: 'pan-y',
-        userSelect: 'none',
-        '&:focus-visible': {
-          outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
-          outlineOffset: rem(theme, -2),
-        },
-      }
-    : {};
+export const interactionSx = (theme: Theme, swipeable: boolean, focusable: boolean): CSSObject => ({
+  ...(swipeable && { touchAction: 'pan-y pinch-zoom', userSelect: 'none' }),
+  ...(focusable && {
+    '&:focus-visible': {
+      outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+      outlineOffset: rem(theme, -2),
+    },
+  }),
+});

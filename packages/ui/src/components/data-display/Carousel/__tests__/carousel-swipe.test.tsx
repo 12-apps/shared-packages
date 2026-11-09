@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act } from '@testing-library/react';
 
 import { Carousel } from '../Carousel';
 import { PT_BR_CAROUSEL_COPY } from '../../../../pt-BR';
@@ -11,7 +12,14 @@ const active = () =>
   makeItems().findIndex((_, i) => screen.getByTestId(`carousel-slide-${i}`).getAttribute('data-active') === 'true');
 
 /** jsdom has no PointerEvent: a MouseEvent under the pointer name carries the same coordinates. */
-const pointer = (el: Element, type: string, x: number, y: number, timeStamp?: number) => {
+const pointer = (
+  el: Element,
+  type: string,
+  x: number,
+  y: number,
+  timeStamp?: number,
+  extra: { pointerId?: number; isPrimary?: boolean; pointerType?: string } = {},
+) => {
   const event = new MouseEvent(type.toLowerCase(), {
     bubbles: true,
     cancelable: true,
@@ -20,6 +28,7 @@ const pointer = (el: Element, type: string, x: number, y: number, timeStamp?: nu
     button: 0,
   });
   if (timeStamp !== undefined) Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+  for (const [key, value] of Object.entries(extra)) Object.defineProperty(event, key, { value });
   fireEvent(el, event);
 };
 
@@ -159,12 +168,11 @@ describe('Carousel start index, counter and a11y', () => {
 describe('Carousel indicators below the photo', () => {
   it('draws the dot row after the frame, outside it, and keeps it in step', () => {
     mount({ indicatorPosition: 'below', indicatorVariant: 'pills' });
-    const frame = screen.getByTestId('carousel-container');
     const row = screen.getByTestId('carousel-indicators');
 
-    expect(frame.contains(row)).toBe(false);
-    expect(frame.parentElement).toBe(row.parentElement);
-    expect(frame.nextElementSibling).toBe(row);
+    expect(screen.getByTestId('carousel-container').contains(row)).toBe(false);
+    expect(screen.getByTestId('carousel-container').parentElement).toBe(row.parentElement);
+    expect(screen.getByTestId('carousel-container').nextElementSibling).toBe(row);
 
     fireEvent.click(screen.getByTestId('carousel-next-button'));
     expect(screen.getByTestId('carousel-indicator-1')).toHaveAttribute('data-active', 'true');
@@ -180,5 +188,116 @@ describe('Carousel indicators below the photo', () => {
   it('draws no row below for a single item', () => {
     mount({ items: makeItems().slice(0, 1), indicatorPosition: 'below' });
     expect(screen.queryAllByTestId('carousel-indicators')).toHaveLength(0);
+  });
+});
+
+const cssText = () =>
+  Array.from(document.querySelectorAll('style'))
+    .map((style) => style.textContent ?? '')
+    .join('');
+
+describe('Carousel review round 1', () => {
+  it('keeps the start index through a list that is still loading', () => {
+    const { rerender } = mount({ items: makeItems().slice(0, 1), startIndex: 2 });
+    rerender(<Carousel items={makeItems()} copy={PT_BR_CAROUSEL_COPY} startIndex={2} />);
+    expect(active()).toBe(2);
+  });
+
+  it('steps from what is shown after the list shrinks', () => {
+    const { rerender } = mount({ startIndex: 3 });
+    rerender(<Carousel items={makeItems().slice(0, 2)} copy={PT_BR_CAROUSEL_COPY} startIndex={3} />);
+    fireEvent.click(screen.getByTestId('carousel-prev-button'));
+    expect(active()).toBe(0);
+  });
+
+  it('taps the active slide with Enter and with Space on the focused frame', () => {
+    const onClick = vi.fn();
+    mount({ onClick, startIndex: 1 });
+    const frame = screen.getByRole('region');
+    fireEvent.keyDown(frame, { key: 'Enter' });
+    fireEvent.keyDown(frame, { key: ' ' });
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(onClick.mock.calls[1]?.[1]).toBe(1);
+  });
+
+  it('leaves Enter on an inner control to that control', () => {
+    const onClick = vi.fn();
+    mount({ onClick });
+    fireEvent.keyDown(screen.getByTestId('carousel-next-button'), { key: 'Enter' });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps arrow keys for an editable control inside the carousel', () => {
+    mount({ items: [{ id: 'a', content: <input aria-label="campo" /> }, { id: 'b', content: 'B' }] });
+    fireEvent.keyDown(screen.getByLabelText('campo'), { key: 'ArrowRight' });
+    expect(active()).toBe(0);
+  });
+
+  it('keeps pinch-zoom while the frame owns the horizontal drag', () => {
+    mount();
+    expect(cssText()).toContain('touch-action:pan-y pinch-zoom');
+  });
+
+  it('ignores a second finger and drops the gesture', () => {
+    mount();
+    const frame = screen.getByTestId('carousel-container');
+    pointer(frame, 'pointerDown', 300, 100, 1000, { pointerId: 1, isPrimary: true });
+    pointer(frame, 'pointerDown', 250, 100, 1010, { pointerId: 2, isPrimary: false });
+    pointer(frame, 'pointerMove', 100, 100, 1100, { pointerId: 1, isPrimary: true });
+    pointer(frame, 'pointerUp', 100, 100, 1200, { pointerId: 1, isPrimary: true });
+    expect(active()).toBe(0);
+  });
+
+  it('follows only the pointer that started it', () => {
+    mount();
+    const frame = screen.getByTestId('carousel-container');
+    pointer(frame, 'pointerDown', 300, 100, 1000, { pointerId: 1, isPrimary: true });
+    pointer(frame, 'pointerMove', 100, 100, 1100, { pointerId: 2, isPrimary: true });
+    pointer(frame, 'pointerUp', 100, 100, 1200, { pointerId: 2, isPrimary: true });
+    expect(active()).toBe(0);
+  });
+
+  it('is quiet to a screen reader while autoplay rotates, polite otherwise', () => {
+    mount({ autoPlay: true });
+    expect(screen.getByTestId('carousel-track')).toHaveAttribute('aria-live', 'off');
+    cleanup();
+    mount();
+    expect(screen.getByTestId('carousel-track')).toHaveAttribute('aria-live', 'polite');
+    cleanup();
+    mount({ autoPlay: true });
+    fireEvent.mouseEnter(screen.getByTestId('carousel-container'));
+    expect(screen.getByTestId('carousel-track')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('does not swallow a later keyboard click after a touch drag', () => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
+    mount({ onClick });
+    drag([300, 100], [100, 100]);
+    act(() => {
+      vi.runAllTimers();
+    });
+    fireEvent.click(screen.getByText('B'));
+    vi.useRealTimers();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report a vertical mouse drag as a tap', () => {
+    const onClick = vi.fn();
+    mount({ onClick });
+    drag([200, 100], [200, 300]);
+    fireEvent.click(screen.getByText('A'));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('emits the hide-on-touch rule for the arrows only when asked', () => {
+    mount({ hideArrowsOnTouch: true });
+    expect(cssText()).toMatch(/@media \(hover: none\) and \(pointer: coarse\)\{[^}]*display:none/);
+  });
+
+  it('gives a pill a 24 design px target and no transition under reduced motion', () => {
+    mount({ indicatorVariant: 'pills' });
+    expect(cssText()).toContain('prefers-reduced-motion: reduce');
+    expect(screen.getByTestId('carousel-indicator-0').tagName).toBe('BUTTON');
   });
 });

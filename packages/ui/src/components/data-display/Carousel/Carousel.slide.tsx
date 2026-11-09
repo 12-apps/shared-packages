@@ -137,6 +137,8 @@ export interface CarouselTrackProps {
   transition: React.ElementType;
   /** Transition length in ms; 0 under reduced motion. */
   timeout: number;
+  /** `off` while autoplay is rotating, so a screen reader is not read every slide. */
+  live: 'off' | 'polite';
   /** Names slide n of m; unnamed when the host passes no wording. */
   slideLabel?: (position: number, total: number) => string;
   slideRoleDescription?: string;
@@ -156,6 +158,7 @@ export const CarouselTrack: React.FC<CarouselTrackProps> = ({
   animation,
   transition: Transition,
   timeout,
+  live,
   slideLabel,
   slideRoleDescription,
   clickable,
@@ -170,7 +173,7 @@ export const CarouselTrack: React.FC<CarouselTrackProps> = ({
       display: 'flex',
       alignItems: 'center',
     }}
-    aria-live="polite"
+    aria-live={live}
   >
     {items.map((item, index) => (
       <Transition

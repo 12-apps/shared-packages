@@ -144,3 +144,13 @@ export const DotsBelowDesktop: Story = {
   ),
   args: { ...gallery, height: 400, indicatorPosition: 'below' },
 };
+
+/** The narrowest phone: the row stays under the photo and the pills stay tappable. */
+export const DotsBelow320: Story = {
+  render: (args) => (
+    <Frame width={320}>
+      <Carousel {...args} />
+    </Frame>
+  ),
+  args: { ...gallery, indicatorPosition: 'below', hideArrowsOnTouch: true },
+};

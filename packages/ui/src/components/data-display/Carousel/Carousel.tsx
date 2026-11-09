@@ -12,10 +12,12 @@ import { withDefaults } from '../../../utils/withDefaults';
 import { useCarouselNavigation, useItemClick } from './Carousel.hooks';
 import { useCarouselInteraction } from './Carousel.swipe';
 import { CarouselChrome } from './Carousel.chrome';
-import { CarouselIndicators } from './Carousel.parts';
+import { CarouselBelow } from './Carousel.below';
 import { CarouselTrack } from './Carousel.slide';
 import { containerStyles, frameBox, interactionSx } from './Carousel.styles';
+import type { CarouselCopy } from '../../../copy';
 import type { CarouselProps } from './Carousel.types';
+import { EN_US_CAROUSEL_COPY } from '../../../en-US.data-display';
 import { muiColor } from '../../../tokens/scales';
 
 export { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
@@ -57,96 +59,97 @@ const CarouselLoading: React.FC<{ sx: CSSObject; color: CarouselProps['color'] }
   </Box>
 );
 
-/**
- * With `indicatorPosition="below"` the frame and the dot row share a wrapper, so
- * the row sits outside the photo; otherwise the frame is returned as it is.
- */
-const CarouselRow: React.FC<{ row: React.ReactNode; width: string; children: React.ReactNode }> = ({
-  row, width, children,
-}) => (row ? <Box sx={{ width }}>{children}{row}</Box> : <>{children}</>);
+/** Whether the dot row is drawn after the frame rather than on it. */
+const isBelow = ({ items, showIndicators, indicatorPosition }: ResolvedCarouselProps) =>
+  items.length > 1 && showIndicators && indicatorPosition === 'below';
+
+/** What the chrome draws: arrows unless disabled, dots unless they went below. */
+const chromeVisibility = ({ showArrows, showIndicators, disabled }: ResolvedCarouselProps, below: boolean) => ({
+  showArrows: showArrows && !disabled,
+  showIndicators: showIndicators && !below,
+});
+
+/** The counter's words: from the caller's pack, English when it omits them. */
+const counterText = (copy: CarouselCopy, show: boolean, position: number, total: number) =>
+  show ? (copy.position ?? EN_US_CAROUSEL_COPY.position)(position, total) : undefined;
+
+/** The frame's accessible shape: a named carousel region, and a tab stop when it can be driven. */
+const frameA11y = (copy: CarouselCopy, focusable: boolean) => ({
+  role: 'region',
+  'aria-roledescription': copy.roleDescription,
+  'aria-label': copy.region,
+  tabIndex: focusable ? 0 : undefined,
+});
 
 export const Carousel: React.FC<CarouselProps> = (props) => {
   const resolved = withDefaults(props, DEFAULTS) as ResolvedCarouselProps;
   const {
-    items, variant, size, color, autoPlay, autoPlayInterval, loop, loading, disabled,
-    className, style, height, width, pauseOnHover, onClick, onChange, onFocus, onBlur,
-    animation, glow, pulse, glass, gradient, startIndex, copy,
+    items, variant, size, color, loading, disabled, className, style, height, width, onClick,
+    onFocus, onBlur, animation, glow, pulse, glass, gradient, copy,
   } = resolved;
 
   const theme = useTheme();
+  const nav = useCarouselNavigation({ ...resolved, count: items.length });
+  const { activeIndex, handleNext, handlePrev, handleSelect, hoverProps } = nav;
+  const { handleItemClick, onActivate } = useItemClick(disabled, items, activeIndex, onClick);
 
-  const { activeIndex, handleNext, handlePrev, handleSelect, hoverProps } = useCarouselNavigation({
-    count: items.length,
-    loop,
-    autoPlay,
-    autoPlayInterval,
-    pauseOnHover,
-    disabled,
-    startIndex,
-    onChange,
+  const { interactive, focusable, reducedMotion, frameProps } = useCarouselInteraction({
+    enabled: items.length > 1 && !disabled,
+    onPrev: handlePrev,
+    onNext: handleNext,
+    onActivate,
   });
-
-  const enabled = items.length > 1 && !disabled;
-  const { interactive, reducedMotion, frameProps } = useCarouselInteraction({
-    enabled, onPrev: handlePrev, onNext: handleNext,
-  });
-
-  const handleItemClick = useItemClick(disabled, onClick);
 
   const frameSx = containerStyles({
     theme, variant, size, color, glow, pulse, glass, gradient, ...frameBox(theme, size, height, width),
   });
 
-  if (loading) {
-    return <CarouselLoading sx={frameSx} color={color} />;
-  }
+  if (loading) return <CarouselLoading sx={frameSx} color={color} />;
 
-  const below = resolved.indicatorPosition === 'below' && resolved.showIndicators && items.length > 1;
+  const below = isBelow(resolved);
 
   return (
-    <CarouselRow
+    <CarouselBelow
+      show={below}
       width={String(frameSx.width)}
-      row={below && (
-        <CarouselIndicators
-          copy={copy} count={items.length} activeIndex={activeIndex} onSelect={handleSelect}
-          position="below" color={color} variant={resolved.indicatorVariant}
+      indicators={{ copy, count: items.length, activeIndex, onSelect: handleSelect, color, variant: resolved.indicatorVariant }}
+    >
+      <Box
+        className={className}
+        data-testid="carousel-container"
+        {...frameA11y(copy, focusable)}
+        {...frameProps}
+        sx={{ ...frameSx, ...interactionSx(theme, interactive, focusable), ...style }}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        {...hoverProps}
+      >
+        <CarouselTrack
+          items={items}
+          activeIndex={activeIndex}
+          variant={variant}
+          animation={animation}
+          transition={TRANSITIONS[animation] ?? Slide}
+          timeout={reducedMotion ? 0 : 600}
+          live={nav.rotating ? 'off' : 'polite'}
+          slideLabel={copy.slideLabel}
+          slideRoleDescription={copy.slideRoleDescription}
+          clickable={Boolean(onClick)}
+          onSelect={handleItemClick}
         />
-      )}
-    >
-    <Box
-      className={className}
-      data-testid="carousel-container"
-      role="region"
-      aria-roledescription={copy.roleDescription}
-      aria-label={copy.region}
-      tabIndex={interactive ? 0 : undefined}
-      {...frameProps}
-      sx={{ ...frameSx, ...interactionSx(theme, interactive), ...style }}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      {...hoverProps}
-    >
-      <CarouselTrack
-        items={items}
-        activeIndex={activeIndex}
-        variant={variant}
-        animation={animation}
-        transition={TRANSITIONS[animation] ?? Slide}
-        timeout={reducedMotion ? 0 : 600}
-        slideLabel={copy.slideLabel}
-        slideRoleDescription={copy.slideRoleDescription}
-        clickable={Boolean(onClick)}
-        onSelect={handleItemClick}
-      />
 
-      <CarouselChrome
-        {...resolved}
-        activeIndex={activeIndex}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onSelect={handleSelect}
-      />
-    </Box>
-    </CarouselRow>
+        {items.length > 1 && (
+          <CarouselChrome
+            {...resolved}
+            {...chromeVisibility(resolved, below)}
+            counterText={counterText(copy, Boolean(resolved.showCounter), activeIndex + 1, items.length)}
+            activeIndex={activeIndex}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onSelect={handleSelect}
+          />
+        )}
+      </Box>
+    </CarouselBelow>
   );
 };

@@ -113,8 +113,10 @@ import { Carousel } from '@/components/data-display/Carousel';
 
 ### Swipe, keys and tap
 
-- A horizontal drag past 50 design px, or a short fast fling, goes to the next or previous slide. The axis is decided on the first move: a vertical start is left to the page (the frame sets `touch-action: pan-y`), so scrolling still works. The classification is `classifySwipe` in `utils/swipe`, the same one the Lightbox uses.
+- A horizontal drag past 50 design px, or a short fast fling, goes to the next or previous slide. The axis is decided on the first move: a vertical start is left to the page (the frame sets `touch-action: pan-y pinch-zoom`, so pinch-zoom still works; only the first pointer is followed), so scrolling still works. The classification is `classifySwipe` in `utils/swipe`, the same one the Lightbox uses.
 - Left and Right move the slide while the carousel, or a control inside it, has focus. There is no global key listener.
+- With `onClick` set, Enter and Space on the focused frame tap the active slide, so the keyboard reaches what a tap opens. The arrow keys are left alone inside a text field.
+- While autoplay rotates, the slides are `aria-live="off"`; otherwise `polite`.
 - `onClick(item, index)` reports a tap. A horizontal drag, swipe or not, never counts as one.
 - With a single item the arrows, indicators, counter and swipe are all off.
 - Under `prefers-reduced-motion: reduce` the slides change with no transition.

@@ -27,11 +27,6 @@ interface ClassifySwipeInput {
   flingDistance?: number;
 }
 
-/**
- * The direction a gesture swiped, or `null` when it was a tap or a nudge. The
- * axis is the one that moved further; the travel must pass `distance`, or be a
- * fling (fast and not tiny) when `elapsed` is given.
- */
 const DIRECTIONS = {
   x: { positive: 'right', negative: 'left' },
   y: { positive: 'down', negative: 'up' },
