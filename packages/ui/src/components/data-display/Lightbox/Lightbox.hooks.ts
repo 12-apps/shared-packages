@@ -10,6 +10,7 @@ import {
   WHEEL_ZOOM_FACTOR,
   ZOOM_STEP,
 } from './Lightbox.constants';
+import { classifySwipe } from '../../../utils/swipe';
 import type { LightboxItem, LightboxProps } from './Lightbox.types';
 
 const clampZoom = (zoom: number): number => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
@@ -242,18 +243,11 @@ export const useSwipe = ({
 
       const deltaX = touch.clientX - start.x;
       const deltaY = touch.clientY - start.y;
-      const swipe = minSwipeDistance(theme);
+      const direction = classifySwipe({ deltaX, deltaY, distance: minSwipeDistance(theme) });
 
-      // Whichever axis moved further decides what the gesture meant.
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        if (Math.abs(deltaX) > swipe) {
-          if (deltaX > 0) prev();
-          else next();
-        }
-        return;
-      }
-
-      if (deltaY > swipe) close();
+      if (direction === 'right') prev();
+      else if (direction === 'left') next();
+      else if (direction === 'down') close();
     },
     [prev, next, close, theme],
   );
