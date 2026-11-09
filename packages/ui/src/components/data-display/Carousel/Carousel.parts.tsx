@@ -140,10 +140,37 @@ const DotIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color,
   );
 };
 
+const PillIndicator: React.FC<IndicatorProps> = ({ index, label, isActive, color, onSelect }) => {
+  const theme = useTheme();
+  const main = accentFor(theme, color).main;
+
+  return (
+    <IconButton
+      size="small"
+      {...indicatorAttrs(index, isActive, label)}
+      onClick={onSelect}
+      sx={{ p: 0.5 }}
+    >
+      <Box
+        component="span"
+        sx={{
+          display: 'block',
+          width: rem(theme, isActive ? 24 : 8),
+          height: rem(theme, 8),
+          borderRadius: rem(theme, 4),
+          backgroundColor: isActive ? main : alpha(main, 0.3),
+          transition: theme.transitions.create(['width', 'background-color']),
+        }}
+      />
+    </IconButton>
+  );
+};
+
 const INDICATORS: Record<IndicatorVariant, React.FC<IndicatorProps>> = {
   lines: LineIndicator,
   numbers: NumberIndicator,
   dots: DotIndicator,
+  pills: PillIndicator,
 };
 
 const INDICATORS_DEFAULTS = {
@@ -202,7 +229,7 @@ const ARROWS_DEFAULTS = {
  * All three positions place the arrow the same way; only `overlay` fades it back
  * until hovered, and only `outside` sits it clear of the frame.
  */
-const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => ({
+const arrowSx = (theme: Theme, color: Color, isOverlay: boolean, hideOnTouch: boolean): CSSObject => ({
   position: 'absolute',
   top: '50%',
   transform: 'translateY(-50%)',
@@ -210,6 +237,7 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
   backgroundColor: alpha(theme.palette.background.paper, 0.8),
   color: accentFor(theme, color).main,
   '&:disabled': { opacity: 0.3 },
+  ...(hideOnTouch && { '@media (hover: none) and (pointer: coarse)': { display: 'none' } }),
   ...(isOverlay
     ? {
         opacity: 0.7,
@@ -220,13 +248,13 @@ const arrowSx = (theme: Theme, color: Color, isOverlay: boolean): CSSObject => (
 
 export const CarouselArrows: React.FC<CarouselArrowsProps> = (props) => {
   const {
-    copy, onPrev, onNext, position, disabled, disablePrev, disableNext, color, size, className,
-    style,
+    copy, onPrev, onNext, position, disabled, disablePrev, disableNext, hideOnTouch, color, size,
+    className, style,
   } = withDefaults(props, ARROWS_DEFAULTS) as CarouselArrowsProps &
     Required<Pick<CarouselArrowsProps, keyof typeof ARROWS_DEFAULTS>>;
 
   const theme = useTheme();
-  const sx = arrowSx(theme, color, position === 'overlay');
+  const sx = arrowSx(theme, color, position === 'overlay', Boolean(hideOnTouch));
   const offset = rem(theme, position === 'outside' ? -40 : 8);
 
   return (

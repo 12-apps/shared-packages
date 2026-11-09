@@ -63,6 +63,11 @@ export const PT_BR_CAROUSEL_COPY: Required<CarouselCopy> = {
   previous: "Anterior",
   next: "Próximo",
   goToSlide: (position) => `Ir para o slide ${position}`,
+  roleDescription: "carrossel",
+  slideRoleDescription: "slide",
+  region: "Carrossel",
+  slideLabel: (n, m) => `Slide ${n} de ${m}`,
+  position: (n, m) => `${n} de ${m}`,
 };
 
 export const PT_BR_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {

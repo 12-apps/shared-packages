@@ -63,6 +63,11 @@ export const EN_US_CAROUSEL_COPY: Required<CarouselCopy> = {
   previous: "Previous",
   next: "Next",
   goToSlide: (position) => `Go to slide ${position}`,
+  roleDescription: "carousel",
+  slideRoleDescription: "slide",
+  region: "Carousel",
+  slideLabel: (n, m) => `Slide ${n} of ${m}`,
+  position: (n, m) => `${n} of ${m}`,
 };
 
 export const EN_US_TIMING_DIAGRAM_COPY: TimingDiagramCopy = {

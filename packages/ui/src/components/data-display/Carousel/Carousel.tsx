@@ -4,14 +4,16 @@ import Fade from '@mui/material/Fade/index.js';
 import Slide from '@mui/material/Slide/index.js';
 import Zoom from '@mui/material/Zoom/index.js';
 import { useTheme } from '@mui/material/styles/index.js';
-import React, { useCallback, useRef } from 'react';
+import type { CSSObject } from '@mui/material/styles/index.js';
+import React, { useCallback } from 'react';
 
 import { withDefaults } from '../../../utils/withDefaults';
 
 import { useCarouselNavigation } from './Carousel.hooks';
+import { useCarouselInteraction } from './Carousel.swipe';
 import { CarouselChrome } from './Carousel.chrome';
 import { CarouselTrack } from './Carousel.slide';
-import { containerStyles, frameBox } from './Carousel.styles';
+import { containerStyles, frameBox, interactionSx } from './Carousel.styles';
 import type { CarouselItem, CarouselProps } from './Carousel.types';
 import { muiColor } from '../../../tokens/scales';
 
@@ -48,16 +50,21 @@ type ResolvedCarouselProps = CarouselProps & Required<Pick<CarouselProps, keyof 
  */
 const TRANSITIONS = { fade: Fade, zoom: Zoom, flip: Slide, slide: Slide } as const;
 
+const CarouselLoading: React.FC<{ sx: CSSObject; color: CarouselProps['color'] }> = ({ sx, color }) => (
+  <Box sx={{ ...sx, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <CircularProgress color={muiColor(color ?? 'primary', 'inherit')} />
+  </Box>
+);
+
 export const Carousel: React.FC<CarouselProps> = (props) => {
   const resolved = withDefaults(props, DEFAULTS) as ResolvedCarouselProps;
   const {
     items, variant, size, color, autoPlay, autoPlayInterval, loop, loading, disabled,
     className, style, height, width, pauseOnHover, onClick, onChange, onFocus, onBlur,
-    animation, glow, pulse, glass, gradient,
+    animation, glow, pulse, glass, gradient, startIndex, copy,
   } = resolved;
 
   const theme = useTheme();
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const { activeIndex, handleNext, handlePrev, handleSelect, hoverProps } = useCarouselNavigation({
     count: items.length,
@@ -66,7 +73,13 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
     autoPlayInterval,
     pauseOnHover,
     disabled,
+    startIndex,
     onChange,
+  });
+
+  const enabled = items.length > 1 && !disabled;
+  const { interactive, reducedMotion, frameProps } = useCarouselInteraction({
+    enabled, onPrev: handlePrev, onNext: handleNext,
   });
 
   const handleItemClick = useCallback(
@@ -79,23 +92,23 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   );
 
   const frameSx = containerStyles({
-    theme, variant, size, color, ...frameBox(theme, size, height, width), glow, pulse, glass, gradient,
+    theme, variant, size, color, glow, pulse, glass, gradient, ...frameBox(theme, size, height, width),
   });
 
   if (loading) {
-    return (
-      <Box sx={{ ...frameSx, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <CircularProgress color={muiColor(color, 'inherit')} />
-      </Box>
-    );
+    return <CarouselLoading sx={frameSx} color={color} />;
   }
 
   return (
     <Box
-      ref={containerRef}
       className={className}
       data-testid="carousel-container"
-      sx={{ ...frameSx, ...style }}
+      role="region"
+      aria-roledescription={copy.roleDescription}
+      aria-label={copy.region}
+      tabIndex={interactive ? 0 : undefined}
+      {...frameProps}
+      sx={{ ...frameSx, ...interactionSx(theme, interactive), ...style }}
       onFocus={onFocus}
       onBlur={onBlur}
       {...hoverProps}
@@ -106,6 +119,9 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
         variant={variant}
         animation={animation}
         transition={TRANSITIONS[animation] ?? Slide}
+        timeout={reducedMotion ? 0 : 600}
+        slideLabel={copy.slideLabel}
+        slideRoleDescription={copy.slideRoleDescription}
         clickable={Boolean(onClick)}
         onSelect={handleItemClick}
       />

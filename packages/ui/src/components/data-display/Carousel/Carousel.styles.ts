@@ -103,3 +103,20 @@ export const containerStyles = (input: ContainerStyleInput): CSSObject => {
     ...(SURFACES[variant] ?? SURFACES.default)(input),
   };
 };
+
+/**
+ * What the frame adds once it can be swiped: the page keeps vertical panning
+ * (the horizontal drag is the carousel's), text is not selected by a drag, and
+ * a keyboard focus ring.
+ */
+export const interactionSx = (theme: Theme, interactive: boolean): CSSObject =>
+  interactive
+    ? {
+        touchAction: 'pan-y',
+        userSelect: 'none',
+        '&:focus-visible': {
+          outline: `${rem(theme, 2)} solid ${theme.palette.primary.main}`,
+          outlineOffset: rem(theme, -2),
+        },
+      }
+    : {};

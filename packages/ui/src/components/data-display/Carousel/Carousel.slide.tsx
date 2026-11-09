@@ -135,6 +135,11 @@ export interface CarouselTrackProps {
   variant: NonNullable<CarouselProps['variant']>;
   animation: NonNullable<CarouselProps['animation']>;
   transition: React.ElementType;
+  /** Transition length in ms; 0 under reduced motion. */
+  timeout: number;
+  /** Names slide n of m; unnamed when the host passes no wording. */
+  slideLabel?: (position: number, total: number) => string;
+  slideRoleDescription?: string;
   clickable: boolean;
   onSelect: (item: CarouselItem, index: number) => void;
 }
@@ -150,6 +155,9 @@ export const CarouselTrack: React.FC<CarouselTrackProps> = ({
   variant,
   animation,
   transition: Transition,
+  timeout,
+  slideLabel,
+  slideRoleDescription,
   clickable,
   onSelect,
 }) => (
@@ -162,16 +170,20 @@ export const CarouselTrack: React.FC<CarouselTrackProps> = ({
       display: 'flex',
       alignItems: 'center',
     }}
+    aria-live="polite"
   >
     {items.map((item, index) => (
       <Transition
         key={item.id}
         in={index === activeIndex}
-        timeout={600}
+        timeout={timeout}
         {...(animation === 'flip' && { direction: 'left' as const })}
       >
         <Box
           data-testid={`carousel-slide-${index}`}
+          role="group"
+          aria-roledescription={slideRoleDescription}
+          aria-label={slideLabel?.(index + 1, items.length)}
           data-active={index === activeIndex}
           sx={{
             position: 'absolute',

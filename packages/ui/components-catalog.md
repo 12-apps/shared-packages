@@ -63,7 +63,7 @@ Components for displaying data, visualizations, and information to users.
 ### Carousel
 **Purpose**: Display multiple items in a slideshow format
 **Use Cases**: Image galleries, featured content, product showcases
-**Features**: Auto-play, navigation controls, indicators, responsive
+**Features**: Auto-play, navigation controls, indicators, responsive, touch swipe, Left/Right keys, "n of m" counter, start index, tap reports the item
 **Location**: `src/components/data-display/Carousel`
 **Docs**: `src/components/data-display/Carousel/Carousel.md`
 

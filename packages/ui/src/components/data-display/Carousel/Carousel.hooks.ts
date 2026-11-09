@@ -7,6 +7,8 @@ interface CarouselNavigationInput {
   autoPlayInterval: number;
   pauseOnHover: boolean;
   disabled: boolean;
+  /** The slide shown first; out of range is clamped. */
+  startIndex?: number;
   onChange?: (index: number) => void;
 }
 
@@ -37,9 +39,10 @@ export const useCarouselNavigation = ({
   autoPlayInterval,
   pauseOnHover,
   disabled,
+  startIndex = 0,
   onChange,
 }: CarouselNavigationInput) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(() => Math.min(Math.max(0, Math.trunc(startIndex) || 0), Math.max(0, count - 1)));
   const [isHovered, setIsHovered] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
@@ -84,5 +87,8 @@ export const useCarouselNavigation = ({
     onMouseLeave: () => pauseOnHover && setIsHovered(false),
   };
 
-  return { activeIndex, handleNext, handlePrev, handleSelect, hoverProps };
+  // The list can shrink under the carousel; never point past its end.
+  const shownIndex = Math.min(activeIndex, Math.max(0, count - 1));
+
+  return { activeIndex: shownIndex, handleNext, handlePrev, handleSelect, hoverProps };
 };

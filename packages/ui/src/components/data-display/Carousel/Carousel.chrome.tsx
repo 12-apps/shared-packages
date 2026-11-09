@@ -1,7 +1,9 @@
 import React from 'react';
 
+import { CarouselCounter } from './Carousel.counter';
 import { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
 import type { CarouselCopy } from '../../../copy';
+import { EN_US_CAROUSEL_COPY } from '../../../en-US.data-display';
 import type {
   CarouselArrowsProps,
   CarouselIndicatorsProps,
@@ -26,6 +28,10 @@ export interface CarouselChromeProps {
   indicatorPosition: IndicatorPosition;
   color: Color;
   size: NonNullable<CarouselThumbnailsProps['size']>;
+  indicatorVariant?: CarouselIndicatorsProps['variant'];
+  showCounter?: boolean;
+  counterPosition?: 'top-end' | 'bottom-end';
+  hideArrowsOnTouch?: boolean;
   onPrev: () => void;
   onNext: () => void;
   onSelect: (index: number) => void;
@@ -49,10 +55,20 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
   indicatorPosition,
   color,
   size,
+  indicatorVariant,
+  showCounter,
+  counterPosition,
+  hideArrowsOnTouch,
   onPrev,
   onNext,
   onSelect,
-}) => (
+}) => {
+  // One slide has nowhere to go: no arrows, dots, counter or strip to draw.
+  if (items.length <= 1) return null;
+
+  const position = copy.position ?? EN_US_CAROUSEL_COPY.position;
+
+  return (
   <>
     {showArrows && !disabled && (
       <CarouselArrows
@@ -63,6 +79,7 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
         color={color}
         disablePrev={!loop && activeIndex === 0}
         disableNext={!loop && activeIndex === items.length - 1}
+        hideOnTouch={hideArrowsOnTouch}
       />
     )}
 
@@ -74,6 +91,14 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
         onSelect={onSelect}
         position={indicatorPosition}
         color={color}
+        variant={indicatorVariant}
+      />
+    )}
+
+    {showCounter && (
+      <CarouselCounter
+        text={position(activeIndex + 1, items.length)}
+        position={counterPosition}
       />
     )}
 
@@ -86,4 +111,5 @@ export const CarouselChrome: React.FC<CarouselChromeProps> = ({
       />
     )}
   </>
-);
+  );
+};

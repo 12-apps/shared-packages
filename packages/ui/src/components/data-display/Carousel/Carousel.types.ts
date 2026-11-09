@@ -13,8 +13,9 @@ export interface CarouselItem {
 
 export interface CarouselProps {
   /**
-   * The two arrows' accessible names. They render a glyph and nothing else,
-   * so this pair IS what a screen reader announces for them. REQUIRED.
+   * The arrows' accessible names (a glyph and nothing else, so this IS what a
+   * screen reader announces), plus the optional region, slide and counter
+   * wording. REQUIRED.
    */
   copy: CarouselCopy;
   items: CarouselItem[];
@@ -50,6 +51,18 @@ export interface CarouselProps {
   indicatorPosition?: 'top' | 'bottom' | 'left' | 'right';
   arrowPosition?: 'inside' | 'outside' | 'overlay';
   animation?: 'slide' | 'fade' | 'zoom' | 'flip';
+  /** The slide shown first (0-based, clamped). Read once, on mount. */
+  startIndex?: number;
+  /**
+   * Draws an "n of m" chip on the photo, worded by `copy.position`. Stays in
+   * step with the indicators. Hidden with a single item.
+   */
+  showCounter?: boolean;
+  counterPosition?: 'top-end' | 'bottom-end';
+  /** How the indicators look; `pills` is small dots with a wider current one. */
+  indicatorVariant?: NonNullable<CarouselIndicatorsProps['variant']>;
+  /** Hides the arrows on a touch-only device, where a swipe does their job. */
+  hideArrowsOnTouch?: boolean;
 }
 
 export interface CarouselIndicatorsProps {
@@ -58,7 +71,7 @@ export interface CarouselIndicatorsProps {
   onSelect: (index: number) => void;
   position?: 'top' | 'bottom' | 'left' | 'right';
   color?: ColorValue;
-  variant?: 'dots' | 'lines' | 'numbers';
+  variant?: 'dots' | 'lines' | 'numbers' | 'pills';
   /** Names each indicator through `goToSlide`; the English pack's wording when omitted. */
   copy?: CarouselCopy;
   className?: string;
@@ -73,6 +86,8 @@ export interface CarouselArrowsProps {
   disabled?: boolean;
   disablePrev?: boolean;
   disableNext?: boolean;
+  /** Hidden on a touch-only device, where a swipe does their job. */
+  hideOnTouch?: boolean;
   color?: ColorValue;
   size?: SizeValue;
   className?: string;

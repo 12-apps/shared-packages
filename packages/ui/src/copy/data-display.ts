@@ -69,6 +69,16 @@ export interface CarouselCopy {
    * host's existing pack keeps compiling; the shipped packs always carry it.
    */
   goToSlide?: (position: number) => string;
+  /** The region's accessible name (`aria-label` of the carousel). */
+  region?: string;
+  /** `aria-roledescription` of the region ("carousel"); the attribute is left off when absent. */
+  roleDescription?: string;
+  /** `aria-roledescription` of each slide ("slide"); left off when absent. */
+  slideRoleDescription?: string;
+  /** Each slide's accessible name from its 1-based position and the total ("2 of 5"). */
+  slideLabel?: (position: number, total: number) => string;
+  /** The "n of m" counter's text, shown when `showCounter` is on. */
+  position?: (position: number, total: number) => string;
 }
 
 /** The request-timing diagram's own words: its region, its phases, its totals. */
