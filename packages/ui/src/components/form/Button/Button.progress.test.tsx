@@ -54,7 +54,7 @@ describe('Button with progress', () => {
       </Button>,
     );
     expect(screen.getByTestId('b-progress-spinner')).toBeInTheDocument();
-    expect(screen.queryByTestId('b-progress-fill')).toBeNull();
+    expect(screen.queryAllByTestId('b-progress-fill')).toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Saving photo…' })).toHaveAttribute('aria-busy', 'true');
   });
 

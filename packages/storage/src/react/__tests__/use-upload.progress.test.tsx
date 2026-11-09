@@ -14,23 +14,24 @@ import { useUpload, type UseUploadConfig } from '../use-upload';
  * exactly as long as a case needs it to.
  */
 
-const reencode = vi.hoisted(() => ({
-  pending: null as null | { resolve: (file: File) => void; file: File },
-  hold: false,
-}));
+const optimizeImageMock = vi.hoisted(() => vi.fn<(file: File) => Promise<File>>());
 
 vi.mock('../optimize-image', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../optimize-image')>();
-  return {
-    ...actual,
-    optimizeImage: (file: File) =>
-      reencode.hold
-        ? new Promise<File>((resolve) => {
-            reencode.pending = { resolve, file };
-          })
-        : Promise.resolve(file),
-  };
+  return { ...actual, optimizeImage: optimizeImageMock };
 });
+
+/** Make the next re-encode wait until the test releases it. */
+function holdReencode(): { release: () => void } {
+  const settle: (() => void)[] = [];
+  optimizeImageMock.mockImplementation(
+    (file: File) =>
+      new Promise<File>((resolve) => {
+        settle.push(() => resolve(file));
+      }),
+  );
+  return { release: () => settle.forEach((run) => run()) };
+}
 
 const KEY = 'products/store/3f2504e0-4f89-41d3-9a0c-0305e82c3301/full.webp';
 const MAX = 8 * 1024 * 1024;
@@ -116,6 +117,15 @@ async function flush(ms = 0): Promise<void> {
   });
 }
 
+/** Start an upload inside `act`; the returned promise is what `upload()` resolves. */
+function start(run: () => Promise<string | null>): Promise<string | null> {
+  const started: Promise<string | null>[] = [];
+  act(() => {
+    started.push(run());
+  });
+  return started[0] as Promise<string | null>;
+}
+
 function distinctStages(seen: (UploadProgress | null)[]): (string | null)[] {
   const out: (string | null)[] = [];
   for (const entry of seen) {
@@ -128,8 +138,8 @@ function distinctStages(seen: (UploadProgress | null)[]): (string | null)[] {
 beforeEach(() => {
   vi.useFakeTimers();
   xhrs = [];
-  reencode.hold = false;
-  reencode.pending = null;
+  optimizeImageMock.mockReset();
+  optimizeImageMock.mockImplementation((file: File) => Promise.resolve(file));
   resetMeasuredUploadRate();
 });
 
@@ -140,10 +150,7 @@ afterEach(() => {
 describe('useUpload stages', () => {
   it('goes preparing → sending → saving → null, with steps 1 → 2 → 3', async () => {
     const { seen, now } = setup();
-    let key: string | null = null;
-    act(() => {
-      void now().upload(photo()).then((value) => (key = value));
-    });
+    const key = start(() => now().upload(photo()));
     expect(now().progress?.stage).toBe('preparing');
     expect(now().progress?.step).toBe(1);
     await flush();
@@ -155,7 +162,7 @@ describe('useUpload stages', () => {
     act(() => lastXhr().respond(200, { data: { imageKey: KEY } }));
     await flush();
 
-    expect(key).toBe(KEY);
+    await expect(key).resolves.toBe(KEY);
     expect(now().progress).toBeNull();
     expect(now().uploading).toBe(false);
     expect(distinctStages(seen)).toEqual([null, 'preparing', 'sending', 'saving', null]);
@@ -198,11 +205,11 @@ describe('useUpload stages', () => {
   });
 
   it('reports `sending` with no fraction when the host gives its own fetchImpl', async () => {
-    let answer: (response: Response) => void = () => undefined;
+    const answers: ((response: Response) => void)[] = [];
     const fetchImpl = vi.fn(
       () =>
         new Promise<Response>((resolve) => {
-          answer = resolve;
+          answers.push(resolve);
         }),
     ) as unknown as typeof fetch;
     const { now } = setup({ fetchImpl });
@@ -210,7 +217,7 @@ describe('useUpload stages', () => {
     await flush();
     expect(now().progress).toMatchObject({ stage: 'sending', fraction: null, secondsLeft: null, step: 2 });
     expect(xhrs).toHaveLength(0);
-    answer(new Response(JSON.stringify({ data: { imageKey: KEY } }), { status: 200 }));
+    answers[0]?.(new Response(JSON.stringify({ data: { imageKey: KEY } }), { status: 200 }));
     await flush();
     expect(now().progress).toBeNull();
   });
@@ -219,12 +226,11 @@ describe('useUpload stages', () => {
 describe('useUpload failures end with progress null and the existing message', () => {
   it('a transport error', async () => {
     const { now } = setup();
-    let key: string | null = 'unset';
-    act(() => void now().upload(photo()).then((value) => (key = value)));
+    const key = start(() => now().upload(photo()));
     await flush();
     act(() => lastXhr().fail());
     await flush();
-    expect(key).toBeNull();
+    await expect(key).resolves.toBeNull();
     expect(now().progress).toBeNull();
     expect(now().error).toBe(transportFailure(PT_BR_WEB_STORAGE_MESSAGES));
   });
@@ -258,33 +264,31 @@ describe('useUpload failures end with progress null and the existing message', (
 describe('useUpload abort()', () => {
   it('mid-send: the request is aborted, progress null, no error, upload() resolves null', async () => {
     const { now } = setup();
-    let key: string | null = 'unset';
-    act(() => void now().upload(photo()).then((value) => (key = value)));
+    const key = start(() => now().upload(photo()));
     await flush();
     act(() => lastXhr().progress(300, 1000));
     act(() => now().abort());
     await flush();
     expect(lastXhr().aborted).toBe(true);
-    expect(key).toBeNull();
+    await expect(key).resolves.toBeNull();
     expect(now().progress).toBeNull();
     expect(now().uploading).toBe(false);
     expect(now().error).toBeNull();
   });
 
   it('during the re-encode: resolves null at once, with no error and no request', async () => {
-    reencode.hold = true;
+    const reencode = holdReencode();
     const { now } = setup();
-    let key: string | null = 'unset';
-    act(() => void now().upload(photo()).then((value) => (key = value)));
+    const key = start(() => now().upload(photo()));
     await flush(300);
     expect(now().progress?.stage).toBe('preparing');
     act(() => now().abort());
     await flush();
-    expect(key).toBeNull();
+    await expect(key).resolves.toBeNull();
     expect(now().progress).toBeNull();
     expect(now().error).toBeNull();
     // The re-encode finishing later sends nothing.
-    reencode.pending?.resolve(reencode.pending.file);
+    reencode.release();
     await flush(1000);
     expect(xhrs).toHaveLength(0);
     expect(now().progress).toBeNull();
@@ -293,18 +297,18 @@ describe('useUpload abort()', () => {
 
 describe('useUpload preparing', () => {
   it('caps `fraction` at 0.95 until the re-encode really ends', async () => {
-    reencode.hold = true;
+    const reencode = holdReencode();
     const { now } = setup({ estimatePrepareMs: () => 1000 });
     act(() => void now().upload(photo()));
     await flush(5000);
     expect(now().progress).toMatchObject({ stage: 'preparing', fraction: 0.95, secondsLeft: null });
-    reencode.pending?.resolve(reencode.pending.file);
+    reencode.release();
     await flush();
     expect(now().progress?.stage).toBe('sending');
   });
 
   it('uses `estimatePrepareMs` over the default', async () => {
-    reencode.hold = true;
+    holdReencode();
     const estimate = vi.fn(() => 2000);
     const { now } = setup({ estimatePrepareMs: estimate });
     const file = photo();
@@ -316,7 +320,7 @@ describe('useUpload preparing', () => {
   });
 
   it('defaults to the file size over REENCODE_BYTES_PER_MS', async () => {
-    reencode.hold = true;
+    holdReencode();
     const { now } = setup();
     // A file the constant says takes exactly one second.
     act(() => void now().upload(photo(REENCODE_BYTES_PER_MS * 1000)));
@@ -325,7 +329,7 @@ describe('useUpload preparing', () => {
   });
 
   it('`totalSecondsLeft` is null with no rate, finite with an assumed one', async () => {
-    reencode.hold = true;
+    holdReencode();
     const bare = setup({ estimatePrepareMs: () => 2000 });
     act(() => void bare.now().upload(photo()));
     await flush(200);
@@ -350,7 +354,7 @@ describe('useUpload preparing', () => {
     act(() => lastXhr().respond(200, { data: { imageKey: KEY } }));
     await flush();
 
-    reencode.hold = true;
+    holdReencode();
     act(() => void now().upload(photo()));
     await flush(200);
     expect(now().progress?.totalSecondsLeft).not.toBeNull();

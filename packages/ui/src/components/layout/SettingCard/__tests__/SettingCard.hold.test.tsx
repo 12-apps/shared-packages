@@ -44,7 +44,7 @@ describe('SettingCard while busy', () => {
     fireEvent.click(save);
     expect(onSave).not.toHaveBeenCalled();
     expect(save).toHaveTextContent(COPY.save);
-    expect(screen.queryByTestId('card-saving')).toBeNull();
+    expect(screen.queryAllByTestId('card-saving')).toHaveLength(0);
     expect(screen.getByTestId('card')).not.toHaveAttribute('aria-busy');
   });
 

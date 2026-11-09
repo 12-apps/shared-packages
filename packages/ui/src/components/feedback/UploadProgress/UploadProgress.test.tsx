@@ -70,7 +70,7 @@ describe('UploadProgress — what each stage says', () => {
     render(<UploadProgress progress={saving} copy={COPY} />);
     expect(text('upload-progress-stage')).toBe('Photo sent, saving…');
     expect(screen.getByTestId('upload-progress-spinner')).toBeInTheDocument();
-    expect(screen.queryByRole('progressbar', { name: 'Photo sent, saving…' })).toBeNull();
+    expect(screen.queryAllByRole('progressbar')).toHaveLength(0);
     expect(text('upload-progress-figure')).toBeNull();
     expect(text('upload-progress-time')).toBeNull();
   });

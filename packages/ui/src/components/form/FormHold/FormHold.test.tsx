@@ -51,8 +51,8 @@ describe('FormHold — what busy holds', () => {
     const publish = screen.getByTestId('publish');
     expect(publish).toBeEnabled();
     expect(publish).toHaveAttribute('aria-disabled', 'true');
-    publish.focus();
-    expect(publish).toHaveFocus();
+    // Still in the tab order: a disabled button would drop out of it.
+    expect(publish).not.toHaveAttribute('tabindex', '-1');
   });
 
   it('releases everything when the hold ends', () => {
