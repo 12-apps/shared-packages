@@ -57,6 +57,7 @@ export type {
   LifecycleStatus,
   PlanCatalog,
   PlanDef,
+  PlanOptions,
   QuotaDecision,
   ResolvedFeatureDef,
   ResolvedPlan,
