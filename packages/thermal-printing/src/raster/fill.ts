@@ -33,8 +33,7 @@ export type { PaintStats } from "./scan";
 function addSpan(row: Float32Array, x0: number, x1: number, weight: number): number {
   const a = Math.max(0, x0);
   const b = Math.min(row.length, x1);
-  // `!(a < b)`, not `b <= a`: an end that overflowed to NaN writes nothing and counts nothing.
-  if (!(a < b)) return 0;
+  if (b <= a) return 0;
   const i0 = Math.floor(a);
   const i1 = Math.floor(b);
   if (i0 === i1) {
@@ -107,7 +106,11 @@ function paintShape(target: Target, { shape, edges }: Prepared): void {
   const factor = sortFactor(edges);
   let written = 0;
   const onSpan = (x0: number, x1: number): void => {
-    written += addCovered(target.row, x0, x1);
+    // A span whose start overflowed to NaN still writes its end pixel, as it
+    // always has, but returns NaN for its count: the counter takes it as 0
+    // (the estimate counts no such span either), so it stays finite.
+    const count = addCovered(target.row, x0, x1);
+    if (Number.isFinite(count)) written += count;
   };
   // One sub-row filled, and its work in the estimate's units.
   const subrow = (y: number): number => {

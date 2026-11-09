@@ -293,3 +293,70 @@ describe("PaintStats.work on a crossing that overflows", () => {
     expect(estimateFillWork([overflow], 100, 20)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
   });
 });
+
+describe("the box bound's own terms (FUT-2919 review round 2)", () => {
+  it("charges the pixel two spans of one sub-row share", () => {
+    // Two even-odd boxes meeting at x = 0.5 on a 1 x 1 canvas: the sub-rows below 0.25 paint
+    // [0, 0.5) and [0.5, 1) — two spans writing the one pixel twice.
+    const touching: Shape = {
+      polygons: [[[0, 0], [0.5, 0], [0.5, 1], [0, 1]], [[0.5, 0.25], [1, 0.25], [1, 1], [0.5, 1]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+
+    paint([touching], 1, 1, new Budget(), stats);
+
+    expect(estimateFillWork([touching], 1, 1)).toBeGreaterThanOrEqual(stats.work ?? Infinity);
+  });
+
+  it("scans a narrow shape whose edge overflows instead of trusting its bounding box", () => {
+    const overflow: Shape = { polygons: [[[-1e308, 0.125], [1e308, 10.125], [0.5, 10.125]]], rgba: [0, 0, 0, 255], rule: "nonzero" };
+    const stats: PaintStats = { rowsFilled: 0, work: 0 };
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    paint([overflow], 1, 20, new Budget(), stats);
+
+    expect(estimateFillWork([overflow], 1, 20, estimate)).toBeGreaterThanOrEqual((stats.work ?? Infinity) + (estimate.scanWork ?? Infinity));
+    expect(estimate.scanWork).toBeGreaterThan(0);
+  });
+
+  it("returns past the budget on edge counts alone, scanning nothing", () => {
+    const estimate: PaintStats = { rowsFilled: 0, scanWork: 0 };
+
+    expect(estimateFillWork(slants(900), W, H, estimate)).toBeGreaterThan(MAX_FILL_WORK);
+    expect(estimate.scanWork).toBe(0);
+  });
+});
+
+describe("output on edges whose horizontal run overflows (FUT-2919 review round 2)", () => {
+  /** Straight alpha of pixel (x, y) on a `width`-wide raster. */
+  const alpha = (data: Uint8ClampedArray, width: number, x: number, y: number): number => data[(y * width + x) * 4 + 3] ?? 0;
+
+  // On a sub-row where such an edge's crossing is NaN, compositing skips the row and its coverage
+  // stays in the row buffer. Main (d80754a) then composited it into the NEXT row, through a span
+  // ending exactly on pixel 0's left boundary that it counted as touching pixel 0. A span no
+  // longer reaches a pixel it does not cover, so these pixels take their geometric value. The
+  // skipped row's coverage still stays in the buffer, as it did on main, and can reach a later
+  // row or the next shape: that defect predates FUT-2919 and is not fixed here.
+  it("leaves the row under the skipped one as the geometry paints it, on a 2-dot canvas", () => {
+    const shape: Shape = {
+      polygons: [[[-1e308, 158.625], [1.7e308, 2206.625], [0.5, 2206.625]], [[0, 0], [1, 0], [1, 2048], [0, 2048]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+
+    expect(alpha(paint([shape], 2, 2048, new Budget()), 2, 0, 159)).toBe(0);
+  });
+
+  it("leaves the row under the skipped one as the geometry paints it, on a 100-dot canvas", () => {
+    const shape: Shape = {
+      polygons: [[[-1e308, 10.875], [1e308, 20.875], [7.53, 20.875]], [[0, 0], [50, 0], [50, 20], [0, 20]]],
+      rgba: [0, 0, 0, 255],
+      rule: "evenodd",
+    };
+    const data = paint([shape], 100, 20, new Budget());
+
+    expect([alpha(data, 100, 0, 11), alpha(data, 100, 25, 11), alpha(data, 100, 75, 11)]).toEqual([0, 0, 255]);
+  });
+});

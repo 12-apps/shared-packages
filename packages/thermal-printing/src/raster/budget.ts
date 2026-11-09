@@ -23,7 +23,7 @@ export const MAX_PATH_POINTS = 250_000;
 
 /**
  * Units of scan-conversion work per document, as ESTIMATED before any row is
- * filled (an upper bound on the real work; see `Plan` in `./fill`): edge
+ * filled (an upper bound on the real work; see `Plan` in `./estimate`): edge
  * visits per sub-row times the sort's log factor, plus, on each of a row's
  * four sub-rows, the pixels its painted spans reach, plus the row's
  * composited extent — at least one unit each. A shape is charged its bounding
