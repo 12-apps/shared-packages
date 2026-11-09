@@ -171,7 +171,7 @@ export const CompactSaving: Story = {
 export const Failure: Story = {
   args: { progress: null },
   render: (args) => (
-    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-start' }}>
       <Box
         sx={{
           width: (theme) => theme.spacing(20),
@@ -189,7 +189,10 @@ export const Failure: Story = {
         <Typography variant="body2">Enviar foto</Typography>
       </Box>
       <UploadProgress {...args} />
-      <Box role="alert" sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start' }}>
+      <Box
+        role="alert"
+        sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start', flex: 1, minWidth: (theme) => theme.spacing(25) }}
+      >
         <Typography variant="body2" color="error" sx={{ fontWeight: 600 }}>
           Não deu para enviar a foto
         </Typography>

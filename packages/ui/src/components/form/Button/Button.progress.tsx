@@ -66,7 +66,9 @@ export function useButtonPress({ progress, loading, disabled, type, onClick }: P
  */
 export function buttonProgressStyles(theme: Theme, color: string): CSSObject {
   const palette = getColorFromTheme(theme, color);
-  const track = alpha(palette.main, 0.45);
+  // Washed out enough to read as "not yet", dark enough that the label on it
+  // keeps a readable contrast (the prototype's track sits near two thirds).
+  const track = alpha(palette.main, 0.65);
   return {
     '&&': { backgroundColor: track, color: palette.contrastText, borderColor: 'transparent', cursor: 'progress' },
     '&&:hover': { backgroundColor: track },
@@ -119,7 +121,7 @@ export function ButtonProgressContent({
       )}
       <span style={LABEL_STYLE} data-testid={testId('progress-label')}>
         {!known && (
-          <CircularProgress size="1em" color="inherit" aria-hidden data-testid={testId('progress-spinner')} />
+          <CircularProgress size="1em" color="inherit" disableShrink aria-hidden data-testid={testId('progress-spinner')} />
         )}
         {progress.label}
       </span>

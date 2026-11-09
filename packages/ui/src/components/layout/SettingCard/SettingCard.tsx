@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React, { forwardRef, useId } from 'react';
 
 import { Icon } from '../../../icons';
@@ -44,8 +45,11 @@ interface OpenBodyProps {
 const OpenBody: React.FC<OpenBodyProps> = ({
   bodyRef, titleId, errorId, copy, learnMore, children, saving, error, saveDisabled, onSave, onCancel, dataTestId,
 }) => {
+  const theme = useTheme();
   const hold = useFormHoldRoot();
   const { busy } = hold;
+  // Looks as unavailable as it is, without the spinner a save would show.
+  const heldStyle = busy ? { opacity: theme.palette.action.disabledOpacity, cursor: 'not-allowed' } : undefined;
   const pressSave = () => {
     if (!busy) onSave();
   };
@@ -82,6 +86,7 @@ const OpenBody: React.FC<OpenBodyProps> = ({
           onClick={pressSave}
           disabled={saveDisabled}
           aria-disabled={saving || busy || undefined}
+          style={heldStyle}
           aria-describedby={error ? errorId : undefined}
           icon={saving ? <PendingSpinner dataTestId={dataTestId} /> : undefined}
           iconPosition="left"

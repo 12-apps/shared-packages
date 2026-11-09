@@ -1,9 +1,12 @@
 import Box from '@mui/material/Box/index.js';
+import CircularProgress from '@mui/material/CircularProgress/index.js';
 import Typography from '@mui/material/Typography/index.js';
+import { useTheme } from '@mui/material/styles/index.js';
 import React from 'react';
 
 import { Progress } from '../../data-display/Progress';
 import { SR_ONLY_SX } from '../../data-display/ScheduleGrid/ScheduleGrid.styles';
+import { rem } from '../../../tokens/relative';
 import { useUploadTimeLeft } from './UploadProgress.hooks';
 import {
   UPLOAD_STAGE_COUNT,
@@ -64,11 +67,17 @@ function Bar({
   );
 }
 
+/** The spinner `saving` shows. `disableShrink`: a constant arc, never a dot mid-animation. */
 function Spinner({ dataTestId }: { dataTestId: string }): React.ReactElement {
+  const theme = useTheme();
   return (
-    <span aria-hidden style={{ display: 'inline-flex' }}>
-      <Progress variant="circular" circularSize={16} thickness={5} dataTestId={part(dataTestId, 'spinner')} />
-    </span>
+    <CircularProgress
+      size={rem(theme, 16)}
+      thickness={5}
+      disableShrink
+      aria-hidden
+      data-testid={part(dataTestId, 'spinner')}
+    />
   );
 }
 
