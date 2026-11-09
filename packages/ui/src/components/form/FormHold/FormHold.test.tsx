@@ -38,10 +38,10 @@ function HeldForm({ held, onSubmit }: { held: boolean; onSubmit: () => void }): 
 }
 
 describe('FormHold — what busy holds', () => {
-  it('holds the fields, the submit and an opted-in control; a plain Button stays live', () => {
+  it('holds the fields, the submit (aria-disabled) and an opted-in control; a plain Button stays live', () => {
     render(<HeldForm held onSubmit={vi.fn()} />);
     expect(screen.getByTestId('total-form-field-name')).toBeDisabled();
-    expect(screen.getByTestId('total-form-submit')).toBeDisabled();
+    expect(screen.getByTestId('total-form-submit')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('opt-in')).toBeDisabled();
     expect(screen.getByTestId('close')).toBeEnabled();
   });
@@ -59,7 +59,7 @@ describe('FormHold — what busy holds', () => {
     const { rerender } = render(<HeldForm held onSubmit={vi.fn()} />);
     rerender(<HeldForm held={false} onSubmit={vi.fn()} />);
     expect(screen.getByTestId('total-form-field-name')).toBeEnabled();
-    expect(screen.getByTestId('total-form-submit')).toBeEnabled();
+    expect(screen.getByTestId('total-form-submit')).not.toHaveAttribute('aria-disabled');
     expect(screen.getByTestId('opt-in')).toBeEnabled();
   });
 
@@ -193,7 +193,7 @@ describe('FormContainer with a drawer scope inside it', () => {
 
   it('a hold in the drawer holds the whole form', () => {
     render(<Editor main={false} drawer />);
-    expect(screen.getByTestId('total-form-submit')).toBeDisabled();
+    expect(screen.getByTestId('total-form-submit')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('total-form-field-name')).toBeDisabled();
     expect(screen.getByTestId('opt-in')).toBeDisabled();
   });
@@ -201,7 +201,7 @@ describe('FormContainer with a drawer scope inside it', () => {
   it('a hold in the form holds the drawer', () => {
     render(<Editor main drawer={false} />);
     expect(screen.getByTestId('opt-in')).toBeDisabled();
-    expect(screen.getByTestId('total-form-submit')).toBeDisabled();
+    expect(screen.getByTestId('total-form-submit')).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

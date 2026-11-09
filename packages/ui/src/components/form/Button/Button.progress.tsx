@@ -5,6 +5,7 @@ import * as React from 'react';
 
 import { rem } from '../../../tokens/relative';
 import { useFormBusy } from '../FormHold/FormHold';
+import { heldFocusRing } from './Button.held';
 import { buttonProgressColors } from './Button.progress.colors';
 import { getColorFromTheme } from './Button.styles';
 import type { ButtonProgress } from './Button.types';
@@ -26,6 +27,8 @@ export interface ButtonPressState {
   ariaDisabled: true | undefined;
   ariaBusy: true | undefined;
   onClick: React.MouseEventHandler<HTMLElement> | undefined;
+  /** A submit held by its form: `aria-disabled`, focusable, a press does nothing. */
+  held: boolean;
 }
 
 /** A press that does nothing — not even submit the form the button sits in. */
@@ -44,18 +47,25 @@ interface PressInput {
 
 /**
  * A `type="submit"` button is held while its form is busy (`useFormBusy`): that
- * is what keeps Save from running while a photo still uploads. Any other
- * button is NOT held unless its host opts in, so navigation stays live.
+ * is what keeps Save from running while a photo still uploads. Held, it is
+ * `aria-disabled` and stays in the tab order — like a button with `progress`,
+ * and like a settings card's Save — so a keyboard or screen-reader user finds
+ * it and hears that it is held; a click or Enter does nothing (and
+ * `FormContainer` refuses an implicit submit while busy). A host's own
+ * `disabled` / `loading` still disable natively. Any other button is NOT held
+ * unless its host opts in, so navigation stays live.
  */
 export function useButtonPress({ progress, loading, disabled, type, onClick }: PressInput): ButtonPressState {
   const busy = useFormBusy();
-  if (progress) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress };
-  const held = type === 'submit' && busy;
+  if (progress) return { disabled: false, ariaDisabled: true, ariaBusy: true, onClick: swallowPress, held: false };
+  const nativelyDisabled = Boolean(disabled || loading);
+  const held = type === 'submit' && busy && !nativelyDisabled;
   return {
-    disabled: Boolean(disabled || loading || held),
-    ariaDisabled: undefined,
+    disabled: nativelyDisabled,
+    ariaDisabled: held ? true : undefined,
     ariaBusy: loading ? true : undefined,
-    onClick,
+    onClick: held ? swallowPress : onClick,
+    held,
   };
 }
 
@@ -75,6 +85,7 @@ export function buttonProgressStyles(theme: Theme, color: string): CSSObject {
   return {
     '&&': { backgroundColor: track, color: palette.contrastText, borderColor: 'transparent', cursor: 'progress' },
     '&&:hover': { backgroundColor: track },
+    ...heldFocusRing(theme),
     [`& [${FILL_ATTR}]`]: {
       backgroundColor: fill,
       transition: `width ${theme.transitions.duration.short}ms linear`,

@@ -91,8 +91,11 @@ running — a photo uploading before Publish can act:
 ```
 
 A `type="submit"` button is also HELD while its form is busy
-([`FormHold`](../FormHold/FormHold.md)): it is `disabled` until the hold is
-released. Any other button is not held, so navigation stays live; a host
+([`FormHold`](../FormHold/FormHold.md)): until the hold is released it is
+`aria-disabled` but focusable, drawn with the theme's disabled tokens (its
+label kept at 3:1), and a click or Enter does nothing. Both a held submit and a
+button with `progress` draw a two-tone `:focus-visible` ring (ink ring, page
+halo), since MUI gives them only a ripple. Any other button is not held, so navigation stays live; a host
 control opts in by reading `useFormBusy()`.
 
 ## Rendering as something else

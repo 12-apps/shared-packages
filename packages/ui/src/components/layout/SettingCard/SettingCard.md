@@ -84,7 +84,8 @@ back to the top of the page.
 
 The open card is a form HOLD scope ([`FormHold`](../../form/FormHold/FormHold.md)).
 While a field in it holds — `useFormHold('logo', uploading)` — Save is
-`aria-disabled` and a press does nothing, **without** the saving spinner: the
+`aria-disabled`, drawn with the theme's disabled tokens (its label kept at
+3:1), and a press does nothing, **without** the saving spinner: the
 upload shows its own progress where the photo is, and an upload must not look
 like a save. **Cancel stays enabled**: it calls `onCancel`, which is where the
 host aborts the upload and restores the saved value. Busy (an upload) and

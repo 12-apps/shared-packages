@@ -5,6 +5,7 @@ import type { Theme } from '@mui/material/styles/index.js';
 import * as React from 'react';
 
 import { resolveButtonProps } from './Button.helpers';
+import { buttonHeldStyles } from './Button.held';
 import { ButtonProgressContent, buttonProgressStyles, useButtonPress } from './Button.progress';
 import { BUTTON_ICON_GLYPH_SIZE } from './Button.metrics';
 import { childTestId, resolveTestId, withoutTestIdProps } from '../../../platform/test-id';
@@ -21,7 +22,7 @@ import type { ButtonComponent, ButtonProps } from './Button.types';
 
 const StyledButton = styled(MuiButton, {
   shouldForwardProp: (prop) =>
-    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple', 'progressing'].indexOf(
+    ['glow', 'pulse', 'loading', 'customVariant', 'customColor', 'ripple', 'progressing', 'held'].indexOf(
       prop as string,
     ) === -1,
 })<{
@@ -31,7 +32,8 @@ const StyledButton = styled(MuiButton, {
   pulse?: boolean;
   ripple?: boolean;
   progressing?: boolean;
-}>(({ theme, customVariant, customColor = 'primary', glow, pulse, progressing }) => {
+  held?: boolean;
+}>(({ theme, customVariant, customColor = 'primary', glow, pulse, progressing, held }) => {
   const colorPalette = getColorFromTheme(theme, customColor);
 
   return {
@@ -45,6 +47,7 @@ const StyledButton = styled(MuiButton, {
     ...buttonVariantStyles(theme, customVariant, colorPalette, customColor),
     ...buttonEmphasisStyles(theme, colorPalette, glow, pulse),
     ...(progressing ? buttonProgressStyles(theme, customColor) : {}),
+    ...(held ? buttonHeldStyles(theme) : {}),
   };
 });
 
@@ -241,6 +244,7 @@ const ButtonRoot = React.forwardRef<HTMLButtonElement, ButtonProps>(
         pulse={pulse}
         ripple={ripple}
         progressing={progress != null}
+        held={press.held}
         disabled={press.disabled}
         aria-disabled={press.ariaDisabled}
         aria-busy={press.ariaBusy}

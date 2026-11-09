@@ -49,7 +49,10 @@ while one card's logo uploads, another card's Save still works.
 ## What busy holds
 
 - The `total-form` fields (`Fields.*`), which render `disabled`.
-- `Button type="submit"` and `SubmitButton`, which render `disabled`.
+- `Button type="submit"` and `SubmitButton`, which turn `aria-disabled` — still
+  focusable, so Tab reaches them and a screen reader hears they are held — with
+  the theme's disabled look and a keyboard focus ring; a click or Enter does
+  nothing. A host's own `disabled` / `loading` still disable natively.
 - `FormContainer`'s submit handler, which returns without calling `onSubmit`,
   so `requestSubmit()` and keyboard shortcuts cannot pass it.
 - An open `SettingCard`'s Save (`aria-disabled`, no spinner; Cancel stays live).

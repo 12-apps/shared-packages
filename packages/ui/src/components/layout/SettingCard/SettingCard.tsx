@@ -4,6 +4,7 @@ import React, { forwardRef, useId } from 'react';
 
 import { Icon } from '../../../icons';
 import { Button } from '../../form/Button';
+import { heldButtonStyle } from '../../form/Button/Button.held';
 import { FormHoldScope, useFormHoldRoot } from '../../form/FormHold/FormHold';
 
 import { useSettingCard } from './SettingCard.hooks';
@@ -50,8 +51,9 @@ const OpenBody: React.FC<OpenBodyProps> = ({
   // one's Save, and this one's never holds a provider the page put around it.
   const hold = useFormHoldRoot({ isolate: true });
   const { busy } = hold;
-  // Looks as unavailable as it is, without the spinner a save would show.
-  const heldStyle = busy ? { opacity: theme.palette.action.disabledOpacity } : undefined;
+  // Looks as unavailable as it is (the theme's disabled tokens, label still
+  // readable at 3:1), without the spinner a save would show.
+  const heldStyle = busy ? heldButtonStyle(theme) : undefined;
   const pressSave = () => {
     if (!busy) onSave();
   };
