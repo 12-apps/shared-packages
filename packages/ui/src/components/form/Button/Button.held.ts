@@ -65,6 +65,9 @@ export function heldFocusRing(theme: Theme): CSSObject {
     outline: `${rem(theme, 2)} solid ${theme.palette.text.primary}`,
     outlineOffset: rem(theme, 2),
     boxShadow: `0 0 0 ${rem(theme, 6)} ${theme.palette.background.paper}`,
+    // The button eases `all` its properties; a focus ring that fades in reads
+    // as late, so the ring appears at once.
+    transition: 'none',
   };
   return { '&&:focus-visible': ring, '&&.Mui-focusVisible': ring };
 }
