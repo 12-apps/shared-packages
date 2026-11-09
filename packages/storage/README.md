@@ -190,6 +190,14 @@ const storage = createWebStorage({ apiBase: '/api' });
 // storage.useUpload   the primitive, for a bespoke affordance
 ```
 
+`useUpload` reports which of three waits a running upload is in —
+`progress: { stage: 'preparing' | 'sending' | 'saving', fraction, secondsLeft,
+step, totalSecondsLeft }`, `null` when idle — and `abort()` cancels it.
+`sending` counts the bytes through an `XMLHttpRequest` (`upload.onprogress`);
+a host's own `fetchImpl` still wins, with no fraction. Every number is `null`
+where there is no honest estimate: the caller shows a spinner there.
+`query` appends a host's scoping parameters to the endpoint.
+
 `ImageField`'s `label` is REQUIRED and has no default word: it
 names the dropzone and is the preview image's `alt`, with no packaged word
 behind it.

@@ -26,6 +26,14 @@ export {
 } from './use-upload';
 
 export {
+  PREPARING_FRACTION_CAP,
+  REENCODE_BYTES_PER_MS,
+  resetMeasuredUploadRate,
+  type UploadProgress,
+  type UploadStage,
+} from './upload-progress';
+
+export {
   CATALOG_IMAGE_PROFILE,
   optimizeImage,
   resetWebpSupportProbe,
