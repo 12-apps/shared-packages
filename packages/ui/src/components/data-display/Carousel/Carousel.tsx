@@ -15,7 +15,7 @@ import { CarouselChrome } from './Carousel.chrome';
 import { CarouselIndicators } from './Carousel.parts';
 import { CarouselTrack } from './Carousel.slide';
 import { containerStyles, frameBox, interactionSx } from './Carousel.styles';
-import type { CarouselItem, CarouselProps } from './Carousel.types';
+import type { CarouselProps } from './Carousel.types';
 import { muiColor } from '../../../tokens/scales';
 
 export { CarouselArrows, CarouselIndicators, CarouselThumbnails } from './Carousel.parts';
