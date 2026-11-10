@@ -57,8 +57,8 @@ mount.
 
 | Export | What it is |
 |---|---|
-| `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`, `textWidth`. Pure, isomorphic. |
-| `…/escpos` | `encodeTicket(lines)` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. `encodeDrawerPulse(options?)` → the five-byte `ESC p m t1 t2` that opens the cash drawer wired to the printer, alone or appended to a ticket. |
+| `@12-apps/thermal-printing` | The line model — `TicketLine`, `columnsFor`, `wrap`, `line`, `centered`, `rule`, `field`, `PAPER_WIDTHS_MM`, and the [reference-sheet vocabulary](#the-vocabulary-four-sizes-bands-boxes-rows-pictures): `textLines`, `band`, `box`, `row`, `image`, `LINE_SIZES`, `printableDotsFor`, `textWidth`; the per-printer [spacing unit](#bands-and-boxes) — `LINE_SPACING_UNITS`, `isLineSpacingUnit`, `lineSpacingFor` — and `lineTestSheet`. Pure, isomorphic. |
+| `…/escpos` | `encodeTicket(lines, { lineSpacingUnit? })` → `Uint8Array`. Initialise, CP850, align, emphasise, font and magnification, reverse, line spacing, `GS v 0` raster, feed, partial cut. `encodeDrawerPulse(options?)` → the five-byte `ESC p m t1 t2` that opens the cash drawer wired to the printer, alone or appended to a ticket. |
 | `…/html` | `renderTicketHtml(lines, paperWidthMm, lang?)` → a standalone document exactly the roll's printable width (72 mm of 80, 48 mm of 58), pure black on white, with `@page { margin: 0 }`. `rasterToDataUri(raster)` → the 1-bit picture as a `data:` URI, for a preview. |
 | `…/raster` | `rasterizeSvg(svg, { width })` → RGBA at the printer's dot size; `toMonochrome(rgba, options?)` → a printable 1-bit `RasterImage`. Pure, isomorphic, no canvas and no native module. |
 | `…/net` | `sendToNetworkPrinter(host, port, bytes, options?)`. Node-only (`node:net`), never throws, structured failures. |
@@ -154,12 +154,28 @@ to draw its own preview.
 - Both default to **bold** — they are there to be noticed; pass `bold: false`
   to opt out.
 
-> **Hardware assumption to verify on paper:** `ESC 3 n` is read as `n` dots,
-> which holds for the 203-dpi class this package targets (Bematech MP4200,
-> Epson TM-T20 and alike, where the line-spacing motion unit is one dot). A
-> printer whose vertical motion unit is different (set by `GS P`, or a
-> 180/300-dpi head) would space framed lines tighter or looser than the cell;
-> check a band and a box on the actual model before relying on them.
+- **The spacing unit is per printer.** `ESC 3 n` is counted in head dots on
+  the 203-dpi class (Epson TM-T20, Bematech MP-4200, Elgin i9), and that is the
+  default. The Epson TM-T88 family counts it in 1/360 inch under a 180-dpi head,
+  two units per dot, so the cell height sent as-is overlaps framed lines by
+  about half a line. A host stores the unit per printer and passes it:
+  `encodeTicket(lines, { lineSpacingUnit: 'inch-360' })` doubles `n` (clamped to
+  `0..255`) and changes no other byte; with no option the bytes are exactly
+  what they always were. `LINE_SPACING_UNITS` lists the units for a host's
+  schema, and `lineSpacingFor(dots, unit)` is the conversion.
+- **Finding the unit without the model.** `lineTestSheet()` returns one
+  numbered section per unit — a box and a two-line band holding the digit 1,
+  then 2, 20 columns wide so they fit any head on either roll — with each
+  framed line pinned to its unit
+  (`TicketLine.lineSpacingUnit`, which the encoder honours over its option), so
+  both print on one roll through any pipeline that carries lines. The host adds
+  its own heading and asks which box came out with its lines touching; the
+  section's `unit` is the answer to store. ESC/POS only: the HTML document has
+  no `ESC 3` and draws both sections alike.
+- **Only the vertical half.** The TM-T88's 180-dpi head is also narrower in
+  dots — 512 on 80 mm, 42 Font A columns where `columnsFor` answers 48 —
+  unless the printer is set to its 48-column emulation. The unit does not
+  change the column count.
 
 ### Rows
 

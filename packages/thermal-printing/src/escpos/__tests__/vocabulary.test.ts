@@ -111,6 +111,37 @@ describe("box", () => {
   });
 });
 
+describe("line spacing unit", () => {
+  const framed = [...box("OK", 80, { size: "large" }), ...band("PAGO", 80), line("after")];
+
+  it("encodes exactly today's bytes when the option is absent or says dot", () => {
+    const today = [...encodeTicket(framed)];
+
+    expect([...encodeTicket(framed, {})]).toEqual(today);
+    expect([...encodeTicket(framed, { lineSpacingUnit: "dot" })]).toEqual(today);
+    expect(indexOfCommand(today, [ESC, 0x33, 34])).toBeGreaterThan(0); // the large box's cell
+    expect(indexOfCommand(today, [ESC, 0x33, 24])).toBeGreaterThan(0); // the band's
+  });
+
+  it("scales ESC 3 n for a TM-T88 and changes nothing else", () => {
+    const today = [...encodeTicket(framed)];
+    const tmT88 = [...encodeTicket(framed, { lineSpacingUnit: "inch-360" })];
+    const at = (stream: number[], n: number): number => indexOfCommand(stream, [ESC, 0x33, n]);
+
+    expect(tmT88).toHaveLength(today.length);
+    expect(at(tmT88, 68)).toBe(at(today, 34));
+    expect(at(tmT88, 48)).toBe(at(today, 24));
+    const differing = tmT88.flatMap((byte, index) => (byte === today[index] ? [] : [index]));
+    expect(differing).toEqual([at(today, 34) + 2, at(today, 24) + 2]);
+  });
+
+  it("never sends ESC 3 for a ticket with no framed line", () => {
+    const plain = [line("A", "bold"), centered("B", "double"), ...textLines("C", 58, { size: "xlarge" })];
+
+    expect([...encodeTicket(plain, { lineSpacingUnit: "inch-360" })]).toEqual([...encodeTicket(plain)]);
+  });
+});
+
 describe("row", () => {
   it("is plain text already padded to the roll: the encoder adds nothing", () => {
     const [only] = row("Total", "9.90", 58);
