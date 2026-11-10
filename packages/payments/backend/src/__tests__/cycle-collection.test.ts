@@ -6,6 +6,7 @@ import {
   type CollectableCycle,
   type CycleCollectionDeps,
 } from '../core/cycle-collection';
+import type { InstallmentQuoteRequest, InstallmentQuoteResult } from '../core/installments';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 
 /**
@@ -73,19 +74,39 @@ interface WorldOptions {
   instrument?: BillingInstrument | null;
   hasAny?: boolean;
   status?: ChargeSnapshot['status'];
+  /** The gateway's quote, or `false` for a gateway without the method. */
+  quote?: ((request: InstallmentQuoteRequest) => InstallmentQuoteResult) | false;
+}
+
+/** A quoting provider's answer: 10% on top, whatever the count. */
+function tenPercent(request: InstallmentQuoteRequest): InstallmentQuoteResult {
+  const total = Math.round(request.amount.amountCents * 1.1);
+  return {
+    ok: true,
+    provider: 'pagbank',
+    quote: {
+      installments: request.installments,
+      perInstallment: { amountCents: Math.ceil(total / request.installments), currency: 'BRL' },
+      total: { amountCents: total, currency: 'BRL' },
+      interest: { amountCents: total - request.amount.amountCents, currency: 'BRL' },
+    },
+  };
 }
 
 function world(options: WorldOptions = {}) {
   // Typed through the generic rather than by declaring unused parameters, so
   // `mock.calls` is readable — what the flow SENDS is half of what these cases
   // assert.
-  const charge = vi.fn<(merchant: MerchantRef, input: ChargeCall) => Promise<RaisedCharge>>(
-    async () => ({
+  const charge = vi.fn<(merchant: MerchantRef, input: ChargeCall, opts?: unknown) => Promise<RaisedCharge>>(
+    async (_merchant, input) => ({
       provider: 'pagbank',
       providerChargeId: 'CHAR_A',
-      snapshot: snapshotWith(options.status ?? 'PENDING'),
+      snapshot: { ...snapshotWith(options.status ?? 'PENDING'), amount: input.amount },
     }),
   );
+  const quoteInstallments = vi.fn<
+    (merchant: MerchantRef, request: InstallmentQuoteRequest, provider?: string) => Promise<InstallmentQuoteResult>
+  >(async (_merchant, request) => (options.quote || tenPercent)(request));
   const recordRaised = vi.fn(async () => undefined);
   const instruments = vi.fn(async () => ({
     instrument: options.instrument === undefined ? CARD_ON_FILE : options.instrument,
@@ -93,7 +114,7 @@ function world(options: WorldOptions = {}) {
   }));
 
   const config = {
-    gateway: { charge },
+    gateway: options.quote === false ? { charge } : { charge, quoteInstallments },
     credentials: {
       defaultProvider: async () =>
         options.defaultProvider === undefined ? 'pagbank' : options.defaultProvider,
@@ -107,7 +128,7 @@ function world(options: WorldOptions = {}) {
     enabled: async () => options.enabled ?? true,
   } as unknown as CycleCollectionDeps;
 
-  return { collector: createCycleCollector(config), charge, recordRaised, instruments };
+  return { collector: createCycleCollector(config), charge, recordRaised, instruments, quoteInstallments };
 }
 
 describe('the guards, before either method charges anything', () => {
@@ -256,5 +277,142 @@ describe('collectByCard', () => {
       providerChargeId: 'CHAR_A',
       method: 'CARD',
     });
+  });
+});
+
+describe('collectByCard in instalments (FUT-4382)', () => {
+  it('leaves one payment exactly as before: no quote, no count, no pin', async () => {
+    const { collector, charge, quoteInstallments, recordRaised } = world();
+
+    const result = await collector.collectByCard('cycle-1', { installments: 1 });
+
+    expect(quoteInstallments).not.toHaveBeenCalled();
+    // Two arguments, as before — no third `options` pinning a provider.
+    expect(charge.mock.calls[0]).toHaveLength(2);
+    expect(charge.mock.calls[0]![1].amount).toEqual(CYCLE.amount);
+    expect(charge.mock.calls[0]![1].card).not.toHaveProperty('installments');
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+    });
+    expect(result.snapshot).not.toHaveProperty('principal');
+  });
+
+  it('charges the QUOTED total in N, pinned to the quoting provider', async () => {
+    const { collector, charge, quoteInstallments } = world();
+
+    await collector.collectByCard('cycle-1', { installments: 3 });
+
+    expect(quoteInstallments).toHaveBeenCalledWith(
+      PLATFORM,
+      {
+        amount: CYCLE.amount,
+        installments: 3,
+        card: { savedCardToken: 'CARD_A' },
+        merchantInitiated: true,
+      },
+      'pagbank',
+    );
+    const [, input, opts] = charge.mock.calls[0]!;
+    expect(input.amount).toEqual({ amountCents: 10_890, currency: 'BRL' });
+    expect(input.card).toMatchObject({ installments: 3, merchantInitiated: true, savedCardToken: 'CARD_A' });
+    // Failover must never land the total on an acquirer that priced nothing.
+    expect(opts).toEqual({ provider: 'pagbank' });
+  });
+
+  it('records principal, total and count apart, and returns them on the snapshot', async () => {
+    const { collector, recordRaised } = world();
+
+    const result = await collector.collectByCard('cycle-1', { installments: 3 });
+
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+      installments: {
+        count: 3,
+        principal: CYCLE.amount,
+        total: { amountCents: 10_890, currency: 'BRL' },
+      },
+    });
+    expect(result.snapshot).toMatchObject({
+      amount: { amountCents: 10_890, currency: 'BRL' },
+      principal: CYCLE.amount,
+      installments: 3,
+    });
+  });
+
+  it('charges the re-quote, never a total quoted earlier', async () => {
+    // The buyer was shown 10% on top; by the time the cycle falls due the
+    // provider prices 20%. The charge takes what the provider says NOW.
+    let rate = 1.1;
+    const quote = (request: InstallmentQuoteRequest) => {
+      const answer = tenPercent(request);
+      if (!answer.ok) return answer;
+      const total = Math.round(request.amount.amountCents * rate);
+      return {
+        ...answer,
+        quote: {
+          ...answer.quote,
+          total: { amountCents: total, currency: 'BRL' },
+          interest: { amountCents: total - request.amount.amountCents, currency: 'BRL' },
+        },
+      };
+    };
+    const { collector, charge, quoteInstallments } = world({ quote });
+    const shown = await quoteInstallments(PLATFORM, { amount: CYCLE.amount, installments: 2, card: {} });
+    expect(shown.ok && shown.quote.total.amountCents).toBe(10_890);
+    rate = 1.2;
+
+    await collector.collectByCard('cycle-1', { installments: 2 });
+
+    expect(charge.mock.calls[0]![1].amount).toEqual({ amountCents: 11_880, currency: 'BRL' });
+  });
+
+  it('records nothing for a declined split, so the retry ladder survives', async () => {
+    const { collector, recordRaised } = world({ status: 'DECLINED' });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 2 });
+
+    expect(result.snapshot?.status).toBe('DECLINED');
+    expect(recordRaised).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a provider that quotes nothing', 'installments-unsupported' as const],
+    ['a merchant-initiated split the provider refuses', 'installments-merchant-initiated' as const],
+  ])('passes the refusal of %s through as the skip, charging nothing', async (_case, refusal) => {
+    const { collector, charge, recordRaised } = world({
+      quote: () => ({ ok: false, provider: 'pagbank', refusal }),
+    });
+
+    expect(await collector.collectByCard('cycle-1', { installments: 4 })).toEqual({
+      skipped: refusal,
+      snapshot: null,
+    });
+    expect(charge).not.toHaveBeenCalled();
+    expect(recordRaised).not.toHaveBeenCalled();
+  });
+
+  it('skips a split when the gateway it was given cannot quote', async () => {
+    const { collector, charge } = world({ quote: false });
+
+    expect((await collector.collectByCard('cycle-1', { installments: 2 })).skipped).toBe('installments-unsupported');
+    expect(charge).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 13, 1.5, Number.NaN])('refuses a count of %s before asking anyone', async (installments) => {
+    const { collector, charge, quoteInstallments, instruments } = world();
+
+    expect((await collector.collectByCard('cycle-1', { installments })).skipped).toBe('installments-out-of-range');
+    expect(quoteInstallments).not.toHaveBeenCalled();
+    expect(instruments).not.toHaveBeenCalled();
+    expect(charge).not.toHaveBeenCalled();
+  });
+
+  it('still answers the cycle guards first — a settled cycle is already-paid, not a split refusal', async () => {
+    const { collector } = world({ row: 'settled' });
+    expect((await collector.collectByCard('cycle-1', { installments: 99 })).skipped).toBe('already-paid');
   });
 });

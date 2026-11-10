@@ -227,12 +227,7 @@ export type {
   WebhookDelivery,
 } from './core/types';
 
-export {
-  createSettingsService,
-  credentialStoreFrom,
-  type SettingsService,
-  type SettingsServiceOptions,
-} from './config/service';
+export { createSettingsService, credentialStoreFrom, type SettingsService, type SettingsServiceOptions } from './config/service';
 export { hasUsableCredentials } from './config/usable-credentials';
 export { mintBrowserKey, storedBrowserKey, type BrowserKeyDeps } from './config/browser-key';
 export { createCycleCollector } from './core/cycle-collection';
@@ -240,7 +235,9 @@ export { merchantWebhookUrl, type MerchantWebhookUrlOptions } from './config/web
 export { classifyFirstCharge } from './checkout/first-charge';
 export type { FirstChargeSettlement, FirstChargeExpectation, FirstChargeOptions } from './checkout/first-charge';
 export { envOAuthAppCredentials, envOAuthAppValues, oauthAppField, oauthAppWebhookSecret, withOAuthAppSigningSecrets, DEFAULT_OAUTH_APP_EXTRAS, type EnvOAuthAppOptions, type OAuthAppValues } from './config/oauth-env';
-export type { BillingInstrument, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup } from './core/cycle-collection';
+export type { BillingInstrument, CardCollectionOptions, CollectableCycle, CollectionResult, CollectionSkip, CycleCollectionDeps, CycleCollector, CycleStore, InstrumentLookup, RaisedCharge } from './core/cycle-collection';
+// Instalments the buyer pays the interest on (FUT-4382) — see `core/installments.ts`.
+export { isInstallmentCount, MAX_INSTALLMENTS, simulatedInstallments, type InstallmentCapability, type InstallmentQuote, type InstallmentQuoteInput, type InstallmentQuoteMethods, type InstallmentQuoteRequest, type InstallmentQuoteResult, type InstallmentRefusal, type SimulatedInstallmentOptions } from './core/installments';
 // Account-level downgrade rule (FUT-761) — see `config/account-downgrade.ts`.
 export { downgradeOnAccountError } from './config/account-downgrade';
 export { type VerifiedProviderConfig } from './config/verify';

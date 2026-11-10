@@ -205,6 +205,9 @@ export interface ChargeSnapshot {
    */
   settlementHints?: SettlementHints;
   declineReason?: DeclineReason;
+  /** A charge split in N (FUT-4382): the count, and the price before the buyer's interest. */
+  installments?: number;
+  principal?: Money;
   /**
    * The provider's OWN verdict on whether another attempt with the same
    * instrument could ever succeed — PagBank's "Retentável" column, Stripe's
@@ -355,11 +358,7 @@ export interface ResolvedCredentials {
  * (this file's size gate), and re-exported here so every adapter and host keeps
  * importing them from `core/types`, which is the only path any of them uses.
  */
-export type {
-  OAuthAuthorizeRequest,
-  OAuthTokens,
-  ProviderAuthMode,
-} from './connect-types';
+export type { OAuthAuthorizeRequest, OAuthTokens, ProviderAuthMode } from './connect-types';
 
 // The buyer's identity and the BUYER-REQUIREMENTS descriptors (FUT-595) live
 // in their own module; re-exported so consumers keep importing from here.
