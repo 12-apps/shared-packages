@@ -64,6 +64,12 @@ store over a database client it resolves lazily. `enabled` is checked first and
 early: a deployment with no platform account should do nothing quietly rather
 than throw once per customer deep inside the gateway.
 
+`collection.collectByCard(cycleId, options?)` takes the collector's own
+`CardCollectionOptions` (`installments`, `cardholderPresent`) and hands them
+through unchanged; omitted, it is one payment, merchant-initiated. Charge in
+instalments THROUGH this binding — never by rebuilding the collection from
+`createCycleCollector` in the host.
+
 ## 3. The card-on-file surface
 
 Adopt through `@12-apps/wiring/consumer` and bind `http`. The four descriptors
