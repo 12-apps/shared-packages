@@ -66,7 +66,34 @@ These are the seams hosts most often re-implement by accident:
 | `classifyReversalEvent` | which reversal shape a delivery is — chargeback, refund, dispute |
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
 | `gateway.captureCharge` | takes the money an AUTHORIZED charge only holds, and persists the PAID it answers (FUT-4082); `UnsupportedOperationError` where the provider cannot |
+| `gateway.quoteInstallments` | the provider's own price for a card charge in 2..12, the buyer paying the interest (FUT-4382) — what to show before paying; a typed `refusal` where the provider quotes none |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
+
+### Cycle collection in instalments (FUT-4382)
+
+`createCycleCollector(deps).collectByCard(cycleId, { installments })` charges
+the card on file in one payment by default, exactly as before. With a count of
+2..12 it re-asks the collecting provider for its price at the moment of the
+charge — a total shown to the buyer earlier is never reused — raises the QUOTED
+total split in that count, pinned to that provider so failover cannot move it,
+and tells `CycleStore.recordRaised` the cycle's `principal` apart from the
+`total` taken. The returned snapshot carries `installments` and `principal`.
+
+The package sets no rate. A provider prices instalments by declaring
+`installments: InstallmentCapability` (`maxInstallments`, `merchantInitiated`,
+`quote`); one that declares none is skipped, never charged in one payment and
+never charged the principal in N:
+
+| skip | when |
+|---|---|
+| `installments-unsupported` | the provider quotes nothing (PagBank, until its buyer-interest contract is proven in a sandbox), or the gateway handed over has no `quoteInstallments` |
+| `installments-out-of-range` | the count is not an integer in 1..12, or is past the provider's `maxInstallments` |
+| `installments-merchant-initiated` | the provider splits only with the cardholder present (`merchantInitiated: false`); a collected cycle never has one |
+
+Each is a code, never a sentence: map it to your own copy. For tests and stub
+mode, `simulatedInstallments()` is a deterministic table — 1x interest-free,
+2..12 on 2.99% a month — to attach to any adapter:
+`{ ...adapter, installments: simulatedInstallments() }`.
 
 ### Parked hosted links (FUT-4072)
 
