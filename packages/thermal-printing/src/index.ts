@@ -39,6 +39,14 @@ export {
   type TextStyle,
 } from "./blocks";
 export {
+  DEFAULT_LINE_SPACING_UNIT,
+  isLineSpacingUnit,
+  LINE_SPACING_UNITS,
+  lineSpacingFor,
+  type LineSpacingUnit,
+} from "./line-spacing";
+export { lineTestSheet, type LineTestSection } from "./line-test";
+export {
   columnsFor,
   DOTS_PER_MM,
   FONT_CELL_DOTS,

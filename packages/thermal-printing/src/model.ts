@@ -1,3 +1,4 @@
+import type { LineSpacingUnit } from "./line-spacing";
 import type { LineSize } from "./sizes";
 
 /**
@@ -59,4 +60,11 @@ export interface TicketLine {
   frame?: LineFrame;
   /** A raster picture. When present the line prints the picture and not `text`. */
   image?: RasterImage;
+  /**
+   * The unit this framed line's `ESC 3 n` is counted in, overriding the
+   * encoder's `lineSpacingUnit` for this line only. Absent on every ordinary
+   * line: it exists so the line-test sheet (`lineTestSheet`) can print the same
+   * box in each unit on one roll. The HTML encoder ignores it.
+   */
+  lineSpacingUnit?: LineSpacingUnit;
 }

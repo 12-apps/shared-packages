@@ -1,4 +1,5 @@
 import type { RasterImage, TicketLine } from "../index";
+import { DEFAULT_LINE_SPACING_UNIT, lineSpacingFor, type LineSpacingUnit } from "../line-spacing";
 import { resolveStyle, type ResolvedStyle } from "../style";
 
 /**
@@ -155,7 +156,7 @@ interface PrinterState {
   mode: number;
   align: number;
   reverse: boolean;
-  /** Line spacing in dots, or `null` for the printer's default. */
+  /** The `n` of the last `ESC 3 n`, in the printer's unit, or `null` for its default. */
   spacing: number | null;
 }
 
@@ -179,6 +180,8 @@ function setReverse(bytes: number[], state: PrinterState, reverse: boolean): voi
  * verticals of a box join into one border and a band of several lines is one
  * black block rather than stripes. Everything else keeps the printer's default
  * spacing, which is what the lines around it were designed against.
+ *
+ * `spacing` is already in the printer's unit (see `lineSpacingFor`).
  */
 function setSpacing(bytes: number[], state: PrinterState, spacing: number | null): void {
   if (spacing === state.spacing) return;
@@ -187,7 +190,12 @@ function setSpacing(bytes: number[], state: PrinterState, spacing: number | null
   state.spacing = spacing;
 }
 
-function pushTextLine(bytes: number[], state: PrinterState, line: TicketLine): void {
+function pushTextLine(
+  bytes: number[],
+  state: PrinterState,
+  line: TicketLine,
+  unit: LineSpacingUnit,
+): void {
   const style = resolveStyle(line);
   const mode = modeByte(style);
   if (mode !== state.mode) {
@@ -196,7 +204,9 @@ function pushTextLine(bytes: number[], state: PrinterState, line: TicketLine): v
   }
   setAlign(bytes, state, line.align);
   setReverse(bytes, state, line.frame === "band");
-  setSpacing(bytes, state, line.frame === undefined ? null : style.cellHeightDots);
+  const spacing =
+    line.frame === undefined ? null : lineSpacingFor(style.cellHeightDots, line.lineSpacingUnit ?? unit);
+  setSpacing(bytes, state, spacing);
   bytes.push(...encodeText(line.text), 0x0a);
 }
 
@@ -206,6 +216,17 @@ function pushImageLine(bytes: number[], state: PrinterState, raster: RasterImage
   setReverse(bytes, state, false);
   setAlign(bytes, state, line.align);
   pushRaster(bytes, raster);
+}
+
+/** How to speak to one particular printer. */
+export interface EncodeTicketOptions {
+  /**
+   * The unit this printer counts `ESC 3 n` in. Default `dot`, which is right
+   * for the TM-T20, MP-4200 and Elgin i9 class and encodes exactly the bytes
+   * this encoder always did; `inch-360` for the Epson TM-T88 family. A host
+   * stores it per printer: see `LINE_SPACING_UNITS` and `lineTestSheet`.
+   */
+  lineSpacingUnit?: LineSpacingUnit;
 }
 
 /**
@@ -222,7 +243,8 @@ function pushImageLine(bytes: number[], state: PrinterState, raster: RasterImage
  * A ticket that uses none of the newer line kinds encodes to exactly the bytes
  * it always did: every command is sent only when its setting changes.
  */
-export function encodeTicket(lines: readonly TicketLine[]): Uint8Array {
+export function encodeTicket(lines: readonly TicketLine[], options: EncodeTicketOptions = {}): Uint8Array {
+  const unit = options.lineSpacingUnit ?? DEFAULT_LINE_SPACING_UNIT;
   const bytes: number[] = [
     ESC, 0x40, // initialise — clears whatever the previous job left set
     ESC, 0x74, 0x02, // select CP850
@@ -230,7 +252,7 @@ export function encodeTicket(lines: readonly TicketLine[]): Uint8Array {
   const state: PrinterState = { mode: 0x00, align: ALIGN.left, reverse: false, spacing: null };
   for (const line of lines) {
     if (line.image !== undefined) pushImageLine(bytes, state, line.image, line);
-    else pushTextLine(bytes, state, line);
+    else pushTextLine(bytes, state, line, unit);
   }
   // Reset before the cut so the NEXT job starts from a known state even if it
   // is written by something that does not initialise.
