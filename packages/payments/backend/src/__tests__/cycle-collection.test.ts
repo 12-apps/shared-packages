@@ -56,6 +56,7 @@ interface RaisedCharge {
   provider: string;
   providerChargeId: string;
   snapshot: ChargeSnapshot;
+  createdAt?: Date;
 }
 
 /** What the collector hands the gateway, as these cases read it back. */
@@ -78,6 +79,8 @@ interface WorldOptions {
   quote?: ((request: InstallmentQuoteRequest) => InstallmentQuoteResult) | false;
   /** What the gateway's charge answers instead — an earlier attempt stored under the cycle's key. */
   returned?: Partial<ChargeSnapshot>;
+  /** The charge was stored by an EARLIER call (its row predates this one), not raised now. */
+  stale?: boolean;
 }
 
 /** A quoting provider's answer: 10% on top, whatever the count. */
@@ -104,6 +107,7 @@ function world(options: WorldOptions = {}) {
       provider: 'pagbank',
       providerChargeId: 'CHAR_A',
       snapshot: { ...snapshotWith(options.status ?? 'PENDING'), amount: input.amount, ...options.returned },
+      createdAt: options.stale ? new Date(0) : new Date('2999-01-01T00:00:00Z'),
     }),
   );
   const quoteInstallments = vi.fn<
@@ -491,15 +495,45 @@ describe('the charge that came back is not the one asked for (FUT-4382)', () => 
     expect(result.snapshot?.installments).toBe(2);
   });
 
-  it('records the stored split when a one-payment retry gets an earlier 3x back', async () => {
-    const { collector, recordRaised } = world({ returned: EARLIER_3X });
+  it('flags a one-payment retry handed an earlier charge at another amount, stamping no split', async () => {
+    // No adapter reports a count, so only the amount gives the earlier 3x away.
+    const { collector, recordRaised } = world({ returned: { amount: { amountCents: 10_452, currency: 'BRL' } } });
 
     const result = await collector.collectByCard('cycle-1');
 
-    expect(recordRaised).toHaveBeenCalledWith('cycle-1', expect.objectContaining({
-      installments: { count: 3, principal: CYCLE.amount, total: EARLIER_3X.amount },
-    }));
-    expect(result.chargeMismatch).toBe('expected 1 installment, got 3');
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+    });
+    expect(result.chargeMismatch).toBe('expected 9900 cents, got 10452');
+    expect(result.snapshot).not.toHaveProperty('principal');
+  });
+
+  it('leaves the count out of a matching split it cannot confirm, and says so', async () => {
+    // Same total, no reported count, and a row older than this call: it may be
+    // an earlier attempt at another count that priced the same.
+    const { collector, recordRaised } = world({ stale: true });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 3 });
+
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+      installments: { principal: CYCLE.amount, total: { amountCents: 10_890, currency: 'BRL' } },
+    });
+    expect(result.chargeMismatch).toBe('count-unconfirmed');
+    expect(result.snapshot).not.toHaveProperty('installments');
+  });
+
+  it('records the method of a PIX charge stored under the cycle id', async () => {
+    const { collector, recordRaised } = world({ returned: { method: 'PIX' } });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 3 });
+
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', expect.objectContaining({ method: 'PIX' }));
+    expect(result.chargeMismatch).toBe('expected a CARD charge, got PIX');
   });
 
   it('adds no flag when the charge is the one asked for', async () => {

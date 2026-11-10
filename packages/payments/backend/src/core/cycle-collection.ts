@@ -1,7 +1,7 @@
 import type { CustomerInfo } from './customer-schema';
 import type { PaymentsGateway } from './gateway';
 import { isInstallmentCount, type InstallmentQuote } from './installments';
-import { splitOf } from './cycle-split';
+import { splitOf, type ReturnedCharge } from './cycle-split';
 import type { CredentialStore } from './ports';
 import type { ChargeSnapshot, MerchantRef, Money, ProviderName } from './types';
 
@@ -140,7 +140,12 @@ export interface RaisedCharge {
    * places the split is told: the gateway's charge store keeps the snapshot
    * the adapter answered, which reports the total. Persist it from here.
    */
-  installments?: { count: number; principal: Money; total: Money };
+  installments?: {
+    /** Absent when no adapter report or fresh raise confirms it — see `chargeMismatch`. */
+    count?: number;
+    principal: Money;
+    total: Money;
+  };
 }
 
 /** How `collectByCard` charges. Omitted: one payment, exactly as before. */
@@ -346,8 +351,9 @@ async function collectCard(
   const quote = await quoteAt(deps, provider, cycle, instrument, count, merchantInitiated);
   if (quote && 'skipped' in quote) return quote;
 
+  const since = new Date();
   const stored = await raiseCard(deps, cycle, instrument, quote, { provider, merchantInitiated });
-  return recordCard(deps, cycle, stored, quote);
+  return recordCard(deps, cycle, { ...stored, since }, quote);
 }
 
 /**
@@ -360,13 +366,14 @@ async function collectCard(
 async function recordCard(
   deps: CycleCollectionDeps,
   cycle: CollectableCycle,
-  stored: { provider: ProviderName; providerChargeId: string; snapshot: ChargeSnapshot },
+  stored: ReturnedCharge,
   quote: InstallmentQuote | null,
 ): Promise<CollectionResult> {
-  const { split, mismatch } = splitOf(stored.snapshot, cycle, quote);
+  const { split, mismatch, method } = splitOf(stored, cycle, quote);
   if (stored.snapshot.status !== 'DECLINED') {
-    await deps.cycles.recordRaised(cycle.id, split ? { ...raisedOf(stored, 'CARD'), installments: split } : raisedOf(stored, 'CARD'));
+    await deps.cycles.recordRaised(cycle.id, split ? { ...raisedOf(stored, method), installments: split } : raisedOf(stored, method));
   }
-  const snapshot = split ? { ...stored.snapshot, installments: split.count, principal: split.principal } : stored.snapshot;
+  const count = split?.count === undefined ? {} : { installments: split.count };
+  const snapshot = split ? { ...stored.snapshot, ...count, principal: split.principal } : stored.snapshot;
   return mismatch ? { skipped: null, snapshot, chargeMismatch: mismatch } : { skipped: null, snapshot };
 }

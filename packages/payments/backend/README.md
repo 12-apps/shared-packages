@@ -90,7 +90,11 @@ The gateway answers the cycle's id with any charge already stored under it, so
 a retry can get back an earlier attempt at another amount or count. The
 collector then records the charge id with the split that charge itself reports
 (none, when it reports no count), never the new quote, and sets
-`chargeMismatch` on the result.
+`chargeMismatch` on the result. The amount is always compared; the count only
+where the adapter reports it on the snapshot (`installments`), which none does
+yet. Without a report, the count is recorded only for a charge this call just
+raised; a stored one handed back records principal and total without a count,
+with `chargeMismatch: 'count-unconfirmed'`.
 
 The package sets no rate. A provider prices instalments by declaring
 `installments: InstallmentCapability` (`maxInstallments`, `merchantInitiated`,
