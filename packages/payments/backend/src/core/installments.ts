@@ -38,6 +38,12 @@ export interface InstallmentQuoteInput {
    * provider that needs to know the card reads one of these. All optional.
    */
   card: { savedCardToken?: string; bin?: string; brand?: string };
+  /**
+   * True for a charge raised with no cardholder present. Default false. Passed
+   * to the provider too, which may price merchant- and customer-initiated
+   * charges differently.
+   */
+  merchantInitiated?: boolean;
 }
 
 /** A provider's price for paying {@link InstallmentQuoteInput.amount} in N. */
@@ -85,11 +91,8 @@ export type InstallmentRefusal =
   | 'installments-out-of-range'
   | 'installments-merchant-initiated';
 
-/** A host's request: the provider's input, plus whether nobody is at the keyboard. */
-export interface InstallmentQuoteRequest extends InstallmentQuoteInput {
-  /** True for a charge raised with no cardholder present. Default false. */
-  merchantInitiated?: boolean;
-}
+/** A host's request — the provider's own input, unchanged. */
+export type InstallmentQuoteRequest = InstallmentQuoteInput;
 
 export type InstallmentQuoteResult =
   | { ok: true; provider: ProviderName; quote: InstallmentQuote }
@@ -98,13 +101,16 @@ export type InstallmentQuoteResult =
 /** The gateway's quote call. */
 export interface InstallmentQuoteMethods<P extends string = string> {
   /**
+   * Optional on the interface so a host's own gateway fake keeps compiling;
+   * `createPaymentsGateway` always provides it.
+   *
    * Price `request.amount` in `request.installments` at the merchant's head
    * provider, or the `provider` named — what a host shows the buyer BEFORE
    * paying. A count of 1 answers the principal, interest-free, without asking
    * the provider. A provider that cannot price the count is a typed refusal,
    * not a throw; a provider failing to answer still throws.
    */
-  quoteInstallments(
+  quoteInstallments?(
     merchant: MerchantRef,
     request: InstallmentQuoteRequest,
     provider?: P,
@@ -145,12 +151,17 @@ function refusalFor(
  * A quote the charge may be raised at — refused loudly otherwise, because a
  * total below the principal or in another currency would charge the buyer a
  * number nobody asked for.
+ *
+ * `perInstallment × installments` may differ from `total` by LESS than
+ * `installments` cents: a provider rounds each payment to the cent and settles
+ * the remainder on one of them, so N payments can be off by at most N-1 cents.
  */
 function checkedQuote(provider: ProviderName, input: InstallmentQuoteInput, quote: InstallmentQuote) {
-  const { amount } = input;
+  const { amount, installments } = input;
   const sameCurrency = [quote.total, quote.perInstallment, quote.interest].every((m) => m.currency === amount.currency);
   const consistent = quote.total.amountCents - quote.interest.amountCents === amount.amountCents;
-  if (quote.installments !== input.installments || !sameCurrency || !consistent || quote.interest.amountCents < 0) {
+  const rounded = Math.abs(quote.perInstallment.amountCents * installments - quote.total.amountCents) < installments;
+  if (quote.installments !== installments || !sameCurrency || !consistent || !rounded || quote.interest.amountCents < 0) {
     throw new AdapterContractError(provider, `installment quote does not price ${input.installments}x of the principal`);
   }
   return quote;
@@ -169,7 +180,12 @@ export function quoteInstallmentsAt(resolve: ResolveFor) {
     if (request.installments === 1 || !adapter.installments) {
       return { ok: true, provider: adapter.name, quote: singlePayment(request.amount) };
     }
-    const input = { amount: request.amount, installments: request.installments, card: request.card };
+    const input = {
+      amount: request.amount,
+      installments: request.installments,
+      card: request.card,
+      merchantInitiated: request.merchantInitiated ?? false,
+    };
     const quote = await adapter.installments.quote(input, creds);
     return { ok: true, provider: adapter.name, quote: checkedQuote(adapter.name, input, quote) };
   };
@@ -185,7 +201,11 @@ export interface SimulatedInstallmentOptions {
   merchantInitiated?: boolean;
 }
 
-/** The price-table payment for `principal` over `count` at `rate` a month; no rate, no interest. */
+/**
+ * The price-table payment for `principal` over `count` at `rate` a month. No
+ * rate, no interest: each payment rounds UP and the total stays the principal,
+ * which keeps `per × count - total` under `count` cents, as `checkedQuote` asks.
+ */
 function amortised(principal: number, rate: number, count: number): { per: number; total: number } {
   if (rate === 0) return { per: Math.ceil(principal / count), total: principal };
   const per = Math.round((principal * rate) / (1 - (1 + rate) ** -count));

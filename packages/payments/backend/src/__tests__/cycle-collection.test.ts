@@ -76,6 +76,8 @@ interface WorldOptions {
   status?: ChargeSnapshot['status'];
   /** The gateway's quote, or `false` for a gateway without the method. */
   quote?: ((request: InstallmentQuoteRequest) => InstallmentQuoteResult) | false;
+  /** What the gateway's charge answers instead — an earlier attempt stored under the cycle's key. */
+  returned?: Partial<ChargeSnapshot>;
 }
 
 /** A quoting provider's answer: 10% on top, whatever the count. */
@@ -101,7 +103,7 @@ function world(options: WorldOptions = {}) {
     async (_merchant, input) => ({
       provider: 'pagbank',
       providerChargeId: 'CHAR_A',
-      snapshot: { ...snapshotWith(options.status ?? 'PENDING'), amount: input.amount },
+      snapshot: { ...snapshotWith(options.status ?? 'PENDING'), amount: input.amount, ...options.returned },
     }),
   );
   const quoteInstallments = vi.fn<
@@ -414,5 +416,95 @@ describe('collectByCard in instalments (FUT-4382)', () => {
   it('still answers the cycle guards first — a settled cycle is already-paid, not a split refusal', async () => {
     const { collector } = world({ row: 'settled' });
     expect((await collector.collectByCard('cycle-1', { installments: 99 })).skipped).toBe('already-paid');
+  });
+});
+
+describe('collectByCard with the cardholder at the screen (FUT-4382)', () => {
+  it('quotes and charges customer-initiated when cardholderPresent', async () => {
+    const { collector, charge, quoteInstallments } = world();
+
+    await collector.collectByCard('cycle-1', { installments: 3, cardholderPresent: true });
+
+    expect(quoteInstallments.mock.calls[0]![1].merchantInitiated).toBe(false);
+    expect(charge.mock.calls[0]![1].card).toMatchObject({ merchantInitiated: false, installments: 3 });
+  });
+
+  it('defaults to merchant-initiated for both the quote and the charge', async () => {
+    const { collector, charge, quoteInstallments } = world();
+
+    await collector.collectByCard('cycle-1', { installments: 3, cardholderPresent: false });
+
+    expect(quoteInstallments.mock.calls[0]![1].merchantInitiated).toBe(true);
+    expect(charge.mock.calls[0]![1].card).toMatchObject({ merchantInitiated: true });
+  });
+
+  it('charges one payment customer-initiated too', async () => {
+    const { collector, charge } = world();
+
+    await collector.collectByCard('cycle-1', { cardholderPresent: true });
+
+    expect(charge.mock.calls[0]![1].card).toMatchObject({ merchantInitiated: false });
+  });
+});
+
+describe('the charge that came back is not the one asked for (FUT-4382)', () => {
+  // The gateway answers the cycle's key with the charge already stored under
+  // it: an earlier sweep raised 3x and its `recordRaised` failed.
+  const EARLIER_3X = { amount: { amountCents: 10_605, currency: 'BRL' }, installments: 3 };
+
+  it("records the stored charge's own split, never this call's quote", async () => {
+    const { collector, recordRaised } = world({ returned: EARLIER_3X });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 6 });
+
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+      installments: { count: 3, principal: CYCLE.amount, total: EARLIER_3X.amount },
+    });
+    expect(result.chargeMismatch).toMatch(/expected 10890 cents, got 10605/);
+    expect(result.snapshot).toMatchObject({ installments: 3, amount: EARLIER_3X.amount });
+  });
+
+  it('stamps no split when the stored charge does not say its count, and flags it', async () => {
+    const { collector, recordRaised } = world({ returned: { amount: EARLIER_3X.amount } });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 3 });
+
+    // The charge id is still recorded: the charge exists, and the guard needs it.
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', {
+      provider: 'pagbank',
+      providerChargeId: 'CHAR_A',
+      method: 'CARD',
+    });
+    expect(result.chargeMismatch).toBeDefined();
+    expect(result.snapshot).not.toHaveProperty('principal');
+  });
+
+  it('flags a count that differs at the same amount', async () => {
+    const { collector } = world({ returned: { amount: { amountCents: 10_890, currency: 'BRL' }, installments: 2 } });
+
+    const result = await collector.collectByCard('cycle-1', { installments: 3 });
+
+    expect(result.chargeMismatch).toBe('expected 3 installments, got 2');
+    expect(result.snapshot?.installments).toBe(2);
+  });
+
+  it('records the stored split when a one-payment retry gets an earlier 3x back', async () => {
+    const { collector, recordRaised } = world({ returned: EARLIER_3X });
+
+    const result = await collector.collectByCard('cycle-1');
+
+    expect(recordRaised).toHaveBeenCalledWith('cycle-1', expect.objectContaining({
+      installments: { count: 3, principal: CYCLE.amount, total: EARLIER_3X.amount },
+    }));
+    expect(result.chargeMismatch).toBe('expected 1 installment, got 3');
+  });
+
+  it('adds no flag when the charge is the one asked for', async () => {
+    const { collector } = world();
+    expect(await collector.collectByCard('cycle-1', { installments: 3 })).not.toHaveProperty('chargeMismatch');
+    expect(await world().collector.collectByCard('cycle-1')).not.toHaveProperty('chargeMismatch');
   });
 });

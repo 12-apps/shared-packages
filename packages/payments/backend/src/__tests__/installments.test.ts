@@ -136,6 +136,47 @@ describe('gateway.quoteInstallments', () => {
     expect(await gateway.quoteInstallments(PLATFORM, request)).toMatchObject({ ok: true });
   });
 
+  it('passes merchantInitiated to the provider, so it can price the two apart', async () => {
+    const table = simulatedInstallments();
+    const quote = vi.spyOn(table, 'quote');
+    const w = world(table);
+    w.credentials.set(PLATFORM, 'quoting', STUB_CREDS);
+
+    await w.gateway.quoteInstallments(PLATFORM, { amount: BRL(10_000), installments: 3, card: CARD, merchantInitiated: true });
+    await w.gateway.quoteInstallments(PLATFORM, { amount: BRL(10_000), installments: 3, card: CARD });
+
+    expect(quote.mock.calls.map(([input]) => input.merchantInitiated)).toEqual([true, false]);
+  });
+
+  it("accepts the simulated table's own rounding at a zero rate (1000 in 3)", async () => {
+    const w = world(simulatedInstallments({ monthlyRateBps: 0 }));
+    w.credentials.set(PLATFORM, 'quoting', STUB_CREDS);
+
+    const result = await w.gateway.quoteInstallments(PLATFORM, { amount: BRL(1000), installments: 3, card: CARD });
+
+    expect(result).toMatchObject({ ok: true, quote: { perInstallment: BRL(334), total: BRL(1000) } });
+  });
+
+  it('throws on payments that do not add up to the total within rounding', async () => {
+    const off: InstallmentCapability = {
+      maxInstallments: 12,
+      merchantInitiated: true,
+      // 3 x 3400 = 10200: 200 cents off a 10000 total, far past rounding.
+      quote: async ({ installments }) => ({
+        installments,
+        perInstallment: BRL(3400),
+        total: BRL(10_000),
+        interest: BRL(0),
+      }),
+    };
+    const w = world(off);
+    w.credentials.set(PLATFORM, 'quoting', STUB_CREDS);
+
+    await expect(
+      w.gateway.quoteInstallments(PLATFORM, { amount: BRL(10_000), installments: 3, card: CARD }),
+    ).rejects.toBeInstanceOf(AdapterContractError);
+  });
+
   it('throws on a quote that does not price the principal — never charges a made-up total', async () => {
     const broken: InstallmentCapability = {
       maxInstallments: 12,

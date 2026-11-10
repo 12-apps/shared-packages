@@ -77,7 +77,20 @@ the card on file in one payment by default, exactly as before. With a count of
 charge — a total shown to the buyer earlier is never reused — raises the QUOTED
 total split in that count, pinned to that provider so failover cannot move it,
 and tells `CycleStore.recordRaised` the cycle's `principal` apart from the
-`total` taken. The returned snapshot carries `installments` and `principal`.
+`total` taken. The returned snapshot carries `installments` and `principal`;
+the gateway's charge store does not (it keeps what the adapter answered), so
+persist the split from `recordRaised`.
+
+`{ cardholderPresent: true }` sends the quote and the charge
+customer-initiated, for the cardholder paying from a screen. A
+customer-initiated charge on a stored card may need 3-D Secure or the CVV and
+can come back PENDING; settlement arrives by webhook as usual.
+
+The gateway answers the cycle's id with any charge already stored under it, so
+a retry can get back an earlier attempt at another amount or count. The
+collector then records the charge id with the split that charge itself reports
+(none, when it reports no count), never the new quote, and sets
+`chargeMismatch` on the result.
 
 The package sets no rate. A provider prices instalments by declaring
 `installments: InstallmentCapability` (`maxInstallments`, `merchantInitiated`,
@@ -86,9 +99,9 @@ never charged the principal in N:
 
 | skip | when |
 |---|---|
-| `installments-unsupported` | the provider quotes nothing (PagBank, until its buyer-interest contract is proven in a sandbox), or the gateway handed over has no `quoteInstallments` |
+| `installments-unsupported` | the provider quotes nothing — PagBank is refused here, before any quote or charge, until its buyer-interest contract is proven in a sandbox — or the gateway handed over has no `quoteInstallments` |
 | `installments-out-of-range` | the count is not an integer in 1..12, or is past the provider's `maxInstallments` |
-| `installments-merchant-initiated` | the provider splits only with the cardholder present (`merchantInitiated: false`); a collected cycle never has one |
+| `installments-merchant-initiated` | the provider splits only with the cardholder present (`merchantInitiated: false`) and the call did not pass `cardholderPresent: true` |
 
 Each is a code, never a sentence: map it to your own copy. For tests and stub
 mode, `simulatedInstallments()` is a deterministic table — 1x interest-free,

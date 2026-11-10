@@ -1,6 +1,7 @@
 import type { CustomerInfo } from './customer-schema';
 import type { PaymentsGateway } from './gateway';
 import { isInstallmentCount, type InstallmentQuote } from './installments';
+import { splitOf } from './cycle-split';
 import type { CredentialStore } from './ports';
 import type { ChargeSnapshot, MerchantRef, Money, ProviderName } from './types';
 
@@ -68,12 +69,21 @@ export type CollectionSkip =
   | 'installments-unsupported'
   /** The count is not 1..12, or past what the provider splits into. */
   | 'installments-out-of-range'
-  /** The provider splits only with the cardholder present, and a cycle has nobody there. */
+  /** The provider splits only with the cardholder present, and `cardholderPresent` was not set. */
   | 'installments-merchant-initiated';
 
 export interface CollectionResult {
   skipped: CollectionSkip | null;
   snapshot: ChargeSnapshot | null;
+  /**
+   * Set only when the charge that came back is NOT the one this call asked for
+   * — the gateway answers a known idempotency key (the cycle's id) with the
+   * charge already stored under it, e.g. an earlier sweep's 3x whose
+   * `recordRaised` failed. The charge id is still recorded (it exists); the
+   * split is taken from the returned charge when it reports one, never from
+   * this call's quote. A short operator-facing reason, never buyer copy.
+   */
+  chargeMismatch?: string;
 }
 
 const SKIPPED = (reason: CollectionSkip): CollectionResult => ({ skipped: reason, snapshot: null });
@@ -125,6 +135,10 @@ export interface RaisedCharge {
    * The cycle's own price (`principal`) kept apart from what was taken
    * (`total`, principal plus the buyer's interest), so the cycle never reads
    * as having cost more than it did.
+   *
+   * This and the returned snapshot's `installments`/`principal` are the ONLY
+   * places the split is told: the gateway's charge store keeps the snapshot
+   * the adapter answered, which reports the total. Persist it from here.
    */
   installments?: { count: number; principal: Money; total: Money };
 }
@@ -133,6 +147,15 @@ export interface RaisedCharge {
 export interface CardCollectionOptions {
   /** 1..12; default 1. Above 1 needs a provider that quotes — see the module doc. */
   installments?: number;
+  /**
+   * The cardholder is at the screen paying this cycle themselves. Default
+   * false: a cycle is collected merchant-initiated. When true the charge (and
+   * its quote) go out customer-initiated, which a provider whose instalments
+   * refuse merchant-initiated charges accepts — but a customer-initiated charge
+   * on a stored card may need 3-D Secure or the CVV, and can come back
+   * PENDING rather than PAID; settlement then arrives by webhook as usual.
+   */
+  cardholderPresent?: boolean;
 }
 
 /**
@@ -240,7 +263,7 @@ export function createCycleCollector(deps: CycleCollectionDeps): CycleCollector 
       return { skipped: null, snapshot: stored.snapshot };
     },
 
-    collectByCard: (cycleId, options) => collectCard(deps, open, cycleId, options?.installments ?? 1),
+    collectByCard: (cycleId, options = {}) => collectCard(deps, open, cycleId, options),
   };
 }
 
@@ -256,6 +279,7 @@ async function quoteAt(
   cycle: CollectableCycle,
   instrument: BillingInstrument,
   count: number,
+  merchantInitiated: boolean,
 ): Promise<InstallmentQuote | CollectionResult | null> {
   if (count === 1) return null;
   if (!deps.gateway.quoteInstallments) return SKIPPED('installments-unsupported');
@@ -265,19 +289,47 @@ async function quoteAt(
       amount: cycle.amount,
       installments: count,
       card: { savedCardToken: instrument.providerInstrumentId },
-      merchantInitiated: true,
+      merchantInitiated,
     },
     provider,
   );
   return result.ok ? result.quote : SKIPPED(result.refusal);
 }
 
+/** One payment is today's call, argument for argument; a split one charges the quoted total, pinned. */
+function raiseCard(
+  deps: CycleCollectionDeps,
+  cycle: CollectableCycle,
+  instrument: BillingInstrument,
+  quote: InstallmentQuote | null,
+  { provider, merchantInitiated }: { provider: ProviderName; merchantInitiated: boolean },
+) {
+  const card = {
+    savedCardToken: instrument.providerInstrumentId,
+    customerRef: instrument.providerCustomerId ?? undefined,
+    // Names the instrument's OWNER, so the gateway can never offer a
+    // Stripe `pm_…` to PagBank and burn the chain on garbage input.
+    tokenProvider: instrument.provider,
+    // Nobody is at the keyboard (unless `cardholderPresent`), so the issuer
+    // has to be told this is a subsequent charge under a stored-credential
+    // agreement — otherwise it may decline for the absence of one, or hold the
+    // intent waiting for an authentication a scheduled job can never give.
+    merchantInitiated,
+  };
+  const input = { reference: cycle.id, method: 'CARD' as const, customer: cycle.customer, idempotencyKey: cycle.id };
+  if (!quote) return deps.gateway.charge(deps.merchant, { ...input, amount: cycle.amount, card });
+  const split = { ...card, installments: quote.installments };
+  return deps.gateway.charge(deps.merchant, { ...input, amount: quote.total, card: split }, { provider });
+}
+
 async function collectCard(
   deps: CycleCollectionDeps,
   open: Opener,
   cycleId: string,
-  count: number,
+  options: CardCollectionOptions,
 ): Promise<CollectionResult> {
+  const count = options.installments ?? 1;
+  const merchantInitiated = !options.cardholderPresent;
   const cycle = await open(cycleId);
   if (isSkip(cycle)) return cycle;
   if (!isInstallmentCount(count)) return SKIPPED('installments-out-of-range');
@@ -291,32 +343,10 @@ async function collectCard(
   const { instrument, hasAny } = await deps.instruments(cycle.groupId, provider);
   if (!instrument) return SKIPPED(hasAny ? 'instrument-elsewhere' : 'no-instrument');
 
-  const quote = await quoteAt(deps, provider, cycle, instrument, count);
+  const quote = await quoteAt(deps, provider, cycle, instrument, count, merchantInitiated);
   if (quote && 'skipped' in quote) return quote;
 
-  const card = {
-    savedCardToken: instrument.providerInstrumentId,
-    customerRef: instrument.providerCustomerId ?? undefined,
-    // Names the instrument's OWNER, so the gateway can never offer a
-    // Stripe `pm_…` to PagBank and burn the chain on garbage input.
-    tokenProvider: instrument.provider,
-    // Nobody is at the keyboard, so the issuer has to be told this is a
-    // subsequent charge under a stored-credential agreement — otherwise
-    // it may decline for the absence of one, or hold the intent waiting
-    // for an authentication a scheduled job can never give.
-    merchantInitiated: true,
-  };
-  const input = { reference: cycle.id, method: 'CARD' as const, customer: cycle.customer, idempotencyKey: cycle.id };
-  // One payment is today's call, argument for argument. A split one charges
-  // the quoted total, pinned to the provider that priced it.
-  const stored = quote
-    ? await deps.gateway.charge(
-        deps.merchant,
-        { ...input, amount: quote.total, card: { ...card, installments: quote.installments } },
-        { provider },
-      )
-    : await deps.gateway.charge(deps.merchant, { ...input, amount: cycle.amount, card });
-
+  const stored = await raiseCard(deps, cycle, instrument, quote, { provider, merchantInitiated });
   return recordCard(deps, cycle, stored, quote);
 }
 
@@ -333,12 +363,10 @@ async function recordCard(
   stored: { provider: ProviderName; providerChargeId: string; snapshot: ChargeSnapshot },
   quote: InstallmentQuote | null,
 ): Promise<CollectionResult> {
-  const outstanding = stored.snapshot.status !== 'DECLINED';
-  if (!quote) {
-    if (outstanding) await deps.cycles.recordRaised(cycle.id, raisedOf(stored, 'CARD'));
-    return { skipped: null, snapshot: stored.snapshot };
+  const { split, mismatch } = splitOf(stored.snapshot, cycle, quote);
+  if (stored.snapshot.status !== 'DECLINED') {
+    await deps.cycles.recordRaised(cycle.id, split ? { ...raisedOf(stored, 'CARD'), installments: split } : raisedOf(stored, 'CARD'));
   }
-  const split = { count: quote.installments, principal: cycle.amount, total: quote.total };
-  if (outstanding) await deps.cycles.recordRaised(cycle.id, { ...raisedOf(stored, 'CARD'), installments: split });
-  return { skipped: null, snapshot: { ...stored.snapshot, installments: split.count, principal: split.principal } };
+  const snapshot = split ? { ...stored.snapshot, installments: split.count, principal: split.principal } : stored.snapshot;
+  return mismatch ? { skipped: null, snapshot, chargeMismatch: mismatch } : { skipped: null, snapshot };
 }
