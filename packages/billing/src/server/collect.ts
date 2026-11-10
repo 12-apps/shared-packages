@@ -1,4 +1,8 @@
-import { createCycleCollector, type CollectionResult } from "@12-apps/payments-backend";
+import {
+  createCycleCollector,
+  type CardCollectionOptions,
+  type CollectionResult,
+} from "@12-apps/payments-backend";
 
 import type { BillingPlatformDeps, CycleStoreFactory, InstrumentLookup } from "./ports";
 
@@ -26,7 +30,9 @@ import type { BillingPlatformDeps, CycleStoreFactory, InstrumentLookup } from ".
  *
  * `collectByCard` is the RECURRING path (FUT-340): the card on file, charged
  * off-session against whichever acquirer the platform is currently collecting
- * through.
+ * through. Its options — how many instalments, whether the cardholder is
+ * present — are the collector's own and are handed to it unchanged
+ * (FUT-4683), so a host never has to rebuild the collection to reach them.
  *
  * `collectByPush` is the pull-free path — a code or a link the customer pays
  * themselves, needing no stored instrument at all. Recurrency is normally
@@ -47,8 +53,12 @@ import type { BillingPlatformDeps, CycleStoreFactory, InstrumentLookup } from ".
 export interface SubscriptionCollection {
   /** Raise the charge that settles one due cycle without an instrument. */
   collectByPush(cycleId: string): Promise<CollectionResult>;
-  /** Charge one due cycle against the card on file (FUT-340). */
-  collectByCard(cycleId: string): Promise<CollectionResult>;
+  /**
+   * Charge one due cycle against the card on file (FUT-340). `options` is the
+   * collector's `CardCollectionOptions`, forwarded unchanged; omitted, one
+   * payment, merchant-initiated, exactly as before.
+   */
+  collectByCard(cycleId: string, options?: CardCollectionOptions): Promise<CollectionResult>;
 }
 
 export interface SubscriptionCollectionDeps extends BillingPlatformDeps {
@@ -83,8 +93,8 @@ export function createSubscriptionCollection(
     async collectByPush(cycleId) {
       return (await collector()).collectByPush(cycleId);
     },
-    async collectByCard(cycleId) {
-      return (await collector()).collectByCard(cycleId);
+    async collectByCard(cycleId, options) {
+      return (await collector()).collectByCard(cycleId, options);
     },
   };
 }

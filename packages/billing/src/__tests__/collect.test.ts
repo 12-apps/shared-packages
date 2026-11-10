@@ -97,6 +97,28 @@ describe("collectByCard", () => {
     });
   });
 
+  it("hands the collector's card options through unchanged (FUT-4683)", async () => {
+    // The binding owns no card policy of its own: a host asking for the
+    // cardholder-present path must reach the collector, or it has to rebuild
+    // the collection to get there — which is what #4604 did.
+    const { collection: collect, gateway } = collection();
+    await collect.collectByCard("cycle-1", { cardholderPresent: true });
+
+    expect(gateway.charge.mock.calls[0]?.[1]).toMatchObject({
+      card: { savedCardToken: "pm-1", merchantInitiated: false },
+    });
+  });
+
+  it("forwards an instalment count, which the collector then judges", async () => {
+    // The fake gateway quotes nothing, so the collector refuses the split
+    // before any charge — reachable only if the count arrived.
+    const { collection: collect, gateway } = collection();
+    await expect(collect.collectByCard("cycle-1", { installments: 12 })).resolves.toMatchObject({
+      skipped: "installments-unsupported",
+    });
+    expect(gateway.charge).not.toHaveBeenCalled();
+  });
+
   it("reports a card at a provider the platform no longer collects through", async () => {
     const { collection: collect } = collection({ instrument: false });
     await expect(collect.collectByCard("cycle-1")).resolves.toMatchObject({
