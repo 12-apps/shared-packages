@@ -1,5 +1,7 @@
 import type { CustomerInfo } from './customer-schema';
 import type { PaymentsGateway } from './gateway';
+import { isInstallmentCount, type InstallmentQuote } from './installments';
+import { splitOf, type ReturnedCharge } from './cycle-split';
 import type { CredentialStore } from './ports';
 import type { ChargeSnapshot, MerchantRef, Money, ProviderName } from './types';
 
@@ -34,6 +36,15 @@ import type { ChargeSnapshot, MerchantRef, Money, ProviderName } from './types';
  * customer with no card. Only a genuine provider or transport failure throws,
  * so a caller sweeping hundreds of tenants can tell "nothing to do here" from
  * "this deployment is broken".
+ *
+ * ## Instalments are re-quoted, and pinned to the quoting provider
+ *
+ * `collectByCard(id, { installments: N })` with N above 1 asks the provider
+ * for its price at the moment of the charge (`core/installments.ts`) and raises
+ * the QUOTED total split in N, the buyer paying the acquirer's interest. A
+ * total shown earlier is never reused. The charge is pinned to the provider
+ * that quoted, so failover can never land the total on an acquirer that priced
+ * nothing. A provider that does not quote is a skip, never a single payment.
  */
 
 /** Why a cycle could not be charged, when the reason is not an exception. */
@@ -53,11 +64,26 @@ export type CollectionSkip =
    * through. Distinct from `no-instrument` because it is the platform's doing,
    * not theirs — someone switched acquirer — and they need different words.
    */
-  | 'instrument-elsewhere';
+  | 'instrument-elsewhere'
+  /** Instalments asked of a provider that prices none — nothing was charged. */
+  | 'installments-unsupported'
+  /** The count is not 1..12, or past what the provider splits into. */
+  | 'installments-out-of-range'
+  /** The provider splits only with the cardholder present, and `cardholderPresent` was not set. */
+  | 'installments-merchant-initiated';
 
 export interface CollectionResult {
   skipped: CollectionSkip | null;
   snapshot: ChargeSnapshot | null;
+  /**
+   * Set only when the charge that came back is NOT the one this call asked for
+   * — the gateway answers a known idempotency key (the cycle's id) with the
+   * charge already stored under it, e.g. an earlier sweep's 3x whose
+   * `recordRaised` failed. The charge id is still recorded (it exists); the
+   * split is taken from the returned charge when it reports one, never from
+   * this call's quote. A short operator-facing reason, never buyer copy.
+   */
+  chargeMismatch?: string;
 }
 
 const SKIPPED = (reason: CollectionSkip): CollectionResult => ({ skipped: reason, snapshot: null });
@@ -97,10 +123,44 @@ export interface BillingInstrument {
 export interface CycleStore {
   read(cycleId: string): Promise<{ cycle: CollectableCycle; providerChargeId: string | null } | 'unknown' | 'settled'>;
   /** Stamp WHICH provider holds the charge. Without it the next sweep duplicates. */
-  recordRaised(
-    cycleId: string,
-    charge: { provider: ProviderName; providerChargeId: string; method: 'PIX' | 'CARD' },
-  ): Promise<void>;
+  recordRaised(cycleId: string, charge: RaisedCharge): Promise<void>;
+}
+
+/** What `recordRaised` is told. `installments` is present only for a charge split in 2..12. */
+export interface RaisedCharge {
+  provider: ProviderName;
+  providerChargeId: string;
+  method: 'PIX' | 'CARD';
+  /**
+   * The cycle's own price (`principal`) kept apart from what was taken
+   * (`total`, principal plus the buyer's interest), so the cycle never reads
+   * as having cost more than it did.
+   *
+   * This and the returned snapshot's `installments`/`principal` are the ONLY
+   * places the split is told: the gateway's charge store keeps the snapshot
+   * the adapter answered, which reports the total. Persist it from here.
+   */
+  installments?: {
+    /** Absent when no adapter report or fresh raise confirms it — see `chargeMismatch`. */
+    count?: number;
+    principal: Money;
+    total: Money;
+  };
+}
+
+/** How `collectByCard` charges. Omitted: one payment, exactly as before. */
+export interface CardCollectionOptions {
+  /** 1..12; default 1. Above 1 needs a provider that quotes — see the module doc. */
+  installments?: number;
+  /**
+   * The cardholder is at the screen paying this cycle themselves. Default
+   * false: a cycle is collected merchant-initiated. When true the charge (and
+   * its quote) go out customer-initiated, which a provider whose instalments
+   * refuse merchant-initiated charges accepts — but a customer-initiated charge
+   * on a stored card may need 3-D Secure or the CVV, and can come back
+   * PENDING rather than PAID; settlement then arrives by webhook as usual.
+   */
+  cardholderPresent?: boolean;
 }
 
 /**
@@ -117,7 +177,8 @@ export type InstrumentLookup = (
 ) => Promise<{ instrument: BillingInstrument | null; hasAny: boolean }>;
 
 export interface CycleCollectionDeps {
-  gateway: Pick<PaymentsGateway, 'charge'>;
+  /** `quoteInstallments` is needed only to collect in instalments; without it they are skipped. */
+  gateway: Pick<PaymentsGateway, 'charge'> & Partial<Pick<PaymentsGateway, 'quoteInstallments'>>;
   credentials: Pick<CredentialStore, 'defaultProvider'>;
   cycles: CycleStore;
   instruments: InstrumentLookup;
@@ -146,7 +207,7 @@ export interface CycleCollector {
    * A DECLINE comes back as a RESULT, in `snapshot.status`, not as a throw:
    * the caller's retry policy reads the reason off it.
    */
-  collectByCard(cycleId: string): Promise<CollectionResult>;
+  collectByCard(cycleId: string, options?: CardCollectionOptions): Promise<CollectionResult>;
 }
 
 /** Load the cycle and rule out every reason it must NOT be charged. */
@@ -176,7 +237,7 @@ async function chargeable(
 function raisedOf(
   stored: { provider: ProviderName; providerChargeId: string },
   method: 'PIX' | 'CARD',
-): { provider: ProviderName; providerChargeId: string; method: 'PIX' | 'CARD' } {
+): RaisedCharge {
   return { provider: stored.provider, providerChargeId: stored.providerChargeId, method };
 }
 
@@ -207,49 +268,112 @@ export function createCycleCollector(deps: CycleCollectionDeps): CycleCollector 
       return { skipped: null, snapshot: stored.snapshot };
     },
 
-    async collectByCard(cycleId) {
-      const cycle = await open(cycleId);
-      if (isSkip(cycle)) return cycle;
-
-      // WHO collects today — the head of the platform's chain, which an
-      // operator switch writes. Null means nothing is enabled at all, which
-      // `enabled()` above has already largely ruled out.
-      const provider = await deps.credentials.defaultProvider(deps.merchant);
-      if (!provider) return SKIPPED('no-platform-account');
-
-      const { instrument, hasAny } = await deps.instruments(cycle.groupId, provider);
-      if (!instrument) return SKIPPED(hasAny ? 'instrument-elsewhere' : 'no-instrument');
-
-      const stored = await deps.gateway.charge(deps.merchant, {
-        reference: cycle.id,
-        amount: cycle.amount,
-        method: 'CARD',
-        customer: cycle.customer,
-        card: {
-          savedCardToken: instrument.providerInstrumentId,
-          customerRef: instrument.providerCustomerId ?? undefined,
-          // Names the instrument's OWNER, so the gateway can never offer a
-          // Stripe `pm_…` to PagBank and burn the chain on garbage input.
-          tokenProvider: instrument.provider,
-          // Nobody is at the keyboard, so the issuer has to be told this is a
-          // subsequent charge under a stored-credential agreement — otherwise
-          // it may decline for the absence of one, or hold the intent waiting
-          // for an authentication a scheduled job can never give.
-          merchantInitiated: true,
-        },
-        idempotencyKey: cycle.id,
-      });
-
-      // Record the provider charge ONLY when one is actually outstanding. A
-      // declined card left nothing behind — no authorization, nothing payable —
-      // and stamping it would make the `already-charged` guard fire on every
-      // subsequent attempt, silently converting the retry ladder into a single
-      // try. A PENDING or PAID charge is the opposite: it exists, and the guard
-      // is what stops a second one.
-      if (stored.snapshot.status !== 'DECLINED') {
-        await deps.cycles.recordRaised(cycle.id, raisedOf(stored, 'CARD'));
-      }
-      return { skipped: null, snapshot: stored.snapshot };
-    },
+    collectByCard: (cycleId, options = {}) => collectCard(deps, open, cycleId, options),
   };
+}
+
+type Opener = (cycleId: string) => Promise<CollectableCycle | CollectionResult>;
+
+/**
+ * The provider's price for `count`, asked NOW; null for one payment, which is
+ * never quoted. A refusal comes back as the matching skip.
+ */
+async function quoteAt(
+  deps: CycleCollectionDeps,
+  provider: ProviderName,
+  cycle: CollectableCycle,
+  instrument: BillingInstrument,
+  count: number,
+  merchantInitiated: boolean,
+): Promise<InstallmentQuote | CollectionResult | null> {
+  if (count === 1) return null;
+  if (!deps.gateway.quoteInstallments) return SKIPPED('installments-unsupported');
+  const result = await deps.gateway.quoteInstallments(
+    deps.merchant,
+    {
+      amount: cycle.amount,
+      installments: count,
+      card: { savedCardToken: instrument.providerInstrumentId },
+      merchantInitiated,
+    },
+    provider,
+  );
+  return result.ok ? result.quote : SKIPPED(result.refusal);
+}
+
+/** One payment is today's call, argument for argument; a split one charges the quoted total, pinned. */
+function raiseCard(
+  deps: CycleCollectionDeps,
+  cycle: CollectableCycle,
+  instrument: BillingInstrument,
+  quote: InstallmentQuote | null,
+  { provider, merchantInitiated }: { provider: ProviderName; merchantInitiated: boolean },
+) {
+  const card = {
+    savedCardToken: instrument.providerInstrumentId,
+    customerRef: instrument.providerCustomerId ?? undefined,
+    // Names the instrument's OWNER, so the gateway can never offer a
+    // Stripe `pm_…` to PagBank and burn the chain on garbage input.
+    tokenProvider: instrument.provider,
+    // Nobody is at the keyboard (unless `cardholderPresent`), so the issuer
+    // has to be told this is a subsequent charge under a stored-credential
+    // agreement — otherwise it may decline for the absence of one, or hold the
+    // intent waiting for an authentication a scheduled job can never give.
+    merchantInitiated,
+  };
+  const input = { reference: cycle.id, method: 'CARD' as const, customer: cycle.customer, idempotencyKey: cycle.id };
+  if (!quote) return deps.gateway.charge(deps.merchant, { ...input, amount: cycle.amount, card });
+  const split = { ...card, installments: quote.installments };
+  return deps.gateway.charge(deps.merchant, { ...input, amount: quote.total, card: split }, { provider });
+}
+
+async function collectCard(
+  deps: CycleCollectionDeps,
+  open: Opener,
+  cycleId: string,
+  options: CardCollectionOptions,
+): Promise<CollectionResult> {
+  const count = options.installments ?? 1;
+  const merchantInitiated = !options.cardholderPresent;
+  const cycle = await open(cycleId);
+  if (isSkip(cycle)) return cycle;
+  if (!isInstallmentCount(count)) return SKIPPED('installments-out-of-range');
+
+  // WHO collects today — the head of the platform's chain, which an
+  // operator switch writes. Null means nothing is enabled at all, which
+  // `enabled()` above has already largely ruled out.
+  const provider = await deps.credentials.defaultProvider(deps.merchant);
+  if (!provider) return SKIPPED('no-platform-account');
+
+  const { instrument, hasAny } = await deps.instruments(cycle.groupId, provider);
+  if (!instrument) return SKIPPED(hasAny ? 'instrument-elsewhere' : 'no-instrument');
+
+  const quote = await quoteAt(deps, provider, cycle, instrument, count, merchantInitiated);
+  if (quote && 'skipped' in quote) return quote;
+
+  const since = new Date();
+  const stored = await raiseCard(deps, cycle, instrument, quote, { provider, merchantInitiated });
+  return recordCard(deps, cycle, { ...stored, since }, quote);
+}
+
+/**
+ * Record the provider charge ONLY when one is actually outstanding. A declined
+ * card left nothing behind — no authorization, nothing payable — and stamping
+ * it would make the `already-charged` guard fire on every subsequent attempt,
+ * silently converting the retry ladder into a single try. A PENDING or PAID
+ * charge is the opposite: it exists, and the guard is what stops a second one.
+ */
+async function recordCard(
+  deps: CycleCollectionDeps,
+  cycle: CollectableCycle,
+  stored: ReturnedCharge,
+  quote: InstallmentQuote | null,
+): Promise<CollectionResult> {
+  const { split, mismatch, method } = splitOf(stored, cycle, quote);
+  if (stored.snapshot.status !== 'DECLINED') {
+    await deps.cycles.recordRaised(cycle.id, split ? { ...raisedOf(stored, method), installments: split } : raisedOf(stored, method));
+  }
+  const count = split?.count === undefined ? {} : { installments: split.count };
+  const snapshot = split ? { ...stored.snapshot, ...count, principal: split.principal } : stored.snapshot;
+  return mismatch ? { skipped: null, snapshot, chargeMismatch: mismatch } : { skipped: null, snapshot };
 }

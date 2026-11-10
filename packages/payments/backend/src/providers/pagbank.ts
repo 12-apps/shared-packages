@@ -297,6 +297,9 @@ const capabilities: ProviderCapabilities = {
   // Refuses `customer.email` equal to the receiving account's (40002).
   payerEmail: true,
 };
+// No `installments` quote (FUT-4382): PagBank's buyer-paid interest is unproven
+// until a sandbox run, so a cycle in 2..12 is refused, never charged at the
+// principal. `fundingOf` still passes an order's own count through unchanged.
 
 /**
  * The smallest card charge PagBank PRODUCTION will create. Its reference

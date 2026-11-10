@@ -38,13 +38,8 @@ import type {
   ResolvedCredentials,
   WebhookDelivery,
 } from './types';
-import type {
-  VaultBeginInput,
-  VaultCompleteInput,
-  VaultedInstrument,
-  VaultForgetInput,
-  VaultSession,
-} from './vault-types';
+import type { VaultBeginInput, VaultCompleteInput, VaultedInstrument, VaultForgetInput, VaultSession } from './vault-types';
+import { quoteInstallmentsAt, type InstallmentQuoteMethods } from './installments';
 
 /** The vault methods, factored out to keep the gateway builder in budget. */
 function vaultMethods(config: PaymentsGatewayConfig): Pick<
@@ -158,7 +153,7 @@ export interface ChargeOptions<P extends string = string> {
 }
 
 export interface PaymentsGateway<P extends string = string>
-  extends ManualChargeMethods<P>, CaptureChargeMethods<P> {
+  extends ManualChargeMethods<P>, CaptureChargeMethods<P>, InstallmentQuoteMethods<P> {
   /**
    * Create a charge, walking the merchant's provider chain until one
    * succeeds. Throws `AmbiguousChargeError` when a provider's outcome cannot
@@ -322,7 +317,7 @@ function manualDepsOf<P extends string>(config: PaymentsGatewayConfig<P>) {
 
 export function createPaymentsGateway<P extends string>(
   config: PaymentsGatewayConfig<P>,
-): PaymentsGateway<P> {
+): PaymentsGateway<P> & Required<InstallmentQuoteMethods<P>> {
   const resolve = makeResolver(config);
   const walkDeps = walkDepsOf(config);
   // Same-process single-flight per (merchant, idempotencyKey): concurrent
@@ -331,7 +326,8 @@ export function createPaymentsGateway<P extends string>(
   // must not each start their own failover walk down the same chain.
   const inFlight = new Map<string, Promise<StoredCharge>>();
 
-  return withProviderFailureReports(config.onProviderFailure, {
+  // Spread over, not wrapped: a quote is a read the walk's reporter never sees.
+  return { quoteInstallments: quoteInstallmentsAt(resolve), ...withProviderFailureReports(config.onProviderFailure, {
     async charge(merchant, input, options = {}) {
       if (!input.idempotencyKey) return walkChargeChain(walkDeps, merchant, input, options);
       // JSON tuple, not delimiter concatenation — distinct (merchant, key)
@@ -396,5 +392,5 @@ export function createPaymentsGateway<P extends string>(
     stillWalkedPast: (merchant, key) => providersStillWalkedPast(config.attempts, config.health, merchant, key),
     handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
-  });
+  }) };
 }

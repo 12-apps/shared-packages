@@ -66,7 +66,51 @@ These are the seams hosts most often re-implement by accident:
 | `classifyReversalEvent` | which reversal shape a delivery is — chargeback, refund, dispute |
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
 | `gateway.captureCharge` | takes the money an AUTHORIZED charge only holds, and persists the PAID it answers (FUT-4082); `UnsupportedOperationError` where the provider cannot |
+| `gateway.quoteInstallments` | the provider's own price for a card charge in 2..12, the buyer paying the interest (FUT-4382) — what to show before paying; a typed `refusal` where the provider quotes none |
 | `attemptIdempotencyKey` | the per-attempt key that keeps a repriced order from being handed the old amount |
+
+### Cycle collection in instalments (FUT-4382)
+
+`createCycleCollector(deps).collectByCard(cycleId, { installments })` charges
+the card on file in one payment by default, exactly as before. With a count of
+2..12 it re-asks the collecting provider for its price at the moment of the
+charge — a total shown to the buyer earlier is never reused — raises the QUOTED
+total split in that count, pinned to that provider so failover cannot move it,
+and tells `CycleStore.recordRaised` the cycle's `principal` apart from the
+`total` taken. The returned snapshot carries `installments` and `principal`;
+the gateway's charge store does not (it keeps what the adapter answered), so
+persist the split from `recordRaised`.
+
+`{ cardholderPresent: true }` sends the quote and the charge
+customer-initiated, for the cardholder paying from a screen. A
+customer-initiated charge on a stored card may need 3-D Secure or the CVV and
+can come back PENDING; settlement arrives by webhook as usual.
+
+The gateway answers the cycle's id with any charge already stored under it, so
+a retry can get back an earlier attempt at another amount or count. The
+collector then records the charge id with the split that charge itself reports
+(none, when it reports no count), never the new quote, and sets
+`chargeMismatch` on the result. The amount is always compared; the count only
+where the adapter reports it on the snapshot (`installments`), which none does
+yet. Without a report, the count is recorded only for a charge this call just
+raised; a stored one handed back records principal and total without a count,
+with `chargeMismatch: 'count-unconfirmed'`.
+
+The package sets no rate. A provider prices instalments by declaring
+`installments: InstallmentCapability` (`maxInstallments`, `merchantInitiated`,
+`quote`); one that declares none is skipped, never charged in one payment and
+never charged the principal in N:
+
+| skip | when |
+|---|---|
+| `installments-unsupported` | the provider quotes nothing — PagBank is refused here, before any quote or charge, until its buyer-interest contract is proven in a sandbox — or the gateway handed over has no `quoteInstallments` |
+| `installments-out-of-range` | the count is not an integer in 1..12, or is past the provider's `maxInstallments` |
+| `installments-merchant-initiated` | the provider splits only with the cardholder present (`merchantInitiated: false`) and the call did not pass `cardholderPresent: true` |
+
+Each is a code, never a sentence: map it to your own copy. For tests and stub
+mode, `simulatedInstallments()` is a deterministic table — 1x interest-free,
+2..12 on 2.99% a month — to attach to any adapter:
+`{ ...adapter, installments: simulatedInstallments() }`.
 
 ### Parked hosted links (FUT-4072)
 

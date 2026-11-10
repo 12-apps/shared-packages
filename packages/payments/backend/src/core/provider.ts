@@ -24,6 +24,7 @@ import type {
 import type { BrowserKeyCapability } from './browser-key-capability';
 import type { CaptureInput } from './charge-capture';
 import type { CredentialExpiry } from './credential-expiry';
+import type { InstallmentCapability } from './installments';
 import type { ProviderWebhookHandling } from './provider-webhook';
 import type { SettlementHints } from './settlement-hints';
 import type {
@@ -308,6 +309,8 @@ export interface PaymentProviderAdapterBase {
 
   /** The 3-D Secure session a debit charge needs (FUT-3754); pairs with `capabilities.debit`. */
   debit?: DebitCapability;
+  /** Prices a card charge in 2..12 with the buyer paying the interest (FUT-4382); absent refuses it. */
+  installments?: InstallmentCapability;
 
   /** Mint this provider's public browser key on demand — most cannot. */
   browserKey?: BrowserKeyCapability;
