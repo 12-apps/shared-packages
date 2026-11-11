@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDiscountBody,
+  listDiscountsQuery,
   discountCollectionParams,
   discountItemParams,
   updateDiscountBody,
@@ -82,5 +83,13 @@ describe("the path params are strict", () => {
       discountItemParams.safeParse({ tenantSlug: "t", id: "d", x: "y" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("the default list query", () => {
+  it("S5: declares the window pill the grid forwards, and still refuses other keys", () => {
+    expect(listDiscountsQuery.safeParse({ window: "RUNNING" }).success).toBe(true);
+    expect(listDiscountsQuery.safeParse({ window: "SOMETIME" }).success).toBe(false);
+    expect(listDiscountsQuery.safeParse({ utm: "x" }).success).toBe(false);
   });
 });

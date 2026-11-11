@@ -13,6 +13,7 @@ import {
   DISCOUNT_TARGET_TYPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
+  DISCOUNT_WINDOW_STATES,
   MAX_COMBO_SLOTS,
   MAX_COMBO_SLOT_QUANTITY,
   MAX_PERCENT_OFF_BP,
@@ -177,7 +178,13 @@ export function createDiscountListQuery<E extends Record<string, z.ZodTypeAny>>(
  * browsers; reading `process.env` at module scope would make the advertised
  * surface depend on where it was generated.
  */
-export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.parse({}));
+export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.parse({}), {
+  // The pill the package's own grid forwards (`OWNED_PARAMS`). It is a window
+  // state, not a filterable column, so it is declared here rather than derived;
+  // the schema is strict, and a host left on this default would otherwise
+  // answer 422 the moment an operator picks that pill.
+  window: z.enum(DISCOUNT_WINDOW_STATES).optional(),
+});
 
 /**
  * The write body, shared by create and update: a discount is always saved
