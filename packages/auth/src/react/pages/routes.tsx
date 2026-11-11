@@ -284,9 +284,15 @@ function LoginView({ config, pages }: RouteViewProps): JSX.Element {
     <pages.LoginPage
       callbackUrl={state.callbackUrl}
       onSignedIn={() => navigate(state.navigateTo, { replace: true })}
-      onForgotPassword={() =>
-        config.onForgotPassword?.((to) => navigate(to)) ?? navigate("/forgot-password")
-      }
+      onForgotPassword={() => {
+        // The host's callback IS the answer when there is one; the route is
+        // only the default. Never chain the two with `??`: a callback that
+        // opens an in-place screen returns nothing, and the fallback then
+        // navigated away from that screen to a route the host never declared
+        // (FUT-4593).
+        if (config.onForgotPassword === undefined) navigate("/forgot-password");
+        else config.onForgotPassword((to) => navigate(to));
+      }}
       emailEnabled={emailEnabled}
       notice={<FailureNotice failure={state.failure} errors={config.errors} />}
       providers={providersSlot(config, state)}
