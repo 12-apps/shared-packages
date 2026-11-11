@@ -84,12 +84,12 @@ describe('the mounted router', () => {
     expect(await response.json()).toEqual({ error: DEFAULT_MESSAGES.forbidden });
   });
 
-  it('answers 400 for a malformed filter', async () => {
+  it('answers 422 for a malformed filter', async () => {
     const { app } = mounted();
 
     const response = await app.request('/api/admin/my-store/audit-logs?from=nope');
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
   });
 
   it('forwards the query string to the filters', async () => {
