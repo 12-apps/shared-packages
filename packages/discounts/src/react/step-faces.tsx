@@ -238,6 +238,8 @@ export function ResumoCard({ copy, sentence, chips }: { copy: CompleteDiscountsW
  */
 export function SubmitBar({
   bar,
+  reach,
+  paint,
   copy,
   error,
   narrowSentence,
@@ -245,6 +247,10 @@ export function SubmitBar({
   label,
 }: {
   bar: RefObject<HTMLDivElement | null>;
+  /** The scroll area's bottom padding, which the bar reaches across (measured). */
+  reach: number;
+  /** The dialog surface's own paint, so the bar is that surface (measured). */
+  paint: Record<string, string>;
   copy: CompleteDiscountsWebCopy;
   error: string | null;
   narrowSentence: string | null;
@@ -256,7 +262,18 @@ export function SubmitBar({
     <Box
       ref={bar}
       data-testid="discount-submit-bar"
-      sx={{ position: "sticky", bottom: 0, zIndex: 1, bgcolor: "background.paper", borderTop: 1, borderColor: "divider", py: 1.5, mt: 2 }}
+      sx={(theme) => ({
+        position: "sticky",
+        bottom: -reach,
+        mb: `${-reach}px`,
+        zIndex: 1,
+        ...paint,
+        borderTop: 1,
+        borderColor: "divider",
+        pt: 1.5,
+        pb: `calc(${theme.spacing(1.5)} + ${reach}px)`,
+        mt: 2,
+      })}
     >
       {error && (
         <Box sx={{ mb: 1 }}>

@@ -10,6 +10,7 @@ import { followBlock, revealBlock, type RevealOptions } from "@12-apps/ui/utils"
 
 import type { WireTargetGroup } from "./api";
 import { asideMinPx, ComboPreviewLayout } from "./combo-cart-preview";
+import { paintOf, stickyTopSx, useInsets, useScrollArea } from "./scroll-area";
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import { validate } from "./discount-form-validate";
@@ -91,32 +92,6 @@ function snapshotOf(values: Readonly<Record<string, string>>, extra: StepExtras)
   };
 }
 
-/** The scroll area an element scrolls in, or null. */
-function scrollAreaOf(element: HTMLElement | null): HTMLElement | null {
-  let area = element?.parentElement ?? null;
-  while (area && !["auto", "scroll"].includes(getComputedStyle(area).overflowY)) area = area.parentElement;
-  return area;
-}
-
-/**
- * How much of the scroll area the sticky bars cover, from its top and from its
- * bottom: where they actually sit, the area's own padding included — a sticky
- * bar rests inside that padding, so its height alone fell short by it.
- */
-function useInsets(): { chrome: RefObject<HTMLDivElement | null>; bar: RefObject<HTMLDivElement | null>; insets: RevealOptions } {
-  const chrome = useRef<HTMLDivElement>(null);
-  const bar = useRef<HTMLDivElement>(null);
-  const covered = (from: "top" | "bottom"): number => {
-    const element = from === "top" ? chrome.current : bar.current;
-    const area = scrollAreaOf(element);
-    if (!element || !area) return element?.offsetHeight ?? 0;
-    const box = element.getBoundingClientRect();
-    const frame = area.getBoundingClientRect();
-    return from === "top" ? box.bottom - frame.top : frame.bottom - box.top;
-  };
-  return { chrome, bar, insets: { topInset: () => covered("top"), bottomInset: () => covered("bottom") } };
-}
-
 /** After a pendência or a server error opens a step: the caret goes to its first invalid field. */
 function useFocusField(root: RefObject<HTMLElement | null>): (step: StepNumber) => void {
   const [request, setRequest] = useState<{ step: StepNumber; at: number } | null>(null);
@@ -129,31 +104,6 @@ function useFocusField(root: RefObject<HTMLElement | null>): (step: StepNumber) 
     return () => window.clearTimeout(timer);
   }, [request, root]);
   return (step) => setRequest({ step, at: Date.now() });
-}
-
-/**
- * The height of the scroll area the form sits in, less its padding: the form
- * fills it, so the submit bar rests on the dialog's bottom edge even when the
- * steps are short (the prototype's footer), and sticks there when they are not.
- * Measured, because the dialog's own height is the library's to decide.
- */
-function useScrollAreaHeight(root: RefObject<HTMLElement | null>): number | null {
-  const [height, setHeight] = useState<number | null>(null);
-  useEffect(() => {
-    const area = scrollAreaOf(root.current);
-    if (!area || typeof ResizeObserver === "undefined") return undefined;
-    const scroller = area;
-    const measure = (): void => {
-      const style = getComputedStyle(scroller);
-      const inner = scroller.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0);
-      setHeight(inner > 0 ? inner : null);
-    };
-    const observer = new ResizeObserver(measure);
-    observer.observe(scroller);
-    measure();
-    return () => observer.disconnect();
-  }, [root]);
-  return height;
 }
 
 /** Passing step 4 collapses every card: the submit bar is what comes next. */
@@ -290,7 +240,7 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
   const { copy, formatters, groups, editing, extra, flow, setFlow } = props;
   const root = useRef<HTMLDivElement>(null);
   const width = useElementWidth(root);
-  const areaHeight = useScrollAreaHeight(root);
+  const area = useScrollArea(root);
   const [rowMin, setRowMin] = useState(rowMinPx(FALLBACK_CARD_PX));
   const { chrome, bar, insets } = useInsets();
   const focusField = useFocusField(root);
@@ -300,15 +250,9 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
   useFocusOnServerRefusal(props.server, focusField);
   const revealChip = useChipReveal(root, insets);
   const wide = width !== null && width >= asideMinPx(rowMin);
-  const faceWorld: FaceWorld = {
-    copy,
-    currencyField: props.currencyField,
-    groups,
-    extra,
-    window: props.window,
-    onKindChange: () => setFlow(flowKindChanged),
-    onRowMin: setRowMin,
-  };
+  const { currencyField, window: windowFlags } = props;
+  const onKindChange = (): void => setFlow(flowKindChanged);
+  const faceWorld: FaceWorld = { copy, currencyField, groups, extra, window: windowFlags, onKindChange, onRowMin: setRowMin };
   const items = STEPS.map((step) => itemOf(step, { copy, flow, setFlow, merged, form, world, faceWorld }));
   const sentence = resumoSentence(form, world);
 
@@ -316,9 +260,9 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
     <Box
       ref={root}
       data-testid="discount-step-form"
-      sx={{ minWidth: 0, display: "flex", flexDirection: "column", minHeight: areaHeight === null ? undefined : `${areaHeight}px` }}
+      sx={{ minWidth: 0, display: "flex", flexDirection: "column", minHeight: area.height === null ? undefined : `${area.height}px` }}
     >
-      <Box ref={chrome} sx={{ position: "sticky", top: 0, zIndex: 1, bgcolor: "background.paper", pb: 1.5 }}>
+      <Box ref={chrome} sx={stickyTopSx(area)}>
         <FormChrome
           copy={copy}
           editing={editing}
@@ -357,6 +301,8 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
       </Box>
       <SubmitBar
         bar={bar}
+        reach={area.padBottom}
+        paint={paintOf(area)}
         copy={copy}
         error={props.error}
         narrowSentence={wide ? null : sentence}
