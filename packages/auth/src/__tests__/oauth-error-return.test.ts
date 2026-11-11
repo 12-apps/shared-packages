@@ -171,21 +171,48 @@ describe("a refused consent returns to the page that started the sign-in", () =>
     expect(target.searchParams.get("error")).toBe("OAuthCallback");
   });
 
-  it("reads a refusal posted as a form, the way Apple answers", async () => {
+  it("reads a refusal posted as a form, though the start cookie never rides it", async () => {
     const auth = makeAuth();
     const jar = new Jar();
     await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
 
+    // A `form_post` answer is a CROSS-SITE POST: the browser sends no Lax
+    // cookie with it — not the start, not Auth.js's PKCE — so this is what
+    // arrives. The failure goes to the sign-in page, as it always did, but the
+    // refusal still reads as one.
     const response = await auth.handler(
       new Request(`${BASE}/callback/acme`, {
         method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded", cookie: jar.header() },
-        body: new URLSearchParams({ error: "user_cancelled_authorize" }).toString(),
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ error: "access_denied" }).toString(),
       }),
     );
 
     const target = location(response);
+    expect(target.pathname).toBe("/login");
+    expect(target.searchParams.get("error")).toBe("OAuthCallback");
+  });
+
+  it("keeps Auth.js's code for a provider error that is not a refused consent", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+
+    const target = location(await callback(auth, jar, "acme", "error=server_error"));
+
     expect(target.pathname).toBe("/entrar");
+    expect(target.searchParams.get("error")).toBe("OAuthCallbackError");
+  });
+
+  it("keeps a code the start page carried itself", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}/convite?code=XYZ`);
+
+    const target = location(await callback(auth, jar, "acme", "error=access_denied"));
+
+    expect(target.pathname).toBe("/convite");
+    expect(target.searchParams.get("code")).toBe("XYZ");
     expect(target.searchParams.get("error")).toBe("OAuthCallback");
   });
 
@@ -303,7 +330,42 @@ describe("the routes it does not touch", () => {
     expect(response.headers.getSetCookie().join("\n")).not.toContain("sign-in-start");
   });
 
-  it("names the cookie with Auth.js's secure prefix on https", () => {
-    expect(signInStartCookieName(true)).toBe("__Secure-authjs.sign-in-start");
+  it("names the cookie __Host- on https, so no sibling subdomain can set it", () => {
+    expect(signInStartCookieName(true)).toBe("__Host-authjs.sign-in-start");
+  });
+});
+
+describe("a planted start cookie never leads off the origin", () => {
+  // Each normalises, in the URL parser, into a path that starts with `//`.
+  for (const planted of ["/.//evil.com/x", "/a/..//evil.com", "/%2e//evil.com", "/..//evil.com"]) {
+    it(`refuses ${planted}`, async () => {
+      const auth = makeAuth();
+
+      const response = await auth.handler(
+        new Request(`${BASE}/callback/acme?error=access_denied`, {
+          headers: { cookie: `${START_COOKIE}=${encodeURIComponent(planted)}` },
+        }),
+      );
+
+      const target = location(response);
+      expect(target.origin).toBe(ORIGIN);
+      expect(target.pathname).toBe("/login");
+    });
+  }
+
+  it("ignores, on https, a start cookie under a name a subdomain could set", async () => {
+    const auth = makeAuth();
+    const secure = "https://shop.example";
+
+    // `__Secure-` may carry `Domain=`; only the `__Host-` name is read.
+    const response = await auth.handler(
+      new Request(`${secure}/api/auth/callback/acme?error=access_denied`, {
+        headers: { cookie: `__Secure-authjs.sign-in-start=${encodeURIComponent("/entrar")}` },
+      }),
+    );
+
+    const target = location(response);
+    expect(target.origin).toBe(secure);
+    expect(target.pathname).toBe("/login");
   });
 });

@@ -20,14 +20,19 @@ import type { AuthConfig } from "@auth/core";
  *
  * ## The code a provider's refusal gets
  *
- * A callback that arrives carrying the provider's own `error` parameter (a
- * consent refused, a cancelled Apple sheet) is the PROVIDER saying no. Auth.js
- * reports it as `OAuthCallbackError`, a code no copy pack names, or — when
- * anything trips before the parameter is read, such as the RFC 9207 `iss`
- * check — as `Configuration`, which tells the person the provider is down.
- * Both become `OAuthCallback`, the code the packs already explain as "could
- * not complete the sign-in, try again". Any other failure keeps its own code,
- * so `AccessDenied` from a host's sign-in gate still reads as "sign up first".
+ * A callback that arrives with the provider's `error=access_denied` is the
+ * person refusing consent. Auth.js reports it as `OAuthCallbackError`, a code
+ * no copy pack names, or — when anything trips before the parameter is read,
+ * such as the RFC 9207 `iss` check — as `Configuration`, which tells the person
+ * the provider is down. Both become `OAuthCallback`, the code the packs already
+ * explain as "could not complete the sign-in, try again". Any other provider
+ * error (`server_error`, `unauthorized_client`, …) and any other failure keeps
+ * Auth.js's code, so `AccessDenied` from a host's sign-in gate still reads as
+ * "sign up first".
+ *
+ * A provider that answers with a cross-site form POST (Apple's `form_post`)
+ * never brings the start cookie back — it is `SameSite=Lax`, like Auth.js's
+ * own — so such a failure goes to the sign-in page, as it always did.
  *
  * ## What is never followed
  *
@@ -35,17 +40,28 @@ import type { AuthConfig } from "@auth/core";
  * origin and outside the auth routes. Anything else — no `Referer` (a
  * `no-referrer` policy), another origin (a custom domain that hands sign-in to
  * the platform origin), an auth route — clears the cookie, and the failure
- * goes where it always went. A redirect of Auth.js's that is not its error
+ * goes where it always went. A stored start is re-checked as it is used: its
+ * PARSED path may not start with `//` or `/\` (a dot segment such as
+ * `/.//host` normalises into one), and the URL built from it must stay on the
+ * auth origin. On https the cookie is `__Host-`, so a sibling subdomain cannot
+ * plant one. A redirect of Auth.js's that is not its error
  * redirect is never rewritten, and neither is a JSON answer
  * (`X-Auth-Return-Redirect`), whose caller reads the code itself.
  *
  * No database, no extra request: two header reads on the sign-in POST and on
  * the callback, nothing on any other route.
+ *
+ * OPT-IN (`errorReturnsToStart`): a host turns it on once every page that can
+ * start a sign-in renders `?error`. Off, the handler is Auth.js's, untouched.
  */
 
-/** The start cookie's name, after Auth.js's own `__Secure-` convention. */
+/**
+ * The start cookie's name. `__Host-` on https (as Auth.js names its CSRF
+ * cookie): it then cannot carry a `Domain`, so a sibling subdomain cannot set
+ * one for this origin.
+ */
 export function signInStartCookieName(secure: boolean): string {
-  return `${secure ? "__Secure-" : ""}authjs.sign-in-start`;
+  return `${secure ? "__Host-" : ""}authjs.sign-in-start`;
 }
 
 /** Long enough for a provider's consent screen; Auth.js's PKCE cookie lives as long. */
@@ -53,6 +69,9 @@ const START_MAX_AGE_SECONDS = 15 * 60;
 
 /** The code every copy pack explains as "could not complete the sign-in". */
 const PROVIDER_REFUSAL_CODE = "OAuthCallback";
+
+/** The provider's `error` for a refused consent (RFC 6749 §4.1.2.1). */
+const CONSENT_REFUSED = "access_denied";
 
 /** The slice of the Auth.js config this reads. */
 type ReturnConfig = Pick<AuthConfig, "basePath" | "pages" | "useSecureCookies">;
@@ -70,19 +89,27 @@ function isAuthRoute(pathname: string, basePath: string): boolean {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);
 }
 
+/** Would a browser read this path as another host (`//host`, `/\host`)? */
+function isProtocolRelative(path: string): boolean {
+  return path.startsWith("//") || path.startsWith("/\\");
+}
+
 /**
  * A stored or offered start, accepted only as a same-origin PATH: a leading
- * `/` that is not `//`, outside the auth routes. Returns `path + search`.
+ * `/` that is not `//` or `/\` — before AND after the URL parser normalises
+ * it, since `/.//host` becomes `//host` — outside the auth routes. Returns
+ * `path + search`.
  */
 function acceptStart(candidate: string, ctx: ReturnContext): string | null {
-  if (!candidate.startsWith("/") || candidate.startsWith("//")) return null;
+  if (!candidate.startsWith("/") || isProtocolRelative(candidate)) return null;
   let parsed: URL;
   try {
     parsed = new URL(candidate, ctx.url.origin);
   } catch {
     return null;
   }
-  if (parsed.origin !== ctx.url.origin || isAuthRoute(parsed.pathname, ctx.basePath)) return null;
+  if (parsed.origin !== ctx.url.origin || isProtocolRelative(parsed.pathname)) return null;
+  if (isAuthRoute(parsed.pathname, ctx.basePath)) return null;
   return `${parsed.pathname}${parsed.search}`;
 }
 
@@ -142,24 +169,33 @@ function errorRedirect(response: Response, ctx: ReturnContext): URL | null {
   return target;
 }
 
-/** Did the provider itself answer with an `error` (query, or Apple's form post)? */
-async function providerRefused(request: Request): Promise<boolean> {
-  if (new URL(request.url).searchParams.has("error")) return true;
-  if (request.method !== "POST") return false;
+/** The provider's `error`, from the query or a `form_post` body, or `null`. */
+async function providerError(request: Request): Promise<string | null> {
+  const fromQuery = new URL(request.url).searchParams.get("error");
+  if (fromQuery !== null) return fromQuery;
+  if (request.method !== "POST") return null;
   if (!(request.headers.get("content-type") ?? "").includes("application/x-www-form-urlencoded")) {
-    return false;
+    return null;
   }
   try {
-    return new URLSearchParams(await request.text()).has("error");
+    return new URLSearchParams(await request.text()).get("error");
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** The start page, with Auth.js's error parameters set on its own query. */
-function backToStart(start: string, authError: URL, code: string, origin: string): string {
+/**
+ * The start page, with Auth.js's `error` set on its own query — or `null` when
+ * the URL it builds would leave the auth origin.
+ *
+ * The page's own parameters are kept. Auth.js's `code` (a credentials
+ * failure's detail) is added only when Auth.js sent one with this same
+ * `error`; a `code` the start page carried itself (an invite, a coupon) is
+ * never removed for an error that had none.
+ */
+function backToStart(start: string, authError: URL, code: string, origin: string): string | null {
   const target = new URL(start, origin);
-  target.searchParams.delete("code");
+  if (target.origin !== origin) return null;
   target.searchParams.set("error", code);
   const detail = authError.searchParams.get("code");
   if (detail !== null && code === authError.searchParams.get("error")) {
@@ -194,12 +230,11 @@ async function onSignIn(
   const out = editable(response);
   out.headers.append("set-cookie", startCookie(ctx, start));
   const failure = errorRedirect(response, ctx);
-  if (failure !== null && start !== null) {
-    out.headers.set(
-      "location",
-      backToStart(start, failure, failure.searchParams.get("error") ?? "", ctx.url.origin),
-    );
-  }
+  const back =
+    failure === null || start === null
+      ? null
+      : backToStart(start, failure, failure.searchParams.get("error") ?? "", ctx.url.origin);
+  if (back !== null) out.headers.set("location", back);
   return out;
 }
 
@@ -211,7 +246,7 @@ async function onCallback(
 ): Promise<Response> {
   const stored = readCookie(request, ctx.cookieName);
   // Read before Auth.js consumes the body; a clone leaves its stream intact.
-  const refused = await providerRefused(request.clone());
+  const refused = (await providerError(request.clone())) === CONSENT_REFUSED;
   const response = await handle(request);
   const failure = errorRedirect(response, ctx);
   if (failure === null && stored === null) return response;
@@ -221,8 +256,9 @@ async function onCallback(
   if (failure !== null) {
     const code = refused ? PROVIDER_REFUSAL_CODE : (failure.searchParams.get("error") ?? "");
     const start = stored === null ? null : acceptStart(stored, ctx);
-    if (start !== null) {
-      out.headers.set("location", backToStart(start, failure, code, ctx.url.origin));
+    const back = start === null ? null : backToStart(start, failure, code, ctx.url.origin);
+    if (back !== null) {
+      out.headers.set("location", back);
     } else if (refused) {
       failure.searchParams.set("error", code);
       out.headers.set("location", failure.toString());
