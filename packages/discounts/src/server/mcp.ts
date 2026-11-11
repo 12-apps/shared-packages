@@ -20,6 +20,7 @@ import {
 } from "../engine/kinds";
 import { MAX_SCHEDULE_WINDOWS } from "../engine/schedule";
 import { discountSearchConfig } from "./search";
+import { bulkDiscountsResponse, bulkDiscountsToolBody } from "./bulk-wire";
 
 /**
  * The discounts tool surface — authored ONCE, beside the route descriptors it
@@ -320,6 +321,24 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     params: discountCollectionParams,
     body: createDiscountBody,
     response: z.object({ data: discountSchema }),
+  },
+  {
+    operationId: "bulkDiscounts",
+    method: "POST",
+    path: "/discounts/bulk",
+    summary:
+      "The discounts' ONE bulk tool (admin). Extending an ended discount makes it active again only if it was active; one paused by hand stays paused. Many discounts, one `operation` per call - `setActive` (active true/false), " +
+      "`extendWindow` (`days` added to each end day, an already ended discount counting from today, or `endsOn` the new " +
+      "last day; a discount with no end date is skipped) or " +
+      "`undo` (the `ok` rows of an earlier call with their before/after; a row changed since is left as it is). " +
+      "At most 500 ids. ALL-OR-NOTHING by default (`allOrNothing` true): every row is planned first and if any row would be " +
+      "skipped or fail the call answers 422 with every problem and its row path and writes nothing; rows that already hold " +
+      "the value are `unchanged`, not errors. `validateOnly` reports what would happen and writes nothing. Whole days on " +
+      "the store's clock. An ended discount paused by hand stays paused when extended; only its end date moves.",
+    tags: ["discounts"],
+    params: discountCollectionParams,
+    body: bulkDiscountsToolBody,
+    response: bulkDiscountsResponse,
   },
   {
     operationId: "updateDiscount",

@@ -44,7 +44,7 @@ export function isCompleteMaskedDay(value: string): boolean {
 }
 
 /** `DD/MM/AAAA` → `YYYY-MM-DD`, or `null` when it is not a complete real day. */
-function maskedToIso(masked: string): string | null {
+export function maskedToIso(masked: string): string | null {
   const match = MASKED_DAY.exec(masked);
   if (match === null) return null;
   const iso = `${match[3]}-${match[2]}-${match[1]}`;
@@ -74,7 +74,7 @@ function maskDigits(raw: string): string {
  * - A part typed past its length moves on to the next part ("12/032" →
  *   "12/03/2"), which is plain typing, not an edit.
  */
-function maskDate(raw: string, previous: string): string {
+export function maskDate(raw: string, previous: string): string {
   if (ISO_DAY.test(raw.trim())) return isoToMasked(raw.trim());
   if (previous.includes("/") && /\D/u.test(raw)) {
     const parts = raw.split(/\D/u);

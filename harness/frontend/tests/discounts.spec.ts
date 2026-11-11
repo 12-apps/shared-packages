@@ -91,3 +91,168 @@ test('the grid filters live in the URL, which is why the host wires a real Route
 
   await expect(page).toHaveURL(/#\/discounts\?.*q=almo/u);
 });
+
+test('the host slot reports a bulk batch, and Desfazer restores what changed (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  const body = (name: string) => ({
+    name,
+    type: 'PERCENTAGE',
+    percentOffBp: 1000,
+    scope: 'ORDER',
+    trigger: 'AUTOMATIC',
+    stackable: true,
+    active: true,
+    endsAt: '2099-03-10',
+  });
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  await request.post('/api/admin/harness/discounts', { data: body('Lote A') });
+  await request.post('/api/admin/harness/discounts', { data: body('Lote B') });
+  /* eslint-enable test-flakiness/no-unmocked-network */
+
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Lote B');
+
+  // Two rows ticked, Ações (2) opens the package's entries.
+  await tick(page, 'Lote A');
+  await tick(page, 'Lote B');
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
+
+  await expect(page.getByTestId('bulk-counts')).toContainText('2 alterados');
+  await page.getByTestId('bulk-undo').click();
+  await expect(page.getByTestId('bulk-undone')).toContainText('2 desfeitos');
+});
+
+test('the extend dialog keeps its two ways on one row at 320 (FUT-4420)', async ({ page, request }) => {
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  for (const name of ['Largura A', 'Largura B']) {
+    await request.post('/api/admin/harness/discounts', {
+      data: {
+        name,
+        type: 'PERCENTAGE',
+        percentOffBp: 1000,
+        scope: 'ORDER',
+        trigger: 'AUTOMATIC',
+        stackable: true,
+        active: true,
+        endsAt: '2099-03-10',
+      },
+    });
+  }
+  /* eslint-enable test-flakiness/no-unmocked-network */
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Largura B');
+  await tick(page, 'Largura A');
+  await tick(page, 'Largura B');
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Estender validade…' }).click();
+
+  const group = page.getByTestId('bulk-extend-mode');
+  await expect(group).toBeVisible();
+  const buttons = await group.getByRole('button').all();
+  const boxes = await Promise.all(buttons.map((button) => button.boundingBox()));
+  expect(boxes).toHaveLength(2);
+  expect(boxes[0]!.y).toBeCloseTo(boxes[1]!.y, 0);
+  expect(boxes[0]!.width).toBeCloseTo(boxes[1]!.width, 0);
+  // Both parts end inside the 320px the test set: no sideways overflow of the control.
+  expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(320);
+});
+
+/** Ticks one row of the table by its name (the first checkbox of the grid is the page's select-all). */
+async function tick(page: import('@playwright/test').Page, name: string): Promise<void> {
+  await page.getByRole('row', { name: new RegExp(name, 'u') }).getByRole('checkbox').check();
+}
+
+async function seedThree(request: import('@playwright/test').APIRequestContext): Promise<void> {
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  for (const name of ['Fila A', 'Fila B', 'Fila C']) {
+    await request.post('/api/admin/harness/discounts', {
+      data: {
+        name,
+        type: 'PERCENTAGE',
+        percentOffBp: 1000,
+        scope: 'ORDER',
+        trigger: 'AUTOMATIC',
+        stackable: true,
+        active: true,
+        endsAt: '2099-03-10',
+      },
+    });
+  }
+  /* eslint-enable test-flakiness/no-unmocked-network */
+}
+
+test('a second batch cannot start while one runs, and one row gets no bulk entries (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  await seedThree(request);
+  // The route holds the batch until the test lets it go: no sleep, only a gate.
+  const gate = Promise.withResolvers<void>();
+  const batches: string[] = [];
+  await page.route('**/discounts/bulk', async (route) => {
+    batches.push(route.request().url());
+    await gate.promise;
+    await route.continue();
+  });
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Fila C');
+
+  // One row: Ações offers no bulk entry at all (Excluir only).
+  await tick(page, 'Fila A');
+  await page.getByTestId('discounts-bulk-actions').click();
+  await expect(page.getByRole('menuitem', { name: 'Desativar todos' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Excluir' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await tick(page, 'Fila B');
+  await tick(page, 'Fila C');
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
+  await expect(page.getByTestId('bulk-running')).toBeVisible();
+
+  // While the batch is in flight every entry is gone - Excluir too, a delete over rows a batch is
+  // changing would race it - so the Ações menu has nothing to offer and is not drawn at all.
+  await expect(page.getByTestId('discounts-bulk-actions')).toHaveCount(0);
+  gate.resolve();
+
+  await expect(page.getByTestId('bulk-counts')).toContainText('3 alterados');
+  expect(batches).toHaveLength(1);
+});
+
+test('the extend dialog: singular title, focus in the field, Enter confirms, hint follows the mode (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  await seedThree(request);
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Fila C');
+  await tick(page, 'Fila A');
+  await tick(page, 'Fila B');
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Estender validade…' }).click();
+
+  await expect(page.getByText('Estender validade de 2 descontos')).toBeVisible();
+  // Focus lands on the next action, never on the container.
+  // eslint-disable-next-line test-flakiness/no-focus-check -- Playwright's auto-retrying toBeFocused() IS the recommended form; the rule flags the matcher itself.
+  await expect(page.getByTestId('bulk-extend-days')).toBeFocused();
+  await expect(page.getByTestId('bulk-extend-hint')).toContainText('Conta a partir do fim');
+
+  await page.getByRole('button', { name: 'Nova data' }).click();
+  await expect(page.getByTestId('bulk-extend-hint')).toContainText('Todos passam a acabar nesta data');
+  // eslint-disable-next-line test-flakiness/no-focus-check -- Playwright's auto-retrying toBeFocused() IS the recommended form; the rule flags the matcher itself.
+  await expect(page.getByTestId('bulk-extend-date')).toBeFocused();
+  await page.getByTestId('bulk-extend-date').fill('01012000');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Escolha uma data de hoje em diante.')).toBeVisible();
+
+  await page.getByRole('button', { name: '+ dias' }).click();
+  // eslint-disable-next-line test-flakiness/no-focus-check -- Playwright's auto-retrying toBeFocused() IS the recommended form; the rule flags the matcher itself.
+  await expect(page.getByTestId('bulk-extend-days')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('bulk-counts')).toContainText('2 alterados');
+  await expect(page.getByTestId('bulk-row-ok').filter({ hasText: 'Fila A' })).toContainText('Validade estendida');
+});

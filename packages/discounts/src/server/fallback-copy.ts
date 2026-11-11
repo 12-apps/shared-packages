@@ -1,6 +1,6 @@
 import { isPortuguese, languageTagOf, nearestPack } from "../pack-language";
 
-import type { DiscountsServerCopy, DiscountsServerFallbackKey } from "./copy";
+import type { DiscountsBulkServerCopy, DiscountsServerCopy, DiscountsServerFallbackKey } from "./copy";
 import { EN_US_DISCOUNTS_SERVER_COPY } from "./en-US";
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "./pt-BR";
 
@@ -24,4 +24,24 @@ export function fallbackSentence(
   const tag = languageTagOf(locale);
   if (tag !== undefined) return (isPortuguese(tag) ? PT_BR_DISCOUNTS_SERVER_COPY : EN_US_DISCOUNTS_SERVER_COPY)[key];
   return nearestPack(copy, PT_BR_DISCOUNTS_SERVER_COPY, EN_US_DISCOUNTS_SERVER_COPY)[key];
+}
+
+/**
+ * The bulk rows' sentences (FUT-4420): the host's own where its pack says them,
+ * the package's pack for the request's language where it does not - a host
+ * written before the bulk actions keeps compiling and keeps answering in words.
+ * The language rule is {@link fallbackSentence}'s.
+ */
+export function bulkCopyFor(copy: DiscountsServerCopy, locale: string | null | undefined): DiscountsBulkServerCopy {
+  const tag = languageTagOf(locale);
+  const pack =
+    tag !== undefined
+      ? isPortuguese(tag)
+        ? PT_BR_DISCOUNTS_SERVER_COPY
+        : EN_US_DISCOUNTS_SERVER_COPY
+      : nearestPack(copy, PT_BR_DISCOUNTS_SERVER_COPY, EN_US_DISCOUNTS_SERVER_COPY);
+  const own = Object.fromEntries(
+    Object.entries(copy.bulk ?? {}).filter(([, sentence]) => typeof sentence === "string" && sentence.trim() !== ""),
+  );
+  return { ...pack.bulk, ...own };
 }

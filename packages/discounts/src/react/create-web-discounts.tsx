@@ -125,6 +125,12 @@ export interface DiscountsWebConfig {
   transport?: DiscountsTransport;
   /** The crumbs above the title. The host owns its information hierarchy. */
   breadcrumb?: readonly { label: string; href?: string }[];
+  /**
+   * The host's report for the bulk actions: progress, the per-row reasons,
+   * "Tentar novamente", Desfazer. See {@link BoundScreenProps.bulkSlot}. Absent,
+   * the screen offers no bulk entries besides Excluir.
+   */
+  bulkSlot?: BoundScreenProps["bulkSlot"];
 }
 
 export interface WebDiscounts {
@@ -162,7 +168,7 @@ function assertConfig(config: DiscountsWebConfig): void {
 
 export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
   assertConfig(config);
-  const { onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings } = config;
+  const { onError, currencyField, breadcrumb, timezone, wholeDays, timeZoneSettings, bulkSlot } = config;
   // A host pack without a sentence added after it was written is filled in
   // from the package's pack for this locale (review round 6): never a throw.
   const copy = completeWebCopy(config.copy, config.locale);
@@ -186,6 +192,7 @@ export function createWebDiscounts(config: DiscountsWebConfig): WebDiscounts {
     ...(timezone ? { timezone } : {}),
     ...(wholeDays ? { wholeDays } : {}),
     ...(timeZoneSettings ? { timeZoneSettings } : {}),
+    ...(bulkSlot ? { bulkSlot } : {}),
   };
 
   return {

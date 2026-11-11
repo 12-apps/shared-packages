@@ -1,0 +1,260 @@
+"use client";
+
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+
+import {
+  DISCOUNT_BULK_MAX_IDS,
+  type DiscountBulkCounts,
+  type DiscountBulkOperation,
+  type DiscountBulkResult,
+  type DiscountBulkRow,
+  type DiscountBulkUndoRow,
+} from "../bulk";
+import type { DiscountsApiClient } from "./api";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
+import type { DiscountsBulkCopy } from "./copy-bulk";
+
+/**
+ * The bulk actions' state (FUT-4420), owned by the PACKAGE and drawn by the
+ * HOST.
+ *
+ * The package knows what a batch is - the request, the per-row answers, the
+ * rows that can be undone - and the host knows what its reports look like. So
+ * the screen keeps this state machine and hands it to the host's
+ * {@link DiscountsBulkSlotProps slot}, which renders "Aplicando em N itens…",
+ * the count and the reasons, "Tentar novamente", "Desfazer (N)" and "Baixar as
+ * falhas" in its own chrome.
+ */
+
+/** A request the slot can show: any operation but the undo, which has its own state. */
+export type DiscountsBulkRequest = Exclude<DiscountBulkOperation, { operation: "undo" }>;
+
+export type DiscountsBulkState =
+  | { phase: "idle" }
+  | { phase: "running"; request: DiscountsBulkRequest; total: number }
+  /** The request itself failed: nothing was applied that the answer can name. */
+  | {
+      phase: "failed";
+      request: DiscountsBulkRequest;
+      message: string;
+      /**
+       * False when the server may have applied the request (nothing answered, or
+       * a 5xx) and sending it again would repeat it: `+N dias` adds N days a
+       * second time. "Tentar novamente" must not be offered then.
+       */
+      retrySafe: boolean;
+    }
+  | {
+      phase: "done";
+      request: DiscountsBulkRequest;
+      /** Every row of the batch, retries folded in. */
+      result: DiscountBulkResult;
+      /** True while Desfazer or a retry is in flight. */
+      busy: boolean;
+      /** Desfazer's answer, once it ran. Offered once, so absent means not yet. */
+      undone: DiscountBulkResult | null;
+      /** A per-row retry of `+N dias` got no definite answer: it must not be sent again. */
+      outcomeUnknown?: boolean;
+    };
+
+/** What the host's slot is handed, and renders around the grid. */
+export interface DiscountsBulkSlotProps {
+  state: DiscountsBulkState;
+  /** The sentences of the bulk group, for the report's own labels. */
+  copy: DiscountsBulkCopy;
+  /** Rows Desfazer would restore: the `ok` rows, with their before and after. */
+  undoable: readonly DiscountBulkUndoRow[];
+  /** Whether "Tentar novamente" may be offered for a failed request (see `retrySafe`). */
+  canRetry: boolean;
+  /** Said under the report when a per-row retry may have been applied (then `canRetry` is false). */
+  retryNotice: string | null;
+  /** Rows "Tentar novamente" would send again: only the `failed` ones. */
+  retryable: readonly DiscountBulkRow[];
+  /** Restore the `ok` rows. A row changed since is left as it is and the answer says why. */
+  undo: () => Promise<void>;
+  /** Send the failed rows again, folding the answers into the same report. */
+  retry: () => Promise<void>;
+  /** Close the report. */
+  dismiss: () => void;
+  /** The grid. */
+  children: ReactNode;
+}
+
+/** The three requests of the "Ações" entries, as the screen builds them. */
+type DiscountsBulkRunner = (request: DiscountsBulkRequest) => Promise<void>;
+
+const countsOf = (rows: readonly DiscountBulkRow[]): DiscountBulkCounts => {
+  const counts: DiscountBulkCounts = { ok: 0, unchanged: 0, skipped: 0, failed: 0 };
+  for (const row of rows) counts[row.status] += 1;
+  return counts;
+};
+
+/** The earlier answer with the rows of a retry swapped in, in place. */
+export function foldRetry(
+  previous: DiscountBulkResult,
+  retried: DiscountBulkResult,
+): DiscountBulkResult {
+  const byId = new Map(retried.rows.map((row) => [row.id, row]));
+  const rows = previous.rows.map((row) => byId.get(row.id) ?? row);
+  return { ...previous, rows, counts: countsOf(rows) };
+}
+
+export function undoableOf(rows: readonly DiscountBulkRow[]): DiscountBulkUndoRow[] {
+  return rows.flatMap((row) =>
+    row.status === "ok" && row.before !== undefined && row.after !== undefined
+      ? [{ id: row.id, before: row.before, after: row.after }]
+      : [],
+  );
+}
+
+/**
+ * A failed request's state. A request nothing answered (no status) or the server
+ * failed on (5xx) may HAVE been applied; `+N dias` is the one operation that
+ * cannot be sent twice, so it is not offered a retry then.
+ */
+function repeatsUnknown(request: DiscountsBulkRequest, answer: { status?: number }): boolean {
+  const unknown = answer.status === undefined || answer.status >= 500;
+  return unknown && request.operation === "extendWindow" && request.days !== undefined;
+}
+
+function failedState(
+  request: DiscountsBulkRequest,
+  answer: { error: string; status?: number },
+  copy: DiscountsBulkCopy,
+): Extract<DiscountsBulkState, { phase: "failed" }> {
+  if (repeatsUnknown(request, answer)) return { phase: "failed", request, retrySafe: false, message: copy.outcomeUnknown };
+  return { phase: "failed", request, retrySafe: true, message: answer.error || copy.requestFailed };
+}
+
+/** What the handlers share: the client, the report's setters and the reload. */
+interface BulkDeps {
+  api: DiscountsApiClient;
+  refresh: () => void;
+  onError: (error: unknown, context: string) => void;
+  latest: { current: DiscountsBulkState };
+  set: (next: DiscountsBulkState) => void;
+}
+
+type Done = Extract<DiscountsBulkState, { phase: "done" }>;
+
+/** Desfazer: the `ok` rows back to their `before`, once. */
+async function undoBatch({ api, refresh, onError, latest, set }: BulkDeps): Promise<void> {
+  const current = latest.current;
+  if (current.phase !== "done" || current.undone !== null || current.busy) return;
+  const rows = undoableOf(current.result.rows);
+  if (rows.length === 0) return;
+  set({ ...current, busy: true });
+  const answer = await api.bulk?.({ operation: "undo", rows });
+  if (answer === undefined) return;
+  if (!answer.ok) {
+    onError(answer, "discounts.bulk.undo");
+    set({ ...current, busy: false });
+    return;
+  }
+  set({ ...current, busy: false, undone: answer.data });
+  refresh();
+}
+
+/** "Tentar novamente" on a finished batch: only its failed rows, folded into the same report. */
+async function retryRows({ api, refresh, onError, latest, set }: BulkDeps, current: Done): Promise<void> {
+  const ids = current.result.rows.filter((row) => row.retryable).map((row) => row.id);
+  if (current.busy || current.outcomeUnknown === true || ids.length === 0) return;
+  set({ ...current, busy: true });
+  const answer = await api.bulk?.({ ...current.request, ids });
+  if (answer === undefined) return;
+  if (!answer.ok) {
+    onError(answer, `discounts.bulk.${current.request.operation}`);
+    // Same rule as `failedState`: a retry that may have been applied must not repeat `+N dias`.
+    set({ ...current, busy: false, ...(repeatsUnknown(current.request, answer) ? { outcomeUnknown: true } : {}) });
+    return;
+  }
+  const latestDone = latest.current.phase === "done" ? latest.current : current;
+  set({ ...latestDone, busy: false, result: foldRetry(latestDone.result, answer.data) });
+  refresh();
+}
+
+export function useDiscountsBulk(
+  api: DiscountsApiClient,
+  copy: CompleteDiscountsWebCopy,
+  refresh: () => void,
+  onError: (error: unknown, context: string) => void,
+): {
+  state: DiscountsBulkState;
+  run: DiscountsBulkRunner;
+  slot: Omit<DiscountsBulkSlotProps, "children">;
+} {
+  const [state, setState] = useState<DiscountsBulkState>({ phase: "idle" });
+  // The latest state for handlers that run after an await: a closure over `state`
+  // would retry against the batch as it was when the button was drawn.
+  const latest = useRef(state);
+  latest.current = state;
+  const set = useCallback((next: DiscountsBulkState) => {
+    latest.current = next;
+    setState(next);
+  }, []);
+  // Which run the screen is waiting for: an answer that is not the latest one is dropped.
+  const runId = useRef(0);
+  const deps = useMemo<BulkDeps>(() => ({ api, refresh, onError, latest, set }), [api, refresh, onError, set]);
+
+  const run = useCallback<DiscountsBulkRunner>(
+    async (request) => {
+      // One batch at a time: a second action while one runs would apply twice and race its report.
+      if (latest.current.phase === "running") return;
+      if (request.ids.length > DISCOUNT_BULK_MAX_IDS) {
+        set({ phase: "failed", request, retrySafe: true, message: fill(copy.bulk.tooMany, { max: DISCOUNT_BULK_MAX_IDS }) });
+        return;
+      }
+      if (api.bulk === undefined) {
+        set({ phase: "failed", request, retrySafe: true, message: copy.bulk.requestFailed });
+        return;
+      }
+      runId.current += 1;
+      const mine = runId.current;
+      set({ phase: "running", request, total: request.ids.length });
+      const answer = await api.bulk(request);
+      if (mine !== runId.current) return;
+      if (!answer.ok) {
+        onError(answer, `discounts.bulk.${request.operation}`);
+        set(failedState(request, answer, copy.bulk));
+        return;
+      }
+      set({ phase: "done", request, result: answer.data, busy: false, undone: null });
+      refresh();
+    },
+    [api, copy.bulk, onError, refresh, set],
+  );
+
+  const retry = useCallback(async () => {
+    const current = latest.current;
+    if (current.phase === "failed") {
+      if (current.retrySafe) await run(current.request);
+    }
+    else if (current.phase === "done") await retryRows(deps, current);
+  }, [deps, run]);
+  const undo = useCallback(() => undoBatch(deps), [deps]);
+  const dismiss = useCallback(() => {
+    runId.current += 1;
+    set({ phase: "idle" });
+  }, [set]);
+
+  return {
+    state,
+    run,
+    slot: { ...slotFacts(state, copy.bulk), state, copy: copy.bulk, undo, retry, dismiss },
+  };
+}
+
+/** What the slot is told about the report, derived from the state alone. */
+function slotFacts(
+  state: DiscountsBulkState,
+  words: DiscountsBulkCopy,
+): Pick<DiscountsBulkSlotProps, "canRetry" | "retryNotice" | "undoable" | "retryable"> {
+  const rows = state.phase === "done" ? state.result.rows : [];
+  const unknown = state.phase === "done" && state.outcomeUnknown === true;
+  return {
+    canRetry: (state.phase === "done" && !unknown) || (state.phase === "failed" && state.retrySafe),
+    retryNotice: unknown ? words.outcomeUnknown : null,
+    undoable: state.phase === "done" && state.undone === null ? undoableOf(rows) : [],
+    retryable: rows.filter((row) => row.retryable),
+  };
+}

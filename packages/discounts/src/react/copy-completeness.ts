@@ -60,7 +60,8 @@ export function missingWebCopy(
   reference: DiscountsWebCopy,
 ): string[] {
   return leafPaths(reference).filter((path) => {
-    if (OPTIONAL_WEB_COPY_PATHS.has(path)) return false;
+    // The bulk group is optional as a whole and filled in by `completeWebCopy` (FUT-4420).
+    if (OPTIONAL_WEB_COPY_PATHS.has(path) || path.startsWith("bulk.")) return false;
     const value = read(copy, path);
     // A leaf is satisfied by a non-blank string OR a function. The `@12-apps/ui`
     // packs folded in below carry entries that take the interpolated value as
