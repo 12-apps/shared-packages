@@ -46,6 +46,18 @@ describe("ingest", () => {
     expect(h.http.requests).toHaveLength(0);
   });
 
+  it("[I4] a later accept of a born-accepted order is stale: no second host half, no second confirm", async () => {
+    const h = createHarness();
+    await h.connect("IFOOD", { autoAccept: true });
+    await deliverIfood(h, ifoodPlaced("ext-1"));
+
+    expect(await h.engine.decide({ clientId: TENANT, orderId: "order-1", decision: "ACCEPT" })).toEqual({
+      kind: "stale",
+    });
+    expect(h.accepted).toHaveLength(1);
+    expect(h.enqueued).toHaveLength(1);
+  });
+
   it("[I3/L2] a redelivered PLACED is a duplicate: one order, one host half, one confirm", async () => {
     const h = createHarness();
     await h.connect("IFOOD", { autoAccept: true });
