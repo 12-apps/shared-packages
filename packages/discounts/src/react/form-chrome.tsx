@@ -11,7 +11,7 @@ import { ListItemButton } from "@12-apps/ui/mui/ListItemButton";
 import { Stack } from "@12-apps/ui/mui/Stack";
 import { alpha, type Theme } from "@12-apps/ui/mui/styles";
 import { Text } from "@12-apps/ui/typography/Text";
-import { darken } from "@mui/material/styles";
+import { darken } from "@12-apps/ui/mui/styles";
 
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import type { Pendencia } from "./step-keys";
