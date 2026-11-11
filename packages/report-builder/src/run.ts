@@ -2,6 +2,7 @@ import { compileReport } from './compile';
 import type { ReportEngineCopy } from './copy';
 import { specSentence } from './describe';
 import { invalidSpecError, ReportBuilderError } from './errors';
+import { withoutUnrecognizedKeys } from './strip-unknown';
 import { renderReport, type ReportRenderModel } from './render';
 import {
   dashboardSpecSchema,
@@ -82,6 +83,16 @@ export function parseReportDocument(input: unknown): ReportDocument {
     return parsed.data;
   }
   return parseReportSpec(input);
+}
+
+/**
+ * Parse a document READ BACK from storage: the same validation, but a key the
+ * schema no longer (or not yet) declares is dropped instead of refused. A row
+ * is not a request, and one written by another release must keep opening.
+ */
+export function parseStoredDocument(input: unknown): ReportDocument {
+  const schema = isDashboardInput(input) ? dashboardSpecSchema : reportSpecSchema;
+  return parseReportDocument(withoutUnrecognizedKeys(schema, input));
 }
 
 export interface DashboardBlockSuccess {

@@ -412,6 +412,19 @@ describe('opening one saved document', () => {
     expect(windows()[0]?.toExclusive.toISOString()).toBe('2026-07-15T03:00:00.000Z');
   });
 
+  it('opens a stored document that carries a key the schema no longer declares', async () => {
+    // Stored rows are not requests: the request schemas are strict, the read-back
+    // drops what another release wrote, and the document keeps opening.
+    const { call } = setup({
+      seed: [record({ spec: { ...ORDERS_SPEC, retiredKey: 1, presentation: { kind: 'table', old: true } } })],
+    });
+
+    const response = await call('GET', '/reports/custom/:id', { params: { id: 'r1' } });
+
+    expect(response.status).toBe(200);
+    expect(data<{ type: string }>(response).type).toBe('report');
+  });
+
   it('answers 404 — not 403 — for a document the actor may not see', async () => {
     // 403 confirms the id exists, which is itself a disclosure on a tenant
     // surface: an outsider could enumerate ids by the status they get back.
