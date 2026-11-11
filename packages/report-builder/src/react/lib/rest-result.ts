@@ -12,13 +12,29 @@ export type Result<T> =
 interface ErrorEnvelope {
   error?: string;
   issues?: Record<string, string>;
+  /** The strict-input shape (422): every problem with the path it was found at. */
+  problems?: ReadonlyArray<{ path?: string | ReadonlyArray<string | number>; message?: string }>;
 }
 
+/** Per-field messages from a 422 `problems` list (dotted paths), else the older `issues`. */
+function fieldErrorsOf(payload: ErrorEnvelope | null): Record<string, string> | undefined {
+  const byPath: Record<string, string> = {};
+  for (const problem of payload?.problems ?? []) {
+    const path = Array.isArray(problem.path) ? problem.path.join(".") : problem.path;
+    if (typeof path === "string" && path !== "" && typeof problem.message === "string") {
+      byPath[path] ??= problem.message;
+    }
+  }
+  return Object.keys(byPath).length > 0 ? byPath : payload?.issues;
+}
+
+
 function foldError<T>(status: number, payload: ErrorEnvelope | null): Result<T> {
+  const fieldErrors = fieldErrorsOf(payload);
   return {
     ok: false,
     error: payload?.error ?? `HTTP ${status}`,
-    ...(payload?.issues ? { fieldErrors: payload.issues } : {}),
+    ...(fieldErrors ? { fieldErrors } : {}),
   };
 }
 

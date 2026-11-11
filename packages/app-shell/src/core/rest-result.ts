@@ -16,7 +16,10 @@
  *     is part of the answer.
  *
  * Both speak the `{ data }` / `{ error, issues }` envelope every `createApi*`
- * package answers in, so a surface can mix them without a second adapter.
+ * package answers in, so a surface can mix them without a second adapter. A
+ * strict-input server answers a refused body with 422 and
+ * `{ error, problems: [{ path, message }] }` instead (FUT-4729); both shapes
+ * fold into the same per-field messages.
  */
 import { EN_US_REST_RESULT_FALLBACKS } from './en-US';
 
@@ -51,7 +54,31 @@ export type Result<T> =
 /** The refusal half of the envelope, as a surface may answer it. */
 interface ErrorEnvelope {
   error?: string;
+  /** The older shape: one message per field name. */
   issues?: Record<string, string>;
+  /** The strict-input shape: every problem with the path it was found at. */
+  problems?: ReadonlyArray<{ path?: string | ReadonlyArray<string | number>; message?: string }>;
+}
+
+/**
+ * Per-field messages out of a refusal body: `problems` (path-keyed, dotted for
+ * nesting) when the server sent them, else the older `issues` record.
+ *
+ * Several problems at one path keep the FIRST message, which is the one a form
+ * can paint beside a single input. A problem with no path (the body as a whole)
+ * has no input to sit beside, so it is left to `error`.
+ */
+function fieldErrorsOf(payload: ErrorEnvelope | null): Record<string, string> | undefined {
+  if (Array.isArray(payload?.problems)) {
+    const byPath: Record<string, string> = {};
+    for (const problem of payload.problems) {
+      const path = Array.isArray(problem?.path) ? problem.path.join('.') : problem?.path;
+      if (typeof path !== 'string' || path === '' || typeof problem.message !== 'string') continue;
+      byPath[path] ??= problem.message;
+    }
+    if (Object.keys(byPath).length > 0) return byPath;
+  }
+  return payload?.issues ?? undefined;
 }
 
 /**
@@ -71,6 +98,7 @@ function foldError<T>(
   payload: ErrorEnvelope | null,
   fallbacks: RestResultFallbacks,
 ): Result<T> {
+  const fieldErrors = fieldErrorsOf(payload);
   return {
     ok: false,
     // A body that carried no sentence still has to say something, and the
@@ -79,7 +107,7 @@ function foldError<T>(
     // rather than an empty string.
     error: payload?.error ?? fallbacks.status(status),
     status,
-    ...(payload?.issues ? { fieldErrors: payload.issues } : {}),
+    ...(fieldErrors ? { fieldErrors } : {}),
   };
 }
 

@@ -79,6 +79,61 @@ describe('a call the server refused', () => {
     });
   });
 
+  it('R5b: reads a 422 `problems` list into per-field messages keyed by path', async () => {
+    stubFetch({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        error: 'Invalid input.',
+        problems: [
+          { path: 'name', message: 'Too short.' },
+          { path: 'items.0.qty', message: 'Must be positive.' },
+          { path: 'name', message: 'Second message loses.' },
+          { path: '', message: 'Body-level, no input to sit beside.' },
+        ],
+      }),
+    });
+    expect(await restResult('/api/things', 'POST', {})).toEqual({
+      ok: false,
+      error: 'Invalid input.',
+      status: 422,
+      fieldErrors: { name: 'Too short.', 'items.0.qty': 'Must be positive.' },
+    });
+  });
+
+  it('R5c: accepts a path sent as segments, and prefers `problems` over `issues`', async () => {
+    stubFetch({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        error: 'Invalid input.',
+        problems: [{ path: ['items', 1, 'sku'], message: 'Unknown key.' }],
+        issues: { old: 'ignored when problems exist' },
+      }),
+    });
+    expect(await restResult('/api/things', 'POST', {})).toMatchObject({
+      fieldErrors: { 'items.1.sku': 'Unknown key.' },
+    });
+  });
+
+  it('R5d: an empty or pathless `problems` list falls back to `issues`, then to none', async () => {
+    stubFetch({
+      ok: false,
+      status: 422,
+      json: async () => ({ error: 'x', problems: [], issues: { name: 'Old server.' } }),
+    });
+    expect(await restResult('/api/things', 'POST', {})).toMatchObject({
+      fieldErrors: { name: 'Old server.' },
+    });
+
+    stubFetch({
+      ok: false,
+      status: 422,
+      json: async () => ({ error: 'x', problems: [{ path: '', message: 'Whole body.' }] }),
+    });
+    expect(await restResult('/api/things', 'POST', {})).not.toHaveProperty('fieldErrors');
+  });
+
   it('R6: keeps the status apart, because 403 and 409 are different answers', async () => {
     // "Not yours" belongs beside the button; "somebody was faster" is answered
     // with a refresh. Folding both into one sentence throws away the whole
