@@ -124,9 +124,18 @@ export interface UpdateManager {
    * switch: somebody who turned automatic updates off and then asked for one
    * has plainly asked for one.
    *
-   * A no-op while a check is already running or a version is downloading or
-   * ready — see {@link ON_ITS_WAY}. The caller reads `state` for the answer
-   * either way.
+   * A version already downloading or ready answers at once, from `state` —
+   * see {@link ON_ITS_WAY}.
+   *
+   * A check that arrives while another is RUNNING waits for it and resolves
+   * after it, so the caller reads `state` as that check's real outcome and
+   * never a transient `checking`. Concurrent callers share one run: the
+   * updater is asked once. One exception, decided by whether the running check
+   * actually asked the feed: an automatic check that was skipped (the switch
+   * is off, no feed, signed out) answered `off` or `idle` without asking, and
+   * that is not an answer for a person who asked. A manual caller that arrives
+   * during such a run therefore runs its own check once it is over (and
+   * several of them still share that one).
    */
   check(options?: { manual?: boolean }): Promise<void>;
   /** Restart into the version already on disk. */
@@ -166,6 +175,13 @@ export interface UpdateManagerOptions {
   timers?: TimerPort;
 }
 
+/** The check in flight, and whether a person asked for it. */
+interface RunningCheck {
+  manual: boolean;
+  /** Settles once it is over; `true` if the updater was asked. Never rejects. */
+  done: Promise<boolean>;
+}
+
 /** A repeating timer, narrowed to what this needs and to what a fake can be. */
 interface TimerPort {
   set(run: () => void, ms: number): TimerHandle;
@@ -190,12 +206,12 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
     set: (run, ms) => globalThis.setInterval(run, ms) as unknown as TimerHandle,
     clear: (handle) => globalThis.clearInterval(handle as unknown as number),
   };
-  const held: { state: UpdateState; timer: TimerHandle | null; running: boolean } = {
+  const held: { state: UpdateState; timer: TimerHandle | null; running: RunningCheck | null } = {
     state: updatesSupported(options.platform) ? { kind: "idle" } : { kind: "unsupported" },
     timer: null,
     // A double-click on the tray shows the window twice in a row; one check
-    // is the answer to both.
-    running: false,
+    // is the answer to both, and a later caller waits on it.
+    running: null,
   };
 
   const move = (next: UpdateState): void => {
@@ -211,13 +227,14 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
   options.updater.autoDownload = true;
   options.updater.autoInstallOnAppQuit = false;
 
-  const run = async (manual: boolean): Promise<void> => {
+  /** Resolves `true` when the updater was actually asked, `false` when the check was skipped. */
+  const run = async (manual: boolean): Promise<boolean> => {
     // A cookie read that rejects is a failed check, not an unhandled rejection
     // in a tray process.
     const decision = await prepare(options, manual).catch((): UpdateState => ({ kind: "failed" }));
     if (decision !== null) {
       move(decision);
-      return;
+      return false;
     }
     move({ kind: "checking" });
     try {
@@ -228,6 +245,7 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
       // agent's work down with it. The next tick asks again.
       move({ kind: "failed" });
     }
+    return true;
   };
 
   const manager: UpdateManager = {
@@ -236,13 +254,24 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
     },
 
     check: async (checkOptions) => {
-      if (held.running || ON_ITS_WAY.has(held.state.kind)) return;
-      held.running = true;
-      try {
-        await run(checkOptions?.manual === true);
-      } finally {
-        held.running = false;
+      const manual = checkOptions?.manual === true;
+      if (ON_ITS_WAY.has(held.state.kind)) return;
+      const running = held.running;
+      if (running !== null) {
+        const asked = await running.done;
+        // A skipped automatic run is no answer to a person: ask again, which
+        // joins any other manual caller that got here first.
+        if (!asked && manual && !running.manual) return manager.check(checkOptions);
+        return;
       }
+      const started: RunningCheck = {
+        manual,
+        done: run(manual).finally(() => {
+          held.running = null;
+        }),
+      };
+      held.running = started;
+      await started.done;
     },
 
     // Silent, and back up afterwards: a one-click per-user installer has
