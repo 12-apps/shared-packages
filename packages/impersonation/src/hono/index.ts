@@ -7,6 +7,7 @@ import {
 } from '../server/create-api-impersonation';
 import {
   foldApiError,
+  messagesOf,
   type ImpersonationActor,
   type ImpersonationRoute,
   type ImpersonationServerConfig,
@@ -55,15 +56,22 @@ export interface ImpersonationHono extends ApiImpersonation {
   tenant: Hono;
 }
 
-/** Reads the JSON body, tolerating an absent or malformed one. */
+/** What `readBody` answers for a body that is present but is not JSON. */
+const MALFORMED = Symbol('malformed');
+
+/**
+ * Reads the JSON body. Absent is `undefined` (the handler's strict parse refuses
+ * it with a 422); present but not JSON is {@link MALFORMED}, which the adapter
+ * answers 400 itself: malformed JSON is a transport error, never a validation one.
+ */
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET' || c.req.method === 'DELETE') return undefined;
+  const text = await c.req.text();
+  if (text.trim() === '') return undefined;
   try {
-    return await c.req.json();
+    return JSON.parse(text);
   } catch {
-    // A malformed body is the caller's error; the handler's own validation
-    // reports it far better than a parse failure would.
-    return undefined;
+    return MALFORMED;
   }
 }
 
@@ -73,11 +81,13 @@ function register(
   config: ImpersonationHonoConfig,
 ): void {
   const handler = async (c: Context) => {
+    const body = await readBody(c);
+    if (body === MALFORMED) return c.json({ error: messagesOf(config).invalidBody }, 400);
     const response = await route
       .handle({
         actor: await config.resolveActor(c),
         params: c.req.param() as Record<string, string | undefined>,
-        body: await readBody(c),
+        body,
         cookieValue: readCookie(c, config.cookieName),
       })
       .catch(foldApiError);
