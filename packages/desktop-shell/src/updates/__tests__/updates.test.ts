@@ -355,3 +355,119 @@ describe("installing and failing", () => {
     expect(run.fake.seen.checks).toBe(0);
   });
 });
+
+describe("a check that arrives while another is running", () => {
+  /** A promise the case settles by hand, so a check can be held in flight. */
+  function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+    const box: { resolve?: (value: T) => void } = {};
+    const promise = new Promise<T>((done) => {
+      box.resolve = done;
+    });
+    return { promise, resolve: (value) => box.resolve?.(value) };
+  }
+
+  /** A manager whose feed answer, and optionally cookie read, are held by the case. */
+  function held(autoUpdate: boolean, gateCookie = false): {
+    api: ReturnType<typeof createUpdateManager>;
+    fake: ReturnType<typeof fakeUpdater>;
+    feed: { release: () => void };
+    cookie: { release: () => void };
+    answers: ReturnType<typeof deferred<null>>[];
+  } {
+    const fake = fakeUpdater();
+    const answers: ReturnType<typeof deferred<null>>[] = [];
+    const cookie = deferred<string | null>();
+    fake.port.checkForUpdates = () => {
+      fake.seen.checks += 1;
+      const answer = deferred<null>();
+      answers.push(answer);
+      return answer.promise;
+    };
+    const api = createUpdateManager({
+      updater: fake.port,
+      cookie: { read: () => (gateCookie ? cookie.promise : Promise.resolve("session=abc")) },
+      platform: "win32",
+      settings: () => ({ feedUrl: FEED, autoUpdate }),
+      timers: { set: () => ({}), clear: () => undefined },
+    });
+    return {
+      api,
+      fake,
+      answers,
+      feed: {
+        release: () => {
+          fake.emit("update-not-available");
+          answers.at(-1)?.resolve(null);
+        },
+      },
+      cookie: { release: () => cookie.resolve("session=abc") },
+    };
+  }
+
+  /** Whether a promise has settled, after the microtask queue drains. */
+  async function settledWithin(promise: Promise<void>): Promise<boolean> {
+    const settled = vi.fn();
+    void promise.then(settled);
+    await new Promise((resolve) => setImmediate(resolve));
+    return settled.mock.calls.length > 0;
+  }
+
+  it("makes a manual check wait for the automatic one, and then read its real outcome", async () => {
+    const run = held(true);
+    const automatic = run.api.check();
+    await vi.waitFor(() => expect(run.api.state).toEqual({ kind: "checking" }));
+
+    const manual = run.api.check({ manual: true });
+
+    expect(await settledWithin(manual)).toBe(false);
+    run.feed.release();
+    await manual;
+    await automatic;
+    expect(run.api.state).toEqual({ kind: "none" });
+    expect(run.fake.seen.checks).toBe(1);
+  });
+
+  it("still asks the feed for a manual check when the running automatic one skipped (switch off)", async () => {
+    const run = held(false, true);
+    const automatic = run.api.check();
+    // The automatic run is reading the cookie; it will answer `off` without asking.
+    const manual = run.api.check({ manual: true });
+
+    run.cookie.release();
+    await automatic;
+    expect(run.api.state).toEqual({ kind: "off" });
+    await vi.waitFor(() => expect(run.fake.seen.checks).toBe(1));
+    expect(await settledWithin(manual)).toBe(false);
+    run.feed.release();
+    await manual;
+    expect(run.api.state).toEqual({ kind: "none" });
+  });
+
+  it("shares one run between concurrent manual checks", async () => {
+    const run = held(true);
+    const first = run.api.check({ manual: true });
+    const second = run.api.check({ manual: true });
+    await vi.waitFor(() => expect(run.fake.seen.checks).toBe(1));
+
+    expect(await settledWithin(first)).toBe(false);
+    expect(await settledWithin(second)).toBe(false);
+    run.feed.release();
+    await Promise.all([first, second]);
+
+    expect(run.fake.seen.checks).toBe(1);
+    expect(run.api.state).toEqual({ kind: "none" });
+  });
+
+  it("starts a fresh check once the previous one is over", async () => {
+    const run = held(true);
+    const first = run.api.check({ manual: true });
+    await vi.waitFor(() => expect(run.fake.seen.checks).toBe(1));
+    run.feed.release();
+    await first;
+
+    const second = run.api.check({ manual: true });
+    await vi.waitFor(() => expect(run.fake.seen.checks).toBe(2));
+    run.feed.release();
+    await second;
+  });
+});
