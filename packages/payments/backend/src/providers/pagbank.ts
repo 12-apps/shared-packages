@@ -19,7 +19,7 @@ import { pagbankApiBase } from './pagbank-api-base';
 import { pagbankOAuth } from './pagbank-oauth';
 import { pixPayload, summaryItems } from './pagbank-payloads';
 import { captureCharge, findChargeByReference, getCharge } from './pagbank-operations';
-import { classifyPagBankRefundRefusal, PARTIAL_REFUND_METHODS, refund } from './pagbank-refund';
+import { PARTIAL_REFUND_METHODS, refund } from './pagbank-refund';
 import { pagbankVault } from './pagbank-vault';
 import { activateApplePayCertificate, requestApplePayCsr } from './pagbank-wallets';
 import { verifyPagbankCredentials } from './pagbank-probe';
@@ -366,7 +366,7 @@ export function pagbankProvider(source: PaymentsCopySource<PagbankCopy>): Paymen
     // where the FUT-681 identity rule (charge id vs order id) is enforced.
     getCharge,
     findChargeByReference,
-    refund, classifyRefundRefusal: classifyPagBankRefundRefusal,
+    refund,
     captureCharge,
 
     webhook,

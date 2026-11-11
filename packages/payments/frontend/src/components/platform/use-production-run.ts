@@ -31,6 +31,13 @@ type Phase = 'idle' | EvidencePhase;
 const PIX_POLL_MS = 5000;
 /** How long one Pix is checked on its own: past the QR's own expiry, so a late payment is still refunded. */
 const PIX_POLL_WINDOW_MS = 15 * 60_000;
+/**
+ * How long a refund being retried is read: the server's last scheduled attempt
+ * is 15 minutes after the first, so this is that plus a margin. Past it the
+ * sweep is not running (no Redis, or the job was not registered) and asking
+ * every few seconds would go on for as long as the tab stays open.
+ */
+const REFUND_POLL_WINDOW_MS = 20 * 60_000;
 
 const isPixOpen = (pix: ProductionPixView | null | undefined): boolean =>
   pix?.state === 'AWAITING_PAYMENT' || pix?.state === 'REFUND_PENDING';
@@ -95,8 +102,8 @@ const isSettling = (pix: ProductionPixView | null): boolean =>
  * check asks PagBank whether a person paid it, which no webhook of ours settles
  * yet: a third-party wait, the one kind of screen poll the origin host admits,
  * and only when bounded. Past the window the screen stops asking on its own and
- * offers "Verificar o Pix" instead. A refund being retried is read without a
- * window: the server decides when it ends (FUT-4360). Answers whether the
+ * offers "Verificar o Pix" instead. A refund being retried is read for a
+ * window of its own, longer than the schedule (FUT-4360). Answers whether the
  * window ran out.
  */
 function usePixPolling(
@@ -105,6 +112,7 @@ function usePixPolling(
   onConfirmPix: HomologacaoProductionEvidenceCardProps['onConfirmPix'],
   everyMs: number,
   windowMs: number,
+  refundWindowMs: number,
 ): boolean {
   const busy = useRef(false);
   const [expiredFor, setExpiredFor] = useState<string | null>(null);
@@ -127,16 +135,15 @@ function usePixPolling(
           busy.current = false;
         });
     }, everyMs);
-    if (retrying) return () => clearInterval(timer);
     const window = setTimeout(() => {
       clearInterval(timer);
       setExpiredFor(runId);
-    }, windowMs);
+    }, retrying ? refundWindowMs : windowMs);
     return () => {
       clearInterval(timer);
       clearTimeout(window);
     };
-  }, [runId, retrying, setPix, everyMs, windowMs]);
+  }, [runId, retrying, setPix, everyMs, windowMs, refundWindowMs]);
   return runId !== null && expiredFor === runId;
 }
 
@@ -158,6 +165,7 @@ function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
     props.onConfirmPix,
     props.pixPollMs ?? PIX_POLL_MS,
     props.pixPollWindowMs ?? PIX_POLL_WINDOW_MS,
+    props.pixRefundWindowMs ?? REFUND_POLL_WINDOW_MS,
   );
   const act = (action: 'CHECK' | 'SKIP' | 'RETRY_REFUND'): void => {
     if (!pix) return;

@@ -1,9 +1,10 @@
 import { REFUND_RETRY_ATTEMPTS } from '../../core/refund-retry';
-import { pixStateOf } from './orders-pix-production';
+import { pollPix } from './orders';
+import { createdPixIds, paidChargeId, pixStateOf } from './orders-pix-production';
 import { claimAttempt, firstClaim, nextClaim, refundStepOf, runClaimedAttempt, stampAfter } from './refund-attempt';
 import { claimHeld, refundStateOf, type EvidenceRefundState } from './refund-state';
 import { sandboxSeller, type EvidenceRunDeps } from './run';
-import { clockOf } from './steps';
+import { clockOf, withStep } from './steps';
 import type { EvidenceRecord } from './types';
 
 /**
@@ -34,12 +35,25 @@ function dueNow(record: EvidenceRecord, now: Date): Due | null {
   return state.attempt >= REFUND_RETRY_ATTEMPTS ? { kind: 'CLOSE', state } : { kind: 'NEXT', state };
 }
 
-/** Close a series whose last attempt died with its process: no automatic attempt is left. */
+/**
+ * Close a series whose last attempt died with its process: no automatic attempt
+ * is left. The charge is read back first — the dead claimant's cancel may have
+ * landed — and adopted as refunded if so; nothing is cancelled here.
+ */
 async function closeSeries(deps: EvidenceRunDeps, record: EvidenceRecord, state: EvidenceRefundState): Promise<EvidenceRecord | null> {
-  const closed = { ...state, refusal: state.refusal ?? 'UNKNOWN', nextAt: null, exhausted: true, claimedAt: null } as const;
   const step = refundStepOf(record);
-  if (!step) return null;
-  const next = { ...record, steps: record.steps.map((s) => (s === step ? { ...s, refund: closed } : s)), updatedAt: stampAfter(clockOf(deps)(), record.updatedAt) };
+  const ids = createdPixIds(record.steps);
+  if (!step || !ids) return null;
+  const polled = await pollPix({ ...deps, pixPolls: 1 }, paidChargeId(record.steps, ids));
+  const calls = [...step.calls, ...polled.calls];
+  const adopted = polled.status === 'REFUNDED';
+  const refund = adopted
+    ? { ...state, refusal: null, nextAt: null, exhausted: false, claimedAt: null }
+    : { ...state, refusal: state.refusal ?? ('UNKNOWN' as const), nextAt: null, exhausted: true, claimedAt: null };
+  const closed = adopted
+    ? { ...step, status: 'EXECUTED' as const, at: clockOf(deps)().toISOString(), calls, observed: deps.copy.canceled('REFUNDED'), refund }
+    : { ...step, calls, refund };
+  const next = { ...record, steps: withStep(record.steps, closed), updatedAt: stampAfter(clockOf(deps)(), record.updatedAt) };
   return deps.store.saveIf(next, record.updatedAt);
 }
 

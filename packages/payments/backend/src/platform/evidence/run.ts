@@ -94,6 +94,7 @@ export interface EvidenceRunDeps {
   onProviderFailure?: ProviderFailureReporter;
   sleep?: (ms: number) => Promise<void>;
   /** Overrides for tests. */
+  refundAttemptMs?: number;
   pixPolls?: number;
   pixPollMs?: number;
 }

@@ -228,13 +228,7 @@ export interface ChargeSnapshot {
   raw?: unknown;
 }
 
-/** Refund request against a previously paid charge. */
-export interface RefundInput {
-  providerChargeId: string;
-  /** Omit for a full refund; set for partial (capability-gated). */
-  amount?: Money;
-  reason?: string;
-}
+export type { RefundInput } from './refund-input';
 
 export interface RefundSnapshot {
   provider: ProviderName;

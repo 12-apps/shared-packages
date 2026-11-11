@@ -140,3 +140,21 @@ describe('the production evidence card shows the server’s outcomes (PG1)', () 
     expect(screen.queryAllByTestId('production-pix-refunding')).toHaveLength(0);
   });
 });
+
+describe('the card stops reading a retried refund when no sweep answers (round 1, item 5)', () => {
+  it('given a refund whose next attempt never comes, then the card stops asking once its window is over', async () => {
+    const onConfirmPix = vi.fn(async () => RETRYING);
+    mount({ onConfirmPix, seller: { ...SELLER, pix: RETRYING, scenarios: SCENARIOS }, pixPollMs: 10, pixRefundWindowMs: 120 });
+
+    await waitFor(() => expect(onConfirmPix).toHaveBeenCalled());
+    const calls = () => onConfirmPix.mock.calls.length;
+    // Past its window the count stops moving: two reads of it, a poll apart, agree.
+    await waitFor(() => {
+      const before = calls();
+      return new Promise<void>((resolve, reject) => {
+        setTimeout(() => (calls() === before ? resolve() : reject(new Error('still polling'))), 60);
+      });
+    }, { timeout: 2000 });
+    expect(calls()).toBeLessThan(40);
+  });
+});

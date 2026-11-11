@@ -32,8 +32,15 @@ export interface EvidencePixRefundView {
   refusal: RefundRefusal | null;
 }
 
-/** How long one attempt may hold its claim: more than a consult and a cancel at the adapter's timeouts. */
+/**
+ * How long one attempt may hold its claim, and the deadline its provider calls
+ * (the read-back and the cancel, together) run under. The deadline is an
+ * AbortSignal the adapter honours, so an attempt is over 90 s after it started
+ * whatever PagBank does, and 30 s of margin remain before another actor may
+ * treat the claim as dead: a second cancel can never overlap a live one (I1).
+ */
 export const REFUND_CLAIM_TTL_MS = 120_000;
+export const REFUND_ATTEMPT_DEADLINE_MS = 90_000;
 
 const refundStep = (record: EvidenceRecord): EvidenceStep | undefined => record.steps.find((step) => step.key === 'pix.refund');
 

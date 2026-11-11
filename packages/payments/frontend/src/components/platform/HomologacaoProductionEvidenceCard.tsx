@@ -81,6 +81,8 @@ export interface HomologacaoProductionEvidenceCardProps {
   pixPollMs?: number;
   /** How long one Pix is checked on its own before "Verificar o Pix" takes over; tests pass a short one. */
   pixPollWindowMs?: number;
+  /** How long a refund being retried is read; tests pass a short one. */
+  pixRefundWindowMs?: number;
 }
 
 /** Off a phone's screen but still read out: the one line above says the same to the eye. */

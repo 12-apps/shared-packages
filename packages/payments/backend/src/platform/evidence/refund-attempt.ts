@@ -6,7 +6,7 @@ import { classifyPagBankRefundRefusal } from '../../providers/pagbank-rejections
 import { idsOf } from './orders';
 import { paidChargeId, createdPixIds } from './orders-pix-production';
 import { recordTraffic, type RecordedOutcome } from './record';
-import type { EvidenceRefundState } from './refund-state';
+import { REFUND_ATTEMPT_DEADLINE_MS, type EvidenceRefundState } from './refund-state';
 import type { EvidenceRunDeps } from './run';
 import { usageStep } from './run';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf, withStep } from './steps';
@@ -74,7 +74,12 @@ interface Settled {
 async function settle(deps: EvidenceRunDeps, claimed: EvidenceRecord, found: boolean): Promise<Settled> {
   const ids = createdPixIds(claimed.steps);
   const chargeId = ids ? paidChargeId(claimed.steps, ids) : '';
-  const refunded = await recordTraffic(() => deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId }));
+  // This caller owns the retry and reports a give-up once per charge (below), so the gateway stays
+  // quiet for it; and its two provider calls run under one deadline shorter than the claim.
+  const signal = AbortSignal.timeout(deps.refundAttemptMs ?? REFUND_ATTEMPT_DEADLINE_MS);
+  const refunded = await recordTraffic(() =>
+    deps.gateway.refund(deps.merchant, PROVIDER, { providerChargeId: chargeId, retriedByCaller: true, signal }),
+  );
   // The attempt that FOUND the Pix paid has that very read as its `pix.consult`: only the cancel is its own.
   const calls = [...(refundStepOf(claimed)?.calls ?? []), ...refunded.calls.filter((call) => !found || call.method !== 'GET')];
   const record = (status: 'EXECUTED' | 'FAILED', observed: string): EvidenceStep =>
@@ -145,7 +150,8 @@ function reportStuckRefund(deps: EvidenceRunDeps, record: EvidenceRecord, settle
   const ids = createdPixIds(record.steps);
   reportProviderFailure(deps.onProviderFailure, {
     path: 'REFUND',
-    severity: 'warning',
+    // A refusal for good is a fault; a "not yet" or no verdict that ran out of attempts is news.
+    severity: settled.refusal === 'REFUSED' ? 'error' : 'warning',
     merchant: deps.merchant,
     provider: PROVIDER,
     reference: ids ? paidChargeId(record.steps, ids) : null,
