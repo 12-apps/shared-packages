@@ -7,6 +7,7 @@ import {
   completeEvidenceRun,
   completeSellerConnect,
   prepareEvidenceRun,
+  retryDueEvidenceRefund,
 } from '../platform/evidence/index';
 import { cards, connected, SECRETS, SELLER, wallets, world } from './homologacao-evidence-world';
 
@@ -65,30 +66,46 @@ describe('homologação evidence', () => {
     expect(file.content).toMatch(/\[4\.4\][^\n]*— EXECUTADO/);
   });
 
-  it('given PagBank answers the cancel 40008 twice, then it is retried until it cancels and every attempt is recorded (FUT-3722)', async () => {
+  // FUT-4740 replaced the in-request backoff these two pinned (FUT-3722: up to 7 cancels over ~3 min inside
+  // the run): the run sends ONE cancel and the evidence sweep sends attempts 2 and 3 at +5 and +15 min, the
+  // schedule the owner decided for the Pix (FUT-4360) and folded in for the card cancels (PG1 contract Q3).
+  it('given PagBank answers the cancel 40008 twice, then the run sends one cancel and the sweep the rest, every attempt recorded (FUT-3722, FUT-4740)', async () => {
     const w = world({ cancelNotYet: 2 });
     await connected(w);
     const prepared = await prepareEvidenceRun(w.runDeps);
     await completeEvidenceRun(w.runDeps, prepared.runId, cards());
+    const cancels = () => w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel');
+    expect(cancels()).toHaveLength(1);
+    expect((await buildHomologacaoEvidenceFile(w.fileDeps)).content).toMatch(/\[4\.6\][^\n]*— FALHOU/);
+
+    const at = (minutes: number) => ({ ...w.runDeps, now: () => new Date(Date.now() + minutes * 60_000) });
+    await retryDueEvidenceRefund(at(4));
+    expect(cancels()).toHaveLength(1);
+    await retryDueEvidenceRefund(at(5));
+    await retryDueEvidenceRefund(at(15));
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
-    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(3);
+    expect(cancels()).toHaveLength(3);
     expect(file.content).toContain('refund_temporarily_unavailable');
     expect(file.content).toMatch(/\[4\.6\][^\n]*— EXECUTADO/);
   });
 
-  it('given PagBank keeps answering the cancel 40008, then it backs off for about three minutes and reports the failure (FUT-3722)', async () => {
+  it('given PagBank keeps answering the cancel 40008, then nothing waits inside the run and the third attempt gives up (FUT-3722, FUT-4740)', async () => {
     const w = world({ cancelNotYet: 100 });
     const pauses: number[] = [];
     await connected(w);
-    const prepared = await prepareEvidenceRun({ ...w.runDeps, sleep: async (ms) => void pauses.push(ms) });
-    await completeEvidenceRun({ ...w.runDeps, sleep: async (ms) => void pauses.push(ms) }, prepared.runId, cards());
+    const deps = { ...w.runDeps, sleep: async (ms: number) => void pauses.push(ms) };
+    const prepared = await prepareEvidenceRun(deps);
+    await completeEvidenceRun(deps, prepared.runId, cards());
+    expect(pauses.filter((ms) => ms >= 5_000)).toEqual([]);
+
+    const at = (minutes: number) => ({ ...deps, now: () => new Date(Date.now() + minutes * 60_000) });
+    await retryDueEvidenceRefund(at(5));
+    await retryDueEvidenceRefund(at(15));
+    await retryDueEvidenceRefund(at(60));
     const file = await buildHomologacaoEvidenceFile(w.fileDeps);
 
-    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(7);
-    const backoff = pauses.filter((ms) => ms >= 5_000);
-    expect(backoff).toEqual([5_000, 10_000, 20_000, 40_000, 60_000, 45_000]);
-    expect(backoff.reduce((sum, ms) => sum + ms, 0)).toBe(180_000);
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_OK/cancel')).toHaveLength(3);
     expect(file.content).toMatch(/\[4\.6\][^\n]*— FALHOU/);
   });
 

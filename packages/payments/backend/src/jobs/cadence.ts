@@ -54,3 +54,10 @@ export const OAUTH_RENEW_WITHIN_MS = 14 * 24 * 60 * 60_000;
  * far inside the window above.
  */
 export const OAUTH_RENEWAL_BATCH = 100;
+
+/**
+ * The store refund retry's sweep (FUT-4740): every minute, because the first
+ * retry of a no-answer series is due 30 s in and of a "not yet" 5 min in, so
+ * an attempt lands at most a minute late. Idle, a tick is one indexed query.
+ */
+export const REFUND_RETRY_CRON = '* * * * *';

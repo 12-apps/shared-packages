@@ -366,6 +366,7 @@ export { createPrismaWebhookInbox, type WebhookEventDelegate } from './prisma/we
 // explicit export list lives in `wire/index.ts` (this file is at the size
 // gate), exactly as the activation and platform blocks below do.
 export * from './wire/index';
+export * from './refund-retry-public';
 
 export {
   createMemoryAttemptLedger,

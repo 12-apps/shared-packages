@@ -547,7 +547,8 @@ describe('the evidence run\'s card cancels: one attempt, the rest in the backgro
         const body = post
           ? { error_messages: [{ code: '40008', message: 'refund_temporarily_unavailable', description: 'Transaction is not found.' }] }
           : { id: 'CHAR_C', status: 'PAID', amount: { value: 100 }, payment_method: { type: 'CREDIT_CARD' } };
-        return { ok: !post, status, statusText: post ? 'Bad Request' : 'OK', json: async () => body, text: async () => JSON.stringify(body) } as unknown as Response;
+        // A real Response, so the evidence traffic recorder can clone it (the run records every call).
+        return new Response(JSON.stringify(body), { status, statusText: post ? 'Bad Request' : 'OK', headers: { 'content-type': 'application/json' } });
       }),
     );
     const credentials = createMemoryCredentialStore();

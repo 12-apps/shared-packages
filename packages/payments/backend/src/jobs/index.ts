@@ -53,8 +53,10 @@ export {
   OAUTH_RENEW_WITHIN_MS,
   PAYMENTS_SWEEP_QUEUE,
   RECONCILE_CRON,
+  REFUND_RETRY_CRON,
   WEBHOOK_DRAIN_CRON,
 } from './cadence';
+export { refundRetryJob, type RefundRetryJob, type RefundRetryJobDeps } from './refund-retry';
 
 import type { WebhookReplayOptions, WebhookReplayReport } from '../core/webhook-replay';
 import type { ExpiringConnection, ProviderConfigStore, StoredProviderConfig } from '../config/types';
