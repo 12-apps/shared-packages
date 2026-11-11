@@ -20,14 +20,14 @@ import { z } from "zod";
 
 const text = (max: number): z.ZodString => z.string().max(max);
 
-export const desktopReportSchema = z.object({
+export const desktopReportSchema = z.strictObject({
   kind: z.enum(["crash", "error", "process-gone", "install-failed"]),
   version: text(40),
   occurredAt: text(40),
   message: text(2000),
   stack: text(8000).optional(),
   breadcrumbs: z
-    .array(z.object({ at: text(40), text: text(300) }))
+    .array(z.strictObject({ at: text(40), text: text(300) }))
     .max(30)
     .optional(),
   details: z
