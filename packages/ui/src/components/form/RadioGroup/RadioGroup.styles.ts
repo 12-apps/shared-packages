@@ -126,6 +126,8 @@ const cardBase = (theme: Theme, flags: SurfaceFlags, palette: ColorPalette): CSS
     backgroundColor: selected ? alpha(palette.main, 0.05) : theme.palette.background.paper,
     position: 'relative' as const,
     overflow: 'hidden' as const,
+    // The card is the radio (keyboard focus lands on it): a ring that shows where.
+    '&:focus-visible': { outline: `${rem(theme, 2)} solid ${palette.main}`, outlineOffset: rem(theme, 2) },
     ...(animated && { animation: `${slideAnimation(theme)} 0.4s ease-out` }),
     // A radial wash that grows from the centre as the card is selected or hovered.
     '&::before': {

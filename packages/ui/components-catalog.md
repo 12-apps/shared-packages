@@ -518,7 +518,7 @@ Components for user input and form interactions.
 ### RadioGroup
 **Purpose**: Single selection from multiple options
 **Use Cases**: Exclusive choices, settings, surveys
-**Features**: Orientation control, validation, disabled options
+**Features**: Orientation control, validation, disabled options; `variant="cards"` is a real radio group (role `radiogroup`/`radio`, `aria-checked`, one Tab stop, arrows/Home/End choose, Space/Enter, focus ring) with an optional `indicator` radio mark
 **Location**: `src/components/form/RadioGroup`
 **Docs**: `src/components/form/RadioGroup/RadioGroup.md`
 

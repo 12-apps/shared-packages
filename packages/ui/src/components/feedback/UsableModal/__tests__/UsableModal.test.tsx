@@ -166,6 +166,19 @@ describe("UsableModal — a host's stack", () => {
     expect(Number(getComputedStyle(drawer).zIndex)).toBeGreaterThan(MODAL_STACK_BASE_Z_INDEX);
   });
 
+  it("keeps the phone's sheet when its host refuses the close: a close only asks (FUT-4478)", async () => {
+    stubViewport(true);
+    const onClose = vi.fn();
+    render(<UsableModal {...props({ onClose })} />);
+    const dialog = await screen.findByRole("dialog", { name: "New order" });
+    fireEvent.click(screen.getByTestId("um-click-catcher"));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(2);
+    // `open` stayed true, so the sheet is still there and still showing its body.
+    await waitFor(() => expect(dialog).toBeVisible());
+    expect(screen.getByText("Body")).toBeVisible();
+  });
+
   it("lets the phone's sheet grow to the screen less a strip, not the Sheet's 600px preset", async () => {
     stubViewport(true);
     render(<UsableModal {...props()} />);

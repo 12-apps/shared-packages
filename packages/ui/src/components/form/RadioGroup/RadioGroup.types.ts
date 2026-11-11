@@ -77,6 +77,12 @@ export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
   showDescriptions?: boolean;
 
   /**
+   * `variant="cards"`: a visible radio in each card, before its label. The card
+   * itself is the `radio` (keyboard and screen reader); this is the mark.
+   */
+  indicator?: boolean;
+
+  /**
    * Test ID for the radio group container element
    */
   dataTestId?: string;

@@ -57,7 +57,10 @@ A later deploy earns its own reload.
 ## Props
 
 - **open**, **onClose** — `onClose` fires for every way out: the ✕, Esc, the
-  backdrop, a swipe down on the sheet.
+  backdrop, a swipe down on the sheet. A way out only ASKS: the surface stays
+  until the host turns `open` false, so a host may answer with a question
+  ("leave without saving?") and keep it open — on the phone's sheet too
+  (`Sheet`'s `controlled`, FUT-4478).
 - **title** — names the dialog (the stacked modal's bar, the sheet's header).
 - **children** — the body. It scrolls.
 - **footer** — the pinned action bar at the bottom of either surface. On the
