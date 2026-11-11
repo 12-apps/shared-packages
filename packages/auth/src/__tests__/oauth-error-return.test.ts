@@ -2,6 +2,7 @@
 // Node, not jsdom: Auth.js encrypts its PKCE cookie with jose, which rejects
 // jsdom's Uint8Array, and the sign-in then fails as `Configuration`.
 
+import { Auth } from "@auth/core";
 import type { Provider } from "@auth/core/providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,8 +79,8 @@ class Jar {
   }
 }
 
-function makeAuth(providers: Provider[] = [oauthProvider]) {
-  return createApiAuth({ providers, signInGate: () => true });
+function makeAuth(providers: Provider[] = [oauthProvider], errorReturnsToStart = true) {
+  return createApiAuth({ providers, signInGate: () => true, errorReturnsToStart });
 }
 
 type Auth = ReturnType<typeof makeAuth>;
@@ -367,5 +368,50 @@ describe("a planted start cookie never leads off the origin", () => {
     const target = location(response);
     expect(target.origin).toBe(secure);
     expect(target.pathname).toBe("/login");
+  });
+});
+
+/** Every Set-Cookie with its value blanked, so two runs can be compared. */
+function cookieShapes(response: Response): string[] {
+  return response.headers
+    .getSetCookie()
+    .map((line) => line.replace(/^([^=]+)=[^;]*/, "$1=<value>"))
+    .sort();
+}
+
+describe("off by default: the handler is Auth.js's, untouched", () => {
+  it("sets no start cookie and answers exactly as Auth.js does", async () => {
+    const auth = makeAuth([oauthProvider], false);
+    const jar = new Jar();
+    const started = await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+    expect(started.headers.getSetCookie().join("\n")).not.toContain("sign-in-start");
+
+    const request = (): Request =>
+      new Request(`${BASE}/callback/acme?error=access_denied`, {
+        headers: { cookie: `${jar.header()}; ${START_COOKIE}=${encodeURIComponent(START)}` },
+      });
+    const viaHandler = await auth.handler(request());
+    const direct = (await Auth(request(), auth.config)) as Response;
+
+    expect(viaHandler.status).toBe(direct.status);
+    expect(viaHandler.headers.get("location")).toBe(direct.headers.get("location"));
+    expect(cookieShapes(viaHandler)).toEqual(cookieShapes(direct));
+    expect(location(viaHandler).pathname).toBe("/login");
+    expect(location(viaHandler).searchParams.get("error")).toBe("OAuthCallbackError");
+  });
+
+  it("is off when createApiAuth is given no option", async () => {
+    // The options object a host passes today, with nothing new in it.
+    const auth = createApiAuth({ providers: [oauthProvider], signInGate: () => true });
+
+    const response = await auth.handler(
+      new Request(`${BASE}/callback/acme?error=access_denied`, {
+        headers: { cookie: `${START_COOKIE}=${encodeURIComponent(START)}` },
+      }),
+    );
+
+    expect(location(response).pathname).toBe("/login");
+    expect(location(response).searchParams.get("error")).toBe("OAuthCallbackError");
+    expect(response.headers.getSetCookie().join("\n")).not.toContain("sign-in-start");
   });
 });

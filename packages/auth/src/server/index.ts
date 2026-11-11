@@ -95,7 +95,7 @@ export type { CredentialsProviderConfig, CredentialsProviderLabels } from "../cr
 export { EN_US_CREDENTIALS_LABELS } from "../credentials-provider.en-US";
 export { PT_BR_CREDENTIALS_LABELS } from "../credentials-provider.pt-BR";
 
-export { setSignInGate, setSessionAdminResolver } from "../config";
+export { setSignInGate, setSessionAdminResolver, setErrorReturnsToStart } from "../config";
 export type { ExtendedSession, SignInGate, SessionAdminResolver } from "../config";
 
 /** Auth.js types, re-exported so a host need not depend on `@auth/core` itself. */
