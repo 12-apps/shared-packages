@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useState, type Dispatch, type JSX, type SetStateAction } from "react";
+import { useCallback, useContext, useMemo, useState, type Dispatch, type JSX, type SetStateAction } from "react";
 
 import { FormContainer, FormErrorSnackbar } from "@12-apps/ui/form/total-form";
 
@@ -19,7 +19,7 @@ import { formDatesLock, initialValues, type DatesLock, type DiscountFormValues }
 import { typeAndScopeFor } from "./form-kind";
 import type { DiscountsFormatters } from "./format";
 import { NO_SERVER_ERRORS, serverErrorsOf, type ServerErrors } from "./step-effects";
-import { flowRefused, initialFlow, type StepFlow } from "./step-flow";
+import { flowOpenTried, flowRefused, initialFlow, type StepFlow } from "./step-flow";
 import { stepOfKey, type StepNumber } from "./step-keys";
 
 /**
@@ -241,7 +241,9 @@ function makeSubmit(
     if (fieldErrors) {
       const form = { values, ...extra, slots: extra.comboRequirements };
       hooks.setServer((previous) => serverErrorsOf(fieldErrors, form, previous.round + 1));
-      hooks.setFlow((flow) => flowRefused(flow, stepsOf(fieldErrors)));
+      // Contract R11: every step it names is tried, and the lowest opens — out of
+      // Ver tudo too, so the field it names is the one thing on screen.
+      hooks.setFlow((flow) => flowOpenTried(flow, stepsOf(fieldErrors)));
     }
     onError(result, editing ? "discounts.update" : "discounts.create");
   };
@@ -272,6 +274,8 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
   const [server, setServer] = useState<ServerErrors>(NO_SERVER_ERRORS);
   const extra = useNonStringState(editing);
   const handleSubmit = makeSubmit(props, extra, { setError, setFlow, setServer });
+  // What the form opened with, worked out once: the container reads it only on its first render.
+  const opened = useMemo(() => initialValues(editing, formatters), [editing, formatters]);
   const report = useContext(DirtyReportContext);
   const { onDirtyChange } = props;
   const onDirty = useCallback(
@@ -287,7 +291,7 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
       // No `schema`: the container runs one before `onSubmit` and stops when
       // it fails, which judged the name alone. Every rule, the name's too,
       // lives in `validate` so one Criar marks every field (FUT-4143).
-      initialValues={initialValues(editing, formatters)}
+      initialValues={opened}
       onSubmit={handleSubmit}
       dataTestId="discount-form"
     >
@@ -299,7 +303,7 @@ export function DiscountForm(props: DiscountFormProps): JSX.Element {
         editing={editing !== null}
         extra={extra}
         window={windowFlags(props)}
-        datesLocked={windowIntent(props, initialValues(editing, formatters)).locked}
+        datesLocked={formDatesLock(editing, props.zoneUnknown === true) !== null}
         flow={flow}
         setFlow={setFlow}
         server={server}

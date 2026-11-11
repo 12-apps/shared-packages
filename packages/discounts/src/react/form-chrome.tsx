@@ -100,7 +100,10 @@ function StatusStrip({
   chips: readonly StripChip[];
   onChip: (chip: StripChip) => void;
 }): JSX.Element {
-  const [active, setActive] = useState(0);
+  const [chosen, setActive] = useState(0);
+  // The chip count changes with the kind (a combo has no first-purchase chip):
+  // clamped, so the toolbar always keeps exactly one Tab stop.
+  const active = Math.min(chosen, chips.length - 1);
   const bar = useRef<HTMLDivElement>(null);
   const move = (event: KeyboardEvent<HTMLDivElement>): void => {
     const last = chips.length - 1;

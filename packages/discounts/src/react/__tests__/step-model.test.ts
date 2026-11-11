@@ -158,6 +158,12 @@ describe("the flow", () => {
     expect(flowRefused({ cur: 0, reached: 4, tried: [], all: false }, [4, 2])).toMatchObject({ cur: 2, tried: [2, 4] });
   });
 
+  it("W7b: a server error in Ver tudo leaves it and opens the lowest step at fault", () => {
+    expect(flowOpenTried({ cur: 1, reached: 1, tried: [], all: true }, [4, 3])).toEqual({ cur: 3, reached: 1, tried: [3, 4], all: false });
+    // The client backstop keeps Ver tudo: every step is open there already.
+    expect(flowRefused({ cur: 1, reached: 1, tried: [], all: true }, [4, 3])).toMatchObject({ all: true, cur: 1 });
+  });
+
   it("W8: a done step that is now wrong shows as error", () => {
     expect(stepStateOf({ cur: 2, reached: 3, tried: [1], all: false }, 1, true)).toBe("error");
   });

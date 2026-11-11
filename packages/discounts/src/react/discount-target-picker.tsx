@@ -62,19 +62,6 @@ function scopeFor(targetType: string): string {
   return targetType === "CATEGORY" ? "CATEGORY" : "ITEM";
 }
 
-/**
- * The kind-driven target block.
- *
- * Reads the LIVE `kind` and `scope` from the form context, so flipping either
- * toggle swaps the control immediately without the parent form having to mirror
- * the value into its own state.
- *
- * The two combo kinds are a different SHAPE, not another picker (FUT-268): a
- * combo is a list of quantified groups, so it gets a builder and every
- * collection at once, while CATEGORY and ITEM each get exactly one collection's
- * picker. ORDER renders nothing — an order-wide discount covers everything, so
- * a target list there is not empty, it is meaningless.
- */
 /** A plain kind's picker: the collection its scope names, or nothing for the whole order. */
 function ScopeTargets({
   groups,
@@ -108,6 +95,19 @@ function ScopeTargets({
   );
 }
 
+/**
+ * The kind-driven target block.
+ *
+ * Reads the LIVE `kind` and `scope` from the form context, so flipping either
+ * toggle swaps the control immediately without the parent form having to mirror
+ * the value into its own state.
+ *
+ * The two combo kinds are a different SHAPE, not another picker (FUT-268): a
+ * combo is a list of quantified groups, so it gets a builder and every
+ * collection at once, while CATEGORY and ITEM each get exactly one collection's
+ * picker. ORDER renders nothing — an order-wide discount covers everything, so
+ * a target list there is not empty, it is meaningless.
+ */
 export function DiscountTargetPicker({
   groups,
   copy,

@@ -210,6 +210,22 @@ describe("editing", () => {
   });
 });
 
+describe("the strip's roving stop", () => {
+  it("E4: a strip that loses chips keeps exactly one Tab stop", async () => {
+    renderForm(COUPON_RULE);
+    const strip = (): HTMLElement => screen.getByRole("toolbar", { name: copy.steps.chrome.strip });
+    const before = within(strip()).getAllByRole("button");
+    fireEvent.keyDown(before[0]!, { key: "End" });
+    await waitFor(() => expect(document.activeElement).toBe(before[before.length - 1]));
+    fireEvent.click(screen.getByTestId("discount-strip-activation"));
+    fireEvent.click(screen.getByTestId("discount-steps-identity-change"));
+    fireEvent.click(screen.getByTestId("discount-kind-COMBO"));
+    await waitFor(() => expect(within(strip()).getAllByRole("button").length).toBeLessThan(before.length));
+    const stops = within(strip()).getAllByRole("button").filter((chip) => chip.getAttribute("tabindex") === "0");
+    expect(stops).toHaveLength(1);
+  });
+});
+
 describe("a server refusal", () => {
   it("S1: a field error opens its step, tried, says it there, and survives typing elsewhere", async () => {
     const { sent } = renderForm(COUPON_RULE, { code: "Este código já existe." });
@@ -225,6 +241,20 @@ describe("a server refusal", () => {
     type("total-form-field-code", "OUTRO");
     await waitFor(() => expect(screen.queryByTestId("total-form-field-code-message")).toBeNull());
     await waitFor(() => expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull());
+  });
+
+  it("S3: in Ver tudo a field error leaves it and opens the step that owns the field", async () => {
+    const { sent } = renderForm(null, { percentOff: "Acima do permitido.", name: "Nome em uso." });
+    type("total-form-field-name", "Happy hour");
+    fireEvent.click(screen.getByTestId("discount-see-all"));
+    type("total-form-field-percentOff", "10");
+    await waitFor(() => expect(screen.getByTestId("discount-form-submit").hasAttribute("disabled")).toBe(false));
+    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    // Two steps at fault: the lowest opens alone, and both say their error.
+    await waitFor(() => expect(state("identity")).toBe("current"));
+    expect(["targets", "price", "rules"].map(state)).not.toContain("current");
+    await waitFor(() => expect(peek("total-form-field-name-message").textContent).toBe("Nome em uso."));
   });
 
   it("S2: a key the table does not list stays in the alert only", async () => {
