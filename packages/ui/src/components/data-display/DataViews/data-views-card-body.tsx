@@ -1,6 +1,7 @@
 "use client";
 
 import { Box } from "../../../mui/Box";
+import { PinnedRowLabel, pinnedRowTint } from "../DataGrid/DataGrid.pinned";
 
 import { cardGridTracks } from "./data-views-grid-helpers";
 import type { DataViewCardSelection } from "./data-views-types";
@@ -18,9 +19,33 @@ interface CardBodyProps<T extends Record<string, unknown>> {
   targetCardWidth: number;
   /** Content scale (padding + type) handed to each card, from the zoom slider. */
   cardScale: number;
+  /** The pinned row (FUT-4745): its card is tinted success and labelled. */
+  pinnedRow?: T;
+  /** Screen-reader text for the pinned card. */
+  pinnedRowLabel?: string;
   dataTestId?: string;
   emptyState?: React.ReactNode;
 }
+
+/**
+ * The pinned card's wrapper: the success tint laid OVER the entity's card, since
+ * the card paints its own surface and would hide a background behind it. The
+ * veil takes no pointer events, so the card stays fully interactive.
+ */
+const PINNED_CARD = {
+  "data-pinned": true,
+  sx: {
+    position: "relative",
+    "&::after": {
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      borderRadius: 1,
+      pointerEvents: "none",
+      backgroundColor: pinnedRowTint,
+    },
+  },
+} as const;
 
 /**
  * The "Grade" layout: the filtered/sorted rows rendered as an auto-filling grid
@@ -38,6 +63,8 @@ export function CardBody<T extends Record<string, unknown>>({
   onToggleId,
   targetCardWidth,
   cardScale,
+  pinnedRow,
+  pinnedRowLabel,
   dataTestId,
   emptyState,
 }: CardBodyProps<T>): React.JSX.Element {
@@ -58,8 +85,10 @@ export function CardBody<T extends Record<string, unknown>>({
     >
       {rows.map((row) => {
         const id = getRowId(row);
+        const pinned = pinnedRow !== undefined && row === pinnedRow;
         return (
-          <Box key={id}>
+          <Box key={id} {...(pinned ? PINNED_CARD : {})}>
+            {pinned ? <PinnedRowLabel label={pinnedRowLabel} /> : null}
             {renderCard(row, {
               selected: selectedIds.has(id),
               onToggleSelect: onToggleId && (() => onToggleId(id)),

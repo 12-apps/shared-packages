@@ -206,6 +206,21 @@ export interface DataGridProps<T = Record<string, unknown>> extends React.HTMLAt
     filters?: GridFilter[];
   }) => void;
 
+  /**
+   * The id (as `getRowId` returns it) of ONE row to show first and tint with
+   * the theme's success colour — e.g. the record the user has just saved. The
+   * row is moved to the top AFTER sorting and BEFORE pagination, so it leads
+   * whatever the sort; it is shown once, never also in its sorted place. An id
+   * that matches no row pins nothing. Omitted or `null`: rows are untouched.
+   */
+  pinnedRowId?: string | number | null;
+  /**
+   * Screen-reader text for the pinned row (e.g. "Saved just now"), rendered
+   * visually hidden at the start of its first cell. The host supplies it: the
+   * grid carries no wording of its own.
+   */
+  pinnedRowLabel?: string;
+
   /** Accessibility */
   ariaLabel?: string; // label for entire grid region
   ariaDescription?: string;

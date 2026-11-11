@@ -415,3 +415,34 @@ scrolls away. Two details make it work on a real page:
   container that never scrolls vertically, so a sticky cell would stick to a box
   that never moves. The cells follow the page by `translateY`, clamped inside
   their own table.
+
+## The pinned row (FUT-4745)
+
+`pinnedRowId` (on `DataViewsTableBase` and `DataViewsGrid`) puts ONE row first,
+tinted with the theme's success colour — the record a user has just added or
+edited, so they see it land. `pinnedRowLabel` is the host's screen-reader text
+for it ("Saved just now", in the host's language); the package ships no words.
+
+- **Shown once, at the top.** The row leaves its sorted place; it is never
+  duplicated. This is the one behaviour, chosen over "also in its sorted
+  place", because a list showing the same record twice reads as two records.
+- **Whatever the sort.** The grid re-pins it after its own client-side sort, in
+  both directions and with no sort at all.
+- **Whatever the filter.** It is resolved against the host's full `rows`, not
+  the filtered set, so a search or pill that would hide it does not — the user
+  just saved it and is looking for it. The other rows are filtered as usual.
+- **Server mode** pins it within the page the host passes in `rows`: a host
+  that wants it on the page includes it there.
+- **An id in no row** pins nothing and does not throw. `null` or omitted: the
+  grid is exactly as it was, the same arrays included.
+- **Every width, every layout's order.** Nothing here reads the width. The
+  table row and the card are tinted (the card through a veil over the entity's
+  own surface, which takes no pointer events); the Lista and the Quadro get the
+  order only, since their rows are the entity's own render.
+- The tint is `alpha(success.main, action.selectedOpacity)` — tokens only, so it
+  follows the host's palette and is stronger in dark mode. A selected pinned
+  table row shows the selection colour.
+
+`__tests__/data-views-pinned-row.test.tsx` and
+`../DataGrid/__tests__/grid-pinned-row.test.tsx` pin all of it; **PinnedRow** in
+`data-views-table.stories.tsx` shows it.

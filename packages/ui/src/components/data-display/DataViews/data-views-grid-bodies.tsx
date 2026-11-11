@@ -45,6 +45,10 @@ interface GridBodyProps<T extends Record<string, unknown>> {
   emptyState?: React.ReactNode;
   /** The header row follows the page scroll under the sticky toolbar. */
   stickyHead?: boolean;
+  /** The row to lead and tint — re-pinned by the DataGrid after its own sort. */
+  pinnedRowId?: string | number | null;
+  /** Screen-reader text for the pinned row. */
+  pinnedRowLabel?: string;
 }
 
 /** The dense DataGrid with multi-select (unless opted out), wrapped in the scrollable table region. */
@@ -63,6 +67,8 @@ function GridBody<T extends Record<string, unknown>>({
   dataTestId,
   emptyState,
   stickyHead = false,
+  pinnedRowId,
+  pinnedRowLabel,
 }: GridBodyProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -96,6 +102,9 @@ function GridBody<T extends Record<string, unknown>>({
         emptyState={emptyState}
         emptyText={copy.grid.emptyFilteredTitle}
         copy={copy.grid}
+        // Spread only when set, so a grid without a pin hands the DataGrid
+        // exactly the props it always did.
+        {...(pinnedRowId == null ? {} : { pinnedRowId, pinnedRowLabel })}
       />
     </Box>
   );
@@ -224,6 +233,8 @@ interface GridMainProps<T extends Record<string, unknown>> {
   testIdPrefix: string;
   /** The table's header row follows the page under a sticky toolbar. */
   stickyHead?: boolean;
+  /** Screen-reader text for the pinned row (the row itself is `c.pinnedRow`). */
+  pinnedRowLabel?: string;
 }
 
 /**
@@ -270,9 +281,10 @@ function Headerless<T extends Record<string, unknown>>({
  * which is also what keeps either function inside the line budget.
  */
 function headerlessBody<T extends Record<string, unknown>>(
-  { c, getRowId, renderCard, renderListRow, listGroup, board, selectable, dataTestId, emptyState }: GridMainProps<T>,
+  props: GridMainProps<T>,
   { layout, zoom, density }: ReturnType<typeof useDataViewsLayout>,
 ): React.ReactNode | null {
+  const { c, getRowId, renderCard, renderListRow, listGroup, board, selectable, dataTestId, emptyState } = props;
   // ONE switch for every headerless body: no toggle reaches a card or row, and
   // BaseCard / BaseListCard draw no checkbox for a record without one.
   const onToggleId = selectable ? c.toggleId : undefined;
@@ -319,6 +331,8 @@ function headerlessBody<T extends Record<string, unknown>>(
         onToggleId={onToggleId}
         targetCardWidth={cardTargetWidthFor(zoom, density)}
         cardScale={cardScaleForZoom(zoom)}
+        pinnedRow={c.pinnedRow}
+        pinnedRowLabel={props.pinnedRowLabel}
         dataTestId={dataTestId}
         emptyState={emptyState}
       />
@@ -355,6 +369,8 @@ export function GridMain<T extends Record<string, unknown>>(props: GridMainProps
       dataTestId={dataTestId}
       emptyState={emptyState}
       stickyHead={props.stickyHead}
+      pinnedRowId={c.pinnedRow === undefined ? null : getRowId(c.pinnedRow)}
+      pinnedRowLabel={props.pinnedRowLabel}
     />
   );
 }

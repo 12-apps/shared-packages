@@ -126,6 +126,10 @@ export interface DataViewsTableBaseProps<T extends Record<string, unknown>> {
   server?: DataViewServer;
   /** Seed the initial view state (search/pills/ranges/sort) from the URL when no saved view applies. */
   initialState?: DataViewState;
+  /** Pin one row first, tinted success — see `DataViewsGrid`'s `pinnedRowId` (FUT-4745). */
+  pinnedRowId?: string | number | null;
+  /** Screen-reader text for the pinned row; the host's words. */
+  pinnedRowLabel?: string;
 }
 
 /**

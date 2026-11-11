@@ -199,6 +199,10 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
     filters?: GridFilter[];
   }) => void;
 
+  /** One row shown first and tinted success (FUT-4745) — see "Pinned row" below */
+  pinnedRowId?: string | number | null;
+  pinnedRowLabel?: string; // the host's screen-reader text for it
+
   /** Accessibility */
   ariaLabel?: string; // label for entire grid region
   ariaDescription?: string;
@@ -250,6 +254,21 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
   - Respect `SelectionMode`; shift-click range selection (optional, nice-to-have).
   - In multi-select, `Ctrl/Cmd` toggles without clearing.
 
+- **Pinned row** (`pinnedRowId`, FUT-4745):
+  - The row whose id (`getRowId`, or the row's `id`; compared as strings) equals
+    `pinnedRowId` is moved to the top AFTER sorting and BEFORE the page slice, so it
+    leads page one whatever the sort direction, and whatever page it would sort onto.
+  - It is shown ONCE: it leaves its sorted place. It is never duplicated.
+  - An id matching no row pins nothing and does not throw. Omitted or `null`: the
+    pipeline returns the very same `rows` array as before.
+  - Tint: `alpha(palette.success.main, palette.action.selectedOpacity)` — theme tokens
+    only, so it follows the host's palette and dark mode (0.16 there against 0.08).
+    Hover deepens it by `hoverOpacity`; a SELECTED pinned row shows the selection
+    colour, since selection is the feedback for what the user is doing now.
+  - `pinnedRowLabel` is rendered visually hidden at the start of the row's first
+    cell (`[data-slot="pinned-label"]`), so a screen reader announces it with the row.
+    The host supplies the words; without a label no text is rendered.
+
 - **Resize/Reorder/Pin**:
   - Columns can be resized (drag + keyboard), reordered via drag, and pinned left/right (sticky).
 
@@ -278,7 +297,9 @@ export interface DataGridProps<T = any> extends React.HTMLAttributes<HTMLElement
   - `[data-slot="header-row"]`
   - `[data-slot="header-cell"]` (+ `data-sort="asc|desc|none"`)
   - `[data-slot="body"]`
-  - `[data-slot="row"]` (+ `data-selected="true|false"`, `data-expanded="true|false"`)
+  - `[data-slot="row"]` (+ `data-selected="true|false"`, `data-expanded="true|false"`,
+    and `data-pinned="true"` on the pinned row only)
+  - `[data-slot="pinned-label"]` (the pinned row's visually hidden label)
   - `[data-slot="cell"]` (+ `data-editing="true|false"`, `data-col-id="<id>"`)
   - `[data-slot="footer"]`
   - `[data-slot="resize-handle"]`

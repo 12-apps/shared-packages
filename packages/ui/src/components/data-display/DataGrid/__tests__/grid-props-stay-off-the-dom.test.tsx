@@ -119,6 +119,8 @@ const GRID_CONFIG = {
   onRequestData: () => undefined,
   ariaLabel: 'Clientes',
   ariaDescription: 'Lista de clientes',
+  pinnedRowId: 2,
+  pinnedRowLabel: 'Salvo agora',
   // `satisfies` rather than `as const`: the shape is still checked against the
   // real prop types, but the nested arrays stay mutable, which `as const` would
   // freeze into `readonly []` and reject at the call site.

@@ -21,6 +21,7 @@ import React from 'react';
 
 import { rem } from '../../../tokens/relative';
 
+import { PinnedRowLabel, pinnedRowHoverTint, pinnedRowTint } from './DataGrid.pinned';
 import { cellValue } from './DataGrid.rows';
 import type { DataGridModel } from './DataGrid.model';
 import type { DataGridProps, GridColumn, GridSort } from './DataGrid.types';
@@ -134,6 +135,8 @@ export interface DataCellProps<T extends Record<string, unknown>> {
   rowHeight: string;
   editing: NonNullable<DataGridProps<T>['editing']>;
   model: Pick<DataGridModel<T>, 'editingCell' | 'setEditingCell'>;
+  /** Rendered before the content — the pinned row's hidden label, on its first cell. */
+  lead?: React.ReactNode;
 }
 
 /** The cell's own click, padding included — never while the cell is being edited (FUT-3849). */
@@ -155,6 +158,7 @@ export function DataCell<T extends Record<string, unknown>>({
   rowHeight,
   editing,
   model,
+  lead,
 }: DataCellProps<T>): React.JSX.Element {
   const theme = useTheme();
   const value = cellValue(row, column);
@@ -177,6 +181,7 @@ export function DataCell<T extends Record<string, unknown>>({
       role="gridcell"
       tabIndex={-1}
     >
+      {lead}
       {isEditing && column.editor
         ? column.editor({
             value,
@@ -199,6 +204,8 @@ export interface GridRowProps<T extends Record<string, unknown>> {
   rowId: string | number;
   isSelected: boolean;
   isExpanded: boolean;
+  /** The row `pinnedRowId` names: tinted, and labelled for screen readers. */
+  isPinned?: boolean;
   totalColumns: number;
   model: DataGridModel<T>;
   props: DataGridProps<T>;
@@ -257,17 +264,25 @@ function RowControls<T extends Record<string, unknown>>({
 export function GridRow<T extends Record<string, unknown>>(
   rowProps: GridRowProps<T>,
 ): React.JSX.Element {
-  const { row, index, rowId, isSelected, isExpanded, totalColumns, model, props } = rowProps;
+  const { row, index, rowId, isSelected, isExpanded, isPinned = false, totalColumns, model, props } =
+    rowProps;
   const theme = useTheme();
   const expansion = props.expansion;
+  const lead = isPinned ? <PinnedRowLabel label={props.pinnedRowLabel} /> : undefined;
   return (
     <React.Fragment>
       <TableRow
         data-slot="row"
         data-selected={isSelected}
         data-expanded={isExpanded}
+        data-pinned={isPinned || undefined}
         sx={{
           '&:hover': { backgroundColor: theme.palette.action.hover },
+          // Selection still wins: it is the feedback for what the user is doing NOW.
+          ...(isPinned && {
+            backgroundColor: pinnedRowTint(theme),
+            '&:hover': { backgroundColor: pinnedRowHoverTint(theme) },
+          }),
           ...(isSelected && { backgroundColor: theme.palette.action.selected }),
           height: model.rowHeight,
         }}
@@ -275,9 +290,10 @@ export function GridRow<T extends Record<string, unknown>>(
         aria-selected={isSelected}
       >
         <RowControls {...rowProps} />
-        {model.visibleColumns.map((column) => (
+        {model.visibleColumns.map((column, columnIndex) => (
           <DataCell
             key={column.id}
+            lead={columnIndex === 0 ? lead : undefined}
             row={row}
             rowIndex={index}
             rowId={rowId}

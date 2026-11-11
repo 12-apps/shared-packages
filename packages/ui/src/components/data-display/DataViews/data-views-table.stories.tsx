@@ -652,6 +652,26 @@ export const Table: Story = {
 };
 
 /**
+ * A just-saved record pinned first (FUT-4745): `pinnedRowId` names it,
+ * `pinnedRowLabel` is what a screen reader hears for it. The row leads whatever
+ * the sort or the filter, is tinted with the theme's success colour, and is
+ * shown ONCE — it leaves its sorted place. Sort by any column, search, or switch
+ * to Cards in Exibir: "029B4E8E" stays on top.
+ */
+export const PinnedRow: Story = {
+  args: {
+    // Client mode, so the search and the sort run in the browser and the pin
+    // can be seen surviving both.
+    ...base,
+    defaultLayout: "table",
+    ignoreStoredLayout: true,
+    pinnedRowId: "029B4E8E",
+    pinnedRowLabel: "Salvo agora",
+  },
+  render: screen,
+};
+
+/**
  * A grid with NO row selection — `selectable={false}`, for a screen with no
  * bulk action left to offer.
  *

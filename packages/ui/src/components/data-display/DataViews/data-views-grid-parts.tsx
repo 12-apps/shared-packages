@@ -264,6 +264,8 @@ interface GridShellProps<T extends Record<string, unknown>> {
   stickyToolbar?: boolean;
   /** Hide the "N de N" counter — see `DataViewsGrid`. */
   showCounter?: boolean;
+  /** Screen-reader text for the pinned row (the pin itself is applied in `c.matched`). */
+  pinnedRowLabel?: string;
 }
 
 /** The scrollable content region: scope tabs, toolbar, filter bar, body, pager. */
@@ -328,6 +330,7 @@ function ShellStack<T extends Record<string, unknown>>({
               listGroup={props.listGroup}
               board={props.board}
               rowDetail={props.rowDetail} selectable={props.selectable !== false}
+              pinnedRowLabel={props.pinnedRowLabel}
               dataTestId={dataTestId}
               testIdPrefix={testIdPrefix}
               emptyState={body}
