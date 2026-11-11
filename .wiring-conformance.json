@@ -363,6 +363,30 @@
     "kind": "exempt",
     "why": "a worker runtime has no screens; the closest thing — queue introspection — is host tooling over the host's own Redis"
   },
+  "@12-apps/marketplace :: areas": {
+    "kind": "exempt",
+    "why": "suggests no nav rows: it ships no web surface to place"
+  },
+  "@12-apps/marketplace :: e2e": {
+    "kind": "exempt",
+    "why": "ships no packaged journeys: the engine is driven through its unit suites (a fake second adapter included), and the screens that would carry a journey are the host's"
+  },
+  "@12-apps/marketplace :: email": {
+    "kind": "exempt",
+    "why": "sends no mail: an arriving or refused marketplace order is the host's news to tell, through its own channels"
+  },
+  "@12-apps/marketplace :: env": {
+    "kind": "exempt",
+    "why": "reads no process.env: every answer (SLA, batch size, attempts, the HTTP client, the clock) arrives as a required port at mount"
+  },
+  "@12-apps/marketplace :: notifications": {
+    "kind": "exempt",
+    "why": "raises no alerts as manifest data: who hears that an order arrived or a cancellation failed is host vocabulary, told through publishChanged and the host's own notifier"
+  },
+  "@12-apps/marketplace :: surface": {
+    "kind": "exempt",
+    "why": "ships no web surface: the acceptance queue, the refusal dialog and the settings screen are the host's, drawn over the routes and the integration read (reasons, capabilities, app link)"
+  },
   "@12-apps/mcp :: areas": {
     "kind": "exempt",
     "why": "no routed screens to suggest: the connect components embed in host settings pages whose routes the host owns"
