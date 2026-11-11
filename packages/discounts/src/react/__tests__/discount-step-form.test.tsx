@@ -95,7 +95,7 @@ describe("Continuar is held exactly while its step has errors", () => {
   it("N1: no name: disabled, described by 'Falta: nome'; a name frees it", async () => {
     renderForm();
     expect(next(1).hasAttribute("disabled")).toBe(true);
-    expect(next(1).getAttribute("aria-describedby")).toBe("discount-step-1-missing");
+    expect(next(1).getAttribute("aria-describedby")).toBe(screen.getByTestId("discount-step-1-missing").id);
     expect(missing(1)).toBe("Falta: nome");
     // Not tried yet: the field itself says nothing.
     await waitFor(() => expect(screen.queryByTestId("total-form-field-name-message")).toBeNull());

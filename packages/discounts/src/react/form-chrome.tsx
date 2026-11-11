@@ -1,11 +1,15 @@
 "use client";
 
-import { useRef, useState, type JSX, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type JSX, type KeyboardEvent } from "react";
 
 import { Chip } from "@12-apps/ui/data-display/Chip";
 import { Button } from "@12-apps/ui/form/Button";
 import { Box } from "@12-apps/ui/mui/Box";
+import { Link } from "@12-apps/ui/mui/Link";
+import { List } from "@12-apps/ui/mui/List";
+import { ListItemButton } from "@12-apps/ui/mui/ListItemButton";
 import { Stack } from "@12-apps/ui/mui/Stack";
+import { alpha } from "@12-apps/ui/mui/styles";
 import { Text } from "@12-apps/ui/typography/Text";
 
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
@@ -35,55 +39,43 @@ function StatePill({ copy, editing, dirty }: { copy: CompleteDiscountsWebCopy; e
   );
 }
 
-/** The pendências' list: each entry opens its step at the field. */
+/** The pendências' list, a warning band: each entry opens its step at the field. */
 function IssuesPanel({
+  id,
   copy,
   issues,
   onIssue,
 }: {
+  id: string;
   copy: CompleteDiscountsWebCopy;
   issues: readonly Pendencia[];
   onIssue: (issue: Pendencia) => void;
 }): JSX.Element {
   return (
     <Box
-      id="discount-issues-panel"
+      id={id}
       role="region"
       aria-label={copy.steps.chrome.issuesRegion}
       data-testid="discount-issues-panel"
-      sx={{ borderTop: 1, borderColor: "divider", pt: 1 }}
+      sx={{ bgcolor: (theme) => alpha(theme.palette.warning.main, 0.1), borderRadius: 1, px: 1, py: 0.5 }}
     >
-      {issues.map((issue, index) => (
-        <Box
-          key={`${issue.key}-${index}`}
-          component="button"
-          type="button"
-          onClick={() => onIssue(issue)}
-          data-testid={`discount-issue-${index}`}
-          sx={{
-            display: "flex",
-            gap: 1,
-            width: "100%",
-            alignItems: "center",
-            textAlign: "left",
-            minHeight: (theme) => theme.spacing(5),
-            px: 0.5,
-            border: 0,
-            borderBottom: 1,
-            borderColor: "divider",
-            bgcolor: "transparent",
-            font: "inherit",
-            color: "text.primary",
-            cursor: "pointer",
-          }}
-        >
-          <Text as="span" weight="semibold">
-            {issue.where}
-          </Text>
-          <Text as="span">{issue.text}</Text>
-        </Box>
-      ))}
-      <Box sx={{ pt: 0.5 }}>
+      <List disablePadding>
+        {issues.map((issue, index) => (
+          <ListItemButton
+            key={`${issue.key}-${index}`}
+            onClick={() => onIssue(issue)}
+            data-testid={`discount-issue-${index}`}
+            sx={{ gap: 1, minHeight: (theme) => theme.spacing(5), px: 0.5, borderRadius: 0.5 }}
+          >
+            {/* Warning ink, the dark step: the main amber is too light on its own tint. */}
+            <Box component="span" sx={{ color: "warning.dark", fontWeight: 600 }}>
+              {issue.where}
+            </Box>
+            <Text as="span">{issue.text}</Text>
+          </ListItemButton>
+        ))}
+      </List>
+      <Box sx={{ px: 0.5, pb: 0.5 }}>
         <Text variant="caption">{copy.steps.chrome.issuesFoot}</Text>
       </Box>
     </Box>
@@ -124,11 +116,20 @@ function StatusStrip({
       sx={{ display: "flex", gap: 1, overflowX: "auto", flexWrap: "nowrap", py: 0.5 }}
     >
       {chips.map((chip, index) => (
-        <Box key={chip.id} sx={{ flexShrink: 0, "& > button": { whiteSpace: "nowrap" } }}>
+        <Box
+          key={chip.id}
+          sx={{
+            flexShrink: 0,
+            // The mock's neutral pills: ink and a hairline, warning only for "Pausado".
+            "& > button": chip.warn
+              ? { whiteSpace: "nowrap", borderRadius: 999 }
+              : { whiteSpace: "nowrap", borderRadius: 999, color: "text.primary", borderColor: "divider" },
+          }}
+        >
           <Button
             variant="outline"
             size="sm"
-            color={chip.warn ? "warning" : "secondary"}
+            color={chip.warn ? "warning" : "neutral"}
             tabIndex={index === active ? 0 : -1}
             onFocus={() => setActive(index)}
             onClick={() => onChip(chip)}
@@ -142,12 +143,19 @@ function StatusStrip({
   );
 }
 
+/** "Ver tudo numa página" / "Voltar ao passo a passo" while creating: a text link on the chrome's row. */
+export interface SeeAll {
+  all: boolean;
+  onToggle: () => void;
+}
+
 export function FormChrome({
   copy,
   editing,
   dirty,
   issues,
   strip,
+  seeAll,
   onIssue,
   onChip,
 }: {
@@ -156,16 +164,38 @@ export function FormChrome({
   dirty: boolean;
   issues: readonly Pendencia[];
   strip: readonly StripChip[];
+  seeAll: SeeAll | null;
   onIssue: (issue: Pendencia) => void;
   onChip: (chip: StripChip) => void;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const { chrome } = copy.steps;
   const count = fill(issues.length === 1 ? chrome.issuesOne : chrome.issuesOther, { count: issues.length });
   return (
     <Stack spacing={1} data-testid="discount-form-chrome">
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minHeight: (theme) => theme.spacing(5) }}>
+      {/* ONE row (the prototype's header): the pill, then Ver tudo while creating
+          or the status strip while editing, and the pendências at its end. */}
+      <Box sx={{ display: "flex", flexWrap: editing ? "nowrap" : "wrap", alignItems: "center", columnGap: 1, rowGap: 0.5, minHeight: (theme) => theme.spacing(5) }}>
         <StatePill copy={copy} editing={editing} dirty={dirty} />
+        {seeAll && (
+          <Link
+            component="button"
+            type="button"
+            variant="body2"
+            underline="hover"
+            onClick={seeAll.onToggle}
+            data-testid="discount-see-all"
+            sx={{ fontWeight: 600, minHeight: (theme) => theme.spacing(5), whiteSpace: "nowrap" }}
+          >
+            {seeAll.all ? copy.steps.backToSteps : copy.steps.seeAll}
+          </Link>
+        )}
+        {editing && (
+          <Box sx={{ flex: "1 1 0", minWidth: 0 }}>
+            <StatusStrip copy={copy} chips={strip} onChip={onChip} />
+          </Box>
+        )}
         {issues.length > 0 && (
           <Box sx={{ ml: "auto", flexShrink: 0, "& > button": { whiteSpace: "nowrap" } }}>
             <Button
@@ -173,7 +203,7 @@ export function FormChrome({
               size="sm"
               color="warning"
               aria-expanded={open}
-              aria-controls="discount-issues-panel"
+              aria-controls={panelId}
               onClick={() => setOpen(!open)}
               dataTestId="discount-issues-button"
             >
@@ -184,6 +214,7 @@ export function FormChrome({
       </Box>
       {open && issues.length > 0 && (
         <IssuesPanel
+          id={panelId}
           copy={copy}
           issues={issues}
           onIssue={(issue) => {
@@ -192,7 +223,6 @@ export function FormChrome({
           }}
         />
       )}
-      {editing && <StatusStrip copy={copy} chips={strip} onChip={onChip} />}
     </Stack>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { JSX, ReactNode, RefObject } from "react";
+import { useId, type JSX, type ReactNode, type RefObject } from "react";
 
 import { Alert } from "@12-apps/ui/data-display/Alert";
 import { Chip } from "@12-apps/ui/data-display/Chip";
@@ -188,9 +188,10 @@ export function StepNav({
   missing: string;
   onNext: () => void;
 }): JSX.Element {
-  const why = `discount-step-${step}-missing`;
+  const why = useId();
+  // The mock's 16 px from the last field: its own 14 px bottom margin plus 2.
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25, mt: 2 }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1.25, mt: 0.25 }}>
       <Box sx={{ flexShrink: 0, "& > button": { whiteSpace: "nowrap" } }}>
         <Button
           variant="solid"
@@ -203,7 +204,7 @@ export function StepNav({
           {label}
         </Button>
       </Box>
-      <Text as="span" variant="caption" id={why} data-testid={why}>
+      <Text as="span" variant="caption" id={why} data-testid={`discount-step-${step}-missing`}>
         {missing}
       </Text>
     </Box>
@@ -215,7 +216,7 @@ export function ResumoCard({ copy, sentence, chips }: { copy: CompleteDiscountsW
   return (
     <Box data-testid="discount-resumo" sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, p: 2.25, bgcolor: "background.paper" }}>
       <Stack spacing={1.25}>
-        <Text as="p" variant="caption" weight="semibold">
+        <Text as="p" variant="caption" weight="semibold" style={{ textTransform: "uppercase" }}>
           {copy.steps.resumo}
         </Text>
         <Text as="p" weight="medium" data-testid="discount-resumo-sentence">
@@ -223,7 +224,7 @@ export function ResumoCard({ copy, sentence, chips }: { copy: CompleteDiscountsW
         </Text>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }} data-testid="discount-resumo-chips">
           {chips.map((chip, index) => (
-            <Chip key={`${chip}-${index}`} size="sm" variant="soft" label={chip} />
+            <Chip key={`${chip}-${index}`} size="sm" variant="soft" color="neutral" label={chip} />
           ))}
         </Box>
       </Stack>
@@ -239,6 +240,7 @@ export function ResumoCard({ copy, sentence, chips }: { copy: CompleteDiscountsW
 export function SubmitBar({
   bar,
   reach,
+  edge,
   paint,
   copy,
   error,
@@ -247,8 +249,10 @@ export function SubmitBar({
   label,
 }: {
   bar: RefObject<HTMLDivElement | null>;
-  /** The scroll area's bottom padding, which the bar reaches across (measured). */
+  /** The space between the form and the area's bottom edge, which the bar reaches across (measured). */
   reach: number;
+  /** The area's own bottom padding: sticky offsets count from inside it (measured). */
+  edge: number;
   /** The dialog surface's own paint, so the bar is that surface (measured). */
   paint: Record<string, string>;
   copy: CompleteDiscountsWebCopy;
@@ -258,22 +262,25 @@ export function SubmitBar({
   label: ReactNode;
 }): JSX.Element {
   const narrow = narrowSentence !== null;
+  const holdId = useId();
   return (
     <Box
       ref={bar}
       data-testid="discount-submit-bar"
-      sx={(theme) => ({
+      sx={{
+        // Pulled down across the space under the form to the area's bottom
+        // edge, and sticky at that edge: it rests where it sticks, never moves.
         position: "sticky",
-        bottom: -reach,
+        bottom: -edge,
         mb: `${-reach}px`,
         zIndex: 1,
         ...paint,
         borderTop: 1,
         borderColor: "divider",
         pt: 1.5,
-        pb: `calc(${theme.spacing(1.5)} + ${reach}px)`,
+        pb: 2,
         mt: 2,
-      })}
+      }}
     >
       {error && (
         <Box sx={{ mb: 1 }}>
@@ -291,11 +298,11 @@ export function SubmitBar({
         }}
       >
         {narrow && <Text variant="caption" data-testid="discount-submit-sentence">{narrowSentence}</Text>}
-        <Text as="span" variant="caption" id="discount-submit-hold" data-testid="discount-submit-hold">
+        <Text as="span" variant="caption" id={holdId} data-testid="discount-submit-hold">
           {hold ?? ""}
         </Text>
         <Box>
-          <SubmitButton dataTestId="discount-form-submit" disabled={hold !== null} {...(hold !== null ? { describedBy: "discount-submit-hold" } : {})}>
+          <SubmitButton dataTestId="discount-form-submit" disabled={hold !== null} {...(hold !== null ? { describedBy: holdId } : {})}>
             {label}
           </SubmitButton>
         </Box>

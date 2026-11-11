@@ -3,14 +3,13 @@
 import { useEffect, useRef, useState, type Dispatch, type JSX, type RefObject, type SetStateAction } from "react";
 
 import { StepCardList, type StepCardItem } from "@12-apps/ui/data-display/StepCardList";
-import { Button } from "@12-apps/ui/form/Button";
 import { useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
 import { followBlock, revealBlock, type RevealOptions } from "@12-apps/ui/utils";
 
 import type { WireTargetGroup } from "./api";
 import { asideMinPx, ComboPreviewLayout } from "./combo-cart-preview";
-import { paintOf, stickyTopSx, useInsets, useScrollArea } from "./scroll-area";
+import { paintOf, stickyTopSx, useHeight, useInsets, useScrollArea } from "./scroll-area";
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import type { CurrencyFieldComponent } from "./discount-form-fields";
 import { validate } from "./discount-form-validate";
@@ -58,6 +57,9 @@ export interface StepFormProps {
   onDirtyChange: (dirty: boolean) => void;
 }
 
+/** The side column's distance under the sticky chrome: the body's own top gap. */
+const ASIDE_GAP_PX = 8;
+
 const STEP_IDS: Readonly<Record<StepNumber, string>> = { 1: "identity", 2: "targets", 3: "price", 4: "rules" };
 
 /** Where a strip chip scrolls to: its own block, when it is on screen (contract C4). */
@@ -92,26 +94,59 @@ function snapshotOf(values: Readonly<Record<string, string>>, extra: StepExtras)
   };
 }
 
-/** After a pendência or a server error opens a step: the caret goes to its first invalid field. */
-function useFocusField(root: RefObject<HTMLElement | null>): (step: StepNumber) => void {
+/**
+ * After a pendência or a server error opens a step: the caret goes to its first
+ * invalid field, and the field is revealed between the sticky bars as they
+ * stand THEN — a server refusal's alert grows the foot after the step opened,
+ * so the insets are read once it has rendered, never before.
+ */
+function useFocusField(root: RefObject<HTMLElement | null>, insets: RevealOptions): (step: StepNumber) => void {
   const [request, setRequest] = useState<{ step: StepNumber; at: number } | null>(null);
   useEffect(() => {
     if (request === null) return undefined;
+    let frame = 0;
     const timer = window.setTimeout(() => {
-      const scope = root.current?.querySelector(`[data-testid="discount-steps-${STEP_IDS[request.step]}"]`);
-      scope?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      frame = window.requestAnimationFrame(() => {
+        const scope = root.current?.querySelector(`[data-testid="discount-steps-${STEP_IDS[request.step]}"]`);
+        const field = scope?.querySelector<HTMLElement>('[aria-invalid="true"]');
+        if (!field) return;
+        field.focus({ preventScroll: true });
+        revealBlock(field, insets);
+        // Its message too, which sits under it: the reason is the point.
+        const owner = field.closest<HTMLElement>('[data-testid^="total-form-field-"]')?.dataset.testid;
+        const message = owner ? scope?.querySelector<HTMLElement>(`[data-testid="${owner}-message"]`) : null;
+        if (message) revealBlock(message, insets);
+      });
     }, 60);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      window.cancelAnimationFrame(frame);
+    };
+    // Once per request; `insets` reads live bars.
   }, [request, root]);
   return (step) => setRequest({ step, at: Date.now() });
 }
 
-/** Passing step 4 collapses every card: the submit bar is what comes next. */
-function useRevealBarOnCollapse(flow: StepFlow, bar: RefObject<HTMLDivElement | null>, insets: RevealOptions): void {
+/**
+ * Passing step 4 collapses every card: the submit bar is what comes next, so it
+ * is revealed, and — the Pronto that had the caret being gone — the submit takes
+ * the caret, never the dialog's root.
+ */
+function useRevealBarOnCollapse(
+  flow: StepFlow,
+  root: RefObject<HTMLElement | null>,
+  bar: RefObject<HTMLDivElement | null>,
+  insets: RevealOptions,
+): void {
   const collapsed = flow.cur === 0 && !flow.all;
   const wasCollapsed = useRef(collapsed);
   useEffect(() => {
-    if (collapsed && !wasCollapsed.current) revealBlock(bar.current, insets);
+    if (collapsed && !wasCollapsed.current) {
+      revealBlock(bar.current, insets);
+      const caret = document.activeElement;
+      const lost = caret === null || caret === document.body || !root.current?.contains(caret);
+      if (lost) bar.current?.querySelector<HTMLElement>('[data-testid="discount-form-submit"]')?.focus({ preventScroll: true });
+    }
     wasCollapsed.current = collapsed;
   });
 }
@@ -243,10 +278,11 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
   const area = useScrollArea(root);
   const [rowMin, setRowMin] = useState(rowMinPx(FALLBACK_CARD_PX));
   const { chrome, bar, insets } = useInsets();
-  const focusField = useFocusField(root);
+  const chromeHeight = useHeight(chrome);
+  const focusField = useFocusField(root, insets);
   const { form, dirty, merged, issues, hold, world } = useStepModel(props);
   useRevealOnAppear(root, revealWatchOf(form), insets);
-  useRevealBarOnCollapse(flow, bar, insets);
+  useRevealBarOnCollapse(flow, root, bar, insets);
   useFocusOnServerRefusal(props.server, focusField);
   const revealChip = useChipReveal(root, insets);
   const wide = width !== null && width >= asideMinPx(rowMin);
@@ -269,39 +305,35 @@ export function DiscountStepForm(props: StepFormProps): JSX.Element {
           dirty={dirty}
           issues={issues}
           strip={editing ? stripChips(form, world) : []}
+          seeAll={editing ? null : { all: flow.all, onToggle: () => setFlow(flowToggleAll) }}
           {...chromeActions(setFlow, focusField, revealChip)}
         />
       </Box>
-      <Box sx={{ flex: 1 }}>
-      <ComboPreviewLayout
-        copy={copy}
-        formatters={formatters}
-        groups={groups}
-        slots={extra.comboRequirements}
-        wide={wide}
-        stickyTop={chrome.current?.offsetHeight ?? 0}
-        aside={<ResumoCard copy={copy} sentence={sentence} chips={ruleChips(form, world)} />}
-      >
-        {!editing && (
-          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-            <Button variant="text" type="button" onClick={() => setFlow(flowToggleAll)} dataTestId="discount-see-all">
-              {flow.all ? copy.steps.backToSteps : copy.steps.seeAll}
-            </Button>
-          </Box>
-        )}
-        <StepCardList
-          aria-label={copy.steps.list}
-          dataTestId="discount-steps"
-          items={items}
-          allOpen={flow.all}
-          reveal={insets}
-          revealWatch={[chrome.current, bar.current]}
-        />
-      </ComboPreviewLayout>
+      <Box sx={{ flex: 1, pt: 1 }}>
+        <ComboPreviewLayout
+          copy={copy}
+          formatters={formatters}
+          groups={groups}
+          slots={extra.comboRequirements}
+          wide={wide}
+          // Below the chrome as it stands now: it grows with its pendências panel.
+          stickyTop={chromeHeight + ASIDE_GAP_PX - area.ownTop}
+          aside={<ResumoCard copy={copy} sentence={sentence} chips={ruleChips(form, world)} />}
+        >
+          <StepCardList
+            aria-label={copy.steps.list}
+            dataTestId="discount-steps"
+            items={items}
+            allOpen={flow.all}
+            reveal={insets}
+            revealWatch={[chrome.current, bar.current]}
+          />
+        </ComboPreviewLayout>
       </Box>
       <SubmitBar
         bar={bar}
         reach={area.padBottom}
+        edge={area.ownBottom}
         paint={paintOf(area)}
         copy={copy}
         error={props.error}
