@@ -425,6 +425,23 @@ describe('opening one saved document', () => {
     expect(data<{ type: string }>(response).type).toBe('report');
   });
 
+  it('answers 422 naming a query key or value the range schema refuses', async () => {
+    const { call } = setup();
+
+    const unknown = await call('GET', '/reports/custom/:id', {
+      params: { id: 'r1' },
+      query: { preset: 'today', utm: 'x' },
+    });
+    expect(unknown.status).toBe(422);
+    expect(unknown.body).toMatchObject({ problems: [{ path: 'utm', message: 'Unrecognized key' }] });
+
+    const badPreset = await call('GET', '/reports/custom/:id', {
+      params: { id: 'r1' },
+      query: { preset: 'fortnight' },
+    });
+    expect(badPreset.status).toBe(422);
+  });
+
   it('answers 404 — not 403 — for a document the actor may not see', async () => {
     // 403 confirms the id exists, which is itself a disclosure on a tenant
     // surface: an outsider could enumerate ids by the status they get back.

@@ -111,7 +111,7 @@ export const REPORT_BUILDER_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     path: '/reports/run',
     summary:
       'Dry-run a custom ReportSpec for a period without saving it: validates the spec against the field catalog, executes it tenant-scoped, and returns the rendered result. Spec shape: { entity, dimensions[{field,timeGrain?}] (max 2), measures[{field,aggregation?,alias?}], filters, sort, limit, presentation }. Money is integer cents; rows are capped at ' +
-      `${REPORT_RUN_MAX_ROWS}. Invalid specs return a 400 whose error message lists what IS available — read it and correct the spec.`,
+      `${REPORT_RUN_MAX_ROWS}. A spec shape the schema refuses returns a 422 with `problems` naming each path; a spec the catalog cannot build returns a 400 whose error message lists what IS available — read it and correct the spec.`,
     tags: ['reports'],
     params: reportsParams,
     body: runReportBody(MCP_RANGE_MESSAGES),

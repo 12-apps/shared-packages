@@ -12,7 +12,7 @@ import {
   ok,
   runOptions,
   toReportRangeView,
-  windowOf,
+  windowOfQuery,
   type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
@@ -163,7 +163,7 @@ function getRoute(config: ReportBuilderServerConfig, store: SavedReportStore): R
         // from the ones it appeared to name must not slip past on the
         // appearance.
         if (!mayQueryAll(config, actor, documentEntities(document))) return forbidden(config);
-        const range = windowOf(config, { query });
+        const range = windowOfQuery(config, { query, locale });
         return ok(await renderSaved(record, document, range, actor, config, locale));
       } catch (error) {
         return foldSpecError(error);
