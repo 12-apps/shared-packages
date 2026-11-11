@@ -113,7 +113,7 @@ const capabilitiesSchema = z.object({
  * needs. The marketplace's capabilities and reasons ride along, so a client
  * draws its refusal dialog without a second call and without the network.
  */
-export const integrationSchema = z.object({
+const integrationSchema = z.object({
   provider: z.string(),
   enabled: z.boolean(),
   environment: environmentSchema,
@@ -129,7 +129,7 @@ export const integrationSchema = z.object({
 });
 
 /** A SKU→catalog link, mapped or not. */
-export const menuLinkSchema = z.object({
+const menuLinkSchema = z.object({
   id: z.string(),
   provider: z.string(),
   externalSku: z.string(),
@@ -139,7 +139,7 @@ export const menuLinkSchema = z.object({
 });
 
 /** One order waiting on the store's acceptance. */
-export const pendingAcceptanceSchema = z.object({
+const pendingAcceptanceSchema = z.object({
   id: z.string(),
   orderId: z.string(),
   provider: z.string(),
@@ -155,7 +155,7 @@ export const pendingAcceptanceSchema = z.object({
 });
 
 /** What a decision answers. */
-export const decisionSchema = z.object({
+const decisionSchema = z.object({
   id: z.string(),
   ackStatus: z.enum(["AWAITING", "ACCEPTED", "REJECTED", "EXPIRED"]),
   cancellation: z.enum(["PENDING", "REQUESTED", "CONFIRMED", "FAILED"]).nullable(),

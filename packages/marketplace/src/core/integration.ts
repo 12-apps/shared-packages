@@ -214,7 +214,7 @@ export async function resolveIngestionTarget(
  * as "no credentials" would silently turn a KEY problem into a connection that
  * looks merely unconfigured.
  */
-export function openCredentials(
+function openCredentials(
   ctx: EngineContext,
   sealed: string,
 ): MarketplaceCredentials {

@@ -17,7 +17,7 @@ import { createMemoryDb } from "./memory-db";
  * asserts `http.requests` is empty.
  */
 
-export const NOW = new Date("2026-11-11T12:00:00.000Z");
+const NOW = new Date("2026-11-11T12:00:00.000Z");
 export const TENANT = "tenant-1";
 
 /** Reversible "sealing", so a test can read what was stored. */
@@ -40,7 +40,7 @@ export function scriptedHttp(responses: MarketplaceHttpResponse[] | ((req: Marke
   return { http, requests };
 }
 
-export interface HarnessOptions {
+interface HarnessOptions {
   adapters?: readonly MarketplaceAdapter[];
   http?: ReturnType<typeof scriptedHttp>;
   /** The host refuses to create orders (its database is down). */

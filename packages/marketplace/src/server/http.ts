@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import type { WireRequest, WireResponse } from "@12-apps/wiring";
+import type { WireResponse } from "@12-apps/wiring";
 
 import type { MarketplaceEngine } from "../core/engine";
 import type { MarketplaceLogger } from "../core/ports";
@@ -58,6 +58,3 @@ export function parse<T>(
 export function iso(value: Date | null | undefined): string | null {
   return value ? value.toISOString() : null;
 }
-
-/** The request a JSON route handles: actor plus parsed parts. */
-export type MarketplaceRequest = WireRequest<MarketplaceActor>;

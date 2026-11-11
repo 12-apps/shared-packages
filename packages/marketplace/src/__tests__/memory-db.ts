@@ -69,7 +69,7 @@ interface TableSpec {
 }
 
 /** One table: rows plus the unique indexes the migration declares. */
-export class MemoryTable {
+class MemoryTable {
   rows: Row[] = [];
   private seq = 0;
   constructor(
@@ -205,4 +205,3 @@ export function createMemoryDb() {
   return { db, tables };
 }
 
-export type MemoryDb = ReturnType<typeof createMemoryDb>;
