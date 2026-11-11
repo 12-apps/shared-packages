@@ -95,6 +95,22 @@ function snapshotOf(values: Readonly<Record<string, string>>, extra: StepExtras)
 }
 
 /**
+ * The field with its label above and its message below: the smallest box that
+ * holds all three. One reveal of it — several smooth scrolls in a row would each
+ * start from the old position — and where it is taller than the room between
+ * the bars (320 × 568), its top reads first: the label, then the field.
+ */
+function fieldBlock(field: HTMLElement, scope: Element | null): HTMLElement {
+  const owner = field.closest<HTMLElement>('[data-testid^="total-form-field-"]')?.dataset.testid;
+  const message = owner ? scope?.querySelector<HTMLElement>(`[data-testid="${owner}-message"]`) : null;
+  const label = field.id ? scope?.querySelector<HTMLElement>(`label[for="${CSS.escape(field.id)}"]`) : null;
+  const parts = [label, message].filter((part): part is HTMLElement => part instanceof HTMLElement);
+  let block: HTMLElement = field;
+  while (block.parentElement && block !== scope && !parts.every((part) => block.contains(part))) block = block.parentElement;
+  return block;
+}
+
+/**
  * After a pendência or a server error opens a step: the caret goes to its first
  * invalid field, and the field is revealed between the sticky bars as they
  * stand THEN — a server refusal's alert grows the foot after the step opened,
@@ -111,11 +127,7 @@ function useFocusField(root: RefObject<HTMLElement | null>, insets: RevealOption
         const field = scope?.querySelector<HTMLElement>('[aria-invalid="true"]');
         if (!field) return;
         field.focus({ preventScroll: true });
-        revealBlock(field, insets);
-        // Its message too, which sits under it: the reason is the point.
-        const owner = field.closest<HTMLElement>('[data-testid^="total-form-field-"]')?.dataset.testid;
-        const message = owner ? scope?.querySelector<HTMLElement>(`[data-testid="${owner}-message"]`) : null;
-        if (message) revealBlock(message, insets);
+        revealBlock(fieldBlock(field, scope ?? null), insets);
       });
     }, 60);
     return () => {

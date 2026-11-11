@@ -219,9 +219,11 @@ export function ResumoCard({ copy, sentence, chips }: { copy: CompleteDiscountsW
         <Text as="p" variant="caption" weight="semibold" style={{ textTransform: "uppercase" }}>
           {copy.steps.resumo}
         </Text>
-        <Text as="p" weight="medium" data-testid="discount-resumo-sentence">
-          {sentence}
-        </Text>
+        {sentence !== "" && (
+          <Text as="p" weight="medium" data-testid="discount-resumo-sentence">
+            {sentence}
+          </Text>
+        )}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }} data-testid="discount-resumo-chips">
           {chips.map((chip, index) => (
             <Chip key={`${chip}-${index}`} size="sm" variant="soft" color="neutral" label={chip} />
@@ -297,7 +299,7 @@ export function SubmitBar({
           "& > div > button": narrow ? { width: "100%" } : {},
         }}
       >
-        {narrow && <Text variant="caption" data-testid="discount-submit-sentence">{narrowSentence}</Text>}
+        {narrow && narrowSentence !== "" && <Text variant="caption" data-testid="discount-submit-sentence">{narrowSentence}</Text>}
         <Text as="span" variant="caption" id={holdId} data-testid="discount-submit-hold">
           {hold ?? ""}
         </Text>

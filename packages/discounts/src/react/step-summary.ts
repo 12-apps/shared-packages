@@ -234,6 +234,8 @@ export function doneLines(step: 1 | 2 | 3 | 4, form: FormSnapshot, world: Summar
 
 function comboSentence(form: FormSnapshot, world: SummaryWorld): string {
   const { summary } = world.copy.steps;
+  // No group yet: nothing to say, so no sentence at all (never "Leve …."; UI R2-2).
+  if (form.slots.length === 0) return "";
   const value = valueText(form, world);
   // No reward value yet: the clause is dropped rather than said as "…" (UI N9).
   if (value === summary.nothing) return fill(summary.sentenceComboNoReward, { parts: comboParts(form, world) });

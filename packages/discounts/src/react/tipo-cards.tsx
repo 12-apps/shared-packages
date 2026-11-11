@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type JSX, type RefObject } from "react";
 
+import { FormLabel } from "@12-apps/ui/form/Form";
 import { RadioGroup } from "@12-apps/ui/form/RadioGroup";
 import { useFormContext } from "@12-apps/ui/form/total-form";
 import { Box } from "@12-apps/ui/mui/Box";
@@ -92,12 +93,14 @@ export function TipoCards({
     dataTestId: `discount-kind-${each}`,
   }));
   return (
-    <Box ref={group} data-testid="discount-kind-cards" data-layout={row ? "row" : "column"} sx={{ minWidth: 0 }}>
+    <Box ref={group} data-testid="discount-kind-cards" data-layout={row ? "row" : "column"} sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0.75 }}>
+      {/* The form's own field label, as "Nome da promoção" above it; the group is named by it. */}
+      <FormLabel>{copy.form.kind}</FormLabel>
       <RadioGroup
         variant="cards"
         indicator
         size="sm"
-        label={copy.form.kind}
+        aria-label={copy.form.kind}
         direction={row ? "row" : "column"}
         options={options}
         value={kind}

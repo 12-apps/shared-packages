@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { WireTargetGroup } from "../api";
 import { initialValues } from "../discount-form-values";
 import { createFormatters } from "../format";
+import { EN_US_DISCOUNTS_WEB_COPY } from "../en-US";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import { doneLines, resumoSentence, ruleChips, stripChips, type FormSnapshot, type SummaryWorld } from "../step-summary";
 
@@ -98,6 +99,10 @@ describe("the Resumo", () => {
     expect(resumoSentence(snapshot({ kind: "FIXED_AMOUNT", scope: "CATEGORY" }, { categoryIds: ["cat-bebidas"] }), world)).toBe(
       "Desconto em Bebidas.",
     );
+    // A combo with no group yet says nothing at all, in either language (UI R2-2).
+    expect(resumoSentence(snapshot({ kind: "COMBO", comboReward: "BUNDLE_PRICE" }), world)).toBe("");
+    const enWorld = { ...world, copy: EN_US_DISCOUNTS_WEB_COPY };
+    expect(resumoSentence(snapshot({ kind: "COMBO", comboReward: "PERCENTAGE" }), enWorld)).toBe("");
     const noPrice = snapshot({ kind: "COMBO", comboReward: "BUNDLE_PRICE" }, { slots: COMBO.slots });
     expect(plain(resumoSentence(noPrice, world))).toBe("Leve 2 de Lanches.");
   });

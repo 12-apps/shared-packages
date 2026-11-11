@@ -9,8 +9,9 @@ import { Link } from "@12-apps/ui/mui/Link";
 import { List } from "@12-apps/ui/mui/List";
 import { ListItemButton } from "@12-apps/ui/mui/ListItemButton";
 import { Stack } from "@12-apps/ui/mui/Stack";
-import { alpha } from "@12-apps/ui/mui/styles";
+import { alpha, type Theme } from "@12-apps/ui/mui/styles";
 import { Text } from "@12-apps/ui/typography/Text";
+import { darken } from "@mui/material/styles";
 
 import { fill, type CompleteDiscountsWebCopy } from "./copy";
 import type { Pendencia } from "./step-keys";
@@ -37,6 +38,12 @@ function StatePill({ copy, editing, dirty }: { copy: CompleteDiscountsWebCopy; e
       dataTestId="discount-state-pill"
     />
   );
+}
+
+/** The warning ink the state pill uses on its own tint: warning.dark, 20% darker (light); warning.light (dark). */
+function warningInk(theme: Theme): string {
+  const { warning, mode } = theme.palette;
+  return mode === "dark" ? warning.light : darken(warning.dark, 0.2);
 }
 
 /** The pendências' list, a warning band: each entry opens its step at the field. */
@@ -67,8 +74,9 @@ function IssuesPanel({
             data-testid={`discount-issue-${index}`}
             sx={{ gap: 1, minHeight: (theme) => theme.spacing(5), px: 0.5, borderRadius: 0.5 }}
           >
-            {/* Warning ink, the dark step: the main amber is too light on its own tint. */}
-            <Box component="span" sx={{ color: "warning.dark", fontWeight: 600 }}>
+            {/* Warning ink as the state pill draws it on the same tint: the dark
+                step, darkened, since warning.dark alone is too light there (FUT-4464). */}
+            <Box component="span" sx={{ color: warningInk, fontWeight: 600 }}>
               {issue.where}
             </Box>
             <Text as="span">{issue.text}</Text>
