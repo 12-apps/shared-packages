@@ -1,5 +1,6 @@
 import type { CardDetails } from '../../core/card-details';
 import type { StoredCharge } from '../../core/ports';
+import { reasonOfFailedCalls, reasonOfStatus } from './failure-reason';
 import { recordTraffic } from './record';
 import { answered, clockOf, errorDetail, failureOf, pendingStep, stepOf } from './steps';
 import type { BrowserCardResult, EvidenceStep, EvidenceStepKey } from './types';
@@ -38,7 +39,7 @@ function orderIdOf(calls: readonly { responseBody?: unknown }[]): string | null 
  * charge — both when both are known, so a card scenario correlates with the
  * order PagBank created for it (FUT-3722).
  */
-function idsOf(
+export function idsOf(
   charge: StoredCharge | { providerChargeId: string },
   reference?: string,
   orderId?: string | null,
@@ -78,6 +79,7 @@ async function createPix(deps: EvidenceRunDeps, runId: string): Promise<CreatedP
         calls: created.calls,
         ids: { reference_id: reference },
         observed: failureOf(deps.copy, created),
+        reason: reasonOfFailedCalls(created.calls),
       }),
     };
   }
@@ -238,6 +240,7 @@ export async function raiseCardOrder(deps: EvidenceRunDeps, order: CardOrder): P
         notes,
         ids: { reference_id: reference },
         observed: failureOf(deps.copy, raised),
+        reason: reasonOfFailedCalls(raised.calls),
       }),
       charge: null,
       orderId: orderIdOf(raised.calls),
@@ -245,12 +248,14 @@ export async function raiseCardOrder(deps: EvidenceRunDeps, order: CardOrder): P
   }
   const status = raised.value.snapshot.status;
   const orderId = orderIdOf(raised.calls);
+  const executed = status === expected && answered(raised.calls);
   return {
-    step: stepOf(key, status === expected && answered(raised.calls) ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
+    step: stepOf(key, executed ? 'EXECUTED' : 'FAILED', clockOf(deps)(), {
       calls: raised.calls,
       notes,
       ids: idsOf(raised.value, reference, orderId),
       observed: deps.copy.chargeStatus(status),
+      reason: executed ? undefined : reasonOfStatus(status, expected),
     }),
     charge: raised.value,
     orderId,
@@ -339,7 +344,7 @@ async function cancelUntilAnswered(deps: EvidenceRunDeps, chargeId: string) {
 
 export async function cancelCharge(
   deps: EvidenceRunDeps,
-  key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel' | 'pix.refund',
+  key: 'card.cancel' | 'debit.cancel' | 'gpay.cancel' | 'apay.cancel',
   chargeId: string,
   orderId: string | null,
 ): Promise<EvidenceStep> {

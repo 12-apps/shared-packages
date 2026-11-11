@@ -224,7 +224,7 @@ export async function pagbankRequest<T>(
   path: string,
   credentials: ResolvedCredentials,
   /** `form` sends multipart instead of JSON — the one upload PagBank takes (Apple Pay's `.cer`). */
-  init: { method: 'GET' | 'POST'; body?: unknown; form?: FormData; idempotencyKey?: string },
+  init: { method: 'GET' | 'POST'; body?: unknown; form?: FormData; idempotencyKey?: string; signal?: AbortSignal },
 ): Promise<T> {
   const url = `${apiBaseFor(credentials)}${path}`;
   return withNetworkRetry(async () => {
@@ -238,6 +238,7 @@ export async function pagbankRequest<T>(
         ...(init.idempotencyKey ? { 'x-idempotency-key': pagbankIdempotencyKey(init.idempotencyKey) } : {}),
       },
       body: init.form ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
+      ...(init.signal ? { signal: init.signal } : {}),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');

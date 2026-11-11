@@ -10,6 +10,9 @@
  */
 export { beginSellerConnect, completeSellerConnect, type SellerCallback, type SellerConnectDeps } from './connect';
 export { confirmEvidencePix } from './confirm-pix';
+export { retryDueEvidenceRefund } from './refund-sweep';
+export type { EvidencePixRefundView } from './refund-state';
+export { evidenceScenarioOutcomes, type EvidenceScenario, type EvidenceScenarioOutcome } from './outcomes';
 export {
   completeEvidenceRun,
   EvidencePixOpenError,
@@ -41,6 +44,7 @@ export {
 export {
   createHomologacaoEvidenceMount,
   type HomologacaoEvidenceMount,
+  type HomologacaoEvidenceSweep,
   type HomologacaoEvidenceMountOptions,
 } from './mount';
 export { recordTraffic, type RecordedOutcome } from './record';

@@ -28,7 +28,7 @@ interface EvidenceRow {
  * (JSON), timestamps. `environment` (FUT-4198) keeps the sandbox and the
  * production files apart: each reads and writes only its own rows.
  */
-export interface EvidenceDelegate {
+export interface EvidenceDelegate extends EvidenceCasDelegate {
   findFirst(args: {
     where: { provider: string; kind: string; environment: EvidenceEnvironment };
     orderBy: { createdAt: 'desc' };
@@ -45,6 +45,14 @@ export interface EvidenceDelegate {
     };
     update: { provider: string; kind: string; steps: unknown };
   }): Promise<EvidenceRow>;
+}
+
+/** The evidence table's compare-and-set (FUT-4360), as much of `updateMany` as the store needs. */
+interface EvidenceCasDelegate {
+  updateMany(args: {
+    where: { id: string; updatedAt: Date };
+    data: { provider: string; kind: string; steps: unknown; updatedAt: Date };
+  }): Promise<{ count: number }>;
 }
 
 /** The webhook inbox, as much of it as the evidence reads. */
@@ -97,6 +105,15 @@ export function createPrismaHomologacaoEvidenceStore(
         update: fields,
       });
       return toRecord(row);
+    },
+    async saveIf(record, expectedUpdatedAt) {
+      // `updatedAt` is written explicitly so the record the caller holds IS the
+      // stored one: the next compare-and-set needs its exact stamp, with no re-read.
+      const claimed = await delegate.updateMany({
+        where: { id: record.id, updatedAt: new Date(expectedUpdatedAt) },
+        data: { provider: record.provider, kind: record.kind, steps: record.steps, updatedAt: new Date(record.updatedAt) },
+      });
+      return claimed.count === 1 ? record : null;
     },
   };
 }

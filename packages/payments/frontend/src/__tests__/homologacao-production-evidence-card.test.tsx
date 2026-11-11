@@ -150,7 +150,7 @@ describe('HomologacaoProductionEvidenceCard', () => {
     expect((screen.getByTestId('production-credit-number') as HTMLInputElement).value).toBe('');
   });
 
-  it('given the run returned with its Pix open, then step 3 is current and each scenario says what was sent, never an outcome', async () => {
+  it('given the run returned with its Pix open and no outcomes, then step 3 is current and only the Pix says where it stands, never a guessed outcome', async () => {
     mount({ onConfirmPix: vi.fn(async () => AWAITING), pixPollMs: 60_000 });
     fillBuyer();
     fillCredit();
@@ -158,9 +158,8 @@ describe('HomologacaoProductionEvidenceCard', () => {
 
     await waitFor(() => expect(screen.getByTestId('production-scenarios')).toBeTruthy());
     expect(screen.getByTestId('production-step-progress').textContent).toBe(PROD.stepper.progress(3, 4, PROD.stepper.charge));
-    expect(screen.getByTestId('production-scenario-credit').textContent).toContain(PROD.scenarios.recorded);
-    expect(screen.getByTestId('production-scenario-debit').textContent).toContain(PROD.scenarios.pending);
     expect(screen.getByTestId('production-scenario-pix').textContent).toContain(PROD.scenarios.pix.AWAITING_PAYMENT);
+    expect(screen.queryAllByTestId('production-scenario-credit')).toHaveLength(0);
     expect(screen.getByTestId('production-incomplete-data').textContent).toBe(PROD.pixBlocksCharge);
   });
 
@@ -171,7 +170,7 @@ describe('HomologacaoProductionEvidenceCard', () => {
   });
 
   it('given the operator skips the Pix, then the server is told and its answer is shown', async () => {
-    const onConfirmPix = vi.fn(async (_runId: string, action: 'CHECK' | 'SKIP'): Promise<ProductionPixView> =>
+    const onConfirmPix = vi.fn(async (_runId: string, action: 'CHECK' | 'SKIP' | 'RETRY_REFUND'): Promise<ProductionPixView> =>
       action === 'SKIP' ? { ...AWAITING, state: 'SKIPPED', qrText: null } : AWAITING,
     );
     mount({ seller: { ...SELLER, pix: AWAITING }, onConfirmPix, pixPollMs: 60_000 });

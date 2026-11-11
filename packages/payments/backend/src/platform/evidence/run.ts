@@ -1,5 +1,6 @@
 import type { OAuthConnectService } from '../../config/oauth';
 import type { PaymentsGateway } from '../../core/gateway';
+import type { ProviderFailureReporter } from '../../core/provider-failure';
 import type { CustomerInfo, MerchantRef, PaymentEnvironment, ThreeDSecureSession } from '../../core/types';
 import { pagbankApiBase } from '../../providers/pagbank-api-base';
 import { fetchPagbankCardPublicKey } from '../../providers/pagbank-public-key';
@@ -89,8 +90,11 @@ export interface EvidenceRunDeps {
    */
   applePayConfigured?: () => boolean | Promise<boolean>;
   now?: () => Date;
+  /** Told ONCE per charge when its Pix refund gives up (FUT-4360); the host's error tracker. */
+  onProviderFailure?: ProviderFailureReporter;
   sleep?: (ms: number) => Promise<void>;
   /** Overrides for tests. */
+  refundAttemptMs?: number;
   pixPolls?: number;
   pixPollMs?: number;
 }
@@ -378,4 +382,4 @@ export async function completeEvidenceRun(
 }
 
 /** What the operator answered about a production Pix (FUT-4198). */
-export type PixConfirmAction = 'CHECK' | 'SKIP';
+export type PixConfirmAction = 'CHECK' | 'SKIP' | 'RETRY_REFUND';

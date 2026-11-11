@@ -1,5 +1,6 @@
 import { ProviderRequestError, UnsupportedOperationError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import { NOTHING_TO_REFUND } from '../core/refund-retry';
 import type { Money, PaymentMethodKind, RefundSnapshot, ResolvedCredentials } from '../core/types';
 import { NAME, pagbankRequest } from './pagbank-http';
 import { chargeInOrder, ORDER_ID_PREFIX } from './pagbank-operations';
@@ -35,9 +36,10 @@ function refundableCents(charge: PagBankOrderCharge): number | null {
 }
 
 /** `GET /charges/{id}`: the fallback read for a row that never learned its order. */
-function readCharge(chargeId: string, credentials: ResolvedCredentials): Promise<ChargeBody> {
+function readCharge(chargeId: string, credentials: ResolvedCredentials, signal?: AbortSignal): Promise<ChargeBody> {
   return pagbankRequest<ChargeBody>(`/charges/${encodeURIComponent(chargeId)}`, credentials, {
     method: 'GET',
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -64,19 +66,19 @@ function readCharge(chargeId: string, credentials: ResolvedCredentials): Promise
 async function refundTarget(
   providerChargeId: string,
   credentials: ResolvedCredentials,
-  options: { orderId?: string; lenient: boolean },
+  options: { orderId?: string; lenient: boolean; signal?: AbortSignal },
 ): Promise<{ chargeId: string; charge: PagBankOrderCharge | null }> {
   if (!ORDER_ID_PREFIX.test(providerChargeId)) {
-    const { orderId } = options;
-    const inOrder = orderId ? await chargeInOrder(orderId, providerChargeId, credentials) : null;
+    const { orderId, signal } = options;
+    const inOrder = orderId ? await chargeInOrder(orderId, providerChargeId, credentials, signal) : null;
     if (inOrder) return { chargeId: providerChargeId, charge: inOrder };
-    const read = readCharge(providerChargeId, credentials);
+    const read = readCharge(providerChargeId, credentials, signal);
     return { chargeId: providerChargeId, charge: options.lenient ? await read.catch(() => null) : await read };
   }
   const res = await pagbankRequest<PagBankOrderResponse>(
     `/orders/${encodeURIComponent(providerChargeId)}`,
     credentials,
-    { method: 'GET' },
+    { method: 'GET', ...(options.signal ? { signal: options.signal } : {}) },
   );
   const charge = settledCharge(res);
   if (typeof charge?.id !== 'string') {
@@ -121,7 +123,7 @@ function reportedRefundCents(res: PagBankOrderCharge): number {
   return typeof value === 'number' ? value : 0;
 }
 
-function cancel(chargeId: string, value: number | null, credentials: ResolvedCredentials) {
+function cancel(chargeId: string, value: number | null, credentials: ResolvedCredentials, signal?: AbortSignal) {
   // A full refund names its amount too (FUT-3722): the sandbox answered a
   // body-less cancel with 400 invalid_parameter. Only a charge that names no
   // amount is cancelled without a body. Never retried once possibly sent: the
@@ -129,6 +131,7 @@ function cancel(chargeId: string, value: number | null, credentials: ResolvedCre
   return pagbankRequest<ChargeBody>(`/charges/${encodeURIComponent(chargeId)}/cancel`, credentials, {
     method: 'POST',
     ...(value !== null ? { body: { amount: { value } } } : {}),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -141,15 +144,19 @@ async function fullRefund(
   providerChargeId: string,
   credentials: ResolvedCredentials,
   orderId: string | undefined,
+  signal?: AbortSignal,
 ): Promise<RefundSnapshot> {
-  const { chargeId, charge } = await refundTarget(providerChargeId, credentials, { orderId, lenient: true });
+  const { chargeId, charge } = await refundTarget(providerChargeId, credentials, { orderId, lenient: true, ...(signal ? { signal } : {}) });
   const value = charge ? refundableCents(charge) : null;
-  if (value === 0) {
+  // CANCELED is PagBank's own word that the money went back, whether or not the
+  // read-back carries `summary.refunded` (FUT-4360): never cancel it a second time.
+  if (value === 0 || charge?.status === 'CANCELED') {
     throw new ProviderRequestError(NAME, `PagBank charge ${chargeId} has nothing left to refund.`, {
+      providerCode: NOTHING_TO_REFUND,
       retriable: false,
     });
   }
-  const res = await cancel(chargeId, value, credentials);
+  const res = await cancel(chargeId, value, credentials, signal);
   if (!charge && hasRefundSummary(res)) return unprovenRefund(providerChargeId, chargeId, res);
   return fullOutcome(providerChargeId, chargeId, charge ? refundedCents(charge) : 0, value, res);
 }
@@ -298,5 +305,5 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   if (credentials.stub) return stubRefund(NAME, input);
   return input.amount
     ? partialRefund(input.providerChargeId, input.amount, credentials, hints?.orderId)
-    : fullRefund(input.providerChargeId, credentials, hints?.orderId);
+    : fullRefund(input.providerChargeId, credentials, hints?.orderId, input.signal);
 };

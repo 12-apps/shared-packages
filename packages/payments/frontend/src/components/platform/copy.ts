@@ -233,18 +233,43 @@ export interface HomologacaoProductionEvidenceCopy extends HomologacaoEvidenceCa
   debitBlankHint: string;
   /** Why the charge button is not pressable yet. */
   incompleteData: string;
-  /** Why it is not pressable while the run's Pix may still move money. */
+  /** Why it is not pressable while the run's Pix is open and not paid yet. */
   pixBlocksCharge: string;
+  /** Why it is not pressable while the Pix is paid and its refund is not done (FUT-4360). */
+  pixBlocksChargeRefund: string;
   /**
-   * Beside the form after a run: each scenario, recorded (its outcome is in
-   * the file, never guessed here), pending, or where the Pix stands.
+   * Beside the form after a run (FUT-4322): one row per scenario, `name · status`
+   * and, after a dash, the reason — the server's outcome, never guessed here.
    */
   scenarios: {
     label: string;
     names: { credit: string; debit: string; pix: string; googlePay: string; applePay: string };
-    recorded: string;
-    pending: string;
-    pix: Record<'AWAITING_PAYMENT' | 'REFUND_PENDING' | 'REFUNDED' | 'SKIPPED', string>;
+    /** The status word of a row, and the name of its mark for a screen reader. */
+    status: { executed: string; failed: string; pending: string };
+    /** The mark's name while the Pix refund is retried, and while the card is still checking. */
+    marks: { retrying: string; checking: string };
+    /** What PagBank said, in words: the reason a scenario failed. */
+    reasons: {
+      emailEqualsMerchant: string;
+      issuerDeclined: { credit: string; debit: string; wallet: string };
+    };
+    pix: {
+      AWAITING_PAYMENT: string;
+      REFUND_PENDING: string;
+      REFUNDED: string;
+      SKIPPED: string;
+      /** The status word of a paid Pix whose refund is not done: retrying, or out of attempts. */
+      paid: string;
+      paidNotRefunded: string;
+      /** PagBank has not released the refund yet; the countdown to the next attempt. */
+      notYet: (attempt: number, of: number, minutes: number) => string;
+      /** Every automatic attempt was refused (not yet, or no verdict). */
+      exhausted: (of: number) => string;
+      /** PagBank refused the refund for good: no automatic attempt. */
+      refused: string;
+    };
+    /** The button under the list once the attempts ran out. */
+    retryRefund: string;
   };
   /** The primary action: charge R$ 1,00 per scenario and refund it. */
   charge: string;

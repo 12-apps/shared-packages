@@ -20,6 +20,17 @@ export interface ProductionPixView {
   state: 'NONE' | 'AWAITING_PAYMENT' | 'REFUND_PENDING' | 'REFUNDED' | 'SKIPPED';
   qrText: string | null;
   expiresAt: string | null;
+  /**
+   * Where the refund's background retry stands (FUT-4360); null while no attempt
+   * was refused. A paid Pix with a refund to show is drawn by the scenario list.
+   */
+  refund?: {
+    attempt: number;
+    of: number;
+    nextAt: string | null;
+    exhausted: boolean;
+    refusal: 'NOT_YET' | 'REFUSED' | 'UNKNOWN' | null;
+  } | null;
 }
 
 /** `mm:ss` until `expiresAt`, ticking once a second; null when there is no expiry. */
@@ -36,9 +47,12 @@ function useTimeLeft(expiresAt: string | null): string | null {
 }
 
 /** A Pix with no QR to pay: paid and refunded, refunding, skipped — or nothing to say. */
-function PixSettled({ state, copy }: { state: ProductionPixView['state']; copy: HomologacaoProductionEvidenceCopy['pix'] }): ReactNode {
+function PixSettled({ pix, copy }: { pix: ProductionPixView; copy: HomologacaoProductionEvidenceCopy['pix'] }): ReactNode {
+  const { state } = pix;
   if (state === 'REFUNDED') return <Alert severity="success" data-testid="production-pix-done">{copy.paid}</Alert>;
   if (state === 'SKIPPED') return <Alert severity="info" data-testid="production-pix-done">{copy.skipped}</Alert>;
+  // Once an attempt was refused the row of the scenario list says how far it got.
+  if (state === 'REFUND_PENDING' && pix.refund) return null;
   if (state === 'REFUND_PENDING') return <Alert severity="info" data-testid="production-pix-refunding">{copy.refunding}</Alert>;
   return null;
 }
@@ -65,7 +79,7 @@ export function ProductionPixPanel({
   useEffect(() => {
     if (awaiting) panel.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [awaiting, pix.runId]);
-  if (!awaiting || !pix.qrText) return <PixSettled state={pix.state} copy={copy} />;
+  if (!awaiting || !pix.qrText) return <PixSettled pix={pix} copy={copy} />;
   return (
     <Stack
       ref={panel}

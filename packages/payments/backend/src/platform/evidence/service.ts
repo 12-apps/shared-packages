@@ -1,6 +1,7 @@
 import type { OAuthAppCredentialsResolver, OAuthConnectService } from '../../config/oauth';
 import type { ProviderConfigStore } from '../../config/types';
 import type { PaymentsGateway } from '../../core/gateway';
+import type { ProviderFailureReporter } from '../../core/provider-failure';
 import type { MerchantRef, PaymentEnvironment } from '../../core/types';
 import { consultConnectApplication, type ConsultConnectApplicationsDeps } from '../connect-application';
 import { beginSellerConnect, completeSellerConnect, type SellerCallback } from './connect';
@@ -23,7 +24,9 @@ import {
   type PixConfirmAction,
   type PreparedEvidenceRun,
 } from './run';
+import { evidenceScenarioOutcomes, type EvidenceScenarioOutcome } from './outcomes';
 import { pixViewOf, type EvidencePixView } from './orders-pix-production';
+import { retryDueEvidenceRefund } from './refund-sweep';
 import { PAGBANK_SANDBOX_DEBIT_TEST, PAGBANK_SANDBOX_TEST_BUYER, productionDebitTest } from './sandbox-buyer';
 import type {
   BrowserCardResult,
@@ -84,6 +87,8 @@ export interface HomologacaoEvidenceConfig {
    * waiting for the Apple Developer account.
    */
   applePayConfigured?: () => boolean | Promise<boolean>;
+  /** Told once per charge when the production Pix refund gives up (FUT-4360); the host's error tracker. */
+  onProviderFailure?: ProviderFailureReporter;
   newId?: () => string;
 }
 
@@ -118,6 +123,12 @@ export interface HomologacaoSellerConnection {
    * Null in sandbox and before any production run.
    */
   pix: EvidencePixView | null;
+  /**
+   * PRODUCTION (FUT-4322): each scenario's real outcome in the latest run —
+   * executed, failed with a reason code, or pending. Null in sandbox and
+   * before any production run.
+   */
+  scenarios: EvidenceScenarioOutcome[] | null;
 }
 
 export interface HomologacaoEvidenceService {
@@ -142,6 +153,8 @@ export interface HomologacaoEvidenceService {
    * it was skipped; answers where it stands now.
    */
   confirmPix(runId: string, action: PixConfirmAction): Promise<EvidencePixView>;
+  /** The refund sweep's tick (FUT-4360): runs the production Pix refund attempt that is due, if any. */
+  retryDueRefund(): Promise<void>;
   /** The evidence file — the TXT PagBank's form takes, or the same records as JSON (FUT-3755). */
   file(format?: EvidenceFileFormat): Promise<EvidenceFile>;
 }
@@ -175,7 +188,8 @@ function sellerView(
   { stored, fields }: Awaited<ReturnType<typeof storedSeller>>,
   connect: EvidenceRecord | null,
   wallets: EvidenceWalletsConfig,
-  pix: EvidencePixView | null,
+  run: EvidenceRecord | null,
+  skippedNote: string,
 ): HomologacaoSellerConnection {
   const field = (key: string): string | null => fields?.[key] ?? null;
   return {
@@ -186,7 +200,8 @@ function sellerView(
     accountId: field('accountId'),
     lastConnectProblem: connectProblem(connect),
     wallets,
-    pix,
+    pix: run ? pixViewOf(run, skippedNote) : null,
+    scenarios: run ? evidenceScenarioOutcomes(run) : null,
   };
 }
 
@@ -224,6 +239,7 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
     consultApplication: () => consultConnectApplication(cfg.consult, environment),
     customer: customerFor(environment, undefined),
     ...(cfg.applePayConfigured ? { applePayConfigured: cfg.applePayConfigured } : {}),
+    ...(cfg.onProviderFailure ? { onProviderFailure: cfg.onProviderFailure } : {}),
   };
   return {
     async seller() {
@@ -233,7 +249,8 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
         seller,
         await store.latest(PROVIDER, 'CONNECT'),
         await walletsConfig(runDeps, sellerAccountId(seller, environment)),
-        run ? pixViewOf(run, cfg.copy.outcome.pixSkipped) : null,
+        run,
+        cfg.copy.outcome.pixSkipped,
       );
     },
     beginConnect: (ctx) => beginSellerConnect(connectDeps, ctx),
@@ -250,6 +267,9 @@ export function createHomologacaoEvidence(cfg: HomologacaoEvidenceConfig): Homol
       completeEvidenceRun({ ...runDeps, customer: customerFor(environment, buyer) }, runId, cards, wallets, onSection),
     confirmPix: async (runId, action) =>
       pixViewOf(await confirmEvidencePix(runDeps, runId, action), cfg.copy.outcome.pixSkipped),
+    retryDueRefund: async () => {
+      await retryDueEvidenceRefund(runDeps);
+    },
     file: (format = 'TXT') =>
       (format === 'JSON' ? buildHomologacaoEvidenceJson : buildHomologacaoEvidenceFile)({
         store,

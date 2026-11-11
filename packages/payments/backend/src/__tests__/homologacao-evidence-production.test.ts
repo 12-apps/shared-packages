@@ -5,6 +5,7 @@ import {
   buildHomologacaoEvidenceJson,
   completeEvidenceRun,
   confirmEvidencePix,
+  retryDueEvidenceRefund,
   EvidencePixOpenError,
   EvidenceRunNotFoundError,
   pixViewOf,
@@ -181,16 +182,22 @@ describe('homologação evidence in production', () => {
     expect(evidenceStepKeys('SANDBOX')).not.toContain('pix.refund');
   });
 
-  it('given the Pix refund fails, then the next check refunds it again instead of leaving the real money charged', async () => {
+  it('given the Pix refund fails, then the next check sends nothing and the background retry refunds it instead of leaving the real money charged', async () => {
     const w = production({ pixRefundFailures: 1 });
+    const clock = { now: new Date('2026-11-11T15:00:00.000Z') };
+    const deps = { ...w.runDeps, now: () => clock.now };
     const prepared = await raised(w);
-    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    await confirmEvidencePix(deps, prepared.runId, 'CHECK');
 
-    const failed = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    const failed = await confirmEvidencePix(deps, prepared.runId, 'CHECK');
     expect(failed.steps.find((step) => step.key === 'pix.refund')?.status).toBe('FAILED');
     expect(pixViewOf(failed, PROD.outcome.pixSkipped).state).toBe('REFUND_PENDING');
 
-    const retried = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    // A check no longer moves money (PG1): the retry is the sweep's, five minutes on.
+    await confirmEvidencePix(deps, prepared.runId, 'CHECK');
+    expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(1);
+    clock.now = new Date('2026-11-11T15:05:00.000Z');
+    const retried = (await retryDueEvidenceRefund(deps))!;
     expect(retried.steps.find((step) => step.key === 'pix.refund')?.status).toBe('EXECUTED');
     expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(2);
   });
@@ -227,6 +234,7 @@ describe('homologação evidence in production', () => {
       state: 'AWAITING_PAYMENT',
       qrText: '00020101pix',
       expiresAt: '2026-10-17T12:15:00-03:00',
+      refund: null,
     });
     const refunded = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
     expect(pixViewOf(refunded, PROD.outcome.pixSkipped)).toMatchObject({ state: 'REFUNDED', qrText: null });
@@ -250,18 +258,22 @@ describe('homologação evidence in production', () => {
     expect(file.content).toMatch(/\[3\.5\][^\n]*— EXECUTADO/);
   });
 
-  it('given the refund answer was lost but PagBank refunded, then the next check reads it refunded and cancels nothing twice', async () => {
+  it('given the refund answer was lost but PagBank refunded, then the background retry reads it refunded and cancels nothing twice', async () => {
     const w = production({ pixRefundAnswerLost: true });
+    const clock = { now: new Date('2026-11-11T15:00:00.000Z') };
+    const deps = { ...w.runDeps, now: () => clock.now };
     const prepared = await raised(w);
-    await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
-    const lost = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    await confirmEvidencePix(deps, prepared.runId, 'CHECK');
+    const lost = await confirmEvidencePix(deps, prepared.runId, 'CHECK');
     expect(lost.steps.find((step) => step.key === 'pix.refund')?.status).toBe('FAILED');
 
-    const settled = await confirmEvidencePix(w.runDeps, prepared.runId, 'CHECK');
+    // A check no longer reads the refund back (PG1): the sweep's attempt does.
+    clock.now = new Date('2026-11-11T15:05:00.000Z');
+    const settled = (await retryDueEvidenceRefund(deps))!;
 
     expect(pixViewOf(settled, PROD.outcome.pixSkipped).state).toBe('REFUNDED');
     expect(w.pagbank.seen.filter((call) => call.path === 'POST /charges/CHAR_PIX/cancel')).toHaveLength(1);
-    await expect(prepareEvidenceRun(w.runDeps, productionDebitTest(BUYER))).resolves.toMatchObject({ publicKey: 'PUBKEY' });
+    await expect(prepareEvidenceRun(deps, productionDebitTest(BUYER))).resolves.toMatchObject({ publicKey: 'PUBKEY' });
   });
 
   it('given a skipped QR still payable, then a later payment is still refunded and no new run starts meanwhile', async () => {

@@ -17,6 +17,7 @@ export { pagbankApiBase } from './pagbank-api-base';
 // pipeline may never branch on a vendor's error strings, but the strings are
 // not the host's either: they are identical for every deployment (FUT-764).
 export {
+  classifyPagBankRefundRefusal,
   classifyPagBankRejection,
   type PagBankRejection,
 } from './pagbank-rejections';

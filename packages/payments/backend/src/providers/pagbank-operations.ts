@@ -98,11 +98,12 @@ export async function chargeInOrder(
   orderId: string,
   chargeId: string,
   credentials: ResolvedCredentials,
+  signal?: AbortSignal,
 ): Promise<PagBankOrderCharge | null> {
   const res = await pagbankRequest<PagBankOrderResponse>(
     `/orders/${encodeURIComponent(orderId)}`,
     credentials,
-    { method: 'GET' },
+    { method: 'GET', ...(signal ? { signal } : {}) },
   ).catch(() => null);
   return res?.charges?.find((charge) => charge.id === chargeId) ?? null;
 }

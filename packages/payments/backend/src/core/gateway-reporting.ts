@@ -46,12 +46,14 @@ function guarded<A extends unknown[], R>(
   severity: ProviderFailureSeverity,
   call: (...args: A) => Promise<R>,
   where: (...args: A) => Where,
+  /** Opt-in per call: the caller owns the retry and reports a give-up itself. */
+  quiet: (...args: A) => boolean = () => false,
 ): (...args: A) => Promise<R> {
   return async (...args: A) => {
     try {
       return await call(...args);
     } catch (error) {
-      if (isProviderEndpointFailure(error)) {
+      if (isProviderEndpointFailure(error) && !quiet(...args)) {
         const { merchant, provider, reference } = where(...args);
         reportProviderFailure(reporter, {
           path,
@@ -123,7 +125,7 @@ export function withProviderFailureReports<P extends string>(
     })),
     refund: guarded(reporter, 'REFUND', 'error', gateway.refund, (merchant, provider, input) => ({
       merchant, provider, reference: input.providerChargeId,
-    })),
+    }), (_merchant, _provider, input) => input.retriedByCaller === true),
     beginVault: guarded(reporter, 'VAULT', 'error', gateway.beginVault, (merchant, input, provider) => ({
       merchant, provider: provider ?? null, reference: input.reference,
     })),

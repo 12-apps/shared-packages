@@ -1,5 +1,6 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
 import type { WalletType } from '../../core/wallet-types';
+import type { EvidenceRefundState } from './refund-state';
 
 /**
  * The homologação EVIDENCE model (FUT-3696) — what was really executed against
@@ -116,7 +117,14 @@ export interface EvidenceStep {
    * can never disagree.
    */
   observed: string;
+  /** Why the step failed, as a CODE read from structured data when it was recorded (FUT-4322). Never printed in the file. */
+  reason?: EvidenceFailureReason;
+  /** `pix.refund` only (FUT-4360): the background retry's state. Never printed in the file. */
+  refund?: EvidenceRefundState;
 }
+
+/** Why a scenario failed, when PagBank said so in a form a program can read. */
+export type EvidenceFailureReason = 'EMAIL_EQUALS_MERCHANT' | 'ISSUER_DECLINED';
 
 /** CONNECT holds the seller's authorization; RUN holds one evidence run. */
 export type EvidenceRecordKind = 'CONNECT' | 'RUN';
@@ -136,6 +144,12 @@ export interface HomologacaoEvidenceStore {
   latest(provider: string, kind: EvidenceRecordKind): Promise<EvidenceRecord | null>;
   /** Insert-or-replace by `record.id`. */
   save(record: EvidenceRecord): Promise<EvidenceRecord>;
+  /**
+   * Replace `record` only if the stored one still has `expectedUpdatedAt`
+   * (compare-and-set, FUT-4360): null when another writer got there first, and
+   * nothing is written. The fence a refund attempt is claimed behind.
+   */
+  saveIf(record: EvidenceRecord, expectedUpdatedAt: string): Promise<EvidenceRecord | null>;
 }
 
 /** One stored webhook delivery, as the host's inbox holds it. */

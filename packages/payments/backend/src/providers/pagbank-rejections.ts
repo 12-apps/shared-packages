@@ -1,4 +1,11 @@
-import { isAccountAccessError, providerRejectionReasons } from '../core/error-readers';
+import {
+  isAccountAccessError,
+  providerRejectionReasons,
+  rejectionReasonsOfBody,
+  type ProviderRejectionReason,
+} from '../core/error-readers';
+import { ProviderRequestError } from '../core/errors';
+import type { RefundRefusal } from '../core/refund-retry';
 
 /**
  * WHICH buyer field PagBank refused, read from its own error vocabulary
@@ -40,11 +47,41 @@ export function classifyPagBankRejection(error: unknown): PagBankRejection | nul
   // Read from the STRUCTURED reasons rather than regexed out of the message:
   // the adapter caps a message at 300 characters, so a payload running past it
   // silently matched nothing.
-  for (const reason of providerRejectionReasons(error)) {
+  return rejectionOfReasons(providerRejectionReasons(error));
+}
+
+/**
+ * The same reading over a recorded error PAYLOAD (FUT-4322): the evidence keeps
+ * each call's body, while the error a failover walk throws wraps the provider's
+ * and loses it. One predicate, two ways in.
+ */
+export function classifyPagBankRejectionBody(body: unknown): PagBankRejection | null {
+  return rejectionOfReasons(rejectionReasonsOfBody(body));
+}
+
+function rejectionOfReasons(reasons: readonly ProviderRejectionReason[]): PagBankRejection | null {
+  for (const reason of reasons) {
     const parameter = reason.parameterName ?? '';
     if (reason.code === '40002' && parameter === 'customer.email') return 'EMAIL_EQUALS_MERCHANT';
     if (parameter.includes('tax_id')) return 'INVALID_TAX_ID';
     if (parameter.includes('customer.name')) return 'INVALID_NAME';
   }
   return null;
+}
+
+/**
+ * What PagBank's refusal of a REFUND means (FUT-4360): `NOT_YET` for
+ * `40008 refund_temporarily_unavailable` ("Transaction is not found", answered
+ * to a cancel sent while the charge is still settling), `REFUSED` for any other
+ * answer of PagBank's that waiting cannot change, `UNKNOWN` for everything
+ * else — a 5xx, a timeout, a transport error — where the refund may even have
+ * happened. Read from the STRUCTURED reasons and the HTTP status, never from
+ * the message.
+ */
+export function classifyPagBankRefundRefusal(error: unknown): RefundRefusal {
+  if (!(error instanceof ProviderRequestError)) return 'UNKNOWN';
+  if (providerRejectionReasons(error).some((reason) => reason.code === '40008')) return 'NOT_YET';
+  const status = error.options.httpStatus;
+  // 408 and 429 are the provider saying "later", not "no".
+  return status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429 ? 'REFUSED' : 'UNKNOWN';
 }
