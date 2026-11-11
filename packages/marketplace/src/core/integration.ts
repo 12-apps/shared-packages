@@ -259,12 +259,11 @@ export async function resolveTenantByMerchant(
 
 /** Stamp the connection's liveness marker. Best-effort; never blocks ingestion. */
 export async function markMarketplaceEventSeen(
-  ctx: EngineContext,
+  db: MarketplaceDb,
   clientId: string,
   provider: MarketplaceProvider,
   at: Date,
 ): Promise<void> {
-  const db = await ctx.ports.db();
   await db.marketplaceIntegration.updateMany({
     where: { clientId, provider },
     data: { lastEventAt: at },

@@ -132,7 +132,7 @@ export async function upsertLink(
  * reading a ticket.
  */
 export async function resolveSkus(
-  ctx: EngineContext,
+  db: MarketplaceDb,
   input: {
     clientId: string;
     provider: MarketplaceProvider;
@@ -140,7 +140,6 @@ export async function resolveSkus(
     seenAt: Date;
   },
 ): Promise<Map<string, string | null>> {
-  const db = await ctx.ports.db();
   const resolved = new Map<string, string | null>();
   for (const sku of input.skus) {
     const row = (await db.marketplaceMenuLink.upsert({

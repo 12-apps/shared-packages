@@ -1,7 +1,7 @@
 import { markMarketplaceEventSeen } from "./integration";
 import { resolveSkus } from "./menu-links";
 import { enqueueOutbound } from "./outbound-queue";
-import type { EngineContext, ResolvedOrderLine } from "./ports";
+import type { EngineContext, MarketplaceDb, ResolvedOrderLine } from "./ports";
 import type { NormalizedMarketplaceOrder } from "./types";
 
 /**
@@ -48,12 +48,12 @@ export interface IngestSettings {
  * store's attention list without anyone having to notice it first.
  */
 async function composeLines(
-  ctx: EngineContext,
+  db: MarketplaceDb,
   clientId: string,
   order: NormalizedMarketplaceOrder,
   seenAt: Date,
 ): Promise<ResolvedOrderLine[]> {
-  const mapping = await resolveSkus(ctx, {
+  const mapping = await resolveSkus(db, {
     clientId,
     provider: order.provider,
     skus: order.lines.map((line) => ({ externalSku: line.externalSku, name: line.name })),
@@ -71,6 +71,33 @@ async function composeLines(
     note: line.note,
     subjectRef: mapping.get(line.externalSku) ?? null,
   }));
+}
+
+/** The acceptance row an ingest writes: born ACCEPTED or on the clock. */
+function acceptanceData(
+  clientId: string,
+  orderId: string,
+  order: NormalizedMarketplaceOrder,
+  settings: IngestSettings,
+  now: Date,
+): Record<string, unknown> {
+  const accepted = settings.autoAccept;
+  return {
+    clientId,
+    orderId,
+    provider: order.provider,
+    externalOrderId: order.externalOrderId,
+    externalDisplayId: order.externalDisplayId,
+    // Who carries a delivery: the merchant's courier or the marketplace's fleet.
+    deliveredBy: order.deliveredBy ?? null,
+    status: accepted ? "ACCEPTED" : "AWAITING",
+    acknowledgeBy: new Date(now.getTime() + settings.ackSlaSeconds * 1000),
+    acknowledgedAt: accepted ? now : null,
+    externalDueAt: order.deliveryDueAt,
+    commissionCents: order.commissionCents,
+    // The order's SKUs: what a cancellation's offending SKUs are checked against.
+    lineSkus: [...new Set(order.lines.map((line) => line.externalSku))],
+  };
 }
 
 /**
@@ -112,29 +139,18 @@ export async function ingestMarketplaceOrder(
     return { orderId: existing.orderId, created: false, unmappedSkus: [], autoAccepted: false };
   }
 
-  const lines = await composeLines(ctx, clientId, order, now);
-  const unmappedSkus = lines.filter((l) => l.subjectRef === null).map((l) => l.externalSku);
-
-  const orderId = await ctx.ports.order.create(clientId, order, lines);
-
   const accepted = settings.autoAccept;
-  await db.marketplaceAcceptance.create({
-    data: {
-      clientId,
-      orderId,
-      provider: order.provider,
-      externalOrderId: order.externalOrderId,
-      externalDisplayId: order.externalDisplayId,
-      // Who carries a delivery: the merchant's courier or the marketplace's fleet.
-      deliveredBy: order.deliveredBy ?? null,
-      status: accepted ? "ACCEPTED" : "AWAITING",
-      acknowledgeBy: new Date(now.getTime() + settings.ackSlaSeconds * 1000),
-      acknowledgedAt: accepted ? now : null,
-      externalDueAt: order.deliveryDueAt,
-      commissionCents: order.commissionCents,
-      // The order's SKUs: what a cancellation's offending SKUs are checked against.
-      lineSkus: [...new Set(order.lines.map((line) => line.externalSku))],
-    },
+  // ONE transaction for the host's order, the SKU rows, the acceptance row and
+  // the liveness stamp: the host's `create` is handed the transaction's client,
+  // so an acceptance that cannot be written (a concurrent ingest won the
+  // unique) rolls the host's order back with it, and a redelivery never meets
+  // an orphan host order to duplicate.
+  const { orderId, unmappedSkus } = await ctx.ports.transaction(async (tx) => {
+    const lines = await composeLines(tx, clientId, order, now);
+    const created = await ctx.ports.order.create(clientId, order, lines, tx);
+    await tx.marketplaceAcceptance.create({ data: acceptanceData(clientId, created, order, settings, now) });
+    await markMarketplaceEventSeen(tx, clientId, order.provider, now);
+    return { orderId: created, unmappedSkus: lines.filter((l) => l.subjectRef === null).map((l) => l.externalSku) };
   });
 
   if (accepted) {
@@ -146,7 +162,6 @@ export async function ingestMarketplaceOrder(
     await ctx.ports.order.onAccepted(clientId, orderId);
   }
 
-  await markMarketplaceEventSeen(ctx, clientId, order.provider, now);
   ctx.ports.publishChanged(clientId);
 
   return { orderId, created: true, unmappedSkus, autoAccepted: accepted };

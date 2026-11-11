@@ -57,6 +57,10 @@ interface HarnessOptions {
   failHostHalf?: boolean;
   /** The queue refuses every job. */
   queueDown?: boolean;
+  /** The host's audit write throws. */
+  failAudit?: boolean;
+  /** The host's own write inside `create`, through the ingest's transaction client. */
+  onCreate?: (db: MarketplaceDb, order: NormalizedMarketplaceOrder) => Promise<void>;
   /** A database other than the in-memory one (the PGlite suite's). */
   store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
@@ -73,6 +77,7 @@ export function createHarness(options: HarnessOptions = {}) {
   const logged: { level: string; message: string }[] = [];
   const catalog = new Set<string>(["menu-1", "menu-2"]);
   const audited: MarketplaceAuditEntry[] = [];
+  const auditDbs: MarketplaceDb[] = [];
   const admitted: MarketplaceAdmissionRequest[] = [];
 
   const engine = createMarketplaceEngine({
@@ -83,8 +88,9 @@ export function createHarness(options: HarnessOptions = {}) {
         admitted.push(request);
         return options.admit ? options.admit(request) : { admitted: true };
       },
-      create: async (clientId, order) => {
+      create: async (clientId, order, _lines, db) => {
         if (options.failCreate) throw new Error("host is down");
+        if (options.onCreate) await options.onCreate(db, order);
         const orderId = `order-${created.length + 1}`;
         created.push({ clientId, order, orderId });
         return orderId;
@@ -110,8 +116,10 @@ export function createHarness(options: HarnessOptions = {}) {
       },
     },
     audit: {
-      record: async (entry) => {
+      record: async (entry, db) => {
+        if (options.failAudit) throw new Error("audit store is down");
         audited.push(entry);
+        auditDbs.push(db);
       },
     },
     clock: { now: () => clock.at },
@@ -171,6 +179,7 @@ export function createHarness(options: HarnessOptions = {}) {
     logged,
     catalog,
     audited,
+    auditDbs,
     admitted,
     connect,
     acceptance,

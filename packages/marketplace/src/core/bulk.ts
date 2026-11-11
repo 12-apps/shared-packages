@@ -125,7 +125,7 @@ async function writeIntegration(
 /**
  * Create, patch, archive or unarchive many connections at once. A connection
  * is never deleted: archiving is reversible, and each archive and unarchive is
- * an audit line through the host's `audit` port, written after the commit.
+ * an audit line through the host's `audit` port, in the same transaction.
  */
 export async function upsertIntegrations(
   ctx: EngineContext,
@@ -143,10 +143,13 @@ export async function upsertIntegrations(
 
   const validateOnly = input.validateOnly === true;
   const now = ctx.ports.clock.now();
+  // The audit lines are written INSIDE the archive's transaction, through its
+  // client: an archive never lands without its line, and an audit that fails
+  // rolls the archive back. A `validateOnly` call rolls both back.
   await inTransaction(ctx, validateOnly, async (db) => {
     for (const row of input.rows) await writeIntegration(ctx, db, input.clientId, row, now);
+    await auditArchives(ctx, db, input, now);
   });
-  if (!validateOnly) await auditArchives(ctx, input, now);
   const providers = input.rows.map((row) => row.provider);
   const rows = validateOnly
     ? []
@@ -156,6 +159,7 @@ export async function upsertIntegrations(
 
 async function auditArchives(
   ctx: EngineContext,
+  db: MarketplaceDb,
   input: { clientId: string; actorId: string | null; rows: readonly IntegrationRowInput[] },
   now: Date,
 ): Promise<void> {
@@ -169,7 +173,7 @@ async function auditArchives(
       reason: row.reason ?? null,
       at: now,
     };
-    await ctx.ports.audit.record(entry);
+    await ctx.ports.audit.record(entry, db);
   }
 }
 

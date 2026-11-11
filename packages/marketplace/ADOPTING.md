@@ -14,14 +14,14 @@ default that quietly adopts another host's policy.
 | `db` | `() => Promise<MarketplaceDb>` | The Prisma client generated from a schema that includes `prisma/marketplace.prisma`. Structural: the four delegates `marketplaceIntegration`, `marketplaceMenuLink`, `marketplaceInboxEvent`, `marketplaceAcceptance`. |
 | `transaction` | `<T>(fn: (db: MarketplaceDb) => Promise<T>) => Promise<T>` | Prisma's interactive `$transaction`: run `fn` with the transaction's client; a throw rolls back. Every bulk write and every decision (admission + claim) is one transaction. |
 | `order.admit` | `(request: { clientId; orderId; decision: "ACCEPT" \| "REJECT"; admission: MarketplaceAdmission; db: MarketplaceDb }) => Promise<{ admitted: true } \| { admitted: false; code: string; message: string; details?: unknown }>` | Judge each decision BEFORE its claim commits, inside the claim's transaction (`request.db` is the transaction's client: draw the stock there, and a refusal anywhere in the call rolls the draw back). `admission` is `{ admitStockPastZero?: boolean }` as the person stated it. Refuse with your own code: the route answers 409 with it (`MARKETPLACE_STOCK_ASK` and the short lines in `details`). Never called for an ingest or `recordStoreCancellation`. |
-| `order.create` | `(clientId, order: NormalizedMarketplaceOrder, lines: readonly ResolvedOrderLine[]) => Promise<string>` | Create the host's own order from a normalized one; return its id. `lines[i].subjectRef` is the mapped catalog id or null (never refuse the order for a null). |
+| `order.create` | `(clientId, order: NormalizedMarketplaceOrder, lines: readonly ResolvedOrderLine[], db: MarketplaceDb) => Promise<string>` | Create the host's own order from a normalized one; return its id. `lines[i].subjectRef` is the mapped catalog id or null (never refuse the order for a null). `db` is the ingest's transaction client: write the order through it, so the order and the acceptance row commit together (a lost race rolls the host's order back instead of leaving an orphan a redelivery would duplicate). |
 | `order.catalogHas` | `(clientId, subjectRef) => Promise<boolean>` | Does this catalog id exist and belong to this tenant? Asked before a SKU is mapped. |
 | `order.onAccepted` | `(clientId, orderId) => Promise<void>` | The store accepted, or the connection auto-accepts. Start whatever accepting means here (the ticket, the board). Runs after the commit and AFTER the confirm is queued; a throw is logged and cannot un-accept or lose the confirm. Atomic work (the stock draw) belongs in `admit`. |
 | `order.onRefused` | `(clientId, orderId, reason: "REJECTED" \| "EXPIRED" \| "CANCELLED") => Promise<void>` | Refuse/cancel the host order: the store refused on the clock, the clock lapsed, or the marketplace cancelled. After the commit and after the cancellation request is queued; a throw on a decision is logged. NOT called for `recordStoreCancellation` (the host's own cancel already ran). |
 | `order.summarize` | `(clientId, orderIds: readonly string[]) => Promise<Map<string, MarketplaceOrderSummary>>` | The queue's host facts in one read: `{ buyerName, totalCents, unmappedLines, createdAt }`. |
 | `secrets` | `{ seal(plaintext): string; open(sealed): string }` | Seal and open the credential blob with the host's key. `open` THROWS on a blob that will not open. |
 | `http` | `(req: MarketplaceHttpRequest) => Promise<MarketplaceHttpResponse>` | The only way the engine reaches a marketplace. Answer any status; throw only when no answer arrived (timeout, network). The host owns the timeout, proxy and CA. |
-| `audit` | `{ record(entry: { clientId; actorId: string \| null; action: "marketplace.integration.archive" \| "marketplace.integration.unarchive"; provider; reason: string \| null; at: Date }): Promise<void> }` | Every archive and unarchive of a connection, written after the commit. `actorId` is `MarketplaceActor.userId`. |
+| `audit` | `{ record(entry: { clientId; actorId: string \| null; action: "marketplace.integration.archive" \| "marketplace.integration.unarchive"; provider; reason: string \| null; at: Date }, db: MarketplaceDb): Promise<void> }` | Every archive and unarchive of a connection, INSIDE the same transaction: write the line through `db`, so an archive never lands without its line and a failing audit rolls the archive back. `actorId` is `MarketplaceActor.userId`. |
 | `enqueue` | `{ enqueue(name, payload, { dedupeKey? }) => Promise<{ enqueued: boolean; reason?: string }> }` | The wiring `JobsEnqueuePort`. The engine queues only `marketplace.outbound` with `{ clientId, orderId, action }` and dedupe key `marketplace.outbound:<action>:<orderId>`. Never throws. |
 | `clock` | `{ now(): Date }` | What time it is. |
 | `logger` | `{ info, warn, error }` | The wiring `LoggerPort`; bind `assembled.loggers["@12-apps/marketplace"]`. |
@@ -132,6 +132,12 @@ each.
    deployed in the other order the plain `ADD COLUMN` of 190000 would fail.
 10. **Stop syncing the predecessor's own migration copies over this package's**: keep the
     host's applied `20260814140000`/`20261105120000` files as they are.
+11. **Orders accepted before adoption are stamped confirmed, never re-sent.** The migration's
+    first run over the predecessor's table sets `confirmed_at = acknowledged_at` on every row
+    already `ACCEPTED`, because nothing confirmed through an API before this engine; the outbound
+    sweep then owes none of them. Fresh databases and replays stamp nothing.
+12. **`order.create` and `audit.record` receive a transaction client** (last argument): write
+    the host's order and the audit line through it, so they commit with the engine's own rows.
 
 ## 5. The database
 

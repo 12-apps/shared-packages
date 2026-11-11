@@ -177,13 +177,18 @@ export async function cancelAcceptance(
   })) as { orderId: string } | null;
   if (!row) return false;
 
-  await db.marketplaceAcceptance.updateMany({
-    where: { orderId: row.orderId, status: { not: "REJECTED" } },
-    data: { status: "REJECTED", acknowledgedAt: input.now ?? ctx.ports.clock.now() },
-  });
-  await db.marketplaceAcceptance.updateMany({
-    where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "REQUESTED", "FAILED"] } },
-    data: { cancellationStatus: "CONFIRMED" },
+  // The two stamps commit together: a cancelled order never shows a request
+  // still PENDING. The host's cancel runs after; if it throws, the inbox row
+  // is FAILED and the retry sweep re-runs this, whose stamps are idempotent.
+  await ctx.ports.transaction(async (tx) => {
+    await tx.marketplaceAcceptance.updateMany({
+      where: { orderId: row.orderId, status: { not: "REJECTED" } },
+      data: { status: "REJECTED", acknowledgedAt: input.now ?? ctx.ports.clock.now() },
+    });
+    await tx.marketplaceAcceptance.updateMany({
+      where: { orderId: row.orderId, cancellationStatus: { in: ["PENDING", "REQUESTED", "FAILED"] } },
+      data: { cancellationStatus: "CONFIRMED" },
+    });
   });
   await ctx.ports.order.onRefused(input.clientId, row.orderId, "CANCELLED");
   ctx.ports.publishChanged(input.clientId);

@@ -133,11 +133,17 @@ export interface MarketplaceOrderPort {
    * order is never refused) nor for `recordStoreCancellation`.
    */
   admit(request: MarketplaceAdmissionRequest): Promise<MarketplaceAdmissionResult>;
-  /** Turn a normalized order into whatever this host sells; hand back its id. */
+  /**
+   * Turn a normalized order into whatever this host sells; hand back its id.
+   * `db` is the ingest's transaction client (the host's `transaction` port):
+   * write the order through it, so the order and the engine's acceptance row
+   * commit together or not at all.
+   */
   create(
     clientId: string,
     order: NormalizedMarketplaceOrder,
     lines: readonly ResolvedOrderLine[],
+    db: MarketplaceDb,
   ): Promise<string>;
   /** Does this catalog id exist and belong to this tenant? */
   catalogHas(clientId: string, subjectRef: string): Promise<boolean>;
@@ -187,9 +193,14 @@ export interface MarketplaceAuditEntry {
   at: Date;
 }
 
-/** The host's audit trail. */
+/**
+ * The host's audit trail. `db` is the transaction client of the write being
+ * audited (the host's `transaction` port): write the line through it, so the
+ * archive and its audit line commit together, and a failing audit rolls the
+ * archive back.
+ */
 export interface MarketplaceAuditPort {
-  record(entry: MarketplaceAuditEntry): Promise<void>;
+  record(entry: MarketplaceAuditEntry, db: MarketplaceDb): Promise<void>;
 }
 
 /** The clock, so a test or a replay decides what "now" is. */

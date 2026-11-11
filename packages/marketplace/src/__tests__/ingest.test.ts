@@ -210,6 +210,57 @@ describe("integration settings", () => {
 /** A fresh iFood adapter per case. */
 const anIfoodAdapter = () => createIfoodAdapter({ copy: IFOOD_ADAPTER_COPY_EN_US });
 
+describe("[R2] writes recorded through a host port share the transaction", () => {
+  it("writes an archive's audit line through the archive's own transaction client", async () => {
+    const h = createHarness();
+    await h.connect();
+
+    await h.engine.upsertIntegrations({ clientId: TENANT, actorId: "user-1", rows: [{ operation: "archive", provider: "IFOOD" }] });
+
+    expect(h.audited).toHaveLength(1);
+    // The in-memory transaction hands its callback this same client.
+    expect(h.auditDbs).toEqual([h.memory.db]);
+  });
+
+  it("rolls the archive back when its audit line cannot be written", async () => {
+    const h = createHarness({ failAudit: true });
+    await h.connect();
+
+    await expect(
+      h.engine.upsertIntegrations({ clientId: TENANT, actorId: "user-1", rows: [{ operation: "archive", provider: "IFOOD" }] }),
+    ).rejects.toThrow(/audit store is down/);
+
+    expect((await h.engine.integrations(TENANT))[0]).toMatchObject({ provider: "IFOOD", archivedAt: null });
+    expect(await h.engine.target(TENANT, "IFOOD")).not.toBeNull();
+  });
+
+  it("rolls the host's order back with the ingest when the acceptance cannot be written", async () => {
+    const h = createHarness({
+      onCreate: async (db, order) => {
+        // The host's own row, written through the ingest's transaction client.
+        // eslint-disable-next-line test-flakiness/no-database-operations -- the host's write IS the subject: the rollback must undo it.
+        await db.marketplaceMenuLink.upsert({
+          where: { clientId_provider_externalSku: { clientId: TENANT, provider: "IFOOD", externalSku: "host-order-row" } },
+          create: { clientId: TENANT, provider: "IFOOD", externalSku: "host-order-row" },
+          update: {},
+        });
+        // A concurrent ingest of the same order won the unique meanwhile.
+        // eslint-disable-next-line test-flakiness/no-database-operations -- the race IS the subject.
+        await db.marketplaceAcceptance.create({
+          data: { clientId: TENANT, orderId: "winner", provider: "IFOOD", externalOrderId: order.externalOrderId },
+        });
+      },
+    });
+    await h.connect();
+
+    const outcome = await deliverIfood(h, ifoodPlaced("ext-1"));
+
+    expect(outcome.kind).toBe("failed");
+    expect(h.memory.tables.marketplaceMenuLink.rows.map((row) => row.externalSku)).toEqual([]);
+    expect(h.memory.tables.marketplaceAcceptance.rows).toEqual([]);
+  });
+});
+
 describe("the adapter registry", () => {
   it("refuses an empty list, a malformed id, a duplicate provider and a duplicate reason code", () => {
     const ifood = anIfoodAdapter();
