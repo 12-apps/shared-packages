@@ -6,7 +6,11 @@
  * `./en-US`); a host passes one by hand, or its own.
  */
 
-/** iFood's documented cancellation reason codes. */
+/**
+ * iFood's documented cancellation reason codes. UNVERIFIED: read from the
+ * merchant portal's search snippets (2026-11-11), not from a page we could
+ * read whole; the homologation run against iFood's sandbox corrects them here.
+ */
 export const IFOOD_REASON_CODES = [
   "501",
   "502",
