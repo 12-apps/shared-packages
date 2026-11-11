@@ -150,12 +150,16 @@ describe('the filters, over a real Postgres', () => {
     expect(second.page.pagination.hasNextPage).toBe(false);
   });
 
-  it('rejects an unknown filter value and a malformed date with 400', async () => {
+  it('rejects an unknown filter value and a malformed date with 422', async () => {
     // `lamp.vanish` is not in the HOST's vocabulary, and the enum the endpoint
     // validates against is built from that vocabulary — so the value the writer
     // would refuse is the value the filter refuses.
-    expect((await list('?action_in=lamp.vanish')).status).toBe(400);
-    expect((await list('?from=31-12-2026')).status).toBe(400);
+    const vanished = await list('?action_in=lamp.vanish');
+    expect(vanished.status).toBe(422);
+    expect(vanished.page).toMatchObject({ problems: [{ path: 'action_in' }] });
+    expect((await list('?from=31-12-2026')).status).toBe(422);
+    // An unknown query key is refused too, not dropped.
+    expect((await list('?utm_source=mail')).status).toBe(422);
   });
 
   it('ignores a tenant a caller tries to name in the query string', async () => {
