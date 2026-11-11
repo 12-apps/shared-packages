@@ -1,6 +1,6 @@
 import type { ProviderFailureReporter } from './provider-failure';
 import type { RefundRefusal } from './refund-retry';
-import { endSeries, firstAttempt, findLive, pressSeries, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
+import { endSeries, firstAttempt, findLive, openDueSeries, pressSeries, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
 import type { RefundSeriesKey, RefundSeriesRow, RefundRetryStore } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { ChargeSnapshot, MerchantRef, RefundSnapshot } from './types';
@@ -82,6 +82,8 @@ export interface RefundRetrier {
   runDue(limit?: number): Promise<number>;
   /** "Tentar estornar de novo": a new series, attempt 1 now with a consult; a no-op while one runs. */
   press(key: RefundSeriesKey): Promise<RefundSeriesView | null>;
+  /** A series whose attempt 1 is due now, for the sweep (a refund held before the retry existed); false when the charge has one. */
+  openDue(key: RefundSeriesKey): Promise<boolean>;
   /** A person settled it: false while an attempt is in flight (the act must wait). */
   settleByHand(key: RefundSeriesKey): Promise<boolean>;
   /** The pedido moved on (an undo): the series ends, whatever runs. */
@@ -97,6 +99,7 @@ export function createRefundRetrier(deps: RefundRetrierDeps): RefundRetrier {
     firstAttempt: (key, input) => firstAttempt(ctx, key, input),
     runDue: (limit) => runDue(ctx, limit),
     press: (key) => pressSeries(ctx, key),
+    openDue: (key) => openDueSeries(ctx, key),
     settleByHand: (key) => settleSeriesByHand(ctx, key),
     end: (key) => endSeries(ctx, key),
     find: (key) => findLive(ctx, key),

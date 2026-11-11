@@ -534,6 +534,29 @@ describe('the person: the press and the hand acts share the fence (C21–C27)', 
   });
 });
 
+describe('a refund held before the retry existed gets a series, consulted first (owner Q2)', () => {
+  it('S19 openDue schedules attempt 1 now; the sweep consults, adopts a refunded charge, and a second open is a no-op', async () => {
+    const w = await world();
+    expect(await w.retrier.openDue!(KEY as never)).toBe(true);
+    expect(await w.retrier.openDue!(KEY as never)).toBe(false);
+    expect(w.gateway.refund).not.toHaveBeenCalled();
+    w.gateway.refreshCharge.mockResolvedValueOnce({ status: 'REFUNDED', providerChargeId: 'CHAR_1' });
+    await w.retrier.runDue!();
+    expect(w.gateway.refund).not.toHaveBeenCalled();
+    expect(w.host.refunded.mock.calls[0]![1]).toMatchObject({ adopted: true });
+  });
+
+  it('S19b a held refund still PAID is sent once by the sweep, and its answer picks the schedule', async () => {
+    const w = await world();
+    await w.retrier.openDue!(KEY as never);
+    w.gateway.refund.mockRejectedValueOnce(down());
+    await w.retrier.runDue!();
+    expect(w.gateway.refreshCharge).toHaveBeenCalledTimes(1);
+    expect(w.gateway.refund).toHaveBeenCalledTimes(1);
+    expect(await viewOf(w)).toMatchObject({ attempt: 1, of: 4, nextAt: new Date(T0 + 30_000).toISOString() });
+  });
+});
+
 describe('the evidence run\'s card cancels: one attempt, the rest in the background (C32)', () => {
   it('S18 a card cancel answered 40008 sends ONE cancel in the run and leaves attempt 2 due at +5 min', async () => {
     const orders = (await import('../platform/evidence/orders')) as Mod;

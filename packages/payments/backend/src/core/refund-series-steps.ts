@@ -263,3 +263,14 @@ export async function endSeries(ctx: SeriesContext, key: RefundSeriesKey): Promi
     if (!row || (await settle(ctx, row, 'ENDED'))) return;
   }
 }
+
+/**
+ * Open a series whose attempt 1 is due NOW, for the sweep to send (FUT-4740
+ * Q2: a refund held before the retry existed). Nothing is sent here, and a
+ * charge that already has a row is left as it is: false.
+ */
+export async function openDueSeries(ctx: SeriesContext, key: RefundSeriesKey): Promise<boolean> {
+  const now = ctx.clock().toISOString();
+  const state: RefundRetryState = { series: 1, attempt: 0, nextAt: now, exhausted: false, refusal: null, claimedAt: null, reported: false };
+  return (await ctx.store.insert({ ...rowFields(key), ...state })) !== null;
+}
