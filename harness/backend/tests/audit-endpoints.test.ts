@@ -162,9 +162,15 @@ describe('the filters, over a real Postgres', () => {
     expect((await list('?utm_source=mail')).status).toBe(422);
   });
 
-  it('ignores a tenant a caller tries to name in the query string', async () => {
-    const { page } = await list('?clientId=audit-harness-b&tenantId=audit-harness-b');
+  it('refuses a tenant a caller tries to name in the query string, and reads nothing', async () => {
+    const refused = await list('?clientId=audit-harness-b&tenantId=audit-harness-b');
+    expect(refused.status).toBe(422);
+    expect(refused.page).toMatchObject({
+      problems: [{ path: 'clientId' }, { path: 'tenantId' }],
+    });
 
+    // A plain read still sees only the actor's own tenant.
+    const { page } = await list();
     expect(page.data.map((entry) => entry.resourceId)).not.toContain('lamp-b-1');
     expect(page.pagination.total).toBe(4);
   });
