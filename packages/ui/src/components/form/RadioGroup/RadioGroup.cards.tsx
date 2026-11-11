@@ -76,7 +76,7 @@ export const CardRadios: React.FC<VariantProps> = ({
       role="radiogroup"
       aria-label={named}
       onKeyDown={onKeyDown}
-      sx={{ display: 'flex', flexDirection: direction, gap: 2, '& > *': direction === 'row' ? { flex: '1 1 0', minWidth: 0 } : {} }}
+      sx={{ display: 'flex', flexDirection: direction, gap: size === 'xs' || size === 'sm' ? 1 : 2, '& > *': direction === 'row' ? { flex: '1 1 0', minWidth: 0 } : {} }}
       data-testid={testId(dataTestId, 'container')}
     >
       {options.map((option, index) => {
@@ -96,7 +96,7 @@ export const CardRadios: React.FC<VariantProps> = ({
             glow={glow}
             customSize={size}
             animated
-            data-testid={testId(dataTestId, `card-${index}`)}
+            data-testid={option.dataTestId ?? testId(dataTestId, `card-${index}`)}
             onClick={() => choose(index, false)}
           >
             <CardBody
@@ -107,6 +107,7 @@ export const CardRadios: React.FC<VariantProps> = ({
               showDescriptions={showDescriptions}
               dataTestId={dataTestId}
               indicator={indicator}
+              compact={size === 'xs' || size === 'sm'}
             />
           </StyledRadioCard>
         );

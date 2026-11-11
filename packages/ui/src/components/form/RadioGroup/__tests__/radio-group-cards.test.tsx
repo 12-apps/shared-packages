@@ -90,4 +90,22 @@ describe('RadioGroup cards', () => {
     expect(screen.getByTestId('rg-card-0').textContent).toContain('Alpha');
     expect(screen.getByTestId('rg-card-0').querySelectorAll('input[type="radio"]')).toHaveLength(0);
   });
+
+  it('names a card by its option\'s own test id when it has one', () => {
+    const named = [
+      { value: 'a', label: 'Alpha' },
+      { value: 'b', label: 'Beta', dataTestId: 'kind-b' },
+    ];
+    render(<RadioGroup variant="cards" label="Kind" options={named} value="a" dataTestId="rg" />);
+    expect(screen.getByTestId('kind-b').getAttribute('role')).toBe('radio');
+    expect(screen.getByTestId('rg-card-0').getAttribute('role')).toBe('radio');
+  });
+
+  it('is compact at sm: a body-sized label and a caption description, md keeps its own', () => {
+    render(<RadioGroup variant="cards" label="Kind" options={OPTIONS} value="a" size="sm" dataTestId="rg" />);
+    expect(screen.getByTestId('rg-label-0').className).toContain('MuiTypography-body2');
+    cleanup();
+    render(<RadioGroup variant="cards" label="Kind" options={OPTIONS} value="a" dataTestId="rg" />);
+    expect(screen.getByTestId('rg-label-0').className).toContain('MuiTypography-subtitle1');
+  });
 });

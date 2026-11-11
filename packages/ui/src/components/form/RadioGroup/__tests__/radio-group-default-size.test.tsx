@@ -130,7 +130,9 @@ describe('the other three variants keep their own sizing untouched', () => {
     );
     const card = screen.getByTestId('rg-cards-card-0');
 
-    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    // Since FUT-4477 each card IS a `radio` (role on the card), so the role no
+    // longer tells "no glyph": no MUI Radio input is drawn without `indicator`.
+    expect(card.querySelectorAll('input[type="radio"]')).toHaveLength(0);
     expect(declared(card, 'padding')).toBe(px(20));
   });
 

@@ -155,6 +155,11 @@ export const DefaultRadios: React.FC<VariantProps> = ({
 export interface CardBodyProps {
   /** A visible radio before the label, presentational: the card is the radio. */
   indicator?: boolean;
+  /**
+   * `xs`/`sm` cards: the card's own padding is the only padding, the gaps are
+   * tighter and the label is body-sized, so four fit on a row in a form.
+   */
+  compact?: boolean;
   option: RadioOption;
   index: number;
   isSelected: boolean;
@@ -162,6 +167,26 @@ export interface CardBodyProps {
   showDescriptions: boolean;
   dataTestId?: string;
 }
+
+/** The compact (`xs`/`sm`) and roomy faces of a card's body. */
+const BODY_LOOK = {
+  compact: { content: { p: 0, '&:last-child': { pb: 0 } }, gap: 1.5, label: 'body2', description: 'caption', descriptionGap: 0.25 },
+  roomy: { content: { p: 2, '&:last-child': { pb: 2 } }, gap: 2, label: 'subtitle1', description: 'body2', descriptionGap: 0.5 },
+} as const;
+
+/** The presentational radio mark of `indicator`: the card itself is the radio. */
+const CardIndicator: React.FC<{ checked: boolean; color: string }> = ({ checked, color }) => (
+  <Radio
+    checked={checked}
+    tabIndex={-1}
+    aria-hidden
+    disableRipple
+    color={color === 'neutral' ? 'default' : muiRadioColor(color)}
+    size="small"
+    sx={{ p: 0, mt: 0.25, pointerEvents: 'none' }}
+    inputProps={{ 'aria-hidden': true, tabIndex: -1 }}
+  />
+);
 
 /** A card's contents: the icon, the label, and the optional description under it. */
 export const CardBody: React.FC<CardBodyProps> = ({
@@ -172,44 +197,38 @@ export const CardBody: React.FC<CardBodyProps> = ({
   showDescriptions,
   dataTestId,
   indicator,
-}) => (
-  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-      {indicator && (
-        <Radio
-          checked={isSelected}
-          tabIndex={-1}
-          aria-hidden
-          disableRipple
-          color={color === 'neutral' ? 'default' : muiRadioColor(color)}
-          size="small"
-          sx={{ p: 0, mt: 0.25, pointerEvents: 'none' }}
-          inputProps={{ 'aria-hidden': true, tabIndex: -1 }}
-        />
-      )}
-      {option.icon && (
-        <Box sx={{ mt: 0.5, color: isSelected ? `${color}.main` : 'text.secondary' }}>
-          {option.icon}
-        </Box>
-      )}
-      <Box sx={{ flex: 1 }}>
-        <Typography
-          variant="subtitle1"
-          fontWeight={600}
-          color={isSelected ? `${color}.main` : 'text.primary'}
-          data-testid={testId(dataTestId, `label-${index}`)}
-        >
-          {option.label}
-        </Typography>
-        {option.description && showDescriptions && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} data-description="">
-            {option.description}
-          </Typography>
+  compact,
+}) => {
+  const look = compact ? BODY_LOOK.compact : BODY_LOOK.roomy;
+  const described = Boolean(option.description) && showDescriptions;
+  return (
+    <CardContent sx={look.content}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: look.gap }}>
+        {indicator && <CardIndicator checked={isSelected} color={color} />}
+        {option.icon && (
+          <Box sx={{ mt: 0.5, color: isSelected ? `${color}.main` : 'text.secondary' }}>
+            {option.icon}
+          </Box>
         )}
+        <Box sx={{ flex: 1 }}>
+          <Typography
+            variant={look.label}
+            fontWeight={600}
+            color={isSelected ? `${color}.main` : 'text.primary'}
+            data-testid={testId(dataTestId, `label-${index}`)}
+          >
+            {option.label}
+          </Typography>
+          {described && (
+            <Typography variant={look.description} component="p" color="text.secondary" sx={{ mt: look.descriptionGap }} data-description="">
+              {option.description}
+            </Typography>
+          )}
+        </Box>
       </Box>
-    </Box>
-  </CardContent>
-);
+    </CardContent>
+  );
+};
 
 export { OptionLabel };
 

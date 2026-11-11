@@ -8,6 +8,8 @@ export interface RadioOption {
   description?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
+  /** The card's own test id (`cards` variant), in place of the index-based `<dataTestId>-card-<n>`. */
+  dataTestId?: string;
 }
 
 export interface RadioGroupProps extends Omit<MuiRadioGroupProps, 'color'> {
