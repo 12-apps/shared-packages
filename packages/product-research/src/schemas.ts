@@ -7,6 +7,7 @@ import { manualPriceRowSchema } from './import/manual';
  * Paladira, the MCP tool registry) validate the exact same shapes.
  */
 
+// @request-input
 export const researchQuerySchema = z.strictObject({
   term: z.string().trim().min(2).max(200),
   brand: z.string().trim().min(1).max(100).optional(),
@@ -19,6 +20,7 @@ export const researchQuerySchema = z.strictObject({
   region: z.string().trim().max(20).optional(),
 });
 
+// @request-input
 export const startResearchSchema = z.strictObject({
   catalogRef: z
     .strictObject({ type: z.string().min(1).max(50), id: z.string().min(1).max(100) })

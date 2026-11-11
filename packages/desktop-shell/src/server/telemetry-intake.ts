@@ -20,6 +20,7 @@ import { z } from "zod";
 
 const text = (max: number): z.ZodString => z.string().max(max);
 
+// @request-input
 export const desktopReportSchema = z.strictObject({
   kind: z.enum(["crash", "error", "process-gone", "install-failed"]),
   version: text(40),

@@ -15,6 +15,7 @@ import { maxBase64Length } from './limits';
  */
 
 /** An image supplied by VALUE, base64-encoded because a tool call is JSON. */
+// @request-input
 export function inlineImageSchema(
   maxBytes: number,
 ): z.ZodObject<{ contentType: z.ZodEnum<Record<string, string>>; contentBase64: z.ZodString }> {

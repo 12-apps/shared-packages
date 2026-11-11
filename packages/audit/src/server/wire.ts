@@ -145,6 +145,7 @@ export interface AuditLogQuery {
  * in rather than read from module constants so the schema a host advertises as
  * a tool and the clamps the endpoint applies are the same three values.
  */
+// @request-input
 export function auditLogQuerySchema(
   vocabulary: AuditVocabulary,
   paging: AuditPagingPolicy = DEFAULT_PAGINATION,

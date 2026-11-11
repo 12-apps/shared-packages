@@ -99,6 +99,7 @@ export const reportPresentationSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
+// @request-input
 export const reportSpecSchema = z.strictObject({
   /** Spec contract version — always 1 today; parse rejects anything else. */
   version: z.literal(1).default(1),
@@ -174,6 +175,7 @@ export const dashboardBlockSchema = z.strictObject({
  * reports and discriminated by `kind: "dashboard"` (a single spec has no
  * top-level `kind`).
  */
+// @request-input
 export const dashboardSpecSchema = z
   .strictObject({
     /** Spec contract version — always 1 today; parse rejects anything else. */
