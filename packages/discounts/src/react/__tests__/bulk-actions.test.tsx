@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+/* eslint-disable test-flakiness/no-global-state-mutation, test-flakiness/no-test-isolation --
+   the probe component publishes its latest hook result into module variables, and `settled` is the
+   promise of the action each case starts itself: every case renders a fresh Probe and re-sets both
+   before reading them, so nothing leaks between cases. */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { JSX } from "react";
 import { describe, expect, it, vi } from "vitest";

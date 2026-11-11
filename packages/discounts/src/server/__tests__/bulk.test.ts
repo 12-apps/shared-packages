@@ -1,3 +1,6 @@
+/* eslint-disable test-flakiness/no-global-state-mutation, test-flakiness/no-test-isolation --
+   the counters and flags below live inside one case's store hooks (they simulate a concurrent
+   writer for that case only) and `logger` is read from the harness that case built. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PT_BR_DISCOUNTS_SERVER_COPY } from "../pt-BR";
