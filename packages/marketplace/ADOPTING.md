@@ -138,6 +138,10 @@ each.
     sweep then owes none of them. Fresh databases and replays stamp nothing.
 12. **`order.create` and `audit.record` receive a transaction client** (last argument): write
     the host's order and the audit line through it, so they commit with the engine's own rows.
+    Everything `create` writes goes through that client, the buyer record and the order
+    number included, never the host's global client inside the callback: on PGlite, which
+    runs one transaction at a time, a write on the global client hangs the ingest, and on
+    Postgres a rolled-back ingest would leave an orphan order and a burnt order number.
 
 ## 5. The database
 
