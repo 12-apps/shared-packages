@@ -40,10 +40,10 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | **Pipeline** | normalize → inbox → ingest / cancel / cancellation-refused / ignore. Never throws. |
 | **Ingest** | Idempotent on `(provider, externalOrderId)`. Unmapped SKUs are rows on the attention list, never a rejection. The deadline is stamped at ingest; auto-accept is born accepted in one write and queues the confirm. |
 | **Acceptance clock** | `AWAITING → ACCEPTED | REJECTED | EXPIRED`, every transition predicated on the current state. The sweep never touches an accepted order. |
-| **Decisions** | Accept, or refuse with a reason code validated against the adapter's own list (all-or-nothing). The store's own cancel through the host's flow stamps the request too. `suggestReason` preselects the item-unavailable reason when the host says stock is short. |
+| **Decisions** | Many at once, all-or-nothing: accept (with the person's admission and a preparation time), or refuse with a reason code validated against the adapter's own list and, for a reason that needs them, the order's offending SKUs. The host admits each decision inside the claim's transaction (`order.admit`: the stock ask, the draw). The store's own cancel through the host's flow stamps the request too. `suggestReason` preselects the item-unavailable reason when the host says stock is short. |
 | **SKU map** | External SKU → host catalog id, every SKU ever seen a row; mapping checks the id is the tenant's. |
-| **Integration settings** | Enabled, environment, merchant id, auto-accept, acknowledgement window; credentials sealed as one blob by the host's secrets port, never returned. |
-| **Outbound engine** | The `marketplace.outbound` job: confirm after accept, cancellation request with the stored reason code. 2xx done, 4xx refused and final, anything else retried until the last attempt. Stamps `confirmed_at`, `confirm_failed_at`, `cancellation_status` (PENDING, REQUESTED, CONFIRMED, FAILED). Idempotent by the row. |
+| **Integration settings** | Enabled, environment, merchant id, auto-accept, acknowledgement window; credentials sealed as one blob by the host's secrets port, never returned. A connection is archived (reversible, audited), never deleted. |
+| **Outbound engine** | The `marketplace.outbound` job: confirm after accept (with the preparation time where the marketplace takes one), cancellation request with the stored reason code and SKUs. 2xx done; a 4xx other than 408/425/429 refused and final; anything else retried until the last attempt, which ends FAILED whatever went wrong. Stamps `confirmed_at`, `confirm_failed_at`, `cancellation_status` (PENDING, REQUESTED, CONFIRMED, FAILED). Idempotent by the row. Queued BEFORE the host's half runs, and the `marketplace.outbound-sweep` job re-queues every call still owed, so nothing is lost. |
 | **Inbound outcomes** | A marketplace CANCELLED confirms a pending request; CANCELLATION_REQUEST_FAILED marks it FAILED; CONFIRMED is terminal. |
 | **Adapter port** | `MarketplaceAdapter`: `normalize`, `readSignature`, `verifySignature`, `cancellationReasons`, `confirm`, `requestCancellation`, `appLink`, and `capabilities`. |
 
@@ -54,7 +54,7 @@ engine code (`src/__tests__/second-adapter.test.ts`).
 | `@12-apps/marketplace` | the engine, the adapter port and registry, every type |
 | `@12-apps/marketplace/ifood` | `createIfoodAdapter({ copy })` |
 | `@12-apps/marketplace/ifood/pt-BR`, `/en-US` | the iFood adapter's copy packs (reason labels, "no street number") |
-| `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS`, `MARKETPLACE_PERMISSIONS`, the Zod inputs |
+| `@12-apps/marketplace/server` | `createApiMarketplace` (route descriptors), `MARKETPLACE_JOBS`, `MARKETPLACE_MCP_TOOLS` (six: a read and a bulk write per entity), `MARKETPLACE_PERMISSIONS`, the strict Zod inputs |
 | `@12-apps/marketplace/server/pt-BR`, `/en-US` | the routes' copy packs |
 | `@12-apps/marketplace/hono` | `marketplaceRouter(config)` — the routes as one Hono router (`hono` is an optional peer) |
 | `@12-apps/marketplace/manifest`, `/manifest/server` | the wiring manifests |
