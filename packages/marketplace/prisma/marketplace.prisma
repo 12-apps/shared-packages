@@ -1,0 +1,226 @@
+// ---------------------------------------------------------------------------
+// @12-apps/marketplace — CANONICAL Prisma model partial.
+//
+// The four tables the marketplace engine owns. A host does NOT copy these
+// models by hand: it composes this file into its multi-file schema folder from
+// the `db` capability (`package.json` "wiring.db"), and discovers the
+// migrations beside it.
+//
+// Host-agnostic by design: `clientId`, `orderId` and `menuItemId` are BY-VALUE
+// scalars with no Prisma relation and no foreign key into a host table (the
+// discounts and payments-backend doctrine). The engine cannot know what a
+// host calls its tenant, order or catalog tables. A host that wants the
+// referential integrity back adds those constraints in its own migration
+// (ADOPTING.md lists the three).
+//
+// `provider` is a String holding an adapter's id; the migration CHECKs its
+// SHAPE (uppercase id) rather than a closed list, so a new adapter is not a
+// migration.
+// ---------------------------------------------------------------------------
+
+/// One store's connection to one marketplace.
+///
+/// The row IS the connection, so there is no separate "connect" and "edit" — a
+/// save is an upsert on `(clientId, provider)`. A row with an empty
+/// `credentials` is a real state and not a broken one: a merchant mid-
+/// homologation has a merchant id and no secrets for weeks, and that half-
+/// connected state is exactly what the settings screen exists to show them.
+model MarketplaceIntegration {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  /// Which marketplace: a registered adapter's id. CHECK on its shape.
+  provider String
+
+  enabled     Boolean @default(false)
+  /// SANDBOX | PRODUCTION (CHECK). A merchant certifies in one and earns the
+  /// other, and the two have different credentials.
+  environment String  @default("SANDBOX")
+
+  /// The credential set, sealed as ONE blob by the host's secrets port. Opaque
+  /// here on purpose: the package holds ciphertext it cannot read without
+  /// asking, so a database dump discloses nothing and adding a field to a
+  /// provider's credential set is not a migration.
+  credentials String
+
+  /// The merchant id the marketplace names in its deliveries. Deliberately
+  /// OUTSIDE the ciphertext: it is an attribution key, and resolving a delivery
+  /// to a tenant must not require decrypting every store's secrets to find the
+  /// match.
+  externalMerchantId String? @map("external_merchant_id")
+
+  /// Whether an arriving order is born accepted. A store that has staffed for
+  /// the channel does not want a second confirmation per order; a store still
+  /// learning it does.
+  autoAccept Boolean @default(false) @map("auto_accept")
+
+  /// How long this store may take to answer, in seconds. Per-connection because
+  /// the marketplace's own cancellation window differs by merchant tier.
+  ackSlaSeconds Int @default(300) @map("ack_sla_seconds")
+
+  /// UNVERIFIED | VERIFIED | FAILED (CHECK). Reset to UNVERIFIED whenever the
+  /// credentials change: the stored status is a claim about a SPECIFIC secret,
+  /// and carrying VERIFIED across a rotation asserts a probe that never ran.
+  status String @default("UNVERIFIED")
+
+  lastEventAt    DateTime? @map("last_event_at")
+  lastVerifiedAt DateTime? @map("last_verified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider])
+  @@index([provider, externalMerchantId])
+  @@map("marketplace_integrations")
+}
+
+/// A marketplace SKU, and the host catalog id it stands for.
+///
+/// `menuItemId` NULL is the whole point of the model rather than a missing
+/// value: every SKU an order has ever carried gets a row, so the unmapped ones
+/// ARE the store's attention list and mapping one is an update to something
+/// they can already see. A store never has to discover the gap by reading a
+/// ticket.
+///
+/// `lastSeenAt` is what the list sorts by, so a store fixing five mappings
+/// fixes the five costing them money rather than the five added first.
+model MarketplaceMenuLink {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  provider String
+
+  /// The marketplace's own SKU — the key a line is matched on.
+  externalSku  String  @map("external_sku")
+  /// What the marketplace calls it, snapshotted for the mapping screen.
+  externalName String? @map("external_name")
+
+  /// The host catalog row this SKU means, or NULL while nothing does.
+  menuItemId String? @map("menu_item_id")
+
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clientId, provider, externalSku])
+  @@index([clientId, provider, menuItemId])
+  @@map("marketplace_menu_links")
+}
+
+/// One inbound delivery, exactly as it arrived.
+///
+/// `(provider, eventId)` is UNIQUE, which is what makes a redelivery a
+/// DB-level no-op rather than a second order. Both producers write here — the
+/// webhook and the reconciliation sweep — so the two cannot disagree about
+/// whether an event was seen.
+///
+/// The RAW payload is kept because normalization is the part most likely to be
+/// wrong: when a mapping bug drops a line, the only way to reconstruct what the
+/// marketplace actually said is to have kept it.
+model MarketplaceInboxEvent {
+  id String @id @default(uuid())
+
+  /// The tenant this delivery was attributed to, or NULL when it named a
+  /// merchant no connection claims. A null is evidence of a half-finished
+  /// onboarding and is deliberately never retried — there is no tenant to
+  /// ingest it into.
+  clientId String? @map("client_id")
+
+  provider String
+  eventId  String @map("event_id")
+  /// The provider's event type verbatim, for the row and the log.
+  eventType String @map("event_type")
+
+  externalOrderId String? @map("external_order_id")
+
+  payload Json
+
+  /// PENDING | PROCESSED | FAILED | IGNORED (CHECK).
+  status String @default("PENDING")
+  /// Truncated by the writer: a provider's error body can be a page of HTML and
+  /// this column exists to be read by a human in a list.
+  error  String?
+
+  /// How many times this row has been TOUCHED, not how many times it failed —
+  /// a row processed on its third attempt is a different story from one
+  /// processed on its first, and only the incrementing version tells them apart.
+  attempts Int @default(0)
+
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([provider, eventId])
+  @@index([status, receivedAt])
+  @@map("marketplace_inbox_events")
+}
+
+/// The acceptance clock for ONE ingested order — the acceptance queue's row.
+///
+/// This model exists because a package may not put columns on the host's order
+/// table. The state lives here, keyed by an OPAQUE `orderId`.
+///
+/// `(provider, externalOrderId)` is UNIQUE and that is where the pipeline's
+/// idempotency actually lives — not in a read. Two concurrent deliveries of the
+/// same order both miss the pre-read and only one of them reaches a row.
+///
+/// `orderId` is UNIQUE too: one host order, one acceptance. A second decision
+/// on the same order is a transition, never a second row.
+///
+/// The status vocabulary is the MECHANISM's, not a language — a host renders
+/// it. `AWAITING → ACCEPTED | REJECTED | EXPIRED`, CHECK in the migration.
+model MarketplaceAcceptance {
+  id       String @id @default(uuid())
+  clientId String @map("client_id")
+  /// The host order this stands for. Opaque here — see the model comment.
+  orderId  String @unique @map("order_id")
+
+  provider          String
+  externalOrderId   String  @map("external_order_id")
+  /// The short code the courier and the buyer say out loud ("pedido 4821").
+  externalDisplayId String? @map("external_display_id")
+
+  /// Who carries a delivery: MARKETPLACE (the marketplace's own fleet) or
+  /// MERCHANT (the store's courier). NULL on a take-out, on a row from
+  /// before the column and when the payload did not say.
+  deliveredBy String? @map("delivered_by")
+
+  status String @default("AWAITING")
+
+  /// The deadline, stamped AT INGESTION from the connection's SLA and never
+  /// recomputed. A store that later changes the setting must not move a
+  /// deadline an order was already taken under.
+  acknowledgeBy  DateTime? @map("acknowledge_by")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+
+  /// The marketplace's OWN promise to the buyer, carried so a host can adopt
+  /// it as its own deadline instead of inventing a second clock.
+  externalDueAt DateTime? @map("external_due_at")
+
+  /// The marketplace's cut on this order, when it states one. NULL and 0 are
+  /// different claims — "took nothing" versus "did not say" — and only one of
+  /// them is safe in a margin report.
+  commissionCents Int? @map("commission_cents")
+
+  /// When the marketplace took the store's acceptance: stamped by the
+  /// `marketplace.outbound` job after the confirm call answered 2xx, and the
+  /// job's own idempotency marker — a stamped row is never confirmed again.
+  confirmedAt     DateTime? @map("confirmed_at")
+  /// When the confirm was given up on: the last attempt failed or the
+  /// marketplace refused it. What a host shows with the adapter's app link.
+  confirmFailedAt DateTime? @map("confirm_failed_at")
+
+  /// The store's own cancellation request: PENDING (asked here, not
+  /// yet sent) → REQUESTED (the marketplace took the request) → CONFIRMED (it
+  /// cancelled) | FAILED (it refused, or every attempt failed). CHECK in the
+  /// migration; NULL when the store never asked. CONFIRMED is terminal.
+  cancellationStatus     String? @map("cancellation_status")
+  /// The marketplace's own reason code the request carries, sent verbatim. Lives on the row, never in a job payload.
+  cancellationReasonCode String? @map("cancellation_reason_code")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, externalOrderId])
+  @@index([clientId, status])
+  @@index([acknowledgeBy])
+  @@map("marketplace_acceptances")
+}

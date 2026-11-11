@@ -69,6 +69,7 @@ env:
     packages/prisma
     packages/shared-helpers
     packages/discounts
+    packages/marketplace
 
 jobs:
   # ── Change detection ───────────────────────────────────────────────────────
