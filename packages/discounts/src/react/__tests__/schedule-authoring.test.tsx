@@ -49,7 +49,10 @@ function recordingTransport(): { transport: DiscountsTransport; sent: unknown[] 
   };
 }
 
-function renderForm(editing: DiscountWireRecord | null = null) {
+function renderForm(
+  editing: DiscountWireRecord | null = null,
+  zone: { label: string | undefined } = { label: "Horário Padrão de Brasília" },
+) {
   const { transport, sent } = recordingTransport();
   render(
     <DiscountForm
@@ -61,7 +64,7 @@ function renderForm(editing: DiscountWireRecord | null = null) {
       editing={editing}
       onSaved={vi.fn()}
       onError={() => {}}
-      timezoneLabel="Horário Padrão de Brasília"
+      timezoneLabel={zone.label}
     />,
   );
   return { sent };
@@ -305,6 +308,14 @@ describe("the timezone is named", () => {
     renderForm();
     chooseSpecificHours();
     expect(screen.getByText("Fuso horário: Horário Padrão de Brasília.")).toBeTruthy();
+  });
+
+  // FUT-4723: a host with no zone label drew "Fuso horário: ." with nothing after it.
+  it.each([undefined, ""])("draws no zone note when the host gives no label (%j)", (label) => {
+    renderForm(null, { label });
+    chooseSpecificHours();
+    expect(screen.getByTestId("schedule-add-window")).toBeTruthy();
+    expect(screen.queryByText(/Fuso horário/u)).toBeNull();
   });
 
   it("states the price guarantee where the merchant makes it", () => {

@@ -388,7 +388,7 @@ export function ScheduleBuilder({
             </Button>
           </Box>
         )}
-        <Text variant="caption">{fill(copy.schedule.timezoneNote, { timezone })}</Text>
+        {timezone.trim() !== "" && <Text variant="caption">{fill(copy.schedule.timezoneNote, { timezone })}</Text>}
         <Text variant="caption">{copy.schedule.guaranteeNote}</Text>
         {spot === null && error != null && error !== "" && <ScheduleMessage text={error} />}
       </Stack>
