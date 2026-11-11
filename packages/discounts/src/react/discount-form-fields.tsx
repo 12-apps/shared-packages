@@ -1,7 +1,8 @@
 "use client";
 
-import type { JSX } from "react";
+import { useId, type JSX } from "react";
 
+import { FormControl, FormLabel } from "@12-apps/ui/form/Form";
 import { RadioGroup } from "@12-apps/ui/form/RadioGroup";
 import { Switch } from "@12-apps/ui/form/Switch";
 import { Fields, useFormContext } from "@12-apps/ui/form/total-form";
@@ -268,6 +269,7 @@ export function WindowFields({
   // field's own error is (FUT-4155).
   const { errors, setFieldValue } = useFormContext();
   const scheduleError = errors.schedule;
+  const repetitionLabelId = useId();
   const clearScheduleError = (): void => {
     if (scheduleError !== undefined) setFieldValue("schedule", "");
   };
@@ -275,21 +277,27 @@ export function WindowFields({
     <Stack spacing={1.5}>
       <Text variant="heading">{copy.schedule.sectionTitle}</Text>
       <PeriodSection copy={copy} wholeDays={wholeDays} datesLock={datesLock} timeZoneSettings={timeZoneSettings} />
-      {/* The library's plain radio list: each row is a full-height tap target (FUT-4724). */}
-      <RadioGroup
-        label={copy.schedule.repetitionTitle}
-        name="discount-repetition"
-        value={String(scheduleEnabled)}
-        options={[
-          { value: "false", label: copy.schedule.always, dataTestId: "repetition-always" },
-          { value: "true", label: copy.schedule.specific, dataTestId: "repetition-specific" },
-        ]}
-        onChange={(_event, next) => {
-          clearScheduleError();
-          onScheduleEnabledChange(next === "true");
-        }}
-        dataTestId="repetition"
-      />
+      {/* The library's plain radio list: each row is a full-height tap target (FUT-4724).
+          The label stays the field label it always was, and names the group. */}
+      <FormControl>
+        <Box id={repetitionLabelId}>
+          <FormLabel>{copy.schedule.repetitionTitle}</FormLabel>
+        </Box>
+        <RadioGroup
+          aria-labelledby={repetitionLabelId}
+          name="discount-repetition"
+          value={String(scheduleEnabled)}
+          options={[
+            { value: "false", label: copy.schedule.always, dataTestId: "repetition-always" },
+            { value: "true", label: copy.schedule.specific, dataTestId: "repetition-specific" },
+          ]}
+          onChange={(_event, next) => {
+            clearScheduleError();
+            onScheduleEnabledChange(next === "true");
+          }}
+          dataTestId="repetition"
+        />
+      </FormControl>
       {scheduleEnabled && (
         <>
           <ScheduleBuilder

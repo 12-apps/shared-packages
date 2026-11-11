@@ -74,6 +74,17 @@ describe("the Repetição options", () => {
     expect(screen.queryAllByTestId("schedule-add-window")).toHaveLength(0);
   });
 
+  it("is named by the field label, not by the group's own legend", () => {
+    renderForm();
+    reach("repetition-always");
+    const group = screen.getByRole("radiogroup", { name: copy.schedule.repetitionTitle });
+    const label = screen.getByText(copy.schedule.repetitionTitle);
+    const namer = label.closest("[id]") as HTMLElement;
+    expect(group.getAttribute("aria-labelledby")).toBe(namer.id);
+    expect(group.contains(label)).toBe(false);
+    expect(screen.queryAllByTestId("repetition-label")).toHaveLength(0);
+  });
+
   it("is a tap target taller than the bare 13px radio: the label wraps a full-size Radio", () => {
     renderForm();
     const radio = reach("repetition-always").closest(".MuiRadio-root");
