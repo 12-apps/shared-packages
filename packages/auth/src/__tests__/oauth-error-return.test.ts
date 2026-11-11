@@ -7,6 +7,7 @@ import type { Provider } from "@auth/core/providers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApiAuth } from "../create-api-auth";
+import { CREDENTIALS_PROVIDER_ID } from "../credentials-provider-id";
 import { signInStartCookieName } from "../oauth-error-return";
 
 /**
@@ -378,6 +379,81 @@ function cookieShapes(response: Response): string[] {
     .map((line) => line.replace(/^([^=]+)=[^;]*/, "$1=<value>"))
     .sort();
 }
+
+describe("a successful sign-in is untouched", () => {
+  function stubProvider(): void {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.startsWith("https://idp.example/token")) {
+        return Response.json({ access_token: "access", token_type: "bearer" });
+      }
+      if (url.startsWith("https://idp.example/userinfo")) {
+        return Response.json({ sub: "user-1", email: "pessoa@example.com", name: "Pessoa" });
+      }
+      throw new TypeError(`unexpected fetch ${url}`);
+    });
+  }
+
+  async function roundTrip(errorReturnsToStart: boolean): Promise<Response> {
+    const auth = makeAuth([oauthProvider], errorReturnsToStart);
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+    if (errorReturnsToStart) expect(jar.has(START_COOKIE)).toBe(true);
+    return callback(auth, jar, "acme", "code=authorization-code");
+  }
+
+  it("keeps Auth.js's redirect and cookies, and clears the start", async () => {
+    stubProvider();
+    const on = await roundTrip(true);
+    const off = await roundTrip(false);
+
+    expect(location(on).toString()).toBe(`${ORIGIN}/painel/pedidos`);
+    expect(on.headers.get("location")).toBe(off.headers.get("location"));
+    const sessions = on.headers.getSetCookie().filter((line) => line.startsWith("authjs.session-token="));
+    expect(sessions).toHaveLength(1);
+    // Auth.js's own cookies exactly as it set them, plus the start's clear.
+    const startClear = `${START_COOKIE}=<value>; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+    expect(cookieShapes(on)).toEqual([...cookieShapes(off), startClear].sort());
+  });
+});
+
+describe("a JSON answer is never rewritten", () => {
+  it("leaves a credentials callback's body and status alone, and clears a stale start", async () => {
+    async function credentialsCallback(errorReturnsToStart: boolean): Promise<Response> {
+      const auth = createApiAuth({
+        providers: [oauthProvider],
+        signInGate: () => true,
+        errorReturnsToStart,
+        emailPassword: {
+          authenticate: () => Promise.resolve({ ok: false, reason: "invalid-credentials" }),
+        },
+      });
+      const jar = new Jar();
+      const csrf = await auth.handler(new Request(`${BASE}/csrf`));
+      jar.take(csrf);
+      const { csrfToken } = (await csrf.json()) as { csrfToken: string };
+      jar.set(START_COOKIE, encodeURIComponent("/entrar?volta=x"));
+      return auth.handler(
+        new Request(`${BASE}/callback/${CREDENTIALS_PROVIDER_ID}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            "x-auth-return-redirect": "1",
+            cookie: jar.header(),
+          },
+          body: new URLSearchParams({ csrfToken, email: "a@b.c", password: "wrong" }).toString(),
+        }),
+      );
+    }
+
+    const on = await credentialsCallback(true);
+    const off = await credentialsCallback(false);
+
+    expect(on.status).toBe(off.status);
+    expect(await on.text()).toBe(await off.text());
+    expect(on.headers.getSetCookie().join("\n")).toMatch(/authjs\.sign-in-start=; .*Max-Age=0/);
+  });
+});
 
 describe("off by default: the handler is Auth.js's, untouched", () => {
   it("sets no start cookie and answers exactly as Auth.js does", async () => {
