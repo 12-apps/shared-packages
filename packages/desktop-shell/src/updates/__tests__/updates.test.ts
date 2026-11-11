@@ -359,11 +359,11 @@ describe("installing and failing", () => {
 describe("a check that arrives while another is running", () => {
   /** A promise the case settles by hand, so a check can be held in flight. */
   function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-    let resolve: (value: T) => void = () => undefined;
+    const box: { resolve?: (value: T) => void } = {};
     const promise = new Promise<T>((done) => {
-      resolve = done;
+      box.resolve = done;
     });
-    return { promise, resolve };
+    return { promise, resolve: (value) => box.resolve?.(value) };
   }
 
   /** A manager whose feed answer, and optionally cookie read, are held by the case. */
@@ -406,12 +406,10 @@ describe("a check that arrives while another is running", () => {
 
   /** Whether a promise has settled, after the microtask queue drains. */
   async function settledWithin(promise: Promise<void>): Promise<boolean> {
-    let done = false;
-    void promise.then(() => {
-      done = true;
-    });
+    const settled = vi.fn();
+    void promise.then(settled);
     await new Promise((resolve) => setImmediate(resolve));
-    return done;
+    return settled.mock.calls.length > 0;
   }
 
   it("makes a manual check wait for the automatic one, and then read its real outcome", async () => {

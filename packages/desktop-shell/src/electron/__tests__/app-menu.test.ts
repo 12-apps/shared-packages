@@ -246,27 +246,27 @@ describe("the manual check's answer", () => {
   });
 });
 
+/** A promise the case settles by hand, so a check or a box can be held open. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  const box: { resolve?: (value: T) => void } = {};
+  const promise = new Promise<T>((done) => {
+    box.resolve = done;
+  });
+  return { promise, resolve: (value) => box.resolve?.(value) };
+}
+
 describe("clicking Check for updates while an answer is pending", () => {
   const settled = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
   const click = (): void => void entry("Help", "Check for updates")?.click?.();
 
   it("opens one box for two clicks during a running check", async () => {
-    let finish: () => void = () => undefined;
-    const updates = manager({ kind: "idle" });
-    updates.check = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finish = () => {
-            updates.set({ kind: "none" });
-            resolve();
-          };
-        }),
-    );
+    const answer = deferred<void>();
+    const updates = { ...manager({ kind: "none" }), check: vi.fn(() => answer.promise) };
     installAppMenu({ copy: TEST_MENU_COPY, updates });
 
     click();
     click();
-    finish();
+    answer.resolve();
     await vi.waitFor(() => expect(recorded.boxes).toHaveLength(1));
     await settled();
 
@@ -275,13 +275,10 @@ describe("clicking Check for updates while an answer is pending", () => {
   });
 
   it("opens no second box while the first is still open, and answers again once it is closed", async () => {
-    let close: () => void = () => undefined;
-    const open = vi.spyOn(electronModule.dialog, "showMessageBox").mockImplementation(
-      () =>
-        new Promise<{ response: number }>((resolve) => {
-          close = () => resolve({ response: 0 });
-        }),
-    );
+    const closed = deferred<{ response: number }>();
+    const open = vi
+      .spyOn(electronModule.dialog, "showMessageBox")
+      .mockImplementationOnce(() => closed.promise);
     try {
       const updates = manager({ kind: "none" });
       installAppMenu({ copy: TEST_MENU_COPY, updates });
@@ -293,7 +290,7 @@ describe("clicking Check for updates while an answer is pending", () => {
       expect(open).toHaveBeenCalledTimes(1);
       expect(updates.check).toHaveBeenCalledTimes(1);
 
-      close();
+      closed.resolve({ response: 0 });
       await settled();
       click();
       await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(2));

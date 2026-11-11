@@ -227,27 +227,6 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
   options.updater.autoDownload = true;
   options.updater.autoInstallOnAppQuit = false;
 
-  /** Resolves `true` when the updater was actually asked, `false` when the check was skipped. */
-  const run = async (manual: boolean): Promise<boolean> => {
-    // A cookie read that rejects is a failed check, not an unhandled rejection
-    // in a tray process.
-    const decision = await prepare(options, manual).catch((): UpdateState => ({ kind: "failed" }));
-    if (decision !== null) {
-      move(decision);
-      return false;
-    }
-    move({ kind: "checking" });
-    try {
-      await options.updater.checkForUpdates();
-    } catch {
-      // Never thrown onward: a machine with no internet for an hour is
-      // ordinary, and an unhandled rejection in a tray process takes the
-      // agent's work down with it. The next tick asks again.
-      move({ kind: "failed" });
-    }
-    return true;
-  };
-
   const manager: UpdateManager = {
     get state(): UpdateState {
       return held.state;
@@ -266,7 +245,7 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
       }
       const started: RunningCheck = {
         manual,
-        done: run(manual).finally(() => {
+        done: runCheck(options, move, manual).finally(() => {
           held.running = null;
         }),
       };
@@ -292,6 +271,34 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
   }
 
   return manager;
+}
+
+/**
+ * One check: prepare, then ask the updater. Resolves `true` when the updater
+ * was actually asked, `false` when the check was skipped. Never rejects.
+ */
+async function runCheck(
+  options: UpdateManagerOptions,
+  move: (state: UpdateState) => void,
+  manual: boolean,
+): Promise<boolean> {
+  // A cookie read that rejects is a failed check, not an unhandled rejection
+  // in a tray process.
+  const decision = await prepare(options, manual).catch((): UpdateState => ({ kind: "failed" }));
+  if (decision !== null) {
+    move(decision);
+    return false;
+  }
+  move({ kind: "checking" });
+  try {
+    await options.updater.checkForUpdates();
+  } catch {
+    // Never thrown onward: a machine with no internet for an hour is
+    // ordinary, and an unhandled rejection in a tray process takes the
+    // agent's work down with it. The next tick asks again.
+    move({ kind: "failed" });
+  }
+  return true;
 }
 
 /**
