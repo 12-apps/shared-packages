@@ -295,8 +295,8 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     activateAll: "Ativar todos",
     deactivateAll: "Desativar todos",
     extend: "Estender validade…",
-    extendTitle: "Estender validade",
-    extendSelected: "{count} descontos selecionados",
+    extendTitleOne: "Estender validade de 1 desconto",
+    extendTitleMany: "Estender validade de {count} descontos",
     modeLabel: "Como estender",
     modeDays: "+ dias",
     modeDate: "Nova data",
@@ -307,8 +307,12 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     dateInvalid: "Essa data não existe.",
     dateIncomplete: "Digite dia, mês e ano.",
     daysRequired: "Informe quantos dias, a partir de 1.",
-    extendHint:
+    extendHintDays:
       "Conta a partir do fim de cada desconto. Os já encerrados contam a partir de hoje e voltam a valer. Sem data de fim, ficam como estão.",
+    extendHintDate:
+      "Todos passam a acabar nesta data. Os que já acabam nela ou depois, e os sem data de fim, ficam como estão.",
+    datePast: "Escolha uma data de hoje em diante.",
+    outcomeUnknown: "Não sabemos se o lote foi aplicado. Confira a lista antes de tentar de novo.",
     extendConfirm: "Estender {count}",
     cancel: "Cancelar",
     close: "Fechar",

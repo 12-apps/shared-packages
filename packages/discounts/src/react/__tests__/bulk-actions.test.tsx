@@ -202,7 +202,7 @@ describe("Estender validade…", () => {
     const group = await screen.findByTestId("bulk-extend-mode");
     const buttons = group.querySelectorAll("button");
     expect([...buttons].map((button) => button.textContent)).toEqual(["+ dias", "Nova data"]);
-    expect(screen.getByText("3 descontos selecionados")).toBeTruthy();
+    expect(screen.getByText("Estender validade de 3 descontos")).toBeTruthy();
     expect(screen.getByTestId("discount-bulk-extend-confirm").textContent).toContain("Estender 3");
   });
 
@@ -247,6 +247,43 @@ describe("Estender validade…", () => {
     expect(bulk).not.toHaveBeenCalled();
   });
 
+  it("says one discount in the singular, in the title (contract T2)", async () => {
+    render(<Probe api={apiWith(vi.fn())} refresh={() => {}} />);
+    act(() => {
+      void (action("bulk-extend").onSelect(items(1)) as Promise<unknown>).catch(() => {});
+    });
+    expect(await screen.findByText("Estender validade de 1 desconto")).toBeTruthy();
+  });
+
+  it("states the rule of the mode it is in: the date rule under Nova data, the counting rule under + dias", async () => {
+    open(vi.fn());
+    expect((await screen.findByTestId("bulk-extend-hint")).textContent).toBe(COPY.bulk.extendHintDays);
+    fireEvent.click(screen.getByText("Nova data"));
+    expect((await screen.findByTestId("bulk-extend-hint")).textContent).toBe(COPY.bulk.extendHintDate);
+  });
+
+  it("refuses a date before today in the dialog, before saving", async () => {
+    const bulk = vi.fn();
+    open(bulk);
+    fireEvent.click(await screen.findByText("Nova data"));
+    fireEvent.change(await screen.findByTestId("bulk-extend-date"), { target: { value: "01012000" } });
+    fireEvent.click(screen.getByTestId("discount-bulk-extend-confirm"));
+    expect(await screen.findByText(COPY.bulk.datePast)).toBeTruthy();
+    expect(bulk).not.toHaveBeenCalled();
+  });
+
+  it("puts the cursor in the days field and Enter confirms", async () => {
+    const bulk = vi.fn().mockResolvedValue({ ok: true, data: { ...resultOf([row("d0")]), operation: "extendWindow" } });
+    const { settled } = open(bulk);
+    const days = (await screen.findByTestId("bulk-extend-days")) as HTMLInputElement;
+    await waitFor(() => expect(document.activeElement).toBe(days));
+    await act(async () => {
+      fireEvent.keyDown(days, { key: "Enter" });
+      await settled;
+    });
+    expect(bulk).toHaveBeenCalledWith({ operation: "extendWindow", ids: ["d0", "d1", "d2"], days: 7 });
+  });
+
   it("keeps the selection when cancelled: the action's promise rejects", async () => {
     const { settled } = open(vi.fn());
     fireEvent.click(await screen.findByTestId("discount-bulk-extend-cancel"));
@@ -287,5 +324,109 @@ describe("the bulk copy", () => {
 
   it("has the same keys in both packs", () => {
     expect(Object.keys(EN_US_DISCOUNTS_WEB_COPY.bulk).sort()).toEqual(Object.keys(PT_BR_DISCOUNTS_WEB_COPY.bulk).sort());
+  });
+});
+
+describe("round 1 fixes (FUT-4420)", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it("B3/N10: a second action while a batch runs is refused, and the entries are hidden", async () => {
+    const first = deferred<unknown>();
+    const bulk = vi.fn().mockReturnValueOnce(first.promise);
+    render(<Probe api={apiWith(bulk)} refresh={() => {}} />);
+    let one: Promise<void> = Promise.resolve();
+    act(() => {
+      one = action("bulk-activate").onSelect(items(3)) as Promise<void>;
+    });
+    expect(latestSlot!.state.phase).toBe("running");
+    // The grid keeps the selection while the promise is pending: no entry may apply a second batch.
+    expect(items(3).filter(action("bulk-deactivate").isVisible!)).toEqual([]);
+    await act(async () => {
+      await action("bulk-deactivate").onSelect(items(1));
+    });
+    expect(bulk).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      first.resolve({ ok: true, data: resultOf([row("d0"), row("d1"), row("d2")]) });
+      await one;
+    });
+    expect(latestSlot!.state).toMatchObject({ phase: "done", result: { counts: { ok: 3 } } });
+  });
+
+  it("B3: an answer from a batch the person dismissed is ignored, not shown over the next one", async () => {
+    const slow = deferred<unknown>();
+    const bulk = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ ok: true, data: resultOf([row("d9")]) });
+    render(<Probe api={apiWith(bulk)} refresh={() => {}} />);
+    let first: Promise<void> = Promise.resolve();
+    act(() => {
+      first = action("bulk-activate").onSelect(items(3)) as Promise<void>;
+    });
+    act(() => latestSlot!.dismiss());
+    await act(async () => {
+      await action("bulk-deactivate").onSelect(items(1));
+    });
+    expect(latestSlot!.state).toMatchObject({ phase: "done", result: { counts: { ok: 1 } } });
+    await act(async () => {
+      slow.resolve({ ok: true, data: resultOf([row("d0"), row("d1"), row("d2")]) });
+      await first;
+    });
+    // The late answer of the first batch did not replace the second one's report.
+    expect(latestSlot!.state).toMatchObject({ phase: "done", result: { counts: { ok: 1 } } });
+  });
+
+  it("B2: a +N dias whose outcome is unknown is not sent again, and the slot is told", async () => {
+    // Nothing answered: the server may have applied it, and a second send would add the days twice.
+    const bulk = vi.fn().mockResolvedValue({ ok: false, error: "network" });
+    render(<Probe api={apiWith(bulk)} refresh={() => {}} />);
+    let settled: Promise<unknown> = Promise.resolve();
+    act(() => {
+      settled = action("bulk-extend").onSelect(items(2)) as Promise<unknown>;
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId("discount-bulk-extend-confirm"));
+      await settled;
+    });
+    await waitFor(() => expect(latestSlot!.state.phase).toBe("failed"));
+    expect(latestSlot!.state).toMatchObject({ retrySafe: false, message: COPY.bulk.outcomeUnknown });
+    expect(latestSlot!.canRetry).toBe(false);
+    await act(async () => {
+      await latestSlot!.retry();
+    });
+    expect(bulk).toHaveBeenCalledTimes(1);
+  });
+
+  it("B2: a definite refusal (4xx) and an idempotent operation may be sent again", async () => {
+    const bulk = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, error: "network" })
+      .mockResolvedValueOnce({ ok: true, data: resultOf([row("d0")]) });
+    render(<Probe api={apiWith(bulk)} refresh={() => {}} />);
+    await act(async () => {
+      await action("bulk-activate").onSelect(items(1));
+    });
+    expect(latestSlot!.canRetry).toBe(true);
+    await act(async () => {
+      await latestSlot!.retry();
+    });
+    expect(bulk).toHaveBeenCalledTimes(2);
+    expect(latestSlot!.state.phase).toBe("done");
+  });
+
+  it("2+: the entries are offered with two rows selected and not with one", () => {
+    render(<Probe api={apiWith(vi.fn())} refresh={() => {}} />);
+    for (const entry of captured!.actions) {
+      expect(items(1).filter(entry.isVisible!)).toEqual([]);
+      expect(items(2).filter(entry.isVisible!)).toHaveLength(2);
+    }
+  });
+
+  it("N9: a client without bulk() offers no entries", () => {
+    render(<Probe api={{} as unknown as DiscountsApiClient} refresh={() => {}} />);
+    expect(captured!.actions).toEqual([]);
   });
 });

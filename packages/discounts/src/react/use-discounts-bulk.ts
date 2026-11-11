@@ -33,7 +33,17 @@ export type DiscountsBulkState =
   | { phase: "idle" }
   | { phase: "running"; request: DiscountsBulkRequest; total: number }
   /** The request itself failed: nothing was applied that the answer can name. */
-  | { phase: "failed"; request: DiscountsBulkRequest; message: string }
+  | {
+      phase: "failed";
+      request: DiscountsBulkRequest;
+      message: string;
+      /**
+       * False when the server may have applied the request (nothing answered, or
+       * a 5xx) and sending it again would repeat it: `+N dias` adds N days a
+       * second time. "Tentar novamente" must not be offered then.
+       */
+      retrySafe: boolean;
+    }
   | {
       phase: "done";
       request: DiscountsBulkRequest;
@@ -52,6 +62,8 @@ export interface DiscountsBulkSlotProps {
   copy: DiscountsBulkCopy;
   /** Rows Desfazer would restore: the `ok` rows, with their before and after. */
   undoable: readonly DiscountBulkUndoRow[];
+  /** Whether "Tentar novamente" may be offered for a failed request (see `retrySafe`). */
+  canRetry: boolean;
   /** Rows "Tentar novamente" would send again: only the `failed` ones. */
   retryable: readonly DiscountBulkRow[];
   /** Restore the `ok` rows. A row changed since is left as it is and the answer says why. */
@@ -91,6 +103,22 @@ export function undoableOf(rows: readonly DiscountBulkRow[]): DiscountBulkUndoRo
   );
 }
 
+/**
+ * A failed request's state. A request nothing answered (no status) or the server
+ * failed on (5xx) may HAVE been applied; `+N dias` is the one operation that
+ * cannot be sent twice, so it is not offered a retry then.
+ */
+function failedState(
+  request: DiscountsBulkRequest,
+  answer: { error: string; status?: number },
+  copy: DiscountsBulkCopy,
+): Extract<DiscountsBulkState, { phase: "failed" }> {
+  const unknown = answer.status === undefined || answer.status >= 500;
+  const repeats = request.operation === "extendWindow" && request.days !== undefined;
+  if (unknown && repeats) return { phase: "failed", request, retrySafe: false, message: copy.outcomeUnknown };
+  return { phase: "failed", request, retrySafe: true, message: answer.error || copy.requestFailed };
+}
+
 /** What the handlers share: the client, the report's setters and the reload. */
 interface BulkDeps {
   api: DiscountsApiClient;
@@ -109,7 +137,8 @@ async function undoBatch({ api, refresh, onError, latest, set }: BulkDeps): Prom
   const rows = undoableOf(current.result.rows);
   if (rows.length === 0) return;
   set({ ...current, busy: true });
-  const answer = await api.bulk({ operation: "undo", rows });
+  const answer = await api.bulk?.({ operation: "undo", rows });
+  if (answer === undefined) return;
   if (!answer.ok) {
     onError(answer, "discounts.bulk.undo");
     set({ ...current, busy: false });
@@ -124,7 +153,8 @@ async function retryRows({ api, refresh, onError, latest, set }: BulkDeps, curre
   const ids = current.result.rows.filter((row) => row.retryable).map((row) => row.id);
   if (current.busy || ids.length === 0) return;
   set({ ...current, busy: true });
-  const answer = await api.bulk({ ...current.request, ids });
+  const answer = await api.bulk?.({ ...current.request, ids });
+  if (answer === undefined) return;
   if (!answer.ok) {
     onError(answer, `discounts.bulk.${current.request.operation}`);
     set({ ...current, busy: false });
@@ -140,7 +170,11 @@ export function useDiscountsBulk(
   copy: CompleteDiscountsWebCopy,
   refresh: () => void,
   onError: (error: unknown, context: string) => void,
-): { state: DiscountsBulkState; run: DiscountsBulkRunner; slot: Omit<DiscountsBulkSlotProps, "children"> } {
+): {
+  state: DiscountsBulkState;
+  run: DiscountsBulkRunner;
+  slot: Omit<DiscountsBulkSlotProps, "children">;
+} {
   const [state, setState] = useState<DiscountsBulkState>({ phase: "idle" });
   // The latest state for handlers that run after an await: a closure over `state`
   // would retry against the batch as it was when the button was drawn.
@@ -150,19 +184,30 @@ export function useDiscountsBulk(
     latest.current = next;
     setState(next);
   }, []);
+  // Which run the screen is waiting for: an answer that is not the latest one is dropped.
+  const runId = useRef(0);
   const deps = useMemo<BulkDeps>(() => ({ api, refresh, onError, latest, set }), [api, refresh, onError, set]);
 
   const run = useCallback<DiscountsBulkRunner>(
     async (request) => {
+      // One batch at a time: a second action while one runs would apply twice and race its report.
+      if (latest.current.phase === "running") return;
       if (request.ids.length > DISCOUNT_BULK_MAX_IDS) {
-        set({ phase: "failed", request, message: fill(copy.bulk.tooMany, { max: DISCOUNT_BULK_MAX_IDS }) });
+        set({ phase: "failed", request, retrySafe: true, message: fill(copy.bulk.tooMany, { max: DISCOUNT_BULK_MAX_IDS }) });
         return;
       }
+      if (api.bulk === undefined) {
+        set({ phase: "failed", request, retrySafe: true, message: copy.bulk.requestFailed });
+        return;
+      }
+      runId.current += 1;
+      const mine = runId.current;
       set({ phase: "running", request, total: request.ids.length });
       const answer = await api.bulk(request);
+      if (mine !== runId.current) return;
       if (!answer.ok) {
         onError(answer, `discounts.bulk.${request.operation}`);
-        set({ phase: "failed", request, message: answer.error || copy.bulk.requestFailed });
+        set(failedState(request, answer, copy.bulk));
         return;
       }
       set({ phase: "done", request, result: answer.data, busy: false, undone: null });
@@ -173,11 +218,16 @@ export function useDiscountsBulk(
 
   const retry = useCallback(async () => {
     const current = latest.current;
-    if (current.phase === "failed") await run(current.request);
+    if (current.phase === "failed") {
+      if (current.retrySafe) await run(current.request);
+    }
     else if (current.phase === "done") await retryRows(deps, current);
   }, [deps, run]);
   const undo = useCallback(() => undoBatch(deps), [deps]);
-  const dismiss = useCallback(() => set({ phase: "idle" }), [set]);
+  const dismiss = useCallback(() => {
+    runId.current += 1;
+    set({ phase: "idle" });
+  }, [set]);
 
   const rows = state.phase === "done" ? state.result.rows : [];
   return {
@@ -186,6 +236,7 @@ export function useDiscountsBulk(
     slot: {
       state,
       copy: copy.bulk,
+      canRetry: state.phase === "done" || (state.phase === "failed" && state.retrySafe),
       undoable: state.phase === "done" && state.undone === null ? undoableOf(rows) : [],
       retryable: rows.filter((row) => row.retryable),
       undo,

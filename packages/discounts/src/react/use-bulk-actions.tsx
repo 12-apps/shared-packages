@@ -4,6 +4,8 @@ import { useCallback, useMemo, useRef, useState, type ComponentType, type JSX, t
 
 import type { RowAction } from "@12-apps/ui/data-display/DataViews";
 
+import { calendarDayAt, isKnownTimeZone } from "../timezone";
+
 import type { DiscountsApiClient } from "./api";
 import { BulkExtendDialog } from "./bulk-extend-dialog";
 import type { CompleteDiscountsWebCopy } from "./copy";
@@ -36,8 +38,10 @@ export function useBulkActions(
   refresh: () => void,
   onError: (error: unknown, context: string) => void,
   Slot: ComponentType<DiscountsBulkSlotProps> | undefined,
+  timezone?: string,
 ): BulkActions {
-  const { run, slot } = useDiscountsBulk(api, copy, refresh, onError);
+  const { run, slot, state } = useDiscountsBulk(api, copy, refresh, onError);
+  const running = state.phase === "running";
   const [extending, setExtending] = useState<readonly string[] | null>(null);
   // The promise `onSelect` returned: it settles with the dialog, so the grid
   // keeps the selection when the dialog is cancelled and clears it when confirmed.
@@ -52,25 +56,33 @@ export function useBulkActions(
   }, []);
 
   const actions = useMemo<RowAction<DiscountListItem>[]>(() => {
-    if (Slot === undefined) return [];
+    if (Slot === undefined || api.bulk === undefined) return [];
     const ids = (rows: DiscountListItem[]): string[] => rows.map((row) => row.id);
+    // Offered with TWO or more rows selected (the Produtos pattern), and not while
+    // a batch runs. The grid filters the selection with this predicate, which
+    // `Array#filter` hands the whole selection as its third argument.
+    const visible = (_row: DiscountListItem, _index?: number, selection?: readonly unknown[]): boolean =>
+      !running && (selection?.length ?? 2) >= 2;
     return [
       {
         id: "bulk-activate",
         label: copy.bulk.activateAll,
         row: false,
+        isVisible: visible,
         onSelect: (rows) => run({ operation: "setActive", ids: ids(rows), active: true }),
       },
       {
         id: "bulk-deactivate",
         label: copy.bulk.deactivateAll,
         row: false,
+        isVisible: visible,
         onSelect: (rows) => run({ operation: "setActive", ids: ids(rows), active: false }),
       },
       {
         id: "bulk-extend",
         label: copy.bulk.extend,
         row: false,
+        isVisible: visible,
         onSelect: (rows) =>
           new Promise<void>((resolve, reject) => {
             pending.current = { resolve, reject };
@@ -78,7 +90,7 @@ export function useBulkActions(
           }),
       },
     ];
-  }, [Slot, copy.bulk, run]);
+  }, [Slot, api.bulk, copy.bulk, run, running]);
 
   const frame = useCallback(
     (grid: ReactNode): JSX.Element => {
@@ -89,6 +101,7 @@ export function useBulkActions(
           <BulkExtendDialog
             ids={extending}
             copy={copy.bulk}
+            today={todayIn(timezone)}
             onCancel={() => settle(false)}
             onConfirm={(request) => {
               settle(true);
@@ -102,4 +115,12 @@ export function useBulkActions(
   );
 
   return { actions, frame };
+}
+
+/** Today in the store's calendar, or in the browser's when the host passed no zone. */
+function todayIn(timezone: string | undefined): string {
+  if (timezone !== undefined && isKnownTimeZone(timezone)) return calendarDayAt(new Date(), timezone);
+  const now = new Date();
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

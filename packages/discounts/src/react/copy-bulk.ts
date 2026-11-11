@@ -9,10 +9,9 @@ export interface DiscountsBulkCopy {
   readonly activateAll: string;
   readonly deactivateAll: string;
   readonly extend: string;
-  /** The extend dialog. */
-  readonly extendTitle: string;
-  /** Under the title, `{count}`. */
-  readonly extendSelected: string;
+  /** The extend dialog's title for ONE discount and for `{count}` of them. */
+  readonly extendTitleOne: string;
+  readonly extendTitleMany: string;
   readonly modeLabel: string;
   readonly modeDays: string;
   readonly modeDate: string;
@@ -23,7 +22,14 @@ export interface DiscountsBulkCopy {
   readonly dateInvalid: string;
   readonly dateIncomplete: string;
   readonly daysRequired: string;
-  readonly extendHint: string;
+  /** The hint under "+ dias": counts from each end, ended ones from today. */
+  readonly extendHintDays: string;
+  /** The hint under "Nova data": the date rule, said before saving. */
+  readonly extendHintDate: string;
+  /** A "Nova data" before today is refused in the dialog, before saving. */
+  readonly datePast: string;
+  /** Nothing answered (or the server failed) on a request that must not be sent twice. */
+  readonly outcomeUnknown: string;
   /** The confirm button, `{count}`. */
   readonly extendConfirm: string;
   readonly cancel: string;

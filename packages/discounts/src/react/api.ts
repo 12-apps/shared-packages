@@ -260,8 +260,12 @@ export interface DiscountsApiClient {
   create(input: DiscountFormPayload): Promise<DiscountsResult<DiscountWireRecord>>;
   update(id: string, input: DiscountFormPayload): Promise<DiscountsResult<{ id: string }>>;
   remove(id: string): Promise<DiscountsResult<{ id: string }>>;
-  /** Activate, deactivate, extend or undo a batch: one answer per discount (FUT-4420). */
-  bulk(operation: DiscountBulkOperation): Promise<DiscountsResult<DiscountBulkResult>>;
+  /**
+   * Activate, deactivate, extend or undo a batch: one answer per discount (FUT-4420).
+   * Optional so a host that implements this interface by hand keeps compiling; the
+   * screen offers no bulk entries without it.
+   */
+  bulk?(operation: DiscountBulkOperation): Promise<DiscountsResult<DiscountBulkResult>>;
 }
 
 export function createDiscountsApiClient(

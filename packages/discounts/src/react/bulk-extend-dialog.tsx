@@ -36,13 +36,21 @@ function dayState(masked: string): "empty" | "incomplete" | "invalid" | "ok" {
 }
 
 /** What the dialog's two inputs hold, and what each says about itself. */
-function useExtendForm(copy: DiscountsBulkCopy) {
+function useExtendForm(copy: DiscountsBulkCopy, today: string) {
   const [mode, setMode] = useState<Mode>("days");
   const [days, setDays] = useState<number | null>(7);
   const [typed, setTyped] = useState("");
   const [tried, setTried] = useState(false);
   const day = dayState(typed);
-  const dayMessage = day === "invalid" ? copy.dateInvalid : day === "ok" ? undefined : copy.dateIncomplete;
+  // Refused before saving: a new last day before today can never be right for any row.
+  const past = day === "ok" && (maskedToIso(typed) ?? today) < today;
+  const dayMessage = past
+    ? copy.datePast
+    : day === "invalid"
+      ? copy.dateInvalid
+      : day === "ok"
+        ? undefined
+        : copy.dateIncomplete;
   const daysMessage = days === null || days < 1 ? copy.daysRequired : undefined;
   return {
     mode,
@@ -73,12 +81,26 @@ function requestOf(form: ExtendForm, ids: readonly string[]): DiscountsBulkReque
   return null;
 }
 
-function ExtendFields({ form, copy, count }: { form: ExtendForm; copy: DiscountsBulkCopy; count: number }): JSX.Element {
+function ExtendFields({
+  form,
+  copy,
+  onSubmit,
+}: {
+  form: ExtendForm;
+  copy: DiscountsBulkCopy;
+  onSubmit: () => void;
+}): JSX.Element {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-      <Text variant="body" as="p">
-        {fill(copy.extendSelected, { count })}
-      </Text>
+    <Box
+      sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+      // Enter in a field confirms, like the button: one tap less (UX3).
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") {
+          event.preventDefault();
+          onSubmit();
+        }
+      }}
+    >
       <ToggleGroup
         variant="exclusive"
         fullWidth
@@ -105,6 +127,7 @@ function ExtendFields({ form, copy, count }: { form: ExtendForm; copy: Discounts
           error={form.tried && form.daysMessage !== undefined}
           helperText={form.tried ? form.daysMessage : undefined}
           data-testid="bulk-extend-days"
+          autoFocus
         />
       ) : (
         <Input
@@ -115,10 +138,11 @@ function ExtendFields({ form, copy, count }: { form: ExtendForm; copy: Discounts
           error={form.tried && form.dayMessage !== undefined}
           helperText={form.tried ? form.dayMessage : undefined}
           inputProps={{ inputMode: "numeric", maxLength: 10, autoComplete: "off", "data-testid": "bulk-extend-date" }}
+          autoFocus
         />
       )}
-      <Text variant="caption" as="p">
-        {copy.extendHint}
+      <Text variant="caption" as="p" data-testid="bulk-extend-hint">
+        {form.mode === "days" ? copy.extendHintDays : copy.extendHintDate}
       </Text>
     </Box>
   );
@@ -127,16 +151,20 @@ function ExtendFields({ form, copy, count }: { form: ExtendForm; copy: Discounts
 export function BulkExtendDialog({
   ids,
   copy,
+  today,
   onConfirm,
   onCancel,
 }: {
   /** The selection the dialog was opened for; `null` when closed. */
   ids: readonly string[] | null;
   copy: DiscountsBulkCopy;
+  /** Today in the store's calendar (`YYYY-MM-DD`): the earliest "Nova data". */
+  today: string;
   onConfirm: (request: DiscountsBulkRequest) => void;
   onCancel: () => void;
 }): JSX.Element {
-  const form = useExtendForm(copy);
+  const form = useExtendForm(copy, today);
+  const count = ids?.length ?? 0;
   const confirm = (): void => {
     const request = ids === null ? null : requestOf(form, ids);
     if (request === null) form.setTried(true);
@@ -146,14 +174,16 @@ export function BulkExtendDialog({
     <UsableModal
       open={ids !== null}
       onClose={onCancel}
-      title={copy.extendTitle}
+      title={count === 1 ? copy.extendTitleOne : fill(copy.extendTitleMany, { count })}
+      // A four-line question: a narrow panel on a computer, not half the screen.
+      panelWidth={{ share: "40vw", maxPx: 480, fullBelowPx: 600 }}
       closeLabel={copy.close}
       backLabel={copy.back}
       dataTestId="discount-bulk-extend-dialog"
       footer={
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", width: "100%" }}>
           <Button onClick={confirm} dataTestId="discount-bulk-extend-confirm">
-            {fill(copy.extendConfirm, { count: ids?.length ?? 0 })}
+            {fill(copy.extendConfirm, { count })}
           </Button>
           <Button variant="outline" onClick={onCancel} dataTestId="discount-bulk-extend-cancel">
             {copy.cancel}
@@ -161,7 +191,7 @@ export function BulkExtendDialog({
         </Box>
       }
     >
-      <ExtendFields form={form} copy={copy} count={ids?.length ?? 0} />
+      <ExtendFields form={form} copy={copy} onSubmit={confirm} />
     </UsableModal>
   );
 }

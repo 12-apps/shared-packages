@@ -162,3 +162,92 @@ test('the extend dialog keeps its two ways on one row at 320 (FUT-4420)', async 
   );
   expect(overflow).toBe(false);
 });
+
+async function seedThree(request: import('@playwright/test').APIRequestContext): Promise<void> {
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  for (const name of ['Fila A', 'Fila B', 'Fila C']) {
+    await request.post('/api/admin/harness/discounts', {
+      data: {
+        name,
+        type: 'PERCENTAGE',
+        percentOffBp: 1000,
+        scope: 'ORDER',
+        trigger: 'AUTOMATIC',
+        stackable: true,
+        active: true,
+        endsAt: '2099-03-10',
+      },
+    });
+  }
+  /* eslint-enable test-flakiness/no-unmocked-network */
+}
+
+test('a second batch cannot start while one runs, and one row gets no bulk entries (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  await seedThree(request);
+  let posts = 0;
+  await page.route('**/discounts/bulk', async (route) => {
+    posts += 1;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Fila C');
+  const boxes = page.getByTestId('discounts-grid').getByRole('checkbox');
+
+  // One row: Ações offers no bulk entry at all (Excluir only).
+  await boxes.nth(0).check();
+  await page.getByTestId('discounts-bulk-actions').click();
+  await expect(page.getByRole('menuitem', { name: 'Desativar todos' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Excluir' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await boxes.nth(1).check();
+  await boxes.nth(2).check();
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
+  await expect(page.getByTestId('bulk-running')).toBeVisible();
+
+  // While the batch is in flight the grid still holds the selection, but the entries are gone.
+  await page.getByTestId('discounts-bulk-actions').click();
+  await expect(page.getByRole('menuitem', { name: 'Ativar todos' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Estender validade…' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByTestId('bulk-counts')).toContainText('3 alterados');
+  expect(posts).toBe(1);
+});
+
+test('the extend dialog: singular title, focus in the field, Enter confirms, hint follows the mode (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  await seedThree(request);
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Fila C');
+  const boxes = page.getByTestId('discounts-grid').getByRole('checkbox');
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Estender validade…' }).click();
+
+  await expect(page.getByText('Estender validade de 2 descontos')).toBeVisible();
+  // Focus lands on the next action, never on the container.
+  await expect(page.getByTestId('bulk-extend-days')).toBeFocused();
+  await expect(page.getByTestId('bulk-extend-hint')).toContainText('Conta a partir do fim');
+
+  await page.getByRole('button', { name: 'Nova data' }).click();
+  await expect(page.getByTestId('bulk-extend-hint')).toContainText('Todos passam a acabar nesta data');
+  await expect(page.getByTestId('bulk-extend-date')).toBeFocused();
+  await page.getByTestId('bulk-extend-date').fill('01012000');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Escolha uma data de hoje em diante.')).toBeVisible();
+
+  await page.getByRole('button', { name: '+ dias' }).click();
+  await expect(page.getByTestId('bulk-extend-days')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('bulk-counts')).toContainText('2 alterados');
+  await expect(page.getByTestId('bulk-row-ok').first()).toContainText('Validade estendida');
+});

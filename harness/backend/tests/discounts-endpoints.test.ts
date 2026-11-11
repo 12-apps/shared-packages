@@ -301,6 +301,17 @@ describe('the bulk route, through a real store (FUT-4420)', () => {
     expect((await read(a)).endsAt).toContain('2099-01-10');
   });
 
+  it('refuses an impossible day, and an all-or-nothing call with a skipped row, writing nothing', async () => {
+    const a = await idOf({ name: 'Atomico A', active: true, endsAt: '2099-01-10' });
+    const open = await idOf({ name: 'Atomico sem fim', active: true });
+    const bad = await bulk({ operation: 'extendWindow', ids: [a], endsOn: '2026-02-31' });
+    expect(bad.status).toBe(422);
+    const atomic = await bulk({ operation: 'extendWindow', ids: [a, open], days: 3, allOrNothing: true });
+    expect(atomic.status).toBe(422);
+    expect(JSON.stringify(atomic.json)).toContain('ids.1');
+    expect((await read(a)).endsAt).toContain('2099-01-10');
+  });
+
   it('refuses a body with an unknown key and one over the cap, writing nothing', async () => {
     const strict = await bulk({ operation: 'setActive', ids: ['x'], active: true, surprise: 1 });
     expect(strict.status).toBe(422);

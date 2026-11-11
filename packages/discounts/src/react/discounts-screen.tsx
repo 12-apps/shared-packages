@@ -320,7 +320,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
-  const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot);
+  const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot, timezone);
 
   const rows = useDiscountRows(data.page?.data, formatters, copy, timezone);
 

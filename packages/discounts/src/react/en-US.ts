@@ -307,8 +307,8 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     activateAll: "Activate all",
     deactivateAll: "Deactivate all",
     extend: "Extend validity…",
-    extendTitle: "Extend validity",
-    extendSelected: "{count} discounts selected",
+    extendTitleOne: "Extend validity of 1 discount",
+    extendTitleMany: "Extend validity of {count} discounts",
     modeLabel: "How to extend",
     modeDays: "+ days",
     modeDate: "New date",
@@ -319,8 +319,12 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     dateInvalid: "That date does not exist.",
     dateIncomplete: "Type day, month and year.",
     daysRequired: "Enter how many days, from 1.",
-    extendHint:
+    extendHintDays:
       "Counts from each discount's end. Ones that already ended count from today and become valid again. With no end date, they stay as they are.",
+    extendHintDate:
+      "Every discount will end on this date. Ones that already end on or after it, and ones with no end date, stay as they are.",
+    datePast: "Pick today or a later date.",
+    outcomeUnknown: "We can't tell whether the batch was applied. Check the list before trying again.",
     extendConfirm: "Extend {count}",
     cancel: "Cancel",
     close: "Close",
