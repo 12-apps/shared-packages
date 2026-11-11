@@ -186,6 +186,17 @@ describe("parseSearchParamsResilient", () => {
     expect(result.page).toBe(2);
   });
 
+  it("keeps the valid filters when an unknown key AND a bad sort arrive together", () => {
+    const result = parseSearchParamsResilient(schema, {
+      q: "ana",
+      page: "2",
+      sort: "bogus:asc",
+      utm_source: "mail",
+    });
+    expect(result.q).toBe("ana");
+    expect(result.page).toBe(2);
+  });
+
   it("falls back to all defaults when the cleaned input still won't parse", () => {
     // A required-shape violation that can't be isolated to a droppable key still
     // yields a valid defaulted object rather than throwing.

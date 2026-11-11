@@ -163,15 +163,17 @@ export function parseSearchParamsResilient<T>(
   schema: z.ZodType<T>,
   raw: Record<string, unknown>,
 ): T {
-  const result = schema.safeParse(raw);
-  if (result.success) return result.data;
-  // An unknown key is a problem at the object's own path, so its names come
-  // from the issue rather than from `path[0]`; both drop only their own key.
-  const badKeys = new Set(result.error.issues.flatMap(offendingKeys));
-  if (badKeys.size > 0) {
-    const cleaned = Object.fromEntries(Object.entries(raw).filter(([key]) => !badKeys.has(key)));
-    const retry = schema.safeParse(cleaned);
-    if (retry.success) return retry.data;
+  // Drop what each failed parse blames and parse again, until it parses or
+  // nothing new is blamed: a strict object reports an unknown key BEFORE its
+  // object-level rules run, so one pass can hide a second bad key.
+  let current = raw;
+  for (let pass = 0; pass <= Object.keys(raw).length; pass += 1) {
+    const result = schema.safeParse(current);
+    if (result.success) return result.data;
+    const bad = new Set(result.error.issues.flatMap(offendingKeys));
+    const kept = Object.entries(current).filter(([key]) => !bad.has(key));
+    if (kept.length === Object.keys(current).length) break;
+    current = Object.fromEntries(kept);
   }
   return schema.parse({});
 }
