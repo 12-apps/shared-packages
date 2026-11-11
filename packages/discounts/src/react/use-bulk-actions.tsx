@@ -12,6 +12,7 @@ import type { CompleteDiscountsWebCopy } from "./copy";
 import type { DiscountListItem } from "./row";
 import {
   useDiscountsBulk,
+  type DiscountsBulkRequest,
   type DiscountsBulkSlotProps,
 } from "./use-discounts-bulk";
 
@@ -55,42 +56,19 @@ export function useBulkActions(
     else waiting?.reject(new Error("cancelled"));
   }, []);
 
-  const actions = useMemo<RowAction<DiscountListItem>[]>(() => {
-    if (Slot === undefined || api.bulk === undefined) return [];
-    const ids = (rows: DiscountListItem[]): string[] => rows.map((row) => row.id);
-    // Offered with TWO or more rows selected (the Produtos pattern), and not while
-    // a batch runs. The grid filters the selection with this predicate, which
-    // `Array#filter` hands the whole selection as its third argument.
-    const visible = (_row: DiscountListItem, _index?: number, selection?: readonly unknown[]): boolean =>
-      !running && (selection?.length ?? 2) >= 2;
-    return [
-      {
-        id: "bulk-activate",
-        label: copy.bulk.activateAll,
-        row: false,
-        isVisible: visible,
-        onSelect: (rows) => run({ operation: "setActive", ids: ids(rows), active: true }),
-      },
-      {
-        id: "bulk-deactivate",
-        label: copy.bulk.deactivateAll,
-        row: false,
-        isVisible: visible,
-        onSelect: (rows) => run({ operation: "setActive", ids: ids(rows), active: false }),
-      },
-      {
-        id: "bulk-extend",
-        label: copy.bulk.extend,
-        row: false,
-        isVisible: visible,
-        onSelect: (rows) =>
-          new Promise<void>((resolve, reject) => {
-            pending.current = { resolve, reject };
-            setExtending(ids(rows));
+  const actions = useMemo<RowAction<DiscountListItem>[]>(
+    () =>
+      Slot === undefined || api.bulk === undefined
+        ? []
+        : bulkEntries(copy.bulk, running, run, (rows) => {
+            pending.current = null;
+            return new Promise<void>((resolve, reject) => {
+              pending.current = { resolve, reject };
+              setExtending(rows.map((row) => row.id));
+            });
           }),
-      },
-    ];
-  }, [Slot, api.bulk, copy.bulk, run, running]);
+    [Slot, api.bulk, copy.bulk, run, running],
+  );
 
   const frame = useCallback(
     (grid: ReactNode): JSX.Element => {
@@ -115,6 +93,35 @@ export function useBulkActions(
   );
 
   return { actions, frame };
+}
+
+/**
+ * The three entries. Offered with TWO or more rows selected (the Produtos
+ * pattern) and not while a batch runs. The grid filters the selection with
+ * `isVisible`, which `Array#filter` hands the whole selection as its third
+ * argument - the only place the count is visible to an entry.
+ */
+function bulkEntries(
+  words: CompleteDiscountsWebCopy["bulk"],
+  running: boolean,
+  run: (request: DiscountsBulkRequest) => Promise<void>,
+  askExtension: (rows: DiscountListItem[]) => Promise<void>,
+): RowAction<DiscountListItem>[] {
+  const visible = (_row: DiscountListItem, _index?: number, selection?: readonly unknown[]): boolean =>
+    !running && (selection?.length ?? 2) >= 2;
+  const ids = (rows: DiscountListItem[]): string[] => rows.map((row) => row.id);
+  const entry = (id: string, label: string, onSelect: RowAction<DiscountListItem>["onSelect"]): RowAction<DiscountListItem> => ({
+    id,
+    label,
+    row: false,
+    isVisible: visible,
+    onSelect,
+  });
+  return [
+    entry("bulk-activate", words.activateAll, (rows) => run({ operation: "setActive", ids: ids(rows), active: true })),
+    entry("bulk-deactivate", words.deactivateAll, (rows) => run({ operation: "setActive", ids: ids(rows), active: false })),
+    entry("bulk-extend", words.extend, askExtension),
+  ];
 }
 
 /** Today in the store's calendar, or in the browser's when the host passed no zone. */

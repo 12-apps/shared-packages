@@ -177,10 +177,19 @@ function planExtend(record: DiscountRecord, extension: Extension, ctx: BulkConte
   if (window === null || window.endsAt === null) return settled("skipped", "zoneOff");
   const refused = refusalOf(window.endsAt, record, ended, ctx.now);
   if (refused !== null) return refused;
-  const next = extendedState(record, window);
+  return extensionChange(record, window, newEndsOn, ended);
+}
+
+/** The change an extension makes, and what the row says about it. */
+function extensionChange(
+  record: DiscountRecord,
+  window: { startsAt: Date | null; endsAt: Date | null; windowInZone: boolean },
+  newEndsOn: string,
+  ended: boolean,
+): Change {
   const revived = ended && record.active;
-  const code: DiscountBulkCode = revived ? "revived" : ended && !record.active ? "extendedPaused" : "extended";
-  return { kind: "change", next, code, endsOn: newEndsOn, revived };
+  const code: DiscountBulkCode = revived ? "revived" : ended ? "extendedPaused" : "extended";
+  return { kind: "change", next: extendedState(record, window), code, endsOn: newEndsOn, revived };
 }
 
 function planUndo(record: DiscountRecord, row: DiscountBulkUndoRow): Plan {
