@@ -91,3 +91,36 @@ test('the grid filters live in the URL, which is why the host wires a real Route
 
   await expect(page).toHaveURL(/#\/discounts\?.*q=almo/u);
 });
+
+test('the host slot reports a bulk batch, and Desfazer restores what changed (FUT-4420)', async ({
+  page,
+  request,
+}) => {
+  const body = (name: string) => ({
+    name,
+    type: 'PERCENTAGE',
+    percentOffBp: 1000,
+    scope: 'ORDER',
+    trigger: 'AUTOMATIC',
+    stackable: true,
+    active: true,
+    endsAt: '2099-03-10',
+  });
+  /* eslint-disable test-flakiness/no-unmocked-network -- the unmocked network IS the subject. */
+  await request.post('/api/admin/harness/discounts', { data: body('Lote A') });
+  await request.post('/api/admin/harness/discounts', { data: body('Lote B') });
+  /* eslint-enable test-flakiness/no-unmocked-network */
+
+  await page.goto('#/discounts');
+  await expect(page.getByTestId('discounts-grid')).toContainText('Lote B');
+
+  // Two rows ticked, Ações (2) opens the package's entries.
+  await page.getByTestId('discounts-grid').getByRole('checkbox').nth(0).check();
+  await page.getByTestId('discounts-grid').getByRole('checkbox').nth(1).check();
+  await page.getByTestId('discounts-bulk-actions').click();
+  await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
+
+  await expect(page.getByTestId('bulk-counts')).toContainText('2 alterados');
+  await page.getByTestId('bulk-undo').click();
+  await expect(page.getByTestId('bulk-undone')).toContainText('2 desfeitos');
+});

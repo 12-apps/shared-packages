@@ -237,3 +237,75 @@ describe('archive', () => {
     expect(rows.rows[0]?.total).toBe('1');
   });
 });
+
+describe('the bulk route, through a real store (FUT-4420)', () => {
+  interface BulkBody {
+    data: {
+      counts: { ok: number; unchanged: number; skipped: number; failed: number };
+      rows: {
+        id: string;
+        status: string;
+        code: string;
+        before?: unknown;
+        after?: unknown;
+      }[];
+    };
+  }
+
+  async function bulk(body: unknown): Promise<{ status: number; json: BulkBody }> {
+    const response = await backend.app.request(`${BASE}/bulk`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return { status: response.status, json: (await response.json()) as BulkBody };
+  }
+
+  async function idOf(overrides: Record<string, unknown>): Promise<string> {
+    const created = (await (await post(percentage(overrides))).json()) as CreatedBody;
+    return created.data.id;
+  }
+
+  async function read(id: string): Promise<{ active: boolean; endsAt: string | null }> {
+    const body = (await (await backend.app.request(`${BASE}/${id}`)).json()) as {
+      data: { active: boolean; endsAt: string | null };
+    };
+    return body.data;
+  }
+
+  it('deactivates and extends rows, then undoes exactly the ones that changed', async () => {
+    const far = '2099-01-10';
+    const a = await idOf({ name: 'Bulk A', active: true, endsAt: far });
+    const b = await idOf({ name: 'Bulk B', active: false, endsAt: far });
+    const open = await idOf({ name: 'Bulk sem fim', active: true });
+
+    const off = await bulk({ operation: 'setActive', ids: [a, b], active: false });
+    expect(off.status).toBe(200);
+    // B already held the value: unchanged, so it is never offered to Desfazer.
+    expect(off.json.data.counts).toEqual({ ok: 1, unchanged: 1, skipped: 0, failed: 0 });
+    expect((await read(a)).active).toBe(false);
+
+    const extended = await bulk({ operation: 'extendWindow', ids: [a, open], days: 5 });
+    expect(extended.json.data.rows.map((row) => `${row.status}:${row.code}`)).toEqual([
+      'ok:extended',
+      'skipped:noEndDate',
+    ]);
+    expect((await read(a)).endsAt).toContain('2099-01-15');
+
+    const ok = extended.json.data.rows.filter((row) => row.status === 'ok');
+    const undone = await bulk({
+      operation: 'undo',
+      rows: ok.map((row) => ({ id: row.id, before: row.before, after: row.after })),
+    });
+    expect(undone.json.data.counts.ok).toBe(1);
+    expect((await read(a)).endsAt).toContain('2099-01-10');
+  });
+
+  it('refuses a body with an unknown key and one over the cap, writing nothing', async () => {
+    const strict = await bulk({ operation: 'setActive', ids: ['x'], active: true, surprise: 1 });
+    expect(strict.status).toBe(422);
+    const ids = Array.from({ length: 501 }, (_, index) => `d${index}`);
+    const over = await bulk({ operation: 'setActive', ids, active: true });
+    expect(over.status).toBe(422);
+  });
+});

@@ -201,6 +201,36 @@ keystroke on the storefront and would need a logger threaded through a browser
 bundle. A rejected coupon is already a `DiscountRejection` in the result, which
 is the host's to report if it wants to.
 
+## Bulk actions — `POST /discounts/bulk` and `bulkSlot` (FUT-4420)
+
+"Ativar todos", "Desativar todos" and "Estender validade…" on a selection, with a report per row and
+Desfazer. The package owns the route and the state; **the host draws the report**.
+
+**Server.** `createApiDiscounts` mounts one more route, `POST /discounts/bulk`, behind `discounts:write`
+(the single-row edit's permission). The body is `{ operation: "setActive" | "extendWindow" | "undo", ... }`
+(`bulkDiscountsBody`), at most 500 ids, and the answer has one row per discount with a status:
+
+| status | meaning | retryable |
+|---|---|---|
+| `ok` | the row changed; carries `before` and `after` | no |
+| `unchanged` | it already held the value; never undone | no |
+| `skipped` | the rule does not apply (no end date, a date not after the current end, ...) | no |
+| `failed` | the store threw, or the row kept moving under the batch | yes |
+
+Extending counts whole days on the store's clock (`storeTimeZone`): `days` from the current end day, or from
+today when the discount already ended (it is then re-activated and the row says so, `code: "revived"`);
+`endsOn` sets the new last day. Every write is conditional on the window **and the active flag** read
+(`DiscountUpdateCondition.active`, new): a store that applies the write only where the row still holds
+them detects a concurrent change instead of overwriting it. `undo` takes the `ok` rows with their
+`before`/`after`; a row whose state is no longer `after` is left as it is (`changedSince`). `validateOnly`
+reports without writing. The sentences are `DiscountsServerCopy.bulk` (optional, filled from the
+package's pt-BR / en-US packs). The same route is the discounts' one bulk MCP tool, `bulkDiscounts`.
+
+**Screen.** `createWebDiscounts({ bulkSlot })` takes a component rendered around the grid, inside the
+screen's `CardActionsProvider`, and handed `DiscountsBulkSlotProps`: `state` (`idle | running | failed |
+done`), `undoable`, `retryable`, `undo()`, `retry()`, `dismiss()`, the `copy` and the grid as `children`.
+Without a slot the three entries are not offered. Copy is `DiscountsWebCopy.bulk` (optional, filled in).
+
 ## Whole days, in the store's zone — `storeTimeZone`
 
 > **Upgrading to this version: every host syncs the partial and runs migration
