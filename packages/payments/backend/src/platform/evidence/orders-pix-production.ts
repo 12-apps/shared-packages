@@ -1,4 +1,5 @@
-import { cancelCharge, pixConsultStep, pollPix } from './orders';
+import { pixConsultStep, pollPix } from './orders';
+import { refundViewOf, type EvidencePixRefundView } from './refund-state';
 import { clockOf, pendingStep, stepOf } from './steps';
 import type { EvidenceRecord, EvidenceStep } from './types';
 import type { EvidenceRunDeps, PixConfirmAction } from './run';
@@ -26,6 +27,11 @@ export interface EvidencePixView {
   qrText: string | null;
   /** When PagBank stops accepting the QR, ISO-8601; null when it did not say. */
   expiresAt: string | null;
+  /**
+   * Where the refund's background retry stands (FUT-4360); null while no
+   * attempt was refused, and once it is refunded.
+   */
+  refund: EvidencePixRefundView | null;
 }
 
 const stepIn = (steps: readonly EvidenceStep[], key: EvidenceStep['key']) => steps.find((step) => step.key === key);
@@ -88,56 +94,34 @@ export function pixViewOf(record: EvidenceRecord, skippedNote: string): Evidence
     state,
     qrText: state === 'AWAITING_PAYMENT' ? findString(qrPartOf(record), ['text']) : null,
     expiresAt: state === 'AWAITING_PAYMENT' ? pixExpiresAt(record) : null,
+    refund: state === 'REFUND_PENDING' ? refundViewOf(record) : null,
   };
 }
 
 /** The stored row's id and the order PagBank named, read back from the recorded `pix.create`. */
-function createdPixIds(steps: readonly EvidenceStep[]): { chargeId: string; orderId: string } | null {
+export function createdPixIds(steps: readonly EvidenceStep[]): { chargeId: string; orderId: string } | null {
   const created = steps.find((step) => step.key === 'pix.create' && step.status === 'EXECUTED');
   const orderId = created?.ids['order_id'];
   if (!orderId) return null;
   return { chargeId: created.ids['charge_id'] ?? orderId, orderId };
 }
 
-/**
- * A refund that failed before, tried again safely: the charge is consulted
- * first, and a charge PagBank already reports REFUNDED is recorded as
- * refunded from that consult instead of being canceled twice.
- */
-async function refundAgain(
-  deps: EvidenceRunDeps,
-  steps: readonly EvidenceStep[],
-  ids: { chargeId: string; orderId: string },
-): Promise<EvidenceStep[]> {
-  const chargeId = paidChargeId(steps, ids);
-  const polled = await pollPix({ ...deps, pixPolls: 1 }, chargeId);
-  if (polled.status === 'REFUNDED') {
-    return [
-      stepOf('pix.refund', 'EXECUTED', clockOf(deps)(), {
-        calls: polled.calls,
-        ids: { order_id: ids.orderId, charge_id: polled.chargeId },
-        observed: deps.copy.canceled('REFUNDED'),
-      }),
-    ];
-  }
-  return [await cancelCharge(deps, 'pix.refund', chargeId, ids.orderId)];
-}
-
 /** The charge to refund: the one the PAID consult named, or the created one. */
-function paidChargeId(steps: readonly EvidenceStep[], ids: { chargeId: string }): string {
+export function paidChargeId(steps: readonly EvidenceStep[], ids: { chargeId: string }): string {
   return stepIn(steps, 'pix.consult')?.ids['charge_id'] ?? stepIn(steps, 'pix.paid')?.ids['charge_id'] ?? ids.chargeId;
 }
 
 /**
  * PRODUCTION (FUT-4198): settle the Pix a person was asked to pay. Returns
- * only the steps it settled.
+ * only the steps it settled, and never refunds: a paid Pix is handed to the
+ * refund's own attempts (`refund-attempt.ts`, FUT-4360).
  *
- * - Paid already, refund not done (it failed before): consult first — a
- *   cancel whose answer was lost may have refunded it already — and cancel
- *   only while PagBank still says PAID.
- * - Otherwise consult it once. PAID → refund it, whatever the operator
- *   pressed: a skipped QR that was paid anyway still gets its money back.
+ * - Consult it once. PAID → `pix.consult` and `pix.paid`, whatever the
+ *   operator pressed: a skipped QR that was paid anyway still gets its money
+ *   back.
  * - Not paid: `CHECK` records the consult; `SKIP` records it was skipped.
+ *
+ * A Pix already paid is not asked about again: its refund is the retry's.
  */
 export async function pixConfirmSteps(
   deps: EvidenceRunDeps,
@@ -145,15 +129,13 @@ export async function pixConfirmSteps(
   action: PixConfirmAction,
 ): Promise<EvidenceStep[]> {
   const ids = createdPixIds(steps);
-  if (!ids) return [];
-  if (stepIn(steps, 'pix.paid')?.status === 'EXECUTED') return refundAgain(deps, steps, ids);
+  if (!ids || stepIn(steps, 'pix.paid')?.status === 'EXECUTED') return [];
   const polled = await pollPix({ ...deps, pixPolls: 1 }, ids.chargeId);
   const { step: consult, ids: idsOfPix } = pixConsultStep(deps, polled, ids.orderId);
   if (polled.status === 'PAID') {
-    const paid = stepOf('pix.paid', 'EXECUTED', clockOf(deps)(), { ids: idsOfPix, observed: deps.copy.paid });
-    return [consult, paid, await cancelCharge(deps, 'pix.refund', polled.chargeId, ids.orderId)];
+    return [consult, stepOf('pix.paid', 'EXECUTED', clockOf(deps)(), { ids: idsOfPix, observed: deps.copy.paid })];
   }
-  if (action === 'CHECK') return [consult];
+  if (action !== 'SKIP') return [consult];
   const why = deps.copy.pixSkipped;
   return [consult, pendingStep('pix.paid', deps.copy, why), pendingStep('pix.refund', deps.copy, why)];
 }

@@ -71,8 +71,15 @@ export interface ProviderRejectionReason {
  * structured body — never throws, and never guesses.
  */
 export function providerRejectionReasons(error: unknown): ProviderRejectionReason[] {
-  if (!(error instanceof ProviderRequestError)) return [];
-  const body = error.options.body;
+  return error instanceof ProviderRequestError ? rejectionReasonsOfBody(error.options.body) : [];
+}
+
+/**
+ * The same reasons, read off a provider's error PAYLOAD itself — what a
+ * recorded call kept when the error that carried it was wrapped on the way up
+ * (a failover walk answers one error for the whole chain).
+ */
+export function rejectionReasonsOfBody(body: unknown): ProviderRejectionReason[] {
   if (typeof body !== 'object' || body === null) return [];
   const reasons = (body as { error_messages?: unknown }).error_messages;
   if (!Array.isArray(reasons)) return [];

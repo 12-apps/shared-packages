@@ -44,12 +44,13 @@ function guarded<A extends unknown[], R>(
   severity: ProviderFailureSeverity,
   call: (...args: A) => Promise<R>,
   where: (...args: A) => Where,
+  quiet: (...args: A) => (error: unknown) => boolean = () => () => false,
 ): (...args: A) => Promise<R> {
   return async (...args: A) => {
     try {
       return await call(...args);
     } catch (error) {
-      if (isProviderEndpointFailure(error)) {
+      if (isProviderEndpointFailure(error) && !quiet(...args)(error)) {
         const { merchant, provider, reference } = where(...args);
         reportProviderFailure(reporter, {
           path,
@@ -67,10 +68,26 @@ function guarded<A extends unknown[], R>(
   };
 }
 
+/**
+ * Whether the provider's refusal of a refund is a state, not a fault: "not
+ * yet" is retried by whoever owns the refund, which reports once if it gives
+ * up (FUT-4360), so six attempts are not six events.
+ */
+export function refundNotYetOf(providers: { get(name: string): { classifyRefundRefusal?(error: unknown): string } }) {
+  return (provider: string) => (error: unknown): boolean => {
+    try {
+      return providers.get(provider).classifyRefundRefusal?.(error) === 'NOT_YET';
+    } catch {
+      return false;
+    }
+  };
+}
+
 /** Wrap the gateway's follow-up calls; the walk is not touched here. */
 export function withProviderFailureReports<P extends string>(
   reporter: ProviderFailureReporter | undefined,
   gateway: PaymentsGateway<P>,
+  refundNotYet: (provider: string) => (error: unknown) => boolean = () => () => false,
 ): PaymentsGateway<P> {
   if (!reporter) return gateway;
   return {
@@ -86,7 +103,7 @@ export function withProviderFailureReports<P extends string>(
     })),
     refund: guarded(reporter, 'REFUND', 'error', gateway.refund, (merchant, provider, input) => ({
       merchant, provider, reference: input.providerChargeId,
-    })),
+    }), (_merchant, provider) => refundNotYet(provider)),
     beginVault: guarded(reporter, 'VAULT', 'error', gateway.beginVault, (merchant, input, provider) => ({
       merchant, provider: provider ?? null, reference: input.reference,
     })),

@@ -13,5 +13,10 @@ export function createMemoryHomologacaoEvidenceStore(): HomologacaoEvidenceStore
       records.set(record.id, structuredClone(record));
       return structuredClone(record);
     },
+    async saveIf(record: EvidenceRecord, expectedUpdatedAt: string) {
+      if (records.get(record.id)?.updatedAt !== expectedUpdatedAt) return null;
+      records.set(record.id, structuredClone(record));
+      return structuredClone(record);
+    },
   };
 }

@@ -1,6 +1,8 @@
 import type { RecordedHttpCall } from '../../core/traffic-recorder';
 import type { RecordedOutcome } from './record';
+import type { EvidenceRefundState } from './refund-state';
 import type {
+  EvidenceFailureReason,
   EvidenceOutcomeCopy,
   EvidenceStatus,
   EvidenceStep,
@@ -17,7 +19,14 @@ export function stepOf(
   key: EvidenceStepKey,
   status: EvidenceStatus,
   at: Date,
-  fields: { observed: string; calls?: RecordedHttpCall[]; notes?: string[]; ids?: Record<string, string> },
+  fields: {
+    observed: string;
+    calls?: RecordedHttpCall[];
+    notes?: string[];
+    ids?: Record<string, string>;
+    reason?: EvidenceFailureReason;
+    refund?: EvidenceRefundState;
+  },
 ): EvidenceStep {
   return {
     key,
@@ -27,6 +36,8 @@ export function stepOf(
     notes: fields.notes ?? [],
     ids: fields.ids ?? {},
     observed: fields.observed,
+    ...(fields.reason ? { reason: fields.reason } : {}),
+    ...(fields.refund ? { refund: fields.refund } : {}),
   };
 }
 

@@ -35,6 +35,7 @@ function delegates() {
       rows.set(create.id, row);
       return row;
     }),
+    updateMany: vi.fn(async () => ({ count: 0 })),
   };
   const webhookEvents: EvidenceWebhookDelegate = { findMany: vi.fn(async () => []) };
   const charges: EvidenceChargeDelegate = { findFirst: vi.fn(async () => null) };
@@ -104,6 +105,7 @@ describe('createHomologacaoEvidence', () => {
       },
       // Sandbox has no Pix a person pays (FUT-4198).
       pix: null,
+      scenarios: null,
     });
     expect(JSON.stringify(view)).not.toContain('seller-secret');
   });

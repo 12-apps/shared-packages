@@ -1,5 +1,6 @@
 import { ProviderRequestError } from '../core/errors';
 import type { PaymentProviderAdapter } from '../core/provider';
+import { NOTHING_TO_REFUND } from '../core/refund-retry';
 import type { RefundSnapshot, ResolvedCredentials } from '../core/types';
 import { NAME, pagbankRequest } from './pagbank-http';
 import {
@@ -222,6 +223,7 @@ export const refund: NonNullable<PaymentProviderAdapter['refund']> = async (
   const value = input.amount ? input.amount.amountCents : cents;
   if (value === 0) {
     throw new ProviderRequestError(NAME, `PagBank charge ${chargeId} has nothing left to refund.`, {
+      providerCode: NOTHING_TO_REFUND,
       retriable: false,
     });
   }

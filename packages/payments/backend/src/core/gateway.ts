@@ -2,7 +2,7 @@ import { cancelChargeAt } from './charge-cancel';
 import { captureChargeAt, type CaptureChargeMethods } from './charge-capture';
 import { manualChargeMethods, type ManualChargeMethods } from './manual-charge';
 import { refreshOneCharge } from './charge-refresh';
-import { withProviderFailureReports } from './gateway-reporting';
+import { refundNotYetOf, withProviderFailureReports } from './gateway-reporting';
 import type { ProviderFailureReporter } from './provider-failure';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
@@ -392,5 +392,5 @@ export function createPaymentsGateway<P extends string>(
     stillWalkedPast: (merchant, key) => providersStillWalkedPast(config.attempts, config.health, merchant, key),
     handleWebhook: (m, d) => runWebhookPipeline(config, (p) => resolve(m, p), m, d),
     replayWebhooks: (options) => replayRetryableWebhooks(config, options),
-  }) };
+  }, refundNotYetOf(config.providers)) };
 }

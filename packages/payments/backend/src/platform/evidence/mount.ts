@@ -1,3 +1,4 @@
+import type { PaymentsJobBlueprint } from '../../jobs';
 import { createConnectState, type ConnectState } from '../../config/connect-state';
 import type { MerchantRef } from '../../core/types';
 import { PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY } from './production-pt-BR';
@@ -50,7 +51,15 @@ export interface HomologacaoEvidenceMount {
   connectState: (environment: EvidenceEnvironment) => ConnectState;
   environmentOf: (request: Request) => EvidenceEnvironment;
   evidence: (environment?: EvidenceEnvironment) => Promise<HomologacaoEvidenceService>;
+  /**
+   * The background sweep that sends the production Pix refund's later attempts
+   * (FUT-4360): the host registers it like the package's other blueprints.
+   */
+  refundSweep: PaymentsJobBlueprint;
 }
+
+/** Every minute: the first retry is due 5 minutes in, so the coarsest tick is a minute late at most. */
+const REFUND_SWEEP_CRON = '* * * * *';
 
 export function createHomologacaoEvidenceMount(options: HomologacaoEvidenceMountOptions): HomologacaoEvidenceMount {
   const state = (cookiePrefix: string) =>
@@ -59,20 +68,32 @@ export function createHomologacaoEvidenceMount(options: HomologacaoEvidenceMount
     SANDBOX: state(options.cookiePrefix),
     PRODUCTION: state(`${options.cookiePrefix}-prod`),
   };
+  const evidence = async (environment: EvidenceEnvironment = 'SANDBOX') => {
+    const production = environment === 'PRODUCTION';
+    return createHomologacaoEvidence({
+      ...(await options.deps()),
+      environment,
+      merchant: SELLERS[environment],
+      webhookUrl: `${options.baseUrl()}${options.webhookPath}${production ? '-producao' : ''}/pagbank`,
+      copy: production ? PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY : PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
+    });
+  };
   return {
     seller: (environment) => SELLERS[environment],
     connectState: (environment) => states[environment],
     environmentOf: (request) =>
       new URL(request.url).searchParams.get('ambiente') === 'producao' ? 'PRODUCTION' : 'SANDBOX',
-    evidence: async (environment = 'SANDBOX') => {
-      const production = environment === 'PRODUCTION';
-      return createHomologacaoEvidence({
-        ...(await options.deps()),
-        environment,
-        merchant: SELLERS[environment],
-        webhookUrl: `${options.baseUrl()}${options.webhookPath}${production ? '-producao' : ''}/pagbank`,
-        copy: production ? PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY : PT_BR_HOMOLOGACAO_EVIDENCE_COPY,
-      });
+    evidence,
+    refundSweep: {
+      name: 'homologacao-evidence-refund',
+      queue: 'sweeps',
+      concurrency: 1,
+      schedule: { pattern: REFUND_SWEEP_CRON },
+      // The next tick IS the retry, and every attempt is claimed behind the record.
+      attempts: 1,
+      // More than one tick (a consult and a cancel at the adapter's timeouts), less than a dead worker's claim.
+      lease: { ttlMs: 60_000 },
+      handle: async () => (await evidence('PRODUCTION')).retryDueRefund(),
     },
   };
 }

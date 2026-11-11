@@ -338,6 +338,8 @@ export interface PaymentProviderAdapterBase {
    * the charge back through its container (PagBank's order) can (FUT-3722).
    */
   refund?(input: RefundInput, credentials: ResolvedCredentials, hints?: SettlementHints): Promise<RefundSnapshot>;
+  /** What this provider's refusal of a refund means (FUT-4360): wait (`NOT_YET`), give up (`REFUSED`) or no verdict. */
+  classifyRefundRefusal?(error: unknown): 'NOT_YET' | 'REFUSED' | 'UNKNOWN';
 
   /**
    * Webhook handling, split in two so the gateway can dedup between the
