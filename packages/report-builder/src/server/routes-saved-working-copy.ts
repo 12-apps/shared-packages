@@ -15,6 +15,7 @@ import {
   type ReportRoute,
 } from './context';
 import type { SavedReportRecord, SavedReportStore } from './saved';
+import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { parksEditsInWorkingCopy, reportWorkingCopySchema } from './working-copy';
@@ -89,8 +90,8 @@ function saveRoute(config: ReportBuilderServerConfig, store: SavedReportStore): 
       if (!mayAuthor(config, actor)) return fail(403, messagesOf(config, locale).forbiddenEdit);
       const parsed = reportWorkingCopySchema.safeParse(body);
       if (!parsed.success) {
-        const first = parsed.error.issues[0];
-        return fail(400, first ? `${first.path.join('.') || 'body'}: ${first.message}` : messagesOf(config, locale).invalidBody);
+        const refused = invalidInputError(parsed.error, messagesOf(config, locale).invalidBody);
+        return fail(422, refused.message, refused.problems);
       }
       const record = await loadPublished(store, actor, params.id ?? '', messagesOf(config, locale));
       if (isFailure(record)) return record.error;
@@ -179,10 +180,7 @@ function parsePublishBody(
 } {
   const parsed = reportWorkingCopySchema.safeParse(body);
   if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    throw invalidSpecError(
-      first ? `${first.path.join('.') || 'body'}: ${first.message}` : messages.invalidBody,
-    );
+    throw invalidInputError(parsed.error, messages.invalidBody);
   }
   const input = parsed.data;
   if (input.name.trim() === '') throw invalidSpecError(messages.nameRequired);

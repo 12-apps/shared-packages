@@ -13,6 +13,7 @@ import {
   DISCOUNT_TARGET_TYPES,
   DISCOUNT_TRIGGERS,
   DISCOUNT_TYPES,
+  DISCOUNT_WINDOW_STATES,
   MAX_COMBO_SLOTS,
   MAX_COMBO_SLOT_QUANTITY,
   MAX_PERCENT_OFF_BP,
@@ -35,12 +36,12 @@ import { discountSearchConfig } from "./search";
  */
 
 /** Path params for the tenant-scoped discounts collection. */
-export const discountCollectionParams = z.object({
+export const discountCollectionParams = z.strictObject({
   tenantSlug: z.string().min(1),
 });
 
 /** Path params for a single discount. */
-export const discountItemParams = z.object({
+export const discountItemParams = z.strictObject({
   tenantSlug: z.string().min(1),
   id: z.string().min(1),
 });
@@ -62,7 +63,7 @@ const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
  * non-empty — a rule `./validate-combo.ts` enforces with the host's own
  * sentence, because a Zod refinement here could only answer in a Zod path.
  */
-export const comboRequirementSchema = z.object({
+export const comboRequirementSchema = z.strictObject({
   menuItemIds: z.array(z.string().min(1)).default([]),
   categoryIds: z.array(z.string().min(1)).default([]),
   quantity: z.number().int().min(1).max(MAX_COMBO_SLOT_QUANTITY),
@@ -86,14 +87,14 @@ const clockTimeSchema = z
  * `to` earlier than `from` is legal and means the window runs past midnight: a
  * bar shutting at 02:00 is the most common happy hour there is.
  */
-const scheduleWindowSchema = z.object({
+const scheduleWindowSchema = z.strictObject({
   days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
   from: clockTimeSchema,
   to: clockTimeSchema,
 });
 
 /** The weekly schedule. Null = always, within the campaign window. */
-const discountScheduleSchema = z.object({
+const discountScheduleSchema = z.strictObject({
   windows: z.array(scheduleWindowSchema).min(1).max(MAX_SCHEDULE_WINDOWS),
 });
 
@@ -177,7 +178,13 @@ export function createDiscountListQuery<E extends Record<string, z.ZodTypeAny>>(
  * browsers; reading `process.env` at module scope would make the advertised
  * surface depend on where it was generated.
  */
-export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.parse({}));
+export const listDiscountsQuery = createDiscountListQuery(searchConfigSchema.parse({}), {
+  // The pill the package's own grid forwards (`OWNED_PARAMS`). It is a window
+  // state, not a filterable column, so it is declared here rather than derived;
+  // the schema is strict, and a host left on this default would otherwise
+  // answer 422 the moment an operator picks that pill.
+  window: z.enum(DISCOUNT_WINDOW_STATES).optional(),
+});
 
 /**
  * The write body, shared by create and update: a discount is always saved
@@ -214,7 +221,7 @@ const discountWriteShape = {
 };
 
 /** Body for creating a discount. */
-export const createDiscountBody = z.object(discountWriteShape);
+export const createDiscountBody = z.strictObject(discountWriteShape);
 
 /**
  * Body for updating a discount — and `keepWindow`, the one word an update has
@@ -223,7 +230,7 @@ export const createDiscountBody = z.object(discountWriteShape);
  * runtime knows) and sends none. The stored window and its flag are then
  * kept, and every other field is written.
  */
-export const updateDiscountBody = z.object({
+export const updateDiscountBody = z.strictObject({
   ...discountWriteShape,
   keepWindow: z
     .boolean()

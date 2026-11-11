@@ -30,6 +30,12 @@ describe("parseSortParam", () => {
 describe("createSearchInput", () => {
   const entityConfig = createMockEntitySearchConfig();
 
+  it("refuses a key the schema does not declare, naming it", () => {
+    const result = createSearchInput(entityConfig, globalConfig).safeParse({ page: "1", bogus: "x" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toMatchObject([{ code: "unrecognized_keys", keys: ["bogus"] }]);
+  });
+
   it("applies defaults when no params provided", () => {
     const result = createSearchInput(entityConfig, globalConfig).parse({});
     expect(result.page).toBe(1);
@@ -171,6 +177,24 @@ describe("parseSearchParamsResilient", () => {
     const result = parseSearchParamsResilient(schema, { q: "ana", status_in: "BOGUS" });
     expect(result.q).toBe("ana");
     expect(result.status_in).toBeUndefined();
+  });
+
+  it("drops an unknown key (a URL's utm_*) and keeps every valid filter", () => {
+    // The schema is strict, so a stray key is a problem at the object's own path.
+    const result = parseSearchParamsResilient(schema, { q: "ana", page: "2", utm_source: "mail" });
+    expect(result.q).toBe("ana");
+    expect(result.page).toBe(2);
+  });
+
+  it("keeps the valid filters when an unknown key AND a bad sort arrive together", () => {
+    const result = parseSearchParamsResilient(schema, {
+      q: "ana",
+      page: "2",
+      sort: "bogus:asc",
+      utm_source: "mail",
+    });
+    expect(result.q).toBe("ana");
+    expect(result.page).toBe(2);
   });
 
   it("falls back to all defaults when the cleaned input still won't parse", () => {

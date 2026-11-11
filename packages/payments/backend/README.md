@@ -64,6 +64,7 @@ These are the seams hosts most often re-implement by accident:
 | `reconcilePendingCharges` | the sweep that re-reads charges the provider never called back about, so a dropped webhook does not strand a paid order |
 | `createPrismaChargeStore` | the charge store the gateway and the sweep share |
 | `classifyReversalEvent` | which reversal shape a delivery is — chargeback, refund, dispute |
+| `supportsPartialRefund(caps, method)` | whether a provider refunds PART of a charge paid with that method (FUT-4571): `partialRefunds` (every method) or `partialRefundMethods` (PagBank: card only, Pix stays manual). Read the pair through it, never the boolean alone |
 | `chargeDeadlinePassed`, `pixChargePayable`, `hostedChargePayable` | whether a charge already raised is still payable |
 | `gateway.captureCharge` | takes the money an AUTHORIZED charge only holds, and persists the PAID it answers (FUT-4082); `UnsupportedOperationError` where the provider cannot |
 | `gateway.quoteInstallments` | the provider's own price for a card charge in 2..12, the buyer paying the interest (FUT-4382) — what to show before paying; a typed `refusal` where the provider quotes none |

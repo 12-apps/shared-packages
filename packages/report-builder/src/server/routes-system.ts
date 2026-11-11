@@ -9,10 +9,10 @@ import {
   ok,
   runOptions,
   toReportRangeView,
-  windowOf,
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
+import { windowOfQuery } from './range-query';
 import type { SystemReportDef } from './system-reports';
 import { REPORT_GRAINS } from './wire';
 import { REPORT_BUILDER_FEATURES } from './features';
@@ -85,7 +85,7 @@ function systemRunRoute(config: ReportBuilderServerConfig): ReportRoute {
 
       const grain = grainOf(query);
       try {
-        const range = windowOf(config, { query });
+        const range = windowOfQuery(config, { query, locale });
         const result = await runReport(
           report.build({ grain }),
           await runOptions(config, actor, range, locale),

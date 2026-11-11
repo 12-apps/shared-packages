@@ -45,7 +45,9 @@ import {
   type LifecycleResponse,
   type LifecycleRoute,
   type LifecycleUserDirectory,
+  invalidInput,
   parseSnapshotBody,
+  unrecognizedKeys,
 } from './context';
 import type { LifecycleEntityRegistration } from './registration';
 import type { VersionComparisonWire, VersionsWire } from '../wire';
@@ -125,18 +127,21 @@ async function ctxOf(deps: EntityRouteDeps, actor: LifecycleActor): Promise<Life
  * every caller makes; a comparison materializes up to four versions.
  *
  * Strict digits, like the restore route: `parseInt` would accept "1.5" and
- * "1abc" and quietly compare v1 instead of answering 400.
+ * "1abc" and quietly compare v1 instead of answering 422.
  */
 function requestedComparison(
   query: Record<string, string | undefined>,
   messages: LifecycleMessages,
 ): number | null {
+  const problems = unrecognizedKeys(query, ['compare']);
   const raw = query.compare;
-  if (raw === undefined || raw === '') return null;
-  if (!/^[0-9]+$/.test(raw)) throw new LifecycleApiError(400, messages.invalidBody);
-  const version = Number.parseInt(raw, 10);
-  if (version < 1) throw new LifecycleApiError(400, messages.invalidBody);
-  return version;
+  if (raw !== undefined && raw !== '' && !/^[0-9]+$/.test(raw)) {
+    problems.push({ path: 'compare', message: 'Expected a version number' });
+  } else if (raw !== undefined && raw !== '' && Number.parseInt(raw, 10) < 1) {
+    problems.push({ path: 'compare', message: 'Must be at least 1' });
+  }
+  if (problems.length > 0) throw invalidInput(messages, problems);
+  return raw === undefined || raw === '' ? null : Number.parseInt(raw, 10);
 }
 
 /** The comparison table for the wire: dates as ISO, actors resolved to names. */

@@ -196,8 +196,8 @@ describe('minting a desk session', () => {
     // Both are the HOST's mint policy — `targetApps` and `reasonLength` are
     // config, so a package with a default here would be inventing the host's
     // apps and its idea of an explanation.
-    expect((await start({ targetApp: 'warehouse' })).status).toBe(400);
-    expect((await start({ reason: 'because' })).status).toBe(400);
+    expect((await start({ targetApp: 'warehouse' })).status).toBe(422);
+    expect((await start({ reason: 'because' })).status).toBe(422);
     expect((await trail()).started).toHaveLength(0);
   });
 
@@ -454,7 +454,10 @@ describe('adopted through @12-apps/wiring, as TWO manifests', () => {
       body: JSON.stringify({ targetUserId: MEMBER?.id, targetApp: 'counter', reason: 'too short' }),
     });
 
-    expect(refused.status).toBe(400);
-    expect((await refused.json()) as { error?: string }).toHaveProperty('error');
+    expect(refused.status).toBe(422);
+    expect((await refused.json()) as { error?: string; problems?: unknown[] }).toMatchObject({
+      error: expect.any(String),
+      problems: expect.any(Array),
+    });
   });
 });

@@ -69,7 +69,7 @@ const jsonWire = <T>(): z.ZodType<T> => z.unknown() as z.ZodType<T>;
  */
 
 /** Every lifecycle route is tenant-scoped. */
-export const lifecycleTenantParams = z.object({
+export const lifecycleTenantParams = z.strictObject({
   tenantSlug: z.string().min(1),
 });
 
@@ -77,7 +77,7 @@ export const lifecycleTenantParams = z.object({
  * Version-history params, identical across every plugged collection:
  * `{ tenantSlug, id }` to list a record's history, `+ version` to address one.
  */
-export const versionsParams = z.object({
+export const versionsParams = z.strictObject({
   tenantSlug: z.string().min(1),
   id: z.string().min(1),
 });
@@ -103,7 +103,7 @@ const versionSummarySchema = z.object({
  * (FUT-247). Optional, and absent by default: the list is the cheap read every
  * caller makes, and materializing four versions is not.
  */
-export const versionsQuery = z.object({
+export const versionsQuery = z.strictObject({
   compare: z.coerce.number().int().min(1).optional(),
 });
 
@@ -173,11 +173,11 @@ export const writeOutcomeResponse = z.object({ data: writeOutcomeSchema });
  * JSON object (validated only at PUBLISH time against the current schema, the
  * schema-drift-tolerant posture).
  */
-export const saveDraftBody = z.object({
+export const saveDraftBody = z.strictObject({
   data: z.record(z.string(), z.unknown()),
 });
 
-export const draftItemParams = z.object({
+export const draftItemParams = z.strictObject({
   tenantSlug: z.string().min(1),
   draftId: z.string().min(1),
 });

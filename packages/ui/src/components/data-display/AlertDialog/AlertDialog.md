@@ -312,6 +312,16 @@ The component automatically adapts to your MUI theme:
 - Follows theme spacing and typography
 - Respects theme transitions and animations
 
+### Over a held sheet
+
+A `controlled` `Sheet` (every `UsableModal` phone sheet) stays open when its
+host refuses a close, and the host usually answers with this dialog. The sheet
+may sit above `zIndex.modal` — a host's stack, or a host theme that lifts bottom
+drawers — so when the dialog opens it reads the computed z-index of every held
+sheet on screen (`data-held-sheet`) and takes one above the highest, inline.
+With no held sheet above its own level it keeps `zIndex.modal`, and a dialog
+whose theme already puts it higher is left alone (FUT-4478).
+
 ## Performance Considerations
 
 - Dialog content is not rendered when closed

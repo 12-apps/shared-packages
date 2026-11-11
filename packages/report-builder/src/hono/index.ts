@@ -63,15 +63,22 @@ function honoPath(route: ReportRoute): string {
   return route.path;
 }
 
-/** Reads the JSON body, tolerating an absent or malformed one. */
+/** What `readBody` answers for a body that is present but is not JSON. */
+const MALFORMED = Symbol('malformed');
+
+/**
+ * Reads the JSON body. Absent is `undefined` (the handler's strict parse refuses
+ * it with a 422); present but not JSON is {@link MALFORMED}, which the adapter
+ * answers 400 itself: malformed JSON is a transport error, never a validation one.
+ */
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET' || c.req.method === 'DELETE') return undefined;
+  const text = await c.req.text();
+  if (text.trim() === '') return undefined;
   try {
-    return await c.req.json();
+    return JSON.parse(text);
   } catch {
-    // A malformed body is the caller's error, and the handler's own validation
-    // reports it far better than a parse failure would.
-    return undefined;
+    return MALFORMED;
   }
 }
 
@@ -89,11 +96,14 @@ export function reportBuilderRouter(config: ReportBuilderHonoConfig): Hono {
         return c.json({ error: messagesOf(config, locale).unauthenticated }, 401);
       }
 
+      const body = await readBody(c);
+      if (body === MALFORMED) return c.json({ error: messagesOf(config, locale).invalidBody }, 400);
+
       const response = await route.handle({
         actor,
         params: c.req.param() as Record<string, string | undefined>,
         query: c.req.query() as Record<string, string | undefined>,
-        body: await readBody(c),
+        body,
         ...(locale === undefined ? {} : { locale }),
       });
 

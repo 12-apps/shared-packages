@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { expect, fn,userEvent, waitFor, within } from 'storybook/test';
 
+import { Sheet } from '../Sheet';
 import { AlertDialog } from './AlertDialog';
 import type { AlertDialogProps } from './AlertDialog.types';
 
@@ -796,5 +797,77 @@ export const NarrowLoneButtonKeepsItsWidth: Story = {
     const inner = box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     await expect(confirm.width).toBeLessThan(inner - 40);
     await expect(Math.abs(confirm.right - (box.right - parseFloat(style.paddingRight)))).toBeLessThanOrEqual(1);
+  },
+};
+
+/**
+ * FUT-4478: the question a HELD sheet's host asks is drawn above the sheet.
+ *
+ * The sheet is `controlled` (as every `UsableModal` phone sheet is) and raised
+ * to 1400, the level a host theme lifts a bottom drawer to. Its ✕ only asks;
+ * the host refuses with this question, so the sheet stays open behind it. At its
+ * own `zIndex.modal` (1300) the question used to sit under the sheet: in the
+ * DOM, unseen, and `elementFromPoint` at its centre hit the sheet's form. The
+ * play hit-tests both buttons' centres, answers "keep editing", and checks the
+ * sheet is still there.
+ */
+const HeldSheetHost = () => {
+  const [asking, setAsking] = useState(false);
+  return (
+    <>
+      <Sheet
+        open
+        controlled
+        position="bottom"
+        size="lg"
+        zIndex={1400}
+        title="Editar pedido"
+        closeLabel="Fechar"
+        dataTestId="held"
+        onOpenChange={(next) => {
+          if (!next) setAsking(true);
+        }}
+      >
+        <p data-testid="held-form">Formulário com alterações</p>
+      </Sheet>
+      <AlertDialog
+        open={asking}
+        variant="destructive"
+        title="Descartar as alterações?"
+        description="O que foi alterado será perdido."
+        confirmText="Descartar"
+        cancelText="Continuar editando"
+        onConfirm={() => setAsking(false)}
+        onCancel={() => setAsking(false)}
+        onClose={() => setAsking(false)}
+        data-testid="held-question"
+      />
+    </>
+  );
+};
+
+/** Whether a real tap at the centre of `element` lands on it (or inside it). */
+const tapReaches = (element: HTMLElement): boolean => {
+  const box = element.getBoundingClientRect();
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  return hit !== null && element.contains(hit);
+};
+
+export const QuestionOverHeldSheet: Story = {
+  parameters: { layout: 'fullscreen' },
+  globals: { viewport: { value: 'xs', isRotated: false } },
+  render: () => <HeldSheetHost />,
+  play: async () => {
+    const page = within(document.body);
+    await userEvent.click(await page.findByTestId('held-header-close-button'));
+    const question = await page.findByRole('alertdialog');
+    await waitFor(() => expect(tapReaches(page.getByTestId('held-question-confirm-button'))).toBe(true));
+    await expect(tapReaches(page.getByTestId('held-question-cancel-button'))).toBe(true);
+    await expect(tapReaches(question)).toBe(true);
+    // The sheet stayed open behind the question: the close only asked.
+    await expect(page.getByTestId('held-form')).toBeVisible();
+    await userEvent.click(page.getByTestId('held-question-cancel-button'));
+    await waitFor(() => expect(page.queryByRole('alertdialog')).toBeNull());
+    await expect(page.getByTestId('held-form')).toBeVisible();
   },
 };

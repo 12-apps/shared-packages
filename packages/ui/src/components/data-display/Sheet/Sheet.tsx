@@ -12,6 +12,7 @@ import {
   SPRING_CONFIG,
 } from './Sheet.animations';
 import { SheetBody } from './Sheet.body';
+import { HELD_SHEET_ATTRIBUTE } from './held-sheet';
 import { useSheetDrag, useSheetOpen } from './Sheet.hooks';
 import { SheetOverlay } from './Sheet.parts';
 import { panelSx } from './Sheet.styles';
@@ -110,6 +111,12 @@ const dialogAriaOf = ({ asDialog, title }: ResolvedSheetProps, titleId: string) 
 const stackedAt = (zIndex: number | undefined) => (zIndex === undefined ? {} : { sx: { zIndex } });
 
 /**
+ * A held sheet marks its root while it is open, so a question its host asks
+ * beside it can clear its level (`./held-sheet`, FUT-4478).
+ */
+const heldMarkOf = (held: boolean) => (held ? { [HELD_SHEET_ATTRIBUTE]: '' } : {});
+
+/**
  * The drawer's modal: kept mounted, its own Escape off (the hook's listener
  * honours `closeOnEscape`), and an invisible backdrop that catches the tap.
  */
@@ -148,6 +155,7 @@ export const Sheet: React.FC<SheetProps> = (props) => {
     open: isOpen,
     className,
     ...stackedAt(zIndex),
+    ...heldMarkOf(Boolean(resolved.controlled) && isOpen),
     ...(resolved.animated === false ? { transitionDuration: 0 } : {}),
     // A tap outside obeys `closeOnOverlayClick`. A swipe-to-dismiss (no
     // reason: SwipeableDrawer calls `onClose()` bare) closes. Escape is the

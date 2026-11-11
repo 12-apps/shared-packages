@@ -8,6 +8,7 @@ import type { AuditCopySource } from '../core/copy';
 import type { AuditVocabulary } from '../core/vocabulary';
 
 import type { AuditDbProvider } from './db';
+import type { InputProblem } from './problems';
 
 /**
  * What a host must resolve before a request reaches these handlers: WHO is
@@ -291,8 +292,11 @@ export type { AuditCopyResolver, AuditCopySource } from '../core/copy';
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class AuditApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** Set on a 422: every problem of the refused input, with its path. */
+  readonly problems?: InputProblem[];
+  constructor(status: number, message: string, problems?: InputProblem[]) {
     super(message);
+    if (problems) this.problems = problems;
     this.name = 'AuditApiError';
     this.status = status;
     Object.setPrototypeOf(this, AuditApiError.prototype);
@@ -307,7 +311,10 @@ export const ok = (data: unknown, status = 200): AuditResponse => ({ status, bod
  * {@link foldApiError}, so there is exactly one place a status and a message
  * become a response.
  */
-const fail = (status: number, error: string): AuditResponse => ({ status, body: { error } });
+const fail = (status: number, error: string, problems?: InputProblem[]): AuditResponse => ({
+  status,
+  body: problems ? { error, problems } : { error },
+});
 
 /** A `{ data, pagination }` page — returned UNWRAPPED (no outer envelope). */
 export const pageResponse = (data: unknown[], pagination: unknown): AuditResponse => ({
@@ -317,7 +324,7 @@ export const pageResponse = (data: unknown[], pagination: unknown): AuditRespons
 
 /** Fold an {@link AuditApiError} into a response; rethrow anything else. */
 export function foldApiError(error: unknown): AuditResponse {
-  if (error instanceof AuditApiError) return fail(error.status, error.message);
+  if (error instanceof AuditApiError) return fail(error.status, error.message, error.problems);
   throw error;
 }
 

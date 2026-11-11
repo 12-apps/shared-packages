@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
+import { parseStoredDocument } from '../run';
 import { reportDocumentSchema } from '../spec';
+import { withoutUnrecognizedKeys } from '../strip-unknown';
 
 import { REPORT_DEFAULT_RANGES } from './range';
 import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
@@ -39,7 +41,8 @@ import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
  * that would drop the very keystrokes this feature exists to keep. The strict
  * schema still guards the moment it goes live.
  */
-export const reportWorkingCopySchema = z.object({
+// @request-input
+export const reportWorkingCopySchema = z.strictObject({
   name: z.string().max(120),
   description: z.string().max(500).nullish(),
   spec: reportDocumentSchema,
@@ -62,7 +65,19 @@ export type ReportWorkingCopy = z.infer<typeof reportWorkingCopySchema>;
  */
 export function readWorkingCopy(value: unknown): ReportWorkingCopy | null {
   if (typeof value !== 'object' || value === null) return null;
-  const parsed = reportWorkingCopySchema.safeParse(value);
+  // Stored, not requested: a key another release wrote must not make the
+  // parked edit read as lost, so unknown keys are dropped (the request schema
+  // stays strict). The spec is cleaned through the document view because its
+  // union hides the unrecognized keys from a top-level pass.
+  const record = value as Record<string, unknown>;
+  let spec: unknown;
+  try {
+    spec = parseStoredDocument(record.spec);
+  } catch {
+    return null;
+  }
+  const cleaned = withoutUnrecognizedKeys(reportWorkingCopySchema, { ...record, spec });
+  const parsed = reportWorkingCopySchema.safeParse(cleaned);
   return parsed.success ? parsed.data : null;
 }
 

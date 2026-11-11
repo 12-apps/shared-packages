@@ -182,7 +182,11 @@ describe('POST on the platform surface — starting an operator session', () => 
         actor: operator(),
         body: startBody({ targetApp: 'kiosk' }),
       }),
-    ).rejects.toMatchObject({ status: 400, message: TEST_MESSAGES.invalidBody });
+    ).rejects.toMatchObject({
+      status: 422,
+      message: TEST_MESSAGES.invalidBody,
+      problems: [{ path: 'targetApp' }],
+    });
   });
 
   it('refuses a reason shorter than the host demands', async () => {
@@ -191,7 +195,19 @@ describe('POST on the platform surface — starting an operator session', () => 
         actor: operator(),
         body: startBody({ reason: 'short' }),
       }),
-    ).rejects.toMatchObject({ status: 400 });
+    ).rejects.toMatchObject({ status: 422, problems: [{ path: 'reason' }] });
+  });
+
+  it('refuses a body carrying a key the start does not read', async () => {
+    await expect(
+      drive(harness, 'POST', 'platform', {
+        actor: operator(),
+        body: { ...startBody(), tenantOverride: 'other' },
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      problems: [{ path: 'tenantOverride', message: 'Unrecognized key' }],
+    });
   });
 
   it('refuses a target that holds platform authority, and says which rule', async () => {
@@ -481,7 +497,7 @@ describe('POST on the tenant surface — starting a preview', () => {
     expect(dataOf<{ readOnly: boolean }>(response)).toMatchObject({ readOnly: true });
   });
 
-  it('takes no allowWrites parameter at all — it is not a parameter of this surface', async () => {
+  it('takes no allowWrites parameter at all — sending one is refused, not ignored', async () => {
     const harness = mount();
     await expect(
       drive(harness, 'POST', 'tenant', {
@@ -489,8 +505,11 @@ describe('POST on the tenant surface — starting a preview', () => {
         params: { tenantSlug: 'acme' },
         body: { as: 'role', roleName: 'FLOOR', allowWrites: true },
       }),
-    ).resolves.toBeDefined();
-    expect(harness.trail.started[0]?.allowWrites).toBe(false);
+    ).rejects.toMatchObject({
+      status: 422,
+      problems: [{ path: 'allowWrites', message: 'Unrecognized key' }],
+    });
+    expect(harness.trail.started).toEqual([]);
   });
 
   it('refuses a caller without the permission, and records it', async () => {

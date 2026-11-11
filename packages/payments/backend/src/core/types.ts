@@ -293,6 +293,8 @@ export interface ProviderCapabilities {
   savedCards: boolean;
   refunds: boolean;
   partialRefunds: boolean;
+  /** Methods refunded in part beyond `partialRefunds`, which means every method (FUT-4571). */
+  partialRefundMethods?: readonly PaymentMethodKind[];
   /** Marketplace-style split of one charge across recipients. */
   splits: boolean;
   webhooks: boolean;
@@ -321,11 +323,10 @@ export interface ProviderCapabilities {
    */
   confirmation?: ChargeConfirmation;
   /**
-   * The environments this provider HAS. Absent: both. A provider with no
-   * sandbox at all (the store's own Pix key: every code is real money)
-   * declares `['PRODUCTION']`, so the settings screen offers no "test
-   * environment" that would promise no money moves, and a save into an
-   * environment it does not have is refused.
+   * The environments this provider HAS. Absent: both. A provider with no sandbox
+   * at all (the store's own Pix key: every code is real money) declares
+   * `['PRODUCTION']`, so the settings screen offers no "test environment" that
+   * would promise no money moves, and a save into one it lacks is refused.
    */
   environments?: readonly PaymentEnvironment[];
   /** It judges `customer.email`, so the activation step asks for it (FUT-4200). Default false. */

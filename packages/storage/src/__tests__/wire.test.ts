@@ -21,6 +21,15 @@ const FLAT_KEY = `products/${SCOPE}/${UUID}.webp`;
 
 const local = (key: string): string => `/api/uploads/local/${key}`;
 
+describe('inlineImageSchema', () => {
+  it('refuses a key it does not declare instead of dropping it', () => {
+    const schema = inlineImageSchema(1024);
+    const image = { contentType: 'image/png', contentBase64: 'AAAA' };
+    expect(schema.safeParse(image).success).toBe(true);
+    expect(schema.safeParse({ ...image, filename: 'x.png' }).success).toBe(false);
+  });
+});
+
 describe('objectKeySchema', () => {
   it('accepts the shapes this scheme actually mints', () => {
     for (const key of [SET_KEY, FLAT_KEY, `products/${UUID}/full.webp`]) {

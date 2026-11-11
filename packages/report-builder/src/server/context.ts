@@ -1,4 +1,4 @@
-import { ReportBuilderError } from '../errors';
+import { InvalidInputError, ReportBuilderError, type InputProblem } from '../errors';
 import type { ReportEngineCopy } from '../copy';
 import type { ReportSpec } from '../spec';
 import type { FieldCatalog, ReportDataSource } from '../types';
@@ -256,9 +256,9 @@ export function engineCopyOf(
 }
 
 export const ok = (data: unknown, status = 200): ReportResponse => ({ status, body: { data } });
-export const fail = (status: number, error: string): ReportResponse => ({
+export const fail = (status: number, error: string, problems?: InputProblem[]): ReportResponse => ({
   status,
-  body: { error },
+  body: problems ? { error, problems } : { error },
 });
 
 /** 403, in the host's own words. */
@@ -273,6 +273,9 @@ export const forbidden = (
  * builder shows beside the field. Anything else is ours and propagates.
  */
 export function foldSpecError(error: unknown): ReportResponse {
+  // A refused input is a 422 carrying every problem; a spec the compiler cannot
+  // build is a 400 carrying its own actionable sentence.
+  if (error instanceof InvalidInputError) return fail(422, error.message, error.problems);
   if (error instanceof ReportBuilderError) return fail(400, error.message);
   throw error;
 }

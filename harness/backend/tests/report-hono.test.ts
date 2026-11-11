@@ -309,8 +309,9 @@ describe('a spec error stays the author’s mistake over HTTP', () => {
     expect(body.error).toMatch(/ghostField/);
   });
 
-  it('tolerates a malformed body rather than failing to parse', async () => {
-    // The handler's own validation reports this far better than a parse error.
+  it('answers a body that is not JSON with 400, never a validation 422', async () => {
+    // Malformed JSON is a transport error; only well-formed JSON of the wrong
+    // shape is the strict parse's 422.
     const { request } = setup();
 
     const response = await request('/api/admin/acme/reports/run', {
