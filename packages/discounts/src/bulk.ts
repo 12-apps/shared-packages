@@ -25,6 +25,14 @@
 /** The most discounts one batch may name; more is refused whole with a 422. */
 export const DISCOUNT_BULK_MAX_IDS = 500;
 
+/**
+ * `allOrNothing` (the MCP tool sends it; the screen does not): every row is
+ * planned first, and if ANY row would be skipped or fail the call answers 422
+ * with every problem and its path and writes nothing. There is no transaction
+ * in the store port, so this is a plan-then-write, not an atomic commit: a row
+ * that moves between the plan and its write is still reported, per row.
+ */
+
 /** Exactly what Desfazer restores: the flag and the window as stored. */
 export interface DiscountBulkState {
   active: boolean;
@@ -47,6 +55,7 @@ export type DiscountBulkCode =
   | "deactivated"
   | "extended"
   | "revived"
+  | "extendedPaused"
   | "restored"
   | "alreadyActive"
   | "alreadyInactive"
@@ -56,6 +65,7 @@ export type DiscountBulkCode =
   | "notLater"
   | "stillEnded"
   | "zoneUnknown"
+  | "zoneOff"
   | "notFound"
   | "changedSince"
   | "changedDuringBatch"
@@ -103,7 +113,7 @@ export interface DiscountBulkUndoRow {
 }
 
 export type DiscountBulkOperation =
-  | { operation: "setActive"; ids: string[]; active: boolean; validateOnly?: boolean }
+  | { operation: "setActive"; ids: string[]; active: boolean; validateOnly?: boolean; allOrNothing?: boolean }
   | {
       operation: "extendWindow";
       ids: string[];
@@ -112,5 +122,6 @@ export type DiscountBulkOperation =
       /** Or the new last day (`YYYY-MM-DD`) for every row. Exactly one of the two. */
       endsOn?: string;
       validateOnly?: boolean;
+      allOrNothing?: boolean;
     }
-  | { operation: "undo"; rows: DiscountBulkUndoRow[]; validateOnly?: boolean };
+  | { operation: "undo"; rows: DiscountBulkUndoRow[]; validateOnly?: boolean; allOrNothing?: boolean };

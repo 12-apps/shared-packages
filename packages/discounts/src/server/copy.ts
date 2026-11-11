@@ -126,6 +126,8 @@ export interface DiscountsBulkServerCopy {
   readonly extended: string;
   /** An ended discount was extended: it is valid again ("voltou a valer"). */
   readonly revived: string;
+  /** An ended discount that was paused by hand is extended and STAYS paused. */
+  readonly extendedPaused: string;
   readonly restored: string;
   readonly alreadyActive: string;
   readonly alreadyInactive: string;
@@ -140,6 +142,8 @@ export interface DiscountsBulkServerCopy {
   /** An ended discount and a "Nova data" that is still in the past. */
   readonly stillEnded: string;
   readonly zoneUnknown: string;
+  /** The host counts no whole days now but this discount's dates were written by day. */
+  readonly zoneOff: string;
   readonly notFound: string;
   /** The row was changed by someone else after the batch: Desfazer leaves it as it is. */
   readonly changedSince: string;
@@ -148,6 +152,8 @@ export interface DiscountsBulkServerCopy {
   readonly failed: string;
   /** 422 - the batch names more discounts than one request may. */
   readonly tooManyIds: string;
+  /** 422 on an all-or-nothing call: nothing was written. `{count}` rows cannot take the change. */
+  readonly atomicRefused: string;
 }
 
 const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [

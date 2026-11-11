@@ -140,18 +140,28 @@ function refusalOf(newEnd: Date, record: DiscountRecord, ended: boolean, now: Da
   return null;
 }
 
-/** The state after an extension: the new window, and active again if the discount had ended. */
+/**
+ * The state after an extension: the new window and the SAME flag. A discount
+ * paused by hand stays paused even when it had ended (decided on FUT-4420, N6);
+ * only an ended one that was active "voltou a valer".
+ */
 function extendedState(
   record: DiscountRecord,
   window: { startsAt: Date | null; endsAt: Date | null; windowInZone: boolean },
-  ended: boolean,
 ): DiscountBulkState {
   return {
-    active: ended || record.active,
+    active: record.active,
     startsAt: window.startsAt?.toISOString() ?? null,
     endsAt: window.endsAt?.toISOString() ?? null,
     windowInZone: window.windowInZone,
   };
+}
+
+/** "Nova data" compares DAYS with the day the row shows, as the single-row edit does (review B3). */
+function dayRefusal(extension: Extension, shownEnd: string, newEnd: string): Settled | null {
+  if (!("endsOn" in extension)) return null;
+  if (newEnd === shownEnd) return settled("unchanged", "alreadyEndsThen");
+  return newEnd < shownEnd ? settled("skipped", "notLater") : null;
 }
 
 function planExtend(record: DiscountRecord, extension: Extension, ctx: BulkContext): Plan {
@@ -161,12 +171,16 @@ function planExtend(record: DiscountRecord, extension: Extension, ctx: BulkConte
   if (shown === null || shown.endsOn === null || today === null) return settled("skipped", "zoneUnknown");
   const ended = record.endsAt.getTime() <= ctx.now.getTime();
   const newEndsOn = newEndOf(extension, shown.endsOn, ended, today);
+  const sameDay = dayRefusal(extension, shown.endsOn, newEndsOn);
+  if (sameDay !== null) return sameDay;
   const window = windowFor(record, shown, newEndsOn, ctx.zone);
-  if (window === null || window.endsAt === null) return settled("skipped", "zoneUnknown");
+  if (window === null || window.endsAt === null) return settled("skipped", "zoneOff");
   const refused = refusalOf(window.endsAt, record, ended, ctx.now);
   if (refused !== null) return refused;
-  const next = extendedState(record, window, ended);
-  return { kind: "change", next, code: ended ? "revived" : "extended", endsOn: newEndsOn, revived: ended };
+  const next = extendedState(record, window);
+  const revived = ended && record.active;
+  const code: DiscountBulkCode = revived ? "revived" : ended && !record.active ? "extendedPaused" : "extended";
+  return { kind: "change", next, code, endsOn: newEndsOn, revived };
 }
 
 function planUndo(record: DiscountRecord, row: DiscountBulkUndoRow): Plan {
@@ -260,10 +274,18 @@ const rowOf = (
 });
 
 /** One row, planned and committed, read again where the row moved underneath. */
-async function runRow(ctx: BulkContext, id: string, plan: Planner, validateOnly: boolean): Promise<DiscountBulkRow> {
+async function runRow(
+  ctx: BulkContext,
+  id: string,
+  plan: Planner,
+  validateOnly: boolean,
+  seen: { name: string | null },
+): Promise<DiscountBulkRow> {
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const record = await ctx.store.get(ctx.clientId, id);
-    if (record === null) return rowOf(ctx.words, id, null, "skipped", "notFound");
+    if (record === null) return rowOf(ctx.words, id, seen.name, "skipped", "notFound");
+    // A failed row must still name its discount: it is the one a person has to find.
+    seen.name = record.name;
     const decided = plan(record);
     if (decided.kind === "settled") return rowOf(ctx.words, id, record.name, decided.status, decided.code);
     const committed = await commit(ctx, record, decided, validateOnly);
@@ -275,16 +297,21 @@ async function runRow(ctx: BulkContext, id: string, plan: Planner, validateOnly:
       ...(decided.revived === true ? { revived: true } : {}),
     });
   }
-  return rowOf(ctx.words, id, null, "failed", "changedDuringBatch");
+  return rowOf(ctx.words, id, seen.name, "failed", "changedDuringBatch");
 }
 
 /** A row that threw: reported and logged, and the batch goes on. */
-async function guarded(ctx: BulkContext, id: string, run: () => Promise<DiscountBulkRow>): Promise<DiscountBulkRow> {
+async function guarded(
+  ctx: BulkContext,
+  id: string,
+  seen: { name: string | null },
+  run: () => Promise<DiscountBulkRow>,
+): Promise<DiscountBulkRow> {
   try {
     return await run();
   } catch (error) {
     ctx.logger.error(`discounts: bulk row ${id} for tenant ${ctx.clientId} failed: ${errorText(error)}`);
-    return rowOf(ctx.words, id, null, "failed", "failed");
+    return rowOf(ctx.words, id, seen.name, "failed", "failed");
   }
 }
 
@@ -307,7 +334,8 @@ export async function runBulk(ctx: BulkContext, body: DiscountBulkOperation): Pr
   const rows: DiscountBulkRow[] = [];
   for (const id of bulkIdsOf(body)) {
     const plan = plannerFor(ctx, body, undoRows?.get(id));
-    rows.push(await guarded(ctx, id, () => runRow(ctx, id, plan, validateOnly)));
+    const seen = { name: null as string | null };
+    rows.push(await guarded(ctx, id, seen, () => runRow(ctx, id, plan, validateOnly, seen)));
   }
   return { operation: body.operation, validateOnly, counts: countsOf(rows), rows };
 }

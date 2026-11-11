@@ -210,9 +210,9 @@ describe("POST /discounts/bulk", () => {
       expect(byId.get("a")?.active).toBe(true);
     });
 
-    it("counts an ended discount from today, re-activates it and says it is valid again", async () => {
-      // Ended: last day 2026-11-05.
-      const ended = record("a", { active: false, endsAt: new Date("2026-11-06T03:00:00.000Z") });
+    it("counts an ended discount from today and says it is valid again", async () => {
+      // Ended while active: last day 2026-11-05.
+      const ended = record("a", { active: true, endsAt: new Date("2026-11-06T03:00:00.000Z") });
       const { call, byId } = harness([ended]);
       const answer = (await call({ operation: "extendWindow", ids: ["a"], days: 3 })) as Answer;
       expect(answer.body.data.rows[0]).toMatchObject({
@@ -223,6 +223,16 @@ describe("POST /discounts/bulk", () => {
         message: "Estava encerrado: voltou a valer.",
       });
       expect(byId.get("a")?.active).toBe(true);
+      expect(byId.get("a")?.endsAt?.toISOString()).toBe("2026-11-16T03:00:00.000Z");
+    });
+
+    it("keeps the pause of an ended discount paused by hand: only the end date moves (N6)", async () => {
+      const ended = record("a", { active: false, endsAt: new Date("2026-11-06T03:00:00.000Z") });
+      const { call, byId } = harness([ended]);
+      const answer = (await call({ operation: "extendWindow", ids: ["a"], days: 3 })) as Answer;
+      expect(answer.body.data.rows[0]).toMatchObject({ status: "ok", code: "extendedPaused", message: expect.stringContaining("continua desativado") });
+      expect(answer.body.data.rows[0]?.revived).toBeUndefined();
+      expect(byId.get("a")?.active).toBe(false);
       expect(byId.get("a")?.endsAt?.toISOString()).toBe("2026-11-16T03:00:00.000Z");
     });
 
@@ -333,12 +343,12 @@ describe("POST /discounts/bulk", () => {
     });
 
     it("restores the previous end date of an extension, revived flag included", async () => {
-      const ended = record("a", { active: false, endsAt: new Date("2026-11-06T03:00:00.000Z") });
+      const ended = record("a", { active: true, endsAt: new Date("2026-11-06T03:00:00.000Z") });
       const { call, byId } = harness([ended]);
       const done = (await call({ operation: "extendWindow", ids: ["a"], days: 3 })) as Answer;
       const row = done.body.data.rows[0]!;
       await call({ operation: "undo", rows: [{ id: "a", before: row.before, after: row.after }] });
-      expect(byId.get("a")?.active).toBe(false);
+      expect(byId.get("a")?.active).toBe(true);
       expect(byId.get("a")?.endsAt?.toISOString()).toBe("2026-11-06T03:00:00.000Z");
     });
 
@@ -403,6 +413,106 @@ describe("POST /discounts/bulk", () => {
       const line = logger.at("info").find((message) => message.startsWith("bulk setActive"));
       expect(line).toContain("1 changed, 0 unchanged, 0 skipped, 0 failed");
       expect(line).not.toContain("Desconto");
+    });
+  });
+});
+
+describe("round 1 fixes (FUT-4420)", () => {
+  it("B1: refuses an endsOn that is not a real day with a 422 on endsOn, reading nothing", async () => {
+    const { call, updates } = harness([record("a"), record("b")]);
+    const answer = (await call({ operation: "extendWindow", ids: ["a", "b"], endsOn: "2026-02-31" })) as Answer;
+    expect(answer.status).toBe(422);
+    expect(JSON.stringify(answer.body.problems)).toContain("endsOn");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("B3: a new date equal to the day a legacy row shows is unchanged and writes nothing", async () => {
+    const legacy = record("a", {
+      windowInZone: false,
+      startsAt: new Date("2026-11-01T00:00:00.000Z"),
+      endsAt: new Date("2026-11-20T00:00:00.000Z"),
+    });
+    const { call, updates } = harness([legacy]);
+    const answer = (await call({ operation: "extendWindow", ids: ["a"], endsOn: "2026-11-20" })) as Answer;
+    expect(answer.body.data.rows[0]).toMatchObject({ status: "unchanged", code: "alreadyEndsThen" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("B4: a failed row keeps the discount's name, on a throw and on a row that keeps moving", async () => {
+    const thrown = harness([record("a", { active: false })], {}, {
+      beforeUpdate: () => {
+        throw new Error("boom");
+      },
+    });
+    const one = (await thrown.call({ operation: "setActive", ids: ["a"], active: true })) as Answer;
+    expect(one.body.data.rows[0]).toMatchObject({ status: "failed", name: "Desconto a" });
+    let n = 0;
+    const moving = harness([record("b", { active: false })], {}, {
+      beforeUpdate: (id: string) => {
+        n += 1;
+        moving.byId.get(id)!.endsAt = new Date(Date.UTC(2027, 0, n));
+      },
+    });
+    const two = (await moving.call({ operation: "setActive", ids: ["b"], active: true })) as Answer;
+    expect(two.body.data.rows[0]).toMatchObject({ status: "failed", code: "changedDuringBatch", name: "Desconto b" });
+  });
+
+  it("N4: an undo whose state closes before it opens is refused", async () => {
+    const { call, updates } = harness([record("a")]);
+    const inverted = { active: true, startsAt: "2030-01-01T00:00:00.000Z", endsAt: "2029-01-01T00:00:00.000Z", windowInZone: true };
+    const sane = { active: true, startsAt: null, endsAt: null, windowInZone: true };
+    const answer = (await call({ operation: "undo", rows: [{ id: "a", before: inverted, after: sane }] })) as Answer;
+    expect(answer.status).toBe(422);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("N8: refuses a body of more than 500 undo rows before reading anything", async () => {
+    const { call } = harness([]);
+    const state = { active: true, startsAt: null, endsAt: null, windowInZone: true };
+    const rows = Array.from({ length: 501 }, (_, i) => ({ id: `d${i}`, before: state, after: state }));
+    expect(((await call({ operation: "undo", rows })) as Answer).status).toBe(422);
+  });
+
+  it("N11: a zoned row while the host counts no whole days says so, not 'zone unknown'", async () => {
+    const { call } = harness([record("a")], { storeTimeZone: undefined });
+    const answer = (await call({ operation: "extendWindow", ids: ["a"], days: 2 })) as Answer;
+    expect(answer.body.data.rows[0]).toMatchObject({ status: "skipped", code: "zoneOff" });
+    expect(answer.body.data.rows[0]?.message).not.toContain("não foi reconhecido");
+  });
+
+  describe("B5: all-or-nothing (the MCP tool's call)", () => {
+    it("refuses the whole call with every problem by row path, in English, writing nothing", async () => {
+      const { call, updates } = harness([record("a", { active: false }), record("b", { endsAt: null }), record("c", { endsAt: null })]);
+      const answer = (await call({ operation: "extendWindow", ids: ["a", "b", "c"], days: 2, allOrNothing: true })) as Answer;
+      expect(answer.status).toBe(422);
+      expect(answer.body.problems).toEqual([
+        { path: "ids.1", message: "Desconto b: No end date: nothing to extend." },
+        { path: "ids.2", message: "Desconto c: No end date: nothing to extend." },
+      ]);
+      expect(answer.body.error).toContain("Nothing was written");
+      expect(updates).toHaveLength(0);
+    });
+
+    it("writes when every row can take it, treating unchanged rows as fine", async () => {
+      const { call, byId } = harness([record("a", { active: false }), record("b", { active: true })]);
+      const answer = (await call({ operation: "setActive", ids: ["a", "b"], active: true, allOrNothing: true })) as Answer;
+      expect(answer.status).toBe(200);
+      expect(answer.body.data.counts).toMatchObject({ ok: 1, unchanged: 1 });
+      expect(byId.get("a")?.active).toBe(true);
+    });
+
+    it("validateOnly reports the plan and writes nothing", async () => {
+      const { call, updates } = harness([record("a", { active: false })]);
+      const answer = (await call({ operation: "setActive", ids: ["a"], active: true, allOrNothing: true, validateOnly: true })) as Answer;
+      expect(answer.status).toBe(200);
+      expect(updates).toHaveLength(0);
+    });
+
+    it("the tool's own schema defaults allOrNothing to true; the screen's does not", async () => {
+      const { bulkDiscountsBody, bulkDiscountsToolBody } = await import("../bulk-wire");
+      const body = { operation: "setActive", ids: ["a"], active: true };
+      expect(bulkDiscountsToolBody.parse(body)).toMatchObject({ allOrNothing: true });
+      expect((bulkDiscountsBody.parse(body) as { allOrNothing?: boolean }).allOrNothing).toBeUndefined();
     });
   });
 });
