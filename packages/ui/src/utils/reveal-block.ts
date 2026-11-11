@@ -94,10 +94,14 @@ function prefersReducedMotion(): boolean {
 /** Scroll the nearest scroller just enough for `el` to read whole. */
 export function revealBlock(el: HTMLElement | null, options: RevealOptions = {}): void {
   if (el === null) return;
+  const rect = el.getBoundingClientRect();
+  // No box (display: none, detached, or a DOM with no layout): there is
+  // nothing on screen to reveal, so nothing is measured — the ancestor walk
+  // and the insets are a computed-style lookup each.
+  if (rect.width === 0 && rect.height === 0) return;
   const own = scroller(el);
   const frame = own?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
   const view = { top: frame.top + inset(options.topInset), bottom: frame.bottom - inset(options.bottomInset) };
-  const rect = el.getBoundingClientRect();
   const delta = revealDelta({ top: rect.top, bottom: rect.bottom }, view, options.gap);
   if (delta === 0) return;
   (own ?? window).scrollBy({ top: delta, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
