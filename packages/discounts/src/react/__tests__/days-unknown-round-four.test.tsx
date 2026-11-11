@@ -18,6 +18,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach } from "./step-form-shim";
 
 /**
  * FUT-4482, review rounds 4 and 5: a rule whose days the server cannot place
@@ -103,8 +104,8 @@ function mount(rows: DiscountWireRecord[], extra: Partial<DiscountsWebConfig> = 
 async function openEdit(id: string): Promise<HTMLElement> {
   const kebab = await screen.findAllByTestId(`discount-actions-${id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  return findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 // The worker's first mount of the admin and its form pays for emotion writing

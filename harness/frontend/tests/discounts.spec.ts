@@ -51,11 +51,16 @@ test('an operator creates a promotion and the backend keeps it', async ({ page }
   await expect(dialog).toBeVisible();
   await expect(page.getByTestId('discount-dialog-title')).toContainText('Novo desconto');
 
-  // The form is the package's, every input of it. The host supplied only the
-  // money field — and `percentOff` is not it, which is the point of the kind
-  // toggle deciding what the rest of the form looks like.
+  // The form is the package's, every input of it, asked in four steps. The
+  // host supplied only the money field — and `percentOff` is not it, which is
+  // the point of the kind deciding what step 3 looks like. Step 3 mounts it
+  // only once steps 1 and 2 are passed (FUT-4477).
   await dialog.locator('input[name="name"]').fill('Terça em dobro');
+  await dialog.getByRole('button', { name: 'Continuar' }).click();
+  await dialog.getByRole('button', { name: 'Continuar' }).click();
   await dialog.locator('input[name="percentOff"]').fill('15');
+  await dialog.getByRole('button', { name: 'Continuar' }).click();
+  await dialog.getByRole('button', { name: 'Pronto' }).click();
   await page.getByTestId('discount-form-submit').click();
 
   // The row arrives from the SERVER, not from optimistic local state: the grid

@@ -13,6 +13,7 @@ import { createFormatters } from "../format";
 import { comboRewardOf, COMBO_REWARDS, kindOf, typeAndScopeFor } from "../form-kind";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
+import { findReach, peek, reach, submitForm } from "./step-form-shim";
 
 /**
  * "X marmitas por um preço fechado" (FUT-4417).
@@ -110,11 +111,12 @@ function lines(slots: ComboRequirement[], value: ComboRewardValue, layout: Combo
 }
 
 describe("the reward is one of three, and the third is a closed price", () => {
-  it("F1: Porcentagem, Valor fixo, Preço fechado — in that order", () => {
+  it("F1: Desconto em %, Desconto em R$, Preço fechado — in that order", () => {
     expect(COMBO_REWARDS).toEqual(["PERCENTAGE", "FIXED_AMOUNT", "BUNDLE_PRICE"]);
+    // Renamed by the owner, 2026-11-05 (FUT-4475, "Copy changes": "Sim, trocar").
     expect(COMBO_REWARDS.map((value) => copy.comboRewards.labels[value])).toEqual([
-      "Porcentagem",
-      "Valor fixo",
+      "Desconto em %",
+      "Desconto em R$",
       "Preço fechado",
     ]);
   });
@@ -315,7 +317,7 @@ describe("what the preview says, word for word as the prototype draws it", () =>
     });
   });
 
-  it("F30: a price equal to the cheapest sum saves 'up to', never 'from R$ 0,00'", () => {
+  it("F30: a price equal to the cheapest sum saves 'up to', never 'from R$ 0,00'", async () => {
     expect(lines(FIVE_MARMITAS, reward({ bundlePriceCents: 13_450 }), "inline").pays).toBe(
       "Cliente paga R$ 134,50 — economiza até R$ 25,00",
     );
@@ -424,16 +426,16 @@ afterEach(() => {
 });
 
 function pickPrice(): void {
-  fireEvent.click(screen.getByTestId("total-form-field-comboReward-item-BUNDLE_PRICE"));
+  fireEvent.click(reach("total-form-field-comboReward-item-BUNDLE_PRICE"));
 }
 
 describe("the form", () => {
   it("F17: choosing Preço fechado mounts the price field and its hint, and nothing of the other two", async () => {
     renderForm(record());
     pickPrice();
-    await waitFor(() => expect(screen.getByTestId("currency-bundlePrice")).toBeTruthy());
+    await waitFor(() => expect(peek("currency-bundlePrice")).toBeTruthy());
     await waitFor(() => expect(screen.queryByTestId("currency-amountOff")).toBeNull());
-    expect(screen.getByTestId("combo-reward-hint").textContent).toBe(
+    expect(reach("combo-reward-hint").textContent).toBe(
       "O combo sai por este preço, qualquer que seja o preço dos itens.",
     );
   });
@@ -441,19 +443,19 @@ describe("the form", () => {
   it("F18: typing the price shows what the buyer pays in the cart", async () => {
     renderForm(record());
     pickPrice();
-    fireEvent.change(await screen.findByTestId("currency-bundlePrice"), {
+    fireEvent.change(await findReach("currency-bundlePrice"), {
       target: { value: "120,00" },
     });
-    const preview = await screen.findByTestId("combo-cart-preview");
+    const preview = await findReach("combo-cart-preview");
     expect(within(preview).getByText(copy.comboRewards.preview.title)).toBeTruthy();
     // A small label over the figures (the prototype's heading), not the Alert's larger title.
     const heading = within(preview).getByTestId("combo-cart-preview-heading");
     expect(heading.textContent).toBe("Como fica no carrinho");
     const px = (node: HTMLElement): number => parseFloat(getComputedStyle(node).fontSize);
     // Both are rem off the same root: the heading is the smaller, and semibold.
-    expect(px(heading)).toBeLessThan(px(screen.getByTestId("combo-cart-preview-items")));
+    expect(px(heading)).toBeLessThan(px(reach("combo-cart-preview-items")));
     expect(getComputedStyle(heading).fontWeight).toBe("600");
-    expect(plain(screen.getByTestId("combo-cart-preview-pays").textContent)).toBe(
+    expect(plain(reach("combo-cart-preview-pays").textContent)).toBe(
       "Cliente paga R$ 120,00 — economiza de R$ 14,50 a R$ 39,50",
     );
   });
@@ -461,10 +463,10 @@ describe("the form", () => {
   it("F19: Criar desconto sends the closed price over COMBO", async () => {
     const { sent, onSaved } = renderForm(record());
     pickPrice();
-    fireEvent.change(await screen.findByTestId("currency-bundlePrice"), {
+    fireEvent.change(await findReach("currency-bundlePrice"), {
       target: { value: "120,00" },
     });
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(sent[0]).toMatchObject({
       type: "BUNDLE_PRICE",
@@ -479,8 +481,8 @@ describe("the form", () => {
   it("F20: a closed price left blank is refused on its field", async () => {
     const { onSaved } = renderForm(record());
     pickPrice();
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    expect(await screen.findByText(copy.form.invalidBundlePrice)).toBeTruthy();
+    submitForm();
+    await waitFor(() => expect(screen.getByText(copy.form.invalidBundlePrice)).toBeTruthy());
     expect(onSaved).not.toHaveBeenCalled();
   });
 
@@ -492,24 +494,24 @@ describe("the form", () => {
         bundlePriceCents: 12_000,
       }),
     );
-    const kinds = within(screen.getByTestId("total-form-field-kind")).getAllByRole("button");
-    expect(kinds.map((button) => button.textContent)).toEqual([
-      "Porcentagem",
-      "Valor fixo",
-      "Combo",
-      "Itens grátis",
-    ]);
+    // The kind is the Tipo cards' radiogroup now (FUT-4477): four radios, Combo checked.
+    const kinds = within(reach("discount-kind-cards")).getAllByRole("radio");
+    expect(kinds.map((radio) => radio.textContent)).toEqual(
+      (["PERCENTAGE", "FIXED_AMOUNT", "COMBO", "FREE_UNITS"] as const).map(
+        (kind) => `${copy.labels.kind[kind]}${copy.steps.kindExamples[kind]}`,
+      ),
+    );
+    expect(kinds.map((radio) => radio.getAttribute("aria-checked"))).toEqual(["false", "false", "true", "false"]);
     expect(
-      screen
-        .getByTestId("total-form-field-comboReward-item-BUNDLE_PRICE")
+      reach("total-form-field-comboReward-item-BUNDLE_PRICE")
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect((screen.getByTestId("currency-bundlePrice") as HTMLInputElement).value).toBe("120");
+    expect((reach("currency-bundlePrice") as HTMLInputElement).value).toBe("120");
   });
 
   it("F22: the preview follows the reward — Porcentagem shows its own range", async () => {
     renderForm(record());
-    expect(plain((await screen.findByTestId("combo-cart-preview-pays")).textContent)).toBe(
+    expect(plain((await findReach("combo-cart-preview-pays")).textContent)).toBe(
       "Cliente paga de R$ 121,05 a R$ 143,55 (10% a menos)",
     );
   });
@@ -517,7 +519,7 @@ describe("the form", () => {
 
 describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
   function rewardControl(): "select" | "toggle" {
-    const field = screen.getByTestId("total-form-field-comboReward");
+    const field = reach("total-form-field-comboReward");
     return within(field).queryAllByRole("combobox").length > 0 ? "select" : "toggle";
   }
 
@@ -525,14 +527,14 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
     containerWidth(288);
     renderForm(record());
     await waitFor(() => expect(rewardControl()).toBe("select"));
-    expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
+    expect(reach("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
   });
 
   it("F24: at 430 px the three fit as a toggle, with the value's field under them", async () => {
     containerWidth(430);
     renderForm(record());
     await waitFor(() => expect(rewardControl()).toBe("toggle"));
-    expect(screen.getByTestId("combo-reward-row").getAttribute("style") ?? "").not.toContain(
+    expect(reach("combo-reward-row").getAttribute("style") ?? "").not.toContain(
       "1fr 1fr",
     );
   });
@@ -541,28 +543,33 @@ describe("where it sits (ADR 0190 in the host; prototype option A)", () => {
     containerWidth(960);
     renderForm(record());
     await waitFor(() =>
-      expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("aside"),
+      expect(peek("combo-preview-layout").getAttribute("data-layout")).toBe("aside"),
     );
-    expect(plain(screen.getByTestId("combo-cart-preview-pays").textContent)).toBe(
+    expect(plain(reach("combo-cart-preview-pays").textContent)).toBe(
       "Cliente paga 10% a menos",
     );
-    expect(screen.getByTestId("combo-cart-preview-examples")).toBeTruthy();
+    expect(reach("combo-cart-preview-examples")).toBeTruthy();
   });
 
   it("F27: a form too narrow to keep the kind toggle beside a column keeps the preview inline", async () => {
     containerWidth(760);
     renderForm(record());
-    await waitFor(() => expect(screen.getByTestId("combo-cart-preview")).toBeTruthy());
-    expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
+    // The inline preview sits in step 3, which an edit opens on its card (FUT-4477).
+    reach("total-form-field-comboReward");
+    await waitFor(() => expect(peek("combo-cart-preview")).toBeTruthy());
+    expect(reach("combo-preview-layout").getAttribute("data-layout")).toBe("inline");
     await waitFor(() => expect(screen.queryByTestId("combo-cart-preview-examples")).toBeNull());
   });
 
-  it("F26: no column for a kind that is not a combo", async () => {
+  it("F26: a kind that is not a combo has the column for its Resumo, and no cart preview", async () => {
+    // The side column holds the Resumo for every kind since FUT-4477; only a
+    // combo adds "Como fica no carrinho" under it.
     containerWidth(960);
     renderForm(record({ scope: "ORDER", comboRequirements: [] }));
     await waitFor(() =>
-      expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("inline"),
+      expect(screen.getByTestId("combo-preview-layout").getAttribute("data-layout")).toBe("aside"),
     );
+    expect(screen.getByTestId("discount-resumo")).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("combo-cart-preview")).toBeNull());
   });
 });

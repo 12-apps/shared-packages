@@ -17,6 +17,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { getByLabelFor } from "./labelled-control";
+import { findReach, peek, reach, showEveryStep, submitForm } from "./step-form-shim";
 
 /**
  * The KIND of promotion, and what it decides (FUT-268).
@@ -72,6 +73,8 @@ function renderForm(editing: DiscountWireRecord | null) {
       onError={() => {}}
     />,
   );
+  // Every step open on a create, as the single page had them (FUT-4477).
+  showEveryStep();
   return { sent, onSaved };
 }
 
@@ -218,7 +221,7 @@ describe("what the operator sees", () => {
 
   it("K17: a combo is asked NOTHING about scope — it covers its own groups", async () => {
     renderForm(comboRecord());
-    expect(screen.getByTestId("combo-slots")).toBeTruthy();
+    expect(reach("combo-slots")).toBeTruthy();
     await waitFor(() => {
       expect(screen.queryByText(copy.form.scope)).toBeNull();
     });
@@ -226,6 +229,7 @@ describe("what the operator sees", () => {
 
   it("K18: a combo's reward sits beside its number, not three screens above it", () => {
     renderForm(comboRecord());
+    reach("total-form-field-comboReward");
     expect(screen.getByText(copy.form.comboReward)).toBeTruthy();
     expect(screen.getByText(copy.form.comboRewardHint)).toBeTruthy();
   });
@@ -239,7 +243,7 @@ describe("what the operator sees", () => {
         comboRequirements: [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }],
       }),
     );
-    expect(screen.getByTestId("free-units-builder")).toBeTruthy();
+    expect(reach("free-units-builder")).toBeTruthy();
     await waitFor(() => {
       expect(screen.queryByTestId("combo-slots")).toBeNull();
     });
@@ -254,7 +258,7 @@ describe("what the operator sees", () => {
         comboRequirements: [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }],
       }),
     );
-    expect(screen.getByTestId("free-units-items")).toBeTruthy();
+    expect(reach("free-units-items")).toBeTruthy();
     await waitFor(() => {
       expect(screen.queryByText("Categorias da promoção")).toBeNull();
     });
@@ -269,12 +273,13 @@ describe("what the operator sees", () => {
         comboRequirements: [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }],
       }),
     );
-    expect(screen.getByTestId("free-units-summary").textContent).toBe("Leve 3, pague 2.");
+    expect(reach("free-units-summary").textContent).toBe("Leve 3, pague 2.");
   });
 
   it("K22: a bundle price opens on the combo's form, its reward on Preço fechado (FUT-4417)", async () => {
     renderForm(comboRecord({ type: "BUNDLE_PRICE", percentOffBp: null, bundlePriceCents: 2_500 }));
     await waitFor(() => expect(screen.queryByText(copy.labels.kind.BUNDLE_PRICE)).toBeNull());
+    reach("total-form-field-comboReward");
     expect(screen.getAllByText(copy.comboRewards.labels.BUNDLE_PRICE).length).toBeGreaterThan(0);
   });
 });
@@ -282,10 +287,10 @@ describe("what the operator sees", () => {
 describe("what it refuses", () => {
   it("K23: a combo with no groups is refused on the kind, which is on screen", async () => {
     renderForm(comboRecord({ comboRequirements: [] }));
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    await waitFor(() => {
-      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
-    });
+    submitForm();
+    // Said at the foot of step 2, which the refusal opens (FUT-4477); the
+    // toast is the server's alone now.
+    await waitFor(() => expect(peek("discount-step-targets-message")).toBeTruthy());
     expect(screen.getByText(copy.form.comboSlotsRequired)).toBeTruthy();
   });
 
@@ -293,16 +298,15 @@ describe("what it refuses", () => {
     renderForm(
       comboRecord({ type: "FREE_UNITS", percentOffBp: null, freeUnits: 1, comboRequirements: [] }),
     );
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    await waitFor(() => {
-      expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy();
-    });
-    expect(screen.getAllByText(copy.form.freeUnitsTargetRequired).length).toBeGreaterThan(0);
+    submitForm();
+    // Said under the products picker, once (FUT-4477): the refusal opens step 2.
+    await waitFor(() => expect(peek("free-units-message")).toBeTruthy());
+    expect(screen.getAllByText(copy.form.freeUnitsTargetRequired)).toHaveLength(1);
   });
 
   it("K25: a valid combo reaches the wire as the pair the engine reads", async () => {
     const { sent, onSaved } = renderForm(comboRecord());
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => {
       expect(onSaved).toHaveBeenCalled();
     });
@@ -322,7 +326,7 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
 
   async function pickFreeUnits(): Promise<void> {
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
-    await screen.findByTestId("free-units-builder");
+    await findReach("free-units-builder");
   }
 
   it("K26: picking the kind shows no product error before any submit", async () => {
@@ -337,8 +341,8 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
   it("K27: submitting with no product shows it under the builder", async () => {
     const { sent } = renderForm(null);
     await pickFreeUnits();
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    expect(await screen.findByTestId(message)).toBeTruthy();
+    submitForm();
+    await waitFor(() => expect(peek(message)).toBeTruthy());
     expect(sent).toHaveLength(0);
   });
 
@@ -360,7 +364,7 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     const empty = [{ menuItemIds: [], categoryIds: [], quantity: 3 }];
     const picked = [{ menuItemIds: ["m-burger"], categoryIds: [], quantity: 3 }];
     const { rerender } = render(<FreeUnitsBuilder {...props} slots={empty} />);
-    expect(screen.getByTestId(message)).toBeTruthy();
+    expect(reach(message)).toBeTruthy();
 
     rerender(<FreeUnitsBuilder {...props} slots={picked} />);
     await waitFor(() => {
@@ -385,9 +389,9 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
   it("K30: no product AND a bad quantity still shows the product line after submit", async () => {
     renderForm(null);
     await pickFreeUnits();
-    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "0" } });
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    expect(await screen.findByTestId(message)).toBeTruthy();
+    fireEvent.change(reach("free-units-quantity"), { target: { value: "0" } });
+    submitForm();
+    await waitFor(() => expect(peek(message)).toBeTruthy());
     expect(screen.getAllByText(copy.form.invalidComboQuantity).length).toBeGreaterThan(0);
   });
 
@@ -398,13 +402,13 @@ describe("FUT-4441: when Itens grátis says a product is missing", () => {
     fireEvent.change(getByLabelFor(copy.form.name), {
       target: { value: "Leve 3" },
     });
-    fireEvent.change(screen.getByTestId("free-units-quantity"), { target: { value: "3" } });
-    fireEvent.change(screen.getByTestId("free-units-free"), { target: { value: "1" } });
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
-    await screen.findByTestId(message);
+    fireEvent.change(reach("free-units-quantity"), { target: { value: "3" } });
+    fireEvent.change(reach("free-units-free"), { target: { value: "1" } });
+    submitForm();
+    await findReach(message);
     fireEvent.click(screen.getAllByText("Porcentagem")[0] as HTMLElement);
     fireEvent.click(screen.getAllByText("Itens grátis")[0] as HTMLElement);
-    await screen.findByTestId("free-units-builder");
+    await findReach("free-units-builder");
     await waitFor(() => {
       expect(screen.queryByTestId(message)).toBeNull();
       expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull();

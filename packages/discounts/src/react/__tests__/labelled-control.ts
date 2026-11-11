@@ -1,5 +1,7 @@
 import { screen } from "@testing-library/react";
 
+import { opening } from "./step-form-shim";
+
 /**
  * The control a `<label for>` names — what `getByLabelText` answers on these
  * forms, at a fraction of its cost (FUT-4530).
@@ -11,10 +13,12 @@ import { screen } from "@testing-library/react";
  * bare form, before a loaded CI runner multiplied it by four: that is what
  * pushed the round-five cases past vitest's 5 s. This finds the one label by
  * its own text and resolves `for` by id, so it still fails when the words are
- * not a label, when two labels say them, or when the label names nothing.
+ * not a label, when two labels say them, or when the label names nothing. A
+ * field in a closed step is reached by opening its step first (FUT-4477).
  */
 export function getByLabelFor(text: string): HTMLInputElement {
-  const label = screen.getByText(text, { selector: "label" }) as HTMLLabelElement;
+  const label = (opening(() => screen.queryAllByText(text, { selector: "label" })[0] ?? null) ??
+    screen.getByText(text, { selector: "label" })) as HTMLLabelElement;
   const control = label.htmlFor === "" ? null : document.getElementById(label.htmlFor);
   if (!(control instanceof HTMLInputElement)) {
     throw new Error(`The label "${text}" names no input (for="${label.htmlFor}").`);

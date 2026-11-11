@@ -9,6 +9,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { getByLabelFor } from "./labelled-control";
+import { findReach, reach, settle, submitForm } from "./step-form-shim";
 
 /**
  * Authoring a recurring promotion (FUT-996).
@@ -76,16 +77,16 @@ beforeAll(() => {
 
 /** Switch the form to "em dias e horários específicos". */
 function chooseSpecificHours(): void {
-  fireEvent.click(screen.getByTestId("repetition-specific"));
+  fireEvent.click(reach("repetition-specific"));
 }
 
 /** Click a weekday chip on one row, by the pack's own short label. */
 function toggleDay(label: string, index = 0): void {
-  fireEvent.click(screen.getByTestId(`schedule-day-${index}-${label}`));
+  fireEvent.click(reach(`schedule-day-${index}-${label}`));
 }
 
 function setTime(kind: "from" | "to", value: string, index = 0): void {
-  fireEvent.change(screen.getByTestId(`schedule-${kind}-${index}`), { target: { value } });
+  fireEvent.change(reach(`schedule-${kind}-${index}`), { target: { value } });
 }
 
 /** Fill the name so the form's other rules do not mask a schedule failure. */
@@ -95,11 +96,11 @@ function nameIt(name = "Happy hour"): void {
 
 /** A radio's checked state — jest-dom is not installed in this package. */
 function checked(testId: string): boolean {
-  return (screen.getByTestId(testId) as HTMLInputElement).checked;
+  return (reach(testId) as HTMLInputElement).checked;
 }
 
 async function submit(): Promise<void> {
-  fireEvent.click(screen.getByTestId("discount-form-submit"));
+  submitForm();
 }
 
 describe("the default is unchanged", () => {
@@ -130,7 +131,7 @@ describe("toda sexta, das 16:00 às 20:00", () => {
     setTime("to", "20:00");
     // The single most valuable thing on this screen: the operator can check
     // what they built against what they meant.
-    expect((await screen.findByTestId("schedule-summary-0")).textContent).toContain("Toda sexta, das 16:00 às 20:00.");
+    expect((await findReach("schedule-summary-0")).textContent).toContain("Toda sexta, das 16:00 às 20:00.");
   });
 
   it("sends the schedule the sentence described", async () => {
@@ -174,7 +175,7 @@ describe("the sentence only appears once it is a real offer", () => {
     toggleDay("Sex");
     setTime("from", "22:00");
     setTime("to", "02:00");
-    expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Toda sexta, das 22:00 às 02:00 do dia seguinte.");
+    expect(reach("schedule-summary-0").textContent).toContain("Toda sexta, das 22:00 às 02:00 do dia seguinte.");
   });
 });
 
@@ -186,7 +187,7 @@ describe("segunda e terça à tarde", () => {
     toggleDay("Ter");
     setTime("from", "12:00");
     setTime("to", "18:00");
-    expect(screen.getByTestId("schedule-summary-0").textContent).toContain("segunda e terça, das 12:00 às 18:00.");
+    expect(reach("schedule-summary-0").textContent).toContain("segunda e terça, das 12:00 às 18:00.");
   });
 });
 
@@ -194,8 +195,8 @@ describe("the presets write into the chips", () => {
   it('collapses a full week into "Todos os dias"', () => {
     renderForm();
     chooseSpecificHours();
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
-    expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Todos os dias, das");
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetEveryDay}`));
+    expect(reach("schedule-summary-0").textContent).toContain("Todos os dias, das");
   });
 
   it("leaves the operator free to deselect a day afterwards", async () => {
@@ -204,7 +205,7 @@ describe("the presets write into the chips", () => {
     nameIt();
     fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetWeekdays}`));
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetWeekdays}`));
     toggleDay("Qua");
     await submit();
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -222,7 +223,7 @@ describe("several time rows", () => {
     toggleDay("Sex");
     setTime("from", "16:00");
     setTime("to", "20:00");
-    fireEvent.click(screen.getByTestId("schedule-add-window"));
+    fireEvent.click(reach("schedule-add-window"));
     toggleDay("Sáb", 1);
     setTime("from", "12:00", 1);
     setTime("to", "16:00", 1);
@@ -242,7 +243,8 @@ describe("what the form refuses", () => {
     fireEvent.change(getByLabelFor(copy.form.percentOff), { target: { value: "10" } });
     chooseSpecificHours();
     await submit();
-    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    // A client refusal is said on its step, not by the toast (FUT-4477).
+    await settle();
     expect(sent).toHaveLength(0);
   });
 });
@@ -274,22 +276,22 @@ describe("editing a rule that already has a schedule", () => {
   it("opens on the schedule it was saved with", () => {
     renderForm(HAPPY_HOUR);
     expect(checked("repetition-specific")).toBe(true);
-    expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
+    expect(reach("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
   });
 
   it("keeps the rows when the operator toggles back to Sempre and returns", async () => {
     // The switch must not be destructive: an operator who changes their mind
     // twice has not lost the days they picked.
     renderForm(HAPPY_HOUR);
-    fireEvent.click(screen.getByTestId("repetition-always"));
+    fireEvent.click(reach("repetition-always"));
     await waitFor(() => expect(screen.queryByTestId("schedule-builder")).toBeNull());
-    fireEvent.click(screen.getByTestId("repetition-specific"));
-    expect(screen.getByTestId("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
+    fireEvent.click(reach("repetition-specific"));
+    expect(reach("schedule-summary-0").textContent).toContain("Toda sexta, das 16:00 às 20:00.");
   });
 
   it("drops the schedule when saved as Sempre", async () => {
     const { sent } = renderForm(HAPPY_HOUR);
-    fireEvent.click(screen.getByTestId("repetition-always"));
+    fireEvent.click(reach("repetition-always"));
     await submit();
     await waitFor(() => expect(sent).toHaveLength(1));
     expect((sent[0] as { schedule: unknown }).schedule).toBeNull();

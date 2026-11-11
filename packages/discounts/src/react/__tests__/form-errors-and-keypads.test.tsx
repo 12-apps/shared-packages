@@ -10,6 +10,7 @@ import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { findReach, peek, reach, settle, submitForm } from "./step-form-shim";
 
 /**
  * The discounts form on a Brazilian screen (FUT-4143).
@@ -44,6 +45,15 @@ function recordingTransport(): { transport: DiscountsTransport; sent: unknown[] 
   };
 }
 
+/** A transport whose every write the SERVER refuses, naming the coupon code. */
+function codeTakenTransport(): DiscountsTransport {
+  return {
+    ...recordingTransport().transport,
+    send: <T,>(): Promise<DiscountsResult<T>> =>
+      Promise.resolve({ ok: false, error: "Já existe um cupom com esse código.", fieldErrors: { code: "Já existe." } }),
+  };
+}
+
 /** A transport whose every write the SERVER refuses, with a sentence of its own. */
 function refusingTransport(): DiscountsTransport {
   return {
@@ -56,11 +66,11 @@ function refusingTransport(): DiscountsTransport {
 function renderForm(
   editing: DiscountWireRecord | null = null,
   pack: CompleteDiscountsWebCopy = copy,
-  refusing = false,
+  refusing: boolean | "code" = false,
 ): { sent: unknown[] } {
   const recording = recordingTransport();
   const sent = recording.sent;
-  const transport = refusing ? refusingTransport() : recording.transport;
+  const transport = refusing === "code" ? codeTakenTransport() : refusing ? refusingTransport() : recording.transport;
   render(
     <DiscountForm
       api={createDiscountsApiClient("/api/admin/loja", transport, formatters)}
@@ -114,7 +124,7 @@ function freeUnitsRecord(): DiscountWireRecord {
 }
 
 function input(testId: string): HTMLInputElement {
-  return screen.getByTestId(testId) as HTMLInputElement;
+  return reach(testId) as HTMLInputElement;
 }
 
 function type(testId: string, value: string): void {
@@ -122,7 +132,7 @@ function type(testId: string, value: string): void {
 }
 
 function submit(): void {
-  fireEvent.click(screen.getByTestId("discount-form-submit"));
+  submitForm();
 }
 
 /** The message a bound field paints under itself, or null. */
@@ -137,29 +147,33 @@ function fillValidPercentage(): void {
 }
 
 describe("the banner after a failed submit speaks the form's language", () => {
+  // The toast follows a SERVER refusal naming a field (FUT-4477, `FormErrorSnackbar show`).
   it("B1: pt-BR — 'Corrija os campos destacados e tente novamente.'", async () => {
-    renderForm();
+    renderForm(null, copy, "code");
+    fillValidPercentage();
     submit();
-    const banner = await screen.findByTestId("total-form-error-snackbar");
+    const banner = await findReach("total-form-error-snackbar");
     expect(banner.textContent).toContain("Corrija os campos destacados e tente novamente.");
     expect(banner.textContent).not.toContain("Please fix");
   });
 
   it("B2: the sentence comes from the pack, so en-US says it in English", async () => {
-    renderForm(null, EN_US_DISCOUNTS_WEB_COPY);
+    renderForm(null, EN_US_DISCOUNTS_WEB_COPY, "code");
+    fillValidPercentage();
     submit();
-    const banner = await screen.findByTestId("total-form-error-snackbar");
+    const banner = await findReach("total-form-error-snackbar");
     expect(banner.textContent).toContain(EN_US_DISCOUNTS_WEB_COPY.form.errorSnackbar);
   });
 });
 
 describe("one message per failure", () => {
-  it("M1: a client refusal shows the toast and the red fields, NOT the saveFailed alert", async () => {
+  it("M1: a client refusal shows the red fields, NOT the saveFailed alert nor the toast", async () => {
+    // Since FUT-4477 the toast is the server's alone: a step says its own errors.
     renderForm();
     type("total-form-field-percentOff", "150");
     submit();
-    const banner = await screen.findByTestId("total-form-error-snackbar");
-    expect(banner.textContent).toContain("Corrija os campos destacados e tente novamente.");
+    await waitFor(() => expect(fieldMessage("name")).toBe(copy.form.nameRequired));
+    await waitFor(() => expect(screen.queryByTestId("total-form-error-snackbar")).toBeNull());
     expect(fieldMessage("name")).toBe(copy.form.nameRequired);
     expect(fieldMessage("percentOff")).toBe(copy.form.invalidPercent);
     expect(screen.queryAllByTestId("discount-form-error")).toHaveLength(0);
@@ -170,7 +184,7 @@ describe("one message per failure", () => {
     renderForm(null, copy, true);
     fillValidPercentage();
     submit();
-    const alert = await screen.findByTestId("discount-form-error");
+    const alert = await findReach("discount-form-error");
     expect(alert.textContent).toContain(copy.form.saveFailed);
     expect(alert.textContent).toContain("Já existe um cupom com esse código.");
   });
@@ -232,7 +246,7 @@ describe("Desconto (%) opens a decimal keypad", () => {
 describe("Das / às are 24-hour text fields", () => {
   function openSchedule(): void {
     renderForm();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(reach("repetition-specific"));
   }
 
   it("C1: no type=time — a masked text field with a numeric keypad", () => {
@@ -257,7 +271,7 @@ describe("Das / às are 24-hour text fields", () => {
     type("schedule-from-0", "2500");
     await waitFor(() => expect(input("schedule-from-0").value).toBe("25:00"));
     expect(input("schedule-from-0").getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByTestId("schedule-from-0-message").textContent).toBe(
+    expect(reach("schedule-from-0-message").textContent).toBe(
       copy.schedule.invalidTime,
     );
   });
@@ -266,7 +280,7 @@ describe("Das / às are 24-hour text fields", () => {
     openSchedule();
     type("schedule-to-0", "1260");
     await waitFor(() =>
-      expect(screen.getByTestId("schedule-to-0-message").textContent).toBe(
+      expect(peek("schedule-to-0-message").textContent).toBe(
         copy.schedule.invalidTime,
       ),
     );
@@ -279,8 +293,8 @@ describe("Das / às are 24-hour text fields", () => {
   it("C5: a real hour is what the rule saves", async () => {
     const { sent } = renderForm();
     fillValidPercentage();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
+    fireEvent.click(reach("repetition-specific"));
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetEveryDay}`));
     type("schedule-from-0", "0730");
     type("schedule-to-0", "1100");
     submit();
@@ -359,7 +373,7 @@ describe("the counts take whole numbers only", () => {
     type("free-units-free", "2,5");
     submit();
     await waitFor(() =>
-      expect(screen.getByTestId("free-units-free-message").textContent).toBe(
+      expect(peek("free-units-free-message").textContent).toBe(
         copy.form.invalidFreeUnits,
       ),
     );
@@ -374,11 +388,12 @@ describe("the counts take whole numbers only", () => {
     type("free-units-quantity", "2,5");
     await waitFor(() => expect(taken.value).toBe("2,5"));
     expect(taken.getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByTestId("free-units-quantity-message").textContent).toBe(
+    expect(reach("free-units-quantity-message").textContent).toBe(
       copy.form.wholeNumberOnly,
     );
     submit();
-    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    // A client refusal is said on its step, not by the toast (FUT-4477).
+    await settle();
     expect(sent).toHaveLength(0);
     expect(document.body.textContent).not.toContain("NaN");
   });
@@ -390,7 +405,7 @@ describe("the counts take whole numbers only", () => {
     expect(quantity.getAttribute("inputmode")).toBe("numeric");
     type("combo-slot-0-quantity", "2,5");
     await waitFor(() =>
-      expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
+      expect(peek("combo-slot-0-quantity-message").textContent).toBe(
         copy.form.wholeNumberOnly,
       ),
     );
@@ -425,33 +440,34 @@ describe("a count box always shows the state it holds", () => {
   it("R1: removing a group does not hand its draft to the group below", async () => {
     const { sent } = renderForm(twoGroups());
     type("combo-slot-1-quantity", "");
-    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    fireEvent.click(reach("combo-slot-0-remove"));
     await waitFor(() => expect(screen.queryAllByTestId(/^combo-slot-\d+$/u)).toHaveLength(1));
     const survivor = input("combo-slot-0-quantity");
     expect(survivor.value).toBe("");
     expect(survivor.getAttribute("aria-invalid")).toBe("true");
-    expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
+    expect(reach("combo-slot-0-quantity-message").textContent).toBe(
       copy.form.invalidComboQuantity,
     );
-    expect(screen.getByTestId("combo-summary").textContent).toBe("O combo leva 0 itens em 1 grupo.");
+    expect(reach("combo-summary").textContent).toBe("O combo leva 0 itens em 1 grupo.");
     submit();
-    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    // A client refusal is said on its step, not by the toast (FUT-4477).
+    await settle();
     expect(sent).toHaveLength(0);
   });
 
   it("R2: the surviving group keeps its OWN draft", async () => {
     renderForm(twoGroups());
     type("combo-slot-1-quantity", "2,5");
-    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    fireEvent.click(reach("combo-slot-0-remove"));
     await waitFor(() => expect(input("combo-slot-0-quantity").value).toBe("2,5"));
-    expect(screen.getByTestId("combo-slot-0-quantity-message").textContent).toBe(
+    expect(reach("combo-slot-0-quantity-message").textContent).toBe(
       copy.form.wholeNumberOnly,
     );
   });
 
   it("R3: the row ids stay on screen and never reach the wire", async () => {
     const { sent } = renderForm(twoGroups());
-    fireEvent.click(screen.getByTestId("combo-slot-0-remove"));
+    fireEvent.click(reach("combo-slot-0-remove"));
     await waitFor(() => expect(input("combo-slot-0-quantity").value).toBe("3"));
     submit();
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -465,7 +481,7 @@ describe("a count box always shows the state it holds", () => {
     renderForm(freeUnitsRecord());
     type("free-units-free", "2,5");
     await waitFor(() =>
-      expect(screen.getByTestId("free-units-free-message").textContent).toBe(
+      expect(peek("free-units-free-message").textContent).toBe(
         copy.form.wholeNumberOnly,
       ),
     );
@@ -476,7 +492,7 @@ describe("a count box always shows the state it holds", () => {
 describe("editing a clock in place", () => {
   function openSchedule(): void {
     renderForm();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(reach("repetition-specific"));
   }
 
   it("E1: '09:00', the hour selected and '1','5' typed, reads 15:00", async () => {
@@ -493,7 +509,7 @@ describe("editing a clock in place", () => {
     openSchedule();
     type("schedule-to-0", "25/10");
     await waitFor(() => expect(input("schedule-to-0").value).toBe("25:10"));
-    expect(screen.getByTestId("schedule-to-0-message").textContent).toBe(copy.schedule.invalidTime);
+    expect(reach("schedule-to-0-message").textContent).toBe(copy.schedule.invalidTime);
   });
 
   it("E3: a time with no colon yet is still masked from its digits", async () => {

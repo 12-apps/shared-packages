@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
@@ -9,6 +9,7 @@ import { missingWebCopy } from "../copy";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { peek, reach, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4156 / FUT-4482, review round 1: whether equal days are legal follows the
@@ -76,8 +77,8 @@ afterEach(() => {
 });
 
 const box = (name: "startsAt" | "endsAt"): HTMLInputElement =>
-  screen.getByTestId(`total-form-field-${name}`) as HTMLInputElement;
-const period = (): HTMLElement => screen.getByTestId("discount-period");
+  reach(`total-form-field-${name}`) as HTMLInputElement;
+const period = (): HTMLElement => reach("discount-period");
 const cellOf = (day: number, month = "novembro", year = 2026): HTMLElement => {
   const cell = within(period()).queryAllByRole("gridcell", { name: `${day} de ${month} de ${year}` })[0];
   if (cell === undefined) throw new Error(`no ${day} de ${month} de ${year} on screen`);
@@ -104,7 +105,7 @@ describe("Início = Término follows the server (wholeDays)", () => {
     openForm(STARTS_10_11, true);
     fireEvent.click(cellOf(10));
     await waitFor(() => expect(box("endsAt").value).toBe("10/11/2026"));
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent.bodies).toHaveLength(1));
     expect(sent.bodies[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-10" });
   });
@@ -112,9 +113,9 @@ describe("Início = Término follows the server (wholeDays)", () => {
   it("W3: without whole days, equal typed days are refused on Término and never sent", async () => {
     openForm(STARTS_10_11);
     typeInto("endsAt", "10112026");
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() =>
-      expect(screen.getByTestId("total-form-field-endsAt-message").textContent).toBe(copy.form.endsBeforeStarts),
+      expect(peek("total-form-field-endsAt-message").textContent).toBe(copy.form.endsBeforeStarts),
     );
     expect(sent.bodies).toEqual([]);
   });
@@ -122,12 +123,12 @@ describe("Início = Término follows the server (wholeDays)", () => {
   it("W4: with whole days, equal typed days are sent, and an earlier Término is refused", async () => {
     openForm(STARTS_10_11, true);
     typeInto("endsAt", "09112026");
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() =>
-      expect(screen.getByTestId("total-form-field-endsAt-message").textContent).toBe(copy.form.endsBeforeStartDay),
+      expect(peek("total-form-field-endsAt-message").textContent).toBe(copy.form.endsBeforeStartDay),
     );
     typeInto("endsAt", "10112026");
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(sent.bodies).toHaveLength(1));
     expect(sent.bodies[0]).toMatchObject({ startsAt: "2026-11-10", endsAt: "2026-11-10" });
   });

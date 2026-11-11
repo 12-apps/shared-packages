@@ -29,7 +29,7 @@ const CARD_GAP_PX = 8;
 
 /**
  * What one card needs, when nothing could measure it (a test DOM): the widest
- * pt-BR kind label at the toggle's type size, 132 px, as `KindField` measured.
+ * pt-BR kind label at the old toggle's type size, 132 px, as measured for FUT-4157.
  */
 export const FALLBACK_CARD_PX = 132;
 

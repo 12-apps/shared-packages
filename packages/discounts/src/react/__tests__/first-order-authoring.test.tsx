@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { createDiscountsApiClient, type DiscountWireRecord } from "../api";
@@ -8,6 +8,7 @@ import { createFormatters } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { findReach, reach, submitForm } from "./step-form-shim";
 
 /**
  * The first-purchase switch (FUT-2825): offered where the condition means
@@ -100,7 +101,7 @@ function orderRecord(overrides: Partial<DiscountWireRecord> = {}): DiscountWireR
 }
 
 function switchInput(): HTMLInputElement {
-  const root = screen.getByTestId("discount-first-order-only");
+  const root = reach("discount-first-order-only");
   const input = root instanceof HTMLInputElement ? root : root.querySelector("input");
   if (!input) throw new Error("the first-purchase switch has no input");
   return input as HTMLInputElement;
@@ -111,7 +112,7 @@ describe("the first-purchase switch", () => {
     const { sent } = renderForm(orderRecord({ firstOrderOnly: true }));
     expect(switchInput().checked).toBe(true);
 
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ firstOrderOnly: true, scope: "ORDER" });
@@ -124,7 +125,7 @@ describe("the first-purchase switch", () => {
 
   it("is not offered on a combo, which keeps its own rules", async () => {
     renderForm(comboRecord());
-    await screen.findByTestId("discount-form");
+    await findReach("discount-form");
     expect(screen.queryAllByTestId("discount-first-order-only")).toHaveLength(0);
   });
 });

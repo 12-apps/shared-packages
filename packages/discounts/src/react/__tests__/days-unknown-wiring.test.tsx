@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { Fields } from "@12-apps/ui/form/total-form";
@@ -9,6 +9,7 @@ import { createWebDiscounts } from "../create-web-discounts";
 import { DaysUnknownMarker, type DiscountsTimeZoneSettings } from "../days-unknown-notice";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsTransport } from "../transport";
+import { reach } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 5 (B3, N5): what the round-four tests left unasserted.
@@ -41,7 +42,7 @@ function displayOf(cls: string, condition?: string): string | undefined {
 describe("the marker under a row's name (B3)", () => {
   it("shows below lg and hides from lg up, by its own media rule", () => {
     render(<DaysUnknownMarker copy={copy} />);
-    const marker = screen.getByTestId("discount-days-unknown-marker");
+    const marker = reach("discount-days-unknown-marker");
     const cls = Array.from(marker.classList).find((name) => name.startsWith("css-"));
     expect(cls).toBeDefined();
     // MUI's default lg is 1200px; `display: { xs: "block", lg: "none" }`.
@@ -95,7 +96,7 @@ describe("the standalone DiscountForm (B3)", () => {
       timeZoneSettings: { href: "/admin/loja/config#fuso" },
     });
     render(<DiscountForm editing={UNKNOWN} groups={[]} onSaved={() => {}} />);
-    const notice = screen.getByTestId("discount-days-unknown");
+    const notice = reach("discount-days-unknown");
     expect(within(notice).getByRole("link", { name: copy.window.openTimeZone }).getAttribute("href")).toBe(
       "/admin/loja/config#fuso",
     );

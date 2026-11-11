@@ -17,6 +17,7 @@ import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
 import { browserRootFontForThisFile, STILL_THEME } from "./still-theme";
+import { findReach, reach, reachLabel, submitForm } from "./step-form-shim";
 
 /**
  * FUT-4482, review round 8 (B2): under an unknown zone the dates are locked
@@ -92,8 +93,8 @@ function mount(rows: DiscountWireRecord[]): Record<string, unknown>[] {
 async function openEdit(id: string): Promise<HTMLElement> {
   const kebab = await screen.findAllByTestId(`discount-actions-${id}`, undefined, SURFACE_LOADED);
   fireEvent.click(within(kebab[0]!).queryByRole("button") ?? kebab[0]!);
-  fireEvent.click(await screen.findByTestId("discount-action-edit"));
-  return screen.findByTestId("discount-period", undefined, SURFACE_LOADED);
+  fireEvent.click(await findReach("discount-action-edit"));
+  return findReach("discount-period", undefined, SURFACE_LOADED);
 }
 
 const box = (period: HTMLElement, name: "startsAt" | "endsAt"): HTMLInputElement => {
@@ -133,16 +134,16 @@ describe("a legacy row read with datesLocked (review round 8)", () => {
   it("keeps every other field editable", async () => {
     mount([LOCKED]);
     await openEdit(LOCKED.id);
-    expect((screen.getByLabelText(copy.form.name) as HTMLInputElement).disabled).toBe(false);
-    expect((screen.getByLabelText(copy.form.percentOff) as HTMLInputElement).disabled).toBe(false);
+    expect((reachLabel(copy.form.name) as HTMLInputElement).disabled).toBe(false);
+    expect((reachLabel(copy.form.percentOff) as HTMLInputElement).disabled).toBe(false);
   });
 
   it("pauses: Salvar sends keepWindow and no dates, and closes", async () => {
     const sent = mount([LOCKED]);
     await openEdit(LOCKED.id);
-    const active = screen.getByTestId("discount-active");
+    const active = reach("discount-active");
     fireEvent.click(active.querySelector("input") ?? active);
-    fireEvent.click(screen.getByTestId("discount-form-submit"));
+    submitForm();
     await waitFor(() => expect(screen.queryAllByTestId("discount-form")).toHaveLength(0), SURFACE_LOADED);
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ active: false, keepWindow: true });

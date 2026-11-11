@@ -9,6 +9,7 @@ import { createFormatters, formatWindow } from "../format";
 import { PT_BR_DISCOUNTS_WEB_COPY } from "../pt-BR";
 import type { DiscountsResult, DiscountsTransport } from "../transport";
 import { STORY_GROUPS } from "../__stories__/fixtures";
+import { peek, reach, settle, submitForm } from "./step-form-shim";
 
 /**
  * The discount form at phone width and in an English browser (FUT-4155,
@@ -78,7 +79,7 @@ function record(overrides: Partial<DiscountWireRecord> = {}): DiscountWireRecord
 }
 
 function input(testId: string): HTMLInputElement {
-  return screen.getByTestId(testId) as HTMLInputElement;
+  return reach(testId) as HTMLInputElement;
 }
 
 function type(testId: string, value: string): void {
@@ -86,7 +87,7 @@ function type(testId: string, value: string): void {
 }
 
 function submit(): void {
-  fireEvent.click(screen.getByTestId("discount-form-submit"));
+  submitForm();
 }
 
 function fillValid(): void {
@@ -116,62 +117,54 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The kind control: a select (combobox) or the toggle's buttons. */
-function kindControl(): "select" | "toggle" {
-  const field = screen.getByTestId("total-form-field-kind");
-  return within(field).queryAllByRole("combobox").length > 0 ? "select" : "toggle";
+/** How the Tipo cards are laid out: one row of four, or one column (FUT-4477). */
+function tipoLayout(): string | null {
+  return reach("discount-kind-cards").getAttribute("data-layout");
 }
 
-async function chooseKindFromSelect(kind: string): Promise<void> {
-  fireEvent.mouseDown(within(screen.getByTestId("total-form-field-kind")).getByRole("combobox"));
-  fireEvent.click(await screen.findByTestId(`total-form-field-kind-option-${kind}`));
-}
-
-describe("FUT-4157: the kind question sits on one line", () => {
-  it("Q1: a form too narrow for four equal parts asks it with a select", async () => {
+// FUT-4157's toggle-or-select is replaced by the Tipo cards (FUT-4475, "Tipo"):
+// still one question on one line or a list, by the FORM's width (ADR 0190).
+describe("FUT-4477: Tipo is four cards, one row or one column", () => {
+  it("Q1: a form too narrow for a row of four stacks them in ONE column, never two by two", async () => {
     containerWidth(288);
     renderForm();
-    await waitFor(() => expect(kindControl()).toBe("select"));
-    fireEvent.mouseDown(within(screen.getByTestId("total-form-field-kind")).getByRole("combobox"));
-    const options = await screen.findAllByTestId(/^total-form-field-kind-option-/u);
-    expect(options.map((option) => option.textContent)).toEqual([
-      copy.labels.kind.PERCENTAGE,
-      copy.labels.kind.FIXED_AMOUNT,
-      copy.labels.kind.COMBO,
-      copy.labels.kind.FREE_UNITS,
-    ]);
+    await waitFor(() => expect(tipoLayout()).toBe("column"));
+    const group = reach("discount-kind-cards");
+    expect(group.getAttribute("role")).toBe("radiogroup");
+    expect(group.getAttribute("aria-label")).toBe(copy.form.kind);
+    expect(within(group).getAllByRole("radio")).toHaveLength(4);
   });
 
-  it("Q2: picking Combo there switches the form exactly as the toggle does", async () => {
+  it("Q2: picking Combo there switches the form exactly as before", async () => {
     containerWidth(288);
     renderForm();
-    await waitFor(() => expect(kindControl()).toBe("select"));
-    await chooseKindFromSelect("COMBO");
-    await waitFor(() => expect(screen.getByTestId("combo-slots")).toBeTruthy());
+    fireEvent.click(reach("discount-kind-COMBO"));
+    expect(reach("discount-kind-COMBO").getAttribute("aria-checked")).toBe("true");
+    expect(reach("combo-slots")).toBeTruthy();
     expect(screen.queryAllByTestId("total-form-field-scope")).toHaveLength(0);
   });
 
-  it("Q3: a wide form keeps the four-part toggle", async () => {
+  it("Q3: a wide form keeps the four on one row", async () => {
     containerWidth(900);
     renderForm();
-    await waitFor(() => expect(screen.getByTestId("total-form-field-kind-item-COMBO")).toBeTruthy());
-    expect(kindControl()).toBe("toggle");
+    await waitFor(() => expect(tipoLayout()).toBe("row"));
   });
 
-  it("Q4: a bundle price keeps the four kinds (FUT-4417), so the same width keeps the toggle", async () => {
-    containerWidth(600);
-    renderForm(
-      record({ type: "BUNDLE_PRICE", scope: "COMBO", percentOffBp: null, bundlePriceCents: 2_500 }),
-    );
-    await waitFor(() => expect(kindControl()).toBe("toggle"));
+  it("Q4: the arrows move the choice, as a radio group's do", async () => {
+    renderForm();
+    const percentage = reach("discount-kind-PERCENTAGE");
+    await waitFor(() => expect(percentage.getAttribute("tabindex")).toBe("0"));
+    fireEvent.keyDown(percentage, { key: "ArrowRight" });
+    await waitFor(() => expect(peek("discount-kind-FIXED_AMOUNT").getAttribute("aria-checked")).toBe("true"));
+    fireEvent.keyDown(peek("discount-kind-FIXED_AMOUNT"), { key: "End" });
+    await waitFor(() => expect(peek("discount-kind-FREE_UNITS").getAttribute("aria-checked")).toBe("true"));
   });
 
-  it("Q5: the select still paints the kind's refusal", async () => {
+  it("Q5: a combo's refusal is said at the foot of step 2", async () => {
     containerWidth(288);
     renderForm(record({ scope: "COMBO", comboRequirements: [] }));
-    await waitFor(() => expect(kindControl()).toBe("select"));
     submit();
-    await waitFor(() => expect(fieldMessage("kind")).toBe(copy.form.comboSlotsRequired));
+    await waitFor(() => expect(peek("discount-step-targets-message").textContent).toBe(copy.form.comboSlotsRequired));
   });
 });
 
@@ -183,7 +176,7 @@ describe("FUT-4155: the schedule's refusal is said on the schedule", () => {
   it("S1: no day chosen", async () => {
     const { sent } = renderForm();
     fillValid();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(reach("repetition-specific"));
     submit();
     await waitFor(() => expect(scheduleMessage()).toBe(copy.schedule.daysRequired));
     expect(sent).toHaveLength(0);
@@ -192,8 +185,8 @@ describe("FUT-4155: the schedule's refusal is said on the schedule", () => {
   it("S2: a window that starts when it ends", async () => {
     renderForm();
     fillValid();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
+    fireEvent.click(reach("repetition-specific"));
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetEveryDay}`));
     type("schedule-to-0", "1600");
     submit();
     await waitFor(() => expect(scheduleMessage()).toBe(copy.schedule.timesRequired));
@@ -202,17 +195,19 @@ describe("FUT-4155: the schedule's refusal is said on the schedule", () => {
   it("S3: the refusal clears once the schedule is edited, like a field's", async () => {
     renderForm();
     fillValid();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(reach("repetition-specific"));
     submit();
     await waitFor(() => expect(scheduleMessage()).toBe(copy.schedule.daysRequired));
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetWeekdays}`));
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetWeekdays}`));
     await waitFor(() => expect(screen.queryAllByTestId("schedule-builder-message")).toHaveLength(0));
   });
 
   it("S4: a combo with no groups is refused on the kind, which paints it", async () => {
     renderForm(record({ scope: "COMBO", comboRequirements: [] }));
     submit();
-    await waitFor(() => expect(fieldMessage("kind")).toBe(copy.form.comboSlotsRequired));
+    // The kind's message is said at the foot of step 2 now, the step the
+    // refusal opens (FUT-4477): the Tipo cards carry no field message.
+    await waitFor(() => expect(peek("discount-step-targets-message").textContent).toBe(copy.form.comboSlotsRequired));
   });
 
   it("S5: leve 3 pague 2 with no product is refused on the kind in its own words", async () => {
@@ -220,7 +215,9 @@ describe("FUT-4155: the schedule's refusal is said on the schedule", () => {
       record({ type: "FREE_UNITS", scope: "COMBO", percentOffBp: null, freeUnits: 1, comboRequirements: [] }),
     );
     submit();
-    await waitFor(() => expect(fieldMessage("kind")).toBe(copy.form.freeUnitsTargetRequired));
+    // Under the products picker, once (FUT-4477): the same sentence is not said again from `kind`.
+    await waitFor(() => expect(peek("free-units-message").textContent).toBe(copy.form.freeUnitsTargetRequired));
+    expect(screen.getAllByText(copy.form.freeUnitsTargetRequired)).toHaveLength(1);
   });
 });
 
@@ -255,7 +252,8 @@ describe("FUT-4156: Início and Término are DD/MM/AAAA on every browser", () =>
     await waitFor(() => expect(fieldMessage("startsAt")).toBe(copy.form.invalidDate));
     expect(input("total-form-field-startsAt").getAttribute("aria-invalid")).toBe("true");
     submit();
-    await waitFor(() => expect(screen.getByTestId("total-form-error-snackbar")).toBeTruthy());
+    // A client refusal is said on its step, not by the toast (FUT-4477).
+    await settle();
     expect(fieldMessage("startsAt")).toBe(copy.form.invalidDate);
     expect(sent).toHaveLength(0);
   });
@@ -380,14 +378,14 @@ describe("an unfinished value is told to finish, not that it is wrong", () => {
 
   it("I3: a clock left at '1:00' says 'Termine o horário' on blur, never while typed", async () => {
     renderForm();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
+    fireEvent.click(reach("repetition-specific"));
     type("schedule-from-0", "0900");
     type("schedule-from-0", "1:00");
     await waitFor(() => expect(input("schedule-from-0").value).toBe("1:00"));
     expect(screen.queryAllByTestId("schedule-from-0-message")).toHaveLength(0);
     fireEvent.blur(input("schedule-from-0"));
     await waitFor(() =>
-      expect(screen.getByTestId("schedule-from-0-message").textContent).toBe(
+      expect(peek("schedule-from-0-message").textContent).toBe(
         "Termine o horário: HH:MM.",
       ),
     );
@@ -398,13 +396,13 @@ describe("an unfinished value is told to finish, not that it is wrong", () => {
   it("I4: at Criar the schedule says the time is unfinished, not that the ends must differ", async () => {
     const { sent } = renderForm();
     fillValid();
-    fireEvent.click(screen.getByTestId("repetition-specific"));
-    fireEvent.click(screen.getByTestId(`schedule-preset-${copy.schedule.presetEveryDay}`));
+    fireEvent.click(reach("repetition-specific"));
+    fireEvent.click(reach(`schedule-preset-${copy.schedule.presetEveryDay}`));
     type("schedule-from-0", "1:00");
     submit();
     // Said once, by the clock it is about (FUT-4143 code review round 3).
     await waitFor(() =>
-      expect(screen.getByTestId("schedule-from-0-message").textContent).toBe(
+      expect(peek("schedule-from-0-message").textContent).toBe(
         copy.schedule.timeIncomplete,
       ),
     );

@@ -56,15 +56,28 @@ async function openCreateDialog(page: Page): Promise<Locator> {
   return dialog;
 }
 
+/** Pass the open step: its Continuar (Pronto on step 4), which is enabled once the step is complete. */
+async function passStep(dialog: Locator, step: 1 | 2 | 3 | 4): Promise<void> {
+  const next = dialog.getByTestId(`discount-step-${step}-next`);
+  await expect(next).toBeEnabled();
+  await next.click();
+}
+
 When('I compose a percentage promotion', async ({ page }) => {
   const { newName, percent } = discountsWorld().fixtures;
   currentName = newName('Journey');
   const dialog = await openCreateDialog(page);
+  // The form asks in four steps: what it is, where it applies (the whole
+  // order by default), how much, and the rules (the usual ones by default).
   await dialog.getByTestId('total-form-field-name').fill(currentName);
-  // Percentage is the default kind; clicking it anyway is the interaction that
-  // proves the toggle drives which value field is mounted.
-  await dialog.getByTestId('total-form-field-kind-item-PERCENTAGE').click();
+  // Percentage is the default kind; picking it anyway is the interaction that
+  // proves the cards drive which value field step 3 mounts.
+  await dialog.getByTestId('discount-kind-PERCENTAGE').click();
+  await passStep(dialog, 1);
+  await passStep(dialog, 2);
   await dialog.getByTestId('total-form-field-percentOff').fill(percent);
+  await passStep(dialog, 3);
+  await passStep(dialog, 4);
   await dialog.getByTestId('discount-form-submit').click();
   await expect(dialog).toBeHidden();
 });
@@ -87,8 +100,31 @@ Then('the promotion is listed with its rate', async ({ page }) => {
   await expect(row.getByText(discountsWorld().fixtures.percentInGrid)).toBeVisible();
 });
 
-When('I start composing a promotion', async ({ page }) => {
+When('I start a promotion step by step', async ({ page }) => {
   await openCreateDialog(page);
+});
+
+Then('the first step cannot be passed yet and says what is missing', async ({ page }) => {
+  const next = page.getByTestId(DIALOG).getByTestId('discount-step-1-next');
+  await expect(next).toBeDisabled();
+  // The reason is the button's description, not a sentence this package names.
+  await expect(page.getByTestId(DIALOG).getByTestId('discount-step-1-missing')).not.toBeEmpty();
+  await expect(next).toHaveAttribute('aria-describedby', 'discount-step-1-missing');
+});
+
+When('I name the promotion', async ({ page }) => {
+  await page.getByTestId(DIALOG).getByTestId('total-form-field-name').fill(discountsWorld().fixtures.newName('Step'));
+});
+
+Then('the first step can be passed', async ({ page }) => {
+  await expect(page.getByTestId(DIALOG).getByTestId('discount-step-1-next')).toBeEnabled();
+  await expect(page.getByTestId(DIALOG).getByTestId('discount-step-1-missing')).toBeEmpty();
+});
+
+When('I start composing a promotion', async ({ page }) => {
+  const dialog = await openCreateDialog(page);
+  // Every step open at once, so each field is on screen whatever its step.
+  await dialog.getByTestId('discount-see-all').click();
 });
 
 Then('the percentage field is the one on screen', async ({ page }) => {
@@ -96,7 +132,7 @@ Then('the percentage field is the one on screen', async ({ page }) => {
 });
 
 When('I switch it to a fixed amount', async ({ page }) => {
-  await page.getByTestId(DIALOG).getByTestId('total-form-field-kind-item-FIXED_AMOUNT').click();
+  await page.getByTestId(DIALOG).getByTestId('discount-kind-FIXED_AMOUNT').click();
 });
 
 Then('the amount field REPLACES the percentage one', async ({ page }) => {
@@ -108,7 +144,7 @@ Then('the amount field REPLACES the percentage one', async ({ page }) => {
 });
 
 When('I switch it to a combo', async ({ page }) => {
-  await page.getByTestId(DIALOG).getByTestId('total-form-field-kind-item-COMBO').click();
+  await page.getByTestId(DIALOG).getByTestId('discount-kind-COMBO').click();
 });
 
 Then('the scope question disappears and the group builder takes its place', async ({ page }) => {
@@ -122,7 +158,7 @@ Then('the scope question disappears and the group builder takes its place', asyn
 
 Then('the scope question comes back for a plain kind', async ({ page }) => {
   const dialog = page.getByTestId(DIALOG);
-  await dialog.getByTestId('total-form-field-kind-item-FIXED_AMOUNT').click();
+  await dialog.getByTestId('discount-kind-FIXED_AMOUNT').click();
   await expect(dialog.getByTestId('total-form-field-scope-item-ORDER')).toBeVisible();
 });
 
@@ -145,6 +181,8 @@ When('I rename it from the row menu', async ({ page }) => {
   const dialog = page.getByTestId(DIALOG);
   await expect(dialog).toBeVisible();
   currentName = `${currentName} II`;
+  // An edit opens every step answered: the name is step 1's, reopened by its card.
+  await dialog.getByTestId('discount-steps-identity-change').click();
   await dialog.getByTestId('total-form-field-name').fill(currentName);
   await dialog.getByTestId('discount-form-submit').click();
   await expect(dialog).toBeHidden();

@@ -59,14 +59,17 @@ function comboParts(form: FormSnapshot, world: SummaryWorld): string {
   const names = namer(world);
   const parts = form.slots.map((slot) => {
     const picked = names([...slot.categoryIds, ...slot.menuItemIds]);
-    return fill(summary.part, { quantity: slot.quantity, names: picked.length > 0 ? picked.join(summary.or) : summary.nothing });
+    const quantity = Number.isFinite(slot.quantity) ? slot.quantity : summary.nothing;
+    return fill(summary.part, { quantity, names: picked.length > 0 ? picked.join(summary.or) : summary.nothing });
   });
   return parts.length > 0 ? parts.join(summary.plus) : summary.nothing;
 }
 
-function freeCounts(form: FormSnapshot): { units: number; paid: number } {
+/** "Leve {units}, pague {paid}": a count still being typed ("2,5") reads as "…", never NaN. */
+function freeCounts(form: FormSnapshot, nothing: string): { units: number | string; paid: number | string } {
   const units = form.slots[0]?.quantity ?? 0;
   const free = Number(form.values.freeUnits ?? "");
+  if (!Number.isFinite(units)) return { units: nothing, paid: nothing };
   return { units, paid: Math.max(0, units - (Number.isFinite(free) ? free : 0)) };
 }
 
@@ -139,7 +142,7 @@ function stepTwoLines(form: FormSnapshot, world: SummaryWorld): DoneLines {
   }
   if (kind === "FREE_UNITS") {
     const products = namer(world)(form.slots.flatMap((slot) => slot.menuItemIds)).join(copy.steps.summary.list);
-    return { answer: fill(copy.steps.summary.freeLine, freeCounts(form)), detail: products };
+    return { answer: fill(copy.steps.summary.freeLine, freeCounts(form, copy.steps.summary.nothing)), detail: products };
   }
   return { answer: targetsLine(form, world), detail: "" };
 }
@@ -246,7 +249,7 @@ function freeSentence(form: FormSnapshot, world: SummaryWorld): string {
   const { summary } = world.copy.steps;
   const names = namer(world)(form.slots.flatMap((slot) => slot.menuItemIds));
   const products = names.length > 0 ? fill(summary.sentenceFreeProducts, { names: names.join(summary.or) }) : "";
-  return fill(summary.sentenceFree, { ...freeCounts(form), products });
+  return fill(summary.sentenceFree, { ...freeCounts(form, summary.nothing), products });
 }
 
 function plainSentence(form: FormSnapshot, world: SummaryWorld): string {

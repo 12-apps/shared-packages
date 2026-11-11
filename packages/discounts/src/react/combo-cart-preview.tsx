@@ -24,7 +24,7 @@ import type { DiscountsFormatters } from "./format";
  * Under the reward's field on a phone or a narrow form; in its own column
  * beside the form when the form has the room, as the approved prototype draws
  * it on a computer. What decides is the FORM's own width, measured the way
- * `KindField` measures it, because the form also lives in a modal narrower
+ * Tipo cards measure it, because the form also lives in a modal narrower
  * than the screen. In the wide stacked modal the screens open it in
  * (`DiscountDialog`), a 1280 window gives the form well over the threshold;
  * a tablet's or a phone's does not, and the preview sits under the field.
