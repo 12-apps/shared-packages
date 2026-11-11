@@ -39,18 +39,16 @@ function git(...args) {
 /** Every finding in the checkout: `path` for a third-party file, `path::name` for a schema. */
 export function scanRepo() {
   const tracked = (git("ls-files") ?? "").split("\n").filter(Boolean);
-  const findings = new Map();
-  for (const path of tracked) {
-    if (!inScope(path) || !existsSync(path)) continue;
-    if (isThirdPartyInbound(path)) {
-      findings.set(path, "parses a third party's payload");
-      continue;
-    }
-    for (const [name, { line, reasons }] of nonStrictInputs(readFileSync(path, "utf8"))) {
-      findings.set(`${path}::${name}`, `${path}:${line} ${name}: ${reasons.join(", ")}`);
-    }
-  }
-  return findings;
+  return new Map(tracked.filter((path) => inScope(path) && existsSync(path)).flatMap(findingsOf));
+}
+
+/** The `[key, detail]` findings of one in-scope file. */
+function findingsOf(path) {
+  if (isThirdPartyInbound(path)) return [[path, "parses a third party's payload"]];
+  return [...nonStrictInputs(readFileSync(path, "utf8"))].map(([name, { line, reasons }]) => [
+    `${path}::${name}`,
+    `${path}:${line} ${name}: ${reasons.join(", ")}`,
+  ]);
 }
 
 /** The shrink-only + touch-must-fix pair, held against the merge base. */

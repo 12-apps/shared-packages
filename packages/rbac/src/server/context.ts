@@ -323,25 +323,21 @@ export interface RbacServerConfig<
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class RbacApiError extends Error {
   readonly status: number;
-  /** Set on a 422: every problem of the refused input, with its path. */
-  readonly problems?: InputProblem[];
-  constructor(status: number, message: string, problems?: InputProblem[]) {
+  constructor(
+    status: number,
+    message: string,
+    readonly problems?: InputProblem[],
+  ) {
     super(message);
-    if (problems) this.problems = problems;
     this.name = 'RbacApiError';
     this.status = status;
     Object.setPrototypeOf(this, RbacApiError.prototype);
   }
 }
 
-export const ok = (data: unknown, status = 200): RbacResponse => ({
-  status,
-  body: { data },
-});
-export const fail = (status: number, error: string, problems?: InputProblem[]): RbacResponse => ({
-  status,
-  body: problems ? { error, problems } : { error },
-});
+export const ok = (data: unknown, status = 200): RbacResponse => ({ status, body: { data } });
+export const fail = (status: number, error: string, problems?: InputProblem[]): RbacResponse =>
+  ({ status, body: problems ? { error, problems } : { error } });
 
 /** Fold a store/governance {@link RbacApiError} into a response; rethrow the rest. */
 export function foldApiError(error: unknown): RbacResponse {

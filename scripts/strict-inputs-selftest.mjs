@@ -47,7 +47,7 @@ const cases = [
     "a file without zod is never read"],
   [names(`${Z}export const saveBody = z.strictObject({ note: z.string().describe("use z.object( here") });`).length === 0,
     "an object call inside a string is not a call"],
-  [isThirdPartyInbound("packages/payments/backend/src/providers/pagbank-webhook.ts"), "a provider webhook is third-party"],
+  [isThirdPartyInbound("packages/payments/backend/src/providers/some-webhook.ts"), "a provider webhook is third-party"],
   [!isThirdPartyInbound("packages/rbac/src/server/wire.ts"), "an ordinary package file is not"],
   [newDebt({
       baseLedger: new Map([["a::b", { kind: "grandfathered" }]]),

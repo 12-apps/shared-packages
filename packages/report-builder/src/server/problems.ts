@@ -7,7 +7,7 @@ import { InvalidInputError, type InputProblem } from '../errors';
  * per key, at the key's own path, so a client can paint the exact field that
  * should not have been sent.
  */
-export function problemsOf(error: z.ZodError): InputProblem[] {
+function problemsOf(error: z.ZodError): InputProblem[] {
   return error.issues.flatMap((issue) => {
     const base = issue.path.map(String);
     if (issue.code === 'unrecognized_keys') {

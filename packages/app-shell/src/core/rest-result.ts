@@ -57,7 +57,19 @@ interface ErrorEnvelope {
   /** The older shape: one message per field name. */
   issues?: Record<string, string>;
   /** The strict-input shape: every problem with the path it was found at. */
-  problems?: ReadonlyArray<{ path?: string | ReadonlyArray<string | number>; message?: string }>;
+  problems?: readonly ProblemWire[];
+}
+
+/** One problem as the wire carries it: a path (dotted, or its segments) and a sentence. */
+interface ProblemWire {
+  path?: string | ReadonlyArray<string | number>;
+  message?: string;
+}
+
+/** The dotted path of one problem; segments are joined, a missing path is the whole body. */
+function pathOf(problem: ProblemWire): string {
+  const { path } = problem;
+  return Array.isArray(path) ? path.join('.') : ((path as string | undefined) ?? '');
 }
 
 /**
@@ -69,16 +81,13 @@ interface ErrorEnvelope {
  * has no input to sit beside, so it is left to `error`.
  */
 function fieldErrorsOf(payload: ErrorEnvelope | null): Record<string, string> | undefined {
-  if (Array.isArray(payload?.problems)) {
-    const byPath: Record<string, string> = {};
-    for (const problem of payload.problems) {
-      const path = Array.isArray(problem?.path) ? problem.path.join('.') : problem?.path;
-      if (typeof path !== 'string' || path === '' || typeof problem.message !== 'string') continue;
-      byPath[path] ??= problem.message;
-    }
-    if (Object.keys(byPath).length > 0) return byPath;
+  const problems = Array.isArray(payload?.problems) ? payload.problems : [];
+  const byPath: Record<string, string> = {};
+  for (const problem of problems) {
+    const path = pathOf(problem);
+    if (path !== '' && typeof problem.message === 'string') byPath[path] ??= problem.message;
   }
-  return payload?.issues ?? undefined;
+  return Object.keys(byPath).length > 0 ? byPath : payload?.issues;
 }
 
 /**

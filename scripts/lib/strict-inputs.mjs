@@ -39,7 +39,7 @@ const TAG = "@request-input";
  * refuses a payment notification the day a provider adds a field, so the owner
  * decided (FUT-4733, 2026-11-11) on a week of observation first.
  */
-export const THIRD_PARTY_INBOUND = [
+const THIRD_PARTY_INBOUND = [
   /^packages\/payments\/backend\/src\/providers\/[^/]*webhook[^/]*\.ts$/,
   /^packages\/payments\/backend\/src\/providers\/pagbank-legacy-notifications\.ts$/,
   /^packages\/payments\/backend\/src\/providers\/pagbank-oauth\.ts$/,
@@ -121,45 +121,37 @@ function candidates(source) {
   return found;
 }
 
-/** Index of the `)` matching the `(` at `open`, skipping strings; -1 when unbalanced. */
-function closingParen(text, open) {
-  let depth = 0;
-  let quote = null;
-  for (let i = open; i < text.length; i += 1) {
-    const ch = text[i];
-    if (quote) {
-      if (ch === "\\") i += 1;
-      else if (ch === quote) quote = null;
-    } else if (ch === "'" || ch === '"' || ch === "`") quote = ch;
-    else if (ch === "(") depth += 1;
-    else if (ch === ")") {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
-  }
-  return -1;
-}
-
 /** The text with the inside of every string blanked, so prose in a `.describe()` is not code. */
 function maskStrings(text) {
   let out = "";
   let quote = null;
   for (let i = 0; i < text.length; i += 1) {
     const ch = text[i];
-    if (quote) {
-      if (ch === "\\") {
-        out += "  ";
-        i += 1;
-      } else if (ch === quote) {
-        quote = null;
-        out += ch;
-      } else out += ch === "\n" ? ch : " ";
-    } else {
-      if (ch === "'" || ch === '"' || ch === "`") quote = ch;
+    if (quote === null) {
+      if (QUOTES.includes(ch)) quote = ch;
       out += ch;
-    }
+    } else if (ch === "\\") {
+      out += "  ";
+      i += 1;
+    } else if (ch === quote) {
+      quote = null;
+      out += ch;
+    } else out += ch === "\n" ? ch : " ";
   }
   return out;
+}
+
+const QUOTES = ["'", '"', "`"];
+
+/** Index of the `)` matching the `(` at `open` in string-masked text; -1 when unbalanced. */
+function closingParen(masked, open) {
+  let depth = 0;
+  for (let i = open; i < masked.length; i += 1) {
+    if (masked[i] === "(") depth += 1;
+    if (masked[i] === ")") depth -= 1;
+    if (depth === 0) return i;
+  }
+  return -1;
 }
 
 /**
@@ -167,7 +159,7 @@ function maskStrings(text) {
  * directly by `.strict()`, `.passthrough()`, `.loose()`, `.catchall(` and
  * `looseObject(`. Returns one short reason per occurrence.
  */
-export function stripsOrAllows(source) {
+function stripsOrAllows(source) {
   const text = maskStrings(source);
   const reasons = [];
   for (const match of text.matchAll(/\.object\s*\(/g)) {
@@ -179,6 +171,14 @@ export function stripsOrAllows(source) {
     reasons.push(`${match[1] ?? "looseObject"} lets unknown keys through`);
   }
   return reasons;
+}
+
+/** The in-file declarations an entry names, other than itself. */
+function referencedDeclarations(entry, byName) {
+  return [...byName.values()].filter(
+    (declaration) =>
+      declaration.name !== entry.name && new RegExp(`\\b${declaration.name}\\b`).test(entry.text),
+  );
 }
 
 /**
@@ -199,9 +199,7 @@ export function nonStrictInputs(source) {
     const key = `${entry.name}:${entry.line}`;
     if (reached.has(key)) continue;
     reached.set(key, entry);
-    for (const [name, declaration] of byName) {
-      if (name !== entry.name && new RegExp(`\\b${name}\\b`).test(entry.text)) queue.push(declaration);
-    }
+    queue.push(...referencedDeclarations(entry, byName));
   }
 
   const findings = new Map();
