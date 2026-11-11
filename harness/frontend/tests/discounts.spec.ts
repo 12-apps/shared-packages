@@ -198,14 +198,14 @@ test('a second batch cannot start while one runs, and one row gets no bulk entri
   const boxes = page.getByTestId('discounts-grid').getByRole('checkbox');
 
   // One row: Ações offers no bulk entry at all (Excluir only).
-  await boxes.nth(0).check();
+  await boxes.nth(1).check();
   await page.getByTestId('discounts-bulk-actions').click();
   await expect(page.getByRole('menuitem', { name: 'Desativar todos' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: 'Excluir' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await boxes.nth(1).check();
   await boxes.nth(2).check();
+  await boxes.nth(3).check();
   await page.getByTestId('discounts-bulk-actions').click();
   await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
   await expect(page.getByTestId('bulk-running')).toBeVisible();
@@ -228,8 +228,9 @@ test('the extend dialog: singular title, focus in the field, Enter confirms, hin
   await page.goto('#/discounts');
   await expect(page.getByTestId('discounts-grid')).toContainText('Fila C');
   const boxes = page.getByTestId('discounts-grid').getByRole('checkbox');
-  await boxes.nth(0).check();
+  // The first checkbox of the grid is the page's select-all: rows start at 1.
   await boxes.nth(1).check();
+  await boxes.nth(2).check();
   await page.getByTestId('discounts-bulk-actions').click();
   await page.getByRole('menuitem', { name: 'Estender validade…' }).click();
 
