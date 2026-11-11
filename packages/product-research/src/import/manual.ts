@@ -22,7 +22,7 @@ export interface ManualRowProblem {
 const AVAILABILITY_VALUES = ['IN_STOCK', 'OUT_OF_STOCK', 'UNKNOWN'] as const;
 
 /** One row as a host submits it — strings straight from a sheet are fine. */
-export const manualPriceRowSchema = z.object({
+export const manualPriceRowSchema = z.strictObject({
   title: z.string().trim().min(2).max(300),
   price: z.union([z.string().trim().min(1).max(40), z.number()]),
   supplierName: z.string().trim().min(1).max(160).optional(),

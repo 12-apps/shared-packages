@@ -7,7 +7,7 @@ import { manualPriceRowSchema } from './import/manual';
  * Paladira, the MCP tool registry) validate the exact same shapes.
  */
 
-export const researchQuerySchema = z.object({
+export const researchQuerySchema = z.strictObject({
   term: z.string().trim().min(2).max(200),
   brand: z.string().trim().min(1).max(100).optional(),
   ean: z
@@ -19,9 +19,9 @@ export const researchQuerySchema = z.object({
   region: z.string().trim().max(20).optional(),
 });
 
-export const startResearchSchema = z.object({
+export const startResearchSchema = z.strictObject({
   catalogRef: z
-    .object({ type: z.string().min(1).max(50), id: z.string().min(1).max(100) })
+    .strictObject({ type: z.string().min(1).max(50), id: z.string().min(1).max(100) })
     .optional(),
   query: researchQuerySchema,
 });
@@ -103,16 +103,16 @@ export type OfferOutput = z.infer<typeof offerOutputSchema>;
  */
 
 /** Path params, host-mount vocabulary included (the report-builder shape). */
-export const researchCollectionParams = z.object({ tenantSlug: z.string().min(1) });
-export const researchRequestParams = z.object({
+export const researchCollectionParams = z.strictObject({ tenantSlug: z.string().min(1) });
+export const researchRequestParams = z.strictObject({
   tenantSlug: z.string().min(1),
   requestId: z.string().min(1),
 });
-export const researchRunParams = z.object({
+export const researchRunParams = z.strictObject({
   tenantSlug: z.string().min(1),
   runId: z.string().min(1),
 });
-export const researchSourceParams = z.object({
+export const researchSourceParams = z.strictObject({
   tenantSlug: z.string().min(1),
   sourceId: z.string().min(1),
 });
@@ -164,14 +164,14 @@ export const researchPaginationSchema = z.object({
  * source's previous entries rather than stacking a second copy.
  */
 export const importManualPricesBody = z
-  .object({
+  .strictObject({
     rows: z.array(manualPriceRowSchema).max(5000).optional(),
     csv: z
-      .object({
+      .strictObject({
         content: z.string().min(1).max(2_000_000),
         delimiter: z.string().length(1).optional(),
         mapping: z
-          .object({
+          .strictObject({
             title: z.string().optional(),
             price: z.string().optional(),
             supplierName: z.string().optional(),
@@ -229,7 +229,7 @@ export const manualPriceViewSchema = z.object({
   createdAt: z.string(),
 });
 
-export const listManualPricesQuery = z.object({
+export const listManualPricesQuery = z.strictObject({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });
