@@ -1,14 +1,26 @@
 import {
   cancelAcceptance,
-  decideAcceptance,
   expireLapsedAcceptances,
   listPendingAcceptances,
-  type AcceptanceDecision,
-  type DecisionResult,
   type ExpirySweepResult,
   type PendingAcceptance,
 } from "./acceptance";
-import { recordStoreCancellation } from "./cancellation";
+import {
+  upsertIntegrations,
+  upsertMenuLinks,
+  type BulkResult,
+  type IntegrationRowInput,
+  type MenuLinkRowInput,
+} from "./bulk";
+import {
+  decideMany,
+  decideOne,
+  recordStoreCancellation,
+  type DecideManyResult,
+  type DecisionInput,
+  type DecisionResult,
+} from "./decisions";
+import { sweepOutbound, type OutboundSweepResult } from "./outbound-sweep";
 import type {
   AdapterTokenCache,
   CancellationReason,
@@ -18,7 +30,6 @@ import type {
 import { listRetryableInboxEvents, type PendingInboxEvent } from "./inbox";
 import { ingestMarketplaceOrder, type IngestResult, type IngestSettings } from "./ingest";
 import {
-  deleteMarketplaceIntegration,
   listMarketplaceIntegrations,
   resolveIngestionTarget,
   resolveTenantByMerchant,
@@ -27,11 +38,7 @@ import {
   type MarketplaceIntegrationView,
   type SaveMarketplaceIntegrationInput,
 } from "./integration";
-import {
-  listMarketplaceMenuLinks,
-  setMarketplaceMenuLink,
-  type MarketplaceMenuLinkView,
-} from "./menu-links";
+import { listMarketplaceMenuLinks, type MarketplaceMenuLinkView } from "./menu-links";
 import { runOutbound, type OutboundAttempt, type OutboundOutcome } from "./outbound";
 import type { OutboundJobPayload } from "./outbound-queue";
 import {
@@ -86,41 +93,54 @@ export interface MarketplaceEngine {
     now?: Date;
   }): Promise<DeliveryOutcome>;
 
-  /** Every connection this store has, secrets withheld. */
-  integrations(clientId: string): Promise<MarketplaceIntegrationView[]>;
+  /** This store's connections, secrets withheld; archived ones only when asked. */
+  integrations(
+    clientId: string,
+    options?: { providers?: readonly string[]; includeArchived?: boolean },
+  ): Promise<MarketplaceIntegrationView[]>;
+  /** Create or patch ONE connection (the bulk call's single-row form, with no audit). */
   saveIntegration(input: SaveMarketplaceIntegrationInput): Promise<MarketplaceIntegrationView>;
-  deleteIntegration(clientId: string, provider: MarketplaceProvider): Promise<void>;
+  /** Create, patch, archive or unarchive many connections, all-or-nothing. */
+  upsertIntegrations(input: {
+    clientId: string;
+    actorId: string | null;
+    rows: readonly IntegrationRowInput[];
+    validateOnly?: boolean;
+  }): Promise<BulkResult<MarketplaceIntegrationView>>;
 
-  /** The SKU map. `unmappedOnly` is the store's attention list. */
+  /** The SKU map. `unmappedOnly` is the store's attention list; `ids` narrows. */
   menuLinks(input: {
     clientId: string;
     provider?: MarketplaceProvider;
     unmappedOnly?: boolean;
+    ids?: readonly string[];
   }): Promise<MarketplaceMenuLinkView[]>;
-  /** Point a SKU at a catalog row, or unmap it. `null` = not this tenant's id. */
-  setMenuLink(input: {
+  /** Map or unmap many SKUs, all-or-nothing. */
+  upsertMenuLinks(input: {
     clientId: string;
-    provider: MarketplaceProvider;
-    externalSku: string;
-    externalName?: string;
-    menuItemId: string | null;
-  }): Promise<MarketplaceMenuLinkView | null>;
+    rows: readonly MenuLinkRowInput[];
+    validateOnly?: boolean;
+  }): Promise<BulkResult<MarketplaceMenuLinkView>>;
+  /** Map or unmap ONE SKU. `null` = the catalog id is not this tenant's. */
+  setMenuLink(input: { clientId: string } & MenuLinkRowInput): Promise<MarketplaceMenuLinkView | null>;
 
-  /** Orders still on the clock, soonest deadline first. */
-  pending(clientId: string): Promise<PendingAcceptance[]>;
-  /** Accept or refuse an order on the clock. All-or-nothing; see `DecisionResult`. */
-  decide(input: {
+  /** Orders still on the clock, soonest deadline first; `orderIds` narrows. */
+  pending(clientId: string, orderIds?: readonly string[]): Promise<PendingAcceptance[]>;
+  /** Decide many orders, all-or-nothing, the host admitting each inside the claim's transaction. */
+  decideMany(input: {
     clientId: string;
-    orderId: string;
-    decision: AcceptanceDecision;
-    reasonCode?: string | null;
+    decisions: readonly DecisionInput[];
+    validateOnly?: boolean;
     now?: Date;
-  }): Promise<DecisionResult>;
+  }): Promise<DecideManyResult>;
+  /** Decide ONE order (`decideMany` with one decision). */
+  decide(input: { clientId: string; now?: Date } & DecisionInput): Promise<DecisionResult>;
   /** The store cancelled through the host's own cancel: stamp and queue the request. */
   recordStoreCancellation(input: {
     clientId: string;
     orderId: string;
     reasonCode?: string | null;
+    offendingSkus?: readonly string[];
     now?: Date;
   }): Promise<DecisionResult>;
   /** The marketplace cancelled an order we already have. */
@@ -130,7 +150,7 @@ export interface MarketplaceEngine {
     externalOrderId: string;
     now?: Date;
   }): Promise<boolean>;
-  /** Where each of these orders' aceite and cancellation stand. */
+  /** Where each of these orders' acceptance and cancellation stand. */
   orderStates(clientId: string, orderIds: readonly string[]): Promise<Map<string, MarketplaceOrderState>>;
 
   /** Expire every order whose deadline has passed, across all tenants. */
@@ -139,6 +159,8 @@ export interface MarketplaceEngine {
   retryable(): Promise<PendingInboxEvent[]>;
   /** Re-run one stored delivery against the store's CURRENT settings. */
   reprocess(event: PendingInboxEvent): Promise<DeliveryOutcome>;
+  /** Re-queue every outbound call still owed (the `marketplace.outbound-sweep` job's body). */
+  sweepOutbound(now?: Date): Promise<OutboundSweepResult>;
   /** Run one queued outbound call (the `marketplace.outbound` job's body). */
   runOutbound(payload: OutboundJobPayload, attempt: OutboundAttempt): Promise<OutboundOutcome>;
 }
@@ -180,15 +202,20 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     ingest: (input) => ingestMarketplaceOrder(ctx, input),
     deliver: (input) => processDelivery(ctx, input),
 
-    integrations: (clientId) => listMarketplaceIntegrations(ctx, clientId),
-    saveIntegration: (input) => saveMarketplaceIntegration(ctx, input),
-    deleteIntegration: (clientId, provider) => deleteMarketplaceIntegration(ctx, clientId, provider),
+    integrations: (clientId, options) => listMarketplaceIntegrations(ctx, clientId, options),
+    saveIntegration: async (input) => saveMarketplaceIntegration(ctx, input, await ports.db()),
+    upsertIntegrations: (input) => upsertIntegrations(ctx, input),
 
     menuLinks: (input) => listMarketplaceMenuLinks(ctx, input),
-    setMenuLink: (input) => setMarketplaceMenuLink(ctx, input),
+    upsertMenuLinks: (input) => upsertMenuLinks(ctx, input),
+    setMenuLink: async ({ clientId, ...row }) => {
+      const result = await upsertMenuLinks(ctx, { clientId, rows: [row] });
+      return result.kind === "saved" ? (result.rows[0] ?? null) : null;
+    },
 
-    pending: (clientId) => listPendingAcceptances(ctx, clientId),
-    decide: (input) => decideAcceptance(ctx, input),
+    pending: (clientId, orderIds) => listPendingAcceptances(ctx, clientId, orderIds),
+    decideMany: (input) => decideMany(ctx, input),
+    decide: (input) => decideOne(ctx, input),
     recordStoreCancellation: (input) => recordStoreCancellation(ctx, input),
     cancel: (input) => cancelAcceptance(ctx, input),
     orderStates: (clientId, orderIds) => readOrderStates(ctx, clientId, orderIds),
@@ -196,6 +223,7 @@ export function createMarketplaceEngine(config: MarketplaceEngineConfig): Market
     expireLapsed: (now) => expireLapsedAcceptances(ctx, now ?? ports.clock.now()),
     retryable: () => listRetryableInboxEvents(ctx),
     reprocess: (event) => reprocessStoredDelivery(ctx, event),
+    sweepOutbound: (now) => sweepOutbound(ctx, now ?? ports.clock.now()),
     runOutbound: (payload, attempt) => runOutbound(ctx, payload, attempt),
   };
 }

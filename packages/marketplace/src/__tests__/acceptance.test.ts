@@ -44,7 +44,7 @@ describe("accepting an order on the clock", () => {
     await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
     const second = await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
 
-    expect(second).toEqual({ kind: "stale" });
+    expect(second).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "ACCEPTED" });
     expect(h.accepted).toHaveLength(1);
     expect(h.enqueued).toHaveLength(1);
   });
@@ -58,7 +58,7 @@ describe("accepting an order on the clock", () => {
 
     const result = await h.engine.decide({ clientId: TENANT, orderId, decision: "ACCEPT" });
 
-    expect(result).toEqual({ kind: "stale" });
+    expect(result).toEqual({ kind: "stale", reason: "EXPIRED", status: "EXPIRED" });
     expect(h.acceptance(orderId)?.status).toBe("EXPIRED");
     expect(h.accepted).toHaveLength(0);
     expect(h.enqueued).toHaveLength(0);
@@ -84,6 +84,8 @@ describe("accepting an order on the clock", () => {
 
     expect(await h.engine.decide({ clientId: "someone-else", orderId, decision: "ACCEPT" })).toEqual({
       kind: "stale",
+      reason: "NOT_FOUND",
+      status: null,
     });
     expect(h.acceptance(orderId)?.status).toBe("AWAITING");
   });
@@ -103,6 +105,7 @@ describe("refusing an order on the clock", () => {
       status: "REJECTED",
       cancellation: "PENDING",
       reasonCode: "503",
+      offendingSkus: [],
     });
     expect(h.acceptance(orderId)).toMatchObject({
       status: "REJECTED",
@@ -177,7 +180,7 @@ describe("the store's own cancel, through the host's cancel", () => {
     await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "509" });
     const second = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "501" });
 
-    expect(second).toEqual({ kind: "stale" });
+    expect(second).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "REJECTED" });
     expect(h.acceptance(orderId)?.cancellationReasonCode).toBe("509");
     expect(h.enqueued).toHaveLength(1);
   });
@@ -190,7 +193,7 @@ describe("the store's own cancel, through the host's cancel", () => {
 
     const result = await h.engine.recordStoreCancellation({ clientId: TENANT, orderId, reasonCode: "509" });
 
-    expect(result).toEqual({ kind: "stale" });
+    expect(result).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "REJECTED" });
     expect(h.enqueued).toHaveLength(0);
   });
 

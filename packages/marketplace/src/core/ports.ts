@@ -76,6 +76,43 @@ export interface MarketplaceOrderSummary {
   createdAt: string | null;
 }
 
+/**
+ * What a person stated beside an accept, for the host's admission to read.
+ * Every field is optional and the host decides what it means.
+ */
+export interface MarketplaceAdmission {
+  /** "Accept anyway": the person was told the order is short and confirmed. */
+  admitStockPastZero?: boolean;
+}
+
+/** One decision as the host's admission sees it, BEFORE the claim commits. */
+export interface MarketplaceAdmissionRequest {
+  clientId: string;
+  orderId: string;
+  decision: "ACCEPT" | "REJECT";
+  admission: MarketplaceAdmission;
+  /**
+   * The transaction the claim will commit in — the SAME object the host's
+   * `transaction` port handed the engine, so a host that draws stock here
+   * draws it atomically with the claim, and a refusal anywhere in the call
+   * rolls the draw back.
+   */
+  db: MarketplaceDb;
+}
+
+/** The host's answer: proceed, or refuse with its own coded reason. */
+export type MarketplaceAdmissionResult =
+  | { admitted: true }
+  | {
+      admitted: false;
+      /** The host's machine code (`MARKETPLACE_STOCK_ASK`). The route answers 409 with it. */
+      code: string;
+      /** The host's sentence, in the caller's language. */
+      message: string;
+      /** Anything the client needs to ask the person (the short lines). */
+      details?: unknown;
+    };
+
 /** Why the engine tells the host to refuse an order. Vocabulary, not copy. */
 export type MarketplaceRefusal = "REJECTED" | "EXPIRED" | "CANCELLED";
 
@@ -87,6 +124,15 @@ export type MarketplaceRefusal = "REJECTED" | "EXPIRED" | "CANCELLED";
  * a host that fails its half must not un-decide the acceptance.
  */
 export interface MarketplaceOrderPort {
+  /**
+   * Judge a decision BEFORE its claim commits, inside the claim's
+   * transaction: the stock check (and the draw) of an accept, anything the
+   * host must refuse with its own code. A refusal writes nothing anywhere in
+   * the call (the transaction rolls back). Called for every decision of a
+   * `decide` call, ACCEPT and REJECT alike; never for an ingest (an arriving
+   * order is never refused) nor for `recordStoreCancellation`.
+   */
+  admit(request: MarketplaceAdmissionRequest): Promise<MarketplaceAdmissionResult>;
   /** Turn a normalized order into whatever this host sells; hand back its id. */
   create(
     clientId: string,
@@ -130,6 +176,22 @@ export interface MarketplaceEnqueuePort {
   ): Promise<{ enqueued: boolean; reason?: string }>;
 }
 
+/** One archive or unarchive of a connection: who, when, what and why. */
+export interface MarketplaceAuditEntry {
+  clientId: string;
+  /** Whoever the host resolved as the caller; null for a system act. */
+  actorId: string | null;
+  action: "marketplace.integration.archive" | "marketplace.integration.unarchive";
+  provider: string;
+  reason: string | null;
+  at: Date;
+}
+
+/** The host's audit trail. */
+export interface MarketplaceAuditPort {
+  record(entry: MarketplaceAuditEntry): Promise<void>;
+}
+
 /** The clock, so a test or a replay decides what "now" is. */
 export interface MarketplaceClockPort {
   now(): Date;
@@ -145,11 +207,19 @@ export interface MarketplaceLogger {
 /** Everything the host plugs in. */
 export interface MarketplacePorts {
   db: () => Promise<MarketplaceDb>;
+  /**
+   * Run `fn` in ONE database transaction and hand it the transaction's client
+   * (Prisma's interactive `$transaction`). A throw rolls everything back. Every
+   * bulk write is all-or-nothing through this, and a decision's admission and
+   * claim share it.
+   */
+  transaction: <T>(fn: (db: MarketplaceDb) => Promise<T>) => Promise<T>;
   order: MarketplaceOrderPort;
   secrets: MarketplaceSecretsPort;
   /** The only way the engine reaches a marketplace. Tests answer it with a fake. */
   http: MarketplaceHttp;
   enqueue: MarketplaceEnqueuePort;
+  audit: MarketplaceAuditPort;
   clock: MarketplaceClockPort;
   logger: MarketplaceLogger;
   /**

@@ -51,8 +51,11 @@ describe("ingest", () => {
     await h.connect("IFOOD", { autoAccept: true });
     await deliverIfood(h, ifoodPlaced("ext-1"));
 
+    // N1: the result says why, so a host answers this as done rather than a 409.
     expect(await h.engine.decide({ clientId: TENANT, orderId: "order-1", decision: "ACCEPT" })).toEqual({
       kind: "stale",
+      reason: "ALREADY_DECIDED",
+      status: "ACCEPTED",
     });
     expect(h.accepted).toHaveLength(1);
     expect(h.enqueued).toHaveLength(1);
@@ -180,12 +183,27 @@ describe("integration settings", () => {
     await expect(h.engine.target(TENANT, "IFOOD")).rejects.toThrow();
   });
 
-  it("forgets a connection, idempotently", async () => {
+  it("archives a connection instead of deleting it: it attributes nothing, unarchives, and both acts are audited", async () => {
     const h = createHarness();
     await h.connect();
-    await h.engine.deleteIntegration(TENANT, "IFOOD");
-    await h.engine.deleteIntegration(TENANT, "IFOOD");
+
+    const archived = await h.engine.upsertIntegrations({
+      clientId: TENANT,
+      actorId: "user-1",
+      rows: [{ operation: "archive", provider: "IFOOD", reason: "paused for the holidays" }],
+    });
+    expect(archived.kind).toBe("saved");
     expect(await h.engine.integrations(TENANT)).toEqual([]);
+    expect((await h.engine.integrations(TENANT, { includeArchived: true }))[0]?.archivedAt).toEqual(h.clock.at);
+    expect(await h.engine.target(TENANT, "IFOOD")).toBeNull();
+    expect(await h.engine.tenantFor("IFOOD", "merchant-IFOOD")).toBeNull();
+
+    await h.engine.upsertIntegrations({ clientId: TENANT, actorId: "user-1", rows: [{ operation: "unarchive", provider: "IFOOD" }] });
+    expect((await h.engine.integrations(TENANT))[0]).toMatchObject({ archivedAt: null, connected: true });
+    expect(h.audited.map((entry) => [entry.action, entry.actorId, entry.reason])).toEqual([
+      ["marketplace.integration.archive", "user-1", "paused for the holidays"],
+      ["marketplace.integration.unarchive", "user-1", null],
+    ]);
   });
 });
 

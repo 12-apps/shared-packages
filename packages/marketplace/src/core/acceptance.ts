@@ -1,5 +1,3 @@
-import { readClaimRow, refuseFrom, type ClaimRow } from "./cancellation";
-import { enqueueOutbound } from "./outbound-queue";
 import type { EngineContext } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
@@ -16,8 +14,8 @@ import type { MarketplaceProvider } from "./types";
  *
  * Every transition is guarded on the CURRENT state in the WHERE clause rather
  * than read-then-written, so the sweep and a person deciding in the same
- * second cannot both win. The loser is told nothing changed (`stale`) and the
- * host decides what that means — a 409 for a person, a no-op for the sweep.
+ * second cannot both win. The decisions themselves are `./decisions.ts`;
+ * this module holds the queue, the sweep and the marketplace's own cancel.
  *
  * Beside the clock sits the store's own CANCELLATION REQUEST, on the same row:
  *
@@ -72,10 +70,11 @@ interface PendingRow {
 export async function listPendingAcceptances(
   ctx: EngineContext,
   clientId: string,
+  orderIds?: readonly string[],
 ): Promise<PendingAcceptance[]> {
   const db = await ctx.ports.db();
   const rows = (await db.marketplaceAcceptance.findMany({
-    where: { clientId, status: "AWAITING" },
+    where: { clientId, status: "AWAITING", ...(orderIds ? { orderId: { in: [...orderIds] } } : {}) },
     orderBy: { acknowledgeBy: "asc" },
     select: {
       id: true,
@@ -104,74 +103,6 @@ export async function listPendingAcceptances(
       createdAt: summary?.createdAt ?? null,
     };
   });
-}
-
-/** The two things a person can do to an order on the clock. */
-export type AcceptanceDecision = "ACCEPT" | "REJECT";
-
-/**
- * What a decision did. `stale` means the claim was lost (decided already,
- * expired, cancelled by the marketplace, or not this tenant's). `invalidReason`
- * means the reason code is not one of the marketplace's, and NOTHING was
- * written: a decision is all-or-nothing.
- */
-export type DecisionResult =
-  | {
-      kind: "decided";
-      orderId: string;
-      status: AcceptanceStatus;
-      cancellation: CancellationStatus | null;
-      reasonCode: string | null;
-    }
-  | { kind: "stale" }
-  | { kind: "invalidReason"; validCodes: string[] };
-
-/**
- * Record the store's decision on one order on the clock.
- *
- * The `status: "AWAITING"` predicate is the concurrency guard AND the
- * idempotency answer: deciding twice, or accepting an order the sweep has
- * just expired, updates nothing and returns `stale`.
- *
- * A refusal carries a reason from the marketplace's own list, validated
- * BEFORE anything is written; with no code the marketplace's first reason is
- * taken. An accept queues the confirm, a refusal queues the cancellation
- * request — never a call inside the decision.
- */
-export async function decideAcceptance(
-  ctx: EngineContext,
-  input: {
-    clientId: string;
-    orderId: string;
-    decision: AcceptanceDecision;
-    reasonCode?: string | null;
-    now?: Date;
-  },
-): Promise<DecisionResult> {
-  const row = await readClaimRow(ctx, input.clientId, input.orderId);
-  if (!row || row.status !== "AWAITING") return { kind: "stale" };
-  const now = input.now ?? ctx.ports.clock.now();
-  if (input.decision === "ACCEPT") return acceptOnTheClock(ctx, input, row, now);
-  return refuseFrom(ctx, { ...input, now, row, callRefused: true });
-}
-
-/** The accept half of a decision: claim, the host's half, the queued confirm. */
-async function acceptOnTheClock(
-  ctx: EngineContext,
-  input: { clientId: string; orderId: string },
-  row: ClaimRow,
-  now: Date,
-): Promise<DecisionResult> {
-  const db = await ctx.ports.db();
-  const claimed = await db.marketplaceAcceptance.updateMany({
-    where: { orderId: input.orderId, clientId: input.clientId, status: "AWAITING" },
-    data: { status: "ACCEPTED", acknowledgedAt: now },
-  });
-  if (claimed.count === 0) return { kind: "stale" };
-  await ctx.ports.order.onAccepted(input.clientId, input.orderId);
-  await enqueueOutbound(ctx, { clientId: input.clientId, orderId: input.orderId, action: "confirm" }, row.provider);
-  ctx.ports.publishChanged(input.clientId);
-  return { kind: "decided", orderId: input.orderId, status: "ACCEPTED", cancellation: null, reasonCode: null };
 }
 
 /** What one sweep pass did. */

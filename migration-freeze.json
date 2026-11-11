@@ -13,7 +13,7 @@
   "packages/feature-flags/prisma/migrations/20260820120000_add_user_feature_grants/migration.sql": "02880b95e4d863dcfb43c0eca291ab1617412b90fbba4535ea4c421a92c121eb",
   "packages/i18n/prisma/migrations/20260826170000_locale_preferences/migration.sql": "e691c1d79a4499f17f3a9bd0cd326882c4c108511e798f2fb0f2bd4d30d16eeb",
   "packages/jobs/prisma/migrations/20260727190000_sweep_leases/migration.sql": "c5c5441ea0d6629d9b32b066e5fb01ce76ff109db3f5c3d3df55eba628378997",
-  "packages/marketplace/prisma/migrations/20261111200000_marketplace_engine/migration.sql": "74d39c5a1235b1463d837972361701323bbafbf888c472682cdab28615f2680f",
+  "packages/marketplace/prisma/migrations/20261111200000_marketplace_engine/migration.sql": "9538094d362ae2dd89099becc40cce0c55e5a6a889e24e9e6d6c69e2741c1b6c",
   "packages/mcp/prisma/migrations/20260812150000_add_mcp_oauth_tables/migration.sql": "e2ba1f2bbf8d1a258725758f69358b46be6cbc1ae2c2d612aac7c923c9e71f7b",
   "packages/mcp/prisma/migrations/20260910120000_add_refresh_grace_seal/migration.sql": "681ed5bc9a322a32c5c86ec7649ad39391186584cc96009e4b22056d67e0d43c",
   "packages/mcp/prisma/migrations/20261001160000_index_mcp_refresh_lineage/migration.sql": "912eb775089bf4b5b52d6456181378220e48a77d7d7d6e1eb522b7397c6c6173",

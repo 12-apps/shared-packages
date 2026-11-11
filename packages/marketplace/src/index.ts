@@ -44,6 +44,11 @@ export {
   type AdapterRegistry,
 } from "./core/registry";
 export type {
+  MarketplaceAdmission,
+  MarketplaceAdmissionRequest,
+  MarketplaceAdmissionResult,
+  MarketplaceAuditEntry,
+  MarketplaceAuditPort,
   MarketplaceClockPort,
   MarketplaceDb,
   MarketplaceEngineConfig,
@@ -69,13 +74,31 @@ export {
   type NormalizedOrderLine,
 } from "./core/types";
 export type {
-  AcceptanceDecision,
   AcceptanceStatus,
   CancellationStatus,
-  DecisionResult,
   ExpirySweepResult,
   PendingAcceptance,
 } from "./core/acceptance";
+export type {
+  AcceptanceDecision,
+  DecidedRow,
+  DecideManyResult,
+  DecisionInput,
+  DecisionResult,
+} from "./core/decisions";
+export type { DecisionProblem, DecisionProblemCode } from "./core/cancellation";
+export type {
+  BulkProblem,
+  BulkProblemCode,
+  BulkResult,
+  IntegrationRowInput,
+  MenuLinkRowInput,
+} from "./core/bulk";
+export {
+  OUTBOUND_GIVE_UP_MS,
+  OUTBOUND_STALE_MS,
+  type OutboundSweepResult,
+} from "./core/outbound-sweep";
 export type { PendingInboxEvent } from "./core/inbox";
 export type { IngestResult, IngestSettings } from "./core/ingest";
 export type {

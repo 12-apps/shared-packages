@@ -5,7 +5,13 @@ import type {
   MarketplaceHttpResponse,
 } from "../core/adapter";
 import type { OutboundJobPayload } from "../core/outbound-queue";
-import type { MarketplaceRefusal } from "../core/ports";
+import type {
+  MarketplaceDb,
+  MarketplaceAdmissionRequest,
+  MarketplaceAdmissionResult,
+  MarketplaceAuditEntry,
+  MarketplaceRefusal,
+} from "../core/ports";
 import type { NormalizedMarketplaceOrder } from "../core/types";
 import { createIfoodAdapter } from "../ifood";
 import { IFOOD_ADAPTER_COPY_EN_US } from "../ifood/en-US";
@@ -45,6 +51,14 @@ interface HarnessOptions {
   http?: ReturnType<typeof scriptedHttp>;
   /** The host refuses to create orders (its database is down). */
   failCreate?: boolean;
+  /** The host's admission: admits everything unless given. */
+  admit?: (request: MarketplaceAdmissionRequest) => Promise<MarketplaceAdmissionResult>;
+  /** The host's half of an accept / refusal throws. */
+  failHostHalf?: boolean;
+  /** The queue refuses every job. */
+  queueDown?: boolean;
+  /** A database other than the in-memory one (the PGlite suite's). */
+  store?: { db: MarketplaceDb; transaction: <T>(fn: (tx: MarketplaceDb) => Promise<T>) => Promise<T> };
 }
 
 export function createHarness(options: HarnessOptions = {}) {
@@ -58,10 +72,17 @@ export function createHarness(options: HarnessOptions = {}) {
   const published: string[] = [];
   const logged: { level: string; message: string }[] = [];
   const catalog = new Set<string>(["menu-1", "menu-2"]);
+  const audited: MarketplaceAuditEntry[] = [];
+  const admitted: MarketplaceAdmissionRequest[] = [];
 
   const engine = createMarketplaceEngine({
-    db: async () => memory.db,
+    db: async () => (options.store ?? memory).db,
+    transaction: (options.store ?? memory).transaction,
     order: {
+      admit: async (request) => {
+        admitted.push(request);
+        return options.admit ? options.admit(request) : { admitted: true };
+      },
       create: async (clientId, order) => {
         if (options.failCreate) throw new Error("host is down");
         const orderId = `order-${created.length + 1}`;
@@ -71,9 +92,11 @@ export function createHarness(options: HarnessOptions = {}) {
       catalogHas: async (_clientId, ref) => catalog.has(ref),
       onAccepted: async (_clientId, orderId) => {
         accepted.push(orderId);
+        if (options.failHostHalf) throw new Error("host half failed");
       },
       onRefused: async (_clientId, orderId, reason) => {
         refused.push({ orderId, reason });
+        if (options.failHostHalf) throw new Error("host half failed");
       },
       summarize: async (_clientId, ids) =>
         new Map(ids.map((id) => [id, { buyerName: "Buyer", totalCents: 1000, unmappedLines: 0, createdAt: null }])),
@@ -83,7 +106,12 @@ export function createHarness(options: HarnessOptions = {}) {
     enqueue: {
       enqueue: async (name, payload, opts) => {
         enqueued.push({ name, payload: payload as OutboundJobPayload, dedupeKey: opts?.dedupeKey });
-        return { enqueued: true };
+        return options.queueDown ? { enqueued: false, reason: "queue down" } : { enqueued: true };
+      },
+    },
+    audit: {
+      record: async (entry) => {
+        audited.push(entry);
       },
     },
     clock: { now: () => clock.at },
@@ -142,6 +170,8 @@ export function createHarness(options: HarnessOptions = {}) {
     published,
     logged,
     catalog,
+    audited,
+    admitted,
     connect,
     acceptance,
   };

@@ -12,8 +12,10 @@
 --   * a fresh host gets the four tables, every index and every CHECK;
 --   * a host that already has them gets only what it is missing — the
 --     outbound columns (`confirmed_at`, `confirm_failed_at`,
---     `cancellation_status`, `cancellation_reason_code`), `delivered_by`, and
---     the provider SHAPE check;
+--     `cancellation_status`, `cancellation_reason_code`,
+--     `cancellation_offending_skus`, `cancellation_requested_at`,
+--     `preparation_minutes`), the order's `line_skus`, `delivered_by`, the
+--     connection's `archived_at`, and the provider SHAPE check;
 --   * replaying the whole folder is a no-op.
 --
 -- ── NO FOREIGN KEYS INTO HOST TABLES ──────────────────────────────────────
@@ -44,11 +46,15 @@ CREATE TABLE IF NOT EXISTS "marketplace_integrations" (
     "status" TEXT NOT NULL DEFAULT 'UNVERIFIED',
     "last_event_at" TIMESTAMP(3),
     "last_verified_at" TIMESTAMP(3),
+    "archived_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "marketplace_integrations_pkey" PRIMARY KEY ("id")
 );
+
+-- A connection is archived, never deleted (reversible; the host audits both).
+ALTER TABLE "marketplace_integrations" ADD COLUMN IF NOT EXISTS "archived_at" TIMESTAMP(3);
 
 CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_integrations_client_id_provider_key"
     ON "marketplace_integrations"("client_id", "provider");
@@ -122,6 +128,10 @@ CREATE TABLE IF NOT EXISTS "marketplace_acceptances" (
     "confirm_failed_at" TIMESTAMP(3),
     "cancellation_status" TEXT,
     "cancellation_reason_code" TEXT,
+    "cancellation_offending_skus" JSONB,
+    "cancellation_requested_at" TIMESTAMP(3),
+    "preparation_minutes" INTEGER,
+    "line_skus" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -134,6 +144,14 @@ ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "confirmed_at" TI
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "confirm_failed_at" TIMESTAMP(3);
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_status" TEXT;
 ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_reason_code" TEXT;
+-- The SKUs a cancellation names, for a marketplace whose reason needs them.
+ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_offending_skus" JSONB;
+-- When the request was stamped PENDING: what the outbound sweep ages it by.
+ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "cancellation_requested_at" TIMESTAMP(3);
+-- The preparation time an accept states, for a marketplace whose confirm takes one.
+ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "preparation_minutes" INTEGER;
+-- The order's SKUs as the marketplace sent them: what offending SKUs are checked against.
+ALTER TABLE "marketplace_acceptances" ADD COLUMN IF NOT EXISTS "line_skus" JSONB;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_acceptances_order_id_key"
     ON "marketplace_acceptances"("order_id");
@@ -141,6 +159,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS "marketplace_acceptances_provider_external_ord
     ON "marketplace_acceptances"("provider", "external_order_id");
 CREATE INDEX IF NOT EXISTS "marketplace_acceptances_client_id_status_idx"
     ON "marketplace_acceptances"("client_id", "status");
+-- The outbound sweep reads only rows whose request is still owed.
+CREATE INDEX IF NOT EXISTS "marketplace_acceptances_cancellation_requested_at_idx"
+    ON "marketplace_acceptances"("cancellation_requested_at")
+    WHERE "cancellation_status" = 'PENDING';
 -- The sweep reads only rows still on the clock.
 CREATE INDEX IF NOT EXISTS "marketplace_acceptances_acknowledge_by_idx"
     ON "marketplace_acceptances"("acknowledge_by")
@@ -216,4 +238,8 @@ DO $$ BEGIN
     ALTER TABLE "marketplace_acceptances" ADD CONSTRAINT "marketplace_acceptances_cancellation_status_check"
         CHECK ("cancellation_status" IS NULL
                OR "cancellation_status" IN ('PENDING', 'REQUESTED', 'CONFIRMED', 'FAILED'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE "marketplace_acceptances" ADD CONSTRAINT "marketplace_acceptances_preparation_minutes_valid"
+        CHECK ("preparation_minutes" IS NULL OR "preparation_minutes" > 0);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

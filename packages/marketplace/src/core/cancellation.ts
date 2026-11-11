@@ -1,6 +1,5 @@
-import type { AcceptanceStatus, CancellationStatus, DecisionResult } from "./acceptance";
+import type { AcceptanceStatus, CancellationStatus } from "./acceptance";
 import type { CancellationReason, MarketplaceAdapter } from "./adapter";
-import { enqueueOutbound } from "./outbound-queue";
 import type { EngineContext } from "./ports";
 import { resolveReason } from "./registry";
 import type { MarketplaceProvider } from "./types";
@@ -10,13 +9,36 @@ import type { MarketplaceProvider } from "./types";
  * the marketplace. Lives on the acceptance row:
  *
  *     null ──refuse/cancel──▶ PENDING ──job 2xx──▶ REQUESTED ──event──▶ CONFIRMED
- *                                │   └──job 4xx / last retry──▶ FAILED ──event──▶ CONFIRMED
+ *                                │   └──job 4xx / last attempt──▶ FAILED ──event──▶ CONFIRMED
  *                                └──event (the marketplace cancelled)──▶ CONFIRMED
  *
  * CONFIRMED is terminal; every write is predicated on the statuses it may come
- * from, so an out-of-order event cannot undo it. One request per order: a
- * row whose request was already stamped is `stale` to every later refusal.
+ * from, so an out-of-order event cannot undo it.
  */
+
+/** Why a decision (or a store cancellation) was refused. Vocabulary, not copy. */
+export type DecisionProblemCode =
+  | "DUPLICATE"
+  | "NOT_FOUND"
+  | "ALREADY_DECIDED"
+  | "EXPIRED"
+  | "CONFLICT"
+  | "INVALID_REASON"
+  | "ITEMS_REQUIRED"
+  | "UNKNOWN_ITEM"
+  | "HOST_REFUSED";
+
+/** One refusal, with the path of the input it is about. Nothing was written. */
+export interface DecisionProblem {
+  path: (string | number)[];
+  code: DecisionProblemCode;
+  /** The row's current status, for NOT-pending refusals (ALREADY_DECIDED, EXPIRED). */
+  status?: AcceptanceStatus;
+  /** The marketplace's codes, for INVALID_REASON. */
+  validCodes?: string[];
+  /** The host's own refusal, for HOST_REFUSED. */
+  host?: { code: string; message: string; details?: unknown };
+}
 
 /** The acceptance row a claim reads first. */
 export interface ClaimRow {
@@ -24,57 +46,99 @@ export interface ClaimRow {
   provider: string;
   status: string;
   cancellationStatus: string | null;
+  lineSkus: unknown;
 }
 
-export async function readClaimRow(
-  ctx: EngineContext,
-  clientId: string,
-  orderId: string,
-): Promise<ClaimRow | null> {
-  const db = await ctx.ports.db();
-  return (await db.marketplaceAcceptance.findFirst({
-    where: { orderId, clientId },
-    select: { orderId: true, provider: true, status: true, cancellationStatus: true },
-  })) as ClaimRow | null;
+export const CLAIM_SELECT = {
+  orderId: true,
+  provider: true,
+  status: true,
+  cancellationStatus: true,
+  lineSkus: true,
+} as const;
+
+/** The refusal a row that is no longer on the clock earns, or null. */
+export function notPendingProblem(
+  row: ClaimRow | undefined | null,
+  path: (string | number)[],
+  allowed: readonly string[] = ["AWAITING"],
+): DecisionProblem | null {
+  if (!row) return { path: [...path, "orderId"], code: "NOT_FOUND" };
+  if (allowed.includes(row.status) && row.cancellationStatus === null) return null;
+  const status = row.status as AcceptanceStatus;
+  return { path: [...path, "orderId"], code: status === "EXPIRED" ? "EXPIRED" : "ALREADY_DECIDED", status };
 }
 
-/** What a refusal stamps, and with which reason. */
-interface CancellationPlan {
+/** What a refusal stamps, and with which reason and SKUs. */
+export interface CancellationPlan {
   status: CancellationStatus | null;
   reason: CancellationReason | null;
+  skus: string[];
+}
+
+function lineSkusOf(row: ClaimRow): Set<string> | null {
+  return Array.isArray(row.lineSkus) ? new Set(row.lineSkus.map(String)) : null;
+}
+
+/** Every refusal the named SKUs earn: none when the reason needs some, an unknown one. */
+function skuProblems(
+  reason: CancellationReason | null,
+  skus: string[],
+  row: ClaimRow,
+  path: (string | number)[],
+): DecisionProblem[] {
+  if (reason?.needsItems && skus.length === 0) return [{ path: [...path, "offendingSkus"], code: "ITEMS_REQUIRED" }];
+  const known = lineSkusOf(row);
+  // A row from before `line_skus` existed cannot be checked; its SKUs pass.
+  if (!known) return [];
+  return skus.flatMap((sku, index) =>
+    known.has(sku) ? [] : [{ path: [...path, "offendingSkus", index], code: "UNKNOWN_ITEM" as const }],
+  );
+}
+
+/** The refusal of a named code that is not the marketplace's, or null. */
+function invalidReasonProblem(
+  adapter: MarketplaceAdapter,
+  reason: CancellationReason | null,
+  code: string | null | undefined,
+  path: (string | number)[],
+): DecisionProblem | null {
+  if (code === null || code === undefined || reason) return null;
+  const validCodes = adapter.cancellationReasons().map((candidate) => candidate.code);
+  return { path: [...path, "reasonCode"], code: "INVALID_REASON", validCodes };
 }
 
 /**
- * Plan the cancellation half of a refusal, or report the code as invalid.
+ * Plan the cancellation half of a refusal, or say what is wrong with it.
  *
  * - No adapter (a provider nobody registers any more): nothing goes out.
+ * - The code must be the marketplace's; with none, its first reason is taken.
+ * - A reason that `needsItems` needs offending SKUs, each one of the order's.
  * - An API that cannot cancel — at all, or after an accept — stamps FAILED at
  *   once: the request cannot be made from here, and FAILED is what puts the
  *   adapter's app link in front of a person.
  * - Otherwise PENDING, for the outbound job.
  */
-function planCancellation(
+export function planCancellation(
   adapter: MarketplaceAdapter | null,
-  reasonCode: string | null | undefined,
-  fromStatus: string,
-): CancellationPlan | "invalid" {
-  if (!adapter) return { status: null, reason: null };
-  const reason = resolveReason(adapter, reasonCode);
-  const named = reasonCode !== null && reasonCode !== undefined;
-  if (named && !reason) return "invalid";
+  input: { reasonCode?: string | null; offendingSkus?: readonly string[] },
+  row: ClaimRow,
+  path: (string | number)[],
+): CancellationPlan | DecisionProblem[] {
+  if (!adapter) return { status: null, reason: null, skus: [] };
+  const reason = resolveReason(adapter, input.reasonCode);
+  const invalid = invalidReasonProblem(adapter, reason, input.reasonCode, path);
+  if (invalid) return [invalid];
+  const skus = [...new Set(input.offendingSkus ?? [])];
+  const problems = skuProblems(reason, skus, row, path);
+  if (problems.length > 0) return problems;
   const { apiCancel, cancelAfterAccept } = adapter.capabilities;
-  const canAsk = apiCancel && reason !== null && (fromStatus === "AWAITING" || cancelAfterAccept);
-  return { status: canAsk ? "PENDING" : "FAILED", reason };
+  const canAsk = apiCancel && reason !== null && (row.status === "AWAITING" || cancelAfterAccept);
+  return { status: canAsk ? "PENDING" : "FAILED", reason, skus };
 }
 
-/** The refusal of a code that is not the marketplace's. Nothing was written. */
-function invalidReason(adapter: MarketplaceAdapter | null): DecisionResult {
-  const validCodes = (adapter?.cancellationReasons() ?? []).map((reason) => reason.code);
-  return { kind: "invalidReason", validCodes };
-}
-
-/** The data one refusal writes, from the status it leaves. */
-function refusalData(plan: CancellationPlan, fromStatus: string, now: Date): Record<string, unknown> {
+/** The columns one refusal writes, from the status it leaves. */
+export function refusalData(plan: CancellationPlan, fromStatus: string, now: Date): Record<string, unknown> {
   return {
     status: "REJECTED",
     // An accepted row keeps the instant it was accepted; a row leaving the
@@ -82,72 +146,9 @@ function refusalData(plan: CancellationPlan, fromStatus: string, now: Date): Rec
     ...(fromStatus === "AWAITING" ? { acknowledgedAt: now } : {}),
     cancellationStatus: plan.status,
     cancellationReasonCode: plan.reason?.code ?? null,
+    cancellationOffendingSkus: plan.skus.length > 0 ? plan.skus : null,
+    cancellationRequestedAt: plan.status === "PENDING" ? now : null,
   };
-}
-
-/**
- * Refuse an order from the status it was read in: validate the reason, claim
- * the row on that status, run the host's half when asked, queue the request.
- *
- * `callRefused` is true for a refusal on the clock (the engine tells the host
- * to cancel its order) and false for the store's own cancel (the host already
- * did).
- */
-export async function refuseFrom(
-  ctx: EngineContext,
-  input: {
-    clientId: string;
-    orderId: string;
-    reasonCode?: string | null;
-    now: Date;
-    row: ClaimRow;
-    callRefused: boolean;
-  },
-): Promise<DecisionResult> {
-  const { row } = input;
-  const adapter = ctx.registry.get(row.provider);
-  const plan = planCancellation(adapter, input.reasonCode, row.status);
-  if (plan === "invalid") return invalidReason(adapter);
-
-  const db = await ctx.ports.db();
-  const claimed = await db.marketplaceAcceptance.updateMany({
-    where: { orderId: input.orderId, clientId: input.clientId, status: row.status, cancellationStatus: null },
-    data: refusalData(plan, row.status, input.now),
-  });
-  if (claimed.count === 0) return { kind: "stale" };
-  if (input.callRefused) await ctx.ports.order.onRefused(input.clientId, input.orderId, "REJECTED");
-  if (plan.status === "PENDING") {
-    const payload = { clientId: input.clientId, orderId: input.orderId, action: "requestCancellation" as const };
-    await enqueueOutbound(ctx, payload, row.provider);
-  }
-  ctx.ports.publishChanged(input.clientId);
-  return {
-    kind: "decided",
-    orderId: input.orderId,
-    status: "REJECTED" satisfies AcceptanceStatus,
-    cancellation: plan.status,
-    reasonCode: plan.reason?.code ?? null,
-  };
-}
-
-/**
- * The STORE cancelled an order through the host's own cancel — before or
- * after accepting it. Stamps the request the marketplace must hear and queues
- * it. The host's own cancel already ran, so the engine does NOT call
- * `onRefused`: it records and queues, and nothing else.
- *
- * `stale` when the marketplace already cancelled it, the clock lapsed, or a
- * request was already made.
- */
-export async function recordStoreCancellation(
-  ctx: EngineContext,
-  input: { clientId: string; orderId: string; reasonCode?: string | null; now?: Date },
-): Promise<DecisionResult> {
-  const row = await readClaimRow(ctx, input.clientId, input.orderId);
-  if (!row || row.cancellationStatus !== null) return { kind: "stale" };
-  if (row.status !== "AWAITING" && row.status !== "ACCEPTED") return { kind: "stale" };
-  const now = input.now ?? ctx.ports.clock.now();
-  return refuseFrom(ctx, { ...input, now, row, callRefused: false });
 }
 
 /**

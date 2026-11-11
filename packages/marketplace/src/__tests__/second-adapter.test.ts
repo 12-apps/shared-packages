@@ -70,11 +70,12 @@ const acmeAdapter: MarketplaceAdapter = {
     { code: "OUT_OF_STOCK", label: "Out of stock", itemUnavailable: true, needsItems: true },
     { code: "CLOSED", label: "Closed", itemUnavailable: false, needsItems: false },
   ],
-  confirm: async (ctx, order) =>
+  confirm: async (ctx, order, _input) =>
     outboundResultOf(
       await ctx.http({
         method: "PUT",
-        url: `https://api.acme.test/orders/${order.externalOrderId}/take/20`,
+        // Its confirm states the preparation time; 20 when the store gave none.
+        url: `https://api.acme.test/orders/${order.externalOrderId}/take/${_input.preparationMinutes ?? 20}`,
         headers: { "X-App": ctx.credentials.clientId },
       }),
     ),
@@ -84,7 +85,7 @@ const acmeAdapter: MarketplaceAdapter = {
         method: "PUT",
         url: `https://api.acme.test/orders/${order.externalOrderId}/reject`,
         headers: { "X-App": ctx.credentials.clientId },
-        body: JSON.stringify({ type: input.reason.code }),
+        body: JSON.stringify({ type: input.reason.code, items_skus: input.offendingSkus }),
       }),
     ),
   appLink: (order) => `https://partners.acme.test/orders/${encodeURIComponent(order.externalOrderId)}`,
@@ -171,20 +172,67 @@ describe("a second marketplace is an adapter and nothing else", () => {
       orderId: outcome.orderId,
       decision: "REJECT",
       reasonCode: "OUT_OF_STOCK",
+      offendingSkus: ["X"],
     });
-    expect(decided).toMatchObject({ kind: "decided", cancellation: "PENDING", reasonCode: "OUT_OF_STOCK" });
+    expect(decided).toMatchObject({
+      kind: "decided",
+      cancellation: "PENDING",
+      reasonCode: "OUT_OF_STOCK",
+      offendingSkus: ["X"],
+    });
     // iFood's codes are not this marketplace's.
     expect(
       await h.engine.recordStoreCancellation({ clientId: TENANT, orderId: outcome.orderId, reasonCode: "503" }),
-    ).toEqual({ kind: "stale" });
+    ).toEqual({ kind: "stale", reason: "ALREADY_DECIDED", status: "REJECTED" });
 
     await h.engine.runOutbound(
       { clientId: TENANT, orderId: outcome.orderId, action: "requestCancellation" },
       { attempt: 1, maxAttempts: 3 },
     );
 
-    expect(JSON.parse(http.requests[0]?.body ?? "{}")).toEqual({ type: "OUT_OF_STOCK" });
+    expect(JSON.parse(http.requests[0]?.body ?? "{}")).toEqual({ type: "OUT_OF_STOCK", items_skus: ["X"] });
     expect(h.acceptance(outcome.orderId)?.cancellationStatus).toBe("CONFIRMED");
+  });
+
+  it("[B4] refuses an item reason with no items, or with an item the order does not carry, writing nothing", async () => {
+    const { h } = harness();
+    await h.connect(ACME);
+    const outcome = await deliverAcme(h, { event: "new", ref: "A-1", basket: [{ sku: "X", qty: 1, price: 900 }] });
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+    const orderId = outcome.orderId;
+
+    const none = await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "OUT_OF_STOCK" });
+    const stranger = await h.engine.decideMany({
+      clientId: TENANT,
+      decisions: [{ orderId, decision: "REJECT", reasonCode: "OUT_OF_STOCK", offendingSkus: ["X", "NOT-IN-ORDER"] }],
+    });
+
+    expect(none).toEqual({ kind: "invalidReason", problem: "ITEMS_REQUIRED", validCodes: [] });
+    expect(stranger).toEqual({
+      kind: "refused",
+      problems: [{ path: ["decisions", 0, "offendingSkus", 1], code: "UNKNOWN_ITEM" }],
+    });
+    expect(h.acceptance(orderId)).toMatchObject({ status: "AWAITING", cancellationStatus: null });
+    // A reason that needs no items takes none.
+    expect(await h.engine.decide({ clientId: TENANT, orderId, decision: "REJECT", reasonCode: "CLOSED" })).toMatchObject({
+      kind: "decided",
+      offendingSkus: [],
+    });
+  });
+
+  it("[N8] feeds the stated preparation time to a marketplace whose confirm takes one", async () => {
+    const { h, http } = harness();
+    await h.connect(ACME);
+    const outcome = await deliverAcme(h, { event: "new", ref: "A-1", basket: [{ sku: "X", qty: 1, price: 900 }] });
+    if (outcome.kind !== "ingested") throw new Error(outcome.kind);
+
+    await h.engine.decide({ clientId: TENANT, orderId: outcome.orderId, decision: "ACCEPT", preparationMinutes: 35 });
+    await h.engine.runOutbound(
+      { clientId: TENANT, orderId: outcome.orderId, action: "confirm" },
+      { attempt: 1, maxAttempts: 3 },
+    );
+
+    expect(http.requests[0]?.url).toBe("https://api.acme.test/orders/A-1/take/35");
   });
 
   it("stamps FAILED at once when its API cannot cancel after an accept, and queues nothing", async () => {

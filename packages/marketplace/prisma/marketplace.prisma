@@ -65,6 +65,11 @@ model MarketplaceIntegration {
   lastEventAt    DateTime? @map("last_event_at")
   lastVerifiedAt DateTime? @map("last_verified_at")
 
+  /// A connection is ARCHIVED, never deleted: reversible, and every archive and
+  /// unarchive is an audit line the host writes. An archived connection
+  /// attributes no delivery and ingests nothing.
+  archivedAt DateTime? @map("archived_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -215,6 +220,15 @@ model MarketplaceAcceptance {
   cancellationStatus     String? @map("cancellation_status")
   /// The marketplace's own reason code the request carries, sent verbatim. Lives on the row, never in a job payload.
   cancellationReasonCode String? @map("cancellation_reason_code")
+  /// The SKUs the request names, for a reason that needs them (a JSON array).
+  cancellationOffendingSkus Json? @map("cancellation_offending_skus")
+  /// When the request was stamped PENDING: what the outbound sweep ages it by.
+  cancellationRequestedAt DateTime? @map("cancellation_requested_at")
+  /// The preparation time the accept stated, for a confirm that takes one.
+  preparationMinutes Int? @map("preparation_minutes")
+  /// The order's SKUs as the marketplace sent them (a JSON array): what
+  /// offending SKUs are validated against. NULL on rows from before it.
+  lineSkus Json? @map("line_skus")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -222,5 +236,6 @@ model MarketplaceAcceptance {
   @@unique([provider, externalOrderId])
   @@index([clientId, status])
   @@index([acknowledgeBy])
+  @@index([cancellationRequestedAt])
   @@map("marketplace_acceptances")
 }

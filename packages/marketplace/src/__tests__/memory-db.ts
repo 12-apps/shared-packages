@@ -27,12 +27,23 @@ function same(a: unknown, b: unknown): boolean {
   return a === b;
 }
 
+type Comparable = number | Date | string;
+
+/** Each operator the engine writes, alone or combined (`{ lt, gte }`). */
+const OPERATORS: Record<string, (value: unknown, operand: unknown) => boolean> = {
+  in: (value, operand) => (operand as unknown[]).some((item) => same(value, item)),
+  not: (value, operand) => !same(value ?? null, operand),
+  lt: (value, operand) => value !== null && value !== undefined && (value as Comparable) < (operand as Comparable),
+  gte: (value, operand) => value !== null && value !== undefined && (value as Comparable) >= (operand as Comparable),
+};
+
 function matchesCondition(value: unknown, condition: unknown): boolean {
   if (!isPlainObject(condition)) return same(value ?? null, condition);
-  if ("in" in condition) return (condition.in as unknown[]).some((item) => same(value, item));
-  if ("not" in condition) return !same(value ?? null, condition.not);
-  if ("lt" in condition) return (value as number | Date) < (condition.lt as number | Date);
-  throw new Error(`memory-db: unsupported condition ${JSON.stringify(condition)}`);
+  return Object.entries(condition).every(([operator, operand]) => {
+    const test = OPERATORS[operator];
+    if (!test) throw new Error(`memory-db: unsupported condition ${JSON.stringify(condition)}`);
+    return test(value, operand);
+  });
 }
 
 function expandWhere(where: Where): Where {
@@ -95,6 +106,11 @@ class MemoryTable {
       const right = b[key] instanceof Date ? (b[key] as Date).getTime() : (b[key] as number | string);
       return left < right ? -sign : left > right ? sign : 0;
     });
+  }
+
+  /** Put the rows back as a snapshot had them. */
+  restore(rows: Row[]): void {
+    this.rows = rows;
   }
 
   async findMany(args: unknown): Promise<unknown[]> {
@@ -166,6 +182,7 @@ export function createMemoryDb() {
         status: "UNVERIFIED",
         lastEventAt: null,
         lastVerifiedAt: null,
+        archivedAt: null,
       }),
       unique: [["clientId", "provider"]],
     }),
@@ -196,12 +213,30 @@ export function createMemoryDb() {
         confirmFailedAt: null,
         cancellationStatus: null,
         cancellationReasonCode: null,
+        cancellationOffendingSkus: null,
+        cancellationRequestedAt: null,
+        preparationMinutes: null,
+        lineSkus: null,
         createdAt: EPOCH,
       }),
       unique: [["orderId"], ["provider", "externalOrderId"]],
     }),
   };
   const db: MarketplaceDb = tables;
-  return { db, tables };
+
+  /**
+   * A transaction: snapshot every table, run, and restore the snapshot on a
+   * throw — the rollback a real `$transaction` gives.
+   */
+  async function transaction<T>(fn: (tx: MarketplaceDb) => Promise<T>): Promise<T> {
+    const snapshot = Object.values(tables).map((table) => table.rows.map((row) => ({ ...row })));
+    try {
+      return await fn(db);
+    } catch (error) {
+      Object.values(tables).forEach((table, index) => table.restore(snapshot[index] ?? []));
+      throw error;
+    }
+  }
+  return { db, tables, transaction };
 }
 
