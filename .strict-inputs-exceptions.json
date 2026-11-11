@@ -1,0 +1,22 @@
+{
+  "packages/impersonation/src/core/session.ts::previewSubject": {
+    "kind": "exempt",
+    "why": "The payload of the impersonation cookie this package signs and reads back itself, not a request body: the HMAC proves it is ours, and a strict parse would sign out every operator whose cookie was minted by an older release that carried an extra key. The request that mints it (startOperatorBody, startPreviewBody) is strict."
+  },
+  "packages/impersonation/src/core/session.ts::sessionSchema": {
+    "kind": "exempt",
+    "why": "The payload of the impersonation cookie this package signs and reads back itself, not a request body: the HMAC proves it is ours, and a strict parse would sign out every operator whose cookie was minted by an older release that carried an extra key. The request that mints it (startOperatorBody, startPreviewBody) is strict."
+  },
+  "packages/product-research/src/connectors/amazon.ts::configSchema": {
+    "kind": "exempt",
+    "why": "A connector's source config, read back from the host's own database when a run starts, not a request: a row saved by an older release that carries a key the connector no longer reads must keep running, and a strict parse would fail the source instead. The write that saves it is validated by the host."
+  },
+  "packages/product-research/src/connectors/serp.ts::configSchema": {
+    "kind": "exempt",
+    "why": "A connector's source config, read back from the host's own database when a run starts, not a request: a row saved by an older release that carries a key the connector no longer reads must keep running, and a strict parse would fail the source instead. The write that saves it is validated by the host."
+  },
+  "packages/product-research/src/connectors/vtex.ts::configSchema": {
+    "kind": "exempt",
+    "why": "A connector's source config, read back from the host's own database when a run starts, not a request: a row saved by an older release that carries a key the connector no longer reads must keep running, and a strict parse would fail the source instead. The write that saves it is validated by the host."
+  }
+}

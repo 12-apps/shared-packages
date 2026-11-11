@@ -39,15 +39,22 @@ export interface RbacHono<P extends string> extends ApiRbac<P> {
   router: Hono;
 }
 
-/** Reads the JSON body, tolerating an absent or malformed one. */
+/** What `readBody` answers for a body that is present but is not JSON. */
+const MALFORMED = Symbol('malformed');
+
+/**
+ * Reads the JSON body. Absent is `undefined` (the handler's strict parse refuses
+ * it with a 422); present but not JSON is {@link MALFORMED}, which the adapter
+ * answers 400 itself: malformed JSON is a transport error, never a validation one.
+ */
 async function readBody(c: Context): Promise<unknown> {
   if (c.req.method === 'GET' || c.req.method === 'DELETE') return undefined;
+  const text = await c.req.text();
+  if (text.trim() === '') return undefined;
   try {
-    return await c.req.json();
+    return JSON.parse(text);
   } catch {
-    // A malformed body is the caller's error; the handler's own validation
-    // reports it far better than a parse failure would.
-    return undefined;
+    return MALFORMED;
   }
 }
 
@@ -63,11 +70,14 @@ export function rbacRouter<P extends string>(config: RbacHonoConfig<P>): RbacHon
       const actor = await config.resolveActor(c);
       if (!actor) return c.json({ error: messages.unauthenticated }, 401);
 
+      const body = await readBody(c);
+      if (body === MALFORMED) return c.json({ error: messages.invalidBody }, 400);
+
       const response = await route.handle({
         actor,
         params: c.req.param() as Record<string, string | undefined>,
         query: c.req.query() as Record<string, string | undefined>,
-        body: await readBody(c),
+        body,
       });
 
       // A handler that chose NO body means exactly that (204).

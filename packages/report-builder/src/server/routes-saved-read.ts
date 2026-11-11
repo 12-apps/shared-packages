@@ -1,4 +1,4 @@
-import { runDashboard, runReport, parseReportDocument, type DashboardRunResult } from '../run';
+import { runDashboard, runReport, parseStoredDocument, type DashboardRunResult } from '../run';
 import { documentEntities, isDashboardSpec, type ReportDocument } from '../spec';
 
 import {
@@ -12,12 +12,12 @@ import {
   ok,
   runOptions,
   toReportRangeView,
-  windowOf,
   type ReportActor,
   type ReportBuilderServerConfig,
   type ReportRoute,
   type ResolvedReportRange,
 } from './context';
+import { windowOfQuery } from './range-query';
 import type { SavedReportRecord, SavedReportStore } from './saved';
 import { documentShape, toSummary } from './summary';
 import { resolveDefaultRange } from './range';
@@ -157,13 +157,13 @@ function getRoute(config: ReportBuilderServerConfig, store: SavedReportStore): R
       // actor who may not read its entities — authorization before validation.
       if (!mayQueryAll(config, actor, documentShape(record.spec).entities)) return forbidden(config);
       try {
-        const document = parseReportDocument(record.spec);
+        const document = parseStoredDocument(record.spec);
         // Re-checked against the PARSED entities: the lenient probe above is
         // deliberately forgiving, and a document whose real entities differ
         // from the ones it appeared to name must not slip past on the
         // appearance.
         if (!mayQueryAll(config, actor, documentEntities(document))) return forbidden(config);
-        const range = windowOf(config, { query });
+        const range = windowOfQuery(config, { query, locale });
         return ok(await renderSaved(record, document, range, actor, config, locale));
       } catch (error) {
         return foldSpecError(error);

@@ -105,6 +105,7 @@ describe("keepWindow while the store's zone is unknown (review round 5, B2)", ()
       body: {
         error: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates,
         issues: { keepWindow: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates },
+        problems: [{ path: "keepWindow", message: PT_BR_DISCOUNTS_SERVER_COPY.keepWindowWithDates }],
       },
     });
     expect(writes).toEqual([]);

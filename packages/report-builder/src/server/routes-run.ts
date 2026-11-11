@@ -1,4 +1,3 @@
-import { invalidSpecError } from '../errors';
 import { runReport } from '../run';
 
 import {
@@ -13,6 +12,7 @@ import {
   type ReportBuilderServerConfig,
   type ReportRoute,
 } from './context';
+import { invalidInputError } from './problems';
 import { runReportBody } from './wire';
 
 /**
@@ -29,10 +29,7 @@ export function runRoute(config: ReportBuilderServerConfig): ReportRoute {
       try {
         const parsed = runReportBody(messagesOf(config, locale).range).safeParse(body);
         if (!parsed.success) {
-          const first = parsed.error.issues[0];
-          throw invalidSpecError(
-            first ? `${first.path.join('.') || 'body'}: ${first.message}` : messagesOf(config, locale).invalidBody,
-          );
+          throw invalidInputError(parsed.error, messagesOf(config, locale).invalidBody);
         }
         // The entity gate runs BEFORE the spec reaches the adapter: a spec is
         // the caller's own text, and the only thing standing between it and a

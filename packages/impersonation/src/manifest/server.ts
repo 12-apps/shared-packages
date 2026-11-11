@@ -111,7 +111,7 @@ function asWireRoute(
             cookieValue: readCookie(request.request?.headers.get('cookie') ?? null, cookieName),
           })
           // EVERY refusal this surface makes is THROWN, not returned: the
-          // lateral-move 403, the invalid-body 400, the unknown-tenant 404, the
+          // lateral-move 403, the invalid-body 422, the unknown-tenant 404, the
           // machine-token refusal. `foldApiError` turns those back into the
           // status and sentence the package chose, and rethrows anything else.
           //

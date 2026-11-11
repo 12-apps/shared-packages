@@ -69,7 +69,7 @@ function withRangeRules<T extends z.ZodType<CustomRangeFields>>(
 export function reportRangeQuery(messages: ReportRangeMessages) {
   const date = isoDateSchema(messages);
   return withRangeRules(
-    z.object({
+    z.strictObject({
       preset: z.enum(REPORT_RANGE_PRESETS).default('30d'),
       from: date.optional(),
       to: date.optional(),
@@ -83,7 +83,7 @@ export function reportRangeQuery(messages: ReportRangeMessages) {
 export function runReportBody(messages: ReportRangeMessages) {
   const date = isoDateSchema(messages);
   return withRangeRules(
-    z.object({
+    z.strictObject({
       spec: reportSpecSchema,
       preset: z.enum(REPORT_RANGE_PRESETS).default('30d'),
       from: date.optional(),

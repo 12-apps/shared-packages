@@ -124,7 +124,7 @@ Filters: `q` (resource id contains, ≤200 chars), `action_in`, `resourceType_in
 `page`, `pageSize`. The paging numbers are config (`pagination`), defaulting to
 20 / 100 / 10 000, and they are published as bounded integers rather than as
 bare strings. Unknown filter values, an unservable `sort` and malformed dates are
-`400` — never accepted and ignored; a denial is `{ error }` at the top level with
+`422` with `problems: [{ path, message }]` — never accepted and ignored; so is a query key it does not declare. Malformed JSON stays `400`; a denial is `{ error }` at the top level with
 `401` / `403`.
 
 The listing's order is **total**: `created_at DESC, id DESC` by default, or

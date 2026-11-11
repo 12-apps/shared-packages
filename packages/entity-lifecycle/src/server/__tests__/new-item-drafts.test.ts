@@ -276,12 +276,26 @@ describe('updating a new-item draft in place', () => {
     expect((await updateDraft(api, owner, other.id, { data: { name: 'x' } })).status).toBe(404);
   });
 
-  it('answers 400 for a body without a data object', async () => {
+  it('answers 422 for a body without a data object, naming what is wrong', async () => {
     const { api } = buildApi();
     const draft = await startDraft(api, owner, { name: 'Novo' });
     const response = await updateDraft(api, owner, draft.id, { nope: true });
-    expect(response.status).toBe(400);
-    expect((response.body as { error: string }).error).toBe('Dados inválidos.');
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      error: 'Dados inválidos.',
+      problems: [
+        { path: 'nope', message: 'Unrecognized key' },
+        { path: 'data', message: 'Expected an object' },
+      ],
+    });
+  });
+
+  it('answers 422 for a draft body that carries a key beside data', async () => {
+    const { api } = buildApi();
+    const draft = await startDraft(api, owner, { name: 'Novo' });
+    const response = await updateDraft(api, owner, draft.id, { data: { name: 'x' }, status: 'PUBLISHED' });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ problems: [{ path: 'status', message: 'Unrecognized key' }] });
   });
 });
 

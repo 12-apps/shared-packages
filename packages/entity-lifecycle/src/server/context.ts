@@ -334,19 +334,46 @@ export function contextOf(
   };
 }
 
-/** The one body shape the draft writes accept: `{ data: <snapshot> }`. */
+/**
+ * The refusal of a request input: 422, the host's `invalidBody` sentence and
+ * every problem with its dotted path, written beside `error`.
+ */
+export function invalidInput(
+  messages: LifecycleMessages,
+  problems: Array<{ path: string; message: string }>,
+): LifecycleApiError {
+  return new LifecycleApiError(422, messages.invalidBody, { problems });
+}
+
+/** One problem per key of `value` that is not in `allowed`: strict, like the advertised schema. */
+export function unrecognizedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  prefix = '',
+): Array<{ path: string; message: string }> {
+  return Object.keys(value)
+    .filter((key) => !allowed.includes(key))
+    .map((key) => ({ path: `${prefix}${key}`, message: 'Unrecognized key' }));
+}
+
+/**
+ * The one body shape the draft writes accept: `{ data: <snapshot> }`, and
+ * nothing else — the same strictness `saveDraftBody` advertises (this server
+ * half takes no runtime dependency on the optional `zod` peer, so it enforces
+ * the schema's rule by hand).
+ */
 export function parseSnapshotBody(body: unknown, messages: LifecycleMessages): Snapshot {
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    Array.isArray(body) ||
-    typeof (body as { data?: unknown }).data !== 'object' ||
-    (body as { data?: unknown }).data === null ||
-    Array.isArray((body as { data?: unknown }).data)
-  ) {
-    throw new LifecycleApiError(400, messages.invalidBody);
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw invalidInput(messages, [{ path: '', message: 'Expected an object' }]);
   }
-  return (body as { data: Snapshot }).data;
+  const record = body as Record<string, unknown>;
+  const problems = unrecognizedKeys(record, ['data']);
+  const data = record.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    problems.push({ path: 'data', message: 'Expected an object' });
+  }
+  if (problems.length > 0) throw invalidInput(messages, problems);
+  return data as Snapshot;
 }
 
 /** The reject body: `{ note?: string }` (≤500 chars, trimmed — the MCP contract). */

@@ -232,7 +232,7 @@ describe('a host that is not the one this package came from — reads', () => {
     const { api } = bankAudit();
 
     expect((await list(api, { action_in: 'vault.thaw' }))?.status).toBe(200);
-    expect((await list(api, { action_in: 'accession.incinerate' }))?.status).toBe(400);
+    expect((await list(api, { action_in: 'accession.incinerate' }))?.status).toBe(422);
   });
 
   it('pages on the bank numbers, not on this package defaults', async () => {

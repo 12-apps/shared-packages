@@ -13,6 +13,7 @@ import {
   messagesOf,
 } from './context';
 import { authorizedSession } from './live-session';
+import { problemsOf } from './problems';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
 import { recordEnd } from './session-end';
 import { startOperatorBody, type StartOperatorBody } from './wire';
@@ -61,7 +62,11 @@ function parseBody(
 ): StartOperatorBody {
   const result = startOperatorBody(parts.config.mintPolicy).safeParse(body);
   if (!result.success) {
-    throw new ImpersonationApiError(400, messagesOf(parts.config, locale).invalidBody);
+    throw new ImpersonationApiError(
+      422,
+      messagesOf(parts.config, locale).invalidBody,
+      problemsOf(result.error),
+    );
   }
   return result.data;
 }

@@ -1011,6 +1011,30 @@ describe('person × role × tenant is N×M×J', () => {
     expect(asked).toEqual([{ customRoles: ['Voluntário'] }]);
   });
 
+  it('a body with an unknown key is a 422 naming the key, and nothing is written', async () => {
+    const { h, asked } = await invitingHost();
+    const response = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'dono@example.com', role: 'CLERK', admin: true },
+    });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({
+      problems: [{ path: 'admin', message: 'Unrecognized key' }],
+    });
+    expect(asked).toEqual([]);
+  });
+
+  it('an invalid value is a 422 with its path, beside the sentence', async () => {
+    const { h, asked } = await invitingHost();
+    const response = await call(h, 'POST', '/team', {
+      actor: memberActor(TENANT, 'owner-1'),
+      body: { email: 'x' },
+    });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ problems: [{ path: 'email' }] });
+    expect(asked).toEqual([]);
+  });
+
   it('an owner role cannot ride into an invite through the list either', async () => {
     const { h, asked } = await invitingHost();
     const response = await call(h, 'POST', '/team', {

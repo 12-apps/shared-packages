@@ -193,8 +193,8 @@ describe('the wire view, on the answers this surface exists to give', () => {
   };
 
   it('folds a refusal into the status and sentence the package chose', async () => {
-    // A start with no reason at all: the package refuses with 400 and its own
-    // `invalidBody` sentence.
+    // A start with no reason at all: the package refuses with 422, its own
+    // `invalidBody` sentence and every problem with its path.
     const answer = await routeFor('POST', '').handle({
       actor: actor({ isPlatformAdmin: true }),
       params: {},
@@ -202,7 +202,10 @@ describe('the wire view, on the answers this surface exists to give', () => {
       query: {},
     } as never);
 
-    expect(answer).toEqual({ status: 400, body: { error: expect.any(String) } });
+    expect(answer).toEqual({
+      status: 422,
+      body: { error: expect.any(String), problems: expect.arrayContaining([expect.objectContaining({ path: 'targetUserId' })]) },
+    });
   });
 
   it('folds an authorization refusal too, rather than throwing past the bridge', async () => {
