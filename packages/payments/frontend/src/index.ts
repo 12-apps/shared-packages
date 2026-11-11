@@ -324,6 +324,7 @@ export { PlatformHomologacao, type PlatformHomologacaoProps } from './components
 export * from './components/platform/HomologacaoEvidenceCard';
 export * from './components/platform/HomologacaoProductionEvidenceCard';
 export type { ProductionPixView } from './components/platform/ProductionPixPanel';
+export type { ProductionScenarioOutcome } from './components/platform/ProductionScenarioList';
 export {
   type HomologacaoSaveInput,
   type HomologacaoSaveState,
