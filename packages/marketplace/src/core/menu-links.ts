@@ -1,4 +1,4 @@
-import type { EngineContext } from "./ports";
+import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
 /**
@@ -12,7 +12,8 @@ import type { MarketplaceProvider } from "./types";
  * doing it is a store quietly selling food it cannot make.
  *
  * The package never dereferences `menuItemId`. It asks the host whether the id
- * is theirs (`order.catalogHas`) and stores it; what the id MEANS is the host's.
+ * is theirs (`order.catalogHas`, in `./bulk.ts`) and stores it; what the id
+ * MEANS is the host's.
  */
 
 /** A link as every read surface sees it. */
@@ -64,12 +65,13 @@ function toView(row: LinkRow): MarketplaceMenuLinkView {
  */
 export async function listMarketplaceMenuLinks(
   ctx: EngineContext,
-  input: { clientId: string; provider?: MarketplaceProvider; unmappedOnly?: boolean },
+  input: { clientId: string; provider?: MarketplaceProvider; unmappedOnly?: boolean; ids?: readonly string[] },
 ): Promise<MarketplaceMenuLinkView[]> {
   const db = await ctx.ports.db();
   const rows = (await db.marketplaceMenuLink.findMany({
     where: {
       clientId: input.clientId,
+      ...(input.ids ? { id: { in: [...input.ids] } } : {}),
       ...(input.provider ? { provider: input.provider } : {}),
       ...(input.unmappedOnly ? { menuItemId: null } : {}),
     },
@@ -80,19 +82,13 @@ export async function listMarketplaceMenuLinks(
 }
 
 /**
- * Point an external SKU at one of the store's catalog rows, or unmap it.
- *
- * Returns `null` when the catalog id is not this tenant's — a VALUE rather than
- * a thrown error with a message, because the message would be copy and copy in
- * a package is a language chosen for every host that mounts it. The host turns
- * the null into whatever its API says "not found" looks like.
- *
- * Creates the link if the SKU has never been seen: an operator mapping ahead of
- * the first order is doing the right thing, and refusing them would make the
- * feature reactive by construction.
+ * Point an external SKU at a catalog id, or unmap it, inside the caller's
+ * transaction. The caller has already checked the id is this tenant's
+ * (`order.catalogHas`). Creates the link if the SKU has never been seen: an
+ * operator mapping ahead of the first order is doing the right thing.
  */
-export async function setMarketplaceMenuLink(
-  ctx: EngineContext,
+export async function upsertLink(
+  db: MarketplaceDb,
   input: {
     clientId: string;
     provider: MarketplaceProvider;
@@ -100,11 +96,7 @@ export async function setMarketplaceMenuLink(
     externalName?: string;
     menuItemId: string | null;
   },
-): Promise<MarketplaceMenuLinkView | null> {
-  if (input.menuItemId && !(await ctx.ports.order.catalogHas(input.clientId, input.menuItemId))) {
-    return null;
-  }
-  const db = await ctx.ports.db();
+): Promise<MarketplaceMenuLinkView> {
   const row = (await db.marketplaceMenuLink.upsert({
     where: {
       clientId_provider_externalSku: {

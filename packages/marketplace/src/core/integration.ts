@@ -1,5 +1,5 @@
 import type { MarketplaceCredentials } from "./adapter";
-import type { EngineContext } from "./ports";
+import type { EngineContext, MarketplaceDb } from "./ports";
 import type { MarketplaceProvider } from "./types";
 
 /**
@@ -29,6 +29,8 @@ export interface MarketplaceIntegrationView {
   connected: boolean;
   lastEventAt: Date | null;
   lastVerifiedAt: Date | null;
+  /** Archived connections ingest nothing; null while live. */
+  archivedAt: Date | null;
 }
 
 interface IntegrationRow {
@@ -42,6 +44,7 @@ interface IntegrationRow {
   credentials: string;
   lastEventAt: Date | null;
   lastVerifiedAt: Date | null;
+  archivedAt: Date | null;
 }
 
 const VIEW_SELECT = {
@@ -55,6 +58,7 @@ const VIEW_SELECT = {
   credentials: true,
   lastEventAt: true,
   lastVerifiedAt: true,
+  archivedAt: true,
 } as const;
 
 function toView(row: IntegrationRow): MarketplaceIntegrationView {
@@ -69,17 +73,26 @@ function toView(row: IntegrationRow): MarketplaceIntegrationView {
     connected: row.credentials !== "",
     lastEventAt: row.lastEventAt,
     lastVerifiedAt: row.lastVerifiedAt,
+    archivedAt: row.archivedAt ?? null,
   };
 }
 
-/** Every marketplace connection this store has, secrets withheld. */
+/**
+ * This store's marketplace connections, secrets withheld: the live ones, or
+ * with `includeArchived` the archived too; `providers` narrows to those ids.
+ */
 export async function listMarketplaceIntegrations(
   ctx: EngineContext,
   clientId: string,
+  options: { providers?: readonly string[]; includeArchived?: boolean } = {},
 ): Promise<MarketplaceIntegrationView[]> {
   const db = await ctx.ports.db();
   const rows = (await db.marketplaceIntegration.findMany({
-    where: { clientId },
+    where: {
+      clientId,
+      ...(options.providers ? { provider: { in: [...options.providers] } } : {}),
+      ...(options.includeArchived ? {} : { archivedAt: null }),
+    },
     select: VIEW_SELECT,
     orderBy: { provider: "asc" },
   })) as IntegrationRow[];
@@ -119,8 +132,8 @@ export interface SaveMarketplaceIntegrationInput {
 export async function saveMarketplaceIntegration(
   ctx: EngineContext,
   input: SaveMarketplaceIntegrationInput,
+  db: MarketplaceDb,
 ): Promise<MarketplaceIntegrationView> {
-  const db = await ctx.ports.db();
   const sealed = input.credentials
     ? ctx.ports.secrets.seal(JSON.stringify(input.credentials))
     : undefined;
@@ -149,16 +162,6 @@ export async function saveMarketplaceIntegration(
   return toView(row);
 }
 
-/** Forget a store's connection to one marketplace. Idempotent. */
-export async function deleteMarketplaceIntegration(
-  ctx: EngineContext,
-  clientId: string,
-  provider: MarketplaceProvider,
-): Promise<void> {
-  const db = await ctx.ports.db();
-  await db.marketplaceIntegration.deleteMany({ where: { clientId, provider } });
-}
-
 /** What the ingestion path needs to know about a store's connection. */
 export interface IngestionTarget {
   enabled: boolean;
@@ -185,14 +188,16 @@ export async function resolveIngestionTarget(
   const db = await ctx.ports.db();
   const row = (await db.marketplaceIntegration.findUnique({
     where: { clientId_provider: { clientId, provider } },
-    select: { enabled: true, autoAccept: true, ackSlaSeconds: true, credentials: true },
+    select: { enabled: true, autoAccept: true, ackSlaSeconds: true, credentials: true, archivedAt: true },
   })) as {
     enabled: boolean;
     autoAccept: boolean;
     ackSlaSeconds: number;
     credentials: string;
+    archivedAt: Date | null;
   } | null;
-  if (!row) return null;
+  // An archived connection is no connection: its deliveries are refused.
+  if (!row || row.archivedAt) return null;
   return {
     enabled: row.enabled,
     autoAccept: row.autoAccept,
@@ -245,7 +250,7 @@ export async function resolveTenantByMerchant(
 ): Promise<string | null> {
   const db = await ctx.ports.db();
   const rows = (await db.marketplaceIntegration.findMany({
-    where: { provider, externalMerchantId },
+    where: { provider, externalMerchantId, archivedAt: null },
     select: { clientId: true },
     take: 1,
   })) as { clientId: string }[];

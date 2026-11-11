@@ -1,33 +1,41 @@
 import type { WireResponse, WireRoute } from "@12-apps/wiring";
 
+import type { BulkProblem } from "../core/bulk";
+import type { DecisionProblem } from "../core/cancellation";
 import type { MarketplaceIntegrationView } from "../core/integration";
 import type { MarketplaceMenuLinkView } from "../core/menu-links";
 import { MARKETPLACE_DECIDE, MARKETPLACE_MANAGE } from "./contribution";
+import type { MarketplaceServerCopy } from "./copy";
 import { iso, ok, parse, refuse, type MarketplaceActor, type MarketplaceApiConfig } from "./http";
 import {
-  decideMarketplaceOrderBody,
-  deleteMarketplaceIntegrationQuery,
+  decideMarketplaceOrdersBody,
+  listMarketplaceAcceptancesQuery,
+  listMarketplaceIntegrationsQuery,
   listMarketplaceMenuLinksQuery,
-  marketplaceOrderParams,
-  saveMarketplaceIntegrationBody,
-  setMarketplaceMenuLinkBody,
+  upsertMarketplaceIntegrationsBody,
+  upsertMarketplaceMenuLinksBody,
 } from "./mcp";
 import { webhookRoute } from "./webhook";
 
 /**
  * The marketplace HTTP surface as framework-neutral wiring descriptors: the
- * webhook every marketplace posts to, and the seven authenticated routes a
- * store's staff (and its MCP tools) use — connect, map, and answer the queue.
+ * webhook every marketplace posts to, and, per entity, one read and one bulk
+ * write — connections, SKU links, decisions — for a store's staff and its MCP
+ * tools alike.
  *
  * There is no authentication, tenant resolution or RBAC in here: each
- * descriptor DECLARES the permission it needs and the host's guard answers
- * it; the actor arrives already resolved. Paths are relative to the host's
- * mount (`/api` reproduces the origin host's URLs exactly).
+ * descriptor DECLARES the permission it needs and the host's guard answers it;
+ * the actor arrives already resolved. Paths are relative to the host's mount.
  */
 
 export type MarketplaceRoute = WireRoute<MarketplaceActor> | WireRoute<unknown>;
 
 const BASE = "/admin/:tenantSlug/marketplace";
+
+/** The 409 code of a decision on an order that is no longer on the clock. */
+export const ORDER_NOT_PENDING_CODE = "MARKETPLACE_ORDER_NOT_PENDING";
+
+const NOT_PENDING = new Set(["NOT_FOUND", "ALREADY_DECIDED", "EXPIRED", "CONFLICT"]);
 
 /** A connection as the read returns it: dates as ISO, the adapter's half beside it. */
 function integrationOut(config: MarketplaceApiConfig, row: MarketplaceIntegrationView) {
@@ -36,6 +44,7 @@ function integrationOut(config: MarketplaceApiConfig, row: MarketplaceIntegratio
     ...row,
     lastEventAt: iso(row.lastEventAt),
     lastVerifiedAt: iso(row.lastVerifiedAt),
+    archivedAt: iso(row.archivedAt),
     capabilities: adapter ? adapter.capabilities : null,
     reasons: adapter ? [...adapter.cancellationReasons()] : [],
   };
@@ -45,10 +54,36 @@ function linkOut(link: MarketplaceMenuLinkView) {
   return { ...link, lastSeenAt: link.lastSeenAt.toISOString() };
 }
 
-/** The provider is a registered adapter's, or the request is refused. */
-function unknownProvider(config: MarketplaceApiConfig, provider: string | undefined): WireResponse | null {
-  if (provider === undefined || config.engine.knows(provider)) return null;
-  return refuse(422, config.copy.unknownProvider);
+/** Each problem with its sentence; a host refusal keeps the host's own words. */
+function problemsOut(copy: MarketplaceServerCopy, problems: readonly (BulkProblem | DecisionProblem)[]) {
+  return problems.map((problem) => {
+    const host = "host" in problem ? problem.host : undefined;
+    return {
+      ...problem,
+      message: host?.message ?? copy.problems[problem.code],
+      ...(host ? { hostCode: host.code, details: host.details } : {}),
+    };
+  });
+}
+
+/** A refused bulk write: 422, nothing saved, every problem with its path. */
+function refusedBulk(copy: MarketplaceServerCopy, problems: readonly BulkProblem[]): WireResponse {
+  return refuse(422, copy.nothingSaved, { problems: problemsOut(copy, problems) });
+}
+
+/**
+ * A refused decision call. The host's own refusal is a 409 carrying ITS code
+ * (`MARKETPLACE_STOCK_ASK` and the short lines in `details`); an order no
+ * longer on the clock a 409; anything else (a reason, an item) a 422.
+ */
+function refusedDecisions(copy: MarketplaceServerCopy, problems: readonly DecisionProblem[]): WireResponse {
+  const out = problemsOut(copy, problems);
+  const host = problems.find((problem) => problem.code === "HOST_REFUSED")?.host;
+  if (host) return refuse(409, host.message, { code: host.code, details: host.details, problems: out });
+  if (problems.some((problem) => NOT_PENDING.has(problem.code))) {
+    return refuse(409, copy.orderNoLongerPending, { code: ORDER_NOT_PENDING_CODE, problems: out });
+  }
+  return refuse(422, copy.nothingSaved, { problems: out });
 }
 
 function integrationRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceActor>[] {
@@ -58,8 +93,13 @@ function integrationRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceA
       method: "GET",
       path: BASE,
       permission: MARKETPLACE_MANAGE,
-      handle: async ({ actor }) => {
-        const rows = await engine.integrations(actor.clientId);
+      handle: async ({ actor, query }) => {
+        const parsed = parse(listMarketplaceIntegrationsQuery, query, copy);
+        if (!parsed.ok) return parsed.response;
+        const rows = await engine.integrations(actor.clientId, {
+          providers: parsed.value.ids,
+          includeArchived: parsed.value.includeArchived === "true",
+        });
         return ok(rows.map((row) => integrationOut(config, row)));
       },
     },
@@ -68,34 +108,20 @@ function integrationRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceA
       path: BASE,
       permission: MARKETPLACE_MANAGE,
       handle: async ({ actor, body }) => {
-        const parsed = parse(saveMarketplaceIntegrationBody, body, copy);
+        const parsed = parse(upsertMarketplaceIntegrationsBody, body, copy);
         if (!parsed.ok) return parsed.response;
-        const { provider, credentials, ...settings } = parsed.value;
-        const refused = unknownProvider(config, provider);
-        if (refused) return refused;
-        if (credentials === undefined && Object.values(settings).every((value) => value === undefined)) {
-          return refuse(422, copy.nothingToUpdate);
-        }
-        const saved = await engine.saveIntegration({
+        const result = await engine.upsertIntegrations({
           clientId: actor.clientId,
-          provider,
-          ...settings,
-          credentials: credentials
-            ? { ...credentials, webhookSecret: credentials.webhookSecret ?? null }
-            : undefined,
+          actorId: actor.userId ?? null,
+          validateOnly: parsed.value.validateOnly,
+          rows: parsed.value.integrations.map((row) =>
+            "credentials" in row && row.credentials
+              ? { ...row, credentials: { ...row.credentials, webhookSecret: row.credentials.webhookSecret ?? null } }
+              : row,
+          ) as Parameters<typeof engine.upsertIntegrations>[0]["rows"],
         });
-        return ok(integrationOut(config, saved));
-      },
-    },
-    {
-      method: "DELETE",
-      path: BASE,
-      permission: MARKETPLACE_MANAGE,
-      handle: async ({ actor, query }) => {
-        const parsed = parse(deleteMarketplaceIntegrationQuery, query, copy);
-        if (!parsed.ok) return parsed.response;
-        await engine.deleteIntegration(actor.clientId, parsed.value.provider);
-        return ok({ ok: true });
+        if (result.kind === "refused") return refusedBulk(copy, result.problems);
+        return ok({ validateOnly: result.validateOnly, integrations: result.rows.map((row) => integrationOut(config, row)) });
       },
     },
   ];
@@ -115,6 +141,7 @@ function menuLinkRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceActo
           clientId: actor.clientId,
           provider: parsed.value.provider,
           unmappedOnly: parsed.value.unmapped === "true",
+          ids: parsed.value.ids,
         });
         return ok(links.map(linkOut));
       },
@@ -124,13 +151,15 @@ function menuLinkRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceActo
       path: `${BASE}/menu-links`,
       permission: MARKETPLACE_MANAGE,
       handle: async ({ actor, body }) => {
-        const parsed = parse(setMarketplaceMenuLinkBody, body, copy);
+        const parsed = parse(upsertMarketplaceMenuLinksBody, body, copy);
         if (!parsed.ok) return parsed.response;
-        const refused = unknownProvider(config, parsed.value.provider);
-        if (refused) return refused;
-        const link = await engine.setMenuLink({ clientId: actor.clientId, ...parsed.value });
-        // `null` is the engine saying the catalog id is not this tenant's.
-        return link ? ok(linkOut(link)) : refuse(404, copy.catalogItemNotFound);
+        const result = await engine.upsertMenuLinks({
+          clientId: actor.clientId,
+          rows: parsed.value.links,
+          validateOnly: parsed.value.validateOnly,
+        });
+        if (result.kind === "refused") return refusedBulk(copy, result.problems);
+        return ok({ validateOnly: result.validateOnly, links: result.rows.map(linkOut) });
       },
     },
   ];
@@ -143,8 +172,10 @@ function acceptanceRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceAc
       method: "GET",
       path: `${BASE}/acceptances`,
       permission: MARKETPLACE_DECIDE,
-      handle: async ({ actor }) => {
-        const pending = await engine.pending(actor.clientId);
+      handle: async ({ actor, query }) => {
+        const parsed = parse(listMarketplaceAcceptancesQuery, query, copy);
+        if (!parsed.ok) return parsed.response;
+        const pending = await engine.pending(actor.clientId, parsed.value.ids);
         return ok(
           pending.map((order) => ({
             ...order,
@@ -156,29 +187,18 @@ function acceptanceRoutes(config: MarketplaceApiConfig): WireRoute<MarketplaceAc
     },
     {
       method: "POST",
-      path: `${BASE}/acceptances/:orderId`,
+      path: `${BASE}/acceptances`,
       permission: MARKETPLACE_DECIDE,
-      handle: async ({ actor, params, body }) => {
-        const route = parse(marketplaceOrderParams, params, copy);
-        if (!route.ok) return route.response;
-        const parsed = parse(decideMarketplaceOrderBody, body, copy);
+      handle: async ({ actor, body }) => {
+        const parsed = parse(decideMarketplaceOrdersBody, body, copy);
         if (!parsed.ok) return parsed.response;
-        const result = await engine.decide({
+        const result = await engine.decideMany({
           clientId: actor.clientId,
-          orderId: route.value.orderId,
-          decision: parsed.value.decision,
-          reasonCode: parsed.value.decision === "REJECT" ? parsed.value.reasonCode : undefined,
+          decisions: parsed.value.decisions,
+          validateOnly: parsed.value.validateOnly,
         });
-        if (result.kind === "stale") return refuse(409, copy.orderNoLongerPending);
-        if (result.kind === "invalidReason") {
-          return refuse(422, copy.invalidReason, { validCodes: result.validCodes });
-        }
-        return ok({
-          id: result.orderId,
-          ackStatus: result.status,
-          cancellation: result.cancellation,
-          reasonCode: result.reasonCode,
-        });
+        if (result.kind === "refused") return refusedDecisions(copy, result.problems);
+        return ok({ validateOnly: result.validateOnly, decisions: result.rows });
       },
     },
   ];

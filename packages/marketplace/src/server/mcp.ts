@@ -7,46 +7,66 @@ import type { WireMcpTool } from "@12-apps/wiring";
  * it proxies to, and reused as the runtime validators. The advertised schema
  * and what a handler accepts are the same objects, so they cannot drift.
  *
- * Every input is STRICT: an unknown key is a 422 naming it, never a field the
- * parser quietly drops.
+ * The shape is the bulk-upsert protocol: ONE bulk write per entity
+ * (connections, SKU links, decisions), each taking a list, all-or-nothing,
+ * `validateOnly` supported, idempotent on the natural key, every refusal
+ * returned with its path; a connection is ARCHIVED, never deleted. A read is
+ * the entity's `list*` tool, taking `ids`.
  *
- * The provider is checked for SHAPE here and for EXISTENCE at runtime (the
- * engine's registry), because the set of marketplaces is the set of adapters
- * a host registered — a closed enum here would make a new adapter a change to
- * this file.
+ * Every input is STRICT (an unknown key is refused, never stripped), and the
+ * cross-row checks (a key twice in one call) are part of the schema. The
+ * provider is checked for SHAPE here and for EXISTENCE at runtime, because
+ * the set of marketplaces is the set of adapters a host registered.
  *
  * Paths are RELATIVE to the http capability's mount (`/api` in the origin
- * host); the wiring consumer prefixes it, so a tool's URL and its route's URL
- * cannot disagree. The webhook is not a tool: a marketplace's server-to-server
- * callback is not a capability anybody invokes.
+ * host). The webhook is not a tool: a marketplace's server-to-server callback
+ * is not a capability anybody invokes.
  */
 
 const providerSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/u);
 const environmentSchema = z.enum(["SANDBOX", "PRODUCTION"]);
+const booleanText = z.enum(["true", "false"]);
+/** A comma-separated id list in a query string: `ids=a,b`. */
+const idsText = z
+  .string()
+  .transform((text) => text.split(",").map((id) => id.trim()).filter((id) => id !== ""))
+  .pipe(z.array(z.string().min(1)).min(1).max(100));
+
+/** Flag every row whose key repeats an earlier one, at that row's path. */
+function noDuplicates<T>(list: string, field: string, keyOf: (row: T) => string) {
+  return (rows: readonly T[], ctx: z.RefinementCtx): void => {
+    const seen = new Set<string>();
+    rows.forEach((row, index) => {
+      const key = keyOf(row);
+      if (seen.has(key)) {
+        ctx.addIssue({ code: "custom", path: [index, field], message: `${field} repeats an earlier row of ${list}` });
+      }
+      seen.add(key);
+    });
+  };
+}
 
 /** Path params for the tenant-scoped marketplace resource. */
 export const marketplaceParams = z.strictObject({
   tenantSlug: z.string().min(1),
 });
 
-/** Path params for one order in the acceptance queue. */
-export const marketplaceOrderParams = z.strictObject({
-  tenantSlug: z.string().min(1),
-  orderId: z.string().min(1),
+/** Which connections to read. */
+export const listMarketplaceIntegrationsQuery = z.strictObject({
+  ids: idsText.optional(),
+  includeArchived: booleanText.optional(),
 });
 
-/**
- * The credential half of a save. Optional as a BLOCK: flipping `autoAccept`
- * must not require retyping a secret the screen cannot read back.
- */
+/** The credential half of a save. Absent leaves the stored secrets alone. */
 const credentialsInput = z.strictObject({
   clientId: z.string().trim().min(1),
   clientSecret: z.string().trim().min(1),
   webhookSecret: z.string().trim().min(1).nullable().optional(),
 });
 
-/** Create or update one marketplace connection; any subset of the settings. */
-export const saveMarketplaceIntegrationBody = z.strictObject({
+/** Create or patch one connection; any subset of its settings. */
+const integrationUpsertInput = z.strictObject({
+  operation: z.literal("upsert").optional(),
   provider: providerSchema,
   enabled: z.boolean().optional(),
   environment: environmentSchema.optional(),
@@ -58,38 +78,89 @@ export const saveMarketplaceIntegrationBody = z.strictObject({
   credentials: credentialsInput.optional(),
 });
 
-/** Which connection to forget. */
-export const deleteMarketplaceIntegrationQuery = z.strictObject({
+/** Archive (reversible) or unarchive one connection, with an optional reason. */
+const integrationArchiveInput = z.strictObject({
+  operation: z.enum(["archive", "unarchive"]),
   provider: providerSchema,
+  reason: z.string().trim().min(1).max(500).nullable().optional(),
+});
+
+/** Many connection changes, all-or-nothing. */
+export const upsertMarketplaceIntegrationsBody = z.strictObject({
+  validateOnly: z.boolean().optional(),
+  integrations: z
+    .array(z.union([integrationArchiveInput, integrationUpsertInput]))
+    .min(1)
+    .max(20)
+    .superRefine(noDuplicates("integrations", "provider", (row) => row.provider)),
 });
 
 /** Filters for the SKU map. `unmapped=true` IS the attention list. */
 export const listMarketplaceMenuLinksQuery = z.strictObject({
   provider: providerSchema.optional(),
-  // A query string is text: "false" must mean false, which `z.coerce.boolean`
-  // would read as true.
-  unmapped: z.enum(["true", "false"]).optional(),
+  // A query string is text: "false" must mean false.
+  unmapped: booleanText.optional(),
+  ids: idsText.optional(),
 });
 
-/** Point one external SKU at a catalog id, or unmap it with `menuItemId: null`. */
-export const setMarketplaceMenuLinkBody = z.strictObject({
+/** Map one external SKU to a catalog id, or unmap it with `menuItemId: null`. */
+const menuLinkInput = z.strictObject({
   provider: providerSchema,
   externalSku: z.string().trim().min(1),
+  externalName: z.string().trim().min(1).optional(),
   menuItemId: z.string().min(1).nullable(),
 });
 
+/** Many SKU links, all-or-nothing; idempotent on (provider, externalSku). */
+export const upsertMarketplaceMenuLinksBody = z.strictObject({
+  validateOnly: z.boolean().optional(),
+  links: z
+    .array(menuLinkInput)
+    .min(1)
+    .max(200)
+    .superRefine(noDuplicates("links", "externalSku", (row) => `${row.provider}\u0000${row.externalSku}`)),
+});
+
+/** Which queued orders to read. */
+export const listMarketplaceAcceptancesQuery = z.strictObject({
+  ids: idsText.optional(),
+});
+
+/** What the person confirmed beside an accept, for the host's admission. */
+const admissionInput = z.strictObject({
+  admitStockPastZero: z.boolean().optional(),
+});
+
 /**
- * Accept, or refuse with one of the marketplace's own reason codes.
- *
- * ONE tool for both, and all-or-nothing: a refusal whose code is not the
- * marketplace's is a 422 and nothing is written. With no code the
- * marketplace's first reason is taken. A code on an accept is refused by the
- * schema rather than ignored.
+ * One decision. An accept may carry the admission and a preparation time; a
+ * refusal one of the marketplace's reason codes (its first when omitted) and,
+ * for a reason that needs them, the order's offending SKUs. A field of the
+ * other kind is refused, not ignored.
  */
-export const decideMarketplaceOrderBody = z.discriminatedUnion("decision", [
-  z.strictObject({ decision: z.literal("ACCEPT") }),
-  z.strictObject({ decision: z.literal("REJECT"), reasonCode: z.string().trim().min(1).optional() }),
+const decisionInput = z.discriminatedUnion("decision", [
+  z.strictObject({
+    orderId: z.string().min(1),
+    decision: z.literal("ACCEPT"),
+    admission: admissionInput.optional(),
+    preparationMinutes: z.number().int().min(1).max(240).optional(),
+  }),
+  z.strictObject({
+    orderId: z.string().min(1),
+    decision: z.literal("REJECT"),
+    reasonCode: z.string().trim().min(1).optional(),
+    offendingSkus: z.array(z.string().trim().min(1)).min(1).max(50).optional(),
+  }),
 ]);
+
+/** Many decisions, all-or-nothing, the host admitting each inside one transaction. */
+export const decideMarketplaceOrdersBody = z.strictObject({
+  validateOnly: z.boolean().optional(),
+  decisions: z
+    .array(decisionInput)
+    .min(1)
+    .max(50)
+    .superRefine(noDuplicates("decisions", "orderId", (row) => row.orderId)),
+});
 
 const reasonSchema = z.object({
   code: z.string(),
@@ -107,12 +178,7 @@ const capabilitiesSchema = z.object({
   confirmTakesPreparationTime: z.boolean(),
 });
 
-/**
- * A connection as every read returns it. `connected` stands in for the
- * credential blob: whether a secret EXISTS is the only fact about it anyone
- * needs. The marketplace's capabilities and reasons ride along, so a client
- * draws its refusal dialog without a second call and without the network.
- */
+/** A connection as every read returns it: `connected` stands in for the secrets. */
 const integrationSchema = z.object({
   provider: z.string(),
   enabled: z.boolean(),
@@ -124,11 +190,11 @@ const integrationSchema = z.object({
   connected: z.boolean(),
   lastEventAt: z.string().nullable(),
   lastVerifiedAt: z.string().nullable(),
+  archivedAt: z.string().nullable(),
   capabilities: capabilitiesSchema.nullable(),
   reasons: z.array(reasonSchema),
 });
 
-/** A SKU→catalog link, mapped or not. */
 const menuLinkSchema = z.object({
   id: z.string(),
   provider: z.string(),
@@ -138,7 +204,6 @@ const menuLinkSchema = z.object({
   lastSeenAt: z.string(),
 });
 
-/** One order waiting on the store's acceptance. */
 const pendingAcceptanceSchema = z.object({
   id: z.string(),
   orderId: z.string(),
@@ -154,59 +219,48 @@ const pendingAcceptanceSchema = z.object({
   createdAt: z.string().nullable(),
 });
 
-/** What a decision answers. */
-const decisionSchema = z.object({
-  id: z.string(),
-  ackStatus: z.enum(["AWAITING", "ACCEPTED", "REJECTED", "EXPIRED"]),
+const decidedSchema = z.object({
+  orderId: z.string(),
+  status: z.enum(["ACCEPTED", "REJECTED"]),
   cancellation: z.enum(["PENDING", "REQUESTED", "CONFIRMED", "FAILED"]).nullable(),
   reasonCode: z.string().nullable(),
+  offendingSkus: z.array(z.string()),
 });
 
 const BASE = "/admin/{tenantSlug}/marketplace";
 
-/** The seven marketplace tools, one per authenticated route. */
+/** The six marketplace tools: a read and a bulk write per entity. */
 export const MARKETPLACE_MCP_TOOLS = [
   {
     operationId: "listMarketplaceIntegrations",
     method: "GET",
     path: BASE,
     summary:
-      "List a store's marketplace connections: which marketplaces are connected, whether each is enabled, its environment, whether incoming orders are auto-accepted, how long the store has to acknowledge one, and each marketplace's capabilities and refusal reasons. Never returns the stored credentials: `connected` says only whether a set is on file.",
+      "List one or many of a store's marketplace connections (pass `ids` as provider ids, e.g. `ids=IFOOD`): whether each is enabled, its environment, auto-accept, the acknowledgement window, and each marketplace's capabilities and refusal reasons. Archived connections only with `includeArchived=true`. Never returns the stored credentials: `connected` says only whether a set is on file.",
     tags: ["marketplace"],
     params: marketplaceParams,
+    query: listMarketplaceIntegrationsQuery,
     response: z.object({ data: z.array(integrationSchema) }),
     annotations: { readOnly: true },
   },
   {
-    operationId: "saveMarketplaceIntegration",
+    operationId: "upsertMarketplaceIntegrations",
     method: "PUT",
     path: BASE,
     summary:
-      "Create or update a store's marketplace connection. Any subset of the settings; omitting `credentials` leaves the stored secrets untouched, and sending them resets the connection to UNVERIFIED.",
+      "Create, update, archive or unarchive one or many marketplace connections in one all-or-nothing call. A row is keyed by `provider`; `operation` is `upsert` (default: any subset of the settings; omitting `credentials` keeps the stored secrets, sending them resets the status to UNVERIFIED), `archive` or `unarchive` (reversible, audited, with an optional `reason`). Any problem writes nothing and every problem comes back with its path. `validateOnly: true` checks without writing.",
     tags: ["marketplace"],
     params: marketplaceParams,
-    body: saveMarketplaceIntegrationBody,
-    response: z.object({ data: integrationSchema }),
+    body: upsertMarketplaceIntegrationsBody,
+    response: z.object({ data: z.object({ validateOnly: z.boolean(), integrations: z.array(integrationSchema) }) }),
     annotations: { readOnly: false, destructive: false },
-  },
-  {
-    operationId: "deleteMarketplaceIntegration",
-    method: "DELETE",
-    path: BASE,
-    summary:
-      "Forget a store's marketplace connection and its stored credentials. Orders already ingested from that marketplace are untouched: they are sales, not integration state.",
-    tags: ["marketplace"],
-    params: marketplaceParams,
-    query: deleteMarketplaceIntegrationQuery,
-    response: z.object({ data: z.object({ ok: z.literal(true) }) }),
-    annotations: { readOnly: false, destructive: true },
   },
   {
     operationId: "listMarketplaceMenuLinks",
     method: "GET",
     path: `${BASE}/menu-links`,
     summary:
-      "List a store's marketplace SKU map: every external SKU an incoming order has carried, and the catalog id it resolves to. Pass `unmapped=true` for the attention list: the SKUs that arrived with nothing behind them, newest-seen first. An unmapped SKU never rejects an order.",
+      "List a store's marketplace SKU map, or the links named by `ids`: every external SKU an incoming order has carried, and the catalog id it resolves to. `unmapped=true` is the attention list: the SKUs that arrived with nothing behind them, newest-seen first. An unmapped SKU never rejects an order.",
     tags: ["marketplace"],
     params: marketplaceParams,
     query: listMarketplaceMenuLinksQuery,
@@ -214,15 +268,15 @@ export const MARKETPLACE_MCP_TOOLS = [
     annotations: { readOnly: true },
   },
   {
-    operationId: "setMarketplaceMenuLink",
+    operationId: "upsertMarketplaceMenuLinks",
     method: "PUT",
     path: `${BASE}/menu-links`,
     summary:
-      "Map an external marketplace SKU to one of the store's catalog ids, or unmap it with `menuItemId: null`. Creates the link if the SKU has never been seen, so a store can map ahead of the first order. Applies to orders ingested from now on.",
+      "Map one or many external marketplace SKUs to the store's catalog ids, or unmap them with `menuItemId: null`, in one all-or-nothing call keyed by (`provider`, `externalSku`). A SKU never seen is created, so a store can map ahead of the first order. Applies to orders ingested from now on. Any problem (a catalog id that is not the store's, a repeated SKU) writes nothing; `validateOnly: true` checks without writing.",
     tags: ["marketplace"],
     params: marketplaceParams,
-    body: setMarketplaceMenuLinkBody,
-    response: z.object({ data: menuLinkSchema }),
+    body: upsertMarketplaceMenuLinksBody,
+    response: z.object({ data: z.object({ validateOnly: z.boolean(), links: z.array(menuLinkSchema) }) }),
     annotations: { readOnly: false, destructive: false },
   },
   {
@@ -230,22 +284,23 @@ export const MARKETPLACE_MCP_TOOLS = [
     method: "GET",
     path: `${BASE}/acceptances`,
     summary:
-      "List marketplace orders waiting on the store's acceptance, soonest deadline first. `acknowledgeBy` is the instant the marketplace cancels an unacknowledged order, and `unmappedLines` counts the lines that arrived with nothing behind them.",
+      "List the marketplace orders waiting on the store's acceptance, soonest deadline first, or those named by `ids` (order ids). `acknowledgeBy` is the instant the marketplace cancels an unacknowledged order; `unmappedLines` counts the lines that arrived with nothing behind them.",
     tags: ["marketplace"],
     params: marketplaceParams,
+    query: listMarketplaceAcceptancesQuery,
     response: z.object({ data: z.array(pendingAcceptanceSchema) }),
     annotations: { readOnly: true },
   },
   {
-    operationId: "decideMarketplaceOrder",
+    operationId: "decideMarketplaceOrders",
     method: "POST",
-    path: `${BASE}/acceptances/{orderId}`,
+    path: `${BASE}/acceptances`,
     summary:
-      "Accept or refuse one marketplace order on the acceptance clock. Refusing cancels it here and asks the marketplace to cancel it, with `reasonCode` from the marketplace's own list (see `listMarketplaceIntegrations`; the first reason when omitted). All-or-nothing: an unknown code is refused with 422 and nothing changes. An order no longer awaiting a decision is refused with 409.",
+      "Accept or refuse one or many marketplace orders on the acceptance clock, all-or-nothing. ACCEPT may carry `admission` (`admitStockPastZero: true` after the store was told an item is short) and `preparationMinutes`. REJECT cancels the order here and asks the marketplace to cancel it, with `reasonCode` from the marketplace's own list (see `listMarketplaceIntegrations`; its first reason when omitted) and, for a reason that needs them, `offendingSkus` from the order. Any problem writes nothing: an unknown code or item is a 422, an order no longer awaiting a decision a 409, and the store's own refusal a 409 with its code (e.g. `MARKETPLACE_STOCK_ASK` with the short items). `validateOnly: true` checks everything without writing.",
     tags: ["marketplace"],
-    params: marketplaceOrderParams,
-    body: decideMarketplaceOrderBody,
-    response: z.object({ data: decisionSchema }),
+    params: marketplaceParams,
+    body: decideMarketplaceOrdersBody,
+    response: z.object({ data: z.object({ validateOnly: z.boolean(), decisions: z.array(decidedSchema) }) }),
     annotations: { readOnly: false, destructive: true, openWorld: true },
   },
 ] as const satisfies readonly WireMcpTool<z.ZodType>[];

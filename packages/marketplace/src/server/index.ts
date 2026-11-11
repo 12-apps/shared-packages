@@ -43,11 +43,13 @@ export {
 } from "./jobs";
 export {
   MARKETPLACE_MCP_TOOLS,
-  decideMarketplaceOrderBody,
-  deleteMarketplaceIntegrationQuery,
+  decideMarketplaceOrdersBody,
+  listMarketplaceAcceptancesQuery,
+  listMarketplaceIntegrationsQuery,
   listMarketplaceMenuLinksQuery,
-  marketplaceOrderParams,
   marketplaceParams,
-  saveMarketplaceIntegrationBody,
-  setMarketplaceMenuLinkBody,
+  upsertMarketplaceIntegrationsBody,
+  upsertMarketplaceMenuLinksBody,
 } from "./mcp";
+export { ORDER_NOT_PENDING_CODE } from "./routes";
+export type { MarketplaceProblemCode } from "./copy";

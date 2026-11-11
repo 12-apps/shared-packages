@@ -39,7 +39,7 @@ async function call(
 ): Promise<WireResponse> {
   const target = route(h, method, path) as WireRoute<MarketplaceActor>;
   return target.handle({
-    actor: { clientId: TENANT },
+    actor: { clientId: TENANT, userId: "user-1" },
     params: { tenantSlug: "the-store", ...parts.params },
     query: parts.query ?? {},
     body: parts.body,
@@ -125,112 +125,195 @@ describe("the webhook", () => {
 });
 
 describe("the authenticated routes", () => {
+  const BASE = "/admin/:tenantSlug/marketplace";
+  type Problem = { path: (string | number)[]; code: string; message: string };
+  const problemsOf = (answer: WireResponse) => (answer.body as { problems: Problem[] }).problems;
+
   it("declare their permission: connecting and mapping take manage, the queue takes decide", () => {
     const h = createHarness();
     const table = api(h)
       .routes.filter((candidate) => candidate.kind !== "webhook")
       .map((candidate) => `${candidate.method} ${candidate.path} -> ${candidate.permission}`);
     expect(table).toEqual([
-      "GET /admin/:tenantSlug/marketplace -> marketplace:manage",
-      "PUT /admin/:tenantSlug/marketplace -> marketplace:manage",
-      "DELETE /admin/:tenantSlug/marketplace -> marketplace:manage",
-      "GET /admin/:tenantSlug/marketplace/menu-links -> marketplace:manage",
-      "PUT /admin/:tenantSlug/marketplace/menu-links -> marketplace:manage",
-      "GET /admin/:tenantSlug/marketplace/acceptances -> marketplace:decide",
-      "POST /admin/:tenantSlug/marketplace/acceptances/:orderId -> marketplace:decide",
+      `GET ${BASE} -> marketplace:manage`,
+      `PUT ${BASE} -> marketplace:manage`,
+      `GET ${BASE}/menu-links -> marketplace:manage`,
+      `PUT ${BASE}/menu-links -> marketplace:manage`,
+      `GET ${BASE}/acceptances -> marketplace:decide`,
+      `POST ${BASE}/acceptances -> marketplace:decide`,
     ]);
   });
 
-  it("saves a connection, never answers its secret, and carries the marketplace's reasons", async () => {
+  it("upserts many connections, never answers a secret, and carries each marketplace's reasons", async () => {
     const h = createHarness();
-    const saved = await call(h, "PUT", "/admin/:tenantSlug/marketplace", {
-      body: { provider: "IFOOD", enabled: true, credentials: { clientId: "a", clientSecret: "very-secret" } },
+    const saved = await call(h, "PUT", BASE, {
+      body: {
+        integrations: [{ provider: "IFOOD", enabled: true, credentials: { clientId: "a", clientSecret: "very-secret" } }],
+      },
     });
 
     expect(saved.status).toBe(200);
     expect(JSON.stringify(saved.body)).not.toContain("very-secret");
-    const listed = (await call(h, "GET", "/admin/:tenantSlug/marketplace")).body as {
+    const listed = (await call(h, "GET", BASE, { query: { ids: "IFOOD" } })).body as {
       data: { connected: boolean; reasons: { code: string }[]; capabilities: { apiCancel: boolean } }[];
     };
     expect(listed.data[0]).toMatchObject({ connected: true, capabilities: { apiCancel: true } });
     expect(listed.data[0]?.reasons.map((reason) => reason.code)).toContain("503");
   });
 
-  it("refuses an unknown key, an unknown provider and an empty save with 422", async () => {
+  it("archives and unarchives through the same tool, audited, and lists archived ones only when asked", async () => {
     const h = createHarness();
-    const unknownKey = await call(h, "PUT", "/admin/:tenantSlug/marketplace", { body: { provider: "IFOOD", enabled: true, extra: 1 } });
-    const unknownProvider = await call(h, "PUT", "/admin/:tenantSlug/marketplace", { body: { provider: "NOBODY", enabled: true } });
-    const empty = await call(h, "PUT", "/admin/:tenantSlug/marketplace", { body: { provider: "IFOOD" } });
+    await h.connect();
 
-    expect(unknownKey).toMatchObject({ status: 422, body: { error: MARKETPLACE_SERVER_COPY_EN_US.invalidInput } });
-    expect(unknownProvider).toMatchObject({ status: 422, body: { error: MARKETPLACE_SERVER_COPY_EN_US.unknownProvider } });
-    expect(empty).toMatchObject({ status: 422, body: { error: MARKETPLACE_SERVER_COPY_EN_US.nothingToUpdate } });
+    const archived = await call(h, "PUT", BASE, {
+      body: { integrations: [{ operation: "archive", provider: "IFOOD", reason: "closed for renovation" }] },
+    });
+
+    expect(archived.status).toBe(200);
+    expect((await call(h, "GET", BASE)).body).toEqual({ data: [] });
+    const all = (await call(h, "GET", BASE, { query: { includeArchived: "true" } })).body as { data: { archivedAt: string }[] };
+    expect(all.data[0]?.archivedAt).toBe(h.clock.at.toISOString());
+    expect(h.audited).toEqual([
+      expect.objectContaining({ action: "marketplace.integration.archive", actorId: "user-1", reason: "closed for renovation" }),
+    ]);
   });
 
-  it("maps a SKU, reads the attention list as text booleans, and 404s a foreign catalog id", async () => {
+  it("refuses an unknown key, a repeated provider and an empty change with every path, saving nothing", async () => {
+    const h = createHarness();
+    const unknownKey = await call(h, "PUT", BASE, { body: { integrations: [{ provider: "IFOOD", enabled: true, extra: 1 }] } });
+    const repeated = await call(h, "PUT", BASE, {
+      body: { integrations: [{ provider: "IFOOD", enabled: true }, { provider: "IFOOD", autoAccept: true }] },
+    });
+    const engineChecks = await call(h, "PUT", BASE, {
+      body: { integrations: [{ provider: "NOBODY", enabled: true }, { provider: "IFOOD" }] },
+    });
+    const archiveNothing = await call(h, "PUT", BASE, { body: { integrations: [{ operation: "archive", provider: "IFOOD" }] } });
+
+    expect(unknownKey.status).toBe(422);
+    expect(problemsOf(repeated)).toEqual([expect.objectContaining({ path: ["integrations", 1, "provider"] })]);
+    expect(engineChecks).toMatchObject({ status: 422, body: { error: MARKETPLACE_SERVER_COPY_EN_US.nothingSaved } });
+    expect(problemsOf(engineChecks).map((problem) => [problem.path, problem.code])).toEqual([
+      [["integrations", 0, "provider"], "UNKNOWN_PROVIDER"],
+      [["integrations", 1], "NOTHING_TO_UPDATE"],
+    ]);
+    expect(problemsOf(archiveNothing).map((problem) => [problem.path, problem.code])).toEqual([
+      [["integrations", 0, "provider"], "NOT_FOUND"],
+    ]);
+    expect(await h.engine.integrations(TENANT, { includeArchived: true })).toEqual([]);
+  });
+
+  it("validateOnly saves no connection", async () => {
+    const h = createHarness();
+    const answer = await call(h, "PUT", BASE, { body: { validateOnly: true, integrations: [{ provider: "IFOOD", enabled: true }] } });
+
+    expect(answer).toEqual({ status: 200, body: { data: { validateOnly: true, integrations: [] } } });
+    expect(await h.engine.integrations(TENANT)).toEqual([]);
+  });
+
+  it("maps many SKUs all-or-nothing, reads the attention list as text booleans, and names a foreign catalog id", async () => {
     const h = createHarness();
     await h.connect();
     await post(h, ifoodPlaced("ext-1"));
-
-    const unmapped = await call(h, "GET", "/admin/:tenantSlug/marketplace/menu-links", { query: { unmapped: "true" } });
-    const foreign = await call(h, "PUT", "/admin/:tenantSlug/marketplace/menu-links", {
-      body: { provider: "IFOOD", externalSku: "SKU-1", menuItemId: "foreign" },
+    const unmapped = await call(h, "GET", `${BASE}/menu-links`, { query: { unmapped: "true" } });
+    const foreign = await call(h, "PUT", `${BASE}/menu-links`, {
+      body: {
+        links: [
+          { provider: "IFOOD", externalSku: "SKU-1", menuItemId: "menu-1" },
+          { provider: "IFOOD", externalSku: "SKU-2", menuItemId: "foreign" },
+        ],
+      },
     });
-    const mapped = await call(h, "PUT", "/admin/:tenantSlug/marketplace/menu-links", {
-      body: { provider: "IFOOD", externalSku: "SKU-1", menuItemId: "menu-1" },
+    const stillUnmapped = await call(h, "GET", `${BASE}/menu-links`, { query: { unmapped: "true" } });
+    const mapped = await call(h, "PUT", `${BASE}/menu-links`, {
+      body: { links: [{ provider: "IFOOD", externalSku: "SKU-1", menuItemId: "menu-1" }, { provider: "IFOOD", externalSku: "SKU-2", menuItemId: null }] },
     });
-    const everything = await call(h, "GET", "/admin/:tenantSlug/marketplace/menu-links", { query: { unmapped: "false" } });
-    const after = await call(h, "GET", "/admin/:tenantSlug/marketplace/menu-links", { query: { unmapped: "true" } });
+    const after = await call(h, "GET", `${BASE}/menu-links`, { query: { unmapped: "false" } });
 
     expect((unmapped.body as { data: { externalSku: string }[] }).data.map((link) => link.externalSku)).toEqual(["SKU-1"]);
-    expect((after.body as { data: unknown[] }).data).toHaveLength(0);
-    expect(foreign).toMatchObject({ status: 404, body: { error: MARKETPLACE_SERVER_COPY_EN_US.catalogItemNotFound } });
+    expect(foreign.status).toBe(422);
+    expect(problemsOf(foreign)).toEqual([
+      { path: ["links", 1, "menuItemId"], code: "CATALOG_ITEM_NOT_FOUND", message: MARKETPLACE_SERVER_COPY_EN_US.problems.CATALOG_ITEM_NOT_FOUND },
+    ]);
+    // All-or-nothing: the valid first row was not written either.
+    expect((stillUnmapped.body as { data: unknown[] }).data).toHaveLength(1);
     expect(mapped.status).toBe(200);
-    expect((everything.body as { data: unknown[] }).data).toHaveLength(1);
+    expect((after.body as { data: unknown[] }).data).toHaveLength(2);
   });
 
-  it("decides: 200 with the stamps, 409 when stale, 422 with the valid codes when the reason is not the marketplace's", async () => {
+  it("re-running the same SKU upsert is idempotent", async () => {
+    const h = createHarness();
+    const body = { links: [{ provider: "IFOOD", externalSku: "SKU-9", menuItemId: "menu-1" }] };
+    await call(h, "PUT", `${BASE}/menu-links`, { body });
+    await call(h, "PUT", `${BASE}/menu-links`, { body });
+    expect(h.memory.tables.marketplaceMenuLink.rows).toHaveLength(1);
+  });
+
+  it("decides many: 200 with the stamps; 422 naming a bad reason's path; 409 when not pending; nothing written on a refusal", async () => {
     const h = createHarness();
     await h.connect("IFOOD", { webhookSecret: SECRET });
     await post(h, ifoodPlaced("ext-1"));
     await post(h, ifoodPlaced("ext-2"));
-    const path = "/admin/:tenantSlug/marketplace/acceptances/:orderId";
+    const path = `${BASE}/acceptances`;
 
-    const invalid = await call(h, "POST", path, { params: { orderId: "order-1" }, body: { decision: "REJECT", reasonCode: "999" } });
-    const refused = await call(h, "POST", path, { params: { orderId: "order-1" }, body: { decision: "REJECT", reasonCode: "503" } });
-    const stale = await call(h, "POST", path, { params: { orderId: "order-1" }, body: { decision: "ACCEPT" } });
-    const codeOnAccept = await call(h, "POST", path, { params: { orderId: "order-2" }, body: { decision: "ACCEPT", reasonCode: "503" } });
-
-    expect(invalid).toMatchObject({ status: 422, body: { error: MARKETPLACE_SERVER_COPY_EN_US.invalidReason } });
-    expect((invalid.body as { validCodes: string[] }).validCodes).toContain("503");
-    expect(refused).toEqual({
-      status: 200,
-      body: { data: { id: "order-1", ackStatus: "REJECTED", cancellation: "PENDING", reasonCode: "503" } },
+    const invalid = await call(h, "POST", path, {
+      body: { decisions: [{ orderId: "order-1", decision: "REJECT", reasonCode: "999" }, { orderId: "order-2", decision: "ACCEPT" }] },
     });
-    expect(stale).toMatchObject({ status: 409, body: { error: MARKETPLACE_SERVER_COPY_EN_US.orderNoLongerPending } });
+    const decided = await call(h, "POST", path, {
+      body: { decisions: [{ orderId: "order-1", decision: "REJECT", reasonCode: "503" }, { orderId: "order-2", decision: "ACCEPT" }] },
+    });
+    const stale = await call(h, "POST", path, { body: { decisions: [{ orderId: "order-1", decision: "ACCEPT" }] } });
+    const codeOnAccept = await call(h, "POST", path, { body: { decisions: [{ orderId: "order-2", decision: "ACCEPT", reasonCode: "503" }] } });
+
+    expect(invalid.status).toBe(422);
+    expect(problemsOf(invalid)).toEqual([expect.objectContaining({ path: ["decisions", 0, "reasonCode"], code: "INVALID_REASON" })]);
+    expect(decided).toEqual({
+      status: 200,
+      body: {
+        data: {
+          validateOnly: false,
+          decisions: [
+            { orderId: "order-1", status: "REJECTED", cancellation: "PENDING", reasonCode: "503", offendingSkus: [] },
+            { orderId: "order-2", status: "ACCEPTED", cancellation: null, reasonCode: null, offendingSkus: [] },
+          ],
+        },
+      },
+    });
+    expect(stale).toMatchObject({ status: 409, body: { code: "MARKETPLACE_ORDER_NOT_PENDING" } });
+    expect(problemsOf(stale)[0]).toMatchObject({ code: "ALREADY_DECIDED", status: "REJECTED" });
     expect(codeOnAccept.status).toBe(422);
-    expect(h.acceptance("order-2")?.status).toBe("AWAITING");
   });
 
-  it("lists the queue with its deadlines as instants", async () => {
+  it("[M2] answers the host's coded refusal as a 409 with its code and details, then accepts once admitted", async () => {
+    const h = createHarness({
+      admit: async (request) =>
+        request.admission.admitStockPastZero
+          ? { admitted: true }
+          : { admitted: false, code: "MARKETPLACE_STOCK_ASK", message: "Short.", details: { short: ["Tuna"] } },
+    });
+    await h.connect("IFOOD", { webhookSecret: SECRET });
+    await post(h, ifoodPlaced("ext-1"));
+    const path = `${BASE}/acceptances`;
+
+    const asked = await call(h, "POST", path, { body: { decisions: [{ orderId: "order-1", decision: "ACCEPT" }] } });
+    const admitted = await call(h, "POST", path, {
+      body: { decisions: [{ orderId: "order-1", decision: "ACCEPT", admission: { admitStockPastZero: true } }] },
+    });
+
+    expect(asked).toMatchObject({ status: 409, body: { code: "MARKETPLACE_STOCK_ASK", error: "Short.", details: { short: ["Tuna"] } } });
+    expect(h.acceptance("order-1")?.status).toBe("ACCEPTED");
+    expect(admitted.status).toBe(200);
+  });
+
+  it("lists the queue, narrowed by ids, with its deadlines as instants", async () => {
     const h = createHarness();
     await h.connect("IFOOD", { webhookSecret: SECRET });
     await post(h, ifoodPlaced("ext-1"));
+    await post(h, ifoodPlaced("ext-2"));
 
-    const answer = await call(h, "GET", "/admin/:tenantSlug/marketplace/acceptances");
+    const answer = await call(h, "GET", `${BASE}/acceptances`, { query: { ids: "order-2" } });
 
-    expect((answer.body as { data: { acknowledgeBy: string }[] }).data[0]?.acknowledgeBy).toBe(
-      new Date(h.clock.at.getTime() + 300_000).toISOString(),
-    );
-  });
-
-  it("forgets a connection by its provider", async () => {
-    const h = createHarness();
-    await h.connect();
-    expect(await call(h, "DELETE", "/admin/:tenantSlug/marketplace", { query: { provider: "IFOOD" } })).toEqual({
-      status: 200,
-      body: { data: { ok: true } },
-    });
-    expect(await h.engine.integrations(TENANT)).toEqual([]);
+    const data = (answer.body as { data: { orderId: string; acknowledgeBy: string }[] }).data;
+    expect(data.map((row) => row.orderId)).toEqual(["order-2"]);
+    expect(data[0]?.acknowledgeBy).toBe(new Date(h.clock.at.getTime() + 300_000).toISOString());
   });
 });

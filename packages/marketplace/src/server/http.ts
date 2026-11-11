@@ -15,6 +15,8 @@ import type { MarketplaceServerCopy } from "./copy";
 export interface MarketplaceActor {
   /** The tenant's id — every engine call is scoped to it. */
   clientId: string;
+  /** The person, for the audit line an archive writes. Null for a system caller. */
+  userId?: string | null;
 }
 
 export interface MarketplaceApiConfig {
@@ -50,8 +52,12 @@ export function parse<T>(
 ): { ok: true; value: T } | { ok: false; response: WireResponse } {
   const parsed = schema.safeParse(value ?? {});
   if (parsed.success) return { ok: true, value: parsed.data };
-  const issues = parsed.error.issues.map((issue) => ({ path: issue.path.map(String), message: issue.message }));
-  return { ok: false, response: refuse(422, copy.invalidInput, { issues }) };
+  const problems = parsed.error.issues.map((issue) => ({
+    path: issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment))),
+    code: "INVALID_INPUT",
+    message: issue.message,
+  }));
+  return { ok: false, response: refuse(422, copy.invalidInput, { problems }) };
 }
 
 /** An ISO string, or null. */

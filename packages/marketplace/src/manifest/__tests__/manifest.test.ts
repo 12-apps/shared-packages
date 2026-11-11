@@ -12,7 +12,14 @@ import { createWiringHost } from "@12-apps/wiring/consumer";
 
 import packageJson from "../../../package.json";
 import { TENANT, createHarness } from "../../__tests__/harness";
-import { createApiMarketplace, decideMarketplaceOrderBody, MARKETPLACE_MCP_TOOLS, MARKETPLACE_PERMISSIONS } from "../../server";
+import {
+  createApiMarketplace,
+  decideMarketplaceOrdersBody,
+  MARKETPLACE_MCP_TOOLS,
+  MARKETPLACE_PERMISSIONS,
+  upsertMarketplaceIntegrationsBody,
+  upsertMarketplaceMenuLinksBody,
+} from "../../server";
 import { MARKETPLACE_JOBS } from "../../server/jobs";
 import { MARKETPLACE_SERVER_COPY_EN_US } from "../../server/en-US";
 import { marketplaceManifest } from "..";
@@ -92,29 +99,81 @@ describe("the manifests", () => {
     expect(new Set(MARKETPLACE_MCP_TOOLS.map((tool) => `${tool.method} ${tool.path}`))).toEqual(
       new Set(routes.map((route) => `${route.method} ${openApi(route.path)}`)),
     );
-    expect(MARKETPLACE_MCP_TOOLS).toHaveLength(7);
+    expect(MARKETPLACE_MCP_TOOLS.map((tool) => tool.operationId)).toEqual([
+      "listMarketplaceIntegrations",
+      "upsertMarketplaceIntegrations",
+      "listMarketplaceMenuLinks",
+      "upsertMarketplaceMenuLinks",
+      "listMarketplaceAcceptances",
+      "decideMarketplaceOrders",
+    ]);
   });
 });
 
-describe("the decision tool's schema", () => {
-  it("takes an accept, and a refusal with or without a reason code", () => {
-    expect(decideMarketplaceOrderBody.safeParse({ decision: "ACCEPT" }).success).toBe(true);
-    expect(decideMarketplaceOrderBody.safeParse({ decision: "REJECT" }).success).toBe(true);
-    expect(decideMarketplaceOrderBody.parse({ decision: "REJECT", reasonCode: " 503 " })).toEqual({
-      decision: "REJECT",
-      reasonCode: "503",
-    });
+describe("the bulk tools' schemas", () => {
+  const decide = (decisions: unknown, extra: Record<string, unknown> = {}) =>
+    decideMarketplaceOrdersBody.safeParse({ decisions, ...extra });
+
+  it("take a list of accepts and refusals, with admission, preparation time, codes and offending SKUs", () => {
+    const parsed = decide(
+      [
+        { orderId: "a", decision: "ACCEPT", admission: { admitStockPastZero: true }, preparationMinutes: 20 },
+        { orderId: "b", decision: "REJECT", reasonCode: " 503 ", offendingSkus: ["X"] },
+        { orderId: "c", decision: "REJECT" },
+      ],
+      { validateOnly: true },
+    );
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.decisions[1]).toEqual({ orderId: "b", decision: "REJECT", reasonCode: "503", offendingSkus: ["X"] });
   });
 
-  it("refuses a code on an accept, an unknown key, a blank code and an unknown decision", () => {
-    for (const body of [
-      { decision: "ACCEPT", reasonCode: "503" },
-      { decision: "REJECT", reasonCode: "503", note: "x" },
-      { decision: "REJECT", reasonCode: "  " },
-      { decision: "MAYBE" },
-      {},
+  it("refuse a code on an accept, an unknown key at any depth, a blank code, an empty list and an unknown decision", () => {
+    for (const decisions of [
+      [{ orderId: "a", decision: "ACCEPT", reasonCode: "503" }],
+      [{ orderId: "a", decision: "REJECT", note: "x" }],
+      [{ orderId: "a", decision: "ACCEPT", admission: { maybe: true } }],
+      [{ orderId: "a", decision: "REJECT", reasonCode: "  " }],
+      [{ orderId: "a", decision: "REJECT", offendingSkus: [] }],
+      [{ orderId: "a", decision: "MAYBE" }],
+      [],
     ]) {
-      expect(decideMarketplaceOrderBody.safeParse(body).success).toBe(false);
+      expect(decide(decisions).success).toBe(false);
+    }
+    expect(decideMarketplaceOrdersBody.safeParse({ decisions: [{ orderId: "a", decision: "ACCEPT" }], extra: 1 }).success).toBe(false);
+  });
+
+  it("refuse the same key twice in one call, at the repeated row's path", () => {
+    const decisions = decide([
+      { orderId: "a", decision: "ACCEPT" },
+      { orderId: "a", decision: "REJECT" },
+    ]);
+    const links = upsertMarketplaceMenuLinksBody.safeParse({
+      links: [
+        { provider: "IFOOD", externalSku: "S", menuItemId: null },
+        { provider: "IFOOD", externalSku: "S", menuItemId: "m" },
+      ],
+    });
+    const integrations = upsertMarketplaceIntegrationsBody.safeParse({
+      integrations: [
+        { provider: "IFOOD", enabled: true },
+        { operation: "archive", provider: "IFOOD" },
+      ],
+    });
+    expect(decisions.error?.issues[0]?.path).toEqual(["decisions", 1, "orderId"]);
+    expect(links.error?.issues[0]?.path).toEqual(["links", 1, "externalSku"]);
+    expect(integrations.error?.issues[0]?.path).toEqual(["integrations", 1, "provider"]);
+  });
+
+  it("take archive and unarchive as operations of the connection tool, never a settings field beside them", () => {
+    expect(upsertMarketplaceIntegrationsBody.safeParse({ integrations: [{ operation: "archive", provider: "IFOOD", reason: "x" }] }).success).toBe(true);
+    expect(upsertMarketplaceIntegrationsBody.safeParse({ integrations: [{ operation: "archive", provider: "IFOOD", enabled: true }] }).success).toBe(false);
+    expect(upsertMarketplaceIntegrationsBody.safeParse({ integrations: [{ operation: "delete", provider: "IFOOD" }] }).success).toBe(false);
+  });
+
+  it("describe every tool in English with no keyword lists", () => {
+    for (const tool of MARKETPLACE_MCP_TOOLS) {
+      expect(tool.summary).not.toMatch(/[\u00C0-\u00FF]/u);
+      expect(tool.summary).toMatch(/one or many|one call|all-or-nothing|List/u);
     }
   });
 });
@@ -154,10 +213,11 @@ describe("the job blueprints", () => {
     expect(wired.jobs.map((job) => job.name).sort()).toEqual([
       "marketplace.expire-acceptances",
       "marketplace.outbound",
+      "marketplace.outbound-sweep",
       "marketplace.reconcile-inbox",
     ]);
-    expect(wired.routes).toHaveLength(8);
-    expect(wired.mcpEndpoints.map((tool) => tool.path)).toContain("/api/admin/{tenantSlug}/marketplace/acceptances/{orderId}");
+    expect(wired.routes).toHaveLength(7);
+    expect(wired.mcpEndpoints.map((tool) => tool.path)).toContain("/api/admin/{tenantSlug}/marketplace/acceptances");
 
     const event = h.engine.normalize("IFOOD", { id: "e", code: "PLC", orderId: "ext-1", order: { items: [{ externalCode: "S", name: "S", quantity: 1, unitPrice: 1 }] } });
     await h.engine.deliver({ clientId: TENANT, event: event!, payload: {}, settings: { autoAccept: true, ackSlaSeconds: 300 } });

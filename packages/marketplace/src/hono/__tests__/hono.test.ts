@@ -57,9 +57,9 @@ describe("marketplaceRouter", () => {
   it("passes a JSON body through and answers the handler's own status", async () => {
     const { app } = mounted(() => true);
 
-    const response = await app.request("/api/admin/the-store/marketplace/acceptances/nope", {
+    const response = await app.request("/api/admin/the-store/marketplace/acceptances", {
       method: "POST",
-      body: JSON.stringify({ decision: "ACCEPT" }),
+      body: JSON.stringify({ decisions: [{ orderId: "nope", decision: "ACCEPT" }] }),
       headers: { "content-type": "application/json" },
     });
 
