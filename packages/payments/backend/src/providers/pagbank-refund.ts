@@ -13,6 +13,8 @@ import {
 } from './pagbank-snapshots';
 import { stubRefund } from './shared';
 
+export { classifyPagBankRefundRefusal } from './pagbank-rejections';
+
 /**
  * PagBank refunds: `POST /charges/{id}/cancel`, full or partial (FUT-680,
  * FUT-681, FUT-4571).
