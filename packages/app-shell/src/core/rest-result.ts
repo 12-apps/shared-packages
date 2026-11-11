@@ -18,7 +18,7 @@
  * Both speak the `{ data }` / `{ error, issues }` envelope every `createApi*`
  * package answers in, so a surface can mix them without a second adapter. A
  * strict-input server answers a refused body with 422 and
- * `{ error, problems: [{ path, message }] }` instead (FUT-4729); both shapes
+ * `{ error, problems: [{ path, message }] }` instead; both shapes
  * fold into the same per-field messages.
  */
 import { EN_US_REST_RESULT_FALLBACKS } from './en-US';
