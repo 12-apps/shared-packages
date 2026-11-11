@@ -176,15 +176,15 @@ describe("a write leaves a line, because a discount is what a buyer is charged",
 });
 
 describe("a refusal is a warning — somebody typed something, nothing is broken", () => {
-  it("L6: warns about a query the schema rejected, and still answers 400", async () => {
+  it("L6: warns about a query the schema rejected, and still answers 422", async () => {
     const api = apiFor(workingStore());
     const response = await api.route("GET", "/discounts").handle({
       actor: ACTOR,
       params: {},
       query: { type_in: "NOT_A_TYPE" },
     });
-    expect(response.status).toBe(400);
-    expect(api.log.at("warn")).toEqual(["GET /discounts for tenant tenant-1 refused with 400"]);
+    expect(response.status).toBe(422);
+    expect(api.log.at("warn")).toEqual(["GET /discounts for tenant tenant-1 refused with 422"]);
     expect(api.log.at("error")).toEqual([]);
   });
 
