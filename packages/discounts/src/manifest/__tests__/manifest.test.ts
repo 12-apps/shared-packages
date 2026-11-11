@@ -98,6 +98,8 @@ describe("the shared manifest", () => {
       "GET /discounts/targets -> discounts:write",
       "GET /discounts/:id -> discounts:read",
       "POST /discounts -> discounts:write",
+      // The ONE bulk route (FUT-4420): the single-row edit's permission, never a laxer one.
+      "POST /discounts/bulk -> discounts:write",
       "PATCH /discounts/:id -> discounts:write",
       "DELETE /discounts/:id -> discounts:write",
     ]);

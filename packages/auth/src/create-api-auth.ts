@@ -15,6 +15,7 @@ import {
   credentialsProvider,
   type CredentialsProviderConfig,
 } from "./credentials-provider";
+import { withOAuthErrorReturn } from "./oauth-error-return";
 import type { SignInClaims } from "./sign-in-claims";
 
 /**
@@ -116,6 +117,16 @@ export interface ApiAuthConfig {
   signInClaims?: SignInClaims;
   /** Where an unauthenticated visitor is sent. Defaults to `/login`. */
   signInPage?: string;
+  /**
+   * Send a failed OAuth sign-in back to the page that STARTED it, with its
+   * query and `?error=`, instead of to `signInPage` (FUT-4595). A refused
+   * consent arrives there as `OAuthCallback`. Off by default.
+   *
+   * Turn it on only once EVERY page of the host that can start a sign-in
+   * renders `?error`: a page that does not would take the person back to
+   * where they were with no word of what happened. See ADOPTING.md.
+   */
+  errorReturnsToStart?: boolean;
   /** Session lifetime in seconds. Defaults to 30 days. */
   maxAge?: number;
   /**
@@ -255,11 +266,16 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
 
   applyEnvDefaults(config, options);
 
-  const handler = (request: Request): Promise<Response> =>
-    Auth(
-      reqWithEnvUrl(request, options.authUrl ?? process.env.AUTH_URL),
-      config,
-    ) as Promise<Response>;
+  const serve = (request: Request): Promise<Response> => Auth(request, config) as Promise<Response>;
+  // Opt-in: a failed OAuth round trip returns to the page that started it, not
+  // to the one error page Auth.js knows (FUT-4595, `./oauth-error-return`).
+  // Off, every request goes to Auth.js exactly as before.
+  const handler = (request: Request): Promise<Response> => {
+    const forwarded = reqWithEnvUrl(request, options.authUrl ?? process.env.AUTH_URL);
+    return options.errorReturnsToStart === true
+      ? withOAuthErrorReturn(forwarded, serve, config)
+      : serve(forwarded);
+  };
 
   /**
    * Deliberately routed through {@link handler} rather than decoding the cookie

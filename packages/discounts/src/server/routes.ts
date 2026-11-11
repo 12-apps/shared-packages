@@ -25,6 +25,7 @@ import {
   type StoreTimeZone,
 } from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
+import { createBulkRoute } from "./bulk-route";
 import { fallbackSentence } from "./fallback-copy";
 import { prepareWrite } from "./prepare-write";
 import { problemsOf } from "./problems";
@@ -385,6 +386,7 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
       targetsRoute(config),
       readRoute(config),
       createRoute(config),
+      createBulkRoute(config, endpoint),
       updateRoute(config),
       archiveRoute(config),
     ],

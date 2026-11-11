@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, type JSX } from "react";
+import { useState, type ComponentType, type JSX } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import AddIcon from "@mui/icons-material/Add";
 
 import { useServerDataViews } from "@12-apps/app-shell/react";
-import {
-  CardActionsProvider,
-  useRowConfirm,
-} from "@12-apps/ui/data-display/CardKit";
+import { CardActionsProvider } from "@12-apps/ui/data-display/CardKit";
 import {
   DataViewsCopyProvider,
   DataViewsGrid,
@@ -24,7 +21,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
 import type { DiscountsApiClient, DiscountsPage } from "./api";
-import { fill, type CompleteDiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
@@ -42,7 +39,10 @@ import {
   discountsAppliedState,
   discountsSearch,
 } from "./table-config";
+import { useBulkActions, type BulkActions } from "./use-bulk-actions";
+import { useBulkDelete } from "./use-bulk-delete";
 import { useDiscountsData } from "./use-discounts-data";
+import type { DiscountsBulkSlotProps } from "./use-discounts-bulk";
 
 /**
  * The promotions list: a grid in SERVER mode — the URL params ARE the query —
@@ -68,44 +68,20 @@ export interface DiscountsScreenProps {
   onError: (error: unknown, context: string) => void;
   /** The crumbs above the title. The host owns its own information hierarchy. */
   breadcrumb?: readonly { label: string; href?: string }[];
-}
-
-/** The bulk delete's confirmation, described from the SELECTION. */
-function useBulkDelete(
-  api: DiscountsApiClient,
-  copy: CompleteDiscountsWebCopy,
-  refresh: () => void,
-  onError: (error: unknown, context: string) => void,
-) {
-  return useRowConfirm<DiscountListItem>({
-    write: async (rows) => {
-      const results = await Promise.all(rows.map((row) => api.remove(row.id)));
-      const failed = results.find((result) => !result.ok);
-      if (failed && !failed.ok) {
-        onError(failed, "discounts.delete");
-        // Throwing is what keeps the popup open carrying the message; the
-        // selection is still there to retry.
-        throw new Error(failed.error);
-      }
-      refresh();
-    },
-    describe: (rows) =>
-      rows.length === 1
-        ? {
-            title: copy.actions.deleteTitle,
-            entityName: rows[0]?.name,
-            description: copy.actions.deleteDescription,
-            confirmText: copy.actions.delete,
-          }
-        : {
-            title: fill(copy.actions.deleteManyTitle, { count: rows.length }),
-            description: copy.actions.deleteManyDescription,
-            confirmText: copy.actions.delete,
-          },
-    errorText: copy.actions.deleteFailed,
-    copy: copy.confirmAction,
-    dataTestId: "discount-bulk-delete-confirm",
-  });
+  /**
+   * The host's report for the bulk actions (FUT-4420). A COMPONENT, for the
+   * reason `RolesScreen.bulkSlot` is one: it renders INSIDE this screen's
+   * `CardActionsProvider` (so it reaches `useCardActions()`), around the grid
+   * it receives as `children`, and holds the chrome that says what a batch did
+   * - progress, the per-row reasons, "Tentar novamente", Desfazer, the
+   * download of the failures. The package owns the state and the server
+   * routes; the host owns the look.
+   *
+   * Absent - the default - the three entries ("Ativar todos", "Desativar
+   * todos", "Estender validade…") are NOT offered and the screen is what it
+   * was: a batch with nowhere to report would be a silent one.
+   */
+  bulkSlot?: ComponentType<DiscountsBulkSlotProps>;
 }
 
 /** The header's controls: the explainer, the export, and the create button. */
@@ -168,6 +144,8 @@ function DiscountsGrid({
   server,
   onVisibleRowsChange,
   bulkDelete,
+  bulkActions,
+  bulkRunning,
 }: {
   rows: DiscountListItem[];
   copy: CompleteDiscountsWebCopy;
@@ -176,6 +154,8 @@ function DiscountsGrid({
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (next: DiscountListItem[]) => void;
   bulkDelete: ReturnType<typeof useBulkDelete>;
+  bulkActions: readonly RowAction<DiscountListItem>[];
+  bulkRunning: boolean;
 }): JSX.Element {
   return (
     <>
@@ -191,10 +171,13 @@ function DiscountsGrid({
         testIdPrefix="discounts"
         rowActions={
           [
+            ...bulkActions,
             {
               id: "delete",
               label: copy.actions.delete,
               color: "danger",
+              // Not while a batch runs: a delete over a selection a batch is changing would race it.
+              bulk: !bulkRunning,
               onSelect: (selected) => bulkDelete.request(selected),
             },
           ] satisfies RowAction<DiscountListItem>[]
@@ -280,6 +263,7 @@ function ScreenBody({
   server,
   onVisibleRowsChange,
   bulkDelete,
+  bulk,
 }: {
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
@@ -292,6 +276,7 @@ function ScreenBody({
   server: ReturnType<typeof useServerDataViews>;
   onVisibleRowsChange: (rows: DiscountListItem[]) => void;
   bulkDelete: ReturnType<typeof useBulkDelete>;
+  bulk: BulkActions;
 }): JSX.Element {
   return (
     <Dashboard.Body>
@@ -315,15 +300,19 @@ function ScreenBody({
         errorDismissLabel={copy.actions.actionFailedDismiss}
       >
         <DaysUnknownListNotice rows={rows} copy={copy} timeZoneSettings={menu.timeZoneSettings} />
-        <DiscountsGrid
-          rows={rows}
-          copy={copy}
-          menu={menu}
-          appliedState={appliedState}
-          server={server}
-          onVisibleRowsChange={onVisibleRowsChange}
-          bulkDelete={bulkDelete}
-        />
+        {bulk.frame(
+          <DiscountsGrid
+            rows={rows}
+            copy={copy}
+            menu={menu}
+            appliedState={appliedState}
+            server={server}
+            onVisibleRowsChange={onVisibleRowsChange}
+            bulkDelete={bulkDelete}
+            bulkActions={bulk.actions}
+            bulkRunning={bulk.running}
+          />,
+        )}
       </CardActionsProvider>
     </Dashboard.Body>
   );
@@ -336,6 +325,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [visibleRows, setVisibleRows] = useState<DiscountListItem[]>([]);
   const bulkDelete = useBulkDelete(api, copy, data.refresh, onError);
+  const bulk = useBulkActions(api, copy, data.refresh, onError, props.bulkSlot, timezone);
 
   const rows = useDiscountRows(data.page?.data, formatters, copy, timezone);
 
@@ -385,6 +375,7 @@ export function DiscountsScreen(props: DiscountsScreenProps): JSX.Element {
           server={server}
           onVisibleRowsChange={setVisibleRows}
           bulkDelete={bulkDelete}
+          bulk={bulk}
         />
       </Dashboard>
     </DataViewsCopyProvider>

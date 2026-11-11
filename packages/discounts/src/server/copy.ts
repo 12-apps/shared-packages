@@ -106,6 +106,54 @@ export interface DiscountsServerCopy {
    * already have is a fact about another store's catalog.
    */
   readonly foreignTarget: string;
+  /**
+   * The bulk actions' sentences (FUT-4420), as a group a host's pack may leave
+   * out or only part of: added after the pack became host config, so requiring
+   * them would break every host that wrote its own. A sentence the pack lacks
+   * is said from the package's own pack for the request's language
+   * (`bulkCopyFor`).
+   */
+  readonly bulk?: Partial<DiscountsBulkServerCopy>;
+}
+
+/**
+ * What a bulk row says (FUT-4420). One sentence per outcome the row can have;
+ * every one is short, because a report lists up to ten of them under a count.
+ */
+export interface DiscountsBulkServerCopy {
+  readonly activated: string;
+  readonly deactivated: string;
+  readonly extended: string;
+  /** An ended discount was extended: it is valid again ("voltou a valer"). */
+  readonly revived: string;
+  /** An ended discount that was paused by hand is extended and STAYS paused. */
+  readonly extendedPaused: string;
+  readonly restored: string;
+  readonly alreadyActive: string;
+  readonly alreadyInactive: string;
+  /** "Nova data" equals the end day the discount already has. */
+  readonly alreadyEndsThen: string;
+  /** Desfazer found the row already as it was before the batch. */
+  readonly alreadyRestored: string;
+  /** No end date: there is nothing to extend ("sem data de fim"). */
+  readonly noEndDate: string;
+  /** "Nova data" is not after the discount's current end day. */
+  readonly notLater: string;
+  /** An ended discount and a "Nova data" that is still in the past. */
+  readonly stillEnded: string;
+  readonly zoneUnknown: string;
+  /** The host counts no whole days now but this discount's dates were written by day. */
+  readonly zoneOff: string;
+  readonly notFound: string;
+  /** The row was changed by someone else after the batch: Desfazer leaves it as it is. */
+  readonly changedSince: string;
+  /** The row kept changing while the batch wrote it. */
+  readonly changedDuringBatch: string;
+  readonly failed: string;
+  /** 422 - the batch names more discounts than one request may. */
+  readonly tooManyIds: string;
+  /** 422 on an all-or-nothing call: nothing was written. `{count}` rows cannot take the change. */
+  readonly atomicRefused: string;
 }
 
 const COPY_KEYS: readonly (keyof DiscountsServerCopy)[] = [
@@ -171,5 +219,7 @@ export function resolveDiscountsCopy<T>(
 export type DiscountsServerFallbackKey = "keepWindowWithDates" | "windowChanged";
 
 /** A pack that says every sentence, the optional ones included: the package's own two. */
-export type CompleteDiscountsServerCopy = DiscountsServerCopy &
-  Required<Pick<DiscountsServerCopy, "endsBeforeStartDay" | "datesNeedKnownZone" | DiscountsServerFallbackKey>>;
+export type CompleteDiscountsServerCopy = Omit<DiscountsServerCopy, "bulk"> &
+  Required<Pick<DiscountsServerCopy, "endsBeforeStartDay" | "datesNeedKnownZone" | DiscountsServerFallbackKey>> & {
+    readonly bulk: DiscountsBulkServerCopy;
+  };
