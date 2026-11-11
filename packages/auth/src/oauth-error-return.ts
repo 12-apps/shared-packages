@@ -54,6 +54,9 @@ const START_MAX_AGE_SECONDS = 15 * 60;
 /** The code every copy pack explains as "could not complete the sign-in". */
 const PROVIDER_REFUSAL_CODE = "OAuthCallback";
 
+/** The slice of the Auth.js config this reads. */
+type ReturnConfig = Pick<AuthConfig, "basePath" | "pages" | "useSecureCookies">;
+
 interface ReturnContext {
   url: URL;
   basePath: string;
@@ -236,7 +239,7 @@ async function onCallback(
 export async function withOAuthErrorReturn(
   request: Request,
   handle: (request: Request) => Promise<Response>,
-  config: Pick<AuthConfig, "basePath" | "pages" | "useSecureCookies">,
+  config: ReturnConfig,
 ): Promise<Response> {
   const url = new URL(request.url);
   const basePath = config.basePath ?? "/api/auth";
@@ -244,8 +247,14 @@ export async function withOAuthErrorReturn(
   const isCallback = url.pathname.startsWith(`${basePath}/callback/`);
   if (!isSignIn && !isCallback) return handle(request);
 
+  const ctx = returnContext(url, basePath, config);
+  return isSignIn ? onSignIn(request, handle, ctx) : onCallback(request, handle, ctx);
+}
+
+/** What both halves read: the origin, the cookie, and Auth.js's error pages. */
+function returnContext(url: URL, basePath: string, config: ReturnConfig): ReturnContext {
   const secure = config.useSecureCookies ?? url.protocol === "https:";
-  const ctx: ReturnContext = {
+  return {
     url,
     basePath,
     secure,
@@ -255,5 +264,4 @@ export async function withOAuthErrorReturn(
       config.pages?.signIn ?? `${basePath}/signin`,
     ],
   };
-  return isSignIn ? onSignIn(request, handle, ctx) : onCallback(request, handle, ctx);
 }
