@@ -48,7 +48,7 @@ export interface EvidenceDelegate extends EvidenceCasDelegate {
 }
 
 /** The evidence table's compare-and-set (FUT-4360), as much of `updateMany` as the store needs. */
-export interface EvidenceCasDelegate {
+interface EvidenceCasDelegate {
   updateMany(args: {
     where: { id: string; updatedAt: Date };
     data: { provider: string; kind: string; steps: unknown; updatedAt: Date };

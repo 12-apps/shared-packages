@@ -39,7 +39,7 @@ export interface EvidencePixRefundView {
  * whatever PagBank does, and 30 s of margin remain before another actor may
  * treat the claim as dead: a second cancel can never overlap a live one (I1).
  */
-export const REFUND_CLAIM_TTL_MS = 120_000;
+const REFUND_CLAIM_TTL_MS = 120_000;
 export const REFUND_ATTEMPT_DEADLINE_MS = 90_000;
 
 const refundStep = (record: EvidenceRecord): EvidenceStep | undefined => record.steps.find((step) => step.key === 'pix.refund');
