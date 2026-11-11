@@ -7,6 +7,7 @@ import {
 } from "@12-apps/ui/en-US";
 
 import type { CompleteDiscountsWebCopy } from "./copy";
+import { EN_US_DISCOUNTS_STEPS_COPY } from "./steps-en-US";
 
 /**
  * The en-US pack for the discounts admin screens.
@@ -157,7 +158,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     name: "Promotion name",
     type: "Type",
     kind: "Promotion type",
-    comboReward: "Bundle discount",
+    comboReward: "How the bundle is charged",
     comboRewardHint: "The bundle sells for the price of its items minus this discount.",
     percentOff: "Discount (%)",
     percentPlaceholder: "10",
@@ -222,7 +223,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     endsBeforeStartDay: "The end date cannot be before the start date.",
   },
   comboRewards: {
-    labels: { PERCENTAGE: "Percentage", FIXED_AMOUNT: "Fixed amount", BUNDLE_PRICE: "Fixed price" },
+    labels: { PERCENTAGE: "Discount in %", FIXED_AMOUNT: "Discount in $", BUNDLE_PRICE: "Fixed price" },
     hints: {
       PERCENTAGE: "The bundle sells for the price of its items minus this discount.",
       FIXED_AMOUNT: "The bundle sells for the price of its items minus this amount.",
@@ -247,6 +248,7 @@ export const EN_US_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
       exampleSaving: "{quantity} × {name} → {pays} (saves {saving})",
     },
   },
+  steps: EN_US_DISCOUNTS_STEPS_COPY,
   combo: {
     title: "Build the bundle",
     hint: "Each group is one part of the bundle: how many units it takes, and what can go in it.",

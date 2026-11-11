@@ -75,14 +75,54 @@ function scopeFor(targetType: string): string {
  * picker. ORDER renders nothing — an order-wide discount covers everything, so
  * a target list there is not empty, it is meaningless.
  */
+/** A plain kind's picker: the collection its scope names, or nothing for the whole order. */
+function ScopeTargets({
+  groups,
+  copy,
+  scope,
+  selection,
+  refused,
+}: {
+  groups: readonly WireTargetGroup[];
+  copy: DiscountsWebCopy;
+  scope: string;
+  selection: DiscountTargetSelection;
+  refused: boolean;
+}): JSX.Element | null {
+  const group = groups.find((entry) => scopeFor(entry.targetType) === scope);
+  if (!group) return null;
+  const { ids, onChange } = bind(group.targetType, selection);
+  return (
+    <TargetPickerField
+      group={group}
+      label={fill(copy.targets.pick, { collection: group.label })}
+      placeholder={fill(copy.targets.search, { collection: group.label })}
+      requiredMessage={copy.targets.required}
+      ids={ids}
+      onChange={onChange}
+      copy={copy.categorySelect}
+      autocompleteCopy={copy.autocomplete}
+      refused={refused}
+      dataTestId={`discount-${group.slug}-targets`}
+    />
+  );
+}
+
 export function DiscountTargetPicker({
   groups,
   copy,
   selection,
+  inStep = false,
 }: {
   groups: readonly WireTargetGroup[];
   copy: DiscountsWebCopy;
   selection: DiscountTargetSelection;
+  /**
+   * Mounted in a step card (FUT-4477): the builders drop their own heading (the
+   * card's says it), and an empty group or list says so only once its message is
+   * in `errors` — which the step layer puts there only for a tried step.
+   */
+  inStep?: boolean;
 }): JSX.Element | null {
   const { values, errors, setFieldValue } = useFormContext();
   const kind = values.kind ?? "PERCENTAGE";
@@ -116,6 +156,8 @@ export function DiscountTargetPicker({
         targetRefused={staleTargets}
         onChange={selection.onComboRequirementsChange}
         onFreeUnitsChange={(next) => setFieldValue("freeUnits", next)}
+        hideTitle={inStep}
+        {...(inStep ? { countsHint: copy.form.freeUnitsHint } : {})}
       />
     );
   }
@@ -127,25 +169,11 @@ export function DiscountTargetPicker({
         groups={groups}
         copy={copy}
         onChange={selection.onComboRequirementsChange}
+        refused={!inStep || errors.kind !== undefined}
+        hideTitle={inStep}
       />
     );
   }
 
-  const group = groups.find((entry) => scopeFor(entry.targetType) === scope);
-  if (!group) return null;
-
-  const { ids, onChange } = bind(group.targetType, selection);
-  return (
-    <TargetPickerField
-      group={group}
-      label={fill(copy.targets.pick, { collection: group.label })}
-      placeholder={fill(copy.targets.search, { collection: group.label })}
-      requiredMessage={copy.targets.required}
-      ids={ids}
-      onChange={onChange}
-      copy={copy.categorySelect}
-          autocompleteCopy={copy.autocomplete}
-      dataTestId={`discount-${group.slug}-targets`}
-    />
-  );
+  return <ScopeTargets groups={groups} copy={copy} scope={scope} selection={selection} refused={!inStep || errors.scope !== undefined} />;
 }

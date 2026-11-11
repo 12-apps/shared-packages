@@ -12,6 +12,7 @@ import type { DiscountsResult, DiscountsTransport } from "../transport";
 
 import PAYLOADS from "./fixtures/form-payloads.json";
 import HARNESS_TARGETS from "./fixtures/harness-targets.json";
+import { reach, showEveryStep } from "./step-form-shim";
 
 /**
  * The wire body is the form's contract, and a redesign of the form must not
@@ -95,17 +96,17 @@ function renderForm(sent: unknown[]): void {
 
 /** Type into a field by test id, whether the id sits on the input or around it. */
 function type(testId: string, value: string): void {
-  const node = screen.getByTestId(testId);
+  const node = reach(testId);
   fireEvent.change(node.querySelector("input") ?? node, { target: { value } });
 }
 
 function click(testId: string): void {
-  fireEvent.click(screen.getByTestId(testId));
+  fireEvent.click(reach(testId));
 }
 
 /** A `Switch` by its test id: its checkbox. */
 function toggle(testId: string): void {
-  const root = screen.getByTestId(testId);
+  const root = reach(testId);
   fireEvent.click(root.querySelector('input[type="checkbox"]') ?? root);
 }
 
@@ -117,7 +118,7 @@ const FILL: Record<string, () => void> = {
   "percentage-category-schedule": () => {
     willPick("discount-categories-targets", ["Bebidas"]);
     type("total-form-field-name", "10% em Bebidas no almoço");
-    click("total-form-field-kind-item-PERCENTAGE");
+    click("discount-kind-PERCENTAGE");
     type("total-form-field-percentOff", "10");
     click("total-form-field-scope-item-CATEGORY");
     click("discount-categories-targets-pick");
@@ -129,7 +130,7 @@ const FILL: Record<string, () => void> = {
   "fixed-item-coupon-rules": () => {
     willPick("discount-items-targets", ["X-Salada"]);
     type("total-form-field-name", "R$ 5 no X-Salada");
-    click("total-form-field-kind-item-FIXED_AMOUNT");
+    click("discount-kind-FIXED_AMOUNT");
     type("total-form-field-amountOff", "5,00");
     click("total-form-field-scope-item-ITEM");
     click("discount-items-targets-pick");
@@ -146,7 +147,7 @@ const FILL: Record<string, () => void> = {
   "combo-bundle-price": () => {
     willPick("combo-slot-0-categories", ["Lanches"]);
     type("total-form-field-name", "2 Lanches por R$ 30");
-    click("total-form-field-kind-item-COMBO");
+    click("discount-kind-COMBO");
     click("combo-add-slot");
     type("combo-slot-0-quantity", "2");
     click("combo-slot-0-categories-pick");
@@ -156,7 +157,7 @@ const FILL: Record<string, () => void> = {
   "free-units-cafe-suco": () => {
     willPick("free-units-items", ["Café", "Suco"]);
     type("total-form-field-name", "Leve 3, pague 2 em Café e Suco");
-    click("total-form-field-kind-item-FREE_UNITS");
+    click("discount-kind-FREE_UNITS");
     type("free-units-quantity", "3");
     type("free-units-free", "1");
     click("free-units-items-pick");
@@ -181,7 +182,11 @@ describe("FUT-4477: the form sends the body main sent, for every kind", () => {
     it(`${name}: the POST body equals the captured one`, async () => {
       const sent: unknown[] = [];
       renderForm(sent);
+      // "Ver tudo numa página": the same fields as the single page, every step open.
+      showEveryStep();
       FILL[name]!();
+      // Every step answered: nothing is pending, so Criar is not held.
+      expect(screen.getByTestId("discount-form-submit").hasAttribute("disabled")).toBe(false);
       fireEvent.click(screen.getByTestId("discount-form-submit"));
       await waitFor(() => expect(sent).toHaveLength(1));
       expect(sent[0]).toEqual(fixture.body);

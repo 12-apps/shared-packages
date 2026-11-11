@@ -7,6 +7,7 @@ import {
 } from "@12-apps/ui/pt-BR";
 
 import type { CompleteDiscountsWebCopy } from "./copy";
+import { PT_BR_DISCOUNTS_STEPS_COPY } from "./steps-pt-BR";
 
 /**
  * The pt-BR pack for the discounts admin screens.
@@ -148,7 +149,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     name: "Nome da promoção",
     type: "Tipo",
     kind: "Tipo de promoção",
-    comboReward: "Desconto do combo",
+    comboReward: "Como o combo é cobrado",
     comboRewardHint: "O combo sai pelo preço dos itens menos este desconto.",
     percentOff: "Desconto (%)",
     percentPlaceholder: "10",
@@ -212,7 +213,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
     endsBeforeStartDay: "A data de término não pode ser anterior à data de início.",
   },
   comboRewards: {
-    labels: { PERCENTAGE: "Porcentagem", FIXED_AMOUNT: "Valor fixo", BUNDLE_PRICE: "Preço fechado" },
+    labels: { PERCENTAGE: "Desconto em %", FIXED_AMOUNT: "Desconto em R$", BUNDLE_PRICE: "Preço fechado" },
     hints: {
       PERCENTAGE: "O combo sai pelo preço dos itens menos este desconto.",
       FIXED_AMOUNT: "O combo sai pelo preço dos itens menos este valor.",
@@ -237,6 +238,7 @@ export const PT_BR_DISCOUNTS_WEB_COPY: CompleteDiscountsWebCopy = {
       exampleSaving: "{quantity} de {name} → {pays} (economiza {saving})",
     },
   },
+  steps: PT_BR_DISCOUNTS_STEPS_COPY,
   combo: {
     title: "Monte o combo",
     hint: "Cada grupo é uma parte do combo: quantas unidades leva e o que pode entrar nela.",

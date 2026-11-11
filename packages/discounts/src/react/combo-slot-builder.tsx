@@ -123,6 +123,7 @@ function ComboSlotRow({
   copy,
   onChange,
   onRemove,
+  refused,
 }: {
   slot: ComboRequirement;
   index: number;
@@ -130,13 +131,16 @@ function ComboSlotRow({
   copy: DiscountsWebCopy;
   onChange: (next: ComboRequirement) => void;
   onRemove: () => void;
+  /** The group's refusal is shown: its step was tried (FUT-4477). */
+  refused: boolean;
 }): JSX.Element {
   const position = index + 1;
   const empty = slot.categoryIds.length === 0 && slot.menuItemIds.length === 0;
+  const shown = empty && refused;
   return (
     <Box
       data-testid={`combo-slot-${index}`}
-      sx={{ border: 1, borderColor: "divider", borderRadius: 1, p: 2 }}
+      sx={{ border: 1, borderColor: shown ? "error.main" : "divider", borderRadius: 1, p: 2 }}
     >
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
         <Text weight="medium">{fill(copy.combo.slot, { position })}</Text>
@@ -177,7 +181,7 @@ function ComboSlotRow({
             dataTestId={`combo-slot-${index}-${group.slug}`}
           />
         ))}
-        {empty && (
+        {shown && (
           <FormMessage error dataTestId={`combo-slot-${index}-message`}>
             {copy.form.comboSlotTargetRequired}
           </FormMessage>
@@ -200,16 +204,22 @@ export function ComboSlotBuilder({
   groups,
   copy,
   onChange,
+  refused = true,
+  hideTitle = false,
 }: {
   slots: readonly ComboRequirement[];
   groups: readonly WireTargetGroup[];
   copy: DiscountsWebCopy;
   onChange: (next: ComboRequirement[]) => void;
+  /** Whether an empty group says so; false until the step is tried (FUT-4477). */
+  refused?: boolean;
+  /** Inside a step card whose heading already says it (ADR 0074: no heading twice in a row). */
+  hideTitle?: boolean;
 }): JSX.Element {
   const rowIds = useRowIds(slots.length);
   return (
     <FormControl fullWidth>
-      <FormLabel>{copy.combo.title}</FormLabel>
+      {hideTitle ? null : <FormLabel>{copy.combo.title}</FormLabel>}
       <Text variant="caption">{copy.combo.hint}</Text>
       <Stack spacing={2} sx={{ mt: 1 }} data-testid="combo-slots">
         {slots.map((slot, index) => (
@@ -222,6 +232,7 @@ export function ComboSlotBuilder({
             index={index}
             groups={groups}
             copy={copy}
+            refused={refused}
             onChange={(next) => onChange(replaceAt(slots, index, next))}
             onRemove={() => {
               rowIds.current = rowIds.current.filter((_, position) => position !== index);

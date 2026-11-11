@@ -9,6 +9,7 @@ import type {
 
 import type { DiscountsComboRewardsCopy } from "./combo-reward-copy";
 import type { DiscountsScheduleCopy } from "./schedule-copy";
+import type { DiscountsStepsCopy } from "./steps-copy";
 
 /**
  * Every word the discounts ADMIN screens put in front of a human — required
@@ -29,11 +30,8 @@ import type { DiscountsScheduleCopy } from "./schedule-copy";
  * match today in one language are two sentences.
  *
  * Grouped by SURFACE rather than alphabetically, because a host fills it in by
- * walking a screen.
- *
- * Interpolation is `{name}`-style and there are exactly four of them, each
- * documented at its key. A template rather than a function so the pack stays
- * plain data a host can lint, diff and translate.
+ * walking a screen. Interpolation is `{name}`-style, each documented at its key:
+ * a template rather than a function, so the pack is plain data a host can lint.
  */
 
 /** The labels for one closed set — every member, so nothing renders raw. */
@@ -362,6 +360,8 @@ export interface DiscountsWebCopy {
   readonly form: DiscountsFormCopy;
   readonly combo: DiscountsComboCopy;
   readonly comboRewards: DiscountsComboRewardsCopy;
+  /** The form as collapsing steps, its "Resumo" and its chrome (FUT-4475). */
+  readonly steps: DiscountsStepsCopy;
   readonly targets: DiscountsTargetCopy;
   readonly actions: DiscountsActionsCopy;
   readonly card: DiscountsCardCopy;

@@ -42,7 +42,7 @@ function sameDays(days: readonly number[], expected: readonly number[]): boolean
  * article follows the day's gender in Portuguese, which is why the pack carries
  * all seven rather than the code prefixing a word.
  */
-function formatDays(days: readonly number[], copy: DiscountsWebCopy): string | null {
+export function formatDays(days: readonly number[], copy: DiscountsWebCopy): string | null {
   const unique = [...new Set(days)].sort((a, b) => a - b);
   if (unique.length === 0) return null;
   if (unique.some((day) => day < 0 || day > 6)) return null;
