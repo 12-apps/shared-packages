@@ -63,7 +63,14 @@ async function closeSeries(deps: EvidenceRunDeps, record: EvidenceRecord, state:
 export async function retryDueEvidenceRefund(deps: EvidenceRunDeps): Promise<EvidenceRecord | null> {
   const record = await deps.store.latest(PROVIDER, 'RUN');
   if (!record) return null;
-  if (pixStateOf(record, deps.copy.pixSkipped) !== 'REFUND_PENDING') return retryDueCardCancel(deps, record);
+  // The Pix first, then a card cancel: a card is never starved by a Pix still retrying (review S5).
+  const pix = pixStateOf(record, deps.copy.pixSkipped) === 'REFUND_PENDING' ? await retryDuePix(deps, record) : null;
+  if (pix) return pix;
+  return retryDueCardCancel(deps, (await deps.store.latest(PROVIDER, 'RUN')) ?? record);
+}
+
+/** The Pix refund's attempt that is due, if any. */
+async function retryDuePix(deps: EvidenceRunDeps, record: EvidenceRecord): Promise<EvidenceRecord | null> {
   const now = clockOf(deps)();
   const due = dueNow(record, now);
   if (!due) return null;

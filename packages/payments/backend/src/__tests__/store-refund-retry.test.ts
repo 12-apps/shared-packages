@@ -557,6 +557,129 @@ describe('a refund held before the retry existed gets a series, consulted first 
   });
 });
 
+/** A clock a case moves forward: the last instant pushed. */
+function stepClock(start: number): { now: () => Date; at: (ms: number) => void } {
+  const instants = [new Date(start)];
+  return { now: () => instants[instants.length - 1]!, at: (ms) => void instants.push(new Date(ms)) };
+}
+
+describe('round-1 review: the deadline, a part, a failed consult, the amount, the undo (B1, B2, N2, S6, S1)', () => {
+  const PART = { ...KEY, subject: 'problem-report:r-1', boundTo: 'r-1', amountCents: 1000 };
+
+  /** Series 1 opened by a "not yet" at T0, on `key`. */
+  async function openedOn(key: Record<string, unknown>): Promise<World> {
+    const fresh = await world();
+    fresh.gateway.refund.mockRejectedValueOnce(notYet());
+    await fresh.retrier.firstAttempt!(key as never, {} as never);
+    fresh.gateway.refund.mockClear();
+    return fresh;
+  }
+
+  it('B1 the consult and the cancel of one attempt share ONE deadline', async () => {
+    const w = await openedOn(KEY);
+    w.at(T0 + 5 * MIN);
+    await w.retrier.runDue!();
+    const consulted = (w.gateway.refreshCharge.mock.calls[0]![4] as { signal: AbortSignal }).signal;
+    const sent = (w.gateway.refund.mock.calls[0]![2] as { signal: AbortSignal }).signal;
+    expect(sent).toBe(consulted);
+  });
+
+  it('B1 a consult that outlives the deadline sends no cancel; the attempt counts as no answer', async () => {
+    const createRefundRetrier = await load<(deps: unknown) => Record<string, Fn>>('../core/refund-series', 'createRefundRetrier');
+    const createMemoryRefundRetryStore = await load<() => unknown>('../memory', 'createMemoryRefundRetryStore');
+    const clock = stepClock(T0);
+    const refund = vi.fn(async () => accepted());
+    refund.mockRejectedValueOnce(notYet());
+    const refreshCharge = vi.fn(
+      (_m: unknown, _p: unknown, _c: unknown, _h: unknown, options: { signal: AbortSignal }) =>
+        new Promise((resolve) => options.signal.addEventListener('abort', () => resolve({ status: 'PAID', providerChargeId: 'CHAR_1' }))),
+    );
+    const host = { stillOwed: vi.fn(async () => true), attempted: vi.fn(async () => undefined), refunded: vi.fn(async () => undefined) };
+    const retrier = createRefundRetrier({
+      gateway: { refund, refreshCharge },
+      store: createMemoryRefundRetryStore(),
+      host,
+      now: clock.now,
+      attemptMs: 20,
+    });
+    await retrier.firstAttempt!(KEY as never, {} as never);
+    clock.at(T0 + 5 * MIN);
+    await retrier.runDue!();
+    expect(refund).toHaveBeenCalledTimes(1);
+    expect((host.attempted.mock.calls.at(-1) as unknown[] | undefined)?.[1]).toBe('UNKNOWN');
+  });
+
+  it('B2 a PART with no answer on attempt 1 opens no series: it is pending at once', async () => {
+    const w = await world();
+    w.gateway.refund.mockRejectedValueOnce(down());
+    const result = (await w.retrier.firstAttempt!(PART as never, {} as never)) as { kind: string; row: unknown };
+    expect(result).toMatchObject({ kind: 'UNKNOWN', row: null });
+    expect(await w.retrier.find!(PART as never)).toBeNull();
+  });
+
+  it('B2 a PART series whose attempt 2 gets no answer is exhausted, never sent blind a third time', async () => {
+    const w = await openedOn(PART);
+    w.gateway.refund.mockRejectedValue(down());
+    w.at(T0 + 5 * MIN);
+    await w.retrier.runDue!();
+    w.at(T0 + 15 * MIN);
+    await w.retrier.runDue!();
+    expect(w.gateway.refund).toHaveBeenCalledTimes(1);
+    expect(w.retrier.viewOf!((await w.retrier.find!(PART as never)) as never)).toMatchObject({ attempt: 2, exhausted: true });
+  });
+
+  it('B2 a consult that fails sends nothing: the attempt counts, and the next one consults again', async () => {
+    const w = await openedOn(KEY);
+    w.gateway.refreshCharge.mockRejectedValueOnce(down());
+    w.at(T0 + 5 * MIN);
+    await w.retrier.runDue!();
+    expect(w.gateway.refund).not.toHaveBeenCalled();
+    expect(await viewOf(w)).toMatchObject({ attempt: 2, refusal: 'UNKNOWN', exhausted: false });
+    w.at(T0 + 15 * MIN);
+    await w.retrier.runDue!();
+    expect(w.gateway.refreshCharge).toHaveBeenCalledTimes(2);
+    expect(w.gateway.refund).toHaveBeenCalledTimes(1);
+  });
+
+  it('N2 our own deadline aborting attempt 1 is no answer, never a pre-dispatch refusal', async () => {
+    const w = await world();
+    w.gateway.refund.mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    const result = (await w.retrier.firstAttempt!(KEY as never, {} as never)) as { kind: string };
+    expect(result.kind).toBe('UNKNOWN');
+    expect(await viewOf(w)).toMatchObject({ of: 4, refusal: 'UNKNOWN' });
+  });
+
+  it('S6 an adoption hands the host what the consult saw go back', async () => {
+    const w = await openedOn(KEY);
+    w.gateway.refreshCharge.mockResolvedValueOnce({ status: 'REFUNDED', providerChargeId: 'CHAR_1', amount: { amountCents: 3990, currency: 'BRL' } });
+    w.at(T0 + 5 * MIN);
+    await w.retrier.runDue!();
+    expect(w.host.refunded.mock.calls[0]![1]).toMatchObject({ adopted: true, refundedCents: 3990 });
+  });
+
+  it('S1 the undo ends a series over the store; it keeps the claim while an attempt is in flight or unconsulted', async () => {
+    const endRefundSeriesFor = await load<(store: unknown, match: unknown, now: Date) => Promise<{ ended: boolean; clearClaim: boolean }>>(
+      '../core/refund-series-end',
+      'endRefundSeriesFor',
+    );
+    const createMemoryRefundRetryStore = await load<() => Record<string, Fn>>('../memory', 'createMemoryRefundRetryStore');
+    const match = { merchant: TENANT, reference: 'order-1', subject: 'order', boundTo: KEY.boundTo };
+    const row = (state: Record<string, unknown>) => ({
+      merchant: TENANT, provider: 'pagbank', providerChargeId: 'CHAR_1', reference: 'order-1', subject: 'order', boundTo: KEY.boundTo,
+      amountCents: null, cause: 'order.cancel', series: 1, exhausted: false, reported: false, settledAt: null, settledHow: null, ...state,
+    });
+    const answered = createMemoryRefundRetryStore();
+    await answered.insert!(row({ attempt: 1, refusal: 'NOT_YET', nextAt: null, claimedAt: null }) as never);
+    expect(await endRefundSeriesFor(answered, match, new Date(T0))).toEqual({ ended: true, clearClaim: true });
+    const inFlight = createMemoryRefundRetryStore();
+    await inFlight.insert!(row({ attempt: 2, refusal: 'NOT_YET', nextAt: null, claimedAt: new Date(T0).toISOString() }) as never);
+    expect(await endRefundSeriesFor(inFlight, match, new Date(T0 + 60_000))).toEqual({ ended: true, clearClaim: false });
+    const unconsulted = createMemoryRefundRetryStore();
+    await unconsulted.insert!(row({ attempt: 1, refusal: 'UNKNOWN', nextAt: null, claimedAt: null }) as never);
+    expect(await endRefundSeriesFor(unconsulted, match, new Date(T0))).toEqual({ ended: true, clearClaim: false });
+  });
+});
+
 describe('the evidence run\'s card cancels: one attempt, the rest in the background (C32)', () => {
   it('S18 a card cancel answered 40008 sends ONE cancel in the run and leaves attempt 2 due at +5 min', async () => {
     const orders = (await import('../platform/evidence/orders')) as Mod;

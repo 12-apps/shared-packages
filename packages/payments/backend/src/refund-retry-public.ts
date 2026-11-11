@@ -28,6 +28,7 @@ export {
   type RefundRetrierHost,
   type RefundSeriesView,
 } from './core/refund-series';
+export { endRefundSeriesFor } from './core/refund-series-end';
 export type {
   NewRefundSeriesRow,
   RefundRetryStore,

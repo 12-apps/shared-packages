@@ -304,11 +304,20 @@ export class EvidencePixOpenError extends Error {
   }
 }
 
-/** Refuse a new production run while the latest one still holds a Pix to settle. */
+/** The card cancels a run retries in the background (FUT-4740). */
+const CARD_CANCEL_KEYS = ['card.cancel', 'debit.cancel', 'gpay.cancel', 'apay.cancel'] as const;
+
+/** A card charge of the run is paid and its cancel has not gone back (C34): a new run would charge again. */
+function cardHoldsMoney(record: EvidenceRecord): boolean {
+  return record.steps.some((step) => (CARD_CANCEL_KEYS as readonly string[]).includes(step.key) && step.status === 'FAILED' && step.refund !== undefined);
+}
+
+/** Refuse a new production run while the latest one still holds a Pix — or a card — to settle (FUT-4740 C34). */
 async function refuseOverOpenPix(deps: EvidenceRunDeps): Promise<void> {
   if (environmentOf(deps) !== 'PRODUCTION') return;
   const latest = await deps.store.latest(PROVIDER, 'RUN');
-  if (latest && pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)())) throw new EvidencePixOpenError(latest.id);
+  if (!latest) return;
+  if (pixHoldsMoney(latest, deps.copy.pixSkipped, clockOf(deps)()) || cardHoldsMoney(latest)) throw new EvidencePixOpenError(latest.id);
 }
 
 /**

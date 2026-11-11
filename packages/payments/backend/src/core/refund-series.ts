@@ -1,6 +1,6 @@
 import type { ProviderFailureReporter } from './provider-failure';
 import type { RefundRefusal } from './refund-retry';
-import { endSeries, firstAttempt, findLive, openDueSeries, pressSeries, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
+import { endSeries, firstAttempt, findLive, openDueSeries, pressSeries, reopenByHand, runDue, seriesView, settleSeriesByHand, type SeriesContext } from './refund-series-steps';
 import type { RefundSeriesKey, RefundSeriesRow, RefundRetryStore } from './refund-series-store';
 import type { RefundInput } from './refund-input';
 import type { ChargeSnapshot, MerchantRef, RefundSnapshot } from './types';
@@ -39,7 +39,15 @@ export interface RefundRetrierHost {
   /** An attempt that did not refund: its trail entry. */
   attempted(row: RefundSeriesRow, refusal: RefundRefusal, error: unknown): Promise<void>;
   /** The money went back (a refund, or one adopted): ALWAYS recorded, whatever `stillOwed` says now (I11). */
-  refunded(row: RefundSeriesRow, outcome: { snapshot: RefundSnapshot | null; adopted: boolean }): Promise<void>;
+  refunded(
+    row: RefundSeriesRow,
+    outcome: {
+      snapshot: RefundSnapshot | null;
+      adopted: boolean;
+      /** An adopted refund: what the consult saw go back (the part's amount, or the charge's), null when unknown. */
+      refundedCents?: number | null;
+    },
+  ): Promise<void>;
 }
 
 export interface RefundRetrierDeps {
@@ -56,11 +64,11 @@ export interface RefundRetrierDeps {
 export type FirstAttemptResult =
   /** The provider answered with a refund snapshot (its `status` says whether it took). */
   | { kind: 'REFUNDED'; snapshot: RefundSnapshot }
-  /** The charge had nothing left to refund: the money is already back. */
-  | { kind: 'ADOPTED' }
+  /** The charge had nothing left to refund: the money is already back; what the charge shows, null when unread. */
+  | { kind: 'ADOPTED'; refundedCents: number | null }
   /** A refusal for good: no series; the host releases its claim. */
   | { kind: 'REFUSED'; error: unknown }
-  /** "Not yet" or no answer: a series is open, attempt 2 is due. */
+  /** "Not yet" or no answer: a series is open, attempt 2 is due (`row` null: none opened — a part with no answer). */
   | { kind: 'NOT_YET' | 'UNKNOWN'; error: unknown; row: RefundSeriesRow | null };
 
 /** The series as a screen shows it. */
@@ -86,6 +94,8 @@ export interface RefundRetrier {
   openDue(key: RefundSeriesKey): Promise<boolean>;
   /** A person settled it: false while an attempt is in flight (the act must wait). */
   settleByHand(key: RefundSeriesKey): Promise<boolean>;
+  /** The host's own write after `settleByHand` failed: the series reads pending again, nothing sent. */
+  reopenByHand(key: RefundSeriesKey): Promise<void>;
   /** The pedido moved on (an undo): the series ends, whatever runs. */
   end(key: RefundSeriesKey): Promise<void>;
   /** The live (unsettled) series of this key, or null. */
@@ -100,6 +110,7 @@ export function createRefundRetrier(deps: RefundRetrierDeps): RefundRetrier {
     runDue: (limit) => runDue(ctx, limit),
     press: (key) => pressSeries(ctx, key),
     openDue: (key) => openDueSeries(ctx, key),
+    reopenByHand: (key) => reopenByHand(ctx, key),
     settleByHand: (key) => settleSeriesByHand(ctx, key),
     end: (key) => endSeries(ctx, key),
     find: (key) => findLive(ctx, key),
