@@ -315,7 +315,7 @@ describe("the timezone is named", () => {
     renderForm(null, { label });
     chooseSpecificHours();
     expect(screen.getByTestId("schedule-add-window")).toBeTruthy();
-    expect(screen.queryByText(/Fuso horário/u)).toBeNull();
+    expect(screen.queryAllByText(/Fuso horário/u)).toHaveLength(0);
   });
 
   it("states the price guarantee where the merchant makes it", () => {

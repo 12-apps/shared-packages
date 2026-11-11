@@ -207,8 +207,7 @@ export const Dialog: React.FC<DialogProps> = (rawProps) => {
     testId,
   };
   const handleClose = closeHandlerOf(persistent, onClose);
-  // Above any held sheet while open (FUT-4748): the modal's level, or the drawer's.
-  const rootStyle = useStyleAboveHeldSheets(open, props.style, variant === 'drawer' ? 'drawer' : 'modal');
+  const rootStyle = useStyleAboveHeldSheets(open, props.style, variant === 'drawer' ? 'drawer' : 'modal'); // FUT-4748
 
   const header = title ? (
     <DialogHeader

@@ -63,7 +63,7 @@ describe("the Repetição options", () => {
   it("checks the always option first, and the specific one once chosen, showing the builder", () => {
     renderForm();
     expect((reach("repetition-always") as HTMLInputElement).checked).toBe(true);
-    expect(screen.queryByTestId("schedule-add-window")).toBeNull();
+    expect(screen.queryAllByTestId("schedule-add-window")).toHaveLength(0);
 
     fireEvent.click(reach("repetition-specific"));
     expect((reach("repetition-specific") as HTMLInputElement).checked).toBe(true);
@@ -71,7 +71,7 @@ describe("the Repetição options", () => {
     expect(screen.getByTestId("schedule-add-window")).toBeTruthy();
 
     fireEvent.click(reach("repetition-always"));
-    expect(screen.queryByTestId("schedule-add-window")).toBeNull();
+    expect(screen.queryAllByTestId("schedule-add-window")).toHaveLength(0);
   });
 
   it("is a tap target taller than the bare 13px radio: the label wraps a full-size Radio", () => {
