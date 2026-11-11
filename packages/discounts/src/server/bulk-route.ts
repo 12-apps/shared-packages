@@ -66,7 +66,10 @@ export function createBulkRoute(
       const parsed = bulkDiscountsBody.safeParse(body);
       if (!parsed.success) {
         // Too many ids is its own sentence (the host's, with the cap in it).
-        const tooMany = parsed.error.issues.some((issue) => issue.code === "too_big");
+        // Only the id lists have the cap: a too-big `days` is its own problem, not "too many ids".
+        const tooMany = parsed.error.issues.some(
+          (issue) => issue.code === "too_big" && (issue.path[0] === "ids" || issue.path[0] === "rows"),
+        );
         const error = tooMany
           ? bulkCopyFor(copy, locale).tooManyIds.replace("{max}", String(DISCOUNT_BULK_MAX_IDS))
           : copy.invalidQuery;

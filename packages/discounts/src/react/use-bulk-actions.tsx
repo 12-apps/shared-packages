@@ -29,6 +29,8 @@ import {
 export interface BulkActions {
   /** The entries to append to the grid's `rowActions`; empty with no slot. */
   actions: RowAction<DiscountListItem>[];
+  /** A batch is in flight: the grid hides every bulk entry, Excluir included. */
+  running: boolean;
   /** Wraps the grid in the host's slot and mounts the extend dialog. */
   frame: (grid: ReactNode) => JSX.Element;
 }
@@ -92,7 +94,7 @@ export function useBulkActions(
     [Slot, slot, extending, copy.bulk, run, settle],
   );
 
-  return { actions, frame };
+  return { actions, frame, running };
 }
 
 /**

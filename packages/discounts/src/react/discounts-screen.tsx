@@ -145,6 +145,7 @@ function DiscountsGrid({
   onVisibleRowsChange,
   bulkDelete,
   bulkActions,
+  bulkRunning,
 }: {
   rows: DiscountListItem[];
   copy: CompleteDiscountsWebCopy;
@@ -154,6 +155,7 @@ function DiscountsGrid({
   onVisibleRowsChange: (next: DiscountListItem[]) => void;
   bulkDelete: ReturnType<typeof useBulkDelete>;
   bulkActions: readonly RowAction<DiscountListItem>[];
+  bulkRunning: boolean;
 }): JSX.Element {
   return (
     <>
@@ -174,6 +176,8 @@ function DiscountsGrid({
               id: "delete",
               label: copy.actions.delete,
               color: "danger",
+              // Not while a batch runs: a delete over a selection a batch is changing would race it.
+              bulk: !bulkRunning,
               onSelect: (selected) => bulkDelete.request(selected),
             },
           ] satisfies RowAction<DiscountListItem>[]
@@ -306,6 +310,7 @@ function ScreenBody({
             onVisibleRowsChange={onVisibleRowsChange}
             bulkDelete={bulkDelete}
             bulkActions={bulk.actions}
+            bulkRunning={bulk.running}
           />,
         )}
       </CardActionsProvider>

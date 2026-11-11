@@ -515,4 +515,15 @@ describe("round 1 fixes (FUT-4420)", () => {
       expect((bulkDiscountsBody.parse(body) as { allOrNothing?: boolean }).allOrNothing).toBeUndefined();
     });
   });
+
+  it("R2-1: a too-big days is its own problem, only the id lists get the cap sentence", async () => {
+    const { call } = harness([record("a")]);
+    const days = (await call({ operation: "extendWindow", ids: ["a"], days: 3651 })) as Answer;
+    expect(days.status).toBe(422);
+    expect(days.body.error).not.toContain("500");
+    expect(JSON.stringify(days.body.problems)).toContain("days");
+    const ids = Array.from({ length: 501 }, (_, i) => `d${i}`);
+    const many = (await call({ operation: "setActive", ids, active: true })) as Answer;
+    expect(many.body.error).toContain("500");
+  });
 });

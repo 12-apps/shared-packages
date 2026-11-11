@@ -210,11 +210,9 @@ test('a second batch cannot start while one runs, and one row gets no bulk entri
   await page.getByRole('menuitem', { name: 'Desativar todos' }).click();
   await expect(page.getByTestId('bulk-running')).toBeVisible();
 
-  // While the batch is in flight the grid still holds the selection, but the entries are gone.
-  await page.getByTestId('discounts-bulk-actions').click();
-  await expect(page.getByRole('menuitem', { name: 'Ativar todos' })).toHaveCount(0);
-  await expect(page.getByRole('menuitem', { name: 'Estender validade…' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
+  // While the batch is in flight every entry is gone - Excluir too, a delete over rows a batch is
+  // changing would race it - so the Ações menu has nothing to offer and is not drawn at all.
+  await expect(page.getByTestId('discounts-bulk-actions')).toHaveCount(0);
 
   await expect(page.getByTestId('bulk-counts')).toContainText('3 alterados');
   expect(posts).toBe(1);

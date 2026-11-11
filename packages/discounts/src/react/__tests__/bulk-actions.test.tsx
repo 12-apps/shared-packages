@@ -429,4 +429,45 @@ describe("round 1 fixes (FUT-4420)", () => {
     render(<Probe api={{} as unknown as DiscountsApiClient} refresh={() => {}} />);
     expect(captured!.actions).toEqual([]);
   });
+
+  it("R2-2: a per-row retry of +N dias that may have been applied is not offered again", async () => {
+    const first = resultOf([row("d0", { status: "failed", code: "changedDuringBatch", retryable: true, before: undefined, after: undefined })]);
+    const bulk = vi.fn().mockResolvedValueOnce({ ok: true, data: { ...first, operation: "extendWindow" } }).mockResolvedValueOnce({ ok: false, error: "network" });
+    render(<Probe api={apiWith(bulk)} refresh={() => {}} />);
+    let settled: Promise<unknown> = Promise.resolve();
+    act(() => {
+      settled = action("bulk-extend").onSelect(items(2)) as Promise<unknown>;
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId("discount-bulk-extend-confirm"));
+      await settled;
+    });
+    await waitFor(() => expect(latestSlot!.state.phase).toBe("done"));
+    expect(latestSlot!.canRetry).toBe(true);
+    await act(async () => {
+      await latestSlot!.retry();
+    });
+    expect(latestSlot!.canRetry).toBe(false);
+    expect(latestSlot!.retryNotice).toBe(COPY.bulk.outcomeUnknown);
+    await act(async () => {
+      await latestSlot!.retry();
+    });
+    expect(bulk).toHaveBeenCalledTimes(2);
+  });
+
+  it("3: Excluir leaves the bulk menu while a batch runs", async () => {
+    const slow = deferred<unknown>();
+    render(<Probe api={apiWith(vi.fn().mockReturnValueOnce(slow.promise))} refresh={() => {}} />);
+    expect(captured!.running).toBe(false);
+    let one: Promise<void> = Promise.resolve();
+    act(() => {
+      one = action("bulk-activate").onSelect(items(2)) as Promise<void>;
+    });
+    expect(captured!.running).toBe(true);
+    await act(async () => {
+      slow.resolve({ ok: true, data: resultOf([row("d0")]) });
+      await one;
+    });
+    expect(captured!.running).toBe(false);
+  });
 });

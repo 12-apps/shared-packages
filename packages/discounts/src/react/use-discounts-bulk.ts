@@ -53,6 +53,8 @@ export type DiscountsBulkState =
       busy: boolean;
       /** Desfazer's answer, once it ran. Offered once, so absent means not yet. */
       undone: DiscountBulkResult | null;
+      /** A per-row retry of `+N dias` got no definite answer: it must not be sent again. */
+      outcomeUnknown?: boolean;
     };
 
 /** What the host's slot is handed, and renders around the grid. */
@@ -64,6 +66,8 @@ export interface DiscountsBulkSlotProps {
   undoable: readonly DiscountBulkUndoRow[];
   /** Whether "Tentar novamente" may be offered for a failed request (see `retrySafe`). */
   canRetry: boolean;
+  /** Said under the report when a per-row retry may have been applied (then `canRetry` is false). */
+  retryNotice: string | null;
   /** Rows "Tentar novamente" would send again: only the `failed` ones. */
   retryable: readonly DiscountBulkRow[];
   /** Restore the `ok` rows. A row changed since is left as it is and the answer says why. */
@@ -108,14 +112,17 @@ export function undoableOf(rows: readonly DiscountBulkRow[]): DiscountBulkUndoRo
  * failed on (5xx) may HAVE been applied; `+N dias` is the one operation that
  * cannot be sent twice, so it is not offered a retry then.
  */
+function repeatsUnknown(request: DiscountsBulkRequest, answer: { status?: number }): boolean {
+  const unknown = answer.status === undefined || answer.status >= 500;
+  return unknown && request.operation === "extendWindow" && request.days !== undefined;
+}
+
 function failedState(
   request: DiscountsBulkRequest,
   answer: { error: string; status?: number },
   copy: DiscountsBulkCopy,
 ): Extract<DiscountsBulkState, { phase: "failed" }> {
-  const unknown = answer.status === undefined || answer.status >= 500;
-  const repeats = request.operation === "extendWindow" && request.days !== undefined;
-  if (unknown && repeats) return { phase: "failed", request, retrySafe: false, message: copy.outcomeUnknown };
+  if (repeatsUnknown(request, answer)) return { phase: "failed", request, retrySafe: false, message: copy.outcomeUnknown };
   return { phase: "failed", request, retrySafe: true, message: answer.error || copy.requestFailed };
 }
 
@@ -151,13 +158,14 @@ async function undoBatch({ api, refresh, onError, latest, set }: BulkDeps): Prom
 /** "Tentar novamente" on a finished batch: only its failed rows, folded into the same report. */
 async function retryRows({ api, refresh, onError, latest, set }: BulkDeps, current: Done): Promise<void> {
   const ids = current.result.rows.filter((row) => row.retryable).map((row) => row.id);
-  if (current.busy || ids.length === 0) return;
+  if (current.busy || current.outcomeUnknown === true || ids.length === 0) return;
   set({ ...current, busy: true });
   const answer = await api.bulk?.({ ...current.request, ids });
   if (answer === undefined) return;
   if (!answer.ok) {
     onError(answer, `discounts.bulk.${current.request.operation}`);
-    set({ ...current, busy: false });
+    // Same rule as `failedState`: a retry that may have been applied must not repeat `+N dias`.
+    set({ ...current, busy: false, ...(repeatsUnknown(current.request, answer) ? { outcomeUnknown: true } : {}) });
     return;
   }
   const latestDone = latest.current.phase === "done" ? latest.current : current;
@@ -229,19 +237,24 @@ export function useDiscountsBulk(
     set({ phase: "idle" });
   }, [set]);
 
-  const rows = state.phase === "done" ? state.result.rows : [];
   return {
     state,
     run,
-    slot: {
-      state,
-      copy: copy.bulk,
-      canRetry: state.phase === "done" || (state.phase === "failed" && state.retrySafe),
-      undoable: state.phase === "done" && state.undone === null ? undoableOf(rows) : [],
-      retryable: rows.filter((row) => row.retryable),
-      undo,
-      retry,
-      dismiss,
-    },
+    slot: { ...slotFacts(state, copy.bulk), state, copy: copy.bulk, undo, retry, dismiss },
+  };
+}
+
+/** What the slot is told about the report, derived from the state alone. */
+function slotFacts(
+  state: DiscountsBulkState,
+  words: DiscountsBulkCopy,
+): Pick<DiscountsBulkSlotProps, "canRetry" | "retryNotice" | "undoable" | "retryable"> {
+  const rows = state.phase === "done" ? state.result.rows : [];
+  const unknown = state.phase === "done" && state.outcomeUnknown === true;
+  return {
+    canRetry: (state.phase === "done" && !unknown) || (state.phase === "failed" && state.retrySafe),
+    retryNotice: unknown ? words.outcomeUnknown : null,
+    undoable: state.phase === "done" && state.undone === null ? undoableOf(rows) : [],
+    retryable: rows.filter((row) => row.retryable),
   };
 }
