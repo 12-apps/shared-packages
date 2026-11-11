@@ -266,7 +266,7 @@ describe('versions + restore', () => {
     expect((response.body as { data: object }).data).not.toHaveProperty('comparison');
   });
 
-  it('answers 400 for a compare that is not a version number', async () => {
+  it('answers 422 for a compare that is not a version number', async () => {
     const { api } = buildApi();
     const handle = api.entity('product');
     const created = await handle.lifecycle.create(handle.context(approver), { name: 'Coca' });
@@ -277,8 +277,19 @@ describe('versions + restore', () => {
       const response = await call(route, approver, { id: created.entityId }, undefined, {
         compare,
       });
-      expect(`${compare} -> ${response.status}`).toBe(`${compare} -> 400`);
+      expect(`${compare} -> ${response.status}`).toBe(`${compare} -> 422`);
     }
+  });
+
+  it('answers 422 for a history query key it does not declare', async () => {
+    const { api } = buildApi();
+    const handle = api.entity('product');
+    const created = await handle.lifecycle.create(handle.context(approver), { name: 'Coca' });
+    if (created.status !== 'applied') throw new Error('expected applied');
+    const route = routeOf(api.routes, 'GET', '/products/:id/versions');
+    const response = await call(route, approver, { id: created.entityId }, undefined, { page: '2' });
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ problems: [{ path: 'page', message: 'Unrecognized key' }] });
   });
 
   it('answers 404 for a comparison of a version the entity never had', async () => {
@@ -447,7 +458,7 @@ describe('drafts', () => {
     expect(rows.get(outcome.entityId)?.name).toBe('Novo item');
   });
 
-  it('rejects a body without a data object as the 400 the wire promises', async () => {
+  it('rejects a body without a data object as the 422 the wire promises', async () => {
     const { api } = buildApi();
     const response = await call(
       routeOf(api.routes, 'POST', '/products/drafts'),
@@ -455,7 +466,7 @@ describe('drafts', () => {
       {},
       { nope: true },
     );
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
     expect((response.body as { error: string }).error).toBe('Dados inválidos.');
   });
 });
