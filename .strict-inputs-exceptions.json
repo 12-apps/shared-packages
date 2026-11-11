@@ -1,8 +1,4 @@
 {
-  "packages/auth/src/server/auth-handler.ts": {
-    "kind": "exempt",
-    "why": "OAuth provider callback handling (Auth.js): the provider adds query keys on its own schedule (Google sends authuser, hd, prompt), and a strict parse would refuse a sign-in the day it does. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host first, then a separate change makes it strict; this entry is deleted then."
-  },
   "packages/impersonation/src/core/session.ts::previewSubject": {
     "kind": "exempt",
     "why": "The payload of the impersonation cookie this package signs and reads back itself, not a request body: the HMAC proves it is ours, and a strict parse would sign out every operator whose cookie was minted by an older release that carried an extra key. The request that mints it (startOperatorBody, startPreviewBody) is strict."
@@ -10,54 +6,6 @@
   "packages/impersonation/src/core/session.ts::sessionSchema": {
     "kind": "exempt",
     "why": "The payload of the impersonation cookie this package signs and reads back itself, not a request body: the HMAC proves it is ours, and a strict parse would sign out every operator whose cookie was minted by an older release that carried an extra key. The request that mints it (startOperatorBody, startPreviewBody) is strict."
-  },
-  "packages/payments/backend/src/core/provider-webhook.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/core/webhook-pipeline.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/core/webhook-public.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/infinitepay-webhook.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/itau-webhook-registration.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/itau-webhook.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/pagbank-legacy-notifications.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/pagbank-oauth.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/pagbank-webhook-auth.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/pagbank-webhook-signer.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/pagbank-webhook.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
-  },
-  "packages/payments/backend/src/providers/stripe-webhook-verify.ts": {
-    "kind": "exempt",
-    "why": "Payment provider inbound payload (webhook, notification or OAuth callback) that a third party writes: a strict schema refuses a payment notification the day the provider adds a field and the money is not recorded. The owner decided (FUT-4733, 2026-11-11) on a week of observation in the host app first, then a separate change makes it strict and deletes this entry."
   },
   "packages/product-research/src/connectors/amazon.ts::configSchema": {
     "kind": "exempt",

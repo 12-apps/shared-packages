@@ -23,8 +23,10 @@
 //      half-measure that lets an unknown key through at depth.
 //
 // A response schema is none of these, so it is never read: the rule is about
-// what a package ACCEPTS. Third-party inbound payloads are the one declared
-// exception, listed by path below and in the ledger with the owner's reason.
+// what a package ACCEPTS. Third-party inbound payloads (payment webhooks,
+// provider OAuth) are the one declared exception, and they are exempted BY
+// SCHEMA NAME in the ledger (`path::name`), never by path: a path waiver would
+// also waive a first-party schema someone adds to the same file later.
 import { stripComments } from "../copy-portability-gate.mjs";
 
 /** A declaration or key whose name says it is something the package ACCEPTS. */
@@ -32,25 +34,6 @@ const INPUT_NAME = /(?:Body|Params|Query|Input|Request|Payload)(?:Of)?$/;
 /** An inline route-definition key (`body: z.object({…})`) is an input by position. */
 const INPUT_KEY = /^(?:body|params|query)$/;
 const TAG = "@request-input";
-
-/**
- * Files that parse a payload a THIRD PARTY wrote. They are exempt from the rule
- * for now and listed in the ledger with the reason: a strict schema there
- * refuses a payment notification the day a provider adds a field, so the owner
- * decided (FUT-4733, 2026-11-11) on a week of observation first.
- */
-const THIRD_PARTY_INBOUND = [
-  /^packages\/payments\/backend\/src\/providers\/[^/]*webhook[^/]*\.ts$/,
-  /^packages\/payments\/backend\/src\/providers\/pagbank-legacy-notifications\.ts$/,
-  /^packages\/payments\/backend\/src\/providers\/pagbank-oauth\.ts$/,
-  /^packages\/payments\/backend\/src\/core\/(?:provider-webhook|webhook-pipeline|webhook-public)\.ts$/,
-  /^packages\/auth\/src\/server\/auth-handler\.ts$/,
-];
-
-/** Whether a path parses a third party's payload and is exempt for now. */
-export function isThirdPartyInbound(path) {
-  return THIRD_PARTY_INBOUND.some((pattern) => pattern.test(path));
-}
 
 /** The leading whitespace width of a line. */
 function indentOf(line) {

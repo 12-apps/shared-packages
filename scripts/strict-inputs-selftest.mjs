@@ -6,7 +6,7 @@
 // should, because a gate that only ever passes is decoration.
 import { pathToFileURL } from "node:url";
 
-import { isThirdPartyInbound, newDebt, nonStrictInputs, touchMustFix } from "./lib/strict-inputs.mjs";
+import { newDebt, nonStrictInputs, touchMustFix } from "./lib/strict-inputs.mjs";
 
 const LABEL = "[strict-inputs]";
 const Z = 'import { z } from "zod";\n';
@@ -47,8 +47,8 @@ const cases = [
     "a file without zod is never read"],
   [names(`${Z}export const saveBody = z.strictObject({ note: z.string().describe("use z.object( here") });`).length === 0,
     "an object call inside a string is not a call"],
-  [isThirdPartyInbound("packages/payments/backend/src/providers/some-webhook.ts"), "a provider webhook is third-party"],
-  [!isThirdPartyInbound("packages/rbac/src/server/wire.ts"), "an ordinary package file is not"],
+  [names(`${Z}export const registerWebhookBody = z.object({ pixKey: z.string() });`).join() === "registerWebhookBody",
+    "an input schema is a finding wherever it lives, a webhook-named file included (no path waiver)"],
   [newDebt({
       baseLedger: new Map([["a::b", { kind: "grandfathered" }]]),
       headLedger: new Map([["a::b", { kind: "grandfathered" }], ["c::d", { kind: "grandfathered" }]]),

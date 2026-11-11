@@ -7,10 +7,13 @@
 //
 // THE LEDGER `.strict-inputs-exceptions.json` holds two kinds of entry:
 //
-//   - `exempt`: the files that parse a THIRD PARTY's payload (payment
-//     webhooks, provider OAuth). Argued, listed by path, and temporary by the
+//   - `exempt`: a schema that parses a THIRD PARTY's payload (payment webhook,
+//     provider OAuth), listed as `path::name`, never by path. Temporary by the
 //     owner's decision: a week of observation in the host (FUT-4733), then a
-//     separate change makes them strict and deletes the entries.
+//     separate change makes it strict and deletes the entry. None exists today:
+//     those parsers are hand-rolled and hold no Zod schema, so a schema added
+//     there is a first-party input until someone argues otherwise by name.
+//     Other exemptions (stored config, a signed cookie) are argued the same way.
 //   - `grandfathered`: an input schema that predates the gate (`path::name`).
 //     Shrink-only against the merge base, and touch-must-fix: editing the file
 //     obliges the same PR to make the schema strict and delete the line.
@@ -23,7 +26,7 @@ import { pathToFileURL } from "node:url";
 
 import { checkLedger, classifyEntry, readLedger, summarize } from "./lib/exception-ledger.mjs";
 import { inScope } from "./lib/shipped-source.mjs";
-import { isThirdPartyInbound, newDebt, nonStrictInputs, touchMustFix } from "./lib/strict-inputs.mjs";
+import { newDebt, nonStrictInputs, touchMustFix } from "./lib/strict-inputs.mjs";
 
 const LABEL = "[strict-inputs]";
 const LEDGER_PATH = ".strict-inputs-exceptions.json";
@@ -36,7 +39,7 @@ function git(...args) {
   }
 }
 
-/** Every finding in the checkout: `path` for a third-party file, `path::name` for a schema. */
+/** Every finding in the checkout, keyed `path::name`. */
 export function scanRepo() {
   const tracked = (git("ls-files") ?? "").split("\n").filter(Boolean);
   return new Map(tracked.filter((path) => inScope(path) && existsSync(path)).flatMap(findingsOf));
@@ -44,7 +47,6 @@ export function scanRepo() {
 
 /** The `[key, detail]` findings of one in-scope file. */
 function findingsOf(path) {
-  if (isThirdPartyInbound(path)) return [[path, "parses a third party's payload"]];
   return [...nonStrictInputs(readFileSync(path, "utf8"))].map(([name, { line, reasons }]) => [
     `${path}::${name}`,
     `${path}:${line} ${name}: ${reasons.join(", ")}`,
@@ -103,7 +105,7 @@ function main() {
     summarize({
       label: LABEL,
       total: findings.size,
-      noun: "non-strict input(s) and third-party parser(s)",
+      noun: "non-strict input schema(s)",
       counts: checked.counts,
       burndown: "editing a file with pending entries obliges that PR to make them strict",
     }),
