@@ -1,4 +1,3 @@
-import { invalidSpecError } from '../errors';
 import { parseReportDocument } from '../run';
 
 import { compileDocument } from './compile-document';
@@ -14,6 +13,7 @@ import {
   type ReportRoute,
 } from './context';
 import type { SavedReportInput, SavedReportRecord, SavedReportStore } from './saved';
+import { invalidInputError } from './problems';
 import { toSummary } from './summary';
 import { canViewSavedReport, visibilityRoleIds } from './visibility';
 import { saveReportBody } from './wire';
@@ -45,15 +45,12 @@ type SaveBody = ReturnType<typeof saveReportBody.parse>;
  * Validate the incoming body against the package's own wire schema. The host
  * may have validated it too, but it does not have to: this surface's contract
  * is authored here, so it is enforced here, and a host on a framework with no
- * schema layer gets the same 400s as one with it.
+ * schema layer gets the same 422s as one with it.
  */
 function parseSaveBody(body: unknown, messages: ReportServerMessages): SaveBody {
   const parsed = saveReportBody.safeParse(body);
   if (parsed.success) return parsed.data;
-  const first = parsed.error.issues[0];
-  throw invalidSpecError(
-    first ? `${first.path.join('.') || 'body'}: ${first.message}` : messages.invalidBody,
-  );
+  throw invalidInputError(parsed.error, messages.invalidBody);
 }
 
 /**

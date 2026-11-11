@@ -34,7 +34,7 @@ export { reportWorkingCopySchema };
 
 export const REPORT_GRAINS = ['day', 'week', 'month'] as const;
 
-export const reportsParams = z.object({
+export const reportsParams = z.strictObject({
   tenantSlug: z.string().min(1),
 });
 
@@ -56,17 +56,17 @@ export const reportsParams = z.object({
  *     const keys = MY_SYSTEM_REPORTS.map((report) => report.key) as [string, ...string[]];
  *     const myParams = z.object({ tenantSlug: z.string().min(1), key: z.enum(keys) });
  */
-export const systemReportParams = z.object({
+export const systemReportParams = z.strictObject({
   tenantSlug: z.string().min(1),
   key: z.string().min(1),
 });
 
-export const savedReportParams = z.object({
+export const savedReportParams = z.strictObject({
   tenantSlug: z.string().min(1),
   id: z.string().min(1),
 });
 
-export const saveReportBody = z.object({
+export const saveReportBody = z.strictObject({
   name: z.string().min(1).max(120),
   description: z.string().max(500).optional(),
   /** A single ReportSpec, or a dashboard document (`kind: "dashboard"`). */

@@ -34,3 +34,24 @@ export function unknownFieldError(
 export function invalidSpecError(message: string): ReportBuilderError {
   return new ReportBuilderError('invalid_spec', message);
 }
+
+/** One thing wrong with a request input, and where (dotted path, empty for the whole input). */
+export interface InputProblem {
+  path: string;
+  message: string;
+}
+
+/**
+ * A request input the strict schema refused: answered 422 with every problem
+ * and its path, and nothing is written. The message is the first problem, in
+ * the compiler's own register, for a caller that reads only `error`.
+ */
+export class InvalidInputError extends ReportBuilderError {
+  readonly problems: InputProblem[];
+
+  constructor(message: string, problems: InputProblem[]) {
+    super('invalid_input', message);
+    this.name = 'InvalidInputError';
+    this.problems = problems;
+  }
+}

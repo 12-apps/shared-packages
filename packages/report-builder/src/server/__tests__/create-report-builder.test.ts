@@ -501,10 +501,18 @@ describe('writing a saved document', () => {
     // else — and authorship is what `visibility: 'private'` is judged on.
     const { call, stored } = setup({ seed: [] });
 
-    await call('POST', '/reports/custom', {
+    // The body is strict: a client naming its own author is refused, not ignored.
+    const refused = await call('POST', '/reports/custom', {
       actor: actor({ userId: 'real-user' }),
       body: { ...body, createdBy: 'someone-else' },
     });
+    expect(refused.status).toBe(422);
+    expect(refused.body).toMatchObject({
+      problems: [{ path: 'createdBy', message: 'Unrecognized key' }],
+    });
+    expect(stored()).toEqual([]);
+
+    await call('POST', '/reports/custom', { actor: actor({ userId: 'real-user' }), body });
 
     expect(stored()[0]?.createdBy).toBe('real-user');
   });
@@ -675,12 +683,13 @@ describe('the dry run', () => {
     expect(windows()).toHaveLength(0);
   });
 
-  it('answers 400 — not 500 — for a body that is not a spec at all', async () => {
+  it('answers 422 — not 500 — for a body that is not a spec at all', async () => {
     const { call } = setup();
 
     const response = await call('POST', '/reports/run', { body: undefined });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
+    expect(response.body).toMatchObject({ problems: [{ path: '' }] });
   });
 
   it('carries the compiler’s message so an author can self-correct', async () => {

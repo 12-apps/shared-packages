@@ -39,7 +39,7 @@ import { REPORT_STATUSES, REPORT_VISIBILITIES } from './visibility';
  * that would drop the very keystrokes this feature exists to keep. The strict
  * schema still guards the moment it goes live.
  */
-export const reportWorkingCopySchema = z.object({
+export const reportWorkingCopySchema = z.strictObject({
   name: z.string().max(120),
   description: z.string().max(500).nullish(),
   spec: reportDocumentSchema,
