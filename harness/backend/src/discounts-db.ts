@@ -45,6 +45,7 @@ import type {
   DiscountStore,
   DiscountWrite,
 } from '@12-apps/discounts/server';
+import { DiscountValidationError } from '@12-apps/discounts/server';
 
 import {
   emptyTargets,
@@ -57,6 +58,26 @@ import {
   writeTargets,
   type DiscountRow,
 } from './discounts-rows';
+
+/**
+ * The coupon code is unique per store (`discounts_client_id_code_key`), a
+ * database fact the package cannot check — so, as `DiscountStore` asks, the
+ * host turns the clash into a refusal naming the field. The words are this
+ * pt-BR host's own. Anything else the database refuses travels on untouched.
+ */
+const CODE_TAKEN = 'Este código de cupom já existe nesta loja.';
+
+async function namingTheCode<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    const clash = error as { code?: string; constraint?: string };
+    if (clash.code === '23505' && clash.constraint === 'discounts_client_id_code_key') {
+      throw new DiscountValidationError('code', CODE_TAKEN);
+    }
+    throw error;
+  }
+}
 
 /**
  * The package's migrations, located by PATH inside the installed package.
@@ -172,7 +193,7 @@ export function discountStore(pg: PGlite): DiscountStore {
     get,
 
     async create(clientId: string, write: DiscountWrite): Promise<DiscountRecord> {
-      const [created] = await rows<{ id: string }>(
+      const [created] = await namingTheCode(() => rows<{ id: string }>(
         pg,
         `INSERT INTO discounts (
            id, client_id, name, type, percent_off_bp, amount_off_cents,
@@ -184,7 +205,7 @@ export function discountStore(pg: PGlite): DiscountStore {
            $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP
          ) RETURNING id`,
         [clientId, ...scalarValues(write)],
-      );
+      ));
       if (!created) throw new Error('discounts insert returned no id');
       await writeTargets(pg, created.id, write);
       const record = await get(clientId, created.id);
@@ -196,7 +217,7 @@ export function discountStore(pg: PGlite): DiscountStore {
       // Tenant-scoped, and the reason is the one on `DiscountStore` itself: a
       // write that forgot its tenant would not leak a row, it would let one
       // store edit another store's prices.
-      await pg.query(
+      await namingTheCode(() => pg.query(
         `UPDATE discounts SET
            name = $3, type = $4, percent_off_bp = $5, amount_off_cents = $6,
            bundle_price_cents = $7, free_units = $8, max_combo_applications = $9,
@@ -205,7 +226,7 @@ export function discountStore(pg: PGlite): DiscountStore {
            stackable = $18, active = $19, updated_at = CURRENT_TIMESTAMP
          WHERE client_id = $1 AND id = $2 AND archived_at IS NULL`,
         [clientId, id, ...scalarValues(write)],
-      );
+      ));
       await writeTargets(pg, id, write);
     },
 

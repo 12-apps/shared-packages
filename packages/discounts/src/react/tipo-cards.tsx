@@ -38,10 +38,15 @@ export function rowMinPx(cardPx: number, count: number = DISCOUNT_KINDS.length):
   return Math.ceil(cardPx * count + CARD_GAP_PX * (count - 1));
 }
 
-/** A card's width with its lines unwrapped: a hidden clone, measured beside it. */
+/**
+ * A card's width with its NAME on one line: a hidden clone, measured beside
+ * it. The example line under the name may wrap — the prototype's own cards
+ * wrap it at 1280 — so the clone leaves it out.
+ */
 function naturalWidth(card: HTMLElement): number {
   const clone = card.cloneNode(true) as HTMLElement;
   Object.assign(clone.style, { position: "absolute", visibility: "hidden", width: "auto", minWidth: "0", whiteSpace: "nowrap" });
+  clone.querySelectorAll<HTMLElement>("[data-example]").forEach((line) => line.remove());
   (card.parentElement ?? document.body).appendChild(clone);
   const width = clone.getBoundingClientRect().width;
   clone.remove();
@@ -127,10 +132,10 @@ function TipoCard({
         }}
       />
       <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25 }}>
-        <Text as="span" weight="semibold">
+        <Text as="span" weight="semibold" size="sm">
           {copy.labels.kind[kind]}
         </Text>
-        <Text as="span" variant="caption">
+        <Text as="span" variant="caption" data-example="">
           {copy.steps.kindExamples[kind]}
         </Text>
       </Box>

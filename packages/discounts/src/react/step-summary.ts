@@ -76,14 +76,20 @@ function capText(form: FormSnapshot, world: SummaryWorld): string {
   return cap === "" ? summary.capAny : fill(summary.capCount, { count: cap });
 }
 
-/** "15%" or "R$ 20,00", for the value the kind (or the combo's reward) holds. */
+/** "15%" or "R$ 20,00", for the value the kind (or the combo's reward) holds; "…" before one is typed. */
 function valueText(form: FormSnapshot, world: SummaryWorld): string {
   const { values } = form;
   const { type } = typeAndScopeFor({ kind: values.kind ?? "", comboReward: values.comboReward ?? "", scope: values.scope ?? "" });
   const { formatters } = world;
-  if (type === "FIXED_AMOUNT") return formatters.money(toCents(values.amountOff ?? "", formatters));
-  if (type === "BUNDLE_PRICE") return formatters.money(toCents(values.bundlePrice ?? "", formatters));
-  return formatters.percent(toBasisPoints(values.percentOff ?? "", formatters));
+  const typed = (key: string): string => values[key] ?? "";
+  const money = (key: string): string => {
+    const cents = toCents(typed(key), formatters);
+    return cents === null ? world.copy.steps.summary.nothing : formatters.money(cents);
+  };
+  if (type === "FIXED_AMOUNT") return money("amountOff");
+  if (type === "BUNDLE_PRICE") return money("bundlePrice");
+  const basisPoints = toBasisPoints(typed("percentOff"), formatters);
+  return basisPoints === null ? world.copy.steps.summary.nothing : formatters.percent(basisPoints);
 }
 
 function targetsLine(form: FormSnapshot, world: SummaryWorld): string {
