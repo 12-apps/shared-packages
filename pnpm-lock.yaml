@@ -891,6 +891,9 @@ importers:
       '@12-apps/wiring':
         specifier: workspace:*
         version: link:../wiring
+      '@electric-sql/pglite':
+        specifier: ^0.2.17
+        version: 0.2.17
       '@types/node':
         specifier: ^22.10.6
         version: 22.20.1
