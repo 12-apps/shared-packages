@@ -43,7 +43,7 @@ export function stepOfKey(key: string): StepNumber | null {
   return Object.prototype.hasOwnProperty.call(STEP_OF_KEY, key) ? (STEP_OF_KEY[key] ?? null) : null;
 }
 
-export interface StepError {
+interface StepError {
   key: string;
   message: string;
 }

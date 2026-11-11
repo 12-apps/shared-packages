@@ -40,7 +40,7 @@ import { FALLBACK_CARD_PX, rowMinPx } from "./tipo-cards";
  * byte-for-byte what the single page sent.
  */
 
-export interface StepFormProps {
+interface StepFormProps {
   copy: CompleteDiscountsWebCopy;
   formatters: DiscountsFormatters;
   currencyField: CurrencyFieldComponent;

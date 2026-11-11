@@ -58,7 +58,7 @@ export function useInsets(): { chrome: RefObject<HTMLDivElement | null>; bar: Re
  * Measured, because the dialog's own shape is the library's to decide: the
  * sheet pads its scroller, the wide modal pads a box inside it.
  */
-export interface ScrollArea {
+interface ScrollArea {
   height: number | null;
   /**
    * The dialog surface's own paint (colour and, in a dark theme, the elevation

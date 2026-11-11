@@ -37,7 +37,7 @@ export interface SummaryWorld {
   groups: readonly WireTargetGroup[];
 }
 
-export interface DoneLines {
+interface DoneLines {
   answer: string;
   detail: string;
 }
@@ -170,7 +170,7 @@ function dayText(value: string, world: SummaryWorld): string {
 }
 
 /** "Sem prazo", "A partir de …", "Até …" or "… a …". */
-export function periodChip(form: FormSnapshot, world: SummaryWorld): string {
+function periodChip(form: FormSnapshot, world: SummaryWorld): string {
   const { window } = world.copy;
   const from = (form.values.startsAt ?? "").trim();
   const to = (form.values.endsAt ?? "").trim();

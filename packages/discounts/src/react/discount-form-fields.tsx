@@ -61,7 +61,7 @@ function HintedField({
 }
 
 /** One closed set as a toggle's options, labelled by the pack. */
-export function optionsFor<TKey extends string>(
+function optionsFor<TKey extends string>(
   values: readonly TKey[],
   labels: Readonly<Record<TKey, string>>,
 ): { value: string; label: string }[] {

@@ -152,7 +152,7 @@ function StatusStrip({
 }
 
 /** "Ver tudo numa página" / "Voltar ao passo a passo" while creating: a text link on the chrome's row. */
-export interface SeeAll {
+interface SeeAll {
   all: boolean;
   onToggle: () => void;
 }

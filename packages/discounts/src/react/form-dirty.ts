@@ -21,7 +21,7 @@ function strings(values: Readonly<Record<string, string>>, keys: readonly string
 }
 
 /** One comparable string for the form. */
-export function dirtyKey(form: FormSnapshot, keys: readonly string[]): string {
+function dirtyKey(form: FormSnapshot, keys: readonly string[]): string {
   return JSON.stringify({
     values: strings(form.values, keys),
     active: form.active,
@@ -36,7 +36,7 @@ export function dirtyKey(form: FormSnapshot, keys: readonly string[]): string {
 }
 
 /** The string keys both sides are compared on: the union, minus the ignored ones. */
-export function comparedKeys(...sides: readonly Readonly<Record<string, string>>[]): string[] {
+function comparedKeys(...sides: readonly Readonly<Record<string, string>>[]): string[] {
   const keys = new Set(sides.flatMap((side) => Object.keys(side)));
   return [...keys].filter((key) => !IGNORED_KEYS.has(key)).sort();
 }

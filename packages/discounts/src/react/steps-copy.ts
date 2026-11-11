@@ -9,7 +9,7 @@
  */
 
 /** The step a key or a pendência belongs to, by name rather than number. */
-export interface DiscountsStepWhereCopy {
+interface DiscountsStepWhereCopy {
   readonly identity: string;
   readonly targets: string;
   readonly price: string;
