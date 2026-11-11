@@ -224,11 +224,17 @@ today when the discount already ended (it is then re-activated and the row says 
 them detects a concurrent change instead of overwriting it. `undo` takes the `ok` rows with their
 `before`/`after`; a row whose state is no longer `after` is left as it is (`changedSince`). `validateOnly`
 reports without writing. The sentences are `DiscountsServerCopy.bulk` (optional, filled from the
-package's pt-BR / en-US packs). The same route is the discounts' one bulk MCP tool, `bulkDiscounts`.
+package's pt-BR / en-US packs). The same route is the discounts' one bulk MCP tool, `bulkDiscounts`, which is **all-or-nothing**
+(`allOrNothing` defaults to true in the tool's schema, `bulkDiscountsToolBody`; the screen's body leaves it off): every row is
+planned first, and if any would be skipped or fail the answer is a 422 with every problem by row path (`ids.N`) in English, and
+nothing is written. The store port has no transaction, so a row that moves between the plan and its write is still reported per
+row. The host's MCP adapter must pass the tool's PARSED body (with the default) to the route. An ended discount that was paused
+by hand stays paused when extended (`extendedPaused`); only an ended, active one "voltou a valer". The conditional write guards the
+window and the active flag only; other columns are re-stated from the read, as the single-row PATCH does.
 
 **Screen.** `createWebDiscounts({ bulkSlot })` takes a component rendered around the grid, inside the
 screen's `CardActionsProvider`, and handed `DiscountsBulkSlotProps`: `state` (`idle | running | failed |
-done`), `undoable`, `retryable`, `undo()`, `retry()`, `dismiss()`, the `copy` and the grid as `children`.
+done`), `undoable`, `retryable`, `canRetry` (false when a `+N dias` request's outcome is unknown: it must not be sent twice), `undo()`, `retry()`, `dismiss()`, the `copy` and the grid as `children`.
 Without a slot the three entries are not offered. Copy is `DiscountsWebCopy.bulk` (optional, filled in).
 
 ## Whole days, in the store's zone — `storeTimeZone`
