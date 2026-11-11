@@ -186,6 +186,23 @@ function startOfDay(day: string, timeZone: string): Date {
   return new Date(onDay[0] ?? candidates[1]!);
 }
 
+/**
+ * The `YYYY-MM-DD` the store's calendar shows at `instant` — "today" for a bulk
+ * extension that counts from today (FUT-4420). Throws on an unknown zone, like
+ * every whole-day function here.
+ */
+export function calendarDayAt(instant: Date, timeZone: string): string {
+  wallClockFormat(timeZone);
+  return dayAt(instant.getTime(), timeZone);
+}
+
+/** `day` moved by `count` whole calendar days (negative moves back). */
+export function addCalendarDays(day: string, count: number): string {
+  const parts = realDay(day);
+  if (parts === null) throw new RangeError(`not a calendar day: ${day}`);
+  return new Date(Date.UTC(parts.y, parts.m - 1, parts.d + count)).toISOString().slice(0, 10);
+}
+
 /** The day after `YYYY-MM-DD`. */
 function nextDay(day: string): string {
   const parts = realDay(day);

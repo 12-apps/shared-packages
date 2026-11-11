@@ -134,6 +134,14 @@ export interface DiscountWrite {
  */
 export interface DiscountUpdateCondition {
   window: { startsAt: Date | null; endsAt: Date | null; windowInZone: boolean };
+  /**
+   * The `active` flag the row held when it was read (FUT-4420). Set only by the
+   * bulk routes, whose whole write turns on it: a pause or an extension decided
+   * from a read must not overwrite a flip made in between. The store applies
+   * the write only where the row still holds it too; a store that ignores the
+   * key keeps the window condition and leaves the flag race open.
+   */
+  active?: boolean;
 }
 
 /** What a conditional update answers: whether the row still matched. */

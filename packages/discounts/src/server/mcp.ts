@@ -20,6 +20,7 @@ import {
 } from "../engine/kinds";
 import { MAX_SCHEDULE_WINDOWS } from "../engine/schedule";
 import { discountSearchConfig } from "./search";
+import { bulkDiscountsBody, bulkDiscountsResponse } from "./bulk-wire";
 
 /**
  * The discounts tool surface — authored ONCE, beside the route descriptors it
@@ -320,6 +321,22 @@ export const DISCOUNTS_MCP_TOOLS: readonly WireMcpTool<z.ZodType>[] = [
     params: discountCollectionParams,
     body: createDiscountBody,
     response: z.object({ data: discountSchema }),
+  },
+  {
+    operationId: "bulkDiscounts",
+    method: "POST",
+    path: "/discounts/bulk",
+    summary:
+      "The discounts' ONE bulk tool (admin): many discounts, one `operation` per call - `setActive` (active true/false), " +
+      "`extendWindow` (`days` added to each end day, an already ended discount counting from today, or `endsOn` the new " +
+      "last day; an ended discount that is extended becomes active again; a discount with no end date is skipped) or " +
+      "`undo` (the `ok` rows of an earlier call with their before/after; a row changed since is left as it is). " +
+      "At most 500 ids. Not all-or-nothing: every row answers `ok`, `unchanged` (already held the value), `skipped` (with " +
+      "the reason) or `failed`; `validateOnly` reports what would happen and writes nothing. Whole days on the store's clock.",
+    tags: ["discounts"],
+    params: discountCollectionParams,
+    body: bulkDiscountsBody,
+    response: bulkDiscountsResponse,
   },
   {
     operationId: "updateDiscount",

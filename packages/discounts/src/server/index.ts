@@ -13,7 +13,9 @@ export {
   type DiscountsApiConfig,
 } from "./routes";
 
-export { missingServerCopy, type DiscountsServerCopy } from "./copy";
+export { missingServerCopy, type DiscountsBulkServerCopy, type DiscountsServerCopy } from "./copy";
+export { bulkDiscountsBody, bulkDiscountsResponse } from "./bulk-wire";
+export * from "../bulk";
 
 export type { StoreTimeZone } from "./calendar-days";
 
