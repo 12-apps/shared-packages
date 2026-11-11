@@ -255,6 +255,8 @@ interface SheetOpenInput {
   onOpenChange?: (open: boolean) => void;
   onClose?: () => void;
   onOpen?: () => void;
+  /** A close only asks; the `open` prop closes the sheet (see `SheetProps.controlled`). */
+  controlled?: boolean;
 }
 
 /**
@@ -266,18 +268,18 @@ export const useSheetOpen = (input: SheetOpenInput) => {
   const {
     open, persistent, disabled, closeOnEscape, closeOnOverlayClick,
     isDraggableVariant, isVerticalSheet, resetToDefaultSnapPoint,
-    onOpenChange, onClose, onOpen,
+    onOpenChange, onClose, onOpen, controlled,
   } = input;
 
   const [isOpen, setIsOpen] = useState(open);
 
   const handleClose = useCallback(() => {
     if (!persistent && !disabled) {
-      setIsOpen(false);
+      if (!controlled) setIsOpen(false);
       onOpenChange?.(false);
       onClose?.();
     }
-  }, [persistent, disabled, onOpenChange, onClose]);
+  }, [persistent, disabled, controlled, onOpenChange, onClose]);
 
   const handleOverlayClick = useCallback(() => {
     if (closeOnOverlayClick && !persistent) {

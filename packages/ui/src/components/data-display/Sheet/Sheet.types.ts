@@ -4,6 +4,14 @@ import type { CSSProperties,ReactNode } from 'react';
 export interface SheetProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * The parent decides when the sheet closes: Escape, a tap outside or the
+   * close button only ASK (`onOpenChange(false)`), and the sheet stays until
+   * `open` turns false. For a host that may refuse a close — "leave without
+   * saving?" — without the sheet sliding away behind its question. Default
+   * false: a close request closes at once, as it always did.
+   */
+  controlled?: boolean;
   children?: ReactNode;
   title?: string;
   description?: string;

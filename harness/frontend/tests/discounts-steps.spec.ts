@@ -91,7 +91,10 @@ for (const width of [390, 1280]) {
       await next(dialog, 3);
       await expect(dialog.getByTestId('discount-steps-price-answer')).toHaveText('Desconto (%): 10%');
 
+      // Leaving with changes asks first (FUT-4478); this case discards.
       await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Descartar e sair' }).click();
+      await expect(dialog).toBeHidden();
       dialog = await openCreate(page);
       await fill(dialog, 'total-form-field-name', 'Leve 3, pague 2');
       await dialog.getByTestId('discount-kind-FREE_UNITS').click();
@@ -150,12 +153,13 @@ for (const width of [390, 1280]) {
       await expect(dialog.getByTestId('discount-form-submit')).toHaveText('Salvar alterações');
       await expect(dialog.getByTestId('discount-form-submit')).toBeEnabled();
       await page.keyboard.press('Escape');
-      const confirm = page.getByRole('dialog', { name: 'Sair sem salvar?' });
-      await expect(confirm).toBeVisible();
+      const confirm = page.getByTestId('discount-leave-confirm');
+      await expect(confirm).toContainText('Sair sem salvar?');
       await confirm.getByRole('button', { name: 'Continuar editando' }).click();
+      await expect(confirm).toBeHidden();
       await expect(dialog.getByTestId('total-form-field-code')).toHaveValue('LANCHE30');
       await page.keyboard.press('Escape');
-      await page.getByRole('dialog', { name: 'Sair sem salvar?' }).getByRole('button', { name: 'Descartar e sair' }).click();
+      await page.getByTestId('discount-leave-confirm').getByRole('button', { name: 'Descartar e sair' }).click();
       await expect(dialog).toBeHidden();
     });
 
