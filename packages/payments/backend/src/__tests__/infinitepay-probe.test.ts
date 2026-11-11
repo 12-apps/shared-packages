@@ -114,4 +114,20 @@ describe('infinitepay getCharge keeps the PENDING mapping', () => {
       infinitePayProvider(PT_BR_INFINITEPAY_COPY).getCharge('order-1', CREDS, { slug: 's', transactionNsu: 't' }),
     ).resolves.toMatchObject({ status: 'PENDING' });
   });
+
+  it('hands the caller\'s deadline to the request, and sends none when the caller has none (FUT-4268)', async () => {
+    const seen: Array<AbortSignal | null | undefined> = [];
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      seen.push(init.signal);
+      return new Response(JSON.stringify({ success: false }), { status: 200 });
+    });
+    const provider = infinitePayProvider(PT_BR_INFINITEPAY_COPY);
+    const signal = new AbortController().signal;
+
+    await provider.getCharge('order-1', CREDS, { slug: 's' }, { signal });
+    await provider.getCharge('order-1', CREDS, { slug: 's' });
+
+    expect(seen[0]).toBe(signal);
+    expect(seen[1] ?? undefined).toBeUndefined();
+  });
 });

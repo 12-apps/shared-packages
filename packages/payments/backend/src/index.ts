@@ -85,6 +85,7 @@ export {
   type PendingSweepOptions,
   type PendingSweepReport,
 } from './core/payable-sweep';
+export type { ProviderReadOptions, RefreshOptions } from './core/refresh-options';
 /** Adapter-declared field roles (FUT-761): which credential field authenticates inbound deliveries. */
 export { webhookFieldOf } from './core/credential-roles';
 export { withMerchantRedirectUrl, withMerchantWebhookUrl } from './core/webhook-url';

@@ -1,4 +1,5 @@
 import { ChargeDeclinedError, ProviderRequestError } from './errors';
+import { isRequestTimeout, isTransportError } from './failover';
 import type { PaymentsGateway } from './gateway';
 import {
   type ProviderFailurePath,
@@ -7,6 +8,7 @@ import {
   isProviderEndpointFailure,
   reportProviderFailure,
 } from './provider-failure';
+import type { RefreshOptions } from './refresh-options';
 import type { MerchantRef } from './types';
 
 /**
@@ -67,6 +69,43 @@ function guarded<A extends unknown[], R>(
   };
 }
 
+/**
+ * The sweep's re-read (FUT-4268). A failure with NO HTTP answer is the
+ * network's, retried five minutes later (every 15 s while young), so reporting
+ * each one paged the store ~288 times a day per unreachable charge. The sweep
+ * says how: `quiet` is not reported; `final` is reported once, under its own
+ * path. An HTTP answer, and any caller that says nothing, keep `REFRESH`.
+ */
+function refreshGuarded<P extends string>(
+  reporter: ProviderFailureReporter,
+  call: PaymentsGateway<P>['refreshCharge'],
+): PaymentsGateway<P>['refreshCharge'] {
+  return async (merchant, provider, id, hints, options?: RefreshOptions) => {
+    try {
+      return await call(merchant, provider, id, hints, options);
+    } catch (error) {
+      const noAnswer = isTransportError(error) || isRequestTimeout(error);
+      if (options?.transport && noAnswer) {
+        if (options.transport === 'final') {
+          reportProviderFailure(reporter, {
+            path: 'REFRESH_ABANDONED', severity: 'warning', merchant, provider: providerOf(error, provider), reference: id, error,
+          });
+        }
+      } else if (isProviderEndpointFailure(error)) {
+        reportProviderFailure(reporter, {
+          path: 'REFRESH',
+          severity: error instanceof ChargeDeclinedError ? 'info' : 'warning',
+          merchant,
+          provider: providerOf(error, provider),
+          reference: id,
+          error,
+        });
+      }
+      throw error;
+    }
+  };
+}
+
 /** Wrap the gateway's follow-up calls; the walk is not touched here. */
 export function withProviderFailureReports<P extends string>(
   reporter: ProviderFailureReporter | undefined,
@@ -75,9 +114,7 @@ export function withProviderFailureReports<P extends string>(
   if (!reporter) return gateway;
   return {
     ...gateway,
-    refreshCharge: guarded(reporter, 'REFRESH', 'warning', gateway.refreshCharge, (merchant, provider, id) => ({
-      merchant, provider, reference: id,
-    })),
+    refreshCharge: refreshGuarded(reporter, gateway.refreshCharge),
     cancelCharge: guarded(reporter, 'CANCEL', 'error', gateway.cancelCharge, (merchant, provider, id) => ({
       merchant, provider, reference: id,
     })),

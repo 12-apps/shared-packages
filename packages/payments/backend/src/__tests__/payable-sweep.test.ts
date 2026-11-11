@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { PaymentsGateway } from '../core/gateway';
 import { reconcilePendingCharges } from '../core/payable-sweep';
 import type { ChargeSnapshot, MerchantRef } from '../core/types';
 import { createMemoryChargeStore } from '../memory';
@@ -190,5 +191,127 @@ describe('reconcilePendingCharges', () => {
     );
 
     expect(report).toEqual({ checked: 1, settled: 0, failed: 1, declined: 0 });
+  });
+
+  // FUT-4268: a read with no HTTP answer is the network's, not the charge's.
+  describe('a failure with no HTTP answer', () => {
+    const transport = (): Error =>
+      Object.assign(new TypeError('fetch failed'), {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      });
+
+    it('is logged at info, never as a warning, and still counts failed', async () => {
+      const store = await storeWith([{ id: 'CHAR_down', ageMs: 10 * MIN }]);
+      const refreshCharge = vi.fn<PaymentsGateway['refreshCharge']>(async () => {
+        throw transport();
+      });
+      const logWarn = vi.fn();
+      const logInfo = vi.fn();
+
+      const report = await reconcilePendingCharges(
+        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { now: NOW, finalTickMs: 5 * MIN },
+      );
+
+      expect(report).toEqual({ checked: 1, settled: 0, failed: 1 });
+      expect(logWarn).not.toHaveBeenCalled();
+      expect(logInfo).toHaveBeenCalledOnce();
+      expect(refreshCharge.mock.calls[0]?.[4]).toMatchObject({ transport: 'quiet' });
+    });
+
+    it('keeps the warning for an HTTP answer, exactly as before', async () => {
+      const store = await storeWith([{ id: 'CHAR_404', ageMs: 10 * MIN }]);
+      const refreshCharge = vi.fn(async () => {
+        throw new Error('InfinitePay 404 Not Found');
+      });
+      const logWarn = vi.fn();
+      const logInfo = vi.fn();
+
+      await reconcilePendingCharges(
+        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { now: NOW, finalTickMs: 5 * MIN },
+      );
+
+      expect(logWarn).toHaveBeenCalledOnce();
+      expect(logInfo).not.toHaveBeenCalled();
+    });
+
+    it('warns once on the last pass before the 24 h cutoff, and not on the passes before it', async () => {
+      const store = await storeWith([
+        { id: 'CHAR_early', ageMs: 24 * HOUR - 6 * MIN },
+        { id: 'CHAR_last', ageMs: 24 * HOUR - 4 * MIN },
+      ]);
+      const refreshCharge = vi.fn(async () => {
+        throw transport();
+      });
+      const logWarn = vi.fn();
+      const logInfo = vi.fn();
+
+      await reconcilePendingCharges(
+        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { now: NOW, finalTickMs: 5 * MIN },
+      );
+
+      expect(logWarn).toHaveBeenCalledOnce();
+      expect(logWarn.mock.calls[0]?.[0]).toContain('CHAR_last');
+      expect(logInfo).toHaveBeenCalledOnce();
+      const modes = refreshCharge.mock.calls.map((call) => (call as unknown[])[4]);
+      expect(modes).toEqual([
+        expect.objectContaining({ transport: 'quiet' }),
+        expect.objectContaining({ transport: 'final' }),
+      ]);
+    });
+
+    it('has no last pass when the caller gives no interval (the young sweep)', async () => {
+      const store = await storeWith([{ id: 'CHAR_edge', ageMs: 24 * HOUR - 1 * MIN }]);
+      const refreshCharge = vi.fn(async () => {
+        throw transport();
+      });
+      const logWarn = vi.fn();
+      const logInfo = vi.fn();
+
+      await reconcilePendingCharges(
+        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { now: NOW },
+      );
+
+      expect(logWarn).not.toHaveBeenCalled();
+      expect(logInfo).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('gives each read a 15 s deadline, and a stuck one stops holding the sweep', async () => {
+    // `AbortSignal.timeout` runs on the runtime's own timer, which fake timers
+    // do not drive: stand in for it, and fire the deadline by hand.
+    const deadlines: Array<{ ms: number; controller: AbortController }> = [];
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+      const controller = new AbortController();
+      deadlines.push({ ms, controller });
+      return controller.signal;
+    });
+    try {
+      const store = await storeWith([{ id: 'CHAR_stuck', ageMs: 10 * MIN }, { id: 'CHAR_ok', ageMs: 10 * MIN }]);
+      const refreshCharge = vi.fn<PaymentsGateway['refreshCharge']>((_m, _p, id) =>
+        id === 'CHAR_stuck' ? new Promise<never>(() => undefined) : Promise.resolve(snapshot({ providerChargeId: id })),
+      );
+      const logWarn = vi.fn();
+      const logInfo = vi.fn();
+
+      const pass = reconcilePendingCharges(
+        { charges: store, gateway: { refreshCharge } as never, settle: vi.fn(), logWarn, logInfo },
+        { now: NOW },
+      );
+      await vi.waitFor(() => expect(deadlines).toHaveLength(1));
+      deadlines[0]?.controller.abort(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
+      const report = await pass;
+
+      expect(deadlines.map((d) => d.ms)).toEqual([15_000, 15_000]);
+      expect(report).toEqual({ checked: 2, settled: 0, failed: 1 });
+      expect(refreshCharge.mock.calls[0]?.[4]?.signal).toBeInstanceOf(AbortSignal);
+      expect(logWarn).not.toHaveBeenCalled();
+      expect(logInfo).toHaveBeenCalledOnce();
+    } finally {
+      timeout.mockRestore();
+    }
   });
 });

@@ -4,6 +4,7 @@ import { manualChargeMethods, type ManualChargeMethods } from './manual-charge';
 import { refreshOneCharge } from './charge-refresh';
 import { withProviderFailureReports } from './gateway-reporting';
 import type { ProviderFailureReporter } from './provider-failure';
+import type { RefreshOptions } from './refresh-options';
 import { type ChargeWalkDeps, type FailoverPolicy, walkChargeChain } from './charge-walk';
 import { type ClientProviderConfig, toClientProviderConfig } from './client-view';
 import { CredentialsError, UnsupportedOperationError } from './errors';
@@ -168,6 +169,7 @@ export interface PaymentsGateway<P extends string = string>
     provider: P,
     providerChargeId: string,
     hints?: SettlementHints,
+    options?: RefreshOptions,
   ): Promise<ChargeSnapshot>;
   cancelCharge(merchant: MerchantRef, provider: P, providerChargeId: string): Promise<ChargeSnapshot>;
   refund(merchant: MerchantRef, provider: P, input: RefundInput): Promise<RefundSnapshot>;
@@ -341,8 +343,8 @@ export function createPaymentsGateway<P extends string>(
       return run;
     },
 
-    refreshCharge: (merchant, provider, chargeId, hints) =>
-      refreshOneCharge(config, resolve, merchant, provider, chargeId, hints),
+    refreshCharge: (merchant, provider, chargeId, hints, options) =>
+      refreshOneCharge(config, resolve, merchant, provider, chargeId, hints, options?.signal),
 
     cancelCharge: cancelChargeAt(config.charges, resolve),
     captureCharge: captureChargeAt(config.charges, resolve),

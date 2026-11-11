@@ -157,6 +157,30 @@ describe('paymentsJobBlueprints', () => {
     ).resolves.toBeUndefined();
     expect(settled).toHaveLength(0);
   });
+
+  it('warns once for a charge on its last pass, with no HTTP answer (FUT-4268)', async () => {
+    const down = Object.assign(new TypeError('fetch failed'), {
+      cause: Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }),
+    });
+    const warnings: string[] = [];
+    const run = (ageMs: number) => {
+      const { deps } = hostDeps({
+        gateway: {
+          refreshCharge: async () => {
+            throw down;
+          },
+        },
+        now: () => new Date(new Date('2026-08-17T12:00:00Z').getTime() + ageMs),
+        logWarn: (line: string) => warnings.push(line),
+      });
+      return paymentsJobBlueprints().reconcilePending.handle(undefined, deps, context);
+    };
+
+    await run(24 * 60 * 60_000 - 20 * 60_000);
+    expect(warnings).toEqual([]);
+    await run(24 * 60 * 60_000 - 4 * 60_000);
+    expect(warnings).toHaveLength(1);
+  });
 });
 
 /**

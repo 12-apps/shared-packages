@@ -22,6 +22,9 @@ export const PAYMENTS_SWEEP_QUEUE = 'sweeps';
 /** Five minutes — the resolution at which "paid but still pending" is a delay. */
 export const RECONCILE_CRON = '*/5 * * * *';
 
+/** The same gap in ms — the pending-charge sweep's last-pass band (FUT-4268). */
+export const RECONCILE_INTERVAL_MS = 5 * 60_000;
+
 /** Same five minutes, same reason: an unsettled delivery is a delay, not news. */
 export const WEBHOOK_DRAIN_CRON = '*/5 * * * *';
 

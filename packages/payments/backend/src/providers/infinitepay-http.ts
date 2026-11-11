@@ -61,11 +61,13 @@ async function post<T>(
   path: string,
   credentials: ResolvedCredentials,
   body: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<T> {
   return providerFetch<T>(NAME, 'InfinitePay', `${API_BASE}${path}`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -130,11 +132,12 @@ export interface InfinitePayPaymentCheck {
 export async function paymentCheck(
   credentials: ResolvedCredentials,
   params: { orderNsu: string; transactionNsu?: string; slug?: string },
+  signal?: AbortSignal,
 ): Promise<InfinitePayPaymentCheck> {
   return post<InfinitePayPaymentCheck>('/payment_check', credentials, {
     handle: handleOf(credentials),
     order_nsu: params.orderNsu,
     transaction_nsu: params.transactionNsu,
     slug: params.slug,
-  });
+  }, signal);
 }

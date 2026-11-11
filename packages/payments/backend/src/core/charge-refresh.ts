@@ -20,6 +20,7 @@ export async function refreshOneCharge(
   provider: string,
   providerChargeId: string,
   hints?: SettlementHints,
+  signal?: AbortSignal,
 ): Promise<ChargeSnapshot> {
   // A store-confirmed charge is read, never re-asked (`manual-charge.ts`) — and
   // read off the REGISTRY, so a store whose Pix manual settings were cleared
@@ -30,7 +31,7 @@ export async function refreshOneCharge(
   const { adapter, creds } = await resolve(merchant, provider);
   const stored = await config.charges.findByProviderChargeId(provider, providerChargeId);
   const merged = { ...stored?.snapshot.settlementHints, ...hints };
-  const snapshot = await adapter.getCharge(providerChargeId, creds, merged);
+  const snapshot = await adapter.getCharge(providerChargeId, creds, merged, signal ? { signal } : undefined);
   await config.charges.upsertByProviderChargeId(merchant, snapshot);
   return snapshot;
 }

@@ -44,7 +44,7 @@
 
 import { reconcilePendingCharges, type PendingSweepDeps } from '../core/payable-sweep';
 
-import { PAYMENTS_SWEEP_QUEUE, RECONCILE_CRON } from './cadence';
+import { PAYMENTS_SWEEP_QUEUE, RECONCILE_CRON, RECONCILE_INTERVAL_MS } from './cadence';
 
 export {
   ACTIVATION_RECONCILE_CRON,
@@ -229,6 +229,8 @@ const reconcilePending: PaymentsJobBlueprint = {
   handle: async (_payload, deps, context) => {
     const report = await reconcilePendingCharges(deps, {
       now: (deps.now ?? (() => new Date()))(),
+      // The last pass before a charge leaves its window raises its one warning.
+      finalTickMs: RECONCILE_INTERVAL_MS,
     });
     if (report.checked > 0) {
       context.logger.info(

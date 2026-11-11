@@ -156,6 +156,20 @@ export function isTransportError(error: unknown): boolean {
 }
 
 /**
+ * True for the abort a caller's own `AbortSignal.timeout` raises (FUT-4268).
+ *
+ * Deliberately NOT part of {@link isTransportError}: that one feeds the walk's
+ * failover verdicts, and an abort this package itself requested says nothing
+ * about whether the provider answered. A read-only caller that set a deadline
+ * (the pending-charge sweep) asks THIS question instead: "did my deadline fire".
+ */
+export function isRequestTimeout(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const name = (error as { name?: unknown }).name;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
+/**
  * HTTP statuses whose meaning is settled. Everything absent — notably every
  * 5xx — falls through to AMBIGUOUS, because a provider that broke while
  * answering may well have created the charge first.
