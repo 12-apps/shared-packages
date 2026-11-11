@@ -24,14 +24,14 @@ const CATALOG = defineCatalog({
 function mounted() {
   const config: ReportBuilderServerConfig = {
     catalog: CATALOG,
-    adapter: () => createMemoryDataSource([], 'Others'),
+    adapter: () => createMemoryDataSource({}, 'Others'),
     copy: PT_BR_REPORT_ENGINE_COPY,
     messages: PT_BR_REPORT_SERVER_MESSAGES,
     db: () => Promise.resolve({} as unknown as SavedReportDb),
     entityPermission: { loans: 'loans:read' },
     systemReports: [],
     starters: {},
-  } as ReportBuilderServerConfig;
+  } as unknown as ReportBuilderServerConfig;
   return reportBuilderRouter({
     ...config,
     resolveActor: () => ({

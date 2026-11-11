@@ -11,7 +11,7 @@ import type { z } from 'zod';
  * object reports an unknown key before its own rules run.
  */
 export function withoutUnrecognizedKeys(schema: z.ZodType, input: unknown): unknown {
-  let current: unknown = structuredClone(input);
+  const current: unknown = structuredClone(input);
   for (let pass = 0; pass < 8; pass += 1) {
     const result = schema.safeParse(current);
     if (result.success) return current;
