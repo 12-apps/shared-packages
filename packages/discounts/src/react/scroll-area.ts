@@ -103,9 +103,11 @@ function gapsBetween(from: HTMLElement, scroller: HTMLElement): { top: number; b
 export function useScrollArea(root: RefObject<HTMLElement | null>): ScrollArea {
   const [area, setArea] = useState<ScrollArea>({ height: null, surface: null, padTop: 0, padBottom: 0, ownTop: 0, ownBottom: 0 });
   useEffect(() => {
+    // No ResizeObserver, no layout to follow (a test DOM): nothing is walked.
+    if (typeof ResizeObserver === "undefined") return undefined;
     const form = root.current;
     const area = scrollAreaOf(form);
-    if (!form || !area || typeof ResizeObserver === "undefined") return undefined;
+    if (!form || !area) return undefined;
     const scroller = area;
     const measure = (): void => {
       const { top, bottom, ownTop, ownBottom } = gapsBetween(form, scroller);

@@ -34,6 +34,9 @@ export function oneAdminPerDescribe(tree: () => ReactElement, reset: () => void)
     });
   });
   afterEach(async () => {
+    // A case that saved last leaves the save's own close in flight: let it land
+    // first, so a saved form is not asked "Sair sem salvar?" and discarded.
+    await act(async () => {});
     const open = screen.queryAllByTestId("discount-form")[0];
     if (open) fireEvent.keyDown(open, { key: "Escape" });
     // A case that changed something meets "Sair sem salvar?" (FUT-4478): discard.

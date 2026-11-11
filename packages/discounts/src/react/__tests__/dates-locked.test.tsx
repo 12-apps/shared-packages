@@ -110,6 +110,9 @@ browserRootFontForThisFile();
 beforeAll(async () => {
   mount([LOCKED]);
   await openEdit(LOCKED.id);
+  // The edit form opens one step at a time (FUT-4477): the first step's face
+  // (the Tipo cards) writes its styles too, here rather than inside a case.
+  reachLabel(copy.form.name);
   cleanup();
 });
 
