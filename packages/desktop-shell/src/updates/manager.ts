@@ -178,7 +178,10 @@ export interface UpdateManagerOptions {
 /** The check in flight, and whether a person asked for it. */
 interface RunningCheck {
   manual: boolean;
-  /** Settles once it is over; `true` if the updater was asked. Never rejects. */
+  /**
+   * Settles once it is over; `true` if the updater was asked. Rejects only if
+   * a state listener throws.
+   */
   done: Promise<boolean>;
 }
 
@@ -275,7 +278,8 @@ export function createUpdateManager(options: UpdateManagerOptions): UpdateManage
 
 /**
  * One check: prepare, then ask the updater. Resolves `true` when the updater
- * was actually asked, `false` when the check was skipped. Never rejects.
+ * was actually asked, `false` when the check was skipped. The updater's own
+ * failure never rejects; a state listener that throws in `move` does.
  */
 async function runCheck(
   options: UpdateManagerOptions,
