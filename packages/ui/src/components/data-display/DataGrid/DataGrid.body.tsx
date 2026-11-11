@@ -153,6 +153,7 @@ export function GridBody<T extends Record<string, unknown>>(
             rowId={rowId}
             isSelected={model.selectedRowIdsSet.has(rowId)}
             isExpanded={model.expandedRowIdsSet.has(rowId)}
+            isPinned={model.isPinnedRow(row)}
             totalColumns={totalColumns}
             model={model}
             props={props}

@@ -3,6 +3,7 @@
 import { useTheme, type Theme } from "@mui/material/styles/index.js";
 
 import { useDataViewsCopy } from "./data-views-copy-context";
+import { PinnedSlot, type PinnedMark } from "./data-views-pinned-slot";
 import { Box } from "../../../mui/Box";
 import { Text } from "../../typography/Text";
 
@@ -182,6 +183,8 @@ interface BoardColumnProps<T extends Record<string, unknown>> {
   selectedIds: Set<string | number>;
   onToggleId?: (id: string | number) => void;
   cardScale: number;
+  /** The pinned row and its label (FUT-4745). */
+  pinned?: PinnedMark<T>;
   /** The column's width as CSS, already through the type scale. */
   width: string;
   testId: string;
@@ -196,6 +199,7 @@ function BoardColumn<T extends Record<string, unknown>>({
   selectedIds,
   onToggleId,
   cardScale,
+  pinned,
   width,
   testId,
 }: BoardColumnProps<T>): React.JSX.Element {
@@ -234,13 +238,13 @@ function BoardColumn<T extends Record<string, unknown>>({
         column.rows.map((row) => {
           const id = getRowId(row);
           return (
-            <Box key={id}>
+            <PinnedSlot key={id} pinned={row === pinned?.row} label={pinned?.label}>
               {renderCard(row, {
                 selected: selectedIds.has(id),
                 onToggleSelect: onToggleId && (() => onToggleId(id)),
                 scale: cardScale,
               })}
-            </Box>
+            </PinnedSlot>
           );
         })
       )}
@@ -259,6 +263,8 @@ interface DataViewsBoardProps<T extends Record<string, unknown>> {
   onToggleId?: (id: string | number) => void;
   /** Card size multiplier from the toolbar zoom slider — the same knob as cards. */
   cardScale: number;
+  /** The pinned row and its label (FUT-4745): first in its column, marked and labelled. */
+  pinned?: PinnedMark<T>;
   dataTestId?: string;
 }
 
@@ -292,6 +298,7 @@ export function DataViewsBoard<T extends Record<string, unknown>>({
   selectedIds,
   onToggleId,
   cardScale,
+  pinned,
   dataTestId,
 }: DataViewsBoardProps<T>): React.JSX.Element {
   const copy = useDataViewsCopy();
@@ -330,6 +337,7 @@ export function DataViewsBoard<T extends Record<string, unknown>>({
             selectedIds={selectedIds}
             onToggleId={onToggleId}
             cardScale={cardScale}
+            pinned={pinned}
             width={width}
             testId={`${testId}-column-${column.key}`}
           />

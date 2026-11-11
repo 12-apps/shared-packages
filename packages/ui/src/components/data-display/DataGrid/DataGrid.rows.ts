@@ -71,6 +71,18 @@ function matchesFilter<T extends Record<string, unknown>>(
     .includes(String(filter.value).toLowerCase());
 }
 
+/**
+ * Move the ONE row `isPinned` matches to the front, leaving every other row in
+ * its order. Shown once: the row leaves its own place rather than appearing
+ * twice. Returns `rows` itself — same identity — when nothing matches or the
+ * row already leads, so a no-op pin never invalidates a memo downstream.
+ */
+export function pinRowFirst<T>(rows: T[], isPinned: (row: T) => boolean): T[] {
+  const at = rows.findIndex(isPinned);
+  if (at <= 0) return rows;
+  return [rows[at] as T, ...rows.slice(0, at), ...rows.slice(at + 1)];
+}
+
 /** Which client-mode steps this render actually needs. */
 interface RowPipeline<T extends Record<string, unknown>> {
   rows: T[];
@@ -80,6 +92,8 @@ interface RowPipeline<T extends Record<string, unknown>> {
   needsFiltering: boolean;
   needsSorting: boolean;
   needsPagination: boolean;
+  /** The pinned-row test, or undefined when no row is pinned. */
+  isPinned?: (row: T) => boolean;
   pageIndex: number;
   pageSize: number;
 }
@@ -91,8 +105,8 @@ interface RowPipeline<T extends Record<string, unknown>> {
  * exactly what it was given.
  */
 export function processRows<T extends Record<string, unknown>>(pipeline: RowPipeline<T>): T[] {
-  const { rows, columnMap, needsFiltering, needsSorting, needsPagination } = pipeline;
-  if (!needsFiltering && !needsSorting && !needsPagination) return rows;
+  const { rows, columnMap, needsFiltering, needsSorting, needsPagination, isPinned } = pipeline;
+  if (!needsFiltering && !needsSorting && !needsPagination && !isPinned) return rows;
 
   let result = rows;
   if (needsFiltering) {
@@ -104,6 +118,9 @@ export function processRows<T extends Record<string, unknown>>(pipeline: RowPipe
     // Copy only here: `Array#sort` is in-place and the caller owns `rows`.
     result = [...result].sort(makeComparator(pipeline.sortBy, columnMap));
   }
+  // After the sort, so the pinned row leads whatever the order; before the
+  // page slice, so it leads page one rather than whichever page it sorted to.
+  if (isPinned) result = pinRowFirst(result, isPinned);
   if (needsPagination) {
     const start = pipeline.pageIndex * pipeline.pageSize;
     result = result.slice(start, start + pipeline.pageSize);
