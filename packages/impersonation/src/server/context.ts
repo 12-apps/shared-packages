@@ -2,6 +2,8 @@ import type { ImpersonationPathRules } from '../core/paths';
 import type { ImpersonationCodec, ImpersonationTimeBoxConfig } from '../core/session';
 import type { ImpersonationCookie, ImpersonationState } from '../core/types';
 
+import type { InputProblem } from './problems';
+
 import type {
   ImpersonationAuditPort,
   ImpersonationDirectory,
@@ -283,9 +285,12 @@ export function messagesOf(
 /** A user-safe API error carrying the HTTP status the wire promises. */
 export class ImpersonationApiError extends Error {
   readonly status: number;
+  /** Set on a 422: every problem of the refused input, with its path. */
+  readonly problems?: InputProblem[];
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, problems?: InputProblem[]) {
     super(message);
+    if (problems) this.problems = problems;
     this.name = 'ImpersonationApiError';
     this.status = status;
     // Restores the prototype chain across the ES5 `extends Error` downlevel, so
@@ -300,13 +305,17 @@ export const ok = (data: unknown, cookie?: ImpersonationCookie): ImpersonationRe
   cookie,
 });
 
-export const fail = (status: number, error: string): ImpersonationResponse => ({
+export const fail = (
+  status: number,
+  error: string,
+  problems?: InputProblem[],
+): ImpersonationResponse => ({
   status,
-  body: { error },
+  body: problems ? { error, problems } : { error },
 });
 
 /** Fold an {@link ImpersonationApiError} into a response; rethrow the rest. */
 export function foldApiError(error: unknown): ImpersonationResponse {
-  if (error instanceof ImpersonationApiError) return fail(error.status, error.message);
+  if (error instanceof ImpersonationApiError) return fail(error.status, error.message, error.problems);
   throw error;
 }

@@ -15,7 +15,7 @@ import type {
 
 /** `POST` on the platform surface: start an operator session. */
 export function startOperatorBody(policy: ImpersonationMintPolicy) {
-  return z.object({
+  return z.strictObject({
     targetUserId: z.string().min(1).max(64),
     /**
      * Narrowed to the host's own apps. `z.enum` needs a non-empty tuple, so a
@@ -45,8 +45,8 @@ export function startOperatorBody(policy: ImpersonationMintPolicy) {
  * flag a caller could set, so there is no parameter for this surface to take.
  */
 export const startPreviewBody = z.discriminatedUnion('as', [
-  z.object({ as: z.literal('role'), roleName: z.string().min(1).max(120) }),
-  z.object({ as: z.literal('member'), memberUserId: z.string().min(1).max(64) }),
+  z.strictObject({ as: z.literal('role'), roleName: z.string().min(1).max(120) }),
+  z.strictObject({ as: z.literal('member'), memberUserId: z.string().min(1).max(64) }),
 ]);
 
 export type StartPreviewBody = z.infer<typeof startPreviewBody>;

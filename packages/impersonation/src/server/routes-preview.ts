@@ -12,6 +12,7 @@ import {
   messagesOf,
 } from './context';
 import { authorizedSession } from './live-session';
+import { problemsOf } from './problems';
 import { attemptOf, type AttemptContext, type Refusals } from './refusals';
 import { recordEnd } from './session-end';
 import { startPreviewBody, type StartPreviewBody } from './wire';
@@ -92,7 +93,11 @@ function parseBody(
 ): StartPreviewBody {
   const result = startPreviewBody.safeParse(body);
   if (!result.success) {
-    throw new ImpersonationApiError(400, messagesOf(parts.config, locale).invalidBody);
+    throw new ImpersonationApiError(
+      422,
+      messagesOf(parts.config, locale).invalidBody,
+      problemsOf(result.error),
+    );
   }
   return result.data;
 }
