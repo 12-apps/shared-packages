@@ -37,7 +37,6 @@ export {
   missingWebCopy,
   fill,
   type DiscountsActionsCopy,
-  type DiscountsBulkCopy,
   type DiscountsCardCopy,
   type DiscountsFormCopy,
   type DiscountsScreenCopy,
@@ -47,6 +46,7 @@ export {
   type DiscountsWindowCopy,
 } from "./copy";
 
+export type { DiscountsBulkCopy } from "./copy-bulk";
 export { PT_BR_DISCOUNTS_WEB_COPY } from "./pt-BR";
 export { EN_US_DISCOUNTS_WEB_COPY } from "./en-US";
 

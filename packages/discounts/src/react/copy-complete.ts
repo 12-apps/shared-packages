@@ -1,4 +1,5 @@
-import type { DiscountsBulkCopy, DiscountsFormCopy, DiscountsWebCopy, DiscountsWindowCopy } from "./copy";
+import type { DiscountsBulkCopy } from "./copy-bulk";
+import type { DiscountsFormCopy, DiscountsWebCopy, DiscountsWindowCopy } from "./copy";
 
 /**
  * The complete shape of a pack, split from `./copy` for the file-size gate;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   DISCOUNT_BULK_MAX_IDS,
@@ -11,7 +11,8 @@ import {
   type DiscountBulkUndoRow,
 } from "../bulk";
 import type { DiscountsApiClient } from "./api";
-import { fill, type CompleteDiscountsWebCopy, type DiscountsBulkCopy } from "./copy";
+import { fill, type CompleteDiscountsWebCopy } from "./copy";
+import type { DiscountsBulkCopy } from "./copy-bulk";
 
 /**
  * The bulk actions' state (FUT-4420), owned by the PACKAGE and drawn by the
@@ -90,6 +91,50 @@ export function undoableOf(rows: readonly DiscountBulkRow[]): DiscountBulkUndoRo
   );
 }
 
+/** What the handlers share: the client, the report's setters and the reload. */
+interface BulkDeps {
+  api: DiscountsApiClient;
+  refresh: () => void;
+  onError: (error: unknown, context: string) => void;
+  latest: { current: DiscountsBulkState };
+  set: (next: DiscountsBulkState) => void;
+}
+
+type Done = Extract<DiscountsBulkState, { phase: "done" }>;
+
+/** Desfazer: the `ok` rows back to their `before`, once. */
+async function undoBatch({ api, refresh, onError, latest, set }: BulkDeps): Promise<void> {
+  const current = latest.current;
+  if (current.phase !== "done" || current.undone !== null || current.busy) return;
+  const rows = undoableOf(current.result.rows);
+  if (rows.length === 0) return;
+  set({ ...current, busy: true });
+  const answer = await api.bulk({ operation: "undo", rows });
+  if (!answer.ok) {
+    onError(answer, "discounts.bulk.undo");
+    set({ ...current, busy: false });
+    return;
+  }
+  set({ ...current, busy: false, undone: answer.data });
+  refresh();
+}
+
+/** "Tentar novamente" on a finished batch: only its failed rows, folded into the same report. */
+async function retryRows({ api, refresh, onError, latest, set }: BulkDeps, current: Done): Promise<void> {
+  const ids = current.result.rows.filter((row) => row.retryable).map((row) => row.id);
+  if (current.busy || ids.length === 0) return;
+  set({ ...current, busy: true });
+  const answer = await api.bulk({ ...current.request, ids });
+  if (!answer.ok) {
+    onError(answer, `discounts.bulk.${current.request.operation}`);
+    set({ ...current, busy: false });
+    return;
+  }
+  const latestDone = latest.current.phase === "done" ? latest.current : current;
+  set({ ...latestDone, busy: false, result: foldRetry(latestDone.result, answer.data) });
+  refresh();
+}
+
 export function useDiscountsBulk(
   api: DiscountsApiClient,
   copy: CompleteDiscountsWebCopy,
@@ -105,15 +150,15 @@ export function useDiscountsBulk(
     latest.current = next;
     setState(next);
   }, []);
+  const deps = useMemo<BulkDeps>(() => ({ api, refresh, onError, latest, set }), [api, refresh, onError, set]);
 
   const run = useCallback<DiscountsBulkRunner>(
     async (request) => {
-      const total = request.ids.length;
-      if (total > DISCOUNT_BULK_MAX_IDS) {
+      if (request.ids.length > DISCOUNT_BULK_MAX_IDS) {
         set({ phase: "failed", request, message: fill(copy.bulk.tooMany, { max: DISCOUNT_BULK_MAX_IDS }) });
         return;
       }
-      set({ phase: "running", request, total });
+      set({ phase: "running", request, total: request.ids.length });
       const answer = await api.bulk(request);
       if (!answer.ok) {
         onError(answer, `discounts.bulk.${request.operation}`);
@@ -126,42 +171,12 @@ export function useDiscountsBulk(
     [api, copy.bulk, onError, refresh, set],
   );
 
-  const undo = useCallback(async () => {
-    const current = latest.current;
-    if (current.phase !== "done" || current.undone !== null || current.busy) return;
-    const rows = undoableOf(current.result.rows);
-    if (rows.length === 0) return;
-    set({ ...current, busy: true });
-    const answer = await api.bulk({ operation: "undo", rows });
-    if (!answer.ok) {
-      onError(answer, "discounts.bulk.undo");
-      set({ ...current, busy: false });
-      return;
-    }
-    set({ ...current, busy: false, undone: answer.data });
-    refresh();
-  }, [api, onError, refresh, set]);
-
   const retry = useCallback(async () => {
     const current = latest.current;
-    if (current.phase === "failed") {
-      await run(current.request);
-      return;
-    }
-    if (current.phase !== "done" || current.busy) return;
-    const ids = current.result.rows.filter((row) => row.retryable).map((row) => row.id);
-    if (ids.length === 0) return;
-    set({ ...current, busy: true });
-    const answer = await api.bulk({ ...current.request, ids });
-    if (!answer.ok) {
-      onError(answer, `discounts.bulk.${current.request.operation}`);
-      set({ ...current, busy: false });
-      return;
-    }
-    set({ ...current, busy: false, result: foldRetry(current.result, answer.data) });
-    refresh();
-  }, [api, onError, refresh, run, set]);
-
+    if (current.phase === "failed") await run(current.request);
+    else if (current.phase === "done") await retryRows(deps, current);
+  }, [deps, run]);
+  const undo = useCallback(() => undoBatch(deps), [deps]);
   const dismiss = useCallback(() => set({ phase: "idle" }), [set]);
 
   const rows = state.phase === "done" ? state.result.rows : [];

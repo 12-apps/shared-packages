@@ -15,8 +15,8 @@ import { foldRetry, undoableOf, type DiscountsBulkSlotProps } from "../use-disco
 
 /**
  * FUT-4420, the screen's half of the bulk actions: the entries, the extend
- * dialog, and the state the HOST's slot is handed. The slot here is a stand-in
- * for future-pay's `bulk-report.tsx`.
+ * dialog, and the state the host's slot is handed. The slot here is a stand-in
+ * for a host's own report component.
  */
 
 const COPY = completeWebCopy(PT_BR_DISCOUNTS_WEB_COPY, "pt-BR");

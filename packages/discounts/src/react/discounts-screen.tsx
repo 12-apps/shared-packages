@@ -6,10 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import AddIcon from "@mui/icons-material/Add";
 
 import { useServerDataViews } from "@12-apps/app-shell/react";
-import {
-  CardActionsProvider,
-  useRowConfirm,
-} from "@12-apps/ui/data-display/CardKit";
+import { CardActionsProvider } from "@12-apps/ui/data-display/CardKit";
 import {
   DataViewsCopyProvider,
   DataViewsGrid,
@@ -24,7 +21,7 @@ import { Text } from "@12-apps/ui/typography/Text";
 import { exportRows } from "@12-apps/ui/utils";
 
 import type { DiscountsApiClient, DiscountsPage } from "./api";
-import { fill, type CompleteDiscountsWebCopy } from "./copy";
+import type { CompleteDiscountsWebCopy } from "./copy";
 import { DaysUnknownListNotice, type DiscountsTimeZoneSettings } from "./days-unknown-notice";
 import { DiscountActionsMenu } from "./discount-actions-menu";
 import { DiscountCard } from "./discount-card";
@@ -43,6 +40,7 @@ import {
   discountsSearch,
 } from "./table-config";
 import { useBulkActions, type BulkActions } from "./use-bulk-actions";
+import { useBulkDelete } from "./use-bulk-delete";
 import { useDiscountsData } from "./use-discounts-data";
 import type { DiscountsBulkSlotProps } from "./use-discounts-bulk";
 
@@ -84,44 +82,6 @@ export interface DiscountsScreenProps {
    * was: a batch with nowhere to report would be a silent one.
    */
   bulkSlot?: ComponentType<DiscountsBulkSlotProps>;
-}
-
-/** The bulk delete's confirmation, described from the SELECTION. */
-function useBulkDelete(
-  api: DiscountsApiClient,
-  copy: CompleteDiscountsWebCopy,
-  refresh: () => void,
-  onError: (error: unknown, context: string) => void,
-) {
-  return useRowConfirm<DiscountListItem>({
-    write: async (rows) => {
-      const results = await Promise.all(rows.map((row) => api.remove(row.id)));
-      const failed = results.find((result) => !result.ok);
-      if (failed && !failed.ok) {
-        onError(failed, "discounts.delete");
-        // Throwing is what keeps the popup open carrying the message; the
-        // selection is still there to retry.
-        throw new Error(failed.error);
-      }
-      refresh();
-    },
-    describe: (rows) =>
-      rows.length === 1
-        ? {
-            title: copy.actions.deleteTitle,
-            entityName: rows[0]?.name,
-            description: copy.actions.deleteDescription,
-            confirmText: copy.actions.delete,
-          }
-        : {
-            title: fill(copy.actions.deleteManyTitle, { count: rows.length }),
-            description: copy.actions.deleteManyDescription,
-            confirmText: copy.actions.delete,
-          },
-    errorText: copy.actions.deleteFailed,
-    copy: copy.confirmAction,
-    dataTestId: "discount-bulk-delete-confirm",
-  });
 }
 
 /** The header's controls: the explainer, the export, and the create button. */

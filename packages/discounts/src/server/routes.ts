@@ -25,10 +25,8 @@ import {
   type StoreTimeZone,
 } from "./calendar-days";
 import { logWrite, observed, type DiscountsLogger } from "./logging";
-import { bulkIdsOf, runBulk } from "./bulk-run";
-import { bulkDiscountsBody } from "./bulk-wire";
-import { DISCOUNT_BULK_MAX_IDS, type DiscountBulkOperation } from "../bulk";
-import { bulkCopyFor, fallbackSentence } from "./fallback-copy";
+import { createBulkRoute } from "./bulk-route";
+import { fallbackSentence } from "./fallback-copy";
 import { prepareWrite } from "./prepare-write";
 import { problemsOf } from "./problems";
 import { updateWithWindow, WindowChangedError, windowModeOf } from "./update-window";
@@ -339,49 +337,6 @@ function archiveRoute(config: DiscountsApiConfig): DiscountRoute {
   };
 }
 
-/**
- * `POST /discounts/bulk` (FUT-4420): activate, deactivate, extend the validity
- * of, or undo a batch of up to 500 discounts, answering EVERY row.
- *
- * The same `discounts:write` as the single-row edit - a batch never opens a
- * door the row's own edit keeps shut. The batch is not all-or-nothing, on the
- * owner's word: a row that cannot take the change says why and the rest go on.
- * Each row is written under a condition (see `./bulk-run`), so a concurrent
- * change is detected, not overwritten.
- */
-function bulkRoute(config: DiscountsApiConfig): DiscountRoute {
-  return {
-    method: "POST",
-    path: "/discounts/bulk",
-    permission: DISCOUNTS_WRITE,
-    handle: endpoint(config, "POST /discounts/bulk", async (request) => {
-      const { actor, body, locale } = request;
-      const copy = resolveDiscountsCopy(config.copy, locale);
-      const words = bulkCopyFor(copy, locale);
-      const parsed = bulkDiscountsBody.safeParse(body);
-      if (!parsed.success) {
-        return { status: 422, body: { error: copy.invalidQuery, problems: problemsOf(parsed.error) } };
-      }
-      const operation = parsed.data as DiscountBulkOperation;
-      if (bulkIdsOf(operation).length > DISCOUNT_BULK_MAX_IDS) {
-        const error = words.tooManyIds.replace("{max}", String(DISCOUNT_BULK_MAX_IDS));
-        return { status: 422, body: { error, problems: [{ path: "ids", message: error }] } };
-      }
-      const zone = await readZoneFor(config.storeTimeZone, actor.clientId, config.logger);
-      const result = await runBulk(
-        { store: config.store, clientId: actor.clientId, zone, now: new Date(), words, logger: config.logger },
-        operation,
-      );
-      const { counts } = result;
-      config.logger.info(
-        `bulk ${result.operation}${result.validateOnly ? " (validateOnly)" : ""} for tenant ${actor.clientId}: ` +
-          `${counts.ok} changed, ${counts.unchanged} unchanged, ${counts.skipped} skipped, ${counts.failed} failed`,
-      );
-      return ok({ data: result });
-    }),
-  };
-}
-
 /** The three methods `observed` calls — asserted before any request arrives. */
 function assertLogger(logger: DiscountsLogger | undefined): void {
   const complete =
@@ -431,7 +386,7 @@ export function createApiDiscounts(config: DiscountsApiConfig): {
       targetsRoute(config),
       readRoute(config),
       createRoute(config),
-      bulkRoute(config),
+      createBulkRoute(config, endpoint),
       updateRoute(config),
       archiveRoute(config),
     ],

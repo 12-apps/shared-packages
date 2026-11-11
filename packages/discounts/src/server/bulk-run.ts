@@ -126,26 +126,47 @@ function windowFor(
   return null;
 }
 
+/** The last day an extension asks for, from the row's own end (or today, once it ended). */
+function newEndOf(extension: Extension, shownEnd: string, ended: boolean, today: string): string {
+  if ("endsOn" in extension) return extension.endsOn;
+  return addCalendarDays(ended ? today : shownEnd, extension.days);
+}
+
+/** Why a new end cannot be written for a row, or null when it can. */
+function refusalOf(newEnd: Date, record: DiscountRecord, ended: boolean, now: Date): Settled | null {
+  if (newEnd.getTime() === record.endsAt?.getTime()) return settled("unchanged", "alreadyEndsThen");
+  if (newEnd.getTime() < (record.endsAt?.getTime() ?? 0)) return settled("skipped", "notLater");
+  if (ended && newEnd.getTime() <= now.getTime()) return settled("skipped", "stillEnded");
+  return null;
+}
+
+/** The state after an extension: the new window, and active again if the discount had ended. */
+function extendedState(
+  record: DiscountRecord,
+  window: { startsAt: Date | null; endsAt: Date | null; windowInZone: boolean },
+  ended: boolean,
+): DiscountBulkState {
+  return {
+    active: ended || record.active,
+    startsAt: window.startsAt?.toISOString() ?? null,
+    endsAt: window.endsAt?.toISOString() ?? null,
+    windowInZone: window.windowInZone,
+  };
+}
+
 function planExtend(record: DiscountRecord, extension: Extension, ctx: BulkContext): Plan {
   if (record.endsAt === null) return settled("skipped", "noEndDate");
   const shown = shownDays(record, ctx.zone);
   const today = todayOf(ctx.zone, ctx.now);
   if (shown === null || shown.endsOn === null || today === null) return settled("skipped", "zoneUnknown");
   const ended = record.endsAt.getTime() <= ctx.now.getTime();
-  const newEndsOn = "endsOn" in extension ? extension.endsOn : addCalendarDays(ended ? today : shown.endsOn, extension.days);
+  const newEndsOn = newEndOf(extension, shown.endsOn, ended, today);
   const window = windowFor(record, shown, newEndsOn, ctx.zone);
   if (window === null || window.endsAt === null) return settled("skipped", "zoneUnknown");
-  if (window.endsAt.getTime() === record.endsAt.getTime()) return settled("unchanged", "alreadyEndsThen");
-  if (window.endsAt.getTime() < record.endsAt.getTime()) return settled("skipped", "notLater");
-  if (ended && window.endsAt.getTime() <= ctx.now.getTime()) return settled("skipped", "stillEnded");
-  const before = stateOf(record);
-  const next: DiscountBulkState = {
-    active: ended ? true : record.active,
-    startsAt: window.startsAt === null ? null : window.startsAt.toISOString(),
-    endsAt: window.endsAt.toISOString(),
-    windowInZone: window.windowInZone,
-  };
-  return { kind: "change", next: { ...before, ...next }, code: ended ? "revived" : "extended", endsOn: newEndsOn, revived: ended };
+  const refused = refusalOf(window.endsAt, record, ended, ctx.now);
+  if (refused !== null) return refused;
+  const next = extendedState(record, window, ended);
+  return { kind: "change", next, code: ended ? "revived" : "extended", endsOn: newEndsOn, revived: ended };
 }
 
 function planUndo(record: DiscountRecord, row: DiscountBulkUndoRow): Plan {
