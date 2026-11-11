@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { BrowserCardResult, BrowserWalletResult, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
+import type { BrowserCardResult, EvidenceRunSection, EvidenceSummary } from '@12-apps/payments-backend';
 
 import type { EvidencePhase } from './HomologacaoEvidenceProgress';
 import type { EvidenceWallets } from './HomologacaoEvidenceWallets';
 import type { HomologacaoProductionEvidenceCardProps } from './HomologacaoProductionEvidenceCard';
 import type { ProductionPixView } from './ProductionPixPanel';
-import type { ProductionScenariosSent } from './ProductionScenarioList';
+import type { ProductionScenarioOutcome } from './ProductionScenarioList';
 import {
   authenticateRealDebit,
   buyerOf,
@@ -78,12 +78,26 @@ async function browserCards(
 }
 
 /**
+ * A paid Pix whose refund PagBank has not taken yet: the server retries it in
+ * the background, so the card keeps reading where it stands (each read is a
+ * database read, not a PagBank call) until it is refunded or out of attempts.
+ */
+const isRefundRetrying = (pix: ProductionPixView | null): boolean =>
+  pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted !== true;
+
+/** Open, and still moving by itself: not a refund whose attempts ran out. */
+const isSettling = (pix: ProductionPixView | null): boolean =>
+  isPixOpen(pix) && !(pix?.state === 'REFUND_PENDING' && pix.refund?.exhausted === true);
+
+/**
  * Keep checking an open Pix, one call at a time, until the server says it is
- * settled — for at most `windowMs` per Pix. Each check asks PagBank
- * whether a person paid it, which no webhook of ours settles yet: a
- * third-party wait, the one kind of screen poll the origin host admits, and
- * only when bounded. Past the window the screen stops asking on its own and
- * offers "Verificar o Pix" instead. Answers whether the window ran out.
+ * settled — for at most `windowMs` per Pix while it waits for a person. Each
+ * check asks PagBank whether a person paid it, which no webhook of ours settles
+ * yet: a third-party wait, the one kind of screen poll the origin host admits,
+ * and only when bounded. Past the window the screen stops asking on its own and
+ * offers "Verificar o Pix" instead. A refund being retried is read without a
+ * window: the server decides when it ends (FUT-4360). Answers whether the
+ * window ran out.
  */
 function usePixPolling(
   pix: ProductionPixView | null,
@@ -98,7 +112,8 @@ function usePixPolling(
   // must not restart the timer before it ever fires.
   const confirm = useRef(onConfirmPix);
   confirm.current = onConfirmPix;
-  const runId = pix && isPixOpen(pix) ? pix.runId : null;
+  const runId = pix && isSettling(pix) ? pix.runId : null;
+  const retrying = isRefundRetrying(pix);
   useEffect(() => {
     if (!runId) return undefined;
     const timer = setInterval(() => {
@@ -112,6 +127,7 @@ function usePixPolling(
           busy.current = false;
         });
     }, everyMs);
+    if (retrying) return () => clearInterval(timer);
     const window = setTimeout(() => {
       clearInterval(timer);
       setExpiredFor(runId);
@@ -120,7 +136,7 @@ function usePixPolling(
       clearInterval(timer);
       clearTimeout(window);
     };
-  }, [runId, setPix, everyMs, windowMs]);
+  }, [runId, retrying, setPix, everyMs, windowMs]);
   return runId !== null && expiredFor === runId;
 }
 
@@ -143,7 +159,7 @@ function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
     props.pixPollMs ?? PIX_POLL_MS,
     props.pixPollWindowMs ?? PIX_POLL_WINDOW_MS,
   );
-  const act = (action: 'CHECK' | 'SKIP'): void => {
+  const act = (action: 'CHECK' | 'SKIP' | 'RETRY_REFUND'): void => {
     if (!pix) return;
     setSkipping(true);
     props
@@ -156,6 +172,7 @@ function useProductionPix(props: HomologacaoProductionEvidenceCardProps) {
     pix,
     setPix,
     skip: () => act('SKIP'),
+    retryRefund: () => act('RETRY_REFUND'),
     check: pollStopped ? () => act('CHECK') : null,
     skipping,
     pixOpen: isPixOpen(pix),
@@ -182,16 +199,6 @@ function useDownload(
   };
 }
 
-/** Which scenarios this browser had something to send for: a debit card that authenticated, a wallet's token. */
-function sentOf(cards: BrowserCardResult[], walletResults: BrowserWalletResult[]): ProductionScenariosSent {
-  const token = (type: BrowserWalletResult['type']) => walletResults.some((result) => result.type === type && Boolean(result.token));
-  return {
-    debit: cards.some((card) => card.scenario === 'debit' && !card.failure),
-    googlePay: token('GOOGLE_PAY'),
-    applePay: token('APPLE_PAY'),
-  };
-}
-
 export function useProductionRun(
   props: HomologacaoProductionEvidenceCardProps,
   form: ProductionForm,
@@ -202,11 +209,13 @@ export function useProductionRun(
   const [section, setSection] = useState<EvidenceRunSection | null>(null);
   const [failed, setFailed] = useState<EvidencePhase | null>(null);
   const [summary, setSummary] = useState<EvidenceSummary | null>(null);
-  const [sent, setSent] = useState<ProductionScenariosSent | null>(null);
-  const { pix, setPix, skip, check, skipping, pixOpen } = useProductionPix(props);
+  // Once a run answered: its outcomes (a bare Pix answer leaves them unknown).
+  const [answered, setAnswered] = useState<{ scenarios: readonly ProductionScenarioOutcome[] | null } | null>(null);
+  const { pix, setPix, skip, retryRefund, check, skipping, pixOpen } = useProductionPix(props);
+  // A reload shows the server's outcomes only while its Pix is open, as it does the Pix itself.
+  const scenarios = answered ? answered.scenarios : (isPixOpen(props.seller?.pix) ? (props.seller?.scenarios ?? null) : null);
   // One run at a time, whatever a double click on the confirmation does.
   const inFlight = useRef(false);
-
   const run = async (): Promise<void> => {
     const buyer = buyerOf(form.buyer);
     if (!buyer || inFlight.current) return;
@@ -232,8 +241,9 @@ export function useProductionRun(
       enter('encrypting');
       const cards = await browserCards(prepared, buyer.name, form.credit, form.debit);
       enter('running');
-      setPix(await props.onRun(prepared.runId, cards, walletResults, setSection, buyer));
-      setSent(sentOf(cards, walletResults));
+      const answer = await props.onRun(prepared.runId, cards, walletResults, setSection, buyer);
+      setAnswered({ scenarios: 'pix' in answer ? answer.scenarios : null });
+      setPix('pix' in answer ? answer.pix : answer);
       form.clearCards();
     } catch {
       setFailed(current);
@@ -256,13 +266,16 @@ export function useProductionRun(
     summary,
     pix,
     skipping,
+    retrying: skipping,
     busy: phase !== 'idle',
     pixOpen,
-    sent,
-    charged: sent !== null && !pixOpen,
+    scenarios,
+    ran: answered !== null,
+    charged: answered !== null && !pixOpen,
     run,
     download,
     skip,
+    retryRefund,
     check,
   };
 }

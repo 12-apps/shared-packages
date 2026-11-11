@@ -241,17 +241,34 @@ export const PT_BR_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     debitBlankHint: 'Em branco: o débito fica pendente no arquivo.',
     incompleteData: 'Preencha o titular e o cartão de crédito para cobrar.',
     pixBlocksCharge: 'Pague ou pule o Pix antes de cobrar de novo.',
+    pixBlocksChargeRefund: 'Estorne o Pix antes de cobrar de novo.',
     scenarios: {
       label: 'Cenários desta cobrança',
       names: { credit: 'Crédito', debit: 'Débito (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
-      recorded: 'registrado no arquivo',
-      pending: 'pendente',
+      status: { executed: 'executado', failed: 'falhou', pending: 'pendente' },
+      marks: { retrying: 'aguardando', checking: 'verificando' },
+      reasons: {
+        emailEqualsMerchant: 'o PagBank recusou: o e-mail do comprador não pode ser o da conta do lojista',
+        issuerDeclined: {
+          credit: 'o banco recusou o cartão de crédito',
+          debit: 'o banco recusou o cartão de débito',
+          wallet: 'o banco recusou o cartão',
+        },
+      },
       pix: {
         AWAITING_PAYMENT: 'aguardando pagamento',
         REFUND_PENDING: 'pago, estornando',
         REFUNDED: 'pago e estornado',
         SKIPPED: 'pulado, pendente',
+        paid: 'pago',
+        paidNotRefunded: 'pago, não estornado',
+        notYet: (attempt, of, minutes) =>
+          `o PagBank ainda não liberou o estorno — tentativa ${attempt} de ${of}, a próxima em ${minutes} min`,
+        exhausted: (of) =>
+          `${of} de ${of} tentativas recusadas pelo PagBank; tente de novo ou estorne no painel do PagBank`,
+        refused: 'o PagBank recusou o estorno; tente de novo ou estorne no painel do PagBank',
       },
+      retryRefund: 'Tentar estornar o Pix de novo',
     },
     charge: '3. Cobrar R$ 1,00 por cenário e estornar',
     confirm: {

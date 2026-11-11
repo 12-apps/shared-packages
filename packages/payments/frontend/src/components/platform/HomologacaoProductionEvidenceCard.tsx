@@ -22,7 +22,7 @@ import { EvidenceProgress } from './HomologacaoEvidenceProgress';
 import { EvidenceWalletBlock, useEvidenceWallets } from './HomologacaoEvidenceWallets';
 import { ProductionEvidenceForm } from './ProductionEvidenceForm';
 import { ProductionPixPanel, type ProductionPixView } from './ProductionPixPanel';
-import { ProductionScenarioList } from './ProductionScenarioList';
+import { ProductionScenarioList, type ProductionScenarioOutcome } from './ProductionScenarioList';
 import { useProductionForm, useProductionRun } from './use-production-run';
 
 /**
@@ -42,7 +42,12 @@ import { useProductionForm, useProductionRun } from './use-production-run';
 export interface HomologacaoProductionSellerView extends HomologacaoSellerView {
   /** The latest run's Pix, so a reloaded screen shows an open QR again. */
   pix?: ProductionPixView | null;
+  /** The latest run's outcomes (FUT-4322), shown again with an open Pix after a reload. */
+  scenarios?: readonly ProductionScenarioOutcome[] | null;
 }
+
+/** What the run answers: the Pix it raised and, from a host that reads them, each scenario's outcome. */
+export type ProductionRunAnswer = ProductionPixView | { pix: ProductionPixView; scenarios: readonly ProductionScenarioOutcome[] | null };
 
 export interface HomologacaoProductionEvidenceCardProps {
   copy: PlatformHomologacaoCopy;
@@ -56,16 +61,19 @@ export interface HomologacaoProductionEvidenceCardProps {
     threeDSSession?: ThreeDSecureSession | null;
     debitTest?: DebitTestData;
   }>;
-  /** Phase 2: raise the orders; answers the run's Pix. */
+  /** Phase 2: raise the orders; answers the run's Pix and its scenarios' outcomes. */
   onRun: (
     runId: string,
     cards: BrowserCardResult[],
     wallets: BrowserWalletResult[],
     onSection: (section: EvidenceRunSection) => void,
     buyer: EvidenceBuyer,
-  ) => Promise<ProductionPixView>;
-  /** Phase 3: check the Pix, or skip it; answers where it stands. */
-  onConfirmPix: (runId: string, action: 'CHECK' | 'SKIP') => Promise<ProductionPixView>;
+  ) => Promise<ProductionRunAnswer>;
+  /**
+   * Phase 3: check the Pix, skip it, or — once the refund's attempts ran out —
+   * try refunding it again; answers where it stands.
+   */
+  onConfirmPix: (runId: string, action: 'CHECK' | 'SKIP' | 'RETRY_REFUND') => Promise<ProductionPixView>;
   onDownload: () => Promise<EvidenceSummary>;
   onValidateApplePayMerchant?: (validationURL: string) => Promise<unknown>;
   googlePayApi?: GooglePayApi | null;
@@ -215,7 +223,7 @@ type ProductionFlow = ReturnType<typeof useProductionRun>;
 
 /** Beside the form while it matters: the run's progress, then the Pix a person pays. */
 function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: HomologacaoProductionEvidenceCopy }): ReactNode {
-  if (!flow.busy && !flow.pix && !flow.sent) return null;
+  if (!flow.busy && !flow.pix && !flow.scenarios) return null;
   return (
     <Stack spacing={2.5} sx={{ flex: '1 1 320px', minWidth: 0 }}>
       {flow.phase !== 'idle' ? (
@@ -223,7 +231,14 @@ function ProductionSidePanel({ flow, copy }: { flow: ProductionFlow; copy: Homol
       ) : null}
       {flow.pix ? <ProductionPixPanel pix={flow.pix} copy={copy.pix} onSkip={flow.skip} onCheck={flow.check} skipping={flow.skipping} /> : null}
       {flow.phase === 'idle' || flow.phase === 'downloading' ? (
-        <ProductionScenarioList sent={flow.sent} pix={flow.pix} checking={flow.check === null} copy={copy.scenarios} />
+        <ProductionScenarioList
+          scenarios={flow.scenarios}
+          pix={flow.pix}
+          checking={flow.check === null}
+          copy={copy.scenarios}
+          onRetryRefund={flow.retryRefund}
+          retrying={flow.retrying}
+        />
       ) : null}
     </Stack>
   );
@@ -240,14 +255,14 @@ function walletsConfigOf(seller: HomologacaoProductionSellerView | null) {
  * cleared card fields say.
  */
 function stepsDone(connected: boolean, ready: boolean, flow: ProductionFlow): boolean[] {
-  const charging = flow.busy || flow.pixOpen || flow.sent !== null;
+  const charging = flow.busy || flow.pixOpen || flow.ran;
   return [connected, ready || charging, flow.charged, flow.summary !== null];
 }
 
 /** Why the charge cannot be pressed, when it cannot: the open Pix first, then the missing data. */
 function chargeBlockedBy(connected: boolean, ready: boolean, flow: ProductionFlow, copy: HomologacaoProductionEvidenceCopy): string | null {
   if (!connected || flow.busy) return null;
-  if (flow.pixOpen) return copy.pixBlocksCharge;
+  if (flow.pixOpen) return flow.pix?.state === 'REFUND_PENDING' ? copy.pixBlocksChargeRefund : copy.pixBlocksCharge;
   return !ready && !flow.charged ? copy.incompleteData : null;
 }
 

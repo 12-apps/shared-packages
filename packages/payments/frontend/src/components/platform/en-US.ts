@@ -253,17 +253,33 @@ export const EN_US_PLATFORM_HOMOLOGACAO_COPY: PlatformHomologacaoCopy = {
     debitBlankHint: 'Left blank: the debit stays pending in the file.',
     incompleteData: 'Fill in the cardholder and the credit card to charge.',
     pixBlocksCharge: 'Pay or skip the Pix before charging again.',
+    pixBlocksChargeRefund: 'Refund the Pix before charging again.',
     scenarios: {
       label: 'Scenarios in this charge',
       names: { credit: 'Credit', debit: 'Debit (3DS)', pix: 'Pix', googlePay: 'Google Pay', applePay: 'Apple Pay' },
-      recorded: 'recorded in the file',
-      pending: 'pending',
+      status: { executed: 'executed', failed: 'failed', pending: 'pending' },
+      marks: { retrying: 'waiting', checking: 'checking' },
+      reasons: {
+        emailEqualsMerchant: "PagBank refused: the buyer's e-mail cannot be the merchant account's",
+        issuerDeclined: {
+          credit: 'the bank declined the credit card',
+          debit: 'the bank declined the debit card',
+          wallet: 'the bank declined the card',
+        },
+      },
       pix: {
         AWAITING_PAYMENT: 'awaiting payment',
         REFUND_PENDING: 'paid, refunding',
         REFUNDED: 'paid and refunded',
         SKIPPED: 'skipped, pending',
+        paid: 'paid',
+        paidNotRefunded: 'paid, not refunded',
+        notYet: (attempt, of, minutes) =>
+          `PagBank has not released the refund yet — attempt ${attempt} of ${of}, the next in ${minutes} min`,
+        exhausted: (of) => `${of} of ${of} attempts refused by PagBank; try again or refund in the PagBank panel`,
+        refused: "PagBank refused the refund; try again or refund in the PagBank panel",
       },
+      retryRefund: 'Try refunding the Pix again',
     },
     charge: '3. Charge R$ 1.00 per scenario and refund',
     confirm: {
