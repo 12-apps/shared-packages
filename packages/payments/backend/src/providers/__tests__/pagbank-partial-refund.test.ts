@@ -49,11 +49,11 @@ type Reply = { status?: number; body?: unknown } | Error;
  * queued so a run that skips the read-back still meets the cancel's answer.
  */
 function mockFetchQueue(replies: Reply[]) {
-  const calls: Array<[string, RequestInit]> = [];
+  const recorded: Array<[string, RequestInit]> = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
-      calls.push([String(url), init]);
+      recorded.push([String(url), init]);
       const reply = (init.method === 'POST' ? replies[replies.length - 1] : replies[0])!;
       if (reply instanceof Error) throw reply;
       const status = reply.status ?? 200;
@@ -66,7 +66,7 @@ function mockFetchQueue(replies: Reply[]) {
       } as unknown as Response;
     }),
   );
-  return calls;
+  return recorded;
 }
 
 const posts = (calls: Array<[string, RequestInit]>) =>
@@ -312,7 +312,7 @@ describe('PagBank refund through the gateway (FUT-4571)', () => {
   function world(snapshot?: Partial<ChargeSnapshot>, creds: ResolvedCredentials = STUB) {
     const credentials = createMemoryCredentialStore();
     const charges = createMemoryChargeStore();
-    const gateway = createPaymentsGateway({
+    const payments = createPaymentsGateway({
       providers: defineProviders({ pagbank: adapter() } as const),
       credentials,
       charges,
@@ -336,7 +336,7 @@ describe('PagBank refund through the gateway (FUT-4571)', () => {
           } as ChargeSnapshot,
         })
       : Promise.resolve();
-    return { gateway, ready: stored };
+    return { gateway: payments, ready: stored };
   }
 
   it('G1 lets a partial through for a stored CARD charge', async () => {
@@ -433,5 +433,26 @@ describe('PagBank webhook and poll of a partially refunded charge (FUT-4571)', (
     expect(polled.method).toBe('CARD');
     const [event] = await parse(order(charge({ status: 'PAID' })));
     expect(event!.charge?.method).toBe('CARD');
+  });
+});
+
+describe('PagBank partials sent at the same time (FUT-4571, implementer’s additions)', () => {
+  it('R12 two partials read before either landed keep two refund ids, the second never REFUNDED', async () => {
+    // Both read refunded 0; PagBank applies them one after the other.
+    mockFetchQueue([{ body: order(charge({ refunded: 0 })) }, { body: charge({ status: 'PAID', refunded: 300 }) }]);
+    const first = await partial(300);
+    mockFetchQueue([{ body: order(charge({ refunded: 0 })) }, { body: charge({ status: 'PAID', refunded: 600 }) }]);
+    const second = await partial(300);
+
+    expect(first).toMatchObject({ status: 'REFUNDED', amount: brl(300) });
+    // Grown by 600 against a read of 0: money moved, but not provably as asked.
+    expect(second.status).toBe('PENDING');
+    expect(second.providerRefundId).not.toBe(first.providerRefundId);
+  });
+
+  it('R13 a CANCELED answer never reports more than the cancel asked for', async () => {
+    mockFetchQueue([{ body: order(charge({ refunded: 0 })) }, { body: charge({ status: 'CANCELED', refunded: 1000 }) }]);
+    const refund = await partial(500);
+    expect(refund).toMatchObject({ status: 'REFUNDED', amount: brl(500) });
   });
 });

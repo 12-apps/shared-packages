@@ -191,7 +191,11 @@ function judgePartial(
   requested: number,
 ): { status: RefundSnapshot['status']; cents: number } {
   const grew = refundedCents(res) - before;
-  if (res.status === 'CANCELED') return { status: 'REFUNDED', cents: grew > 0 ? grew : requested };
+  // CANCELED proves the rest went back. Never report more than THIS cancel
+  // asked: a refund sent at the same time may share the growth.
+  if (res.status === 'CANCELED') {
+    return { status: 'REFUNDED', cents: grew > 0 ? Math.min(grew, requested) : requested };
+  }
   if (res.status !== 'PAID') return { status: refundStatusOf(res.status), cents: requested };
   if (grew === requested) return { status: 'REFUNDED', cents: requested };
   return grew > 0 ? { status: 'PENDING', cents: grew } : { status: 'FAILED', cents: requested };
@@ -232,12 +236,14 @@ async function partialRefund(
   const res = await cancel(chargeId, cents, credentials);
   const judged = judgePartial(res, before, cents);
   // A refund of a whole never-refunded charge keeps the bare charge id, as a
-  // full refund does; every other one is named by the figure it reaches.
+  // full refund does; every other one is named by the figure it reaches — the
+  // answer's own when it moved, so two partials sent at once keep two ids.
   const whole = before === 0 && cents === charge.amount?.value;
+  const after = refundedCents(res);
   return {
     provider: NAME,
     providerChargeId,
-    providerRefundId: whole ? chargeId : refundIdOf(chargeId, before + cents),
+    providerRefundId: whole ? chargeId : refundIdOf(chargeId, after > before ? after : before + cents),
     status: judged.status,
     amount: { amountCents: judged.cents, currency: amount.currency },
     raw: res,
