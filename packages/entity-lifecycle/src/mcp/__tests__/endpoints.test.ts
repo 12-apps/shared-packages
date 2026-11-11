@@ -47,6 +47,18 @@ const suppliers = () =>
     summaries,
   });
 
+describe('the request schemas are strict', () => {
+  it('refuses a key a params, query or body schema does not declare', () => {
+    expect(lifecycleTenantParams.safeParse({ tenantSlug: 't' }).success).toBe(true);
+    expect(lifecycleTenantParams.safeParse({ tenantSlug: 't', id: 'x' }).success).toBe(false);
+    expect(versionsParams.safeParse({ tenantSlug: 't', id: 'x', extra: 1 }).success).toBe(false);
+    expect(versionItemParams.safeParse({ tenantSlug: 't', id: 'x', version: '2', extra: 1 }).success).toBe(false);
+    expect(draftItemParams.safeParse({ tenantSlug: 't', draftId: 'd', extra: 1 }).success).toBe(false);
+    expect(saveDraftBody.safeParse({ data: { a: 1 } }).success).toBe(true);
+    expect(saveDraftBody.safeParse({ data: { a: 1 }, status: 'PUBLISHED' }).success).toBe(false);
+  });
+});
+
 describe('lifecycleMcpEndpoints', () => {
   it('emits the eight capabilities, in a fixed order', () => {
     expect(suppliers().map((e) => e.operationId)).toEqual([
