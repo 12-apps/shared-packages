@@ -45,7 +45,7 @@ afterEach(() => {
 
 const PROD = PT_BR_HOMOLOGACAO_EVIDENCE_PRODUCTION_COPY;
 const SKIPPED = PROD.outcome.pixSkipped;
-const T0 = new Date('2026-11-11T15:00:00.000Z');
+const T0_MS = Date.parse('2026-11-11T15:00:00.000Z');
 const MIN = 60_000;
 const CANCEL = 'POST /charges/CHAR_PIX/cancel';
 const CONSULT = 'GET /orders/ORDE_PIX';
@@ -99,7 +99,7 @@ function pixWorld(script: Answer[], options: { reporter?: (report: ProviderFailu
     return settle(answer);
   };
   vi.stubGlobal('fetch', vi.fn(handler));
-  const clock = { now: T0 };
+  const clock = { now: new Date(T0_MS) };
   const gateway = options.reporter
     ? createPaymentsGateway({
         providers: defineProviders({ pagbank: pagbankProvider(PT_BR_PAGBANK_COPY) }),
@@ -125,7 +125,7 @@ type PixWorld = ReturnType<typeof pixWorld>;
 
 const calls = (p: PixWorld, path: string): number => p.w.pagbank.seen.filter((call) => call.path === path).length;
 const at = (p: PixWorld, minutes: number): void => {
-  p.clock.now = new Date(T0.getTime() + minutes * MIN);
+  p.clock.now = new Date(T0_MS + minutes * MIN);
 };
 const refundStep = (record: EvidenceRecord) => record.steps.find((step) => step.key === 'pix.refund');
 const view = (record: EvidenceRecord) => pixViewOf(record, SKIPPED) as ReturnType<typeof pixViewOf> & {
@@ -161,7 +161,7 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
     expect(view(record).refund).toEqual({
       attempt: 1,
       of: 3,
-      nextAt: new Date(T0.getTime() + 5 * MIN).toISOString(),
+      nextAt: new Date(T0_MS + 5 * MIN).toISOString(),
       exhausted: false,
       refusal: 'NOT_YET',
     });
@@ -208,7 +208,7 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
     at(p, 5);
     const second = await sweep(p.runDeps);
     expect(calls(p, CANCEL)).toBe(2);
-    expect(view(second!).refund).toMatchObject({ attempt: 2, of: 3, nextAt: new Date(T0.getTime() + 15 * MIN).toISOString(), exhausted: false });
+    expect(view(second!).refund).toMatchObject({ attempt: 2, of: 3, nextAt: new Date(T0_MS + 15 * MIN).toISOString(), exhausted: false });
 
     at(p, 14);
     await sweep(p.runDeps);
@@ -246,7 +246,7 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
     expect(view(retried).refund).toEqual({
       attempt: 1,
       of: 3,
-      nextAt: new Date(T0.getTime() + 35 * MIN).toISOString(),
+      nextAt: new Date(T0_MS + 35 * MIN).toISOString(),
       exhausted: false,
       refusal: 'NOT_YET',
     });
@@ -310,7 +310,7 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
   it('B5b given a transport error, then it is retried in the background like a "not yet", on the same schedule, consult first', async () => {
     const p = pixWorld(['TRANSPORT', 'OK']);
     const { runId, record } = await paid(p);
-    expect(view(record).refund).toMatchObject({ attempt: 1, nextAt: new Date(T0.getTime() + 5 * MIN).toISOString(), refusal: 'UNKNOWN' });
+    expect(view(record).refund).toMatchObject({ attempt: 1, nextAt: new Date(T0_MS + 5 * MIN).toISOString(), refusal: 'UNKNOWN' });
 
     const seen = p.w.pagbank.seen.length;
     await confirmEvidencePix(p.runDeps, runId, 'CHECK');
@@ -323,17 +323,15 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
   });
 
   it('B6 given an attempt due, when two sweeps and a stale press arrive together, then exactly ONE cancel is in flight and the counter is 2', async () => {
-    let release: (answer: 'NOT_YET') => void = () => undefined;
-    const hold = new Promise<'NOT_YET'>((resolve) => {
-      release = resolve;
-    });
+    const gates: ((answer: 'NOT_YET') => void)[] = [];
+    const hold = new Promise<'NOT_YET'>((resolve) => gates.push(resolve));
     const p = pixWorld(['NOT_YET', { hold }]);
     const { runId } = await paid(p);
 
     at(p, 5);
     const racing = Promise.allSettled([sweep(p.runDeps), press(p.runDeps, runId), sweep(p.runDeps)]);
     await vi.waitFor(() => expect(calls(p, CANCEL)).toBe(2));
-    release('NOT_YET');
+    gates[0]!('NOT_YET');
     await racing;
 
     expect(calls(p, CANCEL)).toBe(2);
@@ -363,40 +361,38 @@ describe('the production evidence Pix refund on PagBank 40008 (PG1)', () => {
     await paid(p);
 
     // A new process: new deps object over the same durable store, nothing in memory carried over.
-    const restarted = { ...p.runDeps, now: () => new Date(T0.getTime() + 5 * MIN) } as EvidenceRunDeps;
+    const restarted = { ...p.runDeps, now: () => new Date(T0_MS + 5 * MIN) } as EvidenceRunDeps;
     const second = await sweep(restarted);
-    expect(view(second!).refund).toMatchObject({ attempt: 2, nextAt: new Date(T0.getTime() + 15 * MIN).toISOString() });
+    expect(view(second!).refund).toMatchObject({ attempt: 2, nextAt: new Date(T0_MS + 15 * MIN).toISOString() });
 
-    const again = { ...p.runDeps, now: () => new Date(T0.getTime() + 15 * MIN) } as EvidenceRunDeps;
+    const again = { ...p.runDeps, now: () => new Date(T0_MS + 15 * MIN) } as EvidenceRunDeps;
     expect(view((await sweep(again))!).state).toBe('REFUNDED');
     expect(calls(p, CANCEL)).toBe(3);
   });
 
   it('B8b given a process that died holding the claim, then nothing is sent before the claim expires (120 s), and its late answer writes nothing', async () => {
-    let release: (answer: 'OK') => void = () => undefined;
-    const hold = new Promise<'OK'>((resolve) => {
-      release = resolve;
-    });
+    const gates: ((answer: 'OK') => void)[] = [];
+    const hold = new Promise<'OK'>((resolve) => gates.push(resolve));
     const p = pixWorld(['NOT_YET', { hold }, 'NOT_YET']);
     await paid(p);
 
     // Process A claims attempt 2 at +5 min and never comes back.
     at(p, 5);
-    void sweep({ ...p.runDeps, now: () => new Date(T0.getTime() + 5 * MIN) } as EvidenceRunDeps).catch(() => undefined);
+    const dead = sweep({ ...p.runDeps, now: () => new Date(T0_MS + 5 * MIN) } as EvidenceRunDeps).catch(() => undefined);
     await vi.waitFor(() => expect(calls(p, CANCEL)).toBe(2));
 
     // Process B, inside the claim: nothing.
-    await sweep({ ...p.runDeps, now: () => new Date(T0.getTime() + 5 * MIN + 60_000) } as EvidenceRunDeps);
+    await sweep({ ...p.runDeps, now: () => new Date(T0_MS + 5 * MIN + 60_000) } as EvidenceRunDeps);
     expect(calls(p, CANCEL)).toBe(2);
 
     // Past it: consult first (still PAID), then attempt 3 — the dead one counted.
-    const b = await sweep({ ...p.runDeps, now: () => new Date(T0.getTime() + 5 * MIN + 121_000) } as EvidenceRunDeps);
+    const b = await sweep({ ...p.runDeps, now: () => new Date(T0_MS + 5 * MIN + 121_000) } as EvidenceRunDeps);
     expect(calls(p, CANCEL)).toBe(3);
     expect(view(b!).refund).toMatchObject({ attempt: 3, exhausted: true, refusal: 'NOT_YET' });
 
     // A's late answer arrives: the stale attempt may not overwrite B's record.
-    release('OK');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    gates[0]!('OK');
+    await dead;
     const latest = await p.runDeps.store.latest('pagbank', 'RUN');
     expect(view(latest!).refund).toMatchObject({ attempt: 3 });
   });

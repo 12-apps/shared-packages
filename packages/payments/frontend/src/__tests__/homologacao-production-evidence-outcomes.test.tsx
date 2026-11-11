@@ -137,6 +137,6 @@ describe('the production evidence card shows the server’s outcomes (PG1)', () 
     charge();
 
     await screen.findByRole('button', { name: 'Tentar estornar o Pix de novo' });
-    expect(screen.queryByTestId('production-pix-refunding')).toBeNull();
+    expect(screen.queryAllByTestId('production-pix-refunding')).toHaveLength(0);
   });
 });

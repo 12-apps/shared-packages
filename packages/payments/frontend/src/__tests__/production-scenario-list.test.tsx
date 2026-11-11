@@ -92,7 +92,7 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
 
     expect(text('pix')).toBe('Pix · pago — o PagBank ainda não liberou o estorno — tentativa 2 de 3, a próxima em 5 min');
     expect(mark('pix')).toBe('aguardando');
-    expect(screen.queryByRole('button', { name: 'Tentar estornar o Pix de novo' })).toBeNull();
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(0);
   });
 
   it('R3 given the wallets were not run, then their rows are ○ "pendente" with no reason', () => {
@@ -158,6 +158,6 @@ describe('ProductionScenarioList — prototype option A (PG1)', () => {
 
     expect(text('pix')).toBe('Pix · pago e estornado');
     expect(mark('pix')).toBe('executado');
-    expect(screen.queryByRole('button', { name: 'Tentar estornar o Pix de novo' })).toBeNull();
+    expect(screen.queryAllByRole('button', { name: 'Tentar estornar o Pix de novo' })).toHaveLength(0);
   });
 });

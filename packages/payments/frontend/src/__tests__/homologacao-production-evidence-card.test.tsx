@@ -159,7 +159,7 @@ describe('HomologacaoProductionEvidenceCard', () => {
     await waitFor(() => expect(screen.getByTestId('production-scenarios')).toBeTruthy());
     expect(screen.getByTestId('production-step-progress').textContent).toBe(PROD.stepper.progress(3, 4, PROD.stepper.charge));
     expect(screen.getByTestId('production-scenario-pix').textContent).toContain(PROD.scenarios.pix.AWAITING_PAYMENT);
-    expect(screen.queryByTestId('production-scenario-credit')).toBeNull();
+    expect(screen.queryAllByTestId('production-scenario-credit')).toHaveLength(0);
     expect(screen.getByTestId('production-incomplete-data').textContent).toBe(PROD.pixBlocksCharge);
   });
 
