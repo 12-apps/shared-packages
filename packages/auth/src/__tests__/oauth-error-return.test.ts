@@ -1,0 +1,309 @@
+// @vitest-environment node
+// Node, not jsdom: Auth.js encrypts its PKCE cookie with jose, which rejects
+// jsdom's Uint8Array, and the sign-in then fails as `Configuration`.
+
+import type { Provider } from "@auth/core/providers";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createApiAuth } from "../create-api-auth";
+import { signInStartCookieName } from "../oauth-error-return";
+
+/**
+ * A failed OAuth round trip returns to the page that started it (FUT-4595).
+ *
+ * Driven through `createApiAuth` and the real Auth.js, the way a browser does
+ * it: CSRF, the sign-in POST from a page, the provider's redirect back to the
+ * callback. Only the identity provider is fake, and it is never reached — a
+ * refusal is answered before any token request.
+ */
+
+const ORIGIN = "http://localhost:3000";
+const BASE = `${ORIGIN}/api/auth`;
+const START = "/entrar?volta=%2Fpainel%2Fpedidos&challenge=abc";
+
+/** A plain OAuth 2 provider: no discovery, so nothing leaves the process. */
+const oauthProvider = {
+  id: "acme",
+  name: "Acme",
+  type: "oauth",
+  clientId: "client-id",
+  clientSecret: "client-secret",
+  authorization: "https://idp.example/authorize",
+  token: "https://idp.example/token",
+  userinfo: "https://idp.example/userinfo",
+  checks: ["pkce"],
+} as unknown as Provider;
+
+/**
+ * An OIDC provider whose discovery the callback must fetch. With the fetch
+ * failing, Auth.js answers `Configuration` before it even reads the refusal —
+ * the code the live reproduction got.
+ */
+const oidcProvider = {
+  id: "oidc-idp",
+  name: "OIDC IdP",
+  type: "oidc",
+  issuer: "https://oidc.example",
+  clientId: "client-id",
+  clientSecret: "client-secret",
+  authorization: "https://oidc.example/authorize",
+  checks: ["pkce"],
+} as unknown as Provider;
+
+/** A browser's cookie jar, reduced to what these requests carry. */
+class Jar {
+  private readonly cookies = new Map<string, string>();
+
+  take(response: Response): void {
+    for (const line of response.headers.getSetCookie()) {
+      const pair = line.split(";")[0] ?? "";
+      const eq = pair.indexOf("=");
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      if (value === "" || /max-age=0/i.test(line)) this.cookies.delete(name);
+      else this.cookies.set(name, value);
+    }
+  }
+
+  set(name: string, value: string): void {
+    this.cookies.set(name, value);
+  }
+
+  has(name: string): boolean {
+    return this.cookies.has(name);
+  }
+
+  header(): string {
+    return [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+}
+
+function makeAuth(providers: Provider[] = [oauthProvider]) {
+  return createApiAuth({ providers, signInGate: () => true });
+}
+
+type Auth = ReturnType<typeof makeAuth>;
+
+/** CSRF, then the sign-in POST a provider button submits. */
+async function startSignIn(
+  auth: Auth,
+  jar: Jar,
+  provider: string,
+  referer: string | null,
+): Promise<Response> {
+  const csrf = await auth.handler(new Request(`${BASE}/csrf`));
+  jar.take(csrf);
+  const { csrfToken } = (await csrf.json()) as { csrfToken: string };
+  const headers: Record<string, string> = {
+    "content-type": "application/x-www-form-urlencoded",
+    cookie: jar.header(),
+  };
+  if (referer !== null) headers.referer = referer;
+  const response = await auth.handler(
+    new Request(`${BASE}/signin/${provider}`, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ csrfToken, callbackUrl: `${ORIGIN}/painel/pedidos` }).toString(),
+    }),
+  );
+  jar.take(response);
+  return response;
+}
+
+/** The provider sending the browser back, here with its refusal on the query. */
+async function callback(auth: Auth, jar: Jar, provider: string, query: string): Promise<Response> {
+  const response = await auth.handler(
+    new Request(`${BASE}/callback/${provider}?${query}`, { headers: { cookie: jar.header() } }),
+  );
+  jar.take(response);
+  return response;
+}
+
+function location(response: Response): URL {
+  expect(response.status).toBe(302);
+  return new URL(response.headers.get("location") ?? "");
+}
+
+const START_COOKIE = signInStartCookieName(false);
+
+beforeEach(() => {
+  vi.stubEnv("AUTH_SECRET", "test-secret-value-long-enough");
+  vi.stubEnv("AUTH_TRUST_HOST", "true");
+  vi.stubEnv("AUTH_URL", "");
+  vi.stubEnv("ADMIN_EMAILS", "");
+  // Auth.js logs every failure through the package's redacting logger.
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+describe("a refused consent returns to the page that started the sign-in", () => {
+  it("lands on the start page, its query kept, explained as OAuthCallback", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    const started = await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+    expect(location(started).origin).toBe("https://idp.example");
+    expect(jar.has(START_COOKIE)).toBe(true);
+
+    const target = location(await callback(auth, jar, "acme", "error=access_denied"));
+
+    expect(target.origin).toBe(ORIGIN);
+    expect(target.pathname).toBe("/entrar");
+    expect(target.searchParams.get("volta")).toBe("/painel/pedidos");
+    expect(target.searchParams.get("challenge")).toBe("abc");
+    expect(target.searchParams.get("error")).toBe("OAuthCallback");
+    // Spent: the next failure must not reuse it.
+    expect(jar.has(START_COOKIE)).toBe(false);
+  });
+
+  it("is OAuthCallback, not Configuration, when Auth.js trips before reading the refusal", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+    const auth = makeAuth([oidcProvider]);
+    const jar = new Jar();
+    await startSignIn(auth, jar, "oidc-idp", `${ORIGIN}${START}`);
+
+    const target = location(await callback(auth, jar, "oidc-idp", "error=access_denied"));
+
+    expect(`${target.pathname}`).toBe("/entrar");
+    expect(target.searchParams.get("error")).toBe("OAuthCallback");
+  });
+
+  it("reads a refusal posted as a form, the way Apple answers", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+
+    const response = await auth.handler(
+      new Request(`${BASE}/callback/acme`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", cookie: jar.header() },
+        body: new URLSearchParams({ error: "user_cancelled_authorize" }).toString(),
+      }),
+    );
+
+    const target = location(response);
+    expect(target.pathname).toBe("/entrar");
+    expect(target.searchParams.get("error")).toBe("OAuthCallback");
+  });
+
+  it("replaces an error left on the start page by an earlier attempt", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}/login?error=OAuthCallback&callbackUrl=%2Fconta`);
+
+    const target = location(await callback(auth, jar, "acme", "error=access_denied"));
+
+    expect(target.pathname).toBe("/login");
+    expect(target.searchParams.getAll("error")).toEqual(["OAuthCallback"]);
+    expect(target.searchParams.get("callbackUrl")).toBe("/conta");
+  });
+});
+
+describe("a failure that is not the provider's keeps Auth.js's code", () => {
+  it("goes back to the start with that code", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${ORIGIN}${START}`);
+
+    // No refusal on the query, and the PKCE verifier lost on the way: Auth.js's
+    // own failure, which is not the person's to explain away.
+    const response = await auth.handler(
+      new Request(`${BASE}/callback/acme?code=abc`, {
+        headers: { cookie: `${START_COOKIE}=${encodeURIComponent(START)}` },
+      }),
+    );
+
+    const target = location(response);
+    expect(target.pathname).toBe("/entrar");
+    expect(target.searchParams.get("error")).toBe("Configuration");
+  });
+});
+
+describe("where no start is known, the failure goes where it always went", () => {
+  it("uses the sign-in page when the POST carried no Referer", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", null);
+    expect(jar.has(START_COOKIE)).toBe(false);
+
+    const target = location(await callback(auth, jar, "acme", "error=access_denied"));
+
+    expect(target.pathname).toBe("/login");
+    expect(target.searchParams.get("error")).toBe("OAuthCallback");
+  });
+
+  it("never follows a Referer on another origin", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", "https://evil.example/entrar?volta=x");
+    expect(jar.has(START_COOKIE)).toBe(false);
+
+    const target = location(await callback(auth, jar, "acme", "error=access_denied"));
+
+    expect(target.origin).toBe(ORIGIN);
+    expect(target.pathname).toBe("/login");
+  });
+
+  it("does not take an auth route as the start", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    await startSignIn(auth, jar, "acme", `${BASE}/signin`);
+
+    expect(jar.has(START_COOKIE)).toBe(false);
+  });
+
+  it("ignores a start cookie that is not a same-origin path", async () => {
+    const auth = makeAuth();
+
+    const response = await auth.handler(
+      new Request(`${BASE}/callback/acme?error=access_denied`, {
+        headers: { cookie: `${START_COOKIE}=${encodeURIComponent("//evil.example/x")}` },
+      }),
+    );
+
+    const target = location(response);
+    expect(target.origin).toBe(ORIGIN);
+    expect(target.pathname).toBe("/login");
+  });
+
+  it("ignores a backslash path a browser would read as another host", async () => {
+    const auth = makeAuth();
+
+    const response = await auth.handler(
+      new Request(`${BASE}/callback/acme?error=access_denied`, {
+        headers: { cookie: `${START_COOKIE}=${encodeURIComponent("/\\evil.example/x")}` },
+      }),
+    );
+
+    const target = location(response);
+    expect(target.origin).toBe(ORIGIN);
+    expect(target.pathname).toBe("/login");
+  });
+
+  it("forgets a stale start when a later sign-in has none", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    jar.set(START_COOKIE, encodeURIComponent("/old-page"));
+
+    await startSignIn(auth, jar, "acme", null);
+
+    expect(jar.has(START_COOKIE)).toBe(false);
+  });
+});
+
+describe("the routes it does not touch", () => {
+  it("adds no cookie to a sign-in that has nothing to remember or forget", async () => {
+    const auth = makeAuth();
+    const jar = new Jar();
+    const response = await startSignIn(auth, jar, "acme", null);
+
+    expect(response.headers.getSetCookie().join("\n")).not.toContain("sign-in-start");
+  });
+
+  it("names the cookie with Auth.js's secure prefix on https", () => {
+    expect(signInStartCookieName(true)).toBe("__Secure-authjs.sign-in-start");
+  });
+});

@@ -15,6 +15,7 @@ import {
   credentialsProvider,
   type CredentialsProviderConfig,
 } from "./credentials-provider";
+import { withOAuthErrorReturn } from "./oauth-error-return";
 import type { SignInClaims } from "./sign-in-claims";
 
 /**
@@ -255,11 +256,14 @@ export function createApiAuth(options: ApiAuthConfig = {}): ApiAuth {
 
   applyEnvDefaults(config, options);
 
+  // A failed OAuth round trip returns to the page that started it, not to the
+  // one error page Auth.js knows (FUT-4595, `./oauth-error-return`).
   const handler = (request: Request): Promise<Response> =>
-    Auth(
+    withOAuthErrorReturn(
       reqWithEnvUrl(request, options.authUrl ?? process.env.AUTH_URL),
+      (forwarded) => Auth(forwarded, config) as Promise<Response>,
       config,
-    ) as Promise<Response>;
+    );
 
   /**
    * Deliberately routed through {@link handler} rather than decoding the cookie

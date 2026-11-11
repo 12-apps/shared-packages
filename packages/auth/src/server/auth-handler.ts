@@ -3,6 +3,7 @@ import type { AuthConfig } from "@auth/core";
 import type { Session } from "@auth/core/types";
 
 import { authConfig } from "../config";
+import { withOAuthErrorReturn } from "../oauth-error-return";
 
 /**
  * The Auth.js entrypoint (FUT-665) — the RUNTIME-BOUND half of this package.
@@ -86,7 +87,12 @@ function reqWithEnvUrl(request: Request): Request {
  * `Auth(reqWithEnvURL(req), config)`.
  */
 export function authHandler(request: Request): Promise<Response> {
-  return Auth(reqWithEnvUrl(request), authConfig) as Promise<Response>;
+  // Same as `createApiAuth`'s: a failed OAuth round trip returns to its start (FUT-4595).
+  return withOAuthErrorReturn(
+    reqWithEnvUrl(request),
+    (forwarded) => Auth(forwarded, authConfig) as Promise<Response>,
+    authConfig,
+  );
 }
 
 /** The GET/POST pair the auth route exports, keeping the old `handlers` shape. */

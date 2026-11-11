@@ -165,7 +165,7 @@ export const { GET, POST } = handlers;
 | `adminEmails` | `ADMIN_EMAILS` | comma-separated, or an array |
 | `signInGate` | none → **refuse everything** | |
 | `sessionAdmin` | the allowlist | |
-| `signInPage` | `/login` | |
+| `signInPage` | `/login` | where a failure goes when its start page is unknown — see below |
 | `maxAge` | 30 days | seconds |
 
 ### Two settings that bite
@@ -223,6 +223,22 @@ performs a top-level navigation that follows the 302 to the provider.
 resolve them as protocol-relative external URLs, so a `startsWith("/")` check is
 an open redirect. Anything not provably same-origin falls back to the current
 page.
+
+### A failed OAuth sign-in returns to the page that started it
+
+Auth.js sends every sign-in failure to one page, `signInPage`. The handler
+remembers instead the page the provider button sat on (the sign-in POST's
+`Referer`, same origin only, in a 15-minute `authjs.sign-in-start` cookie) and
+sends a failed round trip back there, its query kept, with `?error=` set on it.
+So a host with several sign-in pages — or one whose query carries a return —
+gets the person back where they were, and each such page must render `?error`
+(the routes from `createAuthRoutes` do).
+
+A provider's own refusal (`?error=access_denied`, a cancelled sheet) arrives as
+`error=OAuthCallback`, never as Auth.js's `OAuthCallbackError` or the
+`Configuration` it reports when its `iss` check trips first. Every other code is
+Auth.js's. With no usable `Referer` (another origin, a `no-referrer` policy),
+the failure goes to `signInPage` as before.
 
 ## Migrating from the legacy surface
 
