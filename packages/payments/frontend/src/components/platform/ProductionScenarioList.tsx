@@ -174,6 +174,8 @@ export function ProductionScenarioList({
             alignSelf: 'flex-start',
             minHeight: sxRem(40),
             borderRadius: sxRem(8),
+            textTransform: 'none',
+            fontWeight: 600,
             bgcolor: 'background.paper',
             color: 'text.primary',
             borderColor: 'text.primary',
